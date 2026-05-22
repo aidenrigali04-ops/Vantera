@@ -10,7 +10,7 @@
     "db:migrate": "cd packages/db && drizzle-kit migrate",
     "db:push": "cd packages/db && drizzle-kit push",
     "db:seed": "dotenv-cli -e .env tsx packages/db/seed/index.ts",
-    "db:studio": "cd packages/db && drizzle-kit studio"
+    "db:studio": "dotenv-cli -e .env -- sh -c 'cd packages/db && pnpm exec drizzle-kit studio'"
   },
   "devDependencies": {
     "@eslint/js": "^9.9.0",
