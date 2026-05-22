@@ -3,6 +3,8 @@ import { resolveBrandingFromRequest } from '@/lib/auth/resolve-account'
 import type { Metadata } from 'next'
 import type { ReactNode } from 'react'
 
+export const dynamic = 'force-dynamic'
+
 export async function generateMetadata(): Promise<Metadata> {
   const branding = await resolveBrandingFromRequest()
 

@@ -1,5 +1,5 @@
 import type { BrandingData } from '@/lib/branding/context'
-import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { createSupabasePublicClient } from '@/lib/supabase/public'
 import { headers } from 'next/headers'
 
 type AccountRow = {
@@ -33,36 +33,52 @@ function accountToBranding(account: AccountRow): BrandingData {
 }
 
 export async function resolveAccountFromHost(host: string): Promise<AccountRow | null> {
-  const supabase = createSupabaseServerClient()
-  const appDomain = process.env.NEXT_PUBLIC_APP_DOMAIN ?? 'vantera.app'
-  const hostname = host.split(':')[0] ?? ''
+  try {
+    const supabase = createSupabasePublicClient()
+    const appDomain = process.env.NEXT_PUBLIC_APP_DOMAIN ?? 'vantera.app'
+    const hostname = host.split(':')[0] ?? ''
 
-  if (hostname.endsWith(`.${appDomain}`)) {
-    const dotIndex = hostname.indexOf('.')
-    const slug = dotIndex === -1 ? '' : hostname.slice(0, dotIndex)
-
-    if (!slug) {
+    if (!hostname) {
       return null
     }
 
-    const { data } = await supabase
+    if (hostname.endsWith(`.${appDomain}`)) {
+      const dotIndex = hostname.indexOf('.')
+      const slug = dotIndex === -1 ? '' : hostname.slice(0, dotIndex)
+
+      if (!slug) {
+        return null
+      }
+
+      const { data, error } = await supabase
+        .from('accounts')
+        .select(ACCOUNT_SELECT)
+        .eq('slug', slug)
+        .limit(1)
+        .maybeSingle()
+
+      if (error) {
+        return null
+      }
+
+      return data
+    }
+
+    const { data, error } = await supabase
       .from('accounts')
       .select(ACCOUNT_SELECT)
-      .eq('slug', slug)
+      .eq('portal_domain', hostname)
       .limit(1)
       .maybeSingle()
 
+    if (error) {
+      return null
+    }
+
     return data
+  } catch {
+    return null
   }
-
-  const { data } = await supabase
-    .from('accounts')
-    .select(ACCOUNT_SELECT)
-    .eq('portal_domain', hostname)
-    .limit(1)
-    .maybeSingle()
-
-  return data
 }
 
 export async function resolveBrandingFromRequest(): Promise<BrandingData> {

@@ -1,13 +1,28 @@
 import { env } from '@/lib/env'
-import { drizzle } from 'drizzle-orm/postgres-js'
+import { drizzle, type PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import postgres from 'postgres'
 import * as schema from '@vantera/db'
 
-const connectionString = env.DATABASE_URL
+type Database = PostgresJsDatabase<typeof schema>
 
-// Disable prefetch for connection pooling (Supabase requires this)
-const client = postgres(connectionString, { prepare: false })
+let database: Database | undefined
 
-export const db = drizzle(client, { schema })
+function getDb(): Database {
+  if (!database) {
+    // Disable prefetch for connection pooling (Supabase requires this)
+    const client = postgres(env.DATABASE_URL, { prepare: false })
+    database = drizzle(client, { schema })
+  }
 
-export type Database = typeof db
+  return database
+}
+
+export const db = new Proxy({} as Database, {
+  get(_target, prop, receiver) {
+    const target = getDb() as object
+    const value = Reflect.get(target, prop, receiver)
+    return typeof value === 'function' ? (value as (...args: unknown[]) => unknown).bind(target) : value
+  },
+})
+
+export type { Database }

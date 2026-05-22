@@ -127,7 +127,7 @@ async function seed() {
   console.log('\nTest credentials:')
   console.log(`  Admin:  ${ADMIN_EMAIL} / ${ADMIN_PASSWORD}`)
   console.log(`  Portal: ${PORTAL_EMAIL} / ${PORTAL_PASSWORD}`)
-  console.log(`  URL:    http://testco.localhost:3000/auth/login`)
+  console.log(`  URL:    http://testco.lvh.me:3000/auth/login`)
 
   await client.end()
 }
