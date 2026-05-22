@@ -6,15 +6,35 @@ import type { ReactNode } from 'react'
 export const dynamic = 'force-dynamic'
 
 export async function generateMetadata(): Promise<Metadata> {
-  const branding = await resolveBrandingFromRequest()
+  try {
+    const branding = await resolveBrandingFromRequest()
 
-  return {
-    title: branding.businessName ? `Sign in — ${branding.businessName}` : 'Sign in',
+    return {
+      title: branding.businessName ? `Sign in — ${branding.businessName}` : 'Sign in',
+    }
+  } catch {
+    return { title: 'Sign in' }
   }
 }
 
 export default async function AuthLayout({ children }: { children: ReactNode }) {
-  const branding = await resolveBrandingFromRequest()
+  let branding
+
+  try {
+    branding = await resolveBrandingFromRequest()
+  } catch {
+    branding = {
+      accountId: '',
+      businessName: '',
+      logoUrl: null,
+      primaryColor: '#1648A0',
+      secondaryColor: '#0D9488',
+      vertical: '',
+      plan: 'team',
+      portalDomain: '',
+      onboardingComplete: false,
+    }
+  }
 
   return <BrandingProvider branding={branding}>{children}</BrandingProvider>
 }
