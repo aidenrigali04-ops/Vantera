@@ -1,0 +1,214 @@
+# VANTERA PLATFORM — CURSOR RULES
+# Read this before generating any file.
+# These rules are non-negotiable and apply to every file in this project.
+
+## WHO WE ARE BUILDING
+Vantera is a white-label multi-tenant business operations platform.
+It connects existing business tools (HubSpot, QuickBooks, AppFolio)
+and provides native replacements for businesses that don't have them.
+Every client-facing surface is branded to the business — never to Vantera.
+
+## TECH STACK (exact imports only — no alternatives)
+- Framework:        Next.js 14 App Router
+- Language:         TypeScript strict mode — .ts and .tsx only
+- Styling:          Tailwind CSS utility classes only
+- Components:       shadcn/ui — extend, never replace
+- State (server):   TanStack Query (@tanstack/react-query)
+- State (client):   Zustand
+- Forms:            React Hook Form + Zod (@hookform/resolvers/zod)
+- Tables:           TanStack Table (@tanstack/react-table)
+- Drag/drop:        @dnd-kit/core + @dnd-kit/sortable
+- Database:         Drizzle ORM (drizzle-orm/pg-core) — import from @vantera/db
+- DB client:        import { db } from '@/lib/db/client' — never instantiate inline
+- Auth:             Supabase Auth via @supabase/ssr
+- Jobs:             Trigger.dev (@trigger.dev/sdk)
+- Email:            Resend + React Email (@react-email/components)
+- SMS:              Twilio (twilio)
+- Payments:         Stripe (stripe + @stripe/stripe-js)
+- AI:               Anthropic via Vercel AI SDK (ai + @ai-sdk/anthropic)
+- Animation:        Framer Motion (framer-motion)
+- Charts:           Recharts (recharts)
+- Icons:            Lucide React (lucide-react) — no other icon library
+- Dates:            date-fns — no moment.js, no dayjs
+- HTTP client:      Native fetch only — no axios in components
+
+## ABSOLUTE RULES — NEVER VIOLATE
+
+### Multi-Tenancy (most critical)
+- EVERY database query must filter by accountId
+- Pattern: .where(and(eq(table.accountId, accountId), isNull(table.deletedAt)))
+- accountId ALWAYS comes from the validated session — never from URL, query params, or request body
+- If you write a query without accountId filter: it is a critical security bug
+
+### Soft Deletes
+- NEVER call db.delete() on any table
+- All deletes: await db.update(table).set({ deletedAt: new Date() }).where(...)
+- All list queries: must include isNull(table.deletedAt) in the where clause
+- Tables without deletedAt (activities, automation_runs): these are immutable logs — never delete
+
+### Branding
+- The string "Vantera" must NEVER appear in:
+  app/(portal)/ — any file
+  Any email template
+  Any SMS template body
+  Any page <title> rendered to a contact
+  Any default value for business name, logo, or color
+- Brand values ALWAYS come from: const { businessName, primaryColor, logoUrl } = useBranding()
+- In server components: const branding = getBrandingFromHeaders(headers())
+
+### Session Rules
+- Admin sessions: userId + accountId + role — access /admin/* only
+- Portal sessions: contactId + accountId — access /portal/* only
+- These never overlap — no shared session store, no shared cookies
+- Cookie names: v_admin_session and v_portal_session
+- Always validate session with: const session = await requireAdminSession()
+  or: const session = await requirePortalSession()
+- If session.accountId !== resolved accountId from middleware: reject immediately
+
+### AI Output
+- Team plan: Claude output NEVER sent to contacts without template wrapping or human review
+- Enterprise plan: autonomous send only when evaluateFlag('autonomous_ai_messaging') === true
+- Never log Claude responses containing contact PII
+
+## CODE PATTERNS — USE EXACTLY
+
+### Server Action
+```ts
+export async function actionName(input: z.infer<typeof inputSchema>) {
+  const session = await requireAdminSession()
+  const validated = inputSchema.parse(input)
+  try {
+    const result = await db.transaction(async (tx) => {
+      // multi-table writes go here
+    })
+    return { success: true, data: result }
+  } catch (error) {
+    console.error('[actionName]', error)
+    return { success: false, error: 'Operation failed' }
+  }
+}
+```
+
+### Drizzle Query (list)
+```ts
+const results = await db.query.tableName.findMany({
+  where: and(
+    eq(tableName.accountId, session.accountId),
+    isNull(tableName.deletedAt)
+  ),
+  orderBy: desc(tableName.createdAt),
+  limit: 50,
+})
+```
+
+### Drizzle Query (single)
+```ts
+const record = await db.query.tableName.findFirst({
+  where: and(
+    eq(tableName.id, id),
+    eq(tableName.accountId, session.accountId),
+    isNull(tableName.deletedAt)
+  ),
+})
+if (!record) return { success: false, error: 'Not found' }
+```
+
+### Soft Delete
+```ts
+await db
+  .update(tableName)
+  .set({ deletedAt: new Date() })
+  .where(and(
+    eq(tableName.id, id),
+    eq(tableName.accountId, session.accountId)
+  ))
+```
+
+### API Response Shape (always)
+```ts
+{ success: true, data: T }
+{ success: false, error: string, code?: string }
+```
+
+### React Hook Form + Zod
+```ts
+const form = useForm<z.infer<typeof formSchema>>({
+  resolver: zodResolver(formSchema),
+  defaultValues: { ... },
+})
+```
+
+### Feature Flag Check (server)
+```ts
+const isEnabled = await evaluateFlag({
+  accountId: session.accountId,
+  plan: session.plan,
+  flagName: 'feature_name'
+})
+if (!isEnabled) return { success: false, error: 'Feature not available', code: 'FEATURE_GATED' }
+```
+
+## FILE CONVENTIONS
+
+### File naming
+- Components: PascalCase.tsx (RecordBoard.tsx, ContactProfile.tsx)
+- Hooks: camelCase with use prefix (useRecords.ts, useContacts.ts)
+- Actions: actions.ts — colocated with route segment
+- Types: types.ts — colocated with feature
+- Schemas: schema.ts — colocated with feature
+- Constants: constants.ts — colocated if feature-specific, lib/constants.ts if shared
+- Utils: lib/utils/featureName.ts
+
+### Component rules
+- One component per file — named export matches filename exactly
+- "use client" only when: useState, useEffect, useRef, browser APIs, event handlers
+- Server Components fetch their own data — no prop drilling of server data
+- Client Components receive data as props or use TanStack Query
+- No business logic inside components — extract to lib/ functions
+- Loading states: use Suspense boundaries + skeleton components from shadcn
+- Empty states: every list view has an empty state component
+- Error states: every async operation has an error state
+
+### Import order (auto-formatted but enforce mentally)
+1. React and Next.js
+2. Third-party libraries
+3. Internal packages (@vantera/db, @vantera/types)
+4. Internal aliases (@/lib, @/components, @/app)
+5. Relative imports
+
+## MONOREPO STRUCTURE
+- Package manager: pnpm only — never npm install or yarn add
+- apps/web/app/(admin)  — admin route group
+- apps/web/app/(portal) — client portal route group
+- apps/web/app/(auth)   — auth routes
+- apps/web/app/api      — API routes and webhooks
+- packages/db           — Drizzle schema and migrations (source of truth)
+- packages/types        — shared TypeScript types
+- packages/utils        — shared utilities
+
+## COMMANDS
+```bash
+pnpm dev          # turbo dev (all packages)
+pnpm build        # turbo build
+pnpm lint         # turbo lint
+pnpm type-check   # turbo type-check
+pnpm db:generate  # drizzle-kit generate
+pnpm db:migrate   # drizzle-kit migrate
+pnpm db:push      # drizzle-kit push
+pnpm db:studio    # drizzle-kit studio
+```
+
+## WHAT CURSOR MUST NEVER DO
+- Never use Pages Router (no getServerSideProps, getStaticProps, _app.tsx)
+- Never use axios in components — use fetch or TanStack Query
+- Never use useState for form values — always React Hook Form
+- Never hardcode accountId, userId, or contactId values
+- Never write db.delete() — soft deletes only
+- Never use any CSS module files — Tailwind only
+- Never use styled-components or emotion
+- Never use moment.js or dayjs — use date-fns
+- Never install a package not in the approved stack without flagging it
+- Never write a query without accountId — this is a multi-tenant security requirement
+- Never put the word "Vantera" in any portal-facing component
+- Never expose database error messages in API responses
+- Never skip loading and error states in components
