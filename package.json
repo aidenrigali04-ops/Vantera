@@ -9,7 +9,7 @@
     "db:generate": "cd packages/db && drizzle-kit generate",
     "db:migrate": "cd packages/db && drizzle-kit migrate",
     "db:push": "dotenv-cli -e .env -- sh -c 'cd packages/db && pnpm exec drizzle-kit push:pg'",
-    "db:seed": "dotenv-cli -e .env tsx packages/db/seed/index.ts",
+    "db:seed": "dotenv -e .env -- tsx packages/db/seed/index.ts",
     "db:studio": "dotenv-cli -e .env -- sh -c 'cd packages/db && pnpm exec drizzle-kit studio'"
   },
   "devDependencies": {

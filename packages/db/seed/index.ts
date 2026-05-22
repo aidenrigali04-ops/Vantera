@@ -3,6 +3,7 @@ import { drizzle } from 'drizzle-orm/postgres-js'
 import { createClient } from '@supabase/supabase-js'
 import { eq } from 'drizzle-orm'
 import postgres from 'postgres'
+import ws from 'ws'
 
 const TEST_ACCOUNT_SLUG = 'testco'
 const ADMIN_EMAIL = 'admin@testco.com'
@@ -23,6 +24,7 @@ async function seed() {
   const db = drizzle(client)
   const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
     auth: { autoRefreshToken: false, persistSession: false },
+    realtime: { transport: ws },
   })
 
   const existing = await db.select().from(accounts).where(eq(accounts.slug, TEST_ACCOUNT_SLUG)).limit(1)
@@ -31,7 +33,11 @@ async function seed() {
 
   if (existing[0]) {
     accountId = existing[0].id
-    console.log(`Account "${TEST_ACCOUNT_SLUG}" already exists (${accountId})`)
+    await db
+      .update(accounts)
+      .set({ onboardingCompletedAt: new Date() })
+      .where(eq(accounts.id, accountId))
+    console.log(`Account "${TEST_ACCOUNT_SLUG}" already exists (${accountId}) — onboarding marked complete`)
   } else {
     const [account] = await db
       .insert(accounts)
@@ -42,6 +48,7 @@ async function seed() {
         plan: 'team',
         brandPrimaryColor: '#1648A0',
         brandSecondaryColor: '#0D9488',
+        onboardingCompletedAt: new Date(),
       })
       .returning({ id: accounts.id })
 
@@ -65,7 +72,15 @@ async function seed() {
 
     console.log(`Created Supabase auth user ${ADMIN_EMAIL}`)
   } else {
-    console.log(`Supabase auth user ${ADMIN_EMAIL} already exists`)
+    const { error } = await supabaseAdmin.auth.admin.updateUserById(adminAuthUser.id, {
+      password: ADMIN_PASSWORD,
+    })
+
+    if (error) {
+      throw error
+    }
+
+    console.log(`Reset password for Supabase auth user ${ADMIN_EMAIL}`)
   }
 
   const portalAuthUser = existingAuthUsers.users.find((u) => u.email === PORTAL_EMAIL)
@@ -83,7 +98,15 @@ async function seed() {
 
     console.log(`Created Supabase auth user ${PORTAL_EMAIL}`)
   } else {
-    console.log(`Supabase auth user ${PORTAL_EMAIL} already exists`)
+    const { error } = await supabaseAdmin.auth.admin.updateUserById(portalAuthUser.id, {
+      password: PORTAL_PASSWORD,
+    })
+
+    if (error) {
+      throw error
+    }
+
+    console.log(`Reset password for Supabase auth user ${PORTAL_EMAIL}`)
   }
 
   const existingUsers = await db
