@@ -1,0 +1,41 @@
+# Vantera
+
+White-label multi-tenant business operations platform.
+
+## Stack
+
+- **Monorepo:** Turborepo + pnpm workspaces
+- **App:** Next.js 14 (App Router) — `apps/web` (admin + portal + auth in one app)
+- **Database:** Drizzle ORM — schema lives in `packages/db` (shared source of truth)
+- **Auth / backend:** Supabase (`@supabase/ssr`, `@supabase/supabase-js`)
+- **UI:** Tailwind CSS 3.4; shadcn components go in `apps/web/components/ui` (install in a separate step)
+- **Forms:** react-hook-form + zod + `@hookform/resolvers`
+- **State / data:** zustand, TanStack Query, TanStack Table
+- **API / jobs:** Hono, Trigger.dev, Resend, Twilio, Stripe
+
+## Structure
+
+- `apps/web/app/(admin)` — admin route group
+- `apps/web/app/(portal)` — client portal route group
+- `apps/web/app/(auth)` — auth routes
+- `apps/web/app/api` — API routes and webhooks
+- `packages/db` — Drizzle schema and migrations
+- `packages/types` — shared TypeScript types
+- `packages/utils` — shared utilities
+
+## Conventions
+
+- Package manager: **pnpm only**
+- TypeScript **strict** everywhere; `apps/web` extends root `tsconfig.json`
+- Do not duplicate Drizzle schema in the app — import from `@vantera/db`
+- Multi-tenant and branding logic belong in middleware / `lib/branding`, not scattered in pages
+- Prefer workspace packages (`@vantera/*`) over duplicating code in `apps/web`
+
+## Commands
+
+```bash
+pnpm dev          # turbo dev (all packages)
+pnpm build        # turbo build
+pnpm lint         # turbo lint
+pnpm type-check   # turbo type-check
+```
