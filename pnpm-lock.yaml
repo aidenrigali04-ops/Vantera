@@ -4,6 +4,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+overrides:
+  drizzle-orm: 0.30.10
+
 importers:
 
   .:
@@ -222,7 +225,7 @@ importers:
         specifier: ^4.2.1
         version: 4.2.1
       drizzle-orm:
-        specifier: ^0.30.10
+        specifier: 0.30.10
         version: 0.30.10(@opentelemetry/api@1.9.0)(@types/pg@8.20.0)(@types/react@18.3.29)(pg@8.21.0)(postgres@3.4.9)(react@18.3.1)
       framer-motion:
         specifier: ^11.18.2
@@ -373,7 +376,7 @@ importers:
   packages/db:
     dependencies:
       drizzle-orm:
-        specifier: ^0.30.10
+        specifier: 0.30.10
         version: 0.30.10(@opentelemetry/api@1.9.0)(@types/pg@8.20.0)(@types/react@18.3.29)(pg@8.21.0)(postgres@3.4.9)(react@18.3.1)
       postgres:
         specifier: ^3.4.9
