@@ -1,0 +1,23 @@
+---
+description: Hard prohibitions — things Cursor must never generate
+alwaysApply: true
+---
+
+# Never Do These
+
+| Prohibition | Reason |
+|-------------|--------|
+| Pages Router (`getServerSideProps`, `_app.tsx`) | App Router only |
+| `axios` in components | Use `fetch` or TanStack Query |
+| `useState` for form values | Always React Hook Form |
+| Hardcoded `accountId`, `userId`, or `contactId` | Multi-tenant security |
+| `db.delete()` | Soft deletes only |
+| CSS module files | Tailwind only |
+| `styled-components` or `emotion` | Tailwind only |
+| `moment.js` or `dayjs` | Use `date-fns` |
+| Packages outside the approved stack | Flag it first |
+| Query without `accountId` filter | Multi-tenant security bug |
+| "Vantera" in any portal-facing component | White-label requirement |
+| Database error messages in API responses | Never leak internals |
+| Skipping loading or error states | All async UI needs them |
+| `npm install` or `yarn add` | `pnpm` only |

@@ -1,0 +1,26 @@
+---
+description: Session and auth rules for admin and portal routes
+alwaysApply: true
+---
+
+# Session Rules
+
+Two fully separate session types — they never overlap.
+
+| | Admin | Portal |
+|-|-------|--------|
+| Contains | `userId + accountId + role` | `contactId + accountId` |
+| Accesses | `/admin/*` only | `/portal/*` only |
+| Cookie | `v_admin_session` | `v_portal_session` |
+| Validator | `requireAdminSession()` | `requirePortalSession()` |
+
+```ts
+// ✅ Admin route
+const session = await requireAdminSession()
+
+// ✅ Portal route
+const session = await requirePortalSession()
+```
+
+- If `session.accountId !== resolved accountId` from middleware: **reject immediately**.
+- No shared session store, no shared cookies between admin and portal.

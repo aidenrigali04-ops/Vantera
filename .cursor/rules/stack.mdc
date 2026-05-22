@@ -1,0 +1,33 @@
+---
+description: Approved tech stack — exact imports only, no alternatives
+alwaysApply: true
+---
+
+# Tech Stack
+
+Use only these packages. Never suggest alternatives.
+
+| Concern | Package |
+|---------|---------|
+| Framework | Next.js 14 App Router |
+| Language | TypeScript strict — `.ts` / `.tsx` only |
+| Styling | Tailwind CSS utility classes only |
+| Components | shadcn/ui — extend, never replace |
+| Server state | `@tanstack/react-query` |
+| Client state | `zustand` |
+| Forms | `react-hook-form` + `zod` + `@hookform/resolvers/zod` |
+| Tables | `@tanstack/react-table` |
+| Drag/drop | `@dnd-kit/core` + `@dnd-kit/sortable` |
+| Database | `drizzle-orm/pg-core` — import from `@vantera/db` |
+| DB client | `import { db } from '@/lib/db/client'` — never instantiate inline |
+| Auth | Supabase via `@supabase/ssr` |
+| Jobs | `@trigger.dev/sdk` |
+| Email | `resend` + `@react-email/components` |
+| SMS | `twilio` |
+| Payments | `stripe` + `@stripe/stripe-js` |
+| AI | `ai` + `@ai-sdk/anthropic` |
+| Animation | `framer-motion` |
+| Charts | `recharts` |
+| Icons | `lucide-react` — no other icon library |
+| Dates | `date-fns` — never moment.js or dayjs |
+| HTTP | Native `fetch` only — no axios in components |
