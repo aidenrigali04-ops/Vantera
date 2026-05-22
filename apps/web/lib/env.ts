@@ -3,6 +3,7 @@ import { z } from 'zod'
 const requiredEnvKeys = [
   'DATABASE_URL',
   'SUPABASE_SERVICE_ROLE_KEY',
+  'SUPABASE_JWT_SECRET',
   'ANTHROPIC_API_KEY',
   'TWILIO_ACCOUNT_SID',
   'TWILIO_AUTH_TOKEN',
@@ -32,6 +33,7 @@ const envSchema = z.object({
   DATABASE_URL: z.string().url(),
   DIRECT_URL: z.string().url().optional(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
+  SUPABASE_JWT_SECRET: z.string().min(1),
   ANTHROPIC_API_KEY: z.string().min(1),
   TWILIO_ACCOUNT_SID: z.string().min(1),
   TWILIO_AUTH_TOKEN: z.string().min(1),

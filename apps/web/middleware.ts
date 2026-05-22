@@ -38,15 +38,7 @@ const ACCOUNT_SELECT =
   'id, slug, name, vertical, plan, brand_logo_url, brand_primary_color, brand_secondary_color, portal_domain, onboarding_completed_at'
 
 function shouldSkipTenantResolution(pathname: string): boolean {
-  if (pathname.startsWith('/auth')) {
-    return true
-  }
-
-  if (pathname === '/api/health') {
-    return true
-  }
-
-  return false
+  return pathname.startsWith('/auth')
 }
 
 function getRequiredRoleRank(pathname: string): number {
@@ -92,21 +84,24 @@ async function decodeSessionToken(token: string): Promise<Record<string, unknown
   }
 }
 
-function buildBrandingHeaders(request: NextRequest, account: AccountRow): Headers {
-  const requestHeaders = new Headers(request.headers)
+function applyAccountHeaders(requestHeaders: Headers, response: NextResponse, account: AccountRow): void {
+  const headerValues: Record<string, string> = {
+    'x-account-id': account.id,
+    'x-account-slug': account.slug,
+    'x-account-vertical': account.vertical,
+    'x-account-plan': account.plan,
+    'x-brand-name': account.name,
+    'x-brand-logo-url': account.brand_logo_url ?? '',
+    'x-brand-primary': account.brand_primary_color ?? '#1648A0',
+    'x-brand-secondary': account.brand_secondary_color ?? '#0D9488',
+    'x-portal-domain': account.portal_domain ?? '',
+    'x-onboarding-complete': account.onboarding_completed_at ? 'true' : 'false',
+  }
 
-  requestHeaders.set('x-account-id', account.id)
-  requestHeaders.set('x-account-slug', account.slug)
-  requestHeaders.set('x-account-vertical', account.vertical)
-  requestHeaders.set('x-account-plan', account.plan)
-  requestHeaders.set('x-brand-name', account.name)
-  requestHeaders.set('x-brand-logo-url', account.brand_logo_url ?? '')
-  requestHeaders.set('x-brand-primary', account.brand_primary_color ?? '#1648A0')
-  requestHeaders.set('x-brand-secondary', account.brand_secondary_color ?? '#0D9488')
-  requestHeaders.set('x-portal-domain', account.portal_domain ?? '')
-  requestHeaders.set('x-onboarding-complete', account.onboarding_completed_at ? 'true' : 'false')
-
-  return requestHeaders
+  for (const [key, value] of Object.entries(headerValues)) {
+    requestHeaders.set(key, value)
+    response.headers.set(key, value)
+  }
 }
 
 async function resolveAccountByHost(
@@ -188,7 +183,14 @@ export async function middleware(request: NextRequest) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }
 
-  const requestHeaders = buildBrandingHeaders(request, account)
+  const requestHeaders = new Headers(request.headers)
+  const brandedResponse = NextResponse.next({
+    request: {
+      headers: requestHeaders,
+    },
+  })
+
+  applyAccountHeaders(requestHeaders, brandedResponse, account)
 
   if (pathname.startsWith('/admin')) {
     const sessionToken = request.cookies.get(ADMIN_SESSION_COOKIE)?.value
@@ -235,12 +237,6 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/auth/portal-login', request.url))
     }
   }
-
-  const brandedResponse = NextResponse.next({
-    request: {
-      headers: requestHeaders,
-    },
-  })
 
   response.cookies.getAll().forEach(({ name, value }) => {
     brandedResponse.cookies.set(name, value)
