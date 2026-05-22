@@ -31,8 +31,10 @@ function applyAccountHeaders(
   requestHeaders: Headers,
   response: NextResponse,
   account: AccountRow,
+  pathname: string,
 ): void {
   const headerValues: Record<string, string> = {
+    'x-pathname': pathname,
     'x-account-id': account.id,
     'x-account-slug': account.slug,
     'x-account-vertical': account.vertical,
@@ -137,7 +139,7 @@ export async function middleware(request: NextRequest) {
     },
   })
 
-  applyAccountHeaders(requestHeaders, brandedResponse, account)
+  applyAccountHeaders(requestHeaders, brandedResponse, account, pathname)
 
   if (pathname.startsWith('/admin')) {
     const sessionToken = request.cookies.get(ADMIN_SESSION_COOKIE)?.value
