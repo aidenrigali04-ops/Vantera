@@ -26,7 +26,15 @@ const missing = requiredEnvKeys.filter((key) => {
 })
 
 if (missing.length > 0) {
-  throw new Error(missing.map((key) => `Missing: ${key}`).join('\n'))
+  throw new Error(
+    [
+      'Missing required environment variables:',
+      ...missing.map((key) => `  - ${key}`),
+      '',
+      'Set these in Vercel → Project → Settings → Environment Variables.',
+      'Enable Production (and Preview). Redeploy after saving.',
+    ].join('\n'),
+  )
 }
 
 const envSchema = z.object({
@@ -53,11 +61,23 @@ const envSchema = z.object({
 const parsed = envSchema.safeParse(process.env)
 
 if (!parsed.success) {
-  const invalid = parsed.error.issues
-    .map((issue) => issue.path[0])
-    .filter((key): key is string => typeof key === 'string')
+  const messages = parsed.error.issues.map((issue) => {
+    const key = issue.path.join('.')
+    return `  - ${key}: ${issue.message}`
+  })
 
-  throw new Error([...new Set(invalid)].map((key) => `Missing: ${key}`).join('\n'))
+  throw new Error(
+    [
+      'Invalid environment variables (set but failed validation):',
+      ...messages,
+      '',
+      'Common fixes:',
+      '  - DATABASE_URL: use postgresql:// with URL-encoded password',
+      '  - TRIGGER_API_URL: must start with https://',
+      '  - NEXT_PUBLIC_APP_URL: must start with https:// in production',
+      '  - Remove surrounding quotes from values in Vercel',
+    ].join('\n'),
+  )
 }
 
 export const env = { ...parsed.data }

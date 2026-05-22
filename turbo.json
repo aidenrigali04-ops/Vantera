@@ -1,17 +1,112 @@
 {
   "$schema": "https://turbo.build/schema.json",
+  "envMode": "loose",
+  "globalEnv": [
+    "ANTHROPIC_API_KEY",
+    "DATABASE_URL",
+    "DIRECT_URL",
+    "NEXT_PUBLIC_APP_DOMAIN",
+    "NEXT_PUBLIC_APP_URL",
+    "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+    "NEXT_PUBLIC_SUPABASE_URL",
+    "NODE_ENV",
+    "RESEND_API_KEY",
+    "STRIPE_SECRET_KEY",
+    "STRIPE_WEBHOOK_SECRET",
+    "SUPABASE_JWT_SECRET",
+    "SUPABASE_SERVICE_ROLE_KEY",
+    "TRIGGER_API_KEY",
+    "TRIGGER_API_URL",
+    "TWILIO_ACCOUNT_SID",
+    "TWILIO_AUTH_TOKEN",
+    "TWILIO_PHONE_NUMBER"
+  ],
+  "globalPassThroughEnv": [
+    "CI",
+    "VERCEL",
+    "VERCEL_ENV",
+    "VERCEL_URL"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": [".next/**", "!.next/cache/**", "dist/**"]
+      "outputs": [".next/**", "!.next/cache/**", "dist/**"],
+      "env": [
+        "ANTHROPIC_API_KEY",
+        "DATABASE_URL",
+        "DIRECT_URL",
+        "NEXT_PUBLIC_APP_DOMAIN",
+        "NEXT_PUBLIC_APP_URL",
+        "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY",
+        "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+        "NEXT_PUBLIC_SUPABASE_URL",
+        "NODE_ENV",
+        "RESEND_API_KEY",
+        "STRIPE_SECRET_KEY",
+        "STRIPE_WEBHOOK_SECRET",
+        "SUPABASE_JWT_SECRET",
+        "SUPABASE_SERVICE_ROLE_KEY",
+        "TRIGGER_API_KEY",
+        "TRIGGER_API_URL",
+        "TWILIO_ACCOUNT_SID",
+        "TWILIO_AUTH_TOKEN",
+        "TWILIO_PHONE_NUMBER"
+      ]
     },
     "dev": {
       "cache": false,
-      "persistent": true
+      "persistent": true,
+      "env": [
+        "ANTHROPIC_API_KEY",
+        "DATABASE_URL",
+        "DIRECT_URL",
+        "NEXT_PUBLIC_APP_DOMAIN",
+        "NEXT_PUBLIC_APP_URL",
+        "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY",
+        "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+        "NEXT_PUBLIC_SUPABASE_URL",
+        "NODE_ENV",
+        "RESEND_API_KEY",
+        "STRIPE_SECRET_KEY",
+        "STRIPE_WEBHOOK_SECRET",
+        "SUPABASE_JWT_SECRET",
+        "SUPABASE_SERVICE_ROLE_KEY",
+        "TRIGGER_API_KEY",
+        "TRIGGER_API_URL",
+        "TWILIO_ACCOUNT_SID",
+        "TWILIO_AUTH_TOKEN",
+        "TWILIO_PHONE_NUMBER"
+      ]
     },
-    "lint": {},
+    "lint": {
+      "env": [
+        "NODE_ENV"
+      ]
+    },
     "type-check": {
-      "dependsOn": ["^build"]
+      "dependsOn": ["^build"],
+      "env": [
+        "ANTHROPIC_API_KEY",
+        "DATABASE_URL",
+        "DIRECT_URL",
+        "NEXT_PUBLIC_APP_DOMAIN",
+        "NEXT_PUBLIC_APP_URL",
+        "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY",
+        "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+        "NEXT_PUBLIC_SUPABASE_URL",
+        "NODE_ENV",
+        "RESEND_API_KEY",
+        "STRIPE_SECRET_KEY",
+        "STRIPE_WEBHOOK_SECRET",
+        "SUPABASE_JWT_SECRET",
+        "SUPABASE_SERVICE_ROLE_KEY",
+        "TRIGGER_API_KEY",
+        "TRIGGER_API_URL",
+        "TWILIO_ACCOUNT_SID",
+        "TWILIO_AUTH_TOKEN",
+        "TWILIO_PHONE_NUMBER"
+      ]
     }
   }
 }
