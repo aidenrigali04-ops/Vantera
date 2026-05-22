@@ -12,7 +12,7 @@ import {
   index,
   uniqueIndex,
 } from 'drizzle-orm/pg-core'
-import { relations } from 'drizzle-orm'
+import { relations, sql } from 'drizzle-orm'
 
 const timestamptz = (name: string) => timestamp(name, { withTimezone: true })
 
@@ -148,7 +148,7 @@ export const contacts = pgTable(
     ltvCents: bigint('ltv_cents', { mode: 'number' }).notNull().default(0),
     churnRiskScore: smallint('churn_risk_score').notNull().default(0),
     upsellScore: smallint('upsell_score').notNull().default(0),
-    tags: text('tags').array().notNull().default([]),
+    tags: text('tags').array().notNull().default(sql`'{}'::text[]`),
     source: varchar('source', { length: 100 }),
     notes: text('notes'),
     createdAt: timestamptz('created_at').notNull().defaultNow(),
@@ -263,7 +263,7 @@ export const automations = pgTable(
     isActive: boolean('is_active').notNull().default(true),
     triggerEvent: varchar('trigger_event', { length: 100 }).notNull(),
     triggerConditions: jsonb('trigger_conditions').notNull().default({}),
-    actions: jsonb('actions').array().notNull().default([]),
+    actions: jsonb('actions').array().notNull().default(sql`'{}'::jsonb[]`),
     lastFiredAt: timestamptz('last_fired_at'),
     fireCount: smallint('fire_count').notNull().default(0),
     templateRef: varchar('template_ref', { length: 80 }),
@@ -352,7 +352,7 @@ export const invoices = pgTable(
     status: invoiceStatusEnum('status').notNull().default('draft'),
     dueAt: timestamptz('due_at'),
     paidAt: timestamptz('paid_at'),
-    lineItems: jsonb('line_items').array().notNull().default([]),
+    lineItems: jsonb('line_items').array().notNull().default(sql`'{}'::jsonb[]`),
     paymentLinkUrl: text('payment_link_url'),
     createdAt: timestamptz('created_at').notNull().defaultNow(),
     updatedAt: timestamptz('updated_at').notNull().defaultNow(),
@@ -449,7 +449,7 @@ export const integrationCredentials = pgTable(
     accessToken: text('access_token'),
     refreshToken: text('refresh_token'),
     expiresAt: timestamptz('expires_at'),
-    scopes: text('scopes').array().notNull().default([]),
+    scopes: text('scopes').array().notNull().default(sql`'{}'::text[]`),
     metadata: jsonb('metadata').notNull().default({}),
     isNativeMode: boolean('is_native_mode').notNull().default(true),
     createdAt: timestamptz('created_at').notNull().defaultNow(),
