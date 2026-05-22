@@ -23,6 +23,7 @@
     "postgres": "^3.4.9"
   },
   "devDependencies": {
+    "@supabase/supabase-js": "^2.106.1",
     "@types/pg": "^8.20.0",
     "drizzle-kit": "^0.20.18",
     "pg": "^8.21.0",

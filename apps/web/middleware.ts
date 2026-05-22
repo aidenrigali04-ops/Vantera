@@ -1,5 +1,10 @@
+import {
+  ADMIN_SESSION_COOKIE,
+  PORTAL_SESSION_COOKIE,
+} from '@/lib/auth/constants'
+import { verifySessionToken } from '@/lib/auth/jwt'
+import { canAccessAdminRoute } from '@/lib/auth/rbac'
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
-import { jwtVerify } from 'jose'
 import { type NextRequest, NextResponse } from 'next/server'
 
 type AccountRow = {
@@ -15,25 +20,6 @@ type AccountRow = {
   onboarding_completed_at: string | null
 }
 
-const ADMIN_SESSION_COOKIE = 'v_admin_session'
-const PORTAL_SESSION_COOKIE = 'v_portal_session'
-
-const ROLE_RANK: Record<string, number> = {
-  owner: 6,
-  admin: 5,
-  manager: 4,
-  staff: 3,
-  technician: 2,
-  agent: 1,
-}
-
-const ADMIN_ROUTE_MIN_RANK: Array<{ prefix: string; minRank: number }> = [
-  { prefix: '/admin/billing', minRank: 6 },
-  { prefix: '/admin/settings', minRank: 5 },
-  { prefix: '/admin/team', minRank: 4 },
-  { prefix: '/admin/automations', minRank: 4 },
-]
-
 const ACCOUNT_SELECT =
   'id, slug, name, vertical, plan, brand_logo_url, brand_primary_color, brand_secondary_color, portal_domain, onboarding_completed_at'
 
@@ -41,50 +27,11 @@ function shouldSkipTenantResolution(pathname: string): boolean {
   return pathname.startsWith('/auth')
 }
 
-function getRequiredRoleRank(pathname: string): number {
-  for (const route of ADMIN_ROUTE_MIN_RANK) {
-    if (pathname.startsWith(route.prefix)) {
-      return route.minRank
-    }
-  }
-
-  return 0
-}
-
-function hasSufficientRole(role: string, requiredRank: number): boolean {
-  if (requiredRank === 0) {
-    return true
-  }
-
-  return (ROLE_RANK[role] ?? 0) >= requiredRank
-}
-
-function getAccountIdFromPayload(payload: Record<string, unknown>): string | null {
-  const accountId = payload.accountId ?? payload.account_id
-  return typeof accountId === 'string' ? accountId : null
-}
-
-function getRoleFromPayload(payload: Record<string, unknown>): string | null {
-  const role = payload.role
-  return typeof role === 'string' ? role : null
-}
-
-async function decodeSessionToken(token: string): Promise<Record<string, unknown> | null> {
-  const secret = process.env.SUPABASE_JWT_SECRET
-
-  if (!secret) {
-    return null
-  }
-
-  try {
-    const { payload } = await jwtVerify(token, new TextEncoder().encode(secret))
-    return payload as Record<string, unknown>
-  } catch {
-    return null
-  }
-}
-
-function applyAccountHeaders(requestHeaders: Headers, response: NextResponse, account: AccountRow): void {
+function applyAccountHeaders(
+  requestHeaders: Headers,
+  response: NextResponse,
+  account: AccountRow,
+): void {
   const headerValues: Record<string, string> = {
     'x-account-id': account.id,
     'x-account-slug': account.slug,
@@ -199,21 +146,17 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/auth/login', request.url))
     }
 
-    const payload = await decodeSessionToken(sessionToken)
+    const payload = await verifySessionToken(sessionToken)
 
-    if (!payload) {
+    if (!payload || payload.type !== 'admin') {
       return NextResponse.redirect(new URL('/auth/login', request.url))
     }
 
-    const sessionAccountId = getAccountIdFromPayload(payload)
-
-    if (!sessionAccountId || sessionAccountId !== account.id) {
+    if (payload.accountId !== account.id) {
       return NextResponse.redirect(new URL('/auth/login', request.url))
     }
 
-    const role = getRoleFromPayload(payload)
-
-    if (!role || !hasSufficientRole(role, getRequiredRoleRank(pathname))) {
+    if (!canAccessAdminRoute(payload.role, pathname)) {
       return NextResponse.redirect(new URL('/admin/dashboard', request.url))
     }
   }
@@ -225,15 +168,13 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/auth/portal-login', request.url))
     }
 
-    const payload = await decodeSessionToken(sessionToken)
+    const payload = await verifySessionToken(sessionToken)
 
-    if (!payload) {
+    if (!payload || payload.type !== 'portal') {
       return NextResponse.redirect(new URL('/auth/portal-login', request.url))
     }
 
-    const sessionAccountId = getAccountIdFromPayload(payload)
-
-    if (!sessionAccountId || sessionAccountId !== account.id) {
+    if (payload.accountId !== account.id) {
       return NextResponse.redirect(new URL('/auth/portal-login', request.url))
     }
   }
