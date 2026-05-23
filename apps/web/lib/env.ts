@@ -1,11 +1,17 @@
 import { z } from 'zod'
 
+// Only the variables actually required to render an auth'd page are mandatory
+// here. Everything else (Anthropic, Twilio, Resend, Stripe, Trigger, etc.) is
+// optional at the schema level and validated at its real point of use. This
+// way a single missing API key can never crash the whole app — it only fails
+// the one feature that needs it, and only when that feature is exercised.
+
 const publicEnvSchema = z.object({
   NEXT_PUBLIC_APP_DOMAIN: z.string().min(1),
   NEXT_PUBLIC_APP_URL: z.string().url(),
   NEXT_PUBLIC_SUPABASE_URL: z.string().url(),
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1),
-  NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: z.string().min(1),
+  NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: z.string().optional().default(''),
 })
 
 const serverEnvSchema = z.object({
@@ -13,15 +19,15 @@ const serverEnvSchema = z.object({
   DIRECT_URL: z.string().url().optional(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
   SUPABASE_JWT_SECRET: z.string().min(1),
-  ANTHROPIC_API_KEY: z.string().min(1),
-  TWILIO_ACCOUNT_SID: z.string().min(1),
-  TWILIO_AUTH_TOKEN: z.string().min(1),
-  TWILIO_PHONE_NUMBER: z.string().min(1),
-  RESEND_API_KEY: z.string().min(1),
-  STRIPE_SECRET_KEY: z.string().min(1),
-  STRIPE_WEBHOOK_SECRET: z.string().min(1),
-  TRIGGER_SECRET_KEY: z.string().min(1),
-  TRIGGER_API_URL: z.string().url(),
+  ANTHROPIC_API_KEY: z.string().optional().default(''),
+  TWILIO_ACCOUNT_SID: z.string().optional().default(''),
+  TWILIO_AUTH_TOKEN: z.string().optional().default(''),
+  TWILIO_PHONE_NUMBER: z.string().optional().default(''),
+  RESEND_API_KEY: z.string().optional().default(''),
+  STRIPE_SECRET_KEY: z.string().optional().default(''),
+  STRIPE_WEBHOOK_SECRET: z.string().optional().default(''),
+  TRIGGER_SECRET_KEY: z.string().optional().default(''),
+  TRIGGER_API_URL: z.string().optional().default('https://api.trigger.dev'),
   TEST_TENANT_SLUG: z.string().optional(),
 })
 
@@ -83,8 +89,7 @@ function getServerEnv(): ServerEnv {
         'Set server secrets in Vercel → Project → Settings → Environment Variables.',
         'Common fixes:',
         '  - DATABASE_URL: postgresql:// with URL-encoded password',
-        '  - TRIGGER_API_URL: must start with https://',
-        '  - Remove surrounding quotes from values',
+        '  - Remove surrounding quotes and trailing whitespace from values',
       ].join('\n'),
     )
   }
@@ -106,3 +111,19 @@ export const env = new Proxy({} as Env, {
     return getServerEnv()[prop as keyof ServerEnv]
   },
 })
+
+/**
+ * Use this at the point of consumption when a feature needs a specific secret
+ * that's now optional at the schema level (e.g. Stripe, Resend, Twilio,
+ * Anthropic). Throws a clear, feature-scoped error instead of letting the
+ * underlying SDK throw a cryptic one.
+ */
+export function requireEnv<K extends keyof Env>(key: K): NonNullable<Env[K]> {
+  const value = env[key]
+  if (value === undefined || value === null || value === '') {
+    throw new Error(
+      `${String(key)} is not configured. Set it in Vercel → Project → Settings → Environment Variables, then redeploy.`,
+    )
+  }
+  return value as NonNullable<Env[K]>
+}

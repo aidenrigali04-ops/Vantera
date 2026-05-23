@@ -9,6 +9,8 @@ import type { Plan } from '@/lib/feature-flags/flags'
 import { headers } from 'next/headers'
 import type { ReactNode } from 'react'
 
+export const dynamic = 'force-dynamic'
+
 export default async function PortalLayout({ children }: { children: ReactNode }) {
   const session = await requirePortalSession()
   const branding = getBrandingFromHeaders(headers())

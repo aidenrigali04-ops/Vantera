@@ -3,7 +3,7 @@
 import { requireAdminSession } from '@/lib/auth/require-session'
 import type { ActionResult } from '@/lib/auth/types'
 import { db } from '@/lib/db/client'
-import { env } from '@/lib/env'
+import { env, requireEnv } from '@/lib/env'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import {
   accounts,
@@ -309,7 +309,7 @@ export async function inviteTeamMembers(
     }
 
     const supabase = getSupabaseAdmin()
-    const resend = new Resend(env.RESEND_API_KEY)
+    const resend = new Resend(requireEnv('RESEND_API_KEY'))
     const fromAddress = `${account.name} <onboarding@${env.NEXT_PUBLIC_APP_DOMAIN}>`
 
     let invited = 0
