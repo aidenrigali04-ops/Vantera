@@ -9,10 +9,8 @@ import {
 } from '@/lib/auth/session'
 import type { ActionResult } from '@/lib/auth/types'
 import type { UserRole } from '@/lib/auth/constants'
-import { db } from '@/lib/db/client'
-import { contacts, users } from '@vantera/db'
+import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { and, eq, isNull } from 'drizzle-orm'
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
@@ -21,6 +19,58 @@ const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
 })
+
+type AdminUserRow = {
+  id: string
+  email: string
+  role: string
+}
+
+type PortalContactRow = {
+  id: string
+  email: string | null
+}
+
+async function findActiveAdminUser(accountId: string, email: string): Promise<AdminUserRow | null> {
+  // Uses the Supabase REST API instead of direct Postgres so login works on
+  // Supabase projects whose legacy db.<ref>.supabase.co host has been retired
+  // (newer projects must use the Supavisor pooler URL for direct Postgres).
+  const admin = getSupabaseAdmin()
+  const { data, error } = await admin
+    .from('users')
+    .select('id, email, role, is_active, deleted_at, account_id')
+    .eq('account_id', accountId)
+    .eq('email', email)
+    .eq('is_active', true)
+    .is('deleted_at', null)
+    .limit(1)
+    .maybeSingle()
+
+  if (error || !data) {
+    return null
+  }
+
+  return { id: data.id, email: data.email, role: data.role }
+}
+
+async function findPortalContact(accountId: string, email: string): Promise<PortalContactRow | null> {
+  const admin = getSupabaseAdmin()
+  const { data, error } = await admin
+    .from('contacts')
+    .select('id, email, portal_access, deleted_at, account_id')
+    .eq('account_id', accountId)
+    .eq('email', email)
+    .eq('portal_access', true)
+    .is('deleted_at', null)
+    .limit(1)
+    .maybeSingle()
+
+  if (error || !data) {
+    return null
+  }
+
+  return { id: data.id, email: data.email }
+}
 
 export async function adminLoginAction(
   input: z.infer<typeof loginSchema>,
@@ -48,18 +98,7 @@ export async function adminLoginAction(
     return { success: false, error: 'Invalid email or password' }
   }
 
-  const [user] = await db
-    .select()
-    .from(users)
-    .where(
-      and(
-        eq(users.email, validated.data.email),
-        eq(users.accountId, account.id),
-        eq(users.isActive, true),
-        isNull(users.deletedAt),
-      ),
-    )
-    .limit(1)
+  const user = await findActiveAdminUser(account.id, validated.data.email)
 
   if (!user) {
     await supabase.auth.signOut()
@@ -103,18 +142,7 @@ export async function portalLoginAction(
     return { success: false, error: 'Invalid email or password' }
   }
 
-  const [contact] = await db
-    .select()
-    .from(contacts)
-    .where(
-      and(
-        eq(contacts.email, validated.data.email),
-        eq(contacts.accountId, account.id),
-        eq(contacts.portalAccess, true),
-        isNull(contacts.deletedAt),
-      ),
-    )
-    .limit(1)
+  const contact = await findPortalContact(account.id, validated.data.email)
 
   if (!contact) {
     await supabase.auth.signOut()

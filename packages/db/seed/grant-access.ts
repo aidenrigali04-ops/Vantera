@@ -68,7 +68,7 @@ async function upsertAuthUser(admin: SupabaseClient, email: string, password: st
 async function getAccountIdBySlug(admin: SupabaseClient, slug: string): Promise<string> {
   const { data, error } = await admin
     .from('accounts')
-    .select('id')
+    .select('id, onboarding_completed_at')
     .eq('slug', slug)
     .limit(1)
     .maybeSingle()
@@ -82,6 +82,19 @@ async function getAccountIdBySlug(admin: SupabaseClient, slug: string): Promise<
       `Account "${slug}" not found. Create it via your normal seed flow first, ` +
         `or set TEST_ACCOUNT_SLUG to an existing slug.`,
     )
+  }
+
+  if (!data.onboarding_completed_at) {
+    const { error: updateError } = await admin
+      .from('accounts')
+      .update({ onboarding_completed_at: new Date().toISOString() })
+      .eq('id', data.id)
+
+    if (updateError) {
+      throw updateError
+    }
+
+    console.log(`Marked account "${slug}" onboarding complete`)
   }
 
   return data.id

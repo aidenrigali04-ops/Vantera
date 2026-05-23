@@ -9,8 +9,17 @@ let database: Database | undefined
 
 function getDb(): Database {
   if (!database) {
-    // Disable prefetch for connection pooling (Supabase requires this)
-    const client = postgres(env.DATABASE_URL, { prepare: false })
+    // - prepare: false      → required for Supabase transaction-mode pooling
+    // - connect_timeout: 5  → fail fast on bad DNS / unreachable host instead
+    //                         of hanging the request until Vercel kills it
+    // - idle_timeout: 20    → close idle connections in serverless environments
+    // - max: 5              → smaller pool fits Vercel's serverless model
+    const client = postgres(env.DATABASE_URL, {
+      prepare: false,
+      connect_timeout: 5,
+      idle_timeout: 20,
+      max: 5,
+    })
     database = drizzle(client, { schema })
   }
 
