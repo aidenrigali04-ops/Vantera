@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input'
 import { useBranding } from '@/lib/branding/context'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useState, useTransition } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 
@@ -35,6 +35,7 @@ export function LoginForm({ onSubmit }: LoginFormProps) {
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isPendingNav, startNav] = useTransition()
 
   const form = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
@@ -45,7 +46,14 @@ export function LoginForm({ onSubmit }: LoginFormProps) {
     setIsSubmitting(true)
     setError(null)
 
-    const result = await onSubmit(values)
+    let result
+    try {
+      result = await onSubmit(values)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Sign in failed')
+      setIsSubmitting(false)
+      return
+    }
 
     if (!result.success) {
       setError(result.error ?? 'Sign in failed')
@@ -53,9 +61,20 @@ export function LoginForm({ onSubmit }: LoginFormProps) {
       return
     }
 
-    router.push(result.redirectTo ?? '/admin/dashboard')
-    router.refresh()
+    const redirectTo = result.redirectTo ?? '/admin/dashboard'
+
+    startNav(() => {
+      router.replace(redirectTo)
+      router.refresh()
+    })
   }
+
+  const isBusy = isSubmitting || isPendingNav
+  const buttonLabel = isPendingNav
+    ? 'Loading…'
+    : isSubmitting
+      ? 'Signing in…'
+      : 'Sign in'
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background px-4">
@@ -114,10 +133,10 @@ export function LoginForm({ onSubmit }: LoginFormProps) {
             <Button
               type="submit"
               className="w-full"
-              disabled={isSubmitting}
+              disabled={isBusy}
               style={{ backgroundColor: 'var(--brand-primary)' }}
             >
-              {isSubmitting ? 'Signing in…' : 'Sign in'}
+              {buttonLabel}
             </Button>
           </form>
         </Form>

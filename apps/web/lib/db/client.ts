@@ -16,7 +16,7 @@ function getDb(): Database {
     // - max: 5              → smaller pool fits Vercel's serverless model
     const client = postgres(env.DATABASE_URL, {
       prepare: false,
-      connect_timeout: 5,
+      connect_timeout: 2,
       idle_timeout: 20,
       max: 5,
     })
