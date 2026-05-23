@@ -26,9 +26,15 @@ const loginSchema = z.object({
 })
 
 const signupSchema = z.object({
+  fullName: z.string().min(2, 'Enter your full name').max(120),
   businessName: z.string().min(2, 'Business name must be at least 2 characters').max(120),
   email: z.string().email('Enter a valid email'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
+})
+
+const completeOAuthSignupSchema = z.object({
+  fullName: z.string().min(2, 'Enter your full name').max(120),
+  businessName: z.string().min(2, 'Business name must be at least 2 characters').max(120),
 })
 
 type AdminUserRow = {
@@ -265,7 +271,7 @@ export async function signupAction(
   }
 
   const admin = getSupabaseAdmin()
-  const { businessName, email, password } = validated.data
+  const { fullName, businessName, email, password } = validated.data
 
   // 1) Create the Supabase auth user. email_confirm:true bypasses the
   //    verification email so the user can start onboarding immediately.
@@ -273,7 +279,7 @@ export async function signupAction(
     email,
     password,
     email_confirm: true,
-    user_metadata: { business_name: businessName },
+    user_metadata: { full_name: fullName, business_name: businessName },
   })
 
   if (createResult.error || !createResult.data.user) {
@@ -313,9 +319,7 @@ export async function signupAction(
     return { success: false, error: accountError?.message ?? 'Failed to create workspace' }
   }
 
-  // 4) Insert the owner user row. fullName defaults to the email local-part —
-  //    the user can change this in profile settings later.
-  const fullName = email.split('@')[0] ?? email
+  // 4) Insert the owner user row.
   const { error: userError } = await admin.from('users').insert({
     account_id: account.id,
     email,
@@ -398,6 +402,139 @@ export async function signupAction(
   if (supportsTenantSubdomains && onAppDomain && !onCorrectSubdomain) {
     const target = `https://${account.slug}.${appDomain}/admin/dashboard`
     return { success: true, data: { redirectTo: target } }
+  }
+
+  return { success: true, data: { redirectTo: '/admin/dashboard' } }
+}
+
+/**
+ * Finishes signup for a user who arrived via OAuth (Google / Facebook).
+ *
+ * At this point the Supabase Auth user already exists — the OAuth
+ * callback set their session — but they don't have a Vantera account
+ * yet. This action mirrors the same account-provisioning flow as
+ * `signupAction` minus the password + Supabase user creation:
+ *   - Create the account row (vertical=agency, onboarding complete)
+ *   - Insert the owner users row
+ *   - Seed sample data
+ *   - Mint the admin session cookie
+ */
+export async function completeOAuthSignupAction(
+  input: z.infer<typeof completeOAuthSignupSchema>,
+): Promise<ActionResult<{ redirectTo: string }>> {
+  const validated = completeOAuthSignupSchema.safeParse(input)
+  if (!validated.success) {
+    return {
+      success: false,
+      error: validated.error.issues[0]?.message ?? 'Invalid signup details',
+    }
+  }
+
+  const supabase = createSupabaseServerClient()
+  const { data: userData, error: userErr } = await supabase.auth.getUser()
+  if (userErr || !userData.user || !userData.user.email) {
+    return { success: false, error: 'Your sign-in session expired. Please try again.' }
+  }
+
+  const supaUser = userData.user
+  const email = supaUser.email!
+  const { fullName, businessName } = validated.data
+
+  const admin = getSupabaseAdmin()
+
+  // Guard: if they already have a Vantera user, just sign them in.
+  const { data: existingUser } = await admin
+    .from('users')
+    .select('id, account_id, role, email')
+    .eq('email', email)
+    .is('deleted_at', null)
+    .limit(1)
+    .maybeSingle()
+
+  if (existingUser?.account_id) {
+    await setAdminSession({
+      type: 'admin',
+      userId: existingUser.id,
+      accountId: existingUser.account_id,
+      role: existingUser.role as UserRole,
+      email: existingUser.email,
+    })
+    return { success: true, data: { redirectTo: '/admin/dashboard' } }
+  }
+
+  const baseSlug = slugify(businessName)
+  const slug = await findUniqueSlug(baseSlug)
+
+  const { data: account, error: accountError } = await admin
+    .from('accounts')
+    .insert({
+      slug,
+      name: businessName,
+      vertical: 'agency',
+      plan: 'team',
+      onboarding_completed_at: new Date().toISOString(),
+    })
+    .select('id, slug')
+    .single()
+
+  if (accountError || !account) {
+    return { success: false, error: accountError?.message ?? 'Failed to create workspace' }
+  }
+
+  const { error: userInsertErr } = await admin.from('users').insert({
+    account_id: account.id,
+    email,
+    full_name: fullName,
+    role: 'owner',
+    is_active: true,
+  })
+
+  if (userInsertErr) {
+    await admin.from('accounts').delete().eq('id', account.id)
+    return { success: false, error: userInsertErr.message }
+  }
+
+  const { data: userRow } = await admin
+    .from('users')
+    .select('id')
+    .eq('account_id', account.id)
+    .eq('email', email)
+    .limit(1)
+    .maybeSingle()
+
+  if (!userRow) {
+    return { success: false, error: 'Failed to finalize account setup' }
+  }
+
+  try {
+    await seedSampleWorkspace(account.id)
+  } catch (err) {
+    console.error('[complete-oauth-signup] sample seed failed:', err)
+  }
+
+  await setAdminSession({
+    type: 'admin',
+    userId: userRow.id,
+    accountId: account.id,
+    role: 'owner',
+    email,
+  })
+
+  const host = headers().get('host') ?? ''
+  const hostname = host.split(':')[0] ?? ''
+  const appDomain = process.env.NEXT_PUBLIC_APP_DOMAIN ?? ''
+
+  const supportsTenantSubdomains = Boolean(appDomain) && !isVercelManagedDomain(appDomain)
+  const onAppDomain = Boolean(
+    appDomain && (hostname === appDomain || hostname.endsWith(`.${appDomain}`)),
+  )
+  const onCorrectSubdomain = Boolean(appDomain && hostname === `${account.slug}.${appDomain}`)
+
+  if (supportsTenantSubdomains && onAppDomain && !onCorrectSubdomain) {
+    return {
+      success: true,
+      data: { redirectTo: `https://${account.slug}.${appDomain}/admin/dashboard` },
+    }
   }
 
   return { success: true, data: { redirectTo: '/admin/dashboard' } }

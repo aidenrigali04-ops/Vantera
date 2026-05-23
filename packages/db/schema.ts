@@ -487,6 +487,101 @@ export const verticalTemplates = pgTable('vertical_templates', {
   createdAt: timestamptz('created_at').notNull().defaultNow(),
 })
 
+// ---------------------------------------------------------------------------
+// AI brain — persistent memory and append-only observation log.
+//
+// `ai_memory` is the "brain". One row per (account, kind, subject) holds a
+// distilled summary plus structured evidence. Rows are upserted: when new
+// information arrives, the workflow that owns that kind re-summarizes and
+// bumps `version`. `confidence` is 0..100 and reflects the model's stated
+// confidence in the summary.
+//
+// `ai_observations` is the append-only event log feeding the learning loop.
+// Every AI-relevant action (signal generated, message drafted, recommendation
+// dismissed, prediction outcome) is recorded here so future workflows can
+// look back at what worked and tighten prompts.
+
+export const aiMemoryKindEnum = pgEnum('ai_memory_kind', [
+  'business_context',
+  'contact_memory',
+  'record_memory',
+  'pattern',
+  'preference',
+])
+
+export const aiObservationKindEnum = pgEnum('ai_observation_kind', [
+  'tool_called',
+  'signal_generated',
+  'signal_dismissed',
+  'message_drafted',
+  'message_sent',
+  'recommendation_accepted',
+  'recommendation_dismissed',
+  'prediction_made',
+  'prediction_outcome',
+])
+
+export const aiMemory = pgTable(
+  'ai_memory',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    kind: aiMemoryKindEnum('kind').notNull(),
+    // For account-level memory: subjectType='account', subjectId=accountId.
+    // For per-contact memory: subjectType='contact', subjectId=contacts.id.
+    // For per-record memory:  subjectType='record',  subjectId=records.id.
+    subjectType: varchar('subject_type', { length: 30 }).notNull(),
+    subjectId: uuid('subject_id').notNull(),
+    summary: text('summary').notNull(),
+    evidence: jsonb('evidence').notNull().default({}),
+    confidence: smallint('confidence').notNull().default(50),
+    version: smallint('version').notNull().default(1),
+    modelUsed: varchar('model_used', { length: 80 }),
+    createdAt: timestamptz('created_at').notNull().defaultNow(),
+    updatedAt: timestamptz('updated_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    // One row per unique (account, kind, subject). Re-running a workflow
+    // replaces the summary rather than appending.
+    uniqueMemory: uniqueIndex('ai_memory_account_kind_subject_idx').on(
+      table.accountId,
+      table.kind,
+      table.subjectType,
+      table.subjectId,
+    ),
+    accountIdx: index('ai_memory_account_id_idx').on(table.accountId),
+    kindIdx: index('ai_memory_kind_account_idx').on(table.kind, table.accountId),
+  }),
+)
+
+export const aiObservations = pgTable(
+  'ai_observations',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    kind: aiObservationKindEnum('kind').notNull(),
+    // Free-form context: which tool ran, what input, what came back, what
+    // happened next. Outcome is null until the loop closes (e.g. a message
+    // gets a reply, a signal gets actioned).
+    payload: jsonb('payload').notNull().default({}),
+    outcome: varchar('outcome', { length: 30 }),
+    relatedAutomationId: uuid('related_automation_id').references(() => automations.id),
+    relatedRecordId: uuid('related_record_id').references(() => records.id),
+    relatedContactId: uuid('related_contact_id').references(() => contacts.id),
+    relatedSignalId: uuid('related_signal_id').references(() => intelligenceSignals.id),
+    occurredAt: timestamptz('occurred_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    accountIdx: index('ai_observations_account_id_idx').on(table.accountId),
+    kindIdx: index('ai_observations_kind_account_idx').on(table.kind, table.accountId),
+    occurredIdx: index('ai_observations_occurred_at_idx').on(table.occurredAt),
+  }),
+)
+
 export const accountsRelations = relations(accounts, ({ many }) => ({
   users: many(users),
   contacts: many(contacts),
@@ -660,5 +755,35 @@ export const integrationCredentialsRelations = relations(integrationCredentials,
   account: one(accounts, {
     fields: [integrationCredentials.accountId],
     references: [accounts.id],
+  }),
+}))
+
+export const aiMemoryRelations = relations(aiMemory, ({ one }) => ({
+  account: one(accounts, {
+    fields: [aiMemory.accountId],
+    references: [accounts.id],
+  }),
+}))
+
+export const aiObservationsRelations = relations(aiObservations, ({ one }) => ({
+  account: one(accounts, {
+    fields: [aiObservations.accountId],
+    references: [accounts.id],
+  }),
+  automation: one(automations, {
+    fields: [aiObservations.relatedAutomationId],
+    references: [automations.id],
+  }),
+  record: one(records, {
+    fields: [aiObservations.relatedRecordId],
+    references: [records.id],
+  }),
+  contact: one(contacts, {
+    fields: [aiObservations.relatedContactId],
+    references: [contacts.id],
+  }),
+  signal: one(intelligenceSignals, {
+    fields: [aiObservations.relatedSignalId],
+    references: [intelligenceSignals.id],
   }),
 }))

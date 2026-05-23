@@ -1,5 +1,7 @@
 'use client'
 
+import { AuthLayout } from '@/components/shared/auth-layout'
+import { OAuthButtons } from '@/components/shared/oauth-buttons'
 import { Button } from '@/components/ui/button'
 import {
   Form,
@@ -18,6 +20,7 @@ import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 
 const signupSchema = z.object({
+  fullName: z.string().min(2, 'Enter your full name'),
   businessName: z.string().min(2, 'Business name must be at least 2 characters'),
   email: z.string().email('Enter a valid email'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
@@ -39,7 +42,7 @@ export function SignupForm({ onSubmit }: SignupFormProps) {
 
   const form = useForm<z.infer<typeof signupSchema>>({
     resolver: zodResolver(signupSchema),
-    defaultValues: { businessName: '', email: '', password: '' },
+    defaultValues: { fullName: '', businessName: '', email: '', password: '' },
   })
 
   async function handleSubmit(values: z.infer<typeof signupSchema>) {
@@ -61,11 +64,8 @@ export function SignupForm({ onSubmit }: SignupFormProps) {
       return
     }
 
-    const redirectTo = result.redirectTo ?? '/admin/onboarding'
+    const redirectTo = result.redirectTo ?? '/admin/dashboard'
 
-    // If the redirect target is an absolute URL (i.e. a different host like a
-    // tenant subdomain), use window.location so the browser actually changes
-    // hosts. Otherwise stay inside the Next router for a smooth transition.
     if (redirectTo.startsWith('http')) {
       window.location.href = redirectTo
       return
@@ -81,21 +81,46 @@ export function SignupForm({ onSubmit }: SignupFormProps) {
   const buttonLabel = isPendingNav
     ? 'Loading…'
     : isSubmitting
-      ? 'Creating account…'
-      : 'Create account'
+      ? 'Setting up workspace…'
+      : 'Get started for free'
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-background px-4 py-12">
-      <div className="w-full max-w-sm space-y-6">
-        <div className="space-y-2 text-center">
+    <AuthLayout>
+      <div className="space-y-6">
+        <div className="space-y-2">
           <h1 className="text-2xl font-semibold tracking-tight">Create your workspace</h1>
           <p className="text-sm text-muted-foreground">
-            Set up your business in under 10 minutes.
+            Start with sample data, then make it yours. No credit card required.
           </p>
+        </div>
+
+        <OAuthButtons />
+
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center" aria-hidden>
+            <span className="w-full border-t" />
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-background px-2 text-muted-foreground">Or use email</span>
+          </div>
         </div>
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="fullName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Full name</FormLabel>
+                  <FormControl>
+                    <Input type="text" autoComplete="name" placeholder="Jane Doe" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             <FormField
               control={form.control}
               name="businessName"
@@ -106,7 +131,7 @@ export function SignupForm({ onSubmit }: SignupFormProps) {
                     <Input
                       type="text"
                       autoComplete="organization"
-                      placeholder="Acme HVAC"
+                      placeholder="Acme Agency"
                       {...field}
                     />
                   </FormControl>
@@ -120,7 +145,7 @@ export function SignupForm({ onSubmit }: SignupFormProps) {
               name="email"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Work email</FormLabel>
+                  <FormLabel>Business email</FormLabel>
                   <FormControl>
                     <Input
                       type="email"
@@ -153,19 +178,18 @@ export function SignupForm({ onSubmit }: SignupFormProps) {
               )}
             />
 
-            {error ? <p className="text-sm text-destructive">{error}</p> : null}
+            {error ? (
+              <p className="text-sm text-destructive" role="alert">
+                {error}
+              </p>
+            ) : null}
 
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={isBusy}
-              style={{ backgroundColor: 'var(--brand-primary)' }}
-            >
+            <Button type="submit" className="w-full" disabled={isBusy}>
               {buttonLabel}
             </Button>
 
             <p className="text-center text-xs text-muted-foreground">
-              By creating an account you agree to start the guided setup wizard.
+              By creating an account you agree to the terms of service and privacy policy.
             </p>
           </form>
         </Form>
@@ -177,6 +201,6 @@ export function SignupForm({ onSubmit }: SignupFormProps) {
           </Link>
         </p>
       </div>
-    </div>
+    </AuthLayout>
   )
 }

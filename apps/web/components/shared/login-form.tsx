@@ -1,5 +1,7 @@
 'use client'
 
+import { AuthLayout } from '@/components/shared/auth-layout'
+import { OAuthButtons } from '@/components/shared/oauth-buttons'
 import { Button } from '@/components/ui/button'
 import {
   Form,
@@ -12,7 +14,8 @@ import {
 import { Input } from '@/components/ui/input'
 import { useBranding } from '@/lib/branding/context'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useState, useTransition } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
@@ -28,12 +31,29 @@ type LoginFormProps = {
     error?: string
     redirectTo?: string
   }>
+  /** When true, show OAuth buttons + signup link. Portal logins set this false. */
+  showOAuth?: boolean
+  /** Heading for the form (e.g. "Welcome back" vs "Client portal"). */
+  heading?: string
+  /** Subheading copy. */
+  subheading?: string
+  /** Sign-up link target — hidden when showOAuth is false. */
+  signupHref?: string
 }
 
-export function LoginForm({ onSubmit }: LoginFormProps) {
+export function LoginForm({
+  onSubmit,
+  showOAuth = true,
+  heading = 'Welcome back',
+  subheading = 'Sign in to your workspace.',
+  signupHref = '/auth/signup',
+}: LoginFormProps) {
   const branding = useBranding()
   const router = useRouter()
-  const [error, setError] = useState<string | null>(null)
+  const searchParams = useSearchParams()
+  const [error, setError] = useState<string | null>(
+    searchParams?.get('error') ? decodeURIComponent(searchParams.get('error') ?? '') : null,
+  )
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isPendingNav, startNav] = useTransition()
 
@@ -70,28 +90,38 @@ export function LoginForm({ onSubmit }: LoginFormProps) {
   }
 
   const isBusy = isSubmitting || isPendingNav
-  const buttonLabel = isPendingNav
-    ? 'Loading…'
-    : isSubmitting
-      ? 'Signing in…'
-      : 'Sign in'
+  const buttonLabel = isPendingNav ? 'Loading…' : isSubmitting ? 'Signing in…' : 'Sign in'
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-background px-4">
-      <div className="w-full max-w-sm space-y-6">
-        <div className="space-y-2 text-center">
+    <AuthLayout>
+      <div className="space-y-6">
+        <div className="space-y-2">
           {branding.logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={branding.logoUrl}
               alt={branding.businessName}
-              className="mx-auto h-12 w-auto object-contain"
+              className="h-10 w-auto object-contain"
             />
-          ) : (
-            <h1 className="text-2xl font-semibold tracking-tight">{branding.businessName}</h1>
-          )}
-          <p className="text-sm text-muted-foreground">Sign in to your account</p>
+          ) : null}
+          <h1 className="text-2xl font-semibold tracking-tight">{heading}</h1>
+          <p className="text-sm text-muted-foreground">{subheading}</p>
         </div>
+
+        {showOAuth ? (
+          <>
+            <OAuthButtons />
+
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center" aria-hidden>
+                <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground">Or use email</span>
+              </div>
+            </div>
+          </>
+        ) : null}
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
@@ -102,7 +132,12 @@ export function LoginForm({ onSubmit }: LoginFormProps) {
                 <FormItem>
                   <FormLabel>Email</FormLabel>
                   <FormControl>
-                    <Input type="email" autoComplete="email" placeholder="you@company.com" {...field} />
+                    <Input
+                      type="email"
+                      autoComplete="email"
+                      placeholder="you@company.com"
+                      {...field}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -114,7 +149,17 @@ export function LoginForm({ onSubmit }: LoginFormProps) {
               name="password"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Password</FormLabel>
+                  <div className="flex items-center justify-between">
+                    <FormLabel>Password</FormLabel>
+                    {showOAuth ? (
+                      <Link
+                        href="/auth/forgot-password"
+                        className="text-xs text-muted-foreground hover:underline"
+                      >
+                        Forgot password?
+                      </Link>
+                    ) : null}
+                  </div>
                   <FormControl>
                     <Input
                       type="password"
@@ -128,19 +173,27 @@ export function LoginForm({ onSubmit }: LoginFormProps) {
               )}
             />
 
-            {error ? <p className="text-sm text-destructive">{error}</p> : null}
+            {error ? (
+              <p className="text-sm text-destructive" role="alert">
+                {error}
+              </p>
+            ) : null}
 
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={isBusy}
-              style={{ backgroundColor: 'var(--brand-primary)' }}
-            >
+            <Button type="submit" className="w-full" disabled={isBusy}>
               {buttonLabel}
             </Button>
           </form>
         </Form>
+
+        {showOAuth ? (
+          <p className="text-center text-sm text-muted-foreground">
+            Don&rsquo;t have an account?{' '}
+            <Link href={signupHref} className="font-medium text-foreground hover:underline">
+              Get started for free
+            </Link>
+          </p>
+        ) : null}
       </div>
-    </div>
+    </AuthLayout>
   )
 }

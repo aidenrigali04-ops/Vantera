@@ -1,5 +1,6 @@
 'use server'
 
+import { bootstrapBusinessContext } from '@/lib/ai'
 import { personalizeVoiceWithAI } from '@/lib/ai/personalize-voice'
 import { requireAdminSession } from '@/lib/auth/require-session'
 import type { ActionResult } from '@/lib/auth/types'
@@ -788,6 +789,14 @@ export async function completeOnboarding(
       .update(accounts)
       .set({ onboardingCompletedAt: new Date(), updatedAt: new Date() })
       .where(eq(accounts.id, accountId))
+
+    // Wake up the AI brain for this account. Fire-and-forget — the owner's
+    // redirect to /admin/dashboard never waits on Anthropic, and a failed
+    // bootstrap is non-fatal (the workflow swallows its own errors and the
+    // brain will retry on the next daily sweep).
+    void bootstrapBusinessContext(accountId, session.userId).catch(() => {
+      /* swallow — workflow already logs */
+    })
 
     return { success: true, data: { completed: true } }
   } catch (error) {
