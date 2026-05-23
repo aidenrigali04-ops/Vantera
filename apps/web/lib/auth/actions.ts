@@ -15,6 +15,7 @@ import type { ActionResult } from '@/lib/auth/types'
 import type { UserRole } from '@/lib/auth/constants'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { seedSampleWorkspace } from '@/lib/sample-data/seed'
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
@@ -289,9 +290,11 @@ export async function signupAction(
   const baseSlug = slugify(businessName)
   const slug = await findUniqueSlug(baseSlug)
 
-  // 3) Insert the account. Vertical is required by the schema but the user
-  //    selects it in Step 1 of the wizard; default to 'agency' as a
-  //    placeholder that will be overwritten by updateVertical.
+  // 3) Insert the account. We mark onboarding_completed_at immediately
+  //    because the new flow drops users straight into a demo-data
+  //    workspace — no wizard gate. Vertical defaults to 'agency' to
+  //    match the sample content; the user can change it later from
+  //    settings.
   const { data: account, error: accountError } = await admin
     .from('accounts')
     .insert({
@@ -299,6 +302,7 @@ export async function signupAction(
       name: businessName,
       vertical: 'agency',
       plan: 'team',
+      onboarding_completed_at: new Date().toISOString(),
     })
     .select('id, slug')
     .single()
@@ -339,6 +343,15 @@ export async function signupAction(
     return { success: false, error: 'Failed to finalize account setup' }
   }
 
+  // 5b) Seed sample agency-style content (3 clients, 5 deals, 2 projects
+  //     + pipeline stages). Best-effort — signup must still succeed even
+  //     if seeding hiccups, because the user can always start fresh.
+  try {
+    await seedSampleWorkspace(account.id)
+  } catch (err) {
+    console.error('[signup] sample data seed failed:', err)
+  }
+
   // 6) Sign the user in via Supabase (sets Supabase's sb-* cookies) and then
   //    mint our own admin session cookie.
   const supabase = createSupabaseServerClient()
@@ -364,7 +377,7 @@ export async function signupAction(
   //
   //    - If we're on a real configured app domain that has wildcard SSL
   //      (e.g. vantera.app with *.vantera.app DNS), jump to
-  //      <slug>.<appDomain>/admin/onboarding so the URL bar reflects the
+  //      <slug>.<appDomain>/admin/dashboard so the URL bar reflects the
   //      new workspace. The session cookie's `.appDomain` scope keeps the
   //      user signed in across the subdomain hop.
   //    - On *.vercel.app, localhost, lvh.me, Vercel preview URLs, etc.,
@@ -383,9 +396,9 @@ export async function signupAction(
   const onCorrectSubdomain = Boolean(appDomain && hostname === `${account.slug}.${appDomain}`)
 
   if (supportsTenantSubdomains && onAppDomain && !onCorrectSubdomain) {
-    const target = `https://${account.slug}.${appDomain}/admin/onboarding`
+    const target = `https://${account.slug}.${appDomain}/admin/dashboard`
     return { success: true, data: { redirectTo: target } }
   }
 
-  return { success: true, data: { redirectTo: '/admin/onboarding' } }
+  return { success: true, data: { redirectTo: '/admin/dashboard' } }
 }

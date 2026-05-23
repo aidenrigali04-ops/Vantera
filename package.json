@@ -10,6 +10,11 @@
     "db:migrate": "cd packages/db && drizzle-kit migrate",
     "db:push": "dotenv-cli -e .env -- sh -c 'cd packages/db && pnpm exec drizzle-kit push:pg'",
     "db:studio": "dotenv-cli -e .env -- sh -c 'cd packages/db && pnpm exec drizzle-kit studio'",
+    "db:apply": "dotenv -e .env -- tsx packages/db/scripts/apply-sql.ts",
+    "db:verify": "dotenv -e .env -- tsx packages/db/scripts/verify-rls.ts",
+    "db:list-tables": "dotenv -e .env -- tsx packages/db/scripts/list-tables.ts",
+    "db:seed": "dotenv -e .env -- tsx packages/db/seed/index.ts",
+    "db:seed:templates": "dotenv -e .env -- tsx packages/db/scripts/run-vertical-templates.ts",
     "trigger:dev": "dotenv -e .env -- trigger dev",
     "trigger:deploy": "dotenv -e .env -- trigger deploy"
   },
