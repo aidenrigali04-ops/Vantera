@@ -9,6 +9,7 @@ import { evaluateAllFlags } from '@/lib/feature-flags/evaluate'
 import type { Plan } from '@/lib/feature-flags/flags'
 import { hasSampleDataForAccount } from '@/lib/sample-data/queries'
 import { headers } from 'next/headers'
+import { redirect } from 'next/navigation'
 import type { ReactNode } from 'react'
 
 export const dynamic = 'force-dynamic'
@@ -18,12 +19,24 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   const branding = getBrandingFromHeaders(headers())
   const plan = (branding.plan === 'enterprise' ? 'enterprise' : 'team') as Plan
 
-  // Owners with an incomplete onboarding state are gated to the wizard
-  // by the middleware; we don't redirect from here. The pathname header
-  // (set by middleware) is used below to skip chrome that doesn't make
-  // sense during onboarding (sample-data banner, etc).
   const pathname = headers().get('x-pathname') ?? ''
   const isOnboardingRoute = pathname.startsWith('/admin/onboarding')
+
+  // Final-layer onboarding gate. Middleware ALSO enforces this, but the
+  // layout-level guard means we're safe even if:
+  //   - the middleware matcher ever gets narrowed,
+  //   - Vercel's edge serves a stale response,
+  //   - the request bypasses middleware entirely (rare but possible during
+  //     deployment swaps).
+  // Owners with onboarding_completed_at = NULL get redirected back to the
+  // wizard; non-owner roles never see the wizard so they bypass.
+  if (
+    session.role === 'owner' &&
+    !branding.onboardingComplete &&
+    !isOnboardingRoute
+  ) {
+    redirect('/admin/onboarding')
+  }
 
   let flags
   try {

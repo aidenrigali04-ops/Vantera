@@ -103,12 +103,25 @@ export function DashboardClient({
   }, [])
 
   return (
-    <motion.div
-      variants={containerVariants}
-      initial="hidden"
-      animate="show"
-      className="mx-auto w-full max-w-7xl space-y-8 px-6 py-10 sm:px-10"
-    >
+    // The outer wrapper paints the dark page surface even if the AdminShell
+    // ever fails to wrap (e.g. layout error, edge swap race, stale deploy).
+    // All inner surfaces assume a dark page below them — `bg-white/[0.02]`
+    // cards are invisible on a light body, so this is a hard requirement
+    // rather than a nice-to-have.
+    <div className="relative min-h-screen w-full bg-[#0A0E14] text-white">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute right-0 top-0 size-[40rem] opacity-[0.08] blur-3xl"
+        style={{
+          background: `radial-gradient(circle at top right, ${primaryColor}, transparent 65%)`,
+        }}
+      />
+      <motion.div
+        variants={containerVariants}
+        initial="hidden"
+        animate="show"
+        className="relative mx-auto w-full max-w-7xl space-y-8 px-6 py-10 sm:px-10"
+      >
       {/* Hero */}
       <motion.section variants={fadeUp} className="flex flex-wrap items-end justify-between gap-4">
         <div className="space-y-2">
@@ -321,7 +334,8 @@ export function DashboardClient({
           </Card>
         </motion.section>
       ) : null}
-    </motion.div>
+      </motion.div>
+    </div>
   )
 }
 

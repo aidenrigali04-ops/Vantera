@@ -20,6 +20,7 @@ import {
   type VoiceTone,
 } from '@vantera/db'
 import { and, eq } from 'drizzle-orm'
+import { revalidatePath } from 'next/cache'
 import { Resend } from 'resend'
 import Stripe from 'stripe'
 import twilio from 'twilio'
@@ -792,6 +793,11 @@ export async function completeOnboarding(
       .update(accounts)
       .set({ onboardingCompletedAt: new Date(), updatedAt: new Date() })
       .where(eq(accounts.id, accountId))
+
+    // Bust the layout cache so the next request to /admin/* sees the
+    // freshly-stamped onboardingCompletedAt and lets the user through
+    // to /admin/dashboard instead of bouncing them back to the wizard.
+    revalidatePath('/admin', 'layout')
 
     // Wake up the AI brain for this account. Fire-and-forget — the owner's
     // redirect to /admin/dashboard never waits on Anthropic, and a failed
