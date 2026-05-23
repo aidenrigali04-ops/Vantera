@@ -6,8 +6,8 @@ import { getBrandingFromHeaders } from '@/lib/branding/server'
 import { FeatureFlagProvider } from '@/lib/feature-flags/context'
 import { evaluateAllFlags } from '@/lib/feature-flags/evaluate'
 import type { Plan } from '@/lib/feature-flags/flags'
+import { hasSampleDataForAccount } from '@/lib/sample-data/queries'
 import { headers } from 'next/headers'
-import { redirect } from 'next/navigation'
 import type { ReactNode } from 'react'
 
 export const dynamic = 'force-dynamic'
@@ -16,23 +16,11 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   const session = await requireAdminSession()
   const branding = getBrandingFromHeaders(headers())
   const plan = (branding.plan === 'enterprise' ? 'enterprise' : 'team') as Plan
-  const pathname = headers().get('x-pathname') ?? ''
 
-  // Onboarding redirect runs before flag eval so a missing/slow DB never blocks
-  // the bounce. We only redirect when:
-  //   - middleware actually resolved the tenant (branding.accountId is set)
-  //   - the account hasn't completed onboarding
-  //   - we're not already on the onboarding page (prevents redirect loop)
-  //   - the user is the owner — non-owners can't run the wizard so bouncing
-  //     them there would infinite-loop with the owner-only check on the page
-  if (
-    branding.accountId &&
-    !branding.onboardingComplete &&
-    pathname !== '/admin/onboarding' &&
-    session.role === 'owner'
-  ) {
-    redirect('/admin/onboarding')
-  }
+  // No more forced redirect to a setup wizard. New accounts are seeded
+  // with a sample workspace at signup time and onboarding_completed_at
+  // is set immediately. Configuration (branding, integrations, team)
+  // moves into in-app settings rather than blocking the first session.
 
   let flags
   try {
@@ -42,11 +30,22 @@ export default async function AdminLayout({ children }: { children: ReactNode })
     flags = {} as Awaited<ReturnType<typeof evaluateAllFlags>>
   }
 
+  let hasSampleData = false
+  try {
+    if (branding.accountId) {
+      hasSampleData = await hasSampleDataForAccount(branding.accountId)
+    }
+  } catch (err) {
+    console.error('[admin-layout] sample data check threw:', err)
+  }
+
   return (
     <BrandingProvider branding={branding}>
       <FeatureFlagProvider flags={flags}>
         <ReactQueryProvider>
-          <AdminShell session={session}>{children}</AdminShell>
+          <AdminShell session={session} hasSampleData={hasSampleData}>
+            {children}
+          </AdminShell>
         </ReactQueryProvider>
       </FeatureFlagProvider>
     </BrandingProvider>
