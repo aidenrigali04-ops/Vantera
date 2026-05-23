@@ -38,44 +38,56 @@ export async function resolveAccountFromHost(host: string): Promise<AccountRow |
     const appDomain = process.env.NEXT_PUBLIC_APP_DOMAIN ?? 'vantera.app'
     const hostname = host.split(':')[0] ?? ''
 
-    if (!hostname) {
-      return null
-    }
-
-    if (hostname.endsWith(`.${appDomain}`)) {
+    if (hostname && hostname.endsWith(`.${appDomain}`)) {
       const dotIndex = hostname.indexOf('.')
       const slug = dotIndex === -1 ? '' : hostname.slice(0, dotIndex)
 
-      if (!slug) {
-        return null
-      }
+      if (slug) {
+        const { data } = await supabase
+          .from('accounts')
+          .select(ACCOUNT_SELECT)
+          .eq('slug', slug)
+          .limit(1)
+          .maybeSingle()
 
-      const { data, error } = await supabase
+        if (data) {
+          return data
+        }
+      }
+    }
+
+    if (hostname) {
+      const { data } = await supabase
         .from('accounts')
         .select(ACCOUNT_SELECT)
-        .eq('slug', slug)
+        .eq('portal_domain', hostname)
         .limit(1)
         .maybeSingle()
 
-      if (error) {
-        return null
+      if (data) {
+        return data
       }
-
-      return data
     }
 
-    const { data, error } = await supabase
-      .from('accounts')
-      .select(ACCOUNT_SELECT)
-      .eq('portal_domain', hostname)
-      .limit(1)
-      .maybeSingle()
+    // Fallback: TEST_TENANT_SLUG lets you test on bare deployment URLs
+    // (e.g. *.vercel.app) before configuring custom DNS. Leave unset in
+    // production once real tenant subdomains are wired up.
+    const testSlug = process.env.TEST_TENANT_SLUG
 
-    if (error) {
-      return null
+    if (testSlug) {
+      const { data } = await supabase
+        .from('accounts')
+        .select(ACCOUNT_SELECT)
+        .eq('slug', testSlug)
+        .limit(1)
+        .maybeSingle()
+
+      if (data) {
+        return data
+      }
     }
 
-    return data
+    return null
   } catch {
     return null
   }

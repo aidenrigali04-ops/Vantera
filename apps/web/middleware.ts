@@ -79,28 +79,47 @@ async function resolveAccountByHost(
     const dotIndex = hostname.indexOf('.')
     const slug = dotIndex === -1 ? '' : hostname.slice(0, dotIndex)
 
-    if (!slug) {
-      return null
+    if (slug) {
+      const { data } = await supabase
+        .from('accounts')
+        .select(ACCOUNT_SELECT)
+        .eq('slug', slug)
+        .limit(1)
+        .maybeSingle()
+
+      if (data) {
+        return data
+      }
     }
-
-    const { data } = await supabase
-      .from('accounts')
-      .select(ACCOUNT_SELECT)
-      .eq('slug', slug)
-      .limit(1)
-      .maybeSingle()
-
-    return data
   }
 
-  const { data } = await supabase
+  const { data: portalAccount } = await supabase
     .from('accounts')
     .select(ACCOUNT_SELECT)
     .eq('portal_domain', hostname)
     .limit(1)
     .maybeSingle()
 
-  return data
+  if (portalAccount) {
+    return portalAccount
+  }
+
+  const testSlug = process.env.TEST_TENANT_SLUG
+
+  if (testSlug) {
+    const { data } = await supabase
+      .from('accounts')
+      .select(ACCOUNT_SELECT)
+      .eq('slug', testSlug)
+      .limit(1)
+      .maybeSingle()
+
+    if (data) {
+      return data
+    }
+  }
+
+  return null
 }
 
 export async function middleware(request: NextRequest) {
@@ -113,8 +132,9 @@ export async function middleware(request: NextRequest) {
   const host = request.headers.get('host') ?? ''
   const hostname = host.split(':')[0] ?? ''
   const appDomain = process.env.NEXT_PUBLIC_APP_DOMAIN ?? 'vantera.app'
+  const testSlug = process.env.TEST_TENANT_SLUG
 
-  if (isMarketingHost(hostname, appDomain)) {
+  if (isMarketingHost(hostname, appDomain) && !testSlug) {
     return NextResponse.redirect(new URL('/', request.url))
   }
 
