@@ -24,7 +24,22 @@ const ACCOUNT_SELECT =
   'id, slug, name, vertical, plan, brand_logo_url, brand_primary_color, brand_secondary_color, portal_domain, onboarding_completed_at'
 
 function shouldSkipTenantResolution(pathname: string): boolean {
-  return pathname.startsWith('/auth')
+  return (
+    pathname.startsWith('/auth') ||
+    pathname.startsWith('/api') ||
+    pathname === '/' ||
+    pathname === '/favicon.ico' ||
+    pathname === '/robots.txt' ||
+    pathname === '/sitemap.xml'
+  )
+}
+
+function isMarketingHost(hostname: string, appDomain: string): boolean {
+  if (!hostname) return true
+  if (hostname === appDomain) return true
+  if (hostname === `www.${appDomain}`) return true
+  if (hostname.endsWith('.vercel.app')) return true
+  return false
 }
 
 function applyAccountHeaders(
@@ -95,6 +110,14 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
+  const host = request.headers.get('host') ?? ''
+  const hostname = host.split(':')[0] ?? ''
+  const appDomain = process.env.NEXT_PUBLIC_APP_DOMAIN ?? 'vantera.app'
+
+  if (isMarketingHost(hostname, appDomain)) {
+    return NextResponse.redirect(new URL('/', request.url))
+  }
+
   let response = NextResponse.next({
     request,
   })
@@ -124,12 +147,10 @@ export async function middleware(request: NextRequest) {
     },
   )
 
-  const host = request.headers.get('host') ?? ''
-  const appDomain = process.env.NEXT_PUBLIC_APP_DOMAIN ?? 'vantera.app'
   const account = await resolveAccountByHost(supabase, host, appDomain)
 
   if (!account) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    return NextResponse.redirect(new URL('/', request.url))
   }
 
   const requestHeaders = new Headers(request.headers)
