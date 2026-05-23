@@ -1,28 +1,50 @@
 'use client'
 
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
+import { motion } from 'framer-motion'
+import { Heart, Megaphone, Phone, Sparkles, Zap } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { getBusinessProfile, updateBusinessProfile } from '../actions'
+import {
+  FieldGroup,
+  GhostCTA,
+  PrimaryCTA,
+  StepError,
+  StepHeader,
+  fadeUp,
+  stepContainer,
+} from '../_primitives'
 
 type Voice = 'friendly' | 'professional' | 'urgent'
 
-const VOICES: Array<{ value: Voice; label: string; example: string }> = [
+const VOICES: Array<{
+  value: Voice
+  label: string
+  example: string
+  icon: typeof Heart
+  accent: string
+}> = [
   {
     value: 'friendly',
     label: 'Friendly',
-    example: '“Hey Sam! Just a heads up — your appointment is tomorrow at 2pm 👋”',
+    example: '"Hey Sam! Just a heads up — your appointment is tomorrow at 2pm 👋"',
+    icon: Heart,
+    accent: '#EC4899',
   },
   {
     value: 'professional',
     label: 'Professional',
-    example: '“Hi Sam, this is a reminder that your appointment is scheduled for tomorrow at 2pm.”',
+    example: '"Hi Sam, this is a reminder that your appointment is scheduled for tomorrow at 2pm."',
+    icon: Sparkles,
+    accent: '#3B82F6',
   },
   {
     value: 'urgent',
     label: 'Urgent',
-    example: '“URGENT — appointment tomorrow at 2pm. Reply to confirm or reschedule.”',
+    example: '"URGENT — appointment tomorrow at 2pm. Reply to confirm or reschedule."',
+    icon: Zap,
+    accent: '#F59E0B',
   },
 ]
 
@@ -130,184 +152,228 @@ export function Step3Profile({ accountId, primaryColor, onComplete }: Props) {
 
   if (loading) {
     return (
-      <div className="space-y-6">
-        <div className="space-y-2">
-          <h1 className="text-3xl font-semibold leading-tight tracking-tight">
-            Personalize your messaging
-          </h1>
-          <p className="text-base leading-relaxed text-muted-foreground">
-            Loading your profile…
-          </p>
-        </div>
-        <div className="h-32 animate-pulse rounded-xl border bg-muted/20" />
-      </div>
+      <motion.div variants={stepContainer} initial="hidden" animate="show" className="space-y-6">
+        <StepHeader
+          title="Personalize your messaging"
+          subtitle="Loading your saved profile…"
+        />
+        <motion.div variants={fadeUp} className="h-32 animate-pulse rounded-2xl border border-white/[0.06] bg-white/[0.02]" />
+      </motion.div>
     )
   }
 
   return (
-    <div className="space-y-10">
-      <div className="space-y-2">
-        <h1 className="text-3xl font-semibold leading-tight tracking-tight">
-          Personalize your messaging
-        </h1>
-        <p className="text-base leading-relaxed text-muted-foreground">
-          We use these to tailor every automated message your customers receive. Everything's
-          optional — skip a field and we'll fall back to a sensible default.
-        </p>
-      </div>
+    <motion.div variants={stepContainer} initial="hidden" animate="show" className="space-y-10">
+      <StepHeader
+        title="Personalize your messaging"
+        subtitle="We use these to tailor every automated message your customers receive. Everything's optional — skip a field and we'll fall back to a sensible default."
+      />
 
-      <section className="space-y-3">
-        <div className="flex items-baseline justify-between gap-3">
-          <label className="text-sm font-semibold">Voice</label>
-          {voice ? (
-            <button
-              type="button"
-              onClick={() => setVoice(null)}
-              className="text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-            >
+      <FieldGroup
+        label="Voice"
+        description="Sets the tone our AI uses when rewriting your template messages."
+        right={
+          voice ? (
+            <GhostCTA type="button" onClick={() => setVoice(null)}>
               Clear
-            </button>
-          ) : null}
-        </div>
-        <p className="text-xs leading-relaxed text-muted-foreground">
-          Sets the tone our AI uses when rewriting your template messages.
-        </p>
+            </GhostCTA>
+          ) : null
+        }
+      >
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          {VOICES.map((v) => {
-            const isSelected = voice === v.value
-            return (
-              <button
-                key={v.value}
-                type="button"
-                onClick={() => setVoice(isSelected ? null : v.value)}
-                style={
-                  isSelected
-                    ? { borderColor: primaryColor, boxShadow: `0 0 0 3px ${primaryColor}1f` }
-                    : undefined
-                }
-                className={cn(
-                  'rounded-xl border bg-card p-4 text-left transition-all duration-150',
-                  isSelected ? '' : 'hover:border-foreground/20 hover:bg-accent/40',
-                )}
-              >
-                <p className="text-sm font-semibold">{v.label}</p>
-                <p className="mt-2 text-xs italic leading-relaxed text-muted-foreground">
-                  {v.example}
-                </p>
-              </button>
-            )
-          })}
+          {VOICES.map((v) => (
+            <VoiceTile
+              key={v.value}
+              voice={v}
+              selected={voice === v.value}
+              primaryColor={primaryColor}
+              onClick={() => setVoice(voice === v.value ? null : v.value)}
+            />
+          ))}
         </div>
-      </section>
+      </FieldGroup>
 
-      <section className="space-y-3">
-        <label className="text-sm font-semibold">Business hours</label>
-        <p className="text-xs leading-relaxed text-muted-foreground">
-          Used by after-hours automations (e.g. property management's “We're closed” auto-reply).
-        </p>
+      <FieldGroup
+        label="Business hours"
+        description="Used by after-hours automations (e.g. property management's “We're closed” auto-reply)."
+      >
         <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1">
-            <label htmlFor="hours-start" className="text-xs text-muted-foreground">
-              Opens at
-            </label>
-            <select
-              id="hours-start"
-              value={hoursStart ?? ''}
-              onChange={(e) => setHoursStart(e.target.value === '' ? null : Number(e.target.value))}
-              className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-            >
-              <option value="">— Not set —</option>
-              {HOURS.map((h) => (
-                <option key={h} value={h}>
-                  {fmtHour(h)}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="space-y-1">
-            <label htmlFor="hours-end" className="text-xs text-muted-foreground">
-              Closes at
-            </label>
-            <select
-              id="hours-end"
-              value={hoursEnd ?? ''}
-              onChange={(e) => setHoursEnd(e.target.value === '' ? null : Number(e.target.value))}
-              className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-            >
-              <option value="">— Not set —</option>
-              {HOURS.map((h) => (
-                <option key={h} value={h}>
-                  {fmtHour(h)}
-                </option>
-              ))}
-            </select>
-          </div>
+          <HourSelect
+            id="hours-start"
+            label="Opens at"
+            value={hoursStart}
+            onChange={setHoursStart}
+          />
+          <HourSelect id="hours-end" label="Closes at" value={hoursEnd} onChange={setHoursEnd} />
         </div>
-      </section>
+      </FieldGroup>
 
-      <section className="space-y-3">
-        <label className="text-sm font-semibold">Customer-facing links (optional)</label>
-        <p className="text-xs leading-relaxed text-muted-foreground">
-          These replace <code className="font-mono text-xs">{'{{booking_link}}'}</code>,{' '}
-          <code className="font-mono text-xs">{'{{review_link}}'}</code>, and{' '}
-          <code className="font-mono text-xs">{'{{payment_link}}'}</code> in your message templates.
-          Skip a field to use your portal's default page.
-        </p>
+      <FieldGroup
+        label="Customer-facing links"
+        description="These replace {{booking_link}}, {{review_link}}, and {{payment_link}} in your message templates. Skip a field to use your portal's default."
+      >
+        <div className="space-y-3">
+          <LinkField
+            id="booking-link"
+            label="Booking link"
+            placeholder="https://calendly.com/your-business"
+            value={bookingLink}
+            onChange={setBookingLink}
+          />
+          <LinkField
+            id="review-link"
+            label="Review link"
+            placeholder="https://g.page/r/your-business"
+            value={reviewLink}
+            onChange={setReviewLink}
+          />
+          <LinkField
+            id="payment-link"
+            label="Payment link"
+            placeholder="https://buy.stripe.com/..."
+            value={paymentLink}
+            onChange={setPaymentLink}
+          />
+        </div>
+      </FieldGroup>
 
-        <LinkField
-          id="booking-link"
-          label="Booking link"
-          placeholder="https://calendly.com/your-business"
-          value={bookingLink}
-          onChange={setBookingLink}
-        />
-        <LinkField
-          id="review-link"
-          label="Review link"
-          placeholder="https://g.page/r/your-business"
-          value={reviewLink}
-          onChange={setReviewLink}
-        />
-        <LinkField
-          id="payment-link"
-          label="Payment link"
-          placeholder="https://buy.stripe.com/..."
-          value={paymentLink}
-          onChange={setPaymentLink}
-        />
-      </section>
+      <FieldGroup
+        label="Emergency line"
+        description="Shown in after-hours messages. Substitutes {{emergency_line}}."
+      >
+        <div className="relative">
+          <Phone
+            className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30"
+            aria-hidden
+          />
+          <Input
+            id="emergency-line"
+            type="tel"
+            placeholder="+1 (555) 555-0911"
+            value={emergencyLine}
+            onChange={(e) => setEmergencyLine(e.target.value)}
+            className="h-11 border-white/[0.08] bg-white/[0.02] pl-10 text-sm text-white placeholder:text-white/30 focus-visible:border-white/[0.2] focus-visible:ring-1 focus-visible:ring-white/10"
+          />
+        </div>
+      </FieldGroup>
 
-      <section className="space-y-2">
-        <label htmlFor="emergency-line" className="text-sm font-semibold">
-          Emergency line (optional)
-        </label>
-        <p className="text-xs leading-relaxed text-muted-foreground">
-          Shown in after-hours messages. Substitutes{' '}
-          <code className="font-mono text-xs">{'{{emergency_line}}'}</code>.
-        </p>
-        <Input
-          id="emergency-line"
-          type="tel"
-          placeholder="+1 (555) 555-0911"
-          value={emergencyLine}
-          onChange={(e) => setEmergencyLine(e.target.value)}
-        />
-      </section>
+      {error ? <StepError message={error} /> : null}
 
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
-
-      <div className="flex items-center justify-end">
-        <Button
+      <motion.div variants={fadeUp} className="flex items-center justify-end">
+        <PrimaryCTA
           type="button"
-          size="lg"
           onClick={handleContinue}
           disabled={saving}
-          style={{ backgroundColor: primaryColor }}
-          className="min-w-[140px]"
+          loading={saving}
+          primaryColor={primaryColor}
         >
           {saving ? 'Saving…' : 'Continue'}
-        </Button>
+        </PrimaryCTA>
+      </motion.div>
+    </motion.div>
+  )
+}
+
+function VoiceTile({
+  voice,
+  selected,
+  primaryColor,
+  onClick,
+}: {
+  voice: { value: Voice; label: string; example: string; icon: typeof Megaphone; accent: string }
+  selected: boolean
+  primaryColor: string
+  onClick: () => void
+}) {
+  const Icon = voice.icon
+  return (
+    <motion.button
+      type="button"
+      onClick={onClick}
+      whileHover={{ y: -2 }}
+      whileTap={{ scale: 0.99 }}
+      transition={{ type: 'spring', stiffness: 320, damping: 24 }}
+      style={
+        selected
+          ? {
+              borderColor: `${primaryColor}66`,
+              boxShadow: `0 0 0 1px ${primaryColor}40, 0 12px 28px -16px ${primaryColor}aa`,
+            }
+          : undefined
+      }
+      className={cn(
+        'group relative overflow-hidden rounded-2xl border bg-white/[0.02] p-4 text-left transition-colors duration-200',
+        selected
+          ? 'bg-white/[0.04]'
+          : 'border-white/[0.06] hover:border-white/[0.14] hover:bg-white/[0.035]',
+      )}
+    >
+      <div
+        aria-hidden
+        className={cn(
+          'pointer-events-none absolute -right-10 -top-10 size-28 rounded-full blur-2xl transition-opacity duration-500',
+          selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-60',
+        )}
+        style={{ background: `radial-gradient(circle at center, ${voice.accent}66, transparent 70%)` }}
+      />
+
+      <div className="relative flex items-center gap-2">
+        <span
+          aria-hidden
+          style={{
+            background: selected
+              ? `linear-gradient(135deg, ${voice.accent}33, ${voice.accent}0a)`
+              : 'linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02))',
+            boxShadow: selected
+              ? `inset 0 0 0 1px ${voice.accent}33`
+              : 'inset 0 0 0 1px rgba(255,255,255,0.06)',
+          }}
+          className="flex h-8 w-8 items-center justify-center rounded-lg"
+        >
+          <Icon
+            className="h-4 w-4"
+            style={{ color: selected ? voice.accent : 'rgba(255,255,255,0.55)' }}
+            aria-hidden
+          />
+        </span>
+        <p className="text-sm font-semibold text-white">{voice.label}</p>
       </div>
+      <p className="relative mt-3 text-xs italic leading-relaxed text-white/55">{voice.example}</p>
+    </motion.button>
+  )
+}
+
+function HourSelect({
+  id,
+  label,
+  value,
+  onChange,
+}: {
+  id: string
+  label: string
+  value: number | null
+  onChange: (v: number | null) => void
+}) {
+  return (
+    <div className="space-y-1">
+      <label htmlFor={id} className="text-xs text-white/55">
+        {label}
+      </label>
+      <select
+        id={id}
+        value={value ?? ''}
+        onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))}
+        className="h-11 w-full appearance-none rounded-md border border-white/[0.08] bg-white/[0.02] px-3 text-sm text-white outline-none transition-colors hover:border-white/[0.16] focus:border-white/[0.25]"
+      >
+        <option value="" className="bg-[#0B1015] text-white">
+          — Not set —
+        </option>
+        {HOURS.map((h) => (
+          <option key={h} value={h} className="bg-[#0B1015] text-white">
+            {fmtHour(h)}
+          </option>
+        ))}
+      </select>
     </div>
   )
 }
@@ -327,7 +393,7 @@ function LinkField({
 }) {
   return (
     <div className="space-y-1">
-      <label htmlFor={id} className="text-xs text-muted-foreground">
+      <label htmlFor={id} className="text-xs text-white/55">
         {label}
       </label>
       <Input
@@ -336,6 +402,7 @@ function LinkField({
         placeholder={placeholder}
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        className="h-11 border-white/[0.08] bg-white/[0.02] text-sm text-white placeholder:text-white/30 focus-visible:border-white/[0.2] focus-visible:ring-1 focus-visible:ring-white/10"
       />
     </div>
   )

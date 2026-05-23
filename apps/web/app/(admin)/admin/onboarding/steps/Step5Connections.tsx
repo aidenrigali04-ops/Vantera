@@ -1,13 +1,12 @@
 'use client'
 
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
+import { motion } from 'framer-motion'
 import { Check } from 'lucide-react'
 import { useState } from 'react'
 import { completeOnboarding, saveIntegrationCredentials } from '../actions'
-
-const NATIVELY_HANDLED_COPY = "Don't have %SERVICE%? We handle this natively."
+import { PrimaryCTA, StepError, StepHeader, fadeUp, stepContainer } from '../_primitives'
 
 type ImmediateProvider = 'stripe' | 'twilio'
 type PlaceholderProvider = 'quickbooks' | 'google_calendar' | 'hubspot' | 'gohighlevel'
@@ -17,7 +16,11 @@ type TileBase = {
   provider: AnyProvider
   name: string
   description: string
-  swatch: string
+  monogram: string
+  /** Two-stop gradient for the icon swatch (matches the screenshot's tiles). */
+  gradient: [string, string]
+  /** Sub-line of small uppercase tags (e.g. "CRM · SMS · FUNNELS"). */
+  tags: string[]
 }
 
 type ImmediateTile = TileBase & {
@@ -40,7 +43,9 @@ const TILES: Tile[] = [
     provider: 'stripe',
     name: 'Stripe',
     description: 'Payments & invoicing',
-    swatch: '#635BFF',
+    monogram: 'S',
+    gradient: ['#635BFF', '#7A6BFF'],
+    tags: ['Payments', 'Invoices'],
     kind: 'immediate',
     fields: [
       { key: 'secretKey', label: 'Secret key', type: 'password' },
@@ -51,7 +56,9 @@ const TILES: Tile[] = [
     provider: 'twilio',
     name: 'Twilio',
     description: 'SMS & phone calls',
-    swatch: '#F22F46',
+    monogram: 'T',
+    gradient: ['#F22F46', '#F65A6E'],
+    tags: ['SMS', 'Voice', 'Numbers'],
     kind: 'immediate',
     fields: [
       { key: 'accountSid', label: 'Account SID', type: 'text' },
@@ -63,37 +70,45 @@ const TILES: Tile[] = [
     provider: 'quickbooks',
     name: 'QuickBooks',
     description: 'Accounting & invoices',
-    swatch: '#2CA01C',
+    monogram: 'QB',
+    gradient: ['#2CA01C', '#5BC74B'],
+    tags: ['Accounting', 'Books'],
     kind: 'placeholder',
     buttonLabel: 'Connect QuickBooks',
-    note: 'Connection coming in Phase 2 setup',
+    note: 'Coming in Phase 2',
   },
   {
     provider: 'google_calendar',
     name: 'Google Calendar',
     description: 'Scheduling & availability',
-    swatch: '#4285F4',
+    monogram: 'GC',
+    gradient: ['#4285F4', '#5B9DF9'],
+    tags: ['Calendar', 'Scheduling'],
     kind: 'placeholder',
     buttonLabel: 'Connect Google Calendar',
-    note: 'Connection coming in Phase 2 setup',
+    note: 'Coming in Phase 2',
   },
   {
     provider: 'hubspot',
     name: 'HubSpot',
     description: 'CRM sync',
-    swatch: '#FF7A59',
+    monogram: 'HS',
+    gradient: ['#FF7A59', '#FFA37C'],
+    tags: ['CRM', 'Pipeline', 'Deals'],
     kind: 'placeholder',
     buttonLabel: 'Connect HubSpot',
-    note: 'Connection coming in Phase 2 setup',
+    note: 'Coming in Phase 2',
   },
   {
     provider: 'gohighlevel',
     name: 'GoHighLevel',
     description: 'Marketing automation',
-    swatch: '#1E3A8A',
+    monogram: 'GHL',
+    gradient: ['#1E3A8A', '#3B6FE0'],
+    tags: ['CRM', 'SMS', 'Funnels'],
     kind: 'placeholder',
     buttonLabel: 'Connect GoHighLevel',
-    note: 'Connection coming in Phase 2 setup',
+    note: 'Coming in Phase 2',
   },
 ]
 
@@ -105,11 +120,13 @@ type Props = {
 
 export function Step5Connections({ accountId, primaryColor, onComplete }: Props) {
   const [connected, setConnected] = useState<Record<string, boolean>>({})
+  const [openTile, setOpenTile] = useState<string | null>(null)
   const [completing, setCompleting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   function markConnected(provider: string) {
     setConnected((prev) => ({ ...prev, [provider]: true }))
+    setOpenTile(null)
   }
 
   async function handleComplete() {
@@ -128,44 +145,50 @@ export function Step5Connections({ accountId, primaryColor, onComplete }: Props)
     onComplete()
   }
 
-  return (
-    <div className="space-y-8">
-      <div className="space-y-2">
-        <h1 className="text-3xl font-semibold leading-tight tracking-tight">Connect your tools</h1>
-        <p className="text-base leading-relaxed text-muted-foreground">
-          Optional — bring your existing Stripe or Twilio account, or skip and use our native
-          equivalents. Everything is editable later from the integrations page.
-        </p>
-      </div>
+  const connectedCount = Object.values(connected).filter(Boolean).length
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+  return (
+    <motion.div variants={stepContainer} initial="hidden" animate="show" className="space-y-8">
+      <StepHeader
+        title="Connect your stack"
+        subtitle="Optional — bring your existing Stripe or Twilio account, or skip and use our native equivalents. Everything is editable later from the integrations page."
+      />
+
+      <motion.div variants={fadeUp} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {TILES.map((tile) => (
           <IntegrationTile
             key={tile.provider}
             tile={tile}
             accountId={accountId}
             primaryColor={primaryColor}
+            isOpen={openTile === tile.provider}
             isConnected={connected[tile.provider] === true}
+            onOpen={() => setOpenTile(openTile === tile.provider ? null : tile.provider)}
             onConnected={() => markConnected(tile.provider)}
           />
         ))}
-      </div>
+      </motion.div>
 
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
+      {error ? <StepError message={error} /> : null}
 
-      <div className="flex items-center justify-end">
-        <Button
+      <motion.div variants={fadeUp} className="flex items-center justify-between">
+        <p className="text-xs text-white/45">
+          {connectedCount > 0
+            ? `${connectedCount} connection${connectedCount > 1 ? 's' : ''} added`
+            : 'No connections — your AI brain still works on email-only fallback.'}
+        </p>
+        <PrimaryCTA
           type="button"
-          size="lg"
           onClick={handleComplete}
           disabled={completing}
-          style={{ backgroundColor: primaryColor }}
-          className="min-w-[160px]"
+          loading={completing}
+          primaryColor={primaryColor}
+          className="min-w-[180px]"
         >
           {completing ? 'Finishing…' : 'Complete setup'}
-        </Button>
-      </div>
-    </div>
+        </PrimaryCTA>
+      </motion.div>
+    </motion.div>
   )
 }
 
@@ -173,52 +196,159 @@ function IntegrationTile({
   tile,
   accountId,
   primaryColor,
+  isOpen,
   isConnected,
+  onOpen,
   onConnected,
 }: {
   tile: Tile
   accountId: string
   primaryColor: string
+  isOpen: boolean
   isConnected: boolean
+  onOpen: () => void
   onConnected: () => void
 }) {
+  const [g1, g2] = tile.gradient
+
   return (
-    <div
+    <motion.div
+      layout
+      whileHover={{ y: -2 }}
+      transition={{ type: 'spring', stiffness: 320, damping: 24 }}
       className={cn(
-        'space-y-3 rounded-xl border bg-card p-4 transition-colors',
-        isConnected ? 'border-emerald-200 bg-emerald-50/40' : 'hover:border-foreground/20',
+        'group relative overflow-hidden rounded-2xl border bg-white/[0.02] p-5 transition-colors',
+        isConnected
+          ? 'border-emerald-400/30'
+          : isOpen
+            ? 'border-white/[0.14]'
+            : 'border-white/[0.06] hover:border-white/[0.14] hover:bg-white/[0.035]',
       )}
     >
-      <div className="flex items-start gap-3">
-        <div
-          aria-hidden
-          style={{ backgroundColor: tile.swatch }}
-          className="h-9 w-9 shrink-0 rounded-lg ring-1 ring-inset ring-black/10"
-        />
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center justify-between gap-2">
-            <p className="truncate text-sm font-semibold">{tile.name}</p>
-            <StatusBadge connected={isConnected} />
+      {/* Brand-colored corner glow — same vocabulary as the dashboard KPI tiles. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -right-12 -top-12 size-32 rounded-full opacity-0 blur-2xl transition-opacity duration-500 group-hover:opacity-60"
+        style={{ background: `radial-gradient(circle at center, ${g1}55, transparent 70%)` }}
+      />
+
+      <div className="relative">
+        <div className="flex items-start gap-3">
+          <span
+            aria-hidden
+            style={{
+              background: `linear-gradient(135deg, ${g1}, ${g2})`,
+              boxShadow: `inset 0 0 0 1px rgba(255,255,255,0.12), 0 8px 20px -8px ${g1}66`,
+            }}
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-sm font-semibold text-white"
+          >
+            {tile.monogram}
+          </span>
+
+          <div className="min-w-0 flex-1">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-white">{tile.name}</p>
+                <p className="mt-0.5 truncate text-xs text-white/50">{tile.description}</p>
+              </div>
+              <StatusPill
+                connected={isConnected}
+                kind={tile.kind}
+                onClick={tile.kind === 'immediate' && !isConnected ? onOpen : undefined}
+                isOpen={isOpen}
+              />
+            </div>
+
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              {tile.tags.map((tag) => (
+                <span
+                  key={tag}
+                  className="text-[10px] font-medium uppercase tracking-wider text-white/40"
+                >
+                  {tag}
+                </span>
+              )).reduce<React.ReactNode[]>((acc, el, idx, arr) => {
+                acc.push(el)
+                if (idx < arr.length - 1) {
+                  acc.push(
+                    <span key={`dot-${idx}`} aria-hidden className="text-white/20">
+                      ·
+                    </span>,
+                  )
+                }
+                return acc
+              }, [])}
+            </div>
           </div>
-          <p className="text-xs leading-relaxed text-muted-foreground">{tile.description}</p>
         </div>
+
+        {/* Expandable credential form for immediate-connect providers. */}
+        <motion.div
+          initial={false}
+          animate={{
+            height: isOpen && tile.kind === 'immediate' && !isConnected ? 'auto' : 0,
+            opacity: isOpen && tile.kind === 'immediate' && !isConnected ? 1 : 0,
+          }}
+          transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+          className="overflow-hidden"
+        >
+          {tile.kind === 'immediate' ? (
+            <div className="pt-4">
+              <ImmediateConnectForm
+                tile={tile}
+                accountId={accountId}
+                primaryColor={primaryColor}
+                onConnected={onConnected}
+              />
+            </div>
+          ) : null}
+        </motion.div>
       </div>
+    </motion.div>
+  )
+}
 
-      {tile.kind === 'immediate' ? (
-        <ImmediateConnectForm
-          tile={tile}
-          accountId={accountId}
-          primaryColor={primaryColor}
-          onConnected={onConnected}
-        />
-      ) : (
-        <PlaceholderConnect tile={tile} />
-      )}
+function StatusPill({
+  connected,
+  kind,
+  onClick,
+  isOpen,
+}: {
+  connected: boolean
+  kind: 'immediate' | 'placeholder'
+  onClick?: () => void
+  isOpen: boolean
+}) {
+  if (connected) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-emerald-300">
+        <Check className="h-3 w-3" aria-hidden />
+        Connected
+      </span>
+    )
+  }
 
-      <p className="text-[11px] leading-relaxed text-muted-foreground">
-        {NATIVELY_HANDLED_COPY.replace('%SERVICE%', tile.name)}
-      </p>
-    </div>
+  if (kind === 'immediate') {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className={cn(
+          'inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider transition-colors',
+          isOpen
+            ? 'border-white/20 bg-white/10 text-white'
+            : 'border-emerald-400/30 bg-emerald-400/[0.06] text-emerald-300 hover:border-emerald-400/50 hover:bg-emerald-400/[0.1]',
+        )}
+      >
+        {isOpen ? 'Cancel' : 'Connect'}
+      </button>
+    )
+  }
+
+  return (
+    <span className="inline-flex items-center rounded-full border border-white/[0.08] bg-white/[0.03] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white/50">
+      Available
+    </span>
   )
 }
 
@@ -262,53 +392,42 @@ function ImmediateConnectForm({
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2 border-t border-white/[0.06] pt-4">
       {tile.fields.map((field) => (
-        <Input
-          key={field.key}
-          type={field.type}
-          placeholder={field.label}
-          value={values[field.key] ?? ''}
-          onChange={(e) => setValues((prev) => ({ ...prev, [field.key]: e.target.value }))}
-          autoComplete="off"
-        />
+        <div key={field.key} className="space-y-1">
+          <label htmlFor={`${tile.provider}-${field.key}`} className="text-[11px] text-white/55">
+            {field.label}
+          </label>
+          <Input
+            id={`${tile.provider}-${field.key}`}
+            type={field.type}
+            placeholder={field.label}
+            value={values[field.key] ?? ''}
+            onChange={(e) => setValues((prev) => ({ ...prev, [field.key]: e.target.value }))}
+            autoComplete="off"
+            className="h-10 border-white/[0.08] bg-white/[0.02] text-sm text-white placeholder:text-white/30 focus-visible:border-white/[0.2] focus-visible:ring-1 focus-visible:ring-white/10"
+          />
+        </div>
       ))}
-      {error ? <p className="text-xs text-destructive">{error}</p> : null}
-      <Button
+      {error ? (
+        <p className="rounded-md bg-red-500/[0.08] px-2 py-1.5 text-[11px] text-red-300">{error}</p>
+      ) : null}
+      <button
         type="button"
-        size="sm"
         onClick={handleSave}
         disabled={saving}
-        style={{ backgroundColor: primaryColor }}
-        className="w-full"
+        style={{
+          background: saving
+            ? 'rgba(255,255,255,0.06)'
+            : `linear-gradient(135deg, ${primaryColor}, ${primaryColor}cc)`,
+          boxShadow: saving
+            ? 'none'
+            : `0 8px 20px -10px ${primaryColor}aa, inset 0 1px 0 rgba(255,255,255,0.18)`,
+        }}
+        className="mt-1 inline-flex h-9 w-full items-center justify-center rounded-md text-xs font-medium text-white transition-colors disabled:cursor-not-allowed disabled:text-white/40"
       >
         {saving ? 'Verifying…' : `Connect ${tile.name}`}
-      </Button>
+      </button>
     </div>
-  )
-}
-
-function PlaceholderConnect({ tile }: { tile: PlaceholderTile }) {
-  return (
-    <div className="space-y-2">
-      <Button type="button" size="sm" variant="outline" disabled className="w-full">
-        {tile.buttonLabel}
-      </Button>
-      <p className="text-xs text-muted-foreground">{tile.note}</p>
-    </div>
-  )
-}
-
-function StatusBadge({ connected }: { connected: boolean }) {
-  return (
-    <span
-      className={cn(
-        'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium',
-        connected ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-muted-foreground',
-      )}
-    >
-      {connected ? <Check className="h-3 w-3" /> : null}
-      {connected ? 'Connected' : 'Not connected'}
-    </span>
   )
 }

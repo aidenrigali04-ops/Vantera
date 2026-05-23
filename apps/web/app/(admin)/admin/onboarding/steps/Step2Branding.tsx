@@ -1,14 +1,22 @@
 'use client'
 
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser'
 import { cn } from '@/lib/utils'
 import imageCompression from 'browser-image-compression'
-import { Upload } from 'lucide-react'
+import { motion } from 'framer-motion'
+import { ImageIcon, Upload } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { useDropzone } from 'react-dropzone'
 import { updateBranding } from '../actions'
+import {
+  FieldGroup,
+  PrimaryCTA,
+  StepError,
+  StepHeader,
+  fadeUp,
+  stepContainer,
+} from '../_primitives'
 
 const MAX_BYTES = 2 * 1024 * 1024
 const COMPRESS_OVER_BYTES = 500 * 1024
@@ -172,71 +180,79 @@ export function Step2Branding({
   const previewDomain = portalDomain || 'portal.yourbusiness.com'
 
   return (
-    <div className="space-y-10">
-      <div className="space-y-2">
-        <h1 className="text-3xl font-semibold leading-tight tracking-tight">Make it yours</h1>
-        <p className="text-base leading-relaxed text-muted-foreground">
-          Upload a logo, pick your brand colors, and reserve your client portal domain. Everything
-          here is editable later from settings.
-        </p>
-      </div>
+    <motion.div variants={stepContainer} initial="hidden" animate="show" className="space-y-10">
+      <StepHeader
+        title="Make it yours"
+        subtitle="Upload a logo, pick your brand colors, and reserve your client portal domain. Everything here is editable later from settings."
+      />
 
-      <section className="space-y-3">
-        <label className="text-sm font-semibold">Logo</label>
+      <FieldGroup label="Logo">
         <div
           {...getRootProps()}
           className={cn(
-            'flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed bg-muted/30 p-10 text-center text-sm transition-colors',
-            isDragActive ? 'border-foreground bg-muted/60' : 'hover:border-foreground/40 hover:bg-muted/40',
+            'group flex cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border border-dashed bg-white/[0.02] p-10 text-center text-sm transition-all duration-200 hover:scale-[1.005]',
+            isDragActive
+              ? 'border-white/40 bg-white/[0.06]'
+              : 'border-white/[0.10] hover:border-white/[0.25] hover:bg-white/[0.035]',
           )}
         >
           <input {...getInputProps()} />
-          {logoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={logoUrl} alt="Logo preview" className="h-14 w-auto max-w-[220px] object-contain" />
-          ) : (
-            <Upload className="h-6 w-6 text-muted-foreground" />
-          )}
-          <p className="text-muted-foreground">
-            {logoUploading
-              ? 'Uploading…'
-              : logoUrl
-                ? 'Drag a new file or click to replace'
-                : 'Drag your logo here, or click to browse'}
-          </p>
-          <p className="text-xs text-muted-foreground">PNG, JPG, WebP, or SVG · up to 2MB</p>
+          <span
+            aria-hidden
+            style={{
+              background: `linear-gradient(135deg, ${primary}33, ${primary}0a)`,
+              boxShadow: `inset 0 0 0 1px ${primary}33`,
+            }}
+            className="flex h-12 w-12 items-center justify-center rounded-xl"
+          >
+            {logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={logoUrl} alt="Logo preview" className="h-9 w-9 object-contain" />
+            ) : (
+              <Upload className="h-5 w-5" style={{ color: primary }} aria-hidden />
+            )}
+          </span>
+          <div>
+            <p className="text-sm font-medium text-white/90">
+              {logoUploading
+                ? 'Uploading…'
+                : logoUrl
+                  ? 'Drag a new file or click to replace'
+                  : 'Drag your logo here, or click to browse'}
+            </p>
+            <p className="mt-1 text-xs text-white/45">PNG, JPG, WebP, or SVG · up to 2MB</p>
+          </div>
         </div>
-      </section>
+      </FieldGroup>
 
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <motion.section variants={fadeUp} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <ColorField label="Primary color" value={primary} onChange={setPrimary} />
         <ColorField label="Secondary color" value={secondary} onChange={setSecondary} />
-      </section>
+      </motion.section>
 
-      <section className="space-y-2">
-        <label htmlFor="portal-domain" className="text-sm font-medium">
-          Portal domain (optional)
-        </label>
+      <FieldGroup
+        label="Portal domain"
+        description={
+          'Point your subdomain CNAME to portals.vantera.app. Setup instructions are emailed after onboarding.'
+        }
+      >
         <Input
           id="portal-domain"
           type="text"
           placeholder="portal.yourbusiness.com"
           value={portalDomain}
           onChange={(e) => setPortalDomain(e.target.value.trim())}
+          className="h-11 border-white/[0.08] bg-white/[0.02] text-sm text-white placeholder:text-white/30 focus-visible:border-white/[0.2] focus-visible:ring-1 focus-visible:ring-white/10"
         />
-        <p className="text-xs text-muted-foreground">
-          Point your subdomain's CNAME record to: <span className="font-mono">portals.vantera.app</span>
-        </p>
-        <p className="text-xs text-muted-foreground">
-          Setup instructions will be sent to your email after onboarding.
-        </p>
-      </section>
+      </FieldGroup>
 
-      <section className="space-y-3">
-        <p className="text-sm font-semibold">Portal preview</p>
-        <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
+      <FieldGroup label="Portal preview" description="A peek at how your portal will look to clients.">
+        <motion.div
+          variants={fadeUp}
+          className="overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.015]"
+        >
           <div
-            style={{ backgroundColor: primary }}
+            style={{ background: `linear-gradient(135deg, ${primary}, ${primary}cc)` }}
             className="flex items-center justify-between px-4 py-3 text-white"
           >
             <div className="flex items-center gap-2">
@@ -249,57 +265,67 @@ export function Step2Branding({
             </div>
             <span className="text-xs opacity-80">{previewDomain}</span>
           </div>
-          <div className="space-y-2 p-4">
-            <div className="h-3 w-3/4 rounded bg-muted" />
-            <div className="h-3 w-1/2 rounded bg-muted" />
-            <div className="mt-4 flex gap-2">
+          <div className="space-y-3 p-4">
+            <div className="flex items-center gap-2">
+              <ImageIcon className="h-4 w-4 text-white/30" aria-hidden />
+              <div className="h-2 w-3/4 rounded bg-white/10" />
+            </div>
+            <div className="h-2 w-1/2 rounded bg-white/[0.06]" />
+            <div className="mt-3 flex gap-2">
               <span
-                style={{ backgroundColor: primary }}
-                className="rounded px-3 py-1 text-xs font-medium text-white"
+                style={{ background: `linear-gradient(135deg, ${primary}, ${primary}cc)` }}
+                className="rounded-md px-3 py-1.5 text-xs font-medium text-white shadow-sm"
               >
                 Primary
               </span>
               <span
-                style={{ backgroundColor: secondary }}
-                className="rounded px-3 py-1 text-xs font-medium text-white"
+                style={{ background: `linear-gradient(135deg, ${secondary}, ${secondary}cc)` }}
+                className="rounded-md px-3 py-1.5 text-xs font-medium text-white shadow-sm"
               >
                 Secondary
               </span>
             </div>
           </div>
-        </div>
-      </section>
+        </motion.div>
+      </FieldGroup>
 
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
+      {error ? <StepError message={error} /> : null}
 
-      <div className="flex items-center justify-end">
-        <Button
+      <motion.div variants={fadeUp} className="flex items-center justify-end">
+        <PrimaryCTA
           type="button"
-          size="lg"
           onClick={handleContinue}
           disabled={saving}
-          style={{ backgroundColor: primary }}
-          className="min-w-[140px]"
+          loading={saving}
+          primaryColor={primary}
         >
           {saving ? 'Saving…' : 'Continue'}
-        </Button>
-      </div>
-    </div>
+        </PrimaryCTA>
+      </motion.div>
+    </motion.div>
   )
 }
 
-function ColorField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+function ColorField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string
+  value: string
+  onChange: (v: string) => void
+}) {
   const valid = HEX.test(value)
   return (
     <div className="space-y-2">
-      <label className="text-sm font-semibold">{label}</label>
+      <label className="text-sm font-semibold text-white">{label}</label>
       <div className="flex items-center gap-2">
         <div
           aria-hidden
-          style={valid ? { backgroundColor: value } : undefined}
+          style={valid ? { backgroundColor: value, boxShadow: `0 0 18px -6px ${value}` } : undefined}
           className={cn(
-            'relative h-10 w-12 shrink-0 overflow-hidden rounded-md border border-input ring-1 ring-inset ring-black/[0.04] transition-colors',
-            !valid && 'bg-background',
+            'relative h-11 w-14 shrink-0 overflow-hidden rounded-md border transition-all',
+            valid ? 'border-white/[0.15]' : 'border-white/[0.08] bg-white/[0.02]',
           )}
         >
           <input
@@ -316,7 +342,7 @@ function ColorField({ label, value, onChange }: { label: string; value: string; 
           onChange={(e) => onChange(e.target.value.trim())}
           placeholder="#1648A0"
           maxLength={7}
-          className="font-mono uppercase tracking-wide"
+          className="h-11 border-white/[0.08] bg-white/[0.02] font-mono uppercase tracking-wide text-white placeholder:text-white/30 focus-visible:border-white/[0.2] focus-visible:ring-1 focus-visible:ring-white/10"
         />
       </div>
     </div>

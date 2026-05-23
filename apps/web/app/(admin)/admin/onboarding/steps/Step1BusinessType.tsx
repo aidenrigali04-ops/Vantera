@@ -1,7 +1,6 @@
 'use client'
 
-import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
+import { motion } from 'framer-motion'
 import {
   Briefcase,
   Building,
@@ -14,6 +13,7 @@ import {
 } from 'lucide-react'
 import { useState } from 'react'
 import { updateVertical } from '../actions'
+import { PrimaryCTA, SelectableTile, StepError, StepHeader, fadeUp, stepContainer } from '../_primitives'
 
 type Vertical =
   | 'hvac'
@@ -29,50 +29,58 @@ type VerticalCard = {
   label: string
   description: string
   icon: LucideIcon
+  accent: string
 }
 
 const VERTICALS: VerticalCard[] = [
   {
     value: 'hvac',
     label: 'HVAC',
-    description: 'Manage service calls, maintenance plans, and equipment installs',
+    description: 'Service calls, maintenance plans, equipment installs',
     icon: Wrench,
+    accent: '#3B82F6',
   },
   {
     value: 'landscaping',
     label: 'Landscaping',
-    description: 'Run recurring crews, estimates, and seasonal contracts',
+    description: 'Recurring crews, estimates, seasonal contracts',
     icon: Leaf,
+    accent: '#10B981',
   },
   {
     value: 'plumbing',
     label: 'Plumbing',
-    description: 'Handle emergency dispatch, quotes, and job completion',
+    description: 'Emergency dispatch, quotes, job completion',
     icon: Droplet,
+    accent: '#06B6D4',
   },
   {
     value: 'construction',
     label: 'Construction',
-    description: 'Track projects, change orders, and client milestones',
+    description: 'Projects, change orders, client milestones',
     icon: HardHat,
+    accent: '#F59E0B',
   },
   {
     value: 'property_mgmt',
     label: 'Property Management',
-    description: 'Manage tenants, leases, maintenance, and owners',
+    description: 'Tenants, leases, maintenance, owners',
     icon: Building,
+    accent: '#8B5CF6',
   },
   {
     value: 'agency',
     label: 'Agency',
-    description: 'Deliver campaigns, manage clients, and prove ROI',
+    description: 'Campaigns, clients, ROI reporting',
     icon: Briefcase,
+    accent: '#EC4899',
   },
   {
     value: 'real_estate',
     label: 'Real Estate',
-    description: 'Track leads, transactions, and agent performance',
+    description: 'Leads, transactions, agent performance',
     icon: Home,
+    accent: '#EF4444',
   },
 ]
 
@@ -112,80 +120,40 @@ export function Step1BusinessType({ accountId, currentVertical, primaryColor, on
   }
 
   return (
-    <div className="space-y-8">
-      <div className="space-y-2">
-        <h1 className="text-3xl font-semibold leading-tight tracking-tight">
-          What kind of business do you run?
-        </h1>
-        <p className="text-base leading-relaxed text-muted-foreground">
-          We'll tailor your pipelines, automations, and AI tone to your industry — pick the closest
-          match.
-        </p>
-      </div>
+    <motion.div variants={stepContainer} initial="hidden" animate="show" className="space-y-8">
+      <StepHeader
+        title="What kind of business do you run?"
+        subtitle="We tailor pipelines, automations, and the AI tone to your industry — pick the closest match."
+      />
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        {VERTICALS.map((vertical) => {
-          const Icon = vertical.icon
-          const isSelected = selected === vertical.value
+      <motion.div variants={fadeUp} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {VERTICALS.map((vertical) => (
+          <SelectableTile
+            key={vertical.value}
+            selected={selected === vertical.value}
+            primaryColor={primaryColor}
+            iconColor={vertical.accent}
+            onClick={() => setSelected(vertical.value)}
+            icon={vertical.icon}
+            title={vertical.label}
+            description={vertical.description}
+          />
+        ))}
+      </motion.div>
 
-          return (
-            <button
-              key={vertical.value}
-              type="button"
-              onClick={() => setSelected(vertical.value)}
-              style={
-                isSelected
-                  ? {
-                      borderColor: primaryColor,
-                      boxShadow: `0 0 0 3px ${primaryColor}1f`,
-                    }
-                  : undefined
-              }
-              className={cn(
-                'group flex items-start gap-3 rounded-xl border bg-card p-4 text-left transition-all duration-150',
-                isSelected ? 'bg-card' : 'hover:border-foreground/20 hover:bg-accent/40',
-              )}
-            >
-              <div
-                style={
-                  isSelected
-                    ? { backgroundColor: `${primaryColor}1f`, color: primaryColor }
-                    : undefined
-                }
-                className={cn(
-                  'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg transition-colors',
-                  isSelected
-                    ? ''
-                    : 'bg-muted text-muted-foreground group-hover:bg-muted-foreground/10 group-hover:text-foreground',
-                )}
-              >
-                <Icon className="h-5 w-5" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold leading-tight">{vertical.label}</p>
-                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                  {vertical.description}
-                </p>
-              </div>
-            </button>
-          )
-        })}
-      </div>
+      {error ? <StepError message={error} /> : null}
 
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
-
-      <div className="flex items-center justify-end">
-        <Button
+      <motion.div variants={fadeUp} className="flex items-center justify-end">
+        <PrimaryCTA
           type="button"
-          size="lg"
           onClick={handleContinue}
           disabled={!selected || saving}
-          style={selected ? { backgroundColor: primaryColor } : undefined}
-          className="min-w-[140px]"
+          loading={saving}
+          primaryColor={primaryColor}
         >
           {saving ? 'Saving…' : 'Continue'}
-        </Button>
-      </div>
-    </div>
+        </PrimaryCTA>
+      </motion.div>
+    </motion.div>
   )
 }

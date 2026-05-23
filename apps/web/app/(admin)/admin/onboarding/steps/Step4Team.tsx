@@ -1,6 +1,5 @@
 'use client'
 
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
   Select,
@@ -9,9 +8,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { X } from 'lucide-react'
+import { motion } from 'framer-motion'
+import { Mail, Plus, X } from 'lucide-react'
 import { useState } from 'react'
 import { inviteTeamMembers } from '../actions'
+import {
+  GhostCTA,
+  PrimaryCTA,
+  StepError,
+  StepHeader,
+  fadeUp,
+  stepContainer,
+} from '../_primitives'
 
 const ROLES = ['owner', 'admin', 'manager', 'staff', 'technician', 'agent'] as const
 type Role = (typeof ROLES)[number]
@@ -85,94 +93,101 @@ export function Step4Team({ accountId, primaryColor, onComplete }: Props) {
   }
 
   return (
-    <div className="space-y-8">
-      <div className="space-y-2">
-        <h1 className="text-3xl font-semibold leading-tight tracking-tight">Invite your team</h1>
-        <p className="text-base leading-relaxed text-muted-foreground">
-          Add up to {MAX_MEMBERS} teammates. They'll receive an email with a magic sign-in link —
-          no passwords needed.
-        </p>
-      </div>
+    <motion.div variants={stepContainer} initial="hidden" animate="show" className="space-y-8">
+      <StepHeader
+        title="Invite your team"
+        subtitle={`Add up to ${MAX_MEMBERS} teammates. They'll receive an email with a magic sign-in link — no passwords needed.`}
+      />
 
-      <div className="space-y-3">
+      <motion.div variants={fadeUp} className="space-y-3">
         {members.map((member, index) => (
-          <div
+          <motion.div
             key={index}
-            className="flex items-center gap-2 rounded-xl border bg-card p-2 transition-colors hover:border-foreground/20"
+            initial={{ opacity: 0, x: -6 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.04 * index, ease: 'easeOut' }}
+            className="group flex items-center gap-2 rounded-xl border border-white/[0.06] bg-white/[0.02] p-2 transition-colors hover:border-white/[0.14] hover:bg-white/[0.035]"
           >
+            <span
+              aria-hidden
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/[0.04] text-white/55 ring-1 ring-inset ring-white/[0.06]"
+            >
+              <Mail className="h-4 w-4" aria-hidden />
+            </span>
             <Input
               type="email"
               placeholder="teammate@email.com"
               value={member.email}
               onChange={(e) => updateMember(index, { email: e.target.value })}
-              className="flex-1 border-0 bg-transparent shadow-none focus-visible:ring-0"
+              className="h-9 flex-1 border-0 bg-transparent text-sm text-white placeholder:text-white/30 shadow-none focus-visible:ring-0"
             />
             <Select
               value={member.role}
               onValueChange={(value) => updateMember(index, { role: value as Role })}
             >
-              <SelectTrigger className="w-[150px] border-0 bg-muted/40 shadow-none focus:ring-0">
+              <SelectTrigger className="h-9 w-[140px] border border-white/[0.06] bg-white/[0.03] text-xs text-white shadow-none focus:ring-0">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="border-white/[0.08] bg-[#0F141B] text-white">
                 {ROLES.map((role) => (
-                  <SelectItem key={role} value={role}>
+                  <SelectItem
+                    key={role}
+                    value={role}
+                    className="text-xs text-white focus:bg-white/[0.06] focus:text-white"
+                  >
                     {ROLE_LABELS[role]}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
             {members.length > 1 ? (
-              <Button
+              <button
                 type="button"
-                variant="ghost"
-                size="icon"
-                aria-label="Remove member"
                 onClick={() => removeMember(index)}
-                className="text-muted-foreground hover:text-destructive"
+                aria-label="Remove member"
+                className="flex h-9 w-9 items-center justify-center rounded-md text-white/40 transition-colors hover:bg-red-500/10 hover:text-red-300"
               >
                 <X className="h-4 w-4" />
-              </Button>
+              </button>
             ) : null}
-          </div>
+          </motion.div>
         ))}
 
         {members.length < MAX_MEMBERS ? (
-          <button
+          <motion.button
+            variants={fadeUp}
             type="button"
             onClick={addMember}
-            className="text-sm font-medium text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+            whileHover={{ x: 2 }}
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-white/55 transition-colors hover:text-white"
           >
-            + Add another member
-          </button>
+            <Plus className="h-3.5 w-3.5" aria-hidden />
+            Add another member
+          </motion.button>
         ) : (
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-white/45">
             Team plan supports up to {MAX_MEMBERS} invited members.
           </p>
         )}
-      </div>
+      </motion.div>
 
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
+      {error ? <StepError message={error} /> : null}
 
-      <div className="flex items-center justify-between">
-        <button
-          type="button"
-          onClick={handleSkip}
-          className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-        >
+      <motion.div variants={fadeUp} className="flex items-center justify-between">
+        <GhostCTA type="button" onClick={handleSkip}>
           Skip for now
-        </button>
-        <Button
+        </GhostCTA>
+        <PrimaryCTA
           type="button"
-          size="lg"
           onClick={handleSend}
           disabled={sending}
-          style={{ backgroundColor: primaryColor }}
-          className="min-w-[160px]"
+          loading={sending}
+          primaryColor={primaryColor}
+          className="min-w-[180px]"
         >
           {sending ? 'Sending invites…' : 'Send invites'}
-        </Button>
-      </div>
-    </div>
+        </PrimaryCTA>
+      </motion.div>
+    </motion.div>
   )
 }

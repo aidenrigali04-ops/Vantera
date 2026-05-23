@@ -1,8 +1,8 @@
 'use client'
 
-import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { Check } from 'lucide-react'
+import { AnimatePresence, motion } from 'framer-motion'
+import { ArrowLeft, Check } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import { Step1BusinessType } from './steps/Step1BusinessType'
@@ -166,7 +166,7 @@ export function OnboardingWizard({
   }, [completedSteps])
 
   return (
-    <div className="grid min-h-screen grid-cols-1 bg-background lg:grid-cols-[380px_1fr]">
+    <div className="dark grid min-h-screen grid-cols-1 bg-[#0A0E14] text-white lg:grid-cols-[380px_1fr]">
       {/*
        * Dark left rail. Mirrors the auth split-column hero: deep navy
        * #0B1220 base, subtle grid overlay, two radial-blur "glows"
@@ -175,7 +175,7 @@ export function OnboardingWizard({
        * right column scrolls — feels like a desktop app rather than
        * a long centered form.
        */}
-      <aside className="relative hidden overflow-hidden bg-[#0B1220] lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col">
+      <aside className="relative hidden overflow-hidden bg-[#0B1015] lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col">
         <div
           aria-hidden
           className="absolute inset-0 opacity-[0.06]"
@@ -256,13 +256,15 @@ export function OnboardingWizard({
        * step's label below — keeps the wizard usable on phone without
        * showing the full dark rail.
        */}
-      <header className="border-b bg-background px-5 py-4 lg:hidden">
+      <header className="border-b border-white/[0.06] bg-[#0B1015] px-5 py-4 lg:hidden">
         <div className="flex items-center justify-between gap-4">
           <div className="min-w-0">
-            <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            <p className="text-[10px] font-medium uppercase tracking-wider text-white/45">
               Step {activeStep.id} of {STEPS.length}
             </p>
-            <p className="truncate text-sm font-semibold tracking-tight">{activeStep.label}</p>
+            <p className="truncate text-sm font-semibold tracking-tight text-white">
+              {activeStep.label}
+            </p>
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
             {STEPS.map((step) => {
@@ -271,13 +273,11 @@ export function OnboardingWizard({
               return (
                 <span
                   key={step.id}
-                  style={
-                    isDone || isActive ? { backgroundColor: primaryColor } : undefined
-                  }
+                  style={isDone || isActive ? { backgroundColor: primaryColor } : undefined}
                   className={cn(
                     'block h-1.5 rounded-full transition-all',
                     isActive ? 'w-6' : 'w-1.5',
-                    !isDone && !isActive && 'bg-muted-foreground/25',
+                    !isDone && !isActive && 'bg-white/15',
                   )}
                 />
               )
@@ -287,92 +287,133 @@ export function OnboardingWizard({
       </header>
 
       {/* Right pane: the actual step content. */}
-      <main className="min-w-0">
-        <div className="mx-auto w-full max-w-2xl px-6 py-10 sm:px-10 sm:py-14">
-          <div className="mb-8 space-y-1">
-            <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-              Step {activeStep.id} of {STEPS.length} · {activeStep.subtitle}
-            </p>
-          </div>
+      <main className="relative min-w-0 overflow-hidden">
+        {/* Top-right brand-tinted glow — matches the dashboard's page glow. */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute right-0 top-0 size-[36rem] opacity-[0.10] blur-3xl"
+          style={{
+            background: `radial-gradient(circle at top right, ${primaryColor}, transparent 65%)`,
+          }}
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -left-24 bottom-0 size-[32rem] opacity-[0.06] blur-3xl"
+          style={{
+            background: `radial-gradient(circle at bottom left, ${secondaryColor}, transparent 65%)`,
+          }}
+        />
 
-          {/* key={currentStep} ensures the step content animates in
-              when the user advances or jumps. */}
-          <div key={currentStep} className="animate-in fade-in slide-in-from-bottom-1 duration-300">
-            {currentStep === 1 ? (
-              <Step1BusinessType
-                accountId={accountId}
-                currentVertical={vertical}
-                primaryColor={primaryColor}
-                onComplete={(data) => {
-                  setVertical(data.vertical)
-                  advance(1)
-                }}
-              />
-            ) : null}
+        <div className="relative mx-auto w-full max-w-2xl px-6 py-10 sm:px-10 sm:py-14">
+          <motion.div
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35 }}
+            className="mb-8 flex items-center gap-2"
+          >
+            <span className="text-[11px] font-medium uppercase tracking-wider text-white/45">
+              Step {activeStep.id} of {STEPS.length}
+            </span>
+            <span aria-hidden className="text-white/20">
+              ·
+            </span>
+            <span className="text-[11px] font-medium uppercase tracking-wider text-white/75">
+              {activeStep.subtitle}
+            </span>
+          </motion.div>
 
-            {currentStep === 2 ? (
-              <Step2Branding
-                accountId={accountId}
-                businessName={businessName}
-                initialLogoUrl={logoUrl}
-                initialPrimary={primaryColor}
-                initialSecondary={secondaryColor}
-                initialPortalDomain={portalDomain}
-                onComplete={(data) => {
-                  setLogoUrl(data.logoUrl)
-                  setPrimaryColor(data.primaryColor)
-                  setSecondaryColor(data.secondaryColor)
-                  setPortalDomain(data.portalDomain)
-                  advance(2)
-                }}
-              />
-            ) : null}
+          {/* AnimatePresence with key=currentStep gives us a clean swap
+              between step bodies. mode="wait" prevents both children
+              rendering simultaneously which would jump the back button. */}
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={currentStep}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+            >
+              {currentStep === 1 ? (
+                <Step1BusinessType
+                  accountId={accountId}
+                  currentVertical={vertical}
+                  primaryColor={primaryColor}
+                  onComplete={(data) => {
+                    setVertical(data.vertical)
+                    advance(1)
+                  }}
+                />
+              ) : null}
 
-            {currentStep === 3 ? (
-              <Step3Profile
-                accountId={accountId}
-                primaryColor={primaryColor}
-                onComplete={() => advance(3)}
-              />
-            ) : null}
+              {currentStep === 2 ? (
+                <Step2Branding
+                  accountId={accountId}
+                  businessName={businessName}
+                  initialLogoUrl={logoUrl}
+                  initialPrimary={primaryColor}
+                  initialSecondary={secondaryColor}
+                  initialPortalDomain={portalDomain}
+                  onComplete={(data) => {
+                    setLogoUrl(data.logoUrl)
+                    setPrimaryColor(data.primaryColor)
+                    setSecondaryColor(data.secondaryColor)
+                    setPortalDomain(data.portalDomain)
+                    advance(2)
+                  }}
+                />
+              ) : null}
 
-            {currentStep === 4 ? (
-              <Step4Template
-                accountId={accountId}
-                vertical={vertical}
-                primaryColor={primaryColor}
-                onComplete={() => advance(4)}
-              />
-            ) : null}
+              {currentStep === 3 ? (
+                <Step3Profile
+                  accountId={accountId}
+                  primaryColor={primaryColor}
+                  onComplete={() => advance(3)}
+                />
+              ) : null}
 
-            {currentStep === 5 ? (
-              <Step5Team
-                accountId={accountId}
-                primaryColor={primaryColor}
-                onComplete={() => advance(5)}
-              />
-            ) : null}
+              {currentStep === 4 ? (
+                <Step4Template
+                  accountId={accountId}
+                  vertical={vertical}
+                  primaryColor={primaryColor}
+                  onComplete={() => advance(4)}
+                />
+              ) : null}
 
-            {currentStep === 6 ? (
-              <Step6Connections
-                accountId={accountId}
-                primaryColor={primaryColor}
-                onComplete={handleFinalComplete}
-              />
-            ) : null}
-          </div>
+              {currentStep === 5 ? (
+                <Step5Team
+                  accountId={accountId}
+                  primaryColor={primaryColor}
+                  onComplete={() => advance(5)}
+                />
+              ) : null}
+
+              {currentStep === 6 ? (
+                <Step6Connections
+                  accountId={accountId}
+                  primaryColor={primaryColor}
+                  onComplete={handleFinalComplete}
+                />
+              ) : null}
+            </motion.div>
+          </AnimatePresence>
 
           {currentStep > 1 ? (
-            <div className="mt-10 flex justify-start border-t pt-6">
-              <Button
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.25 }}
+              className="mt-10 flex justify-start border-t border-white/[0.06] pt-6"
+            >
+              <button
                 type="button"
-                variant="ghost"
                 onClick={goBack}
-                className="text-muted-foreground hover:text-foreground"
+                className="inline-flex h-9 items-center gap-2 rounded-md px-3 text-xs font-medium text-white/45 transition-colors hover:bg-white/[0.04] hover:text-white"
               >
-                ← Back to {STEPS[currentStep - 2]?.label ?? 'previous'}
-              </Button>
-            </div>
+                <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
+                Back to {STEPS[currentStep - 2]?.label ?? 'previous'}
+              </button>
+            </motion.div>
           ) : null}
         </div>
       </main>
