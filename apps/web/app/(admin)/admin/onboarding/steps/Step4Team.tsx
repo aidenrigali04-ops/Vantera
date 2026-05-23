@@ -85,29 +85,33 @@ export function Step4Team({ accountId, primaryColor, onComplete }: Props) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div className="space-y-2">
-        <h2 className="text-2xl font-semibold tracking-tight">Invite your team</h2>
-        <p className="text-sm text-muted-foreground">
-          Add up to {MAX_MEMBERS} teammates. They'll receive an email invite with a magic sign-in link.
+        <h1 className="text-3xl font-semibold leading-tight tracking-tight">Invite your team</h1>
+        <p className="text-base leading-relaxed text-muted-foreground">
+          Add up to {MAX_MEMBERS} teammates. They'll receive an email with a magic sign-in link —
+          no passwords needed.
         </p>
       </div>
 
       <div className="space-y-3">
         {members.map((member, index) => (
-          <div key={index} className="flex items-center gap-2">
+          <div
+            key={index}
+            className="flex items-center gap-2 rounded-xl border bg-card p-2 transition-colors hover:border-foreground/20"
+          >
             <Input
               type="email"
               placeholder="teammate@email.com"
               value={member.email}
               onChange={(e) => updateMember(index, { email: e.target.value })}
-              className="flex-1"
+              className="flex-1 border-0 bg-transparent shadow-none focus-visible:ring-0"
             />
             <Select
               value={member.role}
               onValueChange={(value) => updateMember(index, { role: value as Role })}
             >
-              <SelectTrigger className="w-[160px]">
+              <SelectTrigger className="w-[150px] border-0 bg-muted/40 shadow-none focus:ring-0">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -125,6 +129,7 @@ export function Step4Team({ accountId, primaryColor, onComplete }: Props) {
                 size="icon"
                 aria-label="Remove member"
                 onClick={() => removeMember(index)}
+                className="text-muted-foreground hover:text-destructive"
               >
                 <X className="h-4 w-4" />
               </Button>
@@ -136,7 +141,7 @@ export function Step4Team({ accountId, primaryColor, onComplete }: Props) {
           <button
             type="button"
             onClick={addMember}
-            className="text-sm font-medium text-muted-foreground hover:text-foreground"
+            className="text-sm font-medium text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
           >
             + Add another member
           </button>
@@ -153,11 +158,18 @@ export function Step4Team({ accountId, primaryColor, onComplete }: Props) {
         <button
           type="button"
           onClick={handleSkip}
-          className="text-sm text-muted-foreground underline-offset-4 hover:underline"
+          className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
         >
           Skip for now
         </button>
-        <Button type="button" onClick={handleSend} disabled={sending} style={{ backgroundColor: primaryColor }}>
+        <Button
+          type="button"
+          size="lg"
+          onClick={handleSend}
+          disabled={sending}
+          style={{ backgroundColor: primaryColor }}
+          className="min-w-[160px]"
+        >
           {sending ? 'Sending invites…' : 'Send invites'}
         </Button>
       </div>

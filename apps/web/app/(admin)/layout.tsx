@@ -17,10 +17,12 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   const branding = getBrandingFromHeaders(headers())
   const plan = (branding.plan === 'enterprise' ? 'enterprise' : 'team') as Plan
 
-  // No more forced redirect to a setup wizard. New accounts are seeded
-  // with a sample workspace at signup time and onboarding_completed_at
-  // is set immediately. Configuration (branding, integrations, team)
-  // moves into in-app settings rather than blocking the first session.
+  // Owners with an incomplete onboarding state are gated to the wizard
+  // by the middleware; we don't redirect from here. The pathname header
+  // (set by middleware) is used below to skip chrome that doesn't make
+  // sense during onboarding (sample-data banner, etc).
+  const pathname = headers().get('x-pathname') ?? ''
+  const isOnboardingRoute = pathname.startsWith('/admin/onboarding')
 
   let flags
   try {
@@ -31,12 +33,14 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   }
 
   let hasSampleData = false
-  try {
-    if (branding.accountId) {
-      hasSampleData = await hasSampleDataForAccount(branding.accountId)
+  if (!isOnboardingRoute) {
+    try {
+      if (branding.accountId) {
+        hasSampleData = await hasSampleDataForAccount(branding.accountId)
+      }
+    } catch (err) {
+      console.error('[admin-layout] sample data check threw:', err)
     }
-  } catch (err) {
-    console.error('[admin-layout] sample data check threw:', err)
   }
 
   return (

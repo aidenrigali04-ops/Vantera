@@ -172,21 +172,22 @@ export function Step2Branding({
   const previewDomain = portalDomain || 'portal.yourbusiness.com'
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-10">
       <div className="space-y-2">
-        <h2 className="text-2xl font-semibold tracking-tight">Make it yours</h2>
-        <p className="text-sm text-muted-foreground">
-          Upload your logo, pick your brand colors, and choose your client portal domain.
+        <h1 className="text-3xl font-semibold leading-tight tracking-tight">Make it yours</h1>
+        <p className="text-base leading-relaxed text-muted-foreground">
+          Upload a logo, pick your brand colors, and reserve your client portal domain. Everything
+          here is editable later from settings.
         </p>
       </div>
 
       <section className="space-y-3">
-        <label className="text-sm font-medium">Logo</label>
+        <label className="text-sm font-semibold">Logo</label>
         <div
           {...getRootProps()}
           className={cn(
-            'flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed bg-muted/30 p-8 text-center text-sm transition-colors',
-            isDragActive && 'border-foreground bg-muted/60',
+            'flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed bg-muted/30 p-10 text-center text-sm transition-colors',
+            isDragActive ? 'border-foreground bg-muted/60' : 'hover:border-foreground/40 hover:bg-muted/40',
           )}
         >
           <input {...getInputProps()} />
@@ -231,9 +232,9 @@ export function Step2Branding({
         </p>
       </section>
 
-      <section className="space-y-2">
-        <p className="text-sm font-medium">Portal preview</p>
-        <div className="overflow-hidden rounded-lg border bg-card shadow-sm">
+      <section className="space-y-3">
+        <p className="text-sm font-semibold">Portal preview</p>
+        <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
           <div
             style={{ backgroundColor: primary }}
             className="flex items-center justify-between px-4 py-3 text-white"
@@ -271,8 +272,15 @@ export function Step2Branding({
 
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
-      <div className="flex justify-end">
-        <Button type="button" onClick={handleContinue} disabled={saving} style={{ backgroundColor: primary }}>
+      <div className="flex items-center justify-end">
+        <Button
+          type="button"
+          size="lg"
+          onClick={handleContinue}
+          disabled={saving}
+          style={{ backgroundColor: primary }}
+          className="min-w-[140px]"
+        >
           {saving ? 'Saving…' : 'Continue'}
         </Button>
       </div>
@@ -281,23 +289,34 @@ export function Step2Branding({
 }
 
 function ColorField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  const valid = HEX.test(value)
   return (
     <div className="space-y-2">
-      <label className="text-sm font-medium">{label}</label>
+      <label className="text-sm font-semibold">{label}</label>
       <div className="flex items-center gap-2">
-        <input
-          type="color"
-          value={HEX.test(value) ? value : '#000000'}
-          onChange={(e) => onChange(e.target.value)}
-          className="h-10 w-12 cursor-pointer rounded-md border border-input bg-background p-1"
-        />
+        <div
+          aria-hidden
+          style={valid ? { backgroundColor: value } : undefined}
+          className={cn(
+            'relative h-10 w-12 shrink-0 overflow-hidden rounded-md border border-input ring-1 ring-inset ring-black/[0.04] transition-colors',
+            !valid && 'bg-background',
+          )}
+        >
+          <input
+            type="color"
+            value={valid ? value : '#000000'}
+            onChange={(e) => onChange(e.target.value)}
+            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+            aria-label={`${label} color picker`}
+          />
+        </div>
         <Input
           type="text"
           value={value}
           onChange={(e) => onChange(e.target.value.trim())}
           placeholder="#1648A0"
           maxLength={7}
-          className="font-mono uppercase"
+          className="font-mono uppercase tracking-wide"
         />
       </div>
     </div>

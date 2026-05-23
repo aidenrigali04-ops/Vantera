@@ -112,11 +112,14 @@ export function Step1BusinessType({ accountId, currentVertical, primaryColor, on
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div className="space-y-2">
-        <h2 className="text-2xl font-semibold tracking-tight">What kind of business do you run?</h2>
-        <p className="text-sm text-muted-foreground">
-          We'll tailor your pipelines, automations, and reports to your industry.
+        <h1 className="text-3xl font-semibold leading-tight tracking-tight">
+          What kind of business do you run?
+        </h1>
+        <p className="text-base leading-relaxed text-muted-foreground">
+          We'll tailor your pipelines, automations, and AI tone to your industry — pick the closest
+          match.
         </p>
       </div>
 
@@ -130,24 +133,39 @@ export function Step1BusinessType({ accountId, currentVertical, primaryColor, on
               key={vertical.value}
               type="button"
               onClick={() => setSelected(vertical.value)}
-              style={isSelected ? { borderColor: primaryColor, boxShadow: `0 0 0 1px ${primaryColor}` } : undefined}
+              style={
+                isSelected
+                  ? {
+                      borderColor: primaryColor,
+                      boxShadow: `0 0 0 3px ${primaryColor}1f`,
+                    }
+                  : undefined
+              }
               className={cn(
-                'flex flex-col items-start gap-3 rounded-lg border bg-card p-4 text-left transition-colors',
-                isSelected ? 'bg-accent/30' : 'hover:bg-accent/40',
+                'group flex items-start gap-3 rounded-xl border bg-card p-4 text-left transition-all duration-150',
+                isSelected ? 'bg-card' : 'hover:border-foreground/20 hover:bg-accent/40',
               )}
             >
               <div
-                style={isSelected ? { backgroundColor: `${primaryColor}1a`, color: primaryColor } : undefined}
+                style={
+                  isSelected
+                    ? { backgroundColor: `${primaryColor}1f`, color: primaryColor }
+                    : undefined
+                }
                 className={cn(
-                  'flex h-10 w-10 items-center justify-center rounded-md',
-                  isSelected ? '' : 'bg-muted text-muted-foreground',
+                  'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg transition-colors',
+                  isSelected
+                    ? ''
+                    : 'bg-muted text-muted-foreground group-hover:bg-muted-foreground/10 group-hover:text-foreground',
                 )}
               >
                 <Icon className="h-5 w-5" />
               </div>
-              <div>
-                <p className="font-medium">{vertical.label}</p>
-                <p className="mt-1 text-xs text-muted-foreground">{vertical.description}</p>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold leading-tight">{vertical.label}</p>
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                  {vertical.description}
+                </p>
               </div>
             </button>
           )
@@ -156,12 +174,14 @@ export function Step1BusinessType({ accountId, currentVertical, primaryColor, on
 
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
-      <div className="flex justify-end">
+      <div className="flex items-center justify-end">
         <Button
           type="button"
+          size="lg"
           onClick={handleContinue}
           disabled={!selected || saving}
           style={selected ? { backgroundColor: primaryColor } : undefined}
+          className="min-w-[140px]"
         >
           {saving ? 'Saving…' : 'Continue'}
         </Button>

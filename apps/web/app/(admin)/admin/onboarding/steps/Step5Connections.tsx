@@ -129,11 +129,12 @@ export function Step5Connections({ accountId, primaryColor, onComplete }: Props)
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div className="space-y-2">
-        <h2 className="text-2xl font-semibold tracking-tight">Connect your tools</h2>
-        <p className="text-sm text-muted-foreground">
-          Optional — connect existing tools, or skip and use our native equivalents.
+        <h1 className="text-3xl font-semibold leading-tight tracking-tight">Connect your tools</h1>
+        <p className="text-base leading-relaxed text-muted-foreground">
+          Optional — bring your existing Stripe or Twilio account, or skip and use our native
+          equivalents. Everything is editable later from the integrations page.
         </p>
       </div>
 
@@ -152,12 +153,14 @@ export function Step5Connections({ accountId, primaryColor, onComplete }: Props)
 
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
-      <div className="flex justify-end">
+      <div className="flex items-center justify-end">
         <Button
           type="button"
+          size="lg"
           onClick={handleComplete}
           disabled={completing}
           style={{ backgroundColor: primaryColor }}
+          className="min-w-[160px]"
         >
           {completing ? 'Finishing…' : 'Complete setup'}
         </Button>
@@ -180,19 +183,24 @@ function IntegrationTile({
   onConnected: () => void
 }) {
   return (
-    <div className="space-y-3 rounded-lg border bg-card p-4">
+    <div
+      className={cn(
+        'space-y-3 rounded-xl border bg-card p-4 transition-colors',
+        isConnected ? 'border-emerald-200 bg-emerald-50/40' : 'hover:border-foreground/20',
+      )}
+    >
       <div className="flex items-start gap-3">
         <div
           aria-hidden
           style={{ backgroundColor: tile.swatch }}
-          className="h-9 w-9 shrink-0 rounded-md"
+          className="h-9 w-9 shrink-0 rounded-lg ring-1 ring-inset ring-black/10"
         />
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-2">
-            <p className="truncate font-medium">{tile.name}</p>
+            <p className="truncate text-sm font-semibold">{tile.name}</p>
             <StatusBadge connected={isConnected} />
           </div>
-          <p className="text-xs text-muted-foreground">{tile.description}</p>
+          <p className="text-xs leading-relaxed text-muted-foreground">{tile.description}</p>
         </div>
       </div>
 
@@ -207,7 +215,7 @@ function IntegrationTile({
         <PlaceholderConnect tile={tile} />
       )}
 
-      <p className="text-xs text-muted-foreground">
+      <p className="text-[11px] leading-relaxed text-muted-foreground">
         {NATIVELY_HANDLED_COPY.replace('%SERVICE%', tile.name)}
       </p>
     </div>

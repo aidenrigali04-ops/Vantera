@@ -83,21 +83,23 @@ export function Step3Template({ accountId, vertical, primaryColor, onComplete }:
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div className="space-y-2">
-        <h2 className="text-2xl font-semibold tracking-tight">Pick a starter workflow</h2>
-        <p className="text-sm text-muted-foreground">
-          We'll load a stage pipeline and automation set you can adjust later.
+        <h1 className="text-3xl font-semibold leading-tight tracking-tight">
+          Pick a starter workflow
+        </h1>
+        <p className="text-base leading-relaxed text-muted-foreground">
+          We'll load a vetted stage pipeline and automation set, personalized to your voice. You
+          can adjust anything later from settings.
         </p>
       </div>
 
       {loading ? (
-        <div className="rounded-lg border bg-muted/20 p-6 text-sm text-muted-foreground">
-          Loading templates…
-        </div>
+        <div className="h-32 animate-pulse rounded-xl border bg-muted/20" />
       ) : templates.length === 0 ? (
-        <div className="rounded-lg border border-dashed bg-muted/20 p-6 text-sm text-muted-foreground">
-          No templates available for this business type yet — you can skip this step and build your own pipeline later.
+        <div className="rounded-xl border border-dashed bg-muted/20 p-6 text-sm leading-relaxed text-muted-foreground">
+          No templates available for this business type yet — you can skip this step and build
+          your own pipeline later.
         </div>
       ) : (
         <div className="space-y-3">
@@ -115,32 +117,48 @@ export function Step3Template({ accountId, vertical, primaryColor, onComplete }:
                 key={template.id}
                 type="button"
                 onClick={() => setSelectedId(template.id)}
-                style={isSelected ? { borderColor: primaryColor, boxShadow: `0 0 0 1px ${primaryColor}` } : undefined}
+                style={
+                  isSelected
+                    ? { borderColor: primaryColor, boxShadow: `0 0 0 3px ${primaryColor}1f` }
+                    : undefined
+                }
                 className={cn(
-                  'block w-full rounded-lg border bg-card p-4 text-left transition-colors',
-                  isSelected ? 'bg-accent/30' : 'hover:bg-accent/40',
+                  'block w-full rounded-xl border bg-card p-5 text-left transition-all duration-150',
+                  isSelected ? '' : 'hover:border-foreground/20 hover:bg-accent/40',
                 )}
               >
-                <div className="flex items-baseline justify-between gap-4">
-                  <p className="font-medium">{templateLabel(template)}</p>
-                  <div className="flex shrink-0 gap-3 text-xs text-muted-foreground">
-                    <span>{stageCount} stages</span>
-                    <span>{automationCount} automations included</span>
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold">{templateLabel(template)}</p>
+                    {template.templateData.description ? (
+                      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                        {template.templateData.description}
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="flex shrink-0 flex-col items-end gap-1 text-[11px] text-muted-foreground">
+                    <span className="rounded-full bg-muted px-2 py-0.5 font-medium">
+                      {stageCount} stages
+                    </span>
+                    <span className="rounded-full bg-muted px-2 py-0.5 font-medium">
+                      {automationCount} automations
+                    </span>
                   </div>
                 </div>
-                {template.templateData.description ? (
-                  <p className="mt-1 text-xs text-muted-foreground">{template.templateData.description}</p>
-                ) : null}
               </button>
             )
           })}
         </div>
       )}
 
-      {selected && Array.isArray(selected.templateData.stages) && selected.templateData.stages.length > 0 ? (
-        <div className="space-y-2">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Pipeline preview</p>
-          <div className="flex gap-2 overflow-x-auto rounded-md bg-muted/30 p-3">
+      {selected &&
+      Array.isArray(selected.templateData.stages) &&
+      selected.templateData.stages.length > 0 ? (
+        <div className="space-y-3">
+          <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+            Pipeline preview
+          </p>
+          <div className="flex gap-1.5 overflow-x-auto rounded-xl border bg-muted/30 p-3">
             {selected.templateData.stages.map((stage, index) => (
               <span
                 key={`${stage.label}-${index}`}
@@ -156,12 +174,14 @@ export function Step3Template({ accountId, vertical, primaryColor, onComplete }:
 
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
-      <div className="flex justify-end">
+      <div className="flex items-center justify-end">
         <Button
           type="button"
+          size="lg"
           onClick={handleContinue}
           disabled={applying}
           style={{ backgroundColor: primaryColor }}
+          className="min-w-[180px]"
         >
           {applying ? 'Applying…' : selectedId ? 'Apply and continue' : 'Skip for now'}
         </Button>

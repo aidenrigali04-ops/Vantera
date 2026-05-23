@@ -130,25 +130,46 @@ export function Step3Profile({ accountId, primaryColor, onComplete }: Props) {
 
   if (loading) {
     return (
-      <div className="rounded-lg border bg-muted/20 p-6 text-sm text-muted-foreground">
-        Loading your profile…
+      <div className="space-y-6">
+        <div className="space-y-2">
+          <h1 className="text-3xl font-semibold leading-tight tracking-tight">
+            Personalize your messaging
+          </h1>
+          <p className="text-base leading-relaxed text-muted-foreground">
+            Loading your profile…
+          </p>
+        </div>
+        <div className="h-32 animate-pulse rounded-xl border bg-muted/20" />
       </div>
     )
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-10">
       <div className="space-y-2">
-        <h2 className="text-2xl font-semibold tracking-tight">Personalize your messaging</h2>
-        <p className="text-sm text-muted-foreground">
-          We'll use these to tailor every automated message your customers receive. Everything is
-          optional — leave a field blank and we'll fall back to sensible defaults.
+        <h1 className="text-3xl font-semibold leading-tight tracking-tight">
+          Personalize your messaging
+        </h1>
+        <p className="text-base leading-relaxed text-muted-foreground">
+          We use these to tailor every automated message your customers receive. Everything's
+          optional — skip a field and we'll fall back to a sensible default.
         </p>
       </div>
 
       <section className="space-y-3">
-        <label className="text-sm font-medium">Voice</label>
-        <p className="text-xs text-muted-foreground">
+        <div className="flex items-baseline justify-between gap-3">
+          <label className="text-sm font-semibold">Voice</label>
+          {voice ? (
+            <button
+              type="button"
+              onClick={() => setVoice(null)}
+              className="text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+            >
+              Clear
+            </button>
+          ) : null}
+        </div>
+        <p className="text-xs leading-relaxed text-muted-foreground">
           Sets the tone our AI uses when rewriting your template messages.
         </p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -161,15 +182,15 @@ export function Step3Profile({ accountId, primaryColor, onComplete }: Props) {
                 onClick={() => setVoice(isSelected ? null : v.value)}
                 style={
                   isSelected
-                    ? { borderColor: primaryColor, boxShadow: `0 0 0 1px ${primaryColor}` }
+                    ? { borderColor: primaryColor, boxShadow: `0 0 0 3px ${primaryColor}1f` }
                     : undefined
                 }
                 className={cn(
-                  'rounded-lg border bg-card p-4 text-left transition-colors',
-                  isSelected ? 'bg-accent/30' : 'hover:bg-accent/40',
+                  'rounded-xl border bg-card p-4 text-left transition-all duration-150',
+                  isSelected ? '' : 'hover:border-foreground/20 hover:bg-accent/40',
                 )}
               >
-                <p className="text-sm font-medium">{v.label}</p>
+                <p className="text-sm font-semibold">{v.label}</p>
                 <p className="mt-2 text-xs italic leading-relaxed text-muted-foreground">
                   {v.example}
                 </p>
@@ -177,16 +198,11 @@ export function Step3Profile({ accountId, primaryColor, onComplete }: Props) {
             )
           })}
         </div>
-        {voice ? (
-          <p className="text-xs text-muted-foreground">
-            Click your selection again to clear it and use the default tone.
-          </p>
-        ) : null}
       </section>
 
       <section className="space-y-3">
-        <label className="text-sm font-medium">Business hours</label>
-        <p className="text-xs text-muted-foreground">
+        <label className="text-sm font-semibold">Business hours</label>
+        <p className="text-xs leading-relaxed text-muted-foreground">
           Used by after-hours automations (e.g. property management's “We're closed” auto-reply).
         </p>
         <div className="grid grid-cols-2 gap-3">
@@ -230,8 +246,8 @@ export function Step3Profile({ accountId, primaryColor, onComplete }: Props) {
       </section>
 
       <section className="space-y-3">
-        <label className="text-sm font-medium">Customer-facing links (optional)</label>
-        <p className="text-xs text-muted-foreground">
+        <label className="text-sm font-semibold">Customer-facing links (optional)</label>
+        <p className="text-xs leading-relaxed text-muted-foreground">
           These replace <code className="font-mono text-xs">{'{{booking_link}}'}</code>,{' '}
           <code className="font-mono text-xs">{'{{review_link}}'}</code>, and{' '}
           <code className="font-mono text-xs">{'{{payment_link}}'}</code> in your message templates.
@@ -262,10 +278,10 @@ export function Step3Profile({ accountId, primaryColor, onComplete }: Props) {
       </section>
 
       <section className="space-y-2">
-        <label htmlFor="emergency-line" className="text-sm font-medium">
+        <label htmlFor="emergency-line" className="text-sm font-semibold">
           Emergency line (optional)
         </label>
-        <p className="text-xs text-muted-foreground">
+        <p className="text-xs leading-relaxed text-muted-foreground">
           Shown in after-hours messages. Substitutes{' '}
           <code className="font-mono text-xs">{'{{emergency_line}}'}</code>.
         </p>
@@ -280,12 +296,14 @@ export function Step3Profile({ accountId, primaryColor, onComplete }: Props) {
 
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
-      <div className="flex justify-end">
+      <div className="flex items-center justify-end">
         <Button
           type="button"
+          size="lg"
           onClick={handleContinue}
           disabled={saving}
           style={{ backgroundColor: primaryColor }}
+          className="min-w-[140px]"
         >
           {saving ? 'Saving…' : 'Continue'}
         </Button>
