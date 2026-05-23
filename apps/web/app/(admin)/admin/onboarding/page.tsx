@@ -1,13 +1,29 @@
-export default function AdminOnboardingPage() {
+import { requireAdminSession } from '@/lib/auth/require-session'
+import { getBrandingFromHeaders } from '@/lib/branding/server'
+import { headers } from 'next/headers'
+import { redirect } from 'next/navigation'
+import { OnboardingWizard } from './OnboardingWizard'
+
+export const dynamic = 'force-dynamic'
+
+export default async function AdminOnboardingPage() {
+  const session = await requireAdminSession()
+
+  if (session.role !== 'owner') {
+    redirect('/admin/dashboard')
+  }
+
+  const branding = getBrandingFromHeaders(headers())
+
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center p-8">
-      <div className="w-full max-w-md space-y-4 text-center">
-        <h1 className="text-2xl font-semibold tracking-tight">Complete your setup</h1>
-        <p className="text-muted-foreground">
-          The onboarding wizard will be available in Phase 1. For now, contact support to
-          finish account setup.
-        </p>
-      </div>
-    </div>
+    <OnboardingWizard
+      accountId={session.accountId}
+      businessName={branding.businessName}
+      currentVertical={branding.vertical || null}
+      initialPrimaryColor={branding.primaryColor}
+      initialSecondaryColor={branding.secondaryColor}
+      initialLogoUrl={branding.logoUrl}
+      initialPortalDomain={branding.portalDomain || ''}
+    />
   )
 }
