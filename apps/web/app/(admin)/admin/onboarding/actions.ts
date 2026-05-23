@@ -1,5 +1,6 @@
 'use server'
 
+import { personalizeVoiceWithAI } from '@/lib/ai/personalize-voice'
 import { requireAdminSession } from '@/lib/auth/require-session'
 import type { ActionResult } from '@/lib/auth/types'
 import { db } from '@/lib/db/client'
@@ -15,6 +16,7 @@ import {
   verticalTemplates,
   type OnboardingProfile,
   type VerticalTemplateData,
+  type VoiceTone,
 } from '@vantera/db'
 import { and, eq } from 'drizzle-orm'
 import { Resend } from 'resend'
@@ -143,6 +145,12 @@ function derivePortalUrl(slug: string, portalDomain: string | null): string {
   return `${appUrl.protocol}//${slug}.${appUrl.host}`
 }
 
+const VOICE_VALUES = ['friendly', 'professional', 'urgent'] as const satisfies readonly VoiceTone[]
+
+function isVoiceTone(value: unknown): value is VoiceTone {
+  return typeof value === 'string' && (VOICE_VALUES as readonly string[]).includes(value)
+}
+
 async function buildOnboardingProfile(
   accountId: string,
   ownerUserId: string,
@@ -154,6 +162,13 @@ async function buildOnboardingProfile(
       brandPrimaryColor: accounts.brandPrimaryColor,
       portalDomain: accounts.portalDomain,
       timezone: accounts.timezone,
+      bookingLink: accounts.bookingLink,
+      reviewLink: accounts.reviewLink,
+      paymentLink: accounts.paymentLink,
+      emergencyLine: accounts.emergencyLine,
+      businessHoursStart: accounts.businessHoursStart,
+      businessHoursEnd: accounts.businessHoursEnd,
+      voicePreference: accounts.voicePreference,
     })
     .from(accounts)
     .where(eq(accounts.id, accountId))
@@ -206,7 +221,151 @@ async function buildOnboardingProfile(
     twilioPhoneNumber,
     hasStripe,
     timezone: account.timezone ?? 'America/Los_Angeles',
+    voice: isVoiceTone(account.voicePreference) ? account.voicePreference : undefined,
+    businessHoursStart: account.businessHoursStart ?? undefined,
+    businessHoursEnd: account.businessHoursEnd ?? undefined,
+    emergencyLine: account.emergencyLine ?? undefined,
+    bookingLink: account.bookingLink ?? undefined,
+    reviewLink: account.reviewLink ?? undefined,
+    paymentLink: account.paymentLink ?? undefined,
   }
+}
+
+const HTTPS_URL = /^https?:\/\/[^\s]+$/i
+const PHONE_REGEX = /^[+0-9 ()\-]{7,30}$/
+
+const businessProfileSchema = z
+  .object({
+    voicePreference: z.enum(VOICE_VALUES).nullable().optional(),
+    businessHoursStart: z.number().int().min(0).max(23).nullable().optional(),
+    businessHoursEnd: z.number().int().min(0).max(23).nullable().optional(),
+    bookingLink: z.string().regex(HTTPS_URL, 'Booking link must be a URL').max(500).nullable().optional(),
+    reviewLink: z.string().regex(HTTPS_URL, 'Review link must be a URL').max(500).nullable().optional(),
+    paymentLink: z.string().regex(HTTPS_URL, 'Payment link must be a URL').max(500).nullable().optional(),
+    emergencyLine: z.string().regex(PHONE_REGEX, 'Emergency line must be a phone number').max(50).nullable().optional(),
+  })
+  .refine(
+    (val) =>
+      val.businessHoursStart == null ||
+      val.businessHoursEnd == null ||
+      val.businessHoursStart < val.businessHoursEnd,
+    {
+      message: 'Business hours start must be earlier than end',
+      path: ['businessHoursStart'],
+    },
+  )
+
+export type BusinessProfileInput = z.infer<typeof businessProfileSchema>
+
+export type BusinessProfileSnapshot = {
+  voicePreference: VoiceTone | null
+  businessHoursStart: number | null
+  businessHoursEnd: number | null
+  bookingLink: string | null
+  reviewLink: string | null
+  paymentLink: string | null
+  emergencyLine: string | null
+}
+
+export async function getBusinessProfile(
+  accountId: string,
+): Promise<ActionResult<BusinessProfileSnapshot>> {
+  try {
+    await assertOwnAccount(accountId)
+
+    const [row] = await db
+      .select({
+        voicePreference: accounts.voicePreference,
+        businessHoursStart: accounts.businessHoursStart,
+        businessHoursEnd: accounts.businessHoursEnd,
+        bookingLink: accounts.bookingLink,
+        reviewLink: accounts.reviewLink,
+        paymentLink: accounts.paymentLink,
+        emergencyLine: accounts.emergencyLine,
+      })
+      .from(accounts)
+      .where(eq(accounts.id, accountId))
+      .limit(1)
+
+    if (!row) {
+      return err('Account not found')
+    }
+
+    return {
+      success: true,
+      data: {
+        voicePreference: isVoiceTone(row.voicePreference) ? row.voicePreference : null,
+        businessHoursStart: row.businessHoursStart ?? null,
+        businessHoursEnd: row.businessHoursEnd ?? null,
+        bookingLink: row.bookingLink ?? null,
+        reviewLink: row.reviewLink ?? null,
+        paymentLink: row.paymentLink ?? null,
+        emergencyLine: row.emergencyLine ?? null,
+      },
+    }
+  } catch (error) {
+    return err(error instanceof Error ? error.message : 'Failed to load business profile')
+  }
+}
+
+export async function updateBusinessProfile(
+  accountId: string,
+  data: BusinessProfileInput,
+): Promise<ActionResult<{ saved: true; rePersonalized: boolean }>> {
+  try {
+    const { session } = await assertOwnAccount(accountId)
+
+    const parsed = businessProfileSchema.safeParse(data)
+    if (!parsed.success) {
+      return err(parsed.error.issues[0]?.message ?? 'Invalid business profile')
+    }
+
+    const normalized = {
+      voicePreference: parsed.data.voicePreference ?? null,
+      businessHoursStart: parsed.data.businessHoursStart ?? null,
+      businessHoursEnd: parsed.data.businessHoursEnd ?? null,
+      bookingLink: emptyToNull(parsed.data.bookingLink),
+      reviewLink: emptyToNull(parsed.data.reviewLink),
+      paymentLink: emptyToNull(parsed.data.paymentLink),
+      emergencyLine: emptyToNull(parsed.data.emergencyLine),
+    }
+
+    const [existing] = await db
+      .select({ activeTemplateId: accounts.activeTemplateId })
+      .from(accounts)
+      .where(eq(accounts.id, accountId))
+      .limit(1)
+
+    await db
+      .update(accounts)
+      .set({
+        ...normalized,
+        updatedAt: new Date(),
+      })
+      .where(eq(accounts.id, accountId))
+
+    // If the user already applied a template, re-run personalization so the
+    // new voice / hours / links flow into the existing automations.
+    let rePersonalized = false
+    if (existing?.activeTemplateId) {
+      try {
+        await applyTemplateForAccount(accountId, existing.activeTemplateId, session.userId)
+        rePersonalized = true
+      } catch {
+        rePersonalized = false
+      }
+    }
+
+    return { success: true, data: { saved: true, rePersonalized } }
+  } catch (error) {
+    return err(error instanceof Error ? error.message : 'Failed to save business profile')
+  }
+}
+
+function emptyToNull(value: string | null | undefined): string | null {
+  if (value == null) return null
+  const trimmed = value.trim()
+  return trimmed.length === 0 ? null : trimmed
 }
 
 export async function getTemplatesForVertical(
@@ -246,102 +405,129 @@ export async function getTemplatesForVertical(
   }
 }
 
+export type ApplyTemplateResult = {
+  stageCount: number
+  automationCount: number
+  droppedAutomationCount: number
+  aiRewriteConsidered: number
+  aiRewriteApplied: number
+  aiRewriteSkipped: boolean
+  aiRewriteError?: string
+}
+
+// Core apply logic, callable internally without re-running session checks
+// (used by re-personalization triggers after Step 6 integration connects).
+async function applyTemplateForAccount(
+  accountId: string,
+  templateId: string,
+  ownerUserId: string,
+): Promise<ApplyTemplateResult> {
+  const [template] = await db
+    .select({
+      recordType: verticalTemplates.recordType,
+      templateData: verticalTemplates.templateData,
+    })
+    .from(verticalTemplates)
+    .where(eq(verticalTemplates.id, templateId))
+    .limit(1)
+
+  if (!template) {
+    throw new Error('Template not found')
+  }
+
+  const rawData = template.templateData as VerticalTemplateData
+
+  // Step 1 — sync personalization: variable substitution, channel downgrade,
+  // automation drop, business hours injection.
+  const profile = await buildOnboardingProfile(accountId, ownerUserId)
+  const syncPersonalized = personalizeTemplate(rawData, profile)
+
+  // Step 2 — AI voice rewrite (opt-in: only if profile.voice is set AND the
+  // ANTHROPIC_API_KEY is configured). Non-fatal on failure.
+  const { template: personalized, outcome: aiOutcome } = await personalizeVoiceWithAI(
+    syncPersonalized,
+    profile,
+  )
+
+  const stages = Array.isArray(personalized.stages) ? personalized.stages : []
+  const flowAutomations = Array.isArray(personalized.automations) ? personalized.automations : []
+  const droppedAutomationCount =
+    (Array.isArray(rawData.automations) ? rawData.automations.length : 0) - flowAutomations.length
+
+  let stageCount = 0
+  let automationCount = 0
+
+  await db.transaction(async (tx) => {
+    // HARD DELETE: This is the only place in the codebase where we hard-delete
+    // rows instead of soft-deleting. Stage definitions during onboarding have
+    // no foreign-key references yet (no records exist on the account at this
+    // point), so a hard delete is safe and avoids leaving stale rows behind
+    // when a different template is selected. Do NOT copy this pattern.
+    await tx.delete(stageDefinitions).where(eq(stageDefinitions.accountId, accountId))
+
+    // Same rationale: clear any prior auto-seeded automations for this
+    // account before re-applying. Once the user starts editing automations
+    // we'll soft-delete them through the regular admin flow.
+    await tx.delete(automations).where(eq(automations.accountId, accountId))
+
+    if (stages.length > 0) {
+      await tx.insert(stageDefinitions).values(
+        stages.map((stage, index) => ({
+          accountId,
+          recordType: stage.recordType ?? template.recordType,
+          label: stage.label,
+          position: stage.position ?? index,
+          color: stage.color ?? '#64748B',
+          triggersAutomation: stage.triggersAutomation ?? true,
+          isTerminalWin: stage.isTerminalWin ?? false,
+          isTerminalLoss: stage.isTerminalLoss ?? false,
+        })),
+      )
+      stageCount = stages.length
+    }
+
+    if (flowAutomations.length > 0) {
+      await tx.insert(automations).values(
+        flowAutomations.map((flow) => ({
+          accountId,
+          name: flow.name,
+          triggerEvent: flow.triggerEvent,
+          triggerConditions: flow.triggerConditions ?? {},
+          actions: (flow.actions ?? []) as Array<Record<string, unknown>>,
+          templateRef: flow.templateRef ?? null,
+          isActive: false,
+        })),
+      )
+      automationCount = flowAutomations.length
+    }
+
+    // Remember which template was applied so integration-connect flows can
+    // re-personalize against the freshly connected channels.
+    await tx
+      .update(accounts)
+      .set({ activeTemplateId: templateId, updatedAt: new Date() })
+      .where(eq(accounts.id, accountId))
+  })
+
+  return {
+    stageCount,
+    automationCount,
+    droppedAutomationCount,
+    aiRewriteConsidered: aiOutcome.considered,
+    aiRewriteApplied: aiOutcome.applied,
+    aiRewriteSkipped: aiOutcome.skipped,
+    aiRewriteError: aiOutcome.errorMessage,
+  }
+}
+
 export async function applyVerticalTemplate(
   accountId: string,
   templateId: string,
-): Promise<
-  ActionResult<{
-    stageCount: number
-    automationCount: number
-    droppedAutomationCount: number
-  }>
-> {
+): Promise<ActionResult<ApplyTemplateResult>> {
   try {
     const { session } = await assertOwnAccount(accountId)
-
-    const [template] = await db
-      .select({
-        recordType: verticalTemplates.recordType,
-        templateData: verticalTemplates.templateData,
-      })
-      .from(verticalTemplates)
-      .where(eq(verticalTemplates.id, templateId))
-      .limit(1)
-
-    if (!template) {
-      return err('Template not found')
-    }
-
-    const rawData = template.templateData as VerticalTemplateData
-
-    // Personalize the template using the live profile derived from the
-    // account, owner, and currently connected integrations. This substitutes
-    // {{business_name}}, {{owner_first_name}}, {{portal_url}}, etc. into
-    // automation bodies, downgrades SMS → email when Twilio isn't connected,
-    // and drops automations whose action list collapses to empty.
-    const profile = await buildOnboardingProfile(accountId, session.userId)
-    const personalized = personalizeTemplate(rawData, profile)
-
-    const stages = Array.isArray(personalized.stages) ? personalized.stages : []
-    const flowAutomations = Array.isArray(personalized.automations)
-      ? personalized.automations
-      : []
-    const droppedAutomationCount =
-      (Array.isArray(rawData.automations) ? rawData.automations.length : 0) -
-      flowAutomations.length
-
-    let stageCount = 0
-    let automationCount = 0
-
-    await db.transaction(async (tx) => {
-      // HARD DELETE: This is the only place in the codebase where we hard-delete
-      // rows instead of soft-deleting. Stage definitions during onboarding have
-      // no foreign-key references yet (no records exist on the account at this
-      // point), so a hard delete is safe and avoids leaving stale rows behind
-      // when a different template is selected. Do NOT copy this pattern.
-      await tx.delete(stageDefinitions).where(eq(stageDefinitions.accountId, accountId))
-
-      // Same rationale: clear any prior auto-seeded automations for this
-      // account before re-applying. Once the user starts editing automations
-      // we'll soft-delete them through the regular admin flow.
-      await tx.delete(automations).where(eq(automations.accountId, accountId))
-
-      if (stages.length > 0) {
-        await tx.insert(stageDefinitions).values(
-          stages.map((stage, index) => ({
-            accountId,
-            recordType: stage.recordType ?? template.recordType,
-            label: stage.label,
-            position: stage.position ?? index,
-            color: stage.color ?? '#64748B',
-            triggersAutomation: stage.triggersAutomation ?? true,
-            isTerminalWin: stage.isTerminalWin ?? false,
-            isTerminalLoss: stage.isTerminalLoss ?? false,
-          })),
-        )
-        stageCount = stages.length
-      }
-
-      if (flowAutomations.length > 0) {
-        await tx.insert(automations).values(
-          flowAutomations.map((flow) => ({
-            accountId,
-            name: flow.name,
-            triggerEvent: flow.triggerEvent,
-            triggerConditions: flow.triggerConditions ?? {},
-            actions: (flow.actions ?? []) as Array<Record<string, unknown>>,
-            templateRef: flow.templateRef ?? null,
-            isActive: false,
-          })),
-        )
-        automationCount = flowAutomations.length
-      }
-    })
-
-    return {
-      success: true,
-      data: { stageCount, automationCount, droppedAutomationCount },
-    }
+    const result = await applyTemplateForAccount(accountId, templateId, session.userId)
+    return { success: true, data: result }
   } catch (error) {
     return err(error instanceof Error ? error.message : 'Failed to apply template')
   }
@@ -479,9 +665,9 @@ export async function saveIntegrationCredentials(
   accountId: string,
   provider: string,
   credentials: Record<string, string>,
-): Promise<ActionResult<{ saved: true }>> {
+): Promise<ActionResult<{ saved: true; rePersonalized: boolean }>> {
   try {
-    await assertOwnAccount(accountId)
+    const { session } = await assertOwnAccount(accountId)
 
     const parsed = credentialsSchema.safeParse({ provider, credentials })
 
@@ -558,7 +744,31 @@ export async function saveIntegrationCredentials(
         },
       })
 
-    return { success: true, data: { saved: true } }
+    // After a successful integration connect, re-run template personalization
+    // so previously-downgraded actions (e.g. SMS → email when Twilio wasn't
+    // connected at Step 4) get restored to their original channel using the
+    // newly available capability. No-op if the account hasn't applied a
+    // template yet, or if the re-apply fails (we don't want to surface an
+    // integration-save failure for a downstream personalization issue).
+    let rePersonalized = false
+    if (providerKey === 'twilio' || providerKey === 'stripe') {
+      const [acct] = await db
+        .select({ activeTemplateId: accounts.activeTemplateId })
+        .from(accounts)
+        .where(eq(accounts.id, accountId))
+        .limit(1)
+
+      if (acct?.activeTemplateId) {
+        try {
+          await applyTemplateForAccount(accountId, acct.activeTemplateId, session.userId)
+          rePersonalized = true
+        } catch {
+          rePersonalized = false
+        }
+      }
+    }
+
+    return { success: true, data: { saved: true, rePersonalized } }
   } catch (error) {
     return err(error instanceof Error ? error.message : 'Failed to save credentials')
   }

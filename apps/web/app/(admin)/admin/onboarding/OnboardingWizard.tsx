@@ -7,16 +7,18 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { Step1BusinessType } from './steps/Step1BusinessType'
 import { Step2Branding } from './steps/Step2Branding'
-import { Step3Template } from './steps/Step3Template'
-import { Step4Team } from './steps/Step4Team'
-import { Step5Connections } from './steps/Step5Connections'
+import { Step3Profile } from './steps/Step3Profile'
+import { Step3Template as Step4Template } from './steps/Step3Template'
+import { Step4Team as Step5Team } from './steps/Step4Team'
+import { Step5Connections as Step6Connections } from './steps/Step5Connections'
 
 const STEPS = [
   { id: 1, label: 'Business Type' },
   { id: 2, label: 'Branding' },
-  { id: 3, label: 'Workflow' },
-  { id: 4, label: 'Team' },
-  { id: 5, label: 'Connect' },
+  { id: 3, label: 'Voice' },
+  { id: 4, label: 'Workflow' },
+  { id: 5, label: 'Team' },
+  { id: 6, label: 'Connect' },
 ] as const
 
 type Props = {
@@ -99,7 +101,7 @@ export function OnboardingWizard({
   }
 
   function handleFinalComplete() {
-    setCompletedSteps((prev) => new Set(prev).add(5))
+    setCompletedSteps((prev) => new Set(prev).add(STEPS.length))
 
     try {
       window.localStorage.removeItem(storageKey)
@@ -156,24 +158,32 @@ export function OnboardingWizard({
           ) : null}
 
           {currentStep === 3 ? (
-            <Step3Template
+            <Step3Profile
               accountId={accountId}
-              vertical={vertical}
               primaryColor={primaryColor}
               onComplete={() => advance(3)}
             />
           ) : null}
 
           {currentStep === 4 ? (
-            <Step4Team
+            <Step4Template
               accountId={accountId}
+              vertical={vertical}
               primaryColor={primaryColor}
               onComplete={() => advance(4)}
             />
           ) : null}
 
           {currentStep === 5 ? (
-            <Step5Connections
+            <Step5Team
+              accountId={accountId}
+              primaryColor={primaryColor}
+              onComplete={() => advance(5)}
+            />
+          ) : null}
+
+          {currentStep === 6 ? (
+            <Step6Connections
               accountId={accountId}
               primaryColor={primaryColor}
               onComplete={handleFinalComplete}

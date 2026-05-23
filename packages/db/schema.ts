@@ -99,6 +99,21 @@ export const accounts = pgTable('accounts', {
   timezone: varchar('timezone', { length: 60 }).notNull().default('America/Los_Angeles'),
   stripeCustomerId: varchar('stripe_customer_id', { length: 255 }),
   onboardingCompletedAt: timestamptz('onboarding_completed_at'),
+
+  // Personalization profile (used by `personalizeTemplate` at apply time).
+  // All optional — falls back to portal-URL defaults when null.
+  bookingLink: text('booking_link'),
+  reviewLink: text('review_link'),
+  paymentLink: text('payment_link'),
+  emergencyLine: varchar('emergency_line', { length: 50 }),
+  businessHoursStart: smallint('business_hours_start'),
+  businessHoursEnd: smallint('business_hours_end'),
+  voicePreference: varchar('voice_preference', { length: 20 }),
+
+  // Tracks which template was applied so integration-connect flows can
+  // re-run personalization against the current profile.
+  activeTemplateId: uuid('active_template_id'),
+
   createdAt: timestamptz('created_at').notNull().defaultNow(),
   updatedAt: timestamptz('updated_at').notNull().defaultNow(),
 })
