@@ -1,5 +1,6 @@
 import { AdminShell } from '@/components/admin/AdminShell'
 import { ReactQueryProvider } from '@/components/shared/ReactQueryProvider'
+import { isAiEnabled } from '@/lib/ai'
 import { requireAdminSession } from '@/lib/auth/require-session'
 import { BrandingProvider } from '@/lib/branding/context'
 import { getBrandingFromHeaders } from '@/lib/branding/server'
@@ -47,7 +48,15 @@ export default async function AdminLayout({ children }: { children: ReactNode })
     <BrandingProvider branding={branding}>
       <FeatureFlagProvider flags={flags}>
         <ReactQueryProvider>
-          <AdminShell session={session} hasSampleData={hasSampleData}>
+          <AdminShell
+            session={session}
+            hasSampleData={hasSampleData}
+            bare={isOnboardingRoute}
+            businessName={branding.businessName || 'Your workspace'}
+            logoUrl={branding.logoUrl}
+            primaryColor={branding.primaryColor || '#1648A0'}
+            aiEnabled={isAiEnabled()}
+          >
             {children}
           </AdminShell>
         </ReactQueryProvider>

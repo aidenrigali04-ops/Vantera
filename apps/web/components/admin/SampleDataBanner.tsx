@@ -59,19 +59,30 @@ export function SampleDataBanner({ accountId }: Props) {
 
   return (
     <>
-      <div className="border-b border-primary/20 bg-primary/5">
-        <div className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-3 px-4 py-2.5 text-sm sm:flex-row sm:items-center sm:px-6">
-          <div className="flex items-center gap-2 text-foreground">
-            <span aria-hidden className="inline-block size-2 shrink-0 rounded-full bg-primary" />
+      <div className="border-b border-amber-400/15 bg-amber-400/[0.04]">
+        <div className="flex flex-col items-start justify-between gap-3 px-6 py-2.5 text-sm sm:flex-row sm:items-center">
+          <div className="flex items-center gap-2 text-white/85">
+            <span
+              aria-hidden
+              className="inline-block size-1.5 shrink-0 rounded-full bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.7)]"
+            />
             <span className="font-medium">This is sample data — replace it with yours.</span>
           </div>
           <div className="flex items-center gap-2">
-            <Button size="sm" variant="ghost" onClick={handleKeep}>
+            <button
+              type="button"
+              onClick={handleKeep}
+              className="rounded-md px-3 py-1.5 text-xs font-medium text-white/55 transition-colors hover:bg-white/[0.04] hover:text-white"
+            >
               Keep sample data
-            </Button>
-            <Button size="sm" onClick={() => setOpen(true)}>
+            </button>
+            <button
+              type="button"
+              onClick={() => setOpen(true)}
+              className="rounded-md border border-amber-400/30 bg-amber-400/10 px-3 py-1.5 text-xs font-medium text-amber-200 transition-colors hover:border-amber-400/50 hover:bg-amber-400/15"
+            >
               I&rsquo;m ready to set up my workspace
-            </Button>
+            </button>
           </div>
         </div>
       </div>

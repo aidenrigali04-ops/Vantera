@@ -16,6 +16,7 @@ export default async function AdminDashboardPage() {
       email={session.email}
       role={session.role}
       businessName={branding.businessName || 'Your workspace'}
+      primaryColor={branding.primaryColor || '#1648A0'}
       snapshot={snapshot}
     />
   )
