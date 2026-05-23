@@ -17,6 +17,7 @@
     "db:seed:templates": "dotenv -e .env -- tsx packages/db/scripts/run-vertical-templates.ts",
     "db:test:personalize": "tsx packages/db/scripts/test-personalize.ts",
     "db:test:ai-memory": "dotenv -e .env -- tsx packages/db/scripts/test-ai-memory.ts",
+    "db:reset-onboarding": "dotenv -e .env -- tsx packages/db/scripts/reset-onboarding.ts",
     "trigger:dev": "dotenv -e .env -- trigger dev",
     "trigger:deploy": "dotenv -e .env -- trigger deploy"
   },

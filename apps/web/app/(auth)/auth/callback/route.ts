@@ -70,6 +70,15 @@ export async function GET(request: NextRequest) {
     .maybeSingle()
 
   if (existingUserRow?.account_id) {
+    // Resolve where to land them. If onboarding still isn't complete and
+    // they're the owner, drop them into the wizard rather than the
+    // dashboard's empty state.
+    const { data: existingAccount } = await admin
+      .from('accounts')
+      .select('onboarding_completed_at')
+      .eq('id', existingUserRow.account_id)
+      .maybeSingle()
+
     await setAdminSession({
       type: 'admin',
       userId: existingUserRow.id,
@@ -78,7 +87,13 @@ export async function GET(request: NextRequest) {
       email: existingUserRow.email,
     })
 
-    return NextResponse.redirect(new URL(next, request.url))
+    const needsOnboarding =
+      !existingAccount?.onboarding_completed_at && existingUserRow.role === 'owner'
+
+    // Respect an explicit `?next=` only if the user already finished onboarding.
+    // Otherwise we don't want a stale dashboard deep-link to skip the wizard.
+    const target = needsOnboarding ? '/admin/onboarding' : next
+    return NextResponse.redirect(new URL(target, request.url))
   }
 
   // No Vantera account yet — push them through complete-signup.

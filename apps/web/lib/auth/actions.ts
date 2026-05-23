@@ -15,7 +15,6 @@ import type { ActionResult } from '@/lib/auth/types'
 import type { UserRole } from '@/lib/auth/constants'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { seedSampleWorkspace } from '@/lib/sample-data/seed'
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
@@ -296,11 +295,11 @@ export async function signupAction(
   const baseSlug = slugify(businessName)
   const slug = await findUniqueSlug(baseSlug)
 
-  // 3) Insert the account. We mark onboarding_completed_at immediately
-  //    because the new flow drops users straight into a demo-data
-  //    workspace — no wizard gate. Vertical defaults to 'agency' to
-  //    match the sample content; the user can change it later from
-  //    settings.
+  // 3) Insert the account. Onboarding_completed_at is deliberately left
+  //    null — the user is dropped into /admin/onboarding so the wizard
+  //    can capture their vertical, branding, voice, template, team, and
+  //    integrations. Vertical defaults to 'agency' so the schema's NOT
+  //    NULL constraint is satisfied; Step 1 of the wizard overwrites it.
   const { data: account, error: accountError } = await admin
     .from('accounts')
     .insert({
@@ -308,7 +307,6 @@ export async function signupAction(
       name: businessName,
       vertical: 'agency',
       plan: 'team',
-      onboarding_completed_at: new Date().toISOString(),
     })
     .select('id, slug')
     .single()
@@ -347,14 +345,10 @@ export async function signupAction(
     return { success: false, error: 'Failed to finalize account setup' }
   }
 
-  // 5b) Seed sample agency-style content (3 clients, 5 deals, 2 projects
-  //     + pipeline stages). Best-effort — signup must still succeed even
-  //     if seeding hiccups, because the user can always start fresh.
-  try {
-    await seedSampleWorkspace(account.id)
-  } catch (err) {
-    console.error('[signup] sample data seed failed:', err)
-  }
+  // 5b) Sample data is intentionally NOT seeded here. The onboarding wizard
+  //     applies a vertical-specific template (stages + automations) at
+  //     Step 4. Seeding a fixed agency demo before that step would just
+  //     get blown away when the user picks a different vertical.
 
   // 6) Sign the user in via Supabase (sets Supabase's sb-* cookies) and then
   //    mint our own admin session cookie.
@@ -376,19 +370,19 @@ export async function signupAction(
     email,
   })
 
-  // 7) Build the redirect target. The goal: drop the user on a host that
-  //    middleware will resolve to THIS new account, not a different tenant.
+  // 7) Build the redirect target. Fresh signups always land on
+  //    /admin/onboarding (not /admin/dashboard) so the wizard captures
+  //    their vertical, branding, voice, template, team, and integrations.
+  //    The middleware also enforces this gate as a belt-and-suspenders
+  //    guard for any path that tries to skip the wizard.
   //
-  //    - If we're on a real configured app domain that has wildcard SSL
-  //      (e.g. vantera.app with *.vantera.app DNS), jump to
-  //      <slug>.<appDomain>/admin/dashboard so the URL bar reflects the
-  //      new workspace. The session cookie's `.appDomain` scope keeps the
-  //      user signed in across the subdomain hop.
+  //    - If we're on a real configured app domain with wildcard SSL,
+  //      jump to <slug>.<appDomain>/admin/onboarding so the URL bar
+  //      reflects the new workspace. The session cookie's `.appDomain`
+  //      scope keeps the user signed in across the subdomain hop.
   //    - On *.vercel.app, localhost, lvh.me, Vercel preview URLs, etc.,
   //      stay on the current host. *.vercel.app only has a single-level
   //      wildcard cert so sub-subdomains aren't reachable over HTTPS.
-  //      The middleware/resolve-account session-cookie fallback then
-  //      resolves the right tenant from the freshly-set admin session.
   const host = headers().get('host') ?? ''
   const hostname = host.split(':')[0] ?? ''
   const appDomain = process.env.NEXT_PUBLIC_APP_DOMAIN ?? ''
@@ -400,11 +394,11 @@ export async function signupAction(
   const onCorrectSubdomain = Boolean(appDomain && hostname === `${account.slug}.${appDomain}`)
 
   if (supportsTenantSubdomains && onAppDomain && !onCorrectSubdomain) {
-    const target = `https://${account.slug}.${appDomain}/admin/dashboard`
+    const target = `https://${account.slug}.${appDomain}/admin/onboarding`
     return { success: true, data: { redirectTo: target } }
   }
 
-  return { success: true, data: { redirectTo: '/admin/dashboard' } }
+  return { success: true, data: { redirectTo: '/admin/onboarding' } }
 }
 
 /**
@@ -442,7 +436,10 @@ export async function completeOAuthSignupAction(
 
   const admin = getSupabaseAdmin()
 
-  // Guard: if they already have a Vantera user, just sign them in.
+  // Guard: if they already have a Vantera user, just sign them in. Route
+  // to the wizard if their account hasn't completed onboarding yet (so a
+  // user who started signup, bounced, and came back via OAuth still
+  // resumes where they left off).
   const { data: existingUser } = await admin
     .from('users')
     .select('id, account_id, role, email')
@@ -452,6 +449,12 @@ export async function completeOAuthSignupAction(
     .maybeSingle()
 
   if (existingUser?.account_id) {
+    const { data: existingAccount } = await admin
+      .from('accounts')
+      .select('onboarding_completed_at')
+      .eq('id', existingUser.account_id)
+      .maybeSingle()
+
     await setAdminSession({
       type: 'admin',
       userId: existingUser.id,
@@ -459,7 +462,14 @@ export async function completeOAuthSignupAction(
       role: existingUser.role as UserRole,
       email: existingUser.email,
     })
-    return { success: true, data: { redirectTo: '/admin/dashboard' } }
+
+    const needsOnboarding =
+      !existingAccount?.onboarding_completed_at && (existingUser.role as UserRole) === 'owner'
+
+    return {
+      success: true,
+      data: { redirectTo: needsOnboarding ? '/admin/onboarding' : '/admin/dashboard' },
+    }
   }
 
   const baseSlug = slugify(businessName)
@@ -472,7 +482,6 @@ export async function completeOAuthSignupAction(
       name: businessName,
       vertical: 'agency',
       plan: 'team',
-      onboarding_completed_at: new Date().toISOString(),
     })
     .select('id, slug')
     .single()
@@ -506,11 +515,9 @@ export async function completeOAuthSignupAction(
     return { success: false, error: 'Failed to finalize account setup' }
   }
 
-  try {
-    await seedSampleWorkspace(account.id)
-  } catch (err) {
-    console.error('[complete-oauth-signup] sample seed failed:', err)
-  }
+  // Sample data is intentionally NOT seeded here. The onboarding wizard
+  // applies a vertical-specific template at Step 4 which would just
+  // replace anything we seeded now.
 
   await setAdminSession({
     type: 'admin',
@@ -533,9 +540,9 @@ export async function completeOAuthSignupAction(
   if (supportsTenantSubdomains && onAppDomain && !onCorrectSubdomain) {
     return {
       success: true,
-      data: { redirectTo: `https://${account.slug}.${appDomain}/admin/dashboard` },
+      data: { redirectTo: `https://${account.slug}.${appDomain}/admin/onboarding` },
     }
   }
 
-  return { success: true, data: { redirectTo: '/admin/dashboard' } }
+  return { success: true, data: { redirectTo: '/admin/onboarding' } }
 }

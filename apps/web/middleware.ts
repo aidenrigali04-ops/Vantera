@@ -234,6 +234,19 @@ export async function middleware(request: NextRequest) {
     if (!canAccessAdminRoute(payload.role, pathname)) {
       return NextResponse.redirect(new URL('/admin/dashboard', request.url))
     }
+
+    // Onboarding gate: an owner whose account hasn't completed onboarding
+    // is held on /admin/onboarding regardless of what /admin/* path they
+    // try to hit. This catches anything the signup / OAuth redirects
+    // might miss (stale deep links, page refreshes mid-wizard, etc.).
+    // Non-owner roles bypass — they shouldn't be running the wizard.
+    if (
+      payload.role === 'owner' &&
+      !account.onboarding_completed_at &&
+      !pathname.startsWith('/admin/onboarding')
+    ) {
+      return NextResponse.redirect(new URL('/admin/onboarding', request.url))
+    }
   }
 
   if (pathname.startsWith('/portal')) {
