@@ -133,10 +133,6 @@ export async function adminLoginAction(
     return { success: false, error: 'Invalid email or password' }
   }
 
-  // setAdminSession() overwrites any pre-existing v_admin_session cookie via
-  // standard Set-Cookie semantics (same name+path+domain). No explicit clear
-  // is needed and emitting both a delete header and a set header in the same
-  // response can cause cookie-handling races in some clients.
   await setAdminSession({
     type: 'admin',
     userId: user.id,
@@ -146,13 +142,13 @@ export async function adminLoginAction(
   })
 
   // If the owner of an un-onboarded account is signing in, drop them
-  // directly into the wizard. The admin layout would do the same redirect
-  // anyway, but doing it here avoids a visible flash through /admin/dashboard.
+  // directly into the wizard so they don't flash through /admin/dashboard
+  // before the layout redirect kicks in.
   const onboardingComplete = isOnboardingComplete(account)
   const redirectTo =
     !onboardingComplete && user.role === 'owner' ? '/admin/onboarding' : '/admin/dashboard'
 
-  return { success: true, data: { redirectTo } }
+  redirect(redirectTo)
 }
 
 function isOnboardingComplete(account: { onboarding_completed_at?: string | null }): boolean {
@@ -196,8 +192,6 @@ export async function portalLoginAction(
     return { success: false, error: 'Invalid email or password' }
   }
 
-  // setPortalSession() overwrites any pre-existing v_portal_session via
-  // Set-Cookie semantics (same name+path+domain).
   await setPortalSession({
     type: 'portal',
     contactId: contact.id,
@@ -205,7 +199,7 @@ export async function portalLoginAction(
     email: contact.email ?? validated.data.email,
   })
 
-  return { success: true, data: { redirectTo: '/portal' } }
+  redirect('/portal')
 }
 
 export async function adminLogoutAction(): Promise<void> {
@@ -274,18 +268,13 @@ export async function signupAction(
   const { fullName, businessName, email, password } = validated.data
   const normalizedEmail = email.toLowerCase().trim()
 
-  // 0) Sign out of any existing Supabase session. The Vantera admin cookie
-  //    will be overwritten by setAdminSession() at the end of this action
-  //    (cookies()::set with the same name+path+domain replaces the prior
-  //    value), but Supabase's sb-* cookies are tied to the previous user
-  //    and need to be cleared explicitly so signInWithPassword can mint
-  //    fresh ones on the new user.
-  try {
-    const supaForSignout = createSupabaseServerClient()
-    await supaForSignout.auth.signOut()
-  } catch {
-    /* signOut throws when there's no session — fine */
-  }
+  // DO NOT call supabase.auth.signOut() here. signOut() pushes Set-Cookie
+  // headers that delete the sb-* cookies into this response, and on some
+  // edge-runtime / hosted setups those delete headers race with the
+  // signInWithPassword() Set-Cookie headers issued later in the same
+  // action — leaving the user with NO valid Supabase session cookies on
+  // the next request. signInWithPassword() already overwrites sb-* in
+  // place; we don't need to delete them first.
 
   // 0b) Guard against orphaned Vantera users rows. If the email already
   //     has a users row (regardless of whether a Supabase auth user
@@ -400,19 +389,22 @@ export async function signupAction(
     email: normalizedEmail,
   })
 
-  // 7) Always redirect to /admin/onboarding on the SAME host. Tenant
-  //    resolution then runs through the session-cookie fallback in
-  //    middleware — which works on every host (apex, *.vercel.app,
-  //    lvh.me, custom domains). We deliberately do NOT redirect to
-  //    <slug>.<appDomain> here because:
-  //      - locally lvh.me has no HTTPS cert,
-  //      - Vercel preview hosts (*.vercel.app) only have a one-level
-  //        wildcard cert, so slug.preview.vercel.app is unreachable,
-  //      - production needs wildcard DNS + wildcard SSL set up on the
-  //        Vercel project before slug.appDomain even resolves.
-  //    Once those are in place we can introduce a subdomain hop as a
-  //    polish task. The wizard works identically on the apex.
-  return { success: true, data: { redirectTo: '/admin/onboarding' } }
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('[signupAction] minted admin session', {
+      accountId: account.id,
+      userId: userRow.id,
+      email: normalizedEmail,
+    })
+  }
+
+  // Always redirect to /admin/onboarding on the SAME host. Using the
+  // built-in Next.js redirect() instead of returning { redirectTo }
+  // guarantees the Set-Cookie header and the Location/redirect signal
+  // are emitted in the SAME response, so the browser persists the
+  // session cookie before it follows the redirect. The client-side
+  // window.location.href fallback was racing on Vercel — the cookie
+  // wasn't always applied before the next request fired.
+  redirect('/admin/onboarding')
 }
 
 /**
@@ -487,10 +479,7 @@ export async function completeOAuthSignupAction(
     const needsOnboarding =
       !existingAccount?.onboarding_completed_at && (existingUser.role as UserRole) === 'owner'
 
-    return {
-      success: true,
-      data: { redirectTo: needsOnboarding ? '/admin/onboarding' : '/admin/dashboard' },
-    }
+    redirect(needsOnboarding ? '/admin/onboarding' : '/admin/dashboard')
   }
 
   const baseSlug = slugify(businessName)
@@ -544,8 +533,7 @@ export async function completeOAuthSignupAction(
     email,
   })
 
-  // Same-host redirect (see signupAction for rationale — cross-subdomain
-  // hops break on lvh.me, Vercel previews, and any deploy that hasn't
-  // configured wildcard DNS/SSL yet).
-  return { success: true, data: { redirectTo: '/admin/onboarding' } }
+  // Use Next.js redirect() so the Set-Cookie + Location headers ship in
+  // the same response (see signupAction for the full reasoning).
+  redirect('/admin/onboarding')
 }

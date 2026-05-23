@@ -25,6 +25,18 @@ const signupSchema = z.object({
   password: z.string().min(8, 'Password must be at least 8 characters'),
 })
 
+// Next.js Server Actions throw a special error with `digest` starting
+// "NEXT_REDIRECT" when redirect() is called. We must re-throw it so the
+// framework can perform the actual navigation — swallowing it would
+// leave the user stuck on /auth/signup. We check the digest manually
+// instead of importing isRedirectError from a Next.js internal path
+// because the internal export location changes between minor releases.
+function isNextRedirectError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false
+  const digest = (err as { digest?: unknown }).digest
+  return typeof digest === 'string' && digest.startsWith('NEXT_REDIRECT')
+}
+
 type SignupFormProps = {
   onSubmit: (values: z.infer<typeof signupSchema>) => Promise<{
     success: boolean
@@ -50,25 +62,26 @@ export function SignupForm({ onSubmit }: SignupFormProps) {
     try {
       result = await onSubmit(values)
     } catch (err) {
+      // Server Action redirect() throws NEXT_REDIRECT — re-throw so Next.js
+      // can actually navigate. Swallowing it would strand the user here.
+      if (isNextRedirectError(err)) throw err
+
       setError(err instanceof Error ? err.message : 'Account creation failed')
       setIsSubmitting(false)
       return
     }
 
+    // If we reach this point the Server Action returned a value instead
+    // of redirecting — that only happens on failure paths now.
     if (!result.success) {
       setError(result.error ?? 'Account creation failed')
       setIsSubmitting(false)
       return
     }
 
+    // Fallback for the (no-longer-used) success-with-data path. Kept for
+    // defense in depth so older clients keep working during deploys.
     const redirectTo = result.redirectTo ?? '/admin/onboarding'
-
-    // Always use a full-page navigation after signup — never client-side
-    // router.replace. The Set-Cookie response that established the new
-    // session needs to actually be persisted by the browser before the
-    // next request, and a hard reload guarantees that. Client navigation
-    // sometimes raced and the new /admin/* request went out without the
-    // freshly minted cookie, landing the user on a stale tenant.
     window.location.href = redirectTo
   }
 

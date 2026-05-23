@@ -15,8 +15,8 @@ import { Input } from '@/components/ui/input'
 import { useBranding } from '@/lib/branding/context'
 import { zodResolver } from '@hookform/resolvers/zod'
 import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { useState, useTransition } from 'react'
+import { useSearchParams } from 'next/navigation'
+import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 
@@ -24,6 +24,12 @@ const loginSchema = z.object({
   email: z.string().email('Enter a valid email'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
 })
+
+function isNextRedirectError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false
+  const digest = (err as { digest?: unknown }).digest
+  return typeof digest === 'string' && digest.startsWith('NEXT_REDIRECT')
+}
 
 type LoginFormProps = {
   onSubmit: (values: z.infer<typeof loginSchema>) => Promise<{
@@ -49,13 +55,11 @@ export function LoginForm({
   signupHref = '/auth/signup',
 }: LoginFormProps) {
   const branding = useBranding()
-  const router = useRouter()
   const searchParams = useSearchParams()
   const [error, setError] = useState<string | null>(
     searchParams?.get('error') ? decodeURIComponent(searchParams.get('error') ?? '') : null,
   )
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [isPendingNav, startNav] = useTransition()
 
   const form = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
@@ -70,6 +74,9 @@ export function LoginForm({
     try {
       result = await onSubmit(values)
     } catch (err) {
+      // Server Action redirect() throws NEXT_REDIRECT on success — re-throw
+      // so Next.js can navigate. Swallowing would strand the user here.
+      if (isNextRedirectError(err)) throw err
       setError(err instanceof Error ? err.message : 'Sign in failed')
       setIsSubmitting(false)
       return
@@ -81,16 +88,15 @@ export function LoginForm({
       return
     }
 
+    // Defense in depth: if the action returned a redirectTo instead of
+    // calling redirect() (older deploys mid-rollout), fall back to a
+    // full page navigation so the cookie set is guaranteed to be applied.
     const redirectTo = result.redirectTo ?? '/admin/dashboard'
-
-    startNav(() => {
-      router.replace(redirectTo)
-      router.refresh()
-    })
+    window.location.href = redirectTo
   }
 
-  const isBusy = isSubmitting || isPendingNav
-  const buttonLabel = isPendingNav ? 'Loading…' : isSubmitting ? 'Signing in…' : 'Sign in'
+  const isBusy = isSubmitting
+  const buttonLabel = isSubmitting ? 'Signing in…' : 'Sign in'
 
   return (
     <AuthLayout>

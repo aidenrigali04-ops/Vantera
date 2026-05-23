@@ -16,6 +16,12 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 
+function isNextRedirectError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false
+  const digest = (err as { digest?: unknown }).digest
+  return typeof digest === 'string' && digest.startsWith('NEXT_REDIRECT')
+}
+
 const schema = z.object({
   fullName: z.string().min(2, 'Enter your full name'),
   businessName: z.string().min(2, 'Business name must be at least 2 characters'),
@@ -42,7 +48,17 @@ export function CompleteSignupClient({
     setIsSubmitting(true)
     setError(null)
 
-    const result = await completeOAuthSignupAction(values)
+    let result
+    try {
+      result = await completeOAuthSignupAction(values)
+    } catch (err) {
+      // Server Action redirect() throws NEXT_REDIRECT — re-throw so Next.js
+      // can navigate. Swallowing it strands the user on /auth/complete-signup.
+      if (isNextRedirectError(err)) throw err
+      setError(err instanceof Error ? err.message : 'Could not finish signup')
+      setIsSubmitting(false)
+      return
+    }
 
     if (!result.success) {
       setError(result.error ?? 'Could not finish signup')
@@ -51,9 +67,6 @@ export function CompleteSignupClient({
     }
 
     const redirectTo = result.data?.redirectTo ?? '/admin/onboarding'
-    // Always full-page navigate after OAuth signup completion — the
-    // freshly-set session cookie needs to be on the next request, and
-    // client-side replace can race the cookie persist.
     window.location.href = redirectTo
   }
 
