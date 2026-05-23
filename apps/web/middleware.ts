@@ -173,7 +173,16 @@ export async function middleware(request: NextRequest) {
   const appDomain = process.env.NEXT_PUBLIC_APP_DOMAIN ?? 'vantera.app'
   const testSlug = process.env.TEST_TENANT_SLUG
 
-  if (isMarketingHost(hostname, appDomain) && !testSlug) {
+  // A valid session cookie means the user has a real account — let
+  // resolveAccountByHost figure out which tenant via the session fallback,
+  // even on marketing/apex/*.vercel.app hosts. Without this guard a fresh
+  // signup on a Vercel preview URL would be bounced back to the landing
+  // page before middleware ever got a chance to read its admin session.
+  const hasAdminSession = Boolean(request.cookies.get(ADMIN_SESSION_COOKIE)?.value)
+  const hasPortalSession = Boolean(request.cookies.get(PORTAL_SESSION_COOKIE)?.value)
+  const hasAnySession = hasAdminSession || hasPortalSession
+
+  if (isMarketingHost(hostname, appDomain) && !testSlug && !hasAnySession) {
     return NextResponse.redirect(new URL('/', request.url))
   }
 
