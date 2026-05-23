@@ -608,7 +608,10 @@ export async function inviteTeamMembers(
       const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
         type: 'invite',
         email: member.email,
-        options: { redirectTo: `${env.NEXT_PUBLIC_APP_URL}/api/auth/callback` },
+        // `/auth/callback` is the real route (see app/(auth)/auth/callback/route.ts).
+        // The earlier `/api/auth/callback` path doesn't exist and would 404 the
+        // invitee's magic link.
+        options: { redirectTo: `${env.NEXT_PUBLIC_APP_URL}/auth/callback` },
       })
 
       if (linkError) {
