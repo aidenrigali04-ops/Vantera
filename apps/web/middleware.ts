@@ -70,6 +70,7 @@ function applyAccountHeaders(
 
 async function resolveAccountByHost(
   supabase: ReturnType<typeof createServerClient>,
+  request: NextRequest,
   host: string,
   appDomain: string,
 ): Promise<AccountRow | null> {
@@ -102,6 +103,44 @@ async function resolveAccountByHost(
 
   if (portalAccount) {
     return portalAccount
+  }
+
+  // Session fallback: when a freshly-signed-up user is still on the marketing
+  // apex (or *.vercel.app, or localhost) before custom DNS is wired up, their
+  // admin session cookie is the only signal that tells us which tenant they
+  // belong to. Verify the cookie, then look up the account by the embedded ID.
+  const adminToken = request.cookies.get(ADMIN_SESSION_COOKIE)?.value
+  if (adminToken) {
+    const payload = await verifySessionToken(adminToken)
+    if (payload && payload.type === 'admin' && payload.accountId) {
+      const { data } = await supabase
+        .from('accounts')
+        .select(ACCOUNT_SELECT)
+        .eq('id', payload.accountId)
+        .limit(1)
+        .maybeSingle()
+
+      if (data) {
+        return data
+      }
+    }
+  }
+
+  const portalToken = request.cookies.get(PORTAL_SESSION_COOKIE)?.value
+  if (portalToken) {
+    const payload = await verifySessionToken(portalToken)
+    if (payload && payload.type === 'portal' && payload.accountId) {
+      const { data } = await supabase
+        .from('accounts')
+        .select(ACCOUNT_SELECT)
+        .eq('id', payload.accountId)
+        .limit(1)
+        .maybeSingle()
+
+      if (data) {
+        return data
+      }
+    }
   }
 
   const testSlug = process.env.TEST_TENANT_SLUG
@@ -167,7 +206,7 @@ export async function middleware(request: NextRequest) {
     },
   )
 
-  const account = await resolveAccountByHost(supabase, host, appDomain)
+  const account = await resolveAccountByHost(supabase, request, host, appDomain)
 
   if (!account) {
     return NextResponse.redirect(new URL('/', request.url))

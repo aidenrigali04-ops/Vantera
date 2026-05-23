@@ -1,6 +1,8 @@
 import type { BrandingData } from '@/lib/branding/context'
+import { ADMIN_SESSION_COOKIE, PORTAL_SESSION_COOKIE } from '@/lib/auth/constants'
+import { verifySessionToken } from '@/lib/auth/jwt'
 import { createSupabasePublicClient } from '@/lib/supabase/public'
-import { headers } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 
 type AccountRow = {
   id: string
@@ -66,6 +68,41 @@ export async function resolveAccountFromHost(host: string): Promise<AccountRow |
 
       if (data) {
         return data
+      }
+    }
+
+    // Session fallback: a freshly-signed-up user is on the marketing apex
+    // (or a bare *.vercel.app) until custom DNS is set up. Verify the session
+    // cookie and resolve the tenant by the embedded accountId so they can
+    // reach /admin/onboarding without leaving the host they signed up on.
+    const cookieStore = cookies()
+    const adminToken = cookieStore.get(ADMIN_SESSION_COOKIE)?.value
+    if (adminToken) {
+      const payload = await verifySessionToken(adminToken)
+      if (payload && payload.type === 'admin' && payload.accountId) {
+        const { data } = await supabase
+          .from('accounts')
+          .select(ACCOUNT_SELECT)
+          .eq('id', payload.accountId)
+          .limit(1)
+          .maybeSingle()
+
+        if (data) return data
+      }
+    }
+
+    const portalToken = cookieStore.get(PORTAL_SESSION_COOKIE)?.value
+    if (portalToken) {
+      const payload = await verifySessionToken(portalToken)
+      if (payload && payload.type === 'portal' && payload.accountId) {
+        const { data } = await supabase
+          .from('accounts')
+          .select(ACCOUNT_SELECT)
+          .eq('id', payload.accountId)
+          .limit(1)
+          .maybeSingle()
+
+        if (data) return data
       }
     }
 

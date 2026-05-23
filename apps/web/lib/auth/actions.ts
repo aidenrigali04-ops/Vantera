@@ -20,6 +20,12 @@ const loginSchema = z.object({
   password: z.string().min(8),
 })
 
+const signupSchema = z.object({
+  businessName: z.string().min(2, 'Business name must be at least 2 characters').max(120),
+  email: z.string().email('Enter a valid email'),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
+})
+
 type AdminUserRow = {
   id: string
   email: string
@@ -171,4 +177,169 @@ export async function portalLogoutAction(): Promise<void> {
   await supabase.auth.signOut()
   await clearPortalSession()
   redirect('/auth/portal-login')
+}
+
+function slugify(input: string): string {
+  return input
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60)
+}
+
+function randomSuffix(): string {
+  return Math.random().toString(36).slice(2, 6)
+}
+
+async function findUniqueSlug(base: string): Promise<string> {
+  const admin = getSupabaseAdmin()
+  const fallback = base || 'business'
+  let candidate = fallback
+
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const { data } = await admin
+      .from('accounts')
+      .select('id')
+      .eq('slug', candidate)
+      .limit(1)
+      .maybeSingle()
+
+    if (!data) {
+      return candidate
+    }
+
+    candidate = `${fallback}-${randomSuffix()}`
+  }
+
+  return `${fallback}-${Date.now().toString(36).slice(-6)}`
+}
+
+export async function signupAction(
+  input: z.infer<typeof signupSchema>,
+): Promise<ActionResult<{ redirectTo: string }>> {
+  const validated = signupSchema.safeParse(input)
+
+  if (!validated.success) {
+    return {
+      success: false,
+      error: validated.error.issues[0]?.message ?? 'Invalid signup details',
+    }
+  }
+
+  const admin = getSupabaseAdmin()
+  const { businessName, email, password } = validated.data
+
+  // 1) Create the Supabase auth user. email_confirm:true bypasses the
+  //    verification email so the user can start onboarding immediately.
+  const createResult = await admin.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+    user_metadata: { business_name: businessName },
+  })
+
+  if (createResult.error || !createResult.data.user) {
+    const message = createResult.error?.message ?? 'Failed to create account'
+    if (message.toLowerCase().includes('registered') || message.toLowerCase().includes('exists')) {
+      return { success: false, error: 'An account with this email already exists. Try signing in.' }
+    }
+    return { success: false, error: message }
+  }
+
+  const authUserId = createResult.data.user.id
+
+  // 2) Allocate a unique slug for this business.
+  const baseSlug = slugify(businessName)
+  const slug = await findUniqueSlug(baseSlug)
+
+  // 3) Insert the account. Vertical is required by the schema but the user
+  //    selects it in Step 1 of the wizard; default to 'agency' as a
+  //    placeholder that will be overwritten by updateVertical.
+  const { data: account, error: accountError } = await admin
+    .from('accounts')
+    .insert({
+      slug,
+      name: businessName,
+      vertical: 'agency',
+      plan: 'team',
+    })
+    .select('id, slug')
+    .single()
+
+  if (accountError || !account) {
+    // Roll back the auth user so the email can be reused on retry.
+    await admin.auth.admin.deleteUser(authUserId)
+    return { success: false, error: accountError?.message ?? 'Failed to create workspace' }
+  }
+
+  // 4) Insert the owner user row. fullName defaults to the email local-part —
+  //    the user can change this in profile settings later.
+  const fullName = email.split('@')[0] ?? email
+  const { error: userError } = await admin.from('users').insert({
+    account_id: account.id,
+    email,
+    full_name: fullName,
+    role: 'owner',
+    is_active: true,
+  })
+
+  if (userError) {
+    await admin.from('accounts').delete().eq('id', account.id)
+    await admin.auth.admin.deleteUser(authUserId)
+    return { success: false, error: userError.message }
+  }
+
+  // 5) Look up the inserted user so we have its UUID for the session payload.
+  const { data: userRow } = await admin
+    .from('users')
+    .select('id')
+    .eq('account_id', account.id)
+    .eq('email', email)
+    .limit(1)
+    .maybeSingle()
+
+  if (!userRow) {
+    return { success: false, error: 'Failed to finalize account setup' }
+  }
+
+  // 6) Sign the user in via Supabase (sets Supabase's sb-* cookies) and then
+  //    mint our own admin session cookie.
+  const supabase = createSupabaseServerClient()
+  const { error: signInError } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  })
+
+  if (signInError) {
+    return { success: false, error: signInError.message }
+  }
+
+  await setAdminSession({
+    type: 'admin',
+    userId: userRow.id,
+    accountId: account.id,
+    role: 'owner',
+    email,
+  })
+
+  // 7) Build the redirect target. If we're already on the tenant's subdomain,
+  //    stay there. Otherwise (apex/marketing/*.vercel.app/localhost) stay on
+  //    the current host — the session-cookie tenant fallback in middleware
+  //    will let /admin/onboarding render. The user can move to their custom
+  //    subdomain once DNS is configured.
+  const host = headers().get('host') ?? ''
+  const hostname = host.split(':')[0] ?? ''
+  const appDomain = process.env.NEXT_PUBLIC_APP_DOMAIN ?? ''
+  const onTenantSubdomain = appDomain && hostname === `${account.slug}.${appDomain}`
+
+  if (!onTenantSubdomain && appDomain && process.env.NODE_ENV === 'production' && hostname === appDomain) {
+    // Apex on production with custom DNS configured: send the user to their
+    // subdomain so the URL reflects their workspace. Cross-subdomain cookies
+    // (configured in lib/auth/session.ts) keep them signed in.
+    const target = `https://${account.slug}.${appDomain}/admin/onboarding`
+    return { success: true, data: { redirectTo: target } }
+  }
+
+  return { success: true, data: { redirectTo: '/admin/onboarding' } }
 }
