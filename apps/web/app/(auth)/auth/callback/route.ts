@@ -1,4 +1,4 @@
-import { clearAdminSession, clearPortalSession, setAdminSession } from '@/lib/auth/session'
+import { setAdminSession } from '@/lib/auth/session'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { type NextRequest, NextResponse } from 'next/server'
@@ -83,14 +83,9 @@ export async function GET(request: NextRequest) {
       .eq('id', existingUserRow.account_id)
       .maybeSingle()
 
-    // Clear any stale prior session before issuing the new one. Without
-    // this, a user who was previously logged in as account A and then
-    // signs in via OAuth as account B can end up holding both cookies on
-    // the same scope — the older one wins on the next request and they
-    // bleed back into A.
-    await clearAdminSession()
-    await clearPortalSession()
-
+    // setAdminSession overwrites any pre-existing v_admin_session via
+    // Set-Cookie semantics — no separate clear is needed and emitting
+    // both clear+set in the same response can race on some clients.
     await setAdminSession({
       type: 'admin',
       userId: existingUserRow.id,

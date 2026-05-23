@@ -11,9 +11,6 @@ import {
   setAdminSession,
   setPortalSession,
 } from '@/lib/auth/session'
-// (clearAdminSession / clearPortalSession are also used at the start of
-// signupAction + completeOAuthSignupAction so a stale prior session can't
-// outlive a new signup.)
 import type { ActionResult } from '@/lib/auth/types'
 import type { UserRole } from '@/lib/auth/constants'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
@@ -136,12 +133,10 @@ export async function adminLoginAction(
     return { success: false, error: 'Invalid email or password' }
   }
 
-  // Clear any stale prior session before issuing the new one. Without this,
-  // an admin signing in on a browser that still holds another tenant's
-  // admin cookie can race and end up on the prior tenant on the next request.
-  await clearAdminSession()
-  await clearPortalSession()
-
+  // setAdminSession() overwrites any pre-existing v_admin_session cookie via
+  // standard Set-Cookie semantics (same name+path+domain). No explicit clear
+  // is needed and emitting both a delete header and a set header in the same
+  // response can cause cookie-handling races in some clients.
   await setAdminSession({
     type: 'admin',
     userId: user.id,
@@ -201,10 +196,8 @@ export async function portalLoginAction(
     return { success: false, error: 'Invalid email or password' }
   }
 
-  // Drop any prior portal/admin cookie before issuing the new one.
-  await clearAdminSession()
-  await clearPortalSession()
-
+  // setPortalSession() overwrites any pre-existing v_portal_session via
+  // Set-Cookie semantics (same name+path+domain).
   await setPortalSession({
     type: 'portal',
     contactId: contact.id,
@@ -236,15 +229,6 @@ function slugify(input: string): string {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 60)
-}
-
-// `*.vercel.app` only has a one-level wildcard SSL cert. A two-deep host
-// like `<slug>.vantera-web.vercel.app` is unreachable over HTTPS, so when
-// the app domain is Vercel-managed we must NOT redirect to a tenant
-// subdomain — we stay on the same host and resolve the tenant by session.
-function isVercelManagedDomain(appDomain: string): boolean {
-  const normalized = appDomain.startsWith('.') ? appDomain.slice(1) : appDomain
-  return normalized === 'vercel.app' || normalized.endsWith('.vercel.app')
 }
 
 function randomSuffix(): string {
@@ -290,13 +274,12 @@ export async function signupAction(
   const { fullName, businessName, email, password } = validated.data
   const normalizedEmail = email.toLowerCase().trim()
 
-  // 0) Clear any cookies from a prior session. Without this, a user who
-  //    visits /auth/signup while still holding another account's admin
-  //    cookie ends up with two layers of state — Supabase signs in the
-  //    new user but the older Vantera cookie wins on the next middleware
-  //    pass, dumping them on the old account's dashboard.
-  await clearAdminSession()
-  await clearPortalSession()
+  // 0) Sign out of any existing Supabase session. The Vantera admin cookie
+  //    will be overwritten by setAdminSession() at the end of this action
+  //    (cookies()::set with the same name+path+domain replaces the prior
+  //    value), but Supabase's sb-* cookies are tied to the previous user
+  //    and need to be cleared explicitly so signInWithPassword can mint
+  //    fresh ones on the new user.
   try {
     const supaForSignout = createSupabaseServerClient()
     await supaForSignout.auth.signOut()
@@ -417,34 +400,18 @@ export async function signupAction(
     email: normalizedEmail,
   })
 
-  // 7) Build the redirect target. Fresh signups always land on
-  //    /admin/onboarding (not /admin/dashboard) so the wizard captures
-  //    their vertical, branding, voice, template, team, and integrations.
-  //    The middleware also enforces this gate as a belt-and-suspenders
-  //    guard for any path that tries to skip the wizard.
-  //
-  //    - If we're on a real configured app domain with wildcard SSL,
-  //      jump to <slug>.<appDomain>/admin/onboarding so the URL bar
-  //      reflects the new workspace. The session cookie's `.appDomain`
-  //      scope keeps the user signed in across the subdomain hop.
-  //    - On *.vercel.app, localhost, lvh.me, Vercel preview URLs, etc.,
-  //      stay on the current host. *.vercel.app only has a single-level
-  //      wildcard cert so sub-subdomains aren't reachable over HTTPS.
-  const host = headers().get('host') ?? ''
-  const hostname = host.split(':')[0] ?? ''
-  const appDomain = process.env.NEXT_PUBLIC_APP_DOMAIN ?? ''
-
-  const supportsTenantSubdomains = Boolean(appDomain) && !isVercelManagedDomain(appDomain)
-  const onAppDomain = Boolean(
-    appDomain && (hostname === appDomain || hostname.endsWith(`.${appDomain}`)),
-  )
-  const onCorrectSubdomain = Boolean(appDomain && hostname === `${account.slug}.${appDomain}`)
-
-  if (supportsTenantSubdomains && onAppDomain && !onCorrectSubdomain) {
-    const target = `https://${account.slug}.${appDomain}/admin/onboarding`
-    return { success: true, data: { redirectTo: target } }
-  }
-
+  // 7) Always redirect to /admin/onboarding on the SAME host. Tenant
+  //    resolution then runs through the session-cookie fallback in
+  //    middleware — which works on every host (apex, *.vercel.app,
+  //    lvh.me, custom domains). We deliberately do NOT redirect to
+  //    <slug>.<appDomain> here because:
+  //      - locally lvh.me has no HTTPS cert,
+  //      - Vercel preview hosts (*.vercel.app) only have a one-level
+  //        wildcard cert, so slug.preview.vercel.app is unreachable,
+  //      - production needs wildcard DNS + wildcard SSL set up on the
+  //        Vercel project before slug.appDomain even resolves.
+  //    Once those are in place we can introduce a subdomain hop as a
+  //    polish task. The wizard works identically on the apex.
   return { success: true, data: { redirectTo: '/admin/onboarding' } }
 }
 
@@ -509,10 +476,6 @@ export async function completeOAuthSignupAction(
       .eq('id', existingUser.account_id)
       .maybeSingle()
 
-    // Clear any stale prior session before issuing the new one.
-    await clearAdminSession()
-    await clearPortalSession()
-
     await setAdminSession({
       type: 'admin',
       userId: existingUser.id,
@@ -573,11 +536,6 @@ export async function completeOAuthSignupAction(
     return { success: false, error: 'Failed to finalize account setup' }
   }
 
-  // Clear any stale prior session before issuing the new one (defensive —
-  // prevents another tenant's cookie from outliving this fresh signup).
-  await clearAdminSession()
-  await clearPortalSession()
-
   await setAdminSession({
     type: 'admin',
     userId: userRow.id,
@@ -586,22 +544,8 @@ export async function completeOAuthSignupAction(
     email,
   })
 
-  const host = headers().get('host') ?? ''
-  const hostname = host.split(':')[0] ?? ''
-  const appDomain = process.env.NEXT_PUBLIC_APP_DOMAIN ?? ''
-
-  const supportsTenantSubdomains = Boolean(appDomain) && !isVercelManagedDomain(appDomain)
-  const onAppDomain = Boolean(
-    appDomain && (hostname === appDomain || hostname.endsWith(`.${appDomain}`)),
-  )
-  const onCorrectSubdomain = Boolean(appDomain && hostname === `${account.slug}.${appDomain}`)
-
-  if (supportsTenantSubdomains && onAppDomain && !onCorrectSubdomain) {
-    return {
-      success: true,
-      data: { redirectTo: `https://${account.slug}.${appDomain}/admin/onboarding` },
-    }
-  }
-
+  // Same-host redirect (see signupAction for rationale — cross-subdomain
+  // hops break on lvh.me, Vercel previews, and any deploy that hasn't
+  // configured wildcard DNS/SSL yet).
   return { success: true, data: { redirectTo: '/admin/onboarding' } }
 }
