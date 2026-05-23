@@ -17,6 +17,10 @@
  *   ALL_ACCESS_PASSWORD     (optional; defaults to "Vantera2026!")
  *   ALL_ACCESS_FIRST_NAME   (optional; defaults to "Aiden")
  *   ALL_ACCESS_LAST_NAME    (optional; defaults to "Rigali")
+ *   KEEP_ONBOARDING         (optional; "1" preserves onboarding_completed_at
+ *                            instead of resetting it — set this when you want
+ *                            to land directly on /admin/dashboard rather than
+ *                            re-running the 5-step wizard)
  */
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
@@ -84,17 +88,30 @@ async function getAccountIdBySlug(admin: SupabaseClient, slug: string): Promise<
     )
   }
 
-  if (!data.onboarding_completed_at) {
+  // Default behavior: reset onboarding state so logging in walks the
+  // owner through the 5-step wizard. Set KEEP_ONBOARDING=1 to leave the
+  // account's onboarding_completed_at alone (useful when you want to
+  // verify post-onboarding screens without re-running the wizard).
+  if (process.env.KEEP_ONBOARDING === '1') {
+    if (data.onboarding_completed_at) {
+      console.log(`Kept onboarding_completed_at on "${slug}" (KEEP_ONBOARDING=1)`)
+    }
+    return data.id
+  }
+
+  if (data.onboarding_completed_at) {
     const { error: updateError } = await admin
       .from('accounts')
-      .update({ onboarding_completed_at: new Date().toISOString() })
+      .update({ onboarding_completed_at: null })
       .eq('id', data.id)
 
     if (updateError) {
       throw updateError
     }
 
-    console.log(`Marked account "${slug}" onboarding complete`)
+    console.log(`Reset onboarding_completed_at on "${slug}" — wizard will run on next login`)
+  } else {
+    console.log(`Account "${slug}" already has onboarding incomplete — wizard will run on next login`)
   }
 
   return data.id
@@ -214,7 +231,9 @@ async function run() {
   console.log(`  Email:    ${EMAIL}`)
   console.log(`  Password: ${PASSWORD}`)
   console.log(`  Tenant:   ${SLUG}`)
-  console.log(`  Admin:    /auth/login          → /admin/dashboard`)
+  const adminLanding =
+    process.env.KEEP_ONBOARDING === '1' ? '/admin/dashboard' : '/admin/onboarding (wizard)'
+  console.log(`  Admin:    /auth/login          → ${adminLanding}`)
   console.log(`  Portal:   /auth/portal-login   → /portal`)
 }
 

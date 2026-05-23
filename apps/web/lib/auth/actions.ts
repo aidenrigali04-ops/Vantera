@@ -119,7 +119,18 @@ export async function adminLoginAction(
     email: user.email,
   })
 
-  return { success: true, data: { redirectTo: '/admin/dashboard' } }
+  // If the owner of an un-onboarded account is signing in, drop them
+  // directly into the wizard. The admin layout would do the same redirect
+  // anyway, but doing it here avoids a visible flash through /admin/dashboard.
+  const onboardingComplete = isOnboardingComplete(account)
+  const redirectTo =
+    !onboardingComplete && user.role === 'owner' ? '/admin/onboarding' : '/admin/dashboard'
+
+  return { success: true, data: { redirectTo } }
+}
+
+function isOnboardingComplete(account: { onboarding_completed_at?: string | null }): boolean {
+  return Boolean(account.onboarding_completed_at)
 }
 
 export async function portalLoginAction(
@@ -323,20 +334,26 @@ export async function signupAction(
     email,
   })
 
-  // 7) Build the redirect target. If we're already on the tenant's subdomain,
-  //    stay there. Otherwise (apex/marketing/*.vercel.app/localhost) stay on
-  //    the current host — the session-cookie tenant fallback in middleware
-  //    will let /admin/onboarding render. The user can move to their custom
-  //    subdomain once DNS is configured.
+  // 7) Build the redirect target. The goal: drop the user on a host that
+  //    middleware will resolve to THIS new account, not a different tenant.
+  //
+  //    - If we're on the configured app domain (apex or any tenant subdomain),
+  //      DNS for *.<appDomain> is presumed to exist, so jump to
+  //      <slug>.<appDomain>/admin/onboarding. Cross-subdomain cookies keep
+  //      the user signed in.
+  //    - If we're on anything else (Vercel preview, *.vercel.app, localhost,
+  //      lvh.me, etc.), stay on the current host and rely on the session-
+  //      cookie tenant fallback in middleware/resolve-account.
   const host = headers().get('host') ?? ''
   const hostname = host.split(':')[0] ?? ''
   const appDomain = process.env.NEXT_PUBLIC_APP_DOMAIN ?? ''
-  const onTenantSubdomain = appDomain && hostname === `${account.slug}.${appDomain}`
 
-  if (!onTenantSubdomain && appDomain && process.env.NODE_ENV === 'production' && hostname === appDomain) {
-    // Apex on production with custom DNS configured: send the user to their
-    // subdomain so the URL reflects their workspace. Cross-subdomain cookies
-    // (configured in lib/auth/session.ts) keep them signed in.
+  const onAppDomain = Boolean(
+    appDomain && (hostname === appDomain || hostname.endsWith(`.${appDomain}`)),
+  )
+  const onCorrectSubdomain = Boolean(appDomain && hostname === `${account.slug}.${appDomain}`)
+
+  if (onAppDomain && !onCorrectSubdomain) {
     const target = `https://${account.slug}.${appDomain}/admin/onboarding`
     return { success: true, data: { redirectTo: target } }
   }
