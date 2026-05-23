@@ -13,7 +13,14 @@ export default async function PortalLayout({ children }: { children: ReactNode }
   const session = await requirePortalSession()
   const branding = getBrandingFromHeaders(headers())
   const plan = (branding.plan === 'enterprise' ? 'enterprise' : 'team') as Plan
-  const flags = await evaluateAllFlags({ accountId: session.accountId, plan })
+
+  let flags
+  try {
+    flags = await evaluateAllFlags({ accountId: session.accountId, plan })
+  } catch (err) {
+    console.error('[portal-layout] flag eval threw:', err)
+    flags = {} as Awaited<ReturnType<typeof evaluateAllFlags>>
+  }
 
   return (
     <BrandingProvider branding={branding}>

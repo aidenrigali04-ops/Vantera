@@ -14,11 +14,26 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   const session = await requireAdminSession()
   const branding = getBrandingFromHeaders(headers())
   const plan = (branding.plan === 'enterprise' ? 'enterprise' : 'team') as Plan
-  const flags = await evaluateAllFlags({ accountId: session.accountId, plan })
   const pathname = headers().get('x-pathname') ?? ''
 
-  if (!branding.onboardingComplete && pathname !== '/admin/onboarding') {
+  // Onboarding redirect runs before flag eval so a missing/slow DB never blocks
+  // the bounce. We only redirect when we have a real branding payload — if
+  // middleware couldn't resolve the tenant, branding.accountId is empty and
+  // we shouldn't bounce the user into a wizard they can't actually finish.
+  if (
+    branding.accountId &&
+    !branding.onboardingComplete &&
+    pathname !== '/admin/onboarding'
+  ) {
     redirect('/admin/onboarding')
+  }
+
+  let flags
+  try {
+    flags = await evaluateAllFlags({ accountId: session.accountId, plan })
+  } catch (err) {
+    console.error('[admin-layout] flag eval threw:', err)
+    flags = {} as Awaited<ReturnType<typeof evaluateAllFlags>>
   }
 
   return (

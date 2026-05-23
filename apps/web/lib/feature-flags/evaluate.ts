@@ -66,14 +66,23 @@ export async function evaluateAllFlags({
   ) as Record<FlagName, boolean>
 
   const evaluatePromise = (async () => {
-    const entries = await Promise.all(
-      flagNames.map(async (flagName) => {
-        const value = await evaluateFlag({ accountId, plan, flagName })
-        return [flagName, value] as const
-      }),
-    )
-    return Object.fromEntries(entries) as Record<FlagName, boolean>
+    try {
+      const entries = await Promise.all(
+        flagNames.map(async (flagName) => {
+          const value = await evaluateFlag({ accountId, plan, flagName })
+          return [flagName, value] as const
+        }),
+      )
+      return Object.fromEntries(entries) as Record<FlagName, boolean>
+    } catch (err) {
+      console.error('[feature-flags] evaluateAllFlags failed, using plan defaults:', err)
+      return planDefaults
+    }
   })()
+
+  // Swallow any late rejection so we never leave an unhandled promise around
+  // after the race resolves on the timeout side.
+  evaluatePromise.catch(() => {})
 
   const timeoutPromise = new Promise<Record<FlagName, boolean>>((resolve) => {
     setTimeout(() => resolve(planDefaults), EVALUATE_ALL_TIMEOUT_MS)
@@ -81,7 +90,8 @@ export async function evaluateAllFlags({
 
   try {
     return await Promise.race([evaluatePromise, timeoutPromise])
-  } catch {
+  } catch (err) {
+    console.error('[feature-flags] race failed, using plan defaults:', err)
     return planDefaults
   }
 }
