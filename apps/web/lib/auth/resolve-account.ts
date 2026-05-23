@@ -1,6 +1,7 @@
 import type { BrandingData } from '@/lib/branding/context'
 import { ADMIN_SESSION_COOKIE, PORTAL_SESSION_COOKIE } from '@/lib/auth/constants'
 import { verifySessionToken } from '@/lib/auth/jwt'
+import { getSupabaseAdmin as createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { createSupabasePublicClient } from '@/lib/supabase/public'
 import { cookies, headers } from 'next/headers'
 
@@ -125,14 +126,23 @@ export async function resolveAccountFromHost(host: string): Promise<AccountRow |
  */
 export async function findAccountByAdminEmail(email: string): Promise<AccountRow | null> {
   try {
-    const supabase = createSupabasePublicClient()
+    // Anon-key reads on `users` are blocked by RLS — we deliberately use the
+    // service-role client here so the lookup actually returns rows.
+    const supabase = createSupabaseAdminClient()
+    const normalized = email.toLowerCase().trim()
 
+    // ORDER BY created_at DESC: a single email can legitimately own multiple
+    // workspaces. We always route to the most recently created one — that's
+    // the workspace the user was just interacting with. Without the order
+    // clause Postgres returns "some" row and routing becomes non-deterministic
+    // (the original tenant-bleed bug).
     const { data: userRow } = await supabase
       .from('users')
-      .select('account_id')
-      .eq('email', email)
+      .select('account_id, created_at')
+      .eq('email', normalized)
       .eq('is_active', true)
       .is('deleted_at', null)
+      .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
 
@@ -156,14 +166,16 @@ export async function findAccountByAdminEmail(email: string): Promise<AccountRow
  */
 export async function findAccountByPortalEmail(email: string): Promise<AccountRow | null> {
   try {
-    const supabase = createSupabasePublicClient()
+    const supabase = createSupabaseAdminClient()
+    const normalized = email.toLowerCase().trim()
 
     const { data: contactRow } = await supabase
       .from('contacts')
-      .select('account_id')
-      .eq('email', email)
+      .select('account_id, created_at')
+      .eq('email', normalized)
       .eq('portal_access', true)
       .is('deleted_at', null)
+      .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
 

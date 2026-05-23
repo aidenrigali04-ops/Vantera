@@ -11,6 +11,9 @@ import {
   setAdminSession,
   setPortalSession,
 } from '@/lib/auth/session'
+// (clearAdminSession / clearPortalSession are also used at the start of
+// signupAction + completeOAuthSignupAction so a stale prior session can't
+// outlive a new signup.)
 import type { ActionResult } from '@/lib/auth/types'
 import type { UserRole } from '@/lib/auth/constants'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
@@ -52,13 +55,15 @@ async function findActiveAdminUser(accountId: string, email: string): Promise<Ad
   // Supabase projects whose legacy db.<ref>.supabase.co host has been retired
   // (newer projects must use the Supavisor pooler URL for direct Postgres).
   const admin = getSupabaseAdmin()
+  const normalized = email.toLowerCase().trim()
   const { data, error } = await admin
     .from('users')
-    .select('id, email, role, is_active, deleted_at, account_id')
+    .select('id, email, role, is_active, deleted_at, account_id, created_at')
     .eq('account_id', accountId)
-    .eq('email', email)
+    .eq('email', normalized)
     .eq('is_active', true)
     .is('deleted_at', null)
+    .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle()
 
@@ -71,13 +76,15 @@ async function findActiveAdminUser(accountId: string, email: string): Promise<Ad
 
 async function findPortalContact(accountId: string, email: string): Promise<PortalContactRow | null> {
   const admin = getSupabaseAdmin()
+  const normalized = email.toLowerCase().trim()
   const { data, error } = await admin
     .from('contacts')
-    .select('id, email, portal_access, deleted_at, account_id')
+    .select('id, email, portal_access, deleted_at, account_id, created_at')
     .eq('account_id', accountId)
-    .eq('email', email)
+    .eq('email', normalized)
     .eq('portal_access', true)
     .is('deleted_at', null)
+    .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle()
 
@@ -128,6 +135,12 @@ export async function adminLoginAction(
     await supabase.auth.signOut()
     return { success: false, error: 'Invalid email or password' }
   }
+
+  // Clear any stale prior session before issuing the new one. Without this,
+  // an admin signing in on a browser that still holds another tenant's
+  // admin cookie can race and end up on the prior tenant on the next request.
+  await clearAdminSession()
+  await clearPortalSession()
 
   await setAdminSession({
     type: 'admin',
@@ -187,6 +200,10 @@ export async function portalLoginAction(
     await supabase.auth.signOut()
     return { success: false, error: 'Invalid email or password' }
   }
+
+  // Drop any prior portal/admin cookie before issuing the new one.
+  await clearAdminSession()
+  await clearPortalSession()
 
   await setPortalSession({
     type: 'portal',
@@ -271,11 +288,46 @@ export async function signupAction(
 
   const admin = getSupabaseAdmin()
   const { fullName, businessName, email, password } = validated.data
+  const normalizedEmail = email.toLowerCase().trim()
+
+  // 0) Clear any cookies from a prior session. Without this, a user who
+  //    visits /auth/signup while still holding another account's admin
+  //    cookie ends up with two layers of state — Supabase signs in the
+  //    new user but the older Vantera cookie wins on the next middleware
+  //    pass, dumping them on the old account's dashboard.
+  await clearAdminSession()
+  await clearPortalSession()
+  try {
+    const supaForSignout = createSupabaseServerClient()
+    await supaForSignout.auth.signOut()
+  } catch {
+    /* signOut throws when there's no session — fine */
+  }
+
+  // 0b) Guard against orphaned Vantera users rows. If the email already
+  //     has a users row (regardless of whether a Supabase auth user
+  //     still exists), refuse the signup — otherwise we'd end up with
+  //     two rows for the same email pointing to different account_ids,
+  //     and routing would become non-deterministic.
+  const { data: existingUser } = await admin
+    .from('users')
+    .select('id, account_id')
+    .eq('email', normalizedEmail)
+    .is('deleted_at', null)
+    .limit(1)
+    .maybeSingle()
+
+  if (existingUser) {
+    return {
+      success: false,
+      error: 'An account with this email already exists. Try signing in.',
+    }
+  }
 
   // 1) Create the Supabase auth user. email_confirm:true bypasses the
   //    verification email so the user can start onboarding immediately.
   const createResult = await admin.auth.admin.createUser({
-    email,
+    email: normalizedEmail,
     password,
     email_confirm: true,
     user_metadata: { full_name: fullName, business_name: businessName },
@@ -320,7 +372,7 @@ export async function signupAction(
   // 4) Insert the owner user row.
   const { error: userError } = await admin.from('users').insert({
     account_id: account.id,
-    email,
+    email: normalizedEmail,
     full_name: fullName,
     role: 'owner',
     is_active: true,
@@ -337,7 +389,7 @@ export async function signupAction(
     .from('users')
     .select('id')
     .eq('account_id', account.id)
-    .eq('email', email)
+    .eq('email', normalizedEmail)
     .limit(1)
     .maybeSingle()
 
@@ -345,16 +397,11 @@ export async function signupAction(
     return { success: false, error: 'Failed to finalize account setup' }
   }
 
-  // 5b) Sample data is intentionally NOT seeded here. The onboarding wizard
-  //     applies a vertical-specific template (stages + automations) at
-  //     Step 4. Seeding a fixed agency demo before that step would just
-  //     get blown away when the user picks a different vertical.
-
   // 6) Sign the user in via Supabase (sets Supabase's sb-* cookies) and then
   //    mint our own admin session cookie.
   const supabase = createSupabaseServerClient()
   const { error: signInError } = await supabase.auth.signInWithPassword({
-    email,
+    email: normalizedEmail,
     password,
   })
 
@@ -367,7 +414,7 @@ export async function signupAction(
     userId: userRow.id,
     accountId: account.id,
     role: 'owner',
-    email,
+    email: normalizedEmail,
   })
 
   // 7) Build the redirect target. Fresh signups always land on
@@ -431,7 +478,7 @@ export async function completeOAuthSignupAction(
   }
 
   const supaUser = userData.user
-  const email = supaUser.email!
+  const email = supaUser.email!.toLowerCase().trim()
   const { fullName, businessName } = validated.data
 
   const admin = getSupabaseAdmin()
@@ -440,11 +487,18 @@ export async function completeOAuthSignupAction(
   // to the wizard if their account hasn't completed onboarding yet (so a
   // user who started signup, bounced, and came back via OAuth still
   // resumes where they left off).
+  //
+  // ORDER BY created_at DESC: in the rare case where an email is tied to
+  // multiple users rows (e.g. legacy test data), always pick the MOST
+  // RECENT one. Without an explicit order, Postgres returns "some" row
+  // and the user would silently land on an old account they thought was
+  // gone.
   const { data: existingUser } = await admin
     .from('users')
-    .select('id, account_id, role, email')
+    .select('id, account_id, role, email, created_at')
     .eq('email', email)
     .is('deleted_at', null)
+    .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle()
 
@@ -454,6 +508,10 @@ export async function completeOAuthSignupAction(
       .select('onboarding_completed_at')
       .eq('id', existingUser.account_id)
       .maybeSingle()
+
+    // Clear any stale prior session before issuing the new one.
+    await clearAdminSession()
+    await clearPortalSession()
 
     await setAdminSession({
       type: 'admin',
@@ -515,9 +573,10 @@ export async function completeOAuthSignupAction(
     return { success: false, error: 'Failed to finalize account setup' }
   }
 
-  // Sample data is intentionally NOT seeded here. The onboarding wizard
-  // applies a vertical-specific template at Step 4 which would just
-  // replace anything we seeded now.
+  // Clear any stale prior session before issuing the new one (defensive —
+  // prevents another tenant's cookie from outliving this fresh signup).
+  await clearAdminSession()
+  await clearPortalSession()
 
   await setAdminSession({
     type: 'admin',

@@ -1,4 +1,4 @@
-import { setAdminSession } from '@/lib/auth/session'
+import { clearAdminSession, clearPortalSession, setAdminSession } from '@/lib/auth/session'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { type NextRequest, NextResponse } from 'next/server'
@@ -52,20 +52,24 @@ export async function GET(request: NextRequest) {
   }
 
   const supaUser = userData.user
-  const email = supaUser.email ?? ''
+  const email = (supaUser.email ?? '').toLowerCase().trim()
 
   if (!email) {
     return NextResponse.redirect(new URL('/auth/login?error=missing_email', request.url))
   }
 
-  // Look up an existing Vantera admin user with this email.
+  // Look up an existing Vantera admin user with this email. ORDER BY
+  // created_at DESC so a single email tied to multiple workspaces lands
+  // on the MOST RECENT one — without explicit ordering Postgres returns
+  // "some" row and the user silently ends up on an old account.
   const admin = getSupabaseAdmin()
   const { data: existingUserRow } = await admin
     .from('users')
-    .select('id, account_id, role, email')
+    .select('id, account_id, role, email, created_at')
     .eq('email', email)
     .eq('is_active', true)
     .is('deleted_at', null)
+    .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle()
 
@@ -78,6 +82,14 @@ export async function GET(request: NextRequest) {
       .select('onboarding_completed_at')
       .eq('id', existingUserRow.account_id)
       .maybeSingle()
+
+    // Clear any stale prior session before issuing the new one. Without
+    // this, a user who was previously logged in as account A and then
+    // signs in via OAuth as account B can end up holding both cookies on
+    // the same scope — the older one wins on the next request and they
+    // bleed back into A.
+    await clearAdminSession()
+    await clearPortalSession()
 
     await setAdminSession({
       type: 'admin',

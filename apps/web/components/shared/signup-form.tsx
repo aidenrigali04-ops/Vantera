@@ -14,8 +14,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { zodResolver } from '@hookform/resolvers/zod'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { useState, useTransition } from 'react'
+import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 
@@ -35,10 +34,8 @@ type SignupFormProps = {
 }
 
 export function SignupForm({ onSubmit }: SignupFormProps) {
-  const router = useRouter()
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [isPendingNav, startNav] = useTransition()
 
   const form = useForm<z.infer<typeof signupSchema>>({
     resolver: zodResolver(signupSchema),
@@ -64,25 +61,19 @@ export function SignupForm({ onSubmit }: SignupFormProps) {
       return
     }
 
-    const redirectTo = result.redirectTo ?? '/admin/dashboard'
+    const redirectTo = result.redirectTo ?? '/admin/onboarding'
 
-    if (redirectTo.startsWith('http')) {
-      window.location.href = redirectTo
-      return
-    }
-
-    startNav(() => {
-      router.replace(redirectTo)
-      router.refresh()
-    })
+    // Always use a full-page navigation after signup — never client-side
+    // router.replace. The Set-Cookie response that established the new
+    // session needs to actually be persisted by the browser before the
+    // next request, and a hard reload guarantees that. Client navigation
+    // sometimes raced and the new /admin/* request went out without the
+    // freshly minted cookie, landing the user on a stale tenant.
+    window.location.href = redirectTo
   }
 
-  const isBusy = isSubmitting || isPendingNav
-  const buttonLabel = isPendingNav
-    ? 'Loading…'
-    : isSubmitting
-      ? 'Setting up workspace…'
-      : 'Get started for free'
+  const isBusy = isSubmitting
+  const buttonLabel = isSubmitting ? 'Setting up workspace…' : 'Get started for free'
 
   return (
     <AuthLayout>

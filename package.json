@@ -19,6 +19,8 @@
     "db:test:ai-memory": "dotenv -e .env -- tsx packages/db/scripts/test-ai-memory.ts",
     "db:reset-onboarding": "dotenv -e .env -- tsx packages/db/scripts/reset-onboarding.ts",
     "db:reset-stale-onboarding": "dotenv -e .env -- tsx packages/db/scripts/reset-stale-onboarding.ts",
+    "db:audit-accounts": "dotenv -e .env -- tsx packages/db/scripts/audit-accounts.ts",
+    "db:wipe-test-accounts": "dotenv -e .env -- tsx packages/db/scripts/wipe-test-accounts.ts",
     "trigger:dev": "dotenv -e .env -- trigger dev",
     "trigger:deploy": "dotenv -e .env -- trigger deploy"
   },

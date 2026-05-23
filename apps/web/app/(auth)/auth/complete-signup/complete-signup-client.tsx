@@ -12,8 +12,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { completeOAuthSignupAction } from '@/lib/auth/actions'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useRouter } from 'next/navigation'
-import { useState, useTransition } from 'react'
+import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 
@@ -31,10 +30,8 @@ export function CompleteSignupClient({
   prefilledEmail,
   prefilledName,
 }: CompleteSignupClientProps) {
-  const router = useRouter()
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [isPendingNav, startNav] = useTransition()
 
   const form = useForm<z.infer<typeof schema>>({
     resolver: zodResolver(schema),
@@ -53,18 +50,14 @@ export function CompleteSignupClient({
       return
     }
 
-    const redirectTo = result.data?.redirectTo ?? '/admin/dashboard'
-    if (redirectTo.startsWith('http')) {
-      window.location.href = redirectTo
-      return
-    }
-    startNav(() => {
-      router.replace(redirectTo)
-      router.refresh()
-    })
+    const redirectTo = result.data?.redirectTo ?? '/admin/onboarding'
+    // Always full-page navigate after OAuth signup completion — the
+    // freshly-set session cookie needs to be on the next request, and
+    // client-side replace can race the cookie persist.
+    window.location.href = redirectTo
   }
 
-  const busy = isSubmitting || isPendingNav
+  const busy = isSubmitting
 
   return (
     <div className="space-y-6">
