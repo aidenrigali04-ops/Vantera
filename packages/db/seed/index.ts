@@ -1,15 +1,124 @@
 import { accounts, contacts, users } from '../schema.js'
 import { drizzle } from 'drizzle-orm/postgres-js'
-import { createClient } from '@supabase/supabase-js'
-import { eq } from 'drizzle-orm'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { and, eq } from 'drizzle-orm'
 import postgres from 'postgres'
 import ws from 'ws'
 
 const TEST_ACCOUNT_SLUG = 'testco'
+
 const ADMIN_EMAIL = 'admin@testco.com'
 const ADMIN_PASSWORD = 'TestcoAdmin123!'
+
 const PORTAL_EMAIL = 'client@testco.com'
 const PORTAL_PASSWORD = 'TestcoPortal123!'
+
+// Personal all-access account — same Supabase Auth user maps to an
+// `owner` row in `users` (admin) AND a `portalAccess` row in `contacts`
+// (portal). One email + password unlocks both surfaces on `testco`.
+const ALL_ACCESS_EMAIL = 'aidenrigali04@gmail.com'
+const ALL_ACCESS_PASSWORD = 'Vantera2026!'
+
+type Role = 'owner' | 'admin' | 'manager' | 'staff' | 'technician' | 'agent'
+
+async function upsertAuthUser(
+  supabaseAdmin: SupabaseClient,
+  existingAuthUsers: { id: string; email: string | undefined }[],
+  email: string,
+  password: string,
+): Promise<void> {
+  const found = existingAuthUsers.find((u) => u.email === email)
+
+  if (!found) {
+    const { error } = await supabaseAdmin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+    })
+
+    if (error) {
+      throw error
+    }
+
+    console.log(`Created Supabase auth user ${email}`)
+    return
+  }
+
+  const { error } = await supabaseAdmin.auth.admin.updateUserById(found.id, {
+    password,
+  })
+
+  if (error) {
+    throw error
+  }
+
+  console.log(`Reset password for Supabase auth user ${email}`)
+}
+
+async function upsertAdminUser(
+  db: ReturnType<typeof drizzle>,
+  accountId: string,
+  email: string,
+  fullName: string,
+  role: Role,
+): Promise<void> {
+  const [existing] = await db
+    .select()
+    .from(users)
+    .where(and(eq(users.email, email), eq(users.accountId, accountId)))
+    .limit(1)
+
+  if (!existing) {
+    await db.insert(users).values({
+      accountId,
+      email,
+      fullName,
+      role,
+      isActive: true,
+    })
+    console.log(`Created admin user ${email} (${role})`)
+    return
+  }
+
+  await db
+    .update(users)
+    .set({ role, isActive: true, fullName })
+    .where(eq(users.id, existing.id))
+  console.log(`Updated admin user ${email} (${role})`)
+}
+
+async function upsertPortalContact(
+  db: ReturnType<typeof drizzle>,
+  accountId: string,
+  email: string,
+  firstName: string,
+  lastName: string,
+): Promise<void> {
+  const [existing] = await db
+    .select()
+    .from(contacts)
+    .where(and(eq(contacts.email, email), eq(contacts.accountId, accountId)))
+    .limit(1)
+
+  if (!existing) {
+    await db.insert(contacts).values({
+      accountId,
+      type: 'customer',
+      firstName,
+      lastName,
+      email,
+      portalAccess: true,
+    })
+    console.log(`Created portal contact ${email}`)
+    return
+  }
+
+  await db
+    .update(contacts)
+    .set({ portalAccess: true, firstName, lastName })
+    .where(eq(contacts.id, existing.id))
+  console.log(`Updated portal contact ${email}`)
+}
 
 async function seed() {
   const databaseUrl = process.env.DATABASE_URL
@@ -27,7 +136,11 @@ async function seed() {
     realtime: { transport: ws },
   })
 
-  const existing = await db.select().from(accounts).where(eq(accounts.slug, TEST_ACCOUNT_SLUG)).limit(1)
+  const existing = await db
+    .select()
+    .from(accounts)
+    .where(eq(accounts.slug, TEST_ACCOUNT_SLUG))
+    .limit(1)
 
   let accountId: string
 
@@ -56,101 +169,26 @@ async function seed() {
     console.log(`Created account "${TEST_ACCOUNT_SLUG}" (${accountId})`)
   }
 
-  const { data: existingAuthUsers } = await supabaseAdmin.auth.admin.listUsers()
-  const adminAuthUser = existingAuthUsers.users.find((u) => u.email === ADMIN_EMAIL)
+  const { data: existingAuthUsersResult } = await supabaseAdmin.auth.admin.listUsers()
+  const existingAuthUsers = existingAuthUsersResult.users.map((u) => ({ id: u.id, email: u.email }))
 
-  if (!adminAuthUser) {
-    const { error } = await supabaseAdmin.auth.admin.createUser({
-      email: ADMIN_EMAIL,
-      password: ADMIN_PASSWORD,
-      email_confirm: true,
-    })
+  await upsertAuthUser(supabaseAdmin, existingAuthUsers, ADMIN_EMAIL, ADMIN_PASSWORD)
+  await upsertAuthUser(supabaseAdmin, existingAuthUsers, PORTAL_EMAIL, PORTAL_PASSWORD)
+  await upsertAuthUser(supabaseAdmin, existingAuthUsers, ALL_ACCESS_EMAIL, ALL_ACCESS_PASSWORD)
 
-    if (error) {
-      throw error
-    }
+  await upsertAdminUser(db, accountId, ADMIN_EMAIL, 'Test Admin', 'owner')
+  await upsertPortalContact(db, accountId, PORTAL_EMAIL, 'Test', 'Client')
 
-    console.log(`Created Supabase auth user ${ADMIN_EMAIL}`)
-  } else {
-    const { error } = await supabaseAdmin.auth.admin.updateUserById(adminAuthUser.id, {
-      password: ADMIN_PASSWORD,
-    })
-
-    if (error) {
-      throw error
-    }
-
-    console.log(`Reset password for Supabase auth user ${ADMIN_EMAIL}`)
-  }
-
-  const portalAuthUser = existingAuthUsers.users.find((u) => u.email === PORTAL_EMAIL)
-
-  if (!portalAuthUser) {
-    const { error } = await supabaseAdmin.auth.admin.createUser({
-      email: PORTAL_EMAIL,
-      password: PORTAL_PASSWORD,
-      email_confirm: true,
-    })
-
-    if (error) {
-      throw error
-    }
-
-    console.log(`Created Supabase auth user ${PORTAL_EMAIL}`)
-  } else {
-    const { error } = await supabaseAdmin.auth.admin.updateUserById(portalAuthUser.id, {
-      password: PORTAL_PASSWORD,
-    })
-
-    if (error) {
-      throw error
-    }
-
-    console.log(`Reset password for Supabase auth user ${PORTAL_EMAIL}`)
-  }
-
-  const existingUsers = await db
-    .select()
-    .from(users)
-    .where(eq(users.email, ADMIN_EMAIL))
-    .limit(1)
-
-  if (!existingUsers[0]) {
-    await db.insert(users).values({
-      accountId,
-      email: ADMIN_EMAIL,
-      fullName: 'Test Admin',
-      role: 'owner',
-    })
-    console.log(`Created admin user ${ADMIN_EMAIL}`)
-  } else {
-    console.log(`Admin user ${ADMIN_EMAIL} already exists`)
-  }
-
-  const existingContacts = await db
-    .select()
-    .from(contacts)
-    .where(eq(contacts.email, PORTAL_EMAIL))
-    .limit(1)
-
-  if (!existingContacts[0]) {
-    await db.insert(contacts).values({
-      accountId,
-      type: 'customer',
-      firstName: 'Test',
-      lastName: 'Client',
-      email: PORTAL_EMAIL,
-      portalAccess: true,
-    })
-    console.log(`Created portal contact ${PORTAL_EMAIL}`)
-  } else {
-    console.log(`Portal contact ${PORTAL_EMAIL} already exists`)
-  }
+  // All-access identity — owner-level admin AND portal contact on same account
+  await upsertAdminUser(db, accountId, ALL_ACCESS_EMAIL, 'Aiden Rigali', 'owner')
+  await upsertPortalContact(db, accountId, ALL_ACCESS_EMAIL, 'Aiden', 'Rigali')
 
   console.log('\nTest credentials:')
-  console.log(`  Admin:  ${ADMIN_EMAIL} / ${ADMIN_PASSWORD}`)
-  console.log(`  Portal: ${PORTAL_EMAIL} / ${PORTAL_PASSWORD}`)
-  console.log(`  URL:    http://testco.lvh.me:3000/auth/login`)
+  console.log(`  Admin:      ${ADMIN_EMAIL} / ${ADMIN_PASSWORD}`)
+  console.log(`  Portal:     ${PORTAL_EMAIL} / ${PORTAL_PASSWORD}`)
+  console.log(`  All-access: ${ALL_ACCESS_EMAIL} / ${ALL_ACCESS_PASSWORD}`)
+  console.log(`              (works for both /auth/login and /auth/portal-login)`)
+  console.log(`  URL:        http://testco.lvh.me:3000/auth/login`)
 
   await client.end()
 }

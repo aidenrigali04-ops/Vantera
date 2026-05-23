@@ -10,6 +10,7 @@
     "db:migrate": "cd packages/db && drizzle-kit migrate",
     "db:push": "dotenv-cli -e .env -- sh -c 'cd packages/db && pnpm exec drizzle-kit push:pg'",
     "db:seed": "dotenv -e .env -- tsx packages/db/seed/index.ts",
+    "db:grant-access": "dotenv -e .env -- tsx packages/db/seed/grant-access.ts",
     "db:studio": "dotenv-cli -e .env -- sh -c 'cd packages/db && pnpm exec drizzle-kit studio'",
     "trigger:dev": "dotenv -e .env -- trigger dev",
     "trigger:deploy": "dotenv -e .env -- trigger deploy"
