@@ -9,9 +9,12 @@ import {
   accounts,
   automations,
   integrationCredentials,
+  personalizeTemplate,
   stageDefinitions,
   users,
   verticalTemplates,
+  type OnboardingProfile,
+  type VerticalTemplateData,
 } from '@vantera/db'
 import { and, eq } from 'drizzle-orm'
 import { Resend } from 'resend'
@@ -120,34 +123,90 @@ export async function updateBranding(
   }
 }
 
-type TemplateStage = {
-  recordType?: string
-  label: string
-  position: number
-  color?: string
-  triggersAutomation?: boolean
-  isTerminalWin?: boolean
-  isTerminalLoss?: boolean
-}
-
-type TemplateAutomation = {
-  name: string
-  triggerEvent: string
-  triggerConditions?: Record<string, unknown>
-  actions?: Array<Record<string, unknown>>
-  templateRef?: string
-}
-
-type VerticalTemplateData = {
-  description?: string
-  stages: TemplateStage[]
-  automations?: TemplateAutomation[]
-}
-
 export type TemplateSummary = {
   id: string
   recordType: string
   templateData: VerticalTemplateData
+}
+
+function deriveAppBaseUrl(): string {
+  return env.NEXT_PUBLIC_APP_URL.replace(/\/$/, '')
+}
+
+function derivePortalUrl(slug: string, portalDomain: string | null): string {
+  if (portalDomain && portalDomain.length > 0) {
+    return `https://${portalDomain.replace(/^https?:\/\//, '')}`
+  }
+
+  const appUrl = new URL(deriveAppBaseUrl())
+  // Multi-tenant subdomain convention: <slug>.<app-domain>
+  return `${appUrl.protocol}//${slug}.${appUrl.host}`
+}
+
+async function buildOnboardingProfile(
+  accountId: string,
+  ownerUserId: string,
+): Promise<OnboardingProfile> {
+  const [account] = await db
+    .select({
+      slug: accounts.slug,
+      name: accounts.name,
+      brandPrimaryColor: accounts.brandPrimaryColor,
+      portalDomain: accounts.portalDomain,
+      timezone: accounts.timezone,
+    })
+    .from(accounts)
+    .where(eq(accounts.id, accountId))
+    .limit(1)
+
+  if (!account) {
+    throw new Error('Account not found while building personalization profile')
+  }
+
+  const [owner] = await db
+    .select({ fullName: users.fullName, email: users.email })
+    .from(users)
+    .where(eq(users.id, ownerUserId))
+    .limit(1)
+
+  const credentialRows = await db
+    .select({ provider: integrationCredentials.provider, metadata: integrationCredentials.metadata })
+    .from(integrationCredentials)
+    .where(eq(integrationCredentials.accountId, accountId))
+
+  const twilioRow = credentialRows.find((row) => row.provider === 'twilio')
+  const hasTwilio = Boolean(twilioRow)
+  const hasStripe = credentialRows.some((row) => row.provider === 'stripe')
+  const hasResendEnv = Boolean(env.RESEND_API_KEY && env.RESEND_API_KEY.length > 0)
+
+  const twilioPhoneNumber =
+    (twilioRow?.metadata as Record<string, string> | undefined)?.phoneNumber ?? null
+
+  const ownerFullName = owner?.fullName ?? null
+  const ownerFirstName = ownerFullName ? (ownerFullName.split(/\s+/)[0] ?? null) : null
+
+  return {
+    businessName: account.name,
+    businessSlug: account.slug,
+    ownerFullName,
+    ownerFirstName,
+    ownerEmail: owner?.email ?? null,
+    brandPrimaryColor: account.brandPrimaryColor ?? '#1648A0',
+    portalDomain: account.portalDomain ?? null,
+    portalUrl: derivePortalUrl(account.slug, account.portalDomain ?? null),
+    appBaseUrl: deriveAppBaseUrl(),
+    supportedChannels: {
+      // Email is always available when Resend is configured at the env level;
+      // SMS only when Twilio is connected for this tenant; portal is always
+      // available since every tenant gets a portal.
+      sms: hasTwilio,
+      email: hasResendEnv,
+      portal: true,
+    },
+    twilioPhoneNumber,
+    hasStripe,
+    timezone: account.timezone ?? 'America/Los_Angeles',
+  }
 }
 
 export async function getTemplatesForVertical(
@@ -190,9 +249,15 @@ export async function getTemplatesForVertical(
 export async function applyVerticalTemplate(
   accountId: string,
   templateId: string,
-): Promise<ActionResult<{ stageCount: number; automationCount: number }>> {
+): Promise<
+  ActionResult<{
+    stageCount: number
+    automationCount: number
+    droppedAutomationCount: number
+  }>
+> {
   try {
-    await assertOwnAccount(accountId)
+    const { session } = await assertOwnAccount(accountId)
 
     const [template] = await db
       .select({
@@ -207,9 +272,23 @@ export async function applyVerticalTemplate(
       return err('Template not found')
     }
 
-    const data = template.templateData as VerticalTemplateData
-    const stages = Array.isArray(data.stages) ? data.stages : []
-    const flowAutomations = Array.isArray(data.automations) ? data.automations : []
+    const rawData = template.templateData as VerticalTemplateData
+
+    // Personalize the template using the live profile derived from the
+    // account, owner, and currently connected integrations. This substitutes
+    // {{business_name}}, {{owner_first_name}}, {{portal_url}}, etc. into
+    // automation bodies, downgrades SMS → email when Twilio isn't connected,
+    // and drops automations whose action list collapses to empty.
+    const profile = await buildOnboardingProfile(accountId, session.userId)
+    const personalized = personalizeTemplate(rawData, profile)
+
+    const stages = Array.isArray(personalized.stages) ? personalized.stages : []
+    const flowAutomations = Array.isArray(personalized.automations)
+      ? personalized.automations
+      : []
+    const droppedAutomationCount =
+      (Array.isArray(rawData.automations) ? rawData.automations.length : 0) -
+      flowAutomations.length
 
     let stageCount = 0
     let automationCount = 0
@@ -221,6 +300,11 @@ export async function applyVerticalTemplate(
       // point), so a hard delete is safe and avoids leaving stale rows behind
       // when a different template is selected. Do NOT copy this pattern.
       await tx.delete(stageDefinitions).where(eq(stageDefinitions.accountId, accountId))
+
+      // Same rationale: clear any prior auto-seeded automations for this
+      // account before re-applying. Once the user starts editing automations
+      // we'll soft-delete them through the regular admin flow.
+      await tx.delete(automations).where(eq(automations.accountId, accountId))
 
       if (stages.length > 0) {
         await tx.insert(stageDefinitions).values(
@@ -254,7 +338,10 @@ export async function applyVerticalTemplate(
       }
     })
 
-    return { success: true, data: { stageCount, automationCount } }
+    return {
+      success: true,
+      data: { stageCount, automationCount, droppedAutomationCount },
+    }
   } catch (error) {
     return err(error instanceof Error ? error.message : 'Failed to apply template')
   }

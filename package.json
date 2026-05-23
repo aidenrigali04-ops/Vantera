@@ -15,6 +15,7 @@
     "db:list-tables": "dotenv -e .env -- tsx packages/db/scripts/list-tables.ts",
     "db:seed": "dotenv -e .env -- tsx packages/db/seed/index.ts",
     "db:seed:templates": "dotenv -e .env -- tsx packages/db/scripts/run-vertical-templates.ts",
+    "db:test:personalize": "tsx packages/db/scripts/test-personalize.ts",
     "trigger:dev": "dotenv -e .env -- trigger dev",
     "trigger:deploy": "dotenv -e .env -- trigger deploy"
   },
