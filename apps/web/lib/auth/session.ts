@@ -24,9 +24,19 @@ const baseCookieOptions = {
 // localhost / lvh.me / etc. we must emit a host-only cookie or it will
 // silently fail to set — which is exactly what was breaking signup on
 // Vercel preview URLs.
+//
+// Vercel-managed hosts (`*.vercel.app`) also get a host-only cookie even
+// when they happen to match the appDomain: there's no wildcard SSL for
+// sub-subdomains on vercel.app, so the cross-subdomain cookie scope has
+// no value and just risks PSL-related rejection.
 function getCookieDomainForCurrentRequest(): string | undefined {
   const appDomain = process.env.NEXT_PUBLIC_APP_DOMAIN
   if (!appDomain) return undefined
+
+  const normalized = appDomain.startsWith('.') ? appDomain.slice(1) : appDomain
+  if (normalized === 'vercel.app' || normalized.endsWith('.vercel.app')) {
+    return undefined
+  }
 
   let host: string
   try {
@@ -38,7 +48,6 @@ function getCookieDomainForCurrentRequest(): string | undefined {
   const hostname = host.split(':')[0] ?? ''
   if (!hostname) return undefined
 
-  const normalized = appDomain.startsWith('.') ? appDomain.slice(1) : appDomain
   const matchesAppDomain =
     hostname === normalized || hostname.endsWith(`.${normalized}`)
 

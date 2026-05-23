@@ -215,6 +215,15 @@ function slugify(input: string): string {
     .slice(0, 60)
 }
 
+// `*.vercel.app` only has a one-level wildcard SSL cert. A two-deep host
+// like `<slug>.vantera-web.vercel.app` is unreachable over HTTPS, so when
+// the app domain is Vercel-managed we must NOT redirect to a tenant
+// subdomain — we stay on the same host and resolve the tenant by session.
+function isVercelManagedDomain(appDomain: string): boolean {
+  const normalized = appDomain.startsWith('.') ? appDomain.slice(1) : appDomain
+  return normalized === 'vercel.app' || normalized.endsWith('.vercel.app')
+}
+
 function randomSuffix(): string {
   return Math.random().toString(36).slice(2, 6)
 }
@@ -353,23 +362,27 @@ export async function signupAction(
   // 7) Build the redirect target. The goal: drop the user on a host that
   //    middleware will resolve to THIS new account, not a different tenant.
   //
-  //    - If we're on the configured app domain (apex or any tenant subdomain),
-  //      DNS for *.<appDomain> is presumed to exist, so jump to
-  //      <slug>.<appDomain>/admin/onboarding. Cross-subdomain cookies keep
-  //      the user signed in.
-  //    - If we're on anything else (Vercel preview, *.vercel.app, localhost,
-  //      lvh.me, etc.), stay on the current host and rely on the session-
-  //      cookie tenant fallback in middleware/resolve-account.
+  //    - If we're on a real configured app domain that has wildcard SSL
+  //      (e.g. vantera.app with *.vantera.app DNS), jump to
+  //      <slug>.<appDomain>/admin/onboarding so the URL bar reflects the
+  //      new workspace. The session cookie's `.appDomain` scope keeps the
+  //      user signed in across the subdomain hop.
+  //    - On *.vercel.app, localhost, lvh.me, Vercel preview URLs, etc.,
+  //      stay on the current host. *.vercel.app only has a single-level
+  //      wildcard cert so sub-subdomains aren't reachable over HTTPS.
+  //      The middleware/resolve-account session-cookie fallback then
+  //      resolves the right tenant from the freshly-set admin session.
   const host = headers().get('host') ?? ''
   const hostname = host.split(':')[0] ?? ''
   const appDomain = process.env.NEXT_PUBLIC_APP_DOMAIN ?? ''
 
+  const supportsTenantSubdomains = Boolean(appDomain) && !isVercelManagedDomain(appDomain)
   const onAppDomain = Boolean(
     appDomain && (hostname === appDomain || hostname.endsWith(`.${appDomain}`)),
   )
   const onCorrectSubdomain = Boolean(appDomain && hostname === `${account.slug}.${appDomain}`)
 
-  if (onAppDomain && !onCorrectSubdomain) {
+  if (supportsTenantSubdomains && onAppDomain && !onCorrectSubdomain) {
     const target = `https://${account.slug}.${appDomain}/admin/onboarding`
     return { success: true, data: { redirectTo: target } }
   }
