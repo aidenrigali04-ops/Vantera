@@ -19,13 +19,17 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   const pathname = headers().get('x-pathname') ?? ''
 
   // Onboarding redirect runs before flag eval so a missing/slow DB never blocks
-  // the bounce. We only redirect when we have a real branding payload — if
-  // middleware couldn't resolve the tenant, branding.accountId is empty and
-  // we shouldn't bounce the user into a wizard they can't actually finish.
+  // the bounce. We only redirect when:
+  //   - middleware actually resolved the tenant (branding.accountId is set)
+  //   - the account hasn't completed onboarding
+  //   - we're not already on the onboarding page (prevents redirect loop)
+  //   - the user is the owner — non-owners can't run the wizard so bouncing
+  //     them there would infinite-loop with the owner-only check on the page
   if (
     branding.accountId &&
     !branding.onboardingComplete &&
-    pathname !== '/admin/onboarding'
+    pathname !== '/admin/onboarding' &&
+    session.role === 'owner'
   ) {
     redirect('/admin/onboarding')
   }
