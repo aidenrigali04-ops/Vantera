@@ -106,25 +106,77 @@ export async function resolveAccountFromHost(host: string): Promise<AccountRow |
       }
     }
 
-    // Fallback: TEST_TENANT_SLUG lets you test on bare deployment URLs
-    // (e.g. *.vercel.app) before configuring custom DNS. Leave unset in
-    // production once real tenant subdomains are wired up.
-    const testSlug = process.env.TEST_TENANT_SLUG
-
-    if (testSlug) {
-      const { data } = await supabase
-        .from('accounts')
-        .select(ACCOUNT_SELECT)
-        .eq('slug', testSlug)
-        .limit(1)
-        .maybeSingle()
-
-      if (data) {
-        return data
-      }
-    }
-
     return null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Find an account by an admin user's email.
+ *
+ * Used by the login action as a fallback when the request's host doesn't
+ * map to a tenant subdomain — e.g. a user signing in from the marketing
+ * apex, the bare *.vercel.app URL, or localhost. We trust the lookup
+ * because the user must then prove the password against Supabase Auth.
+ *
+ * If the email belongs to multiple accounts we return the first match.
+ * A multi-workspace picker is out of scope for the MVP.
+ */
+export async function findAccountByAdminEmail(email: string): Promise<AccountRow | null> {
+  try {
+    const supabase = createSupabasePublicClient()
+
+    const { data: userRow } = await supabase
+      .from('users')
+      .select('account_id')
+      .eq('email', email)
+      .eq('is_active', true)
+      .is('deleted_at', null)
+      .limit(1)
+      .maybeSingle()
+
+    if (!userRow?.account_id) return null
+
+    const { data: account } = await supabase
+      .from('accounts')
+      .select(ACCOUNT_SELECT)
+      .eq('id', userRow.account_id)
+      .limit(1)
+      .maybeSingle()
+
+    return account ?? null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Find an account by a portal contact's email.
+ */
+export async function findAccountByPortalEmail(email: string): Promise<AccountRow | null> {
+  try {
+    const supabase = createSupabasePublicClient()
+
+    const { data: contactRow } = await supabase
+      .from('contacts')
+      .select('account_id')
+      .eq('email', email)
+      .eq('portal_access', true)
+      .is('deleted_at', null)
+      .limit(1)
+      .maybeSingle()
+
+    if (!contactRow?.account_id) return null
+
+    const { data: account } = await supabase
+      .from('accounts')
+      .select(ACCOUNT_SELECT)
+      .eq('id', contactRow.account_id)
+      .limit(1)
+      .maybeSingle()
+
+    return account ?? null
   } catch {
     return null
   }

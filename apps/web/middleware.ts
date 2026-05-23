@@ -143,21 +143,6 @@ async function resolveAccountByHost(
     }
   }
 
-  const testSlug = process.env.TEST_TENANT_SLUG
-
-  if (testSlug) {
-    const { data } = await supabase
-      .from('accounts')
-      .select(ACCOUNT_SELECT)
-      .eq('slug', testSlug)
-      .limit(1)
-      .maybeSingle()
-
-    if (data) {
-      return data
-    }
-  }
-
   return null
 }
 
@@ -171,7 +156,6 @@ export async function middleware(request: NextRequest) {
   const host = request.headers.get('host') ?? ''
   const hostname = host.split(':')[0] ?? ''
   const appDomain = process.env.NEXT_PUBLIC_APP_DOMAIN ?? 'vantera.app'
-  const testSlug = process.env.TEST_TENANT_SLUG
 
   // A valid session cookie means the user has a real account — let
   // resolveAccountByHost figure out which tenant via the session fallback,
@@ -182,7 +166,7 @@ export async function middleware(request: NextRequest) {
   const hasPortalSession = Boolean(request.cookies.get(PORTAL_SESSION_COOKIE)?.value)
   const hasAnySession = hasAdminSession || hasPortalSession
 
-  if (isMarketingHost(hostname, appDomain) && !testSlug && !hasAnySession) {
+  if (isMarketingHost(hostname, appDomain) && !hasAnySession) {
     return NextResponse.redirect(new URL('/', request.url))
   }
 

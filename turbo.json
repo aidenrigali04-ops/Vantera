@@ -22,8 +22,7 @@
     "TRIGGER_API_URL",
     "TWILIO_ACCOUNT_SID",
     "TWILIO_AUTH_TOKEN",
-    "TWILIO_PHONE_NUMBER",
-    "TEST_TENANT_SLUG"
+    "TWILIO_PHONE_NUMBER"
   ],
   "globalPassThroughEnv": [
     "CI",
@@ -56,8 +55,7 @@
         "TRIGGER_API_URL",
         "TWILIO_ACCOUNT_SID",
         "TWILIO_AUTH_TOKEN",
-        "TWILIO_PHONE_NUMBER",
-        "TEST_TENANT_SLUG"
+        "TWILIO_PHONE_NUMBER"
       ]
     },
     "dev": {
@@ -84,8 +82,7 @@
         "TRIGGER_API_URL",
         "TWILIO_ACCOUNT_SID",
         "TWILIO_AUTH_TOKEN",
-        "TWILIO_PHONE_NUMBER",
-        "TEST_TENANT_SLUG"
+        "TWILIO_PHONE_NUMBER"
       ]
     },
     "lint": {
@@ -116,8 +113,7 @@
         "TRIGGER_API_URL",
         "TWILIO_ACCOUNT_SID",
         "TWILIO_AUTH_TOKEN",
-        "TWILIO_PHONE_NUMBER",
-        "TEST_TENANT_SLUG"
+        "TWILIO_PHONE_NUMBER"
       ]
     }
   }

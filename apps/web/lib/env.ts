@@ -28,7 +28,6 @@ const serverEnvSchema = z.object({
   STRIPE_WEBHOOK_SECRET: z.string().optional().default(''),
   TRIGGER_SECRET_KEY: z.string().optional().default(''),
   TRIGGER_API_URL: z.string().optional().default('https://api.trigger.dev'),
-  TEST_TENANT_SLUG: z.string().optional(),
 })
 
 type PublicEnv = z.infer<typeof publicEnvSchema>

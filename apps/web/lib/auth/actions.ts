@@ -1,6 +1,10 @@
 'use server'
 
-import { resolveAccountFromHost } from '@/lib/auth/resolve-account'
+import {
+  findAccountByAdminEmail,
+  findAccountByPortalEmail,
+  resolveAccountFromHost,
+} from '@/lib/auth/resolve-account'
 import {
   clearAdminSession,
   clearPortalSession,
@@ -88,10 +92,18 @@ export async function adminLoginAction(
   }
 
   const host = headers().get('host') ?? ''
-  const account = await resolveAccountFromHost(host)
+
+  // First try to resolve via the host (tenant subdomain or portal_domain).
+  // Fall back to looking up the account by the admin user's email — this
+  // is what lets users sign in from the marketing apex, the bare
+  // *.vercel.app URL, or localhost without needing a TEST_TENANT_SLUG.
+  let account = await resolveAccountFromHost(host)
+  if (!account) {
+    account = await findAccountByAdminEmail(validated.data.email)
+  }
 
   if (!account) {
-    return { success: false, error: 'Account not found' }
+    return { success: false, error: 'Invalid email or password' }
   }
 
   const supabase = createSupabaseServerClient()
@@ -143,10 +155,14 @@ export async function portalLoginAction(
   }
 
   const host = headers().get('host') ?? ''
-  const account = await resolveAccountFromHost(host)
+
+  let account = await resolveAccountFromHost(host)
+  if (!account) {
+    account = await findAccountByPortalEmail(validated.data.email)
+  }
 
   if (!account) {
-    return { success: false, error: 'Account not found' }
+    return { success: false, error: 'Invalid email or password' }
   }
 
   const supabase = createSupabaseServerClient()
