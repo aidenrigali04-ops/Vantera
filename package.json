@@ -10,10 +10,14 @@
     "db:migrate": "cd packages/db && drizzle-kit migrate",
     "db:push": "dotenv-cli -e .env -- sh -c 'cd packages/db && pnpm exec drizzle-kit push:pg'",
     "db:seed": "dotenv -e .env -- tsx packages/db/seed/index.ts",
-    "db:studio": "dotenv-cli -e .env -- sh -c 'cd packages/db && pnpm exec drizzle-kit studio'"
+    "db:studio": "dotenv-cli -e .env -- sh -c 'cd packages/db && pnpm exec drizzle-kit studio'",
+    "trigger:dev": "dotenv -e .env -- trigger dev",
+    "trigger:deploy": "dotenv -e .env -- trigger deploy"
   },
   "devDependencies": {
     "@eslint/js": "^9.9.0",
+    "@trigger.dev/build": "^4.4.6",
+    "@trigger.dev/sdk": "^4.4.6",
     "@types/node": "^20.19.41",
     "@typescript-eslint/eslint-plugin": "^8.59.4",
     "@typescript-eslint/parser": "^8.59.4",
@@ -22,6 +26,7 @@
     "eslint-config-next": "^14.2.35",
     "prettier": "^3.8.3",
     "tsx": "^4.22.3",
+    "trigger.dev": "^4.4.6",
     "turbo": "^2.9.14",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.0.0"

@@ -25,3 +25,6 @@ next-env.d.ts
 
 # Drizzle
 packages/db/migrations/meta
+
+# Trigger.dev
+.trigger

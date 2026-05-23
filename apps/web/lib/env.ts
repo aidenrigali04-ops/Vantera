@@ -20,7 +20,7 @@ const serverEnvSchema = z.object({
   RESEND_API_KEY: z.string().min(1),
   STRIPE_SECRET_KEY: z.string().min(1),
   STRIPE_WEBHOOK_SECRET: z.string().min(1),
-  TRIGGER_API_KEY: z.string().min(1),
+  TRIGGER_SECRET_KEY: z.string().min(1),
   TRIGGER_API_URL: z.string().url(),
 })
 
@@ -69,7 +69,10 @@ function getServerEnv(): ServerEnv {
     return cachedServerEnv
   }
 
-  const parsed = serverEnvSchema.safeParse(process.env)
+  const parsed = serverEnvSchema.safeParse({
+    ...process.env,
+    TRIGGER_SECRET_KEY: process.env.TRIGGER_SECRET_KEY ?? process.env.TRIGGER_API_KEY,
+  })
 
   if (!parsed.success) {
     throw new Error(
