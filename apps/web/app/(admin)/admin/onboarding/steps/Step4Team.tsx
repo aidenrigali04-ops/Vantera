@@ -18,6 +18,8 @@ import {
   StepError,
   StepHeader,
   fadeUp,
+  rethrowFrameworkNavigation,
+  runStepAction,
   stepContainer,
 } from '../_primitives'
 
@@ -76,16 +78,25 @@ export function Step4Team({ accountId, primaryColor, onComplete }: Props) {
     setError(null)
     setSending(true)
 
-    const result = await inviteTeamMembers(accountId, toSend)
+    try {
+      const result = await runStepAction(() => inviteTeamMembers(accountId, toSend))
 
-    setSending(false)
+      if (!result || result.success !== true) {
+        setError(
+          (result && 'error' in result && result.error) ||
+            'Could not send invites. You can invite teammates later from settings.',
+        )
+        return
+      }
 
-    if (!result.success) {
-      setError(result.error)
-      return
+      onComplete({ invited: result.data.invited, skipped: false })
+    } catch (err) {
+      rethrowFrameworkNavigation(err)
+      console.error('[Step4Team] inviteTeamMembers threw', err)
+      setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
+    } finally {
+      setSending(false)
     }
-
-    onComplete({ invited: result.data.invited, skipped: false })
   }
 
   function handleSkip() {

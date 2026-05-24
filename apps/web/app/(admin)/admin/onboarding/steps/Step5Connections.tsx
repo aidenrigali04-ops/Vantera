@@ -6,7 +6,7 @@ import { motion } from 'framer-motion'
 import { Check } from 'lucide-react'
 import { useState } from 'react'
 import { completeOnboarding, saveIntegrationCredentials } from '../actions'
-import { PrimaryCTA, StepError, StepHeader, fadeUp, stepContainer } from '../_primitives'
+import { PrimaryCTA, StepError, StepHeader, fadeUp, rethrowFrameworkNavigation, runStepAction, stepContainer } from '../_primitives'
 
 type ImmediateProvider = 'stripe' | 'twilio'
 type PlaceholderProvider = 'quickbooks' | 'google_calendar' | 'hubspot' | 'gohighlevel'
@@ -133,16 +133,25 @@ export function Step5Connections({ accountId, primaryColor, onComplete }: Props)
     setError(null)
     setCompleting(true)
 
-    const result = await completeOnboarding(accountId)
+    try {
+      const result = await runStepAction(() => completeOnboarding(accountId))
 
-    setCompleting(false)
+      if (!result || result.success !== true) {
+        setError(
+          (result && 'error' in result && result.error) ||
+            'Could not finalize onboarding. Please try again.',
+        )
+        return
+      }
 
-    if (!result.success) {
-      setError(result.error)
-      return
+      onComplete()
+    } catch (err) {
+      rethrowFrameworkNavigation(err)
+      console.error('[Step5Connections] completeOnboarding threw', err)
+      setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
+    } finally {
+      setCompleting(false)
     }
-
-    onComplete()
   }
 
   const connectedCount = Object.values(connected).filter(Boolean).length
@@ -379,16 +388,27 @@ function ImmediateConnectForm({
     setError(null)
     setSaving(true)
 
-    const result = await saveIntegrationCredentials(accountId, tile.provider, values)
+    try {
+      const result = await runStepAction(() =>
+        saveIntegrationCredentials(accountId, tile.provider, values),
+      )
 
-    setSaving(false)
+      if (!result || result.success !== true) {
+        setError(
+          (result && 'error' in result && result.error) ||
+            'Could not verify credentials. Please double-check and try again.',
+        )
+        return
+      }
 
-    if (!result.success) {
-      setError(result.error)
-      return
+      onConnected()
+    } catch (err) {
+      rethrowFrameworkNavigation(err)
+      console.error('[ImmediateConnectForm] saveIntegrationCredentials threw', err)
+      setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
+    } finally {
+      setSaving(false)
     }
-
-    onConnected()
   }
 
   return (

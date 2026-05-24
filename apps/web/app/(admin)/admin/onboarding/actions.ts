@@ -2,7 +2,7 @@
 
 import { bootstrapBusinessContext } from '@/lib/ai'
 import { personalizeVoiceWithAI } from '@/lib/ai/personalize-voice'
-import { requireAdminSession } from '@/lib/auth/require-session'
+import { getAdminSession } from '@/lib/auth/session'
 import type { ActionResult } from '@/lib/auth/types'
 import { db } from '@/lib/db/client'
 import { env, requireEnv } from '@/lib/env'
@@ -53,11 +53,51 @@ function err(message: string): ActionResult<never> {
   return { success: false, error: message }
 }
 
-async function assertOwnAccount(accountId: string): Promise<{ session: Awaited<ReturnType<typeof requireAdminSession>> }> {
-  const session = await requireAdminSession()
+/**
+ * Next.js' `redirect()` throws a special Error with `digest` starting with
+ * "NEXT_REDIRECT". When that bubbles up through a Server Action, the
+ * framework intercepts it and tells the client to navigate. If we swallow
+ * it in a generic try/catch we'd convert a redirect into a bogus error
+ * string that lands in the UI as e.g. "NEXT_REDIRECT;/auth/login;303"
+ * — and the user would be stuck on a step with no way to recover. Call
+ * this in every catch block before treating the error as a real failure.
+ */
+function isNextRedirectError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false
+  const digest = (err as { digest?: unknown }).digest
+  return typeof digest === 'string' && digest.startsWith('NEXT_REDIRECT')
+}
+
+/**
+ * Same idea for `notFound()`. Less common in our flow but cheap to handle.
+ */
+function isNextNotFoundError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false
+  const digest = (err as { digest?: unknown }).digest
+  return typeof digest === 'string' && digest.startsWith('NEXT_NOT_FOUND')
+}
+
+/** Throw if `error` is a framework-internal signal that should bubble up. */
+function rethrowFrameworkSignals(error: unknown): void {
+  if (isNextRedirectError(error) || isNextNotFoundError(error)) throw error
+}
+
+async function assertOwnAccount(accountId: string): Promise<{ session: NonNullable<Awaited<ReturnType<typeof getAdminSession>>> }> {
+  // Read the session directly from the admin cookie — do NOT call
+  // requireAdminSession() here. That helper calls redirect() when the
+  // session is missing or the host branding doesn't match, and redirect()
+  // inside a Server Action leaves the client's fetch promise hanging
+  // indefinitely — the step button stays on "Saving…" forever with no
+  // error and no navigation. Return a structured error instead so the
+  // wizard can show a message and let the user retry or refresh.
+  const session = await getAdminSession()
+
+  if (!session) {
+    throw new Error('Your session expired. Refresh the page and sign in again.')
+  }
 
   if (session.accountId !== accountId) {
-    throw new Error('Account mismatch')
+    throw new Error('Account mismatch. Refresh the page and try again.')
   }
 
   return { session }
@@ -81,6 +121,7 @@ export async function updateVertical(
 
     return { success: true, data: { vertical: vertical as Vertical } }
   } catch (error) {
+    rethrowFrameworkSignals(error)
     return err(error instanceof Error ? error.message : 'Failed to update business type')
   }
 }
@@ -123,6 +164,7 @@ export async function updateBranding(
 
     return { success: true, data: { saved: true } }
   } catch (error) {
+    rethrowFrameworkSignals(error)
     return err(error instanceof Error ? error.message : 'Failed to save branding')
   }
 }
@@ -306,6 +348,7 @@ export async function getBusinessProfile(
       },
     }
   } catch (error) {
+    rethrowFrameworkSignals(error)
     return err(error instanceof Error ? error.message : 'Failed to load business profile')
   }
 }
@@ -360,6 +403,7 @@ export async function updateBusinessProfile(
 
     return { success: true, data: { saved: true, rePersonalized } }
   } catch (error) {
+    rethrowFrameworkSignals(error)
     return err(error instanceof Error ? error.message : 'Failed to save business profile')
   }
 }
@@ -374,7 +418,10 @@ export async function getTemplatesForVertical(
   vertical: string,
 ): Promise<ActionResult<TemplateSummary[]>> {
   try {
-    await requireAdminSession()
+    const session = await getAdminSession()
+    if (!session) {
+      throw new Error('Your session expired. Refresh the page and sign in again.')
+    }
 
     if (!VERTICAL_VALUES.includes(vertical as Vertical)) {
       return err('Invalid business type')
@@ -403,6 +450,7 @@ export async function getTemplatesForVertical(
       })),
     }
   } catch (error) {
+    rethrowFrameworkSignals(error)
     return err(error instanceof Error ? error.message : 'Failed to load templates')
   }
 }
@@ -531,6 +579,7 @@ export async function applyVerticalTemplate(
     const result = await applyTemplateForAccount(accountId, templateId, session.userId)
     return { success: true, data: result }
   } catch (error) {
+    rethrowFrameworkSignals(error)
     return err(error instanceof Error ? error.message : 'Failed to apply template')
   }
 }
@@ -657,6 +706,7 @@ export async function inviteTeamMembers(
 
     return { success: true, data: { invited } }
   } catch (error) {
+    rethrowFrameworkSignals(error)
     return err(error instanceof Error ? error.message : 'Failed to invite team members')
   }
 }
@@ -775,6 +825,7 @@ export async function saveIntegrationCredentials(
 
     return { success: true, data: { saved: true, rePersonalized } }
   } catch (error) {
+    rethrowFrameworkSignals(error)
     return err(error instanceof Error ? error.message : 'Failed to save credentials')
   }
 }
@@ -809,6 +860,7 @@ export async function completeOnboarding(
 
     return { success: true, data: { completed: true } }
   } catch (error) {
+    rethrowFrameworkSignals(error)
     return err(error instanceof Error ? error.message : 'Failed to complete onboarding')
   }
 }

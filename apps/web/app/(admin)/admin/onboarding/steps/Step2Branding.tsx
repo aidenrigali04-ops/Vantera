@@ -15,6 +15,8 @@ import {
   StepError,
   StepHeader,
   fadeUp,
+  rethrowFrameworkNavigation,
+  runStepAction,
   stepContainer,
 } from '../_primitives'
 
@@ -155,26 +157,37 @@ export function Step2Branding({
     setError(null)
     setSaving(true)
 
-    const result = await updateBranding(accountId, {
-      logoUrl: logoUrl,
-      primaryColor: primary,
-      secondaryColor: secondary,
-      portalDomain: portalDomain || undefined,
-    })
+    try {
+      const result = await runStepAction(() =>
+        updateBranding(accountId, {
+          logoUrl: logoUrl,
+          primaryColor: primary,
+          secondaryColor: secondary,
+          portalDomain: portalDomain || undefined,
+        }),
+      )
 
-    setSaving(false)
+      if (!result || result.success !== true) {
+        const msg =
+          (result && 'error' in result && result.error) ||
+          'Could not save your branding. Please try again.'
+        setError(msg)
+        return
+      }
 
-    if (!result.success) {
-      setError(result.error)
-      return
+      onComplete({
+        logoUrl,
+        primaryColor: primary,
+        secondaryColor: secondary,
+        portalDomain,
+      })
+    } catch (err) {
+      rethrowFrameworkNavigation(err)
+      console.error('[Step2Branding] updateBranding threw', err)
+      setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
+    } finally {
+      setSaving(false)
     }
-
-    onComplete({
-      logoUrl,
-      primaryColor: primary,
-      secondaryColor: secondary,
-      portalDomain,
-    })
   }
 
   const previewDomain = portalDomain || 'portal.yourbusiness.com'

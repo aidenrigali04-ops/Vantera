@@ -132,9 +132,7 @@ export function OnboardingWizard({
   }
 
   function goBack() {
-    if (currentStep > 1) {
-      setCurrentStep((s) => s - 1)
-    }
+    setCurrentStep((s) => (s > 1 ? s - 1 : s))
   }
 
   function jumpTo(stepId: number) {
@@ -156,8 +154,14 @@ export function OnboardingWizard({
       /* ignore */
     }
 
-    router.push('/admin/dashboard')
-    router.refresh()
+    // Use window.location for the final hop so the browser performs a
+    // fresh request — guarantees the layout/middleware sees the freshly
+    // stamped onboarding_completed_at instead of router-cached state.
+    if (typeof window !== 'undefined') {
+      window.location.href = '/admin/dashboard'
+    } else {
+      router.push('/admin/dashboard')
+    }
   }
 
   const activeStep = STEPS[currentStep - 1] ?? STEPS[0]!

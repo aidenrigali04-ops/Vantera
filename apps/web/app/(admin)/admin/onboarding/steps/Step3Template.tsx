@@ -8,7 +8,7 @@ import {
   getTemplatesForVertical,
   type TemplateSummary,
 } from '../actions'
-import { PrimaryCTA, StepError, StepHeader, fadeUp, stepContainer } from '../_primitives'
+import { PrimaryCTA, StepError, StepHeader, fadeUp, rethrowFrameworkNavigation, runStepAction, stepContainer } from '../_primitives'
 
 type Props = {
   accountId: string
@@ -34,23 +34,30 @@ export function Step3Template({ accountId, vertical, primaryColor, onComplete }:
       }
 
       setLoading(true)
-      const result = await getTemplatesForVertical(vertical)
+      try {
+        const result = await runStepAction(() => getTemplatesForVertical(vertical))
+        if (cancelled) return
 
-      if (cancelled) {
-        return
-      }
+        if (!result || result.success !== true) {
+          setError(
+            (result && 'error' in result && result.error) ||
+              'Could not load workflow templates.',
+          )
+          return
+        }
 
-      if (!result.success) {
-        setError(result.error)
-        setLoading(false)
-        return
+        setTemplates(result.data)
+        if (result.data.length === 1 && result.data[0]) {
+          setSelectedId(result.data[0].id)
+        }
+      } catch (err) {
+        if (cancelled) return
+        rethrowFrameworkNavigation(err)
+        console.error('[Step3Template] getTemplatesForVertical threw', err)
+        setError(err instanceof Error ? err.message : 'Failed to load templates.')
+      } finally {
+        if (!cancelled) setLoading(false)
       }
-
-      setTemplates(result.data)
-      if (result.data.length === 1 && result.data[0]) {
-        setSelectedId(result.data[0].id)
-      }
-      setLoading(false)
     }
 
     load()
@@ -71,16 +78,25 @@ export function Step3Template({ accountId, vertical, primaryColor, onComplete }:
     setError(null)
     setApplying(true)
 
-    const result = await applyVerticalTemplate(accountId, selectedId)
+    try {
+      const result = await runStepAction(() => applyVerticalTemplate(accountId, selectedId))
 
-    setApplying(false)
+      if (!result || result.success !== true) {
+        setError(
+          (result && 'error' in result && result.error) ||
+            'Could not apply this template. Please try again.',
+        )
+        return
+      }
 
-    if (!result.success) {
-      setError(result.error)
-      return
+      onComplete(result.data)
+    } catch (err) {
+      rethrowFrameworkNavigation(err)
+      console.error('[Step3Template] applyVerticalTemplate threw', err)
+      setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
+    } finally {
+      setApplying(false)
     }
-
-    onComplete(result.data)
   }
 
   return (

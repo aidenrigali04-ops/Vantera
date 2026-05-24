@@ -13,6 +13,8 @@ import {
   StepError,
   StepHeader,
   fadeUp,
+  rethrowFrameworkNavigation,
+  runStepAction,
   stepContainer,
 } from '../_primitives'
 
@@ -81,19 +83,25 @@ export function Step3Profile({ accountId, primaryColor, onComplete }: Props) {
   useEffect(() => {
     let cancelled = false
     async function load() {
-      const result = await getBusinessProfile(accountId)
-      if (cancelled) return
-      if (result.success) {
-        const p = result.data
-        setVoice(p.voicePreference)
-        setHoursStart(p.businessHoursStart)
-        setHoursEnd(p.businessHoursEnd)
-        setBookingLink(p.bookingLink ?? '')
-        setReviewLink(p.reviewLink ?? '')
-        setPaymentLink(p.paymentLink ?? '')
-        setEmergencyLine(p.emergencyLine ?? '')
+      try {
+        const result = await runStepAction(() => getBusinessProfile(accountId))
+        if (cancelled) return
+        if (result.success) {
+          const p = result.data
+          setVoice(p.voicePreference)
+          setHoursStart(p.businessHoursStart)
+          setHoursEnd(p.businessHoursEnd)
+          setBookingLink(p.bookingLink ?? '')
+          setReviewLink(p.reviewLink ?? '')
+          setPaymentLink(p.paymentLink ?? '')
+          setEmergencyLine(p.emergencyLine ?? '')
+        }
+      } catch (err) {
+        rethrowFrameworkNavigation(err)
+        console.warn('[Step3Profile] getBusinessProfile threw', err)
+      } finally {
+        if (!cancelled) setLoading(false)
       }
-      setLoading(false)
     }
     load()
     return () => {
@@ -130,24 +138,35 @@ export function Step3Profile({ accountId, primaryColor, onComplete }: Props) {
     setError(null)
     setSaving(true)
 
-    const result = await updateBusinessProfile(accountId, {
-      voicePreference: voice ?? null,
-      businessHoursStart: hoursStart ?? null,
-      businessHoursEnd: hoursEnd ?? null,
-      bookingLink: bookingLink.trim() || null,
-      reviewLink: reviewLink.trim() || null,
-      paymentLink: paymentLink.trim() || null,
-      emergencyLine: emergencyLine.trim() || null,
-    })
+    try {
+      const result = await runStepAction(() =>
+        updateBusinessProfile(accountId, {
+          voicePreference: voice ?? null,
+          businessHoursStart: hoursStart ?? null,
+          businessHoursEnd: hoursEnd ?? null,
+          bookingLink: bookingLink.trim() || null,
+          reviewLink: reviewLink.trim() || null,
+          paymentLink: paymentLink.trim() || null,
+          emergencyLine: emergencyLine.trim() || null,
+        }),
+      )
 
-    setSaving(false)
+      if (!result || result.success !== true) {
+        const msg =
+          (result && 'error' in result && result.error) ||
+          'Could not save your profile. Please try again.'
+        setError(msg)
+        return
+      }
 
-    if (!result.success) {
-      setError(result.error)
-      return
+      onComplete({ rePersonalized: result.data.rePersonalized })
+    } catch (err) {
+      rethrowFrameworkNavigation(err)
+      console.error('[Step3Profile] updateBusinessProfile threw', err)
+      setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
+    } finally {
+      setSaving(false)
     }
-
-    onComplete({ rePersonalized: result.data.rePersonalized })
   }
 
   if (loading) {

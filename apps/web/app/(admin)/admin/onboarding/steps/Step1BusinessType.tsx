@@ -13,7 +13,16 @@ import {
 } from 'lucide-react'
 import { useState } from 'react'
 import { updateVertical } from '../actions'
-import { PrimaryCTA, SelectableTile, StepError, StepHeader, fadeUp, stepContainer } from '../_primitives'
+import {
+  PrimaryCTA,
+  SelectableTile,
+  StepError,
+  StepHeader,
+  fadeUp,
+  rethrowFrameworkNavigation,
+  runStepAction,
+  stepContainer,
+} from '../_primitives'
 
 type Vertical =
   | 'hvac'
@@ -107,16 +116,30 @@ export function Step1BusinessType({ accountId, currentVertical, primaryColor, on
     setError(null)
     setSaving(true)
 
-    const result = await updateVertical(accountId, selected)
+    // Wrap in try/finally so the button NEVER gets stuck on "Saving…".
+    // The original implementation only reset saving on the success path,
+    // so any thrown error (action timeout, network blip, NEXT_REDIRECT
+    // bubble from requireAdminSession on a stale session) would freeze
+    // the CTA — which is exactly what the user was seeing.
+    try {
+      const result = await runStepAction(() => updateVertical(accountId, selected))
 
-    setSaving(false)
+      if (!result || result.success !== true) {
+        const msg =
+          (result && 'error' in result && result.error) ||
+          'Could not save your business type. Please try again.'
+        setError(msg)
+        return
+      }
 
-    if (!result.success) {
-      setError(result.error)
-      return
+      onComplete({ vertical: selected })
+    } catch (err) {
+      rethrowFrameworkNavigation(err)
+      console.error('[Step1BusinessType] updateVertical threw', err)
+      setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
+    } finally {
+      setSaving(false)
     }
-
-    onComplete({ vertical: selected })
   }
 
   return (

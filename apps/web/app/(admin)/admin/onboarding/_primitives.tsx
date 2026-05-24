@@ -2,7 +2,7 @@
 
 import { cn } from '@/lib/utils'
 import { motion, type Variants } from 'framer-motion'
-import type { LucideIcon } from 'lucide-react'
+import { Loader2, type LucideIcon } from 'lucide-react'
 import type { MouseEventHandler, ReactNode } from 'react'
 
 /**
@@ -27,6 +27,46 @@ export const stepContainer: Variants = {
 export const fadeUp: Variants = {
   hidden: { opacity: 0, y: 12 },
   show: { opacity: 1, y: 0, transition: { duration: 0.45, ease: [0.22, 1, 0.36, 1] } },
+}
+
+/* ───────────────────── Server Action client helpers ───────────────────── */
+
+const STEP_ACTION_TIMEOUT_MS = 25_000
+
+export function isNextRedirectError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false
+  const digest = (err as { digest?: unknown }).digest
+  return typeof digest === 'string' && digest.startsWith('NEXT_REDIRECT')
+}
+
+export function isNextNotFoundError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false
+  const digest = (err as { digest?: unknown }).digest
+  return typeof digest === 'string' && digest.startsWith('NEXT_NOT_FOUND')
+}
+
+/** Re-throw Next.js navigation signals so the framework can handle them. */
+export function rethrowFrameworkNavigation(err: unknown): void {
+  if (isNextRedirectError(err) || isNextNotFoundError(err)) throw err
+}
+
+/** Guard against Server Actions that never resolve (redirect() hang, network drop). */
+export async function runStepAction<T>(fn: () => Promise<T>): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+
+  try {
+    return await Promise.race([
+      fn(),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error('This is taking longer than expected. Please try again.')),
+          STEP_ACTION_TIMEOUT_MS,
+        )
+      }),
+    ])
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
 }
 
 /* ────────────────────────── Section header ────────────────────────── */
@@ -216,6 +256,7 @@ export function PrimaryCTA({
         className,
       )}
     >
+      {loading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
       {children}
     </motion.button>
   )
