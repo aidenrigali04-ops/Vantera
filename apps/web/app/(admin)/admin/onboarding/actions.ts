@@ -6,6 +6,7 @@ import { getAdminSession } from '@/lib/auth/session'
 import type { ActionResult } from '@/lib/auth/types'
 import { db } from '@/lib/db/client'
 import { env, requireEnv } from '@/lib/env'
+import { patchAccountRow } from '@/lib/onboarding/account-store'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import {
   accounts,
@@ -96,7 +97,7 @@ async function assertOwnAccount(accountId: string): Promise<{ session: NonNullab
     throw new Error('Your session expired. Refresh the page and sign in again.')
   }
 
-  if (session.accountId !== accountId) {
+  if (String(session.accountId) !== String(accountId)) {
     throw new Error('Account mismatch. Refresh the page and try again.')
   }
 
@@ -114,10 +115,13 @@ export async function updateVertical(
       return err('Invalid business type')
     }
 
-    await db
-      .update(accounts)
-      .set({ vertical: vertical as Vertical, updatedAt: new Date() })
-      .where(eq(accounts.id, accountId))
+    const saved = await patchAccountRow(accountId, { vertical })
+
+    if (!saved.ok) {
+      return err(saved.message)
+    }
+
+    revalidatePath('/admin/onboarding')
 
     return { success: true, data: { vertical: vertical as Vertical } }
   } catch (error) {

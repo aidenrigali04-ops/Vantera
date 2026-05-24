@@ -42,6 +42,14 @@ function isMarketingHost(hostname: string, appDomain: string): boolean {
   return false
 }
 
+/** Server Actions POST with this header — middleware must NOT redirect them. */
+function isServerActionRequest(request: NextRequest): boolean {
+  return (
+    request.method === 'POST' &&
+    (request.headers.has('Next-Action') || request.headers.has('next-action'))
+  )
+}
+
 function applyAccountHeaders(
   requestHeaders: Headers,
   response: NextResponse,
@@ -200,8 +208,12 @@ export async function middleware(request: NextRequest) {
   )
 
   const account = await resolveAccountByHost(supabase, request, host, appDomain)
+  const isAction = isServerActionRequest(request)
 
-  if (!account) {
+  // Page navigations need a resolved tenant. Server Actions carry their own
+  // auth in the action body/cookies — redirecting a POST breaks the RSC
+  // action response and the client sees `undefined` ("could not save…").
+  if (!account && !isAction) {
     return NextResponse.redirect(new URL('/', request.url))
   }
 
@@ -212,9 +224,24 @@ export async function middleware(request: NextRequest) {
     },
   })
 
-  applyAccountHeaders(requestHeaders, brandedResponse, account, pathname)
+  if (account) {
+    applyAccountHeaders(requestHeaders, brandedResponse, account, pathname)
+  } else if (isAction) {
+    // Minimal tenant headers from the admin cookie when Supabase lookup
+    // fails (fresh signup, replication lag, etc.) so layouts still render.
+    const adminToken = request.cookies.get(ADMIN_SESSION_COOKIE)?.value
+    if (adminToken) {
+      const payload = await verifySessionToken(adminToken)
+      if (payload?.type === 'admin' && payload.accountId) {
+        requestHeaders.set('x-account-id', payload.accountId)
+        requestHeaders.set('x-onboarding-complete', 'false')
+        brandedResponse.headers.set('x-account-id', payload.accountId)
+        brandedResponse.headers.set('x-onboarding-complete', 'false')
+      }
+    }
+  }
 
-  if (pathname.startsWith('/admin')) {
+  if (pathname.startsWith('/admin') && !isAction) {
     const sessionToken = request.cookies.get(ADMIN_SESSION_COOKIE)?.value
 
     if (!sessionToken) {
@@ -227,7 +254,7 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/auth/login', request.url))
     }
 
-    if (payload.accountId !== account.id) {
+    if (account && payload.accountId !== account.id) {
       return NextResponse.redirect(new URL('/auth/login', request.url))
     }
 
@@ -241,6 +268,7 @@ export async function middleware(request: NextRequest) {
     // might miss (stale deep links, page refreshes mid-wizard, etc.).
     // Non-owner roles bypass — they shouldn't be running the wizard.
     if (
+      account &&
       payload.role === 'owner' &&
       !account.onboarding_completed_at &&
       !pathname.startsWith('/admin/onboarding')
@@ -262,7 +290,7 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/auth/portal-login', request.url))
     }
 
-    if (payload.accountId !== account.id) {
+    if (!account || payload.accountId !== account.id) {
       return NextResponse.redirect(new URL('/auth/portal-login', request.url))
     }
   }

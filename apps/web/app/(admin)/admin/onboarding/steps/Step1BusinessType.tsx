@@ -124,9 +124,14 @@ export function Step1BusinessType({ accountId, currentVertical, primaryColor, on
     try {
       const result = await runStepAction(() => updateVertical(accountId, selected))
 
-      if (!result || result.success !== true) {
+      if (result == null) {
+        setError('The server did not respond. Refresh the page and try again.')
+        return
+      }
+
+      if (result.success !== true) {
         const msg =
-          (result && 'error' in result && result.error) ||
+          ('error' in result && result.error) ||
           'Could not save your business type. Please try again.'
         setError(msg)
         return
