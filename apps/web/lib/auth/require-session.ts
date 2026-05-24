@@ -21,7 +21,7 @@ export async function requireAdminSession(): Promise<AdminSession> {
 
   const branding = getBrandingFromHeaders(headers())
 
-  if (branding.accountId && session.accountId !== branding.accountId) {
+  if (branding.accountId && String(session.accountId) !== String(branding.accountId)) {
     redirect('/auth/login')
   }
 

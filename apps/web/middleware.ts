@@ -3,8 +3,10 @@ import {
   PORTAL_SESSION_COOKIE,
 } from '@/lib/auth/constants'
 import { verifySessionToken } from '@/lib/auth/jwt'
+import type { AdminSession } from '@/lib/auth/types'
 import { canAccessAdminRoute } from '@/lib/auth/rbac'
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
+import { createClient } from '@supabase/supabase-js'
 import { type NextRequest, NextResponse } from 'next/server'
 
 type AccountRow = {
@@ -50,6 +52,49 @@ function isServerActionRequest(request: NextRequest): boolean {
   )
 }
 
+function applySessionFallbackHeaders(
+  requestHeaders: Headers,
+  response: NextResponse,
+  accountId: string,
+  pathname: string,
+): void {
+  const headerValues: Record<string, string> = {
+    'x-pathname': pathname,
+    'x-account-id': accountId,
+    'x-onboarding-complete': 'false',
+  }
+
+  for (const [key, value] of Object.entries(headerValues)) {
+    requestHeaders.set(key, value)
+    response.headers.set(key, value)
+  }
+}
+
+function createServiceRoleClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    },
+  )
+}
+
+async function resolveAccountById(accountId: string): Promise<AccountRow | null> {
+  const service = createServiceRoleClient()
+  const { data } = await service
+    .from('accounts')
+    .select(ACCOUNT_SELECT)
+    .eq('id', accountId)
+    .limit(1)
+    .maybeSingle()
+
+  return data ?? null
+}
+
 function applyAccountHeaders(
   requestHeaders: Headers,
   response: NextResponse,
@@ -81,6 +126,7 @@ async function resolveAccountByHost(
   request: NextRequest,
   host: string,
   appDomain: string,
+  verifiedAdmin: AdminSession | null,
 ): Promise<AccountRow | null> {
   const hostname = host.split(':')[0] ?? ''
 
@@ -117,19 +163,21 @@ async function resolveAccountByHost(
   // apex (or *.vercel.app, or localhost) before custom DNS is wired up, their
   // admin session cookie is the only signal that tells us which tenant they
   // belong to. Verify the cookie, then look up the account by the embedded ID.
+  // Use the service-role client so RLS / anon edge quirks can't block lookup.
+  if (verifiedAdmin?.accountId) {
+    const bySession = await resolveAccountById(String(verifiedAdmin.accountId))
+    if (bySession) {
+      return bySession
+    }
+  }
+
   const adminToken = request.cookies.get(ADMIN_SESSION_COOKIE)?.value
-  if (adminToken) {
+  if (adminToken && !verifiedAdmin) {
     const payload = await verifySessionToken(adminToken)
     if (payload && payload.type === 'admin' && payload.accountId) {
-      const { data } = await supabase
-        .from('accounts')
-        .select(ACCOUNT_SELECT)
-        .eq('id', payload.accountId)
-        .limit(1)
-        .maybeSingle()
-
-      if (data) {
-        return data
+      const bySession = await resolveAccountById(String(payload.accountId))
+      if (bySession) {
+        return bySession
       }
     }
   }
@@ -138,15 +186,9 @@ async function resolveAccountByHost(
   if (portalToken) {
     const payload = await verifySessionToken(portalToken)
     if (payload && payload.type === 'portal' && payload.accountId) {
-      const { data } = await supabase
-        .from('accounts')
-        .select(ACCOUNT_SELECT)
-        .eq('id', payload.accountId)
-        .limit(1)
-        .maybeSingle()
-
-      if (data) {
-        return data
+      const bySession = await resolveAccountById(String(payload.accountId))
+      if (bySession) {
+        return bySession
       }
     }
   }
@@ -178,6 +220,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/', request.url))
   }
 
+  const adminToken = request.cookies.get(ADMIN_SESSION_COOKIE)?.value
+  const adminPayload = adminToken ? await verifySessionToken(adminToken) : null
+  const verifiedAdmin =
+    adminPayload?.type === 'admin' && adminPayload.accountId ? adminPayload : null
+
   let response = NextResponse.next({
     request,
   })
@@ -207,13 +254,14 @@ export async function middleware(request: NextRequest) {
     },
   )
 
-  const account = await resolveAccountByHost(supabase, request, host, appDomain)
+  const account = await resolveAccountByHost(supabase, request, host, appDomain, verifiedAdmin)
   const isAction = isServerActionRequest(request)
+  const adminRouteWithSession = pathname.startsWith('/admin') && Boolean(verifiedAdmin)
 
-  // Page navigations need a resolved tenant. Server Actions carry their own
-  // auth in the action body/cookies — redirecting a POST breaks the RSC
-  // action response and the client sees `undefined` ("could not save…").
-  if (!account && !isAction) {
+  // Page navigations need a resolved tenant unless the user has a verified
+  // admin session on /admin/* (post-signup on apex / preview URLs). Server
+  // Actions must never be redirected — that breaks the RSC action payload.
+  if (!account && !isAction && !adminRouteWithSession) {
     return NextResponse.redirect(new URL('/', request.url))
   }
 
@@ -226,19 +274,13 @@ export async function middleware(request: NextRequest) {
 
   if (account) {
     applyAccountHeaders(requestHeaders, brandedResponse, account, pathname)
-  } else if (isAction) {
-    // Minimal tenant headers from the admin cookie when Supabase lookup
-    // fails (fresh signup, replication lag, etc.) so layouts still render.
-    const adminToken = request.cookies.get(ADMIN_SESSION_COOKIE)?.value
-    if (adminToken) {
-      const payload = await verifySessionToken(adminToken)
-      if (payload?.type === 'admin' && payload.accountId) {
-        requestHeaders.set('x-account-id', payload.accountId)
-        requestHeaders.set('x-onboarding-complete', 'false')
-        brandedResponse.headers.set('x-account-id', payload.accountId)
-        brandedResponse.headers.set('x-onboarding-complete', 'false')
-      }
-    }
+  } else if (verifiedAdmin?.accountId) {
+    applySessionFallbackHeaders(
+      requestHeaders,
+      brandedResponse,
+      String(verifiedAdmin.accountId),
+      pathname,
+    )
   }
 
   if (pathname.startsWith('/admin') && !isAction) {
@@ -254,7 +296,7 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/auth/login', request.url))
     }
 
-    if (account && payload.accountId !== account.id) {
+    if (account && String(payload.accountId) !== String(account.id)) {
       return NextResponse.redirect(new URL('/auth/login', request.url))
     }
 
@@ -262,15 +304,16 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/admin/dashboard', request.url))
     }
 
+    const onboardingIncomplete = account ? !account.onboarding_completed_at : true
+
     // Onboarding gate: an owner whose account hasn't completed onboarding
     // is held on /admin/onboarding regardless of what /admin/* path they
     // try to hit. This catches anything the signup / OAuth redirects
     // might miss (stale deep links, page refreshes mid-wizard, etc.).
     // Non-owner roles bypass — they shouldn't be running the wizard.
     if (
-      account &&
       payload.role === 'owner' &&
-      !account.onboarding_completed_at &&
+      onboardingIncomplete &&
       !pathname.startsWith('/admin/onboarding')
     ) {
       return NextResponse.redirect(new URL('/admin/onboarding', request.url))
@@ -290,7 +333,7 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/auth/portal-login', request.url))
     }
 
-    if (!account || payload.accountId !== account.id) {
+    if (!account || String(payload.accountId) !== String(account.id)) {
       return NextResponse.redirect(new URL('/auth/portal-login', request.url))
     }
   }
