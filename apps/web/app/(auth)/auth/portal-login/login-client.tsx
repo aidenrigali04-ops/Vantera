@@ -2,6 +2,7 @@
 
 import { LoginForm } from '@/components/shared/login-form'
 import { portalLoginAction } from '@/lib/auth/actions'
+import { invokeAuthAction } from '@/lib/auth/invoke-action'
 
 export function PortalLoginClient() {
   return (
@@ -9,15 +10,7 @@ export function PortalLoginClient() {
       heading="Client portal"
       subheading="Sign in to view your projects, invoices, and updates."
       showOAuth={false}
-      onSubmit={async (values) => {
-        const result = await portalLoginAction(values)
-
-        if (!result.success) {
-          return { success: false, error: result.error }
-        }
-
-        return { success: true, redirectTo: result.data.redirectTo }
-      }}
+      onSubmit={(values) => invokeAuthAction(() => portalLoginAction(values), '/portal')}
     />
   )
 }

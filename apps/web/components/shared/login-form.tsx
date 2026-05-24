@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { useBranding } from '@/lib/branding/context'
+import { isNextRedirectError } from '@/lib/auth/invoke-action'
 import { zodResolver } from '@hookform/resolvers/zod'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
@@ -24,12 +25,6 @@ const loginSchema = z.object({
   email: z.string().email('Enter a valid email'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
 })
-
-function isNextRedirectError(err: unknown): boolean {
-  if (!err || typeof err !== 'object') return false
-  const digest = (err as { digest?: unknown }).digest
-  return typeof digest === 'string' && digest.startsWith('NEXT_REDIRECT')
-}
 
 type LoginFormProps = {
   onSubmit: (values: z.infer<typeof loginSchema>) => Promise<{
@@ -82,17 +77,15 @@ export function LoginForm({
       return
     }
 
-    if (!result.success) {
-      setError(result.error ?? 'Sign in failed')
+    if (!result?.success) {
+      setError(result?.error ?? 'Sign in failed')
       setIsSubmitting(false)
       return
     }
 
-    // Defense in depth: if the action returned a redirectTo instead of
-    // calling redirect() (older deploys mid-rollout), fall back to a
-    // full page navigation so the cookie set is guaranteed to be applied.
-    const redirectTo = result.redirectTo ?? '/admin/dashboard'
-    window.location.href = redirectTo
+    if (result.redirectTo) {
+      window.location.href = result.redirectTo
+    }
   }
 
   const isBusy = isSubmitting

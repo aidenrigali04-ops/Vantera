@@ -2,19 +2,14 @@
 
 import { SignupForm } from '@/components/shared/signup-form'
 import { signupAction } from '@/lib/auth/actions'
+import { invokeAuthAction } from '@/lib/auth/invoke-action'
 
 export function SignupClient() {
   return (
     <SignupForm
-      onSubmit={async (values) => {
-        const result = await signupAction(values)
-
-        if (!result.success) {
-          return { success: false, error: result.error }
-        }
-
-        return { success: true, redirectTo: result.data.redirectTo }
-      }}
+      onSubmit={(values) =>
+        invokeAuthAction(() => signupAction(values), '/admin/onboarding')
+      }
     />
   )
 }

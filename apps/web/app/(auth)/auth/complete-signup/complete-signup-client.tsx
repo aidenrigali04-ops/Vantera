@@ -11,16 +11,11 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { completeOAuthSignupAction } from '@/lib/auth/actions'
+import { invokeAuthAction, isNextRedirectError } from '@/lib/auth/invoke-action'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
-
-function isNextRedirectError(err: unknown): boolean {
-  if (!err || typeof err !== 'object') return false
-  const digest = (err as { digest?: unknown }).digest
-  return typeof digest === 'string' && digest.startsWith('NEXT_REDIRECT')
-}
 
 const schema = z.object({
   fullName: z.string().min(2, 'Enter your full name'),
@@ -50,10 +45,11 @@ export function CompleteSignupClient({
 
     let result
     try {
-      result = await completeOAuthSignupAction(values)
+      result = await invokeAuthAction(
+        () => completeOAuthSignupAction(values),
+        '/admin/onboarding',
+      )
     } catch (err) {
-      // Server Action redirect() throws NEXT_REDIRECT — re-throw so Next.js
-      // can navigate. Swallowing it strands the user on /auth/complete-signup.
       if (isNextRedirectError(err)) throw err
       setError(err instanceof Error ? err.message : 'Could not finish signup')
       setIsSubmitting(false)
@@ -66,8 +62,9 @@ export function CompleteSignupClient({
       return
     }
 
-    const redirectTo = result.data?.redirectTo ?? '/admin/onboarding'
-    window.location.href = redirectTo
+    if (result.redirectTo) {
+      window.location.href = result.redirectTo
+    }
   }
 
   const busy = isSubmitting

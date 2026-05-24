@@ -2,19 +2,14 @@
 
 import { LoginForm } from '@/components/shared/login-form'
 import { adminLoginAction } from '@/lib/auth/actions'
+import { invokeAuthAction } from '@/lib/auth/invoke-action'
 
 export function AdminLoginClient() {
   return (
     <LoginForm
-      onSubmit={async (values) => {
-        const result = await adminLoginAction(values)
-
-        if (!result.success) {
-          return { success: false, error: result.error }
-        }
-
-        return { success: true, redirectTo: result.data.redirectTo }
-      }}
+      onSubmit={(values) =>
+        invokeAuthAction(() => adminLoginAction(values), '/admin/dashboard')
+      }
     />
   )
 }
