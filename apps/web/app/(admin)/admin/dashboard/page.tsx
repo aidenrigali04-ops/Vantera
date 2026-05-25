@@ -16,10 +16,16 @@ export default async function AdminDashboardPage() {
   // owners, but if the matcher ever changes or the cached headers are stale,
   // we'd rather force them through the wizard than render an empty dashboard.
   if (session.role === 'owner') {
-    let onboardingComplete = branding.onboardingComplete
-    if (!branding.onboardingKnown) {
+    const brandingMatchesSession =
+      !branding.accountId || String(branding.accountId) === String(session.accountId)
+
+    let onboardingComplete = false
+    if (brandingMatchesSession && branding.onboardingKnown) {
+      onboardingComplete = branding.onboardingComplete
+    } else {
       onboardingComplete = await isOnboardingCompleteForAccount(session.accountId)
     }
+
     if (!onboardingComplete) {
       redirect('/admin/onboarding')
     }

@@ -349,7 +349,18 @@ export async function getBusinessProfile(
     const row = await fetchAccountById(workspaceId)
 
     if (!row) {
-      return err('Account not found')
+      return {
+        success: true,
+        data: {
+          voicePreference: null,
+          businessHoursStart: null,
+          businessHoursEnd: null,
+          bookingLink: null,
+          reviewLink: null,
+          paymentLink: null,
+          emergencyLine: null,
+        },
+      }
     }
 
     return {
@@ -394,9 +405,7 @@ export async function updateBusinessProfile(
     }
 
     const account = await fetchAccountById(workspaceId)
-    if (!account) {
-      return err('Account not found')
-    }
+    const activeTemplateId = account?.active_template_id ?? null
 
     const saved = await patchAccountRow(workspaceId, {
       voice_preference: normalized.voicePreference,
@@ -415,9 +424,9 @@ export async function updateBusinessProfile(
     // If the user already applied a template, re-run personalization so the
     // new voice / hours / links flow into the existing automations.
     let rePersonalized = false
-    if (account.active_template_id) {
+    if (activeTemplateId) {
       try {
-        await applyTemplateForAccount(workspaceId, account.active_template_id, session.userId)
+        await applyTemplateForAccount(workspaceId, activeTemplateId, session.userId)
         rePersonalized = true
       } catch {
         rePersonalized = false
@@ -662,14 +671,12 @@ export async function inviteTeamMembers(
     }
 
     const account = await fetchAccountById(workspaceId)
-
-    if (!account) {
-      return err('Account not found')
-    }
+    const branding = getBrandingFromHeaders(headers())
+    const accountName = account?.name || branding.businessName || 'Your workspace'
 
     const supabase = getSupabaseAdmin()
     const resend = new Resend(requireEnv('RESEND_API_KEY'))
-    const fromAddress = `${account.name} <onboarding@${env.NEXT_PUBLIC_APP_DOMAIN}>`
+    const fromAddress = `${accountName} <onboarding@${env.NEXT_PUBLIC_APP_DOMAIN}>`
 
     let invited = 0
 
@@ -707,9 +714,9 @@ export async function inviteTeamMembers(
 
       const html = `
         <div style="font-family:system-ui,sans-serif;max-width:560px;margin:0 auto;padding:32px;color:#0f172a">
-          <h1 style="font-size:20px;margin:0 0 16px">You've been invited to join ${account.name}</h1>
+          <h1 style="font-size:20px;margin:0 0 16px">You've been invited to join ${accountName}</h1>
           <p style="font-size:14px;line-height:1.6;color:#334155;margin:0 0 24px">
-            ${account.name} has invited you as a <strong>${member.role}</strong>.
+            ${accountName} has invited you as a <strong>${member.role}</strong>.
             Click the button below to accept the invitation and set up your account.
           </p>
           <p style="margin:0 0 32px">
@@ -728,7 +735,7 @@ export async function inviteTeamMembers(
       const { error: sendError } = await resend.emails.send({
         from: fromAddress,
         to: member.email,
-        subject: `You've been invited to join ${account.name}`,
+        subject: `You've been invited to join ${accountName}`,
         html,
       })
 

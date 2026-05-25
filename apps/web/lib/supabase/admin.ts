@@ -1,3 +1,4 @@
+import { sanitizeEnvValue } from '@/lib/env'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import ws from 'ws'
 
@@ -5,9 +6,11 @@ import ws from 'ws'
 let adminClient: SupabaseClient | undefined
 
 function getAdminCredentials(): { url: string; key: string } {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+    ? sanitizeEnvValue(process.env.NEXT_PUBLIC_SUPABASE_URL)
+    : undefined
   const rawKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_SERVICE_KEY
-  const key = rawKey?.trim()
+  const key = rawKey ? sanitizeEnvValue(rawKey) : undefined
 
   if (!url || !key) {
     throw new Error(

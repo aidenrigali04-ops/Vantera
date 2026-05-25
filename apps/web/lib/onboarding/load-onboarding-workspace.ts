@@ -2,6 +2,7 @@ import type { AdminSession } from '@/lib/auth/types'
 import type { BrandingData } from '@/lib/branding/context'
 import type { AccountRow } from './account-store'
 import { fetchAccountById } from './account-store'
+import { isOnboardingCompleteForAccount } from './completion-status'
 
 export type OnboardingWorkspace = {
   accountId: string
@@ -15,11 +16,15 @@ export type OnboardingWorkspace = {
   onboardingComplete: boolean
 }
 
+function brandingMatchesSession(branding: BrandingData, accountId: string): boolean {
+  if (!branding.accountId) return true
+  return String(branding.accountId) === String(accountId)
+}
+
 /**
- * Bootstrap onboarding from the admin session + middleware branding headers.
- * Avoids throwing when the Supabase JS admin client fails to init on Vercel —
- * the page should render for a freshly minted signup session even if a DB
- * round-trip is temporarily unavailable.
+ * Bootstrap onboarding from the admin session. Completion status always comes
+ * from a direct lookup on session.accountId — never from middleware headers
+ * alone (host tenant bleed was marking new accounts "complete").
  */
 export async function loadOnboardingWorkspace(
   session: AdminSession,
@@ -36,18 +41,25 @@ export async function loadOnboardingWorkspace(
     }
   }
 
-  const onboardingComplete =
-    branding.onboardingComplete || Boolean(account?.onboarding_completed_at)
+  let onboardingComplete = false
+  if (accountId) {
+    onboardingComplete = await isOnboardingCompleteForAccount(accountId)
+  } else if (brandingMatchesSession(branding, accountId) && branding.onboardingKnown) {
+    onboardingComplete = branding.onboardingComplete
+  }
+
+  const useBranding = brandingMatchesSession(branding, accountId)
 
   return {
     accountId,
     account,
-    businessName: account?.name || branding.businessName,
-    currentVertical: account?.vertical || branding.vertical || null,
-    primaryColor: account?.brand_primary_color ?? branding.primaryColor,
-    secondaryColor: account?.brand_secondary_color ?? branding.secondaryColor,
-    logoUrl: account?.brand_logo_url ?? branding.logoUrl,
-    portalDomain: account?.portal_domain ?? branding.portalDomain ?? '',
+    businessName: account?.name || (useBranding ? branding.businessName : '') || '',
+    currentVertical: account?.vertical || (useBranding ? branding.vertical : '') || null,
+    primaryColor: account?.brand_primary_color ?? (useBranding ? branding.primaryColor : '#1648A0'),
+    secondaryColor:
+      account?.brand_secondary_color ?? (useBranding ? branding.secondaryColor : '#0D9488'),
+    logoUrl: account?.brand_logo_url ?? (useBranding ? branding.logoUrl : null),
+    portalDomain: account?.portal_domain ?? (useBranding ? branding.portalDomain : '') ?? '',
     onboardingComplete,
   }
 }

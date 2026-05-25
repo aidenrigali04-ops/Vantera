@@ -31,6 +31,7 @@ export default async function AdminOnboardingPage() {
 
   return (
     <OnboardingWizard
+      key={workspace.accountId}
       accountId={workspace.accountId}
       businessName={workspace.businessName}
       currentVertical={workspace.currentVertical}

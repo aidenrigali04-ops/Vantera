@@ -176,6 +176,18 @@ export async function patchAccountRow(
     console.error('[patchAccountRow] REST PATCH failed', rest.error)
   }
 
+  const minimalPatch = await supabaseServiceRest<null>('accounts', {
+    method: 'PATCH',
+    query: { id: `eq.${normalizedId}` },
+    body,
+  })
+
+  if (!minimalPatch.error) {
+    return { ok: true }
+  }
+
+  console.error('[patchAccountRow] REST PATCH (minimal) failed', minimalPatch.error)
+
   try {
     const admin = getSupabaseAdmin()
     const { data, error } = await admin
@@ -196,7 +208,10 @@ export async function patchAccountRow(
     console.error('[patchAccountRow] supabase-js fallback failed', err)
   }
 
-  return { ok: false, message: 'Account not found' }
+  return {
+    ok: false,
+    message: 'Could not save workspace settings. Refresh and try again.',
+  }
 }
 
 /** Load a tenant account by id — PostgREST first, then supabase-js, with select fallbacks. */
@@ -278,7 +293,73 @@ export async function accountHasStageDefinitions(accountId: string): Promise<boo
 }
 
 export async function markOnboardingComplete(accountId: string): Promise<PatchResult> {
-  return patchAccountRow(accountId, {
-    onboarding_completed_at: new Date().toISOString(),
+  const normalizedId = String(accountId).trim()
+  if (!normalizedId) {
+    return { ok: false, message: 'Invalid workspace id' }
+  }
+
+  const timestamp = new Date().toISOString()
+  const body = {
+    onboarding_completed_at: timestamp,
+    updated_at: timestamp,
+  }
+
+  const withRepresentation = await supabaseServiceRest<AccountRow[]>('accounts', {
+    method: 'PATCH',
+    query: { id: `eq.${normalizedId}` },
+    body,
+    prefer: 'return=representation',
   })
+
+  if (!withRepresentation.error && Array.isArray(withRepresentation.data) && withRepresentation.data.length > 0) {
+    return { ok: true }
+  }
+
+  if (withRepresentation.error) {
+    console.error('[markOnboardingComplete] REST PATCH (representation) failed', withRepresentation.error)
+  }
+
+  const minimalPatch = await supabaseServiceRest<null>('accounts', {
+    method: 'PATCH',
+    query: { id: `eq.${normalizedId}` },
+    body,
+  })
+
+  if (!minimalPatch.error) {
+    const verify = await supabaseServiceRestSingle<{ onboarding_completed_at: string | null }>('accounts', {
+      select: 'onboarding_completed_at',
+      id: `eq.${normalizedId}`,
+    })
+
+    if (verify.data?.onboarding_completed_at) {
+      return { ok: true }
+    }
+  } else {
+    console.error('[markOnboardingComplete] REST PATCH (minimal) failed', minimalPatch.error)
+  }
+
+  try {
+    const admin = getSupabaseAdmin()
+    const { data, error } = await admin
+      .from('accounts')
+      .update(body)
+      .eq('id', normalizedId)
+      .select('onboarding_completed_at')
+      .maybeSingle()
+
+    if (!error && data?.onboarding_completed_at) {
+      return { ok: true }
+    }
+
+    if (error) {
+      return { ok: false, message: error.message }
+    }
+  } catch (err) {
+    console.error('[markOnboardingComplete] supabase-js failed', err)
+  }
+
+  return {
+    ok: false,
+    message: 'Could not finalize your workspace. Refresh and try again.',
+  }
 }

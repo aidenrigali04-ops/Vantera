@@ -31,10 +31,16 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   // Owners with onboarding_completed_at = NULL get redirected back to the
   // wizard; non-owner roles never see the wizard so they bypass.
   if (session.role === 'owner' && !isOnboardingRoute) {
-    let onboardingComplete = branding.onboardingComplete
-    if (!branding.onboardingKnown) {
+    const brandingMatchesSession =
+      !branding.accountId || String(branding.accountId) === String(session.accountId)
+
+    let onboardingComplete = false
+    if (brandingMatchesSession && branding.onboardingKnown) {
+      onboardingComplete = branding.onboardingComplete
+    } else {
       onboardingComplete = await isOnboardingCompleteForAccount(session.accountId)
     }
+
     if (!onboardingComplete) {
       redirect('/admin/onboarding')
     }

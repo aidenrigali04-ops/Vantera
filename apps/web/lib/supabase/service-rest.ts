@@ -3,10 +3,14 @@
  * so no Realtime / ws requirement on Vercel Node 20.
  */
 
+import { sanitizeEnvValue } from '@/lib/env'
+
 function getServiceCredentials(): { url: string; key: string } {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+    ? sanitizeEnvValue(process.env.NEXT_PUBLIC_SUPABASE_URL)
+    : undefined
   const rawKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_SERVICE_KEY
-  const key = rawKey?.trim()
+  const key = rawKey ? sanitizeEnvValue(rawKey) : undefined
 
   if (!url || !key) {
     throw new Error(

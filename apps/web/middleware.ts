@@ -61,7 +61,9 @@ function applySessionFallbackHeaders(
   const headerValues: Record<string, string> = {
     'x-pathname': pathname,
     'x-account-id': accountId,
-    'x-onboarding-complete': '',
+    // Explicit false so layout/page treat onboarding as known-incomplete
+    // without a Drizzle round-trip (empty string left onboarding "unknown").
+    'x-onboarding-complete': 'false',
   }
 
   for (const [key, value] of Object.entries(headerValues)) {
@@ -258,22 +260,17 @@ export async function middleware(request: NextRequest) {
   const isAction = isServerActionRequest(request)
   const adminRouteWithSession = pathname.startsWith('/admin') && Boolean(verifiedAdmin)
 
-  // Retry account lookup when the host-based resolution failed but we have a
-  // verified admin session — avoids treating onboarding as incomplete on
-  // transient Supabase edge failures (O4).
   let resolvedAccount = account
-  if (!resolvedAccount && verifiedAdmin?.accountId) {
-    resolvedAccount = await resolveAccountById(String(verifiedAdmin.accountId))
-  }
 
-  // Host-based tenant resolution can disagree with a freshly minted session
-  // (signup on apex / preview URL). Prefer the session account for onboarding.
-  if (
-    resolvedAccount &&
-    verifiedAdmin?.accountId &&
-    String(resolvedAccount.id) !== String(verifiedAdmin.accountId) &&
-    pathname.startsWith('/admin/onboarding')
-  ) {
+  // The admin JWT is authoritative on /admin/* — host slug / portal_domain must
+  // not override the workspace the user signed into (tenant bleed caused false
+  // "onboarding complete" redirects for brand-new accounts).
+  if (verifiedAdmin?.accountId && pathname.startsWith('/admin')) {
+    const sessionAccount = await resolveAccountById(String(verifiedAdmin.accountId))
+    if (sessionAccount) {
+      resolvedAccount = sessionAccount
+    }
+  } else if (!resolvedAccount && verifiedAdmin?.accountId) {
     resolvedAccount = await resolveAccountById(String(verifiedAdmin.accountId))
   }
 
@@ -329,7 +326,9 @@ export async function middleware(request: NextRequest) {
 
     const onboardingIncomplete = resolvedAccount
       ? !resolvedAccount.onboarding_completed_at
-      : false
+      : verifiedAdmin
+        ? true
+        : false
 
     // Onboarding gate: an owner whose account hasn't completed onboarding
     // is held on /admin/onboarding regardless of what /admin/* path they
