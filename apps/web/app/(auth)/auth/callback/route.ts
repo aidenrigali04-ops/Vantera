@@ -65,15 +65,18 @@ export async function GET(request: NextRequest) {
   const admin = getSupabaseAdmin()
   const { data: existingUserRow } = await admin
     .from('users')
-    .select('id, account_id, role, email, created_at')
+    .select('id, account_id, role, email, created_at, is_active')
     .eq('email', email)
-    .eq('is_active', true)
     .is('deleted_at', null)
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle()
 
   if (existingUserRow?.account_id) {
+    // Invited teammates are inserted with is_active=false until first login.
+    if (!existingUserRow.is_active) {
+      await admin.from('users').update({ is_active: true }).eq('id', existingUserRow.id)
+    }
     // Resolve where to land them. If onboarding still isn't complete and
     // they're the owner, drop them into the wizard rather than the
     // dashboard's empty state.

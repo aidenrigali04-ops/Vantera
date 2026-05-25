@@ -1,5 +1,6 @@
 import { env } from '@/lib/env'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import ws from 'ws'
 
 // NEVER import this in client components or expose to browser
 let adminClient: SupabaseClient | undefined
@@ -10,6 +11,10 @@ export function getSupabaseAdmin(): SupabaseClient {
       auth: {
         autoRefreshToken: false,
         persistSession: false,
+      },
+      realtime: {
+        // Node.js < 22 has no native WebSocket; required for admin client init in Larry/CLI.
+        transport: ws as unknown as typeof WebSocket,
       },
     })
   }

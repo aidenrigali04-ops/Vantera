@@ -12,6 +12,8 @@ export type BrandingData = {
   plan: string
   portalDomain: string
   onboardingComplete: boolean
+  /** False when middleware could not resolve account onboarding state (transient lookup). */
+  onboardingKnown: boolean
 }
 
 const BrandingContext = createContext<BrandingData | null>(null)

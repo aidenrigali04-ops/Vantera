@@ -3,6 +3,7 @@ import type { ReadonlyHeaders } from 'next/dist/server/web/spec-extension/adapte
 
 export function getBrandingFromHeaders(headers: ReadonlyHeaders): BrandingData {
   const logoUrl = headers.get('x-brand-logo-url')
+  const onboardingHeader = headers.get('x-onboarding-complete')
 
   return {
     accountId: headers.get('x-account-id') ?? '',
@@ -13,6 +14,7 @@ export function getBrandingFromHeaders(headers: ReadonlyHeaders): BrandingData {
     vertical: headers.get('x-account-vertical') ?? '',
     plan: headers.get('x-account-plan') ?? 'team',
     portalDomain: headers.get('x-portal-domain') ?? '',
-    onboardingComplete: headers.get('x-onboarding-complete') === 'true',
+    onboardingComplete: onboardingHeader === 'true',
+    onboardingKnown: onboardingHeader === 'true' || onboardingHeader === 'false',
   }
 }

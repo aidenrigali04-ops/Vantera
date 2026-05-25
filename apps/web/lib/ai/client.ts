@@ -127,7 +127,7 @@ export function parseJsonResponse<T>(
 
   // Pull the first {...} or [...] block out of the response. Models sometimes
   // wrap JSON in code fences or chatty preambles even when told not to.
-  const blockStart = trimmed.search(/[{\[]/)
+  const blockStart = trimmed.search(/[{[]/)
   const blockEnd = Math.max(trimmed.lastIndexOf('}'), trimmed.lastIndexOf(']'))
   if (blockStart === -1 || blockEnd === -1 || blockEnd <= blockStart) return null
 

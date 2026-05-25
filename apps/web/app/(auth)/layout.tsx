@@ -33,6 +33,7 @@ export default async function AuthLayout({ children }: { children: ReactNode }) 
       plan: 'team',
       portalDomain: '',
       onboardingComplete: false,
+      onboardingKnown: false,
     }
   }
 

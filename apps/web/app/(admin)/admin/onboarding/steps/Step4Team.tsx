@@ -23,11 +23,10 @@ import {
   stepContainer,
 } from '../_primitives'
 
-const ROLES = ['owner', 'admin', 'manager', 'staff', 'technician', 'agent'] as const
-type Role = (typeof ROLES)[number]
+const INVITE_ROLES = ['admin', 'manager', 'staff', 'technician', 'agent'] as const
+type InviteRole = (typeof INVITE_ROLES)[number]
 
-const ROLE_LABELS: Record<Role, string> = {
-  owner: 'Owner',
+const ROLE_LABELS: Record<InviteRole, string> = {
   admin: 'Admin',
   manager: 'Manager',
   staff: 'Staff',
@@ -37,7 +36,7 @@ const ROLE_LABELS: Record<Role, string> = {
 
 const MAX_MEMBERS = 3
 
-type Member = { email: string; role: Role }
+type Member = { email: string; role: InviteRole }
 
 type Props = {
   accountId: string
@@ -134,13 +133,13 @@ export function Step4Team({ accountId, primaryColor, onComplete }: Props) {
             />
             <Select
               value={member.role}
-              onValueChange={(value) => updateMember(index, { role: value as Role })}
+              onValueChange={(value) => updateMember(index, { role: value as InviteRole })}
             >
               <SelectTrigger className="h-9 w-[140px] border border-white/[0.06] bg-white/[0.03] text-xs text-white shadow-none focus:ring-0">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="border-white/[0.08] bg-[#0F141B] text-white">
-                {ROLES.map((role) => (
+                {INVITE_ROLES.map((role) => (
                   <SelectItem
                     key={role}
                     value={role}

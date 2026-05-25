@@ -414,9 +414,8 @@ export async function signupAction(
  * callback set their session — but they don't have a Vantera account
  * yet. This action mirrors the same account-provisioning flow as
  * `signupAction` minus the password + Supabase user creation:
- *   - Create the account row (vertical=agency, onboarding complete)
+ *   - Create the account row (vertical=agency, onboarding incomplete)
  *   - Insert the owner users row
- *   - Seed sample data
  *   - Mint the admin session cookie
  */
 export async function completeOAuthSignupAction(
@@ -454,7 +453,7 @@ export async function completeOAuthSignupAction(
   // gone.
   const { data: existingUser } = await admin
     .from('users')
-    .select('id, account_id, role, email, created_at')
+    .select('id, account_id, role, email, created_at, is_active')
     .eq('email', email)
     .is('deleted_at', null)
     .order('created_at', { ascending: false })
@@ -462,6 +461,10 @@ export async function completeOAuthSignupAction(
     .maybeSingle()
 
   if (existingUser?.account_id) {
+    if (!existingUser.is_active) {
+      await admin.from('users').update({ is_active: true }).eq('id', existingUser.id)
+    }
+
     const { data: existingAccount } = await admin
       .from('accounts')
       .select('onboarding_completed_at')

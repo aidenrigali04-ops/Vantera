@@ -1,4 +1,6 @@
+import { syncEnvVars } from '@trigger.dev/build/extensions/core'
 import { defineConfig } from '@trigger.dev/sdk'
+import { collectEnvVarsForTriggerSync } from './trigger-env-sync'
 
 export default defineConfig({
   project: process.env.TRIGGER_PROJECT_REF ?? '',
@@ -14,4 +16,10 @@ export default defineConfig({
     },
   },
   maxDuration: 3600,
+  build: {
+    extensions: [
+      // Vercel env vars do not reach Trigger.dev workers — sync from .env on deploy.
+      syncEnvVars(async () => collectEnvVarsForTriggerSync()),
+    ],
+  },
 })

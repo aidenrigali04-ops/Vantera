@@ -32,6 +32,7 @@ function accountToBranding(account: AccountRow): BrandingData {
     plan: account.plan,
     portalDomain: account.portal_domain ?? '',
     onboardingComplete: Boolean(account.onboarding_completed_at),
+    onboardingKnown: true,
   }
 }
 
@@ -209,6 +210,7 @@ export async function resolveBrandingFromRequest(): Promise<BrandingData> {
       plan: 'team',
       portalDomain: '',
       onboardingComplete: false,
+      onboardingKnown: false,
     }
   }
 

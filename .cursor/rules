@@ -196,7 +196,27 @@ pnpm db:generate  # drizzle-kit generate
 pnpm db:migrate   # drizzle-kit migrate
 pnpm db:push      # drizzle-kit push
 pnpm db:studio    # drizzle-kit studio
+pnpm larry:run    # Larry — full codebase + stack debug analysis
 ```
+
+## LARRY DEBUG AGENT
+
+When the user says **"Larry"**, **"run Larry"**, **"Larry analysis"**, or asks Larry to scan/fix bugs:
+
+1. Load skill: `.cursor/skills/vantera-debug-simulator/SKILL.md`
+2. Run `pnpm larry:run` OR execute the T0–T7 protocol manually in Cursor
+3. Larry **ONLY** applies debug fixes — **NEVER** UI, foundation, architecture, or UX
+4. Guardrails enforced in `apps/web/lib/debug/guardrails.ts`
+5. Scheduled automatically every 30 min via Trigger.dev task `larry-sweep`
+
+### Larry must NEVER modify
+- UI components, pages, layouts, styles, branding
+- `packages/db/schema.ts`, migrations, monorepo config
+- Architecture docs, dependency graph, UX flows
+
+### Larry MAY modify (debug only)
+- `apps/web/lib/**` (except branding), `apps/web/app/api/**`, `apps/web/trigger/**`
+- Runtime data fixes (RLS policies, score clamping) via Supabase MCP
 
 ## WHAT CURSOR MUST NEVER DO
 - Never use Pages Router (no getServerSideProps, getStaticProps, _app.tsx)

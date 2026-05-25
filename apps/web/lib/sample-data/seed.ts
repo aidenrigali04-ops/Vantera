@@ -204,6 +204,104 @@ export async function seedSampleWorkspace(accountId: string): Promise<void> {
 }
 
 /**
+ * Seed demo content when onboarding finishes and the workspace has no records yet.
+ * If the wizard already applied a vertical template (stages exist), only contacts +
+ * records are inserted using the account's existing pipeline stages.
+ */
+export async function seedSampleWorkspaceIfEmpty(accountId: string): Promise<void> {
+  const admin = getSupabaseAdmin()
+
+  const { count: recordCount } = await admin
+    .from('records')
+    .select('*', { count: 'exact', head: true })
+    .eq('account_id', accountId)
+
+  if (recordCount && recordCount > 0) return
+
+  const { count: stageCount } = await admin
+    .from('stage_definitions')
+    .select('*', { count: 'exact', head: true })
+    .eq('account_id', accountId)
+
+  if (!stageCount || stageCount === 0) {
+    await seedSampleWorkspace(accountId)
+    return
+  }
+
+  const { data: stages } = await admin
+    .from('stage_definitions')
+    .select('id, record_type, label, position, is_terminal_win, is_terminal_loss')
+    .eq('account_id', accountId)
+    .order('position', { ascending: true })
+
+  if (!stages?.length) return
+
+  const firstStageFor = (recordType: string) =>
+    stages.find((s) => s.record_type === recordType && !s.is_terminal_win && !s.is_terminal_loss) ??
+    stages.find((s) => s.record_type === recordType)
+
+  const contactsPayload = SAMPLE_CONTACTS.slice(0, 2).map((c) => ({
+    account_id: accountId,
+    type: 'agency_client',
+    first_name: c.firstName,
+    last_name: c.lastName,
+    email: c.email,
+    phone: c.phone,
+    source: c.source,
+    notes: c.notes,
+    tags: [SAMPLE_TAG],
+    portal_access: false,
+  }))
+
+  const { data: contactRows, error: contactErr } = await admin
+    .from('contacts')
+    .insert(contactsPayload)
+    .select('id')
+
+  if (contactErr) throw new Error(`Sample seed (contacts): ${contactErr.message}`)
+  if (!contactRows?.length) return
+
+  const recordsPayload: Array<Record<string, unknown>> = []
+  const dealStage = firstStageFor('deal') ?? firstStageFor('job')
+  const projectStage = firstStageFor('project') ?? firstStageFor('job')
+
+  if (dealStage && contactRows[0]) {
+    recordsPayload.push({
+      account_id: accountId,
+      contact_id: contactRows[0].id,
+      record_type: dealStage.record_type,
+      title: 'Sample job — replace with your first real one',
+      stage_id: dealStage.id,
+      value_cents: 2_500_000,
+      close_probability: 50,
+      is_pipeline: true,
+      source: SAMPLE_SOURCE,
+      priority: 'normal',
+    })
+  }
+
+  if (projectStage && contactRows[1] && projectStage.id !== dealStage?.id) {
+    recordsPayload.push({
+      account_id: accountId,
+      contact_id: contactRows[1].id,
+      record_type: projectStage.record_type,
+      title: 'Sample project — explore the pipeline',
+      stage_id: projectStage.id,
+      value_cents: 1_200_000,
+      close_probability: 100,
+      is_pipeline: false,
+      source: SAMPLE_SOURCE,
+      priority: 'normal',
+    })
+  }
+
+  if (recordsPayload.length) {
+    const { error: recordErr } = await admin.from('records').insert(recordsPayload)
+    if (recordErr) throw new Error(`Sample seed (records): ${recordErr.message}`)
+  }
+}
+
+/**
  * Hard-delete all sample-tagged content for an account.
  *
  * Hard delete is intentional and safe here: every row is marked with

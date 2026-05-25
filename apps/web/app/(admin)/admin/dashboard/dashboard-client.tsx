@@ -15,7 +15,7 @@ import {
   Users,
   type LucideIcon,
 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo } from 'react'
 
 type DashboardClientProps = {
   email: string

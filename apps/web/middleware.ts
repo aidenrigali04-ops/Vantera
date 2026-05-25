@@ -61,7 +61,7 @@ function applySessionFallbackHeaders(
   const headerValues: Record<string, string> = {
     'x-pathname': pathname,
     'x-account-id': accountId,
-    'x-onboarding-complete': 'false',
+    'x-onboarding-complete': '',
   }
 
   for (const [key, value] of Object.entries(headerValues)) {
@@ -258,10 +258,18 @@ export async function middleware(request: NextRequest) {
   const isAction = isServerActionRequest(request)
   const adminRouteWithSession = pathname.startsWith('/admin') && Boolean(verifiedAdmin)
 
+  // Retry account lookup when the host-based resolution failed but we have a
+  // verified admin session — avoids treating onboarding as incomplete on
+  // transient Supabase edge failures (O4).
+  let resolvedAccount = account
+  if (!resolvedAccount && verifiedAdmin?.accountId) {
+    resolvedAccount = await resolveAccountById(String(verifiedAdmin.accountId))
+  }
+
   // Page navigations need a resolved tenant unless the user has a verified
   // admin session on /admin/* (post-signup on apex / preview URLs). Server
   // Actions must never be redirected — that breaks the RSC action payload.
-  if (!account && !isAction && !adminRouteWithSession) {
+  if (!resolvedAccount && !isAction && !adminRouteWithSession) {
     return NextResponse.redirect(new URL('/', request.url))
   }
 
@@ -272,8 +280,8 @@ export async function middleware(request: NextRequest) {
     },
   })
 
-  if (account) {
-    applyAccountHeaders(requestHeaders, brandedResponse, account, pathname)
+  if (resolvedAccount) {
+    applyAccountHeaders(requestHeaders, brandedResponse, resolvedAccount, pathname)
   } else if (verifiedAdmin?.accountId) {
     applySessionFallbackHeaders(
       requestHeaders,
@@ -296,7 +304,7 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/auth/login', request.url))
     }
 
-    if (account && String(payload.accountId) !== String(account.id)) {
+    if (resolvedAccount && String(payload.accountId) !== String(resolvedAccount.id)) {
       return NextResponse.redirect(new URL('/auth/login', request.url))
     }
 
@@ -304,7 +312,9 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/admin/dashboard', request.url))
     }
 
-    const onboardingIncomplete = account ? !account.onboarding_completed_at : true
+    const onboardingIncomplete = resolvedAccount
+      ? !resolvedAccount.onboarding_completed_at
+      : false
 
     // Onboarding gate: an owner whose account hasn't completed onboarding
     // is held on /admin/onboarding regardless of what /admin/* path they
@@ -333,7 +343,7 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/auth/portal-login', request.url))
     }
 
-    if (!account || String(payload.accountId) !== String(account.id)) {
+    if (!resolvedAccount || String(payload.accountId) !== String(resolvedAccount.id)) {
       return NextResponse.redirect(new URL('/auth/portal-login', request.url))
     }
   }

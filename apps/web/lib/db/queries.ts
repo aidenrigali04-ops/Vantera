@@ -1,11 +1,14 @@
 import { db } from '@/lib/db/client'
 import {
   accounts,
+  activities,
   automations,
   contactTypeEnum,
   contacts,
+  intelligenceSignals,
   records,
   stageDefinitions,
+  users,
 } from '@vantera/db'
 import { and, asc, desc, eq, ilike, isNull, or, sql } from 'drizzle-orm'
 
@@ -165,4 +168,134 @@ export async function getActiveAutomations(accountId: string, triggerEvent: stri
         isNull(automations.deletedAt),
       ),
     )
+}
+
+export async function countContactsByType(accountId: string) {
+  const rows = await db
+    .select({
+      type: contacts.type,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(contacts)
+    .where(and(eq(contacts.accountId, accountId), isNull(contacts.deletedAt)))
+    .groupBy(contacts.type)
+
+  return Object.fromEntries(rows.map((row) => [row.type, row.count])) as Record<string, number>
+}
+
+export async function findContactActivities(accountId: string, contactId: string, limit = 20) {
+  return db
+    .select()
+    .from(activities)
+    .where(and(eq(activities.accountId, accountId), eq(activities.contactId, contactId)))
+    .orderBy(desc(activities.createdAt))
+    .limit(limit)
+}
+
+export async function countOpenRecordsForContact(accountId: string, contactId: string) {
+  const [row] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(records)
+    .where(
+      and(
+        eq(records.accountId, accountId),
+        eq(records.contactId, contactId),
+        isNull(records.deletedAt),
+        isNull(records.completedAt),
+      ),
+    )
+
+  return row?.count ?? 0
+}
+
+export async function findRecordsForContact(accountId: string, contactId: string, limit = 10) {
+  return db
+    .select()
+    .from(records)
+    .where(
+      and(
+        eq(records.accountId, accountId),
+        eq(records.contactId, contactId),
+        isNull(records.deletedAt),
+      ),
+    )
+    .orderBy(desc(records.createdAt))
+    .limit(limit)
+}
+
+export async function findSignalsForContact(accountId: string, contactId: string, limit = 5) {
+  return db
+    .select()
+    .from(intelligenceSignals)
+    .where(
+      and(
+        eq(intelligenceSignals.accountId, accountId),
+        eq(intelligenceSignals.contactId, contactId),
+        eq(intelligenceSignals.isDismissed, false),
+      ),
+    )
+    .orderBy(desc(intelligenceSignals.createdAt))
+    .limit(limit)
+}
+
+export async function findRecordsWithRelations(
+  accountId: string,
+  filters?: Parameters<typeof findRecords>[1],
+) {
+  const rows = await findRecords(accountId, filters)
+
+  return Promise.all(
+    rows.map(async (record) => {
+      const [contact] = await db
+        .select()
+        .from(contacts)
+        .where(eq(contacts.id, record.contactId))
+        .limit(1)
+      const [stage] = await db
+        .select()
+        .from(stageDefinitions)
+        .where(eq(stageDefinitions.id, record.stageId))
+        .limit(1)
+
+      return { ...record, contact: contact ?? null, stage: stage ?? null }
+    }),
+  )
+}
+
+export async function findRecordWithRelations(accountId: string, recordId: string) {
+  const record = await findRecord(accountId, recordId)
+  if (!record) return null
+
+  const [contact] = await db
+    .select()
+    .from(contacts)
+    .where(eq(contacts.id, record.contactId))
+    .limit(1)
+  const [stage] = await db
+    .select()
+    .from(stageDefinitions)
+    .where(eq(stageDefinitions.id, record.stageId))
+    .limit(1)
+
+  const recordActivities = await db
+    .select()
+    .from(activities)
+    .where(and(eq(activities.accountId, accountId), eq(activities.recordId, recordId)))
+    .orderBy(desc(activities.createdAt))
+    .limit(50)
+
+  return {
+    ...record,
+    contact: contact ?? null,
+    stage: stage ?? null,
+    activities: recordActivities,
+  }
+}
+
+export async function findUsersForAccount(accountId: string) {
+  return db
+    .select()
+    .from(users)
+    .where(and(eq(users.accountId, accountId), isNull(users.deletedAt), eq(users.isActive, true)))
+    .orderBy(asc(users.fullName))
 }

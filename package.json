@@ -22,7 +22,9 @@
     "db:audit-accounts": "dotenv -e .env -- tsx packages/db/scripts/audit-accounts.ts",
     "db:wipe-test-accounts": "dotenv -e .env -- tsx packages/db/scripts/wipe-test-accounts.ts",
     "trigger:dev": "dotenv -e .env -- trigger dev",
-    "trigger:deploy": "dotenv -e .env -- trigger deploy"
+    "trigger:deploy": "dotenv -e .env -- trigger deploy",
+    "larry:run": "pnpm exec dotenv -e .env -- pnpm exec tsx --tsconfig apps/web/tsconfig.json apps/web/lib/debug/run-cli.ts",
+    "debug:run": "pnpm exec dotenv -e .env -- pnpm exec tsx --tsconfig apps/web/tsconfig.json apps/web/lib/debug/run-cli.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.9.0",

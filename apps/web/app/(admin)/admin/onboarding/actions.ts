@@ -1,6 +1,7 @@
 'use server'
 
 import { bootstrapBusinessContext } from '@/lib/ai'
+import { seedSampleWorkspaceIfEmpty } from '@/lib/sample-data/seed'
 import { personalizeVoiceWithAI } from '@/lib/ai/personalize-voice'
 import { getAdminSession } from '@/lib/auth/session'
 import type { ActionResult } from '@/lib/auth/types'
@@ -46,9 +47,13 @@ type Role = (typeof ROLE_VALUES)[number]
 const HEX_COLOR = /^#[0-9a-fA-F]{6}$/
 const DOMAIN_REGEX = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/
 
-const PROVIDERS_WITH_VALIDATION = ['stripe', 'twilio'] as const
-const PROVIDERS_OAUTH_PLACEHOLDER = ['quickbooks', 'google_calendar', 'hubspot', 'gohighlevel'] as const
-type Provider = (typeof PROVIDERS_WITH_VALIDATION)[number] | (typeof PROVIDERS_OAUTH_PLACEHOLDER)[number]
+type Provider =
+  | 'stripe'
+  | 'twilio'
+  | 'quickbooks'
+  | 'google_calendar'
+  | 'hubspot'
+  | 'gohighlevel'
 
 function err(message: string): ActionResult<never> {
   return { success: false, error: message }
@@ -280,7 +285,7 @@ async function buildOnboardingProfile(
 }
 
 const HTTPS_URL = /^https?:\/\/[^\s]+$/i
-const PHONE_REGEX = /^[+0-9 ()\-]{7,30}$/
+const PHONE_REGEX = /^[+0-9 ()-]{7,30}$/
 
 const businessProfileSchema = z
   .object({
@@ -590,7 +595,9 @@ export async function applyVerticalTemplate(
 
 const inviteSchema = z.object({
   email: z.string().email('Invalid email address'),
-  role: z.enum(ROLE_VALUES, { errorMap: () => ({ message: 'Invalid role' }) }),
+  role: z.enum(ROLE_VALUES, { errorMap: () => ({ message: 'Invalid role' }) }).refine((r) => r !== 'owner', {
+    message: 'Cannot invite another owner — each workspace has one owner',
+  }),
 })
 
 export async function inviteTeamMembers(
@@ -836,12 +843,17 @@ export async function saveIntegrationCredentials(
 
 export async function completeOnboarding(
   accountId: string,
-): Promise<ActionResult<{ completed: true }>> {
+): Promise<ActionResult<{ completed: true; autoAppliedTemplate?: boolean }>> {
   try {
     const { session } = await assertOwnAccount(accountId)
 
     if (session.role !== 'owner') {
       return err('Only the account owner can complete onboarding')
+    }
+
+    const pipeline = await ensurePipelineReady(accountId, session.userId)
+    if (!pipeline.success) {
+      return err(pipeline.error ?? 'Pipeline setup required before finishing onboarding')
     }
 
     await db
@@ -862,9 +874,62 @@ export async function completeOnboarding(
       /* swallow — workflow already logs */
     })
 
-    return { success: true, data: { completed: true } }
+    // Signup promises "Start with sample data" — seed demo content if the
+    // workspace is still empty after the wizard (non-fatal if it fails).
+    void seedSampleWorkspaceIfEmpty(accountId).catch((err) => {
+      console.error('[completeOnboarding] sample seed failed:', err)
+    })
+
+    return { success: true, data: { completed: true, autoAppliedTemplate: pipeline.data?.autoAppliedTemplate } }
   } catch (error) {
     rethrowFrameworkSignals(error)
     return err(error instanceof Error ? error.message : 'Failed to complete onboarding')
   }
+}
+
+async function ensurePipelineReady(
+  accountId: string,
+  ownerUserId: string,
+): Promise<ActionResult<{ autoAppliedTemplate: boolean }>> {
+  const [existingStage] = await db
+    .select({ id: stageDefinitions.id })
+    .from(stageDefinitions)
+    .where(eq(stageDefinitions.accountId, accountId))
+    .limit(1)
+
+  if (existingStage) {
+    return { success: true, data: { autoAppliedTemplate: false } }
+  }
+
+  const [account] = await db
+    .select({
+      vertical: accounts.vertical,
+      activeTemplateId: accounts.activeTemplateId,
+    })
+    .from(accounts)
+    .where(eq(accounts.id, accountId))
+    .limit(1)
+
+  if (!account) {
+    return err('Account not found')
+  }
+
+  let templateId = account.activeTemplateId
+  if (!templateId) {
+    const [defaultTemplate] = await db
+      .select({ id: verticalTemplates.id })
+      .from(verticalTemplates)
+      .where(
+        and(eq(verticalTemplates.vertical, account.vertical), eq(verticalTemplates.isActive, true)),
+      )
+      .limit(1)
+    templateId = defaultTemplate?.id ?? null
+  }
+
+  if (!templateId) {
+    return err('Apply a workflow template in step 4 before finishing setup.')
+  }
+
+  await applyTemplateForAccount(accountId, templateId, ownerUserId)
+  return { success: true, data: { autoAppliedTemplate: true } }
 }

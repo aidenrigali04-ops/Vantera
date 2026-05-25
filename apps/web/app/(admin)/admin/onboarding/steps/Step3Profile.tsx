@@ -59,7 +59,7 @@ function fmtHour(h: number): string {
 }
 
 const HTTPS_URL = /^https?:\/\/[^\s]+$/i
-const PHONE_REGEX = /^[+0-9 ()\-]{7,30}$/
+const PHONE_REGEX = /^[+0-9 ()-]{7,30}$/
 
 type Props = {
   accountId: string

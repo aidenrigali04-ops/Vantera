@@ -1,5 +1,6 @@
 import { requireAdminSession } from '@/lib/auth/require-session'
 import { getBrandingFromHeaders } from '@/lib/branding/server'
+import { isOnboardingCompleteForAccount } from '@/lib/onboarding/status'
 import { getDashboardSnapshot } from '@/lib/sample-data/queries'
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
@@ -14,8 +15,14 @@ export default async function AdminDashboardPage() {
   // Belt-and-suspenders: middleware already gates /admin/* for un-onboarded
   // owners, but if the matcher ever changes or the cached headers are stale,
   // we'd rather force them through the wizard than render an empty dashboard.
-  if (session.role === 'owner' && !branding.onboardingComplete) {
-    redirect('/admin/onboarding')
+  if (session.role === 'owner') {
+    let onboardingComplete = branding.onboardingComplete
+    if (!branding.onboardingKnown) {
+      onboardingComplete = await isOnboardingCompleteForAccount(session.accountId)
+    }
+    if (!onboardingComplete) {
+      redirect('/admin/onboarding')
+    }
   }
 
   const snapshot = await getDashboardSnapshot(session.accountId)

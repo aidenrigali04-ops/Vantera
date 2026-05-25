@@ -1,12 +1,12 @@
 import { AdminShell } from '@/components/admin/AdminShell'
 import { ReactQueryProvider } from '@/components/shared/ReactQueryProvider'
-import { isAiEnabled } from '@/lib/ai'
 import { requireAdminSession } from '@/lib/auth/require-session'
 import { BrandingProvider } from '@/lib/branding/context'
 import { getBrandingFromHeaders } from '@/lib/branding/server'
 import { FeatureFlagProvider } from '@/lib/feature-flags/context'
 import { evaluateAllFlags } from '@/lib/feature-flags/evaluate'
 import type { Plan } from '@/lib/feature-flags/flags'
+import { isOnboardingCompleteForAccount } from '@/lib/onboarding/status'
 import { hasSampleDataForAccount } from '@/lib/sample-data/queries'
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
@@ -30,12 +30,14 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   //     deployment swaps).
   // Owners with onboarding_completed_at = NULL get redirected back to the
   // wizard; non-owner roles never see the wizard so they bypass.
-  if (
-    session.role === 'owner' &&
-    !branding.onboardingComplete &&
-    !isOnboardingRoute
-  ) {
-    redirect('/admin/onboarding')
+  if (session.role === 'owner' && !isOnboardingRoute) {
+    let onboardingComplete = branding.onboardingComplete
+    if (!branding.onboardingKnown) {
+      onboardingComplete = await isOnboardingCompleteForAccount(session.accountId)
+    }
+    if (!onboardingComplete) {
+      redirect('/admin/onboarding')
+    }
   }
 
   let flags
@@ -61,15 +63,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
     <BrandingProvider branding={branding}>
       <FeatureFlagProvider flags={flags}>
         <ReactQueryProvider>
-          <AdminShell
-            session={session}
-            hasSampleData={hasSampleData}
-            bare={isOnboardingRoute}
-            businessName={branding.businessName || 'Your workspace'}
-            logoUrl={branding.logoUrl}
-            primaryColor={branding.primaryColor || '#1648A0'}
-            aiEnabled={isAiEnabled()}
-          >
+          <AdminShell session={session} hasSampleData={hasSampleData} bare={isOnboardingRoute}>
             {children}
           </AdminShell>
         </ReactQueryProvider>
