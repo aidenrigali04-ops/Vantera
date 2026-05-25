@@ -290,9 +290,25 @@ export async function signupAction(
     .maybeSingle()
 
   if (existingUser) {
-    return {
-      success: false,
-      error: 'An account with this email already exists. Try signing in.',
+    const { clearOrphanedAppAccountForEmail } = await import('@/lib/auth/reconcile-orphan')
+    const orphanCleanup = await clearOrphanedAppAccountForEmail(
+      admin,
+      normalizedEmail,
+      existingUser.account_id,
+    )
+
+    if (orphanCleanup.error) {
+      return {
+        success: false,
+        error: 'This email has leftover account data that could not be cleared. Contact support.',
+      }
+    }
+
+    if (!orphanCleanup.cleared) {
+      return {
+        success: false,
+        error: 'An account with this email already exists. Try signing in.',
+      }
     }
   }
 

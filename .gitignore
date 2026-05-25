@@ -28,3 +28,8 @@ packages/db/migrations/meta
 
 # Trigger.dev
 .trigger
+
+# Local reference docs and ad-hoc scripts (not part of repo)
+*.docx
+*.pdf
+packages/db/scripts/test-update-vertical.ts
