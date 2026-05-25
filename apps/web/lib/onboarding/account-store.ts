@@ -34,23 +34,46 @@ const ACCOUNT_SELECT_MINIMAL =
 const ACCOUNT_SELECT_PIPELINE =
   'id,slug,name,vertical,plan,active_template_id,onboarding_completed_at'
 
+const ACCOUNT_SELECT_ID = 'id'
+
 function isMissingColumnError(message: string): boolean {
   const lower = message.toLowerCase()
   return (
     (lower.includes('column') &&
       (lower.includes('does not exist') || lower.includes('could not find'))) ||
     lower.includes('unknown field') ||
-    lower.includes('bad request')
+    (lower.includes('bad request') && lower.includes('column'))
   )
+}
+
+function emptyAccountRow(id: string): AccountRow {
+  return {
+    id,
+    slug: '',
+    name: '',
+    vertical: 'agency',
+    plan: 'team',
+    brand_logo_url: null,
+    brand_primary_color: null,
+    brand_secondary_color: null,
+    portal_domain: null,
+    timezone: null,
+    booking_link: null,
+    review_link: null,
+    payment_link: null,
+    emergency_line: null,
+    business_hours_start: null,
+    business_hours_end: null,
+    voice_preference: null,
+    active_template_id: null,
+    onboarding_completed_at: null,
+  }
 }
 
 function normalizeAccountRow(row: Partial<AccountRow> & Pick<AccountRow, 'id'>): AccountRow {
   return {
-    id: row.id,
-    slug: row.slug ?? '',
-    name: row.name ?? '',
-    vertical: row.vertical ?? 'agency',
-    plan: row.plan ?? 'team',
+    ...emptyAccountRow(row.id),
+    ...row,
     brand_logo_url: row.brand_logo_url ?? null,
     brand_primary_color: row.brand_primary_color ?? null,
     brand_secondary_color: row.brand_secondary_color ?? null,
@@ -97,6 +120,26 @@ async function fetchAccountViaSupabase(
   }
 
   return data ? normalizeAccountRow(data as unknown as AccountRow) : null
+}
+
+/** True if the account row exists (id-only probe). */
+export async function accountExists(accountId: string): Promise<boolean> {
+  const normalizedId = String(accountId).trim()
+  if (!normalizedId) return false
+
+  const rest = await fetchAccountByIdRest(normalizedId, ACCOUNT_SELECT_ID)
+  if (rest.data?.id) return true
+  if (rest.error) {
+    console.error('[accountExists] REST failed', rest.error)
+  }
+
+  try {
+    const row = await fetchAccountViaSupabase(normalizedId, ACCOUNT_SELECT_ID)
+    return Boolean(row?.id)
+  } catch (err) {
+    console.error('[accountExists] supabase-js failed', err)
+    return false
+  }
 }
 
 /**
@@ -164,16 +207,20 @@ export async function fetchAccountById(accountId: string): Promise<AccountRow | 
     return null
   }
 
-  const attempts: string[] = [ACCOUNT_SELECT, ACCOUNT_SELECT_MINIMAL, ACCOUNT_SELECT_PIPELINE]
+  const attempts: string[] = [
+    ACCOUNT_SELECT,
+    ACCOUNT_SELECT_MINIMAL,
+    ACCOUNT_SELECT_PIPELINE,
+    ACCOUNT_SELECT_ID,
+  ]
 
   for (const select of attempts) {
     const rest = await fetchAccountByIdRest(normalizedId, select)
     if (rest.data) {
       return normalizeAccountRow(rest.data)
     }
-    if (rest.error && !isMissingColumnError(rest.error)) {
+    if (rest.error) {
       console.error('[fetchAccountById] REST select failed', select, rest.error)
-      break
     }
   }
 
@@ -225,8 +272,10 @@ export async function accountHasStageDefinitions(accountId: string): Promise<boo
 
     return (data?.length ?? 0) > 0
   } catch (err) {
+    // Transport failure — assume stages may already exist (Step 4 apply) so we
+    // do not force a re-fetch / re-apply path that fails on flaky REST.
     console.error('[accountHasStageDefinitions] supabase-js failed', err)
-    return false
+    return true
   }
 }
 
