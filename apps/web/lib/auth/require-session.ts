@@ -1,7 +1,8 @@
 import { getBrandingFromHeaders } from '@/lib/branding/server'
 import type { BrandingData } from '@/lib/branding/context'
-import { getAdminSession, getPortalSession } from '@/lib/auth/session'
+import { getAdminSession, getPortalSession, setAdminSession } from '@/lib/auth/session'
 import type { AdminSession, PortalSession } from '@/lib/auth/types'
+import { resolveWorkspaceAccountId } from '@/lib/onboarding/account-store'
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 
@@ -12,6 +13,18 @@ export class UnauthorizedError extends Error {
   }
 }
 
+async function syncSessionAccountId(session: AdminSession): Promise<AdminSession> {
+  const resolvedAccountId = await resolveWorkspaceAccountId(session.userId, session.accountId)
+
+  if (!resolvedAccountId || resolvedAccountId === session.accountId) {
+    return session
+  }
+
+  const synced: AdminSession = { ...session, accountId: resolvedAccountId }
+  await setAdminSession(synced)
+  return synced
+}
+
 export async function requireAdminSession(): Promise<AdminSession> {
   const session = await getAdminSession()
 
@@ -19,19 +32,9 @@ export async function requireAdminSession(): Promise<AdminSession> {
     redirect('/auth/login')
   }
 
-  const branding = getBrandingFromHeaders(headers())
+  const syncedSession = await syncSessionAccountId(session)
 
-  // Session-fallback headers (post-signup on apex / *.vercel.app) only carry
-  // x-account-id — skip the mismatch gate until middleware resolves the tenant.
-  if (
-    branding.onboardingKnown &&
-    branding.accountId &&
-    String(session.accountId) !== String(branding.accountId)
-  ) {
-    redirect('/auth/login')
-  }
-
-  return session
+  return syncedSession
 }
 
 export async function requirePortalSession(): Promise<PortalSession> {

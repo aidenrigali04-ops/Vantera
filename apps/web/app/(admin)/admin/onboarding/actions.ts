@@ -3,11 +3,12 @@
 import { bootstrapBusinessContext } from '@/lib/ai'
 import { seedSampleWorkspaceIfEmpty } from '@/lib/sample-data/seed'
 import { personalizeVoiceWithAI } from '@/lib/ai/personalize-voice'
-import { getAdminSession } from '@/lib/auth/session'
+import { getAdminSession, setAdminSession } from '@/lib/auth/session'
 import type { ActionResult } from '@/lib/auth/types'
 import { db } from '@/lib/db/client'
 import { env, requireEnv } from '@/lib/env'
 import {
+  accountExists,
   fetchAccountById,
   markOnboardingComplete,
   patchAccountRow,
@@ -112,6 +113,7 @@ async function assertOwnAccount(): Promise<{
       resolvedAccountId: accountId,
       userId: session.userId,
     })
+    await setAdminSession({ ...session, accountId })
   }
 
   return { session: { ...session, accountId }, accountId }
@@ -853,8 +855,23 @@ export async function completeOnboarding(
       return err('Only the account owner can complete onboarding')
     }
 
+    const exists = await accountExists(workspaceId)
+    if (!exists) {
+      console.error('[completeOnboarding] workspace row missing', {
+        workspaceId,
+        userId: session.userId,
+        email: session.email,
+      })
+      return err('Your workspace could not be found. Sign out, sign in again, and retry.')
+    }
+
     const marked = await markOnboardingComplete(workspaceId)
     if (!marked.ok) {
+      console.error('[completeOnboarding] markOnboardingComplete failed', {
+        workspaceId,
+        userId: session.userId,
+        message: marked.message,
+      })
       return err(marked.message)
     }
 

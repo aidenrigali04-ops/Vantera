@@ -1,8 +1,13 @@
 import { db } from '@/lib/db/client'
+import {
+  accountExistsViaSql,
+  lookupUserAccountIdViaSql,
+  markAccountOnboardingCompleteViaSql,
+} from '@/lib/db/direct-sql'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { supabaseServiceRest, supabaseServiceRestSingle } from '@/lib/supabase/service-rest'
-import { accounts } from '@vantera/db'
-import { eq } from 'drizzle-orm'
+import { accounts, users } from '@vantera/db'
+import { and, eq, isNull } from 'drizzle-orm'
 
 type PatchResult = { ok: true } | { ok: false; message: string }
 
@@ -130,6 +135,14 @@ export async function accountExists(accountId: string): Promise<boolean> {
   const normalizedId = String(accountId).trim()
   if (!normalizedId) return false
 
+  try {
+    if (await accountExistsViaSql(normalizedId)) {
+      return true
+    }
+  } catch (err) {
+    console.error('[accountExists] direct SQL failed', err)
+  }
+
   const rest = await fetchAccountByIdRest(normalizedId, ACCOUNT_SELECT_ID)
   if (rest.data?.id) return true
   if (rest.error) {
@@ -186,7 +199,10 @@ export async function patchAccountRow(
   })
 
   if (!minimalPatch.error) {
-    return { ok: true }
+    const verify = await fetchAccountByIdRest(normalizedId, ACCOUNT_SELECT_ID)
+    if (verify.data?.id) {
+      return { ok: true }
+    }
   }
 
   console.error('[patchAccountRow] REST PATCH (minimal) failed', minimalPatch.error)
@@ -307,6 +323,31 @@ export async function resolveWorkspaceAccountId(
     return normalizedFallback
   }
 
+  // 1) Direct SQL — most reliable on Vercel serverless.
+  try {
+    const sqlAccountId = await lookupUserAccountIdViaSql(normalizedUserId)
+    if (sqlAccountId) {
+      return sqlAccountId
+    }
+  } catch (err) {
+    console.error('[resolveWorkspaceAccountId] direct SQL failed', err)
+  }
+
+  // 2) Drizzle
+  try {
+    const [row] = await db
+      .select({ accountId: users.accountId })
+      .from(users)
+      .where(and(eq(users.id, normalizedUserId), isNull(users.deletedAt)))
+      .limit(1)
+
+    if (row?.accountId) {
+      return String(row.accountId).trim()
+    }
+  } catch (err) {
+    console.error('[resolveWorkspaceAccountId] Drizzle failed', err)
+  }
+
   try {
     const admin = getSupabaseAdmin()
     const { data, error } = await admin
@@ -359,7 +400,34 @@ export async function markOnboardingComplete(accountId: string): Promise<PatchRe
     onboarding_completed_at: timestamp,
   }
 
-  // 1) supabase-js — same transport that creates accounts at signup.
+  // 1) Direct SQL — bypasses Supabase client / PostgREST entirely.
+  try {
+    if (await markAccountOnboardingCompleteViaSql(normalizedId, timestamp)) {
+      return { ok: true }
+    }
+  } catch (err) {
+    console.error('[markOnboardingComplete] direct SQL threw', err)
+  }
+
+  // 2) Drizzle
+  try {
+    const rows = await db
+      .update(accounts)
+      .set({
+        onboardingCompletedAt: new Date(timestamp),
+        updatedAt: new Date(),
+      })
+      .where(eq(accounts.id, normalizedId))
+      .returning({ id: accounts.id, onboardingCompletedAt: accounts.onboardingCompletedAt })
+
+    if (rows.length > 0 && rows[0]?.onboardingCompletedAt) {
+      return { ok: true }
+    }
+  } catch (err) {
+    console.error('[markOnboardingComplete] Drizzle failed', err)
+  }
+
+  // 3) supabase-js — same transport that creates accounts at signup.
   try {
     const admin = getSupabaseAdmin()
     const { data, error } = await admin
@@ -418,22 +486,7 @@ export async function markOnboardingComplete(accountId: string): Promise<PatchRe
     }
   }
 
-  try {
-    const rows = await db
-      .update(accounts)
-      .set({
-        onboardingCompletedAt: new Date(timestamp),
-        updatedAt: new Date(),
-      })
-      .where(eq(accounts.id, normalizedId))
-      .returning({ id: accounts.id, onboardingCompletedAt: accounts.onboardingCompletedAt })
-
-    if (rows.length > 0 && rows[0]?.onboardingCompletedAt) {
-      return { ok: true }
-    }
-  } catch (err) {
-    console.error('[markOnboardingComplete] Drizzle failed', err)
-  }
+  console.error('[markOnboardingComplete] all strategies failed', { accountId: normalizedId })
 
   return {
     ok: false,
