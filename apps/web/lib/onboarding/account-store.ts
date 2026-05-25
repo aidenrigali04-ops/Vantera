@@ -27,6 +27,14 @@ export type AccountRow = {
 const ACCOUNT_SELECT =
   'id, slug, name, vertical, plan, brand_logo_url, brand_primary_color, brand_secondary_color, portal_domain, timezone, booking_link, review_link, payment_link, emergency_line, business_hours_start, business_hours_end, voice_preference, active_template_id, onboarding_completed_at'
 
+const ACCOUNT_SELECT_MINIMAL =
+  'id, slug, name, vertical, plan, brand_logo_url, brand_primary_color, brand_secondary_color, portal_domain, timezone, onboarding_completed_at'
+
+function isMissingColumnError(message: string): boolean {
+  const lower = message.toLowerCase()
+  return lower.includes('column') && (lower.includes('does not exist') || lower.includes('could not find'))
+}
+
 /**
  * Patch an account row via the Supabase service-role client — the same
  * transport signup uses. Avoids relying on DATABASE_URL / Drizzle in
@@ -38,23 +46,27 @@ export async function patchAccountRow(
   patch: Record<string, string | number | boolean | null>,
 ): Promise<PatchResult> {
   const admin = getSupabaseAdmin()
+  const normalizedId = String(accountId).trim()
 
-  const { data, error } = await admin
+  if (!normalizedId) {
+    return { ok: false, message: 'Invalid workspace id' }
+  }
+
+  const existing = await fetchAccountById(normalizedId)
+  if (!existing) {
+    return { ok: false, message: 'Account not found' }
+  }
+
+  const { error } = await admin
     .from('accounts')
     .update({
       ...patch,
       updated_at: new Date().toISOString(),
     })
-    .eq('id', accountId)
-    .select('id')
-    .maybeSingle()
+    .eq('id', normalizedId)
 
   if (error) {
     return { ok: false, message: error.message }
-  }
-
-  if (!data) {
-    return { ok: false, message: 'Account not found' }
   }
 
   return { ok: true }
@@ -63,27 +75,59 @@ export async function patchAccountRow(
 /** Load a tenant account by id through the service-role client. */
 export async function fetchAccountById(accountId: string): Promise<AccountRow | null> {
   const admin = getSupabaseAdmin()
+  const normalizedId = String(accountId).trim()
+
+  if (!normalizedId) {
+    return null
+  }
 
   const { data, error } = await admin
     .from('accounts')
     .select(ACCOUNT_SELECT)
-    .eq('id', accountId)
+    .eq('id', normalizedId)
     .maybeSingle()
 
-  if (error) {
-    throw new Error(error.message)
+  if (!error) {
+    return (data as AccountRow | null) ?? null
   }
 
-  return (data as AccountRow | null) ?? null
+  if (isMissingColumnError(error.message)) {
+    const { data: minimal, error: minimalError } = await admin
+      .from('accounts')
+      .select(ACCOUNT_SELECT_MINIMAL)
+      .eq('id', normalizedId)
+      .maybeSingle()
+
+    if (minimalError) {
+      throw new Error(minimalError.message)
+    }
+
+    if (!minimal) return null
+
+    return {
+      ...(minimal as AccountRow),
+      booking_link: null,
+      review_link: null,
+      payment_link: null,
+      emergency_line: null,
+      business_hours_start: null,
+      business_hours_end: null,
+      voice_preference: null,
+      active_template_id: null,
+    }
+  }
+
+  throw new Error(error.message)
 }
 
 export async function accountHasStageDefinitions(accountId: string): Promise<boolean> {
   const admin = getSupabaseAdmin()
+  const normalizedId = String(accountId).trim()
 
   const { data, error } = await admin
     .from('stage_definitions')
     .select('id')
-    .eq('account_id', accountId)
+    .eq('account_id', normalizedId)
     .limit(1)
 
   if (error) {

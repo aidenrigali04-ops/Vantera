@@ -22,6 +22,7 @@
     "db:audit-accounts": "dotenv -e .env -- tsx packages/db/scripts/audit-accounts.ts",
     "db:wipe-test-accounts": "dotenv -e .env -- tsx packages/db/scripts/wipe-test-accounts.ts",
     "db:wipe-except": "dotenv -e .env -- tsx packages/db/scripts/wipe-except-keeper.ts",
+    "db:debug-onboarding": "dotenv -e .env -- tsx packages/db/scripts/debug-onboarding-complete.ts",
     "trigger:dev": "dotenv -e .env -- trigger dev",
     "trigger:deploy": "dotenv -e .env -- trigger deploy",
     "larry:run": "pnpm exec dotenv -e .env -- pnpm exec tsx --tsconfig apps/web/tsconfig.json apps/web/lib/debug/run-cli.ts",

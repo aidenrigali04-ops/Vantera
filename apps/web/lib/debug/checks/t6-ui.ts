@@ -1,6 +1,8 @@
 import { env } from '@/lib/env'
 import { fetchAccountById } from '@/lib/onboarding/account-store'
+import { resolveSessionWorkspace } from '@/lib/onboarding/resolve-session-workspace'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
+import type { AdminSession } from '@/lib/auth/types'
 import type { TestResult } from '../types'
 import { getDebugTestConfig } from '../config'
 import { fetchAppPath, fetchWithTimeout, getAdminSql, probeAppHealth } from '../utils'
@@ -229,6 +231,89 @@ export async function runUiChecks(): Promise<TestResult[]> {
       category: 'ui',
       severity: 'high',
       error: error instanceof Error ? error.message : 'onboarding probe failed',
+      fixable: false,
+    })
+  }
+
+  // T6.7 — Session workspace binds to live users + accounts rows (Complete setup guard)
+  try {
+    const admin = getSupabaseAdmin()
+    const { data: owner } = await admin
+      .from('users')
+      .select('id, account_id, email, role')
+      .eq('role', 'owner')
+      .is('deleted_at', null)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (!owner?.account_id) {
+      results.push({
+        id: 'T6.7',
+        module: 'T6',
+        name: 'Onboarding session workspace binding',
+        status: 'skip',
+        category: 'ui',
+        severity: 'high',
+        error: 'No owner user in database',
+        fixable: false,
+      })
+    } else {
+      const session: AdminSession = {
+        type: 'admin',
+        userId: owner.id,
+        accountId: owner.account_id,
+        role: owner.role as AdminSession['role'],
+        email: owner.email,
+      }
+
+      const workspace = await resolveSessionWorkspace(session, { refreshSession: false })
+      const ok =
+        workspace.accountId === owner.account_id &&
+        workspace.account.id === owner.account_id &&
+        Boolean(workspace.account.slug)
+
+      results.push({
+        id: 'T6.7',
+        module: 'T6',
+        name: 'Onboarding session workspace binding',
+        status: ok ? 'pass' : 'fail',
+        category: 'ui',
+        severity: 'high',
+        error: ok ? undefined : 'Session workspace could not bind owner to account row',
+        details: { accountId: workspace.accountId, slug: workspace.account.slug },
+        fixable: false,
+      })
+
+      // Stale JWT simulation — accountId in cookie does not match users row should self-heal
+      const staleSession: AdminSession = {
+        ...session,
+        accountId: '00000000-0000-0000-0000-000000000000',
+      }
+      const healed = await resolveSessionWorkspace(staleSession, { refreshSession: false })
+      results.push({
+        id: 'T6.7b',
+        module: 'T6',
+        name: 'Stale session accountId self-heals from users row',
+        status: healed.accountId === owner.account_id ? 'pass' : 'fail',
+        category: 'ui',
+        severity: 'high',
+        error:
+          healed.accountId === owner.account_id
+            ? undefined
+            : 'resolveSessionWorkspace did not heal stale accountId',
+        fixable: false,
+      })
+    }
+  } catch (error) {
+    results.push({
+      id: 'T6.7',
+      module: 'T6',
+      name: 'Onboarding session workspace binding',
+      status: 'fail',
+      category: 'ui',
+      severity: 'high',
+      error: error instanceof Error ? error.message : 'workspace binding probe failed',
       fixable: false,
     })
   }

@@ -13,6 +13,7 @@ import {
   markOnboardingComplete,
   patchAccountRow,
 } from '@/lib/onboarding/account-store'
+import { resolveSessionWorkspace } from '@/lib/onboarding/resolve-session-workspace'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import {
   integrationCredentials,
@@ -89,33 +90,28 @@ function rethrowFrameworkSignals(error: unknown): void {
   if (isNextRedirectError(error) || isNextNotFoundError(error)) throw error
 }
 
-async function assertOwnAccount(accountId: string): Promise<{ session: NonNullable<Awaited<ReturnType<typeof getAdminSession>>> }> {
-  // Read the session directly from the admin cookie — do NOT call
-  // requireAdminSession() here. That helper calls redirect() when the
-  // session is missing or the host branding doesn't match, and redirect()
-  // inside a Server Action leaves the client's fetch promise hanging
-  // indefinitely — the step button stays on "Saving…" forever with no
-  // error and no navigation. Return a structured error instead so the
-  // wizard can show a message and let the user retry or refresh.
+async function assertOwnAccount(): Promise<{
+  session: NonNullable<Awaited<ReturnType<typeof getAdminSession>>>
+  accountId: string
+}> {
   const session = await getAdminSession()
 
   if (!session) {
     throw new Error('Your session expired. Refresh the page and sign in again.')
   }
 
-  if (String(session.accountId) !== String(accountId)) {
-    throw new Error('Account mismatch. Refresh the page and try again.')
-  }
+  const workspace = await resolveSessionWorkspace(session)
 
-  return { session }
+  return { session: workspace.session, accountId: workspace.accountId }
 }
 
 export async function updateVertical(
-  accountId: string,
+  clientAccountId: string,
   vertical: string,
 ): Promise<ActionResult<{ vertical: Vertical }>> {
   try {
-    await assertOwnAccount(accountId)
+    void clientAccountId
+    const { accountId } = await assertOwnAccount()
 
     if (!VERTICAL_VALUES.includes(vertical as Vertical)) {
       return err('Invalid business type')
@@ -153,7 +149,8 @@ export async function updateBranding(
   },
 ): Promise<ActionResult<{ saved: true }>> {
   try {
-    await assertOwnAccount(accountId)
+    void accountId
+    const { accountId: workspaceId } = await assertOwnAccount()
 
     const parsed = brandingSchema.safeParse(data)
 
@@ -161,7 +158,7 @@ export async function updateBranding(
       return err(parsed.error.issues[0]?.message ?? 'Invalid branding data')
     }
 
-    const saved = await patchAccountRow(accountId, {
+    const saved = await patchAccountRow(workspaceId, {
       brand_logo_url: parsed.data.logoUrl ?? null,
       brand_primary_color: parsed.data.primaryColor,
       brand_secondary_color: parsed.data.secondaryColor,
@@ -318,9 +315,10 @@ export async function getBusinessProfile(
   accountId: string,
 ): Promise<ActionResult<BusinessProfileSnapshot>> {
   try {
-    await assertOwnAccount(accountId)
+    void accountId
+    const { accountId: workspaceId } = await assertOwnAccount()
 
-    const row = await fetchAccountById(accountId)
+    const row = await fetchAccountById(workspaceId)
 
     if (!row) {
       return err('Account not found')
@@ -349,7 +347,8 @@ export async function updateBusinessProfile(
   data: BusinessProfileInput,
 ): Promise<ActionResult<{ saved: true; rePersonalized: boolean }>> {
   try {
-    const { session } = await assertOwnAccount(accountId)
+    void accountId
+    const { session, accountId: workspaceId } = await assertOwnAccount()
 
     const parsed = businessProfileSchema.safeParse(data)
     if (!parsed.success) {
@@ -366,12 +365,12 @@ export async function updateBusinessProfile(
       emergencyLine: emptyToNull(parsed.data.emergencyLine),
     }
 
-    const account = await fetchAccountById(accountId)
+    const account = await fetchAccountById(workspaceId)
     if (!account) {
       return err('Account not found')
     }
 
-    const saved = await patchAccountRow(accountId, {
+    const saved = await patchAccountRow(workspaceId, {
       voice_preference: normalized.voicePreference,
       business_hours_start: normalized.businessHoursStart,
       business_hours_end: normalized.businessHoursEnd,
@@ -390,7 +389,7 @@ export async function updateBusinessProfile(
     let rePersonalized = false
     if (account.active_template_id) {
       try {
-        await applyTemplateForAccount(accountId, account.active_template_id, session.userId)
+        await applyTemplateForAccount(workspaceId, account.active_template_id, session.userId)
         rePersonalized = true
       } catch {
         rePersonalized = false
@@ -586,8 +585,9 @@ export async function applyVerticalTemplate(
   templateId: string,
 ): Promise<ActionResult<ApplyTemplateResult>> {
   try {
-    const { session } = await assertOwnAccount(accountId)
-    const result = await applyTemplateForAccount(accountId, templateId, session.userId)
+    void accountId
+    const { session, accountId: workspaceId } = await assertOwnAccount()
+    const result = await applyTemplateForAccount(workspaceId, templateId, session.userId)
     return { success: true, data: result }
   } catch (error) {
     rethrowFrameworkSignals(error)
@@ -607,7 +607,8 @@ export async function inviteTeamMembers(
   members: Array<{ email: string; role: string }>,
 ): Promise<ActionResult<{ invited: number }>> {
   try {
-    const { session } = await assertOwnAccount(accountId)
+    void accountId
+    const { session, accountId: workspaceId } = await assertOwnAccount()
 
     if (session.role !== 'owner') {
       return err('Only the account owner can invite team members')
@@ -632,7 +633,7 @@ export async function inviteTeamMembers(
       validated.push(result.data)
     }
 
-    const account = await fetchAccountById(accountId)
+    const account = await fetchAccountById(workspaceId)
 
     if (!account) {
       return err('Account not found')
@@ -648,12 +649,12 @@ export async function inviteTeamMembers(
       const [existing] = await db
         .select({ id: users.id })
         .from(users)
-        .where(and(eq(users.email, member.email), eq(users.accountId, accountId)))
+        .where(and(eq(users.email, member.email), eq(users.accountId, workspaceId)))
         .limit(1)
 
       if (!existing) {
         await db.insert(users).values({
-          accountId,
+          accountId: workspaceId,
           email: member.email,
           fullName: member.email.split('@')[0] ?? member.email,
           role: member.role,
@@ -728,7 +729,8 @@ export async function saveIntegrationCredentials(
   credentials: Record<string, string>,
 ): Promise<ActionResult<{ saved: true; rePersonalized: boolean }>> {
   try {
-    const { session } = await assertOwnAccount(accountId)
+    void accountId
+    const { session, accountId: workspaceId } = await assertOwnAccount()
 
     const parsed = credentialsSchema.safeParse({ provider, credentials })
 
@@ -789,7 +791,7 @@ export async function saveIntegrationCredentials(
     await db
       .insert(integrationCredentials)
       .values({
-        accountId,
+        accountId: workspaceId,
         provider: providerKey,
         accessToken,
         metadata,
@@ -813,11 +815,11 @@ export async function saveIntegrationCredentials(
     // integration-save failure for a downstream personalization issue).
     let rePersonalized = false
     if (providerKey === 'twilio' || providerKey === 'stripe') {
-      const acct = await fetchAccountById(accountId)
+      const acct = await fetchAccountById(workspaceId)
 
       if (acct?.active_template_id) {
         try {
-          await applyTemplateForAccount(accountId, acct.active_template_id, session.userId)
+          await applyTemplateForAccount(workspaceId, acct.active_template_id, session.userId)
           rePersonalized = true
         } catch {
           rePersonalized = false
@@ -836,18 +838,19 @@ export async function completeOnboarding(
   accountId: string,
 ): Promise<ActionResult<{ completed: true; autoAppliedTemplate?: boolean }>> {
   try {
-    const { session } = await assertOwnAccount(accountId)
+    void accountId
+    const { session, accountId: workspaceId } = await assertOwnAccount()
 
     if (session.role !== 'owner') {
       return err('Only the account owner can complete onboarding')
     }
 
-    const pipeline = await ensurePipelineReady(accountId, session.userId)
+    const pipeline = await ensurePipelineReady(workspaceId, session.userId)
     if (!pipeline.success) {
       return err(pipeline.error ?? 'Pipeline setup required before finishing onboarding')
     }
 
-    const marked = await markOnboardingComplete(accountId)
+    const marked = await markOnboardingComplete(workspaceId)
     if (!marked.ok) {
       return err(marked.message)
     }
@@ -861,13 +864,13 @@ export async function completeOnboarding(
     // redirect to /admin/dashboard never waits on Anthropic, and a failed
     // bootstrap is non-fatal (the workflow swallows its own errors and the
     // brain will retry on the next daily sweep).
-    void bootstrapBusinessContext(accountId, session.userId).catch(() => {
+    void bootstrapBusinessContext(workspaceId, session.userId).catch(() => {
       /* swallow — workflow already logs */
     })
 
     // Signup promises "Start with sample data" — seed demo content if the
     // workspace is still empty after the wizard (non-fatal if it fails).
-    void seedSampleWorkspaceIfEmpty(accountId).catch((err) => {
+    void seedSampleWorkspaceIfEmpty(workspaceId).catch((err) => {
       console.error('[completeOnboarding] sample seed failed:', err)
     })
 
