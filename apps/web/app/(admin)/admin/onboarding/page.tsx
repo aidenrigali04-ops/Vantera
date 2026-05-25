@@ -16,8 +16,10 @@ export default async function AdminOnboardingPage() {
 
   let workspace
   try {
-    workspace = await resolveSessionWorkspace(session)
-  } catch {
+    // RSC render cannot mutate cookies — refresh happens in server actions.
+    workspace = await resolveSessionWorkspace(session, { refreshSession: false })
+  } catch (err) {
+    console.error('[admin/onboarding] resolveSessionWorkspace failed', err)
     redirect('/auth/login?error=workspace_missing')
   }
 

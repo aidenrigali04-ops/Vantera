@@ -357,8 +357,10 @@ export async function signupAction(
     return { success: false, error: accountError?.message ?? 'Failed to create workspace' }
   }
 
-  // 4) Insert the owner user row.
+  // 4) Insert the owner user row — share the Supabase auth user id so the
+  //    session userId always matches a row we can look up after signup.
   const { error: userError } = await admin.from('users').insert({
+    id: authUserId,
     account_id: account.id,
     email: normalizedEmail,
     full_name: fullName,
@@ -372,20 +374,7 @@ export async function signupAction(
     return { success: false, error: userError.message }
   }
 
-  // 5) Look up the inserted user so we have its UUID for the session payload.
-  const { data: userRow } = await admin
-    .from('users')
-    .select('id')
-    .eq('account_id', account.id)
-    .eq('email', normalizedEmail)
-    .limit(1)
-    .maybeSingle()
-
-  if (!userRow) {
-    return { success: false, error: 'Failed to finalize account setup' }
-  }
-
-  // 6) Sign the user in via Supabase (sets Supabase's sb-* cookies) and then
+  // 5) Sign the user in via Supabase (sets Supabase's sb-* cookies) and then
   //    mint our own admin session cookie.
   const supabase = createSupabaseServerClient()
   const { error: signInError } = await supabase.auth.signInWithPassword({
@@ -399,7 +388,7 @@ export async function signupAction(
 
   await setAdminSession({
     type: 'admin',
-    userId: userRow.id,
+    userId: authUserId,
     accountId: account.id,
     role: 'owner',
     email: normalizedEmail,
@@ -408,7 +397,7 @@ export async function signupAction(
   if (process.env.NODE_ENV !== 'production') {
     console.log('[signupAction] minted admin session', {
       accountId: account.id,
-      userId: userRow.id,
+      userId: authUserId,
       email: normalizedEmail,
     })
   }
@@ -520,6 +509,7 @@ export async function completeOAuthSignupAction(
   }
 
   const { error: userInsertErr } = await admin.from('users').insert({
+    id: supaUser.id,
     account_id: account.id,
     email,
     full_name: fullName,
@@ -532,21 +522,9 @@ export async function completeOAuthSignupAction(
     return { success: false, error: userInsertErr.message }
   }
 
-  const { data: userRow } = await admin
-    .from('users')
-    .select('id')
-    .eq('account_id', account.id)
-    .eq('email', email)
-    .limit(1)
-    .maybeSingle()
-
-  if (!userRow) {
-    return { success: false, error: 'Failed to finalize account setup' }
-  }
-
   await setAdminSession({
     type: 'admin',
-    userId: userRow.id,
+    userId: supaUser.id,
     accountId: account.id,
     role: 'owner',
     email,

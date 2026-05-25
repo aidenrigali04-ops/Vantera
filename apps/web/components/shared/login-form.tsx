@@ -26,6 +26,17 @@ const loginSchema = z.object({
   password: z.string().min(8, 'Password must be at least 8 characters'),
 })
 
+const LOGIN_ERROR_MESSAGES: Record<string, string> = {
+  workspace_missing:
+    'We could not load your workspace after sign-up. Sign in with the email and password you just created.',
+}
+
+function resolveLoginError(raw: string | null): string | null {
+  if (!raw) return null
+  const decoded = decodeURIComponent(raw)
+  return LOGIN_ERROR_MESSAGES[decoded] ?? decoded
+}
+
 type LoginFormProps = {
   onSubmit: (values: z.infer<typeof loginSchema>) => Promise<{
     success: boolean
@@ -51,9 +62,7 @@ export function LoginForm({
 }: LoginFormProps) {
   const branding = useBranding()
   const searchParams = useSearchParams()
-  const [error, setError] = useState<string | null>(
-    searchParams?.get('error') ? decodeURIComponent(searchParams.get('error') ?? '') : null,
-  )
+  const [error, setError] = useState<string | null>(resolveLoginError(searchParams?.get('error') ?? null))
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const form = useForm<z.infer<typeof loginSchema>>({

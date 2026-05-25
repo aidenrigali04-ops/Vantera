@@ -21,7 +21,13 @@ export async function requireAdminSession(): Promise<AdminSession> {
 
   const branding = getBrandingFromHeaders(headers())
 
-  if (branding.accountId && String(session.accountId) !== String(branding.accountId)) {
+  // Session-fallback headers (post-signup on apex / *.vercel.app) only carry
+  // x-account-id — skip the mismatch gate until middleware resolves the tenant.
+  if (
+    branding.onboardingKnown &&
+    branding.accountId &&
+    String(session.accountId) !== String(branding.accountId)
+  ) {
     redirect('/auth/login')
   }
 
