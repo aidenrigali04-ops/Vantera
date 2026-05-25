@@ -148,7 +148,7 @@ export async function adminLoginAction(
   const redirectTo =
     !onboardingComplete && user.role === 'owner' ? '/admin/onboarding' : '/admin/dashboard'
 
-  redirect(redirectTo)
+  return { success: true, data: { redirectTo } }
 }
 
 function isOnboardingComplete(account: { onboarding_completed_at?: string | null }): boolean {
@@ -402,14 +402,11 @@ export async function signupAction(
     })
   }
 
-  // Always redirect to /admin/onboarding on the SAME host. Using the
-  // built-in Next.js redirect() instead of returning { redirectTo }
-  // guarantees the Set-Cookie header and the Location/redirect signal
-  // are emitted in the SAME response, so the browser persists the
-  // session cookie before it follows the redirect. The client-side
-  // window.location.href fallback was racing on Vercel — the cookie
-  // wasn't always applied before the next request fired.
-  redirect('/admin/onboarding')
+  // Always return redirectTo and let the client hard-navigate so the
+  // Set-Cookie from setAdminSession() is committed before /admin/onboarding
+  // loads. redirect() in the same Server Action races on Vercel — the next
+  // request sometimes arrives without v_admin_session.
+  return { success: true, data: { redirectTo: '/admin/onboarding' } }
 }
 
 /**
@@ -487,7 +484,10 @@ export async function completeOAuthSignupAction(
     const needsOnboarding =
       !existingAccount?.onboarding_completed_at && (existingUser.role as UserRole) === 'owner'
 
-    redirect(needsOnboarding ? '/admin/onboarding' : '/admin/dashboard')
+    return {
+      success: true,
+      data: { redirectTo: needsOnboarding ? '/admin/onboarding' : '/admin/dashboard' },
+    }
   }
 
   const baseSlug = slugify(businessName)
@@ -530,7 +530,5 @@ export async function completeOAuthSignupAction(
     email,
   })
 
-  // Use Next.js redirect() so the Set-Cookie + Location headers ship in
-  // the same response (see signupAction for the full reasoning).
-  redirect('/admin/onboarding')
+  return { success: true, data: { redirectTo: '/admin/onboarding' } }
 }

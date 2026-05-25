@@ -1,6 +1,6 @@
 import { requireAdminSession } from '@/lib/auth/require-session'
 import { getBrandingFromHeaders } from '@/lib/branding/server'
-import { resolveSessionWorkspace } from '@/lib/onboarding/resolve-session-workspace'
+import { loadOnboardingWorkspace } from '@/lib/onboarding/load-onboarding-workspace'
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { OnboardingWizard } from './OnboardingWizard'
@@ -14,34 +14,30 @@ export default async function AdminOnboardingPage() {
     redirect('/admin/dashboard')
   }
 
-  let workspace
-  try {
-    // RSC render cannot mutate cookies — refresh happens in server actions.
-    workspace = await resolveSessionWorkspace(session, { refreshSession: false })
-  } catch (err) {
-    console.error('[admin/onboarding] resolveSessionWorkspace failed', err)
+  const branding = getBrandingFromHeaders(headers())
+  const workspace = await loadOnboardingWorkspace(session, branding)
+
+  if (!workspace.accountId) {
+    console.error('[admin/onboarding] session missing accountId', {
+      userId: session.userId,
+      email: session.email,
+    })
     redirect('/auth/login?error=workspace_missing')
   }
 
-  const branding = getBrandingFromHeaders(headers())
-
-  // Onboarding's Step 3 hard-deletes stage_definitions — that's safe only
-  // before the account has any real records on it. Once the account is past
-  // onboarding, bouncing back into the wizard would risk wiping pipeline data,
-  // so send completed accounts to the dashboard.
-  if (branding.onboardingComplete || workspace.account.onboarding_completed_at) {
+  if (workspace.onboardingComplete) {
     redirect('/admin/dashboard')
   }
 
   return (
     <OnboardingWizard
       accountId={workspace.accountId}
-      businessName={workspace.account.name || branding.businessName}
-      currentVertical={workspace.account.vertical || branding.vertical || null}
-      initialPrimaryColor={workspace.account.brand_primary_color ?? branding.primaryColor}
-      initialSecondaryColor={workspace.account.brand_secondary_color ?? branding.secondaryColor}
-      initialLogoUrl={workspace.account.brand_logo_url ?? branding.logoUrl}
-      initialPortalDomain={workspace.account.portal_domain ?? branding.portalDomain ?? ''}
+      businessName={workspace.businessName}
+      currentVertical={workspace.currentVertical}
+      initialPrimaryColor={workspace.primaryColor}
+      initialSecondaryColor={workspace.secondaryColor}
+      initialLogoUrl={workspace.logoUrl}
+      initialPortalDomain={workspace.portalDomain}
     />
   )
 }

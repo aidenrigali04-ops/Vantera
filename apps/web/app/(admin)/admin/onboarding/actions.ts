@@ -13,7 +13,6 @@ import {
   markOnboardingComplete,
   patchAccountRow,
 } from '@/lib/onboarding/account-store'
-import { resolveSessionWorkspace } from '@/lib/onboarding/resolve-session-workspace'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import {
   integrationCredentials,
@@ -100,9 +99,12 @@ async function assertOwnAccount(): Promise<{
     throw new Error('Your session expired. Refresh the page and sign in again.')
   }
 
-  const workspace = await resolveSessionWorkspace(session)
+  const accountId = String(session.accountId).trim()
+  if (!accountId) {
+    throw new Error('Your workspace session is invalid. Sign out and sign in again.')
+  }
 
-  return { session: workspace.session, accountId: workspace.accountId }
+  return { session, accountId }
 }
 
 export async function updateVertical(

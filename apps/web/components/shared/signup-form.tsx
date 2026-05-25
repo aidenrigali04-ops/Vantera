@@ -60,17 +60,21 @@ export function SignupForm({ onSubmit }: SignupFormProps) {
       return
     }
 
-    // Failure path — success uses redirect() and never returns here.
+    // Failure path — success returns redirectTo for hard navigation below.
     if (!result?.success) {
       setError(result?.error ?? 'Account creation failed')
       setIsSubmitting(false)
       return
     }
 
-    // Fallback if redirect() did not fire (older deploys mid-rollout).
+    // Hard navigation so Set-Cookie from the Server Action is applied before
+    // the next request (avoids landing on login/onboarding without session).
     if (result.redirectTo) {
-      window.location.href = result.redirectTo
+      window.location.replace(result.redirectTo)
+      return
     }
+
+    setIsSubmitting(false)
   }
 
   const isBusy = isSubmitting

@@ -93,8 +93,11 @@ export function LoginForm({
     }
 
     if (result.redirectTo) {
-      window.location.href = result.redirectTo
+      window.location.replace(result.redirectTo)
+      return
     }
+
+    setIsSubmitting(false)
   }
 
   const isBusy = isSubmitting

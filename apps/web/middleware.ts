@@ -266,6 +266,17 @@ export async function middleware(request: NextRequest) {
     resolvedAccount = await resolveAccountById(String(verifiedAdmin.accountId))
   }
 
+  // Host-based tenant resolution can disagree with a freshly minted session
+  // (signup on apex / preview URL). Prefer the session account for onboarding.
+  if (
+    resolvedAccount &&
+    verifiedAdmin?.accountId &&
+    String(resolvedAccount.id) !== String(verifiedAdmin.accountId) &&
+    pathname.startsWith('/admin/onboarding')
+  ) {
+    resolvedAccount = await resolveAccountById(String(verifiedAdmin.accountId))
+  }
+
   // Page navigations need a resolved tenant unless the user has a verified
   // admin session on /admin/* (post-signup on apex / preview URLs). Server
   // Actions must never be redirected — that breaks the RSC action payload.
@@ -304,7 +315,11 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/auth/login', request.url))
     }
 
-    if (resolvedAccount && String(payload.accountId) !== String(resolvedAccount.id)) {
+    if (
+      resolvedAccount &&
+      String(payload.accountId) !== String(resolvedAccount.id) &&
+      !pathname.startsWith('/admin/onboarding')
+    ) {
       return NextResponse.redirect(new URL('/auth/login', request.url))
     }
 
