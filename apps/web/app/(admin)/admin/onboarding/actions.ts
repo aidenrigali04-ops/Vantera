@@ -8,12 +8,12 @@ import type { ActionResult } from '@/lib/auth/types'
 import { db } from '@/lib/db/client'
 import { env, requireEnv } from '@/lib/env'
 import {
-  accountExists,
   fetchAccountById,
   markOnboardingComplete,
   patchAccountRow,
   resolveWorkspaceAccountId,
 } from '@/lib/onboarding/account-store'
+import { provisionOwnerWorkspace } from '@/lib/onboarding/provision-workspace'
 import { getBrandingFromHeaders } from '@/lib/branding/server'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { headers } from 'next/headers'
@@ -102,7 +102,10 @@ async function assertOwnAccount(): Promise<{
     throw new Error('Your session expired. Refresh the page and sign in again.')
   }
 
-  const accountId = await resolveWorkspaceAccountId(session.userId, session.accountId)
+  let accountId = await resolveWorkspaceAccountId(session.userId)
+  if (!accountId && session.role === 'owner') {
+    accountId = await provisionOwnerWorkspace(session)
+  }
   if (!accountId) {
     throw new Error('Your workspace session is invalid. Sign out and sign in again.')
   }
@@ -853,16 +856,6 @@ export async function completeOnboarding(
 
     if (session.role !== 'owner') {
       return err('Only the account owner can complete onboarding')
-    }
-
-    const exists = await accountExists(workspaceId)
-    if (!exists) {
-      console.error('[completeOnboarding] workspace row missing', {
-        workspaceId,
-        userId: session.userId,
-        email: session.email,
-      })
-      return err('Your workspace could not be found. Sign out, sign in again, and retry.')
     }
 
     const marked = await markOnboardingComplete(workspaceId)

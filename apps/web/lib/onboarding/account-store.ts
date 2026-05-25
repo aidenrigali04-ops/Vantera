@@ -311,43 +311,12 @@ export async function accountHasStageDefinitions(accountId: string): Promise<boo
   }
 }
 
-/** Resolve the workspace id from the signed-in user row — JWT accountId can drift after re-signup. */
-export async function resolveWorkspaceAccountId(
-  userId: string,
-  fallbackAccountId: string,
-): Promise<string> {
+/** Resolve workspace id from the owner users row. Never trust JWT alone. */
+export async function resolveWorkspaceAccountId(userId: string): Promise<string | null> {
   const normalizedUserId = String(userId).trim()
-  const normalizedFallback = String(fallbackAccountId).trim()
+  if (!normalizedUserId) return null
 
-  if (!normalizedUserId) {
-    return normalizedFallback
-  }
-
-  // 1) Direct SQL — most reliable on Vercel serverless.
-  try {
-    const sqlAccountId = await lookupUserAccountIdViaSql(normalizedUserId)
-    if (sqlAccountId) {
-      return sqlAccountId
-    }
-  } catch (err) {
-    console.error('[resolveWorkspaceAccountId] direct SQL failed', err)
-  }
-
-  // 2) Drizzle
-  try {
-    const [row] = await db
-      .select({ accountId: users.accountId })
-      .from(users)
-      .where(and(eq(users.id, normalizedUserId), isNull(users.deletedAt)))
-      .limit(1)
-
-    if (row?.accountId) {
-      return String(row.accountId).trim()
-    }
-  } catch (err) {
-    console.error('[resolveWorkspaceAccountId] Drizzle failed', err)
-  }
-
+  // 1) supabase-js — same client used to create accounts at signup.
   try {
     const admin = getSupabaseAdmin()
     const { data, error } = await admin
@@ -364,8 +333,44 @@ export async function resolveWorkspaceAccountId(
     if (error) {
       console.error('[resolveWorkspaceAccountId] supabase-js failed', error.message)
     }
+
+    // Include soft-deleted rows as a fallback — better a restored session than a stale JWT.
+    const { data: anyRow, error: anyErr } = await admin
+      .from('users')
+      .select('account_id')
+      .eq('id', normalizedUserId)
+      .maybeSingle()
+
+    if (!anyErr && anyRow?.account_id) {
+      return String(anyRow.account_id).trim()
+    }
   } catch (err) {
     console.error('[resolveWorkspaceAccountId] supabase-js threw', err)
+  }
+
+  // 2) Direct SQL
+  try {
+    const sqlAccountId = await lookupUserAccountIdViaSql(normalizedUserId)
+    if (sqlAccountId) {
+      return sqlAccountId
+    }
+  } catch (err) {
+    console.error('[resolveWorkspaceAccountId] direct SQL failed', err)
+  }
+
+  // 3) Drizzle
+  try {
+    const [row] = await db
+      .select({ accountId: users.accountId })
+      .from(users)
+      .where(and(eq(users.id, normalizedUserId), isNull(users.deletedAt)))
+      .limit(1)
+
+    if (row?.accountId) {
+      return String(row.accountId).trim()
+    }
+  } catch (err) {
+    console.error('[resolveWorkspaceAccountId] Drizzle failed', err)
   }
 
   const rest = await supabaseServiceRestSingle<{ account_id: string }>('users', {
@@ -382,7 +387,7 @@ export async function resolveWorkspaceAccountId(
     console.error('[resolveWorkspaceAccountId] REST failed', rest.error)
   }
 
-  return normalizedFallback
+  return null
 }
 
 export async function markOnboardingComplete(accountId: string): Promise<PatchResult> {
@@ -400,34 +405,7 @@ export async function markOnboardingComplete(accountId: string): Promise<PatchRe
     onboarding_completed_at: timestamp,
   }
 
-  // 1) Direct SQL — bypasses Supabase client / PostgREST entirely.
-  try {
-    if (await markAccountOnboardingCompleteViaSql(normalizedId, timestamp)) {
-      return { ok: true }
-    }
-  } catch (err) {
-    console.error('[markOnboardingComplete] direct SQL threw', err)
-  }
-
-  // 2) Drizzle
-  try {
-    const rows = await db
-      .update(accounts)
-      .set({
-        onboardingCompletedAt: new Date(timestamp),
-        updatedAt: new Date(),
-      })
-      .where(eq(accounts.id, normalizedId))
-      .returning({ id: accounts.id, onboardingCompletedAt: accounts.onboardingCompletedAt })
-
-    if (rows.length > 0 && rows[0]?.onboardingCompletedAt) {
-      return { ok: true }
-    }
-  } catch (err) {
-    console.error('[markOnboardingComplete] Drizzle failed', err)
-  }
-
-  // 3) supabase-js — same transport that creates accounts at signup.
+  // 1) supabase-js — proven path from signup account creation.
   try {
     const admin = getSupabaseAdmin()
     const { data, error } = await admin
@@ -447,6 +425,33 @@ export async function markOnboardingComplete(accountId: string): Promise<PatchRe
     }
   } catch (err) {
     console.error('[markOnboardingComplete] supabase-js threw', err)
+  }
+
+  // 2) Direct SQL
+  try {
+    if (await markAccountOnboardingCompleteViaSql(normalizedId, timestamp)) {
+      return { ok: true }
+    }
+  } catch (err) {
+    console.error('[markOnboardingComplete] direct SQL threw', err)
+  }
+
+  // 3) Drizzle
+  try {
+    const rows = await db
+      .update(accounts)
+      .set({
+        onboardingCompletedAt: new Date(timestamp),
+        updatedAt: new Date(),
+      })
+      .where(eq(accounts.id, normalizedId))
+      .returning({ id: accounts.id, onboardingCompletedAt: accounts.onboardingCompletedAt })
+
+    if (rows.length > 0 && rows[0]?.onboardingCompletedAt) {
+      return { ok: true }
+    }
+  } catch (err) {
+    console.error('[markOnboardingComplete] Drizzle failed', err)
   }
 
   const withRepresentation = await supabaseServiceRest<AccountRow[]>('accounts', {

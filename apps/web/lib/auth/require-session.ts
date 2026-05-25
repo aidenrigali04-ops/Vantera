@@ -14,7 +14,7 @@ export class UnauthorizedError extends Error {
 }
 
 async function syncSessionAccountId(session: AdminSession): Promise<AdminSession> {
-  const resolvedAccountId = await resolveWorkspaceAccountId(session.userId, session.accountId)
+  const resolvedAccountId = await resolveWorkspaceAccountId(session.userId)
 
   if (!resolvedAccountId || resolvedAccountId === session.accountId) {
     return session

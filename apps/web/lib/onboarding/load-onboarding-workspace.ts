@@ -30,7 +30,8 @@ export async function loadOnboardingWorkspace(
   session: AdminSession,
   branding: BrandingData,
 ): Promise<OnboardingWorkspace> {
-  const accountId = await resolveWorkspaceAccountId(session.userId, String(session.accountId).trim())
+  const accountId =
+    (await resolveWorkspaceAccountId(session.userId)) ?? String(session.accountId).trim()
 
   let account: AccountRow | null = null
   if (accountId) {
