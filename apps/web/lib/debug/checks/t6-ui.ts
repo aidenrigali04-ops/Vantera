@@ -1,4 +1,6 @@
 import { env } from '@/lib/env'
+import { fetchAccountById } from '@/lib/onboarding/account-store'
+import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import type { TestResult } from '../types'
 import { getDebugTestConfig } from '../config'
 import { fetchAppPath, fetchWithTimeout, getAdminSql, probeAppHealth } from '../utils'
@@ -160,6 +162,73 @@ export async function runUiChecks(): Promise<TestResult[]> {
       category: 'ui',
       severity: 'medium',
       error: 'Requires full portal + payment integration',
+      fixable: false,
+    })
+  }
+
+  // T6.6 — Onboarding account resolvable via service role (Complete setup guard)
+  try {
+    const cfg = getDebugTestConfig()
+    const admin = getSupabaseAdmin()
+
+    let accountId = cfg.testAccountIdTeam
+    if (!accountId) {
+      const { data } = await admin
+        .from('accounts')
+        .select('id')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      accountId = data?.id
+    }
+
+    if (!accountId) {
+      results.push({
+        id: 'T6.6',
+        module: 'T6',
+        name: 'Onboarding account service-role lookup',
+        status: 'skip',
+        category: 'ui',
+        severity: 'high',
+        error: 'No account in database to probe',
+        fixable: false,
+      })
+    } else {
+      const account = await fetchAccountById(accountId)
+      const { data: stages, error: stageError } = await admin
+        .from('stage_definitions')
+        .select('id')
+        .eq('account_id', accountId)
+        .limit(1)
+
+      const ok = Boolean(account) && !stageError
+      results.push({
+        id: 'T6.6',
+        module: 'T6',
+        name: 'Onboarding account service-role lookup',
+        status: ok ? 'pass' : 'fail',
+        category: 'ui',
+        severity: 'high',
+        error: ok
+          ? undefined
+          : stageError?.message ?? 'Service-role client cannot read tenant account for onboarding',
+        details: {
+          accountId,
+          hasStages: (stages?.length ?? 0) > 0,
+          onboardingComplete: Boolean(account?.onboarding_completed_at),
+        },
+        fixable: false,
+      })
+    }
+  } catch (error) {
+    results.push({
+      id: 'T6.6',
+      module: 'T6',
+      name: 'Onboarding account service-role lookup',
+      status: 'fail',
+      category: 'ui',
+      severity: 'high',
+      error: error instanceof Error ? error.message : 'onboarding probe failed',
       fixable: false,
     })
   }

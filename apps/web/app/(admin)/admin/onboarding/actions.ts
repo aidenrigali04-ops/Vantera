@@ -7,16 +7,17 @@ import { getAdminSession } from '@/lib/auth/session'
 import type { ActionResult } from '@/lib/auth/types'
 import { db } from '@/lib/db/client'
 import { env, requireEnv } from '@/lib/env'
-import { patchAccountRow } from '@/lib/onboarding/account-store'
+import {
+  accountHasStageDefinitions,
+  fetchAccountById,
+  markOnboardingComplete,
+  patchAccountRow,
+} from '@/lib/onboarding/account-store'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import {
-  accounts,
-  automations,
   integrationCredentials,
   personalizeTemplate,
-  stageDefinitions,
   users,
-  verticalTemplates,
   type OnboardingProfile,
   type VerticalTemplateData,
   type VoiceTone,
@@ -160,16 +161,19 @@ export async function updateBranding(
       return err(parsed.error.issues[0]?.message ?? 'Invalid branding data')
     }
 
-    await db
-      .update(accounts)
-      .set({
-        brandLogoUrl: parsed.data.logoUrl ?? null,
-        brandPrimaryColor: parsed.data.primaryColor,
-        brandSecondaryColor: parsed.data.secondaryColor,
-        portalDomain: parsed.data.portalDomain && parsed.data.portalDomain.length > 0 ? parsed.data.portalDomain : null,
-        updatedAt: new Date(),
-      })
-      .where(eq(accounts.id, accountId))
+    const saved = await patchAccountRow(accountId, {
+      brand_logo_url: parsed.data.logoUrl ?? null,
+      brand_primary_color: parsed.data.primaryColor,
+      brand_secondary_color: parsed.data.secondaryColor,
+      portal_domain:
+        parsed.data.portalDomain && parsed.data.portalDomain.length > 0
+          ? parsed.data.portalDomain
+          : null,
+    })
+
+    if (!saved.ok) {
+      return err(saved.message)
+    }
 
     return { success: true, data: { saved: true } }
   } catch (error) {
@@ -208,49 +212,42 @@ async function buildOnboardingProfile(
   accountId: string,
   ownerUserId: string,
 ): Promise<OnboardingProfile> {
-  const [account] = await db
-    .select({
-      slug: accounts.slug,
-      name: accounts.name,
-      brandPrimaryColor: accounts.brandPrimaryColor,
-      portalDomain: accounts.portalDomain,
-      timezone: accounts.timezone,
-      bookingLink: accounts.bookingLink,
-      reviewLink: accounts.reviewLink,
-      paymentLink: accounts.paymentLink,
-      emergencyLine: accounts.emergencyLine,
-      businessHoursStart: accounts.businessHoursStart,
-      businessHoursEnd: accounts.businessHoursEnd,
-      voicePreference: accounts.voicePreference,
-    })
-    .from(accounts)
-    .where(eq(accounts.id, accountId))
-    .limit(1)
+  const account = await fetchAccountById(accountId)
 
   if (!account) {
     throw new Error('Account not found while building personalization profile')
   }
 
-  const [owner] = await db
-    .select({ fullName: users.fullName, email: users.email })
-    .from(users)
-    .where(eq(users.id, ownerUserId))
-    .limit(1)
+  const admin = getSupabaseAdmin()
 
-  const credentialRows = await db
-    .select({ provider: integrationCredentials.provider, metadata: integrationCredentials.metadata })
-    .from(integrationCredentials)
-    .where(eq(integrationCredentials.accountId, accountId))
+  const { data: owner, error: ownerError } = await admin
+    .from('users')
+    .select('full_name, email')
+    .eq('id', ownerUserId)
+    .maybeSingle()
 
-  const twilioRow = credentialRows.find((row) => row.provider === 'twilio')
+  if (ownerError) {
+    throw new Error(ownerError.message)
+  }
+
+  const { data: credentialRows, error: credError } = await admin
+    .from('integration_credentials')
+    .select('provider, metadata')
+    .eq('account_id', accountId)
+
+  if (credError) {
+    throw new Error(credError.message)
+  }
+
+  const twilioRow = (credentialRows ?? []).find((row) => row.provider === 'twilio')
   const hasTwilio = Boolean(twilioRow)
-  const hasStripe = credentialRows.some((row) => row.provider === 'stripe')
+  const hasStripe = (credentialRows ?? []).some((row) => row.provider === 'stripe')
   const hasResendEnv = Boolean(env.RESEND_API_KEY && env.RESEND_API_KEY.length > 0)
 
   const twilioPhoneNumber =
     (twilioRow?.metadata as Record<string, string> | undefined)?.phoneNumber ?? null
 
-  const ownerFullName = owner?.fullName ?? null
+  const ownerFullName = owner?.full_name ?? null
   const ownerFirstName = ownerFullName ? (ownerFullName.split(/\s+/)[0] ?? null) : null
 
   return {
@@ -259,14 +256,11 @@ async function buildOnboardingProfile(
     ownerFullName,
     ownerFirstName,
     ownerEmail: owner?.email ?? null,
-    brandPrimaryColor: account.brandPrimaryColor ?? '#1648A0',
-    portalDomain: account.portalDomain ?? null,
-    portalUrl: derivePortalUrl(account.slug, account.portalDomain ?? null),
+    brandPrimaryColor: account.brand_primary_color ?? '#1648A0',
+    portalDomain: account.portal_domain ?? null,
+    portalUrl: derivePortalUrl(account.slug, account.portal_domain ?? null),
     appBaseUrl: deriveAppBaseUrl(),
     supportedChannels: {
-      // Email is always available when Resend is configured at the env level;
-      // SMS only when Twilio is connected for this tenant; portal is always
-      // available since every tenant gets a portal.
       sms: hasTwilio,
       email: hasResendEnv,
       portal: true,
@@ -274,13 +268,13 @@ async function buildOnboardingProfile(
     twilioPhoneNumber,
     hasStripe,
     timezone: account.timezone ?? 'America/Los_Angeles',
-    voice: isVoiceTone(account.voicePreference) ? account.voicePreference : undefined,
-    businessHoursStart: account.businessHoursStart ?? undefined,
-    businessHoursEnd: account.businessHoursEnd ?? undefined,
-    emergencyLine: account.emergencyLine ?? undefined,
-    bookingLink: account.bookingLink ?? undefined,
-    reviewLink: account.reviewLink ?? undefined,
-    paymentLink: account.paymentLink ?? undefined,
+    voice: isVoiceTone(account.voice_preference) ? account.voice_preference : undefined,
+    businessHoursStart: account.business_hours_start ?? undefined,
+    businessHoursEnd: account.business_hours_end ?? undefined,
+    emergencyLine: account.emergency_line ?? undefined,
+    bookingLink: account.booking_link ?? undefined,
+    reviewLink: account.review_link ?? undefined,
+    paymentLink: account.payment_link ?? undefined,
   }
 }
 
@@ -326,19 +320,7 @@ export async function getBusinessProfile(
   try {
     await assertOwnAccount(accountId)
 
-    const [row] = await db
-      .select({
-        voicePreference: accounts.voicePreference,
-        businessHoursStart: accounts.businessHoursStart,
-        businessHoursEnd: accounts.businessHoursEnd,
-        bookingLink: accounts.bookingLink,
-        reviewLink: accounts.reviewLink,
-        paymentLink: accounts.paymentLink,
-        emergencyLine: accounts.emergencyLine,
-      })
-      .from(accounts)
-      .where(eq(accounts.id, accountId))
-      .limit(1)
+    const row = await fetchAccountById(accountId)
 
     if (!row) {
       return err('Account not found')
@@ -347,13 +329,13 @@ export async function getBusinessProfile(
     return {
       success: true,
       data: {
-        voicePreference: isVoiceTone(row.voicePreference) ? row.voicePreference : null,
-        businessHoursStart: row.businessHoursStart ?? null,
-        businessHoursEnd: row.businessHoursEnd ?? null,
-        bookingLink: row.bookingLink ?? null,
-        reviewLink: row.reviewLink ?? null,
-        paymentLink: row.paymentLink ?? null,
-        emergencyLine: row.emergencyLine ?? null,
+        voicePreference: isVoiceTone(row.voice_preference) ? row.voice_preference : null,
+        businessHoursStart: row.business_hours_start ?? null,
+        businessHoursEnd: row.business_hours_end ?? null,
+        bookingLink: row.booking_link ?? null,
+        reviewLink: row.review_link ?? null,
+        paymentLink: row.payment_link ?? null,
+        emergencyLine: row.emergency_line ?? null,
       },
     }
   } catch (error) {
@@ -384,26 +366,31 @@ export async function updateBusinessProfile(
       emergencyLine: emptyToNull(parsed.data.emergencyLine),
     }
 
-    const [existing] = await db
-      .select({ activeTemplateId: accounts.activeTemplateId })
-      .from(accounts)
-      .where(eq(accounts.id, accountId))
-      .limit(1)
+    const account = await fetchAccountById(accountId)
+    if (!account) {
+      return err('Account not found')
+    }
 
-    await db
-      .update(accounts)
-      .set({
-        ...normalized,
-        updatedAt: new Date(),
-      })
-      .where(eq(accounts.id, accountId))
+    const saved = await patchAccountRow(accountId, {
+      voice_preference: normalized.voicePreference,
+      business_hours_start: normalized.businessHoursStart,
+      business_hours_end: normalized.businessHoursEnd,
+      booking_link: normalized.bookingLink,
+      review_link: normalized.reviewLink,
+      payment_link: normalized.paymentLink,
+      emergency_line: normalized.emergencyLine,
+    })
+
+    if (!saved.ok) {
+      return err(saved.message)
+    }
 
     // If the user already applied a template, re-run personalization so the
     // new voice / hours / links flow into the existing automations.
     let rePersonalized = false
-    if (existing?.activeTemplateId) {
+    if (account.active_template_id) {
       try {
-        await applyTemplateForAccount(accountId, existing.activeTemplateId, session.userId)
+        await applyTemplateForAccount(accountId, account.active_template_id, session.userId)
         rePersonalized = true
       } catch {
         rePersonalized = false
@@ -436,26 +423,23 @@ export async function getTemplatesForVertical(
       return err('Invalid business type')
     }
 
-    const rows = await db
-      .select({
-        id: verticalTemplates.id,
-        recordType: verticalTemplates.recordType,
-        templateData: verticalTemplates.templateData,
-      })
-      .from(verticalTemplates)
-      .where(
-        and(
-          eq(verticalTemplates.vertical, vertical as Vertical),
-          eq(verticalTemplates.isActive, true),
-        ),
-      )
+    const admin = getSupabaseAdmin()
+    const { data: rows, error } = await admin
+      .from('vertical_templates')
+      .select('id, record_type, template_data')
+      .eq('vertical', vertical)
+      .eq('is_active', true)
+
+    if (error) {
+      return err(error.message)
+    }
 
     return {
       success: true,
-      data: rows.map((row) => ({
+      data: (rows ?? []).map((row) => ({
         id: row.id,
-        recordType: row.recordType,
-        templateData: row.templateData as VerticalTemplateData,
+        recordType: row.record_type,
+        templateData: row.template_data as VerticalTemplateData,
       })),
     }
   } catch (error) {
@@ -481,20 +465,23 @@ async function applyTemplateForAccount(
   templateId: string,
   ownerUserId: string,
 ): Promise<ApplyTemplateResult> {
-  const [template] = await db
-    .select({
-      recordType: verticalTemplates.recordType,
-      templateData: verticalTemplates.templateData,
-    })
-    .from(verticalTemplates)
-    .where(eq(verticalTemplates.id, templateId))
-    .limit(1)
+  const admin = getSupabaseAdmin()
+
+  const { data: template, error: templateError } = await admin
+    .from('vertical_templates')
+    .select('record_type, template_data')
+    .eq('id', templateId)
+    .maybeSingle()
+
+  if (templateError) {
+    throw new Error(templateError.message)
+  }
 
   if (!template) {
     throw new Error('Template not found')
   }
 
-  const rawData = template.templateData as VerticalTemplateData
+  const rawData = template.template_data as VerticalTemplateData
 
   // Step 1 — sync personalization: variable substitution, channel downgrade,
   // automation drop, business hours injection.
@@ -516,57 +503,72 @@ async function applyTemplateForAccount(
   let stageCount = 0
   let automationCount = 0
 
-  await db.transaction(async (tx) => {
-    // HARD DELETE: This is the only place in the codebase where we hard-delete
-    // rows instead of soft-deleting. Stage definitions during onboarding have
-    // no foreign-key references yet (no records exist on the account at this
-    // point), so a hard delete is safe and avoids leaving stale rows behind
-    // when a different template is selected. Do NOT copy this pattern.
-    await tx.delete(stageDefinitions).where(eq(stageDefinitions.accountId, accountId))
+  const { error: deleteStagesError } = await admin
+    .from('stage_definitions')
+    .delete()
+    .eq('account_id', accountId)
 
-    // Same rationale: clear any prior auto-seeded automations for this
-    // account before re-applying. Once the user starts editing automations
-    // we'll soft-delete them through the regular admin flow.
-    await tx.delete(automations).where(eq(automations.accountId, accountId))
+  if (deleteStagesError) {
+    throw new Error(deleteStagesError.message)
+  }
 
-    if (stages.length > 0) {
-      await tx.insert(stageDefinitions).values(
-        stages.map((stage, index) => ({
-          accountId,
-          recordType: stage.recordType ?? template.recordType,
-          label: stage.label,
-          position: stage.position ?? index,
-          color: stage.color ?? '#64748B',
-          triggersAutomation: stage.triggersAutomation ?? true,
-          isTerminalWin: stage.isTerminalWin ?? false,
-          isTerminalLoss: stage.isTerminalLoss ?? false,
-        })),
-      )
-      stageCount = stages.length
+  const { error: deleteAutomationsError } = await admin
+    .from('automations')
+    .delete()
+    .eq('account_id', accountId)
+
+  if (deleteAutomationsError) {
+    throw new Error(deleteAutomationsError.message)
+  }
+
+  if (stages.length > 0) {
+    const { error: insertStagesError } = await admin.from('stage_definitions').insert(
+      stages.map((stage, index) => ({
+        account_id: accountId,
+        record_type: stage.recordType ?? template.record_type,
+        label: stage.label,
+        position: stage.position ?? index,
+        color: stage.color ?? '#64748B',
+        triggers_automation: stage.triggersAutomation ?? true,
+        is_terminal_win: stage.isTerminalWin ?? false,
+        is_terminal_loss: stage.isTerminalLoss ?? false,
+      })),
+    )
+
+    if (insertStagesError) {
+      throw new Error(insertStagesError.message)
     }
 
-    if (flowAutomations.length > 0) {
-      await tx.insert(automations).values(
-        flowAutomations.map((flow) => ({
-          accountId,
-          name: flow.name,
-          triggerEvent: flow.triggerEvent,
-          triggerConditions: flow.triggerConditions ?? {},
-          actions: (flow.actions ?? []) as Array<Record<string, unknown>>,
-          templateRef: flow.templateRef ?? null,
-          isActive: false,
-        })),
-      )
-      automationCount = flowAutomations.length
+    stageCount = stages.length
+  }
+
+  if (flowAutomations.length > 0) {
+    const { error: insertAutomationsError } = await admin.from('automations').insert(
+      flowAutomations.map((flow) => ({
+        account_id: accountId,
+        name: flow.name,
+        trigger_event: flow.triggerEvent,
+        trigger_conditions: flow.triggerConditions ?? {},
+        actions: (flow.actions ?? []) as Array<Record<string, unknown>>,
+        template_ref: flow.templateRef ?? null,
+        is_active: false,
+      })),
+    )
+
+    if (insertAutomationsError) {
+      throw new Error(insertAutomationsError.message)
     }
 
-    // Remember which template was applied so integration-connect flows can
-    // re-personalize against the freshly connected channels.
-    await tx
-      .update(accounts)
-      .set({ activeTemplateId: templateId, updatedAt: new Date() })
-      .where(eq(accounts.id, accountId))
+    automationCount = flowAutomations.length
+  }
+
+  const saved = await patchAccountRow(accountId, {
+    active_template_id: templateId,
   })
+
+  if (!saved.ok) {
+    throw new Error(saved.message)
+  }
 
   return {
     stageCount,
@@ -630,14 +632,7 @@ export async function inviteTeamMembers(
       validated.push(result.data)
     }
 
-    const [account] = await db
-      .select({
-        name: accounts.name,
-        portalDomain: accounts.portalDomain,
-      })
-      .from(accounts)
-      .where(eq(accounts.id, accountId))
-      .limit(1)
+    const account = await fetchAccountById(accountId)
 
     if (!account) {
       return err('Account not found')
@@ -818,15 +813,11 @@ export async function saveIntegrationCredentials(
     // integration-save failure for a downstream personalization issue).
     let rePersonalized = false
     if (providerKey === 'twilio' || providerKey === 'stripe') {
-      const [acct] = await db
-        .select({ activeTemplateId: accounts.activeTemplateId })
-        .from(accounts)
-        .where(eq(accounts.id, accountId))
-        .limit(1)
+      const acct = await fetchAccountById(accountId)
 
-      if (acct?.activeTemplateId) {
+      if (acct?.active_template_id) {
         try {
-          await applyTemplateForAccount(accountId, acct.activeTemplateId, session.userId)
+          await applyTemplateForAccount(accountId, acct.active_template_id, session.userId)
           rePersonalized = true
         } catch {
           rePersonalized = false
@@ -856,10 +847,10 @@ export async function completeOnboarding(
       return err(pipeline.error ?? 'Pipeline setup required before finishing onboarding')
     }
 
-    await db
-      .update(accounts)
-      .set({ onboardingCompletedAt: new Date(), updatedAt: new Date() })
-      .where(eq(accounts.id, accountId))
+    const marked = await markOnboardingComplete(accountId)
+    if (!marked.ok) {
+      return err(marked.message)
+    }
 
     // Bust the layout cache so the next request to /admin/* sees the
     // freshly-stamped onboardingCompletedAt and lets the user through
@@ -891,38 +882,31 @@ async function ensurePipelineReady(
   accountId: string,
   ownerUserId: string,
 ): Promise<ActionResult<{ autoAppliedTemplate: boolean }>> {
-  const [existingStage] = await db
-    .select({ id: stageDefinitions.id })
-    .from(stageDefinitions)
-    .where(eq(stageDefinitions.accountId, accountId))
-    .limit(1)
-
-  if (existingStage) {
+  if (await accountHasStageDefinitions(accountId)) {
     return { success: true, data: { autoAppliedTemplate: false } }
   }
 
-  const [account] = await db
-    .select({
-      vertical: accounts.vertical,
-      activeTemplateId: accounts.activeTemplateId,
-    })
-    .from(accounts)
-    .where(eq(accounts.id, accountId))
-    .limit(1)
+  const account = await fetchAccountById(accountId)
 
   if (!account) {
     return err('Account not found')
   }
 
-  let templateId = account.activeTemplateId
+  let templateId = account.active_template_id
   if (!templateId) {
-    const [defaultTemplate] = await db
-      .select({ id: verticalTemplates.id })
-      .from(verticalTemplates)
-      .where(
-        and(eq(verticalTemplates.vertical, account.vertical), eq(verticalTemplates.isActive, true)),
-      )
+    const admin = getSupabaseAdmin()
+    const { data: defaultTemplate, error } = await admin
+      .from('vertical_templates')
+      .select('id')
+      .eq('vertical', account.vertical)
+      .eq('is_active', true)
       .limit(1)
+      .maybeSingle()
+
+    if (error) {
+      return err(error.message)
+    }
+
     templateId = defaultTemplate?.id ?? null
   }
 
