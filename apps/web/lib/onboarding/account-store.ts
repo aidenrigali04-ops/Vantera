@@ -272,10 +272,8 @@ export async function accountHasStageDefinitions(accountId: string): Promise<boo
 
     return (data?.length ?? 0) > 0
   } catch (err) {
-    // Transport failure — assume stages may already exist (Step 4 apply) so we
-    // do not force a re-fetch / re-apply path that fails on flaky REST.
     console.error('[accountHasStageDefinitions] supabase-js failed', err)
-    return true
+    return false
   }
 }
 

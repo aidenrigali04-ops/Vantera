@@ -70,6 +70,11 @@ export function Step3Template({ accountId, vertical, primaryColor, onComplete }:
   const selected = templates.find((t) => t.id === selectedId)
 
   async function handleContinue() {
+    if (templates.length > 0 && !selectedId) {
+      setError('Select a workflow template to continue.')
+      return
+    }
+
     if (!selectedId) {
       onComplete()
       return
@@ -116,8 +121,8 @@ export function Step3Template({ accountId, vertical, primaryColor, onComplete }:
           variants={fadeUp}
           className="rounded-2xl border border-dashed border-white/[0.08] bg-white/[0.015] p-6 text-sm leading-relaxed text-white/55"
         >
-          No templates available for this business type yet — you can skip this step and build your
-          own pipeline later.
+          No templates are available for this business type yet. Contact support if you need help
+          setting up your pipeline after onboarding.
         </motion.div>
       ) : (
         <motion.div variants={fadeUp} className="space-y-3">
@@ -228,12 +233,16 @@ export function Step3Template({ accountId, vertical, primaryColor, onComplete }:
         <PrimaryCTA
           type="button"
           onClick={handleContinue}
-          disabled={applying}
+          disabled={applying || (templates.length > 0 && !selectedId)}
           loading={applying}
           primaryColor={primaryColor}
           className="min-w-[200px]"
         >
-          {applying ? 'Applying…' : selectedId ? 'Apply and continue' : 'Skip for now'}
+          {applying
+            ? 'Applying…'
+            : templates.length === 0
+              ? 'Continue'
+              : 'Apply and continue'}
         </PrimaryCTA>
       </motion.div>
     </motion.div>

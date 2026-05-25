@@ -8,14 +8,12 @@ import type { ActionResult } from '@/lib/auth/types'
 import { db } from '@/lib/db/client'
 import { env, requireEnv } from '@/lib/env'
 import {
-  accountHasStageDefinitions,
   fetchAccountById,
   markOnboardingComplete,
   patchAccountRow,
 } from '@/lib/onboarding/account-store'
 import { getBrandingFromHeaders } from '@/lib/branding/server'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
-import { supabaseServiceRest } from '@/lib/supabase/service-rest'
 import { headers } from 'next/headers'
 import {
   integrationCredentials,
@@ -866,18 +864,13 @@ export async function saveIntegrationCredentials(
 
 export async function completeOnboarding(
   accountId: string,
-): Promise<ActionResult<{ completed: true; autoAppliedTemplate?: boolean; redirectTo: string }>> {
+): Promise<ActionResult<{ completed: true; redirectTo: string }>> {
   try {
     void accountId
     const { session, accountId: workspaceId } = await assertOwnAccount()
 
     if (session.role !== 'owner') {
       return err('Only the account owner can complete onboarding')
-    }
-
-    const pipeline = await ensurePipelineReady(workspaceId, session.userId)
-    if (!pipeline.success) {
-      console.warn('[completeOnboarding] pipeline setup skipped:', pipeline.error)
     }
 
     const marked = await markOnboardingComplete(workspaceId)
@@ -901,79 +894,11 @@ export async function completeOnboarding(
       success: true,
       data: {
         completed: true,
-        autoAppliedTemplate: pipeline.success ? pipeline.data?.autoAppliedTemplate : false,
         redirectTo: '/admin/dashboard',
       },
     }
   } catch (error) {
     rethrowFrameworkSignals(error)
     return err(error instanceof Error ? error.message : 'Failed to complete onboarding')
-  }
-}
-
-async function ensurePipelineReady(
-  accountId: string,
-  ownerUserId: string,
-): Promise<ActionResult<{ autoAppliedTemplate: boolean }>> {
-  if (await accountHasStageDefinitions(accountId)) {
-    return { success: true, data: { autoAppliedTemplate: false } }
-  }
-
-  const branding = getBrandingFromHeaders(headers())
-  const account = (await fetchAccountById(accountId)) ?? normalizeFallbackAccount(accountId, branding)
-
-  let templateId = account.active_template_id
-  if (!templateId) {
-    const vertical = account.vertical || branding.vertical || 'agency'
-
-    const templateRest = await supabaseServiceRest<{ id: string }[]>('vertical_templates', {
-      query: {
-        select: 'id',
-        vertical: `eq.${vertical}`,
-        is_active: 'eq.true',
-        limit: '1',
-      },
-    })
-
-    if (!templateRest.error && Array.isArray(templateRest.data) && templateRest.data[0]?.id) {
-      templateId = templateRest.data[0].id
-    } else {
-      try {
-        const admin = getSupabaseAdmin()
-        const { data: defaultTemplate, error } = await admin
-          .from('vertical_templates')
-          .select('id')
-          .eq('vertical', vertical)
-          .eq('is_active', true)
-          .limit(1)
-          .maybeSingle()
-
-        if (error) {
-          console.warn('[ensurePipelineReady] template lookup failed', error.message)
-        } else {
-          templateId = defaultTemplate?.id ?? null
-        }
-      } catch (err) {
-        console.warn('[ensurePipelineReady] template lookup threw', err)
-      }
-    }
-  }
-
-  if (!templateId) {
-    return {
-      success: false,
-      error: 'No default workflow template is available for your business type.',
-    }
-  }
-
-  try {
-    await applyTemplateForAccount(accountId, templateId, ownerUserId)
-    return { success: true, data: { autoAppliedTemplate: true } }
-  } catch (err) {
-    console.error('[ensurePipelineReady] applyTemplateForAccount failed', err)
-    return {
-      success: false,
-      error: err instanceof Error ? err.message : 'Failed to apply workflow template',
-    }
   }
 }
