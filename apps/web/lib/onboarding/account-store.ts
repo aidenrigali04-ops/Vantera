@@ -31,14 +31,31 @@ const ACCOUNT_SELECT =
 const ACCOUNT_SELECT_MINIMAL =
   'id,slug,name,vertical,plan,brand_logo_url,brand_primary_color,brand_secondary_color,portal_domain,timezone,onboarding_completed_at'
 
+const ACCOUNT_SELECT_PIPELINE =
+  'id,slug,name,vertical,plan,active_template_id,onboarding_completed_at'
+
 function isMissingColumnError(message: string): boolean {
   const lower = message.toLowerCase()
-  return lower.includes('column') && (lower.includes('does not exist') || lower.includes('could not find'))
+  return (
+    (lower.includes('column') &&
+      (lower.includes('does not exist') || lower.includes('could not find'))) ||
+    lower.includes('unknown field') ||
+    lower.includes('bad request')
+  )
 }
 
-function normalizeAccountRow(row: AccountRow): AccountRow {
+function normalizeAccountRow(row: Partial<AccountRow> & Pick<AccountRow, 'id'>): AccountRow {
   return {
-    ...row,
+    id: row.id,
+    slug: row.slug ?? '',
+    name: row.name ?? '',
+    vertical: row.vertical ?? 'agency',
+    plan: row.plan ?? 'team',
+    brand_logo_url: row.brand_logo_url ?? null,
+    brand_primary_color: row.brand_primary_color ?? null,
+    brand_secondary_color: row.brand_secondary_color ?? null,
+    portal_domain: row.portal_domain ?? null,
+    timezone: row.timezone ?? null,
     booking_link: row.booking_link ?? null,
     review_link: row.review_link ?? null,
     payment_link: row.payment_link ?? null,
@@ -61,8 +78,30 @@ async function fetchAccountByIdRest(
   })
 }
 
+async function fetchAccountViaSupabase(
+  normalizedId: string,
+  select: string,
+): Promise<AccountRow | null> {
+  const admin = getSupabaseAdmin()
+  const { data, error } = await admin
+    .from('accounts')
+    .select(select.replace(/,/g, ', '))
+    .eq('id', normalizedId)
+    .maybeSingle()
+
+  if (error) {
+    if (isMissingColumnError(error.message)) {
+      return null
+    }
+    throw new Error(error.message)
+  }
+
+  return data ? normalizeAccountRow(data as unknown as AccountRow) : null
+}
+
 /**
  * Patch an account row via PostgREST (preferred) with supabase-js fallback.
+ * Does not pre-fetch — PATCH + return=representation confirms the row exists.
  */
 export async function patchAccountRow(
   accountId: string,
@@ -74,37 +113,50 @@ export async function patchAccountRow(
     return { ok: false, message: 'Invalid workspace id' }
   }
 
-  const existing = await fetchAccountById(normalizedId)
-  if (!existing) {
-    return { ok: false, message: 'Account not found' }
-  }
-
   const body = {
     ...patch,
     updated_at: new Date().toISOString(),
   }
 
-  const rest = await supabaseServiceRest<null>('accounts', {
+  const rest = await supabaseServiceRest<AccountRow[]>('accounts', {
     method: 'PATCH',
     query: { id: `eq.${normalizedId}` },
     body,
+    prefer: 'return=representation',
   })
 
-  if (!rest.error) {
+  if (!rest.error && Array.isArray(rest.data) && rest.data.length > 0) {
     return { ok: true }
   }
 
-  const admin = getSupabaseAdmin()
-  const { error } = await admin.from('accounts').update(body).eq('id', normalizedId)
-
-  if (error) {
-    return { ok: false, message: error.message }
+  if (rest.error) {
+    console.error('[patchAccountRow] REST PATCH failed', rest.error)
   }
 
-  return { ok: true }
+  try {
+    const admin = getSupabaseAdmin()
+    const { data, error } = await admin
+      .from('accounts')
+      .update(body)
+      .eq('id', normalizedId)
+      .select('id')
+      .maybeSingle()
+
+    if (!error && data) {
+      return { ok: true }
+    }
+
+    if (error) {
+      return { ok: false, message: error.message }
+    }
+  } catch (err) {
+    console.error('[patchAccountRow] supabase-js fallback failed', err)
+  }
+
+  return { ok: false, message: 'Account not found' }
 }
 
-/** Load a tenant account by id — PostgREST first, supabase-js fallback. */
+/** Load a tenant account by id — PostgREST first, then supabase-js, with select fallbacks. */
 export async function fetchAccountById(accountId: string): Promise<AccountRow | null> {
   const normalizedId = String(accountId).trim()
 
@@ -112,77 +164,34 @@ export async function fetchAccountById(accountId: string): Promise<AccountRow | 
     return null
   }
 
-  const full = await fetchAccountByIdRest(normalizedId, ACCOUNT_SELECT)
-  if (!full.error && full.data) {
-    return normalizeAccountRow(full.data)
-  }
+  const attempts: string[] = [ACCOUNT_SELECT, ACCOUNT_SELECT_MINIMAL, ACCOUNT_SELECT_PIPELINE]
 
-  if (full.error && !isMissingColumnError(full.error)) {
-    console.error('[fetchAccountById] REST full select failed', full.error)
-  }
-
-  if (full.error && isMissingColumnError(full.error)) {
-    const minimal = await fetchAccountByIdRest(normalizedId, ACCOUNT_SELECT_MINIMAL)
-    if (minimal.error) {
-      throw new Error(minimal.error)
+  for (const select of attempts) {
+    const rest = await fetchAccountByIdRest(normalizedId, select)
+    if (rest.data) {
+      return normalizeAccountRow(rest.data)
     }
-    if (!minimal.data) return null
-
-    return normalizeAccountRow({
-      ...(minimal.data as AccountRow),
-      booking_link: null,
-      review_link: null,
-      payment_link: null,
-      emergency_line: null,
-      business_hours_start: null,
-      business_hours_end: null,
-      voice_preference: null,
-      active_template_id: null,
-    })
-  }
-
-  if (!full.error && !full.data) {
-    return null
-  }
-
-  const admin = getSupabaseAdmin()
-  const { data, error } = await admin
-    .from('accounts')
-    .select(ACCOUNT_SELECT.replace(/,/g, ', '))
-    .eq('id', normalizedId)
-    .maybeSingle()
-
-  if (!error) {
-    return (data as AccountRow | null) ?? null
-  }
-
-  if (isMissingColumnError(error.message)) {
-    const { data: minimal, error: minimalError } = await admin
-      .from('accounts')
-      .select(ACCOUNT_SELECT_MINIMAL.replace(/,/g, ', '))
-      .eq('id', normalizedId)
-      .maybeSingle()
-
-    if (minimalError) {
-      throw new Error(minimalError.message)
+    if (rest.error && !isMissingColumnError(rest.error)) {
+      console.error('[fetchAccountById] REST select failed', select, rest.error)
+      break
     }
-
-    if (!minimal) return null
-
-    return normalizeAccountRow({
-      ...(minimal as unknown as AccountRow),
-      booking_link: null,
-      review_link: null,
-      payment_link: null,
-      emergency_line: null,
-      business_hours_start: null,
-      business_hours_end: null,
-      voice_preference: null,
-      active_template_id: null,
-    })
   }
 
-  throw new Error(error.message)
+  for (const select of attempts) {
+    try {
+      const row = await fetchAccountViaSupabase(normalizedId, select)
+      if (row) {
+        return row
+      }
+    } catch (err) {
+      console.error('[fetchAccountById] supabase-js select failed', select, err)
+      if (err instanceof Error && !isMissingColumnError(err.message)) {
+        throw err
+      }
+    }
+  }
+
+  return null
 }
 
 export async function accountHasStageDefinitions(accountId: string): Promise<boolean> {
@@ -200,18 +209,25 @@ export async function accountHasStageDefinitions(accountId: string): Promise<boo
     return Array.isArray(rest.data) && rest.data.length > 0
   }
 
-  const admin = getSupabaseAdmin()
-  const { data, error } = await admin
-    .from('stage_definitions')
-    .select('id')
-    .eq('account_id', normalizedId)
-    .limit(1)
+  console.error('[accountHasStageDefinitions] REST failed', rest.error)
 
-  if (error) {
-    throw new Error(error.message)
+  try {
+    const admin = getSupabaseAdmin()
+    const { data, error } = await admin
+      .from('stage_definitions')
+      .select('id')
+      .eq('account_id', normalizedId)
+      .limit(1)
+
+    if (error) {
+      throw new Error(error.message)
+    }
+
+    return (data?.length ?? 0) > 0
+  } catch (err) {
+    console.error('[accountHasStageDefinitions] supabase-js failed', err)
+    return false
   }
-
-  return (data?.length ?? 0) > 0
 }
 
 export async function markOnboardingComplete(accountId: string): Promise<PatchResult> {

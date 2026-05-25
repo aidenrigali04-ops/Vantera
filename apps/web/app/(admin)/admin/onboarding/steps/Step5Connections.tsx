@@ -144,7 +144,19 @@ export function Step5Connections({ accountId, primaryColor, onComplete }: Props)
         return
       }
 
-      onComplete()
+      const redirectTo =
+        result.data && typeof result.data === 'object' && 'redirectTo' in result.data
+          ? String((result.data as { redirectTo?: string }).redirectTo ?? '')
+          : '/admin/dashboard'
+
+      try {
+        window.localStorage.removeItem(`vantera_onboarding_step_${accountId}`)
+      } catch {
+        /* ignore */
+      }
+
+      window.location.replace(redirectTo || '/admin/dashboard')
+      return
     } catch (err) {
       rethrowFrameworkNavigation(err)
       console.error('[Step5Connections] completeOnboarding threw', err)

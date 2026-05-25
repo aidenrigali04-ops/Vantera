@@ -14,6 +14,7 @@ import {
   patchAccountRow,
 } from '@/lib/onboarding/account-store'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
+import { supabaseServiceRest } from '@/lib/supabase/service-rest'
 import {
   integrationCredentials,
   personalizeTemplate,
@@ -838,7 +839,7 @@ export async function saveIntegrationCredentials(
 
 export async function completeOnboarding(
   accountId: string,
-): Promise<ActionResult<{ completed: true; autoAppliedTemplate?: boolean }>> {
+): Promise<ActionResult<{ completed: true; autoAppliedTemplate?: boolean; redirectTo: string }>> {
   try {
     void accountId
     const { session, accountId: workspaceId } = await assertOwnAccount()
@@ -857,26 +858,26 @@ export async function completeOnboarding(
       return err(marked.message)
     }
 
-    // Bust the layout cache so the next request to /admin/* sees the
-    // freshly-stamped onboardingCompletedAt and lets the user through
-    // to /admin/dashboard instead of bouncing them back to the wizard.
     revalidatePath('/admin', 'layout')
+    revalidatePath('/admin/onboarding')
+    revalidatePath('/admin/dashboard')
 
-    // Wake up the AI brain for this account. Fire-and-forget — the owner's
-    // redirect to /admin/dashboard never waits on Anthropic, and a failed
-    // bootstrap is non-fatal (the workflow swallows its own errors and the
-    // brain will retry on the next daily sweep).
     void bootstrapBusinessContext(workspaceId, session.userId).catch(() => {
       /* swallow — workflow already logs */
     })
 
-    // Signup promises "Start with sample data" — seed demo content if the
-    // workspace is still empty after the wizard (non-fatal if it fails).
     void seedSampleWorkspaceIfEmpty(workspaceId).catch((err) => {
       console.error('[completeOnboarding] sample seed failed:', err)
     })
 
-    return { success: true, data: { completed: true, autoAppliedTemplate: pipeline.data?.autoAppliedTemplate } }
+    return {
+      success: true,
+      data: {
+        completed: true,
+        autoAppliedTemplate: pipeline.data?.autoAppliedTemplate,
+        redirectTo: '/admin/dashboard',
+      },
+    }
   } catch (error) {
     rethrowFrameworkSignals(error)
     return err(error instanceof Error ? error.message : 'Failed to complete onboarding')
@@ -894,25 +895,41 @@ async function ensurePipelineReady(
   const account = await fetchAccountById(accountId)
 
   if (!account) {
-    return err('Account not found')
+    console.error('[ensurePipelineReady] could not load account', accountId)
+    return err(
+      'Could not load your workspace. Refresh the page and try again, or sign out and sign back in.',
+    )
   }
 
   let templateId = account.active_template_id
   if (!templateId) {
-    const admin = getSupabaseAdmin()
-    const { data: defaultTemplate, error } = await admin
-      .from('vertical_templates')
-      .select('id')
-      .eq('vertical', account.vertical)
-      .eq('is_active', true)
-      .limit(1)
-      .maybeSingle()
+    const templateRest = await supabaseServiceRest<{ id: string }[]>('vertical_templates', {
+      query: {
+        select: 'id',
+        vertical: `eq.${account.vertical}`,
+        is_active: 'eq.true',
+        limit: '1',
+      },
+    })
 
-    if (error) {
-      return err(error.message)
+    if (!templateRest.error && Array.isArray(templateRest.data) && templateRest.data[0]?.id) {
+      templateId = templateRest.data[0].id
+    } else {
+      const admin = getSupabaseAdmin()
+      const { data: defaultTemplate, error } = await admin
+        .from('vertical_templates')
+        .select('id')
+        .eq('vertical', account.vertical)
+        .eq('is_active', true)
+        .limit(1)
+        .maybeSingle()
+
+      if (error) {
+        return err(error.message)
+      }
+
+      templateId = defaultTemplate?.id ?? null
     }
-
-    templateId = defaultTemplate?.id ?? null
   }
 
   if (!templateId) {
