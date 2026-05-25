@@ -1,8 +1,21 @@
-import { env } from '@/lib/env'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import ws from 'ws'
 
 // NEVER import this in client components or expose to browser
 let adminClient: SupabaseClient | undefined
+
+function getAdminCredentials(): { url: string; key: string } {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_SERVICE_KEY
+
+  if (!url || !key) {
+    throw new Error(
+      'Supabase admin credentials are not configured (NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY).',
+    )
+  }
+
+  return { url, key }
+}
 
 function buildAdminClientOptions(): NonNullable<Parameters<typeof createClient>[2]> {
   const options: NonNullable<Parameters<typeof createClient>[2]> = {
@@ -12,18 +25,13 @@ function buildAdminClientOptions(): NonNullable<Parameters<typeof createClient>[
     },
   }
 
-  // Realtime WebSocket transport is only needed for Larry/CLI on older Node.
-  // Avoid a top-level `ws` import — it breaks some Vercel/serverless bundles
-  // and is unnecessary for REST-only admin queries (signup, onboarding, etc.).
-  if (typeof WebSocket === 'undefined') {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const ws = require('ws') as typeof WebSocket
-      options.realtime = {
-        transport: ws as unknown as typeof WebSocket,
-      }
-    } catch {
-      // REST-only — fine for account/user CRUD.
+  // Supabase JS 2.106+ constructs RealtimeClient in createClient(). On Node
+  // (< 22) that requires the `ws` transport — a dynamic require() often fails
+  // once Next bundles server code for Vercel, which is what broke onboarding
+  // after signup (resolveSessionWorkspace could not init the admin client).
+  if (typeof window === 'undefined') {
+    options.realtime = {
+      transport: ws as unknown as typeof WebSocket,
     }
   }
 
@@ -32,11 +40,8 @@ function buildAdminClientOptions(): NonNullable<Parameters<typeof createClient>[
 
 export function getSupabaseAdmin(): SupabaseClient {
   if (!adminClient) {
-    adminClient = createClient(
-      env.NEXT_PUBLIC_SUPABASE_URL,
-      env.SUPABASE_SERVICE_ROLE_KEY,
-      buildAdminClientOptions(),
-    )
+    const { url, key } = getAdminCredentials()
+    adminClient = createClient(url, key, buildAdminClientOptions())
   }
 
   return adminClient

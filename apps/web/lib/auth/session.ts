@@ -90,7 +90,22 @@ export async function getAdminSession(): Promise<AdminSession | null> {
     return null
   }
 
-  return payload
+  const userId = typeof payload.userId === 'string' ? payload.userId.trim() : ''
+  const accountId = typeof payload.accountId === 'string' ? payload.accountId.trim() : ''
+  const email = typeof payload.email === 'string' ? payload.email.trim() : ''
+  const role = payload.role
+
+  if (!userId || !accountId || !email || typeof role !== 'string') {
+    return null
+  }
+
+  return {
+    type: 'admin',
+    userId,
+    accountId,
+    role: role as AdminSession['role'],
+    email,
+  }
 }
 
 export async function getPortalSession(): Promise<PortalSession | null> {

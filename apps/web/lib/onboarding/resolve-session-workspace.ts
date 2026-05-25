@@ -33,8 +33,12 @@ async function fetchAccountWithRetry(accountId: string): Promise<AccountRow | nu
   if (!normalizedId) return null
 
   for (let attempt = 0; attempt < 3; attempt++) {
-    const account = await fetchAccountById(normalizedId)
-    if (account) return account
+    try {
+      const account = await fetchAccountById(normalizedId)
+      if (account) return account
+    } catch (err) {
+      console.error('[resolveSessionWorkspace] fetchAccountById failed', err)
+    }
     if (attempt < 2) await sleep(200)
   }
 
@@ -123,6 +127,21 @@ export async function resolveSessionWorkspace(
   const userRow = await findUserForSession(session)
 
   if (!userRow) {
+    const accountId = String(session.accountId).trim()
+    const account =
+      accountId && session.role === 'owner' && session.email
+        ? await fetchAccountWithRetry(accountId)
+        : null
+
+    if (account) {
+      return {
+        accountId,
+        account,
+        session,
+        sessionRefreshed: false,
+      }
+    }
+
     throw new Error('Your session expired. Sign out, then sign in or create a new account.')
   }
 
