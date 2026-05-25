@@ -155,6 +155,7 @@ export function Step5Connections({ accountId, primaryColor, onComplete }: Props)
         /* ignore */
       }
 
+      onComplete()
       window.location.replace(redirectTo || '/admin/dashboard')
       return
     } catch (err) {

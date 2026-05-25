@@ -1,5 +1,8 @@
+import { db } from '@/lib/db/client'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { supabaseServiceRest, supabaseServiceRestSingle } from '@/lib/supabase/service-rest'
+import { accounts } from '@vantera/db'
+import { eq } from 'drizzle-orm'
 
 type PatchResult = { ok: true } | { ok: false; message: string }
 
@@ -292,6 +295,55 @@ export async function accountHasStageDefinitions(accountId: string): Promise<boo
   }
 }
 
+/** Resolve the workspace id from the signed-in user row — JWT accountId can drift after re-signup. */
+export async function resolveWorkspaceAccountId(
+  userId: string,
+  fallbackAccountId: string,
+): Promise<string> {
+  const normalizedUserId = String(userId).trim()
+  const normalizedFallback = String(fallbackAccountId).trim()
+
+  if (!normalizedUserId) {
+    return normalizedFallback
+  }
+
+  try {
+    const admin = getSupabaseAdmin()
+    const { data, error } = await admin
+      .from('users')
+      .select('account_id')
+      .eq('id', normalizedUserId)
+      .is('deleted_at', null)
+      .maybeSingle()
+
+    if (!error && data?.account_id) {
+      return String(data.account_id).trim()
+    }
+
+    if (error) {
+      console.error('[resolveWorkspaceAccountId] supabase-js failed', error.message)
+    }
+  } catch (err) {
+    console.error('[resolveWorkspaceAccountId] supabase-js threw', err)
+  }
+
+  const rest = await supabaseServiceRestSingle<{ account_id: string }>('users', {
+    select: 'account_id',
+    id: `eq.${normalizedUserId}`,
+    deleted_at: 'is.null',
+  })
+
+  if (rest.data?.account_id) {
+    return String(rest.data.account_id).trim()
+  }
+
+  if (rest.error) {
+    console.error('[resolveWorkspaceAccountId] REST failed', rest.error)
+  }
+
+  return normalizedFallback
+}
+
 export async function markOnboardingComplete(accountId: string): Promise<PatchResult> {
   const normalizedId = String(accountId).trim()
   if (!normalizedId) {
@@ -299,15 +351,40 @@ export async function markOnboardingComplete(accountId: string): Promise<PatchRe
   }
 
   const timestamp = new Date().toISOString()
-  const body = {
+  const fullBody = {
     onboarding_completed_at: timestamp,
     updated_at: timestamp,
+  }
+  const minimalBody = {
+    onboarding_completed_at: timestamp,
+  }
+
+  // 1) supabase-js — same transport that creates accounts at signup.
+  try {
+    const admin = getSupabaseAdmin()
+    const { data, error } = await admin
+      .from('accounts')
+      .update(fullBody)
+      .eq('id', normalizedId)
+      .select('id, onboarding_completed_at')
+
+    if (!error && Array.isArray(data) && data.length > 0 && data[0]?.onboarding_completed_at) {
+      return { ok: true }
+    }
+
+    if (error) {
+      console.error('[markOnboardingComplete] supabase-js update failed', error.message)
+    } else {
+      console.error('[markOnboardingComplete] supabase-js matched 0 rows', normalizedId)
+    }
+  } catch (err) {
+    console.error('[markOnboardingComplete] supabase-js threw', err)
   }
 
   const withRepresentation = await supabaseServiceRest<AccountRow[]>('accounts', {
     method: 'PATCH',
     query: { id: `eq.${normalizedId}` },
-    body,
+    body: fullBody,
     prefer: 'return=representation',
   })
 
@@ -319,13 +396,18 @@ export async function markOnboardingComplete(accountId: string): Promise<PatchRe
     console.error('[markOnboardingComplete] REST PATCH (representation) failed', withRepresentation.error)
   }
 
-  const minimalPatch = await supabaseServiceRest<null>('accounts', {
-    method: 'PATCH',
-    query: { id: `eq.${normalizedId}` },
-    body,
-  })
+  for (const body of [fullBody, minimalBody]) {
+    const minimalPatch = await supabaseServiceRest<null>('accounts', {
+      method: 'PATCH',
+      query: { id: `eq.${normalizedId}` },
+      body,
+    })
 
-  if (!minimalPatch.error) {
+    if (minimalPatch.error) {
+      console.error('[markOnboardingComplete] REST PATCH (minimal) failed', minimalPatch.error)
+      continue
+    }
+
     const verify = await supabaseServiceRestSingle<{ onboarding_completed_at: string | null }>('accounts', {
       select: 'onboarding_completed_at',
       id: `eq.${normalizedId}`,
@@ -334,28 +416,23 @@ export async function markOnboardingComplete(accountId: string): Promise<PatchRe
     if (verify.data?.onboarding_completed_at) {
       return { ok: true }
     }
-  } else {
-    console.error('[markOnboardingComplete] REST PATCH (minimal) failed', minimalPatch.error)
   }
 
   try {
-    const admin = getSupabaseAdmin()
-    const { data, error } = await admin
-      .from('accounts')
-      .update(body)
-      .eq('id', normalizedId)
-      .select('onboarding_completed_at')
-      .maybeSingle()
+    const rows = await db
+      .update(accounts)
+      .set({
+        onboardingCompletedAt: new Date(timestamp),
+        updatedAt: new Date(),
+      })
+      .where(eq(accounts.id, normalizedId))
+      .returning({ id: accounts.id, onboardingCompletedAt: accounts.onboardingCompletedAt })
 
-    if (!error && data?.onboarding_completed_at) {
+    if (rows.length > 0 && rows[0]?.onboardingCompletedAt) {
       return { ok: true }
     }
-
-    if (error) {
-      return { ok: false, message: error.message }
-    }
   } catch (err) {
-    console.error('[markOnboardingComplete] supabase-js failed', err)
+    console.error('[markOnboardingComplete] Drizzle failed', err)
   }
 
   return {

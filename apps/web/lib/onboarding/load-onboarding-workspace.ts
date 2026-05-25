@@ -1,7 +1,7 @@
 import type { AdminSession } from '@/lib/auth/types'
 import type { BrandingData } from '@/lib/branding/context'
 import type { AccountRow } from './account-store'
-import { fetchAccountById } from './account-store'
+import { fetchAccountById, resolveWorkspaceAccountId } from './account-store'
 import { isOnboardingCompleteForAccount } from './completion-status'
 
 export type OnboardingWorkspace = {
@@ -30,7 +30,7 @@ export async function loadOnboardingWorkspace(
   session: AdminSession,
   branding: BrandingData,
 ): Promise<OnboardingWorkspace> {
-  const accountId = String(session.accountId).trim()
+  const accountId = await resolveWorkspaceAccountId(session.userId, String(session.accountId).trim())
 
   let account: AccountRow | null = null
   if (accountId) {

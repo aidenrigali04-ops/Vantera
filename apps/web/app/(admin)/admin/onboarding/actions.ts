@@ -11,6 +11,7 @@ import {
   fetchAccountById,
   markOnboardingComplete,
   patchAccountRow,
+  resolveWorkspaceAccountId,
 } from '@/lib/onboarding/account-store'
 import { getBrandingFromHeaders } from '@/lib/branding/server'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
@@ -100,12 +101,20 @@ async function assertOwnAccount(): Promise<{
     throw new Error('Your session expired. Refresh the page and sign in again.')
   }
 
-  const accountId = String(session.accountId).trim()
+  const accountId = await resolveWorkspaceAccountId(session.userId, session.accountId)
   if (!accountId) {
     throw new Error('Your workspace session is invalid. Sign out and sign in again.')
   }
 
-  return { session, accountId }
+  if (accountId !== session.accountId) {
+    console.warn('[assertOwnAccount] corrected workspace id from users row', {
+      jwtAccountId: session.accountId,
+      resolvedAccountId: accountId,
+      userId: session.userId,
+    })
+  }
+
+  return { session: { ...session, accountId }, accountId }
 }
 
 export async function updateVertical(
@@ -387,7 +396,7 @@ export async function updateBusinessProfile(
 ): Promise<ActionResult<{ saved: true; rePersonalized: boolean }>> {
   try {
     void accountId
-    const { session, accountId: workspaceId } = await assertOwnAccount()
+    const { accountId: workspaceId } = await assertOwnAccount()
 
     const parsed = businessProfileSchema.safeParse(data)
     if (!parsed.success) {
@@ -404,9 +413,6 @@ export async function updateBusinessProfile(
       emergencyLine: emptyToNull(parsed.data.emergencyLine),
     }
 
-    const account = await fetchAccountById(workspaceId)
-    const activeTemplateId = account?.active_template_id ?? null
-
     const saved = await patchAccountRow(workspaceId, {
       voice_preference: normalized.voicePreference,
       business_hours_start: normalized.businessHoursStart,
@@ -421,19 +427,7 @@ export async function updateBusinessProfile(
       return err(saved.message)
     }
 
-    // If the user already applied a template, re-run personalization so the
-    // new voice / hours / links flow into the existing automations.
-    let rePersonalized = false
-    if (activeTemplateId) {
-      try {
-        await applyTemplateForAccount(workspaceId, activeTemplateId, session.userId)
-        rePersonalized = true
-      } catch {
-        rePersonalized = false
-      }
-    }
-
-    return { success: true, data: { saved: true, rePersonalized } }
+    return { success: true, data: { saved: true, rePersonalized: false } }
   } catch (error) {
     rethrowFrameworkSignals(error)
     return err(error instanceof Error ? error.message : 'Failed to save business profile')
@@ -494,8 +488,7 @@ export type ApplyTemplateResult = {
   aiRewriteError?: string
 }
 
-// Core apply logic, callable internally without re-running session checks
-// (used by re-personalization triggers after Step 6 integration connects).
+// Core apply logic — only invoked from Step 4 "Apply and continue".
 async function applyTemplateForAccount(
   accountId: string,
   templateId: string,
@@ -842,27 +835,7 @@ export async function saveIntegrationCredentials(
         },
       })
 
-    // After a successful integration connect, re-run template personalization
-    // so previously-downgraded actions (e.g. SMS → email when Twilio wasn't
-    // connected at Step 4) get restored to their original channel using the
-    // newly available capability. No-op if the account hasn't applied a
-    // template yet, or if the re-apply fails (we don't want to surface an
-    // integration-save failure for a downstream personalization issue).
-    let rePersonalized = false
-    if (providerKey === 'twilio' || providerKey === 'stripe') {
-      const acct = await fetchAccountById(workspaceId)
-
-      if (acct?.active_template_id) {
-        try {
-          await applyTemplateForAccount(workspaceId, acct.active_template_id, session.userId)
-          rePersonalized = true
-        } catch {
-          rePersonalized = false
-        }
-      }
-    }
-
-    return { success: true, data: { saved: true, rePersonalized } }
+    return { success: true, data: { saved: true, rePersonalized: false } }
   } catch (error) {
     rethrowFrameworkSignals(error)
     return err(error instanceof Error ? error.message : 'Failed to save credentials')
