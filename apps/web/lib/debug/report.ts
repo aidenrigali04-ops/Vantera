@@ -50,8 +50,8 @@ export function formatDebugReport(report: DebugRunReport): string {
 
   lines.push(
     '',
-    'LARRY GUARDRAILS (never violated)',
-    '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+    'LARRY MANDATE',
+    '━━━━━━━━━━━━',
     ...LARRY_MANDATE.slice(3).map((rule) => `• ${rule}`),
     '',
     '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',

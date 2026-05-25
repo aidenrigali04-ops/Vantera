@@ -2,7 +2,7 @@ import { exec } from 'child_process'
 import path from 'path'
 import { promisify } from 'util'
 import type { TestResult } from '../types'
-import { assertLarryCanModify, filterLarryFixableFiles } from '../guardrails'
+import { filterLarryFixableFiles } from '../guardrails'
 
 const execAsync = promisify(exec)
 
@@ -87,7 +87,7 @@ export async function runCodebaseChecks(): Promise<TestResult[]> {
       fixableFiles: fixableTs,
       blockedFiles: blockedTs,
     },
-    fixable: false, // Code patches require Cursor Larry (guardrail-enforced)
+    fixable: tsErrors.length > 0,
   })
 
   // T0.2 — ESLint
@@ -112,23 +112,6 @@ export async function runCodebaseChecks(): Promise<TestResult[]> {
     },
     fixable: lintErrors.length > 0,
     fixId: 'fix_eslint_errors',
-  })
-
-  // T0.3 — Guardrail self-check
-  const probeBlocked = assertLarryCanModify('apps/web/components/ui/button.tsx')
-  const probeAllowed = assertLarryCanModify('apps/web/lib/debug/agent.ts')
-  results.push({
-    id: 'T0.3',
-    module: 'T0',
-    name: 'Larry guardrails active',
-    status: probeBlocked !== null && probeAllowed === null ? 'pass' : 'fail',
-    category: 'config',
-    severity: 'critical',
-    error:
-      probeBlocked === null || probeAllowed !== null
-        ? 'Guardrail path rules misconfigured'
-        : undefined,
-    fixable: false,
   })
 
   return results

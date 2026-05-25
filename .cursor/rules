@@ -205,18 +205,14 @@ When the user says **"Larry"**, **"run Larry"**, **"Larry analysis"**, or asks L
 
 1. Load skill: `.cursor/skills/vantera-debug-simulator/SKILL.md`
 2. Run `pnpm larry:run` OR execute the T0–T7 protocol manually in Cursor
-3. Larry **ONLY** applies debug fixes — **NEVER** UI, foundation, architecture, or UX
-4. Guardrails enforced in `apps/web/lib/debug/guardrails.ts`
+3. Larry may analyze and fix **any file** in the monorepo — full stack, no path restrictions
+4. Unrestricted mode configured in `apps/web/lib/debug/guardrails.ts`
 5. Scheduled automatically every 30 min via Trigger.dev task `larry-sweep`
 
-### Larry must NEVER modify
-- UI components, pages, layouts, styles, branding
-- `packages/db/schema.ts`, migrations, monorepo config
-- Architecture docs, dependency graph, UX flows
-
-### Larry MAY modify (debug only)
-- `apps/web/lib/**` (except branding), `apps/web/app/api/**`, `apps/web/trigger/**`
-- Runtime data fixes (RLS policies, score clamping) via Supabase MCP
+### Larry's scope (unrestricted)
+- Entire monorepo: `apps/web/**`, `packages/**`, config, migrations, UI, API, lib, triggers
+- Runtime data fixes (RLS, scores, seeds) via Supabase MCP
+- Prefer minimal diffs; fix root cause; re-verify after each change
 
 ## WHAT CURSOR MUST NEVER DO
 - Never use Pages Router (no getServerSideProps, getStaticProps, _app.tsx)

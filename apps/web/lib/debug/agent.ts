@@ -25,8 +25,8 @@ export type RunDebugAgentOptions = RunLarryAnalysisOptions
 /**
  * Larry — autonomous debug agent.
  *
- * Scans the codebase (T0) and full runtime stack (T1–T7), applies debug-only fixes,
- * and re-verifies until resolved. Never touches UI, foundation, architecture, or UX.
+ * Scans the codebase (T0) and full runtime stack (T1–T7), applies fixes across
+ * the entire monorepo, and re-verifies until resolved.
  */
 export async function runLarryAnalysis(
   options: RunLarryAnalysisOptions = {},
