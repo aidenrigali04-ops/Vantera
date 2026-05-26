@@ -1,6 +1,15 @@
 import type { AppliedFix, DebugRunReport, DebugScope } from './types'
 import { getDebugTestConfig } from './config'
-import { runFullTestSuite, rerunTest, getFailedTests } from './checks'
+import {
+  runFullTestSuite,
+  rerunTest,
+  getFailedTests,
+  getActionableSkips,
+  retryActionableSkips,
+  fixAttemptKey,
+  mergeModuleResults,
+  rerunModule,
+} from './checks'
 import { executeFix, toAppliedFix } from './fixers'
 import { buildSummary, formatDebugReport } from './report'
 import { closeAdminSql } from './utils'
@@ -42,41 +51,61 @@ export async function runLarryAnalysis(
   let results = await runFullTestSuite()
   const fixes: AppliedFix[] = []
   let attempt = 0
-  const attemptedFixIds = new Set<string>()
+  const attemptedFixKeys = new Set<string>()
 
   while (fixUntilResolved) {
     const failures = getFailedTests(results).filter(
-      (f) => f.fixable && f.fixId && !attemptedFixIds.has(f.fixId),
+      (f) => f.fixable && f.fixId && !attemptedFixKeys.has(fixAttemptKey(f)),
     )
-    if (failures.length === 0) break
+
+    const actionableSkips = getActionableSkips(results).filter(
+      (s) => s.fixable && s.fixId && !attemptedFixKeys.has(fixAttemptKey(s)),
+    )
+
+    const fixTargets = [...failures, ...actionableSkips]
+    if (fixTargets.length === 0) break
     if (attempt >= cfg.maxFixAttempts) break
 
     attempt++
     let anyFixSucceeded = false
 
-    for (const failure of failures) {
-      if (failure.fixId) attemptedFixIds.add(failure.fixId)
-      const fixResult = await executeFix(failure)
-      fixes.push(toAppliedFix(failure, fixResult))
+    for (const target of fixTargets) {
+      if (target.fixId) attemptedFixKeys.add(fixAttemptKey(target))
+      const fixResult = await executeFix(target)
+      fixes.push(toAppliedFix(target, fixResult))
 
       if (fixResult.success) {
         anyFixSucceeded = true
-        const retest = await rerunTest(failure.id)
+        const retest = await rerunTest(target.id)
         if (retest) {
-          results = results.map((r) => (r.id === failure.id ? retest : r))
+          results = results.map((r) => (r.id === target.id ? retest : r))
         }
-      } else {
-        // Don't retry non-actionable fixes in a loop (e.g. unreachable HTTP endpoints).
-        results = results.map((r) => (r.id === failure.id ? { ...r, fixable: false } : r))
+
+        // App probe fixes unlock whole HTTP-dependent modules.
+        if (target.fixId === 'probe_app_urls') {
+          for (const moduleId of ['T3', 'T4', 'T6']) {
+            const fresh = await rerunModule(moduleId)
+            results = mergeModuleResults(results, moduleId, fresh)
+          }
+        }
+      } else if (target.status === 'fail') {
+        results = results.map((r) =>
+          r.id === target.id ? { ...r, fixable: false } : r,
+        )
       }
     }
 
     if (anyFixSucceeded) {
       results = await runFullTestSuite()
+      results = await retryActionableSkips(results)
     } else {
       break
     }
   }
+
+  // Final verification pass — catches skips whose prerequisites were fixed mid-loop.
+  results = await runFullTestSuite()
+  results = await retryActionableSkips(results)
 
   await closeAdminSql()
 

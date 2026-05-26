@@ -41,8 +41,16 @@ export interface DebugTestConfig {
   maxFixAttempts: number
 }
 
+/** Normalize env URLs to the Next.js app origin (not /api/v1 API base). */
+export function normalizeAppBaseUrl(raw?: string): string | undefined {
+  if (!raw) return undefined
+  let url = raw.trim().replace(/\/$/, '')
+  url = url.replace(/\/api\/v1\/?$/i, '')
+  return url || undefined
+}
+
 export function getDebugTestConfig(): DebugTestConfig {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://lvh.me:3000'
+  const appUrl = normalizeAppBaseUrl(process.env.NEXT_PUBLIC_APP_URL) ?? 'http://lvh.me:3000'
 
   return {
     testAccountIdTeam: process.env.DEBUG_TEST_ACCOUNT_ID_TEAM,
@@ -51,7 +59,8 @@ export function getDebugTestConfig(): DebugTestConfig {
     testContactIdB: process.env.DEBUG_TEST_CONTACT_ID_B,
     testContactIdOtherAccount: process.env.DEBUG_TEST_CONTACT_ID_OTHER_ACCOUNT,
     testPortalDomain: process.env.DEBUG_TEST_PORTAL_DOMAIN,
-    internalApiBaseUrl: process.env.INTERNAL_API_BASE_URL ?? appUrl,
+    internalApiBaseUrl:
+      normalizeAppBaseUrl(process.env.INTERNAL_API_BASE_URL) ?? appUrl,
     githubToken: process.env.GITHUB_TOKEN,
     githubRepo: process.env.GITHUB_REPO,
     maxFixAttempts: Number(process.env.DEBUG_MAX_FIX_ATTEMPTS ?? '50'),

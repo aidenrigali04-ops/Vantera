@@ -89,6 +89,46 @@ export async function lookupUserAccountIdViaSql(userId: string): Promise<string 
   }
 }
 
+export async function fetchAccountRowViaSql(accountId: string): Promise<{
+  id: string
+  slug: string
+  name: string
+  vertical: string
+  plan: string
+  onboarding_completed_at: string | null
+} | null> {
+  const normalizedId = String(accountId).trim()
+  if (!normalizedId) return null
+
+  const sql = postgres(getDirectConnectionUrl(), {
+    prepare: false,
+    max: 1,
+    connect_timeout: 5,
+  })
+
+  try {
+    const rows = await sql<
+      {
+        id: string
+        slug: string
+        name: string
+        vertical: string
+        plan: string
+        onboarding_completed_at: string | null
+      }[]
+    >`
+      SELECT id, slug, name, vertical, plan, onboarding_completed_at
+      FROM accounts
+      WHERE id = ${normalizedId}::uuid
+      LIMIT 1
+    `
+
+    return rows[0] ?? null
+  } finally {
+    await sql.end({ timeout: 2 })
+  }
+}
+
 export async function accountExistsViaSql(accountId: string): Promise<boolean> {
   const normalizedId = String(accountId).trim()
   if (!normalizedId) return false

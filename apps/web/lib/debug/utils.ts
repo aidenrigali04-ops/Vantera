@@ -1,5 +1,5 @@
 import postgres from 'postgres'
-import { getDebugTestConfig } from './config'
+import { getDebugTestConfig, normalizeAppBaseUrl } from './config'
 
 let adminSql: ReturnType<typeof postgres> | undefined
 
@@ -37,10 +37,13 @@ export async function fetchWithTimeout(
 export function getAppBaseUrlCandidates(): string[] {
   const cfg = getDebugTestConfig()
   const seen = new Set<string>()
+  const ordered: string[] = []
+
   const add = (raw?: string) => {
-    if (!raw) return
-    const normalized = raw.replace(/\/$/, '')
-    if (!seen.has(normalized)) seen.add(normalized)
+    const normalized = normalizeAppBaseUrl(raw)
+    if (!normalized || seen.has(normalized)) return
+    seen.add(normalized)
+    ordered.push(normalized)
   }
 
   add(cfg.internalApiBaseUrl)
@@ -51,7 +54,7 @@ export function getAppBaseUrlCandidates(): string[] {
   add('http://localhost:3000')
   add('http://lvh.me:3000')
 
-  return [...seen]
+  return ordered
 }
 
 export interface AppProbeResult {
@@ -59,17 +62,67 @@ export interface AppProbeResult {
   response: Response
 }
 
-/** Try each candidate base URL until /api/health responds. */
-export async function probeAppHealth(timeoutMs = 2_000): Promise<AppProbeResult | null> {
+export interface AppProbeDetailedResult {
+  ok: boolean
+  baseUrl?: string
+  candidates: string[]
+  attempts: Array<{ baseUrl: string; error: string }>
+}
+
+async function probeSingleBaseUrl(
+  baseUrl: string,
+  timeoutMs: number,
+): Promise<AppProbeResult> {
+  const response = await fetchWithTimeout(`${baseUrl}/api/health`, {}, timeoutMs)
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}`)
+  }
+
+  const body = (await response.clone().json().catch(() => ({}))) as { ok?: boolean }
+  if (body.ok !== true) {
+    throw new Error('Health body missing ok:true')
+  }
+
+  return { baseUrl, response }
+}
+
+/** Probe each candidate sequentially with retries — reliable on cold starts. */
+export async function probeAppHealthDetailed(options?: {
+  timeoutMs?: number
+  retries?: number
+  retryDelayMs?: number
+}): Promise<AppProbeDetailedResult> {
+  const timeoutMs = options?.timeoutMs ?? 8_000
+  const retries = options?.retries ?? 2
+  const retryDelayMs = options?.retryDelayMs ?? 750
   const candidates = getAppBaseUrlCandidates()
-  const probes = candidates.map(async (baseUrl) => {
-    const response = await fetchWithTimeout(`${baseUrl}/api/health`, {}, timeoutMs)
-    if (!response.ok) throw new Error(`HTTP ${response.status}`)
-    return { baseUrl, response }
-  })
+  const attempts: Array<{ baseUrl: string; error: string }> = []
+
+  for (const baseUrl of candidates) {
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        const probe = await probeSingleBaseUrl(baseUrl, timeoutMs)
+        return { ok: true, baseUrl: probe.baseUrl, candidates, attempts }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'probe failed'
+        attempts.push({ baseUrl, error: message })
+        if (attempt < retries) {
+          await new Promise((resolve) => setTimeout(resolve, retryDelayMs))
+        }
+      }
+    }
+  }
+
+  return { ok: false, candidates, attempts }
+}
+
+/** Try each candidate base URL until /api/health responds. */
+export async function probeAppHealth(timeoutMs = 8_000): Promise<AppProbeResult | null> {
+  const detailed = await probeAppHealthDetailed({ timeoutMs, retries: 1 })
+  if (!detailed.ok || !detailed.baseUrl) return null
 
   try {
-    return await Promise.any(probes)
+    return await probeSingleBaseUrl(detailed.baseUrl, timeoutMs)
   } catch {
     return null
   }

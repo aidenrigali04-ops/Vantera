@@ -1,6 +1,7 @@
 import { db } from '@/lib/db/client'
 import {
   accountExistsViaSql,
+  fetchAccountRowViaSql,
   lookupUserAccountIdViaSql,
   markAccountOnboardingCompleteViaSql,
 } from '@/lib/db/direct-sql'
@@ -270,6 +271,15 @@ export async function fetchAccountById(accountId: string): Promise<AccountRow | 
         throw err
       }
     }
+  }
+
+  try {
+    const sqlRow = await fetchAccountRowViaSql(normalizedId)
+    if (sqlRow) {
+      return normalizeAccountRow(sqlRow)
+    }
+  } catch (err) {
+    console.error('[fetchAccountById] direct SQL failed', err)
   }
 
   return null

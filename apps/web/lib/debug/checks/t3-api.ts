@@ -20,10 +20,12 @@ async function readJson(response: Response): Promise<JsonBody> {
 export async function runApiChecks(): Promise<TestResult[]> {
   const results: TestResult[] = []
 
+  let appProbe: Awaited<ReturnType<typeof probeAppHealth>> = null
+
   // T3.0 — Health endpoint (probes multiple base URLs)
   try {
-    const probe = await probeAppHealth()
-    if (!probe) {
+    appProbe = await probeAppHealth()
+    if (!appProbe) {
       results.push({
         id: 'T3.0',
         module: 'T3',
@@ -36,7 +38,7 @@ export async function runApiChecks(): Promise<TestResult[]> {
         fixId: 'probe_app_urls',
       })
     } else {
-      const body = (await probe.response.json()) as { ok?: boolean }
+      const body = (await appProbe.response.json()) as { ok?: boolean }
       results.push({
         id: 'T3.0',
         module: 'T3',
@@ -45,8 +47,9 @@ export async function runApiChecks(): Promise<TestResult[]> {
         category: 'api',
         severity: 'high',
         error: body.ok === true ? undefined : 'Health body missing ok:true',
-        details: { baseUrl: probe.baseUrl },
-        fixable: false,
+        details: { baseUrl: appProbe.baseUrl },
+        fixable: body.ok !== true,
+        fixId: body.ok !== true ? 'probe_app_urls' : undefined,
       })
     }
   } catch (error) {
@@ -63,7 +66,7 @@ export async function runApiChecks(): Promise<TestResult[]> {
     })
   }
 
-  const appReachable = Boolean(await probeAppHealth().catch(() => null))
+  const appReachable = Boolean(appProbe)
 
   // T3.6 — Session cookie required on app API routes
   if (!appReachable) {
@@ -75,7 +78,8 @@ export async function runApiChecks(): Promise<TestResult[]> {
       category: 'api',
       severity: 'high',
       error: 'App unreachable — cannot probe /api/contacts or /api/records',
-      fixable: false,
+      fixable: true,
+      fixId: 'probe_app_urls',
     })
   } else {
     try {
@@ -127,7 +131,8 @@ export async function runApiChecks(): Promise<TestResult[]> {
       category: 'api',
       severity: 'medium',
       error: 'App unreachable',
-      fixable: false,
+      fixable: true,
+      fixId: 'probe_app_urls',
     })
   } else if (!authHeaders) {
     results.push({
@@ -138,7 +143,8 @@ export async function runApiChecks(): Promise<TestResult[]> {
       category: 'api',
       severity: 'medium',
       error: 'No active admin user found — set DEBUG_TEST_ACCOUNT_ID_TEAM or seed a user',
-      fixable: false,
+      fixable: true,
+      fixId: 'ensure_debug_auth',
     })
   } else {
     try {
@@ -217,7 +223,8 @@ export async function runApiChecks(): Promise<TestResult[]> {
       category: 'api',
       severity: 'medium',
       error: 'App unreachable',
-      fixable: false,
+      fixable: true,
+      fixId: 'probe_app_urls',
     })
   } else if (!authHeaders) {
     results.push({
@@ -228,7 +235,8 @@ export async function runApiChecks(): Promise<TestResult[]> {
       category: 'api',
       severity: 'medium',
       error: 'No active admin user found — set DEBUG_TEST_ACCOUNT_ID_TEAM or seed a user',
-      fixable: false,
+      fixable: true,
+      fixId: 'ensure_debug_auth',
     })
   } else {
     try {
@@ -280,7 +288,8 @@ export async function runApiChecks(): Promise<TestResult[]> {
         category: 'api',
         severity: 'medium',
         error: 'App unreachable',
-        fixable: false,
+        fixable: true,
+        fixId: 'probe_app_urls',
       })
       continue
     }

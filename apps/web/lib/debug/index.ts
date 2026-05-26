@@ -4,7 +4,7 @@ export {
   type RunLarryAnalysisOptions,
   type RunDebugAgentOptions,
 } from './agent'
-export { runFullTestSuite, rerunTest, getFailedTests } from './checks'
+export { runFullTestSuite, rerunTest, getFailedTests, getActionableSkips, retryActionableSkips } from './checks'
 export { formatDebugReport } from './report'
 export {
   LARRY_NAME,

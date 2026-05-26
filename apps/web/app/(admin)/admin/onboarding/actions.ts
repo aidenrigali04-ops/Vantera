@@ -763,7 +763,7 @@ export async function saveIntegrationCredentials(
 ): Promise<ActionResult<{ saved: true; rePersonalized: boolean }>> {
   try {
     void accountId
-    const { session, accountId: workspaceId } = await assertOwnAccount()
+    const { accountId: workspaceId } = await assertOwnAccount()
 
     const parsed = credentialsSchema.safeParse({ provider, credentials })
 

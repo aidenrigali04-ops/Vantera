@@ -1,5 +1,6 @@
 import { env } from '@/lib/env'
-import { fetchAccountById } from '@/lib/onboarding/account-store'
+import { fetchAccountById, markOnboardingComplete } from '@/lib/onboarding/account-store'
+import { isOnboardingCompleteForAccount } from '@/lib/onboarding/completion-status'
 import { resolveSessionWorkspace } from '@/lib/onboarding/resolve-session-workspace'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import type { AdminSession } from '@/lib/auth/types'
@@ -314,6 +315,81 @@ export async function runUiChecks(): Promise<TestResult[]> {
       category: 'ui',
       severity: 'high',
       error: error instanceof Error ? error.message : 'workspace binding probe failed',
+      fixable: false,
+    })
+  }
+
+  // T6.8 — Complete setup write path (mark onboarding_completed_at + verify, then revert)
+  try {
+    const admin = getSupabaseAdmin()
+    const { data: incomplete, error: findError } = await admin
+      .from('accounts')
+      .select('id, onboarding_completed_at')
+      .is('onboarding_completed_at', null)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (findError) {
+      results.push({
+        id: 'T6.8',
+        module: 'T6',
+        name: 'Onboarding complete setup write path',
+        status: 'fail',
+        category: 'ui',
+        severity: 'critical',
+        error: findError.message,
+        fixable: false,
+      })
+    } else if (!incomplete?.id) {
+      results.push({
+        id: 'T6.8',
+        module: 'T6',
+        name: 'Onboarding complete setup write path',
+        status: 'skip',
+        category: 'ui',
+        severity: 'critical',
+        error: 'No incomplete account to probe',
+        fixable: false,
+      })
+    } else {
+      const accountId = incomplete.id
+      const marked = await markOnboardingComplete(accountId)
+      const complete = await isOnboardingCompleteForAccount(accountId)
+
+      if (complete) {
+        await admin
+          .from('accounts')
+          .update({ onboarding_completed_at: null, updated_at: new Date().toISOString() })
+          .eq('id', accountId)
+      }
+
+      results.push({
+        id: 'T6.8',
+        module: 'T6',
+        name: 'Onboarding complete setup write path',
+        status: marked.ok && complete ? 'pass' : 'fail',
+        category: 'ui',
+        severity: 'critical',
+        error:
+          marked.ok && complete
+            ? undefined
+            : marked.ok
+              ? 'onboarding_completed_at not readable after mark'
+              : marked.message,
+        details: { accountId, markedOk: marked.ok, complete },
+        fixable: false,
+      })
+    }
+  } catch (error) {
+    results.push({
+      id: 'T6.8',
+      module: 'T6',
+      name: 'Onboarding complete setup write path',
+      status: 'fail',
+      category: 'ui',
+      severity: 'critical',
+      error: error instanceof Error ? error.message : 'complete setup probe failed',
       fixable: false,
     })
   }

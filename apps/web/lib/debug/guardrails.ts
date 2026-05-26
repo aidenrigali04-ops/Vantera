@@ -35,25 +35,32 @@ export function normalizePath(filePath: string): string {
   return normalized.startsWith('/') ? normalized : `/${normalized}`
 }
 
-export function isLarryBlockedPath(_filePath: string, _testId?: string): boolean {
+export function isLarryBlockedPath(filePath: string, testId?: string): boolean {
+  void filePath
+  void testId
   return false
 }
 
-export function isLarryAllowedPath(_filePath: string, _testId?: string): boolean {
+export function isLarryAllowedPath(filePath: string, testId?: string): boolean {
+  void filePath
+  void testId
   return true
 }
 
 /** Returns null when Larry may modify the file (always, in unrestricted mode). */
-export function assertLarryCanModify(_filePath: string, _testId?: string): string | null {
+export function assertLarryCanModify(filePath: string, testId?: string): string | null {
+  void filePath
+  void testId
   return null
 }
 
 export function filterLarryFixableFiles(
   filePaths: string[],
-  _testId?: string,
+  testId?: string,
 ): {
   allowed: string[]
   blocked: Array<{ path: string; reason: string }>
 } {
+  void testId
   return { allowed: [...filePaths], blocked: [] }
 }

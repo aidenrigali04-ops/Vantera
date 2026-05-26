@@ -4,9 +4,11 @@ import { promisify } from 'util'
 import { sql } from 'drizzle-orm'
 import { db } from '@/lib/db/client'
 import { intelligenceSignals } from '@vantera/db'
+import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import type { AppliedFix, TestResult } from '../types'
 import { CORE_TENANT_TABLES } from '../config'
-import { getAdminSql } from '../utils'
+import { getAdminSql, probeAppHealthDetailed } from '../utils'
+import { resolveDebugAdminSession } from '../api-auth'
 
 const execAsync = promisify(exec)
 
@@ -21,7 +23,7 @@ function getMonorepoRoot(): string {
 }
 
 /** Apply an autonomous fix for a failed test. Returns whether the fix succeeded. */
-export async function executeFix(failure: TestResult, _targetFile?: string): Promise<FixResult> {
+export async function executeFix(failure: TestResult): Promise<FixResult> {
   if (!failure.fixable || !failure.fixId) {
     return {
       success: false,
@@ -41,13 +43,14 @@ export async function executeFix(failure: TestResult, _targetFile?: string): Pro
       return seedTerminalStages(failure)
     case 'fix_eslint_errors':
       return fixEslintErrors()
+    case 'fix_typescript_errors':
+      return fixTypeScriptErrors(failure)
     case 'configure_supabase_ws':
-      return {
-        success: true,
-        description: 'Supabase admin client uses ws transport (apply via lib/supabase/admin.ts)',
-      }
+      return verifySupabaseAuthAdmin()
     case 'probe_app_urls':
-      return probeAppUrlsHint()
+      return probeAppUrls()
+    case 'ensure_debug_auth':
+      return ensureDebugAuth()
     case 'investigate_trigger_failures':
       return investigateTriggerFailures(failure)
     default:
@@ -66,7 +69,6 @@ async function enableRlsPolicies(failure: TestResult): Promise<FixResult> {
   const targets = [...new Set([...tablesWithoutRls, ...tablesWithoutPolicy])]
 
   if (targets.length === 0) {
-    // Re-discover from DB
     const tableRls = await admin<{ tablename: string; rowsecurity: boolean }[]>`
       SELECT tablename, rowsecurity FROM pg_tables
       WHERE schemaname = 'public' AND tablename = ANY(${CORE_TENANT_TABLES as unknown as string[]})
@@ -98,7 +100,6 @@ async function enableRlsPolicies(failure: TestResult): Promise<FixResult> {
       `
 
       if (exists[0]?.count === '0') {
-        // accounts table uses id as tenant key; others use account_id
         const usingClause =
           table === 'accounts'
             ? `id = (auth.jwt()->>'account_id')::uuid`
@@ -269,35 +270,126 @@ async function fixEslintErrors(): Promise<FixResult> {
       maxBuffer: 10 * 1024 * 1024,
       env: process.env,
     })
-    const verify = await execAsync('pnpm exec eslint . --max-warnings 0', {
+  } catch {
+    // --fix may exit non-zero when not all rules are auto-fixable; verify next.
+  }
+
+  try {
+    await execAsync('pnpm exec eslint . --max-warnings 0 --format json', {
       cwd: webDir,
       maxBuffer: 10 * 1024 * 1024,
       env: process.env,
     })
-    if (verify.stderr && verify.stderr.includes('error')) {
-      return {
-        success: false,
-        description: 'ESLint --fix applied but errors remain',
-        error: verify.stderr.slice(0, 500),
-      }
-    }
-    return { success: true, description: 'ESLint --fix applied successfully' }
+    return { success: true, description: 'ESLint --fix applied; lint is clean' }
   } catch (error) {
     const err = error as { stdout?: string; stderr?: string; message?: string }
     const output = [err.stdout, err.stderr, err.message].filter(Boolean).join('\n')
     return {
       success: false,
-      description: 'ESLint --fix failed',
+      description: 'ESLint --fix applied but errors remain',
       error: output.slice(0, 500),
     }
   }
 }
 
-function probeAppUrlsHint(): FixResult {
+async function fixTypeScriptErrors(failure: TestResult): Promise<FixResult> {
+  const webDir = path.join(getMonorepoRoot(), 'apps/web')
+
+  // ESLint --fix resolves many TS-adjacent issues (unused vars, import order, etc.)
+  const eslintFix = await fixEslintErrors()
+
+  try {
+    await execAsync('pnpm exec tsc --noEmit --pretty false', {
+      cwd: webDir,
+      maxBuffer: 10 * 1024 * 1024,
+      env: process.env,
+    })
+    return {
+      success: true,
+      description: eslintFix.success
+        ? 'TypeScript compile clean after ESLint --fix'
+        : 'TypeScript compile clean (ESLint may still have manual fixes)',
+    }
+  } catch (error) {
+    const err = error as { stdout?: string; stderr?: string; message?: string }
+    const output = [err.stdout, err.stderr, err.message].filter(Boolean).join('\n')
+    const parsedCount = (failure.details?.errorCount as number | undefined) ?? 0
+    return {
+      success: false,
+      description:
+        parsedCount > 0
+          ? `TypeScript still has ${parsedCount} error(s) after auto-fix — manual patch required`
+          : 'TypeScript compile failed after auto-fix — see error output',
+      error: output.slice(0, 500),
+    }
+  }
+}
+
+async function verifySupabaseAuthAdmin(): Promise<FixResult> {
+  try {
+    const admin = getSupabaseAdmin()
+    const { error } = await admin.auth.admin.listUsers({ page: 1, perPage: 1 })
+    if (error) {
+      return {
+        success: false,
+        description: 'Supabase auth admin still unreachable',
+        error: error.message,
+      }
+    }
+    return {
+      success: true,
+      description: 'Supabase auth admin reachable (ws transport via lib/supabase/admin.ts)',
+    }
+  } catch (error) {
+    return {
+      success: false,
+      description: 'Supabase auth admin verification failed',
+      error: error instanceof Error ? error.message : 'unknown',
+    }
+  }
+}
+
+async function probeAppUrls(): Promise<FixResult> {
+  const probe = await probeAppHealthDetailed({
+    timeoutMs: 10_000,
+    retries: 3,
+    retryDelayMs: 1_000,
+  })
+
+  if (probe.ok && probe.baseUrl) {
+    return {
+      success: true,
+      description: `App reachable at ${probe.baseUrl} (/api/health ok:true)`,
+    }
+  }
+
+  const attemptSummary = probe.attempts
+    .slice(0, 6)
+    .map((a) => `${a.baseUrl}: ${a.error}`)
+    .join('; ')
+
   return {
     success: false,
-    description: 'Start the app (pnpm dev) or set INTERNAL_API_BASE_URL to a reachable deployment',
-    error: 'No reachable /api/health endpoint among configured base URLs',
+    description:
+      'Start the app (pnpm dev) or set INTERNAL_API_BASE_URL to the Next.js app origin (not /api/v1)',
+    error: attemptSummary || 'No reachable /api/health endpoint among configured base URLs',
+  }
+}
+
+async function ensureDebugAuth(): Promise<FixResult> {
+  const session = await resolveDebugAdminSession()
+  if (session) {
+    return {
+      success: true,
+      description: `Debug admin session resolved for ${session.email} (${session.role})`,
+    }
+  }
+
+  return {
+    success: false,
+    description:
+      'No active admin user for API smoke tests — complete signup or set DEBUG_TEST_ACCOUNT_ID_TEAM',
+    error: 'resolveDebugAdminSession returned null',
   }
 }
 

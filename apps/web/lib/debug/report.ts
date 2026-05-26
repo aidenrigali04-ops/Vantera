@@ -48,6 +48,18 @@ export function formatDebugReport(report: DebugRunReport): string {
     }
   }
 
+  const skippedActionable = report.results.filter(
+    (r) => r.status === 'skip' && r.fixable && r.fixId,
+  )
+  lines.push('', 'SKIPPED (ACTIONABLE)', '━━━━━━━━━━━━━━━━━━')
+  if (skippedActionable.length === 0) {
+    lines.push('None.')
+  } else {
+    for (const s of skippedActionable) {
+      lines.push(`- [${s.module}] ${s.name}: ${s.error ?? 'missing prerequisite'}`)
+    }
+  }
+
   lines.push(
     '',
     'LARRY MANDATE',
