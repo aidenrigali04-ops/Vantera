@@ -14,6 +14,11 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const search = searchParams.get('search') ?? undefined
   const type = searchParams.get('type') ?? undefined
+  const lifecycleStage = searchParams.get('lifecycleStage') as
+    | 'prospect'
+    | 'active_client'
+    | 'churned'
+    | null
   const tags = searchParams.get('tags')?.split(',').filter(Boolean)
   const atRisk = searchParams.get('atRisk') === 'true'
   const limit = Number(searchParams.get('limit') ?? 50)
@@ -22,6 +27,7 @@ export async function GET(request: Request) {
   const data = await findContacts(session.accountId, {
     search,
     type: type && type !== 'all' ? type : undefined,
+    lifecycleStage: lifecycleStage ?? undefined,
     tags,
     limit,
     offset,

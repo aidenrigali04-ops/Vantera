@@ -72,6 +72,7 @@ export async function findContacts(
   accountId: string,
   filters?: {
     type?: string
+    lifecycleStage?: 'prospect' | 'active_client' | 'churned'
     search?: string
     tags?: string[]
     limit?: number
@@ -79,6 +80,10 @@ export async function findContacts(
   },
 ) {
   const conditions = [eq(contacts.accountId, accountId), isNull(contacts.deletedAt)]
+
+  if (filters?.lifecycleStage) {
+    conditions.push(eq(contacts.lifecycleStage, filters.lifecycleStage))
+  }
 
   if (filters?.type) {
     conditions.push(
@@ -181,6 +186,74 @@ export async function countContactsByType(accountId: string) {
     .groupBy(contacts.type)
 
   return Object.fromEntries(rows.map((row) => [row.type, row.count])) as Record<string, number>
+}
+
+export async function getActiveClientKpis(accountId: string) {
+  const [activeRow] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(contacts)
+    .where(
+      and(
+        eq(contacts.accountId, accountId),
+        eq(contacts.lifecycleStage, 'active_client'),
+        isNull(contacts.deletedAt),
+      ),
+    )
+
+  const [atRiskRow] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(contacts)
+    .where(
+      and(
+        eq(contacts.accountId, accountId),
+        eq(contacts.lifecycleStage, 'active_client'),
+        isNull(contacts.deletedAt),
+        sql`${contacts.churnRiskScore} > 70`,
+      ),
+    )
+
+  const [overdueRow] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(records)
+    .where(
+      and(
+        eq(records.accountId, accountId),
+        isNull(records.deletedAt),
+        isNull(records.completedAt),
+        sql`${records.scheduledAt} < now()`,
+      ),
+    )
+
+  return {
+    activeClients: activeRow?.count ?? 0,
+    churnRisk: atRiskRow?.count ?? 0,
+    overdueTasks: overdueRow?.count ?? 0,
+    renewalsDue: 0,
+  }
+}
+
+export async function findUnifiedContactActivities(
+  accountId: string,
+  contactId: string,
+  leadId?: string | null,
+  limit = 50,
+) {
+  const contactActivities = await findContactActivities(accountId, contactId, limit)
+
+  if (!leadId) {
+    return contactActivities
+  }
+
+  const leadActivities = await db
+    .select()
+    .from(activities)
+    .where(and(eq(activities.accountId, accountId), eq(activities.leadId, leadId)))
+    .orderBy(desc(activities.createdAt))
+    .limit(limit)
+
+  return [...contactActivities, ...leadActivities]
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, limit)
 }
 
 export async function findContactActivities(accountId: string, contactId: string, limit = 20) {

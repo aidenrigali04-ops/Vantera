@@ -1,7 +1,11 @@
 'use client'
 
 import { cn } from '@/lib/utils'
+import type { ActionFeedItem } from '@/lib/dashboard/action-feed'
 import type { DashboardSnapshot } from '@/lib/sample-data/queries'
+import { DashboardActionFeed } from './DashboardActionFeed'
+import { ExploreGuideRail } from '@/components/onboarding/ExploreGuideRail'
+import { PostCleanSlatePrompt } from '@/components/onboarding/PostCleanSlatePrompt'
 import { motion, useMotionValue, useSpring, useTransform } from 'framer-motion'
 import {
   ArrowRight,
@@ -23,6 +27,8 @@ type DashboardClientProps = {
   businessName: string
   primaryColor: string
   snapshot: DashboardSnapshot
+  actionFeed: ActionFeedItem[]
+  onboardingIncomplete?: boolean
 }
 
 function formatCurrency(cents: number): string {
@@ -59,6 +65,8 @@ export function DashboardClient({
   businessName,
   primaryColor,
   snapshot,
+  actionFeed,
+  onboardingIncomplete = false,
 }: DashboardClientProps) {
   const {
     clients,
@@ -122,6 +130,20 @@ export function DashboardClient({
         animate="show"
         className="relative mx-auto w-full max-w-7xl space-y-8 px-6 py-10 sm:px-10"
       >
+      <PostCleanSlatePrompt />
+
+      {onboardingIncomplete ? (
+        <motion.section variants={fadeUp} className="grid gap-6 lg:grid-cols-[320px_1fr]">
+          <ExploreGuideRail businessName={businessName} />
+          <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+            <p className="text-sm leading-relaxed text-white/70">
+              You&rsquo;re viewing a pre-built demo workspace. Explore clients, pipeline, and
+              projects — then use the banner above to keep sample data or start fresh.
+            </p>
+          </div>
+        </motion.section>
+      ) : null}
+
       {/* Hero */}
       <motion.section variants={fadeUp} className="flex flex-wrap items-end justify-between gap-4">
         <div className="space-y-2">
@@ -130,21 +152,30 @@ export function DashboardClient({
               aria-hidden
               className="size-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(16,185,129,0.7)]"
             />
-            {today}
+            {onboardingIncomplete ? 'Demo workspace' : today}
           </span>
           <h1 className="text-3xl font-semibold tracking-tight text-white sm:text-4xl">
-            Welcome back, {firstNameFromEmail(email)}.
+            {onboardingIncomplete
+              ? `Explore ${businessName || 'your workspace'}`
+              : `Welcome back, ${firstNameFromEmail(email)}.`}
           </h1>
           <p className="max-w-2xl text-sm leading-relaxed text-white/55">
-            Here's the pulse of {businessName}. Your AI brain is watching for signals while you
-            focus on the work that actually moves the needle.
+            {onboardingIncomplete
+              ? 'Sample clients, deals, and projects are loaded so you can see how everything connects — no setup required yet.'
+              : `Here's the pulse of ${businessName}. Your AI brain is watching for signals while you focus on the work that actually moves the needle.`}
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <PrimaryAction icon={Plus} label="Add client" primaryColor={primaryColor} />
-          <SecondaryAction icon={Briefcase} label="New deal" />
-        </div>
+        {!onboardingIncomplete ? (
+          <div className="flex items-center gap-2">
+            <PrimaryAction icon={Plus} label="Add client" primaryColor={primaryColor} />
+            <SecondaryAction icon={Briefcase} label="New deal" />
+          </div>
+        ) : null}
+      </motion.section>
+
+      <motion.section variants={fadeUp}>
+        <DashboardActionFeed items={actionFeed} className="border-white/[0.06] bg-white/[0.03] text-white [&_h2]:text-white/55 [&_p]:text-white/70 [&_a:hover]:bg-white/[0.04] [&_span]:text-white/40 [&_.rounded-full]:bg-white/[0.06] [&_svg]:text-white/60" />
       </motion.section>
 
       {/* KPI grid */}

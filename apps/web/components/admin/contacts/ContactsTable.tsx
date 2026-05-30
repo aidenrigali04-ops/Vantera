@@ -43,6 +43,7 @@ type ContactsTableProps = {
   contactLabel: string
   contactsLabel: string
   onAddContact: () => void
+  basePath?: string
 }
 
 export function ContactsTable({
@@ -54,6 +55,7 @@ export function ContactsTable({
   contactLabel,
   contactsLabel,
   onAddContact,
+  basePath = '/admin/crm/clients',
 }: ContactsTableProps) {
   const [sorting, setSorting] = useState<SortingState>([])
 
@@ -110,7 +112,7 @@ export function ContactsTable({
         header: 'Name',
         cell: ({ row }) => (
           <Link
-            href={`/admin/contacts/${row.original.id}`}
+            href={`${basePath}/${row.original.id}`}
             className="font-semibold text-stone-900 hover:underline"
             onClick={(e) => e.stopPropagation()}
           >
@@ -218,7 +220,7 @@ export function ContactsTable({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem asChild>
-                <Link href={`/admin/contacts/${row.original.id}`}>View</Link>
+                <Link href={`${basePath}/${row.original.id}`}>View</Link>
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => onArchive(row.original.id)}>Archive</DropdownMenuItem>
             </DropdownMenuContent>
@@ -227,7 +229,7 @@ export function ContactsTable({
         enableSorting: false,
       },
     ],
-    [contactLabel, contactsLabel, data, onArchive, onSelectionChange, selectedIds],
+    [basePath, contactLabel, contactsLabel, data, onArchive, onSelectionChange, selectedIds],
   )
 
   const table = useReactTable({
@@ -299,7 +301,7 @@ export function ContactsTable({
                 key={row.id}
                 className="cursor-pointer border-b border-stone-100 transition-colors hover:bg-stone-50"
                 onClick={() => {
-                  window.location.href = `/admin/contacts/${row.original.id}`
+                  window.location.href = `${basePath}/${row.original.id}`
                 }}
               >
                 {row.getVisibleCells().map((cell) => (

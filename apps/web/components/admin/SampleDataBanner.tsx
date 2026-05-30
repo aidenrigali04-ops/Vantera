@@ -1,5 +1,9 @@
 'use client'
 
+import {
+  clearSampleDataAction,
+  keepSampleDataAction,
+} from '@/app/(admin)/admin/dashboard/actions'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -9,17 +13,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { clearSampleDataAction } from '@/app/(admin)/admin/dashboard/actions'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState, useTransition } from 'react'
 
 type Props = {
   accountId: string
+  onboardingIncomplete?: boolean
 }
 
 const DISMISS_KEY_PREFIX = 'vantera_sample_banner_dismissed'
 
-export function SampleDataBanner({ accountId }: Props) {
+export function SampleDataBanner({ accountId, onboardingIncomplete = false }: Props) {
   const router = useRouter()
   const [dismissed, setDismissed] = useState(false)
   const [open, setOpen] = useState(false)
@@ -27,16 +31,28 @@ export function SampleDataBanner({ accountId }: Props) {
   const [isPending, startTransition] = useTransition()
 
   useEffect(() => {
+    if (onboardingIncomplete) return
     if (typeof window === 'undefined') return
     const flag = window.localStorage.getItem(`${DISMISS_KEY_PREFIX}_${accountId}`)
     if (flag === 'true') setDismissed(true)
-  }, [accountId])
+  }, [accountId, onboardingIncomplete])
 
   function handleKeep() {
-    setDismissed(true)
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem(`${DISMISS_KEY_PREFIX}_${accountId}`, 'true')
-    }
+    startTransition(async () => {
+      if (onboardingIncomplete) {
+        const result = await keepSampleDataAction()
+        if (!result.success) {
+          setError(result.error ?? 'Failed to complete setup')
+          return
+        }
+      } else {
+        setDismissed(true)
+        if (typeof window !== 'undefined') {
+          window.localStorage.setItem(`${DISMISS_KEY_PREFIX}_${accountId}`, 'true')
+        }
+      }
+      router.refresh()
+    })
   }
 
   function handleConfirm() {
@@ -49,22 +65,23 @@ export function SampleDataBanner({ accountId }: Props) {
       }
       if (typeof window !== 'undefined') {
         window.localStorage.removeItem(`${DISMISS_KEY_PREFIX}_${accountId}`)
+        window.sessionStorage.setItem('vantera_clean_slate', 'true')
       }
       setOpen(false)
       router.refresh()
     })
   }
 
-  if (dismissed) return null
+  if (dismissed && !onboardingIncomplete) return null
 
   return (
     <>
-      <div className="border-b border-amber-400/15 bg-amber-400/[0.04]">
-        <div className="flex flex-col items-start justify-between gap-3 px-6 py-2.5 text-sm sm:flex-row sm:items-center">
-          <div className="flex items-center gap-2 text-white/85">
+      <div className="border-b border-amber-200/60 bg-amber-50">
+        <div className="flex flex-col items-start justify-between gap-3 px-4 py-2.5 text-sm sm:flex-row sm:items-center sm:px-6">
+          <div className="flex items-center gap-2 text-stone-800">
             <span
               aria-hidden
-              className="inline-block size-1.5 shrink-0 rounded-full bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.7)]"
+              className="inline-block size-1.5 shrink-0 rounded-full bg-amber-500"
             />
             <span className="font-medium">This is sample data — replace it with yours.</span>
           </div>
@@ -72,14 +89,16 @@ export function SampleDataBanner({ accountId }: Props) {
             <button
               type="button"
               onClick={handleKeep}
-              className="rounded-md px-3 py-1.5 text-xs font-medium text-white/55 transition-colors hover:bg-white/[0.04] hover:text-white"
+              disabled={isPending}
+              className="rounded-md px-3 py-1.5 text-xs font-medium text-stone-600 transition-colors hover:bg-stone-100 hover:text-stone-900 disabled:opacity-50"
             >
               Keep sample data
             </button>
             <button
               type="button"
               onClick={() => setOpen(true)}
-              className="rounded-md border border-amber-400/30 bg-amber-400/10 px-3 py-1.5 text-xs font-medium text-amber-200 transition-colors hover:border-amber-400/50 hover:bg-amber-400/15"
+              disabled={isPending}
+              className="rounded-md border border-stone-900 bg-stone-900 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-stone-800 disabled:opacity-50"
             >
               I&rsquo;m ready to set up my workspace
             </button>
@@ -93,8 +112,7 @@ export function SampleDataBanner({ accountId }: Props) {
             <DialogTitle>Set up your workspace?</DialogTitle>
             <DialogDescription>
               This will clear the sample data. Your pipeline, clients, and projects will start
-              fresh. The pipeline stages you see now will stay so you can add your first real
-              client right away.
+              fresh.
             </DialogDescription>
           </DialogHeader>
           {error ? (

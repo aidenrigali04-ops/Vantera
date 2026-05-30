@@ -10,6 +10,10 @@ export const FLAG_DEFAULTS = {
   sequence_builder: { team: true, enterprise: true },
   lead_scoring: { team: true, enterprise: true },
 
+  lead_pipeline: { team: true, enterprise: true },
+  aspire: { team: true, enterprise: true },
+  linkedin_automation: { team: true, enterprise: true },
+
   autonomous_ai_messaging: { team: false, enterprise: true },
   executive_dashboard: { team: false, enterprise: true },
   retention_health_scoring: { team: false, enterprise: true },

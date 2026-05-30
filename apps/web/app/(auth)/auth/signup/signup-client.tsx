@@ -8,7 +8,7 @@ export function SignupClient() {
   return (
     <SignupForm
       onSubmit={(values) =>
-        invokeAuthAction(() => signupAction(values), '/admin/onboarding')
+        invokeAuthAction(() => signupAction(values), '/admin/dashboard')
       }
     />
   )

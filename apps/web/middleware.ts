@@ -324,24 +324,9 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/admin/dashboard', request.url))
     }
 
-    const onboardingIncomplete = resolvedAccount
-      ? !resolvedAccount.onboarding_completed_at
-      : verifiedAdmin
-        ? true
-        : false
-
-    // Onboarding gate: an owner whose account hasn't completed onboarding
-    // is held on /admin/onboarding regardless of what /admin/* path they
-    // try to hit. This catches anything the signup / OAuth redirects
-    // might miss (stale deep links, page refreshes mid-wizard, etc.).
-    // Non-owner roles bypass — they shouldn't be running the wizard.
-    if (
-      payload.role === 'owner' &&
-      onboardingIncomplete &&
-      !pathname.startsWith('/admin/onboarding')
-    ) {
-      return NextResponse.redirect(new URL('/admin/onboarding', request.url))
-    }
+    // First-session onboarding is explore-first on the demo dashboard.
+    // Owners with incomplete onboarding can access all admin routes until
+    // they choose "keep sample" or "clean slate" via the sample-data banner.
   }
 
   if (pathname.startsWith('/portal')) {

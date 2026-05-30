@@ -33,9 +33,15 @@ type Props = {
   session: AdminSession
   vertical: string
   typeCounts: Record<string, number>
+  basePath?: string
 }
 
-export function ContactsPageClient({ initialContacts, session, typeCounts }: Props) {
+export function ContactsPageClient({
+  initialContacts,
+  session,
+  typeCounts,
+  basePath = '/admin/crm/clients',
+}: Props) {
   const labels = useVerticalLabels()
   const queryClient = useQueryClient()
   const { selectedContactIds, setSelectedContactIds, clearContactSelection } = useUIStore()
@@ -53,12 +59,13 @@ export function ContactsPageClient({ initialContacts, session, typeCounts }: Pro
     type: 'customer' as const,
   })
 
-  const queryKey = ['contacts', session.accountId, search, typeFilter, atRisk]
+  const queryKey = ['contacts', session.accountId, search, typeFilter, atRisk, basePath]
 
   const { data, isLoading } = useQuery({
     queryKey,
     queryFn: async () => {
       const params = new URLSearchParams()
+      params.set('lifecycleStage', 'active_client')
       if (search) params.set('search', search)
       if (typeFilter !== 'all') params.set('type', typeFilter)
       if (atRisk) params.set('atRisk', 'true')
@@ -147,6 +154,7 @@ export function ContactsPageClient({ initialContacts, session, typeCounts }: Pro
         contactLabel={labels.contact}
         contactsLabel={labels.contacts}
         onAddContact={() => setCreateOpen(true)}
+        basePath={basePath}
       />
 
       {totalSelected > 0 ? (

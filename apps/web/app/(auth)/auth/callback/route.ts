@@ -77,15 +77,6 @@ export async function GET(request: NextRequest) {
     if (!existingUserRow.is_active) {
       await admin.from('users').update({ is_active: true }).eq('id', existingUserRow.id)
     }
-    // Resolve where to land them. If onboarding still isn't complete and
-    // they're the owner, drop them into the wizard rather than the
-    // dashboard's empty state.
-    const { data: existingAccount } = await admin
-      .from('accounts')
-      .select('onboarding_completed_at')
-      .eq('id', existingUserRow.account_id)
-      .maybeSingle()
-
     // setAdminSession overwrites any pre-existing v_admin_session via
     // Set-Cookie semantics — no separate clear is needed and emitting
     // both clear+set in the same response can race on some clients.
@@ -97,12 +88,7 @@ export async function GET(request: NextRequest) {
       email: existingUserRow.email,
     })
 
-    const needsOnboarding =
-      !existingAccount?.onboarding_completed_at && existingUserRow.role === 'owner'
-
-    // Respect an explicit `?next=` only if the user already finished onboarding.
-    // Otherwise we don't want a stale dashboard deep-link to skip the wizard.
-    const target = needsOnboarding ? '/admin/onboarding' : next
+    const target = next
     return NextResponse.redirect(new URL(target, request.url))
   }
 

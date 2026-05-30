@@ -3,6 +3,7 @@
 import type { AdminSession } from '@/lib/auth/types'
 import type { ReactNode } from 'react'
 import { CommandPalette } from './CommandPalette'
+import { MobileBottomNav } from './MobileBottomNav'
 import { SampleDataBanner } from './SampleDataBanner'
 import { Sidebar, SidebarMobile } from './Sidebar'
 import { TopHeader } from './TopHeader'
@@ -12,6 +13,7 @@ import { cn } from '@/lib/utils'
 type AdminShellProps = {
   session: AdminSession
   hasSampleData: boolean
+  onboardingIncomplete?: boolean
   bare?: boolean
   children: ReactNode
 }
@@ -20,13 +22,24 @@ type AdminShellProps = {
  * Phase 1 admin shell — CSS grid layout with sidebar, top header, and scrollable main.
  * Brand name comes from BrandingProvider (never hardcoded platform name in chrome).
  */
-export function AdminShell({ session, hasSampleData, bare, children }: AdminShellProps) {
+export function AdminShell({
+  session,
+  hasSampleData,
+  onboardingIncomplete = false,
+  bare,
+  children,
+}: AdminShellProps) {
   const { commandPaletteOpen, setCommandPaletteOpen, sidebarCollapsed } = useUIStore()
 
   if (bare) {
     return (
       <div className="min-h-screen bg-background">
-        {hasSampleData ? <SampleDataBanner accountId={session.accountId} /> : null}
+        {hasSampleData ? (
+          <SampleDataBanner
+            accountId={session.accountId}
+            onboardingIncomplete={onboardingIncomplete}
+          />
+        ) : null}
         {children}
       </div>
     )
@@ -52,12 +65,18 @@ export function AdminShell({ session, hasSampleData, bare, children }: AdminShel
         </div>
 
         <div className="col-start-1 row-start-2 overflow-hidden md:col-start-2">
-          {hasSampleData ? <SampleDataBanner accountId={session.accountId} /> : null}
-          <main className="h-[calc(100vh-60px)] overflow-y-auto p-4 md:p-6">{children}</main>
+          {hasSampleData ? (
+          <SampleDataBanner
+            accountId={session.accountId}
+            onboardingIncomplete={onboardingIncomplete}
+          />
+        ) : null}
+          <main className="h-[calc(100vh-60px)] overflow-y-auto p-4 pb-20 md:p-6 md:pb-6">{children}</main>
         </div>
       </div>
 
       <SidebarMobile session={session} />
+      <MobileBottomNav />
       <CommandPalette open={commandPaletteOpen} onOpenChange={setCommandPaletteOpen} />
     </>
   )

@@ -47,7 +47,7 @@ export function CompleteSignupClient({
     try {
       result = await invokeAuthAction(
         () => completeOAuthSignupAction(values),
-        '/admin/onboarding',
+        '/admin/dashboard',
       )
     } catch (err) {
       if (isNextRedirectError(err)) throw err

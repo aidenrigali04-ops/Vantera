@@ -56,7 +56,7 @@ export const actorTypeEnum = pgEnum('actor_type', [
   'contact',
 ])
 
-export const channelEnum = pgEnum('channel', ['sms', 'email', 'portal'])
+export const channelEnum = pgEnum('channel', ['sms', 'email', 'portal', 'linkedin'])
 
 export const directionEnum = pgEnum('direction', ['outbound', 'inbound'])
 
@@ -84,6 +84,47 @@ export const runStatusEnum = pgEnum('run_status', [
   'running',
   'success',
   'failed',
+])
+
+export const lifecycleStageEnum = pgEnum('lifecycle_stage', [
+  'prospect',
+  'active_client',
+  'churned',
+])
+
+export const leadSourceEnum = pgEnum('lead_source', [
+  'linkedin',
+  'aspire',
+  'manual',
+  'csv',
+  'form',
+  'referral',
+])
+
+export const relationshipStatusEnum = pgEnum('relationship_status', [
+  'new',
+  'contacted',
+  'connected',
+  'nurturing',
+  'qualified',
+  'discovery_booked',
+  'proposal_sent',
+  'won',
+  'lost',
+])
+
+export const linkedinCampaignStatusEnum = pgEnum('linkedin_campaign_status', [
+  'active',
+  'paused',
+  'completed',
+])
+
+export const sequenceStepStatusEnum = pgEnum('sequence_step_status', [
+  'pending',
+  'sent',
+  'failed',
+  'skipped',
+  'cancelled',
 ])
 
 export const accounts = pgTable('accounts', {
@@ -166,6 +207,11 @@ export const contacts = pgTable(
     tags: text('tags').array().notNull().default(sql`'{}'::text[]`),
     source: varchar('source', { length: 100 }),
     notes: text('notes'),
+    lifecycleStage: lifecycleStageEnum('lifecycle_stage').notNull().default('active_client'),
+    company: varchar('company', { length: 255 }),
+    jobTitle: varchar('job_title', { length: 255 }),
+    linkedinUrl: text('linkedin_url'),
+    convertedFromLeadId: uuid('converted_from_lead_id'),
     createdAt: timestamptz('created_at').notNull().defaultNow(),
     updatedAt: timestamptz('updated_at').notNull().defaultNow(),
     deletedAt: timestamptz('deleted_at'),
@@ -251,6 +297,7 @@ export const activities = pgTable(
       .references(() => accounts.id, { onDelete: 'cascade' }),
     recordId: uuid('record_id').references(() => records.id),
     contactId: uuid('contact_id').references(() => contacts.id),
+    leadId: uuid('lead_id'),
     actorType: actorTypeEnum('actor_type').notNull(),
     actorId: uuid('actor_id').notNull(),
     activityType: varchar('activity_type', { length: 80 }).notNull(),
@@ -263,6 +310,7 @@ export const activities = pgTable(
     accountIdx: index('activities_account_id_idx').on(table.accountId),
     recordIdx: index('activities_record_id_idx').on(table.recordId, table.accountId),
     contactIdx: index('activities_contact_id_idx').on(table.contactId, table.accountId),
+    leadIdx: index('activities_lead_id_idx').on(table.leadId, table.accountId),
     createdAtIdx: index('activities_created_at_idx').on(table.createdAt),
   }),
 )
@@ -488,6 +536,207 @@ export const verticalTemplates = pgTable('vertical_templates', {
 })
 
 // ---------------------------------------------------------------------------
+// Core services — Lead Pipeline (LMS), Aspire, LinkedIn Automation
+// ---------------------------------------------------------------------------
+
+export const leads = pgTable(
+  'leads',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    firstName: varchar('first_name', { length: 255 }),
+    lastName: varchar('last_name', { length: 255 }),
+    title: varchar('title', { length: 255 }),
+    company: varchar('company', { length: 255 }).notNull(),
+    email: varchar('email', { length: 255 }),
+    phone: varchar('phone', { length: 30 }),
+    linkedinUrl: text('linkedin_url'),
+    avatarUrl: text('avatar_url'),
+    source: leadSourceEnum('source').notNull().default('manual'),
+    relationshipStatus: relationshipStatusEnum('relationship_status').notNull().default('new'),
+    pipelineStage: varchar('pipeline_stage', { length: 80 }).notNull().default('prospect'),
+    ownerId: uuid('owner_id').references(() => users.id),
+    score: smallint('score').notNull().default(0),
+    tags: text('tags').array().notNull().default(sql`'{}'::text[]`),
+    enrichment: jsonb('enrichment').notNull().default({}),
+    notes: text('notes'),
+    convertedContactId: uuid('converted_contact_id').references(() => contacts.id),
+    createdAt: timestamptz('created_at').notNull().defaultNow(),
+    updatedAt: timestamptz('updated_at').notNull().defaultNow(),
+    deletedAt: timestamptz('deleted_at'),
+  },
+  (table) => ({
+    accountIdx: index('leads_account_id_idx').on(table.accountId),
+    ownerIdx: index('leads_owner_id_idx').on(table.ownerId, table.accountId),
+    statusIdx: index('leads_relationship_status_idx').on(table.relationshipStatus, table.accountId),
+    sourceIdx: index('leads_source_idx').on(table.source, table.accountId),
+  }),
+)
+
+export const leadProfiles = pgTable(
+  'lead_profiles',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    leadId: uuid('lead_id')
+      .notNull()
+      .references(() => leads.id, { onDelete: 'cascade' }),
+    disc: varchar('disc', { length: 1 }),
+    awarenessLevel: smallint('awareness_level'),
+    topTriggers: jsonb('top_triggers').notNull().default([]),
+    primaryFear: text('primary_fear'),
+    egoIdentity: text('ego_identity'),
+    openingHook: text('opening_hook'),
+    doNot: text('do_not'),
+    profiledAt: timestamptz('profiled_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    leadIdx: uniqueIndex('lead_profiles_lead_id_idx').on(table.leadId),
+    accountIdx: index('lead_profiles_account_id_idx').on(table.accountId),
+  }),
+)
+
+export const aspireSavedSearches = pgTable(
+  'aspire_saved_searches',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    name: varchar('name', { length: 255 }).notNull(),
+    filters: jsonb('filters').notNull().default({}),
+    createdByUserId: uuid('created_by_user_id').references(() => users.id),
+    createdAt: timestamptz('created_at').notNull().defaultNow(),
+    updatedAt: timestamptz('updated_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    accountIdx: index('aspire_saved_searches_account_id_idx').on(table.accountId),
+  }),
+)
+
+export const aspireSearchRuns = pgTable(
+  'aspire_search_runs',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    savedSearchId: uuid('saved_search_id').references(() => aspireSavedSearches.id),
+    query: jsonb('query').notNull().default({}),
+    resultCount: smallint('result_count').notNull().default(0),
+    runAt: timestamptz('run_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    accountIdx: index('aspire_search_runs_account_id_idx').on(table.accountId),
+  }),
+)
+
+export const linkedinAccounts = pgTable(
+  'linkedin_accounts',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id').references(() => users.id),
+    linkedinProfileUrl: text('linkedin_profile_url'),
+    extensionConnected: boolean('extension_connected').notNull().default(false),
+    dailyLimit: smallint('daily_limit').notNull().default(50),
+    dailySent: smallint('daily_sent').notNull().default(0),
+    healthStatus: varchar('health_status', { length: 30 }).notNull().default('healthy'),
+    metadata: jsonb('metadata').notNull().default({}),
+    connectedAt: timestamptz('connected_at'),
+    createdAt: timestamptz('created_at').notNull().defaultNow(),
+    updatedAt: timestamptz('updated_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    accountIdx: uniqueIndex('linkedin_accounts_account_user_idx').on(table.accountId, table.userId),
+  }),
+)
+
+export const linkedinCampaigns = pgTable(
+  'linkedin_campaigns',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    name: varchar('name', { length: 255 }).notNull(),
+    status: linkedinCampaignStatusEnum('status').notNull().default('active'),
+    ownerId: uuid('owner_id').references(() => users.id),
+    workflow: jsonb('workflow').notNull().default([]),
+    createdAt: timestamptz('created_at').notNull().defaultNow(),
+    updatedAt: timestamptz('updated_at').notNull().defaultNow(),
+    deletedAt: timestamptz('deleted_at'),
+  },
+  (table) => ({
+    accountIdx: index('linkedin_campaigns_account_id_idx').on(table.accountId),
+    statusIdx: index('linkedin_campaigns_status_idx').on(table.status, table.accountId),
+  }),
+)
+
+export const linkedinSequences = pgTable(
+  'linkedin_sequences',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    campaignId: uuid('campaign_id')
+      .notNull()
+      .references(() => linkedinCampaigns.id, { onDelete: 'cascade' }),
+    leadId: uuid('lead_id')
+      .notNull()
+      .references(() => leads.id, { onDelete: 'cascade' }),
+    status: varchar('status', { length: 30 }).notNull().default('active'),
+    currentStep: smallint('current_step').notNull().default(0),
+    createdAt: timestamptz('created_at').notNull().defaultNow(),
+    updatedAt: timestamptz('updated_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    accountIdx: index('linkedin_sequences_account_id_idx').on(table.accountId),
+    campaignIdx: index('linkedin_sequences_campaign_id_idx').on(table.campaignId),
+    leadIdx: index('linkedin_sequences_lead_id_idx').on(table.leadId),
+  }),
+)
+
+export const linkedinSequenceSteps = pgTable(
+  'linkedin_sequence_steps',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    sequenceId: uuid('sequence_id')
+      .notNull()
+      .references(() => linkedinSequences.id, { onDelete: 'cascade' }),
+    leadId: uuid('lead_id')
+      .notNull()
+      .references(() => leads.id, { onDelete: 'cascade' }),
+    stepNumber: smallint('step_number').notNull(),
+    nodeType: varchar('node_type', { length: 50 }).notNull(),
+    channel: channelEnum('channel').notNull().default('linkedin'),
+    subject: varchar('subject', { length: 500 }),
+    content: text('content'),
+    sendAt: timestamptz('send_at').notNull(),
+    sentAt: timestamptz('sent_at'),
+    status: sequenceStepStatusEnum('status').notNull().default('pending'),
+    skipReason: text('skip_reason'),
+    metadata: jsonb('metadata').notNull().default({}),
+    createdAt: timestamptz('created_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    accountIdx: index('linkedin_sequence_steps_account_id_idx').on(table.accountId),
+    sequenceIdx: index('linkedin_sequence_steps_sequence_id_idx').on(table.sequenceId),
+    statusIdx: index('linkedin_sequence_steps_status_idx').on(table.status, table.sendAt),
+  }),
+)
+
+// ---------------------------------------------------------------------------
 // AI brain — persistent memory and append-only observation log.
 //
 // `ai_memory` is the "brain". One row per (account, kind, subject) holds a
@@ -587,6 +836,8 @@ export const accountsRelations = relations(accounts, ({ many }) => ({
   contacts: many(contacts),
   records: many(records),
   automations: many(automations),
+  leads: many(leads),
+  linkedinCampaigns: many(linkedinCampaigns),
 }))
 
 export const usersRelations = relations(users, ({ one }) => ({
@@ -650,6 +901,10 @@ export const activitiesRelations = relations(activities, ({ one }) => ({
   contact: one(contacts, {
     fields: [activities.contactId],
     references: [contacts.id],
+  }),
+  lead: one(leads, {
+    fields: [activities.leadId],
+    references: [leads.id],
   }),
 }))
 
@@ -785,5 +1040,80 @@ export const aiObservationsRelations = relations(aiObservations, ({ one }) => ({
   signal: one(intelligenceSignals, {
     fields: [aiObservations.relatedSignalId],
     references: [intelligenceSignals.id],
+  }),
+}))
+
+export const leadsRelations = relations(leads, ({ one, many }) => ({
+  account: one(accounts, {
+    fields: [leads.accountId],
+    references: [accounts.id],
+  }),
+  owner: one(users, {
+    fields: [leads.ownerId],
+    references: [users.id],
+  }),
+  convertedContact: one(contacts, {
+    fields: [leads.convertedContactId],
+    references: [contacts.id],
+  }),
+  profile: one(leadProfiles, {
+    fields: [leads.id],
+    references: [leadProfiles.leadId],
+  }),
+  sequences: many(linkedinSequences),
+  activities: many(activities),
+}))
+
+export const leadProfilesRelations = relations(leadProfiles, ({ one }) => ({
+  account: one(accounts, {
+    fields: [leadProfiles.accountId],
+    references: [accounts.id],
+  }),
+  lead: one(leads, {
+    fields: [leadProfiles.leadId],
+    references: [leads.id],
+  }),
+}))
+
+export const linkedinCampaignsRelations = relations(linkedinCampaigns, ({ one, many }) => ({
+  account: one(accounts, {
+    fields: [linkedinCampaigns.accountId],
+    references: [accounts.id],
+  }),
+  owner: one(users, {
+    fields: [linkedinCampaigns.ownerId],
+    references: [users.id],
+  }),
+  sequences: many(linkedinSequences),
+}))
+
+export const linkedinSequencesRelations = relations(linkedinSequences, ({ one, many }) => ({
+  account: one(accounts, {
+    fields: [linkedinSequences.accountId],
+    references: [accounts.id],
+  }),
+  campaign: one(linkedinCampaigns, {
+    fields: [linkedinSequences.campaignId],
+    references: [linkedinCampaigns.id],
+  }),
+  lead: one(leads, {
+    fields: [linkedinSequences.leadId],
+    references: [leads.id],
+  }),
+  steps: many(linkedinSequenceSteps),
+}))
+
+export const linkedinSequenceStepsRelations = relations(linkedinSequenceSteps, ({ one }) => ({
+  account: one(accounts, {
+    fields: [linkedinSequenceSteps.accountId],
+    references: [accounts.id],
+  }),
+  sequence: one(linkedinSequences, {
+    fields: [linkedinSequenceSteps.sequenceId],
+    references: [linkedinSequences.id],
+  }),
+  lead: one(leads, {
+    fields: [linkedinSequenceSteps.leadId],
+    references: [leads.id],
   }),
 }))

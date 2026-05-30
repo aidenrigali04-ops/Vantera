@@ -68,7 +68,7 @@ export function RecordDetail({ record, stages }: Props) {
 
           {record.contact ? (
             <Link
-              href={`/admin/contacts/${record.contact.id}`}
+              href={`/admin/crm/clients/${record.contact.id}`}
               className="mt-2 inline-flex text-sm text-blue-600 hover:underline"
             >
               {record.contact.firstName} {record.contact.lastName}

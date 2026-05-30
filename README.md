@@ -27,6 +27,19 @@ pnpm install
 
 Copy environment variables when they are introduced (`.env.example` in a later step).
 
+## Four-service architecture
+
+Vantera is organized around four core modules:
+
+- **CRM — Active Clients** (`/admin/crm/clients`) — post-conversion client lifecycle
+- **Lead Pipeline / LMS** (`/admin/crm/pipeline`) — pre-conversion prospect management
+- **Aspire** (`/admin/outreach/aspire`) — prospect discovery and enrichment
+- **LinkedIn Automation** (`/admin/outreach/linkedin`) — campaigns and sequences
+
+Legacy routes (`/admin/contacts`, `/admin/records`, `/admin/leads`) redirect to the CRM hub.
+
+The separate [crm-dashboard](https://github.com/aidenrigali04-ops/crm-dashboard) repo remains the agent monitor — not merged into this monorepo.
+
 ## Scripts
 
 | Command | Description |

@@ -9,7 +9,6 @@ import type { Plan } from '@/lib/feature-flags/flags'
 import { isOnboardingCompleteForAccount } from '@/lib/onboarding/status'
 import { hasSampleDataForAccount } from '@/lib/sample-data/queries'
 import { headers } from 'next/headers'
-import { redirect } from 'next/navigation'
 import type { ReactNode } from 'react'
 
 export const dynamic = 'force-dynamic'
@@ -19,30 +18,15 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   const branding = getBrandingFromHeaders(headers())
   const plan = (branding.plan === 'enterprise' ? 'enterprise' : 'team') as Plan
 
-  const pathname = headers().get('x-pathname') ?? ''
-  const isOnboardingRoute = pathname.startsWith('/admin/onboarding')
+  const brandingMatchesSession =
+    !branding.accountId || String(branding.accountId) === String(session.accountId)
 
-  // Final-layer onboarding gate. Middleware ALSO enforces this, but the
-  // layout-level guard means we're safe even if:
-  //   - the middleware matcher ever gets narrowed,
-  //   - Vercel's edge serves a stale response,
-  //   - the request bypasses middleware entirely (rare but possible during
-  //     deployment swaps).
-  // Owners with onboarding_completed_at = NULL get redirected back to the
-  // wizard; non-owner roles never see the wizard so they bypass.
-  if (session.role === 'owner' && !isOnboardingRoute) {
-    const brandingMatchesSession =
-      !branding.accountId || String(branding.accountId) === String(session.accountId)
-
-    let onboardingComplete = false
+  let onboardingComplete = true
+  if (session.role === 'owner') {
     if (brandingMatchesSession && branding.onboardingKnown) {
       onboardingComplete = branding.onboardingComplete
     } else {
       onboardingComplete = await isOnboardingCompleteForAccount(session.accountId)
-    }
-
-    if (!onboardingComplete) {
-      redirect('/admin/onboarding')
     }
   }
 
@@ -55,21 +39,23 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   }
 
   let hasSampleData = false
-  if (!isOnboardingRoute) {
-    try {
-      if (branding.accountId) {
-        hasSampleData = await hasSampleDataForAccount(branding.accountId)
-      }
-    } catch (err) {
-      console.error('[admin-layout] sample data check threw:', err)
+  try {
+    if (branding.accountId) {
+      hasSampleData = await hasSampleDataForAccount(branding.accountId)
     }
+  } catch (err) {
+    console.error('[admin-layout] sample data check threw:', err)
   }
 
   return (
     <BrandingProvider branding={branding}>
       <FeatureFlagProvider flags={flags}>
         <ReactQueryProvider>
-          <AdminShell session={session} hasSampleData={hasSampleData} bare={isOnboardingRoute}>
+          <AdminShell
+            session={session}
+            hasSampleData={hasSampleData}
+            onboardingIncomplete={session.role === 'owner' && !onboardingComplete}
+          >
             {children}
           </AdminShell>
         </ReactQueryProvider>

@@ -28,9 +28,13 @@ function usePageTitle(): string {
   const labels = useVerticalLabels()
 
   if (pathname.startsWith('/admin/dashboard')) return 'Dashboard'
+  if (pathname.startsWith('/admin/crm/clients')) return 'Active Clients'
+  if (pathname.startsWith('/admin/crm/pipeline')) return 'Lead Pipeline'
+  if (pathname.startsWith('/admin/crm')) return 'CRM'
   if (pathname.startsWith('/admin/contacts')) return labels.contacts
   if (pathname.startsWith('/admin/records')) return labels.records
-  if (pathname.startsWith('/admin/pipeline')) return labels.pipeline
+  if (pathname.startsWith('/admin/outreach/aspire')) return 'Aspire'
+  if (pathname.startsWith('/admin/outreach/linkedin')) return 'LinkedIn'
   if (pathname.startsWith('/admin/outreach')) return 'Outreach'
   if (pathname.startsWith('/admin/automations')) return 'Automations'
   if (pathname.startsWith('/admin/reports')) return 'Reports'

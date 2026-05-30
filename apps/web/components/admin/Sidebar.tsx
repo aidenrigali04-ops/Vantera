@@ -3,7 +3,6 @@
 import { adminLogoutAction } from '@/lib/auth/actions'
 import type { AdminSession } from '@/lib/auth/types'
 import { useBranding } from '@/lib/branding/context'
-import { useVerticalLabels } from '@/lib/branding/use-vertical-labels'
 import { FeatureGate } from '@/lib/feature-flags/gate-client'
 import { useUIStore } from '@/lib/stores/ui-store'
 import { cn } from '@/lib/utils'
@@ -12,17 +11,12 @@ import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   BarChart2,
-  Bell,
   Brain,
-  Briefcase,
   Calendar,
-  CheckSquare,
   ChevronLeft,
   ChevronRight,
   CreditCard,
   ExternalLink,
-  FileText,
-  Handshake,
   Inbox,
   LayoutDashboard,
   Share2,
@@ -36,8 +30,6 @@ import {
   Telescope,
   TrendingUp,
   Users,
-  UsersRound,
-  Zap,
   type LucideIcon,
 } from 'lucide-react'
 import Link from 'next/link'
@@ -64,47 +56,35 @@ type SidebarProps = {
 }
 
 function useNavGroups(): NavGroupDef[] {
-  const labels = useVerticalLabels()
-
   return [
     {
       title: 'Command',
       items: [
         { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
         { href: '/admin/inbox', label: 'Inbox', icon: Inbox, badge: 0 },
-        { href: '/admin/notifications', label: 'Notifications', icon: Bell, badge: 0 },
         { href: '/admin/calendar', label: 'Calendar', icon: Calendar },
       ],
     },
     {
-      title: 'Revenue',
+      title: 'CRM',
       items: [
-        { href: '/admin/leads', label: 'Leads', icon: TrendingUp },
-        { href: '/admin/deals', label: 'Deals', icon: Handshake },
-        { href: '/admin/contacts', label: labels.contacts, icon: Users },
-        { href: '/admin/proposals', label: 'Proposals', icon: FileText },
-      ],
-    },
-    {
-      title: 'Operations',
-      items: [
-        { href: '/admin/records', label: labels.records, icon: Briefcase },
-        { href: '/admin/tasks', label: 'Tasks', icon: CheckSquare },
-        { href: '/admin/automations', label: 'Automations', icon: Zap },
-        { href: '/admin/team', label: 'Team', icon: UsersRound },
+        { href: '/admin/crm/clients', label: 'Active Clients', icon: Users },
+        { href: '/admin/crm/pipeline', label: 'Lead Pipeline', icon: TrendingUp },
+        { href: '/admin/crm/inbox', label: 'Inbox', icon: Inbox },
+        { href: '/admin/crm/analytics', label: 'Analytics', icon: BarChart2 },
       ],
     },
     {
       title: 'Outreach',
       items: [
-        { href: '/admin/outreach/linkedin', label: 'LinkedIn', icon: Share2 },
         { href: '/admin/outreach/aspire', label: 'Aspire', icon: Telescope },
+        { href: '/admin/outreach/linkedin', label: 'LinkedIn', icon: Share2 },
         { href: '/admin/outreach/campaigns', label: 'Campaigns', icon: Megaphone },
         { href: '/admin/outreach/email', label: 'Email', icon: Mail },
       ],
     },
     {
-      title: 'Client Experience',
+      title: 'Client',
       items: [
         { href: '/admin/portal', label: 'Client Portal', icon: ExternalLink },
         { href: '/admin/deliverables', label: 'Deliverables', icon: Package },

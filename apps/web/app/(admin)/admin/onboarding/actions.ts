@@ -1,7 +1,6 @@
 'use server'
 
 import { bootstrapBusinessContext } from '@/lib/ai'
-import { seedSampleWorkspaceIfEmpty } from '@/lib/sample-data/seed'
 import { personalizeVoiceWithAI } from '@/lib/ai/personalize-voice'
 import { getAdminSession, setAdminSession } from '@/lib/auth/session'
 import type { ActionResult } from '@/lib/auth/types'
@@ -874,10 +873,6 @@ export async function completeOnboarding(
 
     void bootstrapBusinessContext(workspaceId, session.userId).catch(() => {
       /* swallow — workflow already logs */
-    })
-
-    void seedSampleWorkspaceIfEmpty(workspaceId).catch((err) => {
-      console.error('[completeOnboarding] sample seed failed:', err)
     })
 
     return {

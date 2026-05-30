@@ -157,7 +157,7 @@ export function ContactProfile({ contact, activities, relatedRecords, openRecord
             {labels.records} ({openRecordsCount})
           </h2>
           <Button variant="outline" size="sm" asChild>
-            <Link href={`/admin/records?contactId=${contact.id}`}>Add {labels.record}</Link>
+            <Link href={`/admin/crm/clients?contactId=${contact.id}`}>Add {labels.record}</Link>
           </Button>
         </div>
         <div className="space-y-3">

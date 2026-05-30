@@ -41,12 +41,6 @@ export default async function CompleteSignupPage({ searchParams }: { searchParam
       await admin.from('users').update({ is_active: true }).eq('id', existingUser.id)
     }
 
-    const { data: existingAccount } = await admin
-      .from('accounts')
-      .select('onboarding_completed_at')
-      .eq('id', existingUser.account_id)
-      .maybeSingle()
-
     await setAdminSession({
       type: 'admin',
       userId: existingUser.id,
@@ -55,9 +49,7 @@ export default async function CompleteSignupPage({ searchParams }: { searchParam
       email: existingUser.email,
     })
 
-    const needsOnboarding =
-      !existingAccount?.onboarding_completed_at && existingUser.role === 'owner'
-    redirect(needsOnboarding ? '/admin/onboarding' : '/admin/dashboard')
+    redirect('/admin/dashboard')
   }
 
   const prefilledEmail = searchParams.email ?? email

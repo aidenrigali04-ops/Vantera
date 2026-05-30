@@ -66,7 +66,7 @@ export function KanbanCard({ record, isDragging, stages, users, onUpdated }: Pro
         <div className="min-w-0 flex-1">
           {record.contact ? (
             <Link
-              href={`/admin/contacts/${record.contact.id}`}
+              href={`/admin/crm/clients/${record.contact.id}`}
               onClick={(e) => e.stopPropagation()}
               className="mb-2 flex items-center gap-2"
             >

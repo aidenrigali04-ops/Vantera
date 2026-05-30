@@ -1,9 +1,9 @@
 import { requireAdminSession } from '@/lib/auth/require-session'
 import { getBrandingFromHeaders } from '@/lib/branding/server'
+import { getOperationalActionFeed } from '@/lib/dashboard/action-feed'
 import { isOnboardingCompleteForAccount } from '@/lib/onboarding/status'
 import { getDashboardSnapshot } from '@/lib/sample-data/queries'
 import { headers } from 'next/headers'
-import { redirect } from 'next/navigation'
 import { DashboardClient } from './dashboard-client'
 
 export const dynamic = 'force-dynamic'
@@ -12,26 +12,24 @@ export default async function AdminDashboardPage() {
   const session = await requireAdminSession()
   const branding = getBrandingFromHeaders(headers())
 
-  // Belt-and-suspenders: middleware already gates /admin/* for un-onboarded
-  // owners, but if the matcher ever changes or the cached headers are stale,
-  // we'd rather force them through the wizard than render an empty dashboard.
+  let onboardingIncomplete = false
   if (session.role === 'owner') {
     const brandingMatchesSession =
       !branding.accountId || String(branding.accountId) === String(session.accountId)
 
-    let onboardingComplete = false
+    let onboardingComplete = true
     if (brandingMatchesSession && branding.onboardingKnown) {
       onboardingComplete = branding.onboardingComplete
     } else {
       onboardingComplete = await isOnboardingCompleteForAccount(session.accountId)
     }
-
-    if (!onboardingComplete) {
-      redirect('/admin/onboarding')
-    }
+    onboardingIncomplete = !onboardingComplete
   }
 
-  const snapshot = await getDashboardSnapshot(session.accountId)
+  const [snapshot, actionFeed] = await Promise.all([
+    getDashboardSnapshot(session.accountId),
+    getOperationalActionFeed(session.accountId),
+  ])
 
   return (
     <DashboardClient
@@ -40,6 +38,8 @@ export default async function AdminDashboardPage() {
       businessName={branding.businessName || 'Your workspace'}
       primaryColor={branding.primaryColor || '#1648A0'}
       snapshot={snapshot}
+      actionFeed={actionFeed}
+      onboardingIncomplete={onboardingIncomplete}
     />
   )
 }

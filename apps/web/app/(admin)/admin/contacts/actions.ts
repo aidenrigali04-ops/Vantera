@@ -71,6 +71,7 @@ export async function createContact(input: CreateContactInput): Promise<ActionRe
       city: data.city || null,
       state: data.state || null,
       zip: data.zip || null,
+      lifecycleStage: 'active_client',
     })
     .returning()
 
@@ -83,6 +84,7 @@ export async function createContact(input: CreateContactInput): Promise<ActionRe
   )
 
   revalidatePath('/admin/contacts')
+  revalidatePath('/admin/crm/clients')
   return { success: true, data: contact! }
 }
 
@@ -117,7 +119,9 @@ export async function updateContact(
   await insertContactActivity(session.accountId, contactId, session.userId, 'contact_updated')
 
   revalidatePath('/admin/contacts')
+  revalidatePath('/admin/crm/clients')
   revalidatePath(`/admin/contacts/${contactId}`)
+  revalidatePath(`/admin/crm/clients/${contactId}`)
   return { success: true, data: updated! }
 }
 
@@ -135,6 +139,7 @@ export async function archiveContact(contactId: string): Promise<ActionResult> {
     .where(and(eq(contacts.id, contactId), eq(contacts.accountId, session.accountId)))
 
   revalidatePath('/admin/contacts')
+  revalidatePath('/admin/crm/clients')
   return { success: true, data: undefined }
 }
 
@@ -159,6 +164,7 @@ export async function addTag(contactId: string, tag: string): Promise<ActionResu
     .where(and(eq(contacts.id, contactId), eq(contacts.accountId, session.accountId)))
 
   revalidatePath(`/admin/contacts/${contactId}`)
+  revalidatePath(`/admin/crm/clients/${contactId}`)
   return { success: true, data: undefined }
 }
 
@@ -178,6 +184,7 @@ export async function removeTag(contactId: string, tag: string): Promise<ActionR
     .where(and(eq(contacts.id, contactId), eq(contacts.accountId, session.accountId)))
 
   revalidatePath(`/admin/contacts/${contactId}`)
+  revalidatePath(`/admin/crm/clients/${contactId}`)
   return { success: true, data: undefined }
 }
 

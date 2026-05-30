@@ -15,6 +15,7 @@ import type { ActionResult } from '@/lib/auth/types'
 import type { UserRole } from '@/lib/auth/constants'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { seedSampleWorkspace } from '@/lib/sample-data/seed'
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
@@ -141,12 +142,8 @@ export async function adminLoginAction(
     email: user.email,
   })
 
-  // If the owner of an un-onboarded account is signing in, drop them
-  // directly into the wizard so they don't flash through /admin/dashboard
-  // before the layout redirect kicks in.
-  const onboardingComplete = isOnboardingComplete(account)
-  const redirectTo =
-    !onboardingComplete && user.role === 'owner' ? '/admin/onboarding' : '/admin/dashboard'
+  // Owners land on the demo dashboard to explore before completing setup.
+  const redirectTo = '/admin/dashboard'
 
   return { success: true, data: { redirectTo } }
 }
@@ -394,6 +391,12 @@ export async function signupAction(
     email: normalizedEmail,
   })
 
+  try {
+    await seedSampleWorkspace(account.id)
+  } catch (seedErr) {
+    console.error('[signupAction] sample seed failed:', seedErr)
+  }
+
   if (process.env.NODE_ENV !== 'production') {
     console.log('[signupAction] minted admin session', {
       accountId: account.id,
@@ -406,7 +409,7 @@ export async function signupAction(
   // Set-Cookie from setAdminSession() is committed before /admin/onboarding
   // loads. redirect() in the same Server Action races on Vercel — the next
   // request sometimes arrives without v_admin_session.
-  return { success: true, data: { redirectTo: '/admin/onboarding' } }
+  return { success: true, data: { redirectTo: '/admin/dashboard' } }
 }
 
 /**
@@ -481,12 +484,9 @@ export async function completeOAuthSignupAction(
       email: existingUser.email,
     })
 
-    const needsOnboarding =
-      !existingAccount?.onboarding_completed_at && (existingUser.role as UserRole) === 'owner'
-
     return {
       success: true,
-      data: { redirectTo: needsOnboarding ? '/admin/onboarding' : '/admin/dashboard' },
+      data: { redirectTo: '/admin/dashboard' },
     }
   }
 
@@ -530,5 +530,11 @@ export async function completeOAuthSignupAction(
     email,
   })
 
-  return { success: true, data: { redirectTo: '/admin/onboarding' } }
+  try {
+    await seedSampleWorkspace(account.id)
+  } catch (seedErr) {
+    console.error('[completeOAuthSignupAction] sample seed failed:', seedErr)
+  }
+
+  return { success: true, data: { redirectTo: '/admin/dashboard' } }
 }

@@ -119,7 +119,7 @@ export function ListView({ initialRecords, stages, users, accountId }: Props) {
           if (!c) return '—'
           const name = `${c.firstName} ${c.lastName}`
           return (
-            <Link href={`/admin/contacts/${c.id}`} className="inline-flex items-center gap-2 hover:underline">
+            <Link href={`/admin/crm/clients/${c.id}`} className="inline-flex items-center gap-2 hover:underline">
               <span className={cn('flex h-6 w-6 items-center justify-center rounded-full text-[10px]', avatarColorClass(name))}>
                 {contactInitials(c.firstName, c.lastName)}
               </span>
