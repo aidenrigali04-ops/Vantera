@@ -5,6 +5,7 @@ import { requireAdminSession } from '@/lib/auth/require-session'
 import { db } from '@/lib/db/client'
 import { draftLeadMessage } from '@/lib/outreach/draft-lead-message'
 import { findLeadsByIds, findOutreachCampaignById } from '@/lib/outreach/queries'
+import { enrollLeadsInCampaignCore } from '@/lib/outreach/enroll-leads'
 import { recordCampaignInboundReply } from '@/lib/outreach/record-reply'
 import { materializeCampaignSteps, processDueCampaignSteps } from '@/lib/outreach/runner'
 import {
@@ -102,40 +103,11 @@ export async function enrollLeadsInCampaign(
   leadIds: string[],
 ): Promise<ActionResult<{ enrolled: number }>> {
   const session = await requireAdminSession()
-  if (leadIds.length === 0) return { success: false, error: 'Select at least one lead' }
-
-  const campaign = await findOutreachCampaignById(session.accountId, campaignId)
-  if (!campaign) return { success: false, error: 'Campaign not found' }
-
-  const leads = await findLeadsByIds(session.accountId, leadIds)
-  const validIds = leads.filter((lead) => lead.email).map((lead) => lead.id)
-  if (validIds.length === 0) {
-    return { success: false, error: 'Selected leads need an email address' }
-  }
-
-  const rows = await db
-    .insert(outreachCampaignEnrollments)
-    .values(
-      validIds.map((leadId) => ({
-        accountId: session.accountId,
-        campaignId,
-        leadId,
-        status: 'active' as const,
-      })),
-    )
-    .onConflictDoNothing()
-    .returning({ id: outreachCampaignEnrollments.id })
-
-  const metrics = parseCampaignMetrics(campaign.metrics)
-  metrics.enrolled += rows.length
-
-  await db
-    .update(outreachCampaigns)
-    .set({ metrics, updatedAt: new Date() })
-    .where(eq(outreachCampaigns.id, campaignId))
+  const result = await enrollLeadsInCampaignCore(session.accountId, campaignId, leadIds)
+  if (!result.success) return { success: false, error: result.error }
 
   revalidatePath(`/admin/outreach/campaigns/${campaignId}`)
-  return { success: true, data: { enrolled: rows.length } }
+  return { success: true, data: { enrolled: result.enrolled } }
 }
 
 export async function launchOutreachCampaign(

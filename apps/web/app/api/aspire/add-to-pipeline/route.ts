@@ -1,4 +1,5 @@
-import { EnrollError, enrollLeadFromAspire } from '@/lib/aspire/enroll'
+import { isEnrollError } from '@/lib/aspire/enroll-error'
+import { enrollLeadFromAspire } from '@/lib/aspire/enroll'
 import type { AspireSearchResult } from '@/lib/aspire/types'
 import { getAdminSession } from '@/lib/auth/session'
 import { NextResponse } from 'next/server'
@@ -41,7 +42,7 @@ export async function POST(request: Request) {
     const enrolled = await enrollLeadFromAspire(toApolloPerson(body), '', 'prospect')
     return NextResponse.json({ success: true, data: { id: enrolled.leadId } }, { status: 201 })
   } catch (error) {
-    if (error instanceof EnrollError) {
+    if (isEnrollError(error)) {
       const status = error.code === 'ALREADY_ENROLLED' ? 409 : 400
       return NextResponse.json({ success: false, error: error.message, code: error.code }, { status })
     }

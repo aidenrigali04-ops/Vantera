@@ -1,4 +1,5 @@
 import { getIcpConfigForVertical, scoreICP } from '@/lib/aspire/icp-score'
+import { EnrollError } from '@/lib/aspire/enroll-error'
 import type { ApolloPersonResult, EnrollResult } from '@/lib/aspire/types'
 import { getSystemAutomationId } from '@/lib/automation/system-automation'
 import { getAdminSession } from '@/lib/auth/session'
@@ -14,15 +15,6 @@ import {
   leads,
 } from '@vantera/db'
 import { and, eq, isNull } from 'drizzle-orm'
-import { tasks } from '@trigger.dev/sdk/v3'
-
-export class EnrollError extends Error {
-  code: string
-  constructor(code: string, message: string) {
-    super(message)
-    this.code = code
-  }
-}
 
 async function resolveSessionContext() {
   const session = await getAdminSession()
@@ -189,6 +181,7 @@ export async function enrollLeadFromAspire(
 
   let jobId: string | null = null
   try {
+    const { tasks } = await import('@trigger.dev/sdk/v3')
     const handle = await tasks.trigger('draft-on-enroll', {
       accountId,
       contactId: leadId,
@@ -201,7 +194,7 @@ export async function enrollLeadFromAspire(
     jobId = handle.id
   } catch (error) {
     console.warn('[enrollLeadFromAspire] Trigger.dev unavailable, running inline:', error)
-    const { runDraftOnEnroll } = await import('@/trigger/draft-on-enroll')
+    const { runDraftOnEnroll } = await import('@/lib/aspire/draft-on-enroll-runner')
     await runDraftOnEnroll({
       accountId,
       leadId,

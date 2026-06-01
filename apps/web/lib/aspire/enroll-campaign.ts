@@ -1,7 +1,7 @@
 import { bulkEnrollFromAspire } from '@/lib/aspire/enroll'
 import type { ApolloPersonResult } from '@/lib/aspire/types'
 import { requireAdminSession } from '@/lib/auth/require-session'
-import { enrollLeadsInCampaign } from '@/lib/outreach/actions'
+import { enrollLeadsInCampaignCore } from '@/lib/outreach/enroll-leads'
 
 export async function enrollAspireProspectsInCampaign(input: {
   campaignId: string
@@ -11,7 +11,7 @@ export async function enrollAspireProspectsInCampaign(input: {
   | { success: true; data: { enrolled: number; skipped: number; campaignEnrolled: number } }
   | { success: false; error: string }
 > {
-  await requireAdminSession()
+  const session = await requireAdminSession()
 
   if (!input.people.length) {
     return { success: false, error: 'Select at least one prospect' }
@@ -27,7 +27,11 @@ export async function enrollAspireProspectsInCampaign(input: {
     return { success: false, error: 'Could not resolve leads for selected prospects' }
   }
 
-  const campaignResult = await enrollLeadsInCampaign(input.campaignId, aspireResult.leadIds)
+  const campaignResult = await enrollLeadsInCampaignCore(
+    session.accountId,
+    input.campaignId,
+    aspireResult.leadIds,
+  )
   if (!campaignResult.success) {
     return { success: false, error: campaignResult.error }
   }
@@ -37,7 +41,7 @@ export async function enrollAspireProspectsInCampaign(input: {
     data: {
       enrolled: aspireResult.enrolled,
       skipped: aspireResult.skipped,
-      campaignEnrolled: campaignResult.data.enrolled,
+      campaignEnrolled: campaignResult.enrolled,
     },
   }
 }
