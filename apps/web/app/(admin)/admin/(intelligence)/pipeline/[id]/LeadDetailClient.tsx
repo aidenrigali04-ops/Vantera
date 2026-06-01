@@ -62,14 +62,14 @@ export function LeadDetailClient({ lead, profile, activities }: Props) {
       return
     }
     toast.success('Converted to active client')
-    router.push(`/admin/crm/clients/${result.data.contactId}`)
+    router.push(`/admin/clients/${result.data.contactId}`)
   }
 
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="sm" asChild>
-          <Link href="/admin/crm/pipeline">
+          <Link href="/admin/pipeline">
             <ArrowLeft className="mr-2 h-4 w-4" />
             Pipeline
           </Link>
@@ -128,7 +128,7 @@ export function LeadDetailClient({ lead, profile, activities }: Props) {
           </div>
           {lead.convertedContactId ? (
             <Button asChild className="w-full">
-              <Link href={`/admin/crm/clients/${lead.convertedContactId}`}>View active client</Link>
+              <Link href={`/admin/clients/${lead.convertedContactId}`}>View active client</Link>
             </Button>
           ) : (
             <Button className="w-full" onClick={handleConvert} disabled={converting}>

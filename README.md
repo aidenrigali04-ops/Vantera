@@ -1,6 +1,6 @@
 # Vantera
 
-White-label multi-tenant business operations platform.
+White-label automated sales intelligence platform.
 
 ## Monorepo
 
@@ -27,16 +27,18 @@ pnpm install
 
 Copy environment variables when they are introduced (`.env.example` in a later step).
 
-## Four-service architecture
+## Sales intelligence architecture
 
-Vantera is organized around four core modules:
+Vantera is an automated sales intelligence system organized as **Nurture → Sell → Deliver**:
 
-- **CRM — Active Clients** (`/admin/crm/clients`) — post-conversion client lifecycle
-- **Lead Pipeline / LMS** (`/admin/crm/pipeline`) — pre-conversion prospect management
-- **Aspire** (`/admin/outreach/aspire`) — prospect discovery and enrichment
-- **LinkedIn Automation** (`/admin/outreach/linkedin`) — campaigns and sequences
+| Stage | Route | Purpose |
+|-------|-------|---------|
+| **Deliver** — Active Clients | `/admin/clients` | Post-conversion client lifecycle |
+| **Sell** — Pipeline | `/admin/pipeline` | Pre-conversion prospect management |
+| **Nurture** — Aspire | `/admin/outreach/aspire` | Prospect discovery and enrichment |
+| **Nurture** — LinkedIn | `/admin/outreach/linkedin` | Campaigns and sequences |
 
-Legacy routes (`/admin/contacts`, `/admin/records`, `/admin/leads`) redirect to the CRM hub.
+Legacy routes (`/admin/contacts`, `/admin/records`, `/admin/leads`, `/admin/crm/*`) redirect to the routes above.
 
 The separate [crm-dashboard](https://github.com/aidenrigali04-ops/crm-dashboard) repo remains the agent monitor — not merged into this monorepo.
 

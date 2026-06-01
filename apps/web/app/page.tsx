@@ -6,14 +6,14 @@ export default function HomePage() {
       <div className="w-full max-w-xl space-y-8 text-center">
         <div className="space-y-3">
           <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-            Business Operations Platform
+            Automated Sales Intelligence
           </p>
           <h1 className="text-4xl font-semibold tracking-tight sm:text-5xl">
-            White-label CRM, portal, and automation for service businesses
+            Nurture prospects, close deals, and deliver — under your brand
           </h1>
           <p className="text-base text-muted-foreground sm:text-lg">
-            Run sales, client communication, invoicing, and AI assistance under your own brand.
-            Each account gets a dedicated subdomain with custom branding.
+            Vantera connects outreach, pipeline intelligence, and client delivery in one
+            system. Each account gets a dedicated subdomain with custom branding.
           </p>
         </div>
 

@@ -5,5 +5,5 @@ type Props = {
 }
 
 export default function ContactDetailRedirectPage({ params }: Props) {
-  redirect(`/admin/crm/clients/${params.id}`)
+  redirect(`/admin/clients/${params.id}`)
 }

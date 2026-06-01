@@ -29,7 +29,7 @@ export function PostCleanSlatePrompt() {
       </p>
       <div className="mt-4 flex flex-wrap gap-2">
         <Button asChild size="sm">
-          <Link href="/admin/crm/clients">Add your first client →</Link>
+          <Link href="/admin/clients">Add your first client →</Link>
         </Button>
         <Button variant="outline" size="sm" onClick={dismiss}>
           Dismiss

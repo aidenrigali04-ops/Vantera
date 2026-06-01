@@ -38,7 +38,7 @@ export type ScoreRecordOutput = {
   confidence: number
 }
 
-const SYSTEM_PROMPT = `You are a sales operations analyst. Given an open record in a CRM pipeline,
+const SYSTEM_PROMPT = `You are a sales operations analyst. Given an open opportunity in a sales pipeline,
 estimate two numbers and a brief rationale.
 
 CLOSE PROBABILITY (0..100): the chance this record reaches the terminal "win"

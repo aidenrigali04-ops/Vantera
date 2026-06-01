@@ -65,7 +65,7 @@ export function AspirePageClient({ savedSearches, accountId }: Props) {
       return json.data
     },
     onSuccess: () => {
-      toast.success('Added to Lead Pipeline')
+      toast.success('Added to pipeline')
       queryClient.invalidateQueries({ queryKey: ['leads'] })
     },
     onError: (err: Error) => toast.error(err.message),

@@ -1,7 +1,7 @@
 // Tool: classify-message-intent.
 //
 // Triages an inbound message (SMS, email, portal note) into a small set of
-// CRM-actionable intents. Used by the inbound message workflow to decide
+// Sales-intelligence actionable intents. Used by the inbound message workflow to decide
 // what to do next: auto-reply, escalate to owner, schedule a callback, log
 // as a complaint, etc.
 //

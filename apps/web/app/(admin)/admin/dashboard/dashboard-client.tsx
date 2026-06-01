@@ -161,7 +161,7 @@ export function DashboardClient({
           </h1>
           <p className="max-w-2xl text-sm leading-relaxed text-white/55">
             {onboardingIncomplete
-              ? 'Sample clients, deals, and projects are loaded so you can see how everything connects — no setup required yet.'
+              ? 'Sample clients, opportunities, and projects are loaded so you can see how everything connects — no setup required yet.'
               : `Here's the pulse of ${businessName}. Your AI brain is watching for signals while you focus on the work that actually moves the needle.`}
           </p>
         </div>
@@ -169,7 +169,7 @@ export function DashboardClient({
         {!onboardingIncomplete ? (
           <div className="flex items-center gap-2">
             <PrimaryAction icon={Plus} label="Add client" primaryColor={primaryColor} />
-            <SecondaryAction icon={Briefcase} label="New deal" />
+            <SecondaryAction icon={Briefcase} label="New opportunity" />
           </div>
         ) : null}
       </motion.section>
@@ -188,7 +188,7 @@ export function DashboardClient({
           primaryColor={primaryColor}
         />
         <KpiTile
-          label="Open deals"
+          label="Open opportunities"
           value={openDeals.length}
           icon={TrendingUp}
           accent="#F59E0B"
@@ -218,7 +218,7 @@ export function DashboardClient({
         <Card>
           <CardHeader
             title="Pipeline"
-            subtitle="Deals across each stage — terminal-loss stages are hidden"
+            subtitle="Opportunities across each stage — terminal-loss stages are hidden"
             right={
               <span className="inline-flex h-7 items-center gap-1.5 rounded-full bg-white/[0.04] px-3 text-xs font-medium text-white/70 ring-1 ring-inset ring-white/[0.06]">
                 <span aria-hidden className="size-1.5 rounded-full bg-white/40" />
@@ -261,7 +261,7 @@ export function DashboardClient({
             {clients.length === 0 ? (
               <EmptyState
                 title="No clients yet"
-                subtitle="Add your first client to start tracking deals and projects against them."
+                subtitle="Add your first client to start tracking opportunities and projects against them."
                 cta="Add a client"
                 primaryColor={primaryColor}
               />
@@ -476,7 +476,7 @@ function PipelineColumn({
       <div className="space-y-2">
         {column.deals.length === 0 ? (
           <div className="rounded-lg border border-dashed border-white/[0.08] bg-white/[0.01] p-3 text-center text-[11px] text-white/30">
-            No deals
+            No opportunities
           </div>
         ) : (
           column.deals.map((d, idx) => <DealCard key={d.id} deal={d} index={idx} />)
@@ -508,9 +508,9 @@ function DealCard({ deal, index }: { deal: DashboardSnapshot['deals'][number]; i
 function EmptyPipeline() {
   return (
     <div className="rounded-xl border border-dashed border-white/[0.08] bg-white/[0.01] p-10 text-center">
-      <p className="text-sm font-medium text-white/70">No active deals.</p>
+      <p className="text-sm font-medium text-white/70">No active opportunities.</p>
       <p className="mt-1 text-xs text-white/40">
-        Add a contact and create a deal — your stages are already configured.
+        Add a client and create an opportunity — your stages are already configured.
       </p>
     </div>
   )

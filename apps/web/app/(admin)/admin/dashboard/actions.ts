@@ -49,7 +49,7 @@ export async function clearSampleDataAction(): Promise<ActionResult<{ cleared: t
     }
 
     revalidatePath('/admin/dashboard')
-    revalidatePath('/admin/crm/clients')
+    revalidatePath('/admin/clients')
     revalidatePath('/admin', 'layout')
 
     return { success: true, data: { cleared: true } }

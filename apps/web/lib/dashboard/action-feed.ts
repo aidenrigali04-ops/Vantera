@@ -33,7 +33,7 @@ export async function getOperationalActionFeed(accountId: string, limit = 8): Pr
       type: 'churn_risk',
       title: `${contact.firstName} ${contact.lastName} at churn risk`,
       subtitle: `Risk score ${contact.churnRiskScore}`,
-      href: `/admin/crm/clients/${contact.id}`,
+      href: `/admin/clients/${contact.id}`,
       createdAt: contact.updatedAt,
     })
   }
@@ -82,10 +82,10 @@ export async function getOperationalActionFeed(accountId: string, limit = 8): Pr
       title: activity.body ?? 'New reply detected',
       subtitle: activity.activityType.replace(/_/g, ' '),
       href: activity.leadId
-        ? `/admin/crm/pipeline/${activity.leadId}`
+        ? `/admin/pipeline/${activity.leadId}`
         : activity.contactId
-          ? `/admin/crm/clients/${activity.contactId}`
-          : '/admin/crm/pipeline',
+          ? `/admin/clients/${activity.contactId}`
+          : '/admin/pipeline',
       createdAt: activity.createdAt,
     })
   }
@@ -110,7 +110,7 @@ export async function getOperationalActionFeed(accountId: string, limit = 8): Pr
       type: 'stalled_deal',
       title: `Stalled prospect: ${lead.company}`,
       subtitle: `No activity in 7+ days · ${lead.relationshipStatus}`,
-      href: `/admin/crm/pipeline/${lead.id}`,
+      href: `/admin/pipeline/${lead.id}`,
       createdAt: lead.updatedAt,
     })
   }

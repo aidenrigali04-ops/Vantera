@@ -44,7 +44,7 @@ export async function enrollLeads(
     .returning()
 
   revalidatePath('/admin/outreach/linkedin')
-  revalidatePath('/admin/crm/pipeline')
+  revalidatePath('/admin/pipeline')
   return { success: true, data: { enrolled: rows.length } }
 }
 

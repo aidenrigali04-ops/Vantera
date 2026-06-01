@@ -536,7 +536,7 @@ export const verticalTemplates = pgTable('vertical_templates', {
 })
 
 // ---------------------------------------------------------------------------
-// Core services — Lead Pipeline (LMS), Aspire, LinkedIn Automation
+// Core services — Pipeline, Aspire, LinkedIn Automation
 // ---------------------------------------------------------------------------
 
 export const leads = pgTable(

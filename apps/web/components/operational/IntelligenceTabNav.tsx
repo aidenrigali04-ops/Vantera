@@ -5,27 +5,20 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
 const TABS = [
-  { href: '/admin/crm/clients', label: 'Active Clients' },
-  { href: '/admin/crm/pipeline', label: 'Lead Pipeline' },
-  { href: '/admin/crm/prospecting', label: 'Prospecting' },
-  { href: '/admin/crm/outreach', label: 'Outreach' },
-  { href: '/admin/crm/inbox', label: 'Inbox' },
-  { href: '/admin/crm/analytics', label: 'Analytics' },
+  { href: '/admin/pipeline', label: 'Pipeline' },
+  { href: '/admin/clients', label: 'Active Clients' },
 ] as const
 
-export function CrmTabNav() {
+export function IntelligenceTabNav() {
   const pathname = usePathname() ?? ''
 
   return (
     <nav
       className="flex gap-1 overflow-x-auto border-b border-stone-200 pb-px"
-      aria-label="CRM sections"
+      aria-label="Sales intelligence sections"
     >
       {TABS.map((tab) => {
-        const active =
-          pathname === tab.href ||
-          pathname.startsWith(`${tab.href}/`) ||
-          (tab.href === '/admin/crm/clients' && pathname.startsWith('/admin/crm/clients'))
+        const active = pathname === tab.href || pathname.startsWith(`${tab.href}/`)
         return (
           <Link
             key={tab.href}

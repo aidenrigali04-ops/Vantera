@@ -23,7 +23,7 @@ export type SummarizeOutput = {
   confidence: number
 }
 
-const SYSTEM_PROMPT = `You are the strategic memory of a CRM. Given the live state of a business
+const SYSTEM_PROMPT = `You are the strategic memory of a sales intelligence system. Given the live state of a business
 account, write a tight one-paragraph summary of what kind of operation this
 is, who the customer is, what's working, and where they need help. Then list
 3-5 KEY TRAITS, up to 3 RISK FACTORS, and up to 3 OPPORTUNITIES.

@@ -19,7 +19,7 @@ type TileBase = {
   monogram: string
   /** Two-stop gradient for the icon swatch (matches the screenshot's tiles). */
   gradient: [string, string]
-  /** Sub-line of small uppercase tags (e.g. "CRM · SMS · FUNNELS"). */
+  /** Sub-line of small uppercase tags (e.g. "SALES · SMS · FUNNELS"). */
   tags: string[]
 }
 
@@ -91,10 +91,10 @@ const TILES: Tile[] = [
   {
     provider: 'hubspot',
     name: 'HubSpot',
-    description: 'CRM sync',
+    description: 'Sales sync',
     monogram: 'HS',
     gradient: ['#FF7A59', '#FFA37C'],
-    tags: ['CRM', 'Pipeline', 'Deals'],
+    tags: ['Sales', 'Pipeline', 'Opportunities'],
     kind: 'placeholder',
     buttonLabel: 'Connect HubSpot',
     note: 'Coming in Phase 2',
@@ -105,7 +105,7 @@ const TILES: Tile[] = [
     description: 'Marketing automation',
     monogram: 'GHL',
     gradient: ['#1E3A8A', '#3B6FE0'],
-    tags: ['CRM', 'SMS', 'Funnels'],
+    tags: ['Sales', 'SMS', 'Funnels'],
     kind: 'placeholder',
     buttonLabel: 'Connect GoHighLevel',
     note: 'Coming in Phase 2',

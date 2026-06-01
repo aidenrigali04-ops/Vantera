@@ -40,7 +40,7 @@ export function ContactsPageClient({
   initialContacts,
   session,
   typeCounts,
-  basePath = '/admin/crm/clients',
+  basePath = '/admin/clients',
 }: Props) {
   const labels = useVerticalLabels()
   const queryClient = useQueryClient()

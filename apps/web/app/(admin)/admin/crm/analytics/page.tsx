@@ -1,12 +1,5 @@
-import { ModulePlaceholder } from '@/components/operational/ModulePlaceholder'
-import { BarChart2 } from 'lucide-react'
+import { redirect } from 'next/navigation'
 
-export default function CrmAnalyticsPage() {
-  return (
-    <ModulePlaceholder
-      icon={BarChart2}
-      title="CRM Analytics"
-      description="Pipeline metrics, conversion rates, and operational reporting for leads and active clients."
-    />
-  )
+export default function CrmAnalyticsRedirect() {
+  redirect('/admin/reports')
 }

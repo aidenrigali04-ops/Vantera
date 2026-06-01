@@ -57,7 +57,7 @@ export function AuthLayout({ children }: AuthLayoutProps) {
 
           <div className="grid grid-cols-3 gap-3 pt-12">
             <HeroTile label="Clients" caption="Real people, one source of truth" />
-            <HeroTile label="Pipeline" caption="Deals across every stage" />
+            <HeroTile label="Pipeline" caption="Opportunities across every stage" />
             <HeroTile label="Projects" caption="Delivery wired to clients" />
           </div>
         </div>

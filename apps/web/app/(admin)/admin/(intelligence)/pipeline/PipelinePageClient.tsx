@@ -163,7 +163,7 @@ export function PipelinePageClient({ initialLeads, stats, accountId }: Props) {
         cell: (row: LeadRow) =>
           row.convertedContactId ? (
             <Button variant="ghost" size="sm" asChild>
-              <Link href={`/admin/crm/clients/${row.convertedContactId}`}>View client</Link>
+              <Link href={`/admin/clients/${row.convertedContactId}`}>View client</Link>
             </Button>
           ) : (
             <Button
@@ -178,7 +178,7 @@ export function PipelinePageClient({ initialLeads, stats, accountId }: Props) {
                 }
                 toast.success('Converted to active client')
                 await queryClient.invalidateQueries({ queryKey: ['leads'] })
-                router.push(`/admin/crm/clients/${result.data.contactId}`)
+                router.push(`/admin/clients/${result.data.contactId}`)
               }}
             >
               Convert
@@ -231,7 +231,7 @@ export function PipelinePageClient({ initialLeads, stats, accountId }: Props) {
   return (
     <div className="space-y-5">
       <PageHeader
-        title="Lead Pipeline"
+        title="Pipeline"
         description="Pre-conversion prospects — nurture, qualify, and convert to active clients."
         actions={
           <Button onClick={() => setCreateOpen(true)}>
@@ -286,7 +286,7 @@ export function PipelinePageClient({ initialLeads, stats, accountId }: Props) {
           rows={leadsData}
           selectedIds={selectedIds}
           onSelectionChange={setSelectedIds}
-          onRowClick={(row) => router.push(`/admin/crm/pipeline/${row.id}`)}
+          onRowClick={(row) => router.push(`/admin/pipeline/${row.id}`)}
           emptyState={
             <div className="rounded-xl border border-dashed border-stone-200 bg-stone-50/50 px-6 py-12 text-center">
               <p className="text-sm font-medium text-stone-700">No prospects yet</p>

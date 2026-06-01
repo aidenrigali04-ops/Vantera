@@ -55,7 +55,7 @@ export function ContactsTable({
   contactLabel,
   contactsLabel,
   onAddContact,
-  basePath = '/admin/crm/clients',
+  basePath = '/admin/clients',
 }: ContactsTableProps) {
   const [sorting, setSorting] = useState<SortingState>([])
 

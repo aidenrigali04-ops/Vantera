@@ -143,7 +143,7 @@ async function requestRewrites(args: {
   const payload = args.pending.map((p, idx) => ({ id: String(idx), body: p.original }))
 
   const systemPrompt = [
-    'You rewrite short CRM message templates in a specific tone of voice.',
+    'You rewrite short sales message templates in a specific tone of voice.',
     'You must:',
     '  - Preserve every {{placeholder}} EXACTLY as written. Do not invent new placeholders.',
     '  - Keep each message concise — never longer than 1.4× the original length.',

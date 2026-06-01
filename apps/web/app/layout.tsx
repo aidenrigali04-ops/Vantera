@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Vantera",
-  description: "White-label multi-tenant business operations platform",
+  description: "Automated sales intelligence for service businesses — nurture, sell, and deliver under your brand.",
 };
 
 export default function RootLayout({

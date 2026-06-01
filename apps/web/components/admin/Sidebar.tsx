@@ -66,16 +66,7 @@ function useNavGroups(): NavGroupDef[] {
       ],
     },
     {
-      title: 'CRM',
-      items: [
-        { href: '/admin/crm/clients', label: 'Active Clients', icon: Users },
-        { href: '/admin/crm/pipeline', label: 'Lead Pipeline', icon: TrendingUp },
-        { href: '/admin/crm/inbox', label: 'Inbox', icon: Inbox },
-        { href: '/admin/crm/analytics', label: 'Analytics', icon: BarChart2 },
-      ],
-    },
-    {
-      title: 'Outreach',
+      title: 'Nurture',
       items: [
         { href: '/admin/outreach/aspire', label: 'Aspire', icon: Telescope },
         { href: '/admin/outreach/linkedin', label: 'LinkedIn', icon: Share2 },
@@ -84,10 +75,17 @@ function useNavGroups(): NavGroupDef[] {
       ],
     },
     {
-      title: 'Client',
+      title: 'Sell',
       items: [
-        { href: '/admin/portal', label: 'Client Portal', icon: ExternalLink },
+        { href: '/admin/pipeline', label: 'Pipeline', icon: TrendingUp },
+      ],
+    },
+    {
+      title: 'Deliver',
+      items: [
+        { href: '/admin/clients', label: 'Active Clients', icon: Users },
         { href: '/admin/deliverables', label: 'Deliverables', icon: Package },
+        { href: '/admin/portal', label: 'Client Portal', icon: ExternalLink },
         { href: '/admin/billing', label: 'Billing', icon: CreditCard },
       ],
     },

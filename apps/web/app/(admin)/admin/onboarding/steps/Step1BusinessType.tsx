@@ -151,7 +151,7 @@ export function Step1BusinessType({ accountId, currentVertical, primaryColor, on
     <motion.div variants={stepContainer} initial="hidden" animate="show" className="space-y-8">
       <StepHeader
         title="What are you managing?"
-        subtitle="Choose a template — we tailor CRM tabs, pipelines, and AI tone to your workflow."
+        subtitle="Choose a template — we tailor pipeline stages, client views, and AI tone to your workflow."
       />
 
       <motion.div variants={fadeUp} className="grid grid-cols-1 gap-3 sm:grid-cols-2">

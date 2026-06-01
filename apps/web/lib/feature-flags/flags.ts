@@ -1,5 +1,5 @@
 export const FLAG_DEFAULTS = {
-  native_crm: { team: true, enterprise: true },
+  sales_intelligence: { team: true, enterprise: true },
   native_email_engine: { team: true, enterprise: true },
   native_pipeline: { team: true, enterprise: true },
   native_invoicing: { team: true, enterprise: true },

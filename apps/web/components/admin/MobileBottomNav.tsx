@@ -7,8 +7,8 @@ import { usePathname } from 'next/navigation'
 
 const ITEMS = [
   { href: '/admin/dashboard', label: 'Home', icon: LayoutDashboard },
-  { href: '/admin/crm/clients', label: 'Clients', icon: Users },
-  { href: '/admin/crm/pipeline', label: 'Pipeline', icon: TrendingUp },
+  { href: '/admin/clients', label: 'Clients', icon: Users },
+  { href: '/admin/pipeline', label: 'Pipeline', icon: TrendingUp },
   { href: '/admin/outreach/aspire', label: 'Aspire', icon: Telescope },
   { href: '/admin/outreach/linkedin', label: 'LinkedIn', icon: Share2 },
 ] as const

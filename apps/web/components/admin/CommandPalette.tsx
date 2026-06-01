@@ -72,8 +72,8 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
 
   const navItems = [
     { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { href: '/admin/crm/clients', label: 'Active Clients', icon: Users },
-    { href: '/admin/crm/pipeline', label: 'Lead Pipeline', icon: TrendingUp },
+    { href: '/admin/clients', label: 'Active Clients', icon: Users },
+    { href: '/admin/pipeline', label: 'Pipeline', icon: TrendingUp },
     { href: '/admin/outreach/aspire', label: 'Aspire', icon: Telescope },
     { href: '/admin/outreach/linkedin', label: 'LinkedIn', icon: Share2 },
     { href: '/admin/automations', label: 'Automations', icon: Zap },
@@ -123,7 +123,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
         <CommandSeparator />
 
         <CommandGroup heading="Quick actions">
-          <CommandItem onSelect={() => navigate('/admin/crm/clients?action=create')}>
+          <CommandItem onSelect={() => navigate('/admin/clients?action=create')}>
             <Users className="mr-2 h-4 w-4" />
             Add new {labels.contact.toLowerCase()}
             <CommandShortcut>⇧C</CommandShortcut>
@@ -133,7 +133,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
             Create {labels.record.toLowerCase()}
             <CommandShortcut>⇧J</CommandShortcut>
           </CommandItem>
-          <CommandItem onSelect={() => navigate('/admin/crm/pipeline?action=lead')}>
+          <CommandItem onSelect={() => navigate('/admin/pipeline?action=lead')}>
             <TrendingUp className="mr-2 h-4 w-4" />
             Add lead
           </CommandItem>

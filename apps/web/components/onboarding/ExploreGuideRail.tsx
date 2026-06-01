@@ -18,14 +18,14 @@ const STEPS = [
     icon: Users,
     title: 'Explore active clients',
     body: 'Sample clients show how lifecycle and records link together.',
-    href: '/admin/crm/clients',
+    href: '/admin/clients',
   },
   {
     id: 'pipeline',
     icon: Briefcase,
     title: 'Follow the pipeline',
-    body: 'Deals and projects move through stages — click through to see the flow.',
-    href: '/admin/crm/pipeline',
+    body: 'Opportunities and projects move through stages — click through to see the flow.',
+    href: '/admin/pipeline',
   },
 ] as const
 
@@ -40,8 +40,8 @@ export function ExploreGuideRail({ businessName, className }: Props) {
 
   useEffect(() => {
     const path = window.location.pathname
-    if (path.includes('/crm/clients')) setActiveStep(1)
-    else if (path.includes('/crm/pipeline') || path.includes('/records')) setActiveStep(2)
+    if (path.includes('/clients')) setActiveStep(1)
+    else if (path.includes('/pipeline') || path.includes('/records')) setActiveStep(2)
     else setActiveStep(0)
   }, [])
 
@@ -59,7 +59,7 @@ export function ExploreGuideRail({ businessName, className }: Props) {
       </p>
       <h2 className="mt-1 text-lg font-semibold text-stone-900">{displayName}</h2>
       <p className="mt-2 text-sm leading-relaxed text-stone-600">
-        Click around — this is a working demo. In a minute you&rsquo;ll see how clients, deals, and
+        Click around — this is a working demo. In a minute you&rsquo;ll see how clients, opportunities, and
         projects connect.
       </p>
 
