@@ -7,7 +7,6 @@ import {
   resolveAdminPageTitle,
   resolveWorkspacePrimaryAction,
 } from '@/lib/navigation/admin-nav'
-import { DEMO_WORKSPACE_NAME } from '@/lib/onboarding/constants'
 import { useUIStore } from '@/lib/stores/ui-store'
 import { cn } from '@/lib/utils'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -20,7 +19,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Bell, CalendarRange, Filter, Menu, Plus, Search } from 'lucide-react'
+import { Bell, Menu, Plus, Search } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
@@ -53,17 +52,13 @@ export function TopHeader({ session, showDemoWorkspace = false }: TopHeaderProps
         </Button>
         <div className="min-w-0">
           <h1 className="truncate text-[15px] font-semibold tracking-[-0.02em] text-stone-900 md:text-base">
-            {showDemoWorkspace && pageTitle === 'Dashboard' ? DEMO_WORKSPACE_NAME : pageTitle}
+            {pageTitle}
           </h1>
-          {showDemoWorkspace ? (
-            <p className="truncate text-[11px] text-stone-500">
-              {pageTitle === 'Dashboard' ? 'Demo workspace' : pageTitle}
-            </p>
-          ) : (
-            <p className="hidden truncate text-[11px] text-stone-500 md:block">
-              Ventaro operating system
-            </p>
-          )}
+          <p className="hidden truncate text-[11px] text-stone-500 md:block">
+            {showDemoWorkspace && pageTitle === 'Dashboard'
+              ? 'Sample workspace'
+              : 'Ventaro operating system'}
+          </p>
         </div>
       </div>
 
@@ -79,30 +74,6 @@ export function TopHeader({ session, showDemoWorkspace = false }: TopHeaderProps
             ⌘K
           </kbd>
         </button>
-
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="h-9 shrink-0 border-stone-200 bg-white text-stone-600 hover:bg-stone-50"
-          disabled
-          aria-label="Date range (coming soon)"
-        >
-          <CalendarRange className="mr-1.5 h-4 w-4" aria-hidden />
-          Last 30 days
-        </Button>
-
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="h-9 shrink-0 border-stone-200 bg-white text-stone-600 hover:bg-stone-50"
-          disabled
-          aria-label="Filters (coming soon)"
-        >
-          <Filter className="mr-1.5 h-4 w-4" aria-hidden />
-          Filters
-        </Button>
       </div>
 
       <div className="ml-auto flex shrink-0 items-center gap-1.5 md:gap-2">

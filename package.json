@@ -18,6 +18,7 @@
     "db:test:personalize": "tsx packages/db/scripts/test-personalize.ts",
     "db:test:ai-memory": "dotenv -e .env -- tsx packages/db/scripts/test-ai-memory.ts",
     "db:reset-onboarding": "dotenv -e .env -- tsx packages/db/scripts/reset-onboarding.ts",
+    "db:seed-demo-onboarding": "dotenv -e .env -- tsx --tsconfig apps/web/tsconfig.json apps/web/scripts/seed-demo-onboarding-account.ts",
     "db:reset-stale-onboarding": "dotenv -e .env -- tsx packages/db/scripts/reset-stale-onboarding.ts",
     "db:audit-accounts": "dotenv -e .env -- tsx packages/db/scripts/audit-accounts.ts",
     "db:wipe-test-accounts": "dotenv -e .env -- tsx packages/db/scripts/wipe-test-accounts.ts",

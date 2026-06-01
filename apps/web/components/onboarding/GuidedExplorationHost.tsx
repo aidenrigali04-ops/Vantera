@@ -1,6 +1,7 @@
 'use client'
 
 import { GuidedExplorationTooltip } from '@/components/onboarding/GuidedExplorationTooltip'
+import { isProductTourComplete, PRODUCT_TOUR_COMPLETED_EVENT } from '@/lib/onboarding/product-tour'
 import type { TourStepId } from '@/lib/onboarding/tour'
 import { isTourStepEligible, nextEligibleTourStep } from '@/lib/onboarding/tour'
 import { usePathname } from 'next/navigation'
@@ -9,30 +10,56 @@ import { useCallback, useEffect, useState } from 'react'
 type Props = {
   accountId: string
   enabled: boolean
+  /** Wait for the slideshow product tour before showing scattered tooltips. */
+  deferUntilProductTour?: boolean
 }
 
 /**
  * Contextual onboarding coach — max one tooltip at a time, never repeats after dismiss.
  */
-export function GuidedExplorationHost({ accountId, enabled }: Props) {
+export function GuidedExplorationHost({
+  accountId,
+  enabled,
+  deferUntilProductTour = false,
+}: Props) {
   const pathname = usePathname() ?? ''
   const [activeStep, setActiveStep] = useState<TourStepId | null>(null)
   const [actionFeedDelayElapsed, setActionFeedDelayElapsed] = useState(false)
   const [pipelineSectionVisible, setPipelineSectionVisible] = useState(false)
+  const [productTourDone, setProductTourDone] = useState(
+    deferUntilProductTour ? isProductTourComplete(accountId) : true,
+  )
+
+  useEffect(() => {
+    if (!deferUntilProductTour) return
+    setProductTourDone(isProductTourComplete(accountId))
+
+    function onTourCompleted(event: Event) {
+      const detail = (event as CustomEvent<{ accountId: string }>).detail
+      if (detail?.accountId === accountId) {
+        setProductTourDone(true)
+      }
+    }
+
+    window.addEventListener(PRODUCT_TOUR_COMPLETED_EVENT, onTourCompleted)
+    return () => window.removeEventListener(PRODUCT_TOUR_COMPLETED_EVENT, onTourCompleted)
+  }, [accountId, deferUntilProductTour])
+
+  const coachEnabled = enabled && productTourDone
 
   // Tooltip 1 — Action Feed: 5 seconds on dashboard
   useEffect(() => {
-    if (!enabled) return
+    if (!coachEnabled) return
     setActionFeedDelayElapsed(false)
     if (pathname !== '/admin/dashboard') return
 
     const timer = window.setTimeout(() => setActionFeedDelayElapsed(true), 5000)
     return () => window.clearTimeout(timer)
-  }, [enabled, pathname])
+  }, [coachEnabled, pathname])
 
   // Tooltip 2 — Pipeline revenue: when dashboard pipeline section enters view
   useEffect(() => {
-    if (!enabled || pathname !== '/admin/dashboard') {
+    if (!coachEnabled || pathname !== '/admin/dashboard') {
       setPipelineSectionVisible(false)
       return
     }
@@ -49,10 +76,10 @@ export function GuidedExplorationHost({ accountId, enabled }: Props) {
 
     observer.observe(el)
     return () => observer.disconnect()
-  }, [enabled, pathname])
+  }, [coachEnabled, pathname])
 
   const evaluateNextStep = useCallback(() => {
-    if (!enabled) {
+    if (!coachEnabled) {
       setActiveStep(null)
       return
     }
@@ -64,7 +91,7 @@ export function GuidedExplorationHost({ accountId, enabled }: Props) {
         pipelineSectionVisible,
       }),
     )
-  }, [accountId, enabled, pathname, actionFeedDelayElapsed, pipelineSectionVisible])
+  }, [accountId, coachEnabled, pathname, actionFeedDelayElapsed, pipelineSectionVisible])
 
   useEffect(() => {
     if (activeStep) return
@@ -87,7 +114,7 @@ export function GuidedExplorationHost({ accountId, enabled }: Props) {
     window.setTimeout(evaluateNextStep, 350)
   }
 
-  if (!enabled || !activeStep) return null
+  if (!coachEnabled || !activeStep) return null
 
   return (
     <GuidedExplorationTooltip

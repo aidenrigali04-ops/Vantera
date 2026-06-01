@@ -4,7 +4,6 @@ import {
   BarChart2,
   Bell,
   Brain,
-  Building2,
   Calendar,
   CheckSquare,
   ClipboardList,
@@ -26,7 +25,6 @@ import {
   Package,
   PieChart,
   Plug,
-  Rocket,
   Settings,
   Share2,
   Shield,
@@ -43,7 +41,6 @@ export type AdminNavItem = {
   id: string
   label: string
   icon: LucideIcon
-  /** When omitted, item is shown as coming soon (non-navigable). */
   href?: string
   badge?: number
   highlightLabel?: string
@@ -51,98 +48,208 @@ export type AdminNavItem = {
   tourAnchor?: string
 }
 
-export type AdminNavGroup = {
+export type AdminNavHubLink = {
   id: string
-  title: string
-  items: AdminNavItem[]
+  label: string
+  href: string
+  icon: LucideIcon
+  flag?: FlagName
+  tourAnchor?: string
 }
 
-/** Single source of truth for the Ventaro admin shell navigation (spec-aligned). */
-export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
+export type AdminNavHub = {
+  id: string
+  title: string
+  description: string
+  /** When set, this area’s main route is already in the sidebar. */
+  sidebarId?: string
+  primary: AdminNavHubLink
+  related: AdminNavHubLink[]
+}
+
+/** Sidebar — four destinations only. Everything else lives in dashboard hubs. */
+export const ADMIN_NAV_SIDEBAR: AdminNavItem[] = [
+  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, href: '/admin/dashboard' },
+  { id: 'clients', label: 'Clients', icon: Users, href: '/admin/clients' },
   {
-    id: 'command',
-    title: 'Command',
-    items: [
-      { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, href: '/admin/dashboard' },
-      { id: 'inbox', label: 'Inbox', icon: Inbox, href: '/admin/inbox' },
-      { id: 'notifications', label: 'Notifications', icon: Bell },
-      { id: 'calendar', label: 'Calendar', icon: Calendar, href: '/admin/calendar' },
+    id: 'pipeline',
+    label: 'Pipeline',
+    icon: Handshake,
+    href: '/admin/pipeline',
+    tourAnchor: 'nav-pipeline',
+  },
+  { id: 'projects', label: 'Projects', icon: FolderKanban, href: '/admin/records' },
+]
+
+/**
+ * Grouped areas shown on the dashboard — one primary CTA per hub plus compact related links.
+ * Replaces long sidebar lists and “More tools” sections.
+ */
+export const ADMIN_NAV_HUBS: AdminNavHub[] = [
+  {
+    id: 'clients',
+    title: 'Clients',
+    description: 'Relationships, portal access, and billing in one place.',
+    sidebarId: 'clients',
+    primary: { id: 'contacts', label: 'Open contacts', href: '/admin/clients', icon: Users },
+    related: [
+      {
+        id: 'portal',
+        label: 'Client portal',
+        href: '/admin/portal',
+        icon: ExternalLink,
+        tourAnchor: 'nav-portal',
+      },
+      { id: 'billing', label: 'Billing', href: '/admin/billing', icon: CreditCard },
     ],
   },
   {
-    id: 'revenue',
-    title: 'Revenue',
-    items: [
-      { id: 'leads', label: 'Leads', icon: UserPlus, href: '/admin/pipeline' },
-      { id: 'deals', label: 'Deals', icon: Handshake, href: '/admin/pipeline', tourAnchor: 'nav-pipeline' },
-      { id: 'contacts', label: 'Contacts', icon: Users, href: '/admin/clients' },
-      { id: 'companies', label: 'Companies', icon: Building2 },
-      { id: 'proposals', label: 'Proposals', icon: FileText },
-      { id: 'meetings', label: 'Meetings', icon: Calendar },
+    id: 'pipeline',
+    title: 'Pipeline',
+    description: 'Deals plus outreach — from first touch to close.',
+    sidebarId: 'pipeline',
+    primary: { id: 'deals', label: 'View deals', href: '/admin/pipeline', icon: Handshake },
+    related: [
+      { id: 'aspire', label: 'Aspire', href: '/admin/outreach/aspire', icon: Telescope },
+      { id: 'linkedin', label: 'LinkedIn', href: '/admin/outreach/linkedin', icon: Share2 },
+      { id: 'campaigns', label: 'Campaigns', href: '/admin/outreach/campaigns', icon: Megaphone },
+      { id: 'email', label: 'Email', href: '/admin/outreach/email', icon: Mail },
     ],
   },
   {
-    id: 'operations',
-    title: 'Operations',
-    items: [
-      { id: 'tasks', label: 'Tasks', icon: CheckSquare },
-      { id: 'projects', label: 'Projects', icon: FolderKanban, href: '/admin/records' },
-      { id: 'automations', label: 'Automations', icon: Zap, href: '/admin/automations' },
-      { id: 'workflows', label: 'Workflows', icon: Workflow },
-      { id: 'team-workload', label: 'Team Workload', icon: UsersRound },
-      { id: 'sops', label: 'SOPs', icon: ClipboardList },
-    ],
-  },
-  {
-    id: 'client-experience',
-    title: 'Client Experience',
-    items: [
-      { id: 'client-portal', label: 'Client Portal', icon: ExternalLink, href: '/admin/portal', tourAnchor: 'nav-portal' },
-      { id: 'onboarding', label: 'Onboarding', icon: Rocket, href: '/admin/dashboard' },
-      { id: 'deliverables', label: 'Deliverables', icon: Package, href: '/admin/deliverables' },
-      { id: 'approvals', label: 'Approvals', icon: FileCheck },
-      { id: 'billing', label: 'Billing', icon: CreditCard, href: '/admin/billing' },
-      { id: 'support', label: 'Support', icon: LifeBuoy },
-    ],
-  },
-  {
-    id: 'growth',
-    title: 'Growth',
-    items: [
-      { id: 'campaigns', label: 'Campaigns', icon: Megaphone, href: '/admin/outreach/campaigns' },
-      { id: 'email-marketing', label: 'Email Marketing', icon: Mail, href: '/admin/outreach/email' },
-      { id: 'forms', label: 'Forms', icon: FormInput },
-      { id: 'lead-sources', label: 'Lead Sources', icon: Link2 },
-      { id: 'aspire', label: 'Aspire', icon: Telescope, href: '/admin/outreach/aspire' },
-      { id: 'linkedin', label: 'LinkedIn', icon: Share2, href: '/admin/outreach/linkedin' },
-      { id: 'analytics', label: 'Analytics', icon: PieChart, href: '/admin/reports' },
+    id: 'projects',
+    title: 'Projects',
+    description: 'Delivery, handoffs, and the automations behind them.',
+    sidebarId: 'projects',
+    primary: { id: 'records', label: 'View projects', href: '/admin/records', icon: FolderKanban },
+    related: [
+      { id: 'deliverables', label: 'Deliverables', href: '/admin/deliverables', icon: Package },
+      { id: 'automations', label: 'Automations', href: '/admin/automations', icon: Zap },
     ],
   },
   {
     id: 'intelligence',
     title: 'Intelligence',
-    items: [
-      { id: 'forecasting', label: 'Forecasting', icon: BarChart2, href: '/admin/forecasting', flag: 'executive_dashboard' },
-      { id: 'client-health', label: 'Client Health', icon: HeartPulse, href: '/admin/clients' },
-      { id: 'ai-insights', label: 'AI Insights', icon: Brain, href: '/admin/ai-brain' },
-      { id: 'reports', label: 'Reports', icon: PieChart, href: '/admin/reports', flag: 'executive_dashboard' },
+    description: 'AI recommendations and executive reporting.',
+    primary: { id: 'ai-brain', label: 'AI insights', href: '/admin/ai-brain', icon: Brain },
+    related: [
+      {
+        id: 'reports',
+        label: 'Reports',
+        href: '/admin/reports',
+        icon: PieChart,
+        flag: 'executive_dashboard',
+      },
+      {
+        id: 'forecasting',
+        label: 'Forecasting',
+        href: '/admin/forecasting',
+        icon: BarChart2,
+        flag: 'executive_dashboard',
+      },
+    ],
+  },
+  {
+    id: 'workspace',
+    title: 'Workspace',
+    description: 'Inbox, calendar, integrations, and settings.',
+    primary: { id: 'inbox', label: 'Open inbox', href: '/admin/inbox', icon: Inbox },
+    related: [
+      { id: 'calendar', label: 'Calendar', href: '/admin/calendar', icon: Calendar },
+      { id: 'integrations', label: 'Integrations', href: '/admin/integrations', icon: Plug },
+      { id: 'settings', label: 'Settings', href: '/admin/settings', icon: Settings },
     ],
   },
 ]
 
 export const ADMIN_NAV_FOOTER: AdminNavItem[] = [
   { id: 'settings', label: 'Settings', icon: Settings, href: '/admin/settings' },
-  { id: 'permissions', label: 'Permissions', icon: Shield },
-  { id: 'white-label', label: 'White Label', icon: Sparkles },
-  { id: 'integrations', label: 'Integrations', icon: Plug, href: '/admin/integrations' },
 ]
 
-/** Flat list of navigable routes for command palette / mobile shortcuts. */
+/** Roadmap — command palette only. */
+export const ADMIN_NAV_ROADMAP: AdminNavItem[] = [
+  { id: 'notifications', label: 'Notifications', icon: Bell },
+  { id: 'leads-nav', label: 'Lead inbox', icon: UserPlus },
+  { id: 'companies', label: 'Companies', icon: UsersRound },
+  { id: 'proposals', label: 'Proposals', icon: FileText },
+  { id: 'meetings', label: 'Meetings', icon: Calendar },
+  { id: 'tasks', label: 'Tasks', icon: CheckSquare },
+  { id: 'workflows', label: 'Workflows', icon: Workflow },
+  { id: 'team-workload', label: 'Team workload', icon: UsersRound },
+  { id: 'sops', label: 'SOPs', icon: ClipboardList },
+  { id: 'approvals', label: 'Approvals', icon: FileCheck },
+  { id: 'support', label: 'Support', icon: LifeBuoy },
+  { id: 'forms', label: 'Forms', icon: FormInput },
+  { id: 'lead-sources', label: 'Lead sources', icon: Link2 },
+  { id: 'permissions', label: 'Permissions', icon: Shield },
+  { id: 'white-label', label: 'White label', icon: Sparkles },
+  { id: 'client-health', label: 'Client health score', icon: HeartPulse },
+  { id: 'git-tools', label: 'Version control', icon: GitBranch },
+]
+
+/** @deprecated */
+export const ADMIN_NAV_PRIMARY = ADMIN_NAV_SIDEBAR
+/** @deprecated */
+export const ADMIN_NAV_MORE_GROUPS: { id: string; title: string; items: AdminNavItem[] }[] = []
+
+export function isAdminNavItemActive(pathname: string, href: string): boolean {
+  if (pathname === href) return true
+  if (href === '/admin/dashboard') return pathname === '/admin/dashboard'
+  return pathname.startsWith(`${href}/`)
+}
+
+/** Sidebar highlight — active for the whole hub, not just the primary route. */
+export function isSidebarItemActive(pathname: string, item: AdminNavItem): boolean {
+  if (!item.href) return false
+
+  const hub = ADMIN_NAV_HUBS.find((entry) => entry.sidebarId === item.id)
+  if (hub) {
+    return [hub.primary, ...hub.related].some(
+      (link) => link.href && isAdminNavItemActive(pathname, link.href),
+    )
+  }
+
+  return isAdminNavItemActive(pathname, item.href)
+}
+
+export function isPathInHubNav(pathname: string): boolean {
+  return ADMIN_NAV_HUBS.some((hub) =>
+    [hub.primary, ...hub.related].some(
+      (link) => link.href && isAdminNavItemActive(pathname, link.href),
+    ),
+  )
+}
+
+/** @deprecated */
+export function isPathInMoreNav(pathname: string): boolean {
+  return isPathInHubNav(pathname)
+}
+
+export function getMobileNavItems(): AdminNavItem[] {
+  return ADMIN_NAV_SIDEBAR
+}
+
+export function getSidebarNavItems(): AdminNavItem[] {
+  return ADMIN_NAV_SIDEBAR
+}
+
+export function getDashboardHubs(): AdminNavHub[] {
+  return ADMIN_NAV_HUBS
+}
+
 export function getAvailableAdminNavItems(): AdminNavItem[] {
-  const items = [
-    ...ADMIN_NAV_GROUPS.flatMap((group) => group.items),
-    ...ADMIN_NAV_FOOTER,
-  ]
+  const fromHubs = ADMIN_NAV_HUBS.flatMap((hub) =>
+    [hub.primary, ...hub.related].map((link) => ({
+      id: link.id,
+      label: link.label,
+      icon: link.icon,
+      href: link.href,
+      flag: link.flag,
+      tourAnchor: link.tourAnchor,
+    })),
+  )
+
+  const items = [...ADMIN_NAV_SIDEBAR, ...fromHubs, ...ADMIN_NAV_FOOTER]
   const seen = new Set<string>()
   return items.filter((item) => {
     if (!item.href || seen.has(item.href)) return false
@@ -151,18 +258,41 @@ export function getAvailableAdminNavItems(): AdminNavItem[] {
   })
 }
 
+export function getPrimaryAdminNavItems(): AdminNavItem[] {
+  return ADMIN_NAV_SIDEBAR
+}
+
+export function getMoreAdminNavGroups(): { id: string; title: string; items: AdminNavItem[] }[] {
+  return ADMIN_NAV_HUBS.map((hub) => ({
+    id: hub.id,
+    title: hub.title,
+    items: [hub.primary, ...hub.related].map((link) => ({
+      id: link.id,
+      label: link.label,
+      icon: link.icon,
+      href: link.href,
+      flag: link.flag,
+      tourAnchor: link.tourAnchor,
+    })),
+  }))
+}
+
+export function getRoadmapAdminNavItems(): AdminNavItem[] {
+  return ADMIN_NAV_ROADMAP
+}
+
 export function resolveAdminPageTitle(pathname: string): string {
   if (pathname.startsWith('/admin/dashboard')) return 'Dashboard'
-  if (pathname.startsWith('/admin/clients')) return 'Contacts'
-  if (pathname.startsWith('/admin/pipeline')) return 'Deals'
+  if (pathname.startsWith('/admin/clients')) return 'Clients'
+  if (pathname.startsWith('/admin/pipeline')) return 'Pipeline'
   if (pathname.startsWith('/admin/records')) return 'Projects'
   if (pathname.startsWith('/admin/inbox')) return 'Inbox'
   if (pathname.startsWith('/admin/calendar')) return 'Calendar'
   if (pathname.startsWith('/admin/outreach/aspire')) return 'Aspire'
   if (pathname.startsWith('/admin/outreach/linkedin')) return 'LinkedIn'
   if (pathname.startsWith('/admin/outreach/campaigns')) return 'Campaigns'
-  if (pathname.startsWith('/admin/outreach/email')) return 'Email Marketing'
-  if (pathname.startsWith('/admin/outreach')) return 'Growth'
+  if (pathname.startsWith('/admin/outreach/email')) return 'Email'
+  if (pathname.startsWith('/admin/outreach')) return 'Pipeline'
   if (pathname.startsWith('/admin/ai-brain')) return 'AI Insights'
   if (pathname.startsWith('/admin/forecasting')) return 'Forecasting'
   if (pathname.startsWith('/admin/reports')) return 'Reports'
@@ -190,17 +320,27 @@ export function resolveWorkspacePrimaryAction(pathname: string): WorkspaceHeader
   if (pathname.startsWith('/admin/dashboard')) {
     return { label: 'Add client', href: '/admin/clients' }
   }
-  if (pathname.startsWith('/admin/clients')) {
+  if (pathname.startsWith('/admin/clients') || pathname.startsWith('/admin/portal')) {
     return { label: 'New contact', href: '/admin/clients' }
   }
-  if (pathname.startsWith('/admin/pipeline')) {
+  if (pathname.startsWith('/admin/pipeline') || pathname.startsWith('/admin/outreach')) {
     return { label: 'New deal', href: '/admin/pipeline' }
   }
-  if (pathname.startsWith('/admin/records')) {
+  if (pathname.startsWith('/admin/records') || pathname.startsWith('/admin/deliverables')) {
     return { label: 'New project', href: '/admin/records' }
   }
-  if (pathname.startsWith('/admin/outreach')) {
-    return { label: 'New campaign', href: '/admin/outreach/campaigns' }
+  if (pathname.startsWith('/admin/ai-brain')) {
+    return { label: 'View insights', href: '/admin/ai-brain' }
   }
   return null
+}
+
+export function resolveHubForPath(pathname: string): AdminNavHub | null {
+  return (
+    ADMIN_NAV_HUBS.find((hub) =>
+      [hub.primary, ...hub.related].some(
+        (link) => link.href && isAdminNavItemActive(pathname, link.href),
+      ),
+    ) ?? null
+  )
 }

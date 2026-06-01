@@ -13,8 +13,8 @@ export function DashboardEmbeddedInsights({ insights }: Props) {
 
   return (
     <DashboardSection
-      title="Operational intelligence"
-      subtitle="AI surfaced in context — prioritize what matters next."
+      title="AI insights"
+      subtitle="Patterns and recommendations surfaced from your workspace."
       action={{ label: 'All insights', href: '/admin/ai-brain' }}
     >
       <EmbeddedInsightsPanel

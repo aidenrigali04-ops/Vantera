@@ -37,6 +37,36 @@
     --sidebar-accent-foreground: 240 5.9% 10%;
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* SaaS design system — light tokens (tour + product UI) */
+    --bg-base: #fafafa;
+    --bg-subtle: #f4f4f5;
+    --bg-surface: #ffffff;
+    --bg-elevated: #ffffff;
+    --bg-overlay: #f0f0f0;
+    --border-subtle: rgba(0, 0, 0, 0.06);
+    --border-default: rgba(0, 0, 0, 0.08);
+    --border-strong: rgba(0, 0, 0, 0.14);
+    --border-focus: rgba(0, 0, 0, 0.24);
+    --text-primary: #0a0a0a;
+    --text-secondary: #525252;
+    --text-tertiary: #a0a0a0;
+    --text-disabled: #c4c4c4;
+    --text-inverse: #fafafa;
+    --brand-accent: #4f7cff;
+    --brand-accent-hover: #3d6aef;
+    --brand-accent-muted: rgba(79, 124, 255, 0.1);
+    --brand-accent-border: rgba(79, 124, 255, 0.25);
+    --success: #22a558;
+    --success-muted: rgba(34, 165, 88, 0.1);
+    --warning: #d97706;
+    --warning-muted: rgba(217, 119, 6, 0.1);
+    --danger: #dc2626;
+    --danger-muted: rgba(220, 38, 38, 0.1);
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+    --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.12);
+    --shadow-glow: 0 0 0 3px var(--brand-accent-muted);
   }
 
   .dark {

@@ -7,8 +7,10 @@ import { MobileBottomNav } from './MobileBottomNav'
 import { CsvImportModal } from '@/components/onboarding/CsvImportModal'
 import { OnboardingAutoPrompt } from '@/components/onboarding/OnboardingAutoPrompt'
 import { GuidedExplorationHost } from '@/components/onboarding/GuidedExplorationHost'
+import { ProductTourHost } from '@/components/onboarding/product-tour/ProductTourHost'
 import { NewClientDrawer } from '@/components/onboarding/NewClientDrawer'
 import { OperatingModelHost } from '@/components/onboarding/OperatingModelHost'
+import { HubRelatedStrip } from '@/components/navigation/HubRelatedStrip'
 import { SampleDataBanner } from './SampleDataBanner'
 import { Sidebar, SidebarMobile } from './Sidebar'
 import { TopHeader } from './TopHeader'
@@ -72,6 +74,7 @@ export function AdminShell({
 
         <div className="col-start-1 row-start-2 flex min-h-0 flex-col overflow-hidden md:col-start-2">
           {showSampleExperience ? <SampleDataBanner accountId={session.accountId} /> : null}
+          <HubRelatedStrip />
           <WorkspaceMain constrained={!workspaceFullBleed}>{children}</WorkspaceMain>
         </div>
       </div>
@@ -79,7 +82,8 @@ export function AdminShell({
       <SidebarMobile session={session} />
       <MobileBottomNav />
       <CommandPalette open={commandPaletteOpen} onOpenChange={setCommandPaletteOpen} />
-      <GuidedExplorationHost accountId={session.accountId} enabled={showSampleExperience} />
+      <ProductTourHost accountId={session.accountId} enabled={session.role === 'owner'} />
+      <GuidedExplorationHost accountId={session.accountId} enabled={showSampleExperience} deferUntilProductTour />
       <OperatingModelHost
         accountId={session.accountId}
         enabled={onboardingIncomplete && session.role === 'owner'}

@@ -3,10 +3,11 @@
 import { adminLogoutAction } from '@/lib/auth/actions'
 import type { AdminSession } from '@/lib/auth/types'
 import { useBranding } from '@/lib/branding/context'
-import { FeatureGate } from '@/lib/feature-flags/gate-client'
 import {
   ADMIN_NAV_FOOTER,
-  ADMIN_NAV_GROUPS,
+  getSidebarNavItems,
+  isAdminNavItemActive,
+  isSidebarItemActive,
   type AdminNavItem,
 } from '@/lib/navigation/admin-nav'
 import { isStartHereBadgeActive } from '@/lib/onboarding/prompts'
@@ -15,7 +16,7 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { ChevronLeft, ChevronRight, LogOut } from 'lucide-react'
+import { ChevronLeft, ChevronRight, LogOut, Search } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
@@ -26,15 +27,10 @@ type SidebarProps = {
   onNavigate?: () => void
 }
 
-function isNavItemActive(pathname: string, href: string): boolean {
-  if (pathname === href) return true
-  if (href === '/admin/dashboard') return pathname === '/admin/dashboard'
-  return pathname.startsWith(`${href}/`)
-}
-
 function SidebarContent({ session, collapsed, onNavigate }: SidebarProps & { collapsed: boolean }) {
   const pathname = usePathname() ?? ''
   const { businessName, logoUrl } = useBranding()
+  const { setCommandPaletteOpen } = useUIStore()
   const [startHereActive, setStartHereActive] = useState(false)
   const displayName = (businessName || 'Workspace').slice(0, 20)
   const initial = (businessName?.trim()?.[0] ?? 'W').toUpperCase()
@@ -43,16 +39,13 @@ function SidebarContent({ session, collapsed, onNavigate }: SidebarProps & { col
     setStartHereActive(isStartHereBadgeActive(session.accountId))
   }, [session.accountId, pathname])
 
-  const groups = useMemo(
+  const sidebarItems = useMemo(
     () =>
-      ADMIN_NAV_GROUPS.map((group) => ({
-        ...group,
-        items: group.items.map((item) =>
-          item.id === 'dashboard' && startHereActive
-            ? { ...item, highlightLabel: 'Start here' }
-            : item,
-        ),
-      })),
+      getSidebarNavItems().map((item) =>
+        item.id === 'dashboard' && startHereActive
+          ? { ...item, highlightLabel: 'Start here' }
+          : item,
+      ),
     [startHereActive],
   )
 
@@ -77,60 +70,65 @@ function SidebarContent({ session, collapsed, onNavigate }: SidebarProps & { col
               <div className="min-w-0">
                 <p className="truncate text-[13px] font-semibold tracking-[-0.01em]">{displayName}</p>
                 <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-stone-400">
-                  Operating system
+                  Workspace
                 </p>
               </div>
             ) : null}
           </div>
         </div>
 
-        <nav className="flex-1 space-y-5 overflow-y-auto px-2 py-3" aria-label="Platform navigation">
-          {groups.map((group) => (
-            <div key={group.id}>
-              {!collapsed ? (
-                <p className="mb-1.5 px-2 text-[11px] font-medium uppercase tracking-[0.08em] text-stone-400">
-                  {group.title}
-                </p>
-              ) : null}
-              <ul className="space-y-0.5">
-                {group.items.map((item) => {
-                  const row = (
-                    <NavItemRow
-                      key={item.id}
-                      item={item}
-                      isActive={item.href ? isNavItemActive(pathname, item.href) : false}
-                      collapsed={collapsed}
-                      onNavigate={onNavigate}
-                    />
-                  )
+        <nav className="flex-1 overflow-y-auto px-2 py-3" aria-label="Platform navigation">
+          {!collapsed ? (
+            <p className="mb-1.5 px-2 text-[11px] font-medium uppercase tracking-[0.08em] text-stone-400">
+              Go to
+            </p>
+          ) : null}
+          <ul className="space-y-0.5">
+            {sidebarItems.map((item) => (
+              <NavItemRow
+                key={item.id}
+                item={item}
+                isActive={item.href ? isSidebarItemActive(pathname, item) : false}
+                collapsed={collapsed}
+                onNavigate={onNavigate}
+              />
+            ))}
+          </ul>
 
-                  if (item.flag) {
-                    return (
-                      <FeatureGate key={item.id} flag={item.flag}>
-                        {row}
-                      </FeatureGate>
-                    )
-                  }
-
-                  return row
-                })}
-              </ul>
+          {collapsed ? (
+            <div className="mt-3 px-1">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={() => setCommandPaletteOpen(true)}
+                    className="flex w-full items-center justify-center rounded-md px-2 py-2 text-stone-500 transition-colors hover:bg-stone-50 hover:text-stone-800"
+                    aria-label="Search all tools"
+                  >
+                    <Search className="h-4 w-4" aria-hidden />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="right">Search all tools (⌘K)</TooltipContent>
+              </Tooltip>
             </div>
-          ))}
+          ) : (
+            <p className="mt-4 px-2 text-[11px] leading-relaxed text-stone-400">
+              More tools are grouped on the dashboard. Press{' '}
+              <kbd className="rounded border border-stone-200 bg-stone-50 px-1 py-0.5 text-[10px] font-medium text-stone-500">
+                ⌘K
+              </kbd>{' '}
+              to jump anywhere.
+            </p>
+          )}
         </nav>
 
         <div className="border-t border-stone-200/80 p-2">
-          {!collapsed ? (
-            <p className="mb-1.5 px-2 text-[11px] font-medium uppercase tracking-[0.08em] text-stone-400">
-              System
-            </p>
-          ) : null}
           <ul className="space-y-0.5">
             {ADMIN_NAV_FOOTER.map((item) => (
               <NavItemRow
                 key={item.id}
                 item={item}
-                isActive={item.href ? pathname.startsWith(item.href) : false}
+                isActive={item.href ? isSidebarItemActive(pathname, item) : false}
                 collapsed={collapsed}
                 onNavigate={onNavigate}
               />
@@ -169,7 +167,6 @@ function NavItemRow({
   onNavigate?: () => void
 }) {
   const Icon = item.icon
-  const available = Boolean(item.href)
 
   const inner = (
     <>
@@ -182,16 +179,6 @@ function NavItemRow({
               {item.highlightLabel}
             </span>
           ) : null}
-          {!available ? (
-            <span className="rounded-full bg-stone-100 px-1.5 py-0.5 text-[10px] font-medium text-stone-500">
-              Soon
-            </span>
-          ) : null}
-          {item.badge && item.badge > 0 ? (
-            <span className="rounded-full bg-stone-900 px-1.5 py-0.5 text-[10px] font-medium text-white">
-              {item.badge}
-            </span>
-          ) : null}
         </>
       ) : null}
     </>
@@ -199,15 +186,13 @@ function NavItemRow({
 
   const className = cn(
     'flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-[13px] transition-colors duration-150',
-    isActive && available
+    isActive
       ? 'bg-stone-100 font-medium text-stone-900'
-      : available
-        ? 'text-stone-600 hover:bg-stone-50 hover:text-stone-900'
-        : 'cursor-default text-stone-400',
+      : 'text-stone-600 hover:bg-stone-50 hover:text-stone-900',
     collapsed && 'justify-center px-2',
   )
 
-  const content = available ? (
+  const content = (
     <Link
       href={item.href!}
       onClick={onNavigate}
@@ -217,10 +202,6 @@ function NavItemRow({
     >
       {inner}
     </Link>
-  ) : (
-    <span className={className} aria-disabled="true">
-      {inner}
-    </span>
   )
 
   if (collapsed) {
@@ -228,10 +209,7 @@ function NavItemRow({
       <li>
         <Tooltip>
           <TooltipTrigger asChild>{content}</TooltipTrigger>
-          <TooltipContent side="right">
-            {item.label}
-            {!available ? ' (coming soon)' : ''}
-          </TooltipContent>
+          <TooltipContent side="right">{item.label}</TooltipContent>
         </Tooltip>
       </li>
     )

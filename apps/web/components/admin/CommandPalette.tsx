@@ -10,36 +10,17 @@ import {
   CommandSeparator,
   CommandShortcut,
 } from '@/components/ui/command'
+import { FeatureGate } from '@/lib/feature-flags/gate-client'
 import { useBranding } from '@/lib/branding/context'
 import { useVerticalLabels } from '@/lib/branding/use-vertical-labels'
-import { getAvailableAdminNavItems } from '@/lib/navigation/admin-nav'
-import { useUIStore } from '@/lib/stores/ui-store'
 import {
-  BarChart2,
-  Bell,
-  Brain,
-  Briefcase,
-  Calendar,
-  CheckSquare,
-  CreditCard,
-  ExternalLink,
-  FileText,
-  Handshake,
-  Inbox,
-  LayoutDashboard,
-  Share2,
-  Mail,
-  Megaphone,
-  Package,
-  PieChart,
-  Plug,
-  Settings,
-  Telescope,
-  TrendingUp,
-  Users,
-  UsersRound,
-  Zap,
-} from 'lucide-react'
+  getAvailableAdminNavItems,
+  getDashboardHubs,
+  getRoadmapAdminNavItems,
+  getSidebarNavItems,
+} from '@/lib/navigation/admin-nav'
+import { useUIStore } from '@/lib/stores/ui-store'
+import { Briefcase, CreditCard, TrendingUp, Users } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
 
@@ -71,14 +52,9 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
     onOpenChange(false)
   }
 
-  const navItems = getAvailableAdminNavItems().map((item) => ({
-    href: item.href!,
-    label: item.label,
-    icon: item.icon,
-  }))
-
+  const allNavItems = getAvailableAdminNavItems()
   const recentItems = recentRoutes
-    .map((route) => navItems.find((item) => item.href === route))
+    .map((route) => allNavItems.find((item) => item.href === route))
     .filter(Boolean)
 
   return (
@@ -94,7 +70,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
                 if (!item) return null
                 const Icon = item.icon
                 return (
-                  <CommandItem key={`recent-${item.href}`} onSelect={() => navigate(item.href)}>
+                  <CommandItem key={`recent-${item.href}`} onSelect={() => navigate(item.href!)}>
                     <Icon className="mr-2 h-4 w-4" />
                     {item.label}
                   </CommandItem>
@@ -105,17 +81,41 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
           </>
         ) : null}
 
-        <CommandGroup heading="Navigate">
-          {navItems.map((item) => {
+        <CommandGroup heading="Main areas">
+          {getSidebarNavItems().map((item) => {
             const Icon = item.icon
             return (
-              <CommandItem key={item.href} onSelect={() => navigate(item.href)}>
+              <CommandItem key={item.href} onSelect={() => navigate(item.href!)}>
                 <Icon className="mr-2 h-4 w-4" />
                 {item.label}
               </CommandItem>
             )
           })}
         </CommandGroup>
+
+        {getDashboardHubs().map((hub) => (
+          <CommandGroup key={hub.id} heading={hub.title}>
+            {[hub.primary, ...hub.related].map((link) => {
+              const Icon = link.icon
+              const item = (
+                <CommandItem key={link.href} onSelect={() => navigate(link.href)}>
+                  <Icon className="mr-2 h-4 w-4" />
+                  {link.label}
+                </CommandItem>
+              )
+
+              if (link.flag) {
+                return (
+                  <FeatureGate key={link.href} flag={link.flag}>
+                    {item}
+                  </FeatureGate>
+                )
+              }
+
+              return item
+            })}
+          </CommandGroup>
+        ))}
 
         <CommandSeparator />
 
@@ -142,27 +142,16 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
 
         <CommandSeparator />
 
-        <CommandGroup heading="More">
-          <CommandItem onSelect={() => navigate('/admin/inbox')}>
-            <Inbox className="mr-2 h-4 w-4" />
-            Inbox
-          </CommandItem>
-          <CommandItem onSelect={() => navigate('/admin/calendar')}>
-            <Calendar className="mr-2 h-4 w-4" />
-            Calendar
-          </CommandItem>
-          <CommandItem onSelect={() => navigate('/admin/ai-brain')}>
-            <Brain className="mr-2 h-4 w-4" />
-            AI Insights
-          </CommandItem>
-          <CommandItem onSelect={() => navigate('/admin/reports')}>
-            <PieChart className="mr-2 h-4 w-4" />
-            Reports
-          </CommandItem>
-          <CommandItem onSelect={() => navigate('/admin/integrations')}>
-            <Plug className="mr-2 h-4 w-4" />
-            Integrations
-          </CommandItem>
+        <CommandGroup heading="Coming soon">
+          {getRoadmapAdminNavItems().map((item) => {
+            const Icon = item.icon
+            return (
+              <CommandItem key={item.id} disabled>
+                <Icon className="mr-2 h-4 w-4 opacity-50" />
+                {item.label}
+              </CommandItem>
+            )
+          })}
         </CommandGroup>
       </CommandList>
     </CommandDialog>
@@ -181,31 +170,4 @@ export function useCommandPaletteShortcut(onOpen: () => void) {
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [onOpen])
-}
-
-export const SIDEBAR_ICON_MAP = {
-  LayoutDashboard,
-  Inbox,
-  Bell,
-  Calendar,
-  TrendingUp,
-  Handshake,
-  Users,
-  FileText,
-  Briefcase,
-  CheckSquare,
-  Zap,
-  UsersRound,
-  Share2,
-  Telescope,
-  Megaphone,
-  Mail,
-  ExternalLink,
-  Package,
-  CreditCard,
-  BarChart2,
-  Brain,
-  PieChart,
-  Settings,
-  Plug,
 }

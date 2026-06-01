@@ -13,7 +13,6 @@ import {
   CheckCircle2,
   Clock,
   MessageSquare,
-  Sparkles,
   TrendingDown,
 } from 'lucide-react'
 import Link from 'next/link'
@@ -26,12 +25,12 @@ const ICONS = {
   lead_activity: MessageSquare,
 } as const
 
-const PRIORITY_STYLES = {
-  stalled_deal: 'border-amber-200/80 bg-amber-50/40',
-  overdue_task: 'border-red-200/80 bg-red-50/40',
-  churn_risk: 'border-red-200/80 bg-red-50/50',
-  reply_detected: 'border-blue-200/80 bg-blue-50/40',
-  lead_activity: 'border-stone-200 bg-stone-50/80',
+const ACCENT_STYLES = {
+  stalled_deal: 'border-l-amber-500',
+  overdue_task: 'border-l-red-500',
+  churn_risk: 'border-l-red-500',
+  reply_detected: 'border-l-blue-500',
+  lead_activity: 'border-l-stone-400',
 } as const
 
 type Props = {
@@ -40,6 +39,7 @@ type Props = {
   emptyMessage?: string
   successNotice?: OnboardingSuccessNotice | null
   onDismissSuccessNotice?: () => void
+  maxVisible?: number
 }
 
 export function DashboardActionFeed({
@@ -48,7 +48,10 @@ export function DashboardActionFeed({
   emptyMessage,
   successNotice,
   onDismissSuccessNotice,
+  maxVisible = 5,
 }: Props) {
+  const visibleItems = items.slice(0, maxVisible)
+  const hiddenCount = Math.max(0, items.length - visibleItems.length)
   const totalCount = items.length + (successNotice ? 1 : 0)
   const showEmpty = items.length === 0 && !successNotice
 
@@ -63,22 +66,18 @@ export function DashboardActionFeed({
       <div className="border-b border-stone-100 px-5 py-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <div className="mb-1 flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-stone-400" aria-hidden />
-              <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-stone-400">
-                Operational intelligence
-              </p>
-            </div>
             <h2 className="text-lg font-semibold tracking-[-0.02em] text-stone-900">
-              What needs your attention
+              Today&rsquo;s priorities
             </h2>
             <p className="mt-1 text-[13px] text-stone-500">
-              Prioritized actions across pipeline, delivery, and client health.
+              The actions that protect revenue, clients, and delivery.
             </p>
           </div>
-          <span className="rounded-full bg-stone-100 px-2.5 py-1 text-[11px] font-medium text-stone-600">
-            {totalCount} {totalCount === 1 ? 'item' : 'items'}
-          </span>
+          {totalCount > 0 ? (
+            <span className="rounded-full bg-stone-100 px-2.5 py-1 text-[11px] font-medium text-stone-600">
+              {totalCount} {totalCount === 1 ? 'item' : 'items'}
+            </span>
+          ) : null}
         </div>
       </div>
 
@@ -120,32 +119,47 @@ export function DashboardActionFeed({
               {emptyMessage ?? 'No urgent actions right now — check back as activity picks up.'}
             </p>
           </div>
-        ) : items.length > 0 ? (
-          <ul className="space-y-2">
-            {items.map((item) => {
-              const Icon = ICONS[item.type]
-              return (
-                <li key={item.id}>
-                  <Link
-                    href={item.href}
-                    className={cn(
-                      'flex gap-3 rounded-lg border px-3 py-3 transition-colors duration-150 hover:border-stone-300',
-                      PRIORITY_STYLES[item.type],
-                    )}
-                  >
-                    <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white ring-1 ring-stone-200/80">
-                      <Icon className="h-4 w-4 text-stone-600" />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[13px] font-medium text-stone-900">{item.title}</p>
-                      <p className="mt-0.5 text-[12px] text-stone-500">{item.subtitle}</p>
-                    </div>
-                    <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-stone-300" aria-hidden />
-                  </Link>
-                </li>
-              )
-            })}
-          </ul>
+        ) : visibleItems.length > 0 ? (
+          <>
+            <ul className="space-y-2">
+              {visibleItems.map((item) => {
+                const Icon = ICONS[item.type]
+                return (
+                  <li key={item.id}>
+                    <Link
+                      href={item.href}
+                      className={cn(
+                        'flex gap-3 rounded-lg border border-stone-200/90 border-l-[3px] bg-white px-3 py-3 transition-colors duration-150 hover:border-stone-300 hover:bg-stone-50/50',
+                        ACCENT_STYLES[item.type],
+                      )}
+                    >
+                      <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-stone-50 ring-1 ring-stone-200/80">
+                        <Icon className="h-4 w-4 text-stone-600" />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[13px] font-medium text-stone-900">{item.title}</p>
+                        <p className="mt-0.5 text-[12px] text-stone-500">{item.subtitle}</p>
+                      </div>
+                      <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-stone-300" aria-hidden />
+                    </Link>
+                  </li>
+                )
+              })}
+            </ul>
+            {hiddenCount > 0 ? (
+              <p className="mt-3 text-center text-[12px] text-stone-500">
+                {hiddenCount} more {hiddenCount === 1 ? 'item' : 'items'} in your workspace — open{' '}
+                <Link href="/admin/pipeline" className="font-medium text-stone-700 hover:text-stone-900">
+                  pipeline
+                </Link>{' '}
+                or{' '}
+                <Link href="/admin/clients" className="font-medium text-stone-700 hover:text-stone-900">
+                  clients
+                </Link>{' '}
+                to review.
+              </p>
+            ) : null}
+          </>
         ) : null}
       </div>
     </section>

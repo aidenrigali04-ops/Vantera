@@ -1,18 +1,15 @@
 'use client'
 
 import { DashboardEmbeddedInsights } from '@/components/dashboard/DashboardEmbeddedInsights'
-import { DashboardClientHealthPanel } from '@/components/dashboard/DashboardClientHealthPanel'
 import { DashboardKpiSection } from '@/components/dashboard/DashboardKpiSection'
-import { DashboardPipelineSnapshot } from '@/components/dashboard/DashboardPipelineSnapshot'
-import { DashboardSection } from '@/components/dashboard/DashboardSection'
-import { DashboardTeamWorkloadPanel } from '@/components/dashboard/DashboardTeamWorkloadPanel'
+import { DashboardOverviewCollapsible } from '@/components/dashboard/DashboardOverviewCollapsible'
+import { DashboardWorkspaceHubs } from '@/components/dashboard/DashboardWorkspaceHubs'
 import { CleanSlateWelcome } from '@/components/onboarding/CleanSlateWelcome'
-import { ExploreGuideRail } from '@/components/onboarding/ExploreGuideRail'
+import { ExploreGuideStrip } from '@/components/onboarding/ExploreGuideStrip'
 import type { ActionFeedItem } from '@/lib/dashboard/action-feed'
 import type { EmbeddedInsight } from '@/lib/intelligence/types'
 import type { OnboardingSuccessNotice } from '@/lib/import/fields'
 import { onboardingSuccessStorageKey } from '@/lib/import/fields'
-import { useOperatingModel } from '@/lib/onboarding/use-operating-model'
 import { DURATION, EASE_OUT } from '@/lib/motion'
 import type { DashboardSnapshot } from '@/lib/sample-data/queries'
 import { motion, useReducedMotion } from 'framer-motion'
@@ -49,7 +46,7 @@ const fadeUp = {
 
 export function DashboardClient({
   email,
-  businessName,
+  businessName: _businessName,
   snapshot,
   actionFeed,
   accountId,
@@ -57,7 +54,6 @@ export function DashboardClient({
   embeddedInsights = [],
 }: DashboardClientProps) {
   const reduceMotion = useReducedMotion()
-  const operatingModel = useOperatingModel(accountId)
   const { isEmpty } = snapshot
   const showCleanSlate = isEmpty && onboardingIncomplete
   const showDemoGuide = onboardingIncomplete && !showCleanSlate
@@ -90,20 +86,18 @@ export function DashboardClient({
   }
 
   const greeting = useMemo(() => {
-    if (showCleanSlate) return 'Your workspace is ready'
-    if (onboardingIncomplete) return `Explore ${businessName || 'your demo workspace'}`
+    if (showCleanSlate) return null
+    if (onboardingIncomplete) return 'See how Ventaro runs your business'
     return `Good to see you, ${firstNameFromEmail(email)}`
-  }, [businessName, email, onboardingIncomplete, showCleanSlate])
+  }, [email, onboardingIncomplete, showCleanSlate])
 
   const subline = useMemo(() => {
-    if (showCleanSlate) {
-      return 'Pipeline, clients, and delivery views are configured. Add your first client to bring the system online.'
-    }
+    if (showCleanSlate) return null
     if (onboardingIncomplete) {
-      return operatingModel.dashboardSubline
+      return 'Sample data shows what your day looks like — start with today’s priorities, then explore when you’re ready.'
     }
-    return 'Here is what needs momentum across revenue, delivery, and client health.'
-  }, [onboardingIncomplete, operatingModel.dashboardSubline, showCleanSlate])
+    return 'Your priorities first — then pick an area below. The sidebar stays simple on purpose.'
+  }, [onboardingIncomplete, showCleanSlate])
 
   return (
     <motion.div
@@ -119,48 +113,46 @@ export function DashboardClient({
       }}
     >
       {showCleanSlate ? (
-        <motion.div variants={fadeUp}>
-          <CleanSlateWelcome />
-        </motion.div>
-      ) : (
-        <motion.header variants={fadeUp} className="space-y-1">
-          <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-stone-400">
-            {onboardingIncomplete ? 'Demo workspace' : 'Command center'}
-          </p>
-          <h1 className="text-2xl font-semibold tracking-[-0.02em] text-stone-900 sm:text-[1.75rem]">
-            {greeting}
-          </h1>
-          <p className="max-w-2xl text-[13px] leading-relaxed text-stone-500">{subline}</p>
-        </motion.header>
-      )}
-
-      <div
-        className={
-          showDemoGuide
-            ? 'grid gap-6 xl:grid-cols-[minmax(0,1fr)_300px] xl:items-start'
-            : undefined
-        }
-      >
-        <div className="space-y-6">
+        <>
           <motion.div variants={fadeUp}>
-            <DashboardKpiSection
-              snapshot={snapshot}
-              actionFeed={actionFeed}
-              gettingStarted={showCleanSlate}
-            />
+            <CleanSlateWelcome />
           </motion.div>
+          <motion.div variants={fadeUp}>
+            <DashboardWorkspaceHubs />
+          </motion.div>
+        </>
+      ) : (
+        <>
+          <motion.header variants={fadeUp} className="space-y-1">
+            <h1 className="text-2xl font-semibold tracking-[-0.02em] text-stone-900 sm:text-[1.75rem]">
+              {greeting}
+            </h1>
+            {subline ? (
+              <p className="max-w-2xl text-[13px] leading-relaxed text-stone-500">{subline}</p>
+            ) : null}
+          </motion.header>
 
           <motion.div variants={fadeUp}>
             <DashboardActionFeed
               items={actionFeed}
               successNotice={successNotice}
               onDismissSuccessNotice={dismissSuccessNotice}
-              emptyMessage={
-                showCleanSlate
-                  ? "Your workspace is ready. Let's add your first client."
-                  : undefined
-              }
+              maxVisible={5}
             />
+          </motion.div>
+
+          {showDemoGuide ? (
+            <motion.div variants={fadeUp}>
+              <ExploreGuideStrip accountId={accountId} />
+            </motion.div>
+          ) : null}
+
+          <motion.div variants={fadeUp}>
+            <DashboardWorkspaceHubs />
+          </motion.div>
+
+          <motion.div variants={fadeUp}>
+            <DashboardKpiSection snapshot={snapshot} actionFeed={actionFeed} />
           </motion.div>
 
           {!showCleanSlate && embeddedInsights.length > 0 ? (
@@ -169,42 +161,15 @@ export function DashboardClient({
             </motion.div>
           ) : null}
 
-          <motion.div variants={fadeUp} className="grid gap-6 lg:grid-cols-2">
-            <DashboardSection
-              title="Pipeline snapshot"
-              subtitle="Open opportunities by stage"
-              action={{ label: 'View pipeline', href: '/admin/pipeline' }}
-              tourAnchor="dashboard-pipeline"
-            >
-              <DashboardPipelineSnapshot deals={snapshot.deals} showCleanSlate={showCleanSlate} />
-            </DashboardSection>
-
-            <DashboardSection
-              title="Client health"
-              subtitle="Accounts that may need a check-in"
-              action={{ label: 'View contacts', href: '/admin/clients' }}
-            >
-              <DashboardClientHealthPanel clients={snapshot.clients} />
-            </DashboardSection>
-          </motion.div>
-
           <motion.div variants={fadeUp}>
-            <DashboardSection
-              title="Team workload"
-              subtitle="Overdue tasks and active delivery"
-              action={{ label: 'View tasks', href: '/admin/pipeline' }}
-            >
-              <DashboardTeamWorkloadPanel projects={snapshot.projects} actionFeed={actionFeed} />
-            </DashboardSection>
+            <DashboardOverviewCollapsible
+              snapshot={snapshot}
+              actionFeed={actionFeed}
+              defaultOpen={!onboardingIncomplete}
+            />
           </motion.div>
-        </div>
-
-        {showDemoGuide ? (
-          <motion.aside variants={fadeUp} className="xl:sticky xl:top-6">
-            <ExploreGuideRail accountId={accountId} businessName={businessName} />
-          </motion.aside>
-        ) : null}
-      </div>
+        </>
+      )}
     </motion.div>
   )
 }
