@@ -5,6 +5,7 @@ import { requireAdminSession } from '@/lib/auth/require-session'
 import { db } from '@/lib/db/client'
 import { findContact, findRecord } from '@/lib/db/queries'
 import { transitionStage } from '@/lib/records/stage-engine'
+import { tryCompleteOnboardingForOwner } from '@/lib/onboarding/complete-on-first-action'
 import { activities, records, stageDefinitions } from '@vantera/db'
 import { and, eq } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
@@ -80,7 +81,13 @@ export async function createRecord(input: CreateRecordInput): Promise<ActionResu
     visibleToClient: false,
   })
 
+  if (data.recordType === 'deal' || data.recordType === 'project') {
+    await tryCompleteOnboardingForOwner(session.accountId, session.role)
+  }
+
   revalidatePath('/admin/records')
+  revalidatePath('/admin/dashboard')
+  revalidatePath('/admin/clients')
   return { success: true, data: record! }
 }
 

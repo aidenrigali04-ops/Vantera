@@ -15,6 +15,7 @@ import type { ActionResult } from '@/lib/auth/types'
 import type { UserRole } from '@/lib/auth/constants'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { DEMO_WORKSPACE_NAME } from '@/lib/onboarding/constants'
 import { seedSampleWorkspace } from '@/lib/sample-data/seed'
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
@@ -341,7 +342,7 @@ export async function signupAction(
     .from('accounts')
     .insert({
       slug,
-      name: businessName,
+      name: DEMO_WORKSPACE_NAME,
       vertical: 'agency',
       plan: 'team',
     })
@@ -497,7 +498,7 @@ export async function completeOAuthSignupAction(
     .from('accounts')
     .insert({
       slug,
-      name: businessName,
+      name: DEMO_WORKSPACE_NAME,
       vertical: 'agency',
       plan: 'team',
     })

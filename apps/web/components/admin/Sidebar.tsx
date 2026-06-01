@@ -4,6 +4,7 @@ import { adminLogoutAction } from '@/lib/auth/actions'
 import type { AdminSession } from '@/lib/auth/types'
 import { useBranding } from '@/lib/branding/context'
 import { FeatureGate } from '@/lib/feature-flags/gate-client'
+import { isStartHereBadgeActive } from '@/lib/onboarding/prompts'
 import { useUIStore } from '@/lib/stores/ui-store'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -35,13 +36,16 @@ import {
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import type { ReactNode } from 'react'
+import { useEffect, useState } from 'react'
 
 type NavItemDef = {
   href: string
   label: string
   icon: LucideIcon
   badge?: number
+  highlightLabel?: string
   flag?: 'executive_dashboard'
+  tourAnchor?: string
 }
 
 type NavGroupDef = {
@@ -77,7 +81,7 @@ function useNavGroups(): NavGroupDef[] {
     {
       title: 'Sell',
       items: [
-        { href: '/admin/pipeline', label: 'Pipeline', icon: TrendingUp },
+        { href: '/admin/pipeline', label: 'Pipeline', icon: TrendingUp, tourAnchor: 'nav-pipeline' },
       ],
     },
     {
@@ -85,7 +89,7 @@ function useNavGroups(): NavGroupDef[] {
       items: [
         { href: '/admin/clients', label: 'Active Clients', icon: Users },
         { href: '/admin/deliverables', label: 'Deliverables', icon: Package },
-        { href: '/admin/portal', label: 'Client Portal', icon: ExternalLink },
+        { href: '/admin/portal', label: 'Client Portal', icon: ExternalLink, tourAnchor: 'nav-portal' },
         { href: '/admin/billing', label: 'Billing', icon: CreditCard },
       ],
     },
@@ -103,9 +107,23 @@ function useNavGroups(): NavGroupDef[] {
 function SidebarContent({ session, collapsed, onNavigate }: SidebarProps & { collapsed: boolean }) {
   const pathname = usePathname() ?? ''
   const { businessName, logoUrl } = useBranding()
+  const [startHereActive, setStartHereActive] = useState(false)
   const groups = useNavGroups()
   const displayName = (businessName || 'Workspace').slice(0, 18)
   const initial = (businessName?.trim()?.[0] ?? 'W').toUpperCase()
+
+  useEffect(() => {
+    setStartHereActive(isStartHereBadgeActive(session.accountId))
+  }, [session.accountId, pathname])
+
+  const groupsWithHighlights = groups.map((group) => ({
+    ...group,
+    items: group.items.map((item) =>
+      item.href === '/admin/dashboard' && startHereActive
+        ? { ...item, highlightLabel: 'Start here' }
+        : item,
+    ),
+  }))
 
   return (
     <TooltipProvider delayDuration={0}>
@@ -134,7 +152,7 @@ function SidebarContent({ session, collapsed, onNavigate }: SidebarProps & { col
         </div>
 
         <nav className="flex-1 space-y-4 overflow-y-auto px-2 py-3" aria-label="Admin navigation">
-          {groups.map((group) => (
+          {groupsWithHighlights.map((group) => (
             <div key={group.title}>
               {!collapsed ? (
                 <p className="mb-1 px-2 text-xs font-medium uppercase tracking-wider text-stone-500">
@@ -220,6 +238,7 @@ function NavItemRow({
       href={item.href}
       onClick={onNavigate}
       aria-current={isActive ? 'page' : undefined}
+      data-tour={item.tourAnchor}
       className={cn(
         'flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all duration-150',
         isActive ? 'bg-stone-700 text-white' : 'text-stone-300 hover:bg-stone-800 hover:text-stone-100',
@@ -230,6 +249,11 @@ function NavItemRow({
       {!collapsed ? (
         <>
           <span className="flex-1 truncate font-medium">{item.label}</span>
+          {item.highlightLabel ? (
+            <span className="rounded-full bg-amber-400/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-300">
+              {item.highlightLabel}
+            </span>
+          ) : null}
           {item.badge && item.badge > 0 ? (
             <span className="rounded-full bg-stone-700 px-1.5 py-0.5 text-[10px] font-medium">
               {item.badge}

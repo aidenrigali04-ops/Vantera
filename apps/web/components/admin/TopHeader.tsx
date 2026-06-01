@@ -16,11 +16,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { DEMO_WORKSPACE_NAME } from '@/lib/onboarding/constants'
 import { Bell, Menu, Search } from 'lucide-react'
 import { usePathname } from 'next/navigation'
 
 type TopHeaderProps = {
   session: AdminSession
+  showDemoWorkspace?: boolean
 }
 
 function usePageTitle(): string {
@@ -50,7 +52,7 @@ function usePageTitle(): string {
     .join(' ')
 }
 
-export function TopHeader({ session }: TopHeaderProps) {
+export function TopHeader({ session, showDemoWorkspace = false }: TopHeaderProps) {
   const pageTitle = usePageTitle()
   const { plan } = useBranding()
   const { setCommandPaletteOpen, setMobileSidebarOpen } = useUIStore()
@@ -70,7 +72,16 @@ export function TopHeader({ session }: TopHeaderProps) {
         >
           <Menu className="h-5 w-5" />
         </Button>
-        <h1 className="truncate text-lg font-semibold text-stone-900">{pageTitle}</h1>
+        <div className="min-w-0">
+          <h1 className="truncate text-lg font-semibold tracking-tight text-stone-900">
+            {showDemoWorkspace ? DEMO_WORKSPACE_NAME : pageTitle}
+          </h1>
+          {showDemoWorkspace && pageTitle !== 'Dashboard' ? (
+            <p className="truncate text-xs text-stone-500">{pageTitle}</p>
+          ) : showDemoWorkspace ? (
+            <p className="truncate text-xs text-stone-500">Demo workspace</p>
+          ) : null}
+        </div>
       </div>
 
       <button

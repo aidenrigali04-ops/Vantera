@@ -23,6 +23,7 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet'
 import { convertLeadToClient } from '@/lib/leads/convert'
+import { SectionEmptyState } from '@/components/onboarding/SectionEmptyState'
 import type { leads } from '@vantera/db'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Calendar, MessageSquare, Plus, Target, TrendingUp, Users, Zap } from 'lucide-react'
@@ -41,6 +42,7 @@ type Props = {
     byStatus: { status: string; count: number }[]
   }
   accountId: string
+  setupMode?: boolean
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -64,7 +66,7 @@ const SOURCE_LABELS: Record<string, string> = {
   referral: 'Referral',
 }
 
-export function PipelinePageClient({ initialLeads, stats, accountId }: Props) {
+export function PipelinePageClient({ initialLeads, stats, accountId, setupMode = false }: Props) {
   const router = useRouter()
   const queryClient = useQueryClient()
   const [search, setSearch] = useState('')
@@ -229,7 +231,7 @@ export function PipelinePageClient({ initialLeads, stats, accountId }: Props) {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5" data-tour="pipeline-leads">
       <PageHeader
         title="Pipeline"
         description="Pre-conversion prospects — nurture, qualify, and convert to active clients."
@@ -288,15 +290,21 @@ export function PipelinePageClient({ initialLeads, stats, accountId }: Props) {
           onSelectionChange={setSelectedIds}
           onRowClick={(row) => router.push(`/admin/pipeline/${row.id}`)}
           emptyState={
-            <div className="rounded-xl border border-dashed border-stone-200 bg-stone-50/50 px-6 py-12 text-center">
-              <p className="text-sm font-medium text-stone-700">No prospects yet</p>
-              <p className="mt-1 text-sm text-stone-500">
-                Add manually or import from Aspire outreach.
-              </p>
-              <Button className="mt-4" size="sm" onClick={() => setCreateOpen(true)}>
-                Add prospect
-              </Button>
-            </div>
+            setupMode ? (
+              <SectionEmptyState
+                title="No prospects yet"
+                description="No leads yet. Add your first prospect or connect LinkedIn Automation to start building your pipeline."
+                actionLabel="Add a lead"
+                onAction={() => setCreateOpen(true)}
+              />
+            ) : (
+              <SectionEmptyState
+                title="No prospects yet"
+                description="Add manually or import from Aspire outreach."
+                actionLabel="Add prospect"
+                onAction={() => setCreateOpen(true)}
+              />
+            )
           }
         />
       )}

@@ -18,8 +18,10 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet'
+import { persistOnboardingSuccessNotice } from '@/lib/import/fields'
 import type { stageDefinitions } from '@vantera/db'
 import { useQueryClient } from '@tanstack/react-query'
+import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 
@@ -39,11 +41,13 @@ export function RecordCreateSheet({
   onOpenChange,
   recordType,
   stages,
+  accountId,
   recordLabel,
   contactId,
   scheduledAt,
 }: Props) {
   const queryClient = useQueryClient()
+  const router = useRouter()
   const [saving, setSaving] = useState(false)
   const [contacts, setContacts] = useState<Array<{ id: string; name: string }>>([])
   const [form, setForm] = useState({
@@ -104,8 +108,15 @@ export function RecordCreateSheet({
     }
 
     toast.success(`${recordLabel} created`)
+    if (recordType === 'deal' || recordType === 'project') {
+      persistOnboardingSuccessNotice(accountId, {
+        kind: recordType,
+        label: form.title.trim(),
+      })
+    }
     onOpenChange(false)
     await queryClient.invalidateQueries({ queryKey: ['records'] })
+    router.refresh()
   }
 
   return (

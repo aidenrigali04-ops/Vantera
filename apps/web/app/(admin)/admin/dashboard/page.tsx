@@ -39,6 +39,7 @@ export default async function AdminDashboardPage() {
       primaryColor={branding.primaryColor || '#1648A0'}
       snapshot={snapshot}
       actionFeed={actionFeed}
+      accountId={session.accountId}
       onboardingIncomplete={onboardingIncomplete}
     />
   )

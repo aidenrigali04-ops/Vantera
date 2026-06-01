@@ -3,9 +3,11 @@
 import { cn } from '@/lib/utils'
 import type { ActionFeedItem } from '@/lib/dashboard/action-feed'
 import type { DashboardSnapshot } from '@/lib/sample-data/queries'
+import { CleanSlateWelcome } from '@/components/onboarding/CleanSlateWelcome'
+import type { OnboardingSuccessNotice } from '@/lib/import/fields'
+import { onboardingSuccessStorageKey } from '@/lib/import/fields'
+import { useOnboardingStore } from '@/lib/stores/onboarding-store'
 import { DashboardActionFeed } from './DashboardActionFeed'
-import { ExploreGuideRail } from '@/components/onboarding/ExploreGuideRail'
-import { PostCleanSlatePrompt } from '@/components/onboarding/PostCleanSlatePrompt'
 import { motion, useMotionValue, useSpring, useTransform } from 'framer-motion'
 import {
   ArrowRight,
@@ -19,7 +21,7 @@ import {
   Users,
   type LucideIcon,
 } from 'lucide-react'
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 type DashboardClientProps = {
   email: string
@@ -28,6 +30,7 @@ type DashboardClientProps = {
   primaryColor: string
   snapshot: DashboardSnapshot
   actionFeed: ActionFeedItem[]
+  accountId: string
   onboardingIncomplete?: boolean
 }
 
@@ -66,6 +69,7 @@ export function DashboardClient({
   primaryColor,
   snapshot,
   actionFeed,
+  accountId,
   onboardingIncomplete = false,
 }: DashboardClientProps) {
   const {
@@ -77,6 +81,35 @@ export function DashboardClient({
     weightedPipelineValueCents,
     wonValueCents,
   } = snapshot
+
+  const showCleanSlate = isEmpty && onboardingIncomplete
+  const [successNotice, setSuccessNotice] = useState<OnboardingSuccessNotice | null>(null)
+
+  useEffect(() => {
+    const raw = window.sessionStorage.getItem(onboardingSuccessStorageKey(accountId))
+    if (!raw) return
+    try {
+      const parsed = JSON.parse(raw) as Record<string, unknown>
+      if (parsed.kind && typeof parsed.kind === 'string') {
+        setSuccessNotice(parsed as OnboardingSuccessNotice)
+        return
+      }
+      if (parsed.entity && typeof parsed.count === 'number') {
+        setSuccessNotice({
+          kind: 'import',
+          entity: parsed.entity as Extract<OnboardingSuccessNotice, { kind: 'import' }>['entity'],
+          count: parsed.count,
+        })
+      }
+    } catch {
+      window.sessionStorage.removeItem(onboardingSuccessStorageKey(accountId))
+    }
+  }, [accountId])
+
+  function dismissSuccessNotice() {
+    window.sessionStorage.removeItem(onboardingSuccessStorageKey(accountId))
+    setSuccessNotice(null)
+  }
 
   const openDeals = useMemo(
     () => deals.filter((d) => !d.isTerminalWin && !d.isTerminalLoss),
@@ -130,17 +163,9 @@ export function DashboardClient({
         animate="show"
         className="relative mx-auto w-full max-w-7xl space-y-8 px-6 py-10 sm:px-10"
       >
-      <PostCleanSlatePrompt />
-
-      {onboardingIncomplete ? (
-        <motion.section variants={fadeUp} className="grid gap-6 lg:grid-cols-[320px_1fr]">
-          <ExploreGuideRail businessName={businessName} />
-          <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
-            <p className="text-sm leading-relaxed text-white/70">
-              You&rsquo;re viewing a pre-built demo workspace. Explore clients, pipeline, and
-              projects — then use the banner above to keep sample data or start fresh.
-            </p>
-          </div>
+      {showCleanSlate ? (
+        <motion.section variants={fadeUp}>
+          <CleanSlateWelcome primaryColor={primaryColor} />
         </motion.section>
       ) : null}
 
@@ -152,21 +177,25 @@ export function DashboardClient({
               aria-hidden
               className="size-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(16,185,129,0.7)]"
             />
-            {onboardingIncomplete ? 'Demo workspace' : today}
+            {showCleanSlate ? 'Fresh workspace' : onboardingIncomplete ? 'Demo workspace' : today}
           </span>
           <h1 className="text-3xl font-semibold tracking-tight text-white sm:text-4xl">
-            {onboardingIncomplete
-              ? `Explore ${businessName || 'your workspace'}`
-              : `Welcome back, ${firstNameFromEmail(email)}.`}
+            {showCleanSlate
+              ? 'Your workspace is ready'
+              : onboardingIncomplete
+                ? `Explore ${businessName || 'your workspace'}`
+                : `Welcome back, ${firstNameFromEmail(email)}.`}
           </h1>
           <p className="max-w-2xl text-sm leading-relaxed text-white/55">
-            {onboardingIncomplete
-              ? 'Sample clients, opportunities, and projects are loaded so you can see how everything connects — no setup required yet.'
-              : `Here's the pulse of ${businessName}. Your AI brain is watching for signals while you focus on the work that actually moves the needle.`}
+            {showCleanSlate
+              ? 'Pipeline stages and delivery views are configured. Add your first client to bring the system online.'
+              : onboardingIncomplete
+                ? 'Sample clients, opportunities, and projects are loaded so you can see how everything connects — no setup required yet.'
+                : `Here's the pulse of ${businessName}. Your AI brain is watching for signals while you focus on the work that actually moves the needle.`}
           </p>
         </div>
 
-        {!onboardingIncomplete ? (
+        {!onboardingIncomplete && !showCleanSlate ? (
           <div className="flex items-center gap-2">
             <PrimaryAction icon={Plus} label="Add client" primaryColor={primaryColor} />
             <SecondaryAction icon={Briefcase} label="New opportunity" />
@@ -174,8 +203,18 @@ export function DashboardClient({
         ) : null}
       </motion.section>
 
-      <motion.section variants={fadeUp}>
-        <DashboardActionFeed items={actionFeed} className="border-white/[0.06] bg-white/[0.03] text-white [&_h2]:text-white/55 [&_p]:text-white/70 [&_a:hover]:bg-white/[0.04] [&_span]:text-white/40 [&_.rounded-full]:bg-white/[0.06] [&_svg]:text-white/60" />
+      <motion.section variants={fadeUp} data-tour="action-feed">
+        <DashboardActionFeed
+          items={actionFeed}
+          successNotice={successNotice}
+          onDismissSuccessNotice={dismissSuccessNotice}
+          emptyMessage={
+            showCleanSlate
+              ? "Your workspace is ready. Let's add your first client."
+              : undefined
+          }
+          className="border-white/[0.06] bg-white/[0.03] text-white [&_h2]:text-white/55 [&_p]:text-white/70 [&_a:hover]:bg-white/[0.04] [&_span]:text-white/40 [&_.rounded-full]:bg-white/[0.06] [&_svg]:text-white/60 [&_.border-emerald-200\\/80]:border-emerald-400/30 [&_.bg-emerald-50\\/90]:bg-emerald-500/10 [&_.text-emerald-950]:text-emerald-100 [&_.text-emerald-800]:text-emerald-200"
+        />
       </motion.section>
 
       {/* KPI grid */}
@@ -186,6 +225,7 @@ export function DashboardClient({
           icon={Users}
           accent="#3B82F6"
           primaryColor={primaryColor}
+          gettingStarted={showCleanSlate}
         />
         <KpiTile
           label="Open opportunities"
@@ -193,6 +233,7 @@ export function DashboardClient({
           icon={TrendingUp}
           accent="#F59E0B"
           primaryColor={primaryColor}
+          gettingStarted={showCleanSlate}
         />
         <KpiTile
           label="Pipeline value"
@@ -201,6 +242,7 @@ export function DashboardClient({
           accent={primaryColor}
           primaryColor={primaryColor}
           format="currency"
+          gettingStarted={showCleanSlate}
         />
         <KpiTile
           label="Weighted pipeline"
@@ -209,12 +251,13 @@ export function DashboardClient({
           accent="#10B981"
           primaryColor={primaryColor}
           format="currency"
+          gettingStarted={showCleanSlate}
           sub={wonValueCents ? `${formatCurrency(wonValueCents)} won YTD` : undefined}
         />
       </motion.section>
 
       {/* Pipeline */}
-      <motion.section variants={fadeUp}>
+      <motion.section variants={fadeUp} data-tour="dashboard-pipeline">
         <Card>
           <CardHeader
             title="Pipeline"
@@ -228,7 +271,7 @@ export function DashboardClient({
           />
           <div className="p-5 pt-2">
             {pipelineColumns.length === 0 ? (
-              <EmptyPipeline />
+              <EmptyPipeline showCleanSlate={showCleanSlate} primaryColor={primaryColor} />
             ) : (
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
                 {pipelineColumns.map((col) => (
@@ -336,31 +379,12 @@ export function DashboardClient({
             </div>
           </Card>
         </motion.section>
-      ) : null}
-
-      {isEmpty ? (
+      ) : showCleanSlate ? (
         <motion.section variants={fadeUp}>
           <Card>
-            <div className="flex flex-col items-center gap-3 px-6 py-16 text-center">
-              <span
-                aria-hidden
-                style={{
-                  background: `radial-gradient(circle at center, ${primaryColor}33, transparent 70%)`,
-                }}
-                className="flex h-16 w-16 items-center justify-center rounded-full"
-              >
-                <Sparkles className="h-7 w-7" style={{ color: primaryColor }} aria-hidden />
-              </span>
-              <h2 className="text-xl font-semibold tracking-tight text-white">
-                Your workspace is ready.
-              </h2>
-              <p className="max-w-md text-sm leading-relaxed text-white/55">
-                The pipeline stages, automations, and AI brain are all wired up. Add your first
-                client to see the dashboard come alive.
-              </p>
-              <div className="mt-3 flex gap-2">
-                <PrimaryAction icon={Plus} label="Add your first client" primaryColor={primaryColor} />
-              </div>
+            <CardHeader title="Projects" subtitle="Delivery work tied to clients" />
+            <div className="px-5 pb-5">
+              <CleanSlateProjectsEmpty primaryColor={primaryColor} />
             </div>
           </Card>
         </motion.section>
@@ -380,6 +404,7 @@ function KpiTile({
   primaryColor,
   sub,
   format = 'number',
+  gettingStarted = false,
 }: {
   label: string
   value: number
@@ -388,6 +413,7 @@ function KpiTile({
   primaryColor: string
   sub?: string
   format?: 'number' | 'currency'
+  gettingStarted?: boolean
 }) {
   return (
     <motion.div
@@ -413,7 +439,7 @@ function KpiTile({
           <Icon className="h-4 w-4" style={{ color: accent }} aria-hidden />
         </span>
         <span className="text-[10px] font-medium uppercase tracking-wider text-white/35">
-          Last 30d
+          {gettingStarted ? 'Getting started' : 'Last 30d'}
         </span>
       </div>
 
@@ -505,18 +531,82 @@ function DealCard({ deal, index }: { deal: DashboardSnapshot['deals'][number]; i
   )
 }
 
-function EmptyPipeline() {
+function EmptyPipeline({
+  showCleanSlate = false,
+  primaryColor,
+}: {
+  showCleanSlate?: boolean
+  primaryColor?: string
+}) {
+  const { setNewClientDrawerOpen } = useOnboardingStore()
+
   return (
     <div className="rounded-xl border border-dashed border-white/[0.08] bg-white/[0.01] p-10 text-center">
-      <p className="text-sm font-medium text-white/70">No active opportunities.</p>
-      <p className="mt-1 text-xs text-white/40">
-        Add a client and create an opportunity — your stages are already configured.
+      <p className="text-sm font-medium text-white/70">
+        {showCleanSlate ? 'No opportunities yet.' : 'No active opportunities.'}
       </p>
+      <p className="mt-1 text-xs text-white/40">
+        {showCleanSlate
+          ? 'Opportunities track your active revenue. Add a client first, then create one here.'
+          : 'Add a client and create an opportunity — your stages are already configured.'}
+      </p>
+      {showCleanSlate ? (
+        <button
+          type="button"
+          onClick={() => setNewClientDrawerOpen(true)}
+          className="mt-4 inline-flex items-center rounded-lg px-3 py-1.5 text-xs font-medium text-white ring-1 ring-inset ring-white/20 transition-colors hover:bg-white/[0.06]"
+          style={{ boxShadow: primaryColor ? `0 0 0 1px ${primaryColor}22 inset` : undefined }}
+        >
+          Create an opportunity
+        </button>
+      ) : null}
+    </div>
+  )
+}
+
+function CleanSlateProjectsEmpty({ primaryColor }: { primaryColor: string }) {
+  const { setNewClientDrawerOpen } = useOnboardingStore()
+
+  return (
+    <div className="rounded-xl border border-dashed border-white/[0.08] bg-white/[0.01] px-6 py-10 text-center">
+      <p className="text-sm font-medium text-white/70">No projects yet.</p>
+      <p className="mt-1 text-xs text-white/40">
+        Projects manage your active client work. Start with a client, then add delivery work.
+      </p>
+      <button
+        type="button"
+        onClick={() => setNewClientDrawerOpen(true)}
+        className="mt-4 inline-flex items-center rounded-lg px-3 py-1.5 text-xs font-medium text-white ring-1 ring-inset ring-white/20 transition-colors hover:bg-white/[0.06]"
+        style={{ boxShadow: `0 0 0 1px ${primaryColor}22 inset` }}
+      >
+        Create a project
+      </button>
     </div>
   )
 }
 
 /* ────────────────────── Recent client row ─────────────────────── */
+
+function ClientHealthDot({ status }: { status: DashboardSnapshot['clients'][number]['healthStatus'] }) {
+  const colors = {
+    healthy: 'bg-emerald-400',
+    watch: 'bg-amber-400',
+    at_risk: 'bg-red-400',
+  } as const
+  const labels = {
+    healthy: 'Healthy',
+    watch: 'Needs attention',
+    at_risk: 'At risk',
+  } as const
+
+  return (
+    <span
+      className={cn('inline-block size-1.5 shrink-0 rounded-full', colors[status])}
+      title={labels[status]}
+      aria-label={labels[status]}
+    />
+  )
+}
 
 function ClientRow({
   client,
@@ -543,6 +633,7 @@ function ClientRow({
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
+          <ClientHealthDot status={client.healthStatus} />
           <p className="truncate text-sm font-medium text-white">{display}</p>
           {client.isSample ? (
             <span className="rounded-full bg-white/[0.04] px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider text-white/40">

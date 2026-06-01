@@ -23,6 +23,7 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet'
 import { CONTACT_TYPE_LABELS } from '@/lib/contacts/format'
+import { useOnboardingStore } from '@/lib/stores/onboarding-store'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus } from 'lucide-react'
 import { useCallback, useState } from 'react'
@@ -34,6 +35,7 @@ type Props = {
   vertical: string
   typeCounts: Record<string, number>
   basePath?: string
+  setupMode?: boolean
 }
 
 export function ContactsPageClient({
@@ -41,9 +43,11 @@ export function ContactsPageClient({
   session,
   typeCounts,
   basePath = '/admin/clients',
+  setupMode = false,
 }: Props) {
   const labels = useVerticalLabels()
   const queryClient = useQueryClient()
+  const { setNewClientDrawerOpen } = useOnboardingStore()
   const { selectedContactIds, setSelectedContactIds, clearContactSelection } = useUIStore()
 
   const [search, setSearch] = useState('')
@@ -153,8 +157,10 @@ export function ContactsPageClient({
         onArchive={handleArchive}
         contactLabel={labels.contact}
         contactsLabel={labels.contacts}
-        onAddContact={() => setCreateOpen(true)}
+        onAddContact={() => (setupMode ? setNewClientDrawerOpen(true) : setCreateOpen(true))}
         basePath={basePath}
+        setupMode={setupMode}
+        onSetupAddClient={() => setNewClientDrawerOpen(true)}
       />
 
       {totalSelected > 0 ? (

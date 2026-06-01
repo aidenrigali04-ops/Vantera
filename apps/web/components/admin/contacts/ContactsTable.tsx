@@ -28,6 +28,7 @@ import {
   type ColumnDef,
   type SortingState,
 } from '@tanstack/react-table'
+import { SectionEmptyState } from '@/components/onboarding/SectionEmptyState'
 import { MoreHorizontal, Users } from 'lucide-react'
 import Link from 'next/link'
 import { useMemo, useState } from 'react'
@@ -44,6 +45,8 @@ type ContactsTableProps = {
   contactsLabel: string
   onAddContact: () => void
   basePath?: string
+  setupMode?: boolean
+  onSetupAddClient?: () => void
 }
 
 export function ContactsTable({
@@ -56,6 +59,8 @@ export function ContactsTable({
   contactsLabel,
   onAddContact,
   basePath = '/admin/clients',
+  setupMode = false,
+  onSetupAddClient,
 }: ContactsTableProps) {
   const [sorting, setSorting] = useState<SortingState>([])
 
@@ -252,6 +257,17 @@ export function ContactsTable({
   }
 
   if (!data.length) {
+    if (setupMode) {
+      return (
+        <SectionEmptyState
+          title="No clients yet"
+          description="Add your first client to start tracking opportunities and delivery work against them."
+          actionLabel="Add my first client"
+          onAction={() => onSetupAddClient?.() ?? onAddContact()}
+        />
+      )
+    }
+
     return (
       <div className="flex flex-col items-center justify-center rounded-xl border border-stone-200 bg-white px-6 py-16 text-center shadow-sm">
         <Users className="mb-4 h-12 w-12 text-stone-300" />

@@ -4,6 +4,10 @@ import type { AdminSession } from '@/lib/auth/types'
 import type { ReactNode } from 'react'
 import { CommandPalette } from './CommandPalette'
 import { MobileBottomNav } from './MobileBottomNav'
+import { CsvImportModal } from '@/components/onboarding/CsvImportModal'
+import { OnboardingAutoPrompt } from '@/components/onboarding/OnboardingAutoPrompt'
+import { GuidedExplorationHost } from '@/components/onboarding/GuidedExplorationHost'
+import { NewClientDrawer } from '@/components/onboarding/NewClientDrawer'
 import { SampleDataBanner } from './SampleDataBanner'
 import { Sidebar, SidebarMobile } from './Sidebar'
 import { TopHeader } from './TopHeader'
@@ -31,15 +35,12 @@ export function AdminShell({
 }: AdminShellProps) {
   const { commandPaletteOpen, setCommandPaletteOpen, sidebarCollapsed } = useUIStore()
 
+  const showSampleExperience = hasSampleData && onboardingIncomplete
+
   if (bare) {
     return (
       <div className="min-h-screen bg-background">
-        {hasSampleData ? (
-          <SampleDataBanner
-            accountId={session.accountId}
-            onboardingIncomplete={onboardingIncomplete}
-          />
-        ) : null}
+        {showSampleExperience ? <SampleDataBanner accountId={session.accountId} /> : null}
         {children}
       </div>
     )
@@ -61,23 +62,29 @@ export function AdminShell({
         </div>
 
         <div className="col-start-1 row-start-1 md:col-start-2">
-          <TopHeader session={session} />
+          <TopHeader session={session} showDemoWorkspace={showSampleExperience} />
         </div>
 
-        <div className="col-start-1 row-start-2 overflow-hidden md:col-start-2">
-          {hasSampleData ? (
-          <SampleDataBanner
-            accountId={session.accountId}
-            onboardingIncomplete={onboardingIncomplete}
-          />
-        ) : null}
-          <main className="h-[calc(100vh-60px)] overflow-y-auto p-4 pb-20 md:p-6 md:pb-6">{children}</main>
+        <div className="col-start-1 row-start-2 flex min-h-0 flex-col overflow-hidden md:col-start-2">
+          {showSampleExperience ? <SampleDataBanner accountId={session.accountId} /> : null}
+          <main className="min-h-0 flex-1 overflow-y-auto p-4 pb-20 md:p-6 md:pb-6">{children}</main>
         </div>
       </div>
 
       <SidebarMobile session={session} />
       <MobileBottomNav />
       <CommandPalette open={commandPaletteOpen} onOpenChange={setCommandPaletteOpen} />
+      <GuidedExplorationHost
+        accountId={session.accountId}
+        enabled={showSampleExperience}
+      />
+      <OnboardingAutoPrompt accountId={session.accountId} enabled={showSampleExperience} />
+      {onboardingIncomplete ? (
+        <>
+          <NewClientDrawer session={session} />
+          <CsvImportModal accountId={session.accountId} />
+        </>
+      ) : null}
     </>
   )
 }

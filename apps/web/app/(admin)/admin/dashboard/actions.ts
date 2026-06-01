@@ -2,7 +2,7 @@
 
 import { requireAdminSession } from '@/lib/auth/require-session'
 import type { ActionResult } from '@/lib/auth/types'
-import { markOnboardingComplete } from '@/lib/onboarding/account-store'
+import { tryCompleteOnboardingForOwner } from '@/lib/onboarding/complete-on-first-action'
 import { clearSampleData } from '@/lib/sample-data/seed'
 import { revalidatePath } from 'next/cache'
 
@@ -14,13 +14,10 @@ export async function keepSampleDataAction(): Promise<ActionResult<{ completed: 
       return { success: false, error: 'Only the workspace owner can complete setup.' }
     }
 
-    const marked = await markOnboardingComplete(session.accountId)
-    if (!marked.ok) {
-      return { success: false, error: marked.message }
+    const completed = await tryCompleteOnboardingForOwner(session.accountId, session.role)
+    if (!completed) {
+      return { success: false, error: 'Setup could not be completed. Try again.' }
     }
-
-    revalidatePath('/admin', 'layout')
-    revalidatePath('/admin/dashboard')
 
     return { success: true, data: { completed: true } }
   } catch (err) {
@@ -31,7 +28,24 @@ export async function keepSampleDataAction(): Promise<ActionResult<{ completed: 
   }
 }
 
-/** Clean slate: wipe demo content and mark onboarding complete. */
+/** First real workspace action — marks onboarding success (Step 6). */
+export async function recordOnboardingSuccessAction(): Promise<ActionResult<{ completed: true }>> {
+  try {
+    const session = await requireAdminSession()
+    await tryCompleteOnboardingForOwner(session.accountId, session.role)
+    return { success: true, data: { completed: true } }
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Failed to complete setup',
+    }
+  }
+}
+
+/** @deprecated Use recordOnboardingSuccessAction */
+export const recordFirstClientAction = recordOnboardingSuccessAction
+
+/** Clean slate: wipe demo content. Onboarding completes on first real action. */
 export async function clearSampleDataAction(): Promise<ActionResult<{ cleared: true }>> {
   try {
     const session = await requireAdminSession()
@@ -40,13 +54,6 @@ export async function clearSampleDataAction(): Promise<ActionResult<{ cleared: t
     }
 
     await clearSampleData(session.accountId)
-
-    if (session.role === 'owner') {
-      const marked = await markOnboardingComplete(session.accountId)
-      if (!marked.ok) {
-        return { success: false, error: marked.message }
-      }
-    }
 
     revalidatePath('/admin/dashboard')
     revalidatePath('/admin/clients')

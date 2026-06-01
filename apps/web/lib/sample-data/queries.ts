@@ -9,6 +9,14 @@ export type DashboardClient = {
   phone: string | null
   source: string | null
   isSample: boolean
+  churnRiskScore: number
+  healthStatus: 'healthy' | 'watch' | 'at_risk'
+}
+
+function healthFromScore(score: number): DashboardClient['healthStatus'] {
+  if (score >= 70) return 'at_risk'
+  if (score >= 40) return 'watch'
+  return 'healthy'
 }
 
 export type DashboardDeal = {
@@ -65,7 +73,7 @@ export async function getDashboardSnapshot(accountId: string): Promise<Dashboard
     const [contactsRes, recordsRes, stagesRes] = await Promise.all([
       admin
         .from('contacts')
-        .select('id, first_name, last_name, email, phone, source, tags')
+        .select('id, first_name, last_name, email, phone, source, tags, churn_risk_score')
         .eq('account_id', accountId)
         .is('deleted_at', null)
         .order('created_at', { ascending: false })
@@ -110,6 +118,7 @@ export async function getDashboardSnapshot(accountId: string): Promise<Dashboard
       phone: string | null
       source: string | null
       tags: string[] | null
+      churn_risk_score: number | null
     }
     const contactsById = new Map<string, ContactRow>()
     const clients: DashboardClient[] = []
@@ -119,6 +128,7 @@ export async function getDashboardSnapshot(accountId: string): Promise<Dashboard
       contactsById.set(c.id, c)
       const isSample = Array.isArray(c.tags) && c.tags.includes(SAMPLE_TAG)
       if (isSample) hasSampleData = true
+      const churnRiskScore = Number(c.churn_risk_score ?? 0)
       clients.push({
         id: c.id,
         firstName: c.first_name,
@@ -127,6 +137,8 @@ export async function getDashboardSnapshot(accountId: string): Promise<Dashboard
         phone: c.phone,
         source: c.source,
         isSample,
+        churnRiskScore,
+        healthStatus: healthFromScore(churnRiskScore),
       })
     }
 

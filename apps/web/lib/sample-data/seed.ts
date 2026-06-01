@@ -1,26 +1,12 @@
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 
-/**
- * Sample-workspace seeding for new accounts.
- *
- * Philosophy: rather than gate the first session behind a configuration
- * wizard, new accounts get a populated "explorable" workspace immediately
- * — three sample agency clients, five deals across the pipeline, and two
- * active projects. The user can either layer real data on top, or clear
- * the sample data via {@link clearSampleData} to start fresh.
- *
- * Sample data is identified by two markers:
- *   - contacts.tags contains 'demo'
- *   - records.source = 'demo'
- *
- * stage_definitions are intentionally NOT marked as sample data: they
- * are operational configuration (pipeline stages) that the user will
- * still need after wiping demo content, so the empty state has a
- * pipeline to add the first real deal into.
- */
-
 export const SAMPLE_TAG = 'demo'
 export const SAMPLE_SOURCE = 'demo'
+
+/** ISO timestamp ~8 days ago — powers stalled-prospect Action Feed item. */
+function daysAgoIso(days: number): string {
+  return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
+}
 
 type StageSeed = {
   recordType: 'deal' | 'project'
@@ -54,7 +40,8 @@ const SAMPLE_CONTACTS = [
     email: 'sarah@acme.example',
     phone: '+15550100001',
     source: 'Acme Corporation',
-    notes: 'Sample contact — Acme Corporation.',
+    notes: 'Sample client — healthy account, active retainer.',
+    churnRiskScore: 18,
   },
   {
     firstName: 'Marcus',
@@ -62,7 +49,8 @@ const SAMPLE_CONTACTS = [
     email: 'marcus@brightside.example',
     phone: '+15550100002',
     source: 'Brightside Studios',
-    notes: 'Sample contact — Brightside Studios.',
+    notes: 'Sample client — renewal conversation overdue.',
+    churnRiskScore: 78,
   },
   {
     firstName: 'Priya',
@@ -70,7 +58,8 @@ const SAMPLE_CONTACTS = [
     email: 'priya@northwind.example',
     phone: '+15550100003',
     source: 'Northwind Labs',
-    notes: 'Sample contact — Northwind Labs.',
+    notes: 'Sample client — expansion opportunity in pipeline.',
+    churnRiskScore: 42,
   },
 ]
 
@@ -80,6 +69,7 @@ type DealSeed = {
   title: string
   valueCents: number
   closeProbability: number
+  overdueTask?: boolean
 }
 
 const SAMPLE_DEALS: DealSeed[] = [
@@ -87,7 +77,7 @@ const SAMPLE_DEALS: DealSeed[] = [
   { contactIndex: 1, stageLabel: 'Qualified', title: 'Brand Identity Refresh', valueCents: 1_850_000, closeProbability: 50 },
   { contactIndex: 0, stageLabel: 'Negotiation', title: 'Website Redesign', valueCents: 3_600_000, closeProbability: 80 },
   { contactIndex: 2, stageLabel: 'Lead', title: 'SEO + Content Strategy', valueCents: 1_200_000, closeProbability: 30 },
-  { contactIndex: 1, stageLabel: 'Proposal', title: 'Annual Retainer 2026', valueCents: 6_000_000, closeProbability: 65 },
+  { contactIndex: 1, stageLabel: 'Proposal', title: 'Annual Retainer 2026', valueCents: 6_000_000, closeProbability: 65, overdueTask: true },
 ]
 
 type ProjectSeed = {
@@ -146,6 +136,8 @@ export async function seedSampleWorkspace(accountId: string): Promise<void> {
     notes: c.notes,
     tags: [SAMPLE_TAG],
     portal_access: false,
+    lifecycle_stage: 'active_client',
+    churn_risk_score: c.churnRiskScore,
   }))
 
   const { data: contactRows, error: contactErr } = await admin
@@ -174,6 +166,7 @@ export async function seedSampleWorkspace(accountId: string): Promise<void> {
       is_pipeline: true,
       source: SAMPLE_SOURCE,
       priority: 'normal',
+      ...(d.overdueTask ? { scheduled_at: daysAgoIso(3) } : {}),
     }
   })
 
@@ -201,6 +194,23 @@ export async function seedSampleWorkspace(accountId: string): Promise<void> {
 
   const { error: projectErr } = await admin.from('records').insert(projectsPayload)
   if (projectErr) throw new Error(`Sample seed (projects): ${projectErr.message}`)
+
+  const stalledAt = daysAgoIso(8)
+  const { error: leadErr } = await admin.from('leads').insert({
+    account_id: accountId,
+    company: 'Summit Digital',
+    first_name: 'Jordan',
+    last_name: 'Reeves',
+    email: 'jordan@summitdigital.example',
+    source: 'manual',
+    relationship_status: 'nurturing',
+    pipeline_stage: 'prospect',
+    tags: [SAMPLE_TAG],
+    notes: 'Sample stalled prospect — no activity in 7+ days.',
+    updated_at: stalledAt,
+    created_at: stalledAt,
+  })
+  if (leadErr) throw new Error(`Sample seed (lead): ${leadErr.message}`)
 }
 
 /**
@@ -325,4 +335,11 @@ export async function clearSampleData(accountId: string): Promise<void> {
     .eq('account_id', accountId)
     .contains('tags', [SAMPLE_TAG])
   if (contactsErr) throw new Error(`Sample clear (contacts): ${contactsErr.message}`)
+
+  const { error: leadsErr } = await admin
+    .from('leads')
+    .delete()
+    .eq('account_id', accountId)
+    .contains('tags', [SAMPLE_TAG])
+  if (leadsErr) throw new Error(`Sample clear (leads): ${leadsErr.message}`)
 }

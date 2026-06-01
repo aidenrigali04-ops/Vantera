@@ -3,6 +3,7 @@ import { KpiStrip } from '@/components/operational/KpiStrip'
 import { requireAdminSession } from '@/lib/auth/require-session'
 import { getBrandingFromHeaders } from '@/lib/branding/server'
 import { countContactsByType, findContacts, getActiveClientKpis } from '@/lib/db/queries'
+import { isOnboardingCompleteForAccount } from '@/lib/onboarding/status'
 import { AlertTriangle, CalendarClock, RefreshCw, Users } from 'lucide-react'
 import { headers } from 'next/headers'
 
@@ -11,6 +12,11 @@ export const dynamic = 'force-dynamic'
 export default async function ActiveClientsPage() {
   const session = await requireAdminSession()
   const branding = getBrandingFromHeaders(headers())
+
+  const onboardingComplete =
+    session.role === 'owner'
+      ? await isOnboardingCompleteForAccount(session.accountId)
+      : true
 
   const [initialContacts, typeCounts, kpis] = await Promise.all([
     findContacts(session.accountId, { limit: 50, lifecycleStage: 'active_client' }),
@@ -34,6 +40,7 @@ export default async function ActiveClientsPage() {
         vertical={branding.vertical}
         typeCounts={typeCounts}
         basePath="/admin/clients"
+        setupMode={session.role === 'owner' && !onboardingComplete}
       />
     </div>
   )
