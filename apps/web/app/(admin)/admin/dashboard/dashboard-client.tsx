@@ -1,5 +1,6 @@
 'use client'
 
+import { DraftReviewSheet } from '@/components/dashboard/DraftReviewSheet'
 import { DashboardEmbeddedInsights } from '@/components/dashboard/DashboardEmbeddedInsights'
 import { DashboardKpiSection } from '@/components/dashboard/DashboardKpiSection'
 import { DashboardOverviewCollapsible } from '@/components/dashboard/DashboardOverviewCollapsible'
@@ -58,6 +59,7 @@ export function DashboardClient({
   const showCleanSlate = isEmpty && onboardingIncomplete
   const showDemoGuide = onboardingIncomplete && !showCleanSlate
   const [successNotice, setSuccessNotice] = useState<OnboardingSuccessNotice | null>(null)
+  const [reviewDraftId, setReviewDraftId] = useState<string | null>(null)
 
   useEffect(() => {
     const raw = window.sessionStorage.getItem(onboardingSuccessStorageKey(accountId))
@@ -137,7 +139,13 @@ export function DashboardClient({
               items={actionFeed}
               successNotice={successNotice}
               onDismissSuccessNotice={dismissSuccessNotice}
+              onReviewDraft={setReviewDraftId}
               maxVisible={5}
+            />
+            <DraftReviewSheet
+              draftId={reviewDraftId}
+              onClose={() => setReviewDraftId(null)}
+              onActionComplete={() => window.location.reload()}
             />
           </motion.div>
 

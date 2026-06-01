@@ -81,10 +81,39 @@ export async function findDueCampaignSteps(accountId: string, limit = 50) {
         eq(outreachCampaignSteps.accountId, accountId),
         eq(outreachCampaignSteps.status, 'pending'),
         lte(outreachCampaignSteps.sendAt, new Date()),
+        sql`COALESCE(${outreachCampaignSteps.metadata}->>'manualSend', 'false') <> 'true'`,
       ),
     )
     .orderBy(asc(outreachCampaignSteps.sendAt))
     .limit(limit)
+}
+
+export async function findCampaignStepsForCampaign(accountId: string, campaignId: string) {
+  return db
+    .select()
+    .from(outreachCampaignSteps)
+    .where(
+      and(
+        eq(outreachCampaignSteps.accountId, accountId),
+        eq(outreachCampaignSteps.campaignId, campaignId),
+      ),
+    )
+    .orderBy(asc(outreachCampaignSteps.stepIndex), asc(outreachCampaignSteps.sendAt))
+}
+
+export async function findManualCampaignSteps(accountId: string, campaignId: string) {
+  return db
+    .select()
+    .from(outreachCampaignSteps)
+    .where(
+      and(
+        eq(outreachCampaignSteps.accountId, accountId),
+        eq(outreachCampaignSteps.campaignId, campaignId),
+        eq(outreachCampaignSteps.status, 'pending'),
+        sql`${outreachCampaignSteps.metadata}->>'manualSend' = 'true'`,
+      ),
+    )
+    .orderBy(asc(outreachCampaignSteps.sendAt))
 }
 
 export async function findLeadsByIds(accountId: string, leadIds: string[]) {

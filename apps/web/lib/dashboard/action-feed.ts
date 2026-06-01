@@ -16,11 +16,14 @@ export type ActionFeedItem = {
     | 'email_clicked'
     | 'email_bounced'
     | 'high_icp_no_outreach'
+    | 'linkedin_step_ready'
   title: string
   subtitle: string
   href: string
   createdAt: Date
   severity?: 'red' | 'yellow' | 'green'
+  draftId?: string
+  campaignId?: string
 }
 
 export async function getOperationalActionFeed(accountId: string, limit = 8): Promise<ActionFeedItem[]> {
@@ -148,14 +151,22 @@ export async function getOperationalActionFeed(accountId: string, limit = 8): Pr
     const rawSignalType = signal.signalType
 
     let href = '/admin/dashboard'
+    let draftId: string | undefined
+    let campaignId: string | undefined
+
     if (rawSignalType === 'aspire_icp_match' && payload.searchId) {
       href = `/admin/outreach/aspire?searchId=${payload.searchId}`
+    } else if (payload.campaignId) {
+      campaignId = String(payload.campaignId)
+      href = `/admin/outreach/campaigns/${payload.campaignId}`
     } else if (payload.leadId) {
       href = `/admin/pipeline/${payload.leadId}`
     } else if (payload.contactId) {
       href = `/admin/clients/${payload.contactId}`
-    } else if (payload.draftId) {
-      href = `/admin/pipeline/${payload.leadId ?? ''}`
+    }
+
+    if (payload.draftId) {
+      draftId = String(payload.draftId)
     }
 
     let mappedType: ActionFeedItem['type'] = 'lead_activity'
@@ -165,7 +176,8 @@ export async function getOperationalActionFeed(accountId: string, limit = 8): Pr
       rawSignalType === 'score_increased' ||
       rawSignalType === 'email_clicked' ||
       rawSignalType === 'email_bounced' ||
-      rawSignalType === 'high_icp_no_outreach'
+      rawSignalType === 'high_icp_no_outreach' ||
+      rawSignalType === 'linkedin_step_ready'
     ) {
       mappedType = rawSignalType
     } else if (rawSignalType === 'draft_pending' || rawSignalType === 'draft_sent') {
@@ -180,6 +192,8 @@ export async function getOperationalActionFeed(accountId: string, limit = 8): Pr
       href,
       createdAt: signal.createdAt,
       severity: signal.severity,
+      draftId,
+      campaignId,
     })
   }
 

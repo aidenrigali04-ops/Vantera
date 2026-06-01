@@ -109,6 +109,11 @@ export async function runDailyLeadScore(): Promise<{ accountsProcessed: number; 
         signals: { icpScore, engagementScore },
       })
 
+      await db
+        .update(leads)
+        .set({ score: compositeScore, updatedAt: new Date() })
+        .where(eq(leads.id, lead.id))
+
       leadsScored++
 
       if (previous && compositeScore - previous.compositeScore > 20) {

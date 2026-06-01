@@ -15,9 +15,14 @@ export async function enrollLeadsInCampaignCore(
   if (!campaign) return { success: false, error: 'Campaign not found' }
 
   const leads = await findLeadsByIds(accountId, leadIds)
-  const validIds = leads.filter((lead) => lead.email).map((lead) => lead.id)
+  const validIds = leads
+    .filter((lead) => lead.email || lead.phone || lead.linkedinUrl)
+    .map((lead) => lead.id)
   if (validIds.length === 0) {
-    return { success: false, error: 'Selected leads need an email address' }
+    return {
+      success: false,
+      error: 'Selected leads need at least an email, phone, or LinkedIn URL',
+    }
   }
 
   const rows = await db

@@ -13,6 +13,7 @@ import {
   CheckCircle2,
   Clock,
   FileEdit,
+  Link2,
   MessageSquare,
   MousePointer,
   TrendingDown,
@@ -34,6 +35,7 @@ const ICONS = {
   email_clicked: MousePointer,
   email_bounced: AlertTriangle,
   high_icp_no_outreach: Zap,
+  linkedin_step_ready: Link2,
 } as const
 
 const ACCENT_STYLES = {
@@ -48,6 +50,7 @@ const ACCENT_STYLES = {
   email_clicked: 'border-l-teal-500',
   email_bounced: 'border-l-red-500',
   high_icp_no_outreach: 'border-l-amber-500',
+  linkedin_step_ready: 'border-l-blue-500',
 } as const
 
 type Props = {
@@ -56,6 +59,7 @@ type Props = {
   emptyMessage?: string
   successNotice?: OnboardingSuccessNotice | null
   onDismissSuccessNotice?: () => void
+  onReviewDraft?: (draftId: string) => void
   maxVisible?: number
 }
 
@@ -65,6 +69,7 @@ export function DashboardActionFeed({
   emptyMessage,
   successNotice,
   onDismissSuccessNotice,
+  onReviewDraft,
   maxVisible = 5,
 }: Props) {
   const visibleItems = items.slice(0, maxVisible)
@@ -141,23 +146,41 @@ export function DashboardActionFeed({
             <ul className="space-y-2">
               {visibleItems.map((item) => {
                 const Icon = ICONS[item.type] ?? MessageSquare
+                const content = (
+                  <>
+                    <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-stone-50 ring-1 ring-stone-200/80">
+                      <Icon className="h-4 w-4 text-stone-600" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[13px] font-medium text-stone-900">{item.title}</p>
+                      <p className="mt-0.5 text-[12px] text-stone-500">{item.subtitle}</p>
+                    </div>
+                    <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-stone-300" aria-hidden />
+                  </>
+                )
+                const itemClassName = cn(
+                  'flex gap-3 rounded-lg border border-stone-200/90 border-l-[3px] bg-white px-3 py-3 transition-colors duration-150 hover:border-stone-300 hover:bg-stone-50/50',
+                  ACCENT_STYLES[item.type] ?? 'border-l-stone-400',
+                )
+
+                if (item.type === 'draft_ready' && item.draftId && onReviewDraft) {
+                  return (
+                    <li key={item.id}>
+                      <button
+                        type="button"
+                        onClick={() => onReviewDraft(item.draftId!)}
+                        className={cn('w-full text-left', itemClassName)}
+                      >
+                        {content}
+                      </button>
+                    </li>
+                  )
+                }
+
                 return (
                   <li key={item.id}>
-                    <Link
-                      href={item.href}
-                      className={cn(
-                        'flex gap-3 rounded-lg border border-stone-200/90 border-l-[3px] bg-white px-3 py-3 transition-colors duration-150 hover:border-stone-300 hover:bg-stone-50/50',
-                        ACCENT_STYLES[item.type] ?? 'border-l-stone-400',
-                      )}
-                    >
-                      <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-stone-50 ring-1 ring-stone-200/80">
-                        <Icon className="h-4 w-4 text-stone-600" />
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-[13px] font-medium text-stone-900">{item.title}</p>
-                        <p className="mt-0.5 text-[12px] text-stone-500">{item.subtitle}</p>
-                      </div>
-                      <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-stone-300" aria-hidden />
+                    <Link href={item.href} className={itemClassName}>
+                      {content}
                     </Link>
                   </li>
                 )

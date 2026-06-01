@@ -1,33 +1,36 @@
 'use client'
 
 import { CampaignAspireFinder } from '@/components/aspire/CampaignAspireFinder'
+import { CampaignSequenceBuilder } from '@/components/outreach/CampaignSequenceBuilder'
 import { KpiStrip } from '@/components/operational/KpiStrip'
 import { PageHeader } from '@/components/operational/PageHeader'
 import { StatusBadge } from '@/components/operational/table/StatusBadge'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import {
   draftCampaignMessage,
   enrollLeadsInCampaign,
   launchOutreachCampaign,
   markCampaignEnrollmentMeeting,
   markCampaignEnrollmentReplied,
+  markCampaignStepSent,
   pauseOutreachCampaign,
-  saveCampaignMessage,
+  saveCampaignWorkflow,
 } from '@/lib/outreach/actions'
 import {
   CAMPAIGN_GOAL_LABELS,
   type CampaignWithStats,
   type EnrollmentWithLead,
   type LeadRow,
+  type OutreachStepRow,
 } from '@/lib/outreach/types'
+import { CHANNEL_LABELS, channelsFromWorkflow, validateWorkflowForLaunch } from '@/lib/outreach/workflow-templates'
 import { cn } from '@/lib/utils'
 import {
   ArrowLeft,
   CalendarCheck,
+  Copy,
+  ExternalLink,
   Loader2,
   Mail,
   MessageSquare,
@@ -45,6 +48,7 @@ type Props = {
   campaign: CampaignWithStats
   enrollments: EnrollmentWithLead[]
   leads: LeadRow[]
+  campaignSteps: OutreachStepRow[]
 }
 
 type WizardStep = 'audience' | 'message' | 'launch' | 'results'
@@ -54,7 +58,12 @@ function leadName(lead: Pick<LeadRow, 'firstName' | 'lastName' | 'company'>) {
   return name || lead.company || 'Unknown lead'
 }
 
-export function CampaignDetailClient({ campaign, enrollments, leads }: Props) {
+function channelSummary(channels: string[]) {
+  if (channels.length === 0) return 'Multi-channel'
+  return channels.map((channel) => CHANNEL_LABELS[channel as keyof typeof CHANNEL_LABELS] ?? channel).join(' · ')
+}
+
+export function CampaignDetailClient({ campaign, enrollments, leads, campaignSteps }: Props) {
   const router = useRouter()
   const isDraft = campaign.status === 'draft'
   const isActive = campaign.status === 'active' || campaign.status === 'paused'
@@ -67,13 +76,27 @@ export function CampaignDetailClient({ campaign, enrollments, leads }: Props) {
 
   const [step, setStep] = useState<WizardStep>(initialStep)
   const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([])
-  const [subject, setSubject] = useState(campaign.workflow.steps[0]?.subject ?? '')
-  const [body, setBody] = useState(campaign.workflow.steps[0]?.body ?? '')
+  const [workflowSteps, setWorkflowSteps] = useState(campaign.workflow.steps)
+  const [draftStepIndex, setDraftStepIndex] = useState(0)
   const [draftRationale, setDraftRationale] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
-  const leadsWithEmail = useMemo(() => leads.filter((lead) => lead.email), [leads])
-  const sampleLead = leadsWithEmail[0] ?? enrollments[0]?.lead
+  const enrollableLeads = useMemo(
+    () => leads.filter((lead) => lead.email || lead.phone || lead.linkedinUrl),
+    [leads],
+  )
+  const sampleLead = enrollableLeads[0] ?? enrollments[0]?.lead
+
+  const manualSteps = useMemo(
+    () =>
+      campaignSteps.filter((row) => {
+        const metadata = row.metadata as { manualSend?: boolean; message?: string } | null
+        return row.status === 'pending' && metadata?.manualSend
+      }),
+    [campaignSteps],
+  )
+
+  const launchPreviewError = validateWorkflowForLaunch({ steps: workflowSteps })
 
   const kpiItems = [
     { label: 'Enrolled', value: campaign.metrics.enrolled, icon: Users },
@@ -102,18 +125,22 @@ export function CampaignDetailClient({ campaign, enrollments, leads }: Props) {
     })
   }
 
-  function handleSaveMessage() {
+  function handleSaveSequence() {
+    if (launchPreviewError) {
+      toast.error(launchPreviewError)
+      return
+    }
+
     startTransition(async () => {
-      const result = await saveCampaignMessage({
+      const result = await saveCampaignWorkflow({
         campaignId: campaign.id,
-        subject,
-        body,
+        steps: workflowSteps,
       })
       if (!result.success) {
         toast.error(result.error)
         return
       }
-      toast.success('Message saved')
+      toast.success('Sequence saved')
       setStep('launch')
       router.refresh()
     })
@@ -121,20 +148,26 @@ export function CampaignDetailClient({ campaign, enrollments, leads }: Props) {
 
   function handleDraft() {
     if (!sampleLead) {
-      toast.error('Add a lead with an email before drafting')
+      toast.error('Add a lead before drafting')
       return
     }
 
     startTransition(async () => {
-      const result = await draftCampaignMessage(campaign.id, sampleLead.id)
+      const result = await draftCampaignMessage(campaign.id, sampleLead.id, draftStepIndex)
       if (!result.success) {
         toast.error(result.error)
         return
       }
-      setSubject(result.data.subject)
-      setBody(result.data.body)
+
+      setWorkflowSteps((current) =>
+        current.map((row, index) =>
+          index === draftStepIndex
+            ? { ...row, subject: result.data.subject, body: result.data.body }
+            : row,
+        ),
+      )
       setDraftRationale(result.data.rationale)
-      toast.success('Draft ready — edit before sending')
+      toast.success('Draft applied to selected step')
     })
   }
 
@@ -145,7 +178,11 @@ export function CampaignDetailClient({ campaign, enrollments, leads }: Props) {
         toast.error(result.error)
         return
       }
-      toast.success(`Launched — ${result.data.sent} email${result.data.sent === 1 ? '' : 's'} sent`)
+      const parts = [`${result.data.sent} sent`]
+      if (result.data.manualReady > 0) {
+        parts.push(`${result.data.manualReady} LinkedIn ready`)
+      }
+      toast.success(`Launched — ${parts.join(', ')}`)
       setStep('results')
       router.refresh()
     })
@@ -187,6 +224,23 @@ export function CampaignDetailClient({ campaign, enrollments, leads }: Props) {
     })
   }
 
+  function handleMarkStepSent(stepId: string) {
+    startTransition(async () => {
+      const result = await markCampaignStepSent(stepId)
+      if (!result.success) {
+        toast.error(result.error)
+        return
+      }
+      toast.success('Marked as sent')
+      router.refresh()
+    })
+  }
+
+  async function copyMessage(text: string) {
+    await navigator.clipboard.writeText(text)
+    toast.success('Copied to clipboard')
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-2 text-sm text-stone-500">
@@ -201,7 +255,7 @@ export function CampaignDetailClient({ campaign, enrollments, leads }: Props) {
 
       <PageHeader
         title={campaign.name}
-        description={`${CAMPAIGN_GOAL_LABELS[campaign.goal]} · Email`}
+        description={`${CAMPAIGN_GOAL_LABELS[campaign.goal]} · ${channelSummary(channelsFromWorkflow(campaign.workflow))}`}
         actions={
           isActive ? (
             campaign.status === 'active' ? (
@@ -228,7 +282,7 @@ export function CampaignDetailClient({ campaign, enrollments, leads }: Props) {
                     : 'bg-stone-100 text-stone-500',
                 )}
               >
-                {index + 1}. {wizardStep}
+                {index + 1}. {wizardStep === 'message' ? 'sequence' : wizardStep}
               </span>
             ))}
           </>
@@ -257,42 +311,41 @@ export function CampaignDetailClient({ campaign, enrollments, leads }: Props) {
               Or pick from pipeline
             </p>
             <div className="max-h-80 space-y-2 overflow-y-auto">
-            {leadsWithEmail.length === 0 ? (
-              <p className="text-sm text-stone-500">
-                No leads with email yet.{' '}
-                <Link href="/admin/pipeline" className="text-violet-700 hover:underline">
-                  Add leads in Pipeline
-                </Link>
-              </p>
-            ) : (
-              leadsWithEmail.map((lead) => (
-                <label
-                  key={lead.id}
-                  className="flex cursor-pointer items-start gap-3 rounded-lg border border-stone-100 px-3 py-2.5 hover:bg-stone-50"
-                >
-                  <Checkbox
-                    checked={selectedLeadIds.includes(lead.id)}
-                    onCheckedChange={() => toggleLead(lead.id)}
-                  />
-                  <span>
-                    <span className="block text-sm font-medium text-stone-900">{leadName(lead)}</span>
-                    <span className="block text-xs text-stone-500">
-                      {[lead.title, lead.company, lead.email].filter(Boolean).join(' · ')}
+              {enrollableLeads.length === 0 ? (
+                <p className="text-sm text-stone-500">
+                  No leads with contact info yet.{' '}
+                  <Link href="/admin/pipeline" className="text-violet-700 hover:underline">
+                    Add leads in Pipeline
+                  </Link>
+                </p>
+              ) : (
+                enrollableLeads.map((lead) => (
+                  <label
+                    key={lead.id}
+                    className="flex cursor-pointer items-start gap-3 rounded-lg border border-stone-100 px-3 py-2.5 hover:bg-stone-50"
+                  >
+                    <Checkbox
+                      checked={selectedLeadIds.includes(lead.id)}
+                      onCheckedChange={() => toggleLead(lead.id)}
+                    />
+                    <span>
+                      <span className="block text-sm font-medium text-stone-900">{leadName(lead)}</span>
+                      <span className="block text-xs text-stone-500">
+                        {[lead.title, lead.company, lead.email, lead.phone, lead.linkedinUrl]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </span>
                     </span>
-                  </span>
-                </label>
-              ))
-            )}
+                  </label>
+                ))
+              )}
             </div>
           </div>
 
           <div className="mt-4 flex justify-end gap-2">
-            <Button
-              onClick={handleEnroll}
-              disabled={isPending || selectedLeadIds.length === 0}
-            >
+            <Button onClick={handleEnroll} disabled={isPending || selectedLeadIds.length === 0}>
               {isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : null}
-              Continue to message
+              Continue to sequence
             </Button>
           </div>
         </section>
@@ -302,15 +355,28 @@ export function CampaignDetailClient({ campaign, enrollments, leads }: Props) {
         <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <h3 className="text-sm font-semibold text-stone-900">Write your email</h3>
+              <h3 className="text-sm font-semibold text-stone-900">Build your sequence</h3>
               <p className="mt-1 text-sm text-stone-500">
-                Use {'{{first_name}}'} and {'{{company}}'} — we personalize at send time.
+                Email and SMS send automatically. LinkedIn steps queue for manual send in Results.
               </p>
             </div>
-            <Button variant="outline" size="sm" onClick={handleDraft} disabled={isPending}>
-              <Sparkles className="mr-1.5 h-3.5 w-3.5" />
-              AI draft
-            </Button>
+            <div className="flex items-center gap-2">
+              <select
+                className="rounded-md border border-stone-200 bg-white px-2 py-1.5 text-xs"
+                value={draftStepIndex}
+                onChange={(event) => setDraftStepIndex(Number(event.target.value))}
+              >
+                {workflowSteps.map((row, index) => (
+                  <option key={index} value={index}>
+                    Step {index + 1} ({CHANNEL_LABELS[row.channel]})
+                  </option>
+                ))}
+              </select>
+              <Button variant="outline" size="sm" onClick={handleDraft} disabled={isPending}>
+                <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                AI draft
+              </Button>
+            </div>
           </div>
 
           {draftRationale ? (
@@ -319,33 +385,19 @@ export function CampaignDetailClient({ campaign, enrollments, leads }: Props) {
             </p>
           ) : null}
 
-          <div className="mt-4 space-y-3">
-            <div className="space-y-2">
-              <Label htmlFor="subject">Subject</Label>
-              <Input
-                id="subject"
-                value={subject}
-                onChange={(event) => setSubject(event.target.value)}
-                placeholder="Quick idea for {{company}}"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="body">Message</Label>
-              <Textarea
-                id="body"
-                value={body}
-                onChange={(event) => setBody(event.target.value)}
-                rows={10}
-                placeholder="Hi {{first_name}}, ..."
-              />
-            </div>
+          <div className="mt-4">
+            <CampaignSequenceBuilder
+              steps={workflowSteps}
+              onChange={setWorkflowSteps}
+              disabled={isPending}
+            />
           </div>
 
           <div className="mt-4 flex justify-between gap-2">
             <Button variant="outline" onClick={() => setStep('audience')}>
               Back
             </Button>
-            <Button onClick={handleSaveMessage} disabled={isPending || !subject.trim() || !body.trim()}>
+            <Button onClick={handleSaveSequence} disabled={isPending || Boolean(launchPreviewError)}>
               Continue to launch
             </Button>
           </div>
@@ -356,14 +408,24 @@ export function CampaignDetailClient({ campaign, enrollments, leads }: Props) {
         <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
           <h3 className="text-sm font-semibold text-stone-900">Ready to launch</h3>
           <p className="mt-1 text-sm text-stone-500">
-            {campaign.metrics.enrolled} lead{campaign.metrics.enrolled === 1 ? '' : 's'} enrolled.
-            Immediate sends go out now; scheduled steps run via cron.
+            {campaign.metrics.enrolled} lead{campaign.metrics.enrolled === 1 ? '' : 's'} enrolled ·{' '}
+            {workflowSteps.filter((row) => row.body.trim()).length} steps in sequence.
           </p>
 
-          <div className="mt-4 rounded-lg border border-stone-100 bg-stone-50/80 p-4">
-            <p className="text-xs font-medium uppercase tracking-wide text-stone-500">Preview</p>
-            <p className="mt-2 text-sm font-medium text-stone-900">{subject}</p>
-            <p className="mt-2 whitespace-pre-wrap text-sm text-stone-600">{body}</p>
+          <div className="mt-4 space-y-3">
+            {workflowSteps
+              .filter((row) => row.body.trim())
+              .map((row, index) => (
+                <div key={index} className="rounded-lg border border-stone-100 bg-stone-50/80 p-4">
+                  <p className="text-xs font-medium uppercase tracking-wide text-stone-500">
+                    Day {row.delayDays} · {CHANNEL_LABELS[row.channel]}
+                  </p>
+                  {row.channel === 'email' && row.subject ? (
+                    <p className="mt-2 text-sm font-medium text-stone-900">{row.subject}</p>
+                  ) : null}
+                  <p className="mt-2 whitespace-pre-wrap text-sm text-stone-600">{row.body}</p>
+                </div>
+              ))}
           </div>
 
           <div className="mt-4 flex justify-between gap-2">
@@ -378,13 +440,68 @@ export function CampaignDetailClient({ campaign, enrollments, leads }: Props) {
         </section>
       ) : null}
 
+      {manualSteps.length > 0 ? (
+        <section className="rounded-xl border border-amber-200 bg-amber-50/50 p-5 shadow-sm">
+          <h3 className="text-sm font-semibold text-amber-950">LinkedIn steps ready</h3>
+          <p className="mt-1 text-sm text-amber-900/80">
+            Copy each message, send on LinkedIn, then mark as sent.
+          </p>
+          <div className="mt-4 space-y-3">
+            {manualSteps.map((row) => {
+              const metadata = row.metadata as {
+                message?: string
+                linkedinUrl?: string
+              }
+              const enrollment = enrollments.find((item) => item.leadId === row.leadId)
+              return (
+                <div key={row.id} className="rounded-lg border border-amber-200/80 bg-white p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium text-stone-900">
+                        {enrollment ? leadName(enrollment.lead) : 'Lead'}
+                      </p>
+                      {metadata.linkedinUrl ? (
+                        <a
+                          href={metadata.linkedinUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="mt-1 inline-flex items-center gap-1 text-xs text-violet-700 hover:underline"
+                        >
+                          Open LinkedIn
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                      ) : null}
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => copyMessage(metadata.message ?? row.body)}
+                      >
+                        <Copy className="mr-1 h-3.5 w-3.5" />
+                        Copy
+                      </Button>
+                      <Button size="sm" disabled={isPending} onClick={() => handleMarkStepSent(row.id)}>
+                        Mark sent
+                      </Button>
+                    </div>
+                  </div>
+                  <p className="mt-3 whitespace-pre-wrap text-sm text-stone-600">
+                    {metadata.message ?? row.body}
+                  </p>
+                </div>
+              )
+            })}
+          </div>
+        </section>
+      ) : null}
+
       {(isActive || step === 'results') && enrollments.length > 0 ? (
         <section className="rounded-xl border border-stone-200 bg-white shadow-sm">
           <div className="border-b border-stone-100 px-5 py-4">
             <h3 className="text-sm font-semibold text-stone-900">Results by lead</h3>
             <p className="mt-0.5 text-sm text-stone-500">
               Email replies are detected automatically when Resend inbound is configured.
-              Use &quot;Book meeting&quot; when a reply converts to a scheduled call.
             </p>
           </div>
           <table className="min-w-full divide-y divide-stone-100 text-sm">

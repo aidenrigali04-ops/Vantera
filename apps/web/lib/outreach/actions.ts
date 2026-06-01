@@ -7,13 +7,19 @@ import { draftLeadMessage } from '@/lib/outreach/draft-lead-message'
 import { findLeadsByIds, findOutreachCampaignById } from '@/lib/outreach/queries'
 import { enrollLeadsInCampaignCore } from '@/lib/outreach/enroll-leads'
 import { recordCampaignInboundReply } from '@/lib/outreach/record-reply'
-import { materializeCampaignSteps, processDueCampaignSteps } from '@/lib/outreach/runner'
+import { materializeCampaignSteps, markCampaignStepSentCore, processDueCampaignSteps } from '@/lib/outreach/runner'
 import {
   CAMPAIGN_GOAL_INTENTS,
   parseCampaignMetrics,
   type OutreachCampaignGoal,
   type OutreachCampaignWorkflow,
+  type OutreachCampaignWorkflowStep,
 } from '@/lib/outreach/types'
+import {
+  channelsFromWorkflow,
+  defaultWorkflowForGoal,
+  validateWorkflowForLaunch,
+} from '@/lib/outreach/workflow-templates'
 import {
   outreachCampaignEnrollments,
   outreachCampaigns,
@@ -38,19 +44,7 @@ export async function createOutreachCampaign(
 ): Promise<ActionResult<{ id: string }>> {
   const session = await requireAdminSession()
 
-  const intent = CAMPAIGN_GOAL_INTENTS[input.goal]
-  const workflow: OutreachCampaignWorkflow = {
-    steps: [
-      {
-        stepIndex: 0,
-        delayDays: 0,
-        channel: 'email',
-        intent,
-        subject: '',
-        body: '',
-      },
-    ],
-  }
+  const workflow = defaultWorkflowForGoal(input.goal)
 
   const [campaign] = await db
     .insert(outreachCampaigns)
@@ -60,13 +54,52 @@ export async function createOutreachCampaign(
       goal: input.goal,
       ownerId: session.userId,
       status: 'draft',
-      channels: ['email'],
+      channels: channelsFromWorkflow(workflow),
       workflow,
     })
     .returning({ id: outreachCampaigns.id })
 
   revalidatePath('/admin/outreach/campaigns')
   return { success: true, data: { id: campaign!.id } }
+}
+
+type SaveCampaignWorkflowInput = {
+  campaignId: string
+  steps: OutreachCampaignWorkflowStep[]
+}
+
+export async function saveCampaignWorkflow(
+  input: SaveCampaignWorkflowInput,
+): Promise<ActionResult> {
+  const session = await requireAdminSession()
+  const campaign = await findOutreachCampaignById(session.accountId, input.campaignId)
+  if (!campaign) return { success: false, error: 'Campaign not found' }
+  if (campaign.status !== 'draft') {
+    return { success: false, error: 'Only draft campaigns can be edited' }
+  }
+
+  const steps = input.steps.map((step, index) => ({
+    ...step,
+    stepIndex: index,
+    delayDays: Math.max(0, Number(step.delayDays) || 0),
+    subject: step.subject?.trim() ?? '',
+    body: step.body?.trim() ?? '',
+  }))
+
+  const workflow: OutreachCampaignWorkflow = { steps }
+
+  await db
+    .update(outreachCampaigns)
+    .set({
+      workflow,
+      channels: channelsFromWorkflow(workflow),
+      updatedAt: new Date(),
+    })
+    .where(eq(outreachCampaigns.id, input.campaignId))
+
+  revalidatePath('/admin/outreach/campaigns')
+  revalidatePath(`/admin/outreach/campaigns/${input.campaignId}`)
+  return { success: true, data: undefined }
 }
 
 export async function saveCampaignMessage(
@@ -112,15 +145,13 @@ export async function enrollLeadsInCampaign(
 
 export async function launchOutreachCampaign(
   campaignId: string,
-): Promise<ActionResult<{ stepsCreated: number; sent: number }>> {
+): Promise<ActionResult<{ stepsCreated: number; sent: number; manualReady: number }>> {
   const session = await requireAdminSession()
   const campaign = await findOutreachCampaignById(session.accountId, campaignId)
   if (!campaign) return { success: false, error: 'Campaign not found' }
 
-  const step = campaign.workflow.steps[0]
-  if (!step?.body?.trim() || !step.subject?.trim()) {
-    return { success: false, error: 'Add a subject and message before launching' }
-  }
+  const validationError = validateWorkflowForLaunch(campaign.workflow)
+  if (validationError) return { success: false, error: validationError }
 
   const enrollments = await db
     .select({ id: outreachCampaignEnrollments.id })
@@ -133,7 +164,7 @@ export async function launchOutreachCampaign(
     )
 
   if (enrollments.length === 0) {
-    return { success: false, error: 'Enroll at least one lead with an email address' }
+    return { success: false, error: 'Enroll at least one lead before launching' }
   }
 
   let stepsCreated = 0
@@ -167,13 +198,18 @@ export async function launchOutreachCampaign(
 
   return {
     success: true,
-    data: { stepsCreated, sent: sendResult.sent },
+    data: {
+      stepsCreated,
+      sent: sendResult.sent,
+      manualReady: sendResult.manualReady,
+    },
   }
 }
 
 export async function draftCampaignMessage(
   campaignId: string,
   leadId: string,
+  stepIndex = 0,
 ): Promise<ActionResult<{ subject: string; body: string; rationale: string }>> {
   const session = await requireAdminSession()
   const campaign = await findOutreachCampaignById(session.accountId, campaignId)
@@ -183,7 +219,8 @@ export async function draftCampaignMessage(
   const lead = leads[0]
   if (!lead) return { success: false, error: 'Lead not found' }
 
-  const intent = campaign.workflow.steps[0]?.intent ?? CAMPAIGN_GOAL_INTENTS[campaign.goal]
+  const intent =
+    campaign.workflow.steps[stepIndex]?.intent ?? CAMPAIGN_GOAL_INTENTS[campaign.goal]
 
   const draft = await draftLeadMessage({
     accountId: session.accountId,
@@ -200,6 +237,23 @@ export async function draftCampaignMessage(
     success: true,
     data: draft.output,
   }
+}
+
+export async function markCampaignStepSent(stepId: string): Promise<ActionResult> {
+  const session = await requireAdminSession()
+  const result = await markCampaignStepSentCore(session.accountId, stepId, session.userId)
+  if (!result.ok) {
+    const messages: Record<string, string> = {
+      step_not_found: 'Step not found',
+      already_sent: 'Step already marked as sent',
+      step_not_ready: 'Step is not ready for manual send',
+    }
+    return { success: false, error: messages[result.reason] ?? 'Could not mark step sent' }
+  }
+
+  revalidatePath('/admin/outreach/campaigns')
+  revalidatePath(`/admin/outreach/campaigns/${result.campaignId}`)
+  return { success: true, data: undefined }
 }
 
 export async function markCampaignEnrollmentReplied(

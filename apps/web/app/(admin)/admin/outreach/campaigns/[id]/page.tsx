@@ -2,6 +2,7 @@ import { CampaignDetailClient } from '@/app/(admin)/admin/outreach/campaigns/[id
 import { requireAdminSession } from '@/lib/auth/require-session'
 import {
   findCampaignEnrollments,
+  findCampaignStepsForCampaign,
   findLeadsForCampaignPicker,
   findOutreachCampaignById,
 } from '@/lib/outreach/queries'
@@ -18,12 +19,18 @@ export default async function CampaignDetailPage({ params }: PageProps) {
   const campaign = await findOutreachCampaignById(session.accountId, id)
   if (!campaign) notFound()
 
-  const [enrollments, leads] = await Promise.all([
+  const [enrollments, leads, campaignSteps] = await Promise.all([
     findCampaignEnrollments(session.accountId, id),
     findLeadsForCampaignPicker(session.accountId),
+    findCampaignStepsForCampaign(session.accountId, id),
   ])
 
   return (
-    <CampaignDetailClient campaign={campaign} enrollments={enrollments} leads={leads} />
+    <CampaignDetailClient
+      campaign={campaign}
+      enrollments={enrollments}
+      leads={leads}
+      campaignSteps={campaignSteps}
+    />
   )
 }
