@@ -4,6 +4,7 @@ import { db } from '@/lib/db/client'
 import { evaluateFlag } from '@/lib/feature-flags/evaluate'
 import type { Plan } from '@/lib/feature-flags/flags'
 import { sendCampaignEmail } from '@/lib/outreach/send-email'
+import { sendCampaignSms } from '@/lib/outreach/send-sms'
 import { accounts, activities, automationRuns, leadDrafts, leads } from '@vantera/db'
 import { and, eq, isNull } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
@@ -77,6 +78,37 @@ export async function POST(request: Request, { params }: RouteParams) {
     if (!sent.ok) {
       return NextResponse.json({ success: false, error: sent.reason }, { status: 502 })
     }
+  } else if (row.draft.channel === 'sms') {
+    if (!row.lead.phone) {
+      return NextResponse.json({ success: false, error: 'Lead has no phone number' }, { status: 400 })
+    }
+
+    const sent = await sendCampaignSms({
+      accountId: session.accountId,
+      toPhone: row.lead.phone,
+      body: row.draft.body,
+      lead: {
+        firstName: row.lead.firstName,
+        lastName: row.lead.lastName,
+        company: row.lead.company,
+        email: row.lead.email,
+        title: row.lead.title,
+      },
+    })
+
+    if (!sent.ok) {
+      return NextResponse.json({ success: false, error: sent.reason }, { status: 502 })
+    }
+  } else if (row.draft.channel === 'linkedin') {
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'LinkedIn drafts must be sent manually — copy from the lead profile',
+      },
+      { status: 400 },
+    )
+  } else {
+    return NextResponse.json({ success: false, error: 'Unsupported draft channel' }, { status: 400 })
   }
 
   await db

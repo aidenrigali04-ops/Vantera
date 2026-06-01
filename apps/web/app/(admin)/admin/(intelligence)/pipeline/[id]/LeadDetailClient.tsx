@@ -56,13 +56,16 @@ export function LeadDetailClient({ lead, profile, activities, insights }: Props)
   const name = [lead.firstName, lead.lastName].filter(Boolean).join(' ') || 'Unknown prospect'
 
   const handleStatusChange = async (value: (typeof STATUS_OPTIONS)[number]) => {
+    const previous = status
     setStatus(value)
     const result = await updateLead(lead.id, { relationshipStatus: value })
     if (!result.success) {
+      setStatus(previous)
       toast.error(result.error)
       return
     }
     toast.success('Status updated')
+    router.refresh()
   }
 
   const handleConvert = async () => {

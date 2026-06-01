@@ -19,6 +19,9 @@ export async function keepSampleDataAction(): Promise<ActionResult<{ completed: 
       return { success: false, error: 'Setup could not be completed. Try again.' }
     }
 
+    revalidatePath('/admin/dashboard')
+    revalidatePath('/admin', 'layout')
+
     return { success: true, data: { completed: true } }
   } catch (err) {
     return {
@@ -33,6 +36,11 @@ export async function recordOnboardingSuccessAction(): Promise<ActionResult<{ co
   try {
     const session = await requireAdminSession()
     await tryCompleteOnboardingForOwner(session.accountId, session.role)
+
+    revalidatePath('/admin/dashboard')
+    revalidatePath('/admin/clients')
+    revalidatePath('/admin', 'layout')
+
     return { success: true, data: { completed: true } }
   } catch (err) {
     return {

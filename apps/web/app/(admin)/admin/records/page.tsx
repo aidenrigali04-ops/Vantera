@@ -15,8 +15,11 @@ export const dynamic = 'force-dynamic'
 
 const RECORD_TYPE = 'project'
 
-export default async function RecordsPage() {
+type PageProps = { searchParams: Promise<{ contactId?: string }> }
+
+export default async function RecordsPage({ searchParams }: PageProps) {
   const session = await requireAdminSession()
+  const { contactId } = await searchParams
 
   const onboardingComplete =
     session.role === 'owner'
@@ -38,6 +41,7 @@ export default async function RecordsPage() {
       recordType={RECORD_TYPE}
       accountId={session.accountId}
       setupMode={session.role === 'owner' && !onboardingComplete}
+      initialContactId={contactId}
       kpiStrip={
         <KpiStrip
           items={[

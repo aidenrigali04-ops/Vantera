@@ -324,11 +324,15 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
   const handleBulkAdd = useCallback(async () => {
     const selected = sortedRows.filter((r) => selectedIds.includes(r.id))
     for (const row of selected) {
-      enrollOne(row)
-      await addMutation.mutateAsync(row).catch(() => undefined)
+      setEnrollStates((current) => ({ ...current, [row.id]: 'pending' }))
+      try {
+        await addMutation.mutateAsync(row)
+      } catch {
+        setEnrollStates((current) => ({ ...current, [row.id]: 'idle' }))
+      }
     }
     setSelectedIds([])
-  }, [addMutation, enrollOne, selectedIds, sortedRows])
+  }, [addMutation, selectedIds, sortedRows])
 
   const displayRows = useMemo(() => {
     const view = ASPIRE_TABLE_VIEWS.find((item) => item.id === activeViewId)

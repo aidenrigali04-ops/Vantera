@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils'
 import { ArrowRight, Sparkles, X } from 'lucide-react'
 import Link from 'next/link'
 import { useState } from 'react'
+import { toast } from 'sonner'
 
 const SEVERITY_STYLES: Record<
   InsightSeverity,
@@ -101,9 +102,14 @@ export function EmbeddedInsightsPanel({
   const [insights, setInsights] = useState(initialInsights)
 
   async function handleDismiss(id: string) {
+    const previous = insights
     setInsights((current) => current.filter((item) => item.id !== id))
     if (!id.startsWith('derived-')) {
-      await dismissEmbeddedInsight(id)
+      const result = await dismissEmbeddedInsight(id)
+      if (!result.success) {
+        setInsights(previous)
+        toast.error(result.error ?? 'Could not dismiss insight')
+      }
     }
   }
 

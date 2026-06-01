@@ -119,7 +119,12 @@ export function RecordDetail({ record, stages, insights }: Props) {
                   onChange={(event) => setTitle(event.target.value)}
                   onBlur={async () => {
                     if (title !== record.title) {
-                      await updateRecord(record.id, { title })
+                      const result = await updateRecord(record.id, { title })
+                      if (!result.success) {
+                        setTitle(record.title)
+                        toast.error(result.error)
+                        return
+                      }
                       router.refresh()
                     }
                   }}

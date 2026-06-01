@@ -14,6 +14,7 @@ import { onboardingSuccessStorageKey } from '@/lib/import/fields'
 import { DURATION, EASE_OUT } from '@/lib/motion'
 import type { DashboardSnapshot } from '@/lib/sample-data/queries'
 import { motion, useReducedMotion } from 'framer-motion'
+import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import { DashboardActionFeed } from './DashboardActionFeed'
 
@@ -54,6 +55,7 @@ export function DashboardClient({
   onboardingIncomplete = false,
   embeddedInsights = [],
 }: DashboardClientProps) {
+  const router = useRouter()
   const reduceMotion = useReducedMotion()
   const { isEmpty } = snapshot
   const showCleanSlate = isEmpty && onboardingIncomplete
@@ -145,7 +147,7 @@ export function DashboardClient({
             <DraftReviewSheet
               draftId={reviewDraftId}
               onClose={() => setReviewDraftId(null)}
-              onActionComplete={() => window.location.reload()}
+              onActionComplete={() => router.refresh()}
             />
           </motion.div>
 

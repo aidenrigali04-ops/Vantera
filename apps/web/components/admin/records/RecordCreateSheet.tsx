@@ -62,7 +62,10 @@ export function RecordCreateSheet({
   useEffect(() => {
     if (!open) return
     fetch('/api/contacts?limit=100')
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error('Could not load contacts')
+        return r.json()
+      })
       .then((json) => {
         if (json.success) {
           setContacts(
@@ -73,8 +76,14 @@ export function RecordCreateSheet({
           )
         }
       })
-      .catch(() => {})
+      .catch(() => toast.error('Could not load contacts'))
   }, [open])
+
+  useEffect(() => {
+    if (contactId) {
+      setForm((f) => ({ ...f, contactId }))
+    }
+  }, [contactId, open])
 
   useEffect(() => {
     if (stages[0]?.id) {

@@ -339,7 +339,7 @@ export async function markCampaignEnrollmentMeeting(
 export async function pauseOutreachCampaign(campaignId: string): Promise<ActionResult> {
   const session = await requireAdminSession()
 
-  await db
+  const [updated] = await db
     .update(outreachCampaigns)
     .set({ status: 'paused', updatedAt: new Date() })
     .where(
@@ -348,6 +348,11 @@ export async function pauseOutreachCampaign(campaignId: string): Promise<ActionR
         eq(outreachCampaigns.accountId, session.accountId),
       ),
     )
+    .returning({ id: outreachCampaigns.id })
+
+  if (!updated) {
+    return { success: false, error: 'Campaign not found' }
+  }
 
   revalidatePath('/admin/outreach/campaigns')
   revalidatePath(`/admin/outreach/campaigns/${campaignId}`)

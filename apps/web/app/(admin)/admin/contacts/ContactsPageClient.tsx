@@ -494,13 +494,13 @@ export function ContactsPageClient({
       />
 
       <BulkActionBar count={selectedIds.length} onClear={() => setSelectedIds([])}>
-        <Button size="sm" variant="secondary" onClick={() => toast.info('Bulk tag — coming soon')}>
+        <Button size="sm" variant="secondary" disabled title="Coming soon">
           Tag
         </Button>
-        <Button size="sm" variant="secondary" onClick={() => toast.info('Bulk assign — coming soon')}>
+        <Button size="sm" variant="secondary" disabled title="Coming soon">
           Assign
         </Button>
-        <Button size="sm" variant="outline" onClick={() => toast.info('Export CSV — coming soon')}>
+        <Button size="sm" variant="outline" disabled title="Coming soon">
           Export
         </Button>
         <Button

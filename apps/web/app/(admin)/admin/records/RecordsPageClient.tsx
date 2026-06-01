@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button'
 import type { stageDefinitions, users } from '@vantera/db'
 import { Calendar, FolderKanban, LayoutGrid, List, Plus } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 type Props = {
   initialRecords: RecordWithRelations[]
@@ -23,6 +23,7 @@ type Props = {
   recordType: string
   accountId: string
   setupMode?: boolean
+  initialContactId?: string
   kpiStrip: ReactNode
 }
 
@@ -33,12 +34,19 @@ export function RecordsPageClient({
   recordType,
   accountId,
   setupMode = false,
+  initialContactId,
   kpiStrip,
 }: Props) {
   const labels = useVerticalLabels()
   const { recordsView, setRecordsView } = useUIStore()
-  const [createOpen, setCreateOpen] = useState(false)
+  const [createOpen, setCreateOpen] = useState(Boolean(initialContactId))
   const [prefillSchedule, setPrefillSchedule] = useState<string | undefined>()
+
+  useEffect(() => {
+    if (initialContactId) {
+      setCreateOpen(true)
+    }
+  }, [initialContactId])
 
   const isEmpty = initialRecords.length === 0
 
@@ -109,6 +117,7 @@ export function RecordsPageClient({
         stages={stages}
         accountId={accountId}
         recordLabel={labels.record}
+        contactId={initialContactId}
         scheduledAt={prefillSchedule}
       />
     </div>

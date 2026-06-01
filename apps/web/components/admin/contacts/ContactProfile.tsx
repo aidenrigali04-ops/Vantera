@@ -36,6 +36,7 @@ import type { EmbeddedInsight } from '@/lib/intelligence/types'
 import type { activities, contacts, records } from '@vantera/db'
 import { Mail, Phone } from 'lucide-react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { toast } from 'sonner'
 
@@ -58,6 +59,7 @@ export function ContactProfile({
   openRecordsCount,
   insights,
 }: Props) {
+  const router = useRouter()
   const labels = useVerticalLabels()
   const [editOpen, setEditOpen] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -80,6 +82,7 @@ export function ContactProfile({
     }
     toast.success('Contact updated')
     setEditOpen(false)
+    router.refresh()
   }
 
   return (

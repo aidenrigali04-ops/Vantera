@@ -237,8 +237,12 @@ export function CampaignDetailClient({ campaign, enrollments, leads, campaignSte
   }
 
   async function copyMessage(text: string) {
-    await navigator.clipboard.writeText(text)
-    toast.success('Copied to clipboard')
+    try {
+      await navigator.clipboard.writeText(text)
+      toast.success('Copied to clipboard')
+    } catch {
+      toast.error('Could not copy to clipboard')
+    }
   }
 
   return (

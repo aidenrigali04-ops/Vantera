@@ -281,21 +281,30 @@ export function PipelinePageClient({ initialLeads, stats, accountId, setupMode =
       return
     }
     setCreating(true)
-    const res = await fetch('/api/leads', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
-    })
-    const json = await res.json()
-    setCreating(false)
-    if (!json.success) {
-      toast.error(json.error ?? 'Failed to create lead')
-      return
+    try {
+      const res = await fetch('/api/leads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      })
+      if (!res.ok) {
+        toast.error('Failed to create lead')
+        return
+      }
+      const json = await res.json()
+      if (!json.success) {
+        toast.error(json.error ?? 'Failed to create lead')
+        return
+      }
+      toast.success('Lead added to pipeline')
+      setCreateOpen(false)
+      setForm({ firstName: '', lastName: '', company: '', email: '', title: '' })
+      await queryClient.invalidateQueries({ queryKey: ['leads'] })
+    } catch {
+      toast.error('Failed to create lead')
+    } finally {
+      setCreating(false)
     }
-    toast.success('Lead added to pipeline')
-    setCreateOpen(false)
-    setForm({ firstName: '', lastName: '', company: '', email: '', title: '' })
-    await queryClient.invalidateQueries({ queryKey: ['leads'] })
   }
 
   const handleBulkStatus = async (status: string) => {
@@ -304,6 +313,10 @@ export function PipelinePageClient({ initialLeads, stats, accountId, setupMode =
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ leadIds: selectedIds, relationshipStatus: status }),
     })
+    if (!res.ok) {
+      toast.error('Bulk update failed')
+      return
+    }
     const json = await res.json()
     if (!json.success) {
       toast.error(json.error ?? 'Bulk update failed')
