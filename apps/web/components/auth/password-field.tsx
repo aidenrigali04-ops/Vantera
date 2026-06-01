@@ -32,6 +32,7 @@ type PasswordFieldProps = {
   autoComplete?: 'new-password' | 'current-password'
   placeholder?: string
   showStrength?: boolean
+  enterKeyHint?: 'next' | 'done' | 'go' | 'send'
   'aria-invalid'?: boolean
   disabled?: boolean
 }
@@ -44,6 +45,7 @@ export function PasswordField({
   autoComplete = 'new-password',
   placeholder = '••••••••',
   showStrength = false,
+  enterKeyHint = 'done',
   'aria-invalid': ariaInvalid,
   disabled,
 }: PasswordFieldProps) {
@@ -60,11 +62,12 @@ export function PasswordField({
           onChange={(e) => onChange(e.target.value)}
           onBlur={onBlur}
           autoComplete={autoComplete}
+          enterKeyHint={enterKeyHint}
           placeholder={placeholder}
           disabled={disabled}
           aria-invalid={ariaInvalid}
           className={cn(
-            'flex h-10 w-full rounded-lg border border-stone-200 bg-white px-3 py-2 pr-10 text-sm text-stone-900 shadow-sm transition-colors',
+            'flex h-11 w-full rounded-lg border border-stone-200 bg-white px-3 py-2 pr-10 text-[15px] text-stone-900 shadow-sm transition-colors',
             'placeholder:text-stone-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-900/10',
             ariaInvalid && 'border-red-500 focus-visible:ring-red-500/20',
             disabled && 'cursor-not-allowed opacity-60',

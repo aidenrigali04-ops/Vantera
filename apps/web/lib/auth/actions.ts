@@ -16,6 +16,7 @@ import type { UserRole } from '@/lib/auth/constants'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { DEMO_WORKSPACE_NAME } from '@/lib/onboarding/constants'
+import { AUTH_DASHBOARD_PATH, AUTH_ONBOARDING_PATH } from '@/lib/auth/routes'
 import { seedSampleWorkspace } from '@/lib/sample-data/seed'
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
@@ -27,10 +28,13 @@ const loginSchema = z.object({
 })
 
 const signupSchema = z.object({
-  fullName: z.string().min(2, 'Enter your full name').max(120),
-  businessName: z.string().min(2, 'Business name must be at least 2 characters').max(120),
-  email: z.string().email('Enter a valid email'),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
+  fullName: z.string().min(2, 'Please enter your full name').max(120),
+  businessName: z.string().min(2, 'Please enter your business name').max(120),
+  email: z.string().email('Please enter a valid email address'),
+  password: z
+    .string()
+    .min(8, 'Password must be at least 8 characters')
+    .regex(/\d/, 'Password must include at least one number'),
 })
 
 const completeOAuthSignupSchema = z.object({
@@ -144,7 +148,7 @@ export async function adminLoginAction(
   })
 
   // Owners land on the demo dashboard to explore before completing setup.
-  const redirectTo = '/admin/dashboard'
+  const redirectTo = AUTH_DASHBOARD_PATH
 
   return { success: true, data: { redirectTo } }
 }
@@ -250,6 +254,31 @@ async function findUniqueSlug(base: string): Promise<string> {
   return `${fallback}-${Date.now().toString(36).slice(-6)}`
 }
 
+/** Lightweight availability check for signup email blur validation. */
+export async function checkEmailAvailableAction(
+  email: string,
+): Promise<ActionResult<{ available: boolean }>> {
+  const parsed = z.string().email().safeParse(email.trim().toLowerCase())
+  if (!parsed.success) {
+    return { success: true, data: { available: true } }
+  }
+
+  try {
+    const admin = getSupabaseAdmin()
+    const { data: existingUser } = await admin
+      .from('users')
+      .select('id')
+      .eq('email', parsed.data)
+      .is('deleted_at', null)
+      .limit(1)
+      .maybeSingle()
+
+    return { success: true, data: { available: !existingUser } }
+  } catch {
+    return { success: false, error: 'Could not verify email availability' }
+  }
+}
+
 export async function signupAction(
   input: z.infer<typeof signupSchema>,
 ): Promise<ActionResult<{ redirectTo: string }>> {
@@ -305,7 +334,7 @@ export async function signupAction(
     if (!orphanCleanup.cleared) {
       return {
         success: false,
-        error: 'An account with this email already exists. Try signing in.',
+        error: 'An account with this email already exists. Sign in instead.',
       }
     }
   }
@@ -322,7 +351,7 @@ export async function signupAction(
   if (createResult.error || !createResult.data.user) {
     const message = createResult.error?.message ?? 'Failed to create account'
     if (message.toLowerCase().includes('registered') || message.toLowerCase().includes('exists')) {
-      return { success: false, error: 'An account with this email already exists. Try signing in.' }
+      return { success: false, error: 'An account with this email already exists. Sign in instead.' }
     }
     return { success: false, error: message }
   }
@@ -407,10 +436,8 @@ export async function signupAction(
   }
 
   // Always return redirectTo and let the client hard-navigate so the
-  // Set-Cookie from setAdminSession() is committed before /admin/onboarding
-  // loads. redirect() in the same Server Action races on Vercel — the next
-  // request sometimes arrives without v_admin_session.
-  return { success: true, data: { redirectTo: '/admin/dashboard' } }
+  // Set-Cookie from setAdminSession() is committed before onboarding loads.
+  return { success: true, data: { redirectTo: AUTH_ONBOARDING_PATH } }
 }
 
 /**
@@ -471,12 +498,6 @@ export async function completeOAuthSignupAction(
       await admin.from('users').update({ is_active: true }).eq('id', existingUser.id)
     }
 
-    const { data: existingAccount } = await admin
-      .from('accounts')
-      .select('onboarding_completed_at')
-      .eq('id', existingUser.account_id)
-      .maybeSingle()
-
     await setAdminSession({
       type: 'admin',
       userId: existingUser.id,
@@ -487,7 +508,7 @@ export async function completeOAuthSignupAction(
 
     return {
       success: true,
-      data: { redirectTo: '/admin/dashboard' },
+      data: { redirectTo: AUTH_DASHBOARD_PATH },
     }
   }
 
@@ -537,5 +558,5 @@ export async function completeOAuthSignupAction(
     console.error('[completeOAuthSignupAction] sample seed failed:', seedErr)
   }
 
-  return { success: true, data: { redirectTo: '/admin/dashboard' } }
+  return { success: true, data: { redirectTo: AUTH_ONBOARDING_PATH } }
 }

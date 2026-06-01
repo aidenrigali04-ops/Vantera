@@ -2,6 +2,7 @@ import {
   ADMIN_SESSION_COOKIE,
   PORTAL_SESSION_COOKIE,
 } from '@/lib/auth/constants'
+import { AUTH_LOGIN_ENTRY } from '@/lib/auth/routes'
 import { verifySessionToken } from '@/lib/auth/jwt'
 import type { AdminSession } from '@/lib/auth/types'
 import { canAccessAdminRoute } from '@/lib/auth/rbac'
@@ -30,6 +31,8 @@ function shouldSkipTenantResolution(pathname: string): boolean {
     pathname.startsWith('/auth') ||
     pathname.startsWith('/api') ||
     pathname === '/' ||
+    pathname === '/terms' ||
+    pathname === '/privacy' ||
     pathname === '/favicon.ico' ||
     pathname === '/robots.txt' ||
     pathname === '/sitemap.xml'
@@ -303,13 +306,13 @@ export async function middleware(request: NextRequest) {
     const sessionToken = request.cookies.get(ADMIN_SESSION_COOKIE)?.value
 
     if (!sessionToken) {
-      return NextResponse.redirect(new URL('/auth/login', request.url))
+      return NextResponse.redirect(new URL(AUTH_LOGIN_ENTRY, request.url))
     }
 
     const payload = await verifySessionToken(sessionToken)
 
     if (!payload || payload.type !== 'admin') {
-      return NextResponse.redirect(new URL('/auth/login', request.url))
+      return NextResponse.redirect(new URL(AUTH_LOGIN_ENTRY, request.url))
     }
 
     if (
@@ -317,7 +320,7 @@ export async function middleware(request: NextRequest) {
       String(payload.accountId) !== String(resolvedAccount.id) &&
       !pathname.startsWith('/admin/onboarding')
     ) {
-      return NextResponse.redirect(new URL('/auth/login', request.url))
+      return NextResponse.redirect(new URL(AUTH_LOGIN_ENTRY, request.url))
     }
 
     if (!canAccessAdminRoute(payload.role, pathname)) {

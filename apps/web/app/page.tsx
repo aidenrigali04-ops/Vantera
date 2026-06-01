@@ -19,13 +19,13 @@ export default function HomePage() {
 
         <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
           <Link
-            href="/auth/signup"
+            href="/auth"
             className="inline-flex h-11 items-center justify-center rounded-md bg-foreground px-6 text-sm font-medium text-background transition-colors hover:bg-foreground/90"
           >
             Create account
           </Link>
           <Link
-            href="/auth/login"
+            href="/auth?mode=login"
             className="inline-flex h-11 items-center justify-center rounded-md border border-input bg-background px-6 text-sm font-medium transition-colors hover:bg-muted"
           >
             Sign in

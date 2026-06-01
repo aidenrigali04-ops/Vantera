@@ -1,46 +1,53 @@
 'use client'
 
+import { AuthFieldError, AuthFieldLabel } from '@/components/auth/auth-input'
+import { GlobalErrorCallout } from '@/components/auth/global-error-callout'
+import { PasswordField } from '@/components/auth/password-field'
 import { Button } from '@/components/ui/button'
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form'
-import { Input } from '@/components/ui/input'
+import { AUTH_LOGIN_ENTRY } from '@/lib/auth/routes'
+import { useAuthFormBehavior } from '@/lib/auth/use-auth-form-behavior'
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser'
 import { zodResolver } from '@hookform/resolvers/zod'
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { Loader2 } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 
 const schema = z
   .object({
-    password: z.string().min(8, 'Password must be at least 8 characters'),
+    password: z
+      .string()
+      .min(8, 'Password must be at least 8 characters')
+      .regex(/\d/, 'Password must include at least one number'),
     confirm: z.string().min(8, 'Confirm your password'),
   })
-  .refine((v) => v.password === v.confirm, {
+  .refine((values) => values.password === values.confirm, {
     message: 'Passwords do not match',
     path: ['confirm'],
   })
 
 export function ResetPasswordClient() {
+  const formRef = useRef<HTMLFormElement>(null)
   const [ready, setReady] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [sessionError, setSessionError] = useState<string | null>(null)
+  const [globalError, setGlobalError] = useState<string | null>(null)
   const [done, setDone] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const form = useForm<z.infer<typeof schema>>({
     resolver: zodResolver(schema),
+    mode: 'onBlur',
+    reValidateMode: 'onBlur',
     defaultValues: { password: '', confirm: '' },
   })
 
-  // Supabase puts the recovery session in the URL hash on arrival. The
-  // browser client picks it up automatically; we just need to verify a
-  // session exists before allowing the form to submit.
+  useAuthFormBehavior(formRef, {
+    initialFocusId: ready ? 'reset-password' : undefined,
+    focusKey: ready ? 'reset-ready' : 'reset-waiting',
+  })
+
+  // Supabase puts the recovery session in the URL hash on arrival.
   useEffect(() => {
     const supabase = createSupabaseBrowserClient()
     let cancelled = false
@@ -51,18 +58,18 @@ export function ResetPasswordClient() {
       if (data.session) {
         setReady(true)
       } else {
-        setError('This reset link is invalid or has expired. Request a new one below.')
+        setSessionError('This reset link is invalid or has expired. Request a new one below.')
       }
     }
 
-    check()
+    void check()
     return () => {
       cancelled = true
     }
   }, [])
 
   async function handleSubmit(values: z.infer<typeof schema>) {
-    setError(null)
+    setGlobalError(null)
     setIsSubmitting(true)
 
     try {
@@ -70,11 +77,18 @@ export function ResetPasswordClient() {
       const { error: updateError } = await supabase.auth.updateUser({ password: values.password })
 
       if (updateError) {
-        setError(updateError.message)
+        setGlobalError(updateError.message)
+        setIsSubmitting(false)
         return
       }
 
       setDone(true)
+    } catch (err) {
+      setGlobalError(
+        err instanceof TypeError
+          ? 'Connection issue. Check your internet and try again.'
+          : 'Something went wrong. Please try again.',
+      )
     } finally {
       setIsSubmitting(false)
     }
@@ -84,14 +98,14 @@ export function ResetPasswordClient() {
     return (
       <div className="space-y-6">
         <div className="space-y-2">
-          <h1 className="text-2xl font-semibold tracking-tight">Password updated</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-2xl font-semibold tracking-[-0.02em] text-stone-900">Password updated</h1>
+          <p className="text-[13px] leading-relaxed text-stone-500">
             You can now sign in with your new password.
           </p>
         </div>
         <Link
-          href="/auth/login"
-          className="inline-flex h-10 items-center justify-center rounded-md bg-foreground px-4 text-sm font-medium text-background hover:opacity-90"
+          href={AUTH_LOGIN_ENTRY}
+          className="inline-flex h-11 items-center justify-center rounded-lg bg-stone-900 px-4 text-sm font-medium text-white hover:bg-stone-800"
         >
           Go to sign in
         </Link>
@@ -102,67 +116,78 @@ export function ResetPasswordClient() {
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <h1 className="text-2xl font-semibold tracking-tight">Choose a new password</h1>
-        <p className="text-sm text-muted-foreground">
-          Make sure it&rsquo;s at least 8 characters and something you&rsquo;ll remember.
+        <h1 className="text-2xl font-semibold tracking-[-0.02em] text-stone-900">Choose a new password</h1>
+        <p className="text-[13px] leading-relaxed text-stone-500">
+          Use at least 8 characters with one number — something you&rsquo;ll remember.
         </p>
       </div>
 
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-          <FormField
-            control={form.control}
-            name="password"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>New password</FormLabel>
-                <FormControl>
-                  <Input
-                    type="password"
-                    autoComplete="new-password"
-                    placeholder="At least 8 characters"
-                    {...field}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
+      {sessionError ? <GlobalErrorCallout message={sessionError} /> : null}
+
+      <form
+        ref={formRef}
+        onSubmit={form.handleSubmit(handleSubmit)}
+        className="space-y-4"
+        noValidate
+        aria-busy={isSubmitting}
+      >
+        <div className="space-y-1.5">
+          <AuthFieldLabel htmlFor="reset-password">New password</AuthFieldLabel>
+          <PasswordField
+            id="reset-password"
+            value={form.watch('password')}
+            onChange={(value) => form.setValue('password', value, { shouldValidate: false })}
+            onBlur={() => void form.trigger('password')}
+            autoComplete="new-password"
+            enterKeyHint="next"
+            placeholder="••••••••"
+            showStrength
+            disabled={!ready || isSubmitting}
+            aria-invalid={Boolean(form.formState.errors.password)}
           />
+          <AuthFieldError message={form.formState.errors.password?.message} />
+        </div>
 
-          <FormField
-            control={form.control}
-            name="confirm"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Confirm password</FormLabel>
-                <FormControl>
-                  <Input
-                    type="password"
-                    autoComplete="new-password"
-                    placeholder="Re-enter password"
-                    {...field}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
+        <div className="space-y-1.5">
+          <AuthFieldLabel htmlFor="reset-confirm">Confirm password</AuthFieldLabel>
+          <PasswordField
+            id="reset-confirm"
+            value={form.watch('confirm')}
+            onChange={(value) => form.setValue('confirm', value, { shouldValidate: false })}
+            onBlur={() => void form.trigger('confirm')}
+            autoComplete="new-password"
+            enterKeyHint="go"
+            placeholder="••••••••"
+            disabled={!ready || isSubmitting}
+            aria-invalid={Boolean(form.formState.errors.confirm)}
           />
+          <AuthFieldError message={form.formState.errors.confirm?.message} />
+        </div>
 
-          {error ? (
-            <p className="text-sm text-destructive" role="alert">
-              {error}
-            </p>
-          ) : null}
+        {globalError ? <GlobalErrorCallout message={globalError} /> : null}
 
-          <Button type="submit" className="w-full" disabled={!ready || isSubmitting}>
-            {isSubmitting ? 'Updating…' : 'Update password'}
-          </Button>
-        </form>
-      </Form>
+        <Button
+          type="submit"
+          className="h-11 w-full rounded-lg bg-stone-900 text-white hover:bg-stone-800 disabled:opacity-60"
+          disabled={!ready || isSubmitting}
+        >
+          {isSubmitting ? (
+            <>
+              <Loader2 className="mr-2 size-4 animate-spin" aria-hidden />
+              Updating…
+            </>
+          ) : (
+            'Update password'
+          )}
+        </Button>
+      </form>
 
       {!ready ? (
-        <p className="text-center text-sm text-muted-foreground">
-          <Link href="/auth/forgot-password" className="font-medium text-foreground hover:underline">
+        <p className="text-center text-[13px] text-stone-500">
+          <Link
+            href="/auth/forgot-password"
+            className="font-medium text-stone-900 underline-offset-2 hover:underline"
+          >
             Request a new reset link
           </Link>
         </p>

@@ -1,25 +1,22 @@
 'use client'
 
+import { AuthInput, AuthFieldError, AuthFieldLabel } from '@/components/auth/auth-input'
+import { GlobalErrorCallout } from '@/components/auth/global-error-callout'
 import { Button } from '@/components/ui/button'
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form'
-import { Input } from '@/components/ui/input'
 import { completeOAuthSignupAction } from '@/lib/auth/actions'
+import { signupFormSchema } from '@/lib/auth/form-schemas'
 import { invokeAuthAction, isNextRedirectError } from '@/lib/auth/invoke-action'
+import { AUTH_ONBOARDING_PATH } from '@/lib/auth/routes'
+import { useAuthFormBehavior } from '@/lib/auth/use-auth-form-behavior'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useState } from 'react'
+import { Loader2 } from 'lucide-react'
+import { useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 
-const schema = z.object({
-  fullName: z.string().min(2, 'Enter your full name'),
-  businessName: z.string().min(2, 'Business name must be at least 2 characters'),
+const completeSignupSchema = signupFormSchema.pick({
+  fullName: true,
+  businessName: true,
 })
 
 type CompleteSignupClientProps = {
@@ -31,107 +28,123 @@ export function CompleteSignupClient({
   prefilledEmail,
   prefilledName,
 }: CompleteSignupClientProps) {
-  const [error, setError] = useState<string | null>(null)
+  const formRef = useRef<HTMLFormElement>(null)
+  const redirectingRef = useRef(false)
+  const [globalError, setGlobalError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const form = useForm<z.infer<typeof schema>>({
-    resolver: zodResolver(schema),
+  const form = useForm<z.infer<typeof completeSignupSchema>>({
+    resolver: zodResolver(completeSignupSchema),
+    mode: 'onBlur',
+    reValidateMode: 'onBlur',
     defaultValues: { fullName: prefilledName, businessName: '' },
   })
 
-  async function handleSubmit(values: z.infer<typeof schema>) {
-    setIsSubmitting(true)
-    setError(null)
+  useAuthFormBehavior(formRef, { initialFocusId: 'oauth-fullName', focusKey: 'oauth-complete' })
 
-    let result
+  async function handleSubmit(values: z.infer<typeof completeSignupSchema>) {
+    if (redirectingRef.current) return
+
+    setIsSubmitting(true)
+    setGlobalError(null)
+
     try {
-      result = await invokeAuthAction(
+      const result = await invokeAuthAction(
         () => completeOAuthSignupAction(values),
-        '/admin/dashboard',
+        AUTH_ONBOARDING_PATH,
       )
+
+      if (!result.success) {
+        setGlobalError(result.error ?? 'Something went wrong. Please try again.')
+        setIsSubmitting(false)
+        return
+      }
+
+      if (result.redirectTo) {
+        redirectingRef.current = true
+        window.location.replace(result.redirectTo)
+        return
+      }
     } catch (err) {
       if (isNextRedirectError(err)) throw err
-      setError(err instanceof Error ? err.message : 'Could not finish signup')
-      setIsSubmitting(false)
-      return
+      setGlobalError(
+        err instanceof TypeError
+          ? 'Connection issue. Check your internet and try again.'
+          : 'Something went wrong. Please try again.',
+      )
     }
 
-    if (!result.success) {
-      setError(result.error ?? 'Could not finish signup')
-      setIsSubmitting(false)
-      return
-    }
-
-    if (result.redirectTo) {
-      window.location.replace(result.redirectTo)
-      return
-    }
+    setIsSubmitting(false)
   }
-
-  const busy = isSubmitting
 
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <h1 className="text-2xl font-semibold tracking-tight">One more step</h1>
-        <p className="text-sm text-muted-foreground">
+        <h1 className="text-2xl font-semibold tracking-[-0.02em] text-stone-900">One more step</h1>
+        <p className="text-[13px] leading-relaxed text-stone-500">
           We&rsquo;ve verified your email
           {prefilledEmail ? (
             <>
               {' '}
-              (<span className="font-medium text-foreground">{prefilledEmail}</span>)
+              (<span className="font-medium text-stone-800">{prefilledEmail}</span>)
             </>
           ) : null}
-          . Tell us about your business and we&rsquo;ll set up your workspace.
+          . Name your workspace and we&rsquo;ll load your demo environment.
         </p>
       </div>
 
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-          <FormField
-            control={form.control}
-            name="fullName"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Full name</FormLabel>
-                <FormControl>
-                  <Input type="text" autoComplete="name" placeholder="Jane Doe" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
+      <form
+        ref={formRef}
+        onSubmit={form.handleSubmit(handleSubmit)}
+        className="space-y-4"
+        noValidate
+        aria-busy={isSubmitting}
+      >
+        <div className="space-y-1.5">
+          <AuthFieldLabel htmlFor="oauth-fullName">Full name</AuthFieldLabel>
+          <AuthInput
+            id="oauth-fullName"
+            autoComplete="name"
+            enterKeyHint="next"
+            placeholder="Alex Johnson"
+            disabled={isSubmitting}
+            invalid={Boolean(form.formState.errors.fullName)}
+            {...form.register('fullName')}
           />
+          <AuthFieldError message={form.formState.errors.fullName?.message} />
+        </div>
 
-          <FormField
-            control={form.control}
-            name="businessName"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Business name</FormLabel>
-                <FormControl>
-                  <Input
-                    type="text"
-                    autoComplete="organization"
-                    placeholder="Acme Agency"
-                    {...field}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
+        <div className="space-y-1.5">
+          <AuthFieldLabel htmlFor="oauth-businessName">Business name</AuthFieldLabel>
+          <AuthInput
+            id="oauth-businessName"
+            autoComplete="organization"
+            enterKeyHint="done"
+            placeholder="Acme Agency"
+            disabled={isSubmitting}
+            invalid={Boolean(form.formState.errors.businessName)}
+            {...form.register('businessName')}
           />
+          <AuthFieldError message={form.formState.errors.businessName?.message} />
+        </div>
 
-          {error ? (
-            <p className="text-sm text-destructive" role="alert">
-              {error}
-            </p>
-          ) : null}
+        {globalError ? <GlobalErrorCallout message={globalError} /> : null}
 
-          <Button type="submit" className="w-full" disabled={busy}>
-            {busy ? 'Setting up workspace…' : 'Get started for free'}
-          </Button>
-        </form>
-      </Form>
+        <Button
+          type="submit"
+          className="h-11 w-full rounded-lg bg-stone-900 text-white hover:bg-stone-800 disabled:opacity-60"
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? (
+            <>
+              <Loader2 className="mr-2 size-4 animate-spin" aria-hidden />
+              Creating your workspace…
+            </>
+          ) : (
+            'Get started for free'
+          )}
+        </Button>
+      </form>
     </div>
   )
 }

@@ -1,5 +1,6 @@
 import { getBrandingFromHeaders } from '@/lib/branding/server'
 import type { BrandingData } from '@/lib/branding/context'
+import { AUTH_LOGIN_ENTRY } from '@/lib/auth/routes'
 import { getAdminSession, getPortalSession, setAdminSession } from '@/lib/auth/session'
 import type { AdminSession, PortalSession } from '@/lib/auth/types'
 import { resolveWorkspaceAccountId } from '@/lib/onboarding/account-store'
@@ -29,7 +30,7 @@ export async function requireAdminSession(): Promise<AdminSession> {
   const session = await getAdminSession()
 
   if (!session) {
-    redirect('/auth/login')
+    redirect(AUTH_LOGIN_ENTRY)
   }
 
   const syncedSession = await syncSessionAccountId(session)

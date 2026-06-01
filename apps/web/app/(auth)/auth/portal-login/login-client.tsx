@@ -1,16 +1,17 @@
 'use client'
 
-import { LoginForm } from '@/components/shared/login-form'
-import { portalLoginAction } from '@/lib/auth/actions'
-import { invokeAuthAction } from '@/lib/auth/invoke-action'
+import { AuthCredentialsPanel } from '@/components/auth/auth-credentials-panel'
 
 export function PortalLoginClient() {
   return (
-    <LoginForm
+    <AuthCredentialsPanel
+      initialMode="login"
+      showOAuth={false}
+      allowModeToggle={false}
+      portal
+      loginFallbackPath="/portal"
       heading="Client portal"
       subheading="Sign in to view your projects, invoices, and updates."
-      showOAuth={false}
-      onSubmit={(values) => invokeAuthAction(() => portalLoginAction(values), '/portal')}
     />
   )
 }

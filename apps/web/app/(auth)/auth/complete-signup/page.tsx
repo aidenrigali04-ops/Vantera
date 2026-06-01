@@ -1,5 +1,7 @@
-import { AuthLayout } from '@/components/shared/auth-layout'
+import { AuthShell } from '@/components/auth/auth-shell'
 import type { UserRole } from '@/lib/auth/constants'
+import { AUTH_LOGIN_ENTRY } from '@/lib/auth/routes'
+import { authPageMetadata } from '@/lib/auth/metadata'
 import { setAdminSession } from '@/lib/auth/session'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
@@ -7,6 +9,7 @@ import { redirect } from 'next/navigation'
 import { CompleteSignupClient } from './complete-signup-client'
 
 export const dynamic = 'force-dynamic'
+export const metadata = authPageMetadata.completeSignup
 
 type Search = {
   email?: string
@@ -21,7 +24,7 @@ export default async function CompleteSignupPage({ searchParams }: { searchParam
   } = await supabase.auth.getUser()
 
   if (userError || !user?.email) {
-    redirect('/auth/login?error=session_expired')
+    redirect(`${AUTH_LOGIN_ENTRY}&error=session_expired`)
   }
 
   const email = user.email.toLowerCase().trim()
@@ -60,8 +63,8 @@ export default async function CompleteSignupPage({ searchParams }: { searchParam
     ''
 
   return (
-    <AuthLayout>
+    <AuthShell>
       <CompleteSignupClient prefilledEmail={prefilledEmail} prefilledName={prefilledName} />
-    </AuthLayout>
+    </AuthShell>
   )
 }
