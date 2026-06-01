@@ -1,6 +1,3 @@
-'use server'
-
-import { draftOutreachMessages } from '@/lib/ai/draft-message'
 import { getIcpConfigForVertical, scoreICP } from '@/lib/aspire/icp-score'
 import type { ApolloPersonResult, EnrollResult } from '@/lib/aspire/types'
 import { getSystemAutomationId } from '@/lib/automation/system-automation'
