@@ -47,6 +47,10 @@ export default async function AdminLayout({ children }: { children: ReactNode })
     console.error('[admin-layout] sample data check threw:', err)
   }
 
+  const pathname = headers().get('x-pathname') ?? ''
+  const workspaceFullBleed =
+    pathname.startsWith('/admin/pipeline') || pathname.startsWith('/admin/records')
+
   return (
     <BrandingProvider branding={branding}>
       <FeatureFlagProvider flags={flags}>
@@ -55,6 +59,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
             session={session}
             hasSampleData={hasSampleData}
             onboardingIncomplete={session.role === 'owner' && !onboardingComplete}
+            workspaceFullBleed={workspaceFullBleed}
           >
             {children}
           </AdminShell>

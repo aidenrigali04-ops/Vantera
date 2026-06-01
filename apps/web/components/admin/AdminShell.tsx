@@ -8,9 +8,11 @@ import { CsvImportModal } from '@/components/onboarding/CsvImportModal'
 import { OnboardingAutoPrompt } from '@/components/onboarding/OnboardingAutoPrompt'
 import { GuidedExplorationHost } from '@/components/onboarding/GuidedExplorationHost'
 import { NewClientDrawer } from '@/components/onboarding/NewClientDrawer'
+import { OperatingModelHost } from '@/components/onboarding/OperatingModelHost'
 import { SampleDataBanner } from './SampleDataBanner'
 import { Sidebar, SidebarMobile } from './Sidebar'
 import { TopHeader } from './TopHeader'
+import { WorkspaceMain } from './WorkspaceMain'
 import { useUIStore } from '@/lib/stores/ui-store'
 import { cn } from '@/lib/utils'
 
@@ -19,18 +21,21 @@ type AdminShellProps = {
   hasSampleData: boolean
   onboardingIncomplete?: boolean
   bare?: boolean
+  /** Allow page content to span full width (tables, kanban). */
+  workspaceFullBleed?: boolean
   children: ReactNode
 }
 
 /**
- * Phase 1 admin shell — CSS grid layout with sidebar, top header, and scrollable main.
- * Brand name comes from BrandingProvider (never hardcoded platform name in chrome).
+ * Ventaro application shell — Step 1 global layout.
+ * Sidebar (240px) + workspace header + scrollable main canvas.
  */
 export function AdminShell({
   session,
   hasSampleData,
   onboardingIncomplete = false,
   bare,
+  workspaceFullBleed = false,
   children,
 }: AdminShellProps) {
   const { commandPaletteOpen, setCommandPaletteOpen, sidebarCollapsed } = useUIStore()
@@ -39,7 +44,7 @@ export function AdminShell({
 
   if (bare) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-[#fafaf9]">
         {showSampleExperience ? <SampleDataBanner accountId={session.accountId} /> : null}
         {children}
       </div>
@@ -50,11 +55,11 @@ export function AdminShell({
     <>
       <div
         className={cn(
-          'grid h-screen overflow-hidden bg-stone-50',
-          'grid-rows-[60px_1fr]',
+          'grid h-[100dvh] overflow-hidden bg-[#fafaf9]',
+          'grid-rows-[3.5rem_1fr]',
           sidebarCollapsed
             ? 'md:grid-cols-[4rem_1fr] grid-cols-1'
-            : 'md:grid-cols-[16rem_1fr] grid-cols-1',
+            : 'md:grid-cols-[240px_1fr] grid-cols-1',
         )}
       >
         <div className="col-start-1 row-span-2 row-start-1 hidden md:block">
@@ -67,16 +72,17 @@ export function AdminShell({
 
         <div className="col-start-1 row-start-2 flex min-h-0 flex-col overflow-hidden md:col-start-2">
           {showSampleExperience ? <SampleDataBanner accountId={session.accountId} /> : null}
-          <main className="min-h-0 flex-1 overflow-y-auto p-4 pb-20 md:p-6 md:pb-6">{children}</main>
+          <WorkspaceMain constrained={!workspaceFullBleed}>{children}</WorkspaceMain>
         </div>
       </div>
 
       <SidebarMobile session={session} />
       <MobileBottomNav />
       <CommandPalette open={commandPaletteOpen} onOpenChange={setCommandPaletteOpen} />
-      <GuidedExplorationHost
+      <GuidedExplorationHost accountId={session.accountId} enabled={showSampleExperience} />
+      <OperatingModelHost
         accountId={session.accountId}
-        enabled={showSampleExperience}
+        enabled={onboardingIncomplete && session.role === 'owner'}
       />
       <OnboardingAutoPrompt accountId={session.accountId} enabled={showSampleExperience} />
       {onboardingIncomplete ? (

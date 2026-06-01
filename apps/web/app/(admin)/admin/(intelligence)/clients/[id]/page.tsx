@@ -6,6 +6,7 @@ import {
   findRecordsForContact,
   findUnifiedContactActivities,
 } from '@/lib/db/queries'
+import { findContactEmbeddedInsights } from '@/lib/intelligence/queries'
 import { notFound } from 'next/navigation'
 
 export const dynamic = 'force-dynamic'
@@ -22,7 +23,7 @@ export default async function ActiveClientDetailPage({ params }: Props) {
     notFound()
   }
 
-  const [activities, relatedRecords, openRecordsCount] = await Promise.all([
+  const [activities, relatedRecords, openRecordsCount, insights] = await Promise.all([
     findUnifiedContactActivities(
       session.accountId,
       params.id,
@@ -31,6 +32,7 @@ export default async function ActiveClientDetailPage({ params }: Props) {
     ),
     findRecordsForContact(session.accountId, params.id),
     countOpenRecordsForContact(session.accountId, params.id),
+    findContactEmbeddedInsights(session.accountId, params.id),
   ])
 
   return (
@@ -39,6 +41,7 @@ export default async function ActiveClientDetailPage({ params }: Props) {
       activities={activities}
       relatedRecords={relatedRecords}
       openRecordsCount={openRecordsCount}
+      insights={insights}
     />
   )
 }

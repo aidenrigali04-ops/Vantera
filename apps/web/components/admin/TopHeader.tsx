@@ -3,7 +3,11 @@
 import type { AdminSession } from '@/lib/auth/types'
 import { adminLogoutAction } from '@/lib/auth/actions'
 import { useBranding } from '@/lib/branding/context'
-import { useVerticalLabels } from '@/lib/branding/use-vertical-labels'
+import {
+  resolveAdminPageTitle,
+  resolveWorkspacePrimaryAction,
+} from '@/lib/navigation/admin-nav'
+import { DEMO_WORKSPACE_NAME } from '@/lib/onboarding/constants'
 import { useUIStore } from '@/lib/stores/ui-store'
 import { cn } from '@/lib/utils'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -16,8 +20,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { DEMO_WORKSPACE_NAME } from '@/lib/onboarding/constants'
-import { Bell, Menu, Search } from 'lucide-react'
+import { Bell, CalendarRange, Filter, Menu, Plus, Search } from 'lucide-react'
+import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
 type TopHeaderProps = {
@@ -25,94 +29,118 @@ type TopHeaderProps = {
   showDemoWorkspace?: boolean
 }
 
-function usePageTitle(): string {
-  const pathname = usePathname() ?? ''
-  const labels = useVerticalLabels()
-
-  if (pathname.startsWith('/admin/dashboard')) return 'Dashboard'
-  if (pathname.startsWith('/admin/clients')) return 'Active Clients'
-  if (pathname.startsWith('/admin/pipeline')) return 'Pipeline'
-  if (pathname.startsWith('/admin/crm')) return 'Sales Intelligence'
-  if (pathname.startsWith('/admin/contacts')) return labels.contacts
-  if (pathname.startsWith('/admin/records')) return labels.records
-  if (pathname.startsWith('/admin/outreach/aspire')) return 'Aspire'
-  if (pathname.startsWith('/admin/outreach/linkedin')) return 'LinkedIn'
-  if (pathname.startsWith('/admin/outreach')) return 'Nurture'
-  if (pathname.startsWith('/admin/automations')) return 'Automations'
-  if (pathname.startsWith('/admin/reports')) return 'Reports'
-  if (pathname.startsWith('/admin/settings')) return 'Settings'
-  if (pathname.startsWith('/admin/ai-brain')) return 'AI Insights'
-  if (pathname.startsWith('/admin/calendar')) return 'Calendar'
-  if (pathname.startsWith('/admin/onboarding')) return 'Onboarding'
-
-  const tail = pathname.split('/').filter(Boolean).pop() ?? 'Dashboard'
-  return tail
-    .split('-')
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ')
-}
-
 export function TopHeader({ session, showDemoWorkspace = false }: TopHeaderProps) {
-  const pageTitle = usePageTitle()
+  const pathname = usePathname() ?? ''
+  const pageTitle = resolveAdminPageTitle(pathname)
+  const primaryAction = resolveWorkspacePrimaryAction(pathname)
   const { plan } = useBranding()
   const { setCommandPaletteOpen, setMobileSidebarOpen } = useUIStore()
   const initials = session.email.slice(0, 2).toUpperCase()
   const planLabel = plan === 'enterprise' ? 'Enterprise' : 'Team'
 
   return (
-    <header className="flex h-[60px] shrink-0 items-center gap-4 border-b border-stone-200 bg-white px-4 md:px-6">
-      <div className="flex min-w-0 flex-1 items-center gap-3">
+    <header className="flex h-14 shrink-0 items-center gap-3 border-b border-stone-200/80 bg-white/90 px-4 backdrop-blur-sm md:gap-4 md:px-6">
+      <div className="flex min-w-0 items-center gap-2 md:min-w-[180px] md:gap-3">
         <Button
           type="button"
           variant="ghost"
           size="icon"
-          className="md:hidden"
+          className="h-9 w-9 shrink-0 md:hidden"
           aria-label="Open navigation menu"
           onClick={() => setMobileSidebarOpen(true)}
         >
           <Menu className="h-5 w-5" />
         </Button>
         <div className="min-w-0">
-          <h1 className="truncate text-lg font-semibold tracking-tight text-stone-900">
-            {showDemoWorkspace ? DEMO_WORKSPACE_NAME : pageTitle}
+          <h1 className="truncate text-[15px] font-semibold tracking-[-0.02em] text-stone-900 md:text-base">
+            {showDemoWorkspace && pageTitle === 'Dashboard' ? DEMO_WORKSPACE_NAME : pageTitle}
           </h1>
-          {showDemoWorkspace && pageTitle !== 'Dashboard' ? (
-            <p className="truncate text-xs text-stone-500">{pageTitle}</p>
-          ) : showDemoWorkspace ? (
-            <p className="truncate text-xs text-stone-500">Demo workspace</p>
-          ) : null}
+          {showDemoWorkspace ? (
+            <p className="truncate text-[11px] text-stone-500">
+              {pageTitle === 'Dashboard' ? 'Demo workspace' : pageTitle}
+            </p>
+          ) : (
+            <p className="hidden truncate text-[11px] text-stone-500 md:block">
+              Ventaro operating system
+            </p>
+          )}
         </div>
       </div>
 
-      <button
-        type="button"
-        onClick={() => setCommandPaletteOpen(true)}
-        className="hidden max-w-md flex-1 items-center gap-2 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-500 transition-colors hover:border-stone-300 hover:bg-white md:flex"
-      >
-        <Search className="h-4 w-4 shrink-0" aria-hidden />
-        <span className="flex-1 text-left">Search anything...</span>
-        <kbd className="rounded border border-stone-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-stone-500">
-          ⌘K
-        </kbd>
-      </button>
+      <div className="hidden min-w-0 flex-1 items-center gap-2 lg:flex">
+        <button
+          type="button"
+          onClick={() => setCommandPaletteOpen(true)}
+          className="flex max-w-md flex-1 items-center gap-2 rounded-lg border border-stone-200 bg-stone-50/80 px-3 py-2 text-[13px] text-stone-500 transition-colors duration-150 hover:border-stone-300 hover:bg-white"
+        >
+          <Search className="h-4 w-4 shrink-0" aria-hidden />
+          <span className="flex-1 text-left">Search workspace…</span>
+          <kbd className="rounded border border-stone-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-stone-500">
+            ⌘K
+          </kbd>
+        </button>
 
-      <div className="flex shrink-0 items-center gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-9 shrink-0 border-stone-200 bg-white text-stone-600 hover:bg-stone-50"
+          disabled
+          aria-label="Date range (coming soon)"
+        >
+          <CalendarRange className="mr-1.5 h-4 w-4" aria-hidden />
+          Last 30 days
+        </Button>
+
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-9 shrink-0 border-stone-200 bg-white text-stone-600 hover:bg-stone-50"
+          disabled
+          aria-label="Filters (coming soon)"
+        >
+          <Filter className="mr-1.5 h-4 w-4" aria-hidden />
+          Filters
+        </Button>
+      </div>
+
+      <div className="ml-auto flex shrink-0 items-center gap-1.5 md:gap-2">
         <Button
           type="button"
           variant="ghost"
           size="icon"
-          className="md:hidden"
+          className="h-9 w-9 lg:hidden"
           aria-label="Search"
           onClick={() => setCommandPaletteOpen(true)}
         >
           <Search className="h-5 w-5" />
         </Button>
 
-        <Button type="button" variant="ghost" size="icon" aria-label="Notifications">
+        {primaryAction?.href ? (
+          <Button
+            asChild
+            size="sm"
+            className="hidden h-9 bg-stone-900 text-white hover:bg-stone-800 sm:inline-flex"
+          >
+            <Link href={primaryAction.href}>
+              <Plus className="mr-1.5 h-4 w-4" aria-hidden />
+              {primaryAction.label}
+            </Link>
+          </Button>
+        ) : null}
+
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="h-9 w-9"
+          aria-label="Notifications"
+        >
           <Bell className="h-5 w-5" />
         </Button>
 
-        <Badge variant="secondary" className="hidden sm:inline-flex">
+        <Badge variant="secondary" className="hidden border border-stone-200 bg-stone-50 text-stone-600 sm:inline-flex">
           {planLabel}
         </Badge>
 
@@ -121,13 +149,13 @@ export function TopHeader({ session, showDemoWorkspace = false }: TopHeaderProps
             <button
               type="button"
               className={cn(
-                'flex items-center gap-2 rounded-lg border border-stone-200 px-2 py-1.5 transition-colors hover:bg-stone-50',
+                'flex items-center gap-2 rounded-lg border border-stone-200/80 px-1.5 py-1 transition-colors duration-150 hover:bg-stone-50',
               )}
             >
               <Avatar className="h-7 w-7">
-                <AvatarFallback className="bg-stone-200 text-xs text-stone-700">{initials}</AvatarFallback>
+                <AvatarFallback className="bg-stone-100 text-xs text-stone-700">{initials}</AvatarFallback>
               </Avatar>
-              <span className="hidden max-w-[120px] truncate text-sm text-stone-700 lg:inline">
+              <span className="hidden max-w-[120px] truncate text-[13px] text-stone-700 lg:inline">
                 {session.email.split('@')[0]}
               </span>
             </button>

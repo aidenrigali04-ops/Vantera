@@ -1,25 +1,25 @@
+import { PortalHomeView } from '@/components/portal/PortalHomeView'
 import { requirePortalSession } from '@/lib/auth/require-session'
-import { portalLogoutAction } from '@/lib/auth/actions'
-import { Button } from '@/components/ui/button'
+import { getPortalWorkspace } from '@/lib/portal/queries'
+
+export const dynamic = 'force-dynamic'
 
 export default async function PortalHomePage() {
   const session = await requirePortalSession()
+  const workspace = await getPortalWorkspace(session.accountId, session.contactId)
 
-  return (
-    <div className="min-h-screen bg-background p-8">
-      <div className="mx-auto max-w-4xl space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold">Client Portal</h1>
-            <p className="text-sm text-muted-foreground">Signed in as {session.email}</p>
-          </div>
-          <form action={portalLogoutAction}>
-            <Button type="submit" variant="outline">
-              Sign out
-            </Button>
-          </form>
+  if (!workspace) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#fafaf9] p-8">
+        <div className="max-w-md text-center">
+          <h1 className="text-lg font-semibold text-stone-900">Portal unavailable</h1>
+          <p className="mt-2 text-sm text-stone-500">
+            We couldn&apos;t load your workspace. Please contact your account manager.
+          </p>
         </div>
       </div>
-    </div>
-  )
+    )
+  }
+
+  return <PortalHomeView workspace={workspace} />
 }

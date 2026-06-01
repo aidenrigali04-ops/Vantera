@@ -1,8 +1,16 @@
 'use client'
 
-import { convertLeadToClient } from '@/lib/leads/convert'
-import { updateLead } from '@/lib/leads/actions'
-import { formatRelativeTime } from '@/lib/contacts/format'
+import {
+  DetailBackLink,
+  DetailField,
+  DetailFieldGrid,
+  DetailHeader,
+  DetailLayout,
+  DetailSection,
+  DetailShell,
+  DetailTimeline,
+} from '@/components/operational/detail/DetailShell'
+import { EmbeddedInsightsPanel } from '@/components/intelligence/EmbeddedInsightsPanel'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -12,8 +20,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { formatRelativeTime } from '@/lib/contacts/format'
+import { convertLeadToClient } from '@/lib/leads/convert'
+import { updateLead } from '@/lib/leads/actions'
+import type { EmbeddedInsight } from '@/lib/intelligence/types'
 import type { activities, leadProfiles, leads } from '@vantera/db'
-import { ArrowLeft, Brain, Sparkles } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
@@ -23,6 +34,7 @@ type Props = {
   lead: typeof leads.$inferSelect
   profile: typeof leadProfiles.$inferSelect | null
   activities: (typeof activities.$inferSelect)[]
+  insights: EmbeddedInsight[]
 }
 
 const STATUS_OPTIONS = [
@@ -37,7 +49,7 @@ const STATUS_OPTIONS = [
   'lost',
 ] as const
 
-export function LeadDetailClient({ lead, profile, activities }: Props) {
+export function LeadDetailClient({ lead, profile, activities, insights }: Props) {
   const router = useRouter()
   const [status, setStatus] = useState(lead.relationshipStatus)
   const [converting, setConverting] = useState(false)
@@ -66,135 +78,123 @@ export function LeadDetailClient({ lead, profile, activities }: Props) {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href="/admin/pipeline">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Pipeline
-          </Link>
-        </Button>
-      </div>
+    <DetailShell>
+      <DetailBackLink href="/admin/pipeline" label="Back to pipeline" />
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="space-y-4 rounded-xl border border-stone-200 bg-white p-5 shadow-sm lg:col-span-1">
-          <div>
-            <h1 className="text-xl font-semibold text-stone-900">{name}</h1>
-            <p className="mt-1 text-sm text-stone-500">
-              {lead.title ? `${lead.title} · ` : ''}
-              {lead.company}
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
+      <DetailHeader
+        eyebrow="Prospect"
+        title={name}
+        subtitle={[lead.title, lead.company].filter(Boolean).join(' · ')}
+        badges={
+          <>
             <Badge variant="outline">{lead.source}</Badge>
             <Badge variant="secondary">Score {lead.score}</Badge>
-          </div>
-          <div className="space-y-2 text-sm">
-            {lead.email ? (
-              <p>
-                <span className="text-stone-500">Email:</span> {lead.email}
-              </p>
-            ) : null}
-            {lead.phone ? (
-              <p>
-                <span className="text-stone-500">Phone:</span> {lead.phone}
-              </p>
-            ) : null}
-            {lead.linkedinUrl ? (
-              <p>
-                <span className="text-stone-500">LinkedIn:</span>{' '}
-                <a href={lead.linkedinUrl} className="text-blue-600 hover:underline" target="_blank" rel="noreferrer">
-                  Profile
-                </a>
-              </p>
-            ) : null}
-          </div>
-          <div>
-            <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-stone-500">
-              Relationship status
-            </p>
-            <Select value={status} onValueChange={handleStatusChange}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {STATUS_OPTIONS.map((s) => (
-                  <SelectItem key={s} value={s}>
-                    {s.replace(/_/g, ' ')}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          {lead.convertedContactId ? (
-            <Button asChild className="w-full">
+            <Badge variant="outline">{status.replace(/_/g, ' ')}</Badge>
+          </>
+        }
+        actions={
+          lead.convertedContactId ? (
+            <Button asChild className="bg-stone-900 hover:bg-stone-800">
               <Link href={`/admin/clients/${lead.convertedContactId}`}>View active client</Link>
             </Button>
           ) : (
-            <Button className="w-full" onClick={handleConvert} disabled={converting}>
-              {converting ? 'Converting...' : 'Convert to client'}
+            <Button
+              className="bg-stone-900 hover:bg-stone-800"
+              onClick={handleConvert}
+              disabled={converting}
+            >
+              {converting ? 'Converting…' : 'Convert to client'}
             </Button>
-          )}
-        </div>
+          )
+        }
+      />
 
-        <div className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm lg:col-span-1">
-          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-stone-500">
-            Timeline
-          </h2>
-          <div className="space-y-4">
-            {activities.length === 0 ? (
-              <p className="text-sm text-stone-500">No activity yet.</p>
-            ) : (
-              activities.map((activity) => (
-                <div key={activity.id} className="flex gap-3">
-                  <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-stone-100">
-                    <Sparkles className="h-4 w-4 text-stone-600" />
-                  </span>
-                  <div>
-                    <p className="text-sm text-stone-800">{activity.body ?? activity.activityType}</p>
-                    <p className="text-xs text-stone-500">{formatRelativeTime(activity.createdAt)}</p>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
+      <DetailLayout
+        main={
+          <>
+            <DetailSection title="Contact & status">
+              <DetailFieldGrid>
+                <DetailField label="Email" value={lead.email} />
+                <DetailField label="Phone" value={lead.phone} />
+                <DetailField label="LinkedIn">
+                  {lead.linkedinUrl ? (
+                    <a
+                      href={lead.linkedinUrl}
+                      className="text-blue-600 hover:underline"
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Profile
+                    </a>
+                  ) : (
+                    '—'
+                  )}
+                </DetailField>
+                <DetailField label="Last updated" value={formatRelativeTime(lead.updatedAt)} />
+              </DetailFieldGrid>
 
-        <div className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm lg:col-span-1">
-          <div className="mb-4 flex items-center gap-2">
-            <Brain className="h-4 w-4 text-stone-500" />
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-stone-500">
-              AI insights
-            </h2>
-          </div>
-          {profile ? (
-            <div className="space-y-3 text-sm">
-              {profile.openingHook ? (
-                <div>
-                  <p className="text-xs font-medium text-stone-500">Opening hook</p>
-                  <p className="mt-1 text-stone-800">{profile.openingHook}</p>
-                </div>
-              ) : null}
-              {Array.isArray(profile.topTriggers) && profile.topTriggers.length ? (
-                <div>
-                  <p className="text-xs font-medium text-stone-500">Triggers</p>
-                  <div className="mt-1 flex flex-wrap gap-1">
-                    {(profile.topTriggers as string[]).map((t) => (
-                      <Badge key={t} variant="outline">
-                        {t}
-                      </Badge>
+              <div className="mt-5">
+                <p className="mb-1.5 text-[11px] font-medium uppercase tracking-[0.06em] text-stone-500">
+                  Relationship status
+                </p>
+                <Select value={status} onValueChange={handleStatusChange}>
+                  <SelectTrigger className="max-w-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STATUS_OPTIONS.map((option) => (
+                      <SelectItem key={option} value={option}>
+                        {option.replace(/_/g, ' ')}
+                      </SelectItem>
                     ))}
-                  </div>
+                  </SelectContent>
+                </Select>
+              </div>
+            </DetailSection>
+
+            <DetailSection title="Timeline" subtitle="Outreach, replies, and stage changes">
+              <DetailTimeline
+                items={activities}
+                emptyTitle="No activity yet"
+                emptyDescription="Enroll in LinkedIn sequences or log outreach to start building history."
+              />
+            </DetailSection>
+          </>
+        }
+        aside={
+          <>
+            <DetailSection>
+              <EmbeddedInsightsPanel
+                insights={insights}
+                title="AI insights"
+                subtitle="Workflow-native recommendations for this prospect."
+                emptyMessage="Insights appear as the system detects momentum, replies, or missing data."
+              />
+              {profile?.openingHook ? (
+                <div className="mt-4 border-t border-stone-100 pt-4">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.06em] text-stone-500">
+                    Opening hook
+                  </p>
+                  <p className="mt-1 text-[13px] leading-relaxed text-stone-800">
+                    {profile.openingHook}
+                  </p>
                 </div>
               ) : null}
-            </div>
-          ) : (
-            <p className="text-sm text-stone-500">
-              Enrichment and AI insights appear here after Aspire or LinkedIn sync.
-            </p>
-          )}
-        </div>
-      </div>
-    </div>
+            </DetailSection>
+
+            <DetailSection title="Quick links">
+              <div className="space-y-2 text-[13px]">
+                <Link href="/admin/outreach/aspire" className="block text-stone-700 hover:text-stone-900 hover:underline">
+                  Enrich in Aspire →
+                </Link>
+                <Link href="/admin/outreach/linkedin" className="block text-stone-700 hover:text-stone-900 hover:underline">
+                  LinkedIn automation →
+                </Link>
+              </div>
+            </DetailSection>
+          </>
+        }
+      />
+    </DetailShell>
   )
 }

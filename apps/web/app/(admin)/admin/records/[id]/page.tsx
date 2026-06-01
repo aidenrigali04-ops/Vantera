@@ -1,6 +1,7 @@
 import { RecordDetail } from '@/components/admin/records/RecordDetail'
 import { requireAdminSession } from '@/lib/auth/require-session'
 import { findRecordWithRelations } from '@/lib/db/queries'
+import { findRecordEmbeddedInsights } from '@/lib/intelligence/queries'
 import { getStageDefinitionsForAccount } from '@/lib/records/stage-engine'
 import { notFound } from 'next/navigation'
 
@@ -18,7 +19,10 @@ export default async function RecordDetailPage({ params }: Props) {
     notFound()
   }
 
-  const stages = await getStageDefinitionsForAccount(session.accountId, record.recordType)
+  const [stages, insights] = await Promise.all([
+    getStageDefinitionsForAccount(session.accountId, record.recordType),
+    findRecordEmbeddedInsights(session.accountId, params.id),
+  ])
 
-  return <RecordDetail record={record} stages={stages} />
+  return <RecordDetail record={record} stages={stages} insights={insights} />
 }

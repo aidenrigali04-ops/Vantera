@@ -1,49 +1,42 @@
 'use client'
 
+import { useOperatingModel } from '@/lib/onboarding/use-operating-model'
 import { cn } from '@/lib/utils'
-import { ArrowRight, Briefcase, LayoutDashboard, Users } from 'lucide-react'
+import { ArrowRight, Briefcase, LayoutDashboard, Users, type LucideIcon } from 'lucide-react'
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
-const STEPS = [
-  {
-    id: 'dashboard',
-    icon: LayoutDashboard,
-    title: 'See your operating system',
-    body: 'The dashboard connects clients, pipeline, and delivery in one view.',
-    href: '/admin/dashboard',
-  },
-  {
-    id: 'clients',
-    icon: Users,
-    title: 'Explore active clients',
-    body: 'Sample clients show how lifecycle and records link together.',
-    href: '/admin/clients',
-  },
-  {
-    id: 'pipeline',
-    icon: Briefcase,
-    title: 'Follow the pipeline',
-    body: 'Opportunities and projects move through stages — click through to see the flow.',
-    href: '/admin/pipeline',
-  },
-] as const
+const STEP_ICONS: Record<string, LucideIcon> = {
+  dashboard: LayoutDashboard,
+  clients: Users,
+  pipeline: Briefcase,
+}
 
 type Props = {
+  accountId: string
   businessName: string
   className?: string
 }
 
 /** Guided exploration rail — visible during first-session onboarding only. */
-export function ExploreGuideRail({ businessName, className }: Props) {
+export function ExploreGuideRail({ accountId, businessName, className }: Props) {
+  const operatingModel = useOperatingModel(accountId)
   const [activeStep, setActiveStep] = useState(0)
+
+  const steps = useMemo(
+    () =>
+      operatingModel.exploreSteps.map((step) => ({
+        ...step,
+        icon: STEP_ICONS[step.id] ?? LayoutDashboard,
+      })),
+    [operatingModel.exploreSteps],
+  )
 
   useEffect(() => {
     const path = window.location.pathname
-    if (path.includes('/clients')) setActiveStep(1)
-    else if (path.includes('/pipeline') || path.includes('/records')) setActiveStep(2)
-    else setActiveStep(0)
-  }, [])
+    const index = steps.findIndex((step) => path.startsWith(step.href))
+    setActiveStep(index >= 0 ? index : 0)
+  }, [steps])
 
   const displayName = businessName || 'Acme Agency'
 
@@ -58,13 +51,10 @@ export function ExploreGuideRail({ businessName, className }: Props) {
         Explore your workspace
       </p>
       <h2 className="mt-1 text-lg font-semibold text-stone-900">{displayName}</h2>
-      <p className="mt-2 text-sm leading-relaxed text-stone-600">
-        Click around — this is a working demo. In a minute you&rsquo;ll see how clients, opportunities, and
-        projects connect.
-      </p>
+      <p className="mt-2 text-sm leading-relaxed text-stone-600">{operatingModel.exploreIntro}</p>
 
       <ol className="mt-5 space-y-3">
-        {STEPS.map((step, index) => {
+        {steps.map((step, index) => {
           const Icon = step.icon
           const isActive = index === activeStep
           const isDone = index < activeStep

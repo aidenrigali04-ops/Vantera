@@ -2,19 +2,18 @@
 
 import { BulkActionBar } from '@/components/operational/BulkActionBar'
 import { KpiStrip } from '@/components/operational/KpiStrip'
-import { OperationalTable } from '@/components/operational/OperationalTable'
+import {
+  OperationalTable,
+  type OperationalSort,
+} from '@/components/operational/OperationalTable'
 import { PageHeader } from '@/components/operational/PageHeader'
+import { TableInlineSelect } from '@/components/operational/table/TableInlineSelect'
+import { TableSavedViews } from '@/components/operational/table/TableSavedViews'
+import { TableToolbar } from '@/components/operational/table/TableToolbar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import {
   Sheet,
   SheetContent,
@@ -23,16 +22,19 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet'
 import { convertLeadToClient } from '@/lib/leads/convert'
+import { updateLead } from '@/lib/leads/actions'
+import { PIPELINE_TABLE_VIEWS } from '@/lib/operational/pipeline-table-views'
 import { SectionEmptyState } from '@/components/onboarding/SectionEmptyState'
 import type { leads } from '@vantera/db'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Calendar, MessageSquare, Plus, Target, TrendingUp, Users, Zap } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 
 type LeadRow = typeof leads.$inferSelect
+type RelationshipStatus = LeadRow['relationshipStatus']
 
 type Props = {
   initialLeads: LeadRow[]
@@ -57,6 +59,8 @@ const STATUS_LABELS: Record<string, string> = {
   lost: 'Lost',
 }
 
+const STATUS_OPTIONS = Object.entries(STATUS_LABELS).map(([value, label]) => ({ value, label }))
+
 const SOURCE_LABELS: Record<string, string> = {
   linkedin: 'LinkedIn',
   aspire: 'Aspire',
@@ -66,13 +70,19 @@ const SOURCE_LABELS: Record<string, string> = {
   referral: 'Referral',
 }
 
+function leadDisplayName(row: LeadRow): string {
+  return [row.firstName, row.lastName].filter(Boolean).join(' ') || 'Unknown'
+}
+
 export function PipelinePageClient({ initialLeads, stats, accountId, setupMode = false }: Props) {
   const router = useRouter()
   const queryClient = useQueryClient()
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [sourceFilter, setSourceFilter] = useState('all')
+  const [activeViewId, setActiveViewId] = useState('all')
   const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [sort, setSort] = useState<OperationalSort | null>({ columnId: 'score', direction: 'desc' })
   const [createOpen, setCreateOpen] = useState(false)
   const [creating, setCreating] = useState(false)
   const [form, setForm] = useState({
@@ -100,6 +110,35 @@ export function PipelinePageClient({ initialLeads, stats, accountId, setupMode =
     initialData: initialLeads,
   })
 
+  const sortedLeads = useMemo(() => {
+    if (!sort) return leadsData
+    const copy = [...leadsData]
+    copy.sort((a, b) => {
+      let av: string | number = ''
+      let bv: string | number = ''
+      switch (sort.columnId) {
+        case 'identity':
+          av = leadDisplayName(a).toLowerCase()
+          bv = leadDisplayName(b).toLowerCase()
+          break
+        case 'status':
+          av = a.relationshipStatus
+          bv = b.relationshipStatus
+          break
+        case 'score':
+          av = a.score ?? 0
+          bv = b.score ?? 0
+          break
+        default:
+          return 0
+      }
+      if (av < bv) return sort.direction === 'asc' ? -1 : 1
+      if (av > bv) return sort.direction === 'asc' ? 1 : -1
+      return 0
+    })
+    return copy
+  }, [leadsData, sort])
+
   const kpiItems = useMemo(
     () => [
       { label: 'Active prospects', value: stats.total, icon: Users },
@@ -120,17 +159,51 @@ export function PipelinePageClient({ initialLeads, stats, accountId, setupMode =
     [stats],
   )
 
+  function applySavedView(viewId: string) {
+    const view = PIPELINE_TABLE_VIEWS.find((item) => item.id === viewId)
+    if (!view) return
+    setActiveViewId(viewId)
+    setStatusFilter(view.status)
+    setSourceFilter(view.source)
+  }
+
+  const handleStatusChange = useCallback(
+    async (leadId: string, relationshipStatus: string) => {
+      const previous = queryClient.getQueryData<LeadRow[]>(queryKey)
+      queryClient.setQueryData<LeadRow[]>(queryKey, (old) =>
+        old?.map((row) =>
+          row.id === leadId
+            ? { ...row, relationshipStatus: relationshipStatus as RelationshipStatus }
+            : row,
+        ),
+      )
+
+      const result = await updateLead(leadId, {
+        relationshipStatus: relationshipStatus as RelationshipStatus,
+      })
+
+      if (!result.success) {
+        queryClient.setQueryData(queryKey, previous)
+        toast.error(result.error ?? 'Could not update status')
+        return
+      }
+
+      toast.success('Status updated')
+      await queryClient.invalidateQueries({ queryKey: ['leads'] })
+    },
+    [queryClient, queryKey],
+  )
+
   const columns = useMemo(
     () => [
       {
         id: 'identity',
         header: 'Prospect',
+        sortable: true,
         cell: (row: LeadRow) => (
           <div>
-            <p className="font-medium text-stone-900">
-              {[row.firstName, row.lastName].filter(Boolean).join(' ') || 'Unknown'}
-            </p>
-            <p className="text-xs text-stone-500">
+            <p className="font-medium text-stone-900">{leadDisplayName(row)}</p>
+            <p className="text-[12px] text-stone-500">
               {row.title ? `${row.title} · ` : ''}
               {row.company}
             </p>
@@ -141,38 +214,49 @@ export function PipelinePageClient({ initialLeads, stats, accountId, setupMode =
         id: 'source',
         header: 'Source',
         cell: (row: LeadRow) => (
-          <Badge variant="outline">{SOURCE_LABELS[row.source] ?? row.source}</Badge>
+          <Badge variant="outline" className="font-normal">
+            {SOURCE_LABELS[row.source] ?? row.source}
+          </Badge>
         ),
       },
       {
         id: 'status',
         header: 'Status',
+        sortable: true,
+        interactive: true,
         cell: (row: LeadRow) => (
-          <Badge variant="secondary">
-            {STATUS_LABELS[row.relationshipStatus] ?? row.relationshipStatus}
-          </Badge>
+          <TableInlineSelect
+            value={row.relationshipStatus}
+            options={STATUS_OPTIONS}
+            onSave={(value) => handleStatusChange(row.id, value)}
+          />
         ),
       },
       {
         id: 'score',
         header: 'Score',
-        cell: (row: LeadRow) => <span className="tabular-nums">{row.score}</span>,
+        sortable: true,
+        cell: (row: LeadRow) => (
+          <span className="tabular-nums font-medium text-stone-800">{row.score ?? 0}</span>
+        ),
       },
       {
         id: 'actions',
         header: '',
+        interactive: true,
         className: 'text-right',
         cell: (row: LeadRow) =>
           row.convertedContactId ? (
-            <Button variant="ghost" size="sm" asChild>
+            <Button variant="ghost" size="sm" asChild className="h-8">
               <Link href={`/admin/clients/${row.convertedContactId}`}>View client</Link>
             </Button>
           ) : (
             <Button
               variant="outline"
               size="sm"
-              onClick={async (e) => {
-                e.stopPropagation()
+              className="h-8"
+              onClick={async (event) => {
+                event.stopPropagation()
                 const result = await convertLeadToClient(row.id)
                 if (!result.success) {
                   toast.error(result.error)
@@ -188,7 +272,7 @@ export function PipelinePageClient({ initialLeads, stats, accountId, setupMode =
           ),
       },
     ],
-    [queryClient, router],
+    [handleStatusChange, queryClient, router],
   )
 
   const handleCreate = async () => {
@@ -233,10 +317,10 @@ export function PipelinePageClient({ initialLeads, stats, accountId, setupMode =
   return (
     <div className="space-y-5" data-tour="pipeline-leads">
       <PageHeader
-        title="Pipeline"
-        description="Pre-conversion prospects — nurture, qualify, and convert to active clients."
+        title="Deals"
+        description="Pre-conversion prospects — nurture, qualify, and convert without leaving the table."
         actions={
-          <Button onClick={() => setCreateOpen(true)}>
+          <Button onClick={() => setCreateOpen(true)} className="bg-stone-900 hover:bg-stone-800">
             <Plus className="mr-2 h-4 w-4" />
             Add prospect
           </Button>
@@ -245,79 +329,92 @@ export function PipelinePageClient({ initialLeads, stats, accountId, setupMode =
 
       <KpiStrip items={kpiItems} />
 
-      <div className="flex flex-wrap items-center gap-3">
-        <Input
-          placeholder="Search prospects..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="max-w-xs"
-        />
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-[160px]">
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All statuses</SelectItem>
-            {Object.entries(STATUS_LABELS).map(([value, label]) => (
-              <SelectItem key={value} value={value}>
-                {label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={sourceFilter} onValueChange={setSourceFilter}>
-          <SelectTrigger className="w-[140px]">
-            <SelectValue placeholder="Source" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All sources</SelectItem>
-            {Object.entries(SOURCE_LABELS).map(([value, label]) => (
-              <SelectItem key={value} value={value}>
-                {label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      <TableToolbar
+        search={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search prospects, companies, titles…"
+        savedViews={
+          <TableSavedViews
+            views={PIPELINE_TABLE_VIEWS}
+            activeViewId={activeViewId}
+            onViewChange={applySavedView}
+          />
+        }
+        filters={[
+          {
+            id: 'status',
+            label: 'Status',
+            value: statusFilter,
+            onChange: (value) => {
+              setStatusFilter(value)
+              setActiveViewId('custom')
+            },
+            options: [{ value: 'all', label: 'All statuses' }, ...STATUS_OPTIONS],
+            widthClassName: 'w-[168px]',
+          },
+          {
+            id: 'source',
+            label: 'Source',
+            value: sourceFilter,
+            onChange: (value) => {
+              setSourceFilter(value)
+              setActiveViewId('custom')
+            },
+            options: [
+              { value: 'all', label: 'All sources' },
+              ...Object.entries(SOURCE_LABELS).map(([value, label]) => ({ value, label })),
+            ],
+            widthClassName: 'w-[148px]',
+          },
+        ]}
+      />
 
-      {isLoading ? (
-        <p className="text-sm text-stone-500">Loading pipeline...</p>
-      ) : (
-        <OperationalTable
-          columns={columns}
-          rows={leadsData}
-          selectedIds={selectedIds}
-          onSelectionChange={setSelectedIds}
-          onRowClick={(row) => router.push(`/admin/pipeline/${row.id}`)}
-          emptyState={
-            setupMode ? (
-              <SectionEmptyState
-                title="No prospects yet"
-                description="No leads yet. Add your first prospect or connect LinkedIn Automation to start building your pipeline."
-                actionLabel="Add a lead"
-                onAction={() => setCreateOpen(true)}
-              />
-            ) : (
-              <SectionEmptyState
-                title="No prospects yet"
-                description="Add manually or import from Aspire outreach."
-                actionLabel="Add prospect"
-                onAction={() => setCreateOpen(true)}
-              />
-            )
-          }
-        />
-      )}
+      <OperationalTable
+        columns={columns}
+        rows={sortedLeads}
+        selectedIds={selectedIds}
+        onSelectionChange={setSelectedIds}
+        onRowClick={(row) => router.push(`/admin/pipeline/${row.id}`)}
+        sort={sort}
+        onSortChange={setSort}
+        loading={isLoading}
+        emptyState={
+          setupMode ? (
+            <SectionEmptyState
+              title="No prospects yet"
+              description="No leads yet. Add your first prospect or connect LinkedIn Automation to start building your pipeline."
+              actionLabel="Add a lead"
+              onAction={() => setCreateOpen(true)}
+            />
+          ) : (
+            <SectionEmptyState
+              title="No prospects yet"
+              description="Add manually or import from Aspire outreach."
+              actionLabel="Add prospect"
+              onAction={() => setCreateOpen(true)}
+            />
+          )
+        }
+      />
 
       <BulkActionBar count={selectedIds.length} onClear={() => setSelectedIds([])}>
         <Button size="sm" variant="secondary" onClick={() => handleBulkStatus('nurturing')}>
-          Mark nurturing
+          Move to nurture
         </Button>
         <Button size="sm" variant="secondary" onClick={() => handleBulkStatus('qualified')}>
           Mark qualified
         </Button>
-        <Button size="sm" variant="secondary" onClick={() => handleBulkStatus('lost')}>
-          Mark lost
+        <Button size="sm" variant="secondary" onClick={() => handleBulkStatus('discovery_booked')}>
+          Book meeting
+        </Button>
+        <Button size="sm" variant="outline" disabled title="Coming soon">
+          Assign owner
+        </Button>
+        <Button size="sm" variant="outline" disabled title="Coming soon">
+          Export
+        </Button>
+        <Button size="sm" variant="outline" onClick={() => handleBulkStatus('lost')}>
+          Archive
         </Button>
       </BulkActionBar>
 

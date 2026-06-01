@@ -1,6 +1,7 @@
 import { requireAdminSession } from '@/lib/auth/require-session'
 import { getBrandingFromHeaders } from '@/lib/branding/server'
 import { getOperationalActionFeed } from '@/lib/dashboard/action-feed'
+import { findAccountEmbeddedInsights } from '@/lib/intelligence/queries'
 import { isOnboardingCompleteForAccount } from '@/lib/onboarding/status'
 import { getDashboardSnapshot } from '@/lib/sample-data/queries'
 import { headers } from 'next/headers'
@@ -26,9 +27,10 @@ export default async function AdminDashboardPage() {
     onboardingIncomplete = !onboardingComplete
   }
 
-  const [snapshot, actionFeed] = await Promise.all([
+  const [snapshot, actionFeed, embeddedInsights] = await Promise.all([
     getDashboardSnapshot(session.accountId),
     getOperationalActionFeed(session.accountId),
+    findAccountEmbeddedInsights(session.accountId, 4),
   ])
 
   return (
@@ -41,6 +43,7 @@ export default async function AdminDashboardPage() {
       actionFeed={actionFeed}
       accountId={session.accountId}
       onboardingIncomplete={onboardingIncomplete}
+      embeddedInsights={embeddedInsights}
     />
   )
 }

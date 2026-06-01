@@ -23,6 +23,7 @@ export default async function LinkedInPage() {
       leads={leads}
       stats={stats}
       connectionStatus={connectionStatus}
+      accountId={session.accountId}
     />
   )
 }

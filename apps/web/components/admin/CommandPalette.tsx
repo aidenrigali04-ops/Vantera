@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/command'
 import { useBranding } from '@/lib/branding/context'
 import { useVerticalLabels } from '@/lib/branding/use-vertical-labels'
+import { getAvailableAdminNavItems } from '@/lib/navigation/admin-nav'
 import { useUIStore } from '@/lib/stores/ui-store'
 import {
   BarChart2,
@@ -70,15 +71,11 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
     onOpenChange(false)
   }
 
-  const navItems = [
-    { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { href: '/admin/clients', label: 'Active Clients', icon: Users },
-    { href: '/admin/pipeline', label: 'Pipeline', icon: TrendingUp },
-    { href: '/admin/outreach/aspire', label: 'Aspire', icon: Telescope },
-    { href: '/admin/outreach/linkedin', label: 'LinkedIn', icon: Share2 },
-    { href: '/admin/automations', label: 'Automations', icon: Zap },
-    { href: '/admin/settings', label: 'Settings', icon: Settings },
-  ]
+  const navItems = getAvailableAdminNavItems().map((item) => ({
+    href: item.href!,
+    label: item.label,
+    icon: item.icon,
+  }))
 
   const recentItems = recentRoutes
     .map((route) => navItems.find((item) => item.href === route))

@@ -1,17 +1,14 @@
 import { ContactsPageClient } from '@/app/(admin)/admin/contacts/ContactsPageClient'
 import { KpiStrip } from '@/components/operational/KpiStrip'
 import { requireAdminSession } from '@/lib/auth/require-session'
-import { getBrandingFromHeaders } from '@/lib/branding/server'
 import { countContactsByType, findContacts, getActiveClientKpis } from '@/lib/db/queries'
 import { isOnboardingCompleteForAccount } from '@/lib/onboarding/status'
 import { AlertTriangle, CalendarClock, RefreshCw, Users } from 'lucide-react'
-import { headers } from 'next/headers'
 
 export const dynamic = 'force-dynamic'
 
 export default async function ActiveClientsPage() {
   const session = await requireAdminSession()
-  const branding = getBrandingFromHeaders(headers())
 
   const onboardingComplete =
     session.role === 'owner'
@@ -37,7 +34,6 @@ export default async function ActiveClientsPage() {
       <ContactsPageClient
         initialContacts={initialContacts}
         session={session}
-        vertical={branding.vertical}
         typeCounts={typeCounts}
         basePath="/admin/clients"
         setupMode={session.role === 'owner' && !onboardingComplete}

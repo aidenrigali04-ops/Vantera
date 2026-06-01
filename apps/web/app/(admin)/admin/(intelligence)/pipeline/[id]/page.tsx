@@ -1,5 +1,6 @@
 import { LeadDetailClient } from '@/app/(admin)/admin/(intelligence)/pipeline/[id]/LeadDetailClient'
 import { requireAdminSession } from '@/lib/auth/require-session'
+import { findLeadEmbeddedInsights } from '@/lib/intelligence/queries'
 import { findLeadActivities, findLeadWithProfile } from '@/lib/leads/queries'
 import { notFound } from 'next/navigation'
 
@@ -17,9 +18,17 @@ export default async function LeadDetailPage({ params }: Props) {
     notFound()
   }
 
-  const activities = await findLeadActivities(session.accountId, params.id)
+  const [activities, insights] = await Promise.all([
+    findLeadActivities(session.accountId, params.id),
+    findLeadEmbeddedInsights(session.accountId, params.id),
+  ])
 
   return (
-    <LeadDetailClient lead={row.lead} profile={row.profile} activities={activities} />
+    <LeadDetailClient
+      lead={row.lead}
+      profile={row.profile}
+      activities={activities}
+      insights={insights}
+    />
   )
 }

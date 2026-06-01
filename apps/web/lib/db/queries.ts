@@ -365,6 +365,43 @@ export async function findRecordWithRelations(accountId: string, recordId: strin
   }
 }
 
+export async function getProjectKpis(accountId: string, recordType = 'project') {
+  const base = and(
+    eq(records.accountId, accountId),
+    isNull(records.deletedAt),
+    eq(records.recordType, recordType),
+  )
+
+  const [activeRow] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(records)
+    .where(and(base, isNull(records.completedAt)))
+
+  const [overdueRow] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(records)
+    .where(
+      and(base, isNull(records.completedAt), sql`${records.scheduledAt} < now()`),
+    )
+
+  const [completedRow] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(records)
+    .where(and(base, sql`${records.completedAt} is not null`))
+
+  const [valueRow] = await db
+    .select({ total: sql<number>`coalesce(sum(${records.valueCents}), 0)::bigint` })
+    .from(records)
+    .where(and(base, isNull(records.completedAt)))
+
+  return {
+    active: activeRow?.count ?? 0,
+    overdue: overdueRow?.count ?? 0,
+    completed: completedRow?.count ?? 0,
+    activeValueCents: Number(valueRow?.total ?? 0),
+  }
+}
+
 export async function findUsersForAccount(accountId: string) {
   return db
     .select()
