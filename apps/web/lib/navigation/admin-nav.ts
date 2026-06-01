@@ -3,6 +3,7 @@ import type { LucideIcon } from 'lucide-react'
 import {
   BarChart2,
   Bell,
+  Bot,
   Brain,
   Calendar,
   CheckSquare,
@@ -106,10 +107,17 @@ export const ADMIN_NAV_HUBS: AdminNavHub[] = [
   {
     id: 'pipeline',
     title: 'Pipeline',
-    description: 'Deals plus outreach — from first touch to close.',
+    description: 'Deals plus AI SDR agents — find, contact, and nurture around the clock.',
     sidebarId: 'pipeline',
-    primary: { id: 'deals', label: 'View deals', href: '/admin/pipeline', icon: Handshake },
+    primary: {
+      id: 'sdr-agents',
+      label: 'Build SDR agents',
+      href: '/admin/outreach/agents',
+      icon: Bot,
+      tourAnchor: 'nav-sdr-agents',
+    },
     related: [
+      { id: 'deals', label: 'View deals', href: '/admin/pipeline', icon: Handshake },
       { id: 'aspire', label: 'Aspire', href: '/admin/outreach/aspire', icon: Telescope },
       { id: 'linkedin', label: 'LinkedIn', href: '/admin/outreach/linkedin', icon: Share2 },
       { id: 'campaigns', label: 'Campaigns', href: '/admin/outreach/campaigns', icon: Megaphone },
@@ -288,6 +296,7 @@ export function resolveAdminPageTitle(pathname: string): string {
   if (pathname.startsWith('/admin/records')) return 'Projects'
   if (pathname.startsWith('/admin/inbox')) return 'Inbox'
   if (pathname.startsWith('/admin/calendar')) return 'Calendar'
+  if (pathname.startsWith('/admin/outreach/agents')) return 'SDR Agents'
   if (pathname.startsWith('/admin/outreach/aspire')) return 'Aspire'
   if (pathname.startsWith('/admin/outreach/linkedin')) return 'LinkedIn'
   if (pathname.startsWith('/admin/outreach/campaigns')) return 'Campaigns'
@@ -324,7 +333,7 @@ export function resolveWorkspacePrimaryAction(pathname: string): WorkspaceHeader
     return { label: 'New contact', href: '/admin/clients' }
   }
   if (pathname.startsWith('/admin/pipeline') || pathname.startsWith('/admin/outreach')) {
-    return { label: 'New deal', href: '/admin/pipeline' }
+    return { label: 'Build SDR agents', href: '/admin/outreach/agents' }
   }
   if (pathname.startsWith('/admin/records') || pathname.startsWith('/admin/deliverables')) {
     return { label: 'New project', href: '/admin/records' }

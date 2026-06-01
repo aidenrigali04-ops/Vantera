@@ -9,11 +9,11 @@ export default function HomePage() {
             Automated Sales Intelligence
           </p>
           <h1 className="text-4xl font-semibold tracking-tight sm:text-5xl">
-            Nurture prospects, close deals, and deliver — under your brand
+            Build your SDR Agents
           </h1>
           <p className="text-base text-muted-foreground sm:text-lg">
-            Vantera connects outreach, pipeline intelligence, and client delivery in one
-            system. Each account gets a dedicated subdomain with custom branding.
+            Deploy AI agents that find, contact, and nurture leads around the clock — without
+            adding headcount. Your pipeline never sleeps.
           </p>
         </div>
 

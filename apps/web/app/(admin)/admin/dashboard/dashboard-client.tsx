@@ -7,6 +7,8 @@ import { DashboardOverviewCollapsible } from '@/components/dashboard/DashboardOv
 import { DashboardWorkspaceHubs } from '@/components/dashboard/DashboardWorkspaceHubs'
 import { CleanSlateWelcome } from '@/components/onboarding/CleanSlateWelcome'
 import { ExploreGuideStrip } from '@/components/onboarding/ExploreGuideStrip'
+import { SdrAgentsPromo } from '@/components/dashboard/SdrAgentsPromo'
+import type { SdrAgentCard } from '@/lib/agents/types'
 import type { ActionFeedItem } from '@/lib/dashboard/action-feed'
 import type { EmbeddedInsight } from '@/lib/intelligence/types'
 import type { OnboardingSuccessNotice } from '@/lib/import/fields'
@@ -28,6 +30,7 @@ type DashboardClientProps = {
   accountId: string
   onboardingIncomplete?: boolean
   embeddedInsights?: EmbeddedInsight[]
+  sdrAgents?: SdrAgentCard[]
 }
 
 function firstNameFromEmail(email: string): string {
@@ -54,6 +57,7 @@ export function DashboardClient({
   accountId,
   onboardingIncomplete = false,
   embeddedInsights = [],
+  sdrAgents = [],
 }: DashboardClientProps) {
   const router = useRouter()
   const reduceMotion = useReducedMotion()
@@ -137,6 +141,9 @@ export function DashboardClient({
           </motion.header>
 
           <motion.div variants={fadeUp}>
+            {!showCleanSlate && sdrAgents.length > 0 ? (
+              <SdrAgentsPromo agents={sdrAgents} className="mb-6" />
+            ) : null}
             <DashboardActionFeed
               items={actionFeed}
               successNotice={successNotice}
