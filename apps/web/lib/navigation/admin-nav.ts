@@ -338,6 +338,9 @@ export function resolveWorkspacePrimaryAction(pathname: string): WorkspaceHeader
   if (pathname.startsWith('/admin/records') || pathname.startsWith('/admin/deliverables')) {
     return { label: 'New project', href: '/admin/records' }
   }
+  if (pathname.startsWith('/admin/integrations')) {
+    return { label: 'Connect CRM', href: '/admin/integrations' }
+  }
   if (pathname.startsWith('/admin/ai-brain')) {
     return { label: 'View insights', href: '/admin/ai-brain' }
   }

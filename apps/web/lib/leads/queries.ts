@@ -1,6 +1,6 @@
 import { db } from '@/lib/db/client'
 import { activities, leadProfiles, leads } from '@vantera/db'
-import { and, desc, eq, ilike, isNull, or, sql } from 'drizzle-orm'
+import { and, desc, eq, ilike, inArray, isNull, or, sql } from 'drizzle-orm'
 
 export type LeadFilters = {
   search?: string
@@ -8,6 +8,7 @@ export type LeadFilters = {
   relationshipStatus?: string
   ownerId?: string
   minScore?: number
+  ids?: string[]
   limit?: number
   offset?: number
 }
@@ -39,6 +40,9 @@ export async function findLeads(accountId: string, filters: LeadFilters = {}) {
         ilike(leads.email, q),
       )!,
     )
+  }
+  if (filters.ids && filters.ids.length > 0) {
+    conditions.push(inArray(leads.id, filters.ids))
   }
 
   const limit = filters.limit ?? 50

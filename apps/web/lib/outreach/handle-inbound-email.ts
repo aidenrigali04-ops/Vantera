@@ -138,13 +138,24 @@ export async function handleResendInboundEmail(
   }
 
   if (stepIdFromAddress) {
-    return processMatchedStep({
+    const campaignResult = await processMatchedStep({
       stepId: stepIdFromAddress,
       fromEmail,
       subject: event.data.subject,
       bodyPreview,
       inboundEmailId: event.data.email_id,
     })
+    if (campaignResult.ok && campaignResult.matched) return campaignResult
+
+    const { handleSdrReply } = await import('@/lib/sdr/reply-handler')
+    const sdrResult = await handleSdrReply({
+      stepId: stepIdFromAddress,
+      bodyPreview,
+      fromEmail,
+    })
+    if (sdrResult.handled) {
+      return { ok: true, matched: true, stepId: stepIdFromAddress }
+    }
   }
 
   for (const messageId of headerMessageIds) {

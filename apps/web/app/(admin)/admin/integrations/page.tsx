@@ -1,19 +1,12 @@
-import { ComingSoonPage } from '@/components/operational/ComingSoonPage'
-import { Button } from '@/components/ui/button'
-import { Plug } from 'lucide-react'
-import Link from 'next/link'
+import { IntegrationsPageClient } from '@/components/integrations/IntegrationsPageClient'
+import { requireAdminSession } from '@/lib/auth/require-session'
+import { findCrmConnections } from '@/lib/integrations/queries'
 
-export default function IntegrationsPage() {
-  return (
-    <ComingSoonPage
-      icon={Plug}
-      title="Integrations"
-      description="Connect Stripe, Twilio, QuickBooks, Google Calendar, HubSpot, and other tools to your workspace."
-      action={
-        <Button variant="outline" size="sm" asChild>
-          <Link href="/admin/settings">Workspace settings →</Link>
-        </Button>
-      }
-    />
-  )
+export const dynamic = 'force-dynamic'
+
+export default async function IntegrationsPage() {
+  const session = await requireAdminSession()
+  const connections = await findCrmConnections(session.accountId)
+
+  return <IntegrationsPageClient connections={connections} />
 }

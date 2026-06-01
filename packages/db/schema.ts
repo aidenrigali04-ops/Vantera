@@ -6,6 +6,7 @@ import {
   text,
   boolean,
   smallint,
+  integer,
   bigint,
   timestamp,
   jsonb,
@@ -99,6 +100,10 @@ export const leadSourceEnum = pgEnum('lead_source', [
   'csv',
   'form',
   'referral',
+  'hubspot',
+  'gohighlevel',
+  'salesforce',
+  'sdr_agent',
 ])
 
 export const relationshipStatusEnum = pgEnum('relationship_status', [
@@ -710,6 +715,139 @@ export const leadScores = pgTable(
   }),
 )
 
+export const sdrAgentConfigs = pgTable(
+  'sdr_agent_configs',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    accountId: uuid('account_id')
+      .notNull()
+      .unique()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    agentName: text('agent_name').notNull(),
+    agentTitle: text('agent_title').notNull().default('Sales Development Rep'),
+    fromEmail: text('from_email').notNull(),
+    fromName: text('from_name').notNull(),
+    signature: text('signature'),
+    icpConfig: jsonb('icp_config').notNull().default({}),
+    targetVerticals: text('target_verticals').array().notNull().default(sql`'{}'::text[]`),
+    targetCities: text('target_cities').array().notNull().default(sql`'{}'::text[]`),
+    excludeDomains: text('exclude_domains').array().notNull().default(sql`'{}'::text[]`),
+    searchFrequency: varchar('search_frequency', { length: 20 }).notNull().default('daily'),
+    outreachDays: text('outreach_days').array().notNull().default(sql`ARRAY['mon','tue','wed','thu','fri']`),
+    outreachWindow: jsonb('outreach_window')
+      .notNull()
+      .default({ startHour: 8, endHour: 17, tz: 'America/New_York' }),
+    maxNewLeadsDay: smallint('max_new_leads_day').notNull().default(10),
+    maxActiveLeads: smallint('max_active_leads').notNull().default(200),
+    isActive: boolean('is_active').notNull().default(false),
+    isPaused: boolean('is_paused').notNull().default(false),
+    pausedReason: text('paused_reason'),
+    lastRunAt: timestamptz('last_run_at'),
+    totalLeadsFound: integer('total_leads_found').notNull().default(0),
+    totalContacted: integer('total_contacted').notNull().default(0),
+    totalReplied: integer('total_replied').notNull().default(0),
+    totalBooked: integer('total_booked').notNull().default(0),
+    deletedAt: timestamptz('deleted_at'),
+    createdAt: timestamptz('created_at').notNull().defaultNow(),
+    updatedAt: timestamptz('updated_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    activeIdx: index('sdr_agent_configs_active_idx').on(table.isActive, table.isPaused),
+  }),
+)
+
+export const sdrSequences = pgTable(
+  'sdr_sequences',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    configId: uuid('config_id')
+      .notNull()
+      .references(() => sdrAgentConfigs.id, { onDelete: 'cascade' }),
+    leadId: uuid('lead_id')
+      .notNull()
+      .references(() => leads.id, { onDelete: 'cascade' }),
+    aspireResultId: uuid('aspire_result_id').references(() => aspireResults.id),
+    status: varchar('status', { length: 30 }).notNull().default('active'),
+    currentStep: smallint('current_step').notNull().default(0),
+    totalSteps: smallint('total_steps').notNull().default(5),
+    nextStepAt: timestamptz('next_step_at'),
+    lastStepAt: timestamptz('last_step_at'),
+    repliedAt: timestamptz('replied_at'),
+    replyType: varchar('reply_type', { length: 30 }),
+    bookedAt: timestamptz('booked_at'),
+    meetingUrl: text('meeting_url'),
+    deletedAt: timestamptz('deleted_at'),
+    createdAt: timestamptz('created_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    accountStatusIdx: index('sdr_sequences_account_status_idx').on(table.accountId, table.status),
+    leadIdx: index('sdr_sequences_lead_idx').on(table.leadId, table.accountId),
+  }),
+)
+
+export const sdrSequenceSteps = pgTable(
+  'sdr_sequence_steps',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    sequenceId: uuid('sequence_id')
+      .notNull()
+      .references(() => sdrSequences.id, { onDelete: 'cascade' }),
+    leadId: uuid('lead_id')
+      .notNull()
+      .references(() => leads.id, { onDelete: 'cascade' }),
+    stepNumber: smallint('step_number').notNull(),
+    channel: varchar('channel', { length: 20 }).notNull(),
+    subject: text('subject'),
+    body: text('body').notNull(),
+    scheduledFor: timestamptz('scheduled_for').notNull(),
+    sentAt: timestamptz('sent_at'),
+    status: varchar('status', { length: 30 }).notNull().default('scheduled'),
+    openedAt: timestamptz('opened_at'),
+    clickedAt: timestamptz('clicked_at'),
+    repliedAt: timestamptz('replied_at'),
+    resendId: text('resend_id'),
+    twilioSid: text('twilio_sid'),
+    deletedAt: timestamptz('deleted_at'),
+    createdAt: timestamptz('created_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    dueIdx: index('sdr_sequence_steps_due_idx').on(
+      table.accountId,
+      table.status,
+      table.scheduledFor,
+    ),
+    resendIdx: index('sdr_sequence_steps_resend_idx').on(table.resendId),
+    twilioIdx: index('sdr_sequence_steps_twilio_idx').on(table.twilioSid),
+  }),
+)
+
+export const sdrActivityLog = pgTable(
+  'sdr_activity_log',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    configId: uuid('config_id')
+      .notNull()
+      .references(() => sdrAgentConfigs.id, { onDelete: 'cascade' }),
+    leadId: uuid('lead_id').references(() => leads.id),
+    sequenceId: uuid('sequence_id').references(() => sdrSequences.id),
+    eventType: varchar('event_type', { length: 80 }).notNull(),
+    metadata: jsonb('metadata').notNull().default({}),
+    createdAt: timestamptz('created_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    accountIdx: index('sdr_activity_log_account_idx').on(table.accountId, table.createdAt),
+  }),
+)
+
 export const aspireSearchRuns = pgTable(
   'aspire_search_runs',
   {
@@ -1299,6 +1437,7 @@ export const leadsRelations = relations(leads, ({ one, many }) => ({
     references: [leadProfiles.leadId],
   }),
   sequences: many(linkedinSequences),
+  sdrSequences: many(sdrSequences),
   activities: many(activities),
 }))
 
@@ -1404,5 +1543,68 @@ export const outreachCampaignStepsRelations = relations(outreachCampaignSteps, (
   lead: one(leads, {
     fields: [outreachCampaignSteps.leadId],
     references: [leads.id],
+  }),
+}))
+
+export const sdrAgentConfigsRelations = relations(sdrAgentConfigs, ({ one, many }) => ({
+  account: one(accounts, {
+    fields: [sdrAgentConfigs.accountId],
+    references: [accounts.id],
+  }),
+  sequences: many(sdrSequences),
+  activityLog: many(sdrActivityLog),
+}))
+
+export const sdrSequencesRelations = relations(sdrSequences, ({ one, many }) => ({
+  account: one(accounts, {
+    fields: [sdrSequences.accountId],
+    references: [accounts.id],
+  }),
+  config: one(sdrAgentConfigs, {
+    fields: [sdrSequences.configId],
+    references: [sdrAgentConfigs.id],
+  }),
+  lead: one(leads, {
+    fields: [sdrSequences.leadId],
+    references: [leads.id],
+  }),
+  aspireResult: one(aspireResults, {
+    fields: [sdrSequences.aspireResultId],
+    references: [aspireResults.id],
+  }),
+  steps: many(sdrSequenceSteps),
+}))
+
+export const sdrSequenceStepsRelations = relations(sdrSequenceSteps, ({ one }) => ({
+  account: one(accounts, {
+    fields: [sdrSequenceSteps.accountId],
+    references: [accounts.id],
+  }),
+  sequence: one(sdrSequences, {
+    fields: [sdrSequenceSteps.sequenceId],
+    references: [sdrSequences.id],
+  }),
+  lead: one(leads, {
+    fields: [sdrSequenceSteps.leadId],
+    references: [leads.id],
+  }),
+}))
+
+export const sdrActivityLogRelations = relations(sdrActivityLog, ({ one }) => ({
+  account: one(accounts, {
+    fields: [sdrActivityLog.accountId],
+    references: [accounts.id],
+  }),
+  config: one(sdrAgentConfigs, {
+    fields: [sdrActivityLog.configId],
+    references: [sdrAgentConfigs.id],
+  }),
+  lead: one(leads, {
+    fields: [sdrActivityLog.leadId],
+    references: [leads.id],
+  }),
+  sequence: one(sdrSequences, {
+    fields: [sdrActivityLog.sequenceId],
+    references: [sdrSequences.id],
   }),
 }))

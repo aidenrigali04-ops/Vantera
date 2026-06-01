@@ -27,7 +27,7 @@ import { PIPELINE_TABLE_VIEWS } from '@/lib/operational/pipeline-table-views'
 import { SectionEmptyState } from '@/components/onboarding/SectionEmptyState'
 import type { leads } from '@vantera/db'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Calendar, MessageSquare, Plus, Target, TrendingUp, Users, Zap } from 'lucide-react'
+import { Calendar, MessageSquare, Plug, Plus, Target, TrendingUp, Users, Zap } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useCallback, useMemo, useState } from 'react'
@@ -68,6 +68,9 @@ const SOURCE_LABELS: Record<string, string> = {
   csv: 'CSV',
   form: 'Form',
   referral: 'Referral',
+  hubspot: 'HubSpot',
+  gohighlevel: 'GoHighLevel',
+  salesforce: 'Salesforce',
 }
 
 function leadDisplayName(row: LeadRow): string {
@@ -307,6 +310,14 @@ export function PipelinePageClient({ initialLeads, stats, accountId, setupMode =
     }
   }
 
+  const handleCsvExport = () => {
+    const url =
+      selectedIds.length > 0
+        ? `/api/leads/export?ids=${encodeURIComponent(selectedIds.join(','))}`
+        : '/api/leads/export'
+    window.location.href = url
+  }
+
   const handleBulkStatus = async (status: string) => {
     const res = await fetch('/api/leads/bulk', {
       method: 'PATCH',
@@ -333,10 +344,18 @@ export function PipelinePageClient({ initialLeads, stats, accountId, setupMode =
         title="Deals"
         description="Pre-conversion prospects — nurture, qualify, and convert without leaving the table."
         actions={
-          <Button onClick={() => setCreateOpen(true)} className="bg-stone-900 hover:bg-stone-800">
-            <Plus className="mr-2 h-4 w-4" />
-            Add prospect
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" asChild>
+              <Link href="/admin/integrations">
+                <Plug className="mr-2 h-4 w-4" />
+                CRM sync
+              </Link>
+            </Button>
+            <Button onClick={() => setCreateOpen(true)} className="bg-stone-900 hover:bg-stone-800">
+              <Plus className="mr-2 h-4 w-4" />
+              Add prospect
+            </Button>
+          </div>
         }
       />
 
@@ -423,8 +442,8 @@ export function PipelinePageClient({ initialLeads, stats, accountId, setupMode =
         <Button size="sm" variant="outline" disabled title="Coming soon">
           Assign owner
         </Button>
-        <Button size="sm" variant="outline" disabled title="Coming soon">
-          Export
+        <Button size="sm" variant="outline" onClick={handleCsvExport}>
+          Export CSV
         </Button>
         <Button size="sm" variant="outline" onClick={() => handleBulkStatus('lost')}>
           Archive

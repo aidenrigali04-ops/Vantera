@@ -166,10 +166,23 @@ export async function draftOutreachMessages(context: DraftContext): Promise<Draf
 }
 
 export async function reinforceMessageMemory(
-  _accountId: string,
-  _segmentKey: string,
+  accountId: string,
+  segmentKey: string,
   _draftId: string,
-  _outcome: 'interested' | 'objection' | 'no_response',
+  outcome: 'interested' | 'objection' | 'no_response',
 ): Promise<void> {
-  // Phase 2 stub — wire to agent_memory when embeddings pipeline is ready
+  const { reinforceSdrSegmentMemory } = await import('@/lib/sdr/memory')
+  const [vertical, size] = segmentKey.split('_')
+  const employeeCount =
+    size === 'small' ? 5 : size === 'mid' ? 30 : size === 'large' ? 100 : null
+
+  await reinforceSdrSegmentMemory({
+    accountId,
+    vertical: vertical ?? 'agency',
+    employeeCount,
+    stepNumber: 1,
+    channel: 'email',
+    openingHook: segmentKey,
+    outcome: outcome === 'no_response' ? 'objection' : outcome,
+  })
 }

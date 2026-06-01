@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
 const TABS = [
+  { href: '/admin/outreach/agents', label: 'SDR Agents' },
   { href: '/admin/outreach/aspire', label: 'Aspire' },
   { href: '/admin/outreach/linkedin', label: 'LinkedIn' },
   { href: '/admin/outreach/campaigns', label: 'Campaigns' },

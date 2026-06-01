@@ -4,7 +4,7 @@ import { and, eq, isNull } from 'drizzle-orm'
 
 export async function getSystemAutomationId(
   accountId: string,
-  ref: 'aspire' | 'draft' | 'lead_score',
+  ref: 'aspire' | 'draft' | 'lead_score' | 'sdr_find' | 'sdr_draft' | 'sdr_send',
 ): Promise<string> {
   const templateRef = `system:${ref}`
 
