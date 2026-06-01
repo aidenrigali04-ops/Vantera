@@ -1,82 +1,257 @@
+import { getIcpConfigForVertical, scoreICP } from '@/lib/aspire/icp-score'
+import type {
+  ApolloPersonResult,
+  ApolloSearchFilters,
+  AspireSearchResult,
+} from '@/lib/aspire/types'
 import { db } from '@/lib/db/client'
-import { activities, aspireSearchRuns, leads } from '@vantera/db'
+import { env } from '@/lib/env'
+import { accounts, aspireResults } from '@vantera/db'
+import { and, eq, inArray, isNull } from 'drizzle-orm'
 
-export type AspireSearchResult = {
-  firstName: string
-  lastName: string
-  title: string
-  company: string
-  email?: string
-  linkedinUrl?: string
-  industry?: string
-  intentScore: number
+const APOLLO_SEARCH_URL = 'https://api.apollo.io/v1/mixed_people/search'
+const PAGE_DELAY_MS = 300
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-/** MVP stub — replace with Apollo/Clay API integration */
-export async function searchProspects(
-  accountId: string,
-  query: Record<string, unknown>,
-): Promise<AspireSearchResult[]> {
+function mapApolloPerson(raw: Record<string, unknown>): ApolloPersonResult | null {
+  const org = (raw.organization ?? {}) as Record<string, unknown>
+  const id = typeof raw.id === 'string' ? raw.id : null
+  if (!id) return null
+
+  return {
+    id,
+    firstName: typeof raw.first_name === 'string' ? raw.first_name : '',
+    lastName: typeof raw.last_name === 'string' ? raw.last_name : '',
+    title: typeof raw.title === 'string' ? raw.title : '',
+    email: typeof raw.email === 'string' ? raw.email : null,
+    phone: typeof raw.phone_numbers === 'object' && Array.isArray(raw.phone_numbers)
+      ? String((raw.phone_numbers[0] as Record<string, unknown>)?.sanitized_number ?? '')
+      : null,
+    linkedinUrl: typeof raw.linkedin_url === 'string' ? raw.linkedin_url : null,
+    organizationName:
+      typeof org.name === 'string'
+        ? org.name
+        : typeof raw.organization_name === 'string'
+          ? raw.organization_name
+          : 'Unknown',
+    organizationId: typeof org.id === 'string' ? org.id : null,
+    websiteUrl: typeof org.website_url === 'string' ? org.website_url : null,
+    city: typeof raw.city === 'string' ? raw.city : null,
+    state: typeof raw.state === 'string' ? raw.state : null,
+    employeeCount:
+      typeof org.estimated_num_employees === 'number' ? org.estimated_num_employees : null,
+    revenue: typeof org.annual_revenue === 'number' ? org.annual_revenue : null,
+    industry: typeof org.industry === 'string' ? org.industry : null,
+    technologies: Array.isArray(org.technologies)
+      ? org.technologies.filter((t): t is string => typeof t === 'string')
+      : [],
+    photoUrl: typeof raw.photo_url === 'string' ? raw.photo_url : null,
+  }
+}
+
+function buildApolloBody(filters: ApolloSearchFilters, page: number, perPage: number) {
+  const keywords = [...(filters.keywords ?? [])]
+  if (filters.q) keywords.push(filters.q)
+  if (filters.company) keywords.push(filters.company)
+
+  return {
+    page,
+    per_page: perPage,
+    person_titles: filters.jobTitles.length > 0 ? filters.jobTitles : undefined,
+    q_organization_keyword_tags: filters.industries.length > 0 ? filters.industries : undefined,
+    organization_num_employees_ranges:
+      filters.companySizeRanges.length > 0 ? filters.companySizeRanges : undefined,
+    person_locations: filters.locations.length > 0 ? filters.locations : undefined,
+    q_keywords: keywords.length > 0 ? keywords.join(' ') : undefined,
+    contact_email_status:
+      filters.contactEmailStatus && filters.contactEmailStatus.length > 0
+        ? filters.contactEmailStatus
+        : undefined,
+  }
+}
+
+function stubResults(filters: ApolloSearchFilters): ApolloPersonResult[] {
+  const company = filters.company ?? 'Northstar SaaS'
   return [
     {
+      id: 'stub-alex-chen',
       firstName: 'Alex',
       lastName: 'Chen',
       title: 'Founder',
-      company: 'Northstar SaaS',
       email: 'alex@northstar.io',
       linkedinUrl: 'https://linkedin.com/in/example',
       industry: 'Software',
-      intentScore: 82,
+      organizationName: company,
+      organizationId: null,
+      websiteUrl: null,
+      city: 'Phoenix',
+      state: 'AZ',
+      employeeCount: 25,
+      revenue: null,
+      phone: null,
+      technologies: [],
+      photoUrl: null,
     },
     {
+      id: 'stub-jordan-reeves',
       firstName: 'Jordan',
       lastName: 'Reeves',
       title: 'VP Sales',
-      company: 'Atlas Agency',
       email: 'jordan@atlas.co',
+      linkedinUrl: null,
       industry: 'Marketing',
-      intentScore: 71,
+      organizationName: 'Atlas Agency',
+      organizationId: null,
+      websiteUrl: null,
+      city: 'Dallas',
+      state: 'TX',
+      employeeCount: 40,
+      revenue: null,
+      phone: null,
+      technologies: [],
+      photoUrl: null,
     },
   ]
 }
 
+export async function searchApollo(
+  filters: ApolloSearchFilters,
+  page = 1,
+  perPage = 25,
+): Promise<{ people: ApolloPersonResult[]; total: number; hasMore: boolean }> {
+  const apiKey = process.env.APOLLO_API_KEY ?? env.APOLLO_API_KEY
+  if (!apiKey) {
+    const people = stubResults(filters)
+    return { people, total: people.length, hasMore: false }
+  }
+
+  if (page > 1) await sleep(PAGE_DELAY_MS)
+
+  const response = await fetch(APOLLO_SEARCH_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'no-cache',
+      'X-Api-Key': apiKey,
+    },
+    body: JSON.stringify(buildApolloBody(filters, page, perPage)),
+  })
+
+  const body = (await response.json()) as {
+    people?: Record<string, unknown>[]
+    pagination?: { total_entries?: number; page?: number; per_page?: number }
+    error?: string
+  }
+
+  if (!response.ok) {
+    throw new Error(body.error ?? 'Apollo search failed')
+  }
+
+  const people = (body.people ?? [])
+    .map(mapApolloPerson)
+    .filter((person): person is ApolloPersonResult => person !== null)
+
+  const total = body.pagination?.total_entries ?? people.length
+  const hasMore = page * perPage < total
+
+  return { people, total, hasMore }
+}
+
+export async function filterExistingLeads(
+  accountId: string,
+  apolloIds: string[],
+): Promise<string[]> {
+  if (apolloIds.length === 0) return []
+
+  const rows = await db
+    .select({ apolloId: aspireResults.apolloId })
+    .from(aspireResults)
+    .where(
+      and(
+        eq(aspireResults.accountId, accountId),
+        isNull(aspireResults.deletedAt),
+        inArray(aspireResults.apolloId, apolloIds),
+      ),
+    )
+
+  return rows.map((row) => row.apolloId!).filter(Boolean)
+}
+
+function toAspireSearchResult(
+  person: ApolloPersonResult,
+  icpScore: number,
+  icpSignals: string[],
+): AspireSearchResult {
+  return {
+    ...person,
+    icpScore,
+    icpSignals,
+    intentScore: icpScore,
+    company: person.organizationName,
+  }
+}
+
+export async function searchProspects(
+  accountId: string,
+  filters: ApolloSearchFilters,
+  options?: { searchId?: string; persist?: boolean },
+): Promise<AspireSearchResult[]> {
+  const [account] = await db
+    .select({ vertical: accounts.vertical })
+    .from(accounts)
+    .where(eq(accounts.id, accountId))
+    .limit(1)
+
+  const icpConfig = getIcpConfigForVertical(account?.vertical ?? 'agency')
+  const normalizedFilters: ApolloSearchFilters = {
+    jobTitles: filters.jobTitles ?? ['Owner', 'Founder', 'CEO', 'President'],
+    industries: filters.industries ?? icpConfig.targetIndustries,
+    companySizeRanges: filters.companySizeRanges ?? ['1,10', '11,50', '51,200'],
+    locations: filters.locations ?? [],
+    keywords: filters.keywords,
+    contactEmailStatus: filters.contactEmailStatus ?? ['verified', 'guessed'],
+    q: filters.q,
+    company: filters.company,
+  }
+
+  const { people } = await searchApollo(normalizedFilters)
+  const existingIds = new Set(await filterExistingLeads(accountId, people.map((p) => p.id)))
+  const newPeople = people.filter((p) => !existingIds.has(p.id))
+
+  const scored = newPeople.map((person) => {
+    const scoredResult = scoreICP(person, icpConfig)
+    return toAspireSearchResult(person, scoredResult.score, scoredResult.signals)
+  })
+
+  if (options?.persist !== false && scored.length > 0) {
+    await db.insert(aspireResults).values(
+      scored.map((row) => ({
+        accountId,
+        searchId: options?.searchId ?? null,
+        apolloId: row.id,
+        rawData: row,
+        icpScore: row.icpScore,
+        icpSignals: row.icpSignals,
+        status: 'found',
+      })),
+    )
+  }
+
+  return scored.sort((a, b) => b.icpScore - a.icpScore)
+}
+
+export type { AspireSearchResult } from '@/lib/aspire/types'
+
+/** @deprecated use enrollLeadFromAspire */
 export async function addAspireResultToPipeline(
   accountId: string,
   userId: string,
   result: AspireSearchResult,
 ) {
-  const [lead] = await db
-    .insert(leads)
-    .values({
-      accountId,
-      firstName: result.firstName,
-      lastName: result.lastName,
-      title: result.title,
-      company: result.company,
-      email: result.email,
-      linkedinUrl: result.linkedinUrl,
-      source: 'aspire',
-      score: result.intentScore,
-      ownerId: userId,
-      enrichment: { industry: result.industry },
-    })
-    .returning()
-
-  await db.insert(activities).values({
-    accountId,
-    leadId: lead!.id,
-    actorType: 'system',
-    actorId: userId,
-    activityType: 'aspire_added',
-    body: `Added from Aspire search`,
-    metadata: { company: result.company },
-  })
-
-  await db.insert(aspireSearchRuns).values({
-    accountId,
-    query: result,
-    resultCount: 1,
-  })
-
-  return lead!
+  const { enrollLeadFromAspire } = await import('@/lib/aspire/enroll')
+  const enrolled = await enrollLeadFromAspire(result, '', 'prospect')
+  return { id: enrolled.leadId }
 }

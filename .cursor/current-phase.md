@@ -32,22 +32,24 @@ Sales intelligence rebrand complete. Four-service architecture (Nurture → Sell
 - Mobile bottom nav, explore-first onboarding, command palette routes
 - Legacy `/admin/crm/*` redirects to new routes
 
-## Onboarding (explore-first)
+## Phase 2 — Sales Intelligence (in progress)
 
-New users land on the **demo dashboard** with sample data (3 clients, 5 opportunities, 2 projects) — not a 6-step wizard.
+Master reference: `.cursor/phase-2-sales-intelligence.md`
 
-| Step | Experience |
-|------|------------|
-| 1 | Sign up → sample workspace seeded → `/admin/dashboard` |
-| 2 | Explore via `ExploreGuideRail` + full admin UI |
-| 3 | Banner: "This is sample data — replace it with yours." |
-| 4 | **Keep sample data** or **I'm ready to set up my workspace** (clean slate) |
-| 5 | Clean slate → confirmation modal → empty state with "Add your first client →" |
+**Done:**
+- Migration `0010_phase2_sales_intelligence.sql` — `aspire_results`, `lead_drafts`, `lead_scores`; extended `aspire_saved_searches`
+- `lib/aspire/types.ts`, `icp-score.ts`, `search.ts` (Apollo + ICP scoring)
+- `lib/ai/draft-message.ts` — per-lead email/SMS drafting
+- `lib/aspire/enroll.ts` — enroll → pipeline → draft job
+- Trigger.dev: `draft-on-enroll`, `aspire-weekly-search`, `daily-lead-score`
+- API: `/api/aspire/search`, `/enroll`, `/enroll/bulk`, `/searches`, `/results/[searchId]`
+- API: `/api/drafts`, `/api/drafts/[id]/approve`
+- Resend webhook (inbound reply tracking)
+- Per-customer outreach domains (Settings, in-dashboard DNS)
+- Action feed: intelligence signal types from `intelligence_signals`
 
-Legacy `/admin/onboarding` redirects to dashboard. Optional wizard step files remain for settings migration later.
-
-## Next
-
-- Run migrations against Supabase if not applied
-- Wire real Apollo/Clay (Aspire) and Chrome extension (LinkedIn)
-- Expand RLS policies and production QA
+**Next:**
+- Deploy Trigger.dev jobs (`pnpm trigger:deploy`)
+- Set `APOLLO_API_KEY` in production
+- Aspire UI: ICP ring, saved search CRUD, intelligence panel — DONE
+- Campaign wizard: Find leads from Aspire in audience step — DONE

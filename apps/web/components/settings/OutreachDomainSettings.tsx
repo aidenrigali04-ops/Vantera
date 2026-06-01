@@ -1,0 +1,290 @@
+'use client'
+
+import { DnsRecordsTable } from '@/components/settings/DnsRecordsTable'
+import { OutreachDomainSetupGuide } from '@/components/settings/OutreachDomainSetupGuide'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import type { OutreachDomainSettings } from '@/lib/settings/outreach-domain-actions'
+import {
+  clearOutreachDomain,
+  refreshOutreachDomainDns,
+  saveOutreachDomain,
+  verifyOutreachDomain,
+} from '@/lib/settings/outreach-domain-actions'
+import { cn } from '@/lib/utils'
+import { CheckCircle2, RefreshCw } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { useState, useTransition } from 'react'
+import { toast } from 'sonner'
+
+type Props = {
+  initial: OutreachDomainSettings
+}
+
+function statusLabel(status: string): string {
+  switch (status) {
+    case 'verified':
+      return 'Verified'
+    case 'pending':
+      return 'Pending DNS'
+    case 'failed':
+      return 'Verification failed'
+    default:
+      return 'Platform default'
+  }
+}
+
+function statusTone(status: string): string {
+  switch (status) {
+    case 'verified':
+      return 'bg-emerald-50 text-emerald-700 ring-emerald-200/80'
+    case 'pending':
+      return 'bg-amber-50 text-amber-800 ring-amber-200/80'
+    case 'failed':
+      return 'bg-red-50 text-red-700 ring-red-200/80'
+    default:
+      return 'bg-stone-100 text-stone-600 ring-stone-200/80'
+  }
+}
+
+export function OutreachDomainSettingsPanel({ initial }: Props) {
+  const router = useRouter()
+  const [settings, setSettings] = useState(initial)
+  const [fromDomain, setFromDomain] = useState(initial.fromDomain ?? '')
+  const [inboundDomain, setInboundDomain] = useState(initial.inboundDomain ?? '')
+  const [fromLocalPart, setFromLocalPart] = useState(initial.fromLocalPart)
+  const [isPending, startTransition] = useTransition()
+
+  function handleSave() {
+    startTransition(async () => {
+      const result = await saveOutreachDomain({
+        fromDomain,
+        inboundDomain: inboundDomain || undefined,
+        fromLocalPart,
+      })
+      if (!result.success) {
+        toast.error(result.error)
+        return
+      }
+      setSettings(result.data)
+      setFromDomain(result.data.fromDomain ?? '')
+      setInboundDomain(result.data.inboundDomain ?? '')
+      toast.success('Domain registered — copy the DNS records below into your DNS host')
+      router.refresh()
+    })
+  }
+
+  function handleRefresh() {
+    startTransition(async () => {
+      const result = await refreshOutreachDomainDns()
+      if (!result.success) {
+        toast.error(result.error)
+        return
+      }
+      setSettings(result.data)
+      toast.success('DNS record status updated')
+      router.refresh()
+    })
+  }
+
+  function handleVerify() {
+    startTransition(async () => {
+      const result = await verifyOutreachDomain()
+      if (!result.success) {
+        toast.error(result.error)
+        return
+      }
+      setSettings(result.data)
+      const sendingOk = result.data.domainStatus === 'verified'
+      const inboundOk = result.data.inboundDomainStatus === 'verified'
+      if (sendingOk && inboundOk) {
+        toast.success('Sending and reply routing are verified')
+      } else if (sendingOk) {
+        toast.success('Sending verified — add inbound MX records to track replies')
+      } else {
+        toast.success('Checked — DNS may still be propagating. Try again in a few minutes.')
+      }
+      router.refresh()
+    })
+  }
+
+  function handleClear() {
+    startTransition(async () => {
+      const result = await clearOutreachDomain()
+      if (!result.success) {
+        toast.error(result.error)
+        return
+      }
+      setSettings({
+        fromDomain: null,
+        inboundDomain: null,
+        fromLocalPart: 'outreach',
+        domainStatus: 'not_configured',
+        inboundDomainStatus: 'not_configured',
+        sendingRecords: [],
+        inboundRecords: [],
+        dnsRecords: [],
+        previewFrom: initial.previewFrom,
+        previewReplyDomain: initial.previewReplyDomain,
+        isCustomDomain: false,
+      })
+      setFromDomain('')
+      setInboundDomain('')
+      setFromLocalPart('outreach')
+      toast.success('Using platform default domain for outreach')
+      router.refresh()
+    })
+  }
+
+  const hasRecords = settings.sendingRecords.length > 0 || settings.inboundRecords.length > 0
+
+  return (
+    <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm sm:p-6">
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2 className="text-base font-semibold text-stone-900">Outreach email domain</h2>
+          <p className="mt-0.5 text-[13px] text-stone-500">
+            Everything you need is here in Ventaro — no Resend account required. You only open your
+            DNS host (Cloudflare, GoDaddy, etc.) to paste the records below.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <span
+            className={cn(
+              'inline-flex shrink-0 items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium ring-1 ring-inset',
+              statusTone(settings.domainStatus),
+            )}
+          >
+            Send: {statusLabel(settings.domainStatus)}
+          </span>
+          {settings.fromDomain ? (
+            <span
+              className={cn(
+                'inline-flex shrink-0 items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium ring-1 ring-inset',
+                statusTone(settings.inboundDomainStatus),
+              )}
+            >
+              Replies: {statusLabel(settings.inboundDomainStatus)}
+            </span>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="space-y-5">
+        <OutreachDomainSetupGuide
+          fromDomain={fromDomain}
+          inboundDomain={inboundDomain}
+          fromLocalPart={fromLocalPart}
+          previewFrom={settings.previewFrom}
+          previewReplyDomain={settings.previewReplyDomain}
+          domainStatus={settings.domainStatus}
+          inboundDomainStatus={settings.inboundDomainStatus}
+          hasDnsRecords={hasRecords}
+        />
+
+        <div className="rounded-lg border border-stone-100 bg-stone-50/80 p-4 text-sm text-stone-600">
+          <p>
+            <span className="font-medium text-stone-800">Send as:</span> {settings.previewFrom}
+          </p>
+          <p className="mt-1">
+            <span className="font-medium text-stone-800">Replies to:</span>{' '}
+            replies+{'{step}'}@{settings.previewReplyDomain}
+          </p>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <Label htmlFor="outreach-from-domain">Sending domain</Label>
+            <Input
+              id="outreach-from-domain"
+              value={fromDomain}
+              onChange={(event) => {
+                setFromDomain(event.target.value)
+                if (!inboundDomain || inboundDomain.startsWith('inbound.')) {
+                  const next = event.target.value.trim().replace(/^https?:\/\//, '')
+                  if (next.includes('.')) setInboundDomain(`inbound.${next}`)
+                }
+              }}
+              placeholder="acmehvac.com"
+              className="mt-1.5"
+            />
+          </div>
+          <div>
+            <Label htmlFor="outreach-local-part">From address prefix</Label>
+            <Input
+              id="outreach-local-part"
+              value={fromLocalPart}
+              onChange={(event) => setFromLocalPart(event.target.value)}
+              placeholder="outreach"
+              className="mt-1.5"
+            />
+          </div>
+        </div>
+
+        <div>
+          <Label htmlFor="outreach-inbound-domain">Inbound reply subdomain</Label>
+          <Input
+            id="outreach-inbound-domain"
+            value={inboundDomain}
+            onChange={(event) => setInboundDomain(event.target.value)}
+            placeholder="inbound.acmehvac.com"
+            className="mt-1.5 max-w-md"
+          />
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={handleSave} disabled={isPending || !fromDomain.trim()}>
+            Save domain
+          </Button>
+          {settings.fromDomain ? (
+            <>
+              <Button variant="outline" onClick={handleRefresh} disabled={isPending}>
+                <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+                Refresh DNS status
+              </Button>
+              <Button variant="outline" onClick={handleVerify} disabled={isPending}>
+                Check verification
+              </Button>
+            </>
+          ) : null}
+          {settings.isCustomDomain ? (
+            <Button variant="ghost" onClick={handleClear} disabled={isPending}>
+              Use platform default
+            </Button>
+          ) : null}
+        </div>
+
+        <DnsRecordsTable
+          title="Step 1 — Sending DNS records"
+          description={`Add these at your DNS provider for ${fromDomain || 'your sending domain'}. Use the copy buttons — no need to open Resend.`}
+          records={settings.sendingRecords}
+          emptyMessage="Save your domain to load sending DNS records here."
+        />
+
+        <DnsRecordsTable
+          title="Step 2 — Inbound reply DNS records (MX)"
+          description={`Add these on ${inboundDomain || 'your inbound subdomain'} so campaign replies are tracked automatically.`}
+          records={settings.inboundRecords}
+          emptyMessage={
+            settings.fromDomain
+              ? 'Inbound records will appear here after you save. If empty, click Refresh DNS status.'
+              : undefined
+          }
+        />
+
+        {settings.domainStatus === 'verified' ? (
+          <div className="flex items-start gap-2 rounded-lg bg-emerald-50 px-3 py-2.5 text-sm text-emerald-800">
+            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+            <p>
+              Sending is verified.{' '}
+              {settings.inboundDomainStatus === 'verified'
+                ? 'Replies are routed automatically.'
+                : 'Add the inbound MX records above to enable automatic reply tracking.'}
+            </p>
+          </div>
+        ) : null}
+      </div>
+    </section>
+  )
+}

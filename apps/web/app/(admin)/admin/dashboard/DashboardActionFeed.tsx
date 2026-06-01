@@ -12,8 +12,13 @@ import {
   ArrowRight,
   CheckCircle2,
   Clock,
+  FileEdit,
   MessageSquare,
+  MousePointer,
   TrendingDown,
+  TrendingUp,
+  Users,
+  Zap,
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -23,6 +28,12 @@ const ICONS = {
   churn_risk: AlertTriangle,
   reply_detected: MessageSquare,
   lead_activity: MessageSquare,
+  aspire_icp_match: Users,
+  draft_ready: FileEdit,
+  score_increased: TrendingUp,
+  email_clicked: MousePointer,
+  email_bounced: AlertTriangle,
+  high_icp_no_outreach: Zap,
 } as const
 
 const ACCENT_STYLES = {
@@ -31,6 +42,12 @@ const ACCENT_STYLES = {
   churn_risk: 'border-l-red-500',
   reply_detected: 'border-l-blue-500',
   lead_activity: 'border-l-stone-400',
+  aspire_icp_match: 'border-l-teal-500',
+  draft_ready: 'border-l-violet-500',
+  score_increased: 'border-l-amber-500',
+  email_clicked: 'border-l-teal-500',
+  email_bounced: 'border-l-red-500',
+  high_icp_no_outreach: 'border-l-amber-500',
 } as const
 
 type Props = {
@@ -123,14 +140,14 @@ export function DashboardActionFeed({
           <>
             <ul className="space-y-2">
               {visibleItems.map((item) => {
-                const Icon = ICONS[item.type]
+                const Icon = ICONS[item.type] ?? MessageSquare
                 return (
                   <li key={item.id}>
                     <Link
                       href={item.href}
                       className={cn(
                         'flex gap-3 rounded-lg border border-stone-200/90 border-l-[3px] bg-white px-3 py-3 transition-colors duration-150 hover:border-stone-300 hover:bg-stone-50/50',
-                        ACCENT_STYLES[item.type],
+                        ACCENT_STYLES[item.type] ?? 'border-l-stone-400',
                       )}
                     >
                       <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-stone-50 ring-1 ring-stone-200/80">

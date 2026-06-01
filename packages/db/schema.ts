@@ -155,6 +155,14 @@ export const accounts = pgTable('accounts', {
   // re-run personalization against the current profile.
   activeTemplateId: uuid('active_template_id'),
 
+  // White-label outreach email (Resend verified domain per account)
+  outreachFromDomain: varchar('outreach_from_domain', { length: 255 }),
+  outreachInboundDomain: varchar('outreach_inbound_domain', { length: 255 }),
+  outreachFromLocalPart: varchar('outreach_from_local_part', { length: 64 }).default('outreach'),
+  outreachDomainStatus: varchar('outreach_domain_status', { length: 32 }).default('not_configured'),
+  resendOutreachDomainId: varchar('resend_outreach_domain_id', { length: 255 }),
+  outreachDomainDns: jsonb('outreach_domain_dns').default({}),
+
   createdAt: timestamptz('created_at').notNull().defaultNow(),
   updatedAt: timestamptz('updated_at').notNull().defaultNow(),
 })
@@ -383,6 +391,7 @@ export const messages = pgTable(
     body: text('body').notNull(),
     status: messageStatusEnum('status').notNull().default('queued'),
     automationId: uuid('automation_id').references(() => automations.id),
+    metadata: jsonb('metadata').notNull().default({}),
     sentAt: timestamptz('sent_at'),
     readAt: timestamptz('read_at'),
     createdAt: timestamptz('created_at').notNull().defaultNow(),
@@ -609,12 +618,95 @@ export const aspireSavedSearches = pgTable(
       .references(() => accounts.id, { onDelete: 'cascade' }),
     name: varchar('name', { length: 255 }).notNull(),
     filters: jsonb('filters').notNull().default({}),
+    audienceId: uuid('audience_id'),
+    runFrequency: varchar('run_frequency', { length: 20 }).notNull().default('weekly'),
+    lastRunAt: timestamptz('last_run_at'),
+    totalFound: smallint('total_found').notNull().default(0),
+    isActive: boolean('is_active').notNull().default(true),
     createdByUserId: uuid('created_by_user_id').references(() => users.id),
     createdAt: timestamptz('created_at').notNull().defaultNow(),
     updatedAt: timestamptz('updated_at').notNull().defaultNow(),
+    deletedAt: timestamptz('deleted_at'),
   },
   (table) => ({
     accountIdx: index('aspire_saved_searches_account_id_idx').on(table.accountId),
+    activeIdx: index('aspire_saved_searches_active_idx').on(table.isActive, table.accountId),
+  }),
+)
+
+export const aspireResults = pgTable(
+  'aspire_results',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    searchId: uuid('search_id').references(() => aspireSavedSearches.id),
+    leadId: uuid('lead_id').references(() => leads.id),
+    apolloId: varchar('apollo_id', { length: 255 }),
+    rawData: jsonb('raw_data').notNull().default({}),
+    icpScore: smallint('icp_score').notNull().default(0),
+    icpSignals: jsonb('icp_signals').notNull().default([]),
+    status: varchar('status', { length: 30 }).notNull().default('found'),
+    enrolledAt: timestamptz('enrolled_at'),
+    createdAt: timestamptz('created_at').notNull().defaultNow(),
+    deletedAt: timestamptz('deleted_at'),
+  },
+  (table) => ({
+    accountIdx: index('aspire_results_account_id_idx').on(table.accountId),
+    searchIdx: index('aspire_results_search_id_idx').on(table.searchId, table.accountId),
+    apolloUniq: uniqueIndex('aspire_results_account_apollo_idx').on(table.accountId, table.apolloId),
+  }),
+)
+
+export const leadDrafts = pgTable(
+  'lead_drafts',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    leadId: uuid('lead_id')
+      .notNull()
+      .references(() => leads.id, { onDelete: 'cascade' }),
+    channel: varchar('channel', { length: 20 }).notNull(),
+    subject: text('subject'),
+    body: text('body').notNull(),
+    draftedBy: varchar('drafted_by', { length: 80 }).notNull().default('Sales Assistant'),
+    status: varchar('status', { length: 30 }).notNull().default('pending_review'),
+    approvedBy: uuid('approved_by').references(() => users.id),
+    sentAt: timestamptz('sent_at'),
+    metadata: jsonb('metadata').notNull().default({}),
+    createdAt: timestamptz('created_at').notNull().defaultNow(),
+    deletedAt: timestamptz('deleted_at'),
+  },
+  (table) => ({
+    accountIdx: index('lead_drafts_account_id_idx').on(table.accountId),
+    leadIdx: index('lead_drafts_lead_id_idx').on(table.leadId, table.accountId),
+    statusIdx: index('lead_drafts_status_idx').on(table.status, table.accountId),
+  }),
+)
+
+export const leadScores = pgTable(
+  'lead_scores',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    leadId: uuid('lead_id')
+      .notNull()
+      .references(() => leads.id, { onDelete: 'cascade' }),
+    icpScore: smallint('icp_score').notNull(),
+    engagementScore: smallint('engagement_score').notNull(),
+    compositeScore: smallint('composite_score').notNull(),
+    signals: jsonb('signals').notNull().default({}),
+    scoredAt: timestamptz('scored_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    accountIdx: index('lead_scores_account_id_idx').on(table.accountId),
+    leadIdx: index('lead_scores_lead_id_idx').on(table.leadId, table.accountId),
+    scoredAtIdx: index('lead_scores_scored_at_idx').on(table.scoredAt, table.accountId),
   }),
 )
 
@@ -733,6 +825,152 @@ export const linkedinSequenceSteps = pgTable(
     accountIdx: index('linkedin_sequence_steps_account_id_idx').on(table.accountId),
     sequenceIdx: index('linkedin_sequence_steps_sequence_id_idx').on(table.sequenceId),
     statusIdx: index('linkedin_sequence_steps_status_idx').on(table.status, table.sendAt),
+  }),
+)
+
+// ---------------------------------------------------------------------------
+// Unified outreach campaigns (email / SMS / LinkedIn — Phase 1: email)
+// ---------------------------------------------------------------------------
+
+export const outreachCampaignGoalEnum = pgEnum('outreach_campaign_goal', [
+  'book_meeting',
+  'fill_funnel',
+  're_engage',
+])
+
+export const outreachCampaignStatusEnum = pgEnum('outreach_campaign_status', [
+  'draft',
+  'active',
+  'paused',
+  'completed',
+])
+
+export const outreachEnrollmentStatusEnum = pgEnum('outreach_enrollment_status', [
+  'active',
+  'paused',
+  'completed',
+  'replied',
+  'unsubscribed',
+])
+
+export type OutreachCampaignWorkflowStep = {
+  stepIndex: number
+  delayDays: number
+  channel: 'email' | 'sms' | 'linkedin'
+  intent: string
+  subject?: string
+  body: string
+}
+
+export type OutreachCampaignWorkflow = {
+  steps: OutreachCampaignWorkflowStep[]
+}
+
+export type OutreachCampaignMetrics = {
+  enrolled: number
+  sent: number
+  failed: number
+  replied: number
+  meetings: number
+}
+
+export const outreachCampaigns = pgTable(
+  'outreach_campaigns',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    name: varchar('name', { length: 255 }).notNull(),
+    goal: outreachCampaignGoalEnum('goal').notNull().default('book_meeting'),
+    status: outreachCampaignStatusEnum('status').notNull().default('draft'),
+    channels: jsonb('channels').notNull().default(['email']),
+    workflow: jsonb('workflow').notNull().default({ steps: [] }),
+    metrics: jsonb('metrics').notNull().default({
+      enrolled: 0,
+      sent: 0,
+      failed: 0,
+      replied: 0,
+      meetings: 0,
+    }),
+    ownerId: uuid('owner_id').references(() => users.id),
+    launchedAt: timestamptz('launched_at'),
+    createdAt: timestamptz('created_at').notNull().defaultNow(),
+    updatedAt: timestamptz('updated_at').notNull().defaultNow(),
+    deletedAt: timestamptz('deleted_at'),
+  },
+  (table) => ({
+    accountIdx: index('outreach_campaigns_account_id_idx').on(table.accountId),
+    statusIdx: index('outreach_campaigns_status_idx').on(table.status, table.accountId),
+  }),
+)
+
+export const outreachCampaignEnrollments = pgTable(
+  'outreach_campaign_enrollments',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    campaignId: uuid('campaign_id')
+      .notNull()
+      .references(() => outreachCampaigns.id, { onDelete: 'cascade' }),
+    leadId: uuid('lead_id')
+      .notNull()
+      .references(() => leads.id, { onDelete: 'cascade' }),
+    status: outreachEnrollmentStatusEnum('status').notNull().default('active'),
+    enrolledAt: timestamptz('enrolled_at').notNull().defaultNow(),
+    pausedAt: timestamptz('paused_at'),
+    completedAt: timestamptz('completed_at'),
+    repliedAt: timestamptz('replied_at'),
+    meetingBookedAt: timestamptz('meeting_booked_at'),
+    createdAt: timestamptz('created_at').notNull().defaultNow(),
+    updatedAt: timestamptz('updated_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    accountIdx: index('outreach_enrollments_account_id_idx').on(table.accountId),
+    campaignIdx: index('outreach_enrollments_campaign_id_idx').on(table.campaignId),
+    leadIdx: index('outreach_enrollments_lead_id_idx').on(table.leadId),
+    uniqueLead: uniqueIndex('outreach_enrollments_campaign_lead_idx').on(
+      table.campaignId,
+      table.leadId,
+    ),
+  }),
+)
+
+export const outreachCampaignSteps = pgTable(
+  'outreach_campaign_steps',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    campaignId: uuid('campaign_id')
+      .notNull()
+      .references(() => outreachCampaigns.id, { onDelete: 'cascade' }),
+    enrollmentId: uuid('enrollment_id')
+      .notNull()
+      .references(() => outreachCampaignEnrollments.id, { onDelete: 'cascade' }),
+    leadId: uuid('lead_id')
+      .notNull()
+      .references(() => leads.id, { onDelete: 'cascade' }),
+    stepIndex: smallint('step_index').notNull(),
+    channel: channelEnum('channel').notNull().default('email'),
+    subject: varchar('subject', { length: 500 }),
+    body: text('body').notNull(),
+    sendAt: timestamptz('send_at').notNull(),
+    sentAt: timestamptz('sent_at'),
+    status: sequenceStepStatusEnum('status').notNull().default('pending'),
+    skipReason: text('skip_reason'),
+    providerMessageId: varchar('provider_message_id', { length: 255 }),
+    metadata: jsonb('metadata').notNull().default({}),
+    createdAt: timestamptz('created_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    accountIdx: index('outreach_campaign_steps_account_id_idx').on(table.accountId),
+    campaignIdx: index('outreach_campaign_steps_campaign_id_idx').on(table.campaignId),
+    enrollmentIdx: index('outreach_campaign_steps_enrollment_id_idx').on(table.enrollmentId),
+    statusIdx: index('outreach_campaign_steps_status_idx').on(table.status, table.sendAt),
   }),
 )
 
@@ -1114,6 +1352,57 @@ export const linkedinSequenceStepsRelations = relations(linkedinSequenceSteps, (
   }),
   lead: one(leads, {
     fields: [linkedinSequenceSteps.leadId],
+    references: [leads.id],
+  }),
+}))
+
+export const outreachCampaignsRelations = relations(outreachCampaigns, ({ one, many }) => ({
+  account: one(accounts, {
+    fields: [outreachCampaigns.accountId],
+    references: [accounts.id],
+  }),
+  owner: one(users, {
+    fields: [outreachCampaigns.ownerId],
+    references: [users.id],
+  }),
+  enrollments: many(outreachCampaignEnrollments),
+  steps: many(outreachCampaignSteps),
+}))
+
+export const outreachCampaignEnrollmentsRelations = relations(
+  outreachCampaignEnrollments,
+  ({ one, many }) => ({
+    account: one(accounts, {
+      fields: [outreachCampaignEnrollments.accountId],
+      references: [accounts.id],
+    }),
+    campaign: one(outreachCampaigns, {
+      fields: [outreachCampaignEnrollments.campaignId],
+      references: [outreachCampaigns.id],
+    }),
+    lead: one(leads, {
+      fields: [outreachCampaignEnrollments.leadId],
+      references: [leads.id],
+    }),
+    steps: many(outreachCampaignSteps),
+  }),
+)
+
+export const outreachCampaignStepsRelations = relations(outreachCampaignSteps, ({ one }) => ({
+  account: one(accounts, {
+    fields: [outreachCampaignSteps.accountId],
+    references: [accounts.id],
+  }),
+  campaign: one(outreachCampaigns, {
+    fields: [outreachCampaignSteps.campaignId],
+    references: [outreachCampaigns.id],
+  }),
+  enrollment: one(outreachCampaignEnrollments, {
+    fields: [outreachCampaignSteps.enrollmentId],
+    references: [outreachCampaignEnrollments.id],
+  }),
+  lead: one(leads, {
+    fields: [outreachCampaignSteps.leadId],
     references: [leads.id],
   }),
 }))

@@ -32,11 +32,14 @@ const serverEnvSchema = z.object({
   TWILIO_AUTH_TOKEN: z.string().optional().default(''),
   TWILIO_PHONE_NUMBER: z.string().optional().default(''),
   RESEND_API_KEY: z.string().optional().default(''),
+  RESEND_WEBHOOK_SECRET: z.string().optional().default(''),
+  OUTREACH_INBOUND_DOMAIN: z.string().optional().default(''),
   STRIPE_SECRET_KEY: z.string().optional().default(''),
   STRIPE_WEBHOOK_SECRET: z.string().optional().default(''),
   TRIGGER_SECRET_KEY: z.string().optional().default(''),
   TRIGGER_API_URL: z.string().optional().default('https://api.trigger.dev'),
   CRON_SECRET: z.string().optional().default(''),
+  APOLLO_API_KEY: z.string().optional().default(''),
 })
 
 type PublicEnv = z.infer<typeof publicEnvSchema>

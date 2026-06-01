@@ -1,12 +1,12 @@
-import { ModulePlaceholder } from '@/components/operational/ModulePlaceholder'
-import { Megaphone } from 'lucide-react'
+import { CampaignsPageClient } from '@/app/(admin)/admin/outreach/campaigns/CampaignsPageClient'
+import { requireAdminSession } from '@/lib/auth/require-session'
+import { findOutreachCampaigns } from '@/lib/outreach/queries'
 
-export default function CampaignsPage() {
-  return (
-    <ModulePlaceholder
-      icon={Megaphone}
-      title="Campaigns"
-      description="Multi-channel outreach campaigns across LinkedIn, email, and sequences."
-    />
-  )
+export const dynamic = 'force-dynamic'
+
+export default async function CampaignsPage() {
+  const session = await requireAdminSession()
+  const campaigns = await findOutreachCampaigns(session.accountId)
+
+  return <CampaignsPageClient campaigns={campaigns} />
 }

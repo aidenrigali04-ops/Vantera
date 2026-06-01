@@ -1,14 +1,26 @@
 import { db } from '@/lib/db/client'
-import { activities, contacts, leads, records } from '@vantera/db'
+import { activities, contacts, intelligenceSignals, leads, records } from '@vantera/db'
 import { and, desc, eq, isNull, sql } from 'drizzle-orm'
 
 export type ActionFeedItem = {
   id: string
-  type: 'stalled_deal' | 'overdue_task' | 'churn_risk' | 'reply_detected' | 'lead_activity'
+  type:
+    | 'stalled_deal'
+    | 'overdue_task'
+    | 'churn_risk'
+    | 'reply_detected'
+    | 'lead_activity'
+    | 'aspire_icp_match'
+    | 'draft_ready'
+    | 'score_increased'
+    | 'email_clicked'
+    | 'email_bounced'
+    | 'high_icp_no_outreach'
   title: string
   subtitle: string
   href: string
   createdAt: Date
+  severity?: 'red' | 'yellow' | 'green'
 }
 
 export async function getOperationalActionFeed(accountId: string, limit = 8): Promise<ActionFeedItem[]> {
@@ -76,16 +88,19 @@ export async function getOperationalActionFeed(accountId: string, limit = 8): Pr
     .limit(5)
 
   for (const activity of recentReplies) {
+    const metadata = activity.metadata as { campaignId?: string } | null
     items.push({
       id: `reply-${activity.id}`,
       type: 'reply_detected',
       title: activity.body ?? 'New reply detected',
       subtitle: activity.activityType.replace(/_/g, ' '),
-      href: activity.leadId
-        ? `/admin/pipeline/${activity.leadId}`
-        : activity.contactId
-          ? `/admin/clients/${activity.contactId}`
-          : '/admin/pipeline',
+      href: metadata?.campaignId
+        ? `/admin/outreach/campaigns/${metadata.campaignId}`
+        : activity.leadId
+          ? `/admin/pipeline/${activity.leadId}`
+          : activity.contactId
+            ? `/admin/clients/${activity.contactId}`
+            : '/admin/pipeline',
       createdAt: activity.createdAt,
     })
   }
@@ -115,7 +130,67 @@ export async function getOperationalActionFeed(accountId: string, limit = 8): Pr
     })
   }
 
+  const signals = await db
+    .select()
+    .from(intelligenceSignals)
+    .where(
+      and(
+        eq(intelligenceSignals.accountId, accountId),
+        eq(intelligenceSignals.isDismissed, false),
+        sql`(${intelligenceSignals.expiresAt} IS NULL OR ${intelligenceSignals.expiresAt} > now())`,
+      ),
+    )
+    .orderBy(desc(intelligenceSignals.createdAt))
+    .limit(10)
+
+  for (const signal of signals) {
+    const payload = signal.actionPayload as Record<string, unknown>
+    const rawSignalType = signal.signalType
+
+    let href = '/admin/dashboard'
+    if (rawSignalType === 'aspire_icp_match' && payload.searchId) {
+      href = `/admin/outreach/aspire?searchId=${payload.searchId}`
+    } else if (payload.leadId) {
+      href = `/admin/pipeline/${payload.leadId}`
+    } else if (payload.contactId) {
+      href = `/admin/clients/${payload.contactId}`
+    } else if (payload.draftId) {
+      href = `/admin/pipeline/${payload.leadId ?? ''}`
+    }
+
+    let mappedType: ActionFeedItem['type'] = 'lead_activity'
+    if (
+      rawSignalType === 'aspire_icp_match' ||
+      rawSignalType === 'draft_ready' ||
+      rawSignalType === 'score_increased' ||
+      rawSignalType === 'email_clicked' ||
+      rawSignalType === 'email_bounced' ||
+      rawSignalType === 'high_icp_no_outreach'
+    ) {
+      mappedType = rawSignalType
+    } else if (rawSignalType === 'draft_pending' || rawSignalType === 'draft_sent') {
+      mappedType = 'draft_ready'
+    }
+
+    items.push({
+      id: `signal-${signal.id}`,
+      type: mappedType,
+      title: signal.headline,
+      subtitle: signal.recommendation ?? signal.actionLabel ?? signal.signalType,
+      href,
+      createdAt: signal.createdAt,
+      severity: signal.severity,
+    })
+  }
+
+  const severityRank = { red: 0, yellow: 1, green: 2 }
+
   return items
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .sort((a, b) => {
+      const aRank = a.severity ? severityRank[a.severity] : 3
+      const bRank = b.severity ? severityRank[b.severity] : 3
+      if (aRank !== bRank) return aRank - bRank
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    })
     .slice(0, limit)
 }
