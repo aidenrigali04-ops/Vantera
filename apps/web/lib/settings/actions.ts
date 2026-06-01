@@ -79,6 +79,3 @@ export async function updateWorkspaceBranding(input: {
     return err(error instanceof Error ? error.message : 'Failed to save branding')
   }
 }
-
-export { inviteTeamMembers } from '@/app/(admin)/admin/onboarding/actions'
-export { saveOperatingModel } from '@/lib/onboarding/save-operating-model'

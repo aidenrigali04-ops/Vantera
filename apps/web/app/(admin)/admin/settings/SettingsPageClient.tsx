@@ -11,9 +11,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { inviteTeamMembers } from '@/app/(admin)/admin/onboarding/actions'
 import {
-  inviteTeamMembers,
-  saveOperatingModel,
   updateWorkspaceBranding,
   updateWorkspaceGeneral,
 } from '@/lib/settings/actions'
@@ -21,6 +20,7 @@ import {
   OPERATING_MODELS,
   type OperatingModelId,
 } from '@/lib/onboarding/operating-models'
+import { saveOperatingModel } from '@/lib/onboarding/save-operating-model'
 import {
   readOperatingModelId,
   writeOperatingModelId,
