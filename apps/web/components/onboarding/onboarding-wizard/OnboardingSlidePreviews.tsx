@@ -262,6 +262,10 @@ function PreviewFinish() {
 }
 
 const PREVIEWS: Record<OnboardingWizardPreviewId, () => JSX.Element> = {
+  'business-details': PreviewBusinessType,
+  'ai-overview': PreviewIcp,
+  'lead-preview': PreviewValueProposition,
+  subscription: PreviewFinish,
   'business-type': PreviewBusinessType,
   icp: PreviewIcp,
   'value-proposition': PreviewValueProposition,

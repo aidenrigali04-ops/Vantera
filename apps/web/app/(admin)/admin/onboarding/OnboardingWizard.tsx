@@ -1,10 +1,13 @@
 'use client'
 
 import { OnboardingSingleFrame } from '@/components/onboarding/onboarding-wizard/OnboardingSingleFrame'
+import type { BusinessAnalysis } from '@/lib/onboarding/analyze-business'
+import type { PreviewLead } from '@/lib/onboarding/preview-leads'
 import {
   getOnboardingWizardSlideMeta,
   ONBOARDING_WIZARD_SLIDES,
 } from '@/lib/onboarding/wizard-slides'
+import type { OnboardingStepId } from '@/lib/onboarding/track-onboarding-step'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -12,40 +15,61 @@ import {
   OnboardingNavProvider,
   useOnboardingNavActions,
 } from './onboarding-nav'
-import { Step1BusinessType } from './steps/Step1BusinessType'
-import { Step2Icp } from './steps/Step2Icp'
-import { Step3ValueProposition } from './steps/Step3ValueProposition'
+import { recordOnboardingStepEvent } from './actions'
+import { Step1BusinessDetails } from './steps/Step1BusinessDetails'
+import { Step2AiOverview } from './steps/Step2AiOverview'
+import { Step3LeadPreview } from './steps/Step3LeadPreview'
+import { Step4Subscription } from './steps/Step4Subscription'
+
+type StoredWizardState = {
+  step?: number
+  analysis?: BusinessAnalysis
+  leads?: PreviewLead[]
+}
+
+const STEP_IDS: OnboardingStepId[] = [
+  'business_details',
+  'ai_overview',
+  'lead_preview',
+  'subscription',
+]
 
 type Props = {
   accountId: string
   businessName: string
+  websiteUrl: string | null
   currentVertical: string | null
-  initialPrimaryColor: string
-  initialSecondaryColor: string
-  initialLogoUrl: string | null
-  initialPortalDomain: string
 }
 
 function OnboardingWizardInner({
   accountId,
+  businessName,
+  websiteUrl,
   currentVertical,
-}: Pick<Props, 'accountId' | 'currentVertical'>) {
+}: Props) {
   const router = useRouter()
   const storageKey = `vantera_onboarding_step_${accountId}`
   const { runSubmit, nav } = useOnboardingNavActions()
 
   const [stepIndex, setStepIndex] = useState(0)
   const [hydrated, setHydrated] = useState(false)
-  const [vertical, setVertical] = useState<string | null>(currentVertical)
+  const [analysis, setAnalysis] = useState<BusinessAnalysis | null>(null)
+  const [previewLeads, setPreviewLeads] = useState<PreviewLead[]>([])
 
   useEffect(() => {
     try {
       const stored = window.localStorage.getItem(storageKey)
       if (stored) {
-        const parsed = JSON.parse(stored) as { step?: number }
-        if (typeof parsed.step === 'number' && parsed.step >= 1 && parsed.step <= ONBOARDING_WIZARD_SLIDES.length) {
+        const parsed = JSON.parse(stored) as StoredWizardState
+        if (
+          typeof parsed.step === 'number' &&
+          parsed.step >= 1 &&
+          parsed.step <= ONBOARDING_WIZARD_SLIDES.length
+        ) {
           setStepIndex(parsed.step - 1)
         }
+        if (parsed.analysis) setAnalysis(parsed.analysis)
+        if (Array.isArray(parsed.leads)) setPreviewLeads(parsed.leads)
       }
     } catch {
       /* ignore corrupt localStorage */
@@ -56,11 +80,23 @@ function OnboardingWizardInner({
   useEffect(() => {
     if (!hydrated) return
     try {
-      window.localStorage.setItem(storageKey, JSON.stringify({ step: stepIndex + 1 }))
+      const payload: StoredWizardState = {
+        step: stepIndex + 1,
+        analysis: analysis ?? undefined,
+        leads: previewLeads.length > 0 ? previewLeads : undefined,
+      }
+      window.localStorage.setItem(storageKey, JSON.stringify(payload))
     } catch {
       /* ignore */
     }
-  }, [stepIndex, storageKey, hydrated])
+  }, [stepIndex, storageKey, hydrated, analysis, previewLeads])
+
+  useEffect(() => {
+    if (!hydrated) return
+    const stepId = STEP_IDS[stepIndex]
+    if (!stepId) return
+    void recordOnboardingStepEvent(accountId, stepId, 'viewed')
+  }, [accountId, hydrated, stepIndex])
 
   const meta = getOnboardingWizardSlideMeta(stepIndex)
   const slide = ONBOARDING_WIZARD_SLIDES[stepIndex]!
@@ -139,24 +175,29 @@ function OnboardingWizardInner({
           transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
         >
           {stepIndex === 0 ? (
-            <Step1BusinessType
+            <Step1BusinessDetails
               accountId={accountId}
-              currentVertical={vertical}
-              primaryColor="#1648A0"
+              initialBusinessName={businessName}
+              initialWebsiteUrl={websiteUrl}
+              currentVertical={currentVertical}
               onComplete={(data) => {
-                setVertical(data.vertical)
+                setAnalysis(data.analysis)
               }}
             />
           ) : null}
 
-          {stepIndex === 1 ? <Step2Icp accountId={accountId} /> : null}
-
-          {stepIndex === 2 ? (
-            <Step3ValueProposition
+          {stepIndex === 1 ? (
+            <Step2AiOverview
               accountId={accountId}
-              vertical={vertical}
-              onComplete={() => {}}
+              analysis={analysis}
+              onLeadsReady={setPreviewLeads}
             />
+          ) : null}
+
+          {stepIndex === 2 ? <Step3LeadPreview leads={previewLeads} /> : null}
+
+          {stepIndex === 3 ? (
+            <Step4Subscription accountId={accountId} onComplete={() => {}} />
           ) : null}
         </motion.div>
       </AnimatePresence>
@@ -167,7 +208,7 @@ function OnboardingWizardInner({
 export function OnboardingWizard(props: Props) {
   return (
     <OnboardingNavProvider>
-      <OnboardingWizardInner accountId={props.accountId} currentVertical={props.currentVertical} />
+      <OnboardingWizardInner {...props} />
     </OnboardingNavProvider>
   )
 }

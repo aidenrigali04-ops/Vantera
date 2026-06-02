@@ -30,7 +30,6 @@ const loginSchema = z.object({
 
 const signupSchema = z.object({
   fullName: z.string().min(2, 'Please enter your full name').max(120),
-  businessName: z.string().min(2, 'Please enter your business name').max(120),
   email: z.string().email('Please enter a valid email address'),
   password: z
     .string()
@@ -40,7 +39,6 @@ const signupSchema = z.object({
 
 const completeOAuthSignupSchema = z.object({
   fullName: z.string().min(2, 'Enter your full name').max(120),
-  businessName: z.string().min(2, 'Business name must be at least 2 characters').max(120),
 })
 
 type AdminUserRow = {
@@ -393,7 +391,7 @@ export async function signupAction(
   }
 
   const admin = getSupabaseAdmin()
-  const { fullName, businessName, email, password } = validated.data
+  const { fullName, email, password } = validated.data
   const normalizedEmail = email.toLowerCase().trim()
 
   // DO NOT call supabase.auth.signOut() here. signOut() pushes Set-Cookie
@@ -446,7 +444,7 @@ export async function signupAction(
     email: normalizedEmail,
     password,
     email_confirm: true,
-    user_metadata: { full_name: fullName, business_name: businessName },
+    user_metadata: { full_name: fullName },
   })
 
   if (createResult.error || !createResult.data.user) {
@@ -460,7 +458,7 @@ export async function signupAction(
   const authUserId = createResult.data.user.id
 
   // 2) Allocate a unique slug for this business.
-  const baseSlug = slugify(businessName)
+  const baseSlug = slugify(fullName)
   const slug = await findUniqueSlug(baseSlug)
 
   // 3) Insert the account. Onboarding_completed_at is deliberately left
@@ -542,7 +540,7 @@ export async function signupAction(
 }
 
 /**
- * Finishes signup for a user who arrived via OAuth (Google / Facebook).
+ * Finishes signup for a user who arrived via OAuth (Google / Apple).
  *
  * At this point the Supabase Auth user already exists — the OAuth
  * callback set their session — but they don't have a Vantera account
@@ -571,7 +569,7 @@ export async function completeOAuthSignupAction(
 
   const supaUser = userData.user
   const email = supaUser.email!.toLowerCase().trim()
-  const { fullName, businessName } = validated.data
+  const { fullName } = validated.data
 
   const admin = getSupabaseAdmin()
 
@@ -641,7 +639,7 @@ export async function completeOAuthSignupAction(
     }
   }
 
-  const baseSlug = slugify(businessName)
+  const baseSlug = slugify(fullName)
   const slug = await findUniqueSlug(baseSlug)
 
   const { data: account, error: accountError } = await admin

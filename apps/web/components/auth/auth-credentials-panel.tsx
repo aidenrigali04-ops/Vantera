@@ -68,8 +68,8 @@ type AuthCredentialsPanelProps = {
 
 const HEADINGS: Record<AuthMode, { title: string; subtitle: string }> = {
   signup: {
-    title: 'Create your workspace',
-    subtitle: 'Start with sample data, then make it yours. No credit card required.',
+    title: 'Create your account',
+    subtitle: 'Sign up in seconds with Google, Apple, or email. No credit card required.',
   },
   login: {
     title: 'Welcome back',
@@ -116,7 +116,7 @@ export function AuthCredentialsPanel({
     resolver: zodResolver(signupFormSchema),
     mode: 'onBlur',
     reValidateMode: 'onBlur',
-    defaultValues: { fullName: '', businessName: '', email: '', password: '' },
+    defaultValues: { fullName: '', email: '', password: '' },
   })
 
   const loginForm = useForm<LoginFormValues>({
@@ -327,21 +327,7 @@ export function AuthCredentialsPanel({
           </div>
 
           <div className="space-y-1.5">
-            <AuthFieldLabel htmlFor="businessName">Business name</AuthFieldLabel>
-            <AuthInput
-              id="businessName"
-              autoComplete="organization"
-              enterKeyHint="next"
-              placeholder="Acme Agency"
-              disabled={isBusy}
-              invalid={Boolean(signupForm.formState.errors.businessName)}
-              {...signupForm.register('businessName')}
-            />
-            <AuthFieldError message={signupForm.formState.errors.businessName?.message} />
-          </div>
-
-          <div className="space-y-1.5">
-            <AuthFieldLabel htmlFor="signup-email">Business email</AuthFieldLabel>
+            <AuthFieldLabel htmlFor="signup-email">Email</AuthFieldLabel>
             <AuthInput
               id="signup-email"
               type="email"

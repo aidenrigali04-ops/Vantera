@@ -4,7 +4,6 @@ import { AuthInput, AuthFieldError, AuthFieldLabel } from '@/components/auth/aut
 import { GlobalErrorCallout } from '@/components/auth/global-error-callout'
 import { Button } from '@/components/ui/button'
 import { completeOAuthSignupAction } from '@/lib/auth/actions'
-import { signupFormSchema } from '@/lib/auth/form-schemas'
 import { invokeAuthAction, isNextRedirectError } from '@/lib/auth/invoke-action'
 import { AUTH_ONBOARDING_PATH } from '@/lib/auth/routes'
 import { useAuthFormBehavior } from '@/lib/auth/use-auth-form-behavior'
@@ -14,9 +13,8 @@ import { useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 
-const completeSignupSchema = signupFormSchema.pick({
-  fullName: true,
-  businessName: true,
+const completeSignupSchema = z.object({
+  fullName: z.string().trim().min(2, 'Please enter your full name').max(120),
 })
 
 type CompleteSignupClientProps = {
@@ -37,7 +35,7 @@ export function CompleteSignupClient({
     resolver: zodResolver(completeSignupSchema),
     mode: 'onBlur',
     reValidateMode: 'onBlur',
-    defaultValues: { fullName: prefilledName, businessName: '' },
+    defaultValues: { fullName: prefilledName },
   })
 
   useAuthFormBehavior(formRef, { initialFocusId: 'oauth-fullName', focusKey: 'oauth-complete' })
@@ -89,7 +87,7 @@ export function CompleteSignupClient({
               (<span className="font-medium text-stone-800">{prefilledEmail}</span>)
             </>
           ) : null}
-          . Name your workspace and we&rsquo;ll load your demo environment.
+          . Confirm your name and we&rsquo;ll set up your workspace.
         </p>
       </div>
 
@@ -105,27 +103,13 @@ export function CompleteSignupClient({
           <AuthInput
             id="oauth-fullName"
             autoComplete="name"
-            enterKeyHint="next"
+            enterKeyHint="done"
             placeholder="Alex Johnson"
             disabled={isSubmitting}
             invalid={Boolean(form.formState.errors.fullName)}
             {...form.register('fullName')}
           />
           <AuthFieldError message={form.formState.errors.fullName?.message} />
-        </div>
-
-        <div className="space-y-1.5">
-          <AuthFieldLabel htmlFor="oauth-businessName">Business name</AuthFieldLabel>
-          <AuthInput
-            id="oauth-businessName"
-            autoComplete="organization"
-            enterKeyHint="done"
-            placeholder="Acme Agency"
-            disabled={isSubmitting}
-            invalid={Boolean(form.formState.errors.businessName)}
-            {...form.register('businessName')}
-          />
-          <AuthFieldError message={form.formState.errors.businessName?.message} />
         </div>
 
         {globalError ? <GlobalErrorCallout message={globalError} /> : null}
@@ -141,7 +125,7 @@ export function CompleteSignupClient({
               Creating your workspace…
             </>
           ) : (
-            'Get started for free'
+            'Continue'
           )}
         </Button>
       </form>

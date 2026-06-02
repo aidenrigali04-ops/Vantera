@@ -8,13 +8,33 @@ import type { ActionResult } from '@/lib/auth/types'
 import { db } from '@/lib/db/client'
 import { env, requireEnv } from '@/lib/env'
 import {
+  analyzeBusinessFromDetails,
+  ONBOARDING_VERTICALS,
+  type BusinessAnalysis,
+  type OnboardingVertical,
+} from '@/lib/onboarding/analyze-business'
+import {
   fetchAccountById,
   markOnboardingComplete,
   patchAccountRow,
   resolveWorkspaceAccountId,
 } from '@/lib/onboarding/account-store'
+import {
+  fetchOnboardingPreviewLeads,
+  type PreviewLead,
+} from '@/lib/onboarding/preview-leads'
+import {
+  ONBOARDING_PRICING_PLANS,
+  resolveAccountPlan,
+  type OnboardingPlanId,
+} from '@/lib/onboarding/pricing-plans'
 import { provisionOwnerWorkspace } from '@/lib/onboarding/provision-workspace'
 import { replaceAccountStageDefinitions } from '@/lib/onboarding/replace-stage-definitions'
+import {
+  trackOnboardingStep,
+  type OnboardingStepEvent,
+  type OnboardingStepId,
+} from '@/lib/onboarding/track-onboarding-step'
 import { getBrandingFromHeaders } from '@/lib/branding/server'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { headers } from 'next/headers'
@@ -147,6 +167,224 @@ export async function updateVertical(
   } catch (error) {
     rethrowFrameworkSignals(error)
     return err(error instanceof Error ? error.message : 'Failed to update business type')
+  }
+}
+
+const businessNameSchema = z.string().trim().min(2, 'Enter your business name').max(120)
+const websiteUrlSchema = z
+  .string()
+  .trim()
+  .min(4, 'Enter your website URL')
+  .max(500, 'Website URL is too long')
+  .refine(
+    (value) => {
+      const withProtocol = value.startsWith('http') ? value : `https://${value}`
+      try {
+        const url = new URL(withProtocol)
+        return Boolean(url.hostname.includes('.'))
+      } catch {
+        return false
+      }
+    },
+    { message: 'Enter a valid website URL' },
+  )
+
+function normalizeWebsiteUrl(raw: string): string {
+  const trimmed = raw.trim()
+  return trimmed.startsWith('http') ? trimmed : `https://${trimmed}`
+}
+
+export async function saveBusinessDetailsAndAnalyze(
+  accountId: string,
+  input: {
+    businessName: string
+    websiteUrl: string
+    manualVertical?: string | null
+  },
+): Promise<ActionResult<{ analysis: BusinessAnalysis }>> {
+  try {
+    void accountId
+    const { accountId: workspaceId } = await assertOwnAccount()
+
+    const nameParsed = businessNameSchema.safeParse(input.businessName)
+    if (!nameParsed.success) {
+      return err(nameParsed.error.issues[0]?.message ?? 'Invalid business name')
+    }
+
+    const websiteParsed = websiteUrlSchema.safeParse(input.websiteUrl)
+    if (!websiteParsed.success) {
+      return err(websiteParsed.error.issues[0]?.message ?? 'Invalid website URL')
+    }
+
+    const manualVertical =
+      input.manualVertical &&
+      ONBOARDING_VERTICALS.includes(input.manualVertical as OnboardingVertical)
+        ? (input.manualVertical as OnboardingVertical)
+        : null
+
+    const analysis = await analyzeBusinessFromDetails({
+      accountId: workspaceId,
+      businessName: nameParsed.data,
+      websiteUrl: websiteParsed.data,
+      manualVertical,
+    })
+
+    const saved = await patchAccountRow(workspaceId, {
+      name: nameParsed.data,
+      website_url: normalizeWebsiteUrl(websiteParsed.data),
+      vertical: analysis.vertical,
+      icp_description: analysis.icpDescription,
+      value_proposition: analysis.valueProposition,
+    })
+
+    if (!saved.ok) {
+      return err(saved.message)
+    }
+
+    void trackOnboardingStep(workspaceId, 'business_details', 'completed', {
+      vertical: analysis.vertical,
+    })
+
+    revalidatePath('/admin/onboarding')
+
+    return { success: true, data: { analysis } }
+  } catch (error) {
+    rethrowFrameworkSignals(error)
+    return err(error instanceof Error ? error.message : 'Failed to analyze your business')
+  }
+}
+
+export async function fetchPreviewLeadsAction(
+  accountId: string,
+): Promise<ActionResult<{ leads: PreviewLead[] }>> {
+  try {
+    void accountId
+    const { accountId: workspaceId } = await assertOwnAccount()
+    const account = await fetchAccountById(workspaceId)
+
+    if (!account?.icp_description?.trim()) {
+      return err('Complete business details first')
+    }
+
+    const leads = await fetchOnboardingPreviewLeads({
+      accountId: workspaceId,
+      vertical: (account.vertical as OnboardingVertical) ?? 'agency',
+      businessName: account.name,
+      icpSummary: account.icp_description.slice(0, 240),
+    })
+
+    void trackOnboardingStep(workspaceId, 'ai_overview', 'completed', {
+      leadCount: leads.length,
+    })
+
+    return { success: true, data: { leads } }
+  } catch (error) {
+    rethrowFrameworkSignals(error)
+    return err(error instanceof Error ? error.message : 'Failed to find leads')
+  }
+}
+
+export async function recordOnboardingStepEvent(
+  accountId: string,
+  step: OnboardingStepId,
+  event: OnboardingStepEvent,
+): Promise<ActionResult<{ recorded: true }>> {
+  try {
+    void accountId
+    const { accountId: workspaceId } = await assertOwnAccount()
+    await trackOnboardingStep(workspaceId, step, event)
+    return { success: true, data: { recorded: true } }
+  } catch (error) {
+    rethrowFrameworkSignals(error)
+    return err(error instanceof Error ? error.message : 'Failed to record step')
+  }
+}
+
+export async function completeOnboardingWithPlan(
+  accountId: string,
+  planId: OnboardingPlanId,
+): Promise<ActionResult<{ completed: true; redirectTo: string }>> {
+  try {
+    void accountId
+    const { session, accountId: workspaceId } = await assertOwnAccount()
+
+    if (session.role !== 'owner') {
+      return err('Only the account owner can complete onboarding')
+    }
+
+    const validPlan = ONBOARDING_PRICING_PLANS.some((plan) => plan.id === planId)
+    if (!validPlan) {
+      return err('Choose a plan to continue')
+    }
+
+    const account = await fetchAccountById(workspaceId)
+    const icpDescription = account?.icp_description?.trim() ?? ''
+    const valueProposition = account?.value_proposition?.trim() ?? ''
+
+    if (icpDescription.length < 20) {
+      return err('Complete the earlier onboarding steps first')
+    }
+
+    const saved = await patchAccountRow(workspaceId, {
+      plan: resolveAccountPlan(planId),
+    })
+
+    if (!saved.ok) {
+      return err(saved.message)
+    }
+
+    const vertical = account?.vertical ?? null
+    if (vertical) {
+      await applyDefaultTemplateForVertical(workspaceId, vertical, session.userId)
+    }
+
+    if (valueProposition.length >= 20) {
+      try {
+        await upsertMemory({
+          accountId: workspaceId,
+          kind: 'business_context',
+          subjectType: 'account',
+          subjectId: workspaceId,
+          summary: buildOnboardingBusinessSummary(icpDescription, valueProposition),
+          evidence: {
+            icpDescription,
+            valueProposition,
+            websiteUrl: account?.website_url ?? null,
+            selectedPlan: planId,
+            source: 'onboarding',
+          },
+          confidence: 85,
+        })
+      } catch (memoryErr) {
+        console.error('[completeOnboardingWithPlan] ai_memory upsert failed', memoryErr)
+      }
+    }
+
+    const marked = await markOnboardingComplete(workspaceId)
+    if (!marked.ok) {
+      return err(marked.message)
+    }
+
+    void trackOnboardingStep(workspaceId, 'subscription', 'completed', { planId })
+
+    revalidatePath('/admin', 'layout')
+    revalidatePath('/admin/onboarding')
+    revalidatePath('/admin/dashboard')
+
+    void bootstrapBusinessContext(workspaceId, session.userId).catch(() => {
+      /* swallow — workflow already logs */
+    })
+
+    return {
+      success: true,
+      data: {
+        completed: true,
+        redirectTo: '/admin/dashboard',
+      },
+    }
+  } catch (error) {
+    rethrowFrameworkSignals(error)
+    return err(error instanceof Error ? error.message : 'Failed to complete onboarding')
   }
 }
 
@@ -428,6 +666,7 @@ function normalizeFallbackAccount(
     voice_preference: null,
     icp_description: null,
     value_proposition: null,
+    website_url: null,
     active_template_id: null,
     onboarding_completed_at: null,
   }

@@ -160,6 +160,8 @@ export const accounts = pgTable('accounts', {
   icpDescription: text('icp_description'),
   /** Owner-written value proposition / solutions offered from onboarding. */
   valueProposition: text('value_proposition'),
+  /** Public website URL from onboarding. */
+  websiteUrl: text('website_url'),
 
   // Tracks which template was applied so integration-connect flows can
   // re-run personalization against the current profile.

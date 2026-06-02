@@ -1,4 +1,8 @@
 export type OnboardingWizardPreviewId =
+  | 'business-details'
+  | 'ai-overview'
+  | 'lead-preview'
+  | 'subscription'
   | 'business-type'
   | 'icp'
   | 'value-proposition'
@@ -23,25 +27,32 @@ export type OnboardingWizardSlide = {
 
 export const ONBOARDING_WIZARD_SLIDES: OnboardingWizardSlide[] = [
   {
-    id: 'business-type',
-    eyebrow: 'Business',
-    title: 'What are you managing?',
-    body: 'Pick your industry — we tailor pipeline stages, client views, and AI tone on your dashboard.',
-    media: { type: 'preview', previewId: 'business-type' },
+    id: 'business-details',
+    eyebrow: 'Step 1',
+    title: 'Tell us about your business',
+    body: 'Share your business name and website — we’ll identify your industry and ideal customers automatically.',
+    media: { type: 'preview', previewId: 'business-details' },
   },
   {
-    id: 'icp',
-    eyebrow: 'Ideal customer',
-    title: 'Who is your ICP?',
-    body: 'Describe the customers you want to reach. Aspire and your AI agents use this to find and message the right prospects.',
-    media: { type: 'preview', previewId: 'icp' },
+    id: 'ai-overview',
+    eyebrow: 'Step 2',
+    title: 'Your business at a glance',
+    body: 'We mapped your industry and target buyers. Review the summary, then we’ll find your best-fit leads.',
+    media: { type: 'preview', previewId: 'ai-overview' },
   },
   {
-    id: 'value-proposition',
-    eyebrow: 'Your value',
-    title: 'What solutions do you provide?',
-    body: 'Tell us the outcomes you deliver — so outreach, recommendations, and AI copy speak to the value you actually sell.',
-    media: { type: 'preview', previewId: 'value-proposition' },
+    id: 'lead-preview',
+    eyebrow: 'Step 3',
+    title: 'Your top leads are ready',
+    body: 'These five prospects match your profile. Continue to pick a plan and unlock your workspace.',
+    media: { type: 'preview', previewId: 'lead-preview' },
+  },
+  {
+    id: 'subscription',
+    eyebrow: 'Step 4',
+    title: 'Choose your plan',
+    body: 'Start free or upgrade anytime. No hidden fees — pick what fits today and scale when you’re ready.',
+    media: { type: 'preview', previewId: 'subscription' },
   },
 ]
 

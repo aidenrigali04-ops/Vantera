@@ -29,11 +29,8 @@ export default async function OnboardingPage() {
     <OnboardingWizard
       accountId={workspace.accountId}
       businessName={workspace.businessName}
+      websiteUrl={workspace.websiteUrl}
       currentVertical={workspace.currentVertical}
-      initialPrimaryColor={workspace.primaryColor}
-      initialSecondaryColor={workspace.secondaryColor}
-      initialLogoUrl={workspace.logoUrl}
-      initialPortalDomain={workspace.portalDomain}
     />
   )
 }

@@ -8,6 +8,7 @@ export type OnboardingWorkspace = {
   accountId: string
   account: AccountRow | null
   businessName: string
+  websiteUrl: string | null
   currentVertical: string | null
   primaryColor: string
   secondaryColor: string
@@ -55,6 +56,7 @@ export async function loadOnboardingWorkspace(
     accountId,
     account,
     businessName: account?.name || (useBranding ? branding.businessName : '') || '',
+    websiteUrl: account?.website_url ?? null,
     currentVertical: account?.vertical || (useBranding ? branding.vertical : '') || null,
     primaryColor: account?.brand_primary_color ?? (useBranding ? branding.primaryColor : '#1648A0'),
     secondaryColor:

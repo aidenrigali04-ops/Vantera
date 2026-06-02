@@ -5,10 +5,6 @@ export const signupFormSchema = z.object({
     .string()
     .trim()
     .min(2, 'Please enter your full name'),
-  businessName: z
-    .string()
-    .trim()
-    .min(2, 'Please enter your business name'),
   email: z
     .string()
     .trim()
