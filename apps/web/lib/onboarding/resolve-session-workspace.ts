@@ -69,6 +69,27 @@ async function findUserForSession(session: AdminSession): Promise<UserRow | null
   }
 
   const normalizedEmail = normalizeEmail(session.email)
+
+  if (normalizedEmail) {
+    const { data: byGlobalEmail, error: byGlobalEmailError } = await admin
+      .from('users')
+      .select(USER_SELECT)
+      .eq('email', normalizedEmail)
+      .is('deleted_at', null)
+      .eq('is_active', true)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (byGlobalEmailError) {
+      throw new Error(byGlobalEmailError.message)
+    }
+
+    if (byGlobalEmail) {
+      return byGlobalEmail as UserRow
+    }
+  }
+
   const accountId = String(session.accountId).trim()
 
   if (accountId && normalizedEmail) {

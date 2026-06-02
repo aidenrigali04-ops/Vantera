@@ -1,8 +1,10 @@
 'use server'
 
 import {
+  findAccountByAdminEmail,
   findAccountByPortalEmail,
   resolveAccountFromHost,
+  resolveTenantAccountFromHost,
 } from '@/lib/auth/resolve-account'
 import {
   clearAdminSession,
@@ -76,6 +78,68 @@ async function findAdminUserByAuthId(authUserId: string): Promise<AdminUserWithA
   }
 }
 
+async function findOrLinkAdminUser(
+  authUserId: string,
+  email: string,
+): Promise<AdminUserWithAccount | null> {
+  const byId = await findAdminUserByAuthId(authUserId)
+  if (byId) {
+    return byId
+  }
+
+  const admin = getSupabaseAdmin()
+  const normalized = email.toLowerCase().trim()
+
+  const { data: byEmail, error } = await admin
+    .from('users')
+    .select('id, email, role, is_active, account_id, full_name, created_at')
+    .eq('email', normalized)
+    .is('deleted_at', null)
+    .eq('is_active', true)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (error || !byEmail?.account_id) {
+    return null
+  }
+
+  if (byEmail.id !== authUserId) {
+    const { error: upsertErr } = await admin.from('users').upsert(
+      {
+        id: authUserId,
+        account_id: byEmail.account_id,
+        email: normalized,
+        full_name: byEmail.full_name ?? normalized.split('@')[0],
+        role: byEmail.role ?? 'owner',
+        is_active: true,
+        deleted_at: null,
+      },
+      { onConflict: 'id' },
+    )
+
+    if (upsertErr) {
+      console.error('[findOrLinkAdminUser] relink failed', upsertErr.message)
+      return null
+    }
+
+    if (byEmail.id !== authUserId) {
+      await admin
+        .from('users')
+        .update({ deleted_at: new Date().toISOString(), is_active: false })
+        .eq('id', byEmail.id)
+    }
+  }
+
+  return {
+    id: authUserId,
+    email: byEmail.email,
+    role: byEmail.role,
+    account_id: byEmail.account_id,
+    is_active: byEmail.is_active ?? true,
+  }
+}
+
 async function findActiveAdminUser(accountId: string, email: string): Promise<AdminUserRow | null> {
   // Uses the Supabase REST API instead of direct Postgres so login works on
   // Supabase projects whose legacy db.<ref>.supabase.co host has been retired
@@ -130,8 +194,12 @@ export async function adminLoginAction(
     return { success: false, error: 'Invalid email or password' }
   }
 
+  // Drop any stale workspace cookie before auth — otherwise resolveAccountFromHost
+  // can bind the wrong tenant and reject a valid password.
+  await clearAdminSession()
+
   const host = headers().get('host') ?? ''
-  const hostAccount = await resolveAccountFromHost(host)
+  const hostAccount = await resolveTenantAccountFromHost(host)
   const normalizedEmail = validated.data.email.toLowerCase().trim()
 
   const supabase = createSupabaseServerClient()
@@ -144,7 +212,7 @@ export async function adminLoginAction(
     return { success: false, error: 'Invalid email or password' }
   }
 
-  const user = await findAdminUserByAuthId(authData.user.id)
+  const user = await findOrLinkAdminUser(authData.user.id, normalizedEmail)
 
   if (!user || !user.is_active) {
     await supabase.auth.signOut()
@@ -162,7 +230,11 @@ export async function adminLoginAction(
   }
 
   const { fetchAccountById } = await import('@/lib/onboarding/account-store')
-  const account = hostAccount ?? (await fetchAccountById(user.account_id))
+  let account = hostAccount ?? (await fetchAccountById(user.account_id))
+
+  if (!account?.id) {
+    account = await findAccountByAdminEmail(normalizedEmail)
+  }
 
   if (!account?.id) {
     await supabase.auth.signOut()
@@ -177,8 +249,7 @@ export async function adminLoginAction(
     email: user.email,
   })
 
-  // Owners land on the demo dashboard to explore before completing setup.
-  const redirectTo = AUTH_DASHBOARD_PATH
+  const redirectTo = isOnboardingComplete(account) ? AUTH_DASHBOARD_PATH : AUTH_ONBOARDING_PATH
 
   return { success: true, data: { redirectTo } }
 }
@@ -516,7 +587,7 @@ export async function completeOAuthSignupAction(
   // gone.
   const { data: existingUser } = await admin
     .from('users')
-    .select('id, account_id, role, email, created_at, is_active')
+    .select('id, account_id, role, email, created_at, is_active, full_name')
     .eq('email', email)
     .is('deleted_at', null)
     .order('created_at', { ascending: false })
@@ -528,17 +599,45 @@ export async function completeOAuthSignupAction(
       await admin.from('users').update({ is_active: true }).eq('id', existingUser.id)
     }
 
+    let linkedUserId = existingUser.id
+    if (existingUser.id !== supaUser.id) {
+      const { error: relinkErr } = await admin.from('users').upsert(
+        {
+          id: supaUser.id,
+          account_id: existingUser.account_id,
+          email,
+          full_name: existingUser.full_name ?? fullName,
+          role: existingUser.role ?? 'owner',
+          is_active: true,
+          deleted_at: null,
+        },
+        { onConflict: 'id' },
+      )
+      if (!relinkErr) {
+        linkedUserId = supaUser.id
+        await admin
+          .from('users')
+          .update({ deleted_at: new Date().toISOString(), is_active: false })
+          .eq('id', existingUser.id)
+      }
+    }
+
     await setAdminSession({
       type: 'admin',
-      userId: existingUser.id,
+      userId: linkedUserId,
       accountId: existingUser.account_id,
       role: existingUser.role as UserRole,
       email: existingUser.email,
     })
 
+    const { fetchAccountById } = await import('@/lib/onboarding/account-store')
+    const account = await fetchAccountById(existingUser.account_id)
+    const redirectTo =
+      account && !isOnboardingComplete(account) ? AUTH_ONBOARDING_PATH : AUTH_DASHBOARD_PATH
+
     return {
       success: true,
-      data: { redirectTo: AUTH_DASHBOARD_PATH },
+      data: { redirectTo },
     }
   }
 

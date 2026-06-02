@@ -7,7 +7,9 @@ import { findAccountEmbeddedInsights } from '@/lib/intelligence/queries'
 import { isOnboardingCompleteForAccount } from '@/lib/onboarding/status'
 import { getDashboardSnapshot } from '@/lib/sample-data/queries'
 import { headers } from 'next/headers'
+import { redirect } from 'next/navigation'
 import { DashboardClient } from './dashboard-client'
+import { AUTH_ONBOARDING_PATH } from '@/lib/auth/routes'
 
 export const dynamic = 'force-dynamic'
 
@@ -35,6 +37,10 @@ export default async function AdminDashboardPage() {
       onboardingComplete = await isOnboardingCompleteForAccount(session.accountId)
     }
     onboardingIncomplete = !onboardingComplete
+  }
+
+  if (onboardingIncomplete) {
+    redirect(AUTH_ONBOARDING_PATH)
   }
 
   const [snapshot, actionFeed, embeddedInsights, sdrAgents] = await Promise.all([

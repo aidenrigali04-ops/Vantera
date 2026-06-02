@@ -36,41 +36,68 @@ function accountToBranding(account: AccountRow): BrandingData {
   }
 }
 
-export async function resolveAccountFromHost(host: string): Promise<AccountRow | null> {
-  try {
-    const supabase = createSupabasePublicClient()
-    const appDomain = process.env.NEXT_PUBLIC_APP_DOMAIN ?? 'vantera.app'
-    const hostname = host.split(':')[0] ?? ''
+async function resolveAccountFromHostname(
+  hostname: string,
+  supabase: ReturnType<typeof createSupabasePublicClient>,
+): Promise<AccountRow | null> {
+  const appDomain = process.env.NEXT_PUBLIC_APP_DOMAIN ?? 'vantera.app'
 
-    if (hostname && hostname.endsWith(`.${appDomain}`)) {
-      const dotIndex = hostname.indexOf('.')
-      const slug = dotIndex === -1 ? '' : hostname.slice(0, dotIndex)
+  if (hostname && hostname.endsWith(`.${appDomain}`)) {
+    const dotIndex = hostname.indexOf('.')
+    const slug = dotIndex === -1 ? '' : hostname.slice(0, dotIndex)
 
-      if (slug) {
-        const { data } = await supabase
-          .from('accounts')
-          .select(ACCOUNT_SELECT)
-          .eq('slug', slug)
-          .limit(1)
-          .maybeSingle()
-
-        if (data) {
-          return data
-        }
-      }
-    }
-
-    if (hostname) {
+    if (slug) {
       const { data } = await supabase
         .from('accounts')
         .select(ACCOUNT_SELECT)
-        .eq('portal_domain', hostname)
+        .eq('slug', slug)
         .limit(1)
         .maybeSingle()
 
       if (data) {
         return data
       }
+    }
+  }
+
+  if (hostname) {
+    const { data } = await supabase
+      .from('accounts')
+      .select(ACCOUNT_SELECT)
+      .eq('portal_domain', hostname)
+      .limit(1)
+      .maybeSingle()
+
+    if (data) {
+      return data
+    }
+  }
+
+  return null
+}
+
+/**
+ * Resolve tenant from host slug / portal domain only — never from session cookies.
+ * Use during login so a stale admin cookie cannot block sign-in.
+ */
+export async function resolveTenantAccountFromHost(host: string): Promise<AccountRow | null> {
+  try {
+    const supabase = createSupabasePublicClient()
+    const hostname = host.split(':')[0] ?? ''
+    return resolveAccountFromHostname(hostname, supabase)
+  } catch {
+    return null
+  }
+}
+
+export async function resolveAccountFromHost(host: string): Promise<AccountRow | null> {
+  try {
+    const supabase = createSupabasePublicClient()
+    const hostname = host.split(':')[0] ?? ''
+
+    const fromHost = await resolveAccountFromHostname(hostname, supabase)
+    if (fromHost) {
+      return fromHost
     }
 
     // Session fallback: a freshly-signed-up user is on the marketing apex

@@ -66,8 +66,8 @@ type Props = {
 
 async function fetchAspireResultsFromApi(searchId: string | null): Promise<AspireSearchResult[]> {
   const res = searchId
-    ? await fetch(`/api/aspire/results/${searchId}`)
-    : await fetch('/api/aspire/scout-results')
+    ? await fetch(`/api/aspire/results/${searchId}`, { credentials: 'same-origin' })
+    : await fetch('/api/aspire/scout-results', { credentials: 'same-origin' })
   const json = await res.json()
   if (!json.success) throw new Error(json.error ?? 'Could not load results')
   return json.data as AspireSearchResult[]
@@ -177,6 +177,13 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
         }
 
         if (options?.force) {
+          const live = liveSearchRef.current
+          if (live && Date.now() - live.at < LIVE_RESULTS_TTL_MS) {
+            return live.results
+          }
+          if (displayLeadsRef.current.length > 0) {
+            return displayLeadsRef.current
+          }
           applyDisplayLeads([], 'stored')
           return []
         }
@@ -190,6 +197,13 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
           return displayLeadsRef.current
         }
         if (options?.force) {
+          const live = liveSearchRef.current
+          if (live && Date.now() - live.at < LIVE_RESULTS_TTL_MS) {
+            return live.results
+          }
+          if (displayLeadsRef.current.length > 0) {
+            return displayLeadsRef.current
+          }
           applyDisplayLeads([], 'stored')
           return []
         }

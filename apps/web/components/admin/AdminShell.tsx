@@ -9,7 +9,6 @@ import { OnboardingAutoPrompt } from '@/components/onboarding/OnboardingAutoProm
 import { GuidedExplorationHost } from '@/components/onboarding/GuidedExplorationHost'
 import { ProductTourHost } from '@/components/onboarding/product-tour/ProductTourHost'
 import { NewClientDrawer } from '@/components/onboarding/NewClientDrawer'
-import { OperatingModelHost } from '@/components/onboarding/OperatingModelHost'
 import { HubRelatedStrip } from '@/components/navigation/HubRelatedStrip'
 import { SampleDataBanner } from './SampleDataBanner'
 import { Sidebar, SidebarMobile } from './Sidebar'
@@ -84,10 +83,6 @@ export function AdminShell({
       <CommandPalette open={commandPaletteOpen} onOpenChange={setCommandPaletteOpen} />
       <ProductTourHost accountId={session.accountId} enabled={session.role === 'owner'} />
       <GuidedExplorationHost accountId={session.accountId} enabled={showSampleExperience} deferUntilProductTour />
-      <OperatingModelHost
-        accountId={session.accountId}
-        enabled={onboardingIncomplete && session.role === 'owner'}
-      />
       <OnboardingAutoPrompt accountId={session.accountId} enabled={showSampleExperience} />
       {onboardingIncomplete ? (
         <>

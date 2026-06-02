@@ -2,8 +2,10 @@ import { setAdminSession } from '@/lib/auth/session'
 import {
   AUTH_DASHBOARD_PATH,
   AUTH_LOGIN_PATH,
+  AUTH_ONBOARDING_PATH,
   AUTH_SIGNUP_PATH,
 } from '@/lib/auth/routes'
+import { fetchAccountById } from '@/lib/onboarding/account-store'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { type NextRequest, NextResponse } from 'next/server'
@@ -77,15 +79,41 @@ export async function GET(request: NextRequest) {
       await admin.from('users').update({ is_active: true }).eq('id', existingUserRow.id)
     }
 
+    let linkedUserId = existingUserRow.id
+    if (existingUserRow.id !== supaUser.id) {
+      const { error: relinkErr } = await admin.from('users').upsert(
+        {
+          id: supaUser.id,
+          account_id: existingUserRow.account_id,
+          email,
+          role: existingUserRow.role ?? 'owner',
+          is_active: true,
+          deleted_at: null,
+        },
+        { onConflict: 'id' },
+      )
+      if (!relinkErr) {
+        linkedUserId = supaUser.id
+        await admin
+          .from('users')
+          .update({ deleted_at: new Date().toISOString(), is_active: false })
+          .eq('id', existingUserRow.id)
+      }
+    }
+
     await setAdminSession({
       type: 'admin',
-      userId: existingUserRow.id,
+      userId: linkedUserId,
       accountId: existingUserRow.account_id,
       role: existingUserRow.role,
       email: existingUserRow.email,
     })
 
-    return NextResponse.redirect(new URL(next, request.url))
+    const account = await fetchAccountById(existingUserRow.account_id)
+    const destination =
+      account && !account.onboarding_completed_at ? AUTH_ONBOARDING_PATH : next
+
+    return NextResponse.redirect(new URL(destination, request.url))
   }
 
   const fullName =

@@ -1,8 +1,8 @@
 /**
  * Post-auth destinations for Ventaro.
- * Explore-first onboarding and the live workspace both render at the dashboard route.
+ * New owners complete setup on the dedicated onboarding wizard before the dashboard.
  */
-export const AUTH_ONBOARDING_PATH = '/admin/dashboard'
+export const AUTH_ONBOARDING_PATH = '/admin/onboarding'
 export const AUTH_DASHBOARD_PATH = '/admin/dashboard'
 
 export const AUTH_SIGNUP_PATH = '/auth/signup'
