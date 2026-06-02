@@ -1,7 +1,7 @@
 import { getSystemAutomationId } from '@/lib/automation/system-automation'
 import { getAdminSession } from '@/lib/auth/session'
 import { db } from '@/lib/db/client'
-import { evaluateFlag } from '@/lib/feature-flags/evaluate'
+import { isAiMessageDraftingEnabled } from '@/lib/ai/drafting-enabled'
 import type { Plan } from '@/lib/feature-flags/flags'
 import { sendCampaignEmail } from '@/lib/outreach/send-email'
 import { sendCampaignSms } from '@/lib/outreach/send-sms'
@@ -44,14 +44,16 @@ export async function POST(request: Request, { params }: RouteParams) {
     )
   }
 
-  const draftingEnabled = await evaluateFlag({
-    accountId: session.accountId,
-    plan: row.account.plan as Plan,
-    flagName: 'ai_message_drafting',
-  })
+  const draftingEnabled = await isAiMessageDraftingEnabled(
+    session.accountId,
+    row.account.plan as Plan,
+  )
 
   if (!draftingEnabled) {
-    return NextResponse.json({ success: false, error: 'AI drafting is disabled' }, { status: 403 })
+    return NextResponse.json(
+      { success: false, error: 'AI drafting is disabled. Configure ANTHROPIC_API_KEY.' },
+      { status: 403 },
+    )
   }
 
   if (row.draft.channel === 'email') {

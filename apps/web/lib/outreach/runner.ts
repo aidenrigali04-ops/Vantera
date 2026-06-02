@@ -30,8 +30,9 @@ function leadDisplayName(lead: { firstName: string | null; lastName: string | nu
 export async function processDueCampaignSteps(
   accountId: string,
   actorUserId: string,
+  options?: { campaignIds?: string[] },
 ): Promise<ProcessDueStepsResult> {
-  const dueSteps = await findDueCampaignSteps(accountId, 50)
+  const dueSteps = await findDueCampaignSteps(accountId, 50, options?.campaignIds)
   const result: ProcessDueStepsResult = {
     processed: 0,
     sent: 0,

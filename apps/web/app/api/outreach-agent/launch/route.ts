@@ -1,7 +1,6 @@
 import { getAdminSession } from '@/lib/auth/session'
 import { launchOutreachAgent } from '@/lib/outreach-agent/config'
 import type { LaunchOutreachAgentInput } from '@/lib/outreach-agent/types'
-import { SdrNotEnabledError } from '@/lib/sdr/guard'
 import { NextResponse } from 'next/server'
 
 export async function POST(request: Request) {
@@ -18,12 +17,7 @@ export async function POST(request: Request) {
     }
     return NextResponse.json(result)
   } catch (error) {
-    const message =
-      error instanceof SdrNotEnabledError
-        ? error.message
-        : error instanceof Error
-          ? error.message
-          : 'Launch failed'
-    return NextResponse.json({ success: false, error: message }, { status: 403 })
+    const message = error instanceof Error ? error.message : 'Launch failed'
+    return NextResponse.json({ success: false, error: message }, { status: 500 })
   }
 }

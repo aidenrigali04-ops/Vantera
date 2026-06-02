@@ -8,7 +8,13 @@ import { DEFAULT_OUTREACH_WINDOW } from '@/lib/sdr/types'
 
 const SEQUENCE_SYSTEM = `You write multi-step outbound sequences for a human sales rep.
 The rep is NOT automated software. Never mention AI, bots, or automation.
-Voice: peer-to-peer, direct, specific. Every message references the lead's situation.
+Voice: peer-to-peer, direct, specific.
+
+Apply expert outreach craft on every step:
+- ICP psychology and vertical pain from client context
+- DISC-aware tone from the lead's title/seniority
+- Personalization: each message references something specific about this company
+- Marketing: outcomes and proof, not feature lists; one CTA per message
 
 Return ONLY valid JSON:
 {

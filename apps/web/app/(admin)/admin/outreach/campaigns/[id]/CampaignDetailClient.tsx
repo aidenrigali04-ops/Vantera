@@ -159,10 +159,15 @@ export function CampaignDetailClient({ campaign, enrollments, leads, campaignSte
         return
       }
 
+      const stepChannel = workflowSteps[draftStepIndex]?.channel
       setWorkflowSteps((current) =>
         current.map((row, index) =>
           index === draftStepIndex
-            ? { ...row, subject: result.data.subject, body: result.data.body }
+            ? {
+                ...row,
+                subject: stepChannel === 'email' ? result.data.subject : row.subject,
+                body: result.data.body,
+              }
             : row,
         ),
       )
@@ -362,6 +367,7 @@ export function CampaignDetailClient({ campaign, enrollments, leads, campaignSte
               <h3 className="text-sm font-semibold text-stone-900">Build your sequence</h3>
               <p className="mt-1 text-sm text-stone-500">
                 Email and SMS send automatically. LinkedIn steps queue for manual send in Results.
+                AI draft uses Anthropic with your ICP, value prop, and lead context for each step.
               </p>
             </div>
             <div className="flex items-center gap-2">

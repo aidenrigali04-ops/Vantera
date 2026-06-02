@@ -2,6 +2,7 @@ import { draftOutreachMessages } from '@/lib/ai/draft-message'
 import type { ApifyLead } from '@/lib/aspire/types'
 import { getSystemAutomationId } from '@/lib/automation/system-automation'
 import { db } from '@/lib/db/client'
+import { isAiMessageDraftingEnabled } from '@/lib/ai/drafting-enabled'
 import { evaluateFlag } from '@/lib/feature-flags/evaluate'
 import type { Plan } from '@/lib/feature-flags/flags'
 import { sendCampaignEmail } from '@/lib/outreach/send-email'
@@ -26,11 +27,10 @@ export async function runDraftOnEnroll(payload: DraftOnEnrollPayload): Promise<{
 
   if (!account) return { draftIds: [] }
 
-  const aiDraftingEnabled = await evaluateFlag({
-    accountId: payload.accountId,
-    plan: account.plan as Plan,
-    flagName: 'ai_message_drafting',
-  })
+  const aiDraftingEnabled = await isAiMessageDraftingEnabled(
+    payload.accountId,
+    account.plan as Plan,
+  )
 
   if (!aiDraftingEnabled) return { draftIds: [] }
 

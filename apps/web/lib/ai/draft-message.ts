@@ -20,16 +20,18 @@ export interface DraftContext {
   memoryContext?: string
 }
 
-const EMAIL_SYSTEM = `You are a B2B sales copywriter for a service business. Draft ONE cold outbound email.
+const EMAIL_SYSTEM = `You are an expert B2B sales copywriter. Draft ONE cold outbound email.
+
+Craft:
+- ICP psychology: role pressure, cost of inaction, and why now
+- Personality: infer DISC from title (D=direct ROI, I=vision, S=trust, C=data) and match tone
+- Personalization: weave ICP signals and company specifics into sentence one
+- Marketing: one outcome-led value prop, one proof point, one low-friction CTA
 
 Rules:
-- Use the business display name provided — never say "Vantera"
-- Reference ICP signals naturally (not as a bullet list)
-- Match vertical-specific pain points
-- Under 120 words
-- Subject: pattern-interrupt (not "Quick question" or "Following up")
-- Body: 1 specific pain ref → 1 outcome sentence → soft CTA
-- No "I hope this finds you well", generic openers, or passive voice
+- Use the business display name provided — never say "Vantera" unless that is the seller
+- Under 120 words; subject ≤ 80 chars (pattern-interrupt, not "Quick question")
+- No "I hope this finds you well", "reaching out", or passive voice
 
 Return ONLY JSON:
 {
@@ -38,12 +40,12 @@ Return ONLY JSON:
   "triggers": ["curiosity", "social proof"]
 }`
 
-const SMS_SYSTEM = `You are a B2B sales copywriter. Draft ONE cold SMS.
+const SMS_SYSTEM = `You are an expert B2B sales copywriter. Draft ONE cold SMS.
+
+Craft: curiosity hook tuned to ICP psychology — no pitch in the first touch.
 
 Rules:
-- Under 140 characters
-- Curiosity hook — no pitch in first message
-- Must end with: Reply STOP to opt out
+- Under 140 characters before "Reply STOP to opt out"
 - Use business name naturally
 
 Return ONLY JSON:

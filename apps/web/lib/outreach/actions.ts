@@ -3,7 +3,8 @@
 import type { ActionResult } from '@/lib/auth/types'
 import { requireAdminSession } from '@/lib/auth/require-session'
 import { db } from '@/lib/db/client'
-import { draftLeadMessage } from '@/lib/outreach/draft-lead-message'
+import { isAiMessageDraftingEnabled } from '@/lib/ai/drafting-enabled'
+import { draftCampaignStepMessage } from '@/lib/outreach/draft-campaign-step'
 import { findLeadsByIds, findOutreachCampaignById } from '@/lib/outreach/queries'
 import { enrollLeadsInCampaignCore } from '@/lib/outreach/enroll-leads'
 import { recordCampaignInboundReply } from '@/lib/outreach/record-reply'
@@ -21,6 +22,7 @@ import {
   validateWorkflowForLaunch,
 } from '@/lib/outreach/workflow-templates'
 import {
+  accounts,
   outreachCampaignEnrollments,
   outreachCampaigns,
 } from '@vantera/db'
@@ -215,27 +217,59 @@ export async function draftCampaignMessage(
   const campaign = await findOutreachCampaignById(session.accountId, campaignId)
   if (!campaign) return { success: false, error: 'Campaign not found' }
 
+  const [account] = await db
+    .select({ plan: accounts.plan })
+    .from(accounts)
+    .where(eq(accounts.id, session.accountId))
+    .limit(1)
+
+  const plan = (account?.plan ?? 'team') as import('@/lib/feature-flags/flags').Plan
+  const draftingEnabled = await isAiMessageDraftingEnabled(session.accountId, plan)
+  if (!draftingEnabled) {
+    return {
+      success: false,
+      error: 'AI drafting is not enabled. Add ANTHROPIC_API_KEY or enable ai_message_drafting for your plan.',
+    }
+  }
+
   const leads = await findLeadsByIds(session.accountId, [leadId])
   const lead = leads[0]
   if (!lead) return { success: false, error: 'Lead not found' }
 
-  const intent =
-    campaign.workflow.steps[stepIndex]?.intent ?? CAMPAIGN_GOAL_INTENTS[campaign.goal]
+  const step = campaign.workflow.steps[stepIndex]
+  if (!step) return { success: false, error: 'Invalid sequence step' }
 
-  const draft = await draftLeadMessage({
+  const intent = step.intent?.trim() || CAMPAIGN_GOAL_INTENTS[campaign.goal]
+
+  const draft = await draftCampaignStepMessage({
     accountId: session.accountId,
-    userId: session.userId,
     lead,
+    channel: step.channel,
     intent,
+    goal: campaign.goal,
+    stepIndex,
   })
 
   if (!draft.ok) {
-    return { success: false, error: `Could not draft message: ${draft.reason}` }
+    const reasonMessages: Record<string, string> = {
+      no_api_key: 'Add ANTHROPIC_API_KEY to your environment to generate AI copy.',
+      timeout: 'Anthropic timed out — try again in a moment.',
+      parse_error: 'Could not parse the AI response — try again.',
+      api_error: 'Anthropic API error — check your key and billing.',
+    }
+    return {
+      success: false,
+      error: reasonMessages[draft.reason] ?? `Could not draft message: ${draft.reason}`,
+    }
   }
 
   return {
     success: true,
-    data: draft.output,
+    data: {
+      subject: draft.output.subject ?? '',
+      body: draft.output.body,
+      rationale: draft.output.rationale,
+    },
   }
 }
 

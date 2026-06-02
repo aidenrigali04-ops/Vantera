@@ -72,18 +72,26 @@ export async function findCampaignEnrollments(
   return rows.map((row) => ({ ...row.enrollment, lead: row.lead }))
 }
 
-export async function findDueCampaignSteps(accountId: string, limit = 50) {
+export async function findDueCampaignSteps(
+  accountId: string,
+  limit = 50,
+  campaignIds?: string[],
+) {
+  const filters = [
+    eq(outreachCampaignSteps.accountId, accountId),
+    eq(outreachCampaignSteps.status, 'pending'),
+    lte(outreachCampaignSteps.sendAt, new Date()),
+    sql`COALESCE(${outreachCampaignSteps.metadata}->>'manualSend', 'false') <> 'true'`,
+  ]
+
+  if (campaignIds && campaignIds.length > 0) {
+    filters.push(inArray(outreachCampaignSteps.campaignId, campaignIds))
+  }
+
   return db
     .select()
     .from(outreachCampaignSteps)
-    .where(
-      and(
-        eq(outreachCampaignSteps.accountId, accountId),
-        eq(outreachCampaignSteps.status, 'pending'),
-        lte(outreachCampaignSteps.sendAt, new Date()),
-        sql`COALESCE(${outreachCampaignSteps.metadata}->>'manualSend', 'false') <> 'true'`,
-      ),
-    )
+    .where(and(...filters))
     .orderBy(asc(outreachCampaignSteps.sendAt))
     .limit(limit)
 }

@@ -15,7 +15,7 @@ export const FLAG_DEFAULTS = {
   linkedin_automation: { team: true, enterprise: true },
 
   autonomous_ai_messaging: { team: false, enterprise: true },
-  sdr_agent_enabled: { team: false, enterprise: false },
+  sdr_agent_enabled: { team: true, enterprise: true },
   executive_dashboard: { team: false, enterprise: true },
   retention_health_scoring: { team: false, enterprise: true },
   advanced_forecasting: { team: false, enterprise: true },

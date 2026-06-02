@@ -4,7 +4,6 @@ import type { ActionResult } from '@/lib/auth/types'
 import { requireAdminSession } from '@/lib/auth/require-session'
 import { db } from '@/lib/db/client'
 import { logSdrActivity } from '@/lib/sdr/activity-log'
-import { requireSDREnabled } from '@/lib/sdr/guard'
 import { findSdrConfigByAccount } from '@/lib/sdr/queries'
 import {
   assertCampaignsBelongToAccount,
@@ -32,7 +31,11 @@ function revalidateOutreachAgentPaths() {
 export async function launchOutreachAgent(
   input: LaunchOutreachAgentInput,
 ): Promise<ActionResult<{ id: string }>> {
-  const { accountId } = await requireSDREnabled()
+  const session = await requireAdminSession()
+  if (session.role !== 'owner') {
+    return { success: false, error: 'Only the account owner can activate Outreach Agent' }
+  }
+  const accountId = session.accountId
 
   const validationError = validateLaunchOutreachAgentInput(input)
   if (validationError) return { success: false, error: validationError }
@@ -161,7 +164,9 @@ export async function runLinkedCampaignQueueNow(): Promise<
   }
 
   const { processDueCampaignSteps } = await import('@/lib/outreach/runner')
-  const result = await processDueCampaignSteps(session.accountId, session.userId)
+  const result = await processDueCampaignSteps(session.accountId, session.userId, {
+    campaignIds: existing.linkedCampaignIds,
+  })
 
   revalidateOutreachAgentPaths()
   return {

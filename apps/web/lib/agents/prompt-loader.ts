@@ -23,6 +23,7 @@ const TOOL_TO_AGENT: Record<string, AgentPromptId> = {
   'draft-sdr-sequence': 'message_drafter',
   'draft-outreach-email': 'message_drafter',
   'draft-outreach-sms': 'message_drafter',
+  'draft-campaign-step': 'message_drafter',
   'draft-on-enroll': 'message_drafter',
 }
 

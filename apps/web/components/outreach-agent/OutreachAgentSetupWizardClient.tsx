@@ -305,6 +305,12 @@ export function OutreachAgentSetupWizardClient({ initialCampaigns }: Props) {
                 ))}
               </ul>
             </div>
+            <p className="text-sm text-[var(--text-secondary)]">
+              Draft campaigns still need to be launched from{' '}
+              <span className="font-medium text-[var(--text-primary)]">Outreach → Campaigns</span>
+              : enroll leads, use AI draft on each step, then Launch. This agent sends due steps for
+              linked campaigns only.
+            </p>
           </div>
         ) : null}
       </SlideWizardFrame>
