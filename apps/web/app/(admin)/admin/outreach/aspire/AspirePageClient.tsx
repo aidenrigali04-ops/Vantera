@@ -24,8 +24,8 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { getIcpConfigForVertical } from '@/lib/aspire/icp-score'
-import type { AspireSearchResult } from '@/lib/aspire/search'
-import { normalizeApolloFilters } from '@/lib/aspire/search'
+import { normalizeApolloFilters } from '@/lib/aspire/filters'
+import type { AspireSearchResult } from '@/lib/aspire/types'
 import {
   ASPIRE_TABLE_VIEWS,
   aspireIntentTone,
