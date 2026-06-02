@@ -1,4 +1,5 @@
 import { scoreICP } from '@/lib/aspire/icp-score'
+import { getAspireApifyFetchCount } from '@/lib/aspire/apify-client'
 import { filterExistingLeads, searchApify } from '@/lib/aspire/search'
 import type { ApolloSearchFilters } from '@/lib/aspire/types'
 import { getSystemAutomationId } from '@/lib/automation/system-automation'
@@ -52,7 +53,7 @@ export async function runProspectScoutDiscovery(
 ): Promise<ScoutDiscoveryResult> {
   const icpConfig = config.icpConfig as ICPConfig
   const filters = buildScoutApolloFilters(config)
-  const perPage = options?.perPage ?? 25
+  const perPage = options?.perPage ?? getAspireApifyFetchCount()
   const autoEnroll = options?.autoEnroll ?? true
 
   const [runRow] = await db

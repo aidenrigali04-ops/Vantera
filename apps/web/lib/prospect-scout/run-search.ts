@@ -1,5 +1,6 @@
 import { getIcpConfigForVertical, scoreICP } from '@/lib/aspire/icp-score'
 import { isInteractiveAspireSearch, normalizeApolloFilters } from '@/lib/aspire/filters'
+import { getAspireApifyFetchCount } from '@/lib/aspire/apify-client'
 import { filterExistingLeads, searchApify } from '@/lib/aspire/search'
 import type { ApolloSearchFilters, ApolloPersonResult } from '@/lib/aspire/types'
 import { getSystemAutomationId } from '@/lib/automation/system-automation'
@@ -118,7 +119,7 @@ export async function runBoundSearch(input: RunBoundSearchInput): Promise<RunSea
   })
 
   try {
-    const { people } = await searchApify(filters, 1, 25, interactive)
+    const { people } = await searchApify(filters, 1, getAspireApifyFetchCount(), interactive)
     const fresh = await filterCandidates(people, config.accountId, config.excludeDomains ?? [])
 
     const scored = fresh
@@ -249,7 +250,7 @@ export async function runUnboundSearch(input: RunUnboundSearchInput): Promise<Ru
   })
 
   try {
-    const { people } = await searchApify(filters, 1, 25, interactive)
+    const { people } = await searchApify(filters, 1, getAspireApifyFetchCount(), interactive)
     const fresh = await filterCandidates(
       people,
       accountId,

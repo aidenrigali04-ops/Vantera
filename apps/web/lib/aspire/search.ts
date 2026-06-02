@@ -91,7 +91,7 @@ async function persistAspireResults(
 export async function searchProspects(
   accountId: string,
   filters: Partial<ApolloSearchFilters> = {},
-  options?: { searchId?: string; persist?: boolean },
+  options?: { searchId?: string; persist?: boolean; limit?: number },
 ): Promise<SearchProspectsResult> {
   const [account] = await db
     .select({ vertical: accounts.vertical })
@@ -104,7 +104,12 @@ export async function searchProspects(
   const interactive = isInteractiveAspireSearch(filters)
   const normalizedFilters = normalizeApolloFilters(vertical, filters, { interactive })
 
-  const { people, meta } = await searchApify(normalizedFilters, 1, 25, interactive)
+  const { people, meta } = await searchApify(
+    normalizedFilters,
+    1,
+    options?.limit,
+    interactive,
+  )
 
   const scored = people
     .map((person) => {

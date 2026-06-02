@@ -49,13 +49,13 @@ export function OperatingModelModal({ accountId, open, onOpenChange }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] max-w-2xl gap-0 overflow-hidden border-stone-200 p-0 sm:rounded-xl">
-        <div className="border-b border-stone-100 px-6 py-5">
+      <DialogContent className="max-h-[90vh] max-w-2xl gap-0 overflow-hidden border-[var(--border-default)] bg-[var(--bg-surface)] p-0 sm:rounded-xl">
+        <div className="border-b border-[var(--border-subtle)] px-6 py-5">
           <DialogHeader className="space-y-2 text-left">
-            <DialogTitle className="text-xl font-semibold tracking-[-0.02em] text-stone-900">
+            <DialogTitle className="text-xl font-semibold tracking-[-0.02em] text-[var(--text-primary)]">
               What are you managing?
             </DialogTitle>
-            <DialogDescription className="text-[13px] leading-relaxed text-stone-500">
+            <DialogDescription className="text-[13px] leading-relaxed text-[var(--text-secondary)]">
               We&apos;ll tailor pipeline language, dashboard focus, and templates to how you run
               the business — you can change this later in settings.
             </DialogDescription>
@@ -75,8 +75,8 @@ export function OperatingModelModal({ accountId, open, onOpenChange }: Props) {
                   className={cn(
                     'rounded-xl border p-4 text-left transition-colors duration-150',
                     active
-                      ? 'border-stone-900 bg-stone-50 shadow-sm'
-                      : 'border-stone-200 bg-white hover:border-stone-300 hover:bg-stone-50/80',
+                      ? 'border-[var(--accent-border)] bg-[var(--accent-muted)] shadow-[var(--shadow-sm)]'
+                      : 'border-[var(--border-default)] bg-[var(--bg-surface)] hover:border-[var(--border-strong)] hover:bg-[var(--bg-subtle)]',
                   )}
                 >
                   <div className="flex items-start justify-between gap-3">
@@ -87,27 +87,27 @@ export function OperatingModelModal({ accountId, open, onOpenChange }: Props) {
                       <Icon className="h-4 w-4" aria-hidden />
                     </span>
                     {active ? (
-                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-stone-900 text-white">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--text-primary)] text-[var(--text-inverse)]">
                         <Check className="h-3 w-3" aria-hidden />
                       </span>
                     ) : null}
                   </div>
-                  <p className="mt-3 text-sm font-medium text-stone-900">{model.label}</p>
-                  <p className="mt-1 text-[12px] leading-relaxed text-stone-500">
+                  <p className="mt-3 text-sm font-medium text-[var(--text-primary)]">{model.label}</p>
+                  <p className="mt-1 text-[12px] leading-relaxed text-[var(--text-secondary)]">
                     {model.description}
                   </p>
                 </button>
               )
             })}
           </div>
-          {error ? <p className="mt-4 text-sm text-red-600">{error}</p> : null}
+          {error ? <p className="mt-4 text-sm text-[var(--danger)]">{error}</p> : null}
         </div>
 
-        <div className="flex items-center justify-end border-t border-stone-100 px-6 py-4">
+        <div className="flex items-center justify-end border-t border-[var(--border-subtle)] px-6 py-4">
           <Button
             onClick={handleContinue}
             disabled={isPending}
-            className="bg-stone-900 hover:bg-stone-800"
+            className="bg-[var(--text-primary)] text-[var(--text-inverse)] hover:opacity-90"
           >
             {isPending ? 'Saving…' : 'Continue to workspace'}
             <ArrowRight className="ml-2 h-4 w-4" aria-hidden />
@@ -116,7 +116,7 @@ export function OperatingModelModal({ accountId, open, onOpenChange }: Props) {
 
         <motion.div
           aria-hidden
-          className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-stone-300 to-transparent"
+          className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[var(--border-strong)] to-transparent"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: DURATION.modal, ease: EASE_OUT }}

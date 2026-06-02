@@ -13,6 +13,25 @@ import { env } from '@/lib/env'
 
 const APIFY_API_BASE = 'https://api.apify.com/v2'
 const DEFAULT_LEADS_ACTOR_ID = 'code_crafter~leads-finder'
+/** Apify actor hard cap per run (code_crafter/leads-finder). */
+const APIFY_MAX_FETCH = 100
+const DEFAULT_ASPIRE_FETCH = 50
+
+/** Leads returned per Aspire / Apify search (override with ASPIRE_APIFY_FETCH_COUNT). */
+export function getAspireApifyFetchCount(requested?: number): number {
+  const fromEnv = Number.parseInt(
+    process.env.ASPIRE_APIFY_FETCH_COUNT?.trim() ||
+      env.ASPIRE_APIFY_FETCH_COUNT?.trim() ||
+      '',
+    10,
+  )
+  const envDefault =
+    Number.isFinite(fromEnv) && fromEnv > 0
+      ? Math.min(fromEnv, APIFY_MAX_FETCH)
+      : DEFAULT_ASPIRE_FETCH
+  const n = requested ?? envDefault
+  return Math.min(Math.max(n, 1), APIFY_MAX_FETCH)
+}
 
 export type ProspectSearchSource = 'apify' | 'stub' | 'demo'
 
@@ -98,9 +117,12 @@ export function buildApifyActorInput(
   const keywords = [...(filters.keywords ?? [])]
   if (filters.q?.trim()) keywords.push(filters.q.trim())
 
+  const fetchCount = getAspireApifyFetchCount(perPage)
+
   const input: Record<string, unknown> = {
-    fetch_count: Math.min(Math.max(perPage, 1), 100),
-    email_status: ['validated', 'unknown'],
+    fetch_count: fetchCount,
+    // Broader than validated-only — Apify docs: add unknown/not_validated for higher volume
+    email_status: ['validated', 'unknown', 'not_validated'],
   }
 
   if (filters.company?.trim()) {
@@ -149,33 +171,10 @@ function apifyErrorMessage(body: unknown, fallback: string): string {
   return fallback
 }
 
-function demoFallback(
-  filters: ApolloSearchFilters,
-  configured: boolean,
-  error?: string,
-): {
-  people: ApolloPersonResult[]
-  total: number
-  hasMore: boolean
-  meta: ProspectSearchMeta
-} {
-  const people = stubResults(filters)
-  return {
-    people,
-    total: people.length,
-    hasMore: false,
-    meta: {
-      source: 'demo',
-      providerConfigured: configured,
-      providerError: error,
-    },
-  }
-}
-
 export async function searchApify(
   filters: ApolloSearchFilters,
   page = 1,
-  perPage = 25,
+  perPage?: number,
   interactive = false,
 ): Promise<{
   people: ApolloPersonResult[]
@@ -203,7 +202,8 @@ export async function searchApify(
     }
   }
 
-  const input = buildApifyActorInput(filters, perPage, interactive)
+  const pageSize = getAspireApifyFetchCount(perPage)
+  const input = buildApifyActorInput(filters, pageSize, interactive)
   const url = `${APIFY_API_BASE}/acts/${encodeURIComponent(actorId)}/run-sync-get-dataset-items?token=${encodeURIComponent(token)}&timeout=180&format=json`
 
   try {
@@ -215,13 +215,7 @@ export async function searchApify(
 
     if (!response.ok) {
       const errorText = apifyErrorMessage(await response.text(), 'Apify actor run failed')
-      if (interactive) return demoFallback(filters, true, errorText)
-      return {
-        people: [],
-        total: 0,
-        hasMore: false,
-        meta: { source: 'apify', providerConfigured: true, providerError: errorText },
-      }
+      throw new Error(errorText)
     }
 
     const body = (await response.json()) as unknown
@@ -230,19 +224,14 @@ export async function searchApify(
       .map((row) => mapApifyLead(row as Record<string, unknown>))
       .filter((person): person is ApolloPersonResult => person !== null)
 
-    if (people.length === 0 && interactive) {
-      return demoFallback(filters, true, 'No leads matched your filters')
-    }
-
     return {
       people,
       total: people.length,
-      hasMore: people.length >= perPage,
+      hasMore: people.length >= pageSize,
       meta: { source: 'apify', providerConfigured: true },
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Apify search failed'
-    if (interactive) return demoFallback(filters, true, message)
-    throw error
+    throw new Error(message)
   }
 }

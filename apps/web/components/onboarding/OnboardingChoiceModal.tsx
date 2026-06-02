@@ -68,7 +68,7 @@ export function OnboardingChoiceModal({ accountId }: { accountId: string }) {
 
   return (
     <Dialog open={choiceModalOpen} onOpenChange={(open) => (!open ? handleClose() : setChoiceModalOpen(true))}>
-      <DialogContent className="max-w-lg gap-0 overflow-hidden border-stone-200 p-0 sm:rounded-xl">
+      <DialogContent className="max-w-lg gap-0 overflow-hidden border-[var(--border-default)] bg-[var(--bg-surface)] p-0 sm:rounded-xl">
         <AnimatePresence mode="wait" initial={false}>
           {step === 'choice' ? (
             <motion.div
@@ -80,10 +80,10 @@ export function OnboardingChoiceModal({ accountId }: { accountId: string }) {
               className="p-6"
             >
               <DialogHeader className="space-y-2 text-left">
-                <DialogTitle className="text-xl font-semibold tracking-tight text-stone-900">
+                <DialogTitle className="text-xl font-semibold tracking-tight text-[var(--text-primary)]">
                   Ready to make this yours?
                 </DialogTitle>
-                <DialogDescription className="text-sm leading-relaxed text-stone-600">
+                <DialogDescription className="text-sm leading-relaxed text-[var(--text-secondary)]">
                   Choose how you want to start.
                 </DialogDescription>
               </DialogHeader>
@@ -93,28 +93,28 @@ export function OnboardingChoiceModal({ accountId }: { accountId: string }) {
                   type="button"
                   onClick={() => setStep('confirm')}
                   className={cn(
-                    'group w-full rounded-xl border border-stone-900 bg-stone-50 p-4 text-left transition-colors',
-                    'hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-900 focus-visible:ring-offset-2',
+                    'group w-full rounded-lg border border-[var(--accent-border)] bg-[var(--accent-muted)] p-4 text-left transition-colors duration-150',
+                    'hover:border-[var(--border-strong)] hover:bg-[var(--bg-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-muted)]',
                   )}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-stone-500">
+                      <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-[var(--text-secondary)]">
                         <Sparkles className="h-3 w-3" aria-hidden />
                         Recommended
                       </span>
-                      <p className="mt-1 text-sm font-semibold text-stone-900">Start with my real data</p>
-                      <p className="mt-1 text-xs leading-relaxed text-stone-600">
+                      <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">Start with my real data</p>
+                      <p className="mt-1 text-xs leading-relaxed text-[var(--text-secondary)]">
                         Clear the sample data and start fresh. We&rsquo;ll guide you through adding your
                         first client, opportunity, and project.
                       </p>
                     </div>
                     <ArrowRight
-                      className="mt-1 h-4 w-4 shrink-0 text-stone-400 transition-transform group-hover:translate-x-0.5"
+                      className="mt-1 h-4 w-4 shrink-0 text-[var(--text-tertiary)] transition-transform group-hover:translate-x-0.5"
                       aria-hidden
                     />
                   </div>
-                  <span className="mt-3 inline-flex text-xs font-medium text-stone-900">Start fresh →</span>
+                  <span className="mt-3 inline-flex text-xs font-medium text-[var(--text-primary)]">Start fresh →</span>
                 </button>
 
                 <button
@@ -122,20 +122,20 @@ export function OnboardingChoiceModal({ accountId }: { accountId: string }) {
                   onClick={handleKeepSample}
                   disabled={isPending}
                   className={cn(
-                    'group w-full rounded-xl border border-stone-200 bg-white p-4 text-left transition-colors',
-                    'hover:border-stone-300 hover:bg-stone-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-400 focus-visible:ring-offset-2',
+                    'group w-full rounded-lg border border-[var(--border-default)] bg-[var(--bg-surface)] p-4 text-left transition-colors duration-150',
+                    'hover:border-[var(--border-strong)] hover:bg-[var(--bg-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-muted)]',
                   )}
                 >
-                  <p className="text-sm font-semibold text-stone-900">Keep the sample data</p>
-                  <p className="mt-1 text-xs leading-relaxed text-stone-600">
+                  <p className="text-sm font-semibold text-[var(--text-primary)]">Keep the sample data</p>
+                  <p className="mt-1 text-xs leading-relaxed text-[var(--text-secondary)]">
                     Keep {DEMO_WORKSPACE_NAME} as a reference while you add your real data alongside it.
                   </p>
-                  <span className="mt-3 inline-flex text-xs font-medium text-stone-700">Keep sample data →</span>
+                  <span className="mt-3 inline-flex text-xs font-medium text-[var(--text-secondary)]">Keep sample data →</span>
                 </button>
               </div>
 
               {error ? (
-                <p className="mt-4 text-sm text-red-600" role="alert">
+                <p className="mt-4 text-sm text-[var(--danger)]" role="alert">
                   {error}
                 </p>
               ) : null}
@@ -143,7 +143,7 @@ export function OnboardingChoiceModal({ accountId }: { accountId: string }) {
               <button
                 type="button"
                 onClick={handleClose}
-                className="mt-5 text-xs font-medium text-stone-500 transition-colors hover:text-stone-800"
+                className="mt-5 text-xs font-medium text-[var(--text-secondary)] transition-colors duration-150 hover:text-[var(--text-primary)]"
               >
                 Not ready yet
               </button>
@@ -158,17 +158,17 @@ export function OnboardingChoiceModal({ accountId }: { accountId: string }) {
               className="p-6"
             >
               <DialogHeader className="space-y-2 text-left">
-                <DialogTitle className="text-xl font-semibold tracking-tight text-stone-900">
+                <DialogTitle className="text-xl font-semibold tracking-tight text-[var(--text-primary)]">
                   Clear sample data?
                 </DialogTitle>
-                <DialogDescription className="text-sm leading-relaxed text-stone-600">
+                <DialogDescription className="text-sm leading-relaxed text-[var(--text-secondary)]">
                   This will remove {DEMO_WORKSPACE_NAME}&rsquo;s clients, opportunities, and projects.
                   Your workspace will start fresh.
                 </DialogDescription>
               </DialogHeader>
 
               {error ? (
-                <p className="mt-4 text-sm text-red-600" role="alert">
+                <p className="mt-4 text-sm text-[var(--danger)]" role="alert">
                   {error}
                 </p>
               ) : null}
@@ -177,7 +177,12 @@ export function OnboardingChoiceModal({ accountId }: { accountId: string }) {
                 <Button type="button" variant="outline" onClick={() => setStep('choice')} disabled={isPending}>
                   Go back
                 </Button>
-                <Button type="button" onClick={handleConfirmClear} disabled={isPending}>
+                <Button
+                  type="button"
+                  onClick={handleConfirmClear}
+                  disabled={isPending}
+                  className="bg-[var(--text-primary)] text-[var(--text-inverse)] hover:opacity-90"
+                >
                   {isPending ? 'Clearing…' : 'Yes, start fresh'}
                 </Button>
               </div>

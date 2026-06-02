@@ -43,6 +43,8 @@ const serverEnvSchema = z.object({
   CRON_SECRET: z.string().optional().default(''),
   APIFY_API_TOKEN: z.string().optional().default(''),
   APIFY_LEADS_ACTOR_ID: z.string().optional().default('code_crafter~leads-finder'),
+  /** Max leads per Apify run for Aspire (1–100, default 50 in code). */
+  ASPIRE_APIFY_FETCH_COUNT: z.string().optional().default(''),
 })
 
 type PublicEnv = z.infer<typeof publicEnvSchema>

@@ -31,6 +31,7 @@ import {
   aspireIntentTone,
 } from '@/lib/operational/aspire-table-views'
 import { LiveIndicator } from '@/components/operational/LiveIndicator'
+import { SectionEmptyState } from '@/components/onboarding/SectionEmptyState'
 import { useAccountRealtime } from '@/lib/supabase/account-realtime'
 import { cn } from '@/lib/utils'
 import type { aspireSavedSearches } from '@vantera/db'
@@ -456,11 +457,11 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
         header: 'Prospect',
         sortable: true,
         cell: (row: AspireResultRow) => (
-          <div className="flex items-center gap-3">
+          <div className="flex min-w-[200px] items-center gap-3">
             <IcpScoreRing score={scoreOf(row)} size={36} strokeWidth={3} className="hidden sm:block" />
-            <div>
-              <p className="font-medium text-stone-900">{prospectName(row)}</p>
-              <p className="text-[12px] text-stone-500">
+            <div className="min-w-0">
+              <p className="truncate font-medium text-[var(--text-primary)]">{prospectName(row)}</p>
+              <p className="truncate text-[12px] text-[var(--text-secondary)]">
                 {row.title} · {companyName(row)}
               </p>
             </div>
@@ -480,7 +481,10 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
         header: 'Industry',
         sortable: true,
         cell: (row: AspireResultRow) => (
-          <Badge variant="outline" className="font-normal">
+          <Badge
+            variant="outline"
+            className="border-[var(--border-default)] bg-[var(--bg-subtle)]/60 font-normal text-[var(--text-secondary)]"
+          >
             {row.industry ?? '—'}
           </Badge>
         ),
@@ -490,11 +494,14 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
         header: 'Email',
         cell: (row: AspireResultRow) =>
           row.email ? (
-            <a href={`mailto:${row.email}`} className="text-blue-600 hover:underline">
+            <a
+              href={`mailto:${row.email}`}
+              className="block max-w-[160px] truncate text-[var(--accent)] hover:underline"
+            >
               {row.email}
             </a>
           ) : (
-            <span className="text-stone-400">—</span>
+            <span className="text-[var(--text-tertiary)]">—</span>
           ),
       },
       {
@@ -502,11 +509,14 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
         header: 'Phone',
         cell: (row: AspireResultRow) =>
           row.phone ? (
-            <a href={`tel:${row.phone}`} className="text-stone-800 hover:underline">
+            <a
+              href={`tel:${row.phone}`}
+              className="block max-w-[120px] truncate text-[var(--text-primary)] hover:underline"
+            >
               {row.phone}
             </a>
           ) : (
-            <span className="text-stone-400">—</span>
+            <span className="text-[var(--text-tertiary)]">—</span>
           ),
       },
       {
@@ -518,12 +528,12 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
               href={row.linkedinUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-blue-600 hover:underline"
+              className="text-[var(--accent)] hover:underline"
             >
               Profile
             </a>
           ) : (
-            <span className="text-stone-400">—</span>
+            <span className="text-[var(--text-tertiary)]">—</span>
           ),
       },
       {
@@ -577,17 +587,19 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
     [rows, enrollStates],
   )
 
+  const showTable = isFetching || displayRows.length > 0
+
   return (
-    <div className="space-y-5">
+    <div className="mx-auto w-full space-y-6 px-4 py-5 md:px-8 md:py-6">
       <PageHeader
         title="Aspire"
         description="Discover ICP-matched prospects, score them instantly, and add to your pipeline with AI drafts ready to review."
       />
 
-      <div className="grid gap-5 lg:grid-cols-12">
-        <div className="space-y-4 lg:col-span-3">
-          <div className="rounded-xl border border-stone-200/90 bg-white p-4 shadow-sm">
-            <h3 className="mb-3 text-sm font-semibold text-stone-900">Search criteria</h3>
+      <div className="grid gap-6 lg:grid-cols-[minmax(220px,260px)_minmax(0,1fr)]">
+        <aside className="space-y-4">
+          <div className="card-surface p-4">
+            <h3 className="mb-3 text-sm font-semibold text-[var(--text-primary)]">Search criteria</h3>
             <div className="space-y-3">
               <div>
                 <Label htmlFor="aspire-keywords">Keywords</Label>
@@ -596,7 +608,7 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="Title, skills, keywords…"
-                  className="mt-1.5"
+                  className="mt-1.5 border-[var(--border-default)]"
                 />
               </div>
               <div>
@@ -606,11 +618,11 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
                   value={company}
                   onChange={(e) => setCompany(e.target.value)}
                   placeholder="Company name"
-                  className="mt-1.5"
+                  className="mt-1.5 border-[var(--border-default)]"
                 />
               </div>
               <Button
-                className="w-full bg-stone-900 hover:bg-stone-800"
+                className="w-full bg-[var(--text-primary)] text-[var(--text-inverse)] hover:opacity-90"
                 onClick={handleSearch}
                 disabled={isFetching}
               >
@@ -624,9 +636,9 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
             </div>
           </div>
 
-          <div className="rounded-xl border border-stone-200/90 bg-white p-4 shadow-sm">
+          <div className="card-surface p-4">
             <div className="mb-3 flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 text-sm font-semibold text-stone-900">
+              <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]">
                 <Bookmark className="h-4 w-4" aria-hidden />
                 Saved searches
               </div>
@@ -643,7 +655,9 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
               </Button>
             </div>
             {savedSearches.length === 0 ? (
-              <p className="text-sm text-stone-500">Save a search to auto-run weekly and get ICP matches in your feed.</p>
+              <p className="text-[13px] leading-relaxed text-[var(--text-secondary)]">
+                Save a search to auto-run weekly and get ICP matches in your feed.
+              </p>
             ) : (
               <ul className="space-y-2">
                 {savedSearches.map((s) => (
@@ -652,24 +666,26 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
                       className={cn(
                         'flex items-center gap-1 rounded-lg border px-2 py-1',
                         activeSearchId === s.id
-                          ? 'border-violet-200 bg-violet-50/80'
-                          : 'border-stone-200',
+                          ? 'border-[var(--accent-border)] bg-[var(--accent-muted)]'
+                          : 'border-[var(--border-default)]',
                       )}
                     >
                       <button
                         type="button"
-                        className="min-w-0 flex-1 rounded-md px-1 py-1.5 text-left text-sm text-stone-700 hover:bg-white/60"
+                        className="min-w-0 flex-1 rounded-md px-1 py-1.5 text-left text-sm text-[var(--text-secondary)] transition-colors duration-150 hover:bg-[var(--bg-overlay)]"
                         onClick={() => handleSelectSavedSearch(s)}
                       >
-                        <span className="block truncate font-medium">{s.name}</span>
-                        <span className="block text-[11px] text-stone-500">
+                        <span className="block truncate font-medium text-[var(--text-primary)]">
+                          {s.name}
+                        </span>
+                        <span className="block text-[11px] text-[var(--text-tertiary)]">
                           {s.totalFound} found · {s.runFrequency}
                         </span>
                       </button>
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-7 w-7 shrink-0 px-0 text-stone-500 hover:text-violet-700"
+                        className="h-7 w-7 shrink-0 px-0 text-[var(--text-secondary)] hover:text-[var(--accent)]"
                         title="Run Apify search now"
                         onClick={() => runSavedSearchMutation.mutate(s.id)}
                         disabled={runningSearchId === s.id}
@@ -683,7 +699,7 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-7 w-7 shrink-0 px-0 text-stone-400 hover:text-red-600"
+                        className="h-7 w-7 shrink-0 px-0 text-[var(--text-tertiary)] hover:text-[var(--danger)]"
                         onClick={() => deleteSearchMutation.mutate(s.id)}
                         disabled={deleteSearchMutation.isPending}
                       >
@@ -697,7 +713,7 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
             <Button
               variant="outline"
               size="sm"
-              className="mt-3 w-full"
+              className="mt-3 w-full border-[var(--border-default)]"
               onClick={() => {
                 setSaveName(query ? `${query}${company ? ` · ${company}` : ''}` : 'My search')
                 setSaveDialogOpen(true)
@@ -707,138 +723,155 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
               Save current search
             </Button>
           </div>
-        </div>
+        </aside>
 
-        <div className="space-y-4 lg:col-span-6">
-          {activeSaved ? (
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-[13px] text-[var(--text-secondary)]">
-                Viewing saved search{' '}
-                <span className="font-medium text-[var(--text-primary)]">{activeSaved.name}</span>
-                {searchMeta?.source === 'demo' || searchMeta?.source === 'stub'
-                  ? ' — sample leads (configure APIFY_API_TOKEN for live data)'
-                  : ' — stored results'}
-              </p>
-              <LiveIndicator active={resultsLive} />
-            </div>
-          ) : null}
-
-          {searchMeta?.source === 'demo' || searchMeta?.source === 'stub' ? (
-            <div className="rounded-lg border border-amber-200/90 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-              {searchMeta.source === 'stub'
-                ? 'Apify is not configured. Showing sample leads — add APIFY_API_TOKEN in Vercel for live prospect data.'
-                : (
-                  <>
-                    Apify returned no live results for this search. Showing sample leads for{' '}
-                    <span className="font-medium">{query || company || 'your search'}</span> so you
-                    can test the pipeline.
-                  </>
-                )}
-            </div>
-          ) : null}
-
-          <KpiStrip items={kpiItems} />
-
-          <TableToolbar
-            search={tableSearch}
-            onSearchChange={setTableSearch}
-            searchPlaceholder="Filter results by name, company, title…"
-            savedViews={
-              rows.length > 0 ? (
-                <TableSavedViews
-                  views={ASPIRE_TABLE_VIEWS}
-                  activeViewId={activeViewId}
-                  onViewChange={applySavedView}
-                />
-              ) : null
-            }
-            filters={
-              rows.length > 0
-                ? [
-                    {
-                      id: 'icp',
-                      label: 'ICP score',
-                      value: intentFilter,
-                      onChange: (value) => {
-                        setIntentFilter(value)
-                        setActiveViewId('custom')
-                      },
-                      options: [
-                        { value: 'all', label: 'All scores' },
-                        { value: 'high', label: 'Strong (70+)' },
-                        { value: 'medium', label: 'Moderate (40–69)' },
-                        { value: 'low', label: 'Weak (<40)' },
-                      ],
-                      widthClassName: 'w-[148px]',
-                    },
-                    {
-                      id: 'industry',
-                      label: 'Industry',
-                      value: industryFilter,
-                      onChange: (value) => {
-                        setIndustryFilter(value)
-                        setActiveViewId('custom')
-                      },
-                      options: industryOptions,
-                      widthClassName: 'w-[160px]',
-                    },
-                  ]
-                : []
-            }
-          />
-
-          <OperationalTable
-            columns={columns}
-            rows={displayRows}
-            selectedIds={selectedIds}
-            onSelectionChange={setSelectedIds}
-            onRowClick={(row) => setSelectedResult(row)}
-            sort={sort}
-            onSortChange={setSort}
-            loading={isFetching}
-            emptyState={
-              <div className="rounded-xl border border-dashed border-stone-200 bg-stone-50/80 px-6 py-12 text-center">
-                <p className="text-sm font-medium text-stone-800">No results yet</p>
-                <p className="mt-1 text-sm text-stone-500">
-                  Run a search or select a saved search to discover ICP-matched prospects.
+        <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(240px,280px)]">
+          <div className="min-w-0 space-y-4">
+            {activeSaved ? (
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-[13px] text-[var(--text-secondary)]">
+                  Viewing saved search{' '}
+                  <span className="font-medium text-[var(--text-primary)]">{activeSaved.name}</span>
+                  {searchMeta?.source === 'demo' || searchMeta?.source === 'stub'
+                    ? ' — sample leads (configure APIFY_API_TOKEN for live data)'
+                    : ' — stored results'}
                 </p>
+                <LiveIndicator active={resultsLive} />
               </div>
-            }
-          />
+            ) : null}
 
-          <BulkActionBar count={selectedIds.length} onClear={() => setSelectedIds([])}>
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => void handleBulkAdd()}
-              disabled={addMutation.isPending}
-            >
-              Add {selectedIds.length || ''} to pipeline
-            </Button>
-          </BulkActionBar>
-        </div>
+            {searchMeta?.source === 'demo' || searchMeta?.source === 'stub' ? (
+              <div className="rounded-lg border border-[var(--warning)]/30 bg-[var(--warning-muted)] px-4 py-3 text-sm text-[var(--text-primary)]">
+                {searchMeta.source === 'stub'
+                  ? 'Apify is not configured. Showing sample leads — add APIFY_API_TOKEN in Vercel for live prospect data.'
+                  : (
+                    <>
+                      Apify returned no live results for this search. Showing sample leads for{' '}
+                      <span className="font-medium">{query || company || 'your search'}</span> so you
+                      can test the pipeline.
+                    </>
+                  )}
+              </div>
+            ) : null}
 
-        <div className="lg:col-span-3">
-          <AspireIntelligencePanel
-            result={selectedResult}
-            icpConfig={icpConfig}
-            enrollState={selectedResult ? enrollStates[selectedResult.id] ?? 'idle' : 'idle'}
-            onAdd={selectedResult ? () => enrollOne(selectedResult) : undefined}
-            onSkip={
-              selectedResult
-                ? () => {
-                    setSelectedResult(null)
+            <KpiStrip items={kpiItems} />
+
+            <section className="card-surface overflow-hidden">
+              <div className="border-b border-[var(--border-default)] bg-[var(--bg-subtle)]/50 px-4 py-4 md:px-5">
+                <TableToolbar
+                  search={tableSearch}
+                  onSearchChange={setTableSearch}
+                  searchPlaceholder="Filter results by name, company, title…"
+                  savedViews={
+                    rows.length > 0 ? (
+                      <TableSavedViews
+                        views={ASPIRE_TABLE_VIEWS}
+                        activeViewId={activeViewId}
+                        onViewChange={applySavedView}
+                      />
+                    ) : null
                   }
-                : undefined
-            }
-          />
+                  filters={
+                    rows.length > 0
+                      ? [
+                          {
+                            id: 'icp',
+                            label: 'ICP score',
+                            value: intentFilter,
+                            onChange: (value) => {
+                              setIntentFilter(value)
+                              setActiveViewId('custom')
+                            },
+                            options: [
+                              { value: 'all', label: 'All scores' },
+                              { value: 'high', label: 'Strong (70+)' },
+                              { value: 'medium', label: 'Moderate (40–69)' },
+                              { value: 'low', label: 'Weak (<40)' },
+                            ],
+                            widthClassName: 'w-[148px]',
+                          },
+                          {
+                            id: 'industry',
+                            label: 'Industry',
+                            value: industryFilter,
+                            onChange: (value) => {
+                              setIndustryFilter(value)
+                              setActiveViewId('custom')
+                            },
+                            options: industryOptions,
+                            widthClassName: 'w-[160px]',
+                          },
+                        ]
+                      : []
+                  }
+                  trailing={
+                    displayRows.length > 0 ? (
+                      <span className="hidden text-[12px] text-[var(--text-secondary)] lg:inline">
+                        {displayRows.length} result{displayRows.length === 1 ? '' : 's'}
+                      </span>
+                    ) : null
+                  }
+                />
+              </div>
+
+              {showTable ? (
+                <OperationalTable
+                  columns={columns}
+                  rows={displayRows}
+                  selectedIds={selectedIds}
+                  onSelectionChange={setSelectedIds}
+                  onRowClick={(row) => setSelectedResult(row)}
+                  sort={sort}
+                  onSortChange={setSort}
+                  loading={isFetching}
+                  className="rounded-none border-0 shadow-none"
+                />
+              ) : (
+                <div className="px-4 py-12 md:px-5">
+                  <SectionEmptyState
+                    title="No results yet"
+                    description="Run a search or select a saved search to discover ICP-matched prospects."
+                    actionLabel="Search prospects"
+                    onAction={handleSearch}
+                  />
+                </div>
+              )}
+            </section>
+
+            <BulkActionBar count={selectedIds.length} onClear={() => setSelectedIds([])}>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => void handleBulkAdd()}
+                disabled={addMutation.isPending}
+              >
+                Add {selectedIds.length || ''} to pipeline
+              </Button>
+            </BulkActionBar>
+          </div>
+
+          <div className="min-w-0 xl:sticky xl:top-6 xl:self-start">
+            <AspireIntelligencePanel
+              result={selectedResult}
+              icpConfig={icpConfig}
+              enrollState={selectedResult ? enrollStates[selectedResult.id] ?? 'idle' : 'idle'}
+              onAdd={selectedResult ? () => enrollOne(selectedResult) : undefined}
+              onSkip={
+                selectedResult
+                  ? () => {
+                      setSelectedResult(null)
+                    }
+                  : undefined
+              }
+            />
+          </div>
         </div>
       </div>
 
       <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
-        <DialogContent>
+        <DialogContent className="border-[var(--border-default)] bg-[var(--bg-surface)]">
           <DialogHeader>
-            <DialogTitle>Save search</DialogTitle>
+            <DialogTitle className="text-[var(--text-primary)]">Save search</DialogTitle>
           </DialogHeader>
           <div>
             <Label htmlFor="save-search-name">Name</Label>
@@ -847,9 +880,11 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
               value={saveName}
               onChange={(e) => setSaveName(e.target.value)}
               placeholder="HVAC Phoenix owners"
-              className="mt-1.5"
+              className="mt-1.5 border-[var(--border-default)]"
             />
-            <p className="mt-2 text-xs text-stone-500">Saved searches run weekly and notify you of new ICP matches.</p>
+            <p className="mt-2 text-xs text-[var(--text-secondary)]">
+              Saved searches run weekly and notify you of new ICP matches.
+            </p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setSaveDialogOpen(false)}>
@@ -858,6 +893,7 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
             <Button
               onClick={() => saveSearchMutation.mutate(saveName.trim())}
               disabled={!saveName.trim() || saveSearchMutation.isPending}
+              className="bg-[var(--text-primary)] text-[var(--text-inverse)] hover:opacity-90"
             >
               Save
             </Button>

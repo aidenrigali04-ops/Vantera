@@ -72,16 +72,20 @@ export function SdrActivityFeed({ events, filter = 'all' }: Props) {
   })
 
   if (sorted.length === 0) {
-    return <p className="mt-4 text-sm text-stone-500">No activity yet — agent actions appear here.</p>
+    return (
+      <p className="mt-4 text-sm text-[var(--text-secondary)]">
+        No activity yet — agent actions appear here.
+      </p>
+    )
   }
 
   return (
-    <ul className="mt-3 max-h-[480px] space-y-1 overflow-y-auto">
+    <ul className="max-h-[480px] space-y-1 overflow-y-auto">
       {sorted.map((event) => {
         const meta = EVENT_META[event.eventType] ?? {
           icon: Mail,
           label: () => event.eventType.replace(/_/g, ' '),
-          tone: 'text-stone-600',
+          tone: 'text-[var(--text-secondary)]',
         }
         const Icon = meta.icon
         const isInterested =
@@ -91,14 +95,14 @@ export function SdrActivityFeed({ events, filter = 'all' }: Props) {
           <li
             key={event.id}
             className={cn(
-              'flex items-start gap-3 rounded-lg border border-transparent px-2 py-2 transition-colors',
-              isInterested && 'border-l-2 border-emerald-500 bg-emerald-50/60',
+              'flex items-start gap-3 rounded-lg border border-transparent px-2 py-2 transition-colors duration-150',
+              isInterested && 'border-l-2 border-[var(--success)] bg-[var(--success-muted)]',
             )}
           >
             <Icon className={cn('mt-0.5 h-4 w-4 shrink-0', meta.tone, isInterested && 'animate-pulse')} />
             <div className="min-w-0 flex-1">
-              <p className="text-sm text-stone-800">{meta.label(event)}</p>
-              <p className="text-[11px] text-stone-500">
+              <p className="text-sm text-[var(--text-primary)]">{meta.label(event)}</p>
+              <p className="text-[11px] text-[var(--text-secondary)]">
                 {new Date(event.createdAt).toLocaleString([], {
                   hour: 'numeric',
                   minute: '2-digit',
@@ -110,7 +114,7 @@ export function SdrActivityFeed({ events, filter = 'all' }: Props) {
             {event.leadId ? (
               <Link
                 href={`/admin/pipeline?leadId=${event.leadId}`}
-                className="shrink-0 text-xs font-medium text-stone-600 hover:text-stone-900"
+                className="shrink-0 text-xs font-medium text-[var(--accent)] hover:underline"
               >
                 View
               </Link>

@@ -150,7 +150,7 @@ export function SdrSetupWizardClient({ accountVertical, accountName }: Props) {
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-8">
+    <div className="mx-auto w-full max-w-2xl space-y-8 px-4 py-5 md:px-8 md:py-6">
       <div className="flex justify-center gap-2" role="list" aria-label="Setup progress">
         {STEPS.map((label, index) => (
           <span

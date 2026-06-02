@@ -65,7 +65,11 @@ export function SdrCommandCenterClient({ config, stats, initialActivity, upcomin
       ? 'Running'
       : 'Inactive'
 
-  const statusTone = config.isPaused ? 'text-amber-700' : config.isActive ? 'text-emerald-700' : 'text-stone-500'
+  const statusTone = config.isPaused
+    ? 'text-[var(--warning)]'
+    : config.isActive
+      ? 'text-[var(--success)]'
+      : 'text-[var(--text-secondary)]'
 
   function handlePauseResume() {
     startTransition(async () => {
@@ -93,7 +97,7 @@ export function SdrCommandCenterClient({ config, stats, initialActivity, upcomin
   ]
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto w-full space-y-6 px-4 py-5 md:px-8 md:py-6">
       <PageHeader
         title={`SDR Agent — ${config.agentName}`}
         description={`${statusLabel} · ${stats.activeSequences} active sequences · ${stats.replyRate30d}% reply rate (30d)`}
@@ -136,9 +140,9 @@ export function SdrCommandCenterClient({ config, stats, initialActivity, upcomin
         />
         <span className={statusTone}>{statusLabel}</span>
         {config.isPaused && config.pausedReason ? (
-          <span className="text-stone-500">— {config.pausedReason}</span>
+          <span className="text-[var(--text-secondary)]">— {config.pausedReason}</span>
         ) : null}
-        <span className="text-stone-300">·</span>
+        <span className="text-[var(--text-disabled)]">·</span>
         <Link
           href="/admin/outreach/agents/aspire"
           className="status-pill bg-[var(--accent-muted)] text-[var(--text-primary)] hover:opacity-90"
@@ -149,9 +153,9 @@ export function SdrCommandCenterClient({ config, stats, initialActivity, upcomin
 
       <KpiStrip items={kpiItems} className="lg:grid-cols-4" />
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <section className="card-surface lg:col-span-2 p-4">
-          <div className="flex items-center justify-between gap-2">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(260px,300px)]">
+        <section className="card-surface min-w-0 p-5">
+          <div className="mb-4 flex items-center justify-between gap-2">
             <h3 className="text-sm font-semibold text-[var(--text-primary)]">Activity feed</h3>
             <LiveIndicator active={activityLive} />
           </div>
@@ -159,34 +163,34 @@ export function SdrCommandCenterClient({ config, stats, initialActivity, upcomin
         </section>
 
         <aside className="space-y-4">
-          <section className="card-surface p-4">
+          <section className="card-surface p-5">
             <h3 className="text-sm font-semibold text-[var(--text-primary)]">Pipeline added (30d)</h3>
-            <p className="mt-2 text-2xl font-semibold text-stone-900">
+            <p className="mt-2 text-2xl font-semibold tracking-[-0.02em] text-[var(--text-primary)]">
               ${(stats.pipelineAdded30d / 100).toLocaleString()}
             </p>
-            <p className="mt-1 text-xs text-stone-500">
+            <p className="mt-1 text-xs text-[var(--text-secondary)]">
               Booking rate {stats.bookingRate30d}% · Reply rate {stats.replyRate30d}%
             </p>
           </section>
 
-          <section className="card-surface p-4">
+          <section className="card-surface p-5">
             <h3 className="text-sm font-semibold text-[var(--text-primary)]">Upcoming sends</h3>
-            <ul className="mt-3 space-y-2">
+            <ul className="mt-3 space-y-3">
               {upcoming.length === 0 ? (
-                <li className="text-sm text-stone-500">No scheduled sends</li>
+                <li className="text-sm text-[var(--text-secondary)]">No scheduled sends</li>
               ) : (
                 upcoming.map((row, index) => (
                   <li key={index} className="flex items-start gap-2 text-sm">
                     {row.step.channel === 'sms' ? (
-                      <MessageCircle className="mt-0.5 h-3.5 w-3.5 text-blue-500" />
+                      <MessageCircle className="mt-0.5 h-3.5 w-3.5 text-[var(--accent)]" />
                     ) : (
-                      <Mail className="mt-0.5 h-3.5 w-3.5 text-stone-500" />
+                      <Mail className="mt-0.5 h-3.5 w-3.5 text-[var(--text-secondary)]" />
                     )}
-                    <div>
-                      <p className="text-stone-800">
+                    <div className="min-w-0">
+                      <p className="text-[var(--text-primary)]">
                         {formatTime(row.step.scheduledFor.toISOString())} · Step {row.step.stepNumber}
                       </p>
-                      <p className="text-xs text-stone-500">
+                      <p className="truncate text-xs text-[var(--text-secondary)]">
                         {[row.firstName, row.lastName].filter(Boolean).join(' ') || 'Prospect'},{' '}
                         {row.company}
                       </p>
@@ -197,7 +201,7 @@ export function SdrCommandCenterClient({ config, stats, initialActivity, upcomin
             </ul>
           </section>
 
-          <section className="card-surface border-[var(--border-subtle)] bg-[var(--bg-subtle)]/50 p-4">
+          <section className="card-surface border-[var(--border-subtle)] bg-[var(--bg-subtle)]/50 p-5">
             <div className="flex items-center justify-between gap-2">
               <h3 className="text-sm font-semibold text-[var(--text-primary)]">Prospect Scout</h3>
               <Button variant="ghost" size="sm" className="h-7 text-xs" asChild>
@@ -211,24 +215,40 @@ export function SdrCommandCenterClient({ config, stats, initialActivity, upcomin
             </p>
           </section>
 
-          <section className="card-surface p-4">
+          <section className="card-surface p-5">
             <h3 className="text-sm font-semibold text-[var(--text-primary)]">Agent stats</h3>
-            <dl className="mt-2 grid grid-cols-2 gap-2 text-sm">
+            <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
               <div>
-                <dt className="text-stone-500">Found</dt>
-                <dd className="font-medium">{config.stats.totalLeadsFound}</dd>
+                <dt className="text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--text-secondary)]">
+                  Found
+                </dt>
+                <dd className="mt-1 font-medium text-[var(--text-primary)]">
+                  {config.stats.totalLeadsFound}
+                </dd>
               </div>
               <div>
-                <dt className="text-stone-500">Contacted</dt>
-                <dd className="font-medium">{config.stats.totalContacted}</dd>
+                <dt className="text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--text-secondary)]">
+                  Contacted
+                </dt>
+                <dd className="mt-1 font-medium text-[var(--text-primary)]">
+                  {config.stats.totalContacted}
+                </dd>
               </div>
               <div>
-                <dt className="text-stone-500">Replied</dt>
-                <dd className="font-medium">{config.stats.totalReplied}</dd>
+                <dt className="text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--text-secondary)]">
+                  Replied
+                </dt>
+                <dd className="mt-1 font-medium text-[var(--text-primary)]">
+                  {config.stats.totalReplied}
+                </dd>
               </div>
               <div>
-                <dt className="text-stone-500">Booked</dt>
-                <dd className="font-medium">{config.stats.totalBooked}</dd>
+                <dt className="text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--text-secondary)]">
+                  Booked
+                </dt>
+                <dd className="mt-1 font-medium text-[var(--text-primary)]">
+                  {config.stats.totalBooked}
+                </dd>
               </div>
             </dl>
           </section>

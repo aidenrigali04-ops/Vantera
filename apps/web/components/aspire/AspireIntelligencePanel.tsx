@@ -22,12 +22,29 @@ function prospectName(row: AspireSearchResult): string {
   return [row.firstName, row.lastName].filter(Boolean).join(' ') || 'Unknown'
 }
 
-export function AspireIntelligencePanel({ result, icpConfig, enrollState = 'idle', onAdd, onSkip }: Props) {
+function contactPill(active: boolean) {
+  return cn(
+    'inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset',
+    active
+      ? 'bg-[var(--success-muted)] text-[var(--success)] ring-[var(--success)]/20'
+      : 'bg-[var(--bg-subtle)] text-[var(--text-disabled)] ring-[var(--border-default)]',
+  )
+}
+
+export function AspireIntelligencePanel({
+  result,
+  icpConfig,
+  enrollState = 'idle',
+  onAdd,
+  onSkip,
+}: Props) {
   if (!result) {
     return (
-      <div className="rounded-xl border border-stone-200/90 bg-white p-4 shadow-sm">
-        <h3 className="mb-1 text-sm font-semibold text-stone-900">Intelligence</h3>
-        <p className="text-sm text-stone-500">Select a prospect to see ICP score, signals, and contact quality.</p>
+      <div className="card-surface p-5">
+        <h3 className="text-sm font-semibold text-[var(--text-primary)]">Intelligence</h3>
+        <p className="mt-2 text-[13px] leading-relaxed text-[var(--text-secondary)]">
+          Select a prospect to see ICP score, signals, and contact quality.
+        </p>
       </div>
     )
   }
@@ -37,23 +54,27 @@ export function AspireIntelligencePanel({ result, icpConfig, enrollState = 'idle
   const signals = result.icpSignals?.length ? result.icpSignals : scored.signals
 
   return (
-    <div className="rounded-xl border border-stone-200/90 bg-white p-4 shadow-sm">
-      <h3 className="mb-1 text-sm font-semibold text-stone-900">Intelligence</h3>
-      <p className="mb-4 text-[12px] text-stone-500">ICP fit for your vertical</p>
+    <div className="card-surface p-5">
+      <h3 className="text-sm font-semibold text-[var(--text-primary)]">Intelligence</h3>
+      <p className="mt-1 text-[12px] text-[var(--text-secondary)]">ICP fit for your vertical</p>
 
-      <div className="flex flex-col items-center gap-3 border-b border-stone-100 pb-4">
+      <div className="mt-4 flex flex-col items-center gap-3 border-b border-[var(--border-subtle)] pb-4">
         <IcpScoreRing score={score} />
         <div className="text-center">
           <StatusBadge label={icpScoreLabel(score)} tone={aspireIntentTone(score)} />
-          <p className="mt-1 text-sm font-medium text-stone-900">{prospectName(result)}</p>
-          <p className="text-[12px] text-stone-500">{result.title}</p>
-          <p className="text-[12px] text-stone-500">{result.organizationName ?? result.company}</p>
+          <p className="mt-2 text-sm font-medium text-[var(--text-primary)]">{prospectName(result)}</p>
+          <p className="text-[12px] text-[var(--text-secondary)]">{result.title}</p>
+          <p className="text-[12px] text-[var(--text-secondary)]">
+            {result.organizationName ?? result.company}
+          </p>
         </div>
       </div>
 
-      <div className="mt-4 space-y-3">
+      <div className="mt-4 space-y-4">
         <div>
-          <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-stone-500">Score breakdown</p>
+          <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--text-secondary)]">
+            Score breakdown
+          </p>
           <ul className="space-y-1.5 text-[12px]">
             {[
               ['Title match', scored.breakdown.titleMatch, 30],
@@ -63,8 +84,8 @@ export function AspireIntelligencePanel({ result, icpConfig, enrollState = 'idle
               ['Tech bonus', scored.breakdown.techBonus, 10],
             ].map(([label, value, max]) => (
               <li key={String(label)} className="flex items-center justify-between gap-2">
-                <span className="text-stone-600">{label}</span>
-                <span className="font-mono text-stone-800">
+                <span className="text-[var(--text-secondary)]">{label}</span>
+                <span className="font-mono text-[var(--text-primary)]">
                   {value}/{max}
                 </span>
               </li>
@@ -73,47 +94,28 @@ export function AspireIntelligencePanel({ result, icpConfig, enrollState = 'idle
         </div>
 
         <div>
-          <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-stone-500">Contact</p>
+          <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--text-secondary)]">
+            Contact
+          </p>
           <div className="flex flex-wrap gap-2">
-            <span
-              className={cn(
-                'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] ring-1 ring-inset',
-                result.email
-                  ? 'bg-emerald-50 text-emerald-700 ring-emerald-200/80'
-                  : 'bg-stone-50 text-stone-400 ring-stone-200/80',
-              )}
-            >
+            <span className={contactPill(Boolean(result.email))}>
               <Mail className="h-3 w-3" />
               Email
             </span>
-            <span
-              className={cn(
-                'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] ring-1 ring-inset',
-                result.phone
-                  ? 'bg-emerald-50 text-emerald-700 ring-emerald-200/80'
-                  : 'bg-stone-50 text-stone-400 ring-stone-200/80',
-              )}
-            >
+            <span className={contactPill(Boolean(result.phone))}>
               <Phone className="h-3 w-3" />
               Phone
             </span>
-            <span
-              className={cn(
-                'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] ring-1 ring-inset',
-                result.linkedinUrl
-                  ? 'bg-emerald-50 text-emerald-700 ring-emerald-200/80'
-                  : 'bg-stone-50 text-stone-400 ring-stone-200/80',
-              )}
-            >
+            <span className={contactPill(Boolean(result.linkedinUrl))}>
               <ExternalLink className="h-3 w-3" />
               LinkedIn
             </span>
           </div>
-          <ul className="mt-2 space-y-1 text-[12px] text-stone-600">
+          <ul className="mt-3 space-y-1.5 text-[12px] text-[var(--text-secondary)]">
             <li>
-              <span className="text-stone-500">Email:</span>{' '}
+              <span className="text-[var(--text-tertiary)]">Email:</span>{' '}
               {result.email ? (
-                <a href={`mailto:${result.email}`} className="text-blue-600 hover:underline">
+                <a href={`mailto:${result.email}`} className="text-[var(--accent)] hover:underline">
                   {result.email}
                 </a>
               ) : (
@@ -121,16 +123,16 @@ export function AspireIntelligencePanel({ result, icpConfig, enrollState = 'idle
               )}
             </li>
             <li>
-              <span className="text-stone-500">Phone:</span> {result.phone ?? '—'}
+              <span className="text-[var(--text-tertiary)]">Phone:</span> {result.phone ?? '—'}
             </li>
             <li>
-              <span className="text-stone-500">LinkedIn:</span>{' '}
+              <span className="text-[var(--text-tertiary)]">LinkedIn:</span>{' '}
               {result.linkedinUrl ? (
                 <a
                   href={result.linkedinUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-blue-600 hover:underline"
+                  className="text-[var(--accent)] hover:underline"
                 >
                   View profile
                 </a>
@@ -143,10 +145,12 @@ export function AspireIntelligencePanel({ result, icpConfig, enrollState = 'idle
 
         {signals.length > 0 ? (
           <div>
-            <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-stone-500">Key signals</p>
+            <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--text-secondary)]">
+              Key signals
+            </p>
             <ul className="space-y-1">
               {signals.map((signal) => (
-                <li key={signal} className="text-[12px] text-stone-600">
+                <li key={signal} className="text-[12px] text-[var(--text-secondary)]">
                   · {signal}
                 </li>
               ))}
@@ -155,13 +159,13 @@ export function AspireIntelligencePanel({ result, icpConfig, enrollState = 'idle
         ) : null}
 
         {result.employeeCount ? (
-          <p className="text-[12px] text-stone-500">~{result.employeeCount} employees</p>
+          <p className="text-[12px] text-[var(--text-tertiary)]">~{result.employeeCount} employees</p>
         ) : null}
       </div>
 
-      <div className="mt-4 flex flex-col gap-2">
+      <div className="mt-5 flex flex-col gap-2">
         <Button
-          className="w-full bg-stone-900 hover:bg-stone-800"
+          className="w-full bg-[var(--text-primary)] text-[var(--text-inverse)] hover:opacity-90"
           onClick={onAdd}
           disabled={!onAdd || enrollState === 'pending' || enrollState === 'added'}
         >

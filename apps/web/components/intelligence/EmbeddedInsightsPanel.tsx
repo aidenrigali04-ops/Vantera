@@ -50,14 +50,19 @@ export function EmbeddedInsightCard({ insight, onDismiss, compact = false }: Emb
         <Sparkles className={cn('mt-0.5 h-4 w-4 shrink-0', styles.icon)} aria-hidden />
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
-            <p className={cn('font-medium text-stone-900', compact ? 'text-[13px]' : 'text-sm')}>
+            <p
+              className={cn(
+                'font-medium text-[var(--text-primary)]',
+                compact ? 'text-[13px]' : 'text-sm',
+              )}
+            >
               {insight.headline}
             </p>
             {insight.dismissible && onDismiss ? (
               <button
                 type="button"
                 onClick={() => onDismiss(insight.id)}
-                className="shrink-0 rounded-md p-1 text-stone-400 transition-colors hover:bg-white/80 hover:text-stone-700"
+                className="shrink-0 rounded-md p-1 text-[var(--text-tertiary)] transition-colors duration-150 hover:bg-[var(--bg-overlay)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-muted)]"
                 aria-label="Dismiss insight"
               >
                 <X className="h-3.5 w-3.5" />
@@ -65,14 +70,19 @@ export function EmbeddedInsightCard({ insight, onDismiss, compact = false }: Emb
             ) : null}
           </div>
           {insight.recommendation ? (
-            <p className={cn('mt-1.5 leading-relaxed text-stone-600', compact ? 'text-[12px]' : 'text-[13px]')}>
+            <p
+              className={cn(
+                'mt-1.5 leading-relaxed text-[var(--text-secondary)]',
+                compact ? 'text-[12px]' : 'text-[13px]',
+              )}
+            >
               {insight.recommendation}
             </p>
           ) : null}
           {insight.actionLabel ? (
             <Link
               href={insight.actionHref}
-              className="mt-3 inline-flex items-center gap-1 text-[12px] font-medium text-stone-800 underline-offset-2 hover:underline"
+              className="mt-3 inline-flex items-center gap-1 text-[12px] font-medium text-[var(--accent)] underline-offset-2 hover:underline"
             >
               {insight.actionLabel}
               <ArrowRight className="h-3.5 w-3.5" aria-hidden />
@@ -115,8 +125,8 @@ export function EmbeddedInsightsPanel({
 
   if (insights.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-stone-200 bg-stone-50/80 px-4 py-8 text-center">
-        <p className="text-[13px] text-stone-500">{emptyMessage}</p>
+      <div className="rounded-lg border border-dashed border-[var(--border-default)] bg-[var(--bg-subtle)]/60 px-4 py-8 text-center">
+        <p className="text-[13px] text-[var(--text-secondary)]">{emptyMessage}</p>
       </div>
     )
   }
@@ -125,8 +135,10 @@ export function EmbeddedInsightsPanel({
     <div className="space-y-3">
       {title ? (
         <div>
-          <h3 className="text-sm font-semibold text-stone-900">{title}</h3>
-          {subtitle ? <p className="mt-0.5 text-[12px] text-stone-500">{subtitle}</p> : null}
+          <h3 className="text-sm font-semibold text-[var(--text-primary)]">{title}</h3>
+          {subtitle ? (
+            <p className="mt-0.5 text-[12px] text-[var(--text-secondary)]">{subtitle}</p>
+          ) : null}
         </div>
       ) : null}
       <div className={cn('space-y-3', !compact && 'sm:space-y-3')}>

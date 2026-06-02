@@ -29,12 +29,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
   }
 
-  const body = (await request.json()) as Partial<ApolloSearchFilters> & { searchId?: string }
+  const body = (await request.json()) as Partial<ApolloSearchFilters> & {
+    searchId?: string
+    limit?: number
+  }
 
   try {
     const { results, meta } = await searchProspects(session.accountId, body, {
       searchId: body.searchId,
       persist: true,
+      limit: typeof body.limit === 'number' ? body.limit : undefined,
     })
     return NextResponse.json({
       success: true,

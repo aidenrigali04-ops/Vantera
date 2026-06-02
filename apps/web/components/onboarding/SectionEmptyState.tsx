@@ -25,14 +25,23 @@ export function SectionEmptyState({
   return (
     <div
       className={cn(
-        'rounded-xl border border-dashed border-stone-200 bg-stone-50/80 px-6 py-12 text-center',
+        'rounded-lg border border-dashed border-[var(--border-default)] bg-[var(--bg-subtle)]/60 px-6 py-12 text-center',
         className,
       )}
     >
-      {Icon ? <Icon className="mx-auto mb-3 h-8 w-8 text-stone-300" aria-hidden /> : null}
-      <p className="text-sm font-medium text-stone-800">{title}</p>
-      <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-stone-500">{description}</p>
-      <Button type="button" size="sm" className="mt-5" onClick={onAction}>
+      {Icon ? (
+        <Icon className="mx-auto mb-3 h-8 w-8 text-[var(--text-disabled)]" aria-hidden />
+      ) : null}
+      <p className="text-sm font-medium text-[var(--text-primary)]">{title}</p>
+      <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-[var(--text-secondary)]">
+        {description}
+      </p>
+      <Button
+        type="button"
+        size="sm"
+        className="mt-5 bg-[var(--text-primary)] text-[var(--text-inverse)] hover:opacity-90"
+        onClick={onAction}
+      >
         {actionLabel}
       </Button>
     </div>

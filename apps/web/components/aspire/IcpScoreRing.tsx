@@ -8,9 +8,9 @@ type Props = {
 }
 
 export function icpScoreColor(score: number): string {
-  if (score >= 70) return '#16a34a'
-  if (score >= 40) return '#d97706'
-  return '#dc2626'
+  if (score >= 70) return 'var(--success)'
+  if (score >= 40) return 'var(--warning)'
+  return 'var(--danger)'
 }
 
 export function icpScoreLabel(score: number): string {
@@ -26,16 +26,18 @@ export function IcpScoreRing({ score, size = 88, strokeWidth = 7, className }: P
   const color = icpScoreColor(score)
 
   return (
-    <div className={cn('relative inline-flex items-center justify-center', className)} style={{ width: size, height: size }}>
+    <div
+      className={cn('relative inline-flex items-center justify-center', className)}
+      style={{ width: size, height: size }}
+    >
       <svg width={size} height={size} className="-rotate-90">
         <circle
           cx={size / 2}
           cy={size / 2}
           r={radius}
           fill="none"
-          stroke="currentColor"
+          stroke="var(--border-subtle)"
           strokeWidth={strokeWidth}
-          className="text-stone-100"
         />
         <circle
           cx={size / 2}
@@ -51,8 +53,10 @@ export function IcpScoreRing({ score, size = 88, strokeWidth = 7, className }: P
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-xl font-semibold tabular-nums text-stone-900">{score}</span>
-        <span className="text-[10px] font-medium uppercase tracking-wide text-stone-500">ICP</span>
+        <span className="text-xl font-semibold tabular-nums text-[var(--text-primary)]">{score}</span>
+        <span className="text-[10px] font-medium uppercase tracking-[0.06em] text-[var(--text-secondary)]">
+          ICP
+        </span>
       </div>
     </div>
   )

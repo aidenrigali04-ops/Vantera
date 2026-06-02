@@ -46,27 +46,32 @@ export function SdrAgentsPageClient({ agents, enrolledLeads }: Props) {
   ]
 
   return (
-    <div className="space-y-8">
-      <section className="overflow-hidden rounded-2xl border border-violet-200/80 bg-gradient-to-br from-violet-50 via-white to-stone-50 p-6 shadow-sm sm:p-8">
+    <div className="mx-auto w-full space-y-8 px-4 py-5 md:px-8 md:py-6">
+      <section className="card-surface overflow-hidden border-[var(--accent-border)] bg-gradient-to-br from-[var(--accent-muted)] via-[var(--bg-surface)] to-[var(--bg-subtle)] p-6 sm:p-8">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-2xl space-y-3">
-            <p className="inline-flex items-center gap-1.5 rounded-full bg-violet-100 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-violet-800">
+            <p className="inline-flex items-center gap-1.5 rounded-md border border-[var(--accent-border)] bg-[var(--accent-muted)] px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--text-primary)]">
               <Bot className="h-3.5 w-3.5" />
               AI SDR workforce
             </p>
-            <h1 className="text-2xl font-semibold tracking-[-0.02em] text-stone-900 sm:text-3xl">
+            <h1 className="text-2xl font-semibold tracking-[-0.02em] text-[var(--text-primary)] sm:text-3xl">
               {SDR_AGENTS_HEADLINE}
             </h1>
-            <p className="text-[15px] leading-relaxed text-stone-600">{SDR_AGENTS_SUBHEADLINE}</p>
+            <p className="text-[15px] leading-relaxed text-[var(--text-secondary)]">
+              {SDR_AGENTS_SUBHEADLINE}
+            </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button asChild className="bg-stone-900 hover:bg-stone-800">
+            <Button
+              asChild
+              className="bg-[var(--text-primary)] text-[var(--text-inverse)] hover:opacity-90"
+            >
               <Link href="/admin/outreach/aspire">
                 <Rocket className="mr-1.5 h-4 w-4" />
                 Deploy Prospect Scout
               </Link>
             </Button>
-            <Button asChild variant="outline">
+            <Button asChild variant="outline" className="border-[var(--border-default)]">
               <Link href="/admin/outreach/campaigns">
                 Launch Outreach Agent
                 <ArrowRight className="ml-1.5 h-4 w-4" />
@@ -87,10 +92,10 @@ export function SdrAgentsPageClient({ agents, enrolledLeads }: Props) {
         {agents.map((agent) => (
             <article
               key={agent.id}
-              className="flex h-full flex-col rounded-xl border border-stone-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md"
+              className="card-surface card-surface-interactive flex h-full flex-col p-5"
             >
               <div className="flex items-start justify-between gap-3">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-50 text-violet-700 ring-1 ring-violet-100">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[var(--accent-border)] bg-[var(--accent-muted)] text-[var(--text-primary)]">
                   <SdrAgentIcon name={agent.iconName} className="h-5 w-5" />
                 </span>
                 <StatusBadge
@@ -100,17 +105,21 @@ export function SdrAgentsPageClient({ agents, enrolledLeads }: Props) {
               </div>
 
               <div className="mt-4 flex-1">
-                <h3 className="text-base font-semibold text-stone-900">{agent.name}</h3>
-                <p className="mt-0.5 text-sm font-medium text-violet-700">{agent.tagline}</p>
-                <p className="mt-2 text-sm leading-relaxed text-stone-600">{agent.description}</p>
+                <h3 className="text-base font-semibold text-[var(--text-primary)]">{agent.name}</h3>
+                <p className="mt-0.5 text-sm font-medium text-[var(--accent)]">{agent.tagline}</p>
+                <p className="mt-2 text-sm leading-relaxed text-[var(--text-secondary)]">
+                  {agent.description}
+                </p>
               </div>
 
-              <div className="mt-4 flex items-center justify-between gap-3 border-t border-stone-100 pt-4">
+              <div className="mt-4 flex items-center justify-between gap-3 border-t border-[var(--border-subtle)] pt-4">
                 <div>
-                  <p className="text-[11px] font-medium uppercase tracking-wide text-stone-400">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--text-tertiary)]">
                     {agent.statLabel}
                   </p>
-                  <p className="text-lg font-semibold tabular-nums text-stone-900">{agent.statValue}</p>
+                  <p className="text-lg font-semibold tabular-nums text-[var(--text-primary)]">
+                    {agent.statValue}
+                  </p>
                 </div>
                 <Button asChild size="sm" variant={agent.status === 'needs_setup' ? 'default' : 'outline'}>
                   <Link href={agent.href}>{agent.ctaLabel}</Link>
@@ -120,15 +129,15 @@ export function SdrAgentsPageClient({ agents, enrolledLeads }: Props) {
         ))}
       </div>
 
-      <section className="rounded-xl border border-stone-200 bg-stone-50/60 p-5">
+      <section className="card-surface bg-[var(--bg-subtle)]/50 p-5">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-3">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white ring-1 ring-stone-200">
-              <Zap className="h-4 w-4 text-amber-600" />
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--border-default)] bg-[var(--bg-surface)]">
+              <Zap className="h-4 w-4 text-[var(--warning)]" />
             </span>
             <div>
-              <h3 className="text-sm font-semibold text-stone-900">Recommended deploy order</h3>
-              <ol className="mt-2 space-y-1 text-sm text-stone-600">
+              <h3 className="text-sm font-semibold text-[var(--text-primary)]">Recommended deploy order</h3>
+              <ol className="mt-2 space-y-1 text-sm text-[var(--text-secondary)]">
                 <li>1. Save an Aspire search → Prospect Scout finds leads weekly</li>
                 <li>2. Enroll matches → Message Drafter writes personalized outreach</li>
                 <li>3. Launch a campaign → Outreach Agent runs your sequence 24/7</li>
