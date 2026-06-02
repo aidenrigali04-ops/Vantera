@@ -1,10 +1,10 @@
 import { findProspectScoutResults } from '@/lib/aspire/queries'
 import { hydrateAspireSearchResult } from '@/lib/aspire/hydrate-result'
-import { getAdminSession } from '@/lib/auth/session'
+import { getSyncedAdminSession } from '@/lib/auth/require-session'
 import { NextResponse } from 'next/server'
 
 export async function GET(request: Request) {
-  const session = await getAdminSession()
+  const session = await getSyncedAdminSession()
   if (!session) {
     return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
   }

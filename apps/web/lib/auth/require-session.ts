@@ -38,6 +38,13 @@ export async function requireAdminSession(): Promise<AdminSession> {
   return syncedSession
 }
 
+/** Resolve session accountId from the users row (for API routes). Updates cookie when stale. */
+export async function getSyncedAdminSession(): Promise<AdminSession | null> {
+  const session = await getAdminSession()
+  if (!session) return null
+  return syncSessionAccountId(session)
+}
+
 export async function requirePortalSession(): Promise<PortalSession> {
   const session = await getPortalSession()
 

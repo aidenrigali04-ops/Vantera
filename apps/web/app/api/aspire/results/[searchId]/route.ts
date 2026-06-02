@@ -1,12 +1,12 @@
 import { findAspireResults } from '@/lib/aspire/queries'
 import { hydrateAspireSearchResult } from '@/lib/aspire/hydrate-result'
-import { getAdminSession } from '@/lib/auth/session'
+import { getSyncedAdminSession } from '@/lib/auth/require-session'
 import { NextResponse } from 'next/server'
 
 type RouteParams = { params: Promise<{ searchId: string }> }
 
 export async function GET(request: Request, { params }: RouteParams) {
-  const session = await getAdminSession()
+  const session = await getSyncedAdminSession()
   if (!session) {
     return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
   }

@@ -1,5 +1,5 @@
 import { findSavedSearches } from '@/lib/aspire/queries'
-import { getAdminSession } from '@/lib/auth/session'
+import { getSyncedAdminSession } from '@/lib/auth/require-session'
 import { db } from '@/lib/db/client'
 import { runUnboundSearch } from '@/lib/prospect-scout/run-search'
 import { accounts } from '@vantera/db'
@@ -7,7 +7,7 @@ import { eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 export async function POST(request: Request) {
-  const session = await getAdminSession()
+  const session = await getSyncedAdminSession()
   if (!session) {
     return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
   }

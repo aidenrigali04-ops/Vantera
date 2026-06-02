@@ -1,4 +1,4 @@
-import { getAdminSession } from '@/lib/auth/session'
+import { getSyncedAdminSession } from '@/lib/auth/require-session'
 import { findSavedSearches } from '@/lib/aspire/queries'
 import type { ApolloSearchFilters } from '@/lib/aspire/types'
 import { db } from '@/lib/db/client'
@@ -7,7 +7,7 @@ import { and, eq, isNull } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 export async function GET() {
-  const session = await getAdminSession()
+  const session = await getSyncedAdminSession()
   if (!session) {
     return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
   }
@@ -17,7 +17,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const session = await getAdminSession()
+  const session = await getSyncedAdminSession()
   if (!session) {
     return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
   }
@@ -47,7 +47,7 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  const session = await getAdminSession()
+  const session = await getSyncedAdminSession()
   if (!session) {
     return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
   }
@@ -90,7 +90,7 @@ export async function PATCH(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const session = await getAdminSession()
+  const session = await getSyncedAdminSession()
   if (!session) {
     return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
   }

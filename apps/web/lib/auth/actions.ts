@@ -1,7 +1,6 @@
 'use server'
 
 import {
-  findAccountByAdminEmail,
   findAccountByPortalEmail,
   resolveAccountFromHost,
 } from '@/lib/auth/resolve-account'
@@ -51,6 +50,30 @@ type AdminUserRow = {
 type PortalContactRow = {
   id: string
   email: string | null
+}
+
+type AdminUserWithAccount = AdminUserRow & { account_id: string; is_active: boolean }
+
+async function findAdminUserByAuthId(authUserId: string): Promise<AdminUserWithAccount | null> {
+  const admin = getSupabaseAdmin()
+  const { data, error } = await admin
+    .from('users')
+    .select('id, email, role, is_active, deleted_at, account_id, created_at')
+    .eq('id', authUserId)
+    .is('deleted_at', null)
+    .maybeSingle()
+
+  if (error || !data?.account_id) {
+    return null
+  }
+
+  return {
+    id: data.id,
+    email: data.email,
+    role: data.role,
+    account_id: data.account_id,
+    is_active: data.is_active ?? true,
+  }
 }
 
 async function findActiveAdminUser(accountId: string, email: string): Promise<AdminUserRow | null> {
@@ -108,23 +131,12 @@ export async function adminLoginAction(
   }
 
   const host = headers().get('host') ?? ''
-
-  // First try to resolve via the host (tenant subdomain or portal_domain).
-  // Fall back to looking up the account by the admin user's email — this
-  // is what lets users sign in from the marketing apex, the bare
-  // *.vercel.app URL, or localhost without needing a TEST_TENANT_SLUG.
-  let account = await resolveAccountFromHost(host)
-  if (!account) {
-    account = await findAccountByAdminEmail(validated.data.email)
-  }
-
-  if (!account) {
-    return { success: false, error: 'Invalid email or password' }
-  }
+  const hostAccount = await resolveAccountFromHost(host)
+  const normalizedEmail = validated.data.email.toLowerCase().trim()
 
   const supabase = createSupabaseServerClient()
   const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-    email: validated.data.email,
+    email: normalizedEmail,
     password: validated.data.password,
   })
 
@@ -132,9 +144,27 @@ export async function adminLoginAction(
     return { success: false, error: 'Invalid email or password' }
   }
 
-  const user = await findActiveAdminUser(account.id, validated.data.email)
+  const user = await findAdminUserByAuthId(authData.user.id)
 
-  if (!user) {
+  if (!user || !user.is_active) {
+    await supabase.auth.signOut()
+    return { success: false, error: 'Invalid email or password' }
+  }
+
+  if (user.email.toLowerCase().trim() !== normalizedEmail) {
+    await supabase.auth.signOut()
+    return { success: false, error: 'Invalid email or password' }
+  }
+
+  if (hostAccount && hostAccount.id !== user.account_id) {
+    await supabase.auth.signOut()
+    return { success: false, error: 'Invalid email or password' }
+  }
+
+  const { fetchAccountById } = await import('@/lib/onboarding/account-store')
+  const account = hostAccount ?? (await fetchAccountById(user.account_id))
+
+  if (!account?.id) {
     await supabase.auth.signOut()
     return { success: false, error: 'Invalid email or password' }
   }
@@ -142,7 +172,7 @@ export async function adminLoginAction(
   await setAdminSession({
     type: 'admin',
     userId: user.id,
-    accountId: account.id,
+    accountId: user.account_id,
     role: user.role as UserRole,
     email: user.email,
   })

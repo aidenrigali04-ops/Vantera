@@ -1,10 +1,10 @@
 import { enrollAspireProspectsInCampaign } from '@/lib/aspire/enroll-campaign'
 import type { ApolloPersonResult } from '@/lib/aspire/types'
-import { getAdminSession } from '@/lib/auth/session'
+import { getSyncedAdminSession } from '@/lib/auth/require-session'
 import { NextResponse } from 'next/server'
 
 export async function POST(request: Request) {
-  const session = await getAdminSession()
+  const session = await getSyncedAdminSession()
   if (!session) {
     return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
   }

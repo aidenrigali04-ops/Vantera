@@ -1,21 +1,11 @@
 'use client'
 
+import { OnboardingChoiceList } from '@/components/onboarding/onboarding-wizard/OnboardingChoiceList'
 import { motion } from 'framer-motion'
-import {
-  Briefcase,
-  Building,
-  Droplet,
-  HardHat,
-  Home,
-  Leaf,
-  Wrench,
-  type LucideIcon,
-} from 'lucide-react'
 import { useCallback, useState } from 'react'
 import { useRegisterOnboardingStep } from '../onboarding-nav'
 import { updateVertical } from '../actions'
 import {
-  SelectableTile,
   StepError,
   fadeUp,
   rethrowFrameworkNavigation,
@@ -32,64 +22,18 @@ type Vertical =
   | 'agency'
   | 'real_estate'
 
-type VerticalCard = {
-  value: Vertical
-  label: string
-  description: string
-  icon: LucideIcon
-  accent: string
-}
-
-const VERTICALS: VerticalCard[] = [
-  {
-    value: 'hvac',
-    label: 'HVAC',
-    description: 'Service calls, maintenance plans, equipment installs',
-    icon: Wrench,
-    accent: '#3B82F6',
-  },
-  {
-    value: 'landscaping',
-    label: 'Landscaping',
-    description: 'Recurring crews, estimates, seasonal contracts',
-    icon: Leaf,
-    accent: '#10B981',
-  },
-  {
-    value: 'plumbing',
-    label: 'Plumbing',
-    description: 'Emergency dispatch, quotes, job completion',
-    icon: Droplet,
-    accent: '#06B6D4',
-  },
-  {
-    value: 'construction',
-    label: 'Construction',
-    description: 'Projects, change orders, client milestones',
-    icon: HardHat,
-    accent: '#F59E0B',
-  },
+const VERTICALS: Array<{ value: Vertical; label: string; description: string }> = [
+  { value: 'hvac', label: 'HVAC', description: 'Service calls, maintenance plans, equipment installs' },
+  { value: 'landscaping', label: 'Landscaping', description: 'Recurring crews, estimates, seasonal contracts' },
+  { value: 'plumbing', label: 'Plumbing', description: 'Emergency dispatch, quotes, job completion' },
+  { value: 'construction', label: 'Construction', description: 'Projects, change orders, client milestones' },
   {
     value: 'property_mgmt',
     label: 'Property Management',
     description: 'Tenants, leases, maintenance, owners',
-    icon: Building,
-    accent: '#8B5CF6',
   },
-  {
-    value: 'agency',
-    label: 'Agency',
-    description: 'Campaigns, clients, ROI reporting',
-    icon: Briefcase,
-    accent: '#EC4899',
-  },
-  {
-    value: 'real_estate',
-    label: 'Real Estate',
-    description: 'Leads, transactions, agent performance',
-    icon: Home,
-    accent: '#EF4444',
-  },
+  { value: 'agency', label: 'Agency', description: 'Campaigns, clients, ROI reporting' },
+  { value: 'real_estate', label: 'Real Estate', description: 'Leads, transactions, agent performance' },
 ]
 
 type Props = {
@@ -99,7 +43,7 @@ type Props = {
   onComplete: (data: { vertical: Vertical }) => void
 }
 
-export function Step1BusinessType({ accountId, currentVertical, primaryColor, onComplete }: Props) {
+export function Step1BusinessType({ accountId, currentVertical, onComplete }: Props) {
   const [selected, setSelected] = useState<Vertical | null>(
     VERTICALS.find((v) => v.value === currentVertical)?.value ?? null,
   )
@@ -151,20 +95,12 @@ export function Step1BusinessType({ accountId, currentVertical, primaryColor, on
 
   return (
     <motion.div variants={stepContainer} initial="hidden" animate="show" className="space-y-3">
-      <motion.div variants={fadeUp} className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-        {VERTICALS.map((vertical) => (
-          <SelectableTile
-            key={vertical.value}
-            selected={selected === vertical.value}
-            primaryColor={primaryColor}
-            iconColor={vertical.accent}
-            onClick={() => setSelected(vertical.value)}
-            icon={vertical.icon}
-            title={vertical.label}
-            description={vertical.description}
-            layout="vertical"
-          />
-        ))}
+      <motion.div variants={fadeUp}>
+        <OnboardingChoiceList
+          options={VERTICALS}
+          selected={selected}
+          onSelect={(value) => setSelected(value as Vertical)}
+        />
       </motion.div>
 
       {error ? <StepError message={error} /> : null}

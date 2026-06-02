@@ -172,6 +172,10 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
           return displayLeadsRef.current
         }
 
+        if (isSearchingRef.current && !options?.force) {
+          return displayLeadsRef.current
+        }
+
         if (options?.force) {
           applyDisplayLeads([], 'stored')
           return []
@@ -211,8 +215,10 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
 
   useEffect(() => {
     resultsLoadSeqRef.current += 1
-    liveSearchRef.current = null
-    void loadStoredResults(activeSearchId, { force: true })
+    if (!isSearchingRef.current) {
+      liveSearchRef.current = null
+    }
+    void loadStoredResults(activeSearchId, { force: false, merge: true })
   }, [activeSearchId, loadStoredResults])
 
   const reloadStoredResults = useCallback(() => {
@@ -492,6 +498,8 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
           ? `Found ${results.length} prospect${results.length === 1 ? '' : 's'} for "${trimmedQuery || trimmedCompany}"`
           : 'No prospects matched — try a broader keyword',
       )
+
+      void pollStoredResults(activeSearchId ?? null)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Apify search failed')
     } finally {

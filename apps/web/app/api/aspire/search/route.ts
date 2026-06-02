@@ -1,4 +1,4 @@
-import { getAdminSession } from '@/lib/auth/session'
+import { getSyncedAdminSession } from '@/lib/auth/require-session'
 import { searchProspects } from '@/lib/aspire/search'
 import type { ApolloSearchFilters } from '@/lib/aspire/types'
 import { NextResponse } from 'next/server'
@@ -7,7 +7,7 @@ import { NextResponse } from 'next/server'
 export const maxDuration = 300
 
 export async function GET(request: Request) {
-  const session = await getAdminSession()
+  const session = await getSyncedAdminSession()
   if (!session) {
     return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
   }
@@ -27,7 +27,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const session = await getAdminSession()
+  const session = await getSyncedAdminSession()
   if (!session) {
     return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
   }

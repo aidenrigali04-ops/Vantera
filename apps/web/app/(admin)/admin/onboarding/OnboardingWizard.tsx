@@ -1,7 +1,6 @@
 'use client'
 
-import { OnboardingMediaPanel } from '@/components/onboarding/onboarding-wizard/OnboardingMediaPanel'
-import { SlideWizardFrame } from '@/components/onboarding/slide-wizard/SlideWizardFrame'
+import { OnboardingSingleFrame } from '@/components/onboarding/onboarding-wizard/OnboardingSingleFrame'
 import {
   getOnboardingWizardSlideMeta,
   ONBOARDING_WIZARD_SLIDES,
@@ -15,10 +14,7 @@ import {
 } from './onboarding-nav'
 import { Step1BusinessType } from './steps/Step1BusinessType'
 import { Step2Branding } from './steps/Step2Branding'
-import { Step3Profile } from './steps/Step3Profile'
-import { Step3Template as Step4Template } from './steps/Step3Template'
-import { Step4Team as Step5Team } from './steps/Step4Team'
-import { Step5Connections as Step6Connections } from './steps/Step5Connections'
+import { Step3DashboardSetup } from './steps/Step3DashboardSetup'
 
 type Props = {
   accountId: string
@@ -41,7 +37,7 @@ function OnboardingWizardInner({
 }: Props) {
   const router = useRouter()
   const storageKey = `vantera_onboarding_step_${accountId}`
-  const { runSubmit, runSecondary, nav } = useOnboardingNavActions()
+  const { runSubmit, nav } = useOnboardingNavActions()
 
   const [stepIndex, setStepIndex] = useState(0)
   const [hydrated, setHydrated] = useState(false)
@@ -111,11 +107,6 @@ function OnboardingWizardInner({
     advance()
   }, [runSubmit, meta.isLast, advance, handleFinalComplete])
 
-  const handleSecondary = useCallback(async () => {
-    await runSecondary()
-    if (!meta.isLast) advance()
-  }, [runSecondary, meta.isLast, advance])
-
   const primaryLabel = useMemo(() => {
     if (nav.primaryLabel) return nav.primaryLabel
     if (meta.isLast) return 'Finish setup'
@@ -136,24 +127,16 @@ function OnboardingWizardInner({
   }
 
   return (
-    <SlideWizardFrame
-      variant="overlay"
-      open
+    <OnboardingSingleFrame
       headerLabel={headerLabel}
       slide={slide}
       stepIndex={stepIndex}
       totalSteps={ONBOARDING_WIZARD_SLIDES.length}
-      mediaPanel={
-        <OnboardingMediaPanel media={slide.media} slideId={slide.id} className="h-full lg:min-h-[320px]" />
-      }
       onBack={goBack}
       onPrimary={handlePrimary}
       primaryLabel={primaryLabel}
       primaryDisabled={!nav.canAdvance}
       primaryLoading={nav.isSubmitting}
-      secondaryLabel={nav.secondaryLabel}
-      onSecondary={nav.secondaryLabel ? handleSecondary : undefined}
-      showSkip={false}
       dialogTitleId="onboarding-wizard-title"
       dialogBodyId="onboarding-wizard-body"
     >
@@ -164,7 +147,6 @@ function OnboardingWizardInner({
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -4 }}
           transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-          className="space-y-4"
         >
           {stepIndex === 0 ? (
             <Step1BusinessType
@@ -195,40 +177,15 @@ function OnboardingWizardInner({
           ) : null}
 
           {stepIndex === 2 ? (
-            <Step3Profile
-              accountId={accountId}
-              primaryColor={primaryColor}
-              onComplete={() => {}}
-            />
-          ) : null}
-
-          {stepIndex === 3 ? (
-            <Step4Template
+            <Step3DashboardSetup
               accountId={accountId}
               vertical={vertical}
-              primaryColor={primaryColor}
-              onComplete={() => {}}
-            />
-          ) : null}
-
-          {stepIndex === 4 ? (
-            <Step5Team
-              accountId={accountId}
-              primaryColor={primaryColor}
-              onComplete={() => {}}
-            />
-          ) : null}
-
-          {stepIndex === 5 ? (
-            <Step6Connections
-              accountId={accountId}
-              primaryColor={primaryColor}
               onComplete={() => {}}
             />
           ) : null}
         </motion.div>
       </AnimatePresence>
-    </SlideWizardFrame>
+    </OnboardingSingleFrame>
   )
 }
 
