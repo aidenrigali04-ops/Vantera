@@ -138,11 +138,22 @@ export function SdrAspireConfigClient({ accountId, initial }: Props) {
         toast.error(json.error ?? 'Run failed')
         return
       }
+
+      if (json.data?.queued) {
+        toast.success('Prospect Scout run queued — watch Recent runs for progress')
+        void refreshRuns()
+        router.refresh()
+        return
+      }
+
       const enrolled = json.data?.enrolled ?? json.data?.totalEnrolled ?? 0
+      const found = json.data?.found ?? 0
       toast.success(
         searchId
           ? `Search run complete — ${enrolled} enrolled`
-          : `Prospect Scout run complete — ${enrolled} enrolled`,
+          : found > 0 && enrolled === 0
+            ? `Prospect Scout complete — ${found} scored (none enrolled yet)`
+            : `Prospect Scout run complete — ${enrolled} enrolled`,
       )
       const refresh = await fetch('/api/sdr/aspire-config')
       const refreshJson = await refresh.json()

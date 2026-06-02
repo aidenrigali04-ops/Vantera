@@ -397,21 +397,8 @@ export async function searchApify(
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Apify search failed'
-    if (isApifyAuthError(message)) {
-      const people = stubResults(filters)
-      console.error('[searchApify] invalid Apify token — using stub leads')
-      return {
-        people,
-        total: people.length,
-        hasMore: false,
-        meta: {
-          source: 'stub',
-          providerConfigured: false,
-          providerError: 'Invalid Apify token',
-        },
-      }
-    }
-    console.error('[searchApify]', message, {
+    const people = stubResults(filters)
+    console.error('[searchApify] Apify unavailable — using stub leads', message, {
       actorId,
       input,
       apifyRowCount: rows.length,
@@ -419,6 +406,15 @@ export async function searchApify(
       retriedBroad,
       retriedMinimal,
     })
-    throw new Error(message)
+    return {
+      people,
+      total: people.length,
+      hasMore: false,
+      meta: {
+        source: 'stub',
+        providerConfigured: configured && !isApifyAuthError(message),
+        providerError: isApifyAuthError(message) ? 'Invalid Apify token' : message,
+      },
+    }
   }
 }

@@ -1,3 +1,4 @@
+import { recoverStaleAspireSearchRuns } from '@/lib/prospect-scout/recover-stale-runs'
 import { runAccountProspectScout } from '@/lib/prospect-scout/run-account'
 import { db } from '@/lib/db/client'
 import { logSdrActivity } from '@/lib/sdr/activity-log'
@@ -24,6 +25,8 @@ export async function runProspectScoutBootstrap(
   const plan = (account?.plan ?? 'team') as Plan
   await requireSDREnabledForAccount(accountId, plan)
 
+  await recoverStaleAspireSearchRuns(accountId)
+
   const config = await findSdrConfigByAccount(accountId)
   if (!config || !config.isActive || config.isPaused) {
     return null
@@ -36,18 +39,29 @@ export async function runProspectScoutBootstrap(
     metadata: { source: 'bootstrap' },
   })
 
-  const result = await runAccountProspectScout(accountId)
+  try {
+    const result = await runAccountProspectScout(accountId)
 
-  await logSdrActivity({
-    accountId,
-    configId: config.id,
-    eventType: 'discovery_completed',
-    metadata: {
-      found: result.found,
-      enrolled: result.enrolled,
-      searchesRun: result.searchesRun,
-    },
-  })
+    await logSdrActivity({
+      accountId,
+      configId: config.id,
+      eventType: 'discovery_completed',
+      metadata: {
+        found: result.found,
+        enrolled: result.enrolled,
+        searchesRun: result.searchesRun,
+      },
+    })
 
-  return result
+    return result
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Discovery failed'
+    await logSdrActivity({
+      accountId,
+      configId: config.id,
+      eventType: 'discovery_failed',
+      metadata: { source: 'bootstrap', error: message },
+    })
+    throw error
+  }
 }

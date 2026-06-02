@@ -1,5 +1,6 @@
 import { getAdminSession } from '@/lib/auth/session'
-import { computeEnrollmentHeadroom, runAccountProspectScout } from '@/lib/prospect-scout/run-account'
+import { computeEnrollmentHeadroom } from '@/lib/prospect-scout/run-account'
+import { queueProspectScoutDiscovery } from '@/lib/prospect-scout/queue-discovery'
 import { runBoundSearch, runUnboundSearch } from '@/lib/prospect-scout/run-search'
 import { findBindingsForConfig } from '@/lib/sdr/aspire-config'
 import { requireSDREnabled } from '@/lib/sdr/guard'
@@ -9,6 +10,9 @@ import { db } from '@/lib/db/client'
 import { accounts, sdrAgentConfigs } from '@vantera/db'
 import { and, eq, isNull } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
+
+/** Apify sync runs can exceed serverless limits — queue full scout runs via Trigger.dev. */
+export const maxDuration = 300
 
 export async function POST(request: Request) {
   const session = await getAdminSession()
@@ -77,7 +81,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, data: result })
     }
 
-    const result = await runAccountProspectScout(session.accountId)
+    const result = await queueProspectScoutDiscovery(session.accountId)
+    if ('queued' in result) {
+      return NextResponse.json({ success: true, data: { queued: true } })
+    }
     return NextResponse.json({ success: true, data: result })
   } catch (error) {
     const message =

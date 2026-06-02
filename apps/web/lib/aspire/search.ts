@@ -3,6 +3,7 @@ import 'server-only'
 import { searchApify, type ProspectSearchMeta } from '@/lib/aspire/apify-client'
 import { isInteractiveAspireSearch, normalizeApolloFilters } from '@/lib/aspire/filters'
 import { getIcpConfigForVertical, scoreICP } from '@/lib/aspire/icp-score'
+import { stubResults } from '@/lib/aspire/prospect-stubs'
 import type {
   ApolloPersonResult,
   ApolloSearchFilters,
@@ -108,12 +109,26 @@ export async function searchProspects(
   const interactive = isInteractiveAspireSearch(filters)
   const normalizedFilters = normalizeApolloFilters(vertical, filters, { interactive })
 
-  const { people, meta } = await searchApify(
-    normalizedFilters,
-    1,
-    options?.limit,
-    interactive,
-  )
+  let people: import('@/lib/aspire/types').ApolloPersonResult[]
+  let meta: ProspectSearchMeta
+
+  try {
+    ;({ people, meta } = await searchApify(
+      normalizedFilters,
+      1,
+      options?.limit,
+      interactive,
+    ))
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Search failed'
+    console.error('[searchProspects] Apify failed — stub fallback', message)
+    people = stubResults(normalizedFilters)
+    meta = {
+      source: 'stub',
+      providerConfigured: false,
+      providerError: message,
+    }
+  }
 
   const scored = people
     .map((person) => {

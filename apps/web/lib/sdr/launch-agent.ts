@@ -4,7 +4,7 @@ import type { ActionResult } from '@/lib/auth/types'
 import { findSavedSearches } from '@/lib/aspire/queries'
 import { getIcpConfigForVertical } from '@/lib/aspire/icp-score'
 import { db } from '@/lib/db/client'
-import { runProspectScoutBootstrap } from '@/lib/prospect-scout/bootstrap'
+import { queueProspectScoutDiscovery } from '@/lib/prospect-scout/queue-discovery'
 import type { RunAccountResult } from '@/lib/prospect-scout/types'
 import type { AspireBindingInput } from '@/lib/sdr/aspire-config'
 import { saveSdrAspireConfig } from '@/lib/sdr/aspire-config'
@@ -16,7 +16,6 @@ import { DEFAULT_OUTREACH_WINDOW } from '@/lib/sdr/types'
 import { accounts, sdrAgentConfigs, users } from '@vantera/db'
 import { and, eq, isNull } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
-import { tasks } from '@trigger.dev/sdk'
 
 export type LaunchSdrAgentInput = CreateSDRConfigInput & {
   bindings?: AspireBindingInput[]
@@ -98,30 +97,7 @@ async function normalizeLaunchInput(
 async function queueBootstrapDiscovery(
   accountId: string,
 ): Promise<RunAccountResult | { queued: true }> {
-  const syncResult = await runProspectScoutBootstrap(accountId)
-
-  if (
-    syncResult &&
-    (syncResult.enrolled > 0 || syncResult.found > 0 || syncResult.searchesRun > 0)
-  ) {
-    return syncResult
-  }
-
-  try {
-    await tasks.trigger('sdr-bootstrap-discovery', { accountId })
-    return syncResult ?? { queued: true }
-  } catch (err) {
-    console.error('[launchSdrAgent] trigger bootstrap failed', err)
-    return (
-      syncResult ?? {
-        accountId,
-        searchesRun: 0,
-        found: 0,
-        enrolled: 0,
-        runs: [],
-      }
-    )
-  }
+  return queueProspectScoutDiscovery(accountId)
 }
 
 /**

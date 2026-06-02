@@ -251,9 +251,18 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
   useAccountRealtime({
     accountId,
     table: 'aspire_search_runs',
-    enabled: Boolean(activeSearchId),
+    enabled: true,
     onChange: reloadStoredResults,
   })
+
+  useEffect(() => {
+    if (isSearchingRef.current) return
+    const intervalMs = resultsLive ? 60_000 : 8_000
+    const timer = window.setInterval(() => {
+      void loadStoredResults(activeSearchId, { merge: true })
+    }, intervalMs)
+    return () => window.clearInterval(timer)
+  }, [accountId, activeSearchId, loadStoredResults, resultsLive])
 
   useEffect(() => {
     displayLeadsRef.current = displayLeads

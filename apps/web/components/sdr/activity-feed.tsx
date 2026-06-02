@@ -71,6 +71,14 @@ const EVENT_META: Record<
     },
     tone: 'text-stone-600',
   },
+  discovery_failed: {
+    icon: Radar,
+    label: (e) => {
+      const err = String(e.metadata.error ?? 'Discovery failed')
+      return `Discovery failed — ${err.length > 80 ? `${err.slice(0, 77)}…` : err}`
+    },
+    tone: 'text-red-700',
+  },
   sequence_drafted: {
     icon: Mail,
     label: (e) => `Sequence drafted → ${e.leadName ?? 'prospect'}`,

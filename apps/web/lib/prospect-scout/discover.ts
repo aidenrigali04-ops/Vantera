@@ -1,3 +1,4 @@
+import { recoverStaleAspireSearchRuns } from '@/lib/prospect-scout/recover-stale-runs'
 import { scoreICP } from '@/lib/aspire/icp-score'
 import { getAspireApifyFetchCount } from '@/lib/aspire/apify-client'
 import { filterExistingLeads, searchApify } from '@/lib/aspire/search'
@@ -55,6 +56,8 @@ export async function runProspectScoutDiscovery(
   const filters = buildScoutApolloFilters(config)
   const perPage = options?.perPage ?? getAspireApifyFetchCount()
   const autoEnroll = options?.autoEnroll ?? true
+
+  await recoverStaleAspireSearchRuns(config.accountId)
 
   const [runRow] = await db
     .insert(aspireSearchRuns)
