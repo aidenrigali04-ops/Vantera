@@ -10,11 +10,10 @@ import {
 } from '@/components/ui/select'
 import { motion } from 'framer-motion'
 import { Mail, Plus, X } from 'lucide-react'
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
+import { useRegisterOnboardingStep } from '../onboarding-nav'
 import { inviteTeamMembers } from '../actions'
 import {
-  GhostCTA,
-  PrimaryCTA,
   StepError,
   StepHeader,
   fadeUp,
@@ -64,14 +63,14 @@ export function Step4Team({ accountId, primaryColor, onComplete }: Props) {
     setMembers((prev) => prev.filter((_, i) => i !== index))
   }
 
-  async function handleSend() {
+  const submit = useCallback(async (): Promise<boolean> => {
     const toSend = members
       .map((m) => ({ email: m.email.trim(), role: m.role }))
       .filter((m) => m.email.length > 0)
 
     if (toSend.length === 0) {
       onComplete({ invited: 0, skipped: true })
-      return
+      return true
     }
 
     setError(null)
@@ -85,25 +84,35 @@ export function Step4Team({ accountId, primaryColor, onComplete }: Props) {
           (result && 'error' in result && result.error) ||
             'Could not send invites. You can invite teammates later from settings.',
         )
-        return
+        return false
       }
 
       onComplete({ invited: result.data.invited, skipped: false })
+      return true
     } catch (err) {
       rethrowFrameworkNavigation(err)
       console.error('[Step4Team] inviteTeamMembers threw', err)
       setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
+      return false
     } finally {
       setSending(false)
     }
-  }
+  }, [accountId, members, onComplete])
 
-  function handleSkip() {
+  const skip = useCallback(() => {
     onComplete({ invited: 0, skipped: true })
-  }
+  }, [onComplete])
+
+  useRegisterOnboardingStep({
+    canAdvance: true,
+    isSubmitting: sending,
+    primaryLabel: sending ? 'Sending…' : 'Send invites',
+    submit,
+    secondary: { label: 'Skip for now', action: skip },
+  })
 
   return (
-    <motion.div variants={stepContainer} initial="hidden" animate="show" className="space-y-8">
+    <motion.div variants={stepContainer} initial="hidden" animate="show" className="space-y-4">
       <StepHeader
         title="Invite your team"
         subtitle={`Add up to ${MAX_MEMBERS} teammates. They'll receive an email with a magic sign-in link — no passwords needed.`}
@@ -182,22 +191,6 @@ export function Step4Team({ accountId, primaryColor, onComplete }: Props) {
       </motion.div>
 
       {error ? <StepError message={error} /> : null}
-
-      <motion.div variants={fadeUp} className="flex items-center justify-between">
-        <GhostCTA type="button" onClick={handleSkip}>
-          Skip for now
-        </GhostCTA>
-        <PrimaryCTA
-          type="button"
-          onClick={handleSend}
-          disabled={sending}
-          loading={sending}
-          primaryColor={primaryColor}
-          className="min-w-[180px]"
-        >
-          {sending ? 'Sending invites…' : 'Send invites'}
-        </PrimaryCTA>
-      </motion.div>
     </motion.div>
   )
 }

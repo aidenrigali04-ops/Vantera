@@ -4,9 +4,10 @@ import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import { motion } from 'framer-motion'
 import { Check } from 'lucide-react'
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
+import { useOnboardingNav, useRegisterOnboardingStep } from '../onboarding-nav'
 import { completeOnboarding, saveIntegrationCredentials } from '../actions'
-import { PrimaryCTA, StepError, StepHeader, fadeUp, rethrowFrameworkNavigation, runStepAction, stepContainer } from '../_primitives'
+import { StepError, StepHeader, fadeUp, rethrowFrameworkNavigation, runStepAction, stepContainer } from '../_primitives'
 
 type ImmediateProvider = 'stripe' | 'twilio'
 type PlaceholderProvider = 'quickbooks' | 'google_calendar' | 'hubspot' | 'gohighlevel'
@@ -129,7 +130,9 @@ export function Step5Connections({ accountId, primaryColor, onComplete }: Props)
     setOpenTile(null)
   }
 
-  async function handleComplete() {
+  const embedded = Boolean(useOnboardingNav())
+
+  const submit = useCallback(async (): Promise<boolean> => {
     setError(null)
     setCompleting(true)
 
@@ -141,7 +144,7 @@ export function Step5Connections({ accountId, primaryColor, onComplete }: Props)
           (result && 'error' in result && result.error) ||
             'Could not finalize onboarding. Please try again.',
         )
-        return
+        return false
       }
 
       const redirectTo =
@@ -156,21 +159,34 @@ export function Step5Connections({ accountId, primaryColor, onComplete }: Props)
       }
 
       onComplete()
+
+      if (embedded) {
+        return true
+      }
+
       window.location.replace(redirectTo || '/admin/dashboard')
-      return
+      return true
     } catch (err) {
       rethrowFrameworkNavigation(err)
       console.error('[Step5Connections] completeOnboarding threw', err)
       setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
+      return false
     } finally {
       setCompleting(false)
     }
-  }
+  }, [accountId, embedded, onComplete])
+
+  useRegisterOnboardingStep({
+    canAdvance: true,
+    isSubmitting: completing,
+    primaryLabel: completing ? 'Finishing…' : 'Finish setup',
+    submit,
+  })
 
   const connectedCount = Object.values(connected).filter(Boolean).length
 
   return (
-    <motion.div variants={stepContainer} initial="hidden" animate="show" className="space-y-8">
+    <motion.div variants={stepContainer} initial="hidden" animate="show" className="space-y-4">
       <StepHeader
         title="Connect your stack"
         subtitle="Optional — bring your existing Stripe or Twilio account, or skip and use our native equivalents. Everything is editable later from the integrations page."
@@ -193,23 +209,11 @@ export function Step5Connections({ accountId, primaryColor, onComplete }: Props)
 
       {error ? <StepError message={error} /> : null}
 
-      <motion.div variants={fadeUp} className="flex items-center justify-between">
-        <p className="text-xs text-white/45">
-          {connectedCount > 0
-            ? `${connectedCount} connection${connectedCount > 1 ? 's' : ''} added`
-            : 'No connections — your AI brain still works on email-only fallback.'}
-        </p>
-        <PrimaryCTA
-          type="button"
-          onClick={handleComplete}
-          disabled={completing}
-          loading={completing}
-          primaryColor={primaryColor}
-          className="min-w-[180px]"
-        >
-          {completing ? 'Finishing…' : 'Complete setup'}
-        </PrimaryCTA>
-      </motion.div>
+      <motion.p variants={fadeUp} className="text-xs text-[var(--text-tertiary)]">
+        {connectedCount > 0
+          ? `${connectedCount} connection${connectedCount > 1 ? 's' : ''} added`
+          : 'No connections yet — you can connect tools anytime from settings.'}
+      </motion.p>
     </motion.div>
   )
 }

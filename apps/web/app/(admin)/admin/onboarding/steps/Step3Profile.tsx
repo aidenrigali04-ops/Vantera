@@ -4,12 +4,11 @@ import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import { motion } from 'framer-motion'
 import { Heart, Megaphone, Phone, Sparkles, Zap } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { useOnboardingNav, useRegisterOnboardingStep } from '../onboarding-nav'
 import { getBusinessProfile, updateBusinessProfile } from '../actions'
 import {
   FieldGroup,
-  GhostCTA,
-  PrimaryCTA,
   StepError,
   StepHeader,
   fadeUp,
@@ -128,11 +127,11 @@ export function Step3Profile({ accountId, primaryColor, onComplete }: Props) {
     return null
   }
 
-  async function handleContinue() {
+  const submit = useCallback(async (): Promise<boolean> => {
     const validation = validate()
     if (validation) {
       setError(validation)
-      return
+      return false
     }
 
     setError(null)
@@ -156,18 +155,38 @@ export function Step3Profile({ accountId, primaryColor, onComplete }: Props) {
           (result && 'error' in result && result.error) ||
           'Could not save your profile. Please try again.'
         setError(msg)
-        return
+        return false
       }
 
       onComplete({ rePersonalized: result.data.rePersonalized })
+      return true
     } catch (err) {
       rethrowFrameworkNavigation(err)
       console.error('[Step3Profile] updateBusinessProfile threw', err)
       setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
+      return false
     } finally {
       setSaving(false)
     }
-  }
+  }, [
+    accountId,
+    bookingLink,
+    emergencyLine,
+    hoursEnd,
+    hoursStart,
+    onComplete,
+    paymentLink,
+    reviewLink,
+    voice,
+  ])
+
+  const embedded = Boolean(useOnboardingNav())
+
+  useRegisterOnboardingStep({
+    canAdvance: !loading,
+    isSubmitting: saving,
+    submit,
+  })
 
   if (loading) {
     return (
@@ -182,7 +201,12 @@ export function Step3Profile({ accountId, primaryColor, onComplete }: Props) {
   }
 
   return (
-    <motion.div variants={stepContainer} initial="hidden" animate="show" className="space-y-10">
+    <motion.div
+      variants={stepContainer}
+      initial="hidden"
+      animate="show"
+      className={cn('space-y-6', embedded && 'max-h-[280px] overflow-y-auto pr-1')}
+    >
       <StepHeader
         title="Personalize your messaging"
         subtitle="We use these to tailor every automated message your customers receive. Everything's optional — skip a field and we'll fall back to a sensible default."
@@ -193,9 +217,13 @@ export function Step3Profile({ accountId, primaryColor, onComplete }: Props) {
         description="Sets the tone our AI uses when rewriting your template messages."
         right={
           voice ? (
-            <GhostCTA type="button" onClick={() => setVoice(null)}>
+            <button
+              type="button"
+              onClick={() => setVoice(null)}
+              className="text-xs font-medium text-[var(--text-tertiary)] transition-colors hover:text-[var(--text-primary)]"
+            >
               Clear
-            </GhostCTA>
+            </button>
           ) : null
         }
       >
@@ -277,18 +305,6 @@ export function Step3Profile({ accountId, primaryColor, onComplete }: Props) {
       </FieldGroup>
 
       {error ? <StepError message={error} /> : null}
-
-      <motion.div variants={fadeUp} className="flex items-center justify-end">
-        <PrimaryCTA
-          type="button"
-          onClick={handleContinue}
-          disabled={saving}
-          loading={saving}
-          primaryColor={primaryColor}
-        >
-          {saving ? 'Saving…' : 'Continue'}
-        </PrimaryCTA>
-      </motion.div>
     </motion.div>
   )
 }

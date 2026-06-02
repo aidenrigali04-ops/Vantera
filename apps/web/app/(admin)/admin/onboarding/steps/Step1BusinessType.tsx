@@ -11,10 +11,10 @@ import {
   Wrench,
   type LucideIcon,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
+import { useRegisterOnboardingStep } from '../onboarding-nav'
 import { updateVertical } from '../actions'
 import {
-  PrimaryCTA,
   SelectableTile,
   StepError,
   StepHeader,
@@ -107,26 +107,21 @@ export function Step1BusinessType({ accountId, currentVertical, primaryColor, on
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  async function handleContinue() {
+  const submit = useCallback(async (): Promise<boolean> => {
     if (!selected) {
       setError('Choose a business type to continue')
-      return
+      return false
     }
 
     setError(null)
     setSaving(true)
 
-    // Wrap in try/finally so the button NEVER gets stuck on "Saving…".
-    // The original implementation only reset saving on the success path,
-    // so any thrown error (action timeout, network blip, NEXT_REDIRECT
-    // bubble from requireAdminSession on a stale session) would freeze
-    // the CTA — which is exactly what the user was seeing.
     try {
       const result = await runStepAction(() => updateVertical(accountId, selected))
 
       if (result == null) {
         setError('The server did not respond. Refresh the page and try again.')
-        return
+        return false
       }
 
       if (result.success !== true) {
@@ -134,21 +129,29 @@ export function Step1BusinessType({ accountId, currentVertical, primaryColor, on
           ('error' in result && result.error) ||
           'Could not save your business type. Please try again.'
         setError(msg)
-        return
+        return false
       }
 
       onComplete({ vertical: selected })
+      return true
     } catch (err) {
       rethrowFrameworkNavigation(err)
       console.error('[Step1BusinessType] updateVertical threw', err)
       setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
+      return false
     } finally {
       setSaving(false)
     }
-  }
+  }, [accountId, onComplete, selected])
+
+  useRegisterOnboardingStep({
+    canAdvance: Boolean(selected),
+    isSubmitting: saving,
+    submit,
+  })
 
   return (
-    <motion.div variants={stepContainer} initial="hidden" animate="show" className="space-y-8">
+    <motion.div variants={stepContainer} initial="hidden" animate="show" className="space-y-4">
       <StepHeader
         title="What are you managing?"
         subtitle="Choose a template — we tailor pipeline stages, client views, and AI tone to your workflow."
@@ -170,18 +173,6 @@ export function Step1BusinessType({ accountId, currentVertical, primaryColor, on
       </motion.div>
 
       {error ? <StepError message={error} /> : null}
-
-      <motion.div variants={fadeUp} className="flex items-center justify-end">
-        <PrimaryCTA
-          type="button"
-          onClick={handleContinue}
-          disabled={!selected || saving}
-          loading={saving}
-          primaryColor={primaryColor}
-        >
-          {saving ? 'Saving…' : 'Continue'}
-        </PrimaryCTA>
-      </motion.div>
     </motion.div>
   )
 }

@@ -2,13 +2,14 @@
 
 import { cn } from '@/lib/utils'
 import { motion } from 'framer-motion'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { useRegisterOnboardingStep } from '../onboarding-nav'
 import {
   applyVerticalTemplate,
   getTemplatesForVertical,
   type TemplateSummary,
 } from '../actions'
-import { PrimaryCTA, StepError, StepHeader, fadeUp, rethrowFrameworkNavigation, runStepAction, stepContainer } from '../_primitives'
+import { StepError, StepHeader, fadeUp, rethrowFrameworkNavigation, runStepAction, stepContainer } from '../_primitives'
 
 type Props = {
   accountId: string
@@ -69,15 +70,15 @@ export function Step3Template({ accountId, vertical, primaryColor, onComplete }:
 
   const selected = templates.find((t) => t.id === selectedId)
 
-  async function handleContinue() {
+  const submit = useCallback(async (): Promise<boolean> => {
     if (templates.length > 0 && !selectedId) {
       setError('Select a workflow template to continue.')
-      return
+      return false
     }
 
     if (!selectedId) {
       onComplete()
-      return
+      return true
     }
 
     setError(null)
@@ -91,21 +92,34 @@ export function Step3Template({ accountId, vertical, primaryColor, onComplete }:
           (result && 'error' in result && result.error) ||
             'Could not apply this template. Please try again.',
         )
-        return
+        return false
       }
 
       onComplete(result.data)
+      return true
     } catch (err) {
       rethrowFrameworkNavigation(err)
       console.error('[Step3Template] applyVerticalTemplate threw', err)
       setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
+      return false
     } finally {
       setApplying(false)
     }
-  }
+  }, [accountId, onComplete, selectedId, templates.length])
+
+  useRegisterOnboardingStep({
+    canAdvance: !loading && (templates.length === 0 || Boolean(selectedId)),
+    isSubmitting: applying,
+    primaryLabel: applying
+      ? 'Applying…'
+      : templates.length === 0
+        ? 'Continue'
+        : 'Apply and continue',
+    submit,
+  })
 
   return (
-    <motion.div variants={stepContainer} initial="hidden" animate="show" className="space-y-8">
+    <motion.div variants={stepContainer} initial="hidden" animate="show" className="space-y-4">
       <StepHeader
         title="Pick a starter workflow"
         subtitle="We'll load a vetted stage pipeline and automation set, personalized to your voice. You can adjust anything later from settings."
@@ -228,23 +242,6 @@ export function Step3Template({ accountId, vertical, primaryColor, onComplete }:
       ) : null}
 
       {error ? <StepError message={error} /> : null}
-
-      <motion.div variants={fadeUp} className="flex items-center justify-end">
-        <PrimaryCTA
-          type="button"
-          onClick={handleContinue}
-          disabled={applying || (templates.length > 0 && !selectedId)}
-          loading={applying}
-          primaryColor={primaryColor}
-          className="min-w-[200px]"
-        >
-          {applying
-            ? 'Applying…'
-            : templates.length === 0
-              ? 'Continue'
-              : 'Apply and continue'}
-        </PrimaryCTA>
-      </motion.div>
     </motion.div>
   )
 }

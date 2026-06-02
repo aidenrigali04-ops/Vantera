@@ -21,7 +21,7 @@ assert(
 )
 assert(
   'functional_level is not Title Case Marketing',
-  targeting.functional_level?.[0] !== 'Marketing',
+  (targeting.functional_level?.[0] as string | undefined) !== 'Marketing',
 )
 assert('contact_location normalizes to united states', locations?.[0] === 'united states')
 assert('HR maps to human_resources', resolveApifyKeywordTargeting('hr').functional_level?.[0] === 'human_resources')

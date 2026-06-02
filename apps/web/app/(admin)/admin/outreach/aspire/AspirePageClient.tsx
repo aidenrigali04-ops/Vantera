@@ -420,6 +420,7 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
           'Apify is not configured — showing sample leads. Set APIFY_API_TOKEN for live prospect data.',
           { duration: 6000 },
         )
+      }
 
       toast.success(
         results.length > 0

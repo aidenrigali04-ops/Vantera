@@ -8,10 +8,10 @@ import { motion } from 'framer-motion'
 import { ImageIcon, Upload } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { useDropzone } from 'react-dropzone'
+import { useRegisterOnboardingStep } from '../onboarding-nav'
 import { updateBranding } from '../actions'
 import {
   FieldGroup,
-  PrimaryCTA,
   StepError,
   StepHeader,
   fadeUp,
@@ -138,20 +138,20 @@ export function Step2Branding({
     maxSize: MAX_BYTES,
   })
 
-  async function handleContinue() {
+  const submit = useCallback(async (): Promise<boolean> => {
     if (!HEX.test(primary)) {
       setError('Primary color must be a 6-digit hex')
-      return
+      return false
     }
 
     if (!HEX.test(secondary)) {
       setError('Secondary color must be a 6-digit hex')
-      return
+      return false
     }
 
     if (portalDomain && !DOMAIN.test(portalDomain)) {
       setError('Portal domain looks invalid — leave blank to skip')
-      return
+      return false
     }
 
     setError(null)
@@ -172,7 +172,7 @@ export function Step2Branding({
           (result && 'error' in result && result.error) ||
           'Could not save your branding. Please try again.'
         setError(msg)
-        return
+        return false
       }
 
       onComplete({
@@ -181,19 +181,27 @@ export function Step2Branding({
         secondaryColor: secondary,
         portalDomain,
       })
+      return true
     } catch (err) {
       rethrowFrameworkNavigation(err)
       console.error('[Step2Branding] updateBranding threw', err)
       setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
+      return false
     } finally {
       setSaving(false)
     }
-  }
+  }, [accountId, logoUrl, onComplete, portalDomain, primary, secondary])
+
+  useRegisterOnboardingStep({
+    canAdvance: HEX.test(primary) && HEX.test(secondary),
+    isSubmitting: saving || logoUploading,
+    submit,
+  })
 
   const previewDomain = portalDomain || 'portal.yourbusiness.com'
 
   return (
-    <motion.div variants={stepContainer} initial="hidden" animate="show" className="space-y-10">
+    <motion.div variants={stepContainer} initial="hidden" animate="show" className="space-y-6">
       <StepHeader
         title="Make it yours"
         subtitle="Upload a logo, pick your brand colors, and reserve your client portal domain. Everything here is editable later from settings."
@@ -303,18 +311,6 @@ export function Step2Branding({
       </FieldGroup>
 
       {error ? <StepError message={error} /> : null}
-
-      <motion.div variants={fadeUp} className="flex items-center justify-end">
-        <PrimaryCTA
-          type="button"
-          onClick={handleContinue}
-          disabled={saving}
-          loading={saving}
-          primaryColor={primary}
-        >
-          {saving ? 'Saving…' : 'Continue'}
-        </PrimaryCTA>
-      </motion.div>
     </motion.div>
   )
 }

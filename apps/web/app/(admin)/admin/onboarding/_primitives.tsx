@@ -4,6 +4,11 @@ import { cn } from '@/lib/utils'
 import { motion, type Variants } from 'framer-motion'
 import { Loader2, type LucideIcon } from 'lucide-react'
 import type { MouseEventHandler, ReactNode } from 'react'
+import { useOnboardingNav } from './onboarding-nav'
+
+function useWizardTheme(): 'light' | 'dark' {
+  return useOnboardingNav() ? 'light' : 'dark'
+}
 
 /**
  * Shared dark-theme primitives for the onboarding wizard steps. Mirrors
@@ -78,6 +83,9 @@ export function StepHeader({
   title: string
   subtitle: string
 }) {
+  const theme = useWizardTheme()
+  if (theme === 'light') return null
+
   return (
     <motion.div variants={fadeUp} className="space-y-2">
       <h1 className="text-3xl font-semibold leading-tight tracking-tight text-white">{title}</h1>
@@ -99,14 +107,29 @@ export function FieldGroup({
   right?: ReactNode
   children: ReactNode
 }) {
+  const theme = useWizardTheme()
   return (
     <motion.section variants={fadeUp} className="space-y-3">
       <div className="flex items-baseline justify-between gap-3">
-        <label className="text-sm font-semibold text-white">{label}</label>
+        <label
+          className={cn(
+            'text-sm font-semibold',
+            theme === 'light' ? 'text-[var(--text-primary)]' : 'text-white',
+          )}
+        >
+          {label}
+        </label>
         {right}
       </div>
       {description ? (
-        <p className="text-xs leading-relaxed text-white/45">{description}</p>
+        <p
+          className={cn(
+            'text-xs leading-relaxed',
+            theme === 'light' ? 'text-[var(--text-tertiary)]' : 'text-white/45',
+          )}
+        >
+          {description}
+        </p>
       ) : null}
       {children}
     </motion.section>
@@ -143,6 +166,7 @@ export function SelectableTile({
   className,
   layout = 'horizontal',
 }: SelectableTileProps) {
+  const theme = useWizardTheme()
   const accent = iconColor ?? primaryColor
 
   return (
@@ -161,10 +185,20 @@ export function SelectableTile({
           : undefined
       }
       className={cn(
-        'group relative overflow-hidden rounded-2xl border bg-white/[0.02] p-4 text-left transition-colors duration-200',
-        selected
-          ? 'bg-white/[0.04]'
-          : 'border-white/[0.06] hover:border-white/[0.14] hover:bg-white/[0.035]',
+        'group relative overflow-hidden rounded-xl border p-3 text-left transition-colors duration-200',
+        theme === 'light'
+          ? cn(
+              'bg-[var(--bg-surface)]',
+              selected
+                ? 'border-[var(--brand-accent-border)] bg-[var(--brand-accent-muted)]'
+                : 'border-[var(--border-default)] hover:border-[var(--border-strong)] hover:bg-[var(--bg-overlay)]',
+            )
+          : cn(
+              'rounded-2xl bg-white/[0.02] p-4',
+              selected
+                ? 'bg-white/[0.04]'
+                : 'border-white/[0.06] hover:border-white/[0.14] hover:bg-white/[0.035]',
+            ),
         layout === 'horizontal' ? 'flex items-start gap-3' : 'flex flex-col gap-3',
         className,
       )}
@@ -201,11 +235,27 @@ export function SelectableTile({
       ) : null}
 
       <div className="relative min-w-0 flex-1">
-        <p className={cn('text-sm font-semibold leading-tight', selected ? 'text-white' : 'text-white/90')}>
+        <p
+          className={cn(
+            'text-sm font-semibold leading-tight',
+            theme === 'light'
+              ? 'text-[var(--text-primary)]'
+              : selected
+                ? 'text-white'
+                : 'text-white/90',
+          )}
+        >
           {title}
         </p>
         {description ? (
-          <p className="mt-1 text-xs leading-relaxed text-white/50">{description}</p>
+          <p
+            className={cn(
+              'mt-1 text-xs leading-relaxed',
+              theme === 'light' ? 'text-[var(--text-secondary)]' : 'text-white/50',
+            )}
+          >
+            {description}
+          </p>
         ) : null}
       </div>
     </motion.button>
@@ -233,6 +283,8 @@ export function PrimaryCTA({
   disabled,
   type = 'button',
 }: PrimaryCTAProps) {
+  if (useWizardTheme() === 'light') return null
+
   const inert = Boolean(disabled || loading)
   return (
     <motion.button
@@ -270,6 +322,8 @@ type GhostCTAProps = {
 }
 
 export function GhostCTA({ onClick, type = 'button', children, className }: GhostCTAProps) {
+  if (useWizardTheme() === 'light') return null
+
   return (
     <button
       type={type}
@@ -287,14 +341,26 @@ export function GhostCTA({ onClick, type = 'button', children, className }: Ghos
 /* ───────────────────────────── Error ───────────────────────────── */
 
 export function StepError({ message }: { message: string }) {
+  const theme = useWizardTheme()
   return (
     <motion.p
       initial={{ opacity: 0, y: -4 }}
       animate={{ opacity: 1, y: 0 }}
-      className="flex items-center gap-2 rounded-lg border border-red-500/20 bg-red-500/[0.05] px-3 py-2 text-sm text-red-300"
+      className={cn(
+        'flex items-center gap-2 rounded-lg border px-3 py-2 text-sm',
+        theme === 'light'
+          ? 'border-[var(--danger)]/30 bg-[var(--danger-muted)] text-[var(--danger)]'
+          : 'border-red-500/20 bg-red-500/[0.05] text-red-300',
+      )}
       role="alert"
     >
-      <span aria-hidden className="size-1.5 rounded-full bg-red-400 shadow-[0_0_6px_rgba(248,113,113,0.7)]" />
+      <span
+        aria-hidden
+        className={cn(
+          'size-1.5 rounded-full',
+          theme === 'light' ? 'bg-[var(--danger)]' : 'bg-red-400 shadow-[0_0_6px_rgba(248,113,113,0.7)]',
+        )}
+      />
       {message}
     </motion.p>
   )
