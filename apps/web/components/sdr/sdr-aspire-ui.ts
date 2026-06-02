@@ -24,19 +24,21 @@ export const PROSPECT_MODE_OPTIONS: Array<{
   description: string
 }> = [
   {
-    value: 'aspire_bound',
-    title: 'Aspire saved searches',
-    description: 'Run bound Aspire searches on schedule. Best when you curate searches in Aspire.',
+    value: 'inline_icp',
+    title: 'Prospect Scout (default)',
+    description:
+      'Apollo discovery from your agent ICP → scored in Aspire → optional auto-enroll. Does not re-run Aspire saved searches.',
   },
   {
-    value: 'inline_icp',
-    title: 'Inline ICP find',
-    description: 'Apollo search from agent ICP only. No saved-search bindings required.',
+    value: 'aspire_bound',
+    title: 'Aspire saved searches only',
+    description:
+      'Re-run saved Aspire search filters on schedule (manual curation). Use with bindings below.',
   },
   {
     value: 'hybrid',
-    title: 'Hybrid',
-    description: 'Bound searches first, then inline find for remaining daily headroom.',
+    title: 'Scout + saved searches',
+    description: 'Prospect Scout discovery first, then optional bound Aspire saved searches.',
   },
 ]
 

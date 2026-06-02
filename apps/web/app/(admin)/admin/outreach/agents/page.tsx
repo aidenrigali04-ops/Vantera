@@ -43,7 +43,7 @@ function mapConfig(row: typeof sdrAgentConfigs.$inferSelect): SDRAgentConfig {
     outreachWindow: (row.outreachWindow as SdrOutreachWindow) ?? DEFAULT_OUTREACH_WINDOW,
     maxNewLeadsDay: row.maxNewLeadsDay,
     maxActiveLeads: row.maxActiveLeads,
-    prospectMode: (row.prospectMode ?? 'aspire_bound') as SDRAgentConfig['prospectMode'],
+    prospectMode: (row.prospectMode ?? 'inline_icp') as SDRAgentConfig['prospectMode'],
     defaultMinIcpScore: row.defaultMinIcpScore ?? 70,
     syncIcpToSavedSearches: row.syncIcpToSavedSearches ?? true,
     isActive: row.isActive,

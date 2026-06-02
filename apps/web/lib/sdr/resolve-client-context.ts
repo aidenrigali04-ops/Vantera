@@ -137,7 +137,7 @@ export async function resolveClientContext(accountId: string): Promise<ClientAge
     maxActiveLeads: config.maxActiveLeads,
     outreachWindow: (config.outreachWindow as SdrOutreachWindow) ?? DEFAULT_OUTREACH_WINDOW,
     outreachDays: config.outreachDays ?? ['mon', 'tue', 'wed', 'thu', 'fri'],
-    prospectMode: config.prospectMode ?? 'aspire_bound',
+    prospectMode: config.prospectMode ?? 'inline_icp',
     defaultMinIcpScore: config.defaultMinIcpScore ?? 70,
     voiceTone:
       account.voicePreference ??

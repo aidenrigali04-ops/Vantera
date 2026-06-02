@@ -74,13 +74,14 @@ export async function enrollProspect(input: {
   accountId: string
   config: SdrConfigRow
   person: ApolloPersonResult
-  searchId: string
+  searchId: string | null
   icpScore: number
   icpSignals: string[]
   startSdrSequence: boolean
   accountName?: string
 }): Promise<EnrollProspectResult> {
-  const { accountId, config, person, searchId, icpScore, icpSignals, startSdrSequence } = input
+  const { accountId, config, person, icpScore, icpSignals, startSdrSequence } = input
+  const searchId = input.searchId || null
 
   const leadId = await upsertLeadFromApollo(
     accountId,
@@ -178,7 +179,8 @@ export async function enrollProspect(input: {
 
 export async function recordFoundProspects(input: {
   accountId: string
-  searchId: string
+  /** null = Prospect Scout pool (not tied to a saved Aspire search) */
+  searchId: string | null
   people: Array<{ person: ApolloPersonResult; icpScore: number; icpSignals: string[] }>
 }): Promise<number> {
   if (input.people.length === 0) return 0

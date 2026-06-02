@@ -1,6 +1,4 @@
 import { runAccountProspectScout } from '@/lib/prospect-scout/run-account'
-import { runInlineProspectFind } from '@/lib/prospect-scout/inline-find'
-import type { ProspectMode } from '@/lib/prospect-scout/types'
 import { db } from '@/lib/db/client'
 import { evaluateFlag } from '@/lib/feature-flags/evaluate'
 import type { Plan } from '@/lib/feature-flags/flags'
@@ -39,18 +37,10 @@ export async function runSdrAgentFind(): Promise<{ accountsRun: number; leadsEnr
       continue
     }
 
-    const mode = (config.prospectMode ?? 'aspire_bound') as ProspectMode
-
     try {
-      if (mode === 'inline_icp') {
-        const inline = await runInlineProspectFind(config)
-        if (inline.enrolled > 0) accountsRun += 1
-        leadsEnrolled += inline.enrolled
-      } else {
-        const result = await runAccountProspectScout(config.accountId)
-        if (result.searchesRun > 0 || result.enrolled > 0) accountsRun += 1
-        leadsEnrolled += result.enrolled
-      }
+      const result = await runAccountProspectScout(config.accountId)
+      if (result.searchesRun > 0 || result.enrolled > 0 || result.found > 0) accountsRun += 1
+      leadsEnrolled += result.enrolled
     } catch (error) {
       console.error('[sdr-agent-find] account failed:', config.accountId, error)
     }

@@ -107,7 +107,7 @@ export async function getSdrAspireConfig(accountId: string): Promise<SdrAspireCo
   return {
     config: {
       id: config.id,
-      prospectMode: (config.prospectMode ?? 'aspire_bound') as ProspectMode,
+      prospectMode: (config.prospectMode ?? 'inline_icp') as ProspectMode,
       defaultMinIcpScore: config.defaultMinIcpScore ?? 70,
       syncIcpToSavedSearches: config.syncIcpToSavedSearches ?? true,
       searchFrequency: config.searchFrequency,

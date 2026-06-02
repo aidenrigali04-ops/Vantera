@@ -37,7 +37,7 @@ export function SdrSetupWizardClient({ accountVertical, accountName }: Props) {
     excludeDomains: '',
     maxNewLeadsDay: 10,
     maxActiveLeads: 200,
-    prospectMode: 'aspire_bound' as ProspectMode,
+    prospectMode: 'inline_icp' as ProspectMode,
     defaultMinIcpScore: 70,
     syncIcpToSavedSearches: true,
     bindings: [] as BindingDraft[],

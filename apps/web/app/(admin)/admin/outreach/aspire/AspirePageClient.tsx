@@ -121,6 +121,7 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
   })
 
   const savedResultsQueryKey = ['aspire-results', activeSearchId] as const
+  const scoutResultsQueryKey = ['aspire-scout-results', accountId] as const
 
   const { data: savedResults = [], isFetching: isSavedFetching } = useQuery({
     queryKey: savedResultsQueryKey,
@@ -133,18 +134,37 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
     enabled: Boolean(activeSearchId),
   })
 
+  const { data: scoutResults = [], isFetching: isScoutFetching } = useQuery({
+    queryKey: scoutResultsQueryKey,
+    queryFn: async () => {
+      const res = await fetch('/api/aspire/scout-results')
+      const json = await res.json()
+      if (!json.success) throw new Error(json.error ?? 'Could not load scout results')
+      return json.data as AspireSearchResult[]
+    },
+    enabled: !activeSearchId,
+  })
+
   const { isLive: resultsLive } = useAccountRealtime({
     accountId,
     table: 'aspire_results',
-    searchId: activeSearchId,
-    enabled: Boolean(activeSearchId),
+    searchId: activeSearchId ?? undefined,
+    enabled: true,
     onChange: () => {
-      void queryClient.invalidateQueries({ queryKey: savedResultsQueryKey })
+      if (activeSearchId) {
+        void queryClient.invalidateQueries({ queryKey: savedResultsQueryKey })
+      } else {
+        void queryClient.invalidateQueries({ queryKey: scoutResultsQueryKey })
+      }
     },
   })
 
-  const isFetching = isLiveFetching || isSavedFetching
-  const sourceResults = liveResults.length > 0 ? liveResults : savedResults
+  const isFetching = isLiveFetching || isSavedFetching || isScoutFetching
+  const sourceResults = liveResults.length
+    ? liveResults
+    : activeSearchId
+      ? savedResults
+      : scoutResults
 
   const rows = useMemo<AspireResultRow[]>(
     () =>
