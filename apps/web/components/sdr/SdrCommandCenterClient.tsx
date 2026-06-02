@@ -1,6 +1,11 @@
 'use client'
 
+import { SdrOutreachAutomationToggle } from '@/components/sdr/SdrOutreachAutomationToggle'
 import type { SDRActivityEvent, SDRAgentConfig, SDRDashboardStats } from '@/lib/sdr/types'
+import {
+  isAutomaticOutreachMode,
+  type OutreachAutomationMode,
+} from '@/lib/sdr/outreach-automation'
 import { SdrCreditPaywall } from '@/components/sdr/SdrCreditPaywall'
 import { SdrCreditStrip } from '@/components/sdr/SdrCreditStrip'
 import { SdrOutreachHubTabs } from '@/components/sdr/SdrOutreachHubTabs'
@@ -41,7 +46,6 @@ type Props = {
   stats: SDRDashboardStats
   initialActivity: SDRActivityEvent[]
   upcoming: UpcomingSend[]
-  autonomousMessaging?: boolean
   /** Render inside the agents hub without duplicate page chrome. */
   embedded?: boolean
 }
@@ -55,7 +59,6 @@ export function SdrCommandCenterClient({
   stats,
   initialActivity,
   upcoming,
-  autonomousMessaging = true,
   embedded = false,
 }: Props) {
   const router = useRouter()
@@ -64,6 +67,9 @@ export function SdrCommandCenterClient({
   const [activity, setActivity] = useState(initialActivity)
   const [paywallOpen, setPaywallOpen] = useState(false)
   const [pipelineHints, setPipelineHints] = useState<string[]>([])
+  const [automationMode, setAutomationMode] = useState<OutreachAutomationMode>(
+    config.outreachAutomationMode,
+  )
   const {
     credits,
     exhausted,
@@ -71,6 +77,12 @@ export function SdrCommandCenterClient({
     startTrial,
     refreshCredits,
   } = useSdrCredits(true)
+
+  useEffect(() => {
+    setAutomationMode(config.outreachAutomationMode)
+  }, [config.outreachAutomationMode])
+
+  const automaticOutreach = isAutomaticOutreachMode(automationMode)
 
   useEffect(() => {
     if (exhausted) setPaywallOpen(true)
@@ -266,12 +278,61 @@ export function SdrCommandCenterClient({
         }
       />
 
-      {!autonomousMessaging && config.isActive && !config.isPaused ? (
+      <section className="card-surface space-y-3 p-5">
+        <div>
+          <h3 className="text-sm font-semibold text-[var(--text-primary)]">Outreach pipeline</h3>
+          <p className="mt-1 text-[12px] text-[var(--text-secondary)]">
+            Find leads → AI drafts a 5-step sequence → email/SMS outreach on your schedule.
+          </p>
+        </div>
+        <SdrOutreachAutomationToggle
+          value={automationMode}
+          disabled={isPending}
+          onChange={(mode) => {
+            setAutomationMode(mode)
+            startTransition(async () => {
+              const res = await fetch('/api/sdr/config', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify({ outreachAutomationMode: mode }),
+              })
+              const json = await res.json()
+              if (!json.success) {
+                toast.error(json.error ?? 'Could not save outreach mode')
+                setAutomationMode(config.outreachAutomationMode)
+                return
+              }
+              toast.success(
+                mode === 'automatic'
+                  ? 'Automatic outreach enabled'
+                  : 'Review-before-send enabled',
+              )
+              router.refresh()
+            })
+          }}
+        />
+      </section>
+
+      {!automaticOutreach && config.isActive && !config.isPaused ? (
         <div className="rounded-lg border border-[var(--warning)]/30 bg-[var(--warning-muted)] px-4 py-3 text-[13px] text-[var(--text-primary)]">
-          <p className="font-medium">Review mode — outbound is not auto-sent</p>
+          <p className="font-medium">Review mode — outbound waits for your approval</p>
           <p className="mt-1 text-[var(--text-secondary)]">
-            Sequences are drafted for your approval. Enable autonomous messaging in settings to let{' '}
-            {config.agentName} send on schedule.
+            Approve drafts in{' '}
+            <Link href="/admin/outreach/agents/drafter" className="text-[var(--accent)] hover:underline">
+              Message Drafter
+            </Link>{' '}
+            or send individual steps from the upcoming list.
+          </p>
+        </div>
+      ) : null}
+
+      {automaticOutreach && config.isActive && !config.isPaused ? (
+        <div className="rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-4 py-3 text-[13px] text-[var(--text-primary)]">
+          <p className="font-medium">Automatic outreach is on</p>
+          <p className="mt-1 text-[var(--text-secondary)]">
+            {config.agentName} drafts sequences after each enroll and sends due email/SMS during your
+            outreach window.
           </p>
         </div>
       ) : null}

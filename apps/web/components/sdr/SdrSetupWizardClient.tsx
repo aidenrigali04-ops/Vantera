@@ -1,6 +1,7 @@
 'use client'
 
 import { SlideWizardFrame } from '@/components/onboarding/slide-wizard/SlideWizardFrame'
+import { SdrOutreachAutomationToggle } from '@/components/sdr/SdrOutreachAutomationToggle'
 import { SdrProspectScoutFields } from '@/components/sdr/SdrProspectScoutFields'
 import { SdrWizardMediaPanel } from '@/components/sdr/SdrWizardMediaPanel'
 import { bindingToApiInput, type BindingDraft, type SavedSearchOption } from '@/components/sdr/sdr-aspire-ui'
@@ -8,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { getIcpConfigForVertical } from '@/lib/aspire/icp-score'
 import { getSdrWizardSlideMeta, SDR_WIZARD_SLIDES } from '@/lib/onboarding/sdr-wizard-slides'
+import type { OutreachAutomationMode } from '@/lib/sdr/outreach-automation'
 import type { CreateSDRConfigInput, ProspectMode } from '@/lib/sdr/types'
 import type { AspireBindingInput } from '@/lib/sdr/aspire-config'
 import { useRouter } from 'next/navigation'
@@ -28,6 +30,7 @@ type FormState = {
   defaultMinIcpScore: number
   syncIcpToSavedSearches: boolean
   bindings: BindingDraft[]
+  outreachAutomationMode: OutreachAutomationMode
 }
 
 export function SdrSetupWizardClient({ accountVertical }: Props) {
@@ -50,6 +53,7 @@ export function SdrSetupWizardClient({ accountVertical }: Props) {
     defaultMinIcpScore: 70,
     syncIcpToSavedSearches: true,
     bindings: [],
+    outreachAutomationMode: 'review',
   })
 
   useEffect(() => {
@@ -148,6 +152,7 @@ export function SdrSetupWizardClient({ accountVertical }: Props) {
         prospectMode: form.prospectMode,
         defaultMinIcpScore: form.defaultMinIcpScore,
         syncIcpToSavedSearches: form.syncIcpToSavedSearches,
+        outreachAutomationMode: form.outreachAutomationMode,
         bindings: form.bindings.map(bindingToApiInput),
       }
 
@@ -381,7 +386,26 @@ export function SdrSetupWizardClient({ accountVertical }: Props) {
                 </dd>
               </div>
             )}
+            <div className="flex justify-between gap-4">
+              <dt className="text-[var(--text-tertiary)]">Outreach</dt>
+              <dd className="font-medium text-[var(--text-primary)]">
+                {form.outreachAutomationMode === 'automatic'
+                  ? 'Automatic'
+                  : 'Review before send'}
+              </dd>
+            </div>
           </dl>
+          <div>
+            <p className="mb-2 text-[13px] font-medium text-[var(--text-primary)]">
+              After leads are found
+            </p>
+            <SdrOutreachAutomationToggle
+              compact
+              value={form.outreachAutomationMode}
+              disabled={isPending}
+              onChange={(mode) => setForm({ ...form, outreachAutomationMode: mode })}
+            />
+          </div>
         </div>
       )}
     </SlideWizardFrame>

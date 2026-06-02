@@ -1,8 +1,9 @@
 import { SdrCommandCenterClient } from '@/components/sdr/SdrCommandCenterClient'
 import { requireAdminSession } from '@/lib/auth/require-session'
 import { db } from '@/lib/db/client'
-import { evaluateFlag } from '@/lib/feature-flags/evaluate'
 import type { Plan } from '@/lib/feature-flags/flags'
+import { accounts } from '@vantera/db'
+import { eq } from 'drizzle-orm'
 import { mapSdrAgentConfigRow } from '@/lib/sdr/map-agent-config'
 import {
   findSdrConfigByAccount,
@@ -10,8 +11,7 @@ import {
   getSdrDashboardStats,
   getUpcomingSdrSends,
 } from '@/lib/sdr/queries'
-import { accounts } from '@vantera/db'
-import { eq } from 'drizzle-orm'
+import { evaluateFlag } from '@/lib/feature-flags/evaluate'
 import { redirect } from 'next/navigation'
 import { Suspense } from 'react'
 
@@ -45,11 +45,7 @@ export default async function ProspectScoutPage() {
     redirect('/admin/outreach/agents/setup')
   }
 
-  const autonomousMessaging = await evaluateFlag({
-    accountId: session.accountId,
-    plan,
-    flagName: 'autonomous_ai_messaging',
-  })
+  const config = mapSdrAgentConfigRow(configRow)
 
   const [stats, activity, upcoming] = await Promise.all([
     getSdrDashboardStats(session.accountId),
@@ -60,11 +56,10 @@ export default async function ProspectScoutPage() {
   return (
     <Suspense fallback={<div className="p-6 text-sm text-[var(--text-secondary)]">Loading scout…</div>}>
       <SdrCommandCenterClient
-        config={mapSdrAgentConfigRow(configRow)}
+        config={config}
         stats={stats}
         initialActivity={activity}
         upcoming={upcoming}
-        autonomousMessaging={autonomousMessaging}
       />
     </Suspense>
   )

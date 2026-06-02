@@ -2,6 +2,10 @@ import type { ICPConfig } from '@/lib/aspire/types'
 import { db } from '@/lib/db/client'
 import { findSavedSearches } from '@/lib/aspire/queries'
 import type { BindingWithSearch, ProspectMode } from '@/lib/prospect-scout/types'
+import {
+  normalizeOutreachAutomationMode,
+  type OutreachAutomationMode,
+} from '@/lib/sdr/outreach-automation'
 import type { CreateSDRConfigInput } from '@/lib/sdr/types'
 import {
   aspireSavedSearches,
@@ -32,6 +36,7 @@ export type SdrAspireConfigPayload = {
     isActive: boolean
     isPaused: boolean
     icpConfig: ICPConfig
+    outreachAutomationMode: OutreachAutomationMode
   } | null
   bindings: Array<{
     id: string
@@ -116,6 +121,7 @@ export async function getSdrAspireConfig(accountId: string): Promise<SdrAspireCo
       isActive: config.isActive,
       isPaused: config.isPaused,
       icpConfig: config.icpConfig as ICPConfig,
+      outreachAutomationMode: normalizeOutreachAutomationMode(config.outreachAutomationMode),
     },
     bindings: bindingRows.map((row) => ({
       id: row.binding.id,

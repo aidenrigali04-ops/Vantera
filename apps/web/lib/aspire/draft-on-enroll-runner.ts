@@ -3,11 +3,14 @@ import type { ApifyLead } from '@/lib/aspire/types'
 import { getSystemAutomationId } from '@/lib/automation/system-automation'
 import { db } from '@/lib/db/client'
 import { isAiMessageDraftingEnabled } from '@/lib/ai/drafting-enabled'
-import { evaluateFlag } from '@/lib/feature-flags/evaluate'
+import {
+  isAutomaticOutreachMode,
+  resolveOutreachAutomationMode,
+} from '@/lib/sdr/outreach-automation'
 import type { Plan } from '@/lib/feature-flags/flags'
 import { sendCampaignEmail } from '@/lib/outreach/send-email'
 import { createIntelligenceSignal } from '@/lib/webhooks/resend/signals'
-import { accounts, automationRuns, leadDrafts } from '@vantera/db'
+import { accounts, automationRuns, leadDrafts, sdrAgentConfigs } from '@vantera/db'
 import { eq } from 'drizzle-orm'
 
 export type DraftOnEnrollPayload = {
@@ -34,11 +37,18 @@ export async function runDraftOnEnroll(payload: DraftOnEnrollPayload): Promise<{
 
   if (!aiDraftingEnabled) return { draftIds: [] }
 
-  const autonomous = await evaluateFlag({
-    accountId: payload.accountId,
-    plan: account.plan as Plan,
-    flagName: 'autonomous_ai_messaging',
-  })
+  const [sdrConfig] = await db
+    .select({ outreachAutomationMode: sdrAgentConfigs.outreachAutomationMode })
+    .from(sdrAgentConfigs)
+    .where(eq(sdrAgentConfigs.accountId, payload.accountId))
+    .limit(1)
+
+  const mode = await resolveOutreachAutomationMode(
+    payload.accountId,
+    account.plan as Plan,
+    sdrConfig?.outreachAutomationMode,
+  )
+  const autonomous = isAutomaticOutreachMode(mode)
 
   const person = payload.apifyLead
   const drafts = await draftOutreachMessages({

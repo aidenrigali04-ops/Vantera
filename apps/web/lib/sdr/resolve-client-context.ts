@@ -2,6 +2,10 @@ import type { ICPConfig } from '@/lib/aspire/types'
 import { db } from '@/lib/db/client'
 import { evaluateFlag } from '@/lib/feature-flags/evaluate'
 import type { Plan } from '@/lib/feature-flags/flags'
+import {
+  isAutomaticOutreachMode,
+  resolveOutreachAutomationMode,
+} from '@/lib/sdr/outreach-automation'
 import type { SdrOutreachWindow } from '@/lib/sdr/types'
 import { DEFAULT_OUTREACH_WINDOW } from '@/lib/sdr/types'
 import { accounts, featureFlags, sdrAgentConfigs } from '@vantera/db'
@@ -110,11 +114,12 @@ export async function resolveClientContext(accountId: string): Promise<ClientAge
 
   const vertical = account.vertical ?? 'agency'
   const verticalKey = vertical in VERTICAL_PAIN ? vertical : 'agency'
-  const autonomousOutreach = await evaluateFlag({
+  const automationMode = await resolveOutreachAutomationMode(
     accountId,
     plan,
-    flagName: 'autonomous_ai_messaging',
-  })
+    config.outreachAutomationMode,
+  )
+  const autonomousOutreach = isAutomaticOutreachMode(automationMode)
 
   const icpConfig = config.icpConfig as ICPConfig
 

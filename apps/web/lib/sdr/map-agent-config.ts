@@ -1,4 +1,5 @@
 import type { ICPConfig } from '@/lib/aspire/types'
+import { normalizeOutreachAutomationMode } from '@/lib/sdr/outreach-automation'
 import type { SDRAgentConfig, SdrOutreachWindow } from '@/lib/sdr/types'
 import { DEFAULT_OUTREACH_WINDOW } from '@/lib/sdr/types'
 import type { sdrAgentConfigs } from '@vantera/db'
@@ -30,6 +31,7 @@ export function mapSdrAgentConfigRow(
     prospectMode: (row.prospectMode ?? 'inline_icp') as SDRAgentConfig['prospectMode'],
     defaultMinIcpScore: row.defaultMinIcpScore ?? 70,
     syncIcpToSavedSearches: row.syncIcpToSavedSearches ?? true,
+    outreachAutomationMode: normalizeOutreachAutomationMode(row.outreachAutomationMode),
     isActive: row.isActive,
     isPaused: row.isPaused,
     pausedReason: row.pausedReason,

@@ -1,6 +1,7 @@
 'use client'
 
 import { PageHeader } from '@/components/operational/PageHeader'
+import { SdrOutreachAutomationToggle } from '@/components/sdr/SdrOutreachAutomationToggle'
 import { SdrProspectScoutFields } from '@/components/sdr/SdrProspectScoutFields'
 import {
   bindingFromApi,
@@ -12,6 +13,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { LiveIndicator } from '@/components/operational/LiveIndicator'
 import type { SdrAspireConfigPayload } from '@/lib/sdr/aspire-config'
+import type { OutreachAutomationMode } from '@/lib/sdr/outreach-automation'
 import type { ProspectMode } from '@/lib/sdr/types'
 import { useAccountRealtime } from '@/lib/supabase/account-realtime'
 import { cn } from '@/lib/utils'
@@ -52,6 +54,9 @@ export function SdrAspireConfigClient({ accountId, initial }: Props) {
   )
   const [bindings, setBindings] = useState<BindingDraft[]>(
     initial.bindings.map(bindingFromApi),
+  )
+  const [outreachAutomationMode, setOutreachAutomationMode] = useState<OutreachAutomationMode>(
+    initial.config?.outreachAutomationMode ?? 'review',
   )
   const [recentRuns, setRecentRuns] = useState(initial.recentRuns)
 
@@ -239,6 +244,45 @@ export function SdrAspireConfigClient({ accountId, initial }: Props) {
         onBindingsChange={setBindings}
         savedSearches={savedSearches}
       />
+
+      <section className="card-surface space-y-3 p-5">
+        <div>
+          <h3 className="text-[15px] font-semibold tracking-tight text-[var(--text-primary)]">
+            Outreach pipeline
+          </h3>
+          <p className="mt-1 text-[12px] text-[var(--text-secondary)]">
+            After Prospect Scout enrolls a lead, Message Drafter writes a 5-step sequence. Choose
+            whether sends wait for approval or run automatically in your outreach window.
+          </p>
+        </div>
+        <SdrOutreachAutomationToggle
+          value={outreachAutomationMode}
+          disabled={isPending}
+          onChange={(mode) => {
+            setOutreachAutomationMode(mode)
+            startTransition(async () => {
+              const res = await fetch('/api/sdr/config', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify({ outreachAutomationMode: mode }),
+              })
+              const json = await res.json()
+              if (!json.success) {
+                toast.error(json.error ?? 'Could not save outreach mode')
+                setOutreachAutomationMode(initial.config?.outreachAutomationMode ?? 'review')
+                return
+              }
+              toast.success(
+                mode === 'automatic'
+                  ? 'Automatic outreach enabled'
+                  : 'Review-before-send enabled',
+              )
+              router.refresh()
+            })
+          }}
+        />
+      </section>
 
       <section className="space-y-3">
         <div className="flex items-center justify-between gap-2">

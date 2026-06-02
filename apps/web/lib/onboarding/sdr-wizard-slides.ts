@@ -51,7 +51,7 @@ export const SDR_WIZARD_SLIDES: SdrWizardSlide[] = [
     id: 'launch',
     eyebrow: 'Go live',
     title: 'Review and start prospecting',
-    body: 'Your agent runs its first discovery immediately, then on your chosen schedule.',
+    body: 'Choose review or automatic outreach, then start discovery on your schedule.',
     media: { type: 'preview', previewId: 'launch' },
   },
 ]

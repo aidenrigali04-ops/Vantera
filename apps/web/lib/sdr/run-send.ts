@@ -1,7 +1,10 @@
 import { getSystemAutomationId } from '@/lib/automation/system-automation'
 import { db } from '@/lib/db/client'
-import { evaluateFlag } from '@/lib/feature-flags/evaluate'
 import type { Plan } from '@/lib/feature-flags/flags'
+import {
+  isAutomaticOutreachMode,
+  resolveOutreachAutomationMode,
+} from '@/lib/sdr/outreach-automation'
 import { consumeSdrCredits, outreachSendCostForChannel, SDR_TRIAL_DAYS, SdrCreditsExhaustedError } from '@/lib/sdr/credits'
 import { logSdrActivity } from '@/lib/sdr/activity-log'
 import { requireSDREnabledForAccount } from '@/lib/sdr/guard'
@@ -20,7 +23,18 @@ import {
 } from '@vantera/db'
 import { and, eq, isNull } from 'drizzle-orm'
 
-export async function runSdrAgentSend(): Promise<{ sent: number; failed: number }> {
+export async function runSdrAgentSend(options?: {
+  accountId?: string
+}): Promise<{ sent: number; failed: number }> {
+  const filters = [
+    eq(sdrAgentConfigs.isActive, true),
+    eq(sdrAgentConfigs.isPaused, false),
+    isNull(sdrAgentConfigs.deletedAt),
+  ]
+  if (options?.accountId) {
+    filters.push(eq(sdrAgentConfigs.accountId, options.accountId))
+  }
+
   const configs = await db
     .select({
       config: sdrAgentConfigs,
@@ -28,13 +42,7 @@ export async function runSdrAgentSend(): Promise<{ sent: number; failed: number 
     })
     .from(sdrAgentConfigs)
     .innerJoin(accounts, eq(sdrAgentConfigs.accountId, accounts.id))
-    .where(
-      and(
-        eq(sdrAgentConfigs.isActive, true),
-        eq(sdrAgentConfigs.isPaused, false),
-        isNull(sdrAgentConfigs.deletedAt),
-      ),
-    )
+    .where(and(...filters))
 
   let sent = 0
   let failed = 0
@@ -47,12 +55,12 @@ export async function runSdrAgentSend(): Promise<{ sent: number; failed: number 
       continue
     }
 
-    const autonomous = await evaluateFlag({
-      accountId: config.accountId,
-      plan: plan as Plan,
-      flagName: 'autonomous_ai_messaging',
-    })
-    if (!autonomous) continue
+    const mode = await resolveOutreachAutomationMode(
+      config.accountId,
+      plan as Plan,
+      config.outreachAutomationMode,
+    )
+    if (!isAutomaticOutreachMode(mode)) continue
 
     const window = (config.outreachWindow as SdrOutreachWindow) ?? {
       startHour: 8,

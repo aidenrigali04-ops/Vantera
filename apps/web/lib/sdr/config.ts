@@ -6,6 +6,11 @@ import { db } from '@/lib/db/client'
 import { logSdrActivity } from '@/lib/sdr/activity-log'
 import { requireSDREnabled } from '@/lib/sdr/guard'
 import { queueProspectScoutDiscovery } from '@/lib/prospect-scout/queue-discovery'
+import {
+  normalizeOutreachAutomationMode,
+  setOutreachAutomationMode,
+  type OutreachAutomationMode,
+} from '@/lib/sdr/outreach-automation'
 import type { CreateSDRConfigInput, SDRAgentConfig, SdrOutreachWindow } from '@/lib/sdr/types'
 import { DEFAULT_OUTREACH_WINDOW } from '@/lib/sdr/types'
 import { createIntelligenceSignal } from '@/lib/webhooks/resend/signals'
@@ -38,6 +43,7 @@ function mapConfig(row: typeof sdrAgentConfigs.$inferSelect): SDRAgentConfig {
     prospectMode: (row.prospectMode ?? 'inline_icp') as import('@/lib/sdr/types').ProspectMode,
     defaultMinIcpScore: row.defaultMinIcpScore ?? 70,
     syncIcpToSavedSearches: row.syncIcpToSavedSearches ?? true,
+    outreachAutomationMode: normalizeOutreachAutomationMode(row.outreachAutomationMode),
     isActive: row.isActive,
     isPaused: row.isPaused,
     pausedReason: row.pausedReason,
@@ -113,9 +119,17 @@ export async function createSDRConfig(
       prospectMode: data.prospectMode ?? 'inline_icp',
       defaultMinIcpScore: data.defaultMinIcpScore ?? 70,
       syncIcpToSavedSearches: data.syncIcpToSavedSearches ?? true,
+      outreachAutomationMode: normalizeOutreachAutomationMode(
+        data.outreachAutomationMode ?? 'review',
+      ),
       isActive: data.isActive ?? false,
     })
     .returning()
+
+  await setOutreachAutomationMode(
+    accountId,
+    normalizeOutreachAutomationMode(created!.outreachAutomationMode),
+  )
 
   await db.insert(aiMemory).values({
     accountId,
@@ -178,11 +192,23 @@ export async function updateSDRConfig(
       ...(data.syncIcpToSavedSearches !== undefined
         ? { syncIcpToSavedSearches: data.syncIcpToSavedSearches }
         : {}),
+      ...(data.outreachAutomationMode !== undefined
+        ? {
+            outreachAutomationMode: normalizeOutreachAutomationMode(data.outreachAutomationMode),
+          }
+        : {}),
       ...(data.isActive !== undefined ? { isActive: data.isActive } : {}),
       updatedAt: new Date(),
     })
     .where(eq(sdrAgentConfigs.id, existing.id))
     .returning()
+
+  if (data.outreachAutomationMode !== undefined) {
+    await setOutreachAutomationMode(
+      accountId,
+      normalizeOutreachAutomationMode(updated!.outreachAutomationMode),
+    )
+  }
 
   if (activating) {
     void queueProspectScoutDiscovery(accountId).catch((err) => {
@@ -192,6 +218,12 @@ export async function updateSDRConfig(
 
   revalidatePath('/admin/outreach/agents')
   return { success: true, data: mapConfig(updated!) }
+}
+
+export async function updateOutreachAutomationMode(
+  mode: OutreachAutomationMode,
+): Promise<ActionResult<SDRAgentConfig>> {
+  return updateSDRConfig({ outreachAutomationMode: mode })
 }
 
 export async function pauseSDRAgent(reason: string): Promise<ActionResult> {

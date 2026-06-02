@@ -5,6 +5,7 @@ import { isAiMessageDraftingEnabled } from '@/lib/ai/drafting-enabled'
 import type { Plan } from '@/lib/feature-flags/flags'
 import { sendCampaignEmail } from '@/lib/outreach/send-email'
 import { sendCampaignSms } from '@/lib/outreach/send-sms'
+import { sendSdrSequenceStepNow, SdrSendBlockedError } from '@/lib/sdr/send-single-step'
 import { accounts, activities, automationRuns, leadDrafts, leads } from '@vantera/db'
 import { and, eq, isNull } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
@@ -54,6 +55,61 @@ export async function POST(request: Request, { params }: RouteParams) {
       { success: false, error: 'AI drafting is disabled. Configure ANTHROPIC_API_KEY.' },
       { status: 403 },
     )
+  }
+
+  const metadata = (row.draft.metadata ?? {}) as {
+    sdrSequenceId?: string
+    sequenceStepId?: string
+    stepNumber?: number
+  }
+
+  if (metadata.sequenceStepId) {
+    try {
+      await sendSdrSequenceStepNow({
+        accountId: session.accountId,
+        stepId: metadata.sequenceStepId,
+      })
+    } catch (error) {
+      if (error instanceof SdrSendBlockedError) {
+        return NextResponse.json({ success: false, error: error.message }, { status: 400 })
+      }
+      return NextResponse.json(
+        {
+          success: false,
+          error: error instanceof Error ? error.message : 'Could not send sequence step',
+        },
+        { status: 502 },
+      )
+    }
+
+    await db
+      .update(leadDrafts)
+      .set({
+        status: 'sent',
+        sentAt: new Date(),
+        approvedBy: session.userId,
+      })
+      .where(eq(leadDrafts.id, id))
+
+    await db.insert(activities).values({
+      accountId: session.accountId,
+      leadId: row.lead.id,
+      actorType: 'user',
+      actorId: session.userId,
+      activityType: 'sdr_step_approved_and_sent',
+      body: `Approved and sent ${row.draft.channel} sequence step`,
+      metadata: {
+        draftId: id,
+        sequenceStepId: metadata.sequenceStepId,
+        sequenceId: metadata.sdrSequenceId,
+      },
+      visibleToClient: false,
+    })
+
+    return NextResponse.json({
+      success: true,
+      data: { draftId: id, sentAt: new Date().toISOString(), sequenceStepId: metadata.sequenceStepId },
+    })
   }
 
   if (row.draft.channel === 'email') {

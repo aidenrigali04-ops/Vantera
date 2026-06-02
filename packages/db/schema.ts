@@ -763,6 +763,10 @@ export const sdrAgentConfigs = pgTable(
     prospectMode: varchar('prospect_mode', { length: 20 }).notNull().default('aspire_bound'),
     defaultMinIcpScore: smallint('default_min_icp_score').notNull().default(70),
     syncIcpToSavedSearches: boolean('sync_icp_to_saved_searches').notNull().default(true),
+    /** review = draft + approve sends; automatic = send due steps on schedule */
+    outreachAutomationMode: varchar('outreach_automation_mode', { length: 20 })
+      .notNull()
+      .default('review'),
     deletedAt: timestamptz('deleted_at'),
     createdAt: timestamptz('created_at').notNull().defaultNow(),
     updatedAt: timestamptz('updated_at').notNull().defaultNow(),

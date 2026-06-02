@@ -1,4 +1,5 @@
 import type { ICPConfig } from '@/lib/aspire/types'
+import type { OutreachAutomationMode } from '@/lib/sdr/outreach-automation'
 
 export type SdrOutreachWindow = {
   startHour: number
@@ -26,6 +27,7 @@ export interface SDRAgentConfig {
   prospectMode: ProspectMode
   defaultMinIcpScore: number
   syncIcpToSavedSearches: boolean
+  outreachAutomationMode: OutreachAutomationMode
   isActive: boolean
   isPaused: boolean
   pausedReason: string | null
@@ -60,6 +62,7 @@ export type CreateSDRConfigInput = {
   prospectMode?: ProspectMode
   defaultMinIcpScore?: number
   syncIcpToSavedSearches?: boolean
+  outreachAutomationMode?: OutreachAutomationMode
 }
 
 export interface SDRSequenceStep {

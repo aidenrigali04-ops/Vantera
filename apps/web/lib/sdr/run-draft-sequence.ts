@@ -1,8 +1,12 @@
 import type { ApifyLead } from '@/lib/aspire/types'
 import { getSystemAutomationId } from '@/lib/automation/system-automation'
 import { db } from '@/lib/db/client'
-import { evaluateFlag } from '@/lib/feature-flags/evaluate'
 import type { Plan } from '@/lib/feature-flags/flags'
+import {
+  isAutomaticOutreachMode,
+  resolveOutreachAutomationMode,
+} from '@/lib/sdr/outreach-automation'
+import { sendDueSdrStepsForAccount } from '@/lib/sdr/send-due-for-account'
 import { logSdrActivity } from '@/lib/sdr/activity-log'
 import { generateSdrSequenceSteps } from '@/lib/sdr/draft-sequence'
 import { requireSDREnabledForAccount } from '@/lib/sdr/guard'
@@ -101,19 +105,30 @@ export async function runDraftSdrSequence(payload: DraftSdrSequencePayload): Pro
       ),
     )
 
+  const insertedSteps: Array<{ id: string; stepNumber: number; channel: string }> = []
+
   for (let i = 0; i < steps.length; i++) {
     const step = steps[i]!
-    await db.insert(sdrSequenceSteps).values({
-      accountId: payload.accountId,
-      sequenceId: payload.sequenceId,
-      leadId: payload.leadId,
-      stepNumber: step.stepNumber,
-      channel: step.channel,
-      subject: step.subject,
-      body: step.body,
-      scheduledFor: scheduledFor[i] ?? new Date(),
-      status: 'scheduled',
-    })
+    const [row] = await db
+      .insert(sdrSequenceSteps)
+      .values({
+        accountId: payload.accountId,
+        sequenceId: payload.sequenceId,
+        leadId: payload.leadId,
+        stepNumber: step.stepNumber,
+        channel: step.channel,
+        subject: step.subject,
+        body: step.body,
+        scheduledFor: scheduledFor[i] ?? new Date(),
+        status: 'scheduled',
+      })
+      .returning({
+        id: sdrSequenceSteps.id,
+        stepNumber: sdrSequenceSteps.stepNumber,
+        channel: sdrSequenceSteps.channel,
+      })
+
+    if (row) insertedSteps.push(row)
   }
 
   await db
@@ -134,21 +149,29 @@ export async function runDraftSdrSequence(payload: DraftSdrSequencePayload): Pro
     metadata: { steps: steps.length },
   })
 
-  const autonomous = await evaluateFlag({
-    accountId: payload.accountId,
+  const automationMode = await resolveOutreachAutomationMode(
+    payload.accountId,
     plan,
-    flagName: 'autonomous_ai_messaging',
-  })
+    config.outreachAutomationMode,
+  )
+  const automatic = isAutomaticOutreachMode(automationMode)
 
-  if (!autonomous) {
-    for (const step of steps) {
+  if (!automatic) {
+    for (const inserted of insertedSteps) {
+      const step = steps.find((s) => s.stepNumber === inserted.stepNumber)
+      if (!step) continue
+
       await createIntelligenceSignal({
         accountId: payload.accountId,
         signalType: 'sdr_step_review',
         severity: 'yellow',
         headline: `Review ${config.agentName}'s ${step.channel} before sending to ${lead.firstName}`,
-        actionLabel: 'Review sequence',
-        actionPayload: { sequenceId: payload.sequenceId, leadId: payload.leadId },
+        actionLabel: 'Review in Message Drafter',
+        actionPayload: {
+          sequenceId: payload.sequenceId,
+          leadId: payload.leadId,
+          stepId: inserted.id,
+        },
         expiresInDays: 7,
       })
 
@@ -161,10 +184,18 @@ export async function runDraftSdrSequence(payload: DraftSdrSequencePayload): Pro
           body: step.body,
           draftedBy: config.agentName,
           status: 'pending_review',
-          metadata: { sdrSequenceId: payload.sequenceId, stepNumber: step.stepNumber },
+          metadata: {
+            sdrSequenceId: payload.sequenceId,
+            sequenceStepId: inserted.id,
+            stepNumber: step.stepNumber,
+          },
         })
       }
     }
+  } else {
+    void sendDueSdrStepsForAccount(payload.accountId).catch((err) => {
+      console.error('[runDraftSdrSequence] auto-send after draft failed', err)
+    })
   }
 
   const automationId = await getSystemAutomationId(payload.accountId, 'sdr_draft')
@@ -174,6 +205,10 @@ export async function runDraftSdrSequence(payload: DraftSdrSequencePayload): Pro
     triggerEvent: 'draft_sdr_sequence',
     actionType: 'sequence_draft',
     status: 'success',
-    resultPayload: { sequenceId: payload.sequenceId, steps: steps.length },
+    resultPayload: {
+      sequenceId: payload.sequenceId,
+      steps: steps.length,
+      automationMode,
+    },
   })
 }
