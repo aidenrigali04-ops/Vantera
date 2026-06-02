@@ -1,3 +1,5 @@
+import './load-env.mjs'
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   serverExternalPackages: ['ws', '@trigger.dev/sdk', '@trigger.dev/sdk/v3'],
