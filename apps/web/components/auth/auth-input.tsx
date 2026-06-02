@@ -13,9 +13,9 @@ export const AuthInput = forwardRef<HTMLInputElement, AuthInputProps>(
       <input
         ref={ref}
         className={cn(
-          'flex h-11 w-full rounded-lg border border-stone-200 bg-white px-3 text-[15px] text-stone-900 shadow-sm',
-          'placeholder:text-stone-400 transition-colors duration-150',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-900/10 focus-visible:ring-offset-0',
+          'flex h-11 w-full rounded-lg border border-[var(--border-default)] bg-[var(--bg-surface)] px-3 text-[15px] text-[var(--text-primary)] shadow-[var(--shadow-sm)]',
+          'placeholder:text-[var(--text-tertiary)] transition-[border-color,box-shadow] duration-150',
+          'focus-visible:border-[var(--accent-border)] focus-visible:outline-none focus-visible:shadow-[var(--shadow-glow)]',
           'disabled:cursor-not-allowed disabled:opacity-60',
           invalid && 'border-red-500 focus-visible:ring-red-500/20',
           className,
@@ -37,7 +37,7 @@ export function AuthFieldLabel({
   children: ReactNode
 }) {
   return (
-    <label htmlFor={htmlFor} className="text-[13px] font-medium text-stone-700">
+    <label htmlFor={htmlFor} className="text-[13px] font-medium text-[var(--text-secondary)]">
       {children}
     </label>
   )

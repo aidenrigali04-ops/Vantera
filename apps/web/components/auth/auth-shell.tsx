@@ -31,7 +31,7 @@ export function AuthShell({ children, className, showBrandPanel = true }: AuthSh
   const reduceMotion = useReducedMotion()
 
   return (
-    <div className="grid min-h-[100dvh] grid-cols-1 bg-white lg:grid-cols-2">
+    <div className="grid min-h-[100dvh] grid-cols-1 bg-[var(--bg-surface)] lg:grid-cols-2">
       <motion.div
         className={cn('flex min-h-[100dvh] flex-col', className)}
         initial={reduceMotion ? false : 'hidden'}

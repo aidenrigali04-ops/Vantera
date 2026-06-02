@@ -289,8 +289,8 @@ export function AuthCredentialsPanel({
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <h1 className="text-2xl font-semibold tracking-[-0.02em] text-stone-900">{title}</h1>
-        <p className="text-[13px] leading-relaxed text-stone-500">{subtitle}</p>
+        <h1 className="text-2xl font-semibold tracking-[-0.02em] text-[var(--text-primary)]">{title}</h1>
+        <p className="text-[13px] leading-relaxed text-[var(--text-secondary)]">{subtitle}</p>
       </div>
 
       <div aria-live="polite" aria-atomic="true">
@@ -398,7 +398,7 @@ export function AuthCredentialsPanel({
 
           <Button
             type="submit"
-            className="h-11 w-full rounded-lg bg-stone-900 text-white hover:bg-stone-800 disabled:opacity-60"
+            className="h-11 w-full rounded-lg border border-[var(--accent-border)] bg-[var(--accent)] font-medium text-[var(--text-primary)] shadow-[var(--shadow-sm)] hover:bg-[var(--accent-hover)] disabled:opacity-60"
             disabled={isBusy || emailTaken}
           >
             {isSubmitting ? (
@@ -477,7 +477,7 @@ export function AuthCredentialsPanel({
 
           <Button
             type="submit"
-            className="h-11 w-full rounded-lg bg-stone-900 text-white hover:bg-stone-800 disabled:opacity-60"
+            className="h-11 w-full rounded-lg border border-[var(--accent-border)] bg-[var(--accent)] font-medium text-[var(--text-primary)] shadow-[var(--shadow-sm)] hover:bg-[var(--accent-hover)] disabled:opacity-60"
             disabled={isBusy || showForgotPassword}
           >
             {isSubmitting ? (
