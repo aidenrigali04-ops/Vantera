@@ -25,6 +25,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { getIcpConfigForVertical } from '@/lib/aspire/icp-score'
 import type { AspireSearchResult } from '@/lib/aspire/search'
+import { normalizeApolloFilters } from '@/lib/aspire/search'
 import {
   ASPIRE_TABLE_VIEWS,
   aspireIntentTone,
@@ -34,7 +35,7 @@ import { useAccountRealtime } from '@/lib/supabase/account-realtime'
 import { cn } from '@/lib/utils'
 import type { aspireSavedSearches } from '@vantera/db'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Bookmark, Check, Loader2, Plus, Search, Target, Trash2, TrendingUp, Users } from 'lucide-react'
+import { Bookmark, Check, Loader2, Play, Plus, Search, Target, Trash2, TrendingUp, Users } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
@@ -82,6 +83,8 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
     columnId: 'icp',
     direction: 'desc',
   })
+  const [hasLiveSearch, setHasLiveSearch] = useState(false)
+  const [runningSearchId, setRunningSearchId] = useState<string | null>(null)
 
   useEffect(() => {
     const id = searchParams.get('searchId')
@@ -98,6 +101,10 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
     if (filters.q) setQuery(filters.q)
     if (filters.company) setCompany(filters.company)
   }, [activeSaved?.id])
+
+  useEffect(() => {
+    setHasLiveSearch(false)
+  }, [activeSearchId, query, company])
 
   const liveSearchKey = ['aspire-search', accountId, query, company, activeSearchId]
 
@@ -160,7 +167,7 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
   })
 
   const isFetching = isLiveFetching || isSavedFetching || isScoutFetching
-  const sourceResults = liveResults.length
+  const sourceResults = hasLiveSearch
     ? liveResults
     : activeSearchId
       ? savedResults
@@ -282,12 +289,16 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
 
   const saveSearchMutation = useMutation({
     mutationFn: async (name: string) => {
+      const filters = normalizeApolloFilters(accountVertical, {
+        q: query || undefined,
+        company: company || undefined,
+      })
       const res = await fetch('/api/aspire/searches', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name,
-          filters: { q: query || undefined, company: company || undefined },
+          filters,
           runFrequency: 'weekly',
         }),
       })
@@ -324,8 +335,52 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
     onError: (err: Error) => toast.error(err.message),
   })
 
-  const handleSearch = () => {
-    void queryClient.fetchQuery({ queryKey: liveSearchKey })
+  const runSavedSearchMutation = useMutation({
+    mutationFn: async (searchId: string) => {
+      const res = await fetch('/api/aspire/searches/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ searchId }),
+      })
+      const json = await res.json()
+      if (!json.success) throw new Error(json.error ?? 'Could not run search')
+      return json.data as { found: number; enrolled: number; status: string }
+    },
+    onMutate: (searchId) => {
+      setRunningSearchId(searchId)
+    },
+    onSuccess: (data, searchId) => {
+      void queryClient.invalidateQueries({ queryKey: ['aspire-results', searchId] })
+      void queryClient.invalidateQueries({ queryKey: savedResultsQueryKey })
+      setHasLiveSearch(false)
+      toast.success(
+        data.found > 0
+          ? `Apollo found ${data.found} new prospect${data.found === 1 ? '' : 's'}`
+          : 'Apollo search complete — no new prospects matched your criteria',
+      )
+    },
+    onError: (err: Error) => toast.error(err.message),
+    onSettled: () => setRunningSearchId(null),
+  })
+
+  const handleSearch = async () => {
+    setHasLiveSearch(true)
+    try {
+      const results = (await queryClient.fetchQuery({ queryKey: liveSearchKey })) as AspireSearchResult[]
+      if (activeSearchId) {
+        void queryClient.invalidateQueries({ queryKey: savedResultsQueryKey })
+      } else {
+        void queryClient.invalidateQueries({ queryKey: scoutResultsQueryKey })
+      }
+      toast.success(
+        results.length > 0
+          ? `Found ${results.length} new prospect${results.length === 1 ? '' : 's'} from Apollo`
+          : 'No new prospects — try different keywords or broaden your search',
+      )
+    } catch (err) {
+      setHasLiveSearch(false)
+      toast.error(err instanceof Error ? err.message : 'Apollo search failed')
+    }
   }
 
   const handleSelectSavedSearch = (search: SavedSearch) => {
@@ -563,6 +618,20 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
                       <Button
                         variant="ghost"
                         size="sm"
+                        className="h-7 w-7 shrink-0 px-0 text-stone-500 hover:text-violet-700"
+                        title="Run Apollo search now"
+                        onClick={() => runSavedSearchMutation.mutate(s.id)}
+                        disabled={runningSearchId === s.id}
+                      >
+                        {runningSearchId === s.id ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Play className="h-3.5 w-3.5" />
+                        )}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         className="h-7 w-7 shrink-0 px-0 text-stone-400 hover:text-red-600"
                         onClick={() => deleteSearchMutation.mutate(s.id)}
                         disabled={deleteSearchMutation.isPending}
@@ -595,7 +664,7 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
               <p className="text-[13px] text-[var(--text-secondary)]">
                 Viewing saved search{' '}
                 <span className="font-medium text-[var(--text-primary)]">{activeSaved.name}</span>
-                {liveResults.length === 0 ? ' — showing stored results' : ''}
+                {hasLiveSearch ? ' — live Apollo results' : ' — showing stored results'}
               </p>
               <LiveIndicator active={resultsLive} />
             </div>

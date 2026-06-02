@@ -60,16 +60,37 @@ function buildApolloBody(filters: ApolloSearchFilters, page: number, perPage: nu
   return {
     page,
     per_page: perPage,
-    person_titles: filters.jobTitles.length > 0 ? filters.jobTitles : undefined,
-    q_organization_keyword_tags: filters.industries.length > 0 ? filters.industries : undefined,
-    organization_num_employees_ranges:
-      filters.companySizeRanges.length > 0 ? filters.companySizeRanges : undefined,
-    person_locations: filters.locations.length > 0 ? filters.locations : undefined,
+    person_titles: filters.jobTitles?.length ? filters.jobTitles : undefined,
+    q_organization_keyword_tags: filters.industries?.length ? filters.industries : undefined,
+    organization_num_employees_ranges: filters.companySizeRanges?.length
+      ? filters.companySizeRanges
+      : undefined,
+    person_locations: filters.locations?.length ? filters.locations : undefined,
     q_keywords: keywords.length > 0 ? keywords.join(' ') : undefined,
-    contact_email_status:
-      filters.contactEmailStatus && filters.contactEmailStatus.length > 0
-        ? filters.contactEmailStatus
-        : undefined,
+    contact_email_status: filters.contactEmailStatus?.length
+      ? filters.contactEmailStatus
+      : undefined,
+  }
+}
+
+/** Merge partial UI/saved-search filters with account ICP defaults before Apollo calls. */
+export function normalizeApolloFilters(
+  vertical: string,
+  filters: Partial<ApolloSearchFilters> = {},
+): ApolloSearchFilters {
+  const icpConfig = getIcpConfigForVertical(vertical)
+  const [minSize, maxSize] = icpConfig.targetSizes
+
+  return {
+    jobTitles: filters.jobTitles ?? icpConfig.targetTitles,
+    industries: filters.industries ?? icpConfig.targetIndustries,
+    companySizeRanges:
+      filters.companySizeRanges ?? [`${minSize},${maxSize}`, '1,10', '11,50', '51,200'],
+    locations: filters.locations ?? ['United States'],
+    keywords: filters.keywords,
+    contactEmailStatus: filters.contactEmailStatus ?? ['verified', 'guessed'],
+    q: filters.q,
+    company: filters.company,
   }
 }
 
@@ -205,17 +226,9 @@ export async function searchProspects(
     .where(eq(accounts.id, accountId))
     .limit(1)
 
-  const icpConfig = getIcpConfigForVertical(account?.vertical ?? 'agency')
-  const normalizedFilters: ApolloSearchFilters = {
-    jobTitles: filters.jobTitles ?? ['Owner', 'Founder', 'CEO', 'President'],
-    industries: filters.industries ?? icpConfig.targetIndustries,
-    companySizeRanges: filters.companySizeRanges ?? ['1,10', '11,50', '51,200'],
-    locations: filters.locations ?? [],
-    keywords: filters.keywords,
-    contactEmailStatus: filters.contactEmailStatus ?? ['verified', 'guessed'],
-    q: filters.q,
-    company: filters.company,
-  }
+  const vertical = account?.vertical ?? 'agency'
+  const icpConfig = getIcpConfigForVertical(vertical)
+  const normalizedFilters = normalizeApolloFilters(vertical, filters)
 
   const { people } = await searchApollo(normalizedFilters)
   const existingIds = new Set(await filterExistingLeads(accountId, people.map((p) => p.id)))

@@ -1,5 +1,5 @@
 import { getIcpConfigForVertical, scoreICP } from '@/lib/aspire/icp-score'
-import { filterExistingLeads, searchApollo } from '@/lib/aspire/search'
+import { filterExistingLeads, normalizeApolloFilters, searchApollo } from '@/lib/aspire/search'
 import type { ApolloSearchFilters, ApolloPersonResult } from '@/lib/aspire/types'
 import { getSystemAutomationId } from '@/lib/automation/system-automation'
 import { db } from '@/lib/db/client'
@@ -101,7 +101,9 @@ function filterCandidates(
 export async function runBoundSearch(input: RunBoundSearchInput): Promise<RunSearchResult> {
   const { binding, config, headroom } = input
   const search = binding.search
-  const filters = search.filters as ApolloSearchFilters
+  const rawFilters = search.filters as Partial<ApolloSearchFilters>
+  const vertical = input.vertical ?? 'agency'
+  const filters = normalizeApolloFilters(vertical, rawFilters)
   const icpConfig = resolveIcpConfig(config, search)
   const minIcp = effectiveMinIcp(binding, config)
   const limit = Math.min(headroom, binding.maxLeadsPerRun, 25)
@@ -230,7 +232,8 @@ export async function runBoundSearch(input: RunBoundSearchInput): Promise<RunSea
 /** Weekly/manual run for a saved search without an SDR binding. */
 export async function runUnboundSearch(input: RunUnboundSearchInput): Promise<RunSearchResult> {
   const { search, accountId, vertical } = input
-  const filters = search.filters as ApolloSearchFilters
+  const rawFilters = search.filters as Partial<ApolloSearchFilters>
+  const filters = normalizeApolloFilters(vertical, rawFilters)
   const icpConfig =
     (search.icpConfig as ReturnType<typeof resolveIcpConfig> | null) ??
     getIcpConfigForVertical(vertical)
@@ -250,16 +253,19 @@ export async function runUnboundSearch(input: RunUnboundSearchInput): Promise<Ru
       input.config?.excludeDomains ?? [],
     )
 
-    const scored = fresh.map((person) => ({
-      person,
-      icp: scoreICP(person, icpConfig),
-    }))
+    const scored = fresh
+      .map((person) => ({
+        person,
+        icp: scoreICP(person, icpConfig),
+      }))
+      .sort((a, b) => b.icp.score - a.icp.score)
 
     const minIcp = input.config?.defaultMinIcpScore ?? 70
     let enrolled = 0
+    const enrolledIds = new Set<string>()
 
     if (input.config && input.headroom && input.headroom > 0) {
-      for (const { person, icp } of scored.sort((a, b) => b.icp.score - a.icp.score)) {
+      for (const { person, icp } of scored) {
         if (icp.score < minIcp || enrolled >= input.headroom) break
         const result = await enrollProspect({
           accountId,
@@ -270,13 +276,20 @@ export async function runUnboundSearch(input: RunUnboundSearchInput): Promise<Ru
           icpSignals: icp.signals,
           startSdrSequence: true,
         })
-        if (result.enrolled) enrolled += 1
+        if (result.enrolled) {
+          enrolled += 1
+          enrolledIds.add(person.id)
+        }
       }
     }
 
-    const toStore = scored.filter(
-      ({ icp }) => icp.score >= minIcp && enrolled === 0,
+    let toStore = scored.filter(
+      ({ person, icp }) => icp.score >= minIcp && !enrolledIds.has(person.id),
     )
+    if (toStore.length === 0 && enrolled === 0 && scored.length > 0) {
+      toStore = scored.slice(0, 10)
+    }
+
     if (toStore.length > 0) {
       await recordFoundProspects({
         accountId,
@@ -290,7 +303,7 @@ export async function runUnboundSearch(input: RunUnboundSearchInput): Promise<Ru
       await notifyIcpMatches(accountId, search.name, toStore.length, search.id)
     }
 
-    const found = fresh.length
+    const found = toStore.length > 0 ? toStore.length : fresh.length
 
     await db
       .update(aspireSavedSearches)
