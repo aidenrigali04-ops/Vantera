@@ -1,17 +1,11 @@
 'use client'
 
 import type { VentoraMonthlyPoint } from '@/lib/dashboard/ventora-types'
+import { DURATION, EASE_OUT, fadeUp } from '@/lib/motion'
+import { motion } from 'framer-motion'
 import { MoreHorizontal } from 'lucide-react'
 import { useMemo, useState } from 'react'
-import {
-  Bar,
-  BarChart,
-  Cell,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts'
+import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 
 type Props = {
   data: VentoraMonthlyPoint[]
@@ -20,6 +14,7 @@ type Props = {
 
 export function VentoraOverviewChart({ data, highlightMonth = 'Jul' }: Props) {
   const [activeMonth, setActiveMonth] = useState<string | null>(highlightMonth)
+  const [entered, setEntered] = useState(false)
 
   const chartData = useMemo(
     () => data.map((d) => ({ ...d, total: d.solid + d.hatch })),
@@ -29,7 +24,13 @@ export function VentoraOverviewChart({ data, highlightMonth = 'Jul' }: Props) {
   const active = chartData.find((d) => d.month === (activeMonth ?? highlightMonth))
 
   return (
-    <section className="card-surface flex h-full min-h-[280px] flex-col p-4 sm:p-5">
+    <motion.section
+      className="card-surface flex h-full min-h-[280px] flex-col p-4 sm:p-5"
+      variants={fadeUp}
+      initial="hidden"
+      animate="visible"
+      onAnimationComplete={() => setEntered(true)}
+    >
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-sm font-semibold text-[var(--text-primary)]">Overview</h2>
         <button type="button" aria-label="Overview options" className="icon-btn">
@@ -39,12 +40,16 @@ export function VentoraOverviewChart({ data, highlightMonth = 'Jul' }: Props) {
 
       <div className="relative min-h-[220px] flex-1">
         {active && activeMonth ? (
-          <div
+          <motion.div
             className="pointer-events-none absolute left-1/2 top-0 z-10 -translate-x-1/2 rounded-md bg-[var(--text-primary)] px-3 py-1.5 text-xs font-medium tracking-wide text-[var(--text-inverse)] shadow-md"
             role="status"
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: DURATION.fade, ease: EASE_OUT }}
+            key={active.month}
           >
             Conversion {active.solid}
-          </div>
+          </motion.div>
         ) : null}
 
         <ResponsiveContainer width="100%" height="100%">
@@ -54,6 +59,18 @@ export function VentoraOverviewChart({ data, highlightMonth = 'Jul' }: Props) {
             barCategoryGap="18%"
             onMouseLeave={() => setActiveMonth(highlightMonth)}
           >
+            <defs>
+              <pattern
+                id="ventora-bar-hatch"
+                patternUnits="userSpaceOnUse"
+                width="6"
+                height="6"
+                patternTransform="rotate(45)"
+              >
+                <rect width="6" height="6" fill="var(--accent-hatch)" />
+                <rect width="2" height="6" fill="var(--accent-solid)" opacity="0.35" />
+              </pattern>
+            </defs>
             <XAxis
               dataKey="month"
               axisLine={false}
@@ -65,8 +82,11 @@ export function VentoraOverviewChart({ data, highlightMonth = 'Jul' }: Props) {
             <Bar
               dataKey="hatch"
               stackId="a"
-              fill="var(--accent-hatch)"
+              fill="url(#ventora-bar-hatch)"
               radius={[0, 0, 0, 0]}
+              isAnimationActive={entered}
+              animationDuration={DURATION.page * 1000}
+              animationEasing="ease-out"
               onMouseEnter={(_, index) => setActiveMonth(chartData[index]?.month ?? null)}
             />
             <Bar
@@ -74,6 +94,9 @@ export function VentoraOverviewChart({ data, highlightMonth = 'Jul' }: Props) {
               stackId="a"
               fill="var(--accent-solid)"
               radius={[2, 2, 0, 0]}
+              isAnimationActive={entered}
+              animationDuration={DURATION.page * 1000}
+              animationEasing="ease-out"
               onMouseEnter={(_, index) => setActiveMonth(chartData[index]?.month ?? null)}
             >
               {chartData.map((entry) => (
@@ -87,6 +110,6 @@ export function VentoraOverviewChart({ data, highlightMonth = 'Jul' }: Props) {
           </BarChart>
         </ResponsiveContainer>
       </div>
-    </section>
+    </motion.section>
   )
 }

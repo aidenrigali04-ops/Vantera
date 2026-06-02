@@ -71,7 +71,7 @@ export type AdminNavHub = {
 /** Sidebar — four destinations only. Everything else lives in dashboard hubs. */
 export const ADMIN_NAV_SIDEBAR: AdminNavItem[] = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, href: '/admin/dashboard' },
-  { id: 'clients', label: 'Clients', icon: Users, href: '/admin/clients' },
+  { id: 'clients', label: 'CRM', icon: Users, href: '/admin/clients' },
   {
     id: 'pipeline',
     label: 'Pipeline',
@@ -79,7 +79,18 @@ export const ADMIN_NAV_SIDEBAR: AdminNavItem[] = [
     href: '/admin/pipeline',
     tourAnchor: 'nav-pipeline',
   },
-  { id: 'projects', label: 'Projects', icon: FolderKanban, href: '/admin/records' },
+  {
+    id: 'outreach',
+    label: 'Outreach',
+    icon: Megaphone,
+    href: '/admin/outreach/campaigns',
+    tourAnchor: 'nav-outreach',
+  },
+]
+
+/** Secondary sidebar links (below main nav divider). */
+export const ADMIN_NAV_SIDEBAR_SECONDARY: AdminNavItem[] = [
+  { id: 'linkedin', label: 'LinkedIn', icon: Share2, href: '/admin/outreach/linkedin' },
 ]
 
 /**
@@ -172,6 +183,7 @@ export const ADMIN_NAV_HUBS: AdminNavHub[] = [
 
 export const ADMIN_NAV_FOOTER: AdminNavItem[] = [
   { id: 'settings', label: 'Settings', icon: Settings, href: '/admin/settings' },
+  { id: 'help', label: 'Help Center', icon: LifeBuoy, href: '/admin/settings' },
 ]
 
 /** Roadmap — command palette only. */
@@ -209,6 +221,10 @@ export function isAdminNavItemActive(pathname: string, href: string): boolean {
 /** Sidebar highlight — active for the whole hub, not just the primary route. */
 export function isSidebarItemActive(pathname: string, item: AdminNavItem): boolean {
   if (!item.href) return false
+
+  if (item.id === 'outreach' && pathname.startsWith('/admin/outreach')) {
+    return true
+  }
 
   const hub = ADMIN_NAV_HUBS.find((entry) => entry.sidebarId === item.id)
   if (hub) {
@@ -294,6 +310,7 @@ export function resolveAdminPageTitle(pathname: string): string {
   if (pathname.startsWith('/admin/clients')) return 'Clients'
   if (pathname.startsWith('/admin/pipeline')) return 'Pipeline'
   if (pathname.startsWith('/admin/records')) return 'Projects'
+  if (pathname.startsWith('/admin/outreach/campaigns')) return 'Outreach'
   if (pathname.startsWith('/admin/inbox')) return 'Inbox'
   if (pathname.startsWith('/admin/calendar')) return 'Calendar'
   if (pathname.startsWith('/admin/outreach/agents')) return 'SDR Agents'

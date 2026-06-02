@@ -19,7 +19,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Bell, Menu, Plus, Search } from 'lucide-react'
+import { Bell, Menu, MoreHorizontal, Plus, Search } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
@@ -30,6 +30,7 @@ type TopHeaderProps = {
 
 export function TopHeader({ session, showDemoWorkspace = false }: TopHeaderProps) {
   const pathname = usePathname() ?? ''
+  const isDashboard = pathname.startsWith('/admin/dashboard')
   const pageTitle = resolveAdminPageTitle(pathname)
   const primaryAction = resolveWorkspacePrimaryAction(pathname)
   const { plan } = useBranding()
@@ -38,8 +39,8 @@ export function TopHeader({ session, showDemoWorkspace = false }: TopHeaderProps
   const planLabel = plan === 'enterprise' ? 'Enterprise' : 'Team'
 
   return (
-    <header className="flex h-14 shrink-0 items-center gap-3 border-b border-stone-200/80 bg-white/90 px-4 backdrop-blur-sm md:gap-4 md:px-6">
-      <div className="flex min-w-0 items-center gap-2 md:min-w-[180px] md:gap-3">
+    <header className="flex h-14 shrink-0 items-center gap-3 border-b border-[var(--border-default)] bg-[var(--bg-surface)]/90 px-4 backdrop-blur-sm md:gap-4 md:px-6">
+      <div className={cn('flex min-w-0 items-center gap-2 md:gap-3', isDashboard ? 'md:min-w-0' : 'md:min-w-[180px]')}>
         <Button
           type="button"
           variant="ghost"
@@ -50,23 +51,27 @@ export function TopHeader({ session, showDemoWorkspace = false }: TopHeaderProps
         >
           <Menu className="h-5 w-5" />
         </Button>
-        <div className="min-w-0">
-          <h1 className="truncate text-[15px] font-semibold tracking-[-0.02em] text-stone-900 md:text-base">
-            {pageTitle}
-          </h1>
-          <p className="hidden truncate text-[11px] text-stone-500 md:block">
-            {showDemoWorkspace && pageTitle === 'Dashboard'
-              ? 'Sample workspace'
-              : 'Ventaro operating system'}
+        {!isDashboard ? (
+          <div className="min-w-0">
+            <h1 className="truncate text-[15px] font-semibold tracking-[-0.02em] text-[var(--text-primary)] md:text-base">
+              {pageTitle}
+            </h1>
+            <p className="hidden truncate text-[11px] text-[var(--text-tertiary)] md:block">
+              Ventaro operating system
+            </p>
+          </div>
+        ) : showDemoWorkspace ? (
+          <p className="hidden text-[11px] font-medium text-[var(--text-secondary)] md:block">
+            Sample workspace
           </p>
-        </div>
+        ) : null}
       </div>
 
       <div className="hidden min-w-0 flex-1 items-center gap-2 lg:flex">
         <button
           type="button"
           onClick={() => setCommandPaletteOpen(true)}
-          className="flex max-w-md flex-1 items-center gap-2 rounded-lg border border-stone-200 bg-stone-50/80 px-3 py-2 text-[13px] text-stone-500 transition-colors duration-150 hover:border-stone-300 hover:bg-white"
+          className="flex max-w-md flex-1 items-center gap-2 rounded-lg border border-[var(--border-default)] bg-[var(--bg-subtle)]/80 px-3 py-2 text-[13px] text-[var(--text-secondary)] transition-colors duration-150 hover:border-[var(--border-strong)] hover:bg-[var(--bg-surface)]"
         >
           <Search className="h-4 w-4 shrink-0" aria-hidden />
           <span className="flex-1 text-left">Search workspace…</span>
@@ -110,6 +115,12 @@ export function TopHeader({ session, showDemoWorkspace = false }: TopHeaderProps
         >
           <Bell className="h-5 w-5" />
         </Button>
+
+        {isDashboard ? (
+          <Button type="button" variant="ghost" size="icon" className="h-9 w-9" aria-label="More options">
+            <MoreHorizontal className="h-5 w-5" />
+          </Button>
+        ) : null}
 
         <Badge variant="secondary" className="hidden border border-stone-200 bg-stone-50 text-stone-600 sm:inline-flex">
           {planLabel}

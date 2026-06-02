@@ -78,25 +78,19 @@ export function DashboardActionFeed({
   const showEmpty = items.length === 0 && !successNotice
 
   return (
-    <section
-      className={cn(
-        'rounded-xl border border-stone-200/90 bg-white shadow-sm ring-1 ring-stone-900/[0.02]',
-        className,
-      )}
-      data-tour="action-feed"
-    >
-      <div className="border-b border-stone-100 px-5 py-4">
+    <section className={cn('card-surface overflow-hidden', className)} data-tour="action-feed">
+      <div className="border-b border-[var(--border-subtle)] px-5 py-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="text-lg font-semibold tracking-[-0.02em] text-stone-900">
+            <h2 className="text-lg font-semibold tracking-[-0.02em] text-[var(--text-primary)]">
               Today&rsquo;s priorities
             </h2>
-            <p className="mt-1 text-[13px] text-stone-500">
+            <p className="mt-1 text-[13px] text-[var(--text-secondary)]">
               The actions that protect revenue, clients, and delivery.
             </p>
           </div>
           {totalCount > 0 ? (
-            <span className="rounded-full bg-stone-100 px-2.5 py-1 text-[11px] font-medium text-stone-600">
+            <span className="rounded-full bg-[var(--bg-overlay)] px-2.5 py-1 text-[11px] font-medium text-[var(--text-secondary)]">
               {totalCount} {totalCount === 1 ? 'item' : 'items'}
             </span>
           ) : null}
@@ -135,9 +129,9 @@ export function DashboardActionFeed({
         ) : null}
 
         {showEmpty ? (
-          <div className="rounded-lg border border-dashed border-stone-200 bg-stone-50/60 px-4 py-8 text-center">
-            <p className="text-sm font-medium text-stone-800">You&rsquo;re caught up.</p>
-            <p className="mt-1 text-[13px] text-stone-500">
+          <div className="rounded-lg border border-dashed border-[var(--border-default)] bg-[var(--bg-subtle)]/60 px-4 py-8 text-center">
+            <p className="text-sm font-medium text-[var(--text-primary)]">You&rsquo;re caught up.</p>
+            <p className="mt-1 text-[13px] text-[var(--text-secondary)]">
               {emptyMessage ?? 'No urgent actions right now — check back as activity picks up.'}
             </p>
           </div>
@@ -159,7 +153,7 @@ export function DashboardActionFeed({
                   </>
                 )
                 const itemClassName = cn(
-                  'flex gap-3 rounded-lg border border-stone-200/90 border-l-[3px] bg-white px-3 py-3 transition-colors duration-150 hover:border-stone-300 hover:bg-stone-50/50',
+                  'flex gap-3 rounded-lg border border-[var(--border-default)] border-l-[3px] bg-[var(--bg-surface)] px-3 py-3 transition-colors duration-150 hover:border-[var(--border-strong)] hover:bg-[var(--bg-subtle)]/80',
                   ACCENT_STYLES[item.type] ?? 'border-l-stone-400',
                 )
 

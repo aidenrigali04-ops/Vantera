@@ -1,7 +1,9 @@
 'use client'
 
 import type { VentoraCampaignGroup, VentoraCampaignRow } from '@/lib/dashboard/ventora-types'
+import { fadeUp, staggerContainer } from '@/lib/motion'
 import { cn } from '@/lib/utils'
+import { AnimatePresence, motion } from 'framer-motion'
 import {
   ChevronDown,
   CornerDownRight,
@@ -40,14 +42,14 @@ export function VentoraCampaignsTable({ groups }: Props) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
 
   return (
-    <section>
+    <motion.section variants={fadeUp} initial="hidden" animate="visible">
       <h2 className="mb-4 text-sm font-semibold text-[var(--text-primary)]">Campaigns</h2>
 
       <div className="card-surface overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[640px] border-collapse text-left text-sm">
             <thead>
-              <tr className="border-b border-[var(--border-default)] bg-[var(--bg-subtle)]/40">
+              <tr className="border-b border-[var(--border-default)] bg-[var(--bg-subtle)]/50">
                 <th className="w-10 px-3 py-3" scope="col" />
                 <th className="px-3 py-3 font-medium text-[var(--text-secondary)]" scope="col">
                   Campaigns
@@ -67,12 +69,16 @@ export function VentoraCampaignsTable({ groups }: Props) {
                 <th className="w-10 px-3 py-3" scope="col" />
               </tr>
             </thead>
-            <tbody>
+            <motion.tbody variants={staggerContainer} initial="hidden" animate="visible">
               {groups.map((group) => {
                 const isCollapsed = collapsed[group.id] ?? false
                 return (
                   <Fragment key={group.id}>
-                    <tr className="border-b border-[var(--border-subtle)] bg-[var(--bg-surface)]">
+                    <motion.tr
+                      layout
+                      variants={fadeUp}
+                      className="border-b border-[var(--border-subtle)] bg-[var(--bg-surface)]"
+                    >
                       <td className="px-3 py-3">
                         <input
                           type="checkbox"
@@ -120,82 +126,89 @@ export function VentoraCampaignsTable({ groups }: Props) {
                           <MoreHorizontal size={16} strokeWidth={1.75} aria-hidden />
                         </button>
                       </td>
-                    </tr>
+                    </motion.tr>
 
-                    {!isCollapsed
-                      ? group.rows.map((row) => (
-                          <tr
-                            key={row.id}
-                            className="group border-b border-[var(--border-subtle)] transition-colors last:border-0 hover:bg-[var(--bg-overlay)]/50"
-                          >
-                            <td className="px-3 py-3">
-                              <input
-                                type="checkbox"
-                                defaultChecked={row.checked}
-                                aria-label={`Select ${row.name}`}
-                                className="h-3.5 w-3.5 rounded border-[var(--border-strong)] accent-[var(--accent)]"
-                              />
-                            </td>
-                            <td className="px-3 py-3">
-                              <div className="flex items-center gap-2 pl-4">
-                                <GripVertical
-                                  size={14}
-                                  className="text-[var(--text-tertiary)] opacity-0 transition-opacity group-hover:opacity-100"
-                                  aria-hidden
+                    <AnimatePresence initial={false}>
+                      {!isCollapsed
+                        ? group.rows.map((row) => (
+                            <motion.tr
+                              key={row.id}
+                              layout
+                              initial={{ opacity: 0, y: 6 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: -4 }}
+                              transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
+                              className="group border-b border-[var(--border-subtle)] transition-colors last:border-0 hover:bg-[var(--bg-overlay)]/40"
+                            >
+                              <td className="px-3 py-3">
+                                <input
+                                  type="checkbox"
+                                  defaultChecked={row.checked}
+                                  aria-label={`Select ${row.name}`}
+                                  className="h-3.5 w-3.5 rounded border-[var(--border-strong)] accent-[var(--accent)]"
                                 />
-                                {row.nested ? (
-                                  <CornerDownRight
+                              </td>
+                              <td className="px-3 py-3">
+                                <div className="flex items-center gap-2 pl-4">
+                                  <GripVertical
                                     size={14}
-                                    className="text-[var(--text-tertiary)]"
+                                    className="text-[var(--text-tertiary)] opacity-0 transition-opacity group-hover:opacity-100"
                                     aria-hidden
                                   />
-                                ) : null}
-                                <Link
-                                  href={row.href}
-                                  className="font-medium text-[var(--text-primary)] hover:underline"
+                                  {row.nested ? (
+                                    <CornerDownRight
+                                      size={14}
+                                      className="text-[var(--text-tertiary)]"
+                                      aria-hidden
+                                    />
+                                  ) : null}
+                                  <Link
+                                    href={row.href}
+                                    className="font-medium text-[var(--text-primary)] hover:underline"
+                                  >
+                                    {row.name}
+                                  </Link>
+                                </div>
+                              </td>
+                              <td className="px-3 py-3">
+                                <ChannelIcons channels={row.channels} />
+                              </td>
+                              <td className="tabular-nums text-[var(--text-secondary)] px-3 py-3">
+                                {row.scheduled}
+                              </td>
+                              <td className="px-3 py-3">
+                                <span
+                                  className={cn(
+                                    'status-pill',
+                                    row.status === 'active' ? 'status-active' : 'status-paused',
+                                  )}
                                 >
-                                  {row.name}
-                                </Link>
-                              </div>
-                            </td>
-                            <td className="px-3 py-3">
-                              <ChannelIcons channels={row.channels} />
-                            </td>
-                            <td className="tabular-nums text-[var(--text-secondary)] px-3 py-3">
-                              {row.scheduled}
-                            </td>
-                            <td className="px-3 py-3">
-                              <span
-                                className={cn(
-                                  'status-pill',
-                                  row.status === 'active' ? 'status-active' : 'status-paused',
-                                )}
-                              >
-                                {row.status === 'active' ? 'Active' : 'Paused'}
-                              </span>
-                            </td>
-                            <td className="px-3 py-3 font-medium tabular-nums text-[var(--text-primary)]">
-                              {row.conversionRate}%
-                            </td>
-                            <td className="px-3 py-3">
-                              <button
-                                type="button"
-                                aria-label={`Options for ${row.name}`}
-                                className="icon-btn opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
-                              >
-                                <MoreHorizontal size={16} strokeWidth={1.75} aria-hidden />
-                              </button>
-                            </td>
-                          </tr>
-                        ))
-                      : null}
+                                  {row.status === 'active' ? 'Active' : 'Paused'}
+                                </span>
+                              </td>
+                              <td className="px-3 py-3 font-medium tabular-nums text-[var(--text-primary)]">
+                                {row.conversionRate}%
+                              </td>
+                              <td className="px-3 py-3">
+                                <button
+                                  type="button"
+                                  aria-label={`Options for ${row.name}`}
+                                  className="icon-btn opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+                                >
+                                  <MoreHorizontal size={16} strokeWidth={1.75} aria-hidden />
+                                </button>
+                              </td>
+                            </motion.tr>
+                          ))
+                        : null}
+                    </AnimatePresence>
                   </Fragment>
                 )
               })}
-            </tbody>
+            </motion.tbody>
           </table>
         </div>
       </div>
-    </section>
+    </motion.section>
   )
 }

@@ -4,6 +4,7 @@ import { VentoraAiOverview } from '@/components/dashboard/ventora/VentoraAiOverv
 import { VentoraCampaignsTable } from '@/components/dashboard/ventora/VentoraCampaignsTable'
 import { VentoraMetricCards } from '@/components/dashboard/ventora/VentoraMetricCards'
 import { VentoraOverviewChart } from '@/components/dashboard/ventora/VentoraOverviewChart'
+import { VentoraPageChrome } from '@/components/dashboard/ventora/VentoraPageChrome'
 import { SdrAgentsPromo } from '@/components/dashboard/SdrAgentsPromo'
 import { CleanSlateWelcome } from '@/components/onboarding/CleanSlateWelcome'
 import type { VentoraDashboardPayload } from '@/lib/dashboard/ventora-types'
@@ -11,6 +12,8 @@ import type { SdrAgentCard } from '@/lib/agents/types'
 import type { ActionFeedItem } from '@/lib/dashboard/action-feed'
 import { DashboardActionFeed } from '@/app/(admin)/admin/dashboard/DashboardActionFeed'
 import type { OnboardingSuccessNotice } from '@/lib/import/fields'
+import { fadeUp, staggerContainer } from '@/lib/motion'
+import { motion } from 'framer-motion'
 
 type Props = {
   ventora: VentoraDashboardPayload
@@ -31,6 +34,63 @@ function firstNameFromEmail(email: string): string {
   return first.charAt(0).toUpperCase() + first.slice(1)
 }
 
+function DashboardSections({
+  ventora,
+  actionFeed,
+  sdrAgents,
+  successNotice,
+  onDismissSuccessNotice,
+  onReviewDraft,
+}: Pick<
+  Props,
+  | 'ventora'
+  | 'actionFeed'
+  | 'sdrAgents'
+  | 'successNotice'
+  | 'onDismissSuccessNotice'
+  | 'onReviewDraft'
+>) {
+  return (
+    <>
+      {sdrAgents.length > 0 ? (
+        <motion.div variants={fadeUp}>
+          <SdrAgentsPromo agents={sdrAgents} />
+        </motion.div>
+      ) : null}
+
+      {actionFeed.length > 0 || successNotice ? (
+        <motion.div variants={fadeUp}>
+          <DashboardActionFeed
+            items={actionFeed}
+            successNotice={successNotice}
+            onDismissSuccessNotice={onDismissSuccessNotice}
+            onReviewDraft={onReviewDraft}
+            maxVisible={4}
+          />
+        </motion.div>
+      ) : null}
+
+      <VentoraMetricCards metrics={ventora.metrics} />
+
+      <motion.div variants={fadeUp} className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <VentoraOverviewChart
+            data={ventora.chartData}
+            highlightMonth={ventora.highlightMonth}
+          />
+        </div>
+        <VentoraAiOverview
+          headline={ventora.aiHeadline}
+          body={ventora.aiBody}
+          progress={ventora.aiProgress}
+        />
+      </motion.div>
+
+      <VentoraCampaignsTable groups={ventora.campaignGroups} />
+    </>
+  )
+}
+
 export function VentoraDashboardView({
   ventora,
   email,
@@ -42,72 +102,52 @@ export function VentoraDashboardView({
   onDismissSuccessNotice,
   onReviewDraft,
 }: Props) {
+  const subtitle = showDemoGuide
+    ? 'Sample data shows what your day looks like — start with priorities, then explore campaigns below.'
+    : showCleanSlate
+      ? 'Add your first client or campaign to replace placeholders.'
+      : `Good to see you, ${firstNameFromEmail(email)} — conversion, pipeline, and outreach in one place.`
+
   if (showCleanSlate) {
     return (
-      <div className="space-y-6">
-        <CleanSlateWelcome />
-        <VentoraMetricCards metrics={ventora.metrics} />
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <div className="lg:col-span-2">
-            <VentoraOverviewChart
-              data={ventora.chartData}
-              highlightMonth={ventora.highlightMonth}
-            />
-          </div>
-          <VentoraAiOverview
-            headline={ventora.aiHeadline}
-            body={ventora.aiBody}
-            progress={ventora.aiProgress}
-          />
-        </div>
-        <VentoraCampaignsTable groups={ventora.campaignGroups} />
-      </div>
-    )
-  }
-
-  const greeting = showDemoGuide
-    ? 'See how Ventora runs your business'
-    : `Good to see you, ${firstNameFromEmail(email)}`
-
-  const subline = showDemoGuide
-    ? 'Sample data shows what your day looks like — start with priorities, then explore campaigns below.'
-    : 'Conversion, pipeline, and outreach in one place — gold highlights are live this month.'
-
-  return (
-    <div className="space-y-6">
-      <header className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-[-0.03em] text-[var(--text-primary)] sm:text-[1.75rem]">
-          {greeting}
-        </h1>
-        <p className="max-w-2xl text-[13px] leading-relaxed text-[var(--text-secondary)]">{subline}</p>
-      </header>
-
-      {sdrAgents.length > 0 ? <SdrAgentsPromo agents={sdrAgents} /> : null}
-
-      {actionFeed.length > 0 || successNotice ? (
-        <DashboardActionFeed
-          items={actionFeed}
+      <motion.div
+        className="space-y-6"
+        variants={staggerContainer}
+        initial="hidden"
+        animate="visible"
+      >
+        <VentoraPageChrome subtitle={subtitle} />
+        <motion.div variants={fadeUp}>
+          <CleanSlateWelcome />
+        </motion.div>
+        <DashboardSections
+          ventora={ventora}
+          actionFeed={actionFeed}
+          sdrAgents={sdrAgents}
           successNotice={successNotice}
           onDismissSuccessNotice={onDismissSuccessNotice}
           onReviewDraft={onReviewDraft}
-          maxVisible={4}
         />
-      ) : null}
+      </motion.div>
+    )
+  }
 
-      <VentoraMetricCards metrics={ventora.metrics} />
-
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="lg:col-span-2">
-          <VentoraOverviewChart data={ventora.chartData} highlightMonth={ventora.highlightMonth} />
-        </div>
-        <VentoraAiOverview
-          headline={ventora.aiHeadline}
-          body={ventora.aiBody}
-          progress={ventora.aiProgress}
-        />
-      </div>
-
-      <VentoraCampaignsTable groups={ventora.campaignGroups} />
-    </div>
+  return (
+    <motion.div
+      className="space-y-6"
+      variants={staggerContainer}
+      initial="hidden"
+      animate="visible"
+    >
+      <VentoraPageChrome subtitle={subtitle} />
+      <DashboardSections
+        ventora={ventora}
+        actionFeed={actionFeed}
+        sdrAgents={sdrAgents}
+        successNotice={successNotice}
+        onDismissSuccessNotice={onDismissSuccessNotice}
+        onReviewDraft={onReviewDraft}
+      />
+    </motion.div>
   )
 }

@@ -5,8 +5,8 @@ import type { AdminSession } from '@/lib/auth/types'
 import { useBranding } from '@/lib/branding/context'
 import {
   ADMIN_NAV_FOOTER,
+  ADMIN_NAV_SIDEBAR_SECONDARY,
   getSidebarNavItems,
-  isAdminNavItemActive,
   isSidebarItemActive,
   type AdminNavItem,
 } from '@/lib/navigation/admin-nav'
@@ -16,9 +16,10 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { ChevronLeft, ChevronRight, LogOut, Search } from 'lucide-react'
+import { ChevronLeft, ChevronRight, LogOut, RefreshCw, Search } from 'lucide-react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
+import { motion } from 'framer-motion'
 import { useEffect, useMemo, useState } from 'react'
 
 type SidebarProps = {
@@ -29,6 +30,7 @@ type SidebarProps = {
 
 function SidebarContent({ session, collapsed, onNavigate }: SidebarProps & { collapsed: boolean }) {
   const pathname = usePathname() ?? ''
+  const router = useRouter()
   const { businessName, logoUrl } = useBranding()
   const { setCommandPaletteOpen } = useUIStore()
   const [startHereActive, setStartHereActive] = useState(false)
@@ -62,7 +64,7 @@ function SidebarContent({ session, collapsed, onNavigate }: SidebarProps & { col
                 className="h-8 w-8 shrink-0 rounded-md border border-stone-200 bg-stone-50 object-contain p-0.5"
               />
             ) : (
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-stone-200 bg-stone-100 text-xs font-semibold text-stone-700">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-[var(--border-default)] bg-[var(--text-primary)] text-sm font-bold text-[var(--text-inverse)]">
                 {initial}
               </span>
             )}
@@ -95,6 +97,24 @@ function SidebarContent({ session, collapsed, onNavigate }: SidebarProps & { col
             ))}
           </ul>
 
+          {!collapsed && ADMIN_NAV_SIDEBAR_SECONDARY.length > 0 ? (
+            <>
+              <div className="my-3 border-t border-[var(--border-subtle)]" aria-hidden />
+              <ul className="space-y-0.5">
+                {ADMIN_NAV_SIDEBAR_SECONDARY.map((item) => (
+                  <NavItemRow
+                    key={item.id}
+                    item={item}
+                    isActive={item.href ? isSidebarItemActive(pathname, item) : false}
+                    collapsed={collapsed}
+                    onNavigate={onNavigate}
+                    prefix="+"
+                  />
+                ))}
+              </ul>
+            </>
+          ) : null}
+
           {collapsed ? (
             <div className="mt-3 px-1">
               <Tooltip>
@@ -124,6 +144,24 @@ function SidebarContent({ session, collapsed, onNavigate }: SidebarProps & { col
 
         <div className="border-t border-stone-200/80 p-2">
           <ul className="space-y-0.5">
+            <li>
+              <motion.button
+                type="button"
+                whileHover={{ scale: 1.01 }}
+                whileTap={{ scale: 0.99 }}
+                onClick={() => {
+                  router.refresh()
+                  onNavigate?.()
+                }}
+                className={cn(
+                  'flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-[13px] text-stone-600 transition-colors duration-150 hover:bg-stone-50 hover:text-stone-900',
+                  collapsed && 'justify-center px-2',
+                )}
+              >
+                <RefreshCw className="h-4 w-4 shrink-0" aria-hidden />
+                {!collapsed ? <span>Refresh</span> : null}
+              </motion.button>
+            </li>
             {ADMIN_NAV_FOOTER.map((item) => (
               <NavItemRow
                 key={item.id}
@@ -160,11 +198,13 @@ function NavItemRow({
   isActive,
   collapsed,
   onNavigate,
+  prefix,
 }: {
   item: AdminNavItem
   isActive: boolean
   collapsed: boolean
   onNavigate?: () => void
+  prefix?: string
 }) {
   const Icon = item.icon
 
@@ -173,7 +213,10 @@ function NavItemRow({
       <Icon className="h-4 w-4 shrink-0" aria-hidden />
       {!collapsed ? (
         <>
-          <span className="flex-1 truncate">{item.label}</span>
+          <span className="flex-1 truncate">
+            {prefix ? <span className="text-[var(--text-tertiary)]">{prefix} </span> : null}
+            {item.label}
+          </span>
           {item.highlightLabel ? (
             <span className="rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 ring-1 ring-amber-200/80">
               {item.highlightLabel}
@@ -186,22 +229,22 @@ function NavItemRow({
 
   const className = cn(
     'flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-[13px] transition-colors duration-150',
-    isActive
-      ? 'bg-stone-100 font-medium text-stone-900'
-      : 'text-stone-600 hover:bg-stone-50 hover:text-stone-900',
+    isActive ? 'nav-item-active' : 'text-stone-600 hover:bg-stone-50 hover:text-stone-900',
     collapsed && 'justify-center px-2',
   )
 
   const content = (
-    <Link
-      href={item.href!}
-      onClick={onNavigate}
-      aria-current={isActive ? 'page' : undefined}
-      data-tour={item.tourAnchor}
-      className={className}
-    >
-      {inner}
-    </Link>
+    <motion.div whileHover={{ x: collapsed ? 0 : 2 }} transition={{ duration: 0.12 }}>
+      <Link
+        href={item.href!}
+        onClick={onNavigate}
+        aria-current={isActive ? 'page' : undefined}
+        data-tour={item.tourAnchor}
+        className={className}
+      >
+        {inner}
+      </Link>
+    </motion.div>
   )
 
   if (collapsed) {
