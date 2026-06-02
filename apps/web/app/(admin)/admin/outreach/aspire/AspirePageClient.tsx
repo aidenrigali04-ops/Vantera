@@ -105,6 +105,9 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
   const [displayLeads, setDisplayLeads] = useState<AspireSearchResult[]>([])
   const [searchMeta, setSearchMeta] = useState<SearchMeta | null>(null)
   const isSearchingRef = useRef(false)
+  /** Bumps when a new search starts so stale loadStoredResults cannot clear the table. */
+  const resultsLoadSeqRef = useRef(0)
+  const displayLeadsRef = useRef<AspireSearchResult[]>([])
 
   useEffect(() => {
     const id = searchParams.get('searchId')
@@ -123,13 +126,36 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
   }, [activeSaved?.id])
 
   const loadStoredResults = useCallback(
-    async (searchId: string | null = activeSearchId): Promise<AspireSearchResult[]> => {
+    async (
+      searchId: string | null = activeSearchId,
+      options?: { force?: boolean },
+    ): Promise<AspireSearchResult[]> => {
+      const seq = resultsLoadSeqRef.current
       try {
         const list = await fetchAspireResultsFromApi(searchId)
-        setDisplayLeads(list)
-        return list
-      } catch {
+        if (seq !== resultsLoadSeqRef.current) {
+          return displayLeadsRef.current
+        }
+        if (list.length > 0 || options?.force) {
+          setDisplayLeads(list)
+          displayLeadsRef.current = list
+          return list
+        }
+        if (displayLeadsRef.current.length > 0) {
+          return displayLeadsRef.current
+        }
         setDisplayLeads([])
+        displayLeadsRef.current = []
+        return []
+      } catch {
+        if (seq !== resultsLoadSeqRef.current) {
+          return displayLeadsRef.current
+        }
+        if (displayLeadsRef.current.length > 0) {
+          return displayLeadsRef.current
+        }
+        setDisplayLeads([])
+        displayLeadsRef.current = []
         return []
       }
     },
@@ -151,7 +177,12 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
     },
   })
 
+  useEffect(() => {
+    displayLeadsRef.current = displayLeads
+  }, [displayLeads])
+
   const isFetching = isSearching
+  const tableLoading = isSearching && displayLeads.length === 0
   const sourceResults = displayLeads
 
   const rows = useMemo<AspireResultRow[]>(
@@ -332,7 +363,7 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
     },
     onSuccess: async (data, searchId) => {
       setActiveSearchId(searchId)
-      const list = await loadStoredResults(searchId)
+      const list = await loadStoredResults(searchId, { force: true })
       const listCount = list.length
       toast.success(
         listCount > 0
@@ -356,6 +387,7 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
 
     setIsSearching(true)
     isSearchingRef.current = true
+    resultsLoadSeqRef.current += 1
     try {
       const res = await fetch('/api/aspire/search', {
         method: 'POST',
@@ -380,6 +412,7 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
 
       const results = Array.isArray(json.data) ? json.data : []
       setDisplayLeads(results)
+      displayLeadsRef.current = results
       setSearchMeta(json.meta ?? null)
 
       if (json.meta?.source === 'stub') {
@@ -404,17 +437,23 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
     } finally {
       isSearchingRef.current = false
       setIsSearching(false)
+      if (displayLeadsRef.current.length > 0) {
+        window.setTimeout(() => {
+          void loadStoredResults(activeSearchId)
+        }, 400)
+      }
     }
   }
 
   const handleSelectSavedSearch = (search: SavedSearch) => {
+    resultsLoadSeqRef.current += 1
     setActiveSearchId(search.id)
     setSearchMeta(null)
     router.replace(`/admin/outreach/aspire?searchId=${search.id}`)
     const filters = search.filters as { q?: string; company?: string }
     if (filters.q) setQuery(filters.q)
     if (filters.company) setCompany(filters.company)
-    void loadStoredResults(search.id)
+    void loadStoredResults(search.id, { force: true })
   }
 
   const enrollOne = useCallback(
@@ -591,7 +630,7 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
     [rows, enrollStates],
   )
 
-  const showTable = isFetching || displayRows.length > 0
+  const showTable = tableLoading || displayRows.length > 0
 
   return (
     <div className="mx-auto w-full space-y-6 px-4 py-5 md:px-8 md:py-6">
@@ -827,7 +866,7 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
                   onRowClick={(row) => setSelectedResult(row)}
                   sort={sort}
                   onSortChange={setSort}
-                  loading={isFetching}
+                  loading={tableLoading}
                   className="rounded-none border-0 shadow-none"
                 />
               ) : (

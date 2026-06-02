@@ -3,6 +3,9 @@ import { searchProspects } from '@/lib/aspire/search'
 import type { ApolloSearchFilters } from '@/lib/aspire/types'
 import { NextResponse } from 'next/server'
 
+/** Apify sync runs can take several minutes. */
+export const maxDuration = 300
+
 export async function GET(request: Request) {
   const session = await getAdminSession()
   if (!session) {

@@ -315,6 +315,22 @@ export async function searchApify(
       retriedBroad = true
     }
 
+    if (interactive && people.length === 0) {
+      const demo = stubResults(filters)
+      return {
+        people: demo,
+        total: demo.length,
+        hasMore: false,
+        meta: {
+          source: 'demo',
+          providerConfigured: true,
+          apifyRowCount: rows.length,
+          unmappedRowCount: Math.max(0, rows.length - people.length),
+          retriedBroad,
+        },
+      }
+    }
+
     return {
       people,
       total: people.length,
@@ -329,6 +345,19 @@ export async function searchApify(
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Apify search failed'
+    if (interactive) {
+      const demo = stubResults(filters)
+      return {
+        people: demo,
+        total: demo.length,
+        hasMore: false,
+        meta: {
+          source: 'demo',
+          providerConfigured: true,
+          providerError: message,
+        },
+      }
+    }
     throw new Error(message)
   }
 }
