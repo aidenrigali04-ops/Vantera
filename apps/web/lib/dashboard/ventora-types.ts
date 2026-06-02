@@ -10,6 +10,8 @@ export type VentoraMonthlyPoint = {
   month: string
   solid: number
   hatch: number
+  /** Total leads or activity count for the month (tooltip + chart). */
+  total: number
 }
 
 export type VentoraCampaignStatus = 'active' | 'paused'

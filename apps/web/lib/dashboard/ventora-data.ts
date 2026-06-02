@@ -64,7 +64,7 @@ function mapCampaignRow(campaign: CampaignWithStats): VentoraCampaignRow {
 }
 
 function buildCampaignGroups(campaigns: CampaignWithStats[]): VentoraCampaignGroup[] {
-  if (campaigns.length === 0) return demoCampaignGroups()
+  if (campaigns.length === 0) return []
 
   const queued = campaigns.filter((c) => c.status === 'draft' || c.status === 'paused')
   const live = campaigns.filter((c) => c.status === 'active')
@@ -100,49 +100,55 @@ function buildCampaignGroups(campaigns: CampaignWithStats[]): VentoraCampaignGro
     })
   }
 
-  return groups.length > 0 ? groups : demoCampaignGroups()
+  return groups
 }
 
-function demoCampaignGroups(): VentoraCampaignGroup[] {
-  return [
-    {
-      id: 'queued-blogs',
-      name: 'Queued Blogs',
-      count: 3,
-      rows: [
-        {
-          id: 'demo-1',
-          name: 'Founders',
-          channels: ['linkedin'],
-          scheduled: 'Jan 10, 2026',
-          status: 'active',
-          conversionRate: 25,
-          nested: true,
-          href: '/admin/outreach/campaigns',
-        },
-        {
-          id: 'demo-2',
-          name: 'VP Marketing Directors',
-          channels: ['linkedin'],
-          scheduled: 'Jan 10, 2026',
-          status: 'paused',
-          conversionRate: 25,
-          nested: true,
-          href: '/admin/outreach/campaigns',
-        },
-        {
-          id: 'demo-3',
-          name: 'Marketing Agencies',
-          channels: ['email', 'linkedin'],
-          scheduled: 'Jan 10, 2026',
-          status: 'active',
-          conversionRate: 45,
-          nested: true,
-          href: '/admin/outreach/campaigns',
-        },
-      ],
-    },
-  ]
+function computeConversionLabel(
+  campaigns: CampaignWithStats[],
+  snapshot: DashboardSnapshot,
+): string {
+  const totalEnrolled = campaigns.reduce((n, c) => n + c.metrics.enrolled, 0)
+  const totalResponded = campaigns.reduce(
+    (n, c) => n + c.metrics.replied + c.metrics.meetings,
+    0,
+  )
+
+  if (totalEnrolled > 0) {
+    const pct = Math.min(100, Math.round((totalResponded / totalEnrolled) * 100))
+    return `${pct}%`
+  }
+
+  const openDeals = snapshot.deals.filter((d) => !d.isTerminalWin && !d.isTerminalLoss)
+  if (openDeals.length > 0) {
+    const avg = Math.round(
+      openDeals.reduce((s, d) => s + d.closeProbability, 0) / openDeals.length,
+    )
+    return `${avg}%`
+  }
+
+  const won = snapshot.deals.filter((d) => d.isTerminalWin).length
+  if (snapshot.deals.length > 0) {
+    return `${Math.round((won / snapshot.deals.length) * 100)}%`
+  }
+
+  return '0%'
+}
+
+function computeRevenueLabel(snapshot: DashboardSnapshot): string {
+  if (snapshot.wonValueCents > 0) {
+    return formatCurrency(snapshot.wonValueCents)
+  }
+  return formatCurrency(snapshot.pipelineValueCents)
+}
+
+function computeScheduledLabel(campaigns: CampaignWithStats[]): string {
+  const draftCampaigns = campaigns.filter((c) => c.status === 'draft').length
+  const pendingEnrollments = campaigns.reduce(
+    (n, c) => n + Math.max(0, c.metrics.enrolled - c.metrics.sent),
+    0,
+  )
+  const queued = draftCampaigns + pendingEnrollments
+  return `${queued} Queued`
 }
 
 function aiCopy(
@@ -198,49 +204,25 @@ export async function getVentoraDashboardPayload(
       .catch(() => [] as { createdAt: Date }[]),
   ])
 
-  const totalReplied = campaigns.reduce((n, c) => n + c.metrics.replied, 0)
-  const totalEnrolled = campaigns.reduce((n, c) => n + c.metrics.enrolled, 0)
-  const conversionScore =
-    totalEnrolled > 0
-      ? Math.round((totalReplied / totalEnrolled) * 1000)
-      : snapshot.deals.length > 0
-        ? Math.round(snapshot.deals.reduce((s, d) => s + d.closeProbability, 0) / snapshot.deals.length) * 10
-        : 702
+  const metrics = [
+    {
+      label: 'Conversion',
+      value: computeConversionLabel(campaigns, snapshot),
+      iconName: 'trophy' as const,
+    },
+    {
+      label: 'Revenue',
+      value: computeRevenueLabel(snapshot),
+      iconName: 'grid' as const,
+    },
+    {
+      label: 'Scheduled',
+      value: computeScheduledLabel(campaigns),
+      iconName: 'calendar' as const,
+    },
+  ]
 
-  const queuedCount =
-    campaigns.filter((c) => c.status === 'draft').length +
-    campaigns.reduce((n, c) => n + Math.max(0, c.metrics.enrolled - c.metrics.sent), 0)
-
-  const revenueCents = snapshot.pipelineValueCents || snapshot.wonValueCents
-  const useDemoMetrics = snapshot.isEmpty && campaigns.length === 0
-
-  const metrics = useDemoMetrics
-    ? [
-        { label: 'Conversion', value: '702', iconName: 'trophy' as const },
-        { label: 'Revenue', value: '$423,000', iconName: 'grid' as const },
-        { label: 'Scheduled', value: '195 Queued', iconName: 'calendar' as const },
-      ]
-    : [
-        {
-          label: 'Conversion',
-          value: conversionScore.toLocaleString(),
-          iconName: 'trophy' as const,
-        },
-        {
-          label: 'Revenue',
-          value: formatCurrency(revenueCents),
-          iconName: 'grid' as const,
-        },
-        {
-          label: 'Scheduled',
-          value: `${Math.max(queuedCount, campaigns.filter((c) => c.status === 'draft').length)} Queued`,
-          iconName: 'calendar' as const,
-        },
-      ]
-
-  const chartData = buildMonthlyOverview(
-    leadRows.length > 0 ? leadRows : snapshot.deals.map((d) => ({ createdAt: new Date().toISOString() })),
-  )
+  const chartData = buildMonthlyOverview(leadRows)
 
   const ai = aiCopy(embeddedInsights, snapshot)
 

@@ -1,4 +1,5 @@
 import { getSyncedAdminSession } from '@/lib/auth/require-session'
+import { isApifyConfigured } from '@/lib/aspire/apify-config'
 import { searchProspects } from '@/lib/aspire/search'
 import { stubResults } from '@/lib/aspire/prospect-stubs'
 import { getIcpConfigForVertical, scoreICP } from '@/lib/aspire/icp-score'
@@ -40,7 +41,7 @@ function fallbackSearchResults(
     results,
     meta: {
       source: 'stub',
-      providerConfigured: false,
+      providerConfigured: isApifyConfigured(),
       providerError: 'Search fallback — live Apify run unavailable',
     },
   }

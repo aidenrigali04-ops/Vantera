@@ -109,6 +109,8 @@ function applyAliases(env: Record<string, string>): void {
   env.SUPABASE_SERVICE_ROLE_KEY = env.SUPABASE_SERVICE_ROLE_KEY ?? env.SUPABASE_SERVICE_KEY
   env.SUPABASE_JWT_SECRET = env.SUPABASE_JWT_SECRET ?? env.JWT_SECRET
   env.DATABASE_URL = env.DATABASE_URL ?? env.POSTGRES_URL ?? env.POSTGRES_PRISMA_URL
+  env.APIFY_API_TOKEN = env.APIFY_API_TOKEN ?? env.APIFY_TOKEN ?? env.APIFY_API_KEY
+  env.APIFY_LEADS_ACTOR_ID = env.APIFY_LEADS_ACTOR_ID ?? env.APIFY_ACTOR_ID
 }
 
 /** Env vars pushed to Trigger.dev on every `pnpm trigger:deploy`. */

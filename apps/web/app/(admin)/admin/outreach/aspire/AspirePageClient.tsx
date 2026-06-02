@@ -28,6 +28,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { aspireCompanyName, aspireProspectName } from '@/lib/aspire/display'
+import { getAspireSearchNotice } from '@/lib/aspire/apify-errors'
 import { mergeAspireResults } from '@/lib/aspire/merge-results'
 import { getIcpConfigForVertical } from '@/lib/aspire/icp-score'
 import { normalizeApolloFilters } from '@/lib/aspire/filters'
@@ -283,6 +284,8 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
     [sourceResults],
   )
 
+  const searchNotice = useMemo(() => getAspireSearchNotice(searchMeta), [searchMeta])
+
   const scoreOf = (row: AspireResultRow) => row.icpScore ?? row.intentScore ?? 0
 
   const industryOptions = useMemo(() => {
@@ -509,11 +512,9 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
       applyDisplayLeads(results, 'live')
       setSearchMeta(json.meta ?? null)
 
-      if (json.meta?.source === 'stub') {
-        toast.message(
-          'Apify is not configured — showing sample leads. Set APIFY_API_TOKEN for live prospect data.',
-          { duration: 6000 },
-        )
+      const notice = getAspireSearchNotice(json.meta)
+      if (notice) {
+        toast.message(notice.message, { duration: 6000 })
       }
 
       toast.success(
@@ -779,9 +780,7 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
                   <>
                     Viewing saved search{' '}
                     <span className="font-medium text-[var(--text-primary)]">{activeSaved.name}</span>
-                    {searchMeta?.source === 'stub'
-                      ? ' — sample leads (configure APIFY_API_TOKEN for live data)'
-                      : ' — stored results'}
+                    {searchNotice ? ' — sample leads shown' : ' — stored results'}
                   </>
                 ) : rows.length > 0 ? (
                   <>
@@ -789,7 +788,11 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
                     <span className="font-medium text-[var(--text-primary)]">
                       {rows.length} prospect{rows.length === 1 ? '' : 's'}
                     </span>
-                    {searchMeta?.source === 'apify' ? ' from latest Apify run' : searchMeta?.source === 'stub' ? ' (sample data)' : ''}
+                    {searchMeta?.source === 'apify'
+                      ? ' from latest Apify run'
+                      : searchNotice
+                        ? ' (sample data)'
+                        : ''}
                   </>
                 ) : (
                   'Run a search to discover ICP-matched prospects'
@@ -798,10 +801,15 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
               <LiveIndicator active={resultsLive} />
             </div>
 
-            {searchMeta?.source === 'stub' ? (
-              <div className="rounded-lg border border-[var(--warning)]/30 bg-[var(--warning-muted)] px-4 py-3 text-sm text-[var(--text-primary)]">
-                Apify is not configured. Showing sample leads — add APIFY_API_TOKEN in Vercel (and
-                Trigger) for live prospect data.
+            {searchNotice ? (
+              <div
+                className={
+                  searchNotice.tone === 'warning'
+                    ? 'rounded-lg border border-[var(--warning)]/30 bg-[var(--warning-muted)] px-4 py-3 text-sm text-[var(--text-primary)]'
+                    : 'rounded-lg border border-[var(--border-default)] bg-[var(--bg-subtle)] px-4 py-3 text-sm text-[var(--text-secondary)]'
+                }
+              >
+                {searchNotice.message}
               </div>
             ) : null}
 

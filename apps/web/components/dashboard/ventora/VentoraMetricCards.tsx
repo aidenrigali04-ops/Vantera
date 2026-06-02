@@ -42,8 +42,6 @@ export function VentoraMetricCards({ metrics }: Props) {
           <motion.article
             key={label}
             variants={fadeUp}
-            whileHover={{ scale: 1.02, y: -2, transition: { duration: 0.12 } }}
-            whileTap={{ scale: 0.99 }}
             className="card-surface card-surface-interactive group relative flex flex-col gap-3 p-4"
           >
             <div className="flex items-start justify-between">

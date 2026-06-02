@@ -41,10 +41,51 @@ export function parseApifyErrorMessage(body: unknown, fallback: string): string 
 /** User-safe copy — never show raw provider JSON in the UI. */
 export function toUserFacingProspectSearchError(message: string): string {
   if (isApifyAuthError(message)) {
-    return 'Lead discovery is temporarily using sample matches. Live search will activate once provider credentials are updated.'
+    return 'Apify token is invalid or expired. Update APIFY_API_TOKEN in Vercel and redeploy.'
+  }
+  if (/APIFY_API_TOKEN is not set/i.test(message)) {
+    return 'Apify is not configured. Set APIFY_API_TOKEN in Vercel → Environment Variables (Production), then redeploy.'
   }
   if (/returned no leads/i.test(message)) {
-    return 'No live matches yet — showing sample leads that fit your profile so you can continue.'
+    return 'No live matches for this search — showing sample leads so you can keep exploring.'
   }
-  return 'Could not load live leads right now. Sample matches are shown so you can keep going.'
+  if (/none could be mapped/i.test(message)) {
+    return 'Apify returned data but leads could not be parsed. Check APIFY_LEADS_ACTOR_ID matches your actor.'
+  }
+  return 'Live search is temporarily unavailable — sample leads are shown so you can continue.'
+}
+
+export type AspireSearchMetaNotice = {
+  tone: 'warning' | 'info'
+  message: string
+}
+
+/** Map search API meta to accurate UI copy (stub ≠ always "not configured"). */
+export function getAspireSearchNotice(meta?: {
+  source?: 'apify' | 'stub' | 'demo'
+  providerConfigured?: boolean
+  providerError?: string
+} | null): AspireSearchMetaNotice | null {
+  if (!meta || meta.source === 'apify') return null
+
+  if (meta.providerConfigured === false) {
+    return {
+      tone: 'warning',
+      message: toUserFacingProspectSearchError(
+        meta.providerError ?? 'APIFY_API_TOKEN is not set',
+      ),
+    }
+  }
+
+  if (meta.providerError) {
+    return {
+      tone: 'info',
+      message: toUserFacingProspectSearchError(meta.providerError),
+    }
+  }
+
+  return {
+    tone: 'info',
+    message: 'Showing sample leads for this search.',
+  }
 }

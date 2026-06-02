@@ -8,6 +8,12 @@ import {
   readString as readApifyString,
 } from '@/lib/aspire/contact-fields'
 import {
+  isApifyConfigured,
+  logApifyConfigDiagnostics,
+  resolveApifyActorId,
+  resolveApifyApiToken,
+} from '@/lib/aspire/apify-config'
+import {
   normalizeApifyLocations,
   resolveApifyKeywordTargeting,
 } from '@/lib/aspire/apify-targeting'
@@ -18,7 +24,6 @@ import type { ApolloPersonResult, ApolloSearchFilters } from '@/lib/aspire/types
 import { env } from '@/lib/env'
 
 const APIFY_API_BASE = 'https://api.apify.com/v2'
-const DEFAULT_LEADS_ACTOR_ID = 'code_crafter~leads-finder'
 /** Apify actor hard cap per run (code_crafter/leads-finder). */
 const APIFY_MAX_FETCH = 100
 const DEFAULT_ASPIRE_FETCH = 50
@@ -271,9 +276,6 @@ async function fetchApifyLeads(
 
   if (!response.ok) {
     const errorText = parseApifyErrorMessage(await response.text(), 'Apify actor run failed')
-    if (isApifyAuthError(errorText)) {
-      return { rows: [], people: stubResults({}) }
-    }
     throw new Error(errorText)
   }
 
@@ -315,21 +317,22 @@ export async function searchApify(
 }> {
   void page
 
-  const token =
-    process.env.APIFY_API_TOKEN?.trim() || env.APIFY_API_TOKEN?.trim() || ''
-  const actorId =
-    process.env.APIFY_LEADS_ACTOR_ID?.trim() ||
-    env.APIFY_LEADS_ACTOR_ID?.trim() ||
-    DEFAULT_LEADS_ACTOR_ID
-  const configured = token.length > 0
+  const token = resolveApifyApiToken()
+  const actorId = resolveApifyActorId()
+  const configured = isApifyConfigured()
 
   if (!configured) {
+    logApifyConfigDiagnostics('searchApify')
     const people = stubResults(filters)
     return {
       people,
       total: people.length,
       hasMore: false,
-      meta: { source: 'stub', providerConfigured: false },
+      meta: {
+        source: 'stub',
+        providerConfigured: false,
+        providerError: 'APIFY_API_TOKEN is not set',
+      },
     }
   }
 

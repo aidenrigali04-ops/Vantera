@@ -1,5 +1,6 @@
 import 'server-only'
 
+import { isApifyConfigured } from '@/lib/aspire/apify-config'
 import { searchApify, type ProspectSearchMeta } from '@/lib/aspire/apify-client'
 import { isInteractiveAspireSearch, normalizeApolloFilters } from '@/lib/aspire/filters'
 import { getIcpConfigForVertical, scoreICP } from '@/lib/aspire/icp-score'
@@ -125,7 +126,7 @@ export async function searchProspects(
     people = stubResults(normalizedFilters)
     meta = {
       source: 'stub',
-      providerConfigured: false,
+      providerConfigured: isApifyConfigured(),
       providerError: message,
     }
   }

@@ -46,6 +46,11 @@ export function VentoraCampaignsTable({ groups }: Props) {
       <h2 className="mb-4 text-sm font-semibold text-[var(--text-primary)]">Campaigns</h2>
 
       <div className="card-surface overflow-hidden">
+        {groups.length === 0 ? (
+          <p className="px-4 py-10 text-center text-sm text-[var(--text-secondary)]">
+            No outreach campaigns yet. Launch a campaign to track conversion here.
+          </p>
+        ) : (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[640px] border-collapse text-left text-sm">
             <thead>
@@ -208,6 +213,7 @@ export function VentoraCampaignsTable({ groups }: Props) {
             </motion.tbody>
           </table>
         </div>
+        )}
       </div>
     </motion.section>
   )
