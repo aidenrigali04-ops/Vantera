@@ -24,7 +24,6 @@ type Props = {
   showDemoGuide: boolean
   successNotice: OnboardingSuccessNotice | null
   onDismissSuccessNotice: () => void
-  onReviewDraft: (draftId: string) => void
 }
 
 function firstNameFromEmail(email: string): string {
@@ -40,7 +39,6 @@ function DashboardSections({
   sdrAgents,
   successNotice,
   onDismissSuccessNotice,
-  onReviewDraft,
 }: Pick<
   Props,
   | 'ventora'
@@ -48,7 +46,6 @@ function DashboardSections({
   | 'sdrAgents'
   | 'successNotice'
   | 'onDismissSuccessNotice'
-  | 'onReviewDraft'
 >) {
   return (
     <>
@@ -64,7 +61,6 @@ function DashboardSections({
             items={actionFeed}
             successNotice={successNotice}
             onDismissSuccessNotice={onDismissSuccessNotice}
-            onReviewDraft={onReviewDraft}
             maxVisible={4}
           />
         </motion.div>
@@ -100,13 +96,10 @@ export function VentoraDashboardView({
   showDemoGuide,
   successNotice,
   onDismissSuccessNotice,
-  onReviewDraft,
 }: Props) {
-  const subtitle = showDemoGuide
-    ? 'Sample data shows what your day looks like — start with priorities, then explore campaigns below.'
-    : showCleanSlate
-      ? 'Add your first client or campaign to replace placeholders.'
-      : `Good to see you, ${firstNameFromEmail(email)} — conversion, pipeline, and outreach in one place.`
+  const subtitle = showCleanSlate
+    ? 'Add your first client or campaign to get started.'
+    : `Good to see you, ${firstNameFromEmail(email)} — conversion, pipeline, and outreach in one place.`
 
   if (showCleanSlate) {
     return (
@@ -126,7 +119,6 @@ export function VentoraDashboardView({
           sdrAgents={sdrAgents}
           successNotice={successNotice}
           onDismissSuccessNotice={onDismissSuccessNotice}
-          onReviewDraft={onReviewDraft}
         />
       </motion.div>
     )
@@ -146,7 +138,6 @@ export function VentoraDashboardView({
         sdrAgents={sdrAgents}
         successNotice={successNotice}
         onDismissSuccessNotice={onDismissSuccessNotice}
-        onReviewDraft={onReviewDraft}
       />
     </motion.div>
   )

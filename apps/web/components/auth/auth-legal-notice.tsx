@@ -3,7 +3,7 @@ import Link from 'next/link'
 export function AuthLegalNotice() {
   return (
     <p className="text-center text-[11px] leading-relaxed text-stone-500">
-      By continuing, you agree to Ventaro&rsquo;s{' '}
+      By continuing, you agree to Vantera&rsquo;s{' '}
       <Link
         href="/terms"
         target="_blank"

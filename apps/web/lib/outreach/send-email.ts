@@ -1,5 +1,5 @@
 import { env } from '@/lib/env'
-import { getAccountEmailDomainConfig } from '@/lib/outreach/email-domain'
+import { resolveOutreachSendIdentity } from '@/lib/outreach/email-domain'
 import { buildCampaignReplyAddress } from '@/lib/outreach/reply-address'
 import { personalizeTemplate } from '@/lib/outreach/types'
 import type { LeadRow } from '@/lib/outreach/types'
@@ -34,9 +34,9 @@ export async function sendCampaignEmail(
   const subject = personalizeTemplate(input.subject, input.lead)
   const text = personalizeTemplate(input.body, input.lead)
 
-  const domainConfig = await getAccountEmailDomainConfig(input.accountId)
-  const from = domainConfig?.fromAddress ?? `${input.accountName} <outreach@${env.NEXT_PUBLIC_APP_DOMAIN}>`
-  const replyTo = buildCampaignReplyAddress(input.stepId, domainConfig?.replyDomain)
+  const identity = await resolveOutreachSendIdentity(input.accountId)
+  const from = identity.from || `${input.accountName} <outreach@${env.NEXT_PUBLIC_APP_DOMAIN}>`
+  const replyTo = buildCampaignReplyAddress(input.stepId, identity.replyDomain)
 
   const html = `
     <div style="font-family:system-ui,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#0a0a0a;line-height:1.6;font-size:14px">

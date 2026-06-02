@@ -1128,6 +1128,28 @@ export const outreachCampaigns = pgTable(
   }),
 )
 
+export const outreachAgentConfigs = pgTable(
+  'outreach_agent_configs',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    accountId: uuid('account_id')
+      .notNull()
+      .unique()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    agentName: text('agent_name').notNull().default('Outreach Agent'),
+    linkedCampaignIds: jsonb('linked_campaign_ids').notNull().default([]),
+    isActive: boolean('is_active').notNull().default(false),
+    isPaused: boolean('is_paused').notNull().default(false),
+    pausedReason: text('paused_reason'),
+    deletedAt: timestamptz('deleted_at'),
+    createdAt: timestamptz('created_at').notNull().defaultNow(),
+    updatedAt: timestamptz('updated_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    activeIdx: index('outreach_agent_configs_active_idx').on(table.isActive, table.isPaused),
+  }),
+)
+
 export const outreachCampaignEnrollments = pgTable(
   'outreach_campaign_enrollments',
   {

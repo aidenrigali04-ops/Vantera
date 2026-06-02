@@ -38,9 +38,9 @@ export type VentoraCampaignGroup = {
 export type VentoraDashboardPayload = {
   metrics: VentoraMetric[]
   chartData: VentoraMonthlyPoint[]
-  highlightMonth: string
+  highlightMonth: string | null
   aiHeadline: string
   aiBody: string
-  aiProgress: number
+  aiProgress: number | null
   campaignGroups: VentoraCampaignGroup[]
 }

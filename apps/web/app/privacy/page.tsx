@@ -2,8 +2,8 @@ import { LegalDocumentShell, LegalSection } from '@/components/legal/legal-docum
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'Privacy Policy — Ventaro',
-  description: 'Privacy Policy for Ventaro.',
+  title: 'Privacy Policy — Vantera',
+  description: 'Privacy Policy for Vantera.',
 }
 
 export default function PrivacyPage() {
@@ -11,7 +11,7 @@ export default function PrivacyPage() {
     <LegalDocumentShell title="Privacy Policy" updatedAt="May 25, 2026">
       <LegalSection title="Overview">
         <p>
-          Ventaro respects your privacy. This policy describes what information we collect, how we
+          Vantera respects your privacy. This policy describes what information we collect, how we
           use it, and the choices you have when you use our service.
         </p>
       </LegalSection>
@@ -31,7 +31,7 @@ export default function PrivacyPage() {
       <LegalSection title="How we use information">
         <p>We use your information to:</p>
         <ul className="list-disc space-y-2 pl-5">
-          <li>Provide, maintain, and secure your Ventaro workspace</li>
+          <li>Provide, maintain, and secure your Vantera workspace</li>
           <li>Authenticate you and prevent fraud or abuse</li>
           <li>Respond to support requests and communicate about the service</li>
           <li>Improve product performance and reliability</li>
@@ -41,7 +41,7 @@ export default function PrivacyPage() {
       <LegalSection title="Sharing">
         <p>
           We do not sell your personal information. We share data only with service providers that
-          help us operate Ventaro (such as hosting and authentication), when required by law, or with
+          help us operate Vantera (such as hosting and authentication), when required by law, or with
           your direction.
         </p>
       </LegalSection>
@@ -66,10 +66,10 @@ export default function PrivacyPage() {
         <p>
           Privacy questions? Contact{' '}
           <a
-            href="mailto:privacy@ventaro.app"
+            href="mailto:privacy@vantera.app"
             className="font-medium text-stone-900 underline-offset-2 hover:underline"
           >
-            privacy@ventaro.app
+            privacy@vantera.app
           </a>
           .
         </p>

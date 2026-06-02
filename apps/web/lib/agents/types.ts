@@ -19,12 +19,20 @@ export type SdrAgentSnapshot = {
   draftCampaigns: number
   activeSavedSearches: number
   pendingDrafts: number
+  pendingEmailDrafts: number
+  pendingLinkedInDrafts: number
   leadsInPipeline: number
   enrolledLeads: number
   /** SDR config exists (setup complete). */
   prospectScoutConfigured: boolean
   /** SDR config active and not paused — Prospect Scout can run on schedule. */
   prospectScoutActive: boolean
+  /** Outreach Agent config exists with at least one linked campaign. */
+  outreachAgentConfigured: boolean
+  /** Outreach Agent active and not paused. */
+  outreachAgentActive: boolean
+  /** Linked campaigns currently active. */
+  linkedActiveCampaigns: number
 }
 
 export type SdrAgentCard = SdrAgentDefinition & {

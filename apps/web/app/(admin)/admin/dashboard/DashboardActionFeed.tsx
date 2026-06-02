@@ -59,7 +59,6 @@ type Props = {
   emptyMessage?: string
   successNotice?: OnboardingSuccessNotice | null
   onDismissSuccessNotice?: () => void
-  onReviewDraft?: (draftId: string) => void
   maxVisible?: number
 }
 
@@ -69,7 +68,6 @@ export function DashboardActionFeed({
   emptyMessage,
   successNotice,
   onDismissSuccessNotice,
-  onReviewDraft,
   maxVisible = 5,
 }: Props) {
   const visibleItems = items.slice(0, maxVisible)
@@ -156,20 +154,6 @@ export function DashboardActionFeed({
                   'flex gap-3 rounded-lg border border-[var(--border-default)] border-l-[3px] bg-[var(--bg-surface)] px-3 py-3 transition-colors duration-150 hover:border-[var(--border-strong)] hover:bg-[var(--bg-subtle)]/80',
                   ACCENT_STYLES[item.type] ?? 'border-l-stone-400',
                 )
-
-                if (item.type === 'draft_ready' && item.draftId && onReviewDraft) {
-                  return (
-                    <li key={item.id}>
-                      <button
-                        type="button"
-                        onClick={() => onReviewDraft(item.draftId!)}
-                        className={cn('w-full text-left', itemClassName)}
-                      >
-                        {content}
-                      </button>
-                    </li>
-                  )
-                }
 
                 return (
                   <li key={item.id}>

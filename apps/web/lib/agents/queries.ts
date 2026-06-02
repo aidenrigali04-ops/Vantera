@@ -5,11 +5,15 @@ import {
   aspireSavedSearches,
   leadDrafts,
   leads,
+  outreachAgentConfigs,
   outreachCampaignEnrollments,
+  outreachCampaignSteps,
   outreachCampaigns,
   sdrAgentConfigs,
+  sdrSequenceSteps,
 } from '@vantera/db'
-import { and, eq, isNull, sql } from 'drizzle-orm'
+import { normalizeLinkedCampaignIds } from '@/lib/outreach-agent/validate'
+import { and, eq, inArray, isNull, sql } from 'drizzle-orm'
 
 export async function getSdrAgentSnapshot(accountId: string): Promise<SdrAgentSnapshot> {
   const [campaignStats] = await db
@@ -33,14 +37,39 @@ export async function getSdrAgentSnapshot(accountId: string): Promise<SdrAgentSn
       ),
     )
 
-  const [draftStats] = await db
+  const [emailDraftStats] = await db
     .select({ pending: sql<number>`count(*)::int` })
     .from(leadDrafts)
     .where(
       and(
         eq(leadDrafts.accountId, accountId),
         eq(leadDrafts.status, 'pending_review'),
+        inArray(leadDrafts.channel, ['email', 'sms']),
         isNull(leadDrafts.deletedAt),
+      ),
+    )
+
+  const [campaignLinkedInStats] = await db
+    .select({ pending: sql<number>`count(*)::int` })
+    .from(outreachCampaignSteps)
+    .where(
+      and(
+        eq(outreachCampaignSteps.accountId, accountId),
+        eq(outreachCampaignSteps.channel, 'linkedin'),
+        eq(outreachCampaignSteps.status, 'pending'),
+        sql`${outreachCampaignSteps.metadata}->>'manualSend' = 'true'`,
+      ),
+    )
+
+  const [sdrLinkedInStats] = await db
+    .select({ pending: sql<number>`count(*)::int` })
+    .from(sdrSequenceSteps)
+    .where(
+      and(
+        eq(sdrSequenceSteps.accountId, accountId),
+        eq(sdrSequenceSteps.channel, 'linkedin'),
+        eq(sdrSequenceSteps.status, 'scheduled'),
+        isNull(sdrSequenceSteps.deletedAt),
       ),
     )
 
@@ -74,15 +103,55 @@ export async function getSdrAgentSnapshot(accountId: string): Promise<SdrAgentSn
     )
     .limit(1)
 
+  const [outreachConfig] = await db
+    .select({
+      isActive: outreachAgentConfigs.isActive,
+      isPaused: outreachAgentConfigs.isPaused,
+      linkedCampaignIds: outreachAgentConfigs.linkedCampaignIds,
+    })
+    .from(outreachAgentConfigs)
+    .where(
+      and(eq(outreachAgentConfigs.accountId, accountId), isNull(outreachAgentConfigs.deletedAt)),
+    )
+    .limit(1)
+
+  const linkedCampaignIds = normalizeLinkedCampaignIds(outreachConfig?.linkedCampaignIds)
+  let linkedActiveCampaigns = 0
+  if (linkedCampaignIds.length > 0) {
+    const [linkedActive] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(outreachCampaigns)
+      .where(
+        and(
+          eq(outreachCampaigns.accountId, accountId),
+          inArray(outreachCampaigns.id, linkedCampaignIds),
+          eq(outreachCampaigns.status, 'active'),
+          isNull(outreachCampaigns.deletedAt),
+        ),
+      )
+    linkedActiveCampaigns = linkedActive?.count ?? 0
+  }
+
+  const pendingEmailDrafts = emailDraftStats?.pending ?? 0
+  const pendingLinkedInDrafts =
+    (campaignLinkedInStats?.pending ?? 0) + (sdrLinkedInStats?.pending ?? 0)
+
   return {
     activeCampaigns: campaignStats?.active ?? 0,
     draftCampaigns: campaignStats?.draft ?? 0,
     activeSavedSearches: searchStats?.active ?? 0,
-    pendingDrafts: draftStats?.pending ?? 0,
+    pendingDrafts: pendingEmailDrafts + pendingLinkedInDrafts,
+    pendingEmailDrafts,
+    pendingLinkedInDrafts,
     leadsInPipeline: leadStats?.open ?? 0,
     enrolledLeads: enrollmentStats?.active ?? 0,
     prospectScoutConfigured: Boolean(scoutConfig),
     prospectScoutActive: Boolean(scoutConfig?.isActive && !scoutConfig?.isPaused),
+    outreachAgentConfigured: linkedCampaignIds.length > 0,
+    outreachAgentActive: Boolean(
+      outreachConfig?.isActive && !outreachConfig?.isPaused && linkedCampaignIds.length > 0,
+    ),
+    linkedActiveCampaigns,
   }
 }
 

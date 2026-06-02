@@ -7,6 +7,7 @@ import { SdrOutreachHubTabs } from '@/components/sdr/SdrOutreachHubTabs'
 import { useSdrCredits } from '@/lib/sdr/use-sdr-credits'
 import { cn } from '@/lib/utils'
 import {
+  Bot,
   Calendar,
   Mail,
   MessageCircle,
@@ -75,12 +76,12 @@ export function SdrCommandCenterClient({
   }, [exhausted])
 
   useEffect(() => {
-    if (embedded || searchParams.get('setup') !== 'complete') return
+    if (searchParams.get('setup') !== 'complete') return
     toast.message(`${config.agentName} is live — discovery activity appears below`, {
       duration: 5000,
     })
-    router.replace('/admin/outreach/agents?agent=prospect_scout')
-  }, [config.agentName, embedded, router, searchParams])
+    router.replace('/admin/outreach/agents/scout')
+  }, [config.agentName, router, searchParams])
 
   const refreshActivity = useCallback(async () => {
     const res = await fetch('/api/sdr/activity?limit=50')
@@ -218,8 +219,8 @@ export function SdrCommandCenterClient({
               )}
             </Button>
             <Button variant="outline" size="sm" asChild>
-              <Link href="/admin/outreach/agents/scout">
-                <Radar className="mr-1.5 h-3.5 w-3.5" /> Prospect Scout
+              <Link href="/admin/outreach/agents">
+                <Bot className="mr-1.5 h-3.5 w-3.5" /> Agent roster
               </Link>
             </Button>
             <Button variant="outline" size="sm" asChild>
@@ -257,7 +258,7 @@ export function SdrCommandCenterClient({
         ) : null}
         <span className="text-[var(--text-disabled)]">·</span>
         <Link
-          href="/admin/outreach/agents/scout"
+          href="/admin/outreach/agents/scout/configure"
           className="status-pill bg-[var(--accent-muted)] text-[var(--text-primary)] hover:opacity-90"
         >
           {config.prospectMode.replace(/_/g, ' ')}
@@ -329,7 +330,7 @@ export function SdrCommandCenterClient({
             <div className="flex items-center justify-between gap-2">
               <h3 className="text-sm font-semibold text-[var(--text-primary)]">Prospect Scout</h3>
               <Button variant="ghost" size="sm" className="h-7 text-xs" asChild>
-                <Link href="/admin/outreach/agents/scout">Configure</Link>
+                <Link href="/admin/outreach/agents/scout/configure">Configure</Link>
               </Button>
             </div>
             <p className="mt-2 text-xs text-[var(--text-secondary)]">

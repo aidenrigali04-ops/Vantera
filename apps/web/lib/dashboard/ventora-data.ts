@@ -12,6 +12,14 @@ import { db } from '@/lib/db/client'
 import { leads } from '@vantera/db'
 import { and, desc, eq, isNull } from 'drizzle-orm'
 
+function realDeals(snapshot: DashboardSnapshot) {
+  return snapshot.deals.filter((deal) => !deal.isSample)
+}
+
+function realClients(snapshot: DashboardSnapshot) {
+  return snapshot.clients.filter((client) => !client.isSample)
+}
+
 function formatCurrency(cents: number): string {
   if (!cents) return '$0'
   return new Intl.NumberFormat('en-US', {
@@ -118,7 +126,7 @@ function computeConversionLabel(
     return `${pct}%`
   }
 
-  const openDeals = snapshot.deals.filter((d) => !d.isTerminalWin && !d.isTerminalLoss)
+  const openDeals = realDeals(snapshot).filter((d) => !d.isTerminalWin && !d.isTerminalLoss)
   if (openDeals.length > 0) {
     const avg = Math.round(
       openDeals.reduce((s, d) => s + d.closeProbability, 0) / openDeals.length,
@@ -126,19 +134,30 @@ function computeConversionLabel(
     return `${avg}%`
   }
 
-  const won = snapshot.deals.filter((d) => d.isTerminalWin).length
-  if (snapshot.deals.length > 0) {
-    return `${Math.round((won / snapshot.deals.length) * 100)}%`
+  const deals = realDeals(snapshot)
+  const won = deals.filter((d) => d.isTerminalWin).length
+  if (deals.length > 0 && won > 0) {
+    return `${Math.round((won / deals.length) * 100)}%`
   }
 
-  return '0%'
+  return '—'
 }
 
 function computeRevenueLabel(snapshot: DashboardSnapshot): string {
-  if (snapshot.wonValueCents > 0) {
-    return formatCurrency(snapshot.wonValueCents)
+  const deals = realDeals(snapshot)
+  const wonValueCents = deals.filter((d) => d.isTerminalWin).reduce((n, d) => n + d.valueCents, 0)
+  if (wonValueCents > 0) {
+    return formatCurrency(wonValueCents)
   }
-  return formatCurrency(snapshot.pipelineValueCents)
+
+  const pipelineValueCents = deals
+    .filter((d) => !d.isTerminalWin && !d.isTerminalLoss)
+    .reduce((n, d) => n + d.valueCents, 0)
+  if (pipelineValueCents > 0) {
+    return formatCurrency(pipelineValueCents)
+  }
+
+  return '—'
 }
 
 function computeScheduledLabel(campaigns: CampaignWithStats[]): string {
@@ -148,43 +167,44 @@ function computeScheduledLabel(campaigns: CampaignWithStats[]): string {
     0,
   )
   const queued = draftCampaigns + pendingEnrollments
-  return `${queued} Queued`
+  if (queued <= 0) return '—'
+  return `${queued} queued`
 }
 
 function aiCopy(
   insights: EmbeddedInsight[],
   snapshot: DashboardSnapshot,
-): { headline: string; body: string; progress: number } {
+): { headline: string; body: string; progress: number | null } {
   const top = insights[0]
   if (top) {
     return {
-      headline: 'Ventora AI',
+      headline: 'Vantera AI',
       body: top.recommendation || top.headline,
-      progress: Math.min(95, 40 + insights.length * 12),
+      progress: null,
     }
   }
 
-  if (snapshot.isEmpty) {
+  if (snapshot.isEmpty || (realClients(snapshot).length === 0 && realDeals(snapshot).length === 0)) {
     return {
-      headline: 'Ventora AI',
-      body: 'Connect your pipeline and launch outreach — we will surface priorities and draft personalized sequences for you.',
-      progress: 24,
+      headline: 'Vantera AI',
+      body: 'Connect your pipeline and launch outreach — priorities and draft sequences will appear here as activity comes in.',
+      progress: null,
     }
   }
 
-  const atRisk = snapshot.clients.filter((c) => c.healthStatus === 'at_risk').length
+  const atRisk = realClients(snapshot).filter((c) => c.healthStatus === 'at_risk').length
   if (atRisk > 0) {
     return {
-      headline: 'Ventora AI',
+      headline: 'Vantera AI',
       body: `${atRisk} client${atRisk === 1 ? '' : 's'} need attention this week. Review churn signals and schedule check-ins from your action feed.`,
-      progress: 68,
+      progress: null,
     }
   }
 
   return {
-    headline: 'Ventora AI',
-    body: "We've built out your pipeline for your outreach campaign.",
-    progress: 68,
+    headline: 'Vantera AI',
+    body: 'Your workspace is synced. New recommendations will appear here as outreach and pipeline activity grows.',
+    progress: null,
   }
 }
 
@@ -223,13 +243,15 @@ export async function getVentoraDashboardPayload(
   ]
 
   const chartData = buildMonthlyOverview(leadRows)
+  const highlightMonth =
+    chartData.find((point) => point.total > 0)?.month ?? currentMonthAbbrev()
 
   const ai = aiCopy(embeddedInsights, snapshot)
 
   return {
     metrics,
     chartData,
-    highlightMonth: currentMonthAbbrev(),
+    highlightMonth: chartData.some((point) => point.total > 0) ? highlightMonth : null,
     aiHeadline: ai.headline,
     aiBody: ai.body,
     aiProgress: ai.progress,

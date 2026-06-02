@@ -31,14 +31,14 @@ export const PROSPECT_MODE_OPTIONS: Array<{
   },
   {
     value: 'aspire_bound',
-    title: 'Aspire saved searches (advanced)',
+    title: 'Saved lead searches (advanced)',
     description:
-      'Also re-run manual Aspire saved searches you curate in the Aspire UI. Optional bindings below.',
+      'Also re-run saved lead searches you curate in Lead finder. Optional bindings below.',
   },
   {
     value: 'hybrid',
-    title: 'Scout + Aspire searches',
-    description: 'Autonomous scout first, then optional saved Aspire search bindings.',
+    title: 'Scout + saved searches',
+    description: 'Autonomous scout first, then optional saved search bindings.',
   },
 ]
 

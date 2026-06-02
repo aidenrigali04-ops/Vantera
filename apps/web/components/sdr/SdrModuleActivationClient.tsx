@@ -12,7 +12,7 @@ const CAPABILITIES = [
   {
     icon: Radar,
     title: 'Prospect Scout',
-    description: 'Finds ICP-matched leads on your schedule via Apify and Aspire.',
+    description: 'Finds ICP-matched leads on your schedule via live discovery.',
   },
   {
     icon: Target,

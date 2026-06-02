@@ -40,10 +40,10 @@ async function validateProspectMode(
 
   const saved = await findSavedSearches(accountId)
   if (saved.length === 0) {
-    return 'Create at least one Aspire saved search before using Aspire-bound mode, or switch to inline ICP discovery.'
+    return 'Create at least one saved lead search before using saved-search mode, or switch to inline ICP discovery.'
   }
 
-  return 'Add at least one saved search binding for Aspire-bound mode.'
+  return 'Add at least one saved search binding for saved-search mode.'
 }
 
 async function normalizeLaunchInput(
@@ -167,6 +167,7 @@ export async function launchSdrAgent(
 
   revalidatePath('/admin/outreach/agents')
   revalidatePath('/admin/outreach/agents/scout')
+  revalidatePath('/admin/outreach/agents/scout/configure')
 
   return { success: true, data: { bootstrap } }
 }

@@ -25,8 +25,8 @@ export async function activateSdrModuleForAccount(accountId: string): Promise<Ac
 
   invalidateFlagCache(accountId)
   revalidatePath('/admin/outreach/agents')
-  revalidatePath('/admin/outreach/agents/setup')
-  revalidatePath('/admin/outreach/agents/scout')
+  revalidatePath('/admin/outreach/agents/outreach')
+  revalidatePath('/admin/outreach/agents/outreach/setup')
 
   return { success: true, data: { enabled: true } }
 }

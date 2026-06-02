@@ -30,7 +30,7 @@ type Props = {
 }
 
 export function SavedViews({ accountId, recordsLabel, activeViewId = 'all', onSelectView }: Props) {
-  const storageKey = `ventaro_saved_views_${accountId}`
+  const storageKey = `vantera_saved_views_${accountId}`
   const [customViews, setCustomViews] = useState<SavedView[]>([])
   const [active, setActive] = useState(activeViewId)
   const [saveOpen, setSaveOpen] = useState(false)

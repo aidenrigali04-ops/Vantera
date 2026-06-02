@@ -1,13 +1,11 @@
 'use client'
 
-import { DraftReviewSheet } from '@/components/dashboard/DraftReviewSheet'
 import { VentoraDashboardView } from '@/components/dashboard/ventora/VentoraDashboardView'
 import type { SdrAgentCard } from '@/lib/agents/types'
 import type { ActionFeedItem } from '@/lib/dashboard/action-feed'
 import type { VentoraDashboardPayload } from '@/lib/dashboard/ventora-types'
 import type { OnboardingSuccessNotice } from '@/lib/import/fields'
 import { onboardingSuccessStorageKey } from '@/lib/import/fields'
-import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
 type DashboardClientProps = {
@@ -29,11 +27,9 @@ export function DashboardClient({
   isEmpty = false,
   sdrAgents = [],
 }: DashboardClientProps) {
-  const router = useRouter()
   const showCleanSlate = isEmpty && onboardingIncomplete
   const showDemoGuide = onboardingIncomplete && !showCleanSlate
   const [successNotice, setSuccessNotice] = useState<OnboardingSuccessNotice | null>(null)
-  const [reviewDraftId, setReviewDraftId] = useState<string | null>(null)
 
   useEffect(() => {
     const raw = window.sessionStorage.getItem(onboardingSuccessStorageKey(accountId))
@@ -72,12 +68,6 @@ export function DashboardClient({
         showDemoGuide={showDemoGuide}
         successNotice={successNotice}
         onDismissSuccessNotice={dismissSuccessNotice}
-        onReviewDraft={setReviewDraftId}
-      />
-      <DraftReviewSheet
-        draftId={reviewDraftId}
-        onClose={() => setReviewDraftId(null)}
-        onActionComplete={() => router.refresh()}
       />
     </>
   )

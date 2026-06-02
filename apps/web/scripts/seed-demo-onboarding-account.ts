@@ -10,8 +10,8 @@ import { loadProjectEnv } from '@/lib/load-project-env'
 import { seedSampleWorkspace } from '@/lib/sample-data/seed'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 
-export const DEMO_ONBOARDING_EMAIL = 'demo-onboarding@ventaro.demo'
-export const DEMO_ONBOARDING_PASSWORD = 'DemoVentaro2026!'
+export const DEMO_ONBOARDING_EMAIL = 'demo-onboarding@vantera.demo'
+export const DEMO_ONBOARDING_PASSWORD = 'DemoVantera2026!'
 export const DEMO_ONBOARDING_FULL_NAME = 'Demo Owner'
 export const DEMO_ONBOARDING_BUSINESS_NAME = 'Acme Agency'
 

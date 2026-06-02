@@ -20,9 +20,9 @@ export const SDR_AGENT_DEFINITIONS: SdrAgentDefinition[] = [
     name: 'Outreach Agent',
     tagline: 'Runs email, LinkedIn, and SMS sequences',
     description:
-      'Enrolls leads into multi-step campaigns, sends on schedule, and queues LinkedIn steps for you to approve with one click.',
-    href: '/admin/outreach/campaigns',
-    ctaLabel: 'Launch campaign',
+      'Links to your existing campaigns, runs multi-step outreach on schedule, and surfaces manual LinkedIn steps for one-click approval.',
+    href: '/admin/outreach/agents/outreach/setup',
+    ctaLabel: 'Set up Outreach Agent',
     iconName: 'megaphone',
   },
   {
@@ -30,8 +30,8 @@ export const SDR_AGENT_DEFINITIONS: SdrAgentDefinition[] = [
     name: 'Message Drafter',
     tagline: 'Personalized outreach ready for review',
     description:
-      'Drafts tailored email and SMS messages when prospects enroll — you approve from the dashboard or let autonomous mode send.',
-    href: '/admin/dashboard',
+      'Drafts email and SMS for approval, and surfaces LinkedIn steps as a separate manual sequence — review each flow in the drafter command center.',
+    href: '/admin/outreach/agents/drafter',
     ctaLabel: 'Review drafts',
     iconName: 'pen-line',
   },
@@ -66,7 +66,7 @@ export function buildSdrAgentCards(snapshot: SdrAgentSnapshot): SdrAgentCard[] {
         if (!active) {
           return {
             ...agent,
-            href: '/admin/outreach/agents?agent=prospect_scout',
+            href: '/admin/outreach/agents/scout',
             ctaLabel: 'Open agent',
             status: 'inactive',
             statLabel: 'Open prospects',
@@ -75,32 +75,63 @@ export function buildSdrAgentCards(snapshot: SdrAgentSnapshot): SdrAgentCard[] {
         }
         return {
           ...agent,
-          href: '/admin/outreach/agents?agent=prospect_scout',
+          href: '/admin/outreach/agents/scout',
           ctaLabel: 'Open agent',
           status: 'active',
           statLabel: 'Open prospects',
           statValue: String(snapshot.leadsInPipeline),
         }
       }
-      case 'outreach_agent':
-        return {
-          ...agent,
-          status:
-            snapshot.activeCampaigns > 0
-              ? 'active'
-              : snapshot.draftCampaigns > 0
-                ? 'idle'
-                : 'needs_setup',
-          statLabel: 'Live campaigns',
-          statValue: String(snapshot.activeCampaigns),
+      case 'outreach_agent': {
+        const configured = snapshot.outreachAgentConfigured
+        const active = snapshot.outreachAgentActive
+        if (!configured) {
+          return {
+            ...agent,
+            href: '/admin/outreach/agents/outreach/setup',
+            ctaLabel: 'Configure',
+            status: 'needs_setup',
+            statLabel: 'Status',
+            statValue: 'Not configured',
+          }
         }
-      case 'message_drafter':
+        if (!active) {
+          return {
+            ...agent,
+            href: '/admin/outreach/agents/outreach',
+            ctaLabel: 'Open agent',
+            status: 'inactive',
+            statLabel: 'Linked live',
+            statValue: String(snapshot.linkedActiveCampaigns),
+          }
+        }
         return {
           ...agent,
-          status: snapshot.pendingDrafts > 0 ? 'active' : 'idle',
+          href: '/admin/outreach/agents/outreach',
+          ctaLabel: 'Open agent',
+          status: 'active',
+          statLabel: 'Linked live',
+          statValue: String(snapshot.linkedActiveCampaigns),
+        }
+      }
+      case 'message_drafter': {
+        const pendingTotal = snapshot.pendingEmailDrafts + snapshot.pendingLinkedInDrafts
+        const statValue =
+          pendingTotal === 0
+            ? '0'
+            : snapshot.pendingEmailDrafts > 0 && snapshot.pendingLinkedInDrafts > 0
+              ? `${snapshot.pendingEmailDrafts} email · ${snapshot.pendingLinkedInDrafts} LinkedIn`
+              : snapshot.pendingEmailDrafts > 0
+                ? `${snapshot.pendingEmailDrafts} email`
+                : `${snapshot.pendingLinkedInDrafts} LinkedIn`
+        return {
+          ...agent,
+          href: '/admin/outreach/agents/drafter',
+          status: pendingTotal > 0 ? 'active' : 'idle',
           statLabel: 'Drafts to review',
-          statValue: String(snapshot.pendingDrafts),
+          statValue,
         }
+      }
       case 'pipeline_analyst':
         return {
           ...agent,

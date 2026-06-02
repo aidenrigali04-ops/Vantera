@@ -92,12 +92,63 @@ export async function getAccountEmailDomainConfig(
   }
 }
 
+/** Resolved sender for outbound email — uses verified custom domain when available. */
+export async function resolveOutreachSendIdentity(accountId: string): Promise<{
+  from: string
+  replyDomain: string
+  usesVerifiedCustomDomain: boolean
+}> {
+  const config = await getAccountEmailDomainConfig(accountId)
+  if (!config) {
+    return {
+      from: `Vantera <outreach@${platformFromDomain()}>`,
+      replyDomain: platformInboundDomain(),
+      usesVerifiedCustomDomain: false,
+    }
+  }
+
+  return {
+    from: config.fromAddress,
+    replyDomain: config.replyDomain,
+    usesVerifiedCustomDomain: config.isCustomDomain && config.domainStatus === 'verified',
+  }
+}
+
 export function isValidOutreachDomain(domain: string): boolean {
   const normalized = normalizeDomain(domain)
   if (!normalized || normalized.includes('@')) return false
   return /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$/.test(
     normalized,
   )
+}
+
+export function isValidEmailLocalPart(value: string): boolean {
+  const trimmed = value.trim()
+  if (!trimmed || trimmed.length > 64) return false
+  return /^[a-zA-Z0-9]([a-zA-Z0-9._+-]*[a-zA-Z0-9])?$/.test(trimmed)
+}
+
+/** Preview / settings — shows configured domain even before DNS verification. */
+export function buildConfiguredFromAddress(input: {
+  accountName: string
+  fromLocalPart: string | null | undefined
+  fromDomain: string | null | undefined
+}): string {
+  const localPart = input.fromLocalPart?.trim() || 'outreach'
+  const domain = input.fromDomain ? normalizeDomain(input.fromDomain) : platformFromDomain()
+  return buildFromAddress(input.accountName, localPart, domain)
+}
+
+export function buildConfiguredReplyDomain(input: {
+  fromDomain: string | null | undefined
+  inboundDomain: string | null | undefined
+}): string {
+  if (input.fromDomain) {
+    return input.inboundDomain
+      ? normalizeDomain(input.inboundDomain)
+      : `inbound.${normalizeDomain(input.fromDomain)}`
+  }
+  return platformInboundDomain()
 }
 
 export { normalizeDomain }

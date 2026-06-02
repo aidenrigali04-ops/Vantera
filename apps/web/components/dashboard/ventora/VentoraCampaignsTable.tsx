@@ -192,7 +192,7 @@ export function VentoraCampaignsTable({ groups }: Props) {
                                 </span>
                               </td>
                               <td className="px-3 py-3 font-medium tabular-nums text-[var(--text-primary)]">
-                                {row.conversionRate}%
+                                {row.conversionRate > 0 ? `${row.conversionRate}%` : '—'}
                               </td>
                               <td className="px-3 py-3">
                                 <button

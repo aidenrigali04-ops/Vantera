@@ -5,7 +5,7 @@ type AuthLogoProps = {
   className?: string
 }
 
-/** Ventaro wordmark — top-left of auth column, links to landing. */
+/** Vantera wordmark — top-left of auth column, links to landing. */
 export function AuthLogo({ className }: AuthLogoProps) {
   return (
     <Link
@@ -24,7 +24,7 @@ export function AuthLogo({ className }: AuthLogoProps) {
         V
       </span>
       <span className="text-[17px] font-semibold tracking-[-0.02em] text-[var(--text-primary)]">
-        Ventaro
+        Vantera
       </span>
     </Link>
   )

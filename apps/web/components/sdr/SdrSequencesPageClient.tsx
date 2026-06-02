@@ -163,8 +163,8 @@ export function SdrSequencesPageClient({ rows }: Props) {
       {tableRows.length === 0 ? (
         <SectionEmptyState
           title="No sequences yet"
-          description="Enroll prospects from Aspire or your pipeline to start automated nurture."
-          actionLabel="Open Aspire"
+          description="Enroll prospects from Lead finder or your pipeline to start automated nurture."
+          actionLabel="Open Lead finder"
           onAction={() => router.push('/admin/outreach/agents/scout')}
         />
       ) : (

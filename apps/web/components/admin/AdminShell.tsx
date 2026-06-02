@@ -28,7 +28,7 @@ type AdminShellProps = {
 }
 
 /**
- * Ventaro application shell — Step 1 global layout.
+ * Vantera application shell — Step 1 global layout.
  * Sidebar (240px) + workspace header + scrollable main canvas.
  */
 export function AdminShell({

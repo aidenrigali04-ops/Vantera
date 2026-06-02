@@ -99,7 +99,7 @@ export function SdrSetupWizardClient({ accountVertical }: Props) {
         form.bindings.length === 0
       ) {
         if (savedSearches.length === 0) {
-          toast.error('Create a saved search in Aspire first, or use inline ICP discovery')
+          toast.error('Create a saved search in Lead finder first, or use inline ICP discovery')
           return false
         }
         toast.error('Add at least one saved search binding, or switch to inline ICP mode')
@@ -198,7 +198,7 @@ export function SdrSetupWizardClient({ accountVertical }: Props) {
         }
       }
 
-      router.push('/admin/outreach/agents?setup=complete&agent=prospect_scout')
+      router.push('/admin/outreach/agents/scout?setup=complete')
       router.refresh()
     })
   }

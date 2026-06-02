@@ -26,7 +26,7 @@ export function AuthBrandPanel() {
       initial={reduceMotion ? false : { opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: DURATION.page, ease: EASE_OUT, delay: reduceMotion ? 0 : 0.06 }}
-      aria-label="Ventaro product overview"
+      aria-label="Vantera product overview"
     >
       <div
         className="pointer-events-none absolute inset-y-0 left-0 w-1 bg-[var(--accent)]"

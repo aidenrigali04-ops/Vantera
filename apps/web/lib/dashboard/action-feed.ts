@@ -156,6 +156,11 @@ export async function getOperationalActionFeed(accountId: string, limit = 8): Pr
 
     if (typeof payload.href === 'string' && payload.href.startsWith('/')) {
       href = payload.href
+    } else if (rawSignalType === 'draft_ready' && payload.draftId) {
+      draftId = String(payload.draftId)
+      href = `/admin/outreach/agents/drafter?tab=email&draft=${draftId}`
+    } else if (rawSignalType === 'linkedin_step_ready' && payload.stepId) {
+      href = `/admin/outreach/agents/drafter?tab=linkedin&step=${payload.stepId}&source=campaign`
     } else if (
       rawSignalType === 'aspire_icp_match' &&
       payload.source === 'prospect_scout'
@@ -189,6 +194,10 @@ export async function getOperationalActionFeed(accountId: string, limit = 8): Pr
       mappedType = rawSignalType
     } else if (rawSignalType === 'draft_pending' || rawSignalType === 'draft_sent') {
       mappedType = 'draft_ready'
+      if (payload.draftId) {
+        draftId = String(payload.draftId)
+        href = `/admin/outreach/agents/drafter?tab=email&draft=${draftId}`
+      }
     }
 
     items.push({

@@ -5,12 +5,15 @@ import { ROLE_RANK } from '@/lib/auth/constants'
 import { getAdminSession } from '@/lib/auth/session'
 import { db } from '@/lib/db/client'
 import {
+  buildConfiguredFromAddress,
+  buildConfiguredReplyDomain,
   getAccountEmailDomainConfig,
+  isValidEmailLocalPart,
   isValidOutreachDomain,
   normalizeDomain,
 } from '@/lib/outreach/email-domain'
 import {
-  createResendDomain,
+  ensureResendDomain,
   getResendDomain,
   mapResendStatus,
   parseStoredDomainDns,
@@ -49,6 +52,7 @@ async function assertAdminAccess(): Promise<string> {
 async function loadAccountDomainRow(accountId: string) {
   const [account] = await db
     .select({
+      name: accounts.name,
       outreachFromDomain: accounts.outreachFromDomain,
       outreachInboundDomain: accounts.outreachInboundDomain,
       outreachFromLocalPart: accounts.outreachFromLocalPart,
@@ -69,6 +73,7 @@ function buildSettings(
   inboundDomainStatus: string,
 ): OutreachDomainSettings {
   const parsed = parseStoredDomainDns(account.outreachDomainDns)
+  const hasConfiguredDomain = Boolean(account.outreachFromDomain)
   return {
     fromDomain: account.outreachFromDomain ?? null,
     inboundDomain: account.outreachInboundDomain ?? null,
@@ -78,9 +83,20 @@ function buildSettings(
     sendingRecords: parsed.sendingRecords,
     inboundRecords: parsed.inboundRecords,
     dnsRecords: parsed.sendingRecords,
-    previewFrom: config.fromAddress,
-    previewReplyDomain: config.replyDomain,
-    isCustomDomain: config.isCustomDomain,
+    previewFrom: hasConfiguredDomain
+      ? buildConfiguredFromAddress({
+          accountName: account.name,
+          fromLocalPart: account.outreachFromLocalPart,
+          fromDomain: account.outreachFromDomain,
+        })
+      : config.fromAddress,
+    previewReplyDomain: hasConfiguredDomain
+      ? buildConfiguredReplyDomain({
+          fromDomain: account.outreachFromDomain,
+          inboundDomain: account.outreachInboundDomain,
+        })
+      : config.replyDomain,
+    isCustomDomain: hasConfiguredDomain,
   }
 }
 
@@ -127,6 +143,7 @@ export async function saveOutreachDomain(input: {
 }): Promise<ActionResult<OutreachDomainSettings>> {
   try {
     const accountId = await assertAdminAccess()
+    const existing = await loadAccountDomainRow(accountId)
     const fromDomain = normalizeDomain(input.fromDomain)
     const inboundDomain = input.inboundDomain?.trim()
       ? normalizeDomain(input.inboundDomain)
@@ -141,23 +158,45 @@ export async function saveOutreachDomain(input: {
       return { success: false, error: 'Enter a valid inbound subdomain like inbound.acmehvac.com' }
     }
 
-    const sendingDomain = await createResendDomain(fromDomain, {
-      sending: 'enabled',
-      receiving: 'disabled',
-    })
+    if (!isValidEmailLocalPart(fromLocalPart)) {
+      return { success: false, error: 'From prefix must be a valid email local part (e.g. outreach)' }
+    }
 
-    let inboundDomainResendId: string | null = null
-    let inboundRecords: ResendDnsRecord[] = []
+    const parsedExisting = parseStoredDomainDns(existing?.outreachDomainDns)
+    const inboundUnchanged =
+      existing?.outreachInboundDomain &&
+      normalizeDomain(existing.outreachInboundDomain) === inboundDomain
 
-    try {
-      const receivingDomain = await createResendDomain(inboundDomain, {
-        sending: 'disabled',
-        receiving: 'enabled',
-      })
-      inboundDomainResendId = receivingDomain.id
-      inboundRecords = receivingDomain.records ?? []
-    } catch (error) {
-      console.warn('[saveOutreachDomain] inbound domain registration failed:', error)
+    const sendingDomain = await ensureResendDomain(
+      fromDomain,
+      { sending: 'enabled', receiving: 'disabled' },
+      existing?.resendOutreachDomainId,
+    )
+
+    let inboundDomainResendId: string | null = inboundUnchanged
+      ? parsedExisting.resendInboundDomainId
+      : null
+    let inboundRecords: ResendDnsRecord[] = inboundUnchanged ? parsedExisting.inboundRecords : []
+
+    if (!inboundDomainResendId) {
+      try {
+        const receivingDomain = await ensureResendDomain(
+          inboundDomain,
+          { sending: 'disabled', receiving: 'enabled' },
+          null,
+        )
+        inboundDomainResendId = receivingDomain.id
+        inboundRecords = receivingDomain.records ?? []
+      } catch (error) {
+        console.warn('[saveOutreachDomain] inbound domain registration failed:', error)
+      }
+    } else if (inboundRecords.length === 0) {
+      try {
+        const receivingDomain = await getResendDomain(inboundDomainResendId)
+        inboundRecords = receivingDomain.records ?? []
+      } catch (error) {
+        console.warn('[saveOutreachDomain] inbound domain reload failed:', error)
+      }
     }
 
     const { sendingRecords } = partitionDnsRecords(sendingDomain.records ?? [])
@@ -182,7 +221,10 @@ export async function saveOutreachDomain(input: {
     revalidatePath('/admin/settings')
 
     const refreshed = await getOutreachDomainSettings()
-    if (!refreshed.success || !refreshed.data) {
+    if (!refreshed.success) {
+      return { success: false, error: refreshed.error ?? 'Domain saved but settings could not be reloaded' }
+    }
+    if (!refreshed.data) {
       return { success: false, error: 'Domain saved but settings could not be reloaded' }
     }
 
@@ -219,6 +261,7 @@ export async function refreshOutreachDomainDns(): Promise<ActionResult<OutreachD
     await db
       .update(accounts)
       .set({
+        outreachDomainStatus: mapResendStatus(sendingLatest.status),
         outreachDomainDns: {
           sendingRecords,
           inboundRecords,

@@ -145,7 +145,7 @@ export function OutreachDomainSettingsPanel({ initial }: Props) {
         <div>
           <h2 className="text-base font-semibold text-stone-900">Outreach email domain</h2>
           <p className="mt-0.5 text-[13px] text-stone-500">
-            Everything you need is here in Ventaro — no Resend account required. You only open your
+            Everything you need is here in Vantera — no Resend account required. You only open your
             DNS host (Cloudflare, GoDaddy, etc.) to paste the records below.
           </p>
         </div>
@@ -191,6 +191,11 @@ export function OutreachDomainSettingsPanel({ initial }: Props) {
             <span className="font-medium text-stone-800">Replies to:</span>{' '}
             replies+{'{step}'}@{settings.previewReplyDomain}
           </p>
+          {settings.fromDomain && settings.domainStatus !== 'verified' ? (
+            <p className="mt-2 text-[12px] text-amber-800">
+              Outreach will use your platform default address until sending DNS is verified.
+            </p>
+          ) : null}
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">

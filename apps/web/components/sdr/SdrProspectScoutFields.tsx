@@ -204,7 +204,7 @@ export function SdrProspectScoutFields({
             <div className="card-surface flex flex-col items-center gap-3 px-6 py-10 text-center">
               <Bookmark className="h-8 w-8 text-[var(--text-tertiary)]" aria-hidden />
               <p className="text-sm text-[var(--text-secondary)]">
-                Optional: create saved searches in the manual Aspire UI, then bind them here for
+                Optional: create saved searches in Lead finder, then bind them here for
                 hybrid mode. Autonomous scout does not require this.
               </p>
               <Button
@@ -213,7 +213,7 @@ export function SdrProspectScoutFields({
                 size="sm"
                 className="border-[var(--border-default)]"
               >
-                <Link href="/admin/outreach/aspire">Aspire search UI (optional)</Link>
+                <Link href="/admin/outreach/aspire">Lead finder (optional)</Link>
               </Button>
             </div>
           ) : bindings.length === 0 ? (

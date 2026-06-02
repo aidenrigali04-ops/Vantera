@@ -42,7 +42,7 @@ export function OutreachDomainSetupGuide({
 
   const steps: GuideStep[] = [
     {
-      title: 'Enter your domain in Ventaro',
+      title: 'Enter your domain in Vantera',
       body: (
         <>
           Sending domain:{' '}
@@ -51,7 +51,7 @@ export function OutreachDomainSetupGuide({
           <code className="rounded bg-stone-100 px-1 py-0.5 text-xs">
             {exampleLocal}@{exampleDomain}
           </code>
-          . Ventaro registers everything with our email provider — you never need a Resend login.
+          . Vantera registers everything with our email provider — you never need a Resend login.
         </>
       ),
     },
@@ -59,17 +59,17 @@ export function OutreachDomainSetupGuide({
       title: 'Click Save domain',
       body: (
         <>
-          Ventaro generates your DNS records instantly in the two tables below — one for sending,
+          Vantera generates your DNS records instantly in the two tables below — one for sending,
           one for inbound replies. Each row has copy buttons for the host and value.
         </>
       ),
     },
     {
-      title: 'Paste records at your DNS host (only step outside Ventaro)',
+      title: 'Paste records at your DNS host (only step outside Vantera)',
       body: (
         <>
           Open wherever you manage DNS — Cloudflare, GoDaddy, Namecheap, Google Domains, etc. Paste
-          the records from Ventaro. This takes about 5 minutes. DNS propagation can take up to 48
+          the records from Vantera. This takes about 5 minutes. DNS propagation can take up to 48
           hours, but is often much faster.
         </>
       ),
@@ -78,7 +78,7 @@ export function OutreachDomainSetupGuide({
       title: 'Return here and click Check verification',
       body: (
         <>
-          Ventaro checks DNS for you — no third-party dashboard. When <strong>Send</strong> shows
+          Vantera checks DNS for you — no third-party dashboard. When <strong>Send</strong> shows
           Verified, campaigns use{' '}
           <code className="rounded bg-stone-100 px-1 py-0.5 text-xs">{previewFrom}</code>. When{' '}
           <strong>Replies</strong> shows Verified, replies to{' '}
@@ -96,7 +96,7 @@ export function OutreachDomainSetupGuide({
       <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg border border-stone-200 bg-stone-50/80 px-4 py-3 text-left transition-colors hover:bg-stone-50">
         <span className="flex items-center gap-2 text-sm font-medium text-stone-900">
           <BookOpen className="h-4 w-4 text-violet-600" />
-          Setup guide — stay in Ventaro
+          Setup guide — stay in Vantera
         </span>
         <ChevronDown
           className={cn('h-4 w-4 text-stone-500 transition-transform', open && 'rotate-180')}
@@ -105,7 +105,7 @@ export function OutreachDomainSetupGuide({
       <CollapsibleContent className="pt-4">
         <div className="space-y-4 rounded-lg border border-stone-100 bg-white p-4">
           <p className="text-sm text-stone-600">
-            You only leave Ventaro once — to paste DNS records at your domain provider. Everything
+            You only leave Vantera once — to paste DNS records at your domain provider. Everything
             else (registration, verification, reply routing) happens inside this page.
           </p>
 
@@ -140,7 +140,7 @@ export function OutreachDomainSetupGuide({
             ) : (
               <>
                 <strong>Next:</strong> Paste the DNS records below, then click Check verification.
-                Use Refresh DNS status to update row statuses without leaving Ventaro.
+                Use Refresh DNS status to update row statuses without leaving Vantera.
               </>
             )}
           </div>

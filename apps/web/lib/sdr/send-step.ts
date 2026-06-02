@@ -1,4 +1,5 @@
 import { env } from '@/lib/env'
+import { resolveOutreachSendIdentity } from '@/lib/outreach/email-domain'
 import { personalizeTemplate } from '@/lib/outreach/types'
 import { buildCampaignReplyAddress } from '@/lib/outreach/reply-address'
 import { sendCampaignSms } from '@/lib/outreach/send-sms'
@@ -35,7 +36,9 @@ export async function sendSdrEmail(input: {
     text = `${text}\n\n${input.signature}`
   }
 
-  const replyTo = buildCampaignReplyAddress(input.stepId)
+  const identity = await resolveOutreachSendIdentity(input.accountId)
+  const from = identity.from || `${input.fromName} <${input.fromEmail}>`
+  const replyTo = buildCampaignReplyAddress(input.stepId, identity.replyDomain)
   const html = text
     .split('\n')
     .map((line) => `<p style="margin:0 0 12px">${escapeHtml(line)}</p>`)
@@ -44,7 +47,7 @@ export async function sendSdrEmail(input: {
   try {
     const resend = new Resend(apiKey)
     const { data, error } = await resend.emails.send({
-      from: `${input.fromName} <${input.fromEmail}>`,
+      from,
       to: input.toEmail,
       reply_to: replyTo,
       subject,

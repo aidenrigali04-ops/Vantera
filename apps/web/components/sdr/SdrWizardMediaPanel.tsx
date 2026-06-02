@@ -92,7 +92,7 @@ function PreviewScout() {
           <Radar className="h-3.5 w-3.5 text-[var(--brand-accent)]" />
           Prospect Scout
         </div>
-        {['Inline ICP search', 'Aspire saved search', 'Auto-enroll 70+ ICP'].map((label, i) => (
+        {['Inline ICP search', 'Saved lead search', 'Auto-enroll 70+ ICP'].map((label, i) => (
           <div
             key={label}
             className={cn(

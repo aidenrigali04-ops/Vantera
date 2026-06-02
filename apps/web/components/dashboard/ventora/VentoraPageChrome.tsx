@@ -14,7 +14,7 @@ type Props = {
 
 export function VentoraPageChrome({ title = 'Dashboard', subtitle, className }: Props) {
   const { businessName } = useBranding()
-  const workspace = businessName?.trim() || 'Ventora'
+  const workspace = businessName?.trim() || 'Vantera'
 
   return (
     <motion.header

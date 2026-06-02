@@ -7,16 +7,17 @@ import { MoreHorizontal, Sparkles } from 'lucide-react'
 type Props = {
   headline?: string
   body?: string
-  progress?: number
+  progress?: number | null
 }
 
 export function VentoraAiOverview({
-  headline = 'Ventora AI',
-  body = "We've built out your pipeline for your outreach campaign.",
-  progress = 68,
+  headline = 'Vantera AI',
+  body = 'Recommendations appear here as your pipeline and outreach activity grows.',
+  progress = null,
 }: Props) {
   const reduced = useReducedMotion()
-  const width = Math.min(100, Math.max(8, progress))
+  const showProgress = typeof progress === 'number' && progress > 0
+  const width = showProgress ? Math.min(100, Math.max(8, progress)) : 0
 
   return (
     <motion.section
@@ -47,19 +48,21 @@ export function VentoraAiOverview({
           {body}
         </p>
 
-        <div className="mt-auto pt-6">
-          <div className="h-1.5 overflow-hidden rounded-full bg-[var(--border-default)]">
-            <motion.div
-              className="h-full rounded-full bg-[var(--accent)]"
-              initial={{ width: 0 }}
-              animate={{ width: `${width}%` }}
-              transition={{ duration: DURATION.page, ease: EASE_OUT, delay: 0.12 }}
-            />
+        {showProgress ? (
+          <div className="mt-auto pt-6">
+            <div className="h-1.5 overflow-hidden rounded-full bg-[var(--border-default)]">
+              <motion.div
+                className="h-full rounded-full bg-[var(--accent)]"
+                initial={{ width: 0 }}
+                animate={{ width: `${width}%` }}
+                transition={{ duration: DURATION.page, ease: EASE_OUT, delay: 0.12 }}
+              />
+            </div>
+            <p className="mt-2 text-xs text-[var(--text-tertiary)]">
+              Pipeline sync · {progress}% complete
+            </p>
           </div>
-          <p className="mt-2 text-xs text-[var(--text-tertiary)]">
-            Pipeline sync · {progress}% complete
-          </p>
-        </div>
+        ) : null}
       </div>
     </motion.section>
   )

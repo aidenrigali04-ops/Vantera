@@ -27,7 +27,7 @@ const MONTHS = [
   { label: 'Sep', solid: 40, hatch: 20 },
 ] as const
 
-function VentaroMark({ className, variant = 'dark' }: { className?: string; variant?: 'dark' | 'brand' }) {
+function VanteraMark({ className, variant = 'dark' }: { className?: string; variant?: 'dark' | 'brand' }) {
   return (
     <span
       className={cn(
@@ -117,7 +117,7 @@ function OverviewBar({
   )
 }
 
-/** Product dashboard preview for auth brand column — matches live Ventora shell. */
+/** Product dashboard preview for auth brand column — matches live Vantera shell. */
 export function UiPreviewMock({ className }: { className?: string }) {
   return (
     <div
@@ -137,7 +137,7 @@ export function UiPreviewMock({ className }: { className?: string }) {
           )}
         >
           <div className="mb-4 flex items-center justify-between">
-            <VentaroMark className="size-6 rounded-[6px] text-[11px]" />
+            <VanteraMark className="size-6 rounded-[6px] text-[11px]" />
             <ChevronLeft className="size-3 text-[var(--text-tertiary)]" aria-hidden />
           </div>
 
@@ -182,8 +182,8 @@ export function UiPreviewMock({ className }: { className?: string }) {
             <ArrowLeft className="size-2.5 shrink-0" aria-hidden />
             <span className="font-medium">Team</span>
             <span className="text-[var(--text-tertiary)]">&gt;</span>
-            <VentaroMark variant="brand" className="size-4 rounded-[4px] text-[9px]" />
-            <span className="font-medium text-[var(--text-primary)]">Ventora</span>
+            <VanteraMark variant="brand" className="size-4 rounded-[4px] text-[9px]" />
+            <span className="font-medium text-[var(--text-primary)]">Vantera</span>
           </div>
 
           <h3 className="mb-3 text-[17px] font-semibold tracking-[-0.03em] text-[var(--text-primary)]">

@@ -44,7 +44,7 @@ export const SDR_WIZARD_SLIDES: SdrWizardSlide[] = [
     id: 'scout',
     eyebrow: 'Prospect Scout',
     title: 'How should it discover leads?',
-    body: 'Inline ICP search, Aspire saved searches, or both — prospecting only.',
+    body: 'Inline ICP search, saved lead searches, or both — prospecting only.',
     media: { type: 'preview', previewId: 'scout' },
   },
   {
