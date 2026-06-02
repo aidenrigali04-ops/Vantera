@@ -1,5 +1,6 @@
 import { getIcpConfigForVertical, scoreICP } from '@/lib/aspire/icp-score'
-import { filterExistingLeads, normalizeApolloFilters, searchApollo } from '@/lib/aspire/search'
+import { isInteractiveAspireSearch, normalizeApolloFilters } from '@/lib/aspire/filters'
+import { filterExistingLeads, searchApollo } from '@/lib/aspire/search'
 import type { ApolloSearchFilters, ApolloPersonResult } from '@/lib/aspire/types'
 import { getSystemAutomationId } from '@/lib/automation/system-automation'
 import { db } from '@/lib/db/client'
@@ -103,7 +104,8 @@ export async function runBoundSearch(input: RunBoundSearchInput): Promise<RunSea
   const search = binding.search
   const rawFilters = search.filters as Partial<ApolloSearchFilters>
   const vertical = input.vertical ?? 'agency'
-  const filters = normalizeApolloFilters(vertical, rawFilters)
+  const interactive = isInteractiveAspireSearch(rawFilters)
+  const filters = normalizeApolloFilters(vertical, rawFilters, { interactive })
   const icpConfig = resolveIcpConfig(config, search)
   const minIcp = effectiveMinIcp(binding, config)
   const limit = Math.min(headroom, binding.maxLeadsPerRun, 25)
@@ -116,7 +118,7 @@ export async function runBoundSearch(input: RunBoundSearchInput): Promise<RunSea
   })
 
   try {
-    const { people } = await searchApollo(filters, 1, 25)
+    const { people } = await searchApollo(filters, 1, 25, interactive)
     const fresh = await filterCandidates(people, config.accountId, config.excludeDomains ?? [])
 
     const scored = fresh
@@ -233,7 +235,8 @@ export async function runBoundSearch(input: RunBoundSearchInput): Promise<RunSea
 export async function runUnboundSearch(input: RunUnboundSearchInput): Promise<RunSearchResult> {
   const { search, accountId, vertical } = input
   const rawFilters = search.filters as Partial<ApolloSearchFilters>
-  const filters = normalizeApolloFilters(vertical, rawFilters)
+  const interactive = isInteractiveAspireSearch(rawFilters)
+  const filters = normalizeApolloFilters(vertical, rawFilters, { interactive })
   const icpConfig =
     (search.icpConfig as ReturnType<typeof resolveIcpConfig> | null) ??
     getIcpConfigForVertical(vertical)
@@ -246,7 +249,7 @@ export async function runUnboundSearch(input: RunUnboundSearchInput): Promise<Ru
   })
 
   try {
-    const { people } = await searchApollo(filters, 1, 25)
+    const { people } = await searchApollo(filters, 1, 25, interactive)
     const fresh = await filterCandidates(
       people,
       accountId,

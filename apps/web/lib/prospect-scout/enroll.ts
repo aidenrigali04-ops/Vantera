@@ -204,7 +204,7 @@ export async function recordFoundProspects(input: {
           rawData: person,
           icpScore,
           icpSignals,
-          ...(searchId != null ? { searchId } : {}),
+          searchId,
         },
       })
   }

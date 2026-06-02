@@ -1,11 +1,35 @@
 import { getIcpConfigForVertical } from '@/lib/aspire/icp-score'
 import type { ApolloSearchFilters } from '@/lib/aspire/types'
 
+export function isInteractiveAspireSearch(filters: Partial<ApolloSearchFilters>): boolean {
+  return Boolean(
+    filters.q?.trim() ||
+      filters.company?.trim() ||
+      (filters.keywords?.length ?? 0) > 0,
+  )
+}
+
 /** Merge partial UI/saved-search filters with account ICP defaults before Apollo calls. */
 export function normalizeApolloFilters(
   vertical: string,
   filters: Partial<ApolloSearchFilters> = {},
+  options?: { interactive?: boolean },
 ): ApolloSearchFilters {
+  const interactive = options?.interactive ?? isInteractiveAspireSearch(filters)
+
+  if (interactive) {
+    return {
+      jobTitles: filters.jobTitles ?? [],
+      industries: filters.industries ?? [],
+      companySizeRanges: filters.companySizeRanges ?? [],
+      locations: filters.locations ?? [],
+      keywords: filters.keywords,
+      contactEmailStatus: filters.contactEmailStatus,
+      q: filters.q?.trim() || undefined,
+      company: filters.company?.trim() || undefined,
+    }
+  }
+
   const icpConfig = getIcpConfigForVertical(vertical)
   const [minSize, maxSize] = icpConfig.targetSizes
 

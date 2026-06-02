@@ -1,4 +1,4 @@
-import { normalizeApolloFilters } from '@/lib/aspire/filters'
+import { isInteractiveAspireSearch, normalizeApolloFilters } from '@/lib/aspire/filters'
 import { getIcpConfigForVertical, scoreICP } from '@/lib/aspire/icp-score'
 import type {
   ApolloPersonResult,
@@ -20,9 +20,16 @@ function sleep(ms: number): Promise<void> {
 }
 
 function apolloPersonId(raw: Record<string, unknown>): string | null {
-  const rawId = raw.id ?? raw.person_id
+  const nested =
+    raw.person && typeof raw.person === 'object'
+      ? (raw.person as Record<string, unknown>)
+      : null
+  const rawId = raw.id ?? raw.person_id ?? nested?.id
   if (typeof rawId === 'string' && rawId.length > 0) return rawId
   if (typeof rawId === 'number' && Number.isFinite(rawId)) return String(rawId)
+  if (typeof raw.email === 'string' && raw.email.length > 0) return `email:${raw.email}`
+  const linkedin = typeof raw.linkedin_url === 'string' ? raw.linkedin_url : null
+  if (linkedin) return `linkedin:${linkedin}`
   return null
 }
 
@@ -62,10 +69,26 @@ function mapApolloPerson(raw: Record<string, unknown>): ApolloPersonResult | nul
   }
 }
 
-function buildApolloBody(filters: ApolloSearchFilters, page: number, perPage: number) {
+function buildApolloBody(
+  filters: ApolloSearchFilters,
+  page: number,
+  perPage: number,
+  interactive: boolean,
+) {
   const keywords = [...(filters.keywords ?? [])]
   if (filters.q) keywords.push(filters.q)
   if (filters.company) keywords.push(filters.company)
+  const qKeywords = keywords.length > 0 ? keywords.join(' ') : undefined
+
+  if (interactive) {
+    return {
+      page,
+      per_page: perPage,
+      ...(qKeywords ? { q_keywords: qKeywords } : {}),
+      ...(filters.locations?.length ? { person_locations: filters.locations } : {}),
+      ...(filters.jobTitles?.length ? { person_titles: filters.jobTitles } : {}),
+    }
+  }
 
   return {
     page,
@@ -76,7 +99,7 @@ function buildApolloBody(filters: ApolloSearchFilters, page: number, perPage: nu
       ? filters.companySizeRanges
       : undefined,
     person_locations: filters.locations?.length ? filters.locations : undefined,
-    q_keywords: keywords.length > 0 ? keywords.join(' ') : undefined,
+    q_keywords: qKeywords,
     contact_email_status: filters.contactEmailStatus?.length
       ? filters.contactEmailStatus
       : undefined,
@@ -131,6 +154,7 @@ export async function searchApollo(
   filters: ApolloSearchFilters,
   page = 1,
   perPage = 25,
+  interactive = false,
 ): Promise<{ people: ApolloPersonResult[]; total: number; hasMore: boolean }> {
   const apiKey = process.env.APOLLO_API_KEY ?? env.APOLLO_API_KEY
   if (!apiKey) {
@@ -147,7 +171,7 @@ export async function searchApollo(
       'Cache-Control': 'no-cache',
       'X-Api-Key': apiKey,
     },
-    body: JSON.stringify(buildApolloBody(filters, page, perPage)),
+    body: JSON.stringify(buildApolloBody(filters, page, perPage, interactive)),
   })
 
   const body = (await response.json()) as {
@@ -219,9 +243,10 @@ export async function searchProspects(
 
   const vertical = account?.vertical ?? 'agency'
   const icpConfig = getIcpConfigForVertical(vertical)
-  const normalizedFilters = normalizeApolloFilters(vertical, filters)
+  const interactive = isInteractiveAspireSearch(filters)
+  const normalizedFilters = normalizeApolloFilters(vertical, filters, { interactive })
 
-  const { people } = await searchApollo(normalizedFilters)
+  const { people } = await searchApollo(normalizedFilters, 1, 25, interactive)
 
   const scored = people.map((person) => {
     const scoredResult = scoreICP(person, icpConfig)
@@ -248,7 +273,7 @@ export async function searchProspects(
             rawData: row,
             icpScore: row.icpScore,
             icpSignals: row.icpSignals,
-            ...(searchId != null ? { searchId } : {}),
+            searchId,
           },
         })
     }

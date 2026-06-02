@@ -27,19 +27,13 @@ export async function findRecentSearchRuns(accountId: string, limit = 10) {
     .limit(limit)
 }
 
-/** Leads discovered by Prospect Scout (Apollo), scored in aspire_results — not a saved search. */
+/** Recent Aspire discoveries for the default (non–saved-search) table view. */
 export async function findProspectScoutResults(accountId: string, limit = 50, offset = 0) {
   return db
     .select()
     .from(aspireResults)
-    .where(
-      and(
-        eq(aspireResults.accountId, accountId),
-        isNull(aspireResults.searchId),
-        isNull(aspireResults.deletedAt),
-      ),
-    )
-    .orderBy(desc(aspireResults.icpScore))
+    .where(and(eq(aspireResults.accountId, accountId), isNull(aspireResults.deletedAt)))
+    .orderBy(desc(aspireResults.createdAt))
     .limit(limit)
     .offset(offset)
 }

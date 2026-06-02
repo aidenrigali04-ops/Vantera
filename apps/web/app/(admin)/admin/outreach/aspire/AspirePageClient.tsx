@@ -58,6 +58,15 @@ function companyName(row: AspireSearchResult): string {
   return row.organizationName ?? row.company ?? 'Unknown'
 }
 
+async function fetchAspireResultsFromApi(searchId: string | null): Promise<AspireSearchResult[]> {
+  const res = searchId
+    ? await fetch(`/api/aspire/results/${searchId}`)
+    : await fetch('/api/aspire/scout-results')
+  const json = await res.json()
+  if (!json.success) throw new Error(json.error ?? 'Could not load results')
+  return json.data as AspireSearchResult[]
+}
+
 export function AspirePageClient({ savedSearches: initialSaved, accountId, accountVertical }: Props) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -84,6 +93,7 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
     direction: 'desc',
   })
   const [hasLiveSearch, setHasLiveSearch] = useState(false)
+  const [isSearching, setIsSearching] = useState(false)
   const [runningSearchId, setRunningSearchId] = useState<string | null>(null)
 
   useEffect(() => {
@@ -132,24 +142,16 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
 
   const { data: savedResults = [], isFetching: isSavedFetching } = useQuery({
     queryKey: savedResultsQueryKey,
-    queryFn: async () => {
-      const res = await fetch(`/api/aspire/results/${activeSearchId}`)
-      const json = await res.json()
-      if (!json.success) throw new Error(json.error ?? 'Could not load results')
-      return json.data as AspireSearchResult[]
-    },
+    queryFn: () => fetchAspireResultsFromApi(activeSearchId),
     enabled: Boolean(activeSearchId),
+    staleTime: 0,
   })
 
   const { data: scoutResults = [], isFetching: isScoutFetching } = useQuery({
     queryKey: scoutResultsQueryKey,
-    queryFn: async () => {
-      const res = await fetch('/api/aspire/scout-results')
-      const json = await res.json()
-      if (!json.success) throw new Error(json.error ?? 'Could not load scout results')
-      return json.data as AspireSearchResult[]
-    },
+    queryFn: () => fetchAspireResultsFromApi(null),
     enabled: !activeSearchId,
+    staleTime: 0,
   })
 
   const { isLive: resultsLive } = useAccountRealtime({
@@ -166,7 +168,7 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
     },
   })
 
-  const isFetching = isLiveFetching || isSavedFetching || isScoutFetching
+  const isFetching = isSearching || isLiveFetching || isSavedFetching || isScoutFetching
   const sourceResults = hasLiveSearch
     ? liveResults
     : activeSearchId
@@ -352,9 +354,12 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
     onSuccess: async (data, searchId) => {
       setHasLiveSearch(false)
       setActiveSearchId(searchId)
-      const list = (await queryClient.fetchQuery({
+      await queryClient.invalidateQueries({ queryKey: ['aspire-results', searchId] })
+      const list = await queryClient.fetchQuery({
         queryKey: ['aspire-results', searchId],
-      })) as AspireSearchResult[]
+        queryFn: () => fetchAspireResultsFromApi(searchId),
+        staleTime: 0,
+      })
       const listCount = list.length
       toast.success(
         listCount > 0
@@ -369,22 +374,24 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
   })
 
   const handleSearch = async () => {
+    setIsSearching(true)
     try {
       const results = (await queryClient.fetchQuery({ queryKey: liveSearchKey })) as AspireSearchResult[]
-      setHasLiveSearch(false)
       const listKey = activeSearchId ? savedResultsQueryKey : scoutResultsQueryKey
-      const list = (await queryClient.fetchQuery({ queryKey: listKey })) as AspireSearchResult[]
-      const listCount = list.length
+      queryClient.setQueryData(listKey, results)
+      setHasLiveSearch(false)
+      await queryClient.invalidateQueries({ queryKey: listKey })
+      const listCount = results.length
       toast.success(
         listCount > 0
           ? `Found ${listCount} prospect${listCount === 1 ? '' : 's'}`
-          : results.length > 0
-            ? `Found ${results.length} prospect${results.length === 1 ? '' : 's'} from Apollo`
-            : 'No prospects matched — try different keywords or broaden your search',
+          : 'No prospects matched — try different keywords or broaden your search',
       )
     } catch (err) {
       setHasLiveSearch(false)
       toast.error(err instanceof Error ? err.message : 'Apollo search failed')
+    } finally {
+      setIsSearching(false)
     }
   }
 
