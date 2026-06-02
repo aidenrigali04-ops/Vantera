@@ -2,21 +2,9 @@ import 'server-only'
 
 import { searchProspects } from '@/lib/aspire/search'
 import type { AspireSearchResult } from '@/lib/aspire/types'
-import type { OnboardingVertical } from '@/lib/onboarding/analyze-business'
+import type { OnboardingVertical, PreviewLead } from '@/lib/onboarding/onboarding-wizard-types'
 
-export type PreviewLead = Pick<
-  AspireSearchResult,
-  | 'id'
-  | 'firstName'
-  | 'lastName'
-  | 'title'
-  | 'organizationName'
-  | 'city'
-  | 'state'
-  | 'icpScore'
-  | 'icpSignals'
-  | 'linkedinUrl'
->
+export type { PreviewLead } from '@/lib/onboarding/onboarding-wizard-types'
 
 function toPreviewLead(row: AspireSearchResult): PreviewLead {
   return {

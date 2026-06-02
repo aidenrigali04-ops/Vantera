@@ -1,13 +1,11 @@
 'use client'
 
 import { OnboardingSingleFrame } from '@/components/onboarding/onboarding-wizard/OnboardingSingleFrame'
-import type { BusinessAnalysis } from '@/lib/onboarding/analyze-business'
-import type { PreviewLead } from '@/lib/onboarding/preview-leads'
+import type { BusinessAnalysis, PreviewLead, OnboardingStepId } from '@/lib/onboarding/onboarding-wizard-types'
 import {
   getOnboardingWizardSlideMeta,
   ONBOARDING_WIZARD_SLIDES,
 } from '@/lib/onboarding/wizard-slides'
-import type { OnboardingStepId } from '@/lib/onboarding/track-onboarding-step'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'

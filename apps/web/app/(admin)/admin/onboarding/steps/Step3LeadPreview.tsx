@@ -1,6 +1,6 @@
 'use client'
 
-import type { PreviewLead } from '@/lib/onboarding/preview-leads'
+import type { PreviewLead } from '@/lib/onboarding/onboarding-wizard-types'
 import { cn } from '@/lib/utils'
 import { motion } from 'framer-motion'
 import { MapPin, Sparkles } from 'lucide-react'

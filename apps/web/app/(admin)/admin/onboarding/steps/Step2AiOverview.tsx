@@ -1,12 +1,12 @@
 'use client'
 
-import type { BusinessAnalysis } from '@/lib/onboarding/analyze-business'
+import type { BusinessAnalysis } from '@/lib/onboarding/onboarding-wizard-types'
 import { motion } from 'framer-motion'
 import { Building2, Target, Users } from 'lucide-react'
 import { useCallback, useState } from 'react'
 import { useRegisterOnboardingStep } from '../onboarding-nav'
 import { fetchPreviewLeadsAction } from '../actions'
-import type { PreviewLead } from '@/lib/onboarding/preview-leads'
+import type { PreviewLead } from '@/lib/onboarding/onboarding-wizard-types'
 import {
   StepError,
   fadeUp,

@@ -2,14 +2,12 @@ import 'server-only'
 
 import { db } from '@/lib/db/client'
 import { aiObservations } from '@vantera/db'
+import type {
+  OnboardingStepEvent,
+  OnboardingStepId,
+} from '@/lib/onboarding/onboarding-wizard-types'
 
-export type OnboardingStepId =
-  | 'business_details'
-  | 'ai_overview'
-  | 'lead_preview'
-  | 'subscription'
-
-export type OnboardingStepEvent = 'viewed' | 'completed'
+export type { OnboardingStepEvent, OnboardingStepId } from '@/lib/onboarding/onboarding-wizard-types'
 
 /** Lightweight conversion tracking — one row per step event in ai_observations. */
 export async function trackOnboardingStep(

@@ -1,37 +1,15 @@
 import 'server-only'
 
 import { callModel, parseJsonResponse } from '@/lib/ai/client'
+import {
+  ONBOARDING_VERTICALS,
+  VERTICAL_LABELS,
+  type BusinessAnalysis,
+  type OnboardingVertical,
+} from '@/lib/onboarding/onboarding-wizard-types'
 
-export const ONBOARDING_VERTICALS = [
-  'agency',
-  'hvac',
-  'landscaping',
-  'plumbing',
-  'construction',
-  'property_mgmt',
-  'real_estate',
-] as const
-
-export type OnboardingVertical = (typeof ONBOARDING_VERTICALS)[number]
-
-export type BusinessAnalysis = {
-  industry: string
-  industryLabel: string
-  vertical: OnboardingVertical
-  icpSummary: string
-  icpDescription: string
-  valueProposition: string
-}
-
-const VERTICAL_LABELS: Record<OnboardingVertical, string> = {
-  agency: 'Marketing & creative agency',
-  hvac: 'HVAC & mechanical services',
-  landscaping: 'Landscaping & lawn care',
-  plumbing: 'Plumbing & water services',
-  construction: 'Construction & trades',
-  property_mgmt: 'Property management',
-  real_estate: 'Real estate',
-}
+export type { BusinessAnalysis, OnboardingVertical } from '@/lib/onboarding/onboarding-wizard-types'
+export { ONBOARDING_VERTICALS, VERTICAL_LABELS } from '@/lib/onboarding/onboarding-wizard-types'
 
 const KEYWORD_VERTICAL: Array<{ pattern: RegExp; vertical: OnboardingVertical }> = [
   { pattern: /\b(hvac|heating|cooling|air condition)\b/i, vertical: 'hvac' },
@@ -207,5 +185,3 @@ export async function analyzeBusinessFromDetails(args: {
 
   return parsed ?? fallback
 }
-
-export { VERTICAL_LABELS }

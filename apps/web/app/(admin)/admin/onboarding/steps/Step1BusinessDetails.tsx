@@ -7,7 +7,7 @@ import {
   VERTICAL_LABELS,
   type BusinessAnalysis,
   type OnboardingVertical,
-} from '@/lib/onboarding/analyze-business'
+} from '@/lib/onboarding/onboarding-wizard-types'
 import { motion } from 'framer-motion'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
