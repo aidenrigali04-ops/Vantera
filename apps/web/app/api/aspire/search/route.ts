@@ -19,8 +19,8 @@ export async function GET(request: Request) {
     company: searchParams.get('company') ?? undefined,
   }
 
-  const data = await searchProspects(session.accountId, filters, { persist: true })
-  return NextResponse.json({ success: true, data })
+  const { results, meta } = await searchProspects(session.accountId, filters, { persist: true })
+  return NextResponse.json({ success: true, data: results, meta })
 }
 
 export async function POST(request: Request) {
@@ -32,17 +32,21 @@ export async function POST(request: Request) {
   const body = (await request.json()) as Partial<ApolloSearchFilters> & { searchId?: string }
 
   try {
-    const data = await searchProspects(session.accountId, body, {
+    const { results, meta } = await searchProspects(session.accountId, body, {
       searchId: body.searchId,
       persist: true,
     })
-    return NextResponse.json({ success: true, data })
+    return NextResponse.json({
+      success: true,
+      data: results,
+      meta,
+    })
   } catch (error) {
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : 'Search failed — Apollo API key may need updating',
-        code: 'APOLLO_SEARCH_FAILED',
+        error: error instanceof Error ? error.message : 'Search failed — check APIFY_API_TOKEN in environment variables',
+        code: 'APIFY_SEARCH_FAILED',
       },
       { status: 502 },
     )

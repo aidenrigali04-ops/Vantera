@@ -42,6 +42,8 @@ const serverEnvSchema = z.object({
   TRIGGER_API_URL: z.string().optional().default('https://api.trigger.dev'),
   CRON_SECRET: z.string().optional().default(''),
   APOLLO_API_KEY: z.string().optional().default(''),
+  APIFY_API_TOKEN: z.string().optional().default(''),
+  APIFY_LEADS_ACTOR_ID: z.string().optional().default('code_crafter~leads-finder'),
 })
 
 type PublicEnv = z.infer<typeof publicEnvSchema>

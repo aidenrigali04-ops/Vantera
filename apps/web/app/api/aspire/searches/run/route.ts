@@ -39,7 +39,7 @@ export async function POST(request: Request) {
 
     if (result.status === 'failed') {
       return NextResponse.json(
-        { success: false, error: result.errorMessage ?? 'Apollo search failed' },
+        { success: false, error: result.errorMessage ?? 'Apify search failed' },
         { status: 502 },
       )
     }
@@ -49,8 +49,8 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : 'Apollo search failed',
-        code: 'APOLLO_SEARCH_FAILED',
+        error: error instanceof Error ? error.message : 'Apify search failed',
+        code: 'APIFY_SEARCH_FAILED',
       },
       { status: 502 },
     )

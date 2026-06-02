@@ -7,7 +7,7 @@ import { scoreICP } from '@/lib/aspire/icp-score'
 import type { AspireSearchResult } from '@/lib/aspire/types'
 import { aspireIntentTone } from '@/lib/operational/aspire-table-views'
 import { cn } from '@/lib/utils'
-import { Check, Loader2, Mail, Phone } from 'lucide-react'
+import { Check, ExternalLink, Loader2, Mail, Phone } from 'lucide-react'
 import type { ICPConfig } from '@/lib/aspire/types'
 
 type Props = {
@@ -73,7 +73,7 @@ export function AspireIntelligencePanel({ result, icpConfig, enrollState = 'idle
         </div>
 
         <div>
-          <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-stone-500">Contact quality</p>
+          <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-stone-500">Contact</p>
           <div className="flex flex-wrap gap-2">
             <span
               className={cn(
@@ -97,7 +97,48 @@ export function AspireIntelligencePanel({ result, icpConfig, enrollState = 'idle
               <Phone className="h-3 w-3" />
               Phone
             </span>
+            <span
+              className={cn(
+                'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] ring-1 ring-inset',
+                result.linkedinUrl
+                  ? 'bg-emerald-50 text-emerald-700 ring-emerald-200/80'
+                  : 'bg-stone-50 text-stone-400 ring-stone-200/80',
+              )}
+            >
+              <ExternalLink className="h-3 w-3" />
+              LinkedIn
+            </span>
           </div>
+          <ul className="mt-2 space-y-1 text-[12px] text-stone-600">
+            <li>
+              <span className="text-stone-500">Email:</span>{' '}
+              {result.email ? (
+                <a href={`mailto:${result.email}`} className="text-blue-600 hover:underline">
+                  {result.email}
+                </a>
+              ) : (
+                '—'
+              )}
+            </li>
+            <li>
+              <span className="text-stone-500">Phone:</span> {result.phone ?? '—'}
+            </li>
+            <li>
+              <span className="text-stone-500">LinkedIn:</span>{' '}
+              {result.linkedinUrl ? (
+                <a
+                  href={result.linkedinUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:underline"
+                >
+                  View profile
+                </a>
+              ) : (
+                '—'
+              )}
+            </li>
+          </ul>
         </div>
 
         {signals.length > 0 ? (

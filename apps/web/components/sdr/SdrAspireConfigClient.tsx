@@ -172,7 +172,7 @@ export function SdrAspireConfigClient({ accountId, initial }: Props) {
     <div className="space-y-8">
       <PageHeader
         title="Prospect Scout"
-        description="Prospect Scout pulls leads from Apollo into Aspire for ICP scoring. Optionally bind saved Aspire searches for manual curation."
+        description="Prospect Scout pulls leads from Apify into Aspire for ICP scoring. Optionally bind saved Aspire searches for manual curation."
         className="[&_h2]:text-xl [&_h2]:font-semibold [&_h2]:tracking-tight [&_h2]:text-[var(--text-primary)] [&_p]:text-[var(--text-secondary)]"
         actions={
           <div className="flex flex-wrap gap-2">

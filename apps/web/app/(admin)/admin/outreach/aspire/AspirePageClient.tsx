@@ -44,6 +44,12 @@ type SavedSearch = typeof aspireSavedSearches.$inferSelect
 type AspireResultRow = AspireSearchResult & { id: string }
 type EnrollState = 'idle' | 'pending' | 'added' | 'exists'
 
+type SearchMeta = {
+  source?: 'apify' | 'stub' | 'demo'
+  providerConfigured?: boolean
+  providerError?: string
+}
+
 type Props = {
   savedSearches: SavedSearch[]
   accountId: string
@@ -92,11 +98,11 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
     columnId: 'icp',
     direction: 'desc',
   })
-  const [hasLiveSearch, setHasLiveSearch] = useState(false)
   const [isSearching, setIsSearching] = useState(false)
   const [runningSearchId, setRunningSearchId] = useState<string | null>(null)
-  /** Latest search API response — shown immediately (not cleared by stale list cache). */
-  const [tableResults, setTableResults] = useState<AspireSearchResult[] | null>(null)
+  /** Primary table data — always set directly from search API or DB load. */
+  const [displayLeads, setDisplayLeads] = useState<AspireSearchResult[]>([])
+  const [searchMeta, setSearchMeta] = useState<SearchMeta | null>(null)
 
   useEffect(() => {
     const id = searchParams.get('searchId')
@@ -114,48 +120,23 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
     if (filters.company) setCompany(filters.company)
   }, [activeSaved?.id])
 
-  useEffect(() => {
-    setHasLiveSearch(false)
-    setTableResults(null)
-  }, [activeSearchId, query, company])
-
-  const liveSearchKey = ['aspire-search', accountId, query, company, activeSearchId]
-
-  const { data: liveResults = [], isFetching: isLiveFetching } = useQuery({
-    queryKey: liveSearchKey,
-    queryFn: async () => {
-      const res = await fetch('/api/aspire/search', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          q: query || undefined,
-          company: company || undefined,
-          searchId: activeSearchId ?? undefined,
-        }),
-      })
-      const json = await res.json()
-      if (!json.success) throw new Error(json.error ?? 'Search failed')
-      return json.data as AspireSearchResult[]
+  const loadStoredResults = useCallback(
+    async (searchId: string | null = activeSearchId): Promise<AspireSearchResult[]> => {
+      try {
+        const list = await fetchAspireResultsFromApi(searchId)
+        setDisplayLeads(list)
+        return list
+      } catch {
+        setDisplayLeads([])
+        return []
+      }
     },
-    enabled: false,
-  })
+    [activeSearchId],
+  )
 
-  const savedResultsQueryKey = ['aspire-results', activeSearchId] as const
-  const scoutResultsQueryKey = ['aspire-scout-results', accountId] as const
-
-  const { data: savedResults = [], isFetching: isSavedFetching } = useQuery({
-    queryKey: savedResultsQueryKey,
-    queryFn: () => fetchAspireResultsFromApi(activeSearchId),
-    enabled: Boolean(activeSearchId),
-    staleTime: 0,
-  })
-
-  const { data: scoutResults = [], isFetching: isScoutFetching } = useQuery({
-    queryKey: scoutResultsQueryKey,
-    queryFn: () => fetchAspireResultsFromApi(null),
-    enabled: !activeSearchId,
-    staleTime: 0,
-  })
+  useEffect(() => {
+    void loadStoredResults()
+  }, [loadStoredResults])
 
   const { isLive: resultsLive } = useAccountRealtime({
     accountId,
@@ -163,22 +144,12 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
     searchId: activeSearchId ?? undefined,
     enabled: true,
     onChange: () => {
-      if (activeSearchId) {
-        void queryClient.invalidateQueries({ queryKey: savedResultsQueryKey })
-      } else {
-        void queryClient.invalidateQueries({ queryKey: scoutResultsQueryKey })
-      }
+      void loadStoredResults()
     },
   })
 
-  const isFetching = isSearching || isLiveFetching || isSavedFetching || isScoutFetching
-  const sourceResults =
-    tableResults ??
-    (hasLiveSearch
-      ? liveResults
-      : activeSearchId
-        ? savedResults
-        : scoutResults)
+  const isFetching = isSearching
+  const sourceResults = displayLeads
 
   const rows = useMemo<AspireResultRow[]>(
     () =>
@@ -357,18 +328,15 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
       setRunningSearchId(searchId)
     },
     onSuccess: async (data, searchId) => {
-      setHasLiveSearch(false)
       setActiveSearchId(searchId)
-      const list = await fetchAspireResultsFromApi(searchId)
-      setTableResults(list)
-      queryClient.setQueryData(['aspire-results', searchId], list)
+      const list = await loadStoredResults(searchId)
       const listCount = list.length
       toast.success(
         listCount > 0
           ? `Found ${listCount} prospect${listCount === 1 ? '' : 's'} for this search`
           : data.found > 0
-            ? `Apollo found ${data.found} prospect${data.found === 1 ? '' : 's'}`
-            : 'Apollo search complete — no prospects matched your criteria',
+            ? `Apify found ${data.found} prospect${data.found === 1 ? '' : 's'}`
+            : 'Apify search complete — no prospects matched your criteria',
       )
     },
     onError: (err: Error) => toast.error(err.message),
@@ -388,21 +356,39 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
       const res = await fetch('/api/aspire/search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
         body: JSON.stringify({
           q: trimmedQuery || undefined,
           company: trimmedCompany || undefined,
           searchId: activeSearchId ?? undefined,
         }),
       })
-      const json = await res.json()
-      if (!json.success) throw new Error(json.error ?? 'Search failed')
+      const json = (await res.json()) as {
+        success: boolean
+        data?: AspireSearchResult[]
+        meta?: SearchMeta
+        error?: string
+      }
 
-      const results = json.data as AspireSearchResult[]
-      setTableResults(results)
-      setHasLiveSearch(false)
+      if (!res.ok || !json.success) {
+        throw new Error(json.error ?? `Search failed (${res.status})`)
+      }
 
-      const listKey = activeSearchId ? savedResultsQueryKey : scoutResultsQueryKey
-      queryClient.setQueryData(listKey, results)
+      const results = Array.isArray(json.data) ? json.data : []
+      setDisplayLeads(results)
+      setSearchMeta(json.meta ?? null)
+
+      if (json.meta?.source === 'stub') {
+        toast.message(
+          'Apify is not configured — showing sample leads. Set APIFY_API_TOKEN for live prospect data.',
+          { duration: 6000 },
+        )
+      } else if (json.meta?.source === 'demo') {
+        toast.message(
+          'No Apify matches — showing sample leads so you can test the pipeline.',
+          { duration: 6000 },
+        )
+      }
 
       toast.success(
         results.length > 0
@@ -410,9 +396,7 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
           : 'No prospects matched — try a broader keyword',
       )
     } catch (err) {
-      setHasLiveSearch(false)
-      setTableResults(null)
-      toast.error(err instanceof Error ? err.message : 'Apollo search failed')
+      toast.error(err instanceof Error ? err.message : 'Apify search failed')
     } finally {
       setIsSearching(false)
     }
@@ -420,11 +404,12 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
 
   const handleSelectSavedSearch = (search: SavedSearch) => {
     setActiveSearchId(search.id)
+    setSearchMeta(null)
     router.replace(`/admin/outreach/aspire?searchId=${search.id}`)
     const filters = search.filters as { q?: string; company?: string }
     if (filters.q) setQuery(filters.q)
     if (filters.company) setCompany(filters.company)
-    void queryClient.invalidateQueries({ queryKey: ['aspire-results', search.id] })
+    void loadStoredResults(search.id)
   }
 
   const enrollOne = useCallback(
@@ -505,7 +490,38 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
         header: 'Email',
         cell: (row: AspireResultRow) =>
           row.email ? (
-            <span className="text-blue-600">{row.email}</span>
+            <a href={`mailto:${row.email}`} className="text-blue-600 hover:underline">
+              {row.email}
+            </a>
+          ) : (
+            <span className="text-stone-400">—</span>
+          ),
+      },
+      {
+        id: 'phone',
+        header: 'Phone',
+        cell: (row: AspireResultRow) =>
+          row.phone ? (
+            <a href={`tel:${row.phone}`} className="text-stone-800 hover:underline">
+              {row.phone}
+            </a>
+          ) : (
+            <span className="text-stone-400">—</span>
+          ),
+      },
+      {
+        id: 'linkedin',
+        header: 'LinkedIn',
+        cell: (row: AspireResultRow) =>
+          row.linkedinUrl ? (
+            <a
+              href={row.linkedinUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 hover:underline"
+            >
+              Profile
+            </a>
           ) : (
             <span className="text-stone-400">—</span>
           ),
@@ -654,7 +670,7 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
                         variant="ghost"
                         size="sm"
                         className="h-7 w-7 shrink-0 px-0 text-stone-500 hover:text-violet-700"
-                        title="Run Apollo search now"
+                        title="Run Apify search now"
                         onClick={() => runSavedSearchMutation.mutate(s.id)}
                         disabled={runningSearchId === s.id}
                       >
@@ -699,9 +715,25 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
               <p className="text-[13px] text-[var(--text-secondary)]">
                 Viewing saved search{' '}
                 <span className="font-medium text-[var(--text-primary)]">{activeSaved.name}</span>
-                {hasLiveSearch ? ' — live Apollo results' : ' — showing stored results'}
+                {searchMeta?.source === 'demo' || searchMeta?.source === 'stub'
+                  ? ' — sample leads (configure APIFY_API_TOKEN for live data)'
+                  : ' — stored results'}
               </p>
               <LiveIndicator active={resultsLive} />
+            </div>
+          ) : null}
+
+          {searchMeta?.source === 'demo' || searchMeta?.source === 'stub' ? (
+            <div className="rounded-lg border border-amber-200/90 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+              {searchMeta.source === 'stub'
+                ? 'Apify is not configured. Showing sample leads — add APIFY_API_TOKEN in Vercel for live prospect data.'
+                : (
+                  <>
+                    Apify returned no live results for this search. Showing sample leads for{' '}
+                    <span className="font-medium">{query || company || 'your search'}</span> so you
+                    can test the pipeline.
+                  </>
+                )}
             </div>
           ) : null}
 

@@ -1,7 +1,7 @@
 import 'server-only'
 
+import { searchApify, type ProspectSearchMeta } from '@/lib/aspire/apify-client'
 import { isInteractiveAspireSearch, normalizeApolloFilters } from '@/lib/aspire/filters'
-import { searchApollo } from '@/lib/aspire/apollo-client'
 import { getIcpConfigForVertical, scoreICP } from '@/lib/aspire/icp-score'
 import type {
   ApolloPersonResult,
@@ -10,7 +10,8 @@ import type {
 } from '@/lib/aspire/types'
 
 export { normalizeApolloFilters } from '@/lib/aspire/filters'
-export { searchApollo } from '@/lib/aspire/apollo-client'
+export { searchApify } from '@/lib/aspire/apify-client'
+export type { ProspectSearchMeta } from '@/lib/aspire/apify-client'
 import { db } from '@/lib/db/client'
 import { accounts, aspireResults } from '@vantera/db'
 import { and, eq, inArray, isNull } from 'drizzle-orm'
@@ -49,32 +50,18 @@ function toAspireSearchResult(
   }
 }
 
-export async function searchProspects(
+export type SearchProspectsResult = {
+  results: AspireSearchResult[]
+  meta: ProspectSearchMeta
+}
+
+async function persistAspireResults(
   accountId: string,
-  filters: Partial<ApolloSearchFilters> = {},
-  options?: { searchId?: string; persist?: boolean },
-): Promise<AspireSearchResult[]> {
-  const [account] = await db
-    .select({ vertical: accounts.vertical })
-    .from(accounts)
-    .where(eq(accounts.id, accountId))
-    .limit(1)
-
-  const vertical = account?.vertical ?? 'agency'
-  const icpConfig = getIcpConfigForVertical(vertical)
-  const interactive = isInteractiveAspireSearch(filters)
-  const normalizedFilters = normalizeApolloFilters(vertical, filters, { interactive })
-
-  const { people } = await searchApollo(normalizedFilters, 1, 25, interactive)
-
-  const scored = people.map((person) => {
-    const scoredResult = scoreICP(person, icpConfig)
-    return toAspireSearchResult(person, scoredResult.score, scoredResult.signals)
-  })
-
-  if (options?.persist !== false && scored.length > 0) {
-    const searchId = options?.searchId ?? null
-    for (const row of scored) {
+  scored: AspireSearchResult[],
+  searchId: string | null,
+): Promise<void> {
+  for (const row of scored) {
+    try {
       await db
         .insert(aspireResults)
         .values({
@@ -95,10 +82,42 @@ export async function searchProspects(
             searchId,
           },
         })
+    } catch (error) {
+      console.error('[persistAspireResults] row failed:', row.id, error)
     }
   }
+}
 
-  return scored.sort((a, b) => b.icpScore - a.icpScore)
+export async function searchProspects(
+  accountId: string,
+  filters: Partial<ApolloSearchFilters> = {},
+  options?: { searchId?: string; persist?: boolean },
+): Promise<SearchProspectsResult> {
+  const [account] = await db
+    .select({ vertical: accounts.vertical })
+    .from(accounts)
+    .where(eq(accounts.id, accountId))
+    .limit(1)
+
+  const vertical = account?.vertical ?? 'agency'
+  const icpConfig = getIcpConfigForVertical(vertical)
+  const interactive = isInteractiveAspireSearch(filters)
+  const normalizedFilters = normalizeApolloFilters(vertical, filters, { interactive })
+
+  const { people, meta } = await searchApify(normalizedFilters, 1, 25, interactive)
+
+  const scored = people
+    .map((person) => {
+      const scoredResult = scoreICP(person, icpConfig)
+      return toAspireSearchResult(person, scoredResult.score, scoredResult.signals)
+    })
+    .sort((a, b) => b.icpScore - a.icpScore)
+
+  if (options?.persist !== false && scored.length > 0) {
+    await persistAspireResults(accountId, scored, options?.searchId ?? null)
+  }
+
+  return { results: scored, meta }
 }
 
 export type { AspireSearchResult } from '@/lib/aspire/types'

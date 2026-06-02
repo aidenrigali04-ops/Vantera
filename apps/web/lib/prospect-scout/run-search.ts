@@ -1,6 +1,6 @@
 import { getIcpConfigForVertical, scoreICP } from '@/lib/aspire/icp-score'
 import { isInteractiveAspireSearch, normalizeApolloFilters } from '@/lib/aspire/filters'
-import { filterExistingLeads, searchApollo } from '@/lib/aspire/search'
+import { filterExistingLeads, searchApify } from '@/lib/aspire/search'
 import type { ApolloSearchFilters, ApolloPersonResult } from '@/lib/aspire/types'
 import { getSystemAutomationId } from '@/lib/automation/system-automation'
 import { db } from '@/lib/db/client'
@@ -118,7 +118,7 @@ export async function runBoundSearch(input: RunBoundSearchInput): Promise<RunSea
   })
 
   try {
-    const { people } = await searchApollo(filters, 1, 25, interactive)
+    const { people } = await searchApify(filters, 1, 25, interactive)
     const fresh = await filterCandidates(people, config.accountId, config.excludeDomains ?? [])
 
     const scored = fresh
@@ -203,7 +203,7 @@ export async function runBoundSearch(input: RunBoundSearchInput): Promise<RunSea
       automationId,
       triggerEvent: 'prospect_scout_bound',
       triggerPayload: { searchId: search.id, bindingId: binding.id },
-      actionType: 'search_apollo',
+      actionType: 'search_apify',
       status: 'success',
       resultPayload: { found, enrolled, runId },
     })
@@ -249,7 +249,7 @@ export async function runUnboundSearch(input: RunUnboundSearchInput): Promise<Ru
   })
 
   try {
-    const { people } = await searchApollo(filters, 1, 25, interactive)
+    const { people } = await searchApify(filters, 1, 25, interactive)
     const fresh = await filterCandidates(
       people,
       accountId,
@@ -323,7 +323,7 @@ export async function runUnboundSearch(input: RunUnboundSearchInput): Promise<Ru
       automationId,
       triggerEvent: 'aspire_weekly_search',
       triggerPayload: { searchId: search.id },
-      actionType: 'search_apollo',
+      actionType: 'search_apify',
       status: 'success',
       resultPayload: { newMatches: found, enrolled, runId },
     })

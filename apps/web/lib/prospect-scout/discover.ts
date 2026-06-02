@@ -1,5 +1,5 @@
 import { scoreICP } from '@/lib/aspire/icp-score'
-import { filterExistingLeads, searchApollo } from '@/lib/aspire/search'
+import { filterExistingLeads, searchApify } from '@/lib/aspire/search'
 import type { ApolloSearchFilters } from '@/lib/aspire/types'
 import { getSystemAutomationId } from '@/lib/automation/system-automation'
 import { db } from '@/lib/db/client'
@@ -43,7 +43,7 @@ export type ScoutDiscoveryResult = {
 }
 
 /**
- * Prospect Scout: Apollo discovery → ICP score → aspire_results (Aspire inbox).
+ * Prospect Scout: Apify discovery → ICP score → aspire_results (Aspire inbox).
  * Enrollment is optional and separate from Aspire manual saved searches.
  */
 export async function runProspectScoutDiscovery(
@@ -81,7 +81,7 @@ export async function runProspectScoutDiscovery(
             config.maxActiveLeads - activeCount,
           )
 
-    const { people } = await searchApollo(filters, 1, perPage)
+    const { people } = await searchApify(filters, 1, perPage)
     const existingIds = new Set(await filterExistingLeads(config.accountId, people.map((p) => p.id)))
     const excludeDomains = new Set((config.excludeDomains ?? []).map((d) => d.toLowerCase()))
 

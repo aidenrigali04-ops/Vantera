@@ -27,7 +27,7 @@ export const PROSPECT_MODE_OPTIONS: Array<{
     value: 'inline_icp',
     title: 'Prospect Scout (default)',
     description:
-      'Apollo discovery from your agent ICP → scored in Aspire → optional auto-enroll. Does not re-run Aspire saved searches.',
+      'Apify discovery from your agent ICP → scored in Aspire → optional auto-enroll. Does not re-run Aspire saved searches.',
   },
   {
     value: 'aspire_bound',

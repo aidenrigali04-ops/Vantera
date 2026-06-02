@@ -9,7 +9,7 @@ export function isInteractiveAspireSearch(filters: Partial<ApolloSearchFilters>)
   )
 }
 
-/** Merge partial UI/saved-search filters with account ICP defaults before Apollo calls. */
+/** Merge partial UI/saved-search filters with account ICP defaults before Apify calls. */
 export function normalizeApolloFilters(
   vertical: string,
   filters: Partial<ApolloSearchFilters> = {},
