@@ -17,40 +17,41 @@ export type SdrWizardSlide = {
   media: SdrWizardMedia
 }
 
+/** Prospecting-agent setup only — no outreach identity or sequence configuration. */
 export const SDR_WIZARD_SLIDES: SdrWizardSlide[] = [
   {
     id: 'identity',
-    eyebrow: 'Agent',
-    title: 'Give your SDR a name',
-    body: 'This identity appears on outbound email and in your activity feed.',
+    eyebrow: 'Prospecting agent',
+    title: 'Name your agent',
+    body: 'This label appears in discovery runs and your activity feed when new prospects are found.',
     media: { type: 'preview', previewId: 'identity' },
   },
   {
     id: 'icp',
     eyebrow: 'Targeting',
-    title: 'Who should it pursue?',
-    body: 'ICP defaults to your vertical. Refine cities and exclusions here.',
+    title: 'Who should it find?',
+    body: 'ICP defaults to your vertical. Refine cities and domain exclusions for Prospect Scout.',
     media: { type: 'preview', previewId: 'icp' },
   },
   {
     id: 'schedule',
-    eyebrow: 'Schedule',
-    title: 'Set the operating rhythm',
-    body: 'Daily caps and discovery cadence keep outreach predictable.',
+    eyebrow: 'Discovery',
+    title: 'Set discovery limits',
+    body: 'Control how many new prospects are added to your pipeline each day.',
     media: { type: 'preview', previewId: 'schedule' },
   },
   {
     id: 'scout',
     eyebrow: 'Prospect Scout',
-    title: 'Choose how it finds leads',
-    body: 'Inline ICP discovery, Aspire saved searches, or both.',
+    title: 'How should it discover leads?',
+    body: 'Inline ICP search, Aspire saved searches, or both — prospecting only.',
     media: { type: 'preview', previewId: 'scout' },
   },
   {
     id: 'launch',
-    eyebrow: 'Deploy',
-    title: 'Review and go live',
-    body: 'Your agent starts finding prospects immediately after launch.',
+    eyebrow: 'Go live',
+    title: 'Review and start prospecting',
+    body: 'Your agent runs its first discovery immediately, then on your chosen schedule.',
     media: { type: 'preview', previewId: 'launch' },
   },
 ]

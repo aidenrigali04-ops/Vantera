@@ -14,8 +14,8 @@ import {
   Zap,
 } from 'lucide-react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { useCallback, useState, useTransition } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { useCallback, useEffect, useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { KpiStrip } from '@/components/operational/KpiStrip'
@@ -51,8 +51,17 @@ export function SdrCommandCenterClient({
   autonomousMessaging = true,
 }: Props) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [isPending, startTransition] = useTransition()
   const [activity, setActivity] = useState(initialActivity)
+
+  useEffect(() => {
+    if (searchParams.get('setup') !== 'complete') return
+    toast.message(`${config.agentName} is live — discovery activity appears below`, {
+      duration: 5000,
+    })
+    router.replace('/admin/outreach/agents')
+  }, [config.agentName, router, searchParams])
 
   const refreshActivity = useCallback(async () => {
     const res = await fetch('/api/sdr/activity?limit=50')

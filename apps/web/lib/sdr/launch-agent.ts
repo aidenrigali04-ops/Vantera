@@ -2,6 +2,7 @@
 
 import type { ActionResult } from '@/lib/auth/types'
 import { findSavedSearches } from '@/lib/aspire/queries'
+import { getIcpConfigForVertical } from '@/lib/aspire/icp-score'
 import { db } from '@/lib/db/client'
 import { runProspectScoutBootstrap } from '@/lib/prospect-scout/bootstrap'
 import type { RunAccountResult } from '@/lib/prospect-scout/types'
@@ -11,7 +12,8 @@ import { logSdrActivity } from '@/lib/sdr/activity-log'
 import { createSDRConfig, updateSDRConfig } from '@/lib/sdr/config'
 import { requireSDREnabled } from '@/lib/sdr/guard'
 import type { CreateSDRConfigInput, ProspectMode } from '@/lib/sdr/types'
-import { sdrAgentConfigs } from '@vantera/db'
+import { DEFAULT_OUTREACH_WINDOW } from '@/lib/sdr/types'
+import { accounts, sdrAgentConfigs, users } from '@vantera/db'
 import { and, eq, isNull } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
 import { tasks } from '@trigger.dev/sdk'
@@ -45,12 +47,80 @@ async function validateProspectMode(
   return 'Add at least one saved search binding for Aspire-bound mode.'
 }
 
-async function queueBootstrapDiscovery(accountId: string): Promise<RunAccountResult | { queued: true }> {
+async function normalizeLaunchInput(
+  accountId: string,
+  userId: string,
+  input: LaunchSdrAgentInput,
+): Promise<LaunchSdrAgentInput | { error: string }> {
+  if (!input.agentName?.trim()) {
+    return { error: 'Agent name is required' }
+  }
+
+  const [account] = await db
+    .select({
+      name: accounts.name,
+      vertical: accounts.vertical,
+    })
+    .from(accounts)
+    .where(eq(accounts.id, accountId))
+    .limit(1)
+
+  const [user] = await db
+    .select({ email: users.email })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1)
+
+  const fromEmail = input.fromEmail?.trim() || user?.email?.trim() || ''
+  if (!fromEmail) {
+    return { error: 'Could not resolve a workspace email for this agent' }
+  }
+
+  const agentName = input.agentName.trim()
+  const accountName = account?.name?.trim() || 'Your workspace'
+  const vertical = account?.vertical ?? 'agency'
+
+  return {
+    ...input,
+    agentName,
+    agentTitle: 'Prospecting Agent',
+    fromEmail,
+    fromName: input.fromName?.trim() || `${agentName} · ${accountName}`,
+    signature: null,
+    icpConfig: input.icpConfig ?? getIcpConfigForVertical(vertical),
+    targetVerticals: input.targetVerticals ?? [vertical],
+    outreachWindow: DEFAULT_OUTREACH_WINDOW,
+    maxActiveLeads: input.maxActiveLeads ?? 200,
+    isActive: input.isActive ?? true,
+  }
+}
+
+async function queueBootstrapDiscovery(
+  accountId: string,
+): Promise<RunAccountResult | { queued: true }> {
+  const syncResult = await runProspectScoutBootstrap(accountId)
+
+  if (
+    syncResult &&
+    (syncResult.enrolled > 0 || syncResult.found > 0 || syncResult.searchesRun > 0)
+  ) {
+    return syncResult
+  }
+
   try {
     await tasks.trigger('sdr-bootstrap-discovery', { accountId })
-    return { queued: true }
-  } catch {
-    return (await runProspectScoutBootstrap(accountId)) ?? { accountId, searchesRun: 0, found: 0, enrolled: 0, runs: [] }
+    return syncResult ?? { queued: true }
+  } catch (err) {
+    console.error('[launchSdrAgent] trigger bootstrap failed', err)
+    return (
+      syncResult ?? {
+        accountId,
+        searchesRun: 0,
+        found: 0,
+        enrolled: 0,
+        runs: [],
+      }
+    )
   }
 }
 
@@ -61,18 +131,23 @@ async function queueBootstrapDiscovery(accountId: string): Promise<RunAccountRes
 export async function launchSdrAgent(
   input: LaunchSdrAgentInput,
 ): Promise<ActionResult<{ bootstrap: RunAccountResult | { queued: true } | null }>> {
-  const { accountId } = await requireSDREnabled()
+  const { accountId, userId } = await requireSDREnabled()
+
+  const normalized = await normalizeLaunchInput(accountId, userId, input)
+  if ('error' in normalized) {
+    return { success: false, error: normalized.error }
+  }
 
   const validationError = await validateProspectMode(
     accountId,
-    input.prospectMode,
-    input.bindings,
+    normalized.prospectMode,
+    normalized.bindings,
   )
   if (validationError) {
     return { success: false, error: validationError }
   }
 
-  const createResult = await createSDRConfig({ ...input, isActive: false })
+  const createResult = await createSDRConfig({ ...normalized, isActive: false })
   if (!createResult.success) {
     return createResult
   }
@@ -81,11 +156,11 @@ export async function launchSdrAgent(
 
   try {
     await saveSdrAspireConfig(accountId, {
-      prospectMode: input.prospectMode,
-      defaultMinIcpScore: input.defaultMinIcpScore,
-      syncIcpToSavedSearches: input.syncIcpToSavedSearches,
-      icpConfig: input.icpConfig,
-      bindings: input.bindings,
+      prospectMode: normalized.prospectMode,
+      defaultMinIcpScore: normalized.defaultMinIcpScore,
+      syncIcpToSavedSearches: normalized.syncIcpToSavedSearches,
+      icpConfig: normalized.icpConfig,
+      bindings: normalized.bindings,
     })
   } catch (error) {
     await rollbackConfig(accountId)
@@ -106,9 +181,9 @@ export async function launchSdrAgent(
     configId,
     eventType: 'agent_launched',
     metadata: {
-      agentName: input.agentName,
-      prospectMode: input.prospectMode ?? 'inline_icp',
-      searchFrequency: input.searchFrequency ?? 'daily',
+      agentName: normalized.agentName,
+      prospectMode: normalized.prospectMode ?? 'inline_icp',
+      searchFrequency: normalized.searchFrequency ?? 'daily',
     },
   })
 

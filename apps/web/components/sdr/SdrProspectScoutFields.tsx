@@ -26,6 +26,7 @@ type Props = {
   onBindingsChange: (bindings: BindingDraft[]) => void
   savedSearches: SavedSearchOption[]
   compact?: boolean
+  wizard?: boolean
 }
 
 export function SdrProspectScoutFields({
@@ -39,6 +40,7 @@ export function SdrProspectScoutFields({
   onBindingsChange,
   savedSearches,
   compact = false,
+  wizard = false,
 }: Props) {
   const showBindings = prospectMode === 'aspire_bound' || prospectMode === 'hybrid'
   const boundIds = new Set(bindings.map((b) => b.savedSearchId))
@@ -76,14 +78,14 @@ export function SdrProspectScoutFields({
   }
 
   return (
-    <div className="space-y-8">
-      <section className="space-y-3">
+    <div className={cn('space-y-8', wizard && 'space-y-4')}>
+      <section className={cn('space-y-3', wizard && 'space-y-2')}>
         <div>
           <h3 className="text-[15px] font-semibold tracking-tight text-[var(--text-primary)]">
-            Prospect source
+            Discovery source
           </h3>
           <p className="mt-1 text-sm text-[var(--text-secondary)]">
-            How {compact ? 'your agent' : 'Prospect Scout'} discovers leads before SDR enrollment.
+            How Prospect Scout finds leads for your pipeline.
           </p>
         </div>
         <div className={cn('grid gap-3', compact ? 'grid-cols-1' : 'sm:grid-cols-3')}>
@@ -111,7 +113,7 @@ export function SdrProspectScoutFields({
         </div>
       </section>
 
-      <section className="card-surface space-y-4 p-4 sm:p-5">
+      <section className={cn('card-surface space-y-4 p-4 sm:p-5', wizard && 'p-3 sm:p-4')}>
         <h3 className="text-[15px] font-semibold tracking-tight text-[var(--text-primary)]">
           Scoring defaults
         </h3>
@@ -293,7 +295,7 @@ export function SdrProspectScoutFields({
                           className="data-[state=checked]:bg-[var(--accent)]"
                         />
                         <Label className="text-xs text-[var(--text-secondary)]">
-                          Auto-enroll into SDR
+                          Add to pipeline automatically
                         </Label>
                       </div>
                     </div>
@@ -301,7 +303,7 @@ export function SdrProspectScoutFields({
                     <div className="flex flex-wrap gap-4 px-4 py-3 text-xs text-[var(--text-secondary)]">
                       <span>ICP ≥ {binding.minIcpScore}</span>
                       <span>Up to {binding.maxLeadsPerRun} leads/run</span>
-                      <span>{binding.autoEnrollSdr ? 'Auto-enroll' : 'Score only'}</span>
+                      <span>{binding.autoEnrollSdr ? 'Auto-add' : 'Score only'}</span>
                     </div>
                   )}
                 </li>

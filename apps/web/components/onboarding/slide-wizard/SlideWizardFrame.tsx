@@ -15,7 +15,7 @@ export type SlideWizardFrameSlide = {
 }
 
 type Props = {
-  variant: 'overlay' | 'page'
+  variant: 'overlay' | 'page' | 'fullscreen'
   open?: boolean
   headerLabel: string
   slide: SlideWizardFrameSlide
@@ -90,7 +90,7 @@ export function SlideWizardFrame({
   }, [open, onClose, onBack, onPrimary, isFirst, primaryDisabled, primaryLoading])
 
   useEffect(() => {
-    if (!open || variant !== 'overlay') return
+    if (!open || (variant !== 'overlay' && variant !== 'fullscreen')) return
     const previous = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     return () => {
@@ -118,8 +118,9 @@ export function SlideWizardFrame({
       exit={{ opacity: 0, scale: 0.98, y: 4 }}
       transition={{ duration: DURATION.modal, ease: EASE_OUT }}
       className={cn(
-        'w-full max-w-[880px] overflow-hidden rounded-xl border border-[var(--border-default)]',
+        'flex max-h-[min(720px,calc(100dvh-2rem))] w-full max-w-[880px] flex-col overflow-hidden rounded-xl border border-[var(--border-default)]',
         'bg-[var(--bg-elevated)] shadow-[var(--shadow-lg)] outline-none',
+        variant === 'fullscreen' && 'max-h-[min(720px,calc(100dvh-2rem))]',
       )}
       onClick={(event) => event.stopPropagation()}
     >
@@ -141,12 +142,12 @@ export function SlideWizardFrame({
         )}
       </div>
 
-      <div className="grid gap-0 lg:grid-cols-[1.1fr_0.9fr]">
-        <div className="border-b border-[var(--border-subtle)] p-4 lg:border-b-0 lg:min-h-[360px] lg:p-5">
+      <div className="grid min-h-0 flex-1 gap-0 lg:grid-cols-[1.1fr_0.9fr]">
+        <div className="hidden border-b border-[var(--border-subtle)] p-4 lg:block lg:min-h-0 lg:border-b-0 lg:p-5">
           {mediaPanel}
         </div>
 
-        <div className="flex max-h-[min(78vh,680px)] flex-col border-t border-[var(--border-subtle)] lg:border-l lg:border-t-0">
+        <div className="flex min-h-0 flex-col border-t border-[var(--border-subtle)] lg:border-l lg:border-t-0">
           <div className="flex flex-1 flex-col overflow-hidden p-5 lg:p-6">
             <div className="shrink-0">
               <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--brand-accent)]">
@@ -251,6 +252,15 @@ export function SlideWizardFrame({
       <div className="flex min-h-screen items-center justify-center bg-[var(--bg-base)] p-4 sm:p-6">
         {dialog}
       </div>
+    )
+  }
+
+  if (variant === 'fullscreen') {
+    return createPortal(
+      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[var(--bg-base)] p-4 sm:p-6">
+        {dialog}
+      </div>,
+      document.body,
     )
   }
 

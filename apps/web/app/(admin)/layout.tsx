@@ -49,13 +49,14 @@ export default async function AdminLayout({ children }: { children: ReactNode })
 
   const pathname = headers().get('x-pathname') ?? ''
   const isOnboardingWizard = pathname.startsWith('/admin/onboarding')
+  const isSdrSetupWizard = pathname.startsWith('/admin/outreach/agents/setup')
   const workspaceFullBleed =
     pathname.startsWith('/admin/pipeline') ||
     pathname.startsWith('/admin/records') ||
     pathname.startsWith('/admin/outreach/aspire') ||
-    pathname.startsWith('/admin/outreach/agents')
+    (pathname.startsWith('/admin/outreach/agents') && !isSdrSetupWizard)
 
-  if (isOnboardingWizard) {
+  if (isOnboardingWizard || isSdrSetupWizard) {
     return (
       <BrandingProvider branding={branding}>
         <FeatureFlagProvider flags={flags}>

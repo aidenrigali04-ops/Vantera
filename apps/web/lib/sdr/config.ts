@@ -68,8 +68,17 @@ export async function createSDRConfig(
 ): Promise<ActionResult<SDRAgentConfig>> {
   const { accountId } = await requireSDREnabled()
 
-  if (!data.agentName?.trim() || !data.fromEmail?.trim() || !data.fromName?.trim()) {
-    return { success: false, error: 'Agent name, from email, and from name are required' }
+  if (!data.agentName?.trim()) {
+    return { success: false, error: 'Agent name is required' }
+  }
+
+  const fromEmail = data.fromEmail?.trim()
+  const fromName = data.fromName?.trim()
+  if (!fromEmail || !fromName) {
+    return {
+      success: false,
+      error: 'Sender identity could not be resolved — refresh and try again',
+    }
   }
 
   const [existing] = await db
@@ -87,9 +96,9 @@ export async function createSDRConfig(
     .values({
       accountId,
       agentName: data.agentName.trim(),
-      agentTitle: data.agentTitle?.trim() || 'Sales Development Rep',
-      fromEmail: data.fromEmail.trim(),
-      fromName: data.fromName.trim(),
+      agentTitle: data.agentTitle?.trim() || 'Prospecting Agent',
+      fromEmail,
+      fromName,
       signature: data.signature ?? null,
       icpConfig: data.icpConfig,
       targetVerticals: data.targetVerticals ?? [],
@@ -112,7 +121,7 @@ export async function createSDRConfig(
     kind: 'business_context',
     subjectType: 'account',
     subjectId: accountId,
-    summary: `SDR agent ${data.agentName} configured for outbound`,
+    summary: `Prospecting agent ${data.agentName} configured for discovery`,
     evidence: { sdrAgent: true },
     confidence: 60,
   })

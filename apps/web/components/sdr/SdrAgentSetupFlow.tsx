@@ -18,7 +18,6 @@ export function SdrAgentSetupFlow({
   isOwner,
   plan,
   accountVertical,
-  accountName,
 }: Props) {
   const [sdrEnabled, setSdrEnabled] = useState(initialEnabled)
 
@@ -32,7 +31,5 @@ export function SdrAgentSetupFlow({
     )
   }
 
-  return (
-    <SdrSetupWizardClient accountVertical={accountVertical} accountName={accountName} />
-  )
+  return <SdrSetupWizardClient accountVertical={accountVertical} />
 }

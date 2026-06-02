@@ -44,8 +44,8 @@ export type ProspectMode = 'aspire_bound' | 'inline_icp' | 'hybrid'
 export type CreateSDRConfigInput = {
   agentName: string
   agentTitle?: string
-  fromEmail: string
-  fromName: string
+  fromEmail?: string
+  fromName?: string
   signature?: string | null
   icpConfig: ICPConfig
   targetVerticals?: string[]

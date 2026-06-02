@@ -105,14 +105,14 @@ export default async function SdrAgentsPage() {
     return (
       <div className="flex flex-col items-center justify-center gap-4 px-4 py-20 text-center">
         <p className="text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--accent)]">
-          SDR Agents
+          Prospecting agent
         </p>
         <h1 className="text-2xl font-semibold tracking-[-0.02em] text-[var(--text-primary)]">
-          Set up your SDR Agent
+          Set up Prospect Scout
         </h1>
         <p className="max-w-md text-[15px] leading-relaxed text-[var(--text-secondary)]">
-          Deploy an always-on sales development rep that finds, profiles, and nurtures leads — then
-          hands qualified replies to your pipeline.
+          Configure an autonomous prospecting agent that finds ICP-matched leads and adds them to
+          your pipeline on a daily or weekly schedule.
         </p>
         <Button
           asChild
