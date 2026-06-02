@@ -267,19 +267,23 @@ export async function fetchPreviewLeadsAction(
       return err('Complete business details first')
     }
 
-    const leads = await fetchOnboardingPreviewLeads({
+    const { leads, usedStubFallback } = await fetchOnboardingPreviewLeads({
       accountId: workspaceId,
       vertical: (account.vertical as OnboardingVertical) ?? 'agency',
+      businessName: account.name,
+      icpSummary: account.icp_summary ?? account.icp_description,
     })
 
     void trackOnboardingStep(workspaceId, 'ai_overview', 'completed', {
       leadCount: leads.length,
+      usedStubFallback,
     })
 
     return { success: true, data: { leads } }
   } catch (error) {
     rethrowFrameworkSignals(error)
-    return err(error instanceof Error ? error.message : 'Failed to find leads')
+    console.error('[fetchPreviewLeadsAction] failed', error)
+    return err('Could not find leads. Please try again.')
   }
 }
 
@@ -1221,19 +1225,22 @@ export async function saveIntegrationCredentials(
       return err('This integration is not yet available')
     }
 
+    const { encryptCredentialValue } = await import('@/lib/integrations/credential-secrets')
+    const storedAccessToken = encryptCredentialValue(accessToken)
+
     await db
       .insert(integrationCredentials)
       .values({
         accountId: workspaceId,
         provider: providerKey,
-        accessToken,
+        accessToken: storedAccessToken,
         metadata,
         isNativeMode: false,
       })
       .onConflictDoUpdate({
         target: [integrationCredentials.accountId, integrationCredentials.provider],
         set: {
-          accessToken,
+          accessToken: storedAccessToken,
           metadata,
           isNativeMode: false,
           updatedAt: new Date(),

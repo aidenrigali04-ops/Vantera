@@ -1,7 +1,7 @@
 import type { ApolloPersonResult, ApolloSearchFilters } from '@/lib/aspire/types'
 
 /** Sample leads when Apify is not configured or returns no matches (interactive search). */
-export function stubResults(filters: ApolloSearchFilters): ApolloPersonResult[] {
+export function stubResults(filters: Partial<ApolloSearchFilters> = {}): ApolloPersonResult[] {
   const keyword = (filters.q ?? filters.keywords?.join(' ') ?? '').trim().toLowerCase()
   const company = filters.company?.trim() || 'Northstar SaaS'
 

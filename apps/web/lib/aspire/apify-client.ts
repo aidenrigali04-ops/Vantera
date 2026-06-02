@@ -12,6 +12,7 @@ import {
   resolveApifyKeywordTargeting,
 } from '@/lib/aspire/apify-targeting'
 import { splitFullName } from '@/lib/aspire/contact-fields'
+import { isApifyAuthError, parseApifyErrorMessage } from '@/lib/aspire/apify-errors'
 import { stubResults } from '@/lib/aspire/prospect-stubs'
 import type { ApolloPersonResult, ApolloSearchFilters } from '@/lib/aspire/types'
 import { env } from '@/lib/env'
@@ -269,7 +270,10 @@ async function fetchApifyLeads(
   })
 
   if (!response.ok) {
-    const errorText = apifyErrorMessage(await response.text(), 'Apify actor run failed')
+    const errorText = parseApifyErrorMessage(await response.text(), 'Apify actor run failed')
+    if (isApifyAuthError(errorText)) {
+      return { rows: [], people: stubResults({}) }
+    }
     throw new Error(errorText)
   }
 
@@ -283,16 +287,6 @@ async function fetchApifyLeads(
 }
 
 const MIN_INTERACTIVE_RESULTS = 10
-
-function apifyErrorMessage(body: unknown, fallback: string): string {
-  if (typeof body === 'string' && body.trim()) return body.slice(0, 300)
-  if (body && typeof body === 'object') {
-    const record = body as Record<string, unknown>
-    if (typeof record.error === 'string') return record.error
-    if (typeof record.message === 'string') return record.message
-  }
-  return fallback
-}
 
 function apifyEmptyResultMessage(
   rows: Record<string, unknown>[],
@@ -366,6 +360,24 @@ export async function searchApify(
     }
 
     if (people.length === 0) {
+      const stubPeople = stubResults(filters)
+      if (stubPeople.length > 0) {
+        console.warn('[searchApify] no Apify matches — using stub leads', {
+          actorId,
+          retriedBroad,
+          retriedMinimal,
+        })
+        return {
+          people: stubPeople,
+          total: stubPeople.length,
+          hasMore: false,
+          meta: {
+            source: 'stub',
+            providerConfigured: configured,
+            providerError: apifyEmptyResultMessage(rows, people, retriedBroad, retriedMinimal),
+          },
+        }
+      }
       throw new Error(
         apifyEmptyResultMessage(rows, people, retriedBroad, retriedMinimal),
       )
@@ -385,6 +397,20 @@ export async function searchApify(
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Apify search failed'
+    if (isApifyAuthError(message)) {
+      const people = stubResults(filters)
+      console.error('[searchApify] invalid Apify token — using stub leads')
+      return {
+        people,
+        total: people.length,
+        hasMore: false,
+        meta: {
+          source: 'stub',
+          providerConfigured: false,
+          providerError: 'Invalid Apify token',
+        },
+      }
+    }
     console.error('[searchApify]', message, {
       actorId,
       input,
