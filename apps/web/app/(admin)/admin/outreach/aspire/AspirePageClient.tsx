@@ -95,6 +95,8 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
   const [hasLiveSearch, setHasLiveSearch] = useState(false)
   const [isSearching, setIsSearching] = useState(false)
   const [runningSearchId, setRunningSearchId] = useState<string | null>(null)
+  /** Latest search API response — shown immediately (not cleared by stale list cache). */
+  const [tableResults, setTableResults] = useState<AspireSearchResult[] | null>(null)
 
   useEffect(() => {
     const id = searchParams.get('searchId')
@@ -114,6 +116,7 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
 
   useEffect(() => {
     setHasLiveSearch(false)
+    setTableResults(null)
   }, [activeSearchId, query, company])
 
   const liveSearchKey = ['aspire-search', accountId, query, company, activeSearchId]
@@ -169,11 +172,13 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
   })
 
   const isFetching = isSearching || isLiveFetching || isSavedFetching || isScoutFetching
-  const sourceResults = hasLiveSearch
-    ? liveResults
-    : activeSearchId
-      ? savedResults
-      : scoutResults
+  const sourceResults =
+    tableResults ??
+    (hasLiveSearch
+      ? liveResults
+      : activeSearchId
+        ? savedResults
+        : scoutResults)
 
   const rows = useMemo<AspireResultRow[]>(
     () =>
@@ -354,12 +359,9 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
     onSuccess: async (data, searchId) => {
       setHasLiveSearch(false)
       setActiveSearchId(searchId)
-      await queryClient.invalidateQueries({ queryKey: ['aspire-results', searchId] })
-      const list = await queryClient.fetchQuery({
-        queryKey: ['aspire-results', searchId],
-        queryFn: () => fetchAspireResultsFromApi(searchId),
-        staleTime: 0,
-      })
+      const list = await fetchAspireResultsFromApi(searchId)
+      setTableResults(list)
+      queryClient.setQueryData(['aspire-results', searchId], list)
       const listCount = list.length
       toast.success(
         listCount > 0
@@ -374,21 +376,42 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
   })
 
   const handleSearch = async () => {
+    const trimmedQuery = query.trim()
+    const trimmedCompany = company.trim()
+    if (!trimmedQuery && !trimmedCompany) {
+      toast.error('Enter a keyword or company to search')
+      return
+    }
+
     setIsSearching(true)
     try {
-      const results = (await queryClient.fetchQuery({ queryKey: liveSearchKey })) as AspireSearchResult[]
+      const res = await fetch('/api/aspire/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          q: trimmedQuery || undefined,
+          company: trimmedCompany || undefined,
+          searchId: activeSearchId ?? undefined,
+        }),
+      })
+      const json = await res.json()
+      if (!json.success) throw new Error(json.error ?? 'Search failed')
+
+      const results = json.data as AspireSearchResult[]
+      setTableResults(results)
+      setHasLiveSearch(false)
+
       const listKey = activeSearchId ? savedResultsQueryKey : scoutResultsQueryKey
       queryClient.setQueryData(listKey, results)
-      setHasLiveSearch(false)
-      await queryClient.invalidateQueries({ queryKey: listKey })
-      const listCount = results.length
+
       toast.success(
-        listCount > 0
-          ? `Found ${listCount} prospect${listCount === 1 ? '' : 's'}`
-          : 'No prospects matched — try different keywords or broaden your search',
+        results.length > 0
+          ? `Found ${results.length} prospect${results.length === 1 ? '' : 's'} for "${trimmedQuery || trimmedCompany}"`
+          : 'No prospects matched — try a broader keyword',
       )
     } catch (err) {
       setHasLiveSearch(false)
+      setTableResults(null)
       toast.error(err instanceof Error ? err.message : 'Apollo search failed')
     } finally {
       setIsSearching(false)
