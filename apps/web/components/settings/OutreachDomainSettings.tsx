@@ -15,7 +15,7 @@ import {
 import { cn } from '@/lib/utils'
 import { CheckCircle2, RefreshCw } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { useState, useTransition } from 'react'
+import { useEffect, useState, useTransition } from 'react'
 import { toast } from 'sonner'
 
 type Props = {
@@ -56,6 +56,13 @@ export function OutreachDomainSettingsPanel({ initial }: Props) {
   const [fromLocalPart, setFromLocalPart] = useState(initial.fromLocalPart)
   const [isPending, startTransition] = useTransition()
 
+  useEffect(() => {
+    setSettings(initial)
+    setFromDomain(initial.fromDomain ?? '')
+    setInboundDomain(initial.inboundDomain ?? '')
+    setFromLocalPart(initial.fromLocalPart)
+  }, [initial])
+
   function handleSave() {
     startTransition(async () => {
       const result = await saveOutreachDomain({
@@ -64,13 +71,39 @@ export function OutreachDomainSettingsPanel({ initial }: Props) {
         fromLocalPart,
       })
       if (!result.success) {
-        toast.error(result.error)
+        toast.error('error' in result ? result.error : 'Could not save domain')
         return
       }
-      setSettings(result.data)
-      setFromDomain(result.data.fromDomain ?? '')
-      setInboundDomain(result.data.inboundDomain ?? '')
-      toast.success('Domain registered — copy the DNS records below into your DNS host')
+      if (!result.data) {
+        toast.error('Domain saved but settings could not be reloaded')
+        return
+      }
+
+      let next = result.data
+      if (next.sendingRecords.length === 0 && next.fromDomain) {
+        const refreshed = await refreshOutreachDomainDns()
+        if (refreshed.success && refreshed.data) {
+          next = refreshed.data
+        }
+      }
+
+      setSettings(next)
+      setFromDomain(next.fromDomain ?? '')
+      setInboundDomain(next.inboundDomain ?? '')
+
+      if (next.sendingRecords.length > 0) {
+        toast.success('Domain saved — copy the DNS records below into your DNS host')
+      } else {
+        toast.message(
+          'Domain saved, but DNS records are not available yet. Click Refresh DNS status in a moment.',
+          { duration: 6000 },
+        )
+      }
+
+      if (next.inboundSetupWarning) {
+        toast.warning(next.inboundSetupWarning, { duration: 8000 })
+      }
+
       router.refresh()
     })
   }
@@ -79,11 +112,19 @@ export function OutreachDomainSettingsPanel({ initial }: Props) {
     startTransition(async () => {
       const result = await refreshOutreachDomainDns()
       if (!result.success) {
-        toast.error(result.error)
+        toast.error('error' in result ? result.error : 'Could not refresh DNS')
+        return
+      }
+      if (!result.data) {
+        toast.error('DNS refreshed but settings could not be reloaded')
         return
       }
       setSettings(result.data)
-      toast.success('DNS record status updated')
+      toast.success(
+        result.data.sendingRecords.length > 0
+          ? 'DNS record status updated'
+          : 'Refreshed — records still pending from Resend. Try again shortly.',
+      )
       router.refresh()
     })
   }
@@ -92,7 +133,11 @@ export function OutreachDomainSettingsPanel({ initial }: Props) {
     startTransition(async () => {
       const result = await verifyOutreachDomain()
       if (!result.success) {
-        toast.error(result.error)
+        toast.error('error' in result ? result.error : 'Verification failed')
+        return
+      }
+      if (!result.data) {
+        toast.error('Verification ran but settings could not be reloaded')
         return
       }
       setSettings(result.data)
@@ -237,6 +282,13 @@ export function OutreachDomainSettingsPanel({ initial }: Props) {
             className="mt-1.5 max-w-md"
           />
         </div>
+
+        {settings.inboundSetupWarning ? (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-[13px] text-amber-900">
+            <p className="font-medium">Inbound reply routing needs attention</p>
+            <p className="mt-1">{settings.inboundSetupWarning}</p>
+          </div>
+        ) : null}
 
         <div className="flex flex-wrap gap-2">
           <Button onClick={handleSave} disabled={isPending || !fromDomain.trim()}>

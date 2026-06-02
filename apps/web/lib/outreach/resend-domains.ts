@@ -119,7 +119,7 @@ export async function findResendDomainByName(domain: string): Promise<ResendDoma
   const domains = await listResendDomains()
   const match = domains.find((row) => normalizeDomain(row.name) === normalized)
   if (!match) return null
-  return getResendDomain(match.id)
+  return loadResendDomainWithRecords(match.id)
 }
 
 export async function createResendDomain(
@@ -142,7 +142,8 @@ export async function createResendDomain(
     throw new Error(extractResendError(body, 'Could not register domain with Resend'))
   }
 
-  return normalizeDomainResponse(unwrapResendEntity<Record<string, unknown>>(body))
+  const created = normalizeDomainResponse(unwrapResendEntity<Record<string, unknown>>(body))
+  return loadResendDomainWithRecords(created.id)
 }
 
 export async function getResendDomain(domainId: string): Promise<ResendDomainResponse> {
@@ -155,6 +156,26 @@ export async function getResendDomain(domainId: string): Promise<ResendDomainRes
   return normalizeDomainResponse(unwrapResendEntity<Record<string, unknown>>(body))
 }
 
+const RECORD_FETCH_DELAYS_MS = [0, 400, 900, 1600]
+
+/** Resend may return an empty records array immediately after create — retry before giving up. */
+export async function loadResendDomainWithRecords(domainId: string): Promise<ResendDomainResponse> {
+  let last: ResendDomainResponse | null = null
+
+  for (const delayMs of RECORD_FETCH_DELAYS_MS) {
+    if (delayMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs))
+    }
+    const domain = await getResendDomain(domainId)
+    last = domain
+    if ((domain.records?.length ?? 0) > 0) {
+      return domain
+    }
+  }
+
+  return last ?? getResendDomain(domainId)
+}
+
 export async function verifyResendDomain(domainId: string): Promise<ResendDomainResponse> {
   const response = await resendFetch(`/domains/${domainId}/verify`, { method: 'POST' })
   const body = await response.json()
@@ -163,7 +184,7 @@ export async function verifyResendDomain(domainId: string): Promise<ResendDomain
   }
 
   // Verify endpoint returns a minimal payload — reload full domain (with records).
-  return getResendDomain(domainId)
+  return loadResendDomainWithRecords(domainId)
 }
 
 export async function ensureResendDomain(
@@ -175,7 +196,7 @@ export async function ensureResendDomain(
 
   if (existingId) {
     try {
-      const existing = await getResendDomain(existingId)
+      const existing = await loadResendDomainWithRecords(existingId)
       if (normalizeDomain(existing.name) === normalized) {
         return existing
       }
@@ -190,7 +211,7 @@ export async function ensureResendDomain(
     const message = error instanceof Error ? error.message : ''
     if (/already exists|already registered|duplicate|has been registered/i.test(message)) {
       const existing = await findResendDomainByName(normalized)
-      if (existing) return existing
+      if (existing) return loadResendDomainWithRecords(existing.id)
     }
     throw error
   }
@@ -209,9 +230,7 @@ export function partitionDnsRecords(records: ResendDnsRecord[]): {
   inboundRecords: ResendDnsRecord[]
 } {
   const inboundRecords = records.filter(
-    (record) =>
-      record.record?.toLowerCase() === 'receiving' ||
-      (record.type === 'MX' && record.record?.toLowerCase() !== 'spf'),
+    (record) => record.record?.toLowerCase() === 'receiving',
   )
   const sendingRecords = records.filter((record) => !inboundRecords.includes(record))
   return { sendingRecords, inboundRecords }

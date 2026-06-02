@@ -15,6 +15,7 @@ import {
 import {
   ensureResendDomain,
   getResendDomain,
+  loadResendDomainWithRecords,
   mapResendStatus,
   parseStoredDomainDns,
   partitionDnsRecords,
@@ -38,6 +39,8 @@ export type OutreachDomainSettings = {
   previewFrom: string
   previewReplyDomain: string
   isCustomDomain: boolean
+  /** Set when save succeeded but inbound subdomain registration failed. */
+  inboundSetupWarning?: string | null
 }
 
 async function assertAdminAccess(): Promise<string> {
@@ -105,7 +108,7 @@ async function fetchInboundDomainStatus(
 ): Promise<string> {
   if (!resendInboundDomainId) return 'not_configured'
   try {
-    const inbound = await getResendDomain(resendInboundDomainId)
+    const inbound = await loadResendDomainWithRecords(resendInboundDomainId)
     return mapResendStatus(inbound.status)
   } catch {
     return 'pending'
@@ -177,6 +180,7 @@ export async function saveOutreachDomain(input: {
       ? parsedExisting.resendInboundDomainId
       : null
     let inboundRecords: ResendDnsRecord[] = inboundUnchanged ? parsedExisting.inboundRecords : []
+    let inboundSetupWarning: string | null = null
 
     if (!inboundDomainResendId) {
       try {
@@ -188,18 +192,29 @@ export async function saveOutreachDomain(input: {
         inboundDomainResendId = receivingDomain.id
         inboundRecords = receivingDomain.records ?? []
       } catch (error) {
+        inboundSetupWarning =
+          error instanceof Error
+            ? error.message
+            : 'Inbound reply domain could not be registered — sending DNS is still available.'
         console.warn('[saveOutreachDomain] inbound domain registration failed:', error)
       }
     } else if (inboundRecords.length === 0) {
       try {
-        const receivingDomain = await getResendDomain(inboundDomainResendId)
+        const receivingDomain = await loadResendDomainWithRecords(inboundDomainResendId)
         inboundRecords = receivingDomain.records ?? []
       } catch (error) {
+        inboundSetupWarning =
+          error instanceof Error
+            ? error.message
+            : 'Could not load inbound DNS records — try Refresh DNS status.'
         console.warn('[saveOutreachDomain] inbound domain reload failed:', error)
       }
     }
 
-    const { sendingRecords } = partitionDnsRecords(sendingDomain.records ?? [])
+    let { sendingRecords } = partitionDnsRecords(sendingDomain.records ?? [])
+    if (sendingRecords.length === 0 && (sendingDomain.records?.length ?? 0) > 0) {
+      sendingRecords = sendingDomain.records ?? []
+    }
 
     await db
       .update(accounts)
@@ -228,7 +243,13 @@ export async function saveOutreachDomain(input: {
       return { success: false, error: 'Domain saved but settings could not be reloaded' }
     }
 
-    return { success: true, data: refreshed.data }
+    return {
+      success: true,
+      data: {
+        ...refreshed.data,
+        inboundSetupWarning,
+      },
+    }
   } catch (error) {
     return {
       success: false,
@@ -246,14 +267,17 @@ export async function refreshOutreachDomainDns(): Promise<ActionResult<OutreachD
     }
 
     const parsed = parseStoredDomainDns(account.outreachDomainDns)
-    const sendingLatest = await getResendDomain(account.resendOutreachDomainId)
-    const { sendingRecords } = partitionDnsRecords(sendingLatest.records ?? [])
+    const sendingLatest = await loadResendDomainWithRecords(account.resendOutreachDomainId)
+    let { sendingRecords } = partitionDnsRecords(sendingLatest.records ?? [])
+    if (sendingRecords.length === 0 && (sendingLatest.records?.length ?? 0) > 0) {
+      sendingRecords = sendingLatest.records ?? []
+    }
 
     let inboundRecords = parsed.inboundRecords
     let inboundDomainStatus = 'not_configured'
 
     if (parsed.resendInboundDomainId) {
-      const inboundLatest = await getResendDomain(parsed.resendInboundDomainId)
+      const inboundLatest = await loadResendDomainWithRecords(parsed.resendInboundDomainId)
       inboundRecords = inboundLatest.records ?? []
       inboundDomainStatus = mapResendStatus(inboundLatest.status)
     }
@@ -297,7 +321,7 @@ export async function verifyOutreachDomain(): Promise<ActionResult<OutreachDomai
     }
 
     await verifyResendDomain(account.resendOutreachDomainId)
-    const sendingLatest = await getResendDomain(account.resendOutreachDomainId)
+    const sendingLatest = await loadResendDomainWithRecords(account.resendOutreachDomainId)
     const sendingStatus = mapResendStatus(sendingLatest.status)
 
     const parsed = parseStoredDomainDns(account.outreachDomainDns)
@@ -307,7 +331,7 @@ export async function verifyOutreachDomain(): Promise<ActionResult<OutreachDomai
     if (parsed.resendInboundDomainId) {
       try {
         await verifyResendDomain(parsed.resendInboundDomainId)
-        const inboundLatest = await getResendDomain(parsed.resendInboundDomainId)
+        const inboundLatest = await loadResendDomainWithRecords(parsed.resendInboundDomainId)
         inboundRecords = inboundLatest.records ?? []
         inboundStatus = mapResendStatus(inboundLatest.status)
       } catch {
@@ -315,7 +339,10 @@ export async function verifyOutreachDomain(): Promise<ActionResult<OutreachDomai
       }
     }
 
-    const { sendingRecords } = partitionDnsRecords(sendingLatest.records ?? [])
+    let { sendingRecords } = partitionDnsRecords(sendingLatest.records ?? [])
+    if (sendingRecords.length === 0 && (sendingLatest.records?.length ?? 0) > 0) {
+      sendingRecords = sendingLatest.records ?? []
+    }
 
     await db
       .update(accounts)

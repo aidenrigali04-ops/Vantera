@@ -38,7 +38,16 @@ export default async function SettingsPage() {
       />
       {outreachDomain.success && outreachDomain.data ? (
         <OutreachDomainSettingsPanel initial={outreachDomain.data} />
-      ) : null}
+      ) : (
+        <section className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">
+          <p className="font-medium">Outreach email domain settings could not be loaded</p>
+          <p className="mt-1 text-[13px]">
+            {!outreachDomain.success
+              ? outreachDomain.error
+              : 'Refresh the page or contact support if this persists.'}
+          </p>
+        </section>
+      )}
     </div>
   )
 }
