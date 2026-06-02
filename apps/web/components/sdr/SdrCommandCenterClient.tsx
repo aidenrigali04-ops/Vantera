@@ -10,16 +10,19 @@ import {
   Play,
   Settings,
   Users,
+  Radar,
   Zap,
 } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useCallback, useEffect, useState, useTransition } from 'react'
+import { useCallback, useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { KpiStrip } from '@/components/operational/KpiStrip'
 import { PageHeader } from '@/components/operational/PageHeader'
+import { LiveIndicator } from '@/components/operational/LiveIndicator'
 import { SdrActivityFeed } from '@/components/sdr/activity-feed'
+import { useAccountRealtime } from '@/lib/supabase/account-realtime'
 
 type UpcomingSend = {
   step: { stepNumber: number; channel: string; scheduledFor: Date }
@@ -50,10 +53,11 @@ export function SdrCommandCenterClient({ config, stats, initialActivity, upcomin
     if (json.success) setActivity(json.data)
   }, [])
 
-  useEffect(() => {
-    const interval = setInterval(refreshActivity, 30_000)
-    return () => clearInterval(interval)
-  }, [refreshActivity])
+  const { isLive: activityLive } = useAccountRealtime({
+    accountId: config.accountId,
+    table: 'sdr_activity_log',
+    onChange: refreshActivity,
+  })
 
   const statusLabel = config.isPaused
     ? 'Paused'
@@ -107,6 +111,11 @@ export function SdrCommandCenterClient({ config, stats, initialActivity, upcomin
               )}
             </Button>
             <Button variant="outline" size="sm" asChild>
+              <Link href="/admin/outreach/agents/aspire">
+                <Radar className="mr-1.5 h-3.5 w-3.5" /> Prospect Scout
+              </Link>
+            </Button>
+            <Button variant="outline" size="sm" asChild>
               <Link href="/admin/outreach/agents/setup">
                 <Settings className="mr-1.5 h-3.5 w-3.5" /> Settings
               </Link>
@@ -118,7 +127,7 @@ export function SdrCommandCenterClient({ config, stats, initialActivity, upcomin
         }
       />
 
-      <div className="flex items-center gap-2 text-sm">
+      <div className="flex flex-wrap items-center gap-2 text-sm">
         <span
           className={cn(
             'inline-flex h-2 w-2 rounded-full',
@@ -129,19 +138,29 @@ export function SdrCommandCenterClient({ config, stats, initialActivity, upcomin
         {config.isPaused && config.pausedReason ? (
           <span className="text-stone-500">— {config.pausedReason}</span>
         ) : null}
+        <span className="text-stone-300">·</span>
+        <Link
+          href="/admin/outreach/agents/aspire"
+          className="status-pill bg-[var(--accent-muted)] text-[var(--text-primary)] hover:opacity-90"
+        >
+          {config.prospectMode.replace(/_/g, ' ')}
+        </Link>
       </div>
 
       <KpiStrip items={kpiItems} className="lg:grid-cols-4" />
 
       <div className="grid gap-4 lg:grid-cols-3">
-        <section className="lg:col-span-2 rounded-xl border border-stone-200 bg-white p-4 shadow-sm">
-          <h3 className="text-sm font-semibold text-stone-900">Activity feed</h3>
+        <section className="card-surface lg:col-span-2 p-4">
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold text-[var(--text-primary)]">Activity feed</h3>
+            <LiveIndicator active={activityLive} />
+          </div>
           <SdrActivityFeed events={activity} accountId={config.accountId} />
         </section>
 
         <aside className="space-y-4">
-          <section className="rounded-xl border border-stone-200 bg-white p-4 shadow-sm">
-            <h3 className="text-sm font-semibold text-stone-900">Pipeline added (30d)</h3>
+          <section className="card-surface p-4">
+            <h3 className="text-sm font-semibold text-[var(--text-primary)]">Pipeline added (30d)</h3>
             <p className="mt-2 text-2xl font-semibold text-stone-900">
               ${(stats.pipelineAdded30d / 100).toLocaleString()}
             </p>
@@ -150,8 +169,8 @@ export function SdrCommandCenterClient({ config, stats, initialActivity, upcomin
             </p>
           </section>
 
-          <section className="rounded-xl border border-stone-200 bg-white p-4 shadow-sm">
-            <h3 className="text-sm font-semibold text-stone-900">Upcoming sends</h3>
+          <section className="card-surface p-4">
+            <h3 className="text-sm font-semibold text-[var(--text-primary)]">Upcoming sends</h3>
             <ul className="mt-3 space-y-2">
               {upcoming.length === 0 ? (
                 <li className="text-sm text-stone-500">No scheduled sends</li>
@@ -178,8 +197,22 @@ export function SdrCommandCenterClient({ config, stats, initialActivity, upcomin
             </ul>
           </section>
 
-          <section className="rounded-xl border border-stone-200 bg-stone-50 p-4">
-            <h3 className="text-sm font-semibold text-stone-900">Agent stats</h3>
+          <section className="card-surface border-[var(--border-subtle)] bg-[var(--bg-subtle)]/50 p-4">
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold text-[var(--text-primary)]">Prospect Scout</h3>
+              <Button variant="ghost" size="sm" className="h-7 text-xs" asChild>
+                <Link href="/admin/outreach/agents/aspire">Configure</Link>
+              </Button>
+            </div>
+            <p className="mt-2 text-xs text-[var(--text-secondary)]">
+              Mode: <span className="font-medium text-[var(--text-primary)]">{config.prospectMode.replace(/_/g, ' ')}</span>
+              {' · '}
+              ICP floor {config.defaultMinIcpScore}
+            </p>
+          </section>
+
+          <section className="card-surface p-4">
+            <h3 className="text-sm font-semibold text-[var(--text-primary)]">Agent stats</h3>
             <dl className="mt-2 grid grid-cols-2 gap-2 text-sm">
               <div>
                 <dt className="text-stone-500">Found</dt>

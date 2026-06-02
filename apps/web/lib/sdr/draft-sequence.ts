@@ -1,3 +1,4 @@
+import { assembleAgentPrompt } from '@/lib/agents/prompt-loader'
 import { callModel, parseJsonResponse } from '@/lib/ai/client'
 import type { ICPConfig } from '@/lib/aspire/types'
 import { fetchSdrSegmentMemory } from '@/lib/sdr/memory'
@@ -68,10 +69,8 @@ export async function generateSdrSequenceSteps(input: {
 
   const payload = buildDraftPayload({ ...input, memoryContext })
 
-  const userPrompt = [
+  const callContext = [
     `Rep name: ${payload.agentName}`,
-    `Business: ${payload.accountDisplayName}`,
-    `Vertical: ${payload.vertical}`,
     `Lead: ${payload.firstName} ${payload.lastName}, ${payload.title} at ${payload.company}`,
     payload.employeeCount ? `Company size: ${payload.employeeCount} employees` : null,
     `ICP score: ${payload.icpScore}`,
@@ -82,11 +81,18 @@ export async function generateSdrSequenceSteps(input: {
     .filter(Boolean)
     .join('\n')
 
+  const { system, user } = await assembleAgentPrompt({
+    accountId: input.accountId,
+    agentId: 'message_drafter',
+    taskInstructions: SEQUENCE_SYSTEM.replace('[agent_name]', input.agentName),
+    callContext,
+  })
+
   const result = await callModel({
     accountId: input.accountId,
     toolName: 'draft-sdr-sequence',
-    system: SEQUENCE_SYSTEM.replace('[agent_name]', input.agentName),
-    user: userPrompt,
+    system,
+    user,
     maxTokens: 2000,
     timeoutMs: 60_000,
   })

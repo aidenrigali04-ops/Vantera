@@ -1,3 +1,4 @@
+import { assembleAgentPrompt } from '@/lib/agents/prompt-loader'
 import { callModel, parseJsonResponse } from '@/lib/ai/client'
 import type { DraftResult } from '@/lib/aspire/types'
 
@@ -77,11 +78,18 @@ export async function draftOutreachMessages(context: DraftContext): Promise<Draf
 
   if (context.email) {
     try {
+      const emailPrompt = await assembleAgentPrompt({
+        accountId: context.accountId,
+        agentId: 'message_drafter',
+        taskInstructions: EMAIL_SYSTEM,
+        callContext: sharedContext,
+      })
+
       const result = await callModel({
         accountId: context.accountId,
         toolName: 'draft-outreach-email',
-        system: EMAIL_SYSTEM,
-        user: sharedContext,
+        system: emailPrompt.system,
+        user: emailPrompt.user,
         maxTokens: 500,
         timeoutMs: 30_000,
       })
@@ -123,11 +131,18 @@ export async function draftOutreachMessages(context: DraftContext): Promise<Draf
 
   if (context.phone) {
     try {
+      const smsPrompt = await assembleAgentPrompt({
+        accountId: context.accountId,
+        agentId: 'message_drafter',
+        taskInstructions: SMS_SYSTEM,
+        callContext: sharedContext,
+      })
+
       const result = await callModel({
         accountId: context.accountId,
         toolName: 'draft-outreach-sms',
-        system: SMS_SYSTEM,
-        user: sharedContext,
+        system: smsPrompt.system,
+        user: smsPrompt.user,
         maxTokens: 120,
         timeoutMs: 30_000,
       })

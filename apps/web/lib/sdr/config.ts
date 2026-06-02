@@ -34,6 +34,9 @@ function mapConfig(row: typeof sdrAgentConfigs.$inferSelect): SDRAgentConfig {
     outreachWindow: (row.outreachWindow as SdrOutreachWindow) ?? DEFAULT_OUTREACH_WINDOW,
     maxNewLeadsDay: row.maxNewLeadsDay,
     maxActiveLeads: row.maxActiveLeads,
+    prospectMode: (row.prospectMode ?? 'aspire_bound') as import('@/lib/sdr/types').ProspectMode,
+    defaultMinIcpScore: row.defaultMinIcpScore ?? 70,
+    syncIcpToSavedSearches: row.syncIcpToSavedSearches ?? true,
     isActive: row.isActive,
     isPaused: row.isPaused,
     pausedReason: row.pausedReason,
@@ -97,6 +100,9 @@ export async function createSDRConfig(
       outreachWindow: data.outreachWindow ?? DEFAULT_OUTREACH_WINDOW,
       maxNewLeadsDay: data.maxNewLeadsDay ?? 10,
       maxActiveLeads: data.maxActiveLeads ?? 200,
+      prospectMode: data.prospectMode ?? 'aspire_bound',
+      defaultMinIcpScore: data.defaultMinIcpScore ?? 70,
+      syncIcpToSavedSearches: data.syncIcpToSavedSearches ?? true,
       isActive: data.isActive ?? false,
     })
     .returning()
@@ -153,6 +159,13 @@ export async function updateSDRConfig(
       ...(data.outreachWindow !== undefined ? { outreachWindow: data.outreachWindow } : {}),
       ...(data.maxNewLeadsDay !== undefined ? { maxNewLeadsDay: data.maxNewLeadsDay } : {}),
       ...(data.maxActiveLeads !== undefined ? { maxActiveLeads: data.maxActiveLeads } : {}),
+      ...(data.prospectMode !== undefined ? { prospectMode: data.prospectMode } : {}),
+      ...(data.defaultMinIcpScore !== undefined
+        ? { defaultMinIcpScore: data.defaultMinIcpScore }
+        : {}),
+      ...(data.syncIcpToSavedSearches !== undefined
+        ? { syncIcpToSavedSearches: data.syncIcpToSavedSearches }
+        : {}),
       ...(data.isActive !== undefined ? { isActive: data.isActive } : {}),
       updatedAt: new Date(),
     })

@@ -1,10 +1,13 @@
-import { getIcpConfigForVertical, scoreICP } from '@/lib/aspire/icp-score'
-import { filterExistingLeads, searchApollo } from '@/lib/aspire/search'
-import type { ApolloSearchFilters } from '@/lib/aspire/types'
-import { getSystemAutomationId } from '@/lib/automation/system-automation'
+import { runBoundSearch, runUnboundSearch } from '@/lib/prospect-scout/run-search'
+import { findBindingsForConfig } from '@/lib/sdr/aspire-config'
 import { db } from '@/lib/db/client'
-import { createIntelligenceSignal } from '@/lib/webhooks/resend/signals'
-import { accounts, aspireResults, aspireSavedSearches, automationRuns } from '@vantera/db'
+import { computeEnrollmentHeadroom } from '@/lib/prospect-scout/run-account'
+import {
+  accounts,
+  aspireSavedSearches,
+  sdrAgentConfigs,
+  sdrAspireBindings,
+} from '@vantera/db'
 import { and, eq, isNull, lt, or, sql } from 'drizzle-orm'
 import { schedules } from '@trigger.dev/sdk'
 
@@ -17,6 +20,7 @@ export async function runAspireWeeklySearch(): Promise<{ searchesRun: number; ne
     .select({
       search: aspireSavedSearches,
       vertical: accounts.vertical,
+      accountId: accounts.id,
     })
     .from(aspireSavedSearches)
     .innerJoin(accounts, eq(aspireSavedSearches.accountId, accounts.id))
@@ -34,69 +38,100 @@ export async function runAspireWeeklySearch(): Promise<{ searchesRun: number; ne
   let searchesRun = 0
   let newMatches = 0
 
-  for (const { search, vertical } of searches) {
-    const filters = search.filters as ApolloSearchFilters
-    const icpConfig = getIcpConfigForVertical(vertical)
+  for (const { search, vertical, accountId } of searches) {
+    const [binding] = await db
+      .select({ bindingId: sdrAspireBindings.id })
+      .from(sdrAspireBindings)
+      .where(
+        and(
+          eq(sdrAspireBindings.savedSearchId, search.id),
+          eq(sdrAspireBindings.isActive, true),
+        ),
+      )
+      .limit(1)
+
+    if (binding) {
+      continue
+    }
+
+    const [config] = await db
+      .select()
+      .from(sdrAgentConfigs)
+      .where(
+        and(
+          eq(sdrAgentConfigs.accountId, accountId),
+          eq(sdrAgentConfigs.isActive, true),
+          isNull(sdrAgentConfigs.deletedAt),
+        ),
+      )
+      .limit(1)
+
+    const headroom = config ? await computeEnrollmentHeadroom(config) : 0
 
     try {
-      const { people } = await searchApollo(filters, 1, 25)
-      const existingIds = new Set(await filterExistingLeads(search.accountId, people.map((p) => p.id)))
-      const fresh = people.filter((p) => !existingIds.has(p.id))
-
-      if (fresh.length > 0) {
-        await db.insert(aspireResults).values(
-          fresh.map((person) => {
-            const scored = scoreICP(person, icpConfig)
-            return {
-              accountId: search.accountId,
-              searchId: search.id,
-              apolloId: person.id,
-              rawData: person,
-              icpScore: scored.score,
-              icpSignals: scored.signals,
-              status: 'found',
-            }
-          }),
-        )
-        newMatches += fresh.length
-
-        await createIntelligenceSignal({
-          accountId: search.accountId,
-          signalType: 'aspire_icp_match',
-          severity: 'yellow',
-          headline: `${fresh.length} new ICP leads found in ${search.name}`,
-          actionLabel: 'Review matches',
-          actionPayload: { searchId: search.id },
-          expiresInDays: 7,
-        })
-      }
-
-      await db
-        .update(aspireSavedSearches)
-        .set({
-          lastRunAt: new Date(),
-          totalFound: search.totalFound + fresh.length,
-          updatedAt: new Date(),
-        })
-        .where(eq(aspireSavedSearches.id, search.id))
-
-      const automationId = await getSystemAutomationId(search.accountId, 'aspire')
-      await db.insert(automationRuns).values({
-        accountId: search.accountId,
-        automationId,
-        triggerEvent: 'aspire_weekly_search',
-        triggerPayload: { searchId: search.id },
-        actionType: 'search_apollo',
-        status: 'success',
-        resultPayload: { newMatches: fresh.length },
+      const result = await runUnboundSearch({
+        search,
+        accountId,
+        vertical,
+        config: config ?? null,
+        headroom: headroom > 0 ? headroom : undefined,
       })
-
-      searchesRun++
+      searchesRun += 1
+      newMatches += result.found
     } catch (error) {
       console.error('[aspireWeeklySearch] search failed:', search.id, error)
     }
 
     await sleep(300)
+  }
+
+  const boundConfigs = await db
+    .select({ config: sdrAgentConfigs })
+    .from(sdrAgentConfigs)
+    .where(
+      and(
+        eq(sdrAgentConfigs.isActive, true),
+        eq(sdrAgentConfigs.isPaused, false),
+        isNull(sdrAgentConfigs.deletedAt),
+      ),
+    )
+
+  for (const { config } of boundConfigs) {
+    const bindings = await findBindingsForConfig(config.id)
+    let headroom = await computeEnrollmentHeadroom(config)
+
+    for (const binding of bindings) {
+      if (headroom <= 0) break
+
+      const lastRun = binding.search.lastRunAt
+      const due =
+        !lastRun || lastRun.getTime() < Date.now() - 6 * 86_400_000
+
+      if (!due || !binding.search.isActive) continue
+
+      const [account] = await db
+        .select({ name: accounts.name, vertical: accounts.vertical })
+        .from(accounts)
+        .where(eq(accounts.id, config.accountId))
+        .limit(1)
+
+      try {
+        const result = await runBoundSearch({
+          binding,
+          config,
+          headroom,
+          accountName: account?.name ?? undefined,
+          vertical: account?.vertical ?? undefined,
+        })
+        searchesRun += 1
+        newMatches += result.found
+        headroom = Math.max(0, headroom - result.enrolled)
+      } catch (error) {
+        console.error('[aspireWeeklySearch] bound search failed:', binding.id, error)
+      }
+
+      await sleep(300)
+    }
   }
 
   return { searchesRun, newMatches }

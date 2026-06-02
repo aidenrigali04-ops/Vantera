@@ -628,6 +628,7 @@ export const aspireSavedSearches = pgTable(
     lastRunAt: timestamptz('last_run_at'),
     totalFound: smallint('total_found').notNull().default(0),
     isActive: boolean('is_active').notNull().default(true),
+    icpConfig: jsonb('icp_config'),
     createdByUserId: uuid('created_by_user_id').references(() => users.id),
     createdAt: timestamptz('created_at').notNull().defaultNow(),
     updatedAt: timestamptz('updated_at').notNull().defaultNow(),
@@ -747,12 +748,46 @@ export const sdrAgentConfigs = pgTable(
     totalContacted: integer('total_contacted').notNull().default(0),
     totalReplied: integer('total_replied').notNull().default(0),
     totalBooked: integer('total_booked').notNull().default(0),
+    prospectMode: varchar('prospect_mode', { length: 20 }).notNull().default('aspire_bound'),
+    defaultMinIcpScore: smallint('default_min_icp_score').notNull().default(70),
+    syncIcpToSavedSearches: boolean('sync_icp_to_saved_searches').notNull().default(true),
     deletedAt: timestamptz('deleted_at'),
     createdAt: timestamptz('created_at').notNull().defaultNow(),
     updatedAt: timestamptz('updated_at').notNull().defaultNow(),
   },
   (table) => ({
     activeIdx: index('sdr_agent_configs_active_idx').on(table.isActive, table.isPaused),
+  }),
+)
+
+export const sdrAspireBindings = pgTable(
+  'sdr_aspire_bindings',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    configId: uuid('config_id')
+      .notNull()
+      .references(() => sdrAgentConfigs.id, { onDelete: 'cascade' }),
+    savedSearchId: uuid('saved_search_id')
+      .notNull()
+      .references(() => aspireSavedSearches.id, { onDelete: 'cascade' }),
+    priority: smallint('priority').notNull().default(0),
+    minIcpScore: smallint('min_icp_score').notNull().default(70),
+    maxLeadsPerRun: smallint('max_leads_per_run').notNull().default(25),
+    autoEnrollSdr: boolean('auto_enroll_sdr').notNull().default(true),
+    isActive: boolean('is_active').notNull().default(true),
+    createdAt: timestamptz('created_at').notNull().defaultNow(),
+    updatedAt: timestamptz('updated_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    accountIdx: index('sdr_aspire_bindings_account_idx').on(table.accountId, table.isActive),
+    configIdx: index('sdr_aspire_bindings_config_idx').on(table.configId, table.priority),
+    configSearchUniq: uniqueIndex('sdr_aspire_bindings_config_search_idx').on(
+      table.configId,
+      table.savedSearchId,
+    ),
   }),
 )
 
@@ -856,12 +891,18 @@ export const aspireSearchRuns = pgTable(
       .notNull()
       .references(() => accounts.id, { onDelete: 'cascade' }),
     savedSearchId: uuid('saved_search_id').references(() => aspireSavedSearches.id),
+    configId: uuid('config_id').references(() => sdrAgentConfigs.id, { onDelete: 'set null' }),
     query: jsonb('query').notNull().default({}),
     resultCount: smallint('result_count').notNull().default(0),
+    enrolledCount: smallint('enrolled_count').notNull().default(0),
+    status: varchar('status', { length: 20 }).notNull().default('success'),
+    errorMessage: text('error_message'),
     runAt: timestamptz('run_at').notNull().defaultNow(),
+    finishedAt: timestamptz('finished_at'),
   },
   (table) => ({
     accountIdx: index('aspire_search_runs_account_id_idx').on(table.accountId),
+    statusIdx: index('aspire_search_runs_status_idx').on(table.accountId, table.runAt),
   }),
 )
 
@@ -1553,6 +1594,22 @@ export const sdrAgentConfigsRelations = relations(sdrAgentConfigs, ({ one, many 
   }),
   sequences: many(sdrSequences),
   activityLog: many(sdrActivityLog),
+  aspireBindings: many(sdrAspireBindings),
+}))
+
+export const sdrAspireBindingsRelations = relations(sdrAspireBindings, ({ one }) => ({
+  account: one(accounts, {
+    fields: [sdrAspireBindings.accountId],
+    references: [accounts.id],
+  }),
+  config: one(sdrAgentConfigs, {
+    fields: [sdrAspireBindings.configId],
+    references: [sdrAgentConfigs.id],
+  }),
+  savedSearch: one(aspireSavedSearches, {
+    fields: [sdrAspireBindings.savedSearchId],
+    references: [aspireSavedSearches.id],
+  }),
 }))
 
 export const sdrSequencesRelations = relations(sdrSequences, ({ one, many }) => ({

@@ -23,6 +23,9 @@ export interface SDRAgentConfig {
   outreachWindow: SdrOutreachWindow
   maxNewLeadsDay: number
   maxActiveLeads: number
+  prospectMode: ProspectMode
+  defaultMinIcpScore: number
+  syncIcpToSavedSearches: boolean
   isActive: boolean
   isPaused: boolean
   pausedReason: string | null
@@ -35,6 +38,8 @@ export interface SDRAgentConfig {
     bookingRate: number
   }
 }
+
+export type ProspectMode = 'aspire_bound' | 'inline_icp' | 'hybrid'
 
 export type CreateSDRConfigInput = {
   agentName: string
@@ -52,6 +57,9 @@ export type CreateSDRConfigInput = {
   maxNewLeadsDay?: number
   maxActiveLeads?: number
   isActive?: boolean
+  prospectMode?: ProspectMode
+  defaultMinIcpScore?: number
+  syncIcpToSavedSearches?: boolean
 }
 
 export interface SDRSequenceStep {

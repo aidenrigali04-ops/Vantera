@@ -48,7 +48,7 @@ export default async function SdrSetupPage() {
     <div className="space-y-8 py-4">
       <PageHeader
         title="Set up your SDR Agent"
-        description="Configure identity, ICP, and schedule — launch in about 5 minutes."
+        description="Identity, ICP, schedule, and Prospect Scout bindings — launch in about 5 minutes."
       />
       <SdrSetupWizardClient
         accountVertical={account?.vertical ?? 'agency'}

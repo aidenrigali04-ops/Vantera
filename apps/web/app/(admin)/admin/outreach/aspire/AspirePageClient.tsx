@@ -29,6 +29,8 @@ import {
   ASPIRE_TABLE_VIEWS,
   aspireIntentTone,
 } from '@/lib/operational/aspire-table-views'
+import { LiveIndicator } from '@/components/operational/LiveIndicator'
+import { useAccountRealtime } from '@/lib/supabase/account-realtime'
 import { cn } from '@/lib/utils'
 import type { aspireSavedSearches } from '@vantera/db'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -118,8 +120,10 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
     enabled: false,
   })
 
+  const savedResultsQueryKey = ['aspire-results', activeSearchId] as const
+
   const { data: savedResults = [], isFetching: isSavedFetching } = useQuery({
-    queryKey: ['aspire-results', activeSearchId],
+    queryKey: savedResultsQueryKey,
     queryFn: async () => {
       const res = await fetch(`/api/aspire/results/${activeSearchId}`)
       const json = await res.json()
@@ -127,6 +131,16 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
       return json.data as AspireSearchResult[]
     },
     enabled: Boolean(activeSearchId),
+  })
+
+  const { isLive: resultsLive } = useAccountRealtime({
+    accountId,
+    table: 'aspire_results',
+    searchId: activeSearchId,
+    enabled: Boolean(activeSearchId),
+    onChange: () => {
+      void queryClient.invalidateQueries({ queryKey: savedResultsQueryKey })
+    },
   })
 
   const isFetching = isLiveFetching || isSavedFetching
@@ -557,10 +571,14 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
 
         <div className="space-y-4 lg:col-span-6">
           {activeSaved ? (
-            <p className="text-[13px] text-stone-500">
-              Viewing saved search <span className="font-medium text-stone-800">{activeSaved.name}</span>
-              {liveResults.length === 0 ? ' — showing stored results' : ''}
-            </p>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-[13px] text-[var(--text-secondary)]">
+                Viewing saved search{' '}
+                <span className="font-medium text-[var(--text-primary)]">{activeSaved.name}</span>
+                {liveResults.length === 0 ? ' — showing stored results' : ''}
+              </p>
+              <LiveIndicator active={resultsLive} />
+            </div>
           ) : null}
 
           <KpiStrip items={kpiItems} />
