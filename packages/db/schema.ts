@@ -156,6 +156,11 @@ export const accounts = pgTable('accounts', {
   businessHoursEnd: smallint('business_hours_end'),
   voicePreference: varchar('voice_preference', { length: 20 }),
 
+  /** Owner-written ideal customer profile from onboarding. */
+  icpDescription: text('icp_description'),
+  /** Owner-written value proposition / solutions offered from onboarding. */
+  valueProposition: text('value_proposition'),
+
   // Tracks which template was applied so integration-connect flows can
   // re-run personalization against the current profile.
   activeTemplateId: uuid('active_template_id'),

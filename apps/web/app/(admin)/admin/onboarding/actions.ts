@@ -1,6 +1,7 @@
 'use server'
 
 import { bootstrapBusinessContext } from '@/lib/ai'
+import { upsertMemory } from '@/lib/ai/memory'
 import { personalizeVoiceWithAI } from '@/lib/ai/personalize-voice'
 import { getAdminSession, setAdminSession } from '@/lib/auth/session'
 import type { ActionResult } from '@/lib/auth/types'
@@ -196,6 +197,187 @@ export async function updateBranding(
   }
 }
 
+const icpDescriptionSchema = z
+  .string()
+  .trim()
+  .min(20, 'Describe your ideal customer in at least a few sentences')
+  .max(2000, 'Keep your ICP under 2000 characters')
+
+const valuePropositionSchema = z
+  .string()
+  .trim()
+  .min(20, 'Describe the value you provide in at least a few sentences')
+  .max(2000, 'Keep your answer under 2000 characters')
+
+export type OnboardingProfileSnapshot = {
+  icpDescription: string | null
+  valueProposition: string | null
+}
+
+export async function getOnboardingProfile(
+  accountId: string,
+): Promise<ActionResult<OnboardingProfileSnapshot>> {
+  try {
+    void accountId
+    const { accountId: workspaceId } = await assertOwnAccount()
+    const row = await fetchAccountById(workspaceId)
+
+    return {
+      success: true,
+      data: {
+        icpDescription: row?.icp_description ?? null,
+        valueProposition: row?.value_proposition ?? null,
+      },
+    }
+  } catch (error) {
+    rethrowFrameworkSignals(error)
+    return err(error instanceof Error ? error.message : 'Failed to load onboarding profile')
+  }
+}
+
+export async function saveOnboardingIcp(
+  accountId: string,
+  icpDescription: string,
+): Promise<ActionResult<{ saved: true }>> {
+  try {
+    void accountId
+    const { accountId: workspaceId } = await assertOwnAccount()
+
+    const parsed = icpDescriptionSchema.safeParse(icpDescription)
+    if (!parsed.success) {
+      return err(parsed.error.issues[0]?.message ?? 'Invalid ICP description')
+    }
+
+    const saved = await patchAccountRow(workspaceId, {
+      icp_description: parsed.data,
+    })
+
+    if (!saved.ok) {
+      return err(saved.message)
+    }
+
+    revalidatePath('/admin/onboarding')
+    return { success: true, data: { saved: true } }
+  } catch (error) {
+    rethrowFrameworkSignals(error)
+    return err(error instanceof Error ? error.message : 'Failed to save ICP')
+  }
+}
+
+function buildOnboardingBusinessSummary(icpDescription: string, valueProposition: string): string {
+  return `Ideal customer: ${icpDescription} Value provided: ${valueProposition}`
+}
+
+async function applyDefaultTemplateForVertical(
+  accountId: string,
+  vertical: string,
+  ownerUserId: string,
+): Promise<void> {
+  if (!VERTICAL_VALUES.includes(vertical as Vertical)) {
+    return
+  }
+
+  const admin = getSupabaseAdmin()
+  const { data: rows, error } = await admin
+    .from('vertical_templates')
+    .select('id')
+    .eq('vertical', vertical)
+    .eq('is_active', true)
+    .order('record_type', { ascending: true })
+    .limit(1)
+
+  if (error || !rows?.[0]?.id) {
+    return
+  }
+
+  try {
+    await applyTemplateForAccount(accountId, rows[0].id, ownerUserId)
+  } catch (templateErr) {
+    console.error('[finishOnboardingSetup] template apply failed', templateErr)
+  }
+}
+
+export async function finishOnboardingSetup(
+  accountId: string,
+  valueProposition: string,
+  vertical: string | null,
+): Promise<ActionResult<{ completed: true; redirectTo: string }>> {
+  try {
+    void accountId
+    const { session, accountId: workspaceId } = await assertOwnAccount()
+
+    if (session.role !== 'owner') {
+      return err('Only the account owner can complete onboarding')
+    }
+
+    const parsed = valuePropositionSchema.safeParse(valueProposition)
+    if (!parsed.success) {
+      return err(parsed.error.issues[0]?.message ?? 'Invalid value proposition')
+    }
+
+    const account = await fetchAccountById(workspaceId)
+    const icpDescription = account?.icp_description?.trim() ?? ''
+
+    if (icpDescription.length < 20) {
+      return err('Complete your ideal customer profile on the previous step first')
+    }
+
+    const saved = await patchAccountRow(workspaceId, {
+      value_proposition: parsed.data,
+    })
+
+    if (!saved.ok) {
+      return err(saved.message)
+    }
+
+    if (vertical) {
+      await applyDefaultTemplateForVertical(workspaceId, vertical, session.userId)
+    }
+
+    try {
+      await upsertMemory({
+        accountId: workspaceId,
+        kind: 'business_context',
+        subjectType: 'account',
+        subjectId: workspaceId,
+        summary: buildOnboardingBusinessSummary(icpDescription, parsed.data),
+        evidence: {
+          icpDescription,
+          valueProposition: parsed.data,
+          source: 'onboarding',
+        },
+        confidence: 85,
+      })
+    } catch (memoryErr) {
+      console.error('[finishOnboardingSetup] ai_memory upsert failed', memoryErr)
+    }
+
+    const marked = await markOnboardingComplete(workspaceId)
+    if (!marked.ok) {
+      return err(marked.message)
+    }
+
+    revalidatePath('/admin', 'layout')
+    revalidatePath('/admin/onboarding')
+    revalidatePath('/admin/dashboard')
+
+    void bootstrapBusinessContext(workspaceId, session.userId).catch(() => {
+      /* swallow — workflow already logs */
+    })
+
+    return {
+      success: true,
+      data: {
+        completed: true,
+        redirectTo: '/admin/dashboard',
+      },
+    }
+  } catch (error) {
+    rethrowFrameworkSignals(error)
+    return err(error instanceof Error ? error.message : 'Failed to complete onboarding')
+  }
+}
+
 export type TemplateSummary = {
   id: string
   recordType: string
@@ -244,6 +426,8 @@ function normalizeFallbackAccount(
     business_hours_start: null,
     business_hours_end: null,
     voice_preference: null,
+    icp_description: null,
+    value_proposition: null,
     active_template_id: null,
     onboarding_completed_at: null,
   }

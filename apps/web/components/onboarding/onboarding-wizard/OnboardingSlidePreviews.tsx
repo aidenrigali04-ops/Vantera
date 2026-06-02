@@ -69,6 +69,39 @@ function PreviewBusinessType() {
   )
 }
 
+function PreviewIcp() {
+  return (
+    <MockChrome>
+      <div className="space-y-2 p-3">
+        <p className="text-[11px] font-semibold text-[var(--text-primary)]">Ideal customer profile</p>
+        <div className="space-y-1.5 rounded-md border border-[var(--border-default)] bg-[var(--bg-surface)] p-2.5">
+          <div className="h-2 w-full rounded bg-[var(--bg-overlay)]" />
+          <div className="h-2 w-[92%] rounded bg-[var(--bg-overlay)]" />
+          <div className="h-2 w-[78%] rounded bg-[var(--bg-overlay)]" />
+        </div>
+        <p className="text-[10px] text-[var(--text-tertiary)]">Powers Aspire targeting &amp; ICP scoring</p>
+      </div>
+    </MockChrome>
+  )
+}
+
+function PreviewValueProposition() {
+  return (
+    <MockChrome>
+      <div className="space-y-2 p-3">
+        <p className="text-[11px] font-semibold text-[var(--text-primary)]">Your value proposition</p>
+        <div className="rounded-md border border-[var(--brand-accent-border)] bg-[var(--brand-accent-muted)] p-2.5 text-[10px] leading-relaxed text-[var(--text-secondary)]">
+          Outcomes you deliver — woven into AI outreach and recommendations
+        </div>
+        <div className="flex items-center gap-1.5 text-[10px] text-[var(--brand-accent)]">
+          <Sparkles className="h-3 w-3" />
+          Shapes messaging tone
+        </div>
+      </div>
+    </MockChrome>
+  )
+}
+
 function PreviewBranding() {
   return (
     <MockChrome>
@@ -230,6 +263,8 @@ function PreviewFinish() {
 
 const PREVIEWS: Record<OnboardingWizardPreviewId, () => JSX.Element> = {
   'business-type': PreviewBusinessType,
+  icp: PreviewIcp,
+  'value-proposition': PreviewValueProposition,
   branding: PreviewBranding,
   voice: PreviewVoice,
   workflow: PreviewWorkflow,

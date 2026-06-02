@@ -13,8 +13,8 @@ import {
   useOnboardingNavActions,
 } from './onboarding-nav'
 import { Step1BusinessType } from './steps/Step1BusinessType'
-import { Step2Branding } from './steps/Step2Branding'
-import { Step3DashboardSetup } from './steps/Step3DashboardSetup'
+import { Step2Icp } from './steps/Step2Icp'
+import { Step3ValueProposition } from './steps/Step3ValueProposition'
 
 type Props = {
   accountId: string
@@ -28,25 +28,15 @@ type Props = {
 
 function OnboardingWizardInner({
   accountId,
-  businessName,
   currentVertical,
-  initialPrimaryColor,
-  initialSecondaryColor,
-  initialLogoUrl,
-  initialPortalDomain,
-}: Props) {
+}: Pick<Props, 'accountId' | 'currentVertical'>) {
   const router = useRouter()
   const storageKey = `vantera_onboarding_step_${accountId}`
   const { runSubmit, nav } = useOnboardingNavActions()
 
   const [stepIndex, setStepIndex] = useState(0)
   const [hydrated, setHydrated] = useState(false)
-
   const [vertical, setVertical] = useState<string | null>(currentVertical)
-  const [primaryColor, setPrimaryColor] = useState(initialPrimaryColor)
-  const [secondaryColor, setSecondaryColor] = useState(initialSecondaryColor)
-  const [logoUrl, setLogoUrl] = useState<string | null>(initialLogoUrl)
-  const [portalDomain, setPortalDomain] = useState(initialPortalDomain)
 
   useEffect(() => {
     try {
@@ -152,32 +142,17 @@ function OnboardingWizardInner({
             <Step1BusinessType
               accountId={accountId}
               currentVertical={vertical}
-              primaryColor={primaryColor}
+              primaryColor="#1648A0"
               onComplete={(data) => {
                 setVertical(data.vertical)
               }}
             />
           ) : null}
 
-          {stepIndex === 1 ? (
-            <Step2Branding
-              accountId={accountId}
-              businessName={businessName}
-              initialLogoUrl={logoUrl}
-              initialPrimary={primaryColor}
-              initialSecondary={secondaryColor}
-              initialPortalDomain={portalDomain}
-              onComplete={(data) => {
-                setLogoUrl(data.logoUrl)
-                setPrimaryColor(data.primaryColor)
-                setSecondaryColor(data.secondaryColor)
-                setPortalDomain(data.portalDomain)
-              }}
-            />
-          ) : null}
+          {stepIndex === 1 ? <Step2Icp accountId={accountId} /> : null}
 
           {stepIndex === 2 ? (
-            <Step3DashboardSetup
+            <Step3ValueProposition
               accountId={accountId}
               vertical={vertical}
               onComplete={() => {}}
@@ -192,7 +167,7 @@ function OnboardingWizardInner({
 export function OnboardingWizard(props: Props) {
   return (
     <OnboardingNavProvider>
-      <OnboardingWizardInner {...props} />
+      <OnboardingWizardInner accountId={props.accountId} currentVertical={props.currentVertical} />
     </OnboardingNavProvider>
   )
 }

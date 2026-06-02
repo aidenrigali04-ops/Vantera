@@ -30,12 +30,14 @@ export type AccountRow = {
   business_hours_start: number | null
   business_hours_end: number | null
   voice_preference: string | null
+  icp_description: string | null
+  value_proposition: string | null
   active_template_id: string | null
   onboarding_completed_at: string | null
 }
 
 const ACCOUNT_SELECT =
-  'id,slug,name,vertical,plan,brand_logo_url,brand_primary_color,brand_secondary_color,portal_domain,timezone,booking_link,review_link,payment_link,emergency_line,business_hours_start,business_hours_end,voice_preference,active_template_id,onboarding_completed_at'
+  'id,slug,name,vertical,plan,brand_logo_url,brand_primary_color,brand_secondary_color,portal_domain,timezone,booking_link,review_link,payment_link,emergency_line,business_hours_start,business_hours_end,voice_preference,icp_description,value_proposition,active_template_id,onboarding_completed_at'
 
 const ACCOUNT_SELECT_MINIMAL =
   'id,slug,name,vertical,plan,brand_logo_url,brand_primary_color,brand_secondary_color,portal_domain,timezone,onboarding_completed_at'
@@ -74,6 +76,8 @@ function emptyAccountRow(id: string): AccountRow {
     business_hours_start: null,
     business_hours_end: null,
     voice_preference: null,
+    icp_description: null,
+    value_proposition: null,
     active_template_id: null,
     onboarding_completed_at: null,
   }
@@ -95,6 +99,8 @@ function normalizeAccountRow(row: Partial<AccountRow> & Pick<AccountRow, 'id'>):
     business_hours_start: row.business_hours_start ?? null,
     business_hours_end: row.business_hours_end ?? null,
     voice_preference: row.voice_preference ?? null,
+    icp_description: row.icp_description ?? null,
+    value_proposition: row.value_proposition ?? null,
     active_template_id: row.active_template_id ?? null,
     onboarding_completed_at: row.onboarding_completed_at ?? null,
   }
