@@ -1,0 +1,2 @@
+-- Superseded by 0024_aspire_apify_id.sql (renames apollo_id → apify_id + full unique index).
+-- If you have not applied this file yet, run 0024 only.

@@ -20,7 +20,7 @@ import {
 import { splitFullName } from '@/lib/aspire/contact-fields'
 import { isApifyAuthError, parseApifyErrorMessage } from '@/lib/aspire/apify-errors'
 import { stubResults } from '@/lib/aspire/prospect-stubs'
-import type { ApolloPersonResult, ApolloSearchFilters } from '@/lib/aspire/types'
+import type { ApifyLead, ApifySearchFilters } from '@/lib/aspire/types'
 import { env } from '@/lib/env'
 
 const APIFY_API_BASE = 'https://api.apify.com/v2'
@@ -84,7 +84,7 @@ function unwrapApifyRow(raw: Record<string, unknown>): Record<string, unknown> {
   return raw
 }
 
-export function mapApifyLead(raw: Record<string, unknown>): ApolloPersonResult | null {
+export function mapApifyLead(raw: Record<string, unknown>): ApifyLead | null {
   const row = unwrapApifyRow(raw)
   const id = buildProspectId(row)
   if (!id) return null
@@ -151,7 +151,7 @@ function mapCompanySizeRanges(ranges: string[] | undefined): string[] | undefine
 }
 
 export function buildApifyActorInput(
-  filters: ApolloSearchFilters,
+  filters: ApifySearchFilters,
   perPage: number,
   interactive: boolean,
 ): Record<string, unknown> {
@@ -183,12 +183,9 @@ export function buildApifyActorInput(
     }
   }
 
-  const locations = normalizeApifyLocations(
-    filters.locations?.length ? filters.locations : interactive ? ['united states'] : undefined,
+  input.contact_location = normalizeApifyLocations(
+    filters.locations?.length ? filters.locations : ['united states'],
   )
-  if (locations?.length) {
-    input.contact_location = locations
-  }
 
   if (filters.industries?.length) {
     input.company_industry = filters.industries
@@ -221,10 +218,10 @@ function parseApifyDatasetItems(body: unknown): Record<string, unknown>[] {
 }
 
 function mergePeople(
-  primary: ApolloPersonResult[],
-  extra: ApolloPersonResult[],
+  primary: ApifyLead[],
+  extra: ApifyLead[],
   max: number,
-): ApolloPersonResult[] {
+): ApifyLead[] {
   const seen = new Set(primary.map((p) => p.id))
   const merged = [...primary]
   for (const person of extra) {
@@ -277,7 +274,7 @@ async function fetchApifyLeads(
   token: string,
   actorId: string,
   syncTimeoutSec: number,
-): Promise<{ rows: Record<string, unknown>[]; people: ApolloPersonResult[] }> {
+): Promise<{ rows: Record<string, unknown>[]; people: ApifyLead[] }> {
   const url = `${APIFY_API_BASE}/acts/${actorIdForUrl(actorId)}/run-sync-get-dataset-items?token=${encodeURIComponent(token)}&timeout=${syncTimeoutSec}&format=json`
   const response = await fetch(url, {
     method: 'POST',
@@ -295,14 +292,14 @@ async function fetchApifyLeads(
   const rows = parseApifyDatasetItems(body)
   const people = rows
     .map((row) => mapApifyLead(row))
-    .filter((person): person is ApolloPersonResult => person !== null)
+    .filter((person): person is ApifyLead => person !== null)
 
   return { rows, people }
 }
 
 function apifyEmptyResultMessage(
   rows: Record<string, unknown>[],
-  people: ApolloPersonResult[],
+  people: ApifyLead[],
   retriedBroad: boolean,
   retriedMinimal: boolean,
 ): string {
@@ -315,12 +312,12 @@ function apifyEmptyResultMessage(
 }
 
 export async function searchApify(
-  filters: ApolloSearchFilters,
+  filters: ApifySearchFilters,
   page = 1,
   perPage?: number,
   interactive = false,
 ): Promise<{
-  people: ApolloPersonResult[]
+  people: ApifyLead[]
   total: number
   hasMore: boolean
   meta: ProspectSearchMeta
@@ -354,7 +351,7 @@ export async function searchApify(
   const maxRuns = interactive ? 2 : 3
 
   let rows: Record<string, unknown>[] = []
-  let people: ApolloPersonResult[] = []
+  let people: ApifyLead[] = []
   let retriedBroad = false
   let retriedMinimal = false
   let runs = 0

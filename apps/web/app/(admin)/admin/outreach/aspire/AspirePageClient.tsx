@@ -34,7 +34,7 @@ import { aspireCompanyName, aspireProspectName } from '@/lib/aspire/display'
 import { getAspireSearchNotice } from '@/lib/aspire/apify-errors'
 import { mergeAspireResults } from '@/lib/aspire/merge-results'
 import { getIcpConfigForVertical } from '@/lib/aspire/icp-score'
-import { normalizeApolloFilters } from '@/lib/aspire/filters'
+import { normalizeApifyFilters } from '@/lib/aspire/filters'
 import type { AspireSearchResult } from '@/lib/aspire/types'
 import { ASPIRE_TABLE_VIEWS } from '@/lib/operational/aspire-table-views'
 import { LiveIndicator } from '@/components/operational/LiveIndicator'
@@ -428,7 +428,7 @@ export function AspirePageClient({
 
   const saveSearchMutation = useMutation({
     mutationFn: async (name: string) => {
-      const filters = normalizeApolloFilters(accountVertical, {
+      const filters = normalizeApifyFilters(accountVertical, {
         q: query || undefined,
         company: company || undefined,
       })

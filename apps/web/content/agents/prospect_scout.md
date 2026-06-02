@@ -1,50 +1,29 @@
-# Prospect Scout (Agent 01)
+# Prospect Scout
 
-Discovery and enrichment for each client account. Find owner-operators who match ICP, score them, and surface high-fit leads for enrollment.
+Automated lead discovery for SDR agents. Runs on schedule via `sdr-agent-find` (Trigger).
 
-## Mission
+## Data source
 
-Run on schedule per account where `sdr_agent_enabled` is true and SDR config is active. Respect capacity: `max_active_leads`, `max_new_leads_day`, `exclude_domains`.
+**Apify** — actor `code_crafter/leads-finder` (see `lib/aspire/apify-client.ts`). Filters map from `sdr_agent_configs` ICP (`icpConfig`, `targetCities`, `targetVerticals`).
 
-## Discovery sources (Vantera implementation)
+## Modes (`prospect_mode` on `sdr_agent_configs`)
 
-1. **Aspire saved searches** (bound mode) — filters from `sdr_aspire_bindings`
-2. **Inline Apollo search** — `icpConfig`, `targetCities`, `targetVerticals` from `sdr_agent_configs`
-3. **Manual / weekly** — `aspire-weekly-search` for unbound saved searches
+1. **`inline_icp`** — Scout runs Apify from config ICP (default)
+2. **`aspire_bound`** — Re-run saved Aspire search bindings only
+3. **`hybrid`** — Scout Apify run + optional saved searches
 
-Apollo: `POST https://api.apollo.io/v1/mixed_people/search` with `person_titles`, locations, keywords from ICP.
+## Flow
 
-## Franchise / disqualifier filter
+1. Build `ApifySearchFilters` from config
+2. Call Apify → normalize rows to `ApifyLead`
+3. Score with ICP engine (`scoreICP`)
+4. Upsert `aspire_results` on `(account_id, apify_id)` — stable id from `buildProspectId`
+5. Optional auto-enroll → `leads`, `sdr_sequences`, credit ledger
 
-Skip franchise brands and marketplaces (not SMB owner-operators):
+## Dedup
 
-HomeTeam, Coverall, Jan-Pro, Neighborly, ServiceMaster, Angi, HomeAdvisor, Thumbtack, Pella, Renewal by Andersen, Two Men and a Truck, College Hunks.
+Before insert, check `contacts`, `leads`, `aspire_results` by email, phone, `apify_id`, company name within the same `account_id`.
 
-Also skip: domains in `exclude_domains`, missing business name, ICP score below account minimum (default 40–70).
+## Credits
 
-## ICP fit signals (score 0–100)
-
-Weight toward:
-
-- Website quality (custom site, SSL, not franchise subdomain)
-- Review volume and rating
-- Team size in target range (Apollo `employeeCount`)
-- No enterprise CRM in technographics (HubSpot/Salesforce/GHL absent = positive)
-- Verified email + phone
-- Owner title matches `targetTitles` in ICP config
-
-## Dedup (strict per account)
-
-Before insert, check existing `contacts`, `leads`, `aspire_results` by email, phone, `apolloId`, company name within same `accountId`.
-
-## Outputs
-
-- `aspire_results` — status `found` or `enrolled`
-- `leads` — source `sdr_agent` when auto-enroll
-- `sdr_activity_log` — `leads_found` / `lead_enrolled`
-- `aspire_search_runs` — status, enrolled_count, error_message
-- Yellow intelligence signal when batch finds > 0: "Review new ICP matches"
-
-## Voice
-
-Prospect Scout does not message leads. Logging and signals only. Never mention Vantera to the prospect.
+Scout enroll and pipeline enroll consume SDR credits (`lib/sdr/credits.ts`). See `0019_sdr_credits.sql`.

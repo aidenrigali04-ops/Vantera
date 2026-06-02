@@ -1,5 +1,5 @@
 import { draftOutreachMessages } from '@/lib/ai/draft-message'
-import type { ApolloPersonResult } from '@/lib/aspire/types'
+import type { ApifyLead } from '@/lib/aspire/types'
 import { getSystemAutomationId } from '@/lib/automation/system-automation'
 import { db } from '@/lib/db/client'
 import { evaluateFlag } from '@/lib/feature-flags/evaluate'
@@ -12,7 +12,7 @@ import { eq } from 'drizzle-orm'
 export type DraftOnEnrollPayload = {
   accountId: string
   leadId: string
-  apolloData: ApolloPersonResult
+  apifyLead: ApifyLead
   icpScore: number
   icpSignals: string[]
 }
@@ -40,7 +40,7 @@ export async function runDraftOnEnroll(payload: DraftOnEnrollPayload): Promise<{
     flagName: 'autonomous_ai_messaging',
   })
 
-  const person = payload.apolloData
+  const person = payload.apifyLead
   const drafts = await draftOutreachMessages({
     accountId: payload.accountId,
     accountDisplayName: account.name,

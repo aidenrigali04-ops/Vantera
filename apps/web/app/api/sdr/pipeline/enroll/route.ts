@@ -10,7 +10,7 @@ import { accounts } from '@vantera/db'
 import { eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
-function toApolloPerson(result: AspireSearchResult) {
+function toApifyLead(result: AspireSearchResult) {
   return {
     id: result.id,
     firstName: result.firstName,
@@ -67,7 +67,7 @@ export async function POST(request: Request) {
     .where(eq(accounts.id, session.accountId))
     .limit(1)
 
-  const person = toApolloPerson(body)
+  const person = toApifyLead(body)
   const icpConfig = config.icpConfig as import('@/lib/aspire/types').ICPConfig
   const scored = scoreICP(person, icpConfig)
   const icpScore = body.icpScore ?? scored.score

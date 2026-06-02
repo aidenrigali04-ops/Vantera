@@ -4,7 +4,7 @@ export {
   computeEnrollmentHeadroom,
 } from './run-account'
 export { runProspectScoutBootstrap } from './bootstrap'
-export { runProspectScoutDiscovery, buildScoutApolloFilters } from './discover'
+export { runProspectScoutDiscovery, buildScoutApifyFilters } from './discover'
 export { shouldRunProspectScoutOnSchedule } from './schedule'
 export { runBoundSearch, runUnboundSearch } from './run-search'
 export { runInlineProspectFind, runInlineProspectFindBatch } from './inline-find'

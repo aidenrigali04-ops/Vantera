@@ -1,8 +1,8 @@
 import { getIcpConfigForVertical, scoreICP } from '@/lib/aspire/icp-score'
-import { isInteractiveAspireSearch, normalizeApolloFilters } from '@/lib/aspire/filters'
+import { isInteractiveAspireSearch, normalizeApifyFilters } from '@/lib/aspire/filters'
 import { getAspireApifyFetchCount } from '@/lib/aspire/apify-client'
 import { filterExistingLeads, searchApify } from '@/lib/aspire/search'
-import type { ApolloSearchFilters, ApolloPersonResult } from '@/lib/aspire/types'
+import type { ApifySearchFilters, ApifyLead } from '@/lib/aspire/types'
 import { getSystemAutomationId } from '@/lib/automation/system-automation'
 import { db } from '@/lib/db/client'
 import {
@@ -46,7 +46,7 @@ async function startRun(input: {
   accountId: string
   savedSearchId: string
   configId?: string
-  query: ApolloSearchFilters
+  query: ApifySearchFilters
 }): Promise<string> {
   const [row] = await db
     .insert(aspireSearchRuns)
@@ -85,10 +85,10 @@ async function finishRun(
 }
 
 function filterCandidates(
-  people: ApolloPersonResult[],
+  people: ApifyLead[],
   accountId: string,
   excludeDomains: string[],
-): Promise<ApolloPersonResult[]> {
+): Promise<ApifyLead[]> {
   return filterExistingLeads(accountId, people.map((p) => p.id)).then((existing) => {
     const existingIds = new Set(existing)
     const exclude = new Set(excludeDomains.map((d) => d.toLowerCase()))
@@ -103,10 +103,10 @@ function filterCandidates(
 export async function runBoundSearch(input: RunBoundSearchInput): Promise<RunSearchResult> {
   const { binding, config, headroom } = input
   const search = binding.search
-  const rawFilters = search.filters as Partial<ApolloSearchFilters>
+  const rawFilters = search.filters as Partial<ApifySearchFilters>
   const vertical = input.vertical ?? 'agency'
   const interactive = isInteractiveAspireSearch(rawFilters)
-  const filters = normalizeApolloFilters(vertical, rawFilters, { interactive })
+  const filters = normalizeApifyFilters(vertical, rawFilters, { interactive })
   const icpConfig = resolveIcpConfig(config, search)
   const minIcp = effectiveMinIcp(binding, config)
   const limit = Math.min(headroom, binding.maxLeadsPerRun, 25)
@@ -235,9 +235,9 @@ export async function runBoundSearch(input: RunBoundSearchInput): Promise<RunSea
 /** Weekly/manual run for a saved search without an SDR binding. */
 export async function runUnboundSearch(input: RunUnboundSearchInput): Promise<RunSearchResult> {
   const { search, accountId, vertical } = input
-  const rawFilters = search.filters as Partial<ApolloSearchFilters>
+  const rawFilters = search.filters as Partial<ApifySearchFilters>
   const interactive = isInteractiveAspireSearch(rawFilters)
-  const filters = normalizeApolloFilters(vertical, rawFilters, { interactive })
+  const filters = normalizeApifyFilters(vertical, rawFilters, { interactive })
   const icpConfig =
     (search.icpConfig as ReturnType<typeof resolveIcpConfig> | null) ??
     getIcpConfigForVertical(vertical)

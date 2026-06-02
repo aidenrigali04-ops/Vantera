@@ -1,7 +1,7 @@
 import { getIcpConfigForVertical } from '@/lib/aspire/icp-score'
-import type { ApolloSearchFilters } from '@/lib/aspire/types'
+import type { ApifySearchFilters } from '@/lib/aspire/types'
 
-export function isInteractiveAspireSearch(filters: Partial<ApolloSearchFilters>): boolean {
+export function isInteractiveAspireSearch(filters: Partial<ApifySearchFilters>): boolean {
   return Boolean(
     filters.q?.trim() ||
       filters.company?.trim() ||
@@ -10,11 +10,11 @@ export function isInteractiveAspireSearch(filters: Partial<ApolloSearchFilters>)
 }
 
 /** Merge partial UI/saved-search filters with account ICP defaults before Apify calls. */
-export function normalizeApolloFilters(
+export function normalizeApifyFilters(
   vertical: string,
-  filters: Partial<ApolloSearchFilters> = {},
+  filters: Partial<ApifySearchFilters> = {},
   options?: { interactive?: boolean },
-): ApolloSearchFilters {
+): ApifySearchFilters {
   const interactive = options?.interactive ?? isInteractiveAspireSearch(filters)
 
   if (interactive) {

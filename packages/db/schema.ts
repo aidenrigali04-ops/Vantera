@@ -661,7 +661,7 @@ export const aspireResults = pgTable(
       .references(() => accounts.id, { onDelete: 'cascade' }),
     searchId: uuid('search_id').references(() => aspireSavedSearches.id),
     leadId: uuid('lead_id').references(() => leads.id),
-    apolloId: varchar('apollo_id', { length: 255 }),
+    apifyId: varchar('apify_id', { length: 255 }),
     rawData: jsonb('raw_data').notNull().default({}),
     icpScore: smallint('icp_score').notNull().default(0),
     icpSignals: jsonb('icp_signals').notNull().default([]),
@@ -673,7 +673,7 @@ export const aspireResults = pgTable(
   (table) => ({
     accountIdx: index('aspire_results_account_id_idx').on(table.accountId),
     searchIdx: index('aspire_results_search_id_idx').on(table.searchId, table.accountId),
-    apolloUniq: uniqueIndex('aspire_results_account_apollo_idx').on(table.accountId, table.apolloId),
+    apifyUniq: uniqueIndex('aspire_results_account_apify_idx').on(table.accountId, table.apifyId),
   }),
 )
 

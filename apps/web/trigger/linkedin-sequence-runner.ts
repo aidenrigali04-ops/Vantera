@@ -44,7 +44,7 @@ export const aspireEnrichmentSync = schedules.task({
   id: 'aspire-enrichment-sync',
   cron: '0 6 * * *',
   run: async () => {
-    // TODO: refresh enrichment cache from Apollo/Clay
+    // TODO: refresh enrichment cache from Apify/Clay
     return { refreshed: 0, message: 'Aspire enrichment sync stub' }
   },
 })

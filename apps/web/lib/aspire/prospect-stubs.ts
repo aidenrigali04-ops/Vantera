@@ -1,11 +1,11 @@
-import type { ApolloPersonResult, ApolloSearchFilters } from '@/lib/aspire/types'
+import type { ApifyLead, ApifySearchFilters } from '@/lib/aspire/types'
 
 /** Sample leads when Apify is not configured or returns no matches (interactive search). */
-export function stubResults(filters: Partial<ApolloSearchFilters> = {}): ApolloPersonResult[] {
+export function stubResults(filters: Partial<ApifySearchFilters> = {}): ApifyLead[] {
   const keyword = (filters.q ?? filters.keywords?.join(' ') ?? '').trim().toLowerCase()
   const company = filters.company?.trim() || 'Northstar SaaS'
 
-  const pool: ApolloPersonResult[] = [
+  const pool: ApifyLead[] = [
     {
       id: 'stub-alex-chen',
       firstName: 'Alex',

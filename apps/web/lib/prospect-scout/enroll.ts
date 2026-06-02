@@ -1,4 +1,4 @@
-import type { ApolloPersonResult } from '@/lib/aspire/types'
+import type { ApifyLead } from '@/lib/aspire/types'
 import { getSystemAutomationId } from '@/lib/automation/system-automation'
 import { db } from '@/lib/db/client'
 import {
@@ -28,9 +28,9 @@ function domainFromEmail(email: string | null): string | null {
   return email.split('@')[1]?.toLowerCase() ?? null
 }
 
-async function upsertLeadFromApollo(
+async function upsertLeadFromApify(
   accountId: string,
-  person: ApolloPersonResult,
+  person: ApifyLead,
   score: number,
   signals: string[],
   source: 'sdr_agent' | 'aspire',
@@ -70,7 +70,7 @@ async function upsertLeadFromApollo(
       linkedinUrl: person.linkedinUrl,
       source,
       score,
-      enrichment: { apolloId: person.id, icpSignals: signals, industry: person.industry },
+      enrichment: { apifyId: person.id, icpSignals: signals, industry: person.industry },
     })
     .returning({ id: leads.id })
 
@@ -80,7 +80,7 @@ async function upsertLeadFromApollo(
 export async function enrollProspect(input: {
   accountId: string
   config: SdrConfigRow
-  person: ApolloPersonResult
+  person: ApifyLead
   searchId: string | null
   icpScore: number
   icpSignals: string[]
@@ -109,7 +109,7 @@ export async function enrollProspect(input: {
       ? 'sdr_agent'
       : 'aspire'
 
-  const leadId = await upsertLeadFromApollo(
+  const leadId = await upsertLeadFromApify(
     accountId,
     person,
     icpScore,
@@ -122,7 +122,7 @@ export async function enrollProspect(input: {
     .values({
       accountId,
       searchId: searchId || null,
-      apolloId: person.id,
+      apifyId: person.id,
       rawData: person,
       icpScore,
       icpSignals,
@@ -131,7 +131,7 @@ export async function enrollProspect(input: {
       enrolledAt: startSdrSequence ? new Date() : null,
     })
     .onConflictDoUpdate({
-      target: [aspireResults.accountId, aspireResults.apolloId],
+      target: [aspireResults.accountId, aspireResults.apifyId],
       set: {
         searchId,
         leadId,
@@ -241,7 +241,7 @@ export async function recordFoundProspects(input: {
   accountId: string
   /** null = Prospect Scout pool (not tied to a saved Aspire search) */
   searchId: string | null
-  people: Array<{ person: ApolloPersonResult; icpScore: number; icpSignals: string[] }>
+  people: Array<{ person: ApifyLead; icpScore: number; icpSignals: string[] }>
 }): Promise<number> {
   if (input.people.length === 0) return 0
 
@@ -252,14 +252,14 @@ export async function recordFoundProspects(input: {
       .values({
         accountId: input.accountId,
         searchId,
-        apolloId: person.id,
+        apifyId: person.id,
         rawData: person,
         icpScore,
         icpSignals,
         status: 'found',
       })
       .onConflictDoUpdate({
-        target: [aspireResults.accountId, aspireResults.apolloId],
+        target: [aspireResults.accountId, aspireResults.apifyId],
         set: {
           rawData: person,
           icpScore,

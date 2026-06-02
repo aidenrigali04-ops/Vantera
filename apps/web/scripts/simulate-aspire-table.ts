@@ -8,7 +8,7 @@ import {
   extractPhone,
   readProspectContact,
 } from '../lib/aspire/contact-fields'
-import { normalizeApolloFilters } from '../lib/aspire/filters'
+import { normalizeApifyFilters } from '../lib/aspire/filters'
 import { hydrateAspireSearchResult } from '../lib/aspire/hydrate-result'
 import { stubResults } from '../lib/aspire/prospect-stubs'
 import type { AspireSearchResult } from '../lib/aspire/types'
@@ -97,7 +97,7 @@ async function main() {
   console.log('=== Aspire table simulation ===\n')
 
   // 1) Stub path (no APIFY_API_TOKEN — same as production fallback)
-  const filters = normalizeApolloFilters('agency', { q: 'marketing' }, { interactive: true })
+  const filters = normalizeApifyFilters('agency', { q: 'marketing' }, { interactive: true })
   const stubPeople = stubResults(filters)
   const stubRows = toTableRows(
     stubPeople.map((p) => ({
@@ -142,7 +142,7 @@ async function main() {
   // 3) Stored aspire_results → hydrate → table (saved search / scout inbox path)
   const hydrated = hydrateAspireSearchResult({
     id: 'db-row-1',
-    apolloId: apifyRow.id,
+    apifyId: apifyRow.id,
     icpScore: 80,
     icpSignals: ['Has email', 'Has phone'],
     status: 'found',

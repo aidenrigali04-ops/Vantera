@@ -1,6 +1,6 @@
 import { getSyncedAdminSession } from '@/lib/auth/require-session'
 import { findSavedSearches } from '@/lib/aspire/queries'
-import type { ApolloSearchFilters } from '@/lib/aspire/types'
+import type { ApifySearchFilters } from '@/lib/aspire/types'
 import { db } from '@/lib/db/client'
 import { aspireSavedSearches } from '@vantera/db'
 import { and, eq, isNull } from 'drizzle-orm'
@@ -24,7 +24,7 @@ export async function POST(request: Request) {
 
   const body = (await request.json()) as {
     name: string
-    filters: ApolloSearchFilters
+    filters: ApifySearchFilters
     runFrequency?: string
   }
 
@@ -55,7 +55,7 @@ export async function PATCH(request: Request) {
   const body = (await request.json()) as {
     id: string
     name?: string
-    filters?: ApolloSearchFilters
+    filters?: ApifySearchFilters
     runFrequency?: string
     isActive?: boolean
   }

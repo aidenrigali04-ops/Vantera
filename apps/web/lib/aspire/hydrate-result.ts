@@ -6,7 +6,7 @@ type RawAspireRow = Record<string, unknown>
 export function hydrateAspireSearchResult(
   row: {
     id: string
-    apolloId: string | null
+    apifyId: string | null
     icpScore: number
     icpSignals: unknown
     status: string
@@ -24,7 +24,7 @@ export function hydrateAspireSearchResult(
   const split = fullName ? splitFullName(fullName) : { firstName: '', lastName: '' }
 
   return {
-    id: row.apolloId ?? row.id,
+    id: row.apifyId ?? row.id,
     firstName: String(raw.firstName ?? raw.first_name ?? split.firstName),
     lastName: String(raw.lastName ?? raw.last_name ?? split.lastName),
     title: String(raw.title ?? raw.job_title ?? ''),

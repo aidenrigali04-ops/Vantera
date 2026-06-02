@@ -82,23 +82,7 @@ const TITLE_PACKS: Record<ApifyFunctionalLevel, string[]> = {
   support: ['Head of Support', 'VP Customer Success', 'Support Director'],
 }
 
-/** Normalize UI location strings to Apify `contact_location` enum (lowercase). */
-export function normalizeApifyLocations(locations: string[] | undefined): string[] | undefined {
-  if (!locations?.length) return undefined
-
-  const normalized = locations
-    .map((loc) => {
-      const key = loc.trim().toLowerCase()
-      if (key === 'us' || key === 'usa' || key === 'u.s.' || key === 'united states of america') {
-        return 'united states'
-      }
-      if (key === 'uk' || key === 'great britain') return 'united kingdom'
-      return key
-    })
-    .filter(Boolean)
-
-  return normalized.length > 0 ? [...new Set(normalized)] : undefined
-}
+export { normalizeApifyLocation, normalizeApifyLocations } from '@/lib/aspire/apify-locations'
 
 export function resolveApifyKeywordTargeting(term: string): {
   functional_level?: ApifyFunctionalLevel[]

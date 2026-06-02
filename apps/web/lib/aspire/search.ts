@@ -2,16 +2,16 @@ import 'server-only'
 
 import { isApifyConfigured } from '@/lib/aspire/apify-config'
 import { searchApify, type ProspectSearchMeta } from '@/lib/aspire/apify-client'
-import { isInteractiveAspireSearch, normalizeApolloFilters } from '@/lib/aspire/filters'
+import { isInteractiveAspireSearch, normalizeApifyFilters } from '@/lib/aspire/filters'
 import { getIcpConfigForVertical, scoreICP } from '@/lib/aspire/icp-score'
 import { stubResults } from '@/lib/aspire/prospect-stubs'
 import type {
-  ApolloPersonResult,
-  ApolloSearchFilters,
+  ApifyLead,
+  ApifySearchFilters,
   AspireSearchResult,
 } from '@/lib/aspire/types'
 
-export { normalizeApolloFilters } from '@/lib/aspire/filters'
+export { normalizeApifyFilters } from '@/lib/aspire/filters'
 export { searchApify } from '@/lib/aspire/apify-client'
 export type { ProspectSearchMeta } from '@/lib/aspire/apify-client'
 import { db } from '@/lib/db/client'
@@ -20,26 +20,26 @@ import { and, eq, inArray, isNull, sql } from 'drizzle-orm'
 
 export async function filterExistingLeads(
   accountId: string,
-  apolloIds: string[],
+  apifyIds: string[],
 ): Promise<string[]> {
-  if (apolloIds.length === 0) return []
+  if (apifyIds.length === 0) return []
 
   const rows = await db
-    .select({ apolloId: aspireResults.apolloId })
+    .select({ apifyId: aspireResults.apifyId })
     .from(aspireResults)
     .where(
       and(
         eq(aspireResults.accountId, accountId),
         isNull(aspireResults.deletedAt),
-        inArray(aspireResults.apolloId, apolloIds),
+        inArray(aspireResults.apifyId, apifyIds),
       ),
     )
 
-  return rows.map((row) => row.apolloId!).filter(Boolean)
+  return rows.map((row) => row.apifyId!).filter(Boolean)
 }
 
 function toAspireSearchResult(
-  person: ApolloPersonResult,
+  person: ApifyLead,
   icpScore: number,
   icpSignals: string[],
 ): AspireSearchResult {
@@ -72,14 +72,14 @@ async function persistAspireResults(
           .values({
             accountId,
             searchId,
-            apolloId: row.id,
+            apifyId: row.id,
             rawData: row,
             icpScore: row.icpScore,
             icpSignals: row.icpSignals,
             status: 'found',
           })
           .onConflictDoUpdate({
-            target: [aspireResults.accountId, aspireResults.apolloId],
+            target: [aspireResults.accountId, aspireResults.apifyId],
             set: {
               rawData: row,
               icpScore: row.icpScore,
@@ -96,7 +96,7 @@ async function persistAspireResults(
 
 export async function searchProspects(
   accountId: string,
-  filters: Partial<ApolloSearchFilters> = {},
+  filters: Partial<ApifySearchFilters> = {},
   options?: { searchId?: string; persist?: boolean; limit?: number },
 ): Promise<SearchProspectsResult> {
   const [account] = await db
@@ -108,9 +108,9 @@ export async function searchProspects(
   const vertical = account?.vertical ?? 'agency'
   const icpConfig = getIcpConfigForVertical(vertical)
   const interactive = isInteractiveAspireSearch(filters)
-  const normalizedFilters = normalizeApolloFilters(vertical, filters, { interactive })
+  const normalizedFilters = normalizeApifyFilters(vertical, filters, { interactive })
 
-  let people: import('@/lib/aspire/types').ApolloPersonResult[]
+  let people: import('@/lib/aspire/types').ApifyLead[]
   let meta: ProspectSearchMeta
 
   try {

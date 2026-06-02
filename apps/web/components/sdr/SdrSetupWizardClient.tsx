@@ -264,11 +264,11 @@ export function SdrSetupWizardClient({ accountVertical }: Props) {
             ICP defaults to your vertical ({accountVertical}). Adjust cities and exclusions below.
           </p>
           <div>
-            <Label htmlFor="target-cities">Target cities (comma-separated)</Label>
+            <Label htmlFor="target-cities">Target locations (comma-separated)</Label>
             <Input
               id="target-cities"
               className="mt-1.5 border-[var(--border-default)] bg-[var(--bg-surface)]"
-              placeholder="Phoenix AZ, Dallas TX"
+              placeholder="United States, Texas, Phoenix AZ"
               value={form.targetCities}
               onChange={(e) => setForm({ ...form, targetCities: e.target.value })}
             />

@@ -1,6 +1,6 @@
 import { isEnrollError } from '@/lib/aspire/enroll-error'
 import { enrollLeadFromAspire } from '@/lib/aspire/enroll'
-import type { ApolloPersonResult } from '@/lib/aspire/types'
+import type { ApifyLead } from '@/lib/aspire/types'
 import { getSyncedAdminSession } from '@/lib/auth/require-session'
 import { NextResponse } from 'next/server'
 
@@ -11,7 +11,7 @@ export async function POST(request: Request) {
   }
 
   const body = (await request.json()) as {
-    person: ApolloPersonResult
+    person: ApifyLead
     searchId?: string
     pipelineStage?: string
   }

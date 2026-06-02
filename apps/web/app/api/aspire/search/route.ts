@@ -3,8 +3,8 @@ import { isApifyConfigured } from '@/lib/aspire/apify-config'
 import { searchProspects } from '@/lib/aspire/search'
 import { stubResults } from '@/lib/aspire/prospect-stubs'
 import { getIcpConfigForVertical, scoreICP } from '@/lib/aspire/icp-score'
-import { normalizeApolloFilters, isInteractiveAspireSearch } from '@/lib/aspire/filters'
-import type { ApolloSearchFilters, AspireSearchResult } from '@/lib/aspire/types'
+import { normalizeApifyFilters, isInteractiveAspireSearch } from '@/lib/aspire/filters'
+import type { ApifySearchFilters, AspireSearchResult } from '@/lib/aspire/types'
 import { db } from '@/lib/db/client'
 import { accounts } from '@vantera/db'
 import { eq } from 'drizzle-orm'
@@ -15,11 +15,11 @@ export const maxDuration = 300
 
 function fallbackSearchResults(
   accountId: string,
-  filters: Partial<ApolloSearchFilters>,
+  filters: Partial<ApifySearchFilters>,
   vertical: string,
 ): { results: AspireSearchResult[]; meta: { source: 'stub'; providerConfigured: boolean; providerError: string } } {
   const interactive = isInteractiveAspireSearch(filters)
-  const normalized = normalizeApolloFilters(vertical, filters, { interactive })
+  const normalized = normalizeApifyFilters(vertical, filters, { interactive })
   const icpConfig = getIcpConfigForVertical(vertical)
   const people = stubResults(normalized)
 
@@ -54,7 +54,7 @@ export async function GET(request: Request) {
   }
 
   const { searchParams } = new URL(request.url)
-  const filters: ApolloSearchFilters = {
+  const filters: ApifySearchFilters = {
     jobTitles: [],
     industries: [],
     companySizeRanges: [],
@@ -87,7 +87,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
   }
 
-  const body = (await request.json()) as Partial<ApolloSearchFilters> & {
+  const body = (await request.json()) as Partial<ApifySearchFilters> & {
     searchId?: string
     limit?: number
   }

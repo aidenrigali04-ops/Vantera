@@ -2,7 +2,7 @@ import { recoverStaleAspireSearchRuns } from '@/lib/prospect-scout/recover-stale
 import { scoreICP } from '@/lib/aspire/icp-score'
 import { getAspireApifyFetchCount } from '@/lib/aspire/apify-client'
 import { filterExistingLeads, searchApify } from '@/lib/aspire/search'
-import type { ApolloSearchFilters } from '@/lib/aspire/types'
+import type { ApifySearchFilters } from '@/lib/aspire/types'
 import { getSystemAutomationId } from '@/lib/automation/system-automation'
 import { db } from '@/lib/db/client'
 import {
@@ -17,7 +17,7 @@ import type { ICPConfig } from '@/lib/aspire/types'
 import { aspireSearchRuns, automationRuns, sdrAgentConfigs } from '@vantera/db'
 import { eq } from 'drizzle-orm'
 
-export function buildScoutApolloFilters(config: SdrConfigRow): ApolloSearchFilters {
+export function buildScoutApifyFilters(config: SdrConfigRow): ApifySearchFilters {
   const icp = config.icpConfig as {
     targetTitles?: string[]
     targetIndustries?: string[]
@@ -32,7 +32,7 @@ export function buildScoutApolloFilters(config: SdrConfigRow): ApolloSearchFilte
     companySizeRanges: icp.targetSizes
       ? [`${icp.targetSizes[0]},${icp.targetSizes[1]}`]
       : ['1,10', '11,50', '51,200'],
-    locations: config.targetCities.length ? config.targetCities : ['United States'],
+    locations: config.targetCities.length ? config.targetCities : ['united states'],
     contactEmailStatus: undefined,
   }
 }
@@ -53,7 +53,7 @@ export async function runProspectScoutDiscovery(
   options?: { autoEnroll?: boolean; perPage?: number },
 ): Promise<ScoutDiscoveryResult> {
   const icpConfig = config.icpConfig as ICPConfig
-  const filters = buildScoutApolloFilters(config)
+  const filters = buildScoutApifyFilters(config)
   const perPage = options?.perPage ?? getAspireApifyFetchCount()
   const autoEnroll = options?.autoEnroll ?? true
 

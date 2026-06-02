@@ -4,7 +4,7 @@ import type { AspireSearchResult } from '@/lib/aspire/types'
 import { getSyncedAdminSession } from '@/lib/auth/require-session'
 import { NextResponse } from 'next/server'
 
-function toApolloPerson(result: AspireSearchResult) {
+function toApifyLead(result: AspireSearchResult) {
   return {
     id: result.id,
     firstName: result.firstName,
@@ -39,7 +39,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const enrolled = await enrollLeadFromAspire(toApolloPerson(body), '', 'prospect')
+    const enrolled = await enrollLeadFromAspire(toApifyLead(body), '', 'prospect')
     return NextResponse.json({ success: true, data: { id: enrolled.leadId } }, { status: 201 })
   } catch (error) {
     if (isEnrollError(error)) {

@@ -1,5 +1,5 @@
 import { bulkEnrollFromAspire } from '@/lib/aspire/enroll'
-import type { ApolloPersonResult } from '@/lib/aspire/types'
+import type { ApifyLead } from '@/lib/aspire/types'
 import { getSyncedAdminSession } from '@/lib/auth/require-session'
 import { NextResponse } from 'next/server'
 
@@ -10,7 +10,7 @@ export async function POST(request: Request) {
   }
 
   const body = (await request.json()) as {
-    people: ApolloPersonResult[]
+    people: ApifyLead[]
     searchId?: string
     pipelineStage?: string
   }

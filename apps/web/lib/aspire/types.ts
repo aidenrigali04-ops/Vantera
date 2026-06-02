@@ -1,4 +1,4 @@
-export interface ApolloSearchFilters {
+export interface ApifySearchFilters {
   jobTitles: string[]
   industries: string[]
   companySizeRanges: string[]
@@ -10,7 +10,8 @@ export interface ApolloSearchFilters {
   company?: string
 }
 
-export interface ApolloPersonResult {
+/** Normalized lead row from Apify (code_crafter/leads-finder) — not Apollo.io. */
+export interface ApifyLead {
   id: string
   firstName: string
   lastName: string
@@ -73,7 +74,7 @@ export interface EnrollResult {
 }
 
 /** UI-facing search row — includes ICP score from scoring engine */
-export type AspireSearchResult = ApolloPersonResult & {
+export type AspireSearchResult = ApifyLead & {
   icpScore: number
   icpSignals: string[]
   /** @deprecated use icpScore */

@@ -1,6 +1,6 @@
 import { getIcpConfigForVertical, scoreICP } from '@/lib/aspire/icp-score'
 import { EnrollError } from '@/lib/aspire/enroll-error'
-import type { ApolloPersonResult, EnrollResult } from '@/lib/aspire/types'
+import type { ApifyLead, EnrollResult } from '@/lib/aspire/types'
 import { getSystemAutomationId } from '@/lib/automation/system-automation'
 import { getAdminSession } from '@/lib/auth/session'
 import { db } from '@/lib/db/client'
@@ -22,14 +22,14 @@ async function resolveSessionContext() {
   return session
 }
 
-async function findExistingResult(accountId: string, apolloId: string) {
+async function findExistingResult(accountId: string, apifyId: string) {
   const [row] = await db
     .select()
     .from(aspireResults)
     .where(
       and(
         eq(aspireResults.accountId, accountId),
-        eq(aspireResults.apolloId, apolloId),
+        eq(aspireResults.apifyId, apifyId),
         isNull(aspireResults.deletedAt),
       ),
     )
@@ -38,14 +38,14 @@ async function findExistingResult(accountId: string, apolloId: string) {
 }
 
 export async function enrollLeadFromAspire(
-  apolloResult: ApolloPersonResult,
+  apifyLead: ApifyLead,
   searchId: string,
   pipelineStage = 'prospect',
 ): Promise<EnrollResult> {
   const session = await resolveSessionContext()
   const accountId = session.accountId
 
-  const existing = await findExistingResult(accountId, apolloResult.id)
+  const existing = await findExistingResult(accountId, apifyLead.id)
   if (existing?.status === 'added_to_crm' || existing?.status === 'enrolled') {
     throw new EnrollError('ALREADY_ENROLLED', 'This prospect is already in your pipeline')
   }
@@ -57,18 +57,18 @@ export async function enrollLeadFromAspire(
     .limit(1)
 
   const icpConfig = getIcpConfigForVertical(account?.vertical ?? 'agency')
-  const icp = scoreICP(apolloResult, icpConfig)
+  const icp = scoreICP(apifyLead, icpConfig)
 
   let leadId: string
 
-  if (apolloResult.email) {
+  if (apifyLead.email) {
     const [existingLead] = await db
       .select({ id: leads.id })
       .from(leads)
       .where(
         and(
           eq(leads.accountId, accountId),
-          eq(leads.email, apolloResult.email),
+          eq(leads.email, apifyLead.email),
           isNull(leads.deletedAt),
         ),
       )
@@ -81,20 +81,20 @@ export async function enrollLeadFromAspire(
         .insert(leads)
         .values({
           accountId,
-          firstName: apolloResult.firstName,
-          lastName: apolloResult.lastName,
-          title: apolloResult.title,
-          company: apolloResult.organizationName,
-          email: apolloResult.email,
-          phone: apolloResult.phone,
-          linkedinUrl: apolloResult.linkedinUrl,
+          firstName: apifyLead.firstName,
+          lastName: apifyLead.lastName,
+          title: apifyLead.title,
+          company: apifyLead.organizationName,
+          email: apifyLead.email,
+          phone: apifyLead.phone,
+          linkedinUrl: apifyLead.linkedinUrl,
           source: 'aspire',
           score: icp.score,
           ownerId: session.userId,
           pipelineStage,
           enrichment: {
-            industry: apolloResult.industry,
-            apolloId: apolloResult.id,
+            industry: apifyLead.industry,
+            apifyId: apifyLead.id,
             icpSignals: icp.signals,
           },
         })
@@ -106,19 +106,19 @@ export async function enrollLeadFromAspire(
       .insert(leads)
       .values({
         accountId,
-        firstName: apolloResult.firstName,
-        lastName: apolloResult.lastName,
-        title: apolloResult.title,
-        company: apolloResult.organizationName,
-        phone: apolloResult.phone,
-        linkedinUrl: apolloResult.linkedinUrl,
+        firstName: apifyLead.firstName,
+        lastName: apifyLead.lastName,
+        title: apifyLead.title,
+        company: apifyLead.organizationName,
+        phone: apifyLead.phone,
+        linkedinUrl: apifyLead.linkedinUrl,
         source: 'aspire',
         score: icp.score,
         ownerId: session.userId,
         pipelineStage,
         enrichment: {
-          industry: apolloResult.industry,
-          apolloId: apolloResult.id,
+          industry: apifyLead.industry,
+          apifyId: apifyLead.id,
           icpSignals: icp.signals,
         },
       })
@@ -142,8 +142,8 @@ export async function enrollLeadFromAspire(
       accountId,
       searchId: searchId || null,
       leadId,
-      apolloId: apolloResult.id,
-      rawData: apolloResult,
+      apifyId: apifyLead.id,
+      rawData: apifyLead,
       icpScore: icp.score,
       icpSignals: icp.signals,
       status: 'added_to_crm',
@@ -157,8 +157,8 @@ export async function enrollLeadFromAspire(
     actorType: 'system',
     actorId: session.userId,
     activityType: 'aspire_enrolled',
-    body: `Added ${apolloResult.firstName} ${apolloResult.lastName} from Aspire`,
-    metadata: { apolloId: apolloResult.id, searchId, icpScore: icp.score },
+    body: `Added ${apifyLead.firstName} ${apifyLead.lastName} from Aspire`,
+    metadata: { apifyId: apifyLead.id, searchId, icpScore: icp.score },
     visibleToClient: false,
   })
 
@@ -173,8 +173,8 @@ export async function enrollLeadFromAspire(
       accountId,
       signalType: 'draft_pending',
       severity: 'green',
-      headline: `Draft being generated for ${apolloResult.firstName} at ${apolloResult.organizationName}`,
-      actionPayload: { leadId, apolloId: apolloResult.id },
+      headline: `Draft being generated for ${apifyLead.firstName} at ${apifyLead.organizationName}`,
+      actionPayload: { leadId, apifyId: apifyLead.id },
       expiresInDays: 7,
     })
   }
@@ -187,7 +187,7 @@ export async function enrollLeadFromAspire(
       contactId: leadId,
       recordId: leadId,
       leadId,
-      apolloData: apolloResult,
+      apifyLead: apifyLead,
       icpScore: icp.score,
       icpSignals: icp.signals,
     })
@@ -198,7 +198,7 @@ export async function enrollLeadFromAspire(
     await runDraftOnEnroll({
       accountId,
       leadId,
-      apolloData: apolloResult,
+      apifyLead: apifyLead,
       icpScore: icp.score,
       icpSignals: icp.signals,
     })
@@ -209,7 +209,7 @@ export async function enrollLeadFromAspire(
     accountId,
     automationId,
     triggerEvent: 'aspire_enrolled',
-    triggerPayload: { leadId, apolloId: apolloResult.id },
+    triggerPayload: { leadId, apifyId: apifyLead.id },
     actionType: 'draft_on_enroll',
     status: 'success',
     resultPayload: { jobId },
@@ -227,21 +227,21 @@ export async function enrollLeadFromAspire(
 
 async function findLeadIdForAspirePerson(
   accountId: string,
-  person: ApolloPersonResult,
+  person: ApifyLead,
 ): Promise<string | null> {
   if (person.id) {
-    const [byApollo] = await db
+    const [byApify] = await db
       .select({ leadId: aspireResults.leadId })
       .from(aspireResults)
       .where(
         and(
           eq(aspireResults.accountId, accountId),
-          eq(aspireResults.apolloId, person.id),
+          eq(aspireResults.apifyId, person.id),
           isNull(aspireResults.deletedAt),
         ),
       )
       .limit(1)
-    if (byApollo?.leadId) return byApollo.leadId
+    if (byApify?.leadId) return byApify.leadId
   }
 
   if (person.email) {
@@ -263,7 +263,7 @@ async function findLeadIdForAspirePerson(
 }
 
 export async function bulkEnrollFromAspire(
-  apolloResults: ApolloPersonResult[],
+  apifyLeads: ApifyLead[],
   searchId: string,
   pipelineStage = 'prospect',
 ): Promise<{ enrolled: number; skipped: number; errors: number; leadIds: string[] }> {
@@ -275,7 +275,7 @@ export async function bulkEnrollFromAspire(
   let errors = 0
   const leadIds: string[] = []
 
-  for (const person of apolloResults) {
+  for (const person of apifyLeads) {
     try {
       const result = await enrollLeadFromAspire(person, searchId, pipelineStage)
       leadIds.push(result.leadId)
