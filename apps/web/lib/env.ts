@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import { PUBLIC_ENV_DEFAULTS } from '@/config/public-env-defaults'
+
 // Only the variables actually required to render an auth'd page are mandatory
 // here. Everything else (Anthropic, Twilio, Resend, Stripe, Trigger, etc.) is
 // optional at the schema level and validated at its real point of use. This
@@ -46,7 +48,26 @@ type PublicEnv = z.infer<typeof publicEnvSchema>
 type ServerEnv = z.infer<typeof serverEnvSchema>
 export type Env = PublicEnv & ServerEnv
 
+/** Safe browser defaults — override via Vercel env or local .env (see config/public-env.defaults). */
+const PUBLIC_ENV_DEFAULTS_MAP: Record<keyof PublicEnv, string> = {
+  ...PUBLIC_ENV_DEFAULTS,
+}
+
 const PUBLIC_ENV_KEYS = new Set<string>(Object.keys(publicEnvSchema.shape))
+
+/**
+ * Next.js only inlines NEXT_PUBLIC_* when accessed statically (process.env.FOO).
+ * Dynamic reads like Object.entries(process.env) are empty in client bundles.
+ */
+function readPublicEnvFromProcess(): Partial<Record<keyof PublicEnv, string | undefined>> {
+  return {
+    NEXT_PUBLIC_APP_DOMAIN: process.env.NEXT_PUBLIC_APP_DOMAIN,
+    NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
+    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,
+  }
+}
 
 /** Trim whitespace and strip surrounding quotes from .env values. */
 export function sanitizeEnvValue(value: string): string {
@@ -61,10 +82,24 @@ export function sanitizeEnvValue(value: string): string {
 }
 
 function buildEnvInput(): Record<string, string | undefined> {
-  const out: Record<string, string | undefined> = {}
-  for (const [key, value] of Object.entries(process.env)) {
+  const out: Record<string, string | undefined> = { ...PUBLIC_ENV_DEFAULTS_MAP }
+
+  for (const [key, value] of Object.entries(readPublicEnvFromProcess())) {
     if (typeof value === 'string') {
-      out[key] = sanitizeEnvValue(value)
+      const sanitized = sanitizeEnvValue(value)
+      if (sanitized) {
+        out[key] = sanitized
+      }
+    }
+  }
+
+  for (const [key, value] of Object.entries(process.env)) {
+    if (PUBLIC_ENV_KEYS.has(key)) continue
+    if (typeof value === 'string') {
+      const sanitized = sanitizeEnvValue(value)
+      if (sanitized) {
+        out[key] = sanitized
+      }
     }
   }
 
