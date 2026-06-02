@@ -2,7 +2,7 @@ export type SdrAgentId = 'prospect_scout' | 'outreach_agent' | 'message_drafter'
 
 export type SdrAgentIconName = 'telescope' | 'megaphone' | 'pen-line' | 'brain'
 
-export type SdrAgentStatus = 'active' | 'idle' | 'needs_setup'
+export type SdrAgentStatus = 'active' | 'inactive' | 'idle' | 'needs_setup'
 
 export type SdrAgentDefinition = {
   id: SdrAgentId
@@ -21,6 +21,8 @@ export type SdrAgentSnapshot = {
   pendingDrafts: number
   leadsInPipeline: number
   enrolledLeads: number
+  /** SDR config exists (setup complete). */
+  prospectScoutConfigured: boolean
   /** SDR config active and not paused — Prospect Scout can run on schedule. */
   prospectScoutActive: boolean
 }

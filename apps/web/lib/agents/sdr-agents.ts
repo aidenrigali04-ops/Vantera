@@ -51,14 +51,35 @@ export function buildSdrAgentCards(snapshot: SdrAgentSnapshot): SdrAgentCard[] {
   return SDR_AGENT_DEFINITIONS.map((agent) => {
     switch (agent.id) {
       case 'prospect_scout': {
+        const configured = snapshot.prospectScoutConfigured
         const active = snapshot.prospectScoutActive
+        if (!configured) {
+          return {
+            ...agent,
+            href: '/admin/outreach/agents/setup',
+            ctaLabel: 'Configure',
+            status: 'needs_setup',
+            statLabel: 'Status',
+            statValue: 'Not configured',
+          }
+        }
+        if (!active) {
+          return {
+            ...agent,
+            href: '/admin/outreach/agents?agent=prospect_scout',
+            ctaLabel: 'Open agent',
+            status: 'inactive',
+            statLabel: 'Open prospects',
+            statValue: String(snapshot.leadsInPipeline),
+          }
+        }
         return {
           ...agent,
-          href: active ? '/admin/outreach/agents/scout' : '/admin/outreach/agents/setup',
-          ctaLabel: active ? 'Open Prospect Scout' : 'Set up Prospect Scout',
-          status: active ? 'active' : 'needs_setup',
-          statLabel: active ? 'Open prospects' : 'Not configured',
-          statValue: active ? String(snapshot.leadsInPipeline) : '—',
+          href: '/admin/outreach/agents?agent=prospect_scout',
+          ctaLabel: 'Open agent',
+          status: 'active',
+          statLabel: 'Open prospects',
+          statValue: String(snapshot.leadsInPipeline),
         }
       }
       case 'outreach_agent':

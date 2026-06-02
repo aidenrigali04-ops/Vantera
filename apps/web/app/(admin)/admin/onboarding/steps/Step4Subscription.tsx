@@ -1,15 +1,17 @@
 'use client'
 
+import { completeOnboardingWithPlan } from '@/app/(admin)/admin/onboarding/actions'
 import {
   ONBOARDING_PRICING_PLANS,
+  planRequiresPayment,
   type OnboardingPlanId,
 } from '@/lib/onboarding/pricing-plans'
+import { openStripePaymentLink } from '@/lib/stripe/open-payment-link'
 import { cn } from '@/lib/utils'
 import { motion } from 'framer-motion'
 import { Check } from 'lucide-react'
 import { useCallback, useState } from 'react'
 import { useRegisterOnboardingStep } from '../onboarding-nav'
-import { completeOnboardingWithPlan } from '../actions'
 import {
   StepError,
   fadeUp,
@@ -47,6 +49,11 @@ export function Step4Subscription({ accountId, onComplete }: Props) {
         return false
       }
 
+      if (planRequiresPayment(selectedPlan)) {
+        openStripePaymentLink(selectedPlan)
+        return false
+      }
+
       onComplete()
       return true
     } catch (err) {
@@ -68,8 +75,8 @@ export function Step4Subscription({ accountId, onComplete }: Props) {
       selectedPlan === 'free'
         ? 'Start free'
         : selectedPlan === 'enterprise'
-          ? 'Contact sales'
-          : 'Start Team plan',
+          ? `Subscribe — ${selectedPlanMeta?.price ?? '$449'}/mo`
+          : `Subscribe — ${selectedPlanMeta?.price ?? '$79'}/mo`,
   })
 
   return (
@@ -125,9 +132,9 @@ export function Step4Subscription({ accountId, onComplete }: Props) {
 
       {selectedPlanMeta ? (
         <motion.p variants={fadeUp} className="text-[12px] text-[var(--text-tertiary)]">
-          {selectedPlan === 'enterprise'
-            ? 'We’ll reach out to tailor Enterprise — you can explore the product now.'
-            : 'No credit card required to start. Upgrade anytime from settings.'}
+          {planRequiresPayment(selectedPlan)
+            ? `${selectedPlanMeta.name} is billed monthly through Stripe (${selectedPlanMeta.price}${selectedPlanMeta.period}). You will complete payment on the next screen, then return to your workspace.`
+            : 'No credit card required. Upgrade anytime from Plan & billing.'}
         </motion.p>
       ) : null}
 

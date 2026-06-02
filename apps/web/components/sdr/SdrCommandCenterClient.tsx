@@ -1,6 +1,10 @@
 'use client'
 
 import type { SDRActivityEvent, SDRAgentConfig, SDRDashboardStats } from '@/lib/sdr/types'
+import { SdrCreditPaywall } from '@/components/sdr/SdrCreditPaywall'
+import { SdrCreditStrip } from '@/components/sdr/SdrCreditStrip'
+import { SdrOutreachHubTabs } from '@/components/sdr/SdrOutreachHubTabs'
+import { useSdrCredits } from '@/lib/sdr/use-sdr-credits'
 import { cn } from '@/lib/utils'
 import {
   Calendar,
@@ -25,7 +29,7 @@ import { SdrActivityFeed } from '@/components/sdr/activity-feed'
 import { useAccountRealtime } from '@/lib/supabase/account-realtime'
 
 type UpcomingSend = {
-  step: { stepNumber: number; channel: string; scheduledFor: Date }
+  step: { id: string; stepNumber: number; channel: string; scheduledFor: Date }
   firstName: string | null
   lastName: string | null
   company: string
@@ -37,6 +41,8 @@ type Props = {
   initialActivity: SDRActivityEvent[]
   upcoming: UpcomingSend[]
   autonomousMessaging?: boolean
+  /** Render inside the agents hub without duplicate page chrome. */
+  embedded?: boolean
 }
 
 function formatTime(iso: string): string {
@@ -49,19 +55,32 @@ export function SdrCommandCenterClient({
   initialActivity,
   upcoming,
   autonomousMessaging = true,
+  embedded = false,
 }: Props) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [isPending, startTransition] = useTransition()
   const [activity, setActivity] = useState(initialActivity)
+  const [paywallOpen, setPaywallOpen] = useState(false)
+  const {
+    credits,
+    exhausted,
+    isLoading: creditsLoading,
+    startTrial,
+    refreshCredits,
+  } = useSdrCredits(true)
 
   useEffect(() => {
-    if (searchParams.get('setup') !== 'complete') return
+    if (exhausted) setPaywallOpen(true)
+  }, [exhausted])
+
+  useEffect(() => {
+    if (embedded || searchParams.get('setup') !== 'complete') return
     toast.message(`${config.agentName} is live — discovery activity appears below`, {
       duration: 5000,
     })
-    router.replace('/admin/outreach/agents')
-  }, [config.agentName, router, searchParams])
+    router.replace('/admin/outreach/agents?agent=prospect_scout')
+  }, [config.agentName, embedded, router, searchParams])
 
   const refreshActivity = useCallback(async () => {
     const res = await fetch('/api/sdr/activity?limit=50')
@@ -96,7 +115,8 @@ export function SdrCommandCenterClient({
         return
       }
       if (json.data?.queued) {
-        toast.success('Discovery run started — results will appear in the activity feed')
+        toast.success('Discovery run started — Prospect Scout is now active')
+        router.refresh()
         await refreshActivity()
         return
       }
@@ -132,6 +152,25 @@ export function SdrCommandCenterClient({
     })
   }
 
+  function handleSendNow(stepId: string) {
+    startTransition(async () => {
+      const res = await fetch(`/api/sdr/steps/${stepId}/send`, { method: 'POST' })
+      const json = await res.json()
+      if (!json.success) {
+        if (json.code === 'SDR_CREDITS_EXHAUSTED') {
+          setPaywallOpen(true)
+          return
+        }
+        toast.error(json.error ?? 'Send failed')
+        return
+      }
+      toast.success('Outreach sent')
+      router.refresh()
+      await refreshActivity()
+      await refreshCredits()
+    })
+  }
+
   const kpiItems = [
     { label: 'Leads today', value: stats.leadsFoundToday, icon: Users },
     { label: 'Emails today', value: stats.emailsSentToday, icon: Mail },
@@ -140,7 +179,19 @@ export function SdrCommandCenterClient({
   ]
 
   return (
-    <div className="mx-auto w-full space-y-6 px-4 py-5 md:px-8 md:py-6">
+    <div
+      className={cn(
+        embedded ? 'space-y-6' : 'mx-auto w-full space-y-6 px-4 py-5 md:px-8 md:py-6',
+      )}
+    >
+      {!embedded ? <SdrOutreachHubTabs /> : null}
+
+      <SdrCreditStrip
+        credits={credits}
+        loading={creditsLoading}
+        onUpgradeClick={() => setPaywallOpen(true)}
+      />
+
       <PageHeader
         title={`SDR Agent — ${config.agentName}`}
         description={`${statusLabel} · ${stats.activeSequences} active sequences · ${stats.replyRate30d}% reply rate (30d)`}
@@ -149,7 +200,7 @@ export function SdrCommandCenterClient({
             <Button
               variant="outline"
               size="sm"
-              disabled={isPending || config.isPaused}
+              disabled={isPending}
               onClick={handleRunDiscovery}
             >
               <Radar className="mr-1.5 h-3.5 w-3.5" />
@@ -241,22 +292,33 @@ export function SdrCommandCenterClient({
               {upcoming.length === 0 ? (
                 <li className="text-sm text-[var(--text-secondary)]">No scheduled sends</li>
               ) : (
-                upcoming.map((row, index) => (
-                  <li key={index} className="flex items-start gap-2 text-sm">
-                    {row.step.channel === 'sms' ? (
-                      <MessageCircle className="mt-0.5 h-3.5 w-3.5 text-[var(--accent)]" />
-                    ) : (
-                      <Mail className="mt-0.5 h-3.5 w-3.5 text-[var(--text-secondary)]" />
-                    )}
-                    <div className="min-w-0">
-                      <p className="text-[var(--text-primary)]">
-                        {formatTime(row.step.scheduledFor.toISOString())} · Step {row.step.stepNumber}
-                      </p>
-                      <p className="truncate text-xs text-[var(--text-secondary)]">
-                        {[row.firstName, row.lastName].filter(Boolean).join(' ') || 'Prospect'},{' '}
-                        {row.company}
-                      </p>
+                upcoming.map((row) => (
+                  <li key={row.step.id} className="flex items-start justify-between gap-2 text-sm">
+                    <div className="flex min-w-0 items-start gap-2">
+                      {row.step.channel === 'sms' ? (
+                        <MessageCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--accent)]" />
+                      ) : (
+                        <Mail className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--text-secondary)]" />
+                      )}
+                      <div className="min-w-0">
+                        <p className="text-[var(--text-primary)]">
+                          {formatTime(row.step.scheduledFor.toISOString())} · Step {row.step.stepNumber}
+                        </p>
+                        <p className="truncate text-xs text-[var(--text-secondary)]">
+                          {[row.firstName, row.lastName].filter(Boolean).join(' ') || 'Prospect'},{' '}
+                          {row.company}
+                        </p>
+                      </div>
                     </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 shrink-0 border-[var(--border-default)] text-[11px]"
+                      disabled={isPending}
+                      onClick={() => handleSendNow(row.step.id)}
+                    >
+                      Send now
+                    </Button>
                   </li>
                 ))
               )}
@@ -316,6 +378,13 @@ export function SdrCommandCenterClient({
           </section>
         </aside>
       </div>
+
+      <SdrCreditPaywall
+        open={paywallOpen}
+        onOpenChange={setPaywallOpen}
+        credits={credits}
+        onStartTrial={startTrial}
+      />
     </div>
   )
 }

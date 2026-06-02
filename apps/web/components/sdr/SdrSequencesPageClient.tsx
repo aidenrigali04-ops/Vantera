@@ -3,12 +3,16 @@
 import { BulkActionBar } from '@/components/operational/BulkActionBar'
 import { OperationalTable } from '@/components/operational/OperationalTable'
 import { PageHeader } from '@/components/operational/PageHeader'
+import { SdrCreditPaywall } from '@/components/sdr/SdrCreditPaywall'
+import { SdrCreditStrip } from '@/components/sdr/SdrCreditStrip'
+import { SdrOutreachHubTabs } from '@/components/sdr/SdrOutreachHubTabs'
 import { SectionEmptyState } from '@/components/onboarding/SectionEmptyState'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { useSdrCredits } from '@/lib/sdr/use-sdr-credits'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useState, useTransition } from 'react'
 import { toast } from 'sonner'
 
 type SequenceRow = {
@@ -36,6 +40,12 @@ export function SdrSequencesPageClient({ rows }: Props) {
   const router = useRouter()
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [isPending, startTransition] = useTransition()
+  const [paywallOpen, setPaywallOpen] = useState(false)
+  const { credits, exhausted, isLoading: creditsLoading, startTrial } = useSdrCredits(true)
+
+  useEffect(() => {
+    if (exhausted) setPaywallOpen(true)
+  }, [exhausted])
 
   const tableRows: TableRow[] = useMemo(
     () => rows.map((row) => ({ ...row, id: row.sequence.id })),
@@ -132,6 +142,14 @@ export function SdrSequencesPageClient({ rows }: Props) {
 
   return (
     <div className="mx-auto w-full space-y-6 px-4 py-5 md:px-8 md:py-6">
+      <SdrOutreachHubTabs />
+
+      <SdrCreditStrip
+        credits={credits}
+        loading={creditsLoading}
+        onUpgradeClick={() => setPaywallOpen(true)}
+      />
+
       <PageHeader
         title="Active sequences"
         description="Every prospect enrolled in your SDR agent's nurture sequence."
@@ -166,6 +184,13 @@ export function SdrSequencesPageClient({ rows }: Props) {
           Cancel selected
         </Button>
       </BulkActionBar>
+
+      <SdrCreditPaywall
+        open={paywallOpen}
+        onOpenChange={setPaywallOpen}
+        credits={credits}
+        onStartTrial={startTrial}
+      />
     </div>
   )
 }

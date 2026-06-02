@@ -81,6 +81,7 @@ export async function getSdrAgentSnapshot(accountId: string): Promise<SdrAgentSn
     pendingDrafts: draftStats?.pending ?? 0,
     leadsInPipeline: leadStats?.open ?? 0,
     enrolledLeads: enrollmentStats?.active ?? 0,
+    prospectScoutConfigured: Boolean(scoutConfig),
     prospectScoutActive: Boolean(scoutConfig?.isActive && !scoutConfig?.isPaused),
   }
 }

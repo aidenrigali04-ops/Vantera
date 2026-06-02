@@ -2,6 +2,7 @@ import { getSystemAutomationId } from '@/lib/automation/system-automation'
 import { db } from '@/lib/db/client'
 import { evaluateFlag } from '@/lib/feature-flags/evaluate'
 import type { Plan } from '@/lib/feature-flags/flags'
+import { consumeSdrCredits, outreachSendCostForChannel, SDR_TRIAL_DAYS, SdrCreditsExhaustedError } from '@/lib/sdr/credits'
 import { logSdrActivity } from '@/lib/sdr/activity-log'
 import { requireSDREnabledForAccount } from '@/lib/sdr/guard'
 import { findDueSdrSteps } from '@/lib/sdr/queries'
@@ -87,6 +88,31 @@ export async function runSdrAgentSend(): Promise<{ sent: number; failed: number 
       let failReason = 'unknown'
 
       if (step.channel === 'email' && lead.email) {
+        try {
+          await consumeSdrCredits(
+            config.accountId,
+            'outreach_send',
+            step.id,
+            outreachSendCostForChannel(step.channel),
+            { channel: step.channel },
+          )
+        } catch (error) {
+          if (error instanceof SdrCreditsExhaustedError) {
+            await createIntelligenceSignal({
+              accountId: config.accountId,
+              signalType: 'sdr_credits_exhausted',
+              severity: 'yellow',
+              headline: 'SDR outreach credits exhausted',
+              recommendation: `Upgrade or start a ${SDR_TRIAL_DAYS}-day trial to resume automated sends.`,
+              actionLabel: 'View plans',
+              actionPayload: { href: '/admin/outreach/agents' },
+              expiresInDays: 7,
+            })
+            break
+          }
+          throw error
+        }
+
         const result = await sendSdrEmail({
           accountId: config.accountId,
           fromEmail: config.fromEmail,
@@ -102,6 +128,31 @@ export async function runSdrAgentSend(): Promise<{ sent: number; failed: number 
         if (result.ok) providerId = result.resendId
         else failReason = result.reason
       } else if (step.channel === 'sms' && lead.phone) {
+        try {
+          await consumeSdrCredits(
+            config.accountId,
+            'outreach_send',
+            step.id,
+            outreachSendCostForChannel(step.channel),
+            { channel: step.channel },
+          )
+        } catch (error) {
+          if (error instanceof SdrCreditsExhaustedError) {
+            await createIntelligenceSignal({
+              accountId: config.accountId,
+              signalType: 'sdr_credits_exhausted',
+              severity: 'yellow',
+              headline: 'SDR outreach credits exhausted',
+              recommendation: `Upgrade or start a ${SDR_TRIAL_DAYS}-day trial to resume automated sends.`,
+              actionLabel: 'View plans',
+              actionPayload: { href: '/admin/outreach/agents' },
+              expiresInDays: 7,
+            })
+            break
+          }
+          throw error
+        }
+
         const result = await sendSdrSms({
           accountId: config.accountId,
           toPhone: lead.phone,

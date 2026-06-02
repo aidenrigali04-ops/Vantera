@@ -16,6 +16,7 @@ type Props = {
   enrollState?: 'idle' | 'pending' | 'added' | 'exists'
   onAdd?: () => void
   onSkip?: () => void
+  addLabel?: string
 }
 
 function prospectName(row: AspireSearchResult): string {
@@ -37,6 +38,7 @@ export function AspireIntelligencePanel({
   enrollState = 'idle',
   onAdd,
   onSkip,
+  addLabel = 'Add to pipeline',
 }: Props) {
   if (!result) {
     return (
@@ -178,7 +180,7 @@ export function AspireIntelligencePanel({
             ? 'Added to pipeline'
             : enrollState === 'exists'
               ? 'Already in CRM'
-              : 'Add to pipeline'}
+              : addLabel}
         </Button>
         {onSkip ? (
           <Button variant="ghost" size="sm" className="w-full" onClick={onSkip}>

@@ -184,9 +184,15 @@ type EnrollCellProps = {
   state: 'idle' | 'pending' | 'added' | 'exists'
   disabled: boolean
   onEnroll: () => void
+  actionLabel?: string
 }
 
-export function AspireEnrollCell({ state, disabled, onEnroll }: EnrollCellProps) {
+export function AspireEnrollCell({
+  state,
+  disabled,
+  onEnroll,
+  actionLabel = 'Add to pipeline',
+}: EnrollCellProps) {
   if (state === 'added') {
     return (
       <span className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-[var(--success-muted)] px-3 text-[12px] font-medium text-[var(--success)] ring-1 ring-inset ring-[var(--success)]/20">
@@ -218,7 +224,7 @@ export function AspireEnrollCell({ state, disabled, onEnroll }: EnrollCellProps)
       {state === 'pending' ? (
         <Loader2 className="h-3.5 w-3.5 animate-spin" aria-label="Adding to pipeline" />
       ) : (
-        'Add to pipeline'
+        actionLabel
       )}
     </Button>
   )

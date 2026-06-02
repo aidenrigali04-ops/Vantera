@@ -29,6 +29,7 @@ import {
   type OnboardingPlanId,
 } from '@/lib/onboarding/pricing-plans'
 import { provisionOwnerWorkspace } from '@/lib/onboarding/provision-workspace'
+import { initSdrCreditAccountFromOnboarding } from '@/lib/sdr/credits'
 import { replaceAccountStageDefinitions } from '@/lib/onboarding/replace-stage-definitions'
 import {
   trackOnboardingStep,
@@ -361,6 +362,12 @@ export async function completeOnboardingWithPlan(
       } catch (memoryErr) {
         console.error('[completeOnboardingWithPlan] ai_memory upsert failed', memoryErr)
       }
+    }
+
+    try {
+      await initSdrCreditAccountFromOnboarding(workspaceId, planId)
+    } catch (creditErr) {
+      console.error('[completeOnboardingWithPlan] sdr credit init failed', creditErr)
     }
 
     const marked = await markOnboardingComplete(workspaceId)

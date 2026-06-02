@@ -1,10 +1,10 @@
 import { recoverStaleAspireSearchRuns } from '@/lib/prospect-scout/recover-stale-runs'
 import { runAccountProspectScout } from '@/lib/prospect-scout/run-account'
 import { db } from '@/lib/db/client'
+import { ensureProspectScoutActiveForDiscovery } from '@/lib/sdr/ensure-scout-active'
 import { logSdrActivity } from '@/lib/sdr/activity-log'
 import { requireSDREnabledForAccount } from '@/lib/sdr/guard'
 import type { Plan } from '@/lib/feature-flags/flags'
-import { findSdrConfigByAccount } from '@/lib/sdr/queries'
 import type { RunAccountResult } from '@/lib/prospect-scout/types'
 import { accounts } from '@vantera/db'
 import { eq } from 'drizzle-orm'
@@ -27,10 +27,7 @@ export async function runProspectScoutBootstrap(
 
   await recoverStaleAspireSearchRuns(accountId)
 
-  const config = await findSdrConfigByAccount(accountId)
-  if (!config || !config.isActive || config.isPaused) {
-    return null
-  }
+  const config = await ensureProspectScoutActiveForDiscovery(accountId)
 
   await logSdrActivity({
     accountId,

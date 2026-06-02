@@ -1,6 +1,13 @@
 import type { ApolloPersonResult } from '@/lib/aspire/types'
 import { getSystemAutomationId } from '@/lib/automation/system-automation'
 import { db } from '@/lib/db/client'
+import {
+  type SdrCreditAction,
+} from '@/lib/sdr/credit-types'
+import {
+  consumeSdrCredits,
+  SdrCreditsExhaustedError,
+} from '@/lib/sdr/credits'
 import { logSdrActivity } from '@/lib/sdr/activity-log'
 import type { DraftSdrSequencePayload } from '@/lib/sdr/types'
 import { createIntelligenceSignal } from '@/lib/webhooks/resend/signals'
@@ -81,9 +88,20 @@ export async function enrollProspect(input: {
   /** When false without sequence, still tag as scout-sourced pipeline lead (not manual Aspire). */
   pipelineOnlyFromScout?: boolean
   accountName?: string
+  /** Caller already charged credits (e.g. pipeline enroll API). */
+  skipCreditCharge?: boolean
+  sdrCreditAction?: SdrCreditAction
 }): Promise<EnrollProspectResult> {
   const { accountId, config, person, icpScore, icpSignals, startSdrSequence } = input
   const searchId = input.searchId || null
+
+  const isSdrEnroll = startSdrSequence || Boolean(input.pipelineOnlyFromScout)
+  if (isSdrEnroll && !input.skipCreditCharge) {
+    const action =
+      input.sdrCreditAction ??
+      (input.pipelineOnlyFromScout && !startSdrSequence ? 'pipeline_enroll' : 'scout_enroll')
+    await consumeSdrCredits(accountId, action, person.id)
+  }
 
   const leadSource = startSdrSequence
     ? 'sdr_agent'
@@ -272,4 +290,4 @@ export async function notifyIcpMatches(
   })
 }
 
-export { domainFromEmail }
+export { domainFromEmail, SdrCreditsExhaustedError }

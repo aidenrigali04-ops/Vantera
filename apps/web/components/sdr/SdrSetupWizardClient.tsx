@@ -198,7 +198,7 @@ export function SdrSetupWizardClient({ accountVertical }: Props) {
         }
       }
 
-      router.push('/admin/outreach/agents?setup=complete')
+      router.push('/admin/outreach/agents?setup=complete&agent=prospect_scout')
       router.refresh()
     })
   }

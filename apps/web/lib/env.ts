@@ -38,6 +38,9 @@ const serverEnvSchema = z.object({
   OUTREACH_INBOUND_DOMAIN: z.string().optional().default(''),
   STRIPE_SECRET_KEY: z.string().optional().default(''),
   STRIPE_WEBHOOK_SECRET: z.string().optional().default(''),
+  /** Stripe Price ID for Vantera Team (subscription checkout). */
+  STRIPE_PRICE_TEAM_MONTHLY: z.string().optional().default(''),
+  STRIPE_PRICE_ENTERPRISE_MONTHLY: z.string().optional().default(''),
   TRIGGER_SECRET_KEY: z.string().optional().default(''),
   TRIGGER_API_URL: z.string().optional().default('https://api.trigger.dev'),
   CRON_SECRET: z.string().optional().default(''),

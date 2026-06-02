@@ -156,6 +156,16 @@ export function IntegrationsPageClient({ connections }: Props) {
       />
 
       <section className="rounded-xl border border-stone-200 bg-stone-50/60 p-5">
+        <h3 className="text-sm font-semibold text-stone-900">Vantera plan</h3>
+        <p className="mt-1 text-sm text-stone-600">
+          Upgrade to Team, manage your subscription, or update your payment method in Stripe.
+        </p>
+        <Button variant="outline" size="sm" className="mt-4" asChild>
+          <Link href="/admin/billing">Plan &amp; billing</Link>
+        </Button>
+      </section>
+
+      <section className="rounded-xl border border-stone-200 bg-stone-50/60 p-5">
         <h3 className="text-sm font-semibold text-stone-900">CSV import / export</h3>
         <p className="mt-1 text-sm text-stone-600">
           No CRM connected yet? Import leads from a spreadsheet or export your pipeline anytime.

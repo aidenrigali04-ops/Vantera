@@ -1,6 +1,9 @@
 'use client'
 
 import { AspireIntelligencePanel } from '@/components/aspire/AspireIntelligencePanel'
+import { SdrCreditPaywall } from '@/components/sdr/SdrCreditPaywall'
+import { SdrCreditStrip } from '@/components/sdr/SdrCreditStrip'
+import { SdrOutreachHubTabs } from '@/components/sdr/SdrOutreachHubTabs'
 import {
   AspireContactCell,
   AspireEnrollCell,
@@ -37,6 +40,7 @@ import { ASPIRE_TABLE_VIEWS } from '@/lib/operational/aspire-table-views'
 import { LiveIndicator } from '@/components/operational/LiveIndicator'
 import { SectionEmptyState } from '@/components/onboarding/SectionEmptyState'
 import { useAccountRealtime } from '@/lib/supabase/account-realtime'
+import { useSdrCredits } from '@/lib/sdr/use-sdr-credits'
 import { cn } from '@/lib/utils'
 import type { aspireSavedSearches } from '@vantera/db'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -63,6 +67,7 @@ type Props = {
   savedSearches: SavedSearch[]
   accountId: string
   accountVertical: string
+  sdrMode?: boolean
 }
 
 async function fetchAspireResultsFromApi(searchId: string | null): Promise<AspireSearchResult[]> {
@@ -74,7 +79,12 @@ async function fetchAspireResultsFromApi(searchId: string | null): Promise<Aspir
   return json.data as AspireSearchResult[]
 }
 
-export function AspirePageClient({ savedSearches: initialSaved, accountId, accountVertical }: Props) {
+export function AspirePageClient({
+  savedSearches: initialSaved,
+  accountId,
+  accountVertical,
+  sdrMode = false,
+}: Props) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const queryClient = useQueryClient()
@@ -249,6 +259,20 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
     onChange: reloadStoredResults,
   })
 
+  const [paywallOpen, setPaywallOpen] = useState(false)
+  const pipelineActionLabel = sdrMode ? 'Proceed to pipeline' : 'Add to pipeline'
+  const {
+    credits,
+    exhausted,
+    refreshCredits,
+    startTrial,
+    isLoading: creditsLoading,
+  } = useSdrCredits(sdrMode)
+
+  useEffect(() => {
+    if (sdrMode && exhausted) setPaywallOpen(true)
+  }, [sdrMode, exhausted])
+
   useAccountRealtime({
     accountId,
     table: 'aspire_search_runs',
@@ -361,10 +385,13 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
 
   const addMutation = useMutation({
     mutationFn: async (result: AspireSearchResult) => {
-      const res = await fetch('/api/aspire/add-to-pipeline', {
+      const endpoint = sdrMode ? '/api/sdr/pipeline/enroll' : '/api/aspire/add-to-pipeline'
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(result),
+        body: JSON.stringify(
+          sdrMode ? { ...result, searchId: activeSearchId } : result,
+        ),
       })
       const json = await res.json()
       if (!json.success) {
@@ -375,11 +402,21 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
       return json.data
     },
     onSuccess: (_data, variables) => {
-      toast.success('Added to pipeline — draft generating')
+      toast.success(
+        sdrMode
+          ? 'Added to SDR pipeline — outreach sequence starting'
+          : 'Added to pipeline — draft generating',
+      )
       setEnrollStates((current) => ({ ...current, [variables.id]: 'added' }))
       queryClient.invalidateQueries({ queryKey: ['leads'] })
+      if (sdrMode) void refreshCredits()
     },
     onError: (err: Error & { code?: string }, variables) => {
+      if (err.code === 'SDR_CREDITS_EXHAUSTED') {
+        setPaywallOpen(true)
+        setEnrollStates((current) => ({ ...current, [variables.id]: 'idle' }))
+        return
+      }
       if (err.code === 'ALREADY_ENROLLED') {
         setEnrollStates((current) => ({ ...current, [variables.id]: 'exists' }))
         toast.message('Already in your pipeline')
@@ -544,6 +581,10 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
 
   const enrollOne = useCallback(
     (row: AspireResultRow) => {
+      if (sdrMode && exhausted) {
+        setPaywallOpen(true)
+        return
+      }
       setEnrollStates((current) => ({ ...current, [row.id]: 'pending' }))
       addMutation.mutate(row, {
         onSettled: (_data, error) => {
@@ -557,7 +598,7 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
         },
       })
     },
-    [addMutation],
+    [addMutation, sdrMode, exhausted],
   )
 
   const handleBulkAdd = useCallback(async () => {
@@ -613,12 +654,13 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
           <AspireEnrollCell
             state={enrollStates[row.id] ?? 'idle'}
             disabled={addMutation.isPending}
+            actionLabel={pipelineActionLabel}
             onEnroll={() => enrollOne(row)}
           />
         ),
       },
     ],
-    [addMutation.isPending, enrollOne, enrollStates],
+    [addMutation.isPending, enrollOne, enrollStates, pipelineActionLabel],
   )
 
   const kpiItems = useMemo(
@@ -638,10 +680,24 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
 
   return (
     <div className="mx-auto w-full space-y-6 px-4 py-5 md:px-8 md:py-6">
+      {sdrMode ? <SdrOutreachHubTabs /> : null}
+
       <PageHeader
-        title="Aspire"
-        description="Discover ICP-matched prospects, score them instantly, and add to your pipeline with AI drafts ready to review."
+        title={sdrMode ? 'Lead finder' : 'Aspire'}
+        description={
+          sdrMode
+            ? 'Discover ICP-matched prospects and proceed to your SDR pipeline — each lead uses 0.1 outreach credits.'
+            : 'Discover ICP-matched prospects, score them instantly, and add to your pipeline with AI drafts ready to review.'
+        }
       />
+
+      {sdrMode ? (
+        <SdrCreditStrip
+          credits={credits}
+          loading={creditsLoading}
+          onUpgradeClick={() => setPaywallOpen(true)}
+        />
+      ) : null}
 
       <div className="grid gap-6 lg:grid-cols-[minmax(220px,260px)_minmax(0,1fr)]">
         <aside className="space-y-4">
@@ -904,7 +960,9 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
                 onClick={() => void handleBulkAdd()}
                 disabled={addMutation.isPending}
               >
-                Add {selectedIds.length || ''} to pipeline
+                {sdrMode
+                  ? `Proceed ${selectedIds.length || ''} to pipeline`
+                  : `Add ${selectedIds.length || ''} to pipeline`}
               </Button>
             </BulkActionBar>
           </div>
@@ -914,6 +972,7 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
               result={selectedResult}
               icpConfig={icpConfig}
               enrollState={selectedResult ? enrollStates[selectedResult.id] ?? 'idle' : 'idle'}
+              addLabel={pipelineActionLabel}
               onAdd={selectedResult ? () => enrollOne(selectedResult) : undefined}
               onSkip={
                 selectedResult
@@ -959,6 +1018,15 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {sdrMode ? (
+        <SdrCreditPaywall
+          open={paywallOpen}
+          onOpenChange={setPaywallOpen}
+          credits={credits}
+          onStartTrial={startTrial}
+        />
+      ) : null}
     </div>
   )
 }

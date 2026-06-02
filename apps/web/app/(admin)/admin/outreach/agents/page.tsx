@@ -1,5 +1,4 @@
-import { SdrAgentsPageClient } from '@/app/(admin)/admin/outreach/agents/SdrAgentsPageClient'
-import { SdrCommandCenterClient } from '@/components/sdr/SdrCommandCenterClient'
+import { SdrAgentsHubClient } from '@/components/sdr/SdrAgentsHubClient'
 import { requireAdminSession } from '@/lib/auth/require-session'
 import { getSdrAgentCards, getSdrAgentSnapshot } from '@/lib/agents/queries'
 import { db } from '@/lib/db/client'
@@ -16,8 +15,7 @@ import type { SDRAgentConfig, SdrOutreachWindow } from '@/lib/sdr/types'
 import { DEFAULT_OUTREACH_WINDOW } from '@/lib/sdr/types'
 import { accounts, sdrAgentConfigs } from '@vantera/db'
 import { eq } from 'drizzle-orm'
-import Link from 'next/link'
-import { Button } from '@/components/ui/button'
+import { Suspense } from 'react'
 
 export const dynamic = 'force-dynamic'
 
@@ -63,71 +61,55 @@ function mapConfig(row: typeof sdrAgentConfigs.$inferSelect): SDRAgentConfig {
 export default async function SdrAgentsPage() {
   const session = await requireAdminSession()
 
-  const [account] = await db
-    .select({ plan: accounts.plan })
-    .from(accounts)
-    .where(eq(accounts.id, session.accountId))
-    .limit(1)
+  const [account, agents, snapshot, configRow] = await Promise.all([
+    db
+      .select({ plan: accounts.plan })
+      .from(accounts)
+      .where(eq(accounts.id, session.accountId))
+      .limit(1),
+    getSdrAgentCards(session.accountId),
+    getSdrAgentSnapshot(session.accountId),
+    findSdrConfigByAccount(session.accountId),
+  ])
 
-  const plan = (account?.plan ?? 'team') as Plan
+  const plan = (account[0]?.plan ?? 'team') as Plan
   const sdrEnabled = await evaluateFlag({
     accountId: session.accountId,
     plan,
     flagName: 'sdr_agent_enabled',
   })
 
-  if (sdrEnabled) {
-    const configRow = await findSdrConfigByAccount(session.accountId)
-    if (configRow) {
-      const autonomousMessaging = await evaluateFlag({
-        accountId: session.accountId,
-        plan,
-        flagName: 'autonomous_ai_messaging',
-      })
+  let scoutDetail = null
+  if (configRow && sdrEnabled) {
+    const autonomousMessaging = await evaluateFlag({
+      accountId: session.accountId,
+      plan,
+      flagName: 'autonomous_ai_messaging',
+    })
 
-      const [stats, activity, upcoming] = await Promise.all([
-        getSdrDashboardStats(session.accountId),
-        getSdrActivityFeed(session.accountId),
-        getUpcomingSdrSends(session.accountId),
-      ])
+    const [stats, activity, upcoming] = await Promise.all([
+      getSdrDashboardStats(session.accountId),
+      getSdrActivityFeed(session.accountId),
+      getUpcomingSdrSends(session.accountId),
+    ])
 
-      return (
-        <SdrCommandCenterClient
-          config={mapConfig(configRow)}
-          stats={stats}
-          initialActivity={activity}
-          upcoming={upcoming}
-          autonomousMessaging={autonomousMessaging}
-        />
-      )
+    scoutDetail = {
+      config: mapConfig(configRow),
+      stats,
+      initialActivity: activity,
+      upcoming,
+      autonomousMessaging,
     }
-
-    return (
-      <div className="flex flex-col items-center justify-center gap-4 px-4 py-20 text-center">
-        <p className="text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--accent)]">
-          Prospecting agent
-        </p>
-        <h1 className="text-2xl font-semibold tracking-[-0.02em] text-[var(--text-primary)]">
-          Set up Prospect Scout
-        </h1>
-        <p className="max-w-md text-[15px] leading-relaxed text-[var(--text-secondary)]">
-          Configure an autonomous prospecting agent that finds ICP-matched leads and adds them to
-          your pipeline on a daily or weekly schedule.
-        </p>
-        <Button
-          asChild
-          className="bg-[var(--accent)] text-[var(--text-primary)] hover:bg-[var(--accent-hover)]"
-        >
-          <Link href="/admin/outreach/agents/setup">Set up in 5 minutes</Link>
-        </Button>
-      </div>
-    )
   }
 
-  const [agents, snapshot] = await Promise.all([
-    getSdrAgentCards(session.accountId),
-    getSdrAgentSnapshot(session.accountId),
-  ])
-
-  return <SdrAgentsPageClient agents={agents} enrolledLeads={snapshot.enrolledLeads} />
+  return (
+    <Suspense fallback={<div className="p-6 text-sm text-[var(--text-secondary)]">Loading agents…</div>}>
+      <SdrAgentsHubClient
+        agents={agents}
+        enrolledLeads={snapshot.enrolledLeads}
+        sdrEnabled={sdrEnabled}
+        scoutDetail={scoutDetail}
+      />
+    </Suspense>
+  )
 }

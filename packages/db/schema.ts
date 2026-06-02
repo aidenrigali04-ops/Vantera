@@ -8,6 +8,7 @@ import {
   smallint,
   integer,
   bigint,
+  numeric,
   timestamp,
   jsonb,
   index,
@@ -144,6 +145,7 @@ export const accounts = pgTable('accounts', {
   portalDomain: varchar('portal_domain', { length: 255 }),
   timezone: varchar('timezone', { length: 60 }).notNull().default('America/Los_Angeles'),
   stripeCustomerId: varchar('stripe_customer_id', { length: 255 }),
+  stripeSubscriptionId: varchar('stripe_subscription_id', { length: 255 }),
   onboardingCompletedAt: timestamptz('onboarding_completed_at'),
 
   // Personalization profile (used by `personalizeTemplate` at apply time).
@@ -889,6 +891,39 @@ export const sdrActivityLog = pgTable(
   },
   (table) => ({
     accountIdx: index('sdr_activity_log_account_idx').on(table.accountId, table.createdAt),
+  }),
+)
+
+export const sdrBillingTierEnum = pgEnum('sdr_billing_tier', ['free', 'standard', 'premium'])
+
+export const sdrCreditAccounts = pgTable('sdr_credit_accounts', {
+  accountId: uuid('account_id')
+    .primaryKey()
+    .references(() => accounts.id, { onDelete: 'cascade' }),
+  billingTier: sdrBillingTierEnum('billing_tier').notNull().default('free'),
+  usedThisPeriod: numeric('used_this_period', { precision: 12, scale: 1 }).notNull().default('0'),
+  periodStart: timestamptz('period_start').notNull().defaultNow(),
+  trialStartedAt: timestamptz('trial_started_at'),
+  trialEndsAt: timestamptz('trial_ends_at'),
+  createdAt: timestamptz('created_at').notNull().defaultNow(),
+  updatedAt: timestamptz('updated_at').notNull().defaultNow(),
+})
+
+export const sdrCreditLedger = pgTable(
+  'sdr_credit_ledger',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    action: varchar('action', { length: 40 }).notNull(),
+    credits: numeric('credits', { precision: 12, scale: 1 }).notNull(),
+    referenceId: varchar('reference_id', { length: 120 }),
+    metadata: jsonb('metadata').notNull().default({}),
+    createdAt: timestamptz('created_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    accountIdx: index('sdr_credit_ledger_account_idx').on(table.accountId, table.createdAt),
   }),
 )
 
