@@ -5,7 +5,7 @@ import type { SDRActivityEvent, SDRAgentConfig, SDRDashboardStats } from '@/lib/
 import {
   isAutomaticOutreachMode,
   type OutreachAutomationMode,
-} from '@/lib/sdr/outreach-automation'
+} from '@/lib/sdr/outreach-automation-mode'
 import { SdrCreditPaywall } from '@/components/sdr/SdrCreditPaywall'
 import { SdrCreditStrip } from '@/components/sdr/SdrCreditStrip'
 import { SdrOutreachHubTabs } from '@/components/sdr/SdrOutreachHubTabs'

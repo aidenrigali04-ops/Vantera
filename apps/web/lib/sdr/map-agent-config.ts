@@ -1,5 +1,5 @@
 import type { ICPConfig } from '@/lib/aspire/types'
-import { normalizeOutreachAutomationMode } from '@/lib/sdr/outreach-automation'
+import { normalizeOutreachAutomationMode } from '@/lib/sdr/outreach-automation-mode'
 import type { SDRAgentConfig, SdrOutreachWindow } from '@/lib/sdr/types'
 import { DEFAULT_OUTREACH_WINDOW } from '@/lib/sdr/types'
 import type { sdrAgentConfigs } from '@vantera/db'

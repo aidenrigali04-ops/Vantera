@@ -13,7 +13,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { LiveIndicator } from '@/components/operational/LiveIndicator'
 import type { SdrAspireConfigPayload } from '@/lib/sdr/aspire-config'
-import type { OutreachAutomationMode } from '@/lib/sdr/outreach-automation'
+import type { OutreachAutomationMode } from '@/lib/sdr/outreach-automation-mode'
 import type { ProspectMode } from '@/lib/sdr/types'
 import { useAccountRealtime } from '@/lib/supabase/account-realtime'
 import { cn } from '@/lib/utils'

@@ -1,25 +1,19 @@
 import { db } from '@/lib/db/client'
 import { evaluateFlag } from '@/lib/feature-flags/evaluate'
 import type { Plan } from '@/lib/feature-flags/flags'
+import {
+  normalizeOutreachAutomationMode,
+  type OutreachAutomationMode,
+} from '@/lib/sdr/outreach-automation-mode'
 import { featureFlags, sdrAgentConfigs } from '@vantera/db'
 import { and, eq, isNull } from 'drizzle-orm'
 
-export type OutreachAutomationMode = 'review' | 'automatic'
-
-export const OUTREACH_AUTOMATION_LABELS: Record<OutreachAutomationMode, string> = {
-  review: 'Review before outreach',
-  automatic: 'Automatic outreach',
-}
-
-export function normalizeOutreachAutomationMode(
-  value: string | null | undefined,
-): OutreachAutomationMode {
-  return value === 'automatic' ? 'automatic' : 'review'
-}
-
-export function isAutomaticOutreachMode(mode: OutreachAutomationMode): boolean {
-  return mode === 'automatic'
-}
+export type { OutreachAutomationMode } from '@/lib/sdr/outreach-automation-mode'
+export {
+  OUTREACH_AUTOMATION_LABELS,
+  isAutomaticOutreachMode,
+  normalizeOutreachAutomationMode,
+} from '@/lib/sdr/outreach-automation-mode'
 
 /** Account-level setting: config column wins; legacy flag is fallback only when column missing. */
 export async function resolveOutreachAutomationMode(

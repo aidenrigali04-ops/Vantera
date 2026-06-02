@@ -1,8 +1,10 @@
 'use client'
 
 import { cn } from '@/lib/utils'
-import type { OutreachAutomationMode } from '@/lib/sdr/outreach-automation'
-import { OUTREACH_AUTOMATION_LABELS } from '@/lib/sdr/outreach-automation'
+import {
+  OUTREACH_AUTOMATION_LABELS,
+  type OutreachAutomationMode,
+} from '@/lib/sdr/outreach-automation-mode'
 import { Check, Zap } from 'lucide-react'
 
 type Props = {

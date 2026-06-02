@@ -5,7 +5,7 @@ import type { BindingWithSearch, ProspectMode } from '@/lib/prospect-scout/types
 import {
   normalizeOutreachAutomationMode,
   type OutreachAutomationMode,
-} from '@/lib/sdr/outreach-automation'
+} from '@/lib/sdr/outreach-automation-mode'
 import type { CreateSDRConfigInput } from '@/lib/sdr/types'
 import {
   aspireSavedSearches,

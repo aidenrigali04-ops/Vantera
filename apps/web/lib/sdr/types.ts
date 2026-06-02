@@ -1,5 +1,5 @@
 import type { ICPConfig } from '@/lib/aspire/types'
-import type { OutreachAutomationMode } from '@/lib/sdr/outreach-automation'
+import type { OutreachAutomationMode } from '@/lib/sdr/outreach-automation-mode'
 
 export type SdrOutreachWindow = {
   startHour: number
