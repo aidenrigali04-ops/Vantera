@@ -13,6 +13,7 @@ import {
   resolveWorkspaceAccountId,
 } from '@/lib/onboarding/account-store'
 import { provisionOwnerWorkspace } from '@/lib/onboarding/provision-workspace'
+import { replaceAccountStageDefinitions } from '@/lib/onboarding/replace-stage-definitions'
 import { getBrandingFromHeaders } from '@/lib/branding/server'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { headers } from 'next/headers'
@@ -536,15 +537,6 @@ async function applyTemplateForAccount(
   let stageCount = 0
   let automationCount = 0
 
-  const { error: deleteStagesError } = await admin
-    .from('stage_definitions')
-    .delete()
-    .eq('account_id', accountId)
-
-  if (deleteStagesError) {
-    throw new Error(deleteStagesError.message)
-  }
-
   const { error: deleteAutomationsError } = await admin
     .from('automations')
     .delete()
@@ -554,26 +546,12 @@ async function applyTemplateForAccount(
     throw new Error(deleteAutomationsError.message)
   }
 
-  if (stages.length > 0) {
-    const { error: insertStagesError } = await admin.from('stage_definitions').insert(
-      stages.map((stage, index) => ({
-        account_id: accountId,
-        record_type: stage.recordType ?? template.record_type,
-        label: stage.label,
-        position: stage.position ?? index,
-        color: stage.color ?? '#64748B',
-        triggers_automation: stage.triggersAutomation ?? true,
-        is_terminal_win: stage.isTerminalWin ?? false,
-        is_terminal_loss: stage.isTerminalLoss ?? false,
-      })),
-    )
-
-    if (insertStagesError) {
-      throw new Error(insertStagesError.message)
-    }
-
-    stageCount = stages.length
-  }
+  stageCount = await replaceAccountStageDefinitions(
+    admin,
+    accountId,
+    stages,
+    template.record_type,
+  )
 
   if (flowAutomations.length > 0) {
     const { error: insertAutomationsError } = await admin.from('automations').insert(
