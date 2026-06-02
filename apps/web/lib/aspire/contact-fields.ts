@@ -70,6 +70,13 @@ export function readProspectContact(raw: Record<string, unknown>): {
   }
 }
 
+export function splitFullName(fullName: string): { firstName: string; lastName: string } {
+  const parts = fullName.trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return { firstName: '', lastName: '' }
+  if (parts.length === 1) return { firstName: parts[0]!, lastName: '' }
+  return { firstName: parts[0]!, lastName: parts.slice(1).join(' ') }
+}
+
 export function buildProspectId(raw: Record<string, unknown>): string | null {
   const { email, linkedinUrl } = readProspectContact(raw)
   if (email) return `email:${email}`
@@ -78,9 +85,18 @@ export function buildProspectId(raw: Record<string, unknown>): string | null {
 
   const firstName = readString(raw, ['first_name', 'firstName']) ?? ''
   const lastName = readString(raw, ['last_name', 'lastName']) ?? ''
+  const fullName = readString(raw, ['full_name', 'fullName', 'contact_full_name'])
   const company =
     readString(raw, ['company_name', 'organizationName', 'company']) ?? ''
-  const nameKey = [firstName, lastName, company].filter(Boolean).join('-')
+  const domain = readString(raw, ['company_domain', 'companyDomain'])
+
+  const displayName =
+    [firstName, lastName].filter(Boolean).join(' ') || fullName || ''
+  if (displayName && domain) {
+    return `name:${displayName.toLowerCase()}@${domain.toLowerCase()}`
+  }
+
+  const nameKey = [firstName || fullName, lastName, company].filter(Boolean).join('-')
   if (nameKey.length > 2) return `name:${nameKey.toLowerCase()}`
 
   return null

@@ -21,6 +21,8 @@ export type SdrAgentSnapshot = {
   pendingDrafts: number
   leadsInPipeline: number
   enrolledLeads: number
+  /** SDR config active and not paused — Prospect Scout can run on schedule. */
+  prospectScoutActive: boolean
 }
 
 export type SdrAgentCard = SdrAgentDefinition & {

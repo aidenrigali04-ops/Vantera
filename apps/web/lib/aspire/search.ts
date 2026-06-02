@@ -14,7 +14,7 @@ export { searchApify } from '@/lib/aspire/apify-client'
 export type { ProspectSearchMeta } from '@/lib/aspire/apify-client'
 import { db } from '@/lib/db/client'
 import { accounts, aspireResults } from '@vantera/db'
-import { and, eq, inArray, isNull } from 'drizzle-orm'
+import { and, eq, inArray, isNull, sql } from 'drizzle-orm'
 
 export async function filterExistingLeads(
   accountId: string,
@@ -60,30 +60,58 @@ async function persistAspireResults(
   scored: AspireSearchResult[],
   searchId: string | null,
 ): Promise<void> {
-  for (const row of scored) {
-    try {
-      await db
-        .insert(aspireResults)
-        .values({
-          accountId,
-          searchId,
-          apolloId: row.id,
-          rawData: row,
-          icpScore: row.icpScore,
-          icpSignals: row.icpSignals,
-          status: 'found',
-        })
-        .onConflictDoUpdate({
-          target: [aspireResults.accountId, aspireResults.apolloId],
-          set: {
+  if (scored.length === 0) return
+
+  const values = scored.map((row) => ({
+    accountId,
+    searchId,
+    apolloId: row.id,
+    rawData: row,
+    icpScore: row.icpScore,
+    icpSignals: row.icpSignals,
+    status: 'found' as const,
+  }))
+
+  try {
+    await db
+      .insert(aspireResults)
+      .values(values)
+      .onConflictDoUpdate({
+        target: [aspireResults.accountId, aspireResults.apolloId],
+        set: {
+          rawData: sql`excluded.raw_data`,
+          icpScore: sql`excluded.icp_score`,
+          icpSignals: sql`excluded.icp_signals`,
+          searchId: sql`excluded.search_id`,
+        },
+      })
+  } catch (error) {
+    console.error('[persistAspireResults] batch failed, falling back per-row:', error)
+    for (const row of scored) {
+      try {
+        await db
+          .insert(aspireResults)
+          .values({
+            accountId,
+            searchId,
+            apolloId: row.id,
             rawData: row,
             icpScore: row.icpScore,
             icpSignals: row.icpSignals,
-            searchId,
-          },
-        })
-    } catch (error) {
-      console.error('[persistAspireResults] row failed:', row.id, error)
+            status: 'found',
+          })
+          .onConflictDoUpdate({
+            target: [aspireResults.accountId, aspireResults.apolloId],
+            set: {
+              rawData: row,
+              icpScore: row.icpScore,
+              icpSignals: row.icpSignals,
+              searchId,
+            },
+          })
+      } catch (rowError) {
+        console.error('[persistAspireResults] row failed:', row.id, rowError)
+      }
     }
   }
 }

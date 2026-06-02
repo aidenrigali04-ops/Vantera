@@ -66,9 +66,9 @@ export function SdrAgentsPageClient({ agents, enrolledLeads }: Props) {
               asChild
               className="bg-[var(--text-primary)] text-[var(--text-inverse)] hover:opacity-90"
             >
-              <Link href="/admin/outreach/aspire">
+              <Link href="/admin/outreach/agents/setup">
                 <Rocket className="mr-1.5 h-4 w-4" />
-                Deploy Prospect Scout
+                Set up Prospect Scout
               </Link>
             </Button>
             <Button asChild variant="outline" className="border-[var(--border-default)]">
@@ -138,7 +138,7 @@ export function SdrAgentsPageClient({ agents, enrolledLeads }: Props) {
             <div>
               <h3 className="text-sm font-semibold text-[var(--text-primary)]">Recommended deploy order</h3>
               <ol className="mt-2 space-y-1 text-sm text-[var(--text-secondary)]">
-                <li>1. Save an Aspire search → Prospect Scout finds leads weekly</li>
+                <li>1. Set up Prospect Scout → daily or weekly discovery into your pipeline</li>
                 <li>2. Enroll matches → Message Drafter writes personalized outreach</li>
                 <li>3. Launch a campaign → Outreach Agent runs your sequence 24/7</li>
                 <li>4. Pipeline Analyst scores engagement and surfaces follow-ups</li>

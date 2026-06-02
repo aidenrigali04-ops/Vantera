@@ -25,20 +25,20 @@ export const PROSPECT_MODE_OPTIONS: Array<{
 }> = [
   {
     value: 'inline_icp',
-    title: 'Prospect Scout (default)',
+    title: 'Autonomous scout (recommended)',
     description:
-      'Apify discovery from your agent ICP → scored in Aspire → optional auto-enroll. Does not re-run Aspire saved searches.',
+      'Prospect Scout pulls from Apify using your agent ICP, scores matches, and adds qualified prospects to your pipeline on schedule.',
   },
   {
     value: 'aspire_bound',
-    title: 'Aspire saved searches only',
+    title: 'Aspire saved searches (advanced)',
     description:
-      'Re-run saved Aspire search filters on schedule (manual curation). Use with bindings below.',
+      'Also re-run manual Aspire saved searches you curate in the Aspire UI. Optional bindings below.',
   },
   {
     value: 'hybrid',
-    title: 'Scout + saved searches',
-    description: 'Prospect Scout discovery first, then optional bound Aspire saved searches.',
+    title: 'Scout + Aspire searches',
+    description: 'Autonomous scout first, then optional saved Aspire search bindings.',
   },
 ]
 

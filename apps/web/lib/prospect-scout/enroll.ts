@@ -78,17 +78,25 @@ export async function enrollProspect(input: {
   icpScore: number
   icpSignals: string[]
   startSdrSequence: boolean
+  /** When false without sequence, still tag as scout-sourced pipeline lead (not manual Aspire). */
+  pipelineOnlyFromScout?: boolean
   accountName?: string
 }): Promise<EnrollProspectResult> {
   const { accountId, config, person, icpScore, icpSignals, startSdrSequence } = input
   const searchId = input.searchId || null
+
+  const leadSource = startSdrSequence
+    ? 'sdr_agent'
+    : input.pipelineOnlyFromScout
+      ? 'sdr_agent'
+      : 'aspire'
 
   const leadId = await upsertLeadFromApollo(
     accountId,
     person,
     icpScore,
     icpSignals,
-    startSdrSequence ? 'sdr_agent' : 'aspire',
+    leadSource,
   )
 
   const [aspireRow] = await db
@@ -167,13 +175,36 @@ export async function enrollProspect(input: {
         updatedAt: new Date(),
       })
       .where(eq(sdrAgentConfigs.id, config.id))
+  } else if (input.pipelineOnlyFromScout && leadId) {
+    await db
+      .update(aspireResults)
+      .set({
+        leadId,
+        status: 'enrolled',
+        enrolledAt: new Date(),
+      })
+      .where(eq(aspireResults.id, aspireRow!.id))
+
+    await logSdrActivity({
+      accountId,
+      configId: config.id,
+      leadId,
+      eventType: 'lead_enrolled',
+      metadata: {
+        icpScore,
+        company: person.organizationName,
+        searchId,
+        source: 'prospect_scout',
+        pipelineOnly: true,
+      },
+    })
   }
 
   return {
     leadId,
     aspireResultId: aspireRow!.id,
     sequenceId,
-    enrolled: Boolean(sequenceId),
+    enrolled: Boolean(sequenceId) || Boolean(input.pipelineOnlyFromScout && leadId),
   }
 }
 
@@ -223,9 +254,9 @@ export async function notifyIcpMatches(
     accountId,
     signalType: 'aspire_icp_match',
     severity: 'yellow',
-    headline: `${count} new ICP leads found in ${searchName}`,
-    actionLabel: 'Review matches',
-    actionPayload: { searchId },
+    headline: `${count} new ICP-matched prospects from ${searchName}`,
+    actionLabel: 'View pipeline',
+    actionPayload: { searchId, source: 'prospect_scout', href: '/admin/pipeline' },
     expiresInDays: 7,
   })
 }

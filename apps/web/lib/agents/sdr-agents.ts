@@ -10,9 +10,9 @@ export const SDR_AGENT_DEFINITIONS: SdrAgentDefinition[] = [
     name: 'Prospect Scout',
     tagline: 'Finds ICP-matched leads while you sleep',
     description:
-      'Runs saved Aspire searches on a weekly schedule, scores prospects against your ICP, and surfaces high-fit matches to your pipeline.',
-    href: '/admin/outreach/aspire',
-    ctaLabel: 'Configure scout',
+      'Runs on your schedule from agent ICP rules, discovers prospects via Apify, scores them, and adds qualified matches to your pipeline automatically.',
+    href: '/admin/outreach/agents/setup',
+    ctaLabel: 'Set up Prospect Scout',
     iconName: 'telescope',
   },
   {
@@ -50,13 +50,17 @@ export const SDR_AGENT_DEFINITIONS: SdrAgentDefinition[] = [
 export function buildSdrAgentCards(snapshot: SdrAgentSnapshot): SdrAgentCard[] {
   return SDR_AGENT_DEFINITIONS.map((agent) => {
     switch (agent.id) {
-      case 'prospect_scout':
+      case 'prospect_scout': {
+        const active = snapshot.prospectScoutActive
         return {
           ...agent,
-          status: snapshot.activeSavedSearches > 0 ? 'active' : 'needs_setup',
-          statLabel: 'Active searches',
-          statValue: String(snapshot.activeSavedSearches),
+          href: active ? '/admin/outreach/agents/scout' : '/admin/outreach/agents/setup',
+          ctaLabel: active ? 'Open Prospect Scout' : 'Set up Prospect Scout',
+          status: active ? 'active' : 'needs_setup',
+          statLabel: active ? 'Open prospects' : 'Not configured',
+          statValue: active ? String(snapshot.leadsInPipeline) : '—',
         }
+      }
       case 'outreach_agent':
         return {
           ...agent,

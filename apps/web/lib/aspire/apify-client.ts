@@ -7,6 +7,8 @@ import {
   extractPhone,
   readString as readApifyString,
 } from '@/lib/aspire/contact-fields'
+import { resolveApifyKeywordTargeting } from '@/lib/aspire/apify-targeting'
+import { splitFullName } from '@/lib/aspire/contact-fields'
 import { stubResults } from '@/lib/aspire/prospect-stubs'
 import type { ApolloPersonResult, ApolloSearchFilters } from '@/lib/aspire/types'
 import { env } from '@/lib/env'
@@ -39,6 +41,12 @@ export type ProspectSearchMeta = {
   source: ProspectSearchSource
   providerConfigured: boolean
   providerError?: string
+  /** Raw rows from Apify dataset before mapping. */
+  apifyRowCount?: number
+  /** Rows dropped because mapApifyLead returned null. */
+  unmappedRowCount?: number
+  /** True when a second broader Apify run was used to fill volume. */
+  retriedBroad?: boolean
 }
 
 function readString(raw: Record<string, unknown>, keys: string[]): string | null {
@@ -58,8 +66,16 @@ export function mapApifyLead(raw: Record<string, unknown>): ApolloPersonResult |
   const id = buildProspectId(raw)
   if (!id) return null
 
-  const firstName = readString(raw, ['first_name', 'firstName']) ?? ''
-  const lastName = readString(raw, ['last_name', 'lastName']) ?? ''
+  let firstName = readString(raw, ['first_name', 'firstName']) ?? ''
+  let lastName = readString(raw, ['last_name', 'lastName']) ?? ''
+  if (!firstName && !lastName) {
+    const full = readString(raw, ['full_name', 'fullName', 'contact_full_name'])
+    if (full) {
+      const split = splitFullName(full)
+      firstName = split.firstName
+      lastName = split.lastName
+    }
+  }
   const contact = {
     email: extractEmail(raw),
     phone: extractPhone(raw),
@@ -75,7 +91,9 @@ export function mapApifyLead(raw: Record<string, unknown>): ApolloPersonResult |
     phone: contact.phone,
     linkedinUrl: contact.linkedinUrl,
     organizationName:
-      readString(raw, ['company_name', 'organizationName', 'company']) ?? 'Unknown',
+      readString(raw, ['company_name', 'organizationName', 'company']) ??
+      readString(raw, ['company_domain', 'companyDomain']) ??
+      'Unknown',
     organizationId: null,
     websiteUrl: readString(raw, ['company_website', 'websiteUrl', 'website']),
     city: readString(raw, ['city']),
@@ -134,19 +152,19 @@ export function buildApifyActorInput(
   if (filters.jobTitles?.length) {
     input.contact_job_title = filters.jobTitles
   } else if (filters.q?.trim()) {
-    const term = filters.q.trim()
-    input.contact_job_title = [
-      term,
-      `${term} manager`,
-      `${term} director`,
-      `head of ${term}`,
-      `director of ${term}`,
-      `vp ${term}`,
-    ]
+    const targeting = resolveApifyKeywordTargeting(filters.q.trim())
+    if (targeting.functional_level) {
+      input.functional_level = targeting.functional_level
+    }
+    if (targeting.contact_job_title) {
+      input.contact_job_title = targeting.contact_job_title
+    }
   }
 
   if (filters.locations?.length) {
     input.contact_location = filters.locations
+  } else if (interactive) {
+    input.contact_location = ['united states']
   }
 
   if (filters.industries?.length) {
@@ -160,6 +178,86 @@ export function buildApifyActorInput(
 
   return input
 }
+
+function parseApifyDatasetItems(body: unknown): Record<string, unknown>[] {
+  if (Array.isArray(body)) {
+    return body.filter((row): row is Record<string, unknown> => row !== null && typeof row === 'object')
+  }
+  if (body && typeof body === 'object') {
+    const record = body as Record<string, unknown>
+    for (const key of ['items', 'data', 'results', 'datasetItems']) {
+      const value = record[key]
+      if (Array.isArray(value)) {
+        return value.filter(
+          (row): row is Record<string, unknown> => row !== null && typeof row === 'object',
+        )
+      }
+    }
+  }
+  return []
+}
+
+function mergePeople(
+  primary: ApolloPersonResult[],
+  extra: ApolloPersonResult[],
+  max: number,
+): ApolloPersonResult[] {
+  const seen = new Set(primary.map((p) => p.id))
+  const merged = [...primary]
+  for (const person of extra) {
+    if (seen.has(person.id)) continue
+    seen.add(person.id)
+    merged.push(person)
+    if (merged.length >= max) break
+  }
+  return merged
+}
+
+function buildBroadRetryInput(
+  base: Record<string, unknown>,
+  pageSize: number,
+): Record<string, unknown> {
+  const retry: Record<string, unknown> = {
+    fetch_count: getAspireApifyFetchCount(pageSize),
+    email_status: base.email_status,
+    contact_location: base.contact_location ?? ['united states'],
+  }
+  if (Array.isArray(base.functional_level) && base.functional_level.length > 0) {
+    retry.functional_level = base.functional_level
+  }
+  if (base.company_keywords) {
+    retry.company_keywords = base.company_keywords
+  }
+  return retry
+}
+
+async function fetchApifyLeads(
+  input: Record<string, unknown>,
+  token: string,
+  actorId: string,
+): Promise<{ rows: Record<string, unknown>[]; people: ApolloPersonResult[] }> {
+  const url = `${APIFY_API_BASE}/acts/${encodeURIComponent(actorId)}/run-sync-get-dataset-items?token=${encodeURIComponent(token)}&timeout=300&format=json`
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+
+  if (!response.ok) {
+    const errorText = apifyErrorMessage(await response.text(), 'Apify actor run failed')
+    throw new Error(errorText)
+  }
+
+  const body = (await response.json()) as unknown
+  const rows = parseApifyDatasetItems(body)
+  const people = rows
+    .map((row) => mapApifyLead(row))
+    .filter((person): person is ApolloPersonResult => person !== null)
+
+  return { rows, people }
+}
+
+const MIN_INTERACTIVE_RESULTS = 10
 
 function apifyErrorMessage(body: unknown, fallback: string): string {
   if (typeof body === 'string' && body.trim()) return body.slice(0, 300)
@@ -204,31 +302,30 @@ export async function searchApify(
 
   const pageSize = getAspireApifyFetchCount(perPage)
   const input = buildApifyActorInput(filters, pageSize, interactive)
-  const url = `${APIFY_API_BASE}/acts/${encodeURIComponent(actorId)}/run-sync-get-dataset-items?token=${encodeURIComponent(token)}&timeout=180&format=json`
 
   try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(input),
-    })
+    let { rows, people } = await fetchApifyLeads(input, token, actorId)
+    let retriedBroad = false
 
-    if (!response.ok) {
-      const errorText = apifyErrorMessage(await response.text(), 'Apify actor run failed')
-      throw new Error(errorText)
+    if (interactive && people.length < MIN_INTERACTIVE_RESULTS) {
+      const retryInput = buildBroadRetryInput(input, pageSize)
+      const retry = await fetchApifyLeads(retryInput, token, actorId)
+      rows = rows.concat(retry.rows)
+      people = mergePeople(people, retry.people, pageSize)
+      retriedBroad = true
     }
-
-    const body = (await response.json()) as unknown
-    const rows = Array.isArray(body) ? body : []
-    const people = rows
-      .map((row) => mapApifyLead(row as Record<string, unknown>))
-      .filter((person): person is ApolloPersonResult => person !== null)
 
     return {
       people,
       total: people.length,
       hasMore: people.length >= pageSize,
-      meta: { source: 'apify', providerConfigured: true },
+      meta: {
+        source: 'apify',
+        providerConfigured: true,
+        apifyRowCount: rows.length,
+        unmappedRowCount: Math.max(0, rows.length - people.length),
+        retriedBroad,
+      },
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Apify search failed'

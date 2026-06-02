@@ -154,7 +154,14 @@ export async function getOperationalActionFeed(accountId: string, limit = 8): Pr
     let draftId: string | undefined
     let campaignId: string | undefined
 
-    if (rawSignalType === 'aspire_icp_match' && payload.searchId) {
+    if (typeof payload.href === 'string' && payload.href.startsWith('/')) {
+      href = payload.href
+    } else if (
+      rawSignalType === 'aspire_icp_match' &&
+      payload.source === 'prospect_scout'
+    ) {
+      href = '/admin/pipeline'
+    } else if (rawSignalType === 'aspire_icp_match' && payload.searchId) {
       href = `/admin/outreach/aspire?searchId=${payload.searchId}`
     } else if (payload.campaignId) {
       campaignId = String(payload.campaignId)

@@ -71,6 +71,28 @@ export function SdrCommandCenterClient({ config, stats, initialActivity, upcomin
       ? 'text-[var(--success)]'
       : 'text-[var(--text-secondary)]'
 
+  async function handleRunDiscovery() {
+    startTransition(async () => {
+      const res = await fetch('/api/sdr/bootstrap', { method: 'POST' })
+      const json = await res.json()
+      if (!json.success) {
+        toast.error(json.error ?? 'Discovery run failed')
+        return
+      }
+      const enrolled = json.data?.enrolled ?? 0
+      const found = json.data?.found ?? 0
+      toast.success(
+        enrolled > 0
+          ? `Added ${enrolled} prospect${enrolled === 1 ? '' : 's'} to pipeline`
+          : found > 0
+            ? `Scored ${found} prospects (none met ICP floor)`
+            : 'Discovery run finished — no new matches',
+      )
+      router.refresh()
+      await refreshActivity()
+    })
+  }
+
   function handlePauseResume() {
     startTransition(async () => {
       const url = config.isPaused ? '/api/sdr/config/resume' : '/api/sdr/config/pause'
@@ -102,7 +124,16 @@ export function SdrCommandCenterClient({ config, stats, initialActivity, upcomin
         title={`SDR Agent — ${config.agentName}`}
         description={`${statusLabel} · ${stats.activeSequences} active sequences · ${stats.replyRate30d}% reply rate (30d)`}
         actions={
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={isPending || config.isPaused}
+              onClick={handleRunDiscovery}
+            >
+              <Radar className="mr-1.5 h-3.5 w-3.5" />
+              Run discovery
+            </Button>
             <Button variant="outline" size="sm" disabled={isPending} onClick={handlePauseResume}>
               {config.isPaused ? (
                 <>
@@ -115,7 +146,7 @@ export function SdrCommandCenterClient({ config, stats, initialActivity, upcomin
               )}
             </Button>
             <Button variant="outline" size="sm" asChild>
-              <Link href="/admin/outreach/agents/aspire">
+              <Link href="/admin/outreach/agents/scout">
                 <Radar className="mr-1.5 h-3.5 w-3.5" /> Prospect Scout
               </Link>
             </Button>
@@ -144,7 +175,7 @@ export function SdrCommandCenterClient({ config, stats, initialActivity, upcomin
         ) : null}
         <span className="text-[var(--text-disabled)]">·</span>
         <Link
-          href="/admin/outreach/agents/aspire"
+          href="/admin/outreach/agents/scout"
           className="status-pill bg-[var(--accent-muted)] text-[var(--text-primary)] hover:opacity-90"
         >
           {config.prospectMode.replace(/_/g, ' ')}
@@ -205,7 +236,7 @@ export function SdrCommandCenterClient({ config, stats, initialActivity, upcomin
             <div className="flex items-center justify-between gap-2">
               <h3 className="text-sm font-semibold text-[var(--text-primary)]">Prospect Scout</h3>
               <Button variant="ghost" size="sm" className="h-7 text-xs" asChild>
-                <Link href="/admin/outreach/agents/aspire">Configure</Link>
+                <Link href="/admin/outreach/agents/scout">Configure</Link>
               </Button>
             </div>
             <p className="mt-2 text-xs text-[var(--text-secondary)]">

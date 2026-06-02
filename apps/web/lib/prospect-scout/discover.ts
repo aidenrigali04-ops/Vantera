@@ -44,8 +44,8 @@ export type ScoutDiscoveryResult = {
 }
 
 /**
- * Prospect Scout: Apify discovery → ICP score → aspire_results (Aspire inbox).
- * Enrollment is optional and separate from Aspire manual saved searches.
+ * Prospect Scout: Apify discovery → ICP score → pipeline leads (and optional SDR sequence).
+ * Uses aspire_results as internal staging; not the manual Aspire search UI.
  */
 export async function runProspectScoutDiscovery(
   config: SdrConfigRow,
@@ -114,8 +114,9 @@ export async function runProspectScoutDiscovery(
 
     for (const { person, icp } of scored.sort((a, b) => b.icp.score - a.icp.score)) {
       if (icp.score < minIcp) continue
-      if (!shouldEnroll || headroom <= 0) continue
+      if (!shouldEnroll) continue
 
+      const withSequence = headroom > 0
       const result = await enrollProspect({
         accountId: config.accountId,
         config,
@@ -123,11 +124,13 @@ export async function runProspectScoutDiscovery(
         searchId: null,
         icpScore: icp.score,
         icpSignals: icp.signals,
-        startSdrSequence: true,
+        startSdrSequence: withSequence,
+        pipelineOnlyFromScout: !withSequence,
       })
+
       if (result.enrolled) {
         enrolled += 1
-        headroom -= 1
+        if (withSequence) headroom -= 1
       }
     }
 

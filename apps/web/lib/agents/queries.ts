@@ -7,6 +7,7 @@ import {
   leads,
   outreachCampaignEnrollments,
   outreachCampaigns,
+  sdrAgentConfigs,
 } from '@vantera/db'
 import { and, eq, isNull, sql } from 'drizzle-orm'
 
@@ -65,6 +66,14 @@ export async function getSdrAgentSnapshot(accountId: string): Promise<SdrAgentSn
       ),
     )
 
+  const [scoutConfig] = await db
+    .select({ isActive: sdrAgentConfigs.isActive, isPaused: sdrAgentConfigs.isPaused })
+    .from(sdrAgentConfigs)
+    .where(
+      and(eq(sdrAgentConfigs.accountId, accountId), isNull(sdrAgentConfigs.deletedAt)),
+    )
+    .limit(1)
+
   return {
     activeCampaigns: campaignStats?.active ?? 0,
     draftCampaigns: campaignStats?.draft ?? 0,
@@ -72,6 +81,7 @@ export async function getSdrAgentSnapshot(accountId: string): Promise<SdrAgentSn
     pendingDrafts: draftStats?.pending ?? 0,
     leadsInPipeline: leadStats?.open ?? 0,
     enrolledLeads: enrollmentStats?.active ?? 0,
+    prospectScoutActive: Boolean(scoutConfig?.isActive && !scoutConfig?.isPaused),
   }
 }
 

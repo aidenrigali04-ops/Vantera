@@ -82,6 +82,82 @@ export function stubResults(filters: ApolloSearchFilters): ApolloPersonResult[] 
       technologies: [],
       photoUrl: null,
     },
+    {
+      id: 'stub-morgan-lee',
+      firstName: 'Morgan',
+      lastName: 'Lee',
+      title: 'CMO',
+      email: 'morgan@launchpad.io',
+      linkedinUrl: 'https://linkedin.com/in/morgan-lee-example',
+      industry: 'Marketing',
+      organizationName: 'Launchpad',
+      organizationId: null,
+      websiteUrl: null,
+      city: 'Seattle',
+      state: 'WA',
+      employeeCount: 80,
+      revenue: null,
+      phone: '+1 (206) 555-0111',
+      technologies: [],
+      photoUrl: null,
+    },
+    {
+      id: 'stub-casey-blake',
+      firstName: 'Casey',
+      lastName: 'Blake',
+      title: 'Director of Marketing',
+      email: 'casey@signalstack.co',
+      linkedinUrl: null,
+      industry: 'Marketing',
+      organizationName: 'Signalstack',
+      organizationId: null,
+      websiteUrl: null,
+      city: 'Boston',
+      state: 'MA',
+      employeeCount: 45,
+      revenue: null,
+      phone: null,
+      technologies: [],
+      photoUrl: null,
+    },
+    {
+      id: 'stub-avery-kim',
+      firstName: 'Avery',
+      lastName: 'Kim',
+      title: 'Marketing Manager',
+      email: 'avery@pipelinehq.com',
+      linkedinUrl: null,
+      industry: 'Marketing',
+      organizationName: 'Pipeline HQ',
+      organizationId: null,
+      websiteUrl: null,
+      city: 'San Francisco',
+      state: 'CA',
+      employeeCount: 28,
+      revenue: null,
+      phone: '+1 (415) 555-0177',
+      technologies: [],
+      photoUrl: null,
+    },
+    {
+      id: 'stub-drew-hayes',
+      firstName: 'Drew',
+      lastName: 'Hayes',
+      title: 'Head of Marketing',
+      email: 'drew@nexuspartners.co',
+      linkedinUrl: 'https://linkedin.com/in/drew-hayes-example',
+      industry: 'Marketing',
+      organizationName: 'Nexus Partners',
+      organizationId: null,
+      websiteUrl: null,
+      city: 'Miami',
+      state: 'FL',
+      employeeCount: 60,
+      revenue: null,
+      phone: null,
+      technologies: [],
+      photoUrl: null,
+    },
   ]
 
   if (!keyword) return pool
@@ -93,7 +169,17 @@ export function stubResults(filters: ApolloSearchFilters): ApolloPersonResult[] 
       p.organizationName.toLowerCase().includes(keyword),
   )
 
-  if (matched.length > 0) return matched
+  if (matched.length > 0) {
+    const seen = new Set(matched.map((p) => p.id))
+    for (const p of pool) {
+      if (matched.length >= 8) break
+      if (!seen.has(p.id)) {
+        seen.add(p.id)
+        matched.push(p)
+      }
+    }
+    return matched
+  }
 
   return [
     {

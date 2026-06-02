@@ -1,4 +1,5 @@
 import { runAccountProspectScout } from '@/lib/prospect-scout/run-account'
+import { shouldRunProspectScoutOnSchedule } from '@/lib/prospect-scout/schedule'
 import { db } from '@/lib/db/client'
 import { evaluateFlag } from '@/lib/feature-flags/evaluate'
 import type { Plan } from '@/lib/feature-flags/flags'
@@ -34,6 +35,10 @@ export async function runSdrAgentFind(): Promise<{ accountsRun: number; leadsEnr
     try {
       await requireSDREnabledForAccount(config.accountId, plan as Plan)
     } catch {
+      continue
+    }
+
+    if (!shouldRunProspectScoutOnSchedule(config)) {
       continue
     }
 

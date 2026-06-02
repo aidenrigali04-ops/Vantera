@@ -147,7 +147,7 @@ export function SdrSequencesPageClient({ rows }: Props) {
           title="No sequences yet"
           description="Enroll prospects from Aspire or your pipeline to start automated nurture."
           actionLabel="Open Aspire"
-          onAction={() => router.push('/admin/outreach/aspire')}
+          onAction={() => router.push('/admin/outreach/agents/scout')}
         />
       ) : (
         <section className="card-surface overflow-hidden">

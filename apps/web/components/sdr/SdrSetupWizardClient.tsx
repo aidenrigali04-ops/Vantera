@@ -37,6 +37,7 @@ export function SdrSetupWizardClient({ accountVertical, accountName }: Props) {
     excludeDomains: '',
     maxNewLeadsDay: 10,
     maxActiveLeads: 200,
+    searchFrequency: 'daily' as 'daily' | 'weekly',
     prospectMode: 'inline_icp' as ProspectMode,
     defaultMinIcpScore: 70,
     syncIcpToSavedSearches: true,
@@ -110,6 +111,7 @@ export function SdrSetupWizardClient({ accountVertical, accountName }: Props) {
         outreachWindow: DEFAULT_OUTREACH_WINDOW,
         maxNewLeadsDay: form.maxNewLeadsDay,
         maxActiveLeads: form.maxActiveLeads,
+        searchFrequency: form.searchFrequency,
         isActive: true,
         prospectMode: form.prospectMode,
         defaultMinIcpScore: form.defaultMinIcpScore,
@@ -143,7 +145,24 @@ export function SdrSetupWizardClient({ accountVertical, accountName }: Props) {
         return
       }
 
-      toast.success(`${form.agentName} is live — finding and contacting leads`)
+      const bootstrapRes = await fetch('/api/sdr/bootstrap', { method: 'POST' })
+      const bootstrapJson = await bootstrapRes.json()
+      if (!bootstrapJson.success) {
+        toast.error(bootstrapJson.error ?? 'Agent saved but first discovery run failed')
+        router.push('/admin/outreach/agents/scout')
+        router.refresh()
+        return
+      }
+
+      const enrolled = bootstrapJson.data?.enrolled ?? 0
+      const found = bootstrapJson.data?.found ?? 0
+      toast.success(
+        enrolled > 0
+          ? `${form.agentName} is live — ${enrolled} prospect${enrolled === 1 ? '' : 's'} added to your pipeline`
+          : found > 0
+            ? `${form.agentName} is live — ${found} prospects scored (none met your ICP floor yet)`
+            : `${form.agentName} is live — scheduled discovery runs ${form.searchFrequency}`,
+      )
       router.push('/admin/outreach/agents')
       router.refresh()
     })
@@ -262,6 +281,26 @@ export function SdrSetupWizardClient({ accountVertical, accountName }: Props) {
               onChange={(e) => setForm({ ...form, maxActiveLeads: Number(e.target.value) })}
             />
           </div>
+          <div>
+            <Label>Prospect Scout discovery</Label>
+            <select
+              className="mt-1.5 flex h-9 w-full rounded-md border border-[var(--border-default)] bg-[var(--bg-surface)] px-3 text-[13px]"
+              value={form.searchFrequency}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  searchFrequency: e.target.value as 'daily' | 'weekly',
+                })
+              }
+            >
+              <option value="daily">Daily (6:00 UTC)</option>
+              <option value="weekly">Weekly (Mondays 6:00 UTC)</option>
+            </select>
+            <p className="mt-1.5 text-[12px] text-[var(--text-secondary)]">
+              Qualified prospects are added to your pipeline automatically — separate from the Aspire
+              search UI.
+            </p>
+          </div>
         </div>
       )}
 
@@ -308,6 +347,10 @@ export function SdrSetupWizardClient({ accountVertical, accountName }: Props) {
             <div className="flex justify-between gap-4">
               <dt className="text-[var(--text-tertiary)]">Daily cap</dt>
               <dd className="font-medium text-[var(--text-primary)]">{form.maxNewLeadsDay} leads</dd>
+            </div>
+            <div className="flex justify-between gap-4">
+              <dt className="text-[var(--text-tertiary)]">Discovery</dt>
+              <dd className="font-medium text-[var(--text-primary)]">{form.searchFrequency}</dd>
             </div>
             <div className="flex justify-between gap-4">
               <dt className="text-[var(--text-tertiary)]">Prospect mode</dt>
