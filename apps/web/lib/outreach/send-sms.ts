@@ -2,6 +2,7 @@ import { env } from '@/lib/env'
 import { db } from '@/lib/db/client'
 import { personalizeTemplate } from '@/lib/outreach/types'
 import type { LeadRow } from '@/lib/outreach/types'
+import { decryptCredentialValue } from '@/lib/integrations/credential-secrets'
 import { integrationCredentials } from '@vantera/db'
 import { eq } from 'drizzle-orm'
 import twilio from 'twilio'
@@ -41,9 +42,12 @@ async function loadTwilioConfig(accountId: string) {
   const phoneNumber = metadata?.phoneNumber ?? platformFrom
   if (!phoneNumber) return null
 
+  const token = decryptCredentialValue(row.accessToken)
+  if (!token) return null
+
   return {
-    sid: platformSid || process.env.TWILIO_ACCOUNT_SID || '',
-    token: row.accessToken,
+    sid: metadata?.accountSid ?? platformSid ?? process.env.TWILIO_ACCOUNT_SID ?? '',
+    token,
     from: phoneNumber,
   }
 }

@@ -5,6 +5,7 @@ import {
 import { validateHubSpotToken } from '@/lib/integrations/hubspot/client'
 import { validateSalesforceCredentials } from '@/lib/integrations/salesforce/client'
 import type { CrmProvider } from '@/lib/integrations/types'
+import { encryptCredentialValue } from '@/lib/integrations/credential-secrets'
 import { integrationCredentials } from '@vantera/db'
 import { and, eq } from 'drizzle-orm'
 
@@ -59,16 +60,16 @@ export async function connectCrmIntegration(
     .values({
       accountId,
       provider,
-      accessToken,
-      refreshToken,
+      accessToken: encryptCredentialValue(accessToken),
+      refreshToken: encryptCredentialValue(refreshToken),
       metadata,
       isNativeMode: false,
     })
     .onConflictDoUpdate({
       target: [integrationCredentials.accountId, integrationCredentials.provider],
       set: {
-        accessToken,
-        refreshToken,
+        accessToken: encryptCredentialValue(accessToken),
+        refreshToken: encryptCredentialValue(refreshToken),
         metadata,
         isNativeMode: false,
         updatedAt: new Date(),

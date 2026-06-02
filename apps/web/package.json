@@ -56,6 +56,8 @@
     "@tanstack/react-query-devtools": "^5.100.11",
     "@tanstack/react-table": "^8.21.3",
     "@trigger.dev/sdk": "^4.4.6",
+    "@upstash/ratelimit": "^2.0.8",
+    "@upstash/redis": "^1.38.0",
     "@vantera/db": "workspace:*",
     "@vantera/types": "workspace:*",
     "@vantera/utils": "workspace:*",

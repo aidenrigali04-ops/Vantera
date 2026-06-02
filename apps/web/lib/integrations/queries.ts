@@ -1,4 +1,5 @@
 import { db } from '@/lib/db/client'
+import { decryptCredentialValue } from '@/lib/integrations/credential-secrets'
 import type { CrmConnectionStatus, CrmProvider } from '@/lib/integrations/types'
 import { CRM_PROVIDERS } from '@/lib/integrations/types'
 import { integrationCredentials } from '@vantera/db'
@@ -48,5 +49,11 @@ export async function findCrmCredential(accountId: string, provider: CrmProvider
     )
     .limit(1)
 
-  return row ?? null
+  if (!row) return null
+
+  return {
+    ...row,
+    accessToken: decryptCredentialValue(row.accessToken),
+    refreshToken: decryptCredentialValue(row.refreshToken),
+  }
 }

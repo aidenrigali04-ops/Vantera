@@ -8,6 +8,11 @@ import type { AdminSession } from '@/lib/auth/types'
 import { canAccessAdminRoute } from '@/lib/auth/rbac'
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { createClient } from '@supabase/supabase-js'
+import {
+  applyRateLimit,
+  getClientIp,
+  shouldBypassRateLimit,
+} from '@/lib/security/rate-limit'
 import { type NextRequest, NextResponse } from 'next/server'
 
 type AccountRow = {
@@ -203,6 +208,22 @@ async function resolveAccountByHost(
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
+
+  if (!shouldBypassRateLimit(pathname)) {
+    const ip = getClientIp(request)
+    const { success, limit, remaining } = await applyRateLimit(pathname, ip)
+    if (!success) {
+      return new NextResponse(JSON.stringify({ error: 'Too many requests' }), {
+        status: 429,
+        headers: {
+          'Content-Type': 'application/json',
+          ...(limit != null ? { 'X-RateLimit-Limit': String(limit) } : {}),
+          ...(remaining != null ? { 'X-RateLimit-Remaining': String(remaining) } : {}),
+          'Retry-After': '60',
+        },
+      })
+    }
+  }
 
   if (shouldSkipTenantResolution(pathname)) {
     return NextResponse.next()
