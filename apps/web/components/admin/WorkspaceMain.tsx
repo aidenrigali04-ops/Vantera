@@ -16,7 +16,7 @@ export function WorkspaceMain({ children, className, constrained = true }: Works
   return (
     <main
       className={cn(
-        'min-h-0 flex-1 overflow-y-auto bg-[#fafaf9] pb-20 md:pb-6',
+        'min-h-0 flex-1 overflow-y-auto bg-[var(--bg-base)] pb-20 md:pb-6',
         className,
       )}
     >

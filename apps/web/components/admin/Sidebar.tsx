@@ -51,7 +51,7 @@ function SidebarContent({ session, collapsed, onNavigate }: SidebarProps & { col
 
   return (
     <TooltipProvider delayDuration={0}>
-      <div className="flex h-full flex-col bg-white text-stone-900">
+      <div className="sidebar-gradient flex h-full flex-col text-stone-900">
         <div className={cn('border-b border-stone-200/80 px-3 py-3.5', collapsed && 'px-2')}>
           <div className={cn('flex items-center gap-2.5', collapsed && 'justify-center')}>
             {logoUrl ? (
@@ -224,7 +224,7 @@ export function Sidebar({ session, mobile, onNavigate }: SidebarProps) {
   if (mobile) {
     return (
       <Sheet open={mobileSidebarOpen} onOpenChange={setMobileSidebarOpen}>
-        <SheetContent side="left" className="w-[240px] border-stone-200 bg-white p-0 text-stone-900">
+        <SheetContent side="left" className="sidebar-gradient w-[240px] border-stone-200 p-0 text-stone-900">
           <SidebarContent
             session={session}
             onNavigate={() => {
@@ -241,7 +241,7 @@ export function Sidebar({ session, mobile, onNavigate }: SidebarProps) {
   return (
     <aside
       className={cn(
-        'hidden h-full shrink-0 flex-col border-r border-stone-200/80 bg-white transition-[width] duration-150 md:flex',
+        'sidebar-gradient hidden h-full shrink-0 flex-col border-r border-stone-200/80 transition-[width] duration-150 md:flex',
         sidebarCollapsed ? 'w-16' : 'w-[240px]',
       )}
     >

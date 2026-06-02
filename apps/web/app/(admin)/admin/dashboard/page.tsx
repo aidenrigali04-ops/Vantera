@@ -1,6 +1,7 @@
 import { requireAdminSession } from '@/lib/auth/require-session'
 import { getBrandingFromHeaders } from '@/lib/branding/server'
-import { getOperationalActionFeed } from '@/lib/dashboard/action-feed'
+import { getOperationalActionFeed, type ActionFeedItem } from '@/lib/dashboard/action-feed'
+import { getVentoraDashboardPayload } from '@/lib/dashboard/ventora-data'
 import { getSdrAgentCards } from '@/lib/agents/queries'
 import { findAccountEmbeddedInsights } from '@/lib/intelligence/queries'
 import { isOnboardingCompleteForAccount } from '@/lib/onboarding/status'
@@ -9,6 +10,14 @@ import { headers } from 'next/headers'
 import { DashboardClient } from './dashboard-client'
 
 export const dynamic = 'force-dynamic'
+
+/** Strip Date objects so RSC → client serialization stays safe. */
+function serializeActionFeed(items: ActionFeedItem[]): ActionFeedItem[] {
+  return items.map((item) => ({
+    ...item,
+    createdAt: new Date(item.createdAt).toISOString() as unknown as Date,
+  }))
+}
 
 export default async function AdminDashboardPage() {
   const session = await requireAdminSession()
@@ -35,17 +44,20 @@ export default async function AdminDashboardPage() {
     getSdrAgentCards(session.accountId),
   ])
 
+  const ventora = await getVentoraDashboardPayload(
+    session.accountId,
+    snapshot,
+    embeddedInsights,
+  )
+
   return (
     <DashboardClient
       email={session.email}
-      role={session.role}
-      businessName={branding.businessName || 'Your workspace'}
-      primaryColor={branding.primaryColor || '#1648A0'}
-      snapshot={snapshot}
-      actionFeed={actionFeed}
+      ventora={ventora}
+      actionFeed={serializeActionFeed(actionFeed)}
       accountId={session.accountId}
       onboardingIncomplete={onboardingIncomplete}
-      embeddedInsights={embeddedInsights}
+      isEmpty={snapshot.isEmpty}
       sdrAgents={sdrAgents}
     />
   )
