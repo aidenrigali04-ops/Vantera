@@ -38,7 +38,7 @@ import type { aspireSavedSearches } from '@vantera/db'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Bookmark, Check, Loader2, Play, Plus, Search, Target, Trash2, TrendingUp, Users } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 
 type SavedSearch = typeof aspireSavedSearches.$inferSelect
@@ -104,6 +104,7 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
   /** Primary table data — always set directly from search API or DB load. */
   const [displayLeads, setDisplayLeads] = useState<AspireSearchResult[]>([])
   const [searchMeta, setSearchMeta] = useState<SearchMeta | null>(null)
+  const isSearchingRef = useRef(false)
 
   useEffect(() => {
     const id = searchParams.get('searchId')
@@ -145,6 +146,7 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
     searchId: activeSearchId ?? undefined,
     enabled: true,
     onChange: () => {
+      if (isSearchingRef.current) return
       void loadStoredResults()
     },
   })
@@ -353,6 +355,7 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
     }
 
     setIsSearching(true)
+    isSearchingRef.current = true
     try {
       const res = await fetch('/api/aspire/search', {
         method: 'POST',
@@ -399,6 +402,7 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Apify search failed')
     } finally {
+      isSearchingRef.current = false
       setIsSearching(false)
     }
   }
