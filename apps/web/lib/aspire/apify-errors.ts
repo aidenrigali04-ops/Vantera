@@ -52,6 +52,28 @@ export function toUserFacingProspectSearchError(message: string): string {
   if (/none could be mapped/i.test(message)) {
     return 'Apify returned data but leads could not be parsed. Check APIFY_LEADS_ACTOR_ID matches your actor.'
   }
+  if (/timed out|timeout|aborted|ETIMEDOUT|ECONNRESET|fetch failed/i.test(message)) {
+    return 'Apify search timed out on the server. Try a narrower keyword — or upgrade Vercel plan for longer function runs.'
+  }
+  if (/actor.*not found|record-not-found|was not found/i.test(message)) {
+    return 'Apify actor not found. Set APIFY_LEADS_ACTOR_ID to code_crafter~leads-finder and redeploy.'
+  }
+  if (/usage.*limit|insufficient|credits|billing|must rent|paid actor/i.test(message)) {
+    return 'Apify account limit reached. Check billing and actor access in your Apify console.'
+  }
+  if (/input is not valid|invalid input|validation/i.test(message)) {
+    return 'Apify rejected the search filters. Try a simpler keyword or company name.'
+  }
+  if (/Search fallback/i.test(message)) {
+    return 'Live search did not finish in time. Try again with a specific company or keyword.'
+  }
+  const trimmed = message.trim()
+  if (trimmed.length > 0 && trimmed.length <= 160) {
+    return `Live search failed: ${trimmed}`
+  }
+  if (trimmed.length > 160) {
+    return `Live search failed: ${trimmed.slice(0, 157)}…`
+  }
   return 'Live search is temporarily unavailable — sample leads are shown so you can continue.'
 }
 

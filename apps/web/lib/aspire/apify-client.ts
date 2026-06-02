@@ -27,6 +27,9 @@ const APIFY_API_BASE = 'https://api.apify.com/v2'
 /** Apify actor hard cap per run (code_crafter/leads-finder). */
 const APIFY_MAX_FETCH = 100
 const DEFAULT_ASPIRE_FETCH = 50
+/** Vercel maxDuration is 300s — keep sync runs well under that (interactive = 2 runs max). */
+const INTERACTIVE_SYNC_TIMEOUT_SEC = 90
+const BATCH_SYNC_TIMEOUT_SEC = 120
 
 /** Leads returned per Aspire / Apify search (override with ASPIRE_APIFY_FETCH_COUNT). */
 export function getAspireApifyFetchCount(requested?: number): number {
@@ -262,16 +265,25 @@ function buildMinimalRetryInput(pageSize: number): Record<string, unknown> {
   }
 }
 
+function actorIdForUrl(actorId: string): string {
+  return actorId
+    .split('~')
+    .map((segment) => encodeURIComponent(segment))
+    .join('~')
+}
+
 async function fetchApifyLeads(
   input: Record<string, unknown>,
   token: string,
   actorId: string,
+  syncTimeoutSec: number,
 ): Promise<{ rows: Record<string, unknown>[]; people: ApolloPersonResult[] }> {
-  const url = `${APIFY_API_BASE}/acts/${encodeURIComponent(actorId)}/run-sync-get-dataset-items?token=${encodeURIComponent(token)}&timeout=300&format=json`
+  const url = `${APIFY_API_BASE}/acts/${actorIdForUrl(actorId)}/run-sync-get-dataset-items?token=${encodeURIComponent(token)}&timeout=${syncTimeoutSec}&format=json`
   const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(input),
+    signal: AbortSignal.timeout((syncTimeoutSec + 25) * 1000),
   })
 
   if (!response.ok) {
@@ -287,8 +299,6 @@ async function fetchApifyLeads(
 
   return { rows, people }
 }
-
-const MIN_INTERACTIVE_RESULTS = 10
 
 function apifyEmptyResultMessage(
   rows: Record<string, unknown>[],
@@ -336,30 +346,38 @@ export async function searchApify(
     }
   }
 
-  const pageSize = getAspireApifyFetchCount(perPage)
+  const pageSize = interactive
+    ? Math.min(getAspireApifyFetchCount(perPage), 25)
+    : getAspireApifyFetchCount(perPage)
   const input = buildApifyActorInput(filters, pageSize, interactive)
+  const syncTimeoutSec = interactive ? INTERACTIVE_SYNC_TIMEOUT_SEC : BATCH_SYNC_TIMEOUT_SEC
+  const maxRuns = interactive ? 2 : 3
 
   let rows: Record<string, unknown>[] = []
   let people: ApolloPersonResult[] = []
   let retriedBroad = false
   let retriedMinimal = false
+  let runs = 0
 
   try {
-    ;({ rows, people } = await fetchApifyLeads(input, token, actorId))
+    ;({ rows, people } = await fetchApifyLeads(input, token, actorId, syncTimeoutSec))
+    runs += 1
 
-    if (people.length < MIN_INTERACTIVE_RESULTS) {
+    if (people.length === 0 && runs < maxRuns) {
       const retryInput = buildBroadRetryInput(input, pageSize)
-      const retry = await fetchApifyLeads(retryInput, token, actorId)
+      const retry = await fetchApifyLeads(retryInput, token, actorId, syncTimeoutSec)
       rows = rows.concat(retry.rows)
       people = mergePeople(people, retry.people, pageSize)
       retriedBroad = true
+      runs += 1
     }
 
-    if (people.length < MIN_INTERACTIVE_RESULTS) {
-      const minimal = await fetchApifyLeads(buildMinimalRetryInput(pageSize), token, actorId)
+    if (people.length === 0 && runs < maxRuns && !interactive) {
+      const minimal = await fetchApifyLeads(buildMinimalRetryInput(pageSize), token, actorId, syncTimeoutSec)
       rows = rows.concat(minimal.rows)
       people = mergePeople(people, minimal.people, pageSize)
       retriedMinimal = true
+      runs += 1
     }
 
     if (people.length === 0) {

@@ -71,7 +71,11 @@ export async function GET(request: Request) {
         .from(accounts)
         .where(eq(accounts.id, session.accountId))
         .limit(1)
-      return fallbackSearchResults(session.accountId, filters, account?.vertical ?? 'agency')
+      const fallback = fallbackSearchResults(session.accountId, filters, account?.vertical ?? 'agency')
+      const message = error instanceof Error ? error.message : 'Search failed'
+      fallback.meta.providerError = message
+      fallback.meta.providerConfigured = isApifyConfigured()
+      return fallback
     },
   )
   return NextResponse.json({ success: true, data: results, meta })
@@ -111,6 +115,9 @@ export async function POST(request: Request) {
       body,
       account?.vertical ?? 'agency',
     )
+    const message = error instanceof Error ? error.message : 'Search failed'
+    fallback.meta.providerError = message
+    fallback.meta.providerConfigured = isApifyConfigured()
     return NextResponse.json({
       success: true,
       data: fallback.results,
