@@ -19,9 +19,16 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
+function apolloPersonId(raw: Record<string, unknown>): string | null {
+  const rawId = raw.id ?? raw.person_id
+  if (typeof rawId === 'string' && rawId.length > 0) return rawId
+  if (typeof rawId === 'number' && Number.isFinite(rawId)) return String(rawId)
+  return null
+}
+
 function mapApolloPerson(raw: Record<string, unknown>): ApolloPersonResult | null {
   const org = (raw.organization ?? {}) as Record<string, unknown>
-  const id = typeof raw.id === 'string' ? raw.id : null
+  const id = apolloPersonId(raw)
   if (!id) return null
 
   return {
@@ -145,6 +152,7 @@ export async function searchApollo(
 
   const body = (await response.json()) as {
     people?: Record<string, unknown>[]
+    contacts?: Record<string, unknown>[]
     pagination?: { total_entries?: number; page?: number; per_page?: number }
     error?: string
   }
@@ -153,7 +161,8 @@ export async function searchApollo(
     throw new Error(body.error ?? 'Apollo search failed')
   }
 
-  const people = (body.people ?? [])
+  const rawPeople = body.people ?? body.contacts ?? []
+  const people = rawPeople
     .map(mapApolloPerson)
     .filter((person): person is ApolloPersonResult => person !== null)
 
@@ -199,7 +208,7 @@ function toAspireSearchResult(
 
 export async function searchProspects(
   accountId: string,
-  filters: ApolloSearchFilters,
+  filters: Partial<ApolloSearchFilters> = {},
   options?: { searchId?: string; persist?: boolean },
 ): Promise<AspireSearchResult[]> {
   const [account] = await db
@@ -213,26 +222,36 @@ export async function searchProspects(
   const normalizedFilters = normalizeApolloFilters(vertical, filters)
 
   const { people } = await searchApollo(normalizedFilters)
-  const existingIds = new Set(await filterExistingLeads(accountId, people.map((p) => p.id)))
-  const newPeople = people.filter((p) => !existingIds.has(p.id))
 
-  const scored = newPeople.map((person) => {
+  const scored = people.map((person) => {
     const scoredResult = scoreICP(person, icpConfig)
     return toAspireSearchResult(person, scoredResult.score, scoredResult.signals)
   })
 
   if (options?.persist !== false && scored.length > 0) {
-    await db.insert(aspireResults).values(
-      scored.map((row) => ({
-        accountId,
-        searchId: options?.searchId ?? null,
-        apolloId: row.id,
-        rawData: row,
-        icpScore: row.icpScore,
-        icpSignals: row.icpSignals,
-        status: 'found',
-      })),
-    )
+    const searchId = options?.searchId ?? null
+    for (const row of scored) {
+      await db
+        .insert(aspireResults)
+        .values({
+          accountId,
+          searchId,
+          apolloId: row.id,
+          rawData: row,
+          icpScore: row.icpScore,
+          icpSignals: row.icpSignals,
+          status: 'found',
+        })
+        .onConflictDoUpdate({
+          target: [aspireResults.accountId, aspireResults.apolloId],
+          set: {
+            rawData: row,
+            icpScore: row.icpScore,
+            icpSignals: row.icpSignals,
+            ...(searchId != null ? { searchId } : {}),
+          },
+        })
+    }
   }
 
   return scored.sort((a, b) => b.icpScore - a.icpScore)

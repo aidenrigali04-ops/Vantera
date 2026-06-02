@@ -29,20 +29,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
   }
 
-  const body = (await request.json()) as ApolloSearchFilters & { searchId?: string }
-  const filters: ApolloSearchFilters = {
-    jobTitles: body.jobTitles ?? [],
-    industries: body.industries ?? [],
-    companySizeRanges: body.companySizeRanges ?? [],
-    locations: body.locations ?? [],
-    keywords: body.keywords,
-    contactEmailStatus: body.contactEmailStatus,
-    q: body.q,
-    company: body.company,
-  }
+  const body = (await request.json()) as Partial<ApolloSearchFilters> & { searchId?: string }
 
   try {
-    const data = await searchProspects(session.accountId, filters, {
+    const data = await searchProspects(session.accountId, body, {
       searchId: body.searchId,
       persist: true,
     })

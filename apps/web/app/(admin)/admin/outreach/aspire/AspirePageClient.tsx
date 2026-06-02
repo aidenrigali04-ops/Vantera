@@ -349,14 +349,19 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
     onMutate: (searchId) => {
       setRunningSearchId(searchId)
     },
-    onSuccess: (data, searchId) => {
-      void queryClient.invalidateQueries({ queryKey: ['aspire-results', searchId] })
-      void queryClient.invalidateQueries({ queryKey: savedResultsQueryKey })
+    onSuccess: async (data, searchId) => {
       setHasLiveSearch(false)
+      setActiveSearchId(searchId)
+      const list = (await queryClient.fetchQuery({
+        queryKey: ['aspire-results', searchId],
+      })) as AspireSearchResult[]
+      const listCount = list.length
       toast.success(
-        data.found > 0
-          ? `Apollo found ${data.found} new prospect${data.found === 1 ? '' : 's'}`
-          : 'Apollo search complete — no new prospects matched your criteria',
+        listCount > 0
+          ? `Found ${listCount} prospect${listCount === 1 ? '' : 's'} for this search`
+          : data.found > 0
+            ? `Apollo found ${data.found} prospect${data.found === 1 ? '' : 's'}`
+            : 'Apollo search complete — no prospects matched your criteria',
       )
     },
     onError: (err: Error) => toast.error(err.message),
@@ -364,18 +369,18 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
   })
 
   const handleSearch = async () => {
-    setHasLiveSearch(true)
     try {
       const results = (await queryClient.fetchQuery({ queryKey: liveSearchKey })) as AspireSearchResult[]
-      if (activeSearchId) {
-        void queryClient.invalidateQueries({ queryKey: savedResultsQueryKey })
-      } else {
-        void queryClient.invalidateQueries({ queryKey: scoutResultsQueryKey })
-      }
+      setHasLiveSearch(false)
+      const listKey = activeSearchId ? savedResultsQueryKey : scoutResultsQueryKey
+      const list = (await queryClient.fetchQuery({ queryKey: listKey })) as AspireSearchResult[]
+      const listCount = list.length
       toast.success(
-        results.length > 0
-          ? `Found ${results.length} new prospect${results.length === 1 ? '' : 's'} from Apollo`
-          : 'No new prospects — try different keywords or broaden your search',
+        listCount > 0
+          ? `Found ${listCount} prospect${listCount === 1 ? '' : 's'}`
+          : results.length > 0
+            ? `Found ${results.length} prospect${results.length === 1 ? '' : 's'} from Apollo`
+            : 'No prospects matched — try different keywords or broaden your search',
       )
     } catch (err) {
       setHasLiveSearch(false)

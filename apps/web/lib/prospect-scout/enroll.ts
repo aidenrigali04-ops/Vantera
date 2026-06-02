@@ -185,19 +185,28 @@ export async function recordFoundProspects(input: {
 }): Promise<number> {
   if (input.people.length === 0) return 0
 
+  const searchId = input.searchId ?? null
   for (const { person, icpScore, icpSignals } of input.people) {
     await db
       .insert(aspireResults)
       .values({
         accountId: input.accountId,
-        searchId: input.searchId,
+        searchId,
         apolloId: person.id,
         rawData: person,
         icpScore,
         icpSignals,
         status: 'found',
       })
-      .onConflictDoNothing({ target: [aspireResults.accountId, aspireResults.apolloId] })
+      .onConflictDoUpdate({
+        target: [aspireResults.accountId, aspireResults.apolloId],
+        set: {
+          rawData: person,
+          icpScore,
+          icpSignals,
+          ...(searchId != null ? { searchId } : {}),
+        },
+      })
   }
 
   return input.people.length
