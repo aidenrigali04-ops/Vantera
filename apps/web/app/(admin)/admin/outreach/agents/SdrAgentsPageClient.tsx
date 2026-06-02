@@ -9,6 +9,7 @@ import {
   SDR_AGENTS_HEADLINE,
   SDR_AGENTS_SUBHEADLINE,
 } from '@/lib/agents/sdr-agents'
+import { SdrAgentIcon } from '@/components/agents/SdrAgentIcon'
 import type { SdrAgentCard } from '@/lib/agents/types'
 import { ArrowRight, Bot, Clock, Rocket, Sparkles, Users, Zap } from 'lucide-react'
 import Link from 'next/link'
@@ -83,16 +84,14 @@ export function SdrAgentsPageClient({ agents, enrolledLeads }: Props) {
       />
 
       <div className="grid gap-4 md:grid-cols-2">
-        {agents.map((agent) => {
-          const Icon = agent.icon
-          return (
+        {agents.map((agent) => (
             <article
               key={agent.id}
               className="flex h-full flex-col rounded-xl border border-stone-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md"
             >
               <div className="flex items-start justify-between gap-3">
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-50 text-violet-700 ring-1 ring-violet-100">
-                  <Icon className="h-5 w-5" />
+                  <SdrAgentIcon name={agent.iconName} className="h-5 w-5" />
                 </span>
                 <StatusBadge
                   label={STATUS_LABEL[agent.status]}
@@ -118,8 +117,7 @@ export function SdrAgentsPageClient({ agents, enrolledLeads }: Props) {
                 </Button>
               </div>
             </article>
-          )
-        })}
+        ))}
       </div>
 
       <section className="rounded-xl border border-stone-200 bg-stone-50/60 p-5">

@@ -1,6 +1,6 @@
-import type { LucideIcon } from 'lucide-react'
-
 export type SdrAgentId = 'prospect_scout' | 'outreach_agent' | 'message_drafter' | 'pipeline_analyst'
+
+export type SdrAgentIconName = 'telescope' | 'megaphone' | 'pen-line' | 'brain'
 
 export type SdrAgentStatus = 'active' | 'idle' | 'needs_setup'
 
@@ -11,7 +11,7 @@ export type SdrAgentDefinition = {
   description: string
   href: string
   ctaLabel: string
-  icon: LucideIcon
+  iconName: SdrAgentIconName
 }
 
 export type SdrAgentSnapshot = {

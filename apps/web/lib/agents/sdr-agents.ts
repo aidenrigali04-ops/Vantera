@@ -1,5 +1,4 @@
 import type { SdrAgentCard, SdrAgentDefinition, SdrAgentSnapshot } from '@/lib/agents/types'
-import { Brain, Megaphone, PenLine, Telescope } from 'lucide-react'
 
 export const SDR_AGENTS_HEADLINE = 'Build your SDR Agents'
 export const SDR_AGENTS_SUBHEADLINE =
@@ -14,7 +13,7 @@ export const SDR_AGENT_DEFINITIONS: SdrAgentDefinition[] = [
       'Runs saved Aspire searches on a weekly schedule, scores prospects against your ICP, and surfaces high-fit matches to your pipeline.',
     href: '/admin/outreach/aspire',
     ctaLabel: 'Configure scout',
-    icon: Telescope,
+    iconName: 'telescope',
   },
   {
     id: 'outreach_agent',
@@ -24,7 +23,7 @@ export const SDR_AGENT_DEFINITIONS: SdrAgentDefinition[] = [
       'Enrolls leads into multi-step campaigns, sends on schedule, and queues LinkedIn steps for you to approve with one click.',
     href: '/admin/outreach/campaigns',
     ctaLabel: 'Launch campaign',
-    icon: Megaphone,
+    iconName: 'megaphone',
   },
   {
     id: 'message_drafter',
@@ -34,7 +33,7 @@ export const SDR_AGENT_DEFINITIONS: SdrAgentDefinition[] = [
       'Drafts tailored email and SMS messages when prospects enroll — you approve from the dashboard or let autonomous mode send.',
     href: '/admin/dashboard',
     ctaLabel: 'Review drafts',
-    icon: PenLine,
+    iconName: 'pen-line',
   },
   {
     id: 'pipeline_analyst',
@@ -44,7 +43,7 @@ export const SDR_AGENT_DEFINITIONS: SdrAgentDefinition[] = [
       'Combines ICP fit with engagement signals daily, updates lead scores, and surfaces who to contact next in your action feed.',
     href: '/admin/pipeline',
     ctaLabel: 'View pipeline',
-    icon: Brain,
+    iconName: 'brain',
   },
 ]
 
