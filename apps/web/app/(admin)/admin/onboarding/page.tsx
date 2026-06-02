@@ -31,6 +31,7 @@ export default async function OnboardingPage() {
       businessName={workspace.businessName}
       websiteUrl={workspace.websiteUrl}
       currentVertical={workspace.currentVertical}
+      initialAnalysis={workspace.initialAnalysis}
     />
   )
 }

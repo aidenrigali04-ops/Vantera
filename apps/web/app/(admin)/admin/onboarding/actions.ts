@@ -233,6 +233,7 @@ export async function saveBusinessDetailsAndAnalyze(
       name: nameParsed.data,
       website_url: normalizeWebsiteUrl(websiteParsed.data),
       vertical: analysis.vertical,
+      icp_summary: analysis.icpSummary,
       icp_description: analysis.icpDescription,
       value_proposition: analysis.valueProposition,
     })
@@ -269,8 +270,6 @@ export async function fetchPreviewLeadsAction(
     const leads = await fetchOnboardingPreviewLeads({
       accountId: workspaceId,
       vertical: (account.vertical as OnboardingVertical) ?? 'agency',
-      businessName: account.name,
-      icpSummary: account.icp_description.slice(0, 240),
     })
 
     void trackOnboardingStep(workspaceId, 'ai_overview', 'completed', {
@@ -665,6 +664,7 @@ function normalizeFallbackAccount(
     business_hours_end: null,
     voice_preference: null,
     icp_description: null,
+    icp_summary: null,
     value_proposition: null,
     website_url: null,
     active_template_id: null,

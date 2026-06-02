@@ -37,6 +37,7 @@ type Props = {
   businessName: string
   websiteUrl: string | null
   currentVertical: string | null
+  initialAnalysis: BusinessAnalysis | null
 }
 
 function OnboardingWizardInner({
@@ -44,6 +45,7 @@ function OnboardingWizardInner({
   businessName,
   websiteUrl,
   currentVertical,
+  initialAnalysis,
 }: Props) {
   const router = useRouter()
   const storageKey = `vantera_onboarding_step_${accountId}`
@@ -55,6 +57,8 @@ function OnboardingWizardInner({
   const [previewLeads, setPreviewLeads] = useState<PreviewLead[]>([])
 
   useEffect(() => {
+    let restoredAnalysis: BusinessAnalysis | null = null
+
     try {
       const stored = window.localStorage.getItem(storageKey)
       if (stored) {
@@ -66,14 +70,16 @@ function OnboardingWizardInner({
         ) {
           setStepIndex(parsed.step - 1)
         }
-        if (parsed.analysis) setAnalysis(parsed.analysis)
+        if (parsed.analysis) restoredAnalysis = parsed.analysis
         if (Array.isArray(parsed.leads)) setPreviewLeads(parsed.leads)
       }
     } catch {
       /* ignore corrupt localStorage */
     }
+
+    setAnalysis(restoredAnalysis ?? initialAnalysis)
     setHydrated(true)
-  }, [storageKey])
+  }, [storageKey, initialAnalysis])
 
   useEffect(() => {
     if (!hydrated) return

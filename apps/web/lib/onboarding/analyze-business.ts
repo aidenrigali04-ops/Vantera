@@ -2,6 +2,11 @@ import 'server-only'
 
 import { callModel, parseJsonResponse } from '@/lib/ai/client'
 import {
+  fetchWebsiteSnapshot,
+  formatWebsiteSnapshotForPrompt,
+  type WebsiteSnapshot,
+} from '@/lib/onboarding/fetch-website-snapshot'
+import {
   ONBOARDING_VERTICALS,
   VERTICAL_LABELS,
   type BusinessAnalysis,
@@ -28,6 +33,19 @@ function normalizeVertical(value: unknown): OnboardingVertical {
   return 'agency'
 }
 
+function snapshotText(snapshot: WebsiteSnapshot | null): string {
+  if (!snapshot) return ''
+  return [
+    snapshot.title,
+    snapshot.description,
+    snapshot.headings.join(' '),
+    snapshot.excerpt,
+    snapshot.hostname,
+  ]
+    .filter(Boolean)
+    .join(' ')
+}
+
 function inferVerticalFromText(...parts: string[]): OnboardingVertical {
   const blob = parts.filter(Boolean).join(' ')
   for (const rule of KEYWORD_VERTICAL) {
@@ -40,16 +58,13 @@ function heuristicAnalysis(
   businessName: string,
   websiteUrl: string,
   manualVertical?: OnboardingVertical | null,
+  snapshot?: WebsiteSnapshot | null,
 ): BusinessAnalysis {
-  const vertical = manualVertical ?? inferVerticalFromText(businessName, websiteUrl)
+  const siteText = snapshotText(snapshot ?? null)
+  const vertical =
+    manualVertical ?? inferVerticalFromText(businessName, websiteUrl, siteText)
   const industryLabel = VERTICAL_LABELS[vertical]
-  const host = (() => {
-    try {
-      return new URL(websiteUrl.startsWith('http') ? websiteUrl : `https://${websiteUrl}`).hostname
-    } catch {
-      return websiteUrl
-    }
-  })()
+  const host = snapshot?.hostname ?? websiteUrl
 
   const icpByVertical: Record<OnboardingVertical, { summary: string; description: string; value: string }> = {
     agency: {
@@ -104,19 +119,22 @@ function heuristicAnalysis(
   }
 
   const icp = icpByVertical[vertical]
+  const siteContext = snapshot?.description || snapshot?.title
 
   return {
     industry: vertical,
     industryLabel,
     vertical,
     icpSummary: icp.summary,
-    icpDescription: `${businessName} serves ${icp.description} Website: ${host}.`,
+    icpDescription: siteContext
+      ? `${businessName} (${host}) focuses on ${siteContext}. ${icp.description}`
+      : `${businessName} serves ${icp.description}`,
     valueProposition: icp.value,
   }
 }
 
-const SYSTEM_PROMPT = `You analyze businesses for a sales intelligence platform. Given a business name and website,
-infer the industry vertical and ideal customer profile. Be concise and practical — no mention of AI or analysis process.
+const SYSTEM_PROMPT = `You analyze businesses for a sales intelligence platform. Use the business name and website content
+to infer the industry vertical and ideal customer profile. Be concise and practical — no mention of AI or analysis process.
 
 Return ONLY JSON:
 {
@@ -133,7 +151,17 @@ export async function analyzeBusinessFromDetails(args: {
   websiteUrl: string
   manualVertical?: OnboardingVertical | null
 }): Promise<BusinessAnalysis> {
-  const fallback = heuristicAnalysis(args.businessName, args.websiteUrl, args.manualVertical)
+  const normalizedUrl = args.websiteUrl.startsWith('http')
+    ? args.websiteUrl
+    : `https://${args.websiteUrl}`
+
+  const snapshot = await fetchWebsiteSnapshot(normalizedUrl)
+  const fallback = heuristicAnalysis(
+    args.businessName,
+    normalizedUrl,
+    args.manualVertical,
+    snapshot,
+  )
 
   const result = await callModel({
     accountId: args.accountId,
@@ -141,13 +169,19 @@ export async function analyzeBusinessFromDetails(args: {
     system: SYSTEM_PROMPT,
     user: [
       `Business name: ${args.businessName}`,
-      `Website: ${args.websiteUrl}`,
+      snapshot
+        ? `Website content:\n${formatWebsiteSnapshotForPrompt(snapshot)}`
+        : `Website URL (content unavailable): ${normalizedUrl}`,
       args.manualVertical ? `Owner-selected vertical hint: ${args.manualVertical}` : '',
     ]
       .filter(Boolean)
-      .join('\n'),
+      .join('\n\n'),
     maxTokens: 512,
     timeoutMs: 8_000,
+    metadata: {
+      websiteFetched: Boolean(snapshot),
+      websiteHostname: snapshot?.hostname ?? null,
+    },
   })
 
   if (!result.ok) {

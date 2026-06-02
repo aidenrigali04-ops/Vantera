@@ -17,11 +17,15 @@ BEGIN;
 
 ALTER TABLE accounts
   ADD COLUMN IF NOT EXISTS icp_description text,
+  ADD COLUMN IF NOT EXISTS icp_summary text,
   ADD COLUMN IF NOT EXISTS value_proposition text,
   ADD COLUMN IF NOT EXISTS website_url text;
 
 COMMENT ON COLUMN accounts.icp_description IS
   'AI- or owner-written ideal customer profile from onboarding step 1.';
+
+COMMENT ON COLUMN accounts.icp_summary IS
+  'One-line ideal customer summary from onboarding AI analysis.';
 
 COMMENT ON COLUMN accounts.value_proposition IS
   'AI- or owner-written value proposition from onboarding step 1.';

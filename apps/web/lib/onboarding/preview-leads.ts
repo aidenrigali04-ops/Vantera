@@ -24,16 +24,10 @@ function toPreviewLead(row: AspireSearchResult): PreviewLead {
 export async function fetchOnboardingPreviewLeads(args: {
   accountId: string
   vertical: OnboardingVertical
-  businessName: string
-  icpSummary: string
 }): Promise<PreviewLead[]> {
-  const { results } = await searchProspects(
-    args.accountId,
-    {
-      keywords: [args.businessName, args.icpSummary].filter(Boolean),
-    },
-    { limit: 5, persist: true },
-  )
+  void args.vertical
+
+  const { results } = await searchProspects(args.accountId, {}, { limit: 5, persist: true })
 
   return results.slice(0, 5).map(toPreviewLead)
 }

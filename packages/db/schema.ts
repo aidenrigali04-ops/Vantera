@@ -158,6 +158,8 @@ export const accounts = pgTable('accounts', {
 
   /** Owner-written ideal customer profile from onboarding. */
   icpDescription: text('icp_description'),
+  /** One-line ICP headline from onboarding AI analysis. */
+  icpSummary: text('icp_summary'),
   /** Owner-written value proposition / solutions offered from onboarding. */
   valueProposition: text('value_proposition'),
   /** Public website URL from onboarding. */

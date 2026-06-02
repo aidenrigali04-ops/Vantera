@@ -3,6 +3,8 @@ import type { BrandingData } from '@/lib/branding/context'
 import type { AccountRow } from './account-store'
 import { fetchAccountById, resolveWorkspaceAccountId } from './account-store'
 import { isOnboardingCompleteForAccount } from './completion-status'
+import type { BusinessAnalysis } from '@/lib/onboarding/onboarding-wizard-types'
+import { buildAnalysisFromAccount } from '@/lib/onboarding/onboarding-analysis-utils'
 
 export type OnboardingWorkspace = {
   accountId: string
@@ -10,6 +12,7 @@ export type OnboardingWorkspace = {
   businessName: string
   websiteUrl: string | null
   currentVertical: string | null
+  initialAnalysis: BusinessAnalysis | null
   primaryColor: string
   secondaryColor: string
   logoUrl: string | null
@@ -58,6 +61,7 @@ export async function loadOnboardingWorkspace(
     businessName: account?.name || (useBranding ? branding.businessName : '') || '',
     websiteUrl: account?.website_url ?? null,
     currentVertical: account?.vertical || (useBranding ? branding.vertical : '') || null,
+    initialAnalysis: buildAnalysisFromAccount(account),
     primaryColor: account?.brand_primary_color ?? (useBranding ? branding.primaryColor : '#1648A0'),
     secondaryColor:
       account?.brand_secondary_color ?? (useBranding ? branding.secondaryColor : '#0D9488'),
