@@ -59,6 +59,7 @@
     "@vantera/db": "workspace:*",
     "@vantera/types": "workspace:*",
     "@vantera/utils": "workspace:*",
+    "@vercel/speed-insights": "^2.0.0",
     "ai": "^6.0.190",
     "axios": "^1.16.1",
     "bcryptjs": "^3.0.3",
