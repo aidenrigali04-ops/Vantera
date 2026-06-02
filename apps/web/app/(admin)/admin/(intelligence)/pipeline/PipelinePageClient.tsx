@@ -27,11 +27,12 @@ import { PIPELINE_TABLE_VIEWS } from '@/lib/operational/pipeline-table-views'
 import { SectionEmptyState } from '@/components/onboarding/SectionEmptyState'
 import type { leads } from '@vantera/db'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Calendar, MessageSquare, Plug, Plus, Target, TrendingUp, Users, Zap } from 'lucide-react'
+import { Calendar, MessageSquare, Plug, Plus, Target, Users } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useCallback, useMemo, useState } from 'react'
 import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
 
 type LeadRow = typeof leads.$inferSelect
 type RelationshipStatus = LeadRow['relationshipStatus']
@@ -76,6 +77,15 @@ const SOURCE_LABELS: Record<string, string> = {
 function leadDisplayName(row: LeadRow): string {
   return [row.firstName, row.lastName].filter(Boolean).join(' ') || 'Unknown'
 }
+
+function scoreTone(score: number | null | undefined): string {
+  const value = score ?? 0
+  if (value >= 70) return 'text-[var(--text-primary)]'
+  if (value >= 40) return 'text-[var(--text-secondary)]'
+  return 'text-[var(--text-tertiary)]'
+}
+
+const PRIMARY_STAGES = ['new', 'contacted', 'connected', 'nurturing', 'qualified', 'discovery_booked']
 
 export function PipelinePageClient({ initialLeads, stats, accountId, setupMode = false }: Props) {
   const router = useRouter()
@@ -156,10 +166,19 @@ export function PipelinePageClient({ initialLeads, stats, accountId, setupMode =
         value: stats.byStatus.find((s) => s.status === 'discovery_booked')?.count ?? 0,
         icon: Calendar,
       },
-      { label: 'Pipeline value', value: '—', icon: TrendingUp },
-      { label: 'Active sequences', value: 0, icon: Zap },
     ],
     [stats],
+  )
+
+  const stageSummary = useMemo(
+    () =>
+      stats.byStatus
+        .filter((item) => item.count > 0 && PRIMARY_STAGES.includes(item.status))
+        .sort(
+          (a, b) =>
+            PRIMARY_STAGES.indexOf(a.status) - PRIMARY_STAGES.indexOf(b.status),
+        ),
+    [stats.byStatus],
   )
 
   function applySavedView(viewId: string) {
@@ -204,9 +223,9 @@ export function PipelinePageClient({ initialLeads, stats, accountId, setupMode =
         header: 'Prospect',
         sortable: true,
         cell: (row: LeadRow) => (
-          <div>
-            <p className="font-medium text-stone-900">{leadDisplayName(row)}</p>
-            <p className="text-[12px] text-stone-500">
+          <div className="min-w-[180px]">
+            <p className="font-medium text-[var(--text-primary)]">{leadDisplayName(row)}</p>
+            <p className="truncate text-[12px] text-[var(--text-secondary)]">
               {row.title ? `${row.title} · ` : ''}
               {row.company}
             </p>
@@ -214,10 +233,25 @@ export function PipelinePageClient({ initialLeads, stats, accountId, setupMode =
         ),
       },
       {
+        id: 'contact',
+        header: 'Contact',
+        cell: (row: LeadRow) => (
+          <div className="min-w-[140px]">
+            <p className="truncate text-[13px] text-[var(--text-primary)]">{row.email ?? '—'}</p>
+            {row.phone ? (
+              <p className="truncate text-[12px] text-[var(--text-secondary)]">{row.phone}</p>
+            ) : null}
+          </div>
+        ),
+      },
+      {
         id: 'source',
         header: 'Source',
         cell: (row: LeadRow) => (
-          <Badge variant="outline" className="font-normal">
+          <Badge
+            variant="outline"
+            className="border-[var(--border-default)] bg-[var(--bg-subtle)]/60 font-normal text-[var(--text-secondary)]"
+          >
             {SOURCE_LABELS[row.source] ?? row.source}
           </Badge>
         ),
@@ -240,7 +274,9 @@ export function PipelinePageClient({ initialLeads, stats, accountId, setupMode =
         header: 'Score',
         sortable: true,
         cell: (row: LeadRow) => (
-          <span className="tabular-nums font-medium text-stone-800">{row.score ?? 0}</span>
+          <span className={cn('tabular-nums text-sm font-semibold', scoreTone(row.score))}>
+            {row.score ?? 0}
+          </span>
         ),
       },
       {
@@ -338,20 +374,44 @@ export function PipelinePageClient({ initialLeads, stats, accountId, setupMode =
     await queryClient.invalidateQueries({ queryKey: ['leads'] })
   }
 
+  const emptyState = setupMode ? (
+    <SectionEmptyState
+      title="No prospects yet"
+      description="No leads yet. Add your first prospect or connect LinkedIn Automation to start building your pipeline."
+      actionLabel="Add a lead"
+      onAction={() => setCreateOpen(true)}
+    />
+  ) : (
+    <SectionEmptyState
+      title="No prospects yet"
+      description="Add manually or import from Aspire outreach."
+      actionLabel="Add prospect"
+      onAction={() => setCreateOpen(true)}
+    />
+  )
+
+  const showTable = isLoading || sortedLeads.length > 0
+
   return (
-    <div className="space-y-5" data-tour="pipeline-leads">
+    <div
+      className="mx-auto w-full space-y-6 px-4 py-5 md:px-8 md:py-6"
+      data-tour="pipeline-leads"
+    >
       <PageHeader
         title="Deals"
         description="Pre-conversion prospects — nurture, qualify, and convert without leaving the table."
         actions={
-          <div className="flex gap-2">
-            <Button variant="outline" asChild>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" asChild className="border-[var(--border-default)]">
               <Link href="/admin/integrations">
                 <Plug className="mr-2 h-4 w-4" />
                 CRM sync
               </Link>
             </Button>
-            <Button onClick={() => setCreateOpen(true)} className="bg-stone-900 hover:bg-stone-800">
+            <Button
+              onClick={() => setCreateOpen(true)}
+              className="bg-[var(--text-primary)] text-[var(--text-inverse)] hover:opacity-90"
+            >
               <Plus className="mr-2 h-4 w-4" />
               Add prospect
             </Button>
@@ -361,73 +421,102 @@ export function PipelinePageClient({ initialLeads, stats, accountId, setupMode =
 
       <KpiStrip items={kpiItems} />
 
-      <TableToolbar
-        search={search}
-        onSearchChange={setSearch}
-        searchPlaceholder="Search prospects, companies, titles…"
-        savedViews={
-          <TableSavedViews
-            views={PIPELINE_TABLE_VIEWS}
-            activeViewId={activeViewId}
-            onViewChange={applySavedView}
-          />
-        }
-        filters={[
-          {
-            id: 'status',
-            label: 'Status',
-            value: statusFilter,
-            onChange: (value) => {
-              setStatusFilter(value)
-              setActiveViewId('custom')
-            },
-            options: [{ value: 'all', label: 'All statuses' }, ...STATUS_OPTIONS],
-            widthClassName: 'w-[168px]',
-          },
-          {
-            id: 'source',
-            label: 'Source',
-            value: sourceFilter,
-            onChange: (value) => {
-              setSourceFilter(value)
-              setActiveViewId('custom')
-            },
-            options: [
-              { value: 'all', label: 'All sources' },
-              ...Object.entries(SOURCE_LABELS).map(([value, label]) => ({ value, label })),
-            ],
-            widthClassName: 'w-[148px]',
-          },
-        ]}
-      />
+      {stageSummary.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="mr-1 text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--text-tertiary)]">
+            Stages
+          </span>
+          {stageSummary.map((item) => {
+            const active = statusFilter === item.status
+            return (
+              <button
+                key={item.status}
+                type="button"
+                onClick={() => {
+                  setStatusFilter(active ? 'all' : item.status)
+                  setActiveViewId('custom')
+                }}
+                className={cn(
+                  'inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-[12px] font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-muted)]',
+                  active
+                    ? 'border-[var(--accent-border)] bg-[var(--accent-muted)] text-[var(--text-primary)]'
+                    : 'border-[var(--border-default)] bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:border-[var(--border-strong)] hover:bg-[var(--bg-subtle)]',
+                )}
+              >
+                {STATUS_LABELS[item.status] ?? item.status}
+                <span className="tabular-nums text-[11px] text-[var(--text-tertiary)]">
+                  {item.count}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      ) : null}
 
-      <OperationalTable
-        columns={columns}
-        rows={sortedLeads}
-        selectedIds={selectedIds}
-        onSelectionChange={setSelectedIds}
-        onRowClick={(row) => router.push(`/admin/pipeline/${row.id}`)}
-        sort={sort}
-        onSortChange={setSort}
-        loading={isLoading}
-        emptyState={
-          setupMode ? (
-            <SectionEmptyState
-              title="No prospects yet"
-              description="No leads yet. Add your first prospect or connect LinkedIn Automation to start building your pipeline."
-              actionLabel="Add a lead"
-              onAction={() => setCreateOpen(true)}
-            />
-          ) : (
-            <SectionEmptyState
-              title="No prospects yet"
-              description="Add manually or import from Aspire outreach."
-              actionLabel="Add prospect"
-              onAction={() => setCreateOpen(true)}
-            />
-          )
-        }
-      />
+      <section className="card-surface overflow-hidden">
+        <div className="border-b border-[var(--border-default)] bg-[var(--bg-subtle)]/50 px-4 py-4 md:px-5">
+          <TableToolbar
+            search={search}
+            onSearchChange={setSearch}
+            searchPlaceholder="Search prospects, companies, titles…"
+            savedViews={
+              <TableSavedViews
+                views={PIPELINE_TABLE_VIEWS}
+                activeViewId={activeViewId}
+                onViewChange={applySavedView}
+              />
+            }
+            filters={[
+              {
+                id: 'status',
+                label: 'Status',
+                value: statusFilter,
+                onChange: (value) => {
+                  setStatusFilter(value)
+                  setActiveViewId('custom')
+                },
+                options: [{ value: 'all', label: 'All statuses' }, ...STATUS_OPTIONS],
+                widthClassName: 'w-[168px]',
+              },
+              {
+                id: 'source',
+                label: 'Source',
+                value: sourceFilter,
+                onChange: (value) => {
+                  setSourceFilter(value)
+                  setActiveViewId('custom')
+                },
+                options: [
+                  { value: 'all', label: 'All sources' },
+                  ...Object.entries(SOURCE_LABELS).map(([value, label]) => ({ value, label })),
+                ],
+                widthClassName: 'w-[148px]',
+              },
+            ]}
+            trailing={
+              <span className="hidden text-[12px] text-[var(--text-secondary)] lg:inline">
+                {sortedLeads.length} prospect{sortedLeads.length === 1 ? '' : 's'}
+              </span>
+            }
+          />
+        </div>
+
+        {showTable ? (
+          <OperationalTable
+            columns={columns}
+            rows={sortedLeads}
+            selectedIds={selectedIds}
+            onSelectionChange={setSelectedIds}
+            onRowClick={(row) => router.push(`/admin/pipeline/${row.id}`)}
+            sort={sort}
+            onSortChange={setSort}
+            loading={isLoading}
+            className="rounded-none border-0 shadow-none"
+          />
+        ) : (
+          <div className="px-4 py-12 md:px-5">{emptyState}</div>
+        )}
+      </section>
 
       <BulkActionBar count={selectedIds.length} onClear={() => setSelectedIds([])}>
         <Button size="sm" variant="secondary" onClick={() => handleBulkStatus('nurturing')}>
@@ -451,9 +540,9 @@ export function PipelinePageClient({ initialLeads, stats, accountId, setupMode =
       </BulkActionBar>
 
       <Sheet open={createOpen} onOpenChange={setCreateOpen}>
-        <SheetContent>
+        <SheetContent className="border-l border-[var(--border-default)] bg-[var(--bg-surface)]">
           <SheetHeader>
-            <SheetTitle>Add prospect</SheetTitle>
+            <SheetTitle className="text-[var(--text-primary)]">Add prospect</SheetTitle>
           </SheetHeader>
           <div className="mt-6 space-y-4">
             <div className="grid grid-cols-2 gap-3">
@@ -462,6 +551,7 @@ export function PipelinePageClient({ initialLeads, stats, accountId, setupMode =
                 <Input
                   value={form.firstName}
                   onChange={(e) => setForm((f) => ({ ...f, firstName: e.target.value }))}
+                  className="border-[var(--border-default)]"
                 />
               </div>
               <div>
@@ -469,6 +559,7 @@ export function PipelinePageClient({ initialLeads, stats, accountId, setupMode =
                 <Input
                   value={form.lastName}
                   onChange={(e) => setForm((f) => ({ ...f, lastName: e.target.value }))}
+                  className="border-[var(--border-default)]"
                 />
               </div>
             </div>
@@ -477,6 +568,7 @@ export function PipelinePageClient({ initialLeads, stats, accountId, setupMode =
               <Input
                 value={form.company}
                 onChange={(e) => setForm((f) => ({ ...f, company: e.target.value }))}
+                className="border-[var(--border-default)]"
               />
             </div>
             <div>
@@ -484,6 +576,7 @@ export function PipelinePageClient({ initialLeads, stats, accountId, setupMode =
               <Input
                 value={form.title}
                 onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+                className="border-[var(--border-default)]"
               />
             </div>
             <div>
@@ -492,11 +585,16 @@ export function PipelinePageClient({ initialLeads, stats, accountId, setupMode =
                 type="email"
                 value={form.email}
                 onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+                className="border-[var(--border-default)]"
               />
             </div>
           </div>
           <SheetFooter className="mt-6">
-            <Button onClick={handleCreate} disabled={creating || !form.company.trim()}>
+            <Button
+              onClick={handleCreate}
+              disabled={creating || !form.company.trim()}
+              className="bg-[var(--text-primary)] text-[var(--text-inverse)] hover:opacity-90"
+            >
               {creating ? 'Saving...' : 'Add to pipeline'}
             </Button>
           </SheetFooter>

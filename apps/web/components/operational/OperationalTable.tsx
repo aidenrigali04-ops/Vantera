@@ -75,20 +75,15 @@ export function OperationalTable<T extends { id: string }>({
   }
 
   if (!loading && rows.length === 0 && emptyState) {
-    return <div className={className}>{emptyState}</div>
+    return <div className={cn('card-surface overflow-hidden', className)}>{emptyState}</div>
   }
 
   return (
-    <div
-      className={cn(
-        'overflow-hidden rounded-xl border border-stone-200/90 bg-white shadow-sm',
-        className,
-      )}
-    >
+    <div className={cn('card-surface overflow-hidden', className)}>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[720px] text-[13px]">
-          <thead className="sticky top-0 z-10 bg-stone-50/95 backdrop-blur-sm">
-            <tr className="border-b border-stone-200">
+        <table className="w-full min-w-[860px] text-[13px]">
+          <thead className="sticky top-0 z-10 bg-[var(--bg-subtle)]/80 backdrop-blur-sm">
+            <tr className="border-b border-[var(--border-default)]">
               {onSelectionChange ? (
                 <th className="w-10 px-3 py-2.5">
                   <Checkbox
@@ -110,7 +105,7 @@ export function OperationalTable<T extends { id: string }>({
                   <th
                     key={col.id}
                     className={cn(
-                      'px-4 py-2.5 text-left text-[11px] font-medium uppercase tracking-[0.06em] text-stone-500',
+                      'whitespace-nowrap px-4 py-3 text-left text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--text-secondary)]',
                       col.className,
                     )}
                   >
@@ -118,7 +113,7 @@ export function OperationalTable<T extends { id: string }>({
                       <button
                         type="button"
                         onClick={() => toggleSort(col.id)}
-                        className="inline-flex items-center gap-1 transition-colors hover:text-stone-800"
+                        className="inline-flex items-center gap-1 rounded-md transition-colors duration-150 hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-muted)]"
                       >
                         {col.header}
                         <SortIcon className="h-3.5 w-3.5" aria-hidden />
@@ -131,12 +126,12 @@ export function OperationalTable<T extends { id: string }>({
               })}
             </tr>
           </thead>
-          <tbody className="divide-y divide-stone-100">
+          <tbody className="divide-y divide-[var(--border-subtle)]">
             {loading ? (
               <tr>
                 <td
                   colSpan={columns.length + (onSelectionChange ? 1 : 0)}
-                  className="px-4 py-10 text-center text-stone-500"
+                  className="px-4 py-12 text-center text-[var(--text-secondary)]"
                 >
                   {loadingMessage}
                 </td>
@@ -146,14 +141,14 @@ export function OperationalTable<T extends { id: string }>({
                 <tr
                   key={row.id}
                   className={cn(
-                    'transition-colors duration-150 hover:bg-stone-50/80',
+                    'bg-[var(--bg-surface)] transition-colors duration-150 hover:bg-[var(--bg-subtle)]/60',
                     onRowClick && 'cursor-pointer',
-                    selectedIds.includes(row.id) && 'bg-stone-50',
+                    selectedIds.includes(row.id) && 'bg-[var(--accent-muted)]/40',
                   )}
                   onClick={() => onRowClick?.(row)}
                 >
                   {onSelectionChange ? (
-                    <td className="px-3 py-2.5" onClick={(event) => event.stopPropagation()}>
+                    <td className="px-3 py-3" onClick={(event) => event.stopPropagation()}>
                       <Checkbox
                         checked={selectedIds.includes(row.id)}
                         onCheckedChange={(v) => toggleRow(row.id, v === true)}
@@ -164,7 +159,7 @@ export function OperationalTable<T extends { id: string }>({
                   {columns.map((col) => (
                     <td
                       key={col.id}
-                      className={cn('px-4 py-2.5 align-middle', col.className)}
+                      className={cn('px-4 py-3 align-middle', col.className)}
                       onClick={col.interactive ? (event) => event.stopPropagation() : undefined}
                     >
                       {col.cell(row)}

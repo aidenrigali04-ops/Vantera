@@ -81,7 +81,7 @@ export function LeadDetailClient({ lead, profile, activities, insights }: Props)
   }
 
   return (
-    <DetailShell>
+    <DetailShell className="mx-auto w-full px-4 py-5 md:px-8 md:py-6">
       <DetailBackLink href="/admin/pipeline" label="Back to pipeline" />
 
       <DetailHeader
@@ -97,12 +97,15 @@ export function LeadDetailClient({ lead, profile, activities, insights }: Props)
         }
         actions={
           lead.convertedContactId ? (
-            <Button asChild className="bg-stone-900 hover:bg-stone-800">
+            <Button
+              asChild
+              className="bg-[var(--text-primary)] text-[var(--text-inverse)] hover:opacity-90"
+            >
               <Link href={`/admin/clients/${lead.convertedContactId}`}>View active client</Link>
             </Button>
           ) : (
             <Button
-              className="bg-stone-900 hover:bg-stone-800"
+              className="bg-[var(--text-primary)] text-[var(--text-inverse)] hover:opacity-90"
               onClick={handleConvert}
               disabled={converting}
             >
@@ -123,7 +126,7 @@ export function LeadDetailClient({ lead, profile, activities, insights }: Props)
                   {lead.linkedinUrl ? (
                     <a
                       href={lead.linkedinUrl}
-                      className="text-blue-600 hover:underline"
+                      className="text-[var(--accent)] hover:underline"
                       target="_blank"
                       rel="noreferrer"
                     >
@@ -137,11 +140,11 @@ export function LeadDetailClient({ lead, profile, activities, insights }: Props)
               </DetailFieldGrid>
 
               <div className="mt-5">
-                <p className="mb-1.5 text-[11px] font-medium uppercase tracking-[0.06em] text-stone-500">
+                <p className="mb-1.5 text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--text-secondary)]">
                   Relationship status
                 </p>
                 <Select value={status} onValueChange={handleStatusChange}>
-                  <SelectTrigger className="max-w-xs">
+                  <SelectTrigger className="max-w-xs border-[var(--border-default)]">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -174,11 +177,11 @@ export function LeadDetailClient({ lead, profile, activities, insights }: Props)
                 emptyMessage="Insights appear as the system detects momentum, replies, or missing data."
               />
               {profile?.openingHook ? (
-                <div className="mt-4 border-t border-stone-100 pt-4">
-                  <p className="text-[11px] font-medium uppercase tracking-[0.06em] text-stone-500">
+                <div className="mt-4 border-t border-[var(--border-subtle)] pt-4">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--text-secondary)]">
                     Opening hook
                   </p>
-                  <p className="mt-1 text-[13px] leading-relaxed text-stone-800">
+                  <p className="mt-1 text-[13px] leading-relaxed text-[var(--text-primary)]">
                     {profile.openingHook}
                   </p>
                 </div>
@@ -187,10 +190,16 @@ export function LeadDetailClient({ lead, profile, activities, insights }: Props)
 
             <DetailSection title="Quick links">
               <div className="space-y-2 text-[13px]">
-                <Link href="/admin/outreach/aspire" className="block text-stone-700 hover:text-stone-900 hover:underline">
+                <Link
+                  href="/admin/outreach/aspire"
+                  className="block text-[var(--text-secondary)] transition-colors duration-150 hover:text-[var(--text-primary)] hover:underline"
+                >
                   Enrich in Aspire →
                 </Link>
-                <Link href="/admin/outreach/linkedin" className="block text-stone-700 hover:text-stone-900 hover:underline">
+                <Link
+                  href="/admin/outreach/linkedin"
+                  className="block text-[var(--text-secondary)] transition-colors duration-150 hover:text-[var(--text-primary)] hover:underline"
+                >
                   LinkedIn automation →
                 </Link>
               </div>

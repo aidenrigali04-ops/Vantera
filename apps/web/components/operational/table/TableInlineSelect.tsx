@@ -51,12 +51,12 @@ export function TableInlineSelect({
       <Select value={value} onValueChange={handleChange} disabled={disabled || pending}>
         <SelectTrigger
           className={cn(
-            'h-8 border-stone-200 bg-white text-[13px] shadow-none hover:bg-stone-50',
+            'h-8 border-[var(--border-default)] bg-[var(--bg-surface)] text-[13px] shadow-none hover:border-[var(--border-strong)] hover:bg-[var(--bg-subtle)]',
             triggerClassName,
           )}
         >
           {pending ? (
-            <span className="flex items-center gap-2 text-stone-500">
+            <span className="flex items-center gap-2 text-[var(--text-secondary)]">
               <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
               Saving…
             </span>

@@ -46,22 +46,22 @@ export function TableToolbar({
       {savedViews ? <div>{savedViews}</div> : null}
 
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div className="relative min-w-0 flex-1 lg:max-w-sm">
+        <div className="relative min-w-0 flex-1 lg:max-w-md">
           <Search
-            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400"
+            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-tertiary)]"
             aria-hidden
           />
           <Input
             value={search}
             onChange={(event) => onSearchChange(event.target.value)}
             placeholder={searchPlaceholder}
-            className="h-9 border-stone-200 bg-white pl-9 text-[13px] shadow-sm"
+            className="h-9 border-[var(--border-default)] bg-[var(--bg-surface)] pl-9 text-[13px] shadow-[var(--shadow-sm)]"
           />
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
           {filters.length > 0 ? (
-            <span className="hidden items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.06em] text-stone-400 sm:inline-flex">
+            <span className="hidden items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--text-tertiary)] sm:inline-flex">
               <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden />
               Filters
             </span>
@@ -70,7 +70,7 @@ export function TableToolbar({
             <Select key={filter.id} value={filter.value} onValueChange={filter.onChange}>
               <SelectTrigger
                 className={cn(
-                  'h-9 border-stone-200 bg-white text-[13px] shadow-sm',
+                  'h-9 border-[var(--border-default)] bg-[var(--bg-surface)] text-[13px] shadow-[var(--shadow-sm)]',
                   filter.widthClassName ?? 'w-[160px]',
                 )}
               >

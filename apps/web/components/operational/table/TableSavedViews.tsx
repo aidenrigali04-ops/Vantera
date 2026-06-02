@@ -24,7 +24,7 @@ export function TableSavedViews({
 }: TableSavedViewsProps) {
   return (
     <div className={cn('flex flex-wrap items-center gap-2', className)}>
-      <span className="mr-1 text-[11px] font-medium uppercase tracking-[0.06em] text-stone-400">
+      <span className="mr-1 text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--text-tertiary)]">
         Views
       </span>
       {views.map((view) => {
@@ -36,10 +36,10 @@ export function TableSavedViews({
             title={view.description}
             onClick={() => onViewChange(view.id)}
             className={cn(
-              'rounded-full px-3 py-1 text-[12px] font-medium transition-colors duration-150',
+              'rounded-md px-3 py-1.5 text-[12px] font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-muted)]',
               active
-                ? 'bg-stone-900 text-white'
-                : 'bg-white text-stone-600 ring-1 ring-stone-200 hover:bg-stone-50 hover:text-stone-900',
+                ? 'border border-[var(--accent-border)] bg-[var(--accent-muted)] text-[var(--text-primary)]'
+                : 'border border-[var(--border-default)] bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:border-[var(--border-strong)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]',
             )}
           >
             {view.label}
@@ -49,7 +49,7 @@ export function TableSavedViews({
       <button
         type="button"
         disabled
-        className="rounded-full px-3 py-1 text-[12px] font-medium text-stone-400 ring-1 ring-dashed ring-stone-200"
+        className="rounded-md border border-dashed border-[var(--border-default)] px-3 py-1.5 text-[12px] font-medium text-[var(--text-disabled)]"
         title="Custom saved views coming soon"
       >
         + Save view

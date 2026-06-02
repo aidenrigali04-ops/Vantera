@@ -105,14 +105,22 @@ export function buildApifyActorInput(
 
   if (filters.company?.trim()) {
     input.company_keywords = [filters.company.trim()]
-  } else if (keywords.length > 0) {
+  } else if (!interactive && keywords.length > 0) {
     input.company_keywords = keywords
   }
 
   if (filters.jobTitles?.length) {
     input.contact_job_title = filters.jobTitles
-  } else if (interactive && keywords.length > 0) {
-    input.contact_job_title = keywords
+  } else if (filters.q?.trim()) {
+    const term = filters.q.trim()
+    input.contact_job_title = [
+      term,
+      `${term} manager`,
+      `${term} director`,
+      `head of ${term}`,
+      `director of ${term}`,
+      `vp ${term}`,
+    ]
   }
 
   if (filters.locations?.length) {

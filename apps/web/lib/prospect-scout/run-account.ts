@@ -48,7 +48,7 @@ export async function runAccountProspectScout(
   let enrolled = 0
   let searchesRun = 0
 
-  // Primary: Prospect Scout — Apollo → aspire_results (scored inbox)
+  // Primary: Prospect Scout — Apify → aspire_results (scored inbox)
   if (mode === 'inline_icp' || mode === 'hybrid') {
     const discovery = await runProspectScoutDiscovery(config, { autoEnroll: true })
     found += discovery.found

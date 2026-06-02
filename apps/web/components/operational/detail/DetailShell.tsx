@@ -24,7 +24,7 @@ export function DetailBackLink({ href, label }: DetailBackLinkProps) {
   return (
     <Link
       href={href}
-      className="inline-flex items-center gap-2 text-[13px] font-medium text-stone-500 transition-colors hover:text-stone-900"
+      className="inline-flex items-center gap-2 text-[13px] font-medium text-[var(--text-secondary)] transition-colors duration-150 hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-muted)]"
     >
       <ArrowLeft className="h-4 w-4" aria-hidden />
       {label}
@@ -50,18 +50,20 @@ export function DetailHeader({
   avatar,
 }: DetailHeaderProps) {
   return (
-    <div className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm sm:p-6">
+    <div className="card-surface p-5 sm:p-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex min-w-0 items-start gap-4">
           {avatar}
           <div className="min-w-0">
-            <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-stone-400">
+            <p className="text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--text-tertiary)]">
               {eyebrow}
             </p>
-            <h1 className="mt-1 text-xl font-semibold tracking-[-0.02em] text-stone-900 sm:text-2xl">
+            <h1 className="mt-1 text-xl font-semibold tracking-[-0.02em] text-[var(--text-primary)] sm:text-2xl">
               {title}
             </h1>
-            {subtitle ? <p className="mt-1 text-[13px] text-stone-500">{subtitle}</p> : null}
+            {subtitle ? (
+              <p className="mt-1 text-[13px] text-[var(--text-secondary)]">{subtitle}</p>
+            ) : null}
             {badges ? <div className="mt-3 flex flex-wrap gap-2">{badges}</div> : null}
           </div>
         </div>
@@ -95,16 +97,18 @@ type DetailSectionProps = {
 
 export function DetailSection({ title, subtitle, action, children, className }: DetailSectionProps) {
   return (
-    <section className={cn('rounded-xl border border-stone-200 bg-white p-5 shadow-sm sm:p-6', className)}>
+    <section className={cn('card-surface p-5 sm:p-6', className)}>
       {title || action ? (
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
             {title ? (
-              <h2 className="text-sm font-semibold uppercase tracking-[0.06em] text-stone-500">
+              <h2 className="text-sm font-semibold uppercase tracking-[0.06em] text-[var(--text-secondary)]">
                 {title}
               </h2>
             ) : null}
-            {subtitle ? <p className="mt-1 text-[13px] text-stone-500">{subtitle}</p> : null}
+            {subtitle ? (
+              <p className="mt-1 text-[13px] text-[var(--text-secondary)]">{subtitle}</p>
+            ) : null}
           </div>
           {action}
         </div>
@@ -143,9 +147,9 @@ export function DetailTimeline({
 }: DetailTimelineProps) {
   if (items.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-stone-200 bg-stone-50/80 px-4 py-8 text-center">
-        <p className="text-sm font-medium text-stone-800">{emptyTitle}</p>
-        <p className="mx-auto mt-2 max-w-md text-[13px] leading-relaxed text-stone-500">
+      <div className="rounded-lg border border-dashed border-[var(--border-default)] bg-[var(--bg-subtle)]/60 px-4 py-8 text-center">
+        <p className="text-sm font-medium text-[var(--text-primary)]">{emptyTitle}</p>
+        <p className="mx-auto mt-2 max-w-md text-[13px] leading-relaxed text-[var(--text-secondary)]">
           {emptyDescription}
         </p>
       </div>
@@ -158,14 +162,16 @@ export function DetailTimeline({
         const Icon = timelineIcon(item)
         return (
           <li key={item.id} className="flex gap-3">
-            <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-stone-100">
-              <Icon className="h-4 w-4 text-stone-600" aria-hidden />
+            <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[var(--bg-subtle)]">
+              <Icon className="h-4 w-4 text-[var(--text-secondary)]" aria-hidden />
             </span>
             <div className="min-w-0">
-              <p className="text-[13px] leading-relaxed text-stone-800">
+              <p className="text-[13px] leading-relaxed text-[var(--text-primary)]">
                 {item.body ?? item.activityType.replace(/_/g, ' ')}
               </p>
-              <p className="mt-0.5 text-[11px] text-stone-500">{formatRelativeTime(item.createdAt)}</p>
+              <p className="mt-0.5 text-[11px] text-[var(--text-secondary)]">
+                {formatRelativeTime(item.createdAt)}
+              </p>
             </div>
           </li>
         )
@@ -183,8 +189,10 @@ type DetailFieldProps = {
 export function DetailField({ label, value, children }: DetailFieldProps) {
   return (
     <div>
-      <p className="text-[11px] font-medium uppercase tracking-[0.06em] text-stone-500">{label}</p>
-      <div className="mt-1 text-[13px] text-stone-900">{children ?? value ?? '—'}</div>
+      <p className="text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--text-secondary)]">
+        {label}
+      </p>
+      <div className="mt-1 text-[13px] text-[var(--text-primary)]">{children ?? value ?? '—'}</div>
     </div>
   )
 }
@@ -215,10 +223,10 @@ export function DetailMetaPanel({ title = 'Details', items }: DetailMetaPanelPro
       <dl className="space-y-3">
         {items.map((item) => (
           <div key={item.label}>
-            <dt className="text-[11px] font-medium uppercase tracking-[0.06em] text-stone-500">
+            <dt className="text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--text-secondary)]">
               {item.label}
             </dt>
-            <dd className="mt-1 text-[13px] text-stone-900">{item.value}</dd>
+            <dd className="mt-1 text-[13px] text-[var(--text-primary)]">{item.value}</dd>
           </div>
         ))}
       </dl>
