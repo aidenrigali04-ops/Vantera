@@ -7,6 +7,7 @@ import {
   findUnifiedContactActivities,
 } from '@/lib/db/queries'
 import { findContactEmbeddedInsights } from '@/lib/intelligence/queries'
+import { getPortalAccessMeta } from '@/lib/portal/invite'
 import { notFound } from 'next/navigation'
 
 export const dynamic = 'force-dynamic'
@@ -23,7 +24,7 @@ export default async function ActiveClientDetailPage({ params }: Props) {
     notFound()
   }
 
-  const [activities, relatedRecords, openRecordsCount, insights] = await Promise.all([
+  const [activities, relatedRecords, openRecordsCount, insights, portalMeta] = await Promise.all([
     findUnifiedContactActivities(
       session.accountId,
       params.id,
@@ -33,6 +34,7 @@ export default async function ActiveClientDetailPage({ params }: Props) {
     findRecordsForContact(session.accountId, params.id),
     countOpenRecordsForContact(session.accountId, params.id),
     findContactEmbeddedInsights(session.accountId, params.id),
+    getPortalAccessMeta(session.accountId),
   ])
 
   return (
@@ -42,6 +44,13 @@ export default async function ActiveClientDetailPage({ params }: Props) {
       relatedRecords={relatedRecords}
       openRecordsCount={openRecordsCount}
       insights={insights}
+      portal={{
+        portalUrl: portalMeta.portalUrl,
+        portalAccess: contact.portalAccess,
+        portalInvitedAt: contact.portalInvitedAt,
+        portalLastLoginAt: contact.portalLastLoginAt,
+        email: contact.email,
+      }}
     />
   )
 }

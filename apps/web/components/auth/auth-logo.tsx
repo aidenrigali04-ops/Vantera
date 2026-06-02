@@ -5,7 +5,7 @@ type AuthLogoProps = {
   className?: string
 }
 
-/** Vantera wordmark — top-left of auth column, links to landing. */
+/** Vantera wordmark — top-left of auth column, links to signup entry. */
 export function AuthLogo({ className }: AuthLogoProps) {
   return (
     <Link

@@ -5,7 +5,7 @@ import { resolveAuthModeFromSearch } from '@/lib/auth/resolve-auth-mode'
 import { usePathname, useSearchParams } from 'next/navigation'
 
 export function UnifiedAuthClient() {
-  const pathname = usePathname() ?? '/auth'
+  const pathname = usePathname() ?? '/'
   const searchParams = useSearchParams()
   const initialMode = resolveAuthModeFromSearch(searchParams?.get('mode') ?? null, pathname)
 

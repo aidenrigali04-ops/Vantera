@@ -58,6 +58,7 @@ export function shouldBypassRateLimit(pathname: string): boolean {
 
 export function isAuthRateLimitPath(pathname: string): boolean {
   return (
+    pathname === '/' ||
     pathname.startsWith('/api/auth') ||
     pathname.startsWith('/auth') ||
     pathname.includes('/login') ||

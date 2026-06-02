@@ -16,7 +16,7 @@ export function LegalDocumentShell({ title, updatedAt, children }: LegalDocument
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-4">
           <AuthLogo />
           <Link
-            href="/auth"
+            href="/"
             className="text-[13px] font-medium text-stone-600 underline-offset-2 hover:text-stone-900 hover:underline"
           >
             Back to sign in

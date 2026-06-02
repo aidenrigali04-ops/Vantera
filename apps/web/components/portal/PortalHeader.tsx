@@ -17,31 +17,38 @@ export function PortalHeader({ contactName, preview = false, className }: Portal
   return (
     <header
       className={cn(
-        'border-b border-stone-200/90 bg-white/95 backdrop-blur-sm',
+        'sticky top-0 z-20 border-b border-[var(--border-subtle)] bg-[var(--bg-surface)]/90 backdrop-blur-md',
         preview && 'rounded-t-xl',
         className,
       )}
     >
-      <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-5 py-4 sm:px-8">
+      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-6 sm:px-8">
         <div className="min-w-0">
-          <p className="text-[11px] font-medium uppercase tracking-[0.06em] text-stone-400">
+          <p className="text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--text-tertiary)]">
             Client portal
           </p>
-          <h1 className="truncate text-lg font-semibold tracking-[-0.02em] text-stone-900">
+          <h1 className="truncate text-lg font-semibold tracking-[-0.02em] text-[var(--text-primary)]">
             {branding.businessName}
           </h1>
           {contactName ? (
-            <p className="mt-0.5 text-[13px] text-stone-500">Welcome back, {contactName}</p>
+            <p className="mt-0.5 text-[13px] text-[var(--text-secondary)]">
+              Welcome back, {contactName}
+            </p>
           ) : null}
         </div>
         {!preview ? (
           <form action={portalLogoutAction}>
-            <Button type="submit" variant="outline" size="sm" className="shrink-0">
+            <Button
+              type="submit"
+              variant="outline"
+              size="sm"
+              className="shrink-0 border-[var(--border-default)]"
+            >
               Sign out
             </Button>
           </form>
         ) : (
-          <span className="rounded-full bg-stone-100 px-3 py-1 text-[11px] font-medium text-stone-600">
+          <span className="rounded-full bg-[var(--bg-subtle)] px-3 py-1 text-[11px] font-medium text-[var(--text-secondary)]">
             Preview
           </span>
         )}

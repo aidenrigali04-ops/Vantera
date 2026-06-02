@@ -1,5 +1,6 @@
 'use client'
 
+import { PortalAccessPanel } from '@/components/admin/contacts/PortalAccessPanel'
 import { updateContact } from '@/app/(admin)/admin/contacts/actions'
 import { EmbeddedInsightsPanel } from '@/components/intelligence/EmbeddedInsightsPanel'
 import {
@@ -33,6 +34,7 @@ import {
 } from '@/lib/contacts/format'
 import { useVerticalLabels } from '@/lib/branding/use-vertical-labels'
 import type { EmbeddedInsight } from '@/lib/intelligence/types'
+import type { PortalAccessState } from '@/lib/portal/types'
 import type { activities, contacts, records } from '@vantera/db'
 import { Mail, Phone } from 'lucide-react'
 import Link from 'next/link'
@@ -50,6 +52,7 @@ type Props = {
   relatedRecords: RecordRow[]
   openRecordsCount: number
   insights: EmbeddedInsight[]
+  portal: PortalAccessState
 }
 
 export function ContactProfile({
@@ -58,6 +61,7 @@ export function ContactProfile({
   relatedRecords,
   openRecordsCount,
   insights,
+  portal,
 }: Props) {
   const router = useRouter()
   const labels = useVerticalLabels()
@@ -232,13 +236,16 @@ export function ContactProfile({
           </>
         }
         aside={
-          <DetailSection>
-            <EmbeddedInsightsPanel
-              insights={insights}
-              title="Operational intelligence"
-              subtitle="Churn, expansion, and delivery signals for this client."
-            />
-          </DetailSection>
+          <>
+            <PortalAccessPanel contact={contact} portal={portal} />
+            <DetailSection className="mt-5">
+              <EmbeddedInsightsPanel
+                insights={insights}
+                title="Operational intelligence"
+                subtitle="Churn, expansion, and delivery signals for this client."
+              />
+            </DetailSection>
+          </>
         }
       />
 

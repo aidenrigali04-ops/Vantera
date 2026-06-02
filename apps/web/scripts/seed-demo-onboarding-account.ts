@@ -146,7 +146,7 @@ async function main(): Promise<void> {
   console.log('  Workspace: ', DEMO_WORKSPACE_NAME)
   console.log('  Slug:      ', account.slug)
   console.log('  Account:   ', account.id)
-  console.log('\n  Login:    ', `${appUrl}/auth?mode=login`)
+  console.log('\n  Login:    ', `${appUrl}/?mode=login`)
   console.log('  Tenant:   ', `http://${account.slug}.${appDomain}:3000/admin/dashboard`)
   console.log('\n  Onboarding is incomplete — expect operating model modal, sample banner, and choice modal.')
 }

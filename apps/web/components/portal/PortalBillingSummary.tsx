@@ -22,19 +22,19 @@ export function PortalBillingSummary({ billing }: PortalBillingSummaryProps) {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[13px] text-stone-600">Outstanding balance</span>
+        <span className="text-[13px] text-[var(--text-secondary)]">Outstanding balance</span>
         <StatusBadge label={billingLabel(billing.status)} tone={billingTone(billing.status)} />
       </div>
-      <p className="text-2xl font-semibold tracking-[-0.02em] text-stone-900">
+      <p className="text-2xl font-semibold tracking-[-0.02em] text-[var(--text-primary)]">
         {formatUsdFromCents(billing.outstandingCents)}
       </p>
       {billing.nextDueDate ? (
-        <p className="text-[12px] text-stone-500">
-          Next invoice due{' '}
+        <p className="text-[12px] text-[var(--text-secondary)]">
+          Next due{' '}
           {billing.nextDueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
         </p>
       ) : (
-        <p className="text-[12px] text-stone-500">No upcoming invoices</p>
+        <p className="text-[12px] text-[var(--text-secondary)]">No upcoming invoices</p>
       )}
     </div>
   )

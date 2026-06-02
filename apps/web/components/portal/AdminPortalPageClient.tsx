@@ -38,8 +38,9 @@ export function AdminPortalPageClient({ meta, workspace }: Props) {
         <div className="space-y-4 lg:col-span-4">
           <div className="rounded-xl border border-stone-200/90 bg-white p-5 shadow-sm">
             <h3 className="text-sm font-semibold text-stone-900">Portal access</h3>
-            <p className="mt-1 text-[13px] leading-relaxed text-stone-500">
-              Enable portal access on a contact to let them sign in and view their workspace.
+            <p className="mt-1 text-[13px] leading-relaxed text-[var(--text-secondary)]">
+              Send portal invites from any client profile. Clients sign in with branded auth and
+              see projects, documents, invoices, and messaging.
             </p>
             <dl className="mt-4 space-y-3 text-[13px]">
               <div>
@@ -71,10 +72,11 @@ export function AdminPortalPageClient({ meta, workspace }: Props) {
           <div className="rounded-xl border border-dashed border-stone-200 bg-stone-50/80 p-5">
             <h3 className="text-sm font-semibold text-stone-900">What clients get</h3>
             <ul className="mt-3 space-y-2 text-[13px] text-stone-600">
+              <li>Secure branded sign-in for each client</li>
               <li>Project progress with stage tracking</li>
-              <li>Deliverables and approval requests</li>
-              <li>Activity feed from your team</li>
-              <li>Billing snapshot and invoice status</li>
+              <li>Shared documents and signature requests</li>
+              <li>Invoices with one-click payment links</li>
+              <li>Two-way portal messaging with your team</li>
             </ul>
           </div>
         </div>

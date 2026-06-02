@@ -293,6 +293,11 @@ export async function portalLoginAction(
     return { success: false, error: 'Invalid email or password' }
   }
 
+  await getSupabaseAdmin()
+    .from('contacts')
+    .update({ portal_last_login_at: new Date().toISOString() })
+    .eq('id', contact.id)
+
   await setPortalSession({
     type: 'portal',
     contactId: contact.id,

@@ -2,6 +2,7 @@ import { Button } from '@/components/ui/button'
 import { StatusBadge } from '@/components/operational/table/StatusBadge'
 import type { PortalApproval } from '@/lib/portal/types'
 import { formatRelativeTime } from '@/lib/contacts/format'
+import { ExternalLink } from 'lucide-react'
 
 type PortalApprovalsPanelProps = {
   approvals: PortalApproval[]
@@ -18,7 +19,9 @@ export function PortalApprovalsPanel({ approvals }: PortalApprovalsPanelProps) {
 
   if (pending.length === 0) {
     return (
-      <p className="text-[13px] text-stone-500">No approvals waiting on you right now.</p>
+      <p className="text-[13px] text-[var(--text-secondary)]">
+        No approvals waiting on you right now.
+      </p>
     )
   }
 
@@ -27,23 +30,21 @@ export function PortalApprovalsPanel({ approvals }: PortalApprovalsPanelProps) {
       {pending.map((approval) => (
         <li
           key={approval.id}
-          className="rounded-lg border border-stone-200 bg-stone-50/50 p-3"
+          className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-subtle)] p-3"
         >
           <div className="flex items-start justify-between gap-2">
-            <p className="text-[13px] font-medium text-stone-900">{approval.title}</p>
+            <p className="text-[13px] font-medium text-[var(--text-primary)]">{approval.title}</p>
             <StatusBadge label="Pending" tone={approvalTone(approval.status)} />
           </div>
-          <p className="mt-1 text-[11px] text-stone-400">
+          <p className="mt-1 text-[11px] text-[var(--text-tertiary)]">
             Requested {formatRelativeTime(approval.requestedAt)}
           </p>
-          <div className="mt-3 flex gap-2">
-            <Button size="sm" className="h-8 bg-stone-900 hover:bg-stone-800">
-              Review
-            </Button>
-            <Button size="sm" variant="outline" className="h-8" disabled title="Coming soon">
-              Decline
-            </Button>
-          </div>
+          <Button size="sm" className="mt-3 h-8" asChild>
+            <a href={approval.storageUrl} target="_blank" rel="noopener noreferrer">
+              Review document
+              <ExternalLink className="ml-2 h-3.5 w-3.5" />
+            </a>
+          </Button>
         </li>
       ))}
     </ul>

@@ -6,12 +6,15 @@ import type {
   PortalApproval,
   PortalBillingSummary,
   PortalDeliverable,
+  PortalDocument,
+  PortalInvoice,
+  PortalMessage,
   PortalProject,
   PortalWorkspace,
 } from '@/lib/portal/types'
 import { derivePortalUrl } from '@/lib/portal/url'
-import { activities, contacts, records, stageDefinitions } from '@vantera/db'
-import { and, desc, eq, isNull, sql } from 'drizzle-orm'
+import { activities, contacts, documents, invoices, messages, records, stageDefinitions } from '@vantera/db'
+import { and, desc, eq, inArray, isNull, or, sql } from 'drizzle-orm'
 
 function projectProgress(
   stagePosition: number,
@@ -23,44 +26,66 @@ function projectProgress(
   return Math.min(100, Math.round((stagePosition / maxPosition) * 100))
 }
 
-function deriveDeliverables(projects: PortalProject[]): PortalDeliverable[] {
-  return projects.slice(0, 4).map((project, index) => ({
-    id: `del-${project.id}`,
-    title: index === 0 ? `${project.title} — milestone review` : `${project.title} — deliverable pack`,
-    status: index === 0 ? 'in_review' : index === 1 ? 'pending' : 'delivered',
-    dueAt: index === 0 ? new Date(Date.now() + 3 * 86400000) : null,
-  }))
-}
+function deriveBillingFromInvoices(invoiceRows: PortalInvoice[]): PortalBillingSummary {
+  const openStatuses = ['sent', 'viewed', 'overdue'] as const
+  const open = invoiceRows.filter((inv) =>
+    openStatuses.includes(inv.status as (typeof openStatuses)[number]),
+  )
 
-function deriveApprovals(activitiesList: PortalActivity[]): PortalApproval[] {
-  const fromActivities = activitiesList
-    .filter((a) => a.activityType.includes('approval') || a.body?.toLowerCase().includes('approval'))
-    .slice(0, 3)
-    .map((a) => ({
-      id: a.id,
-      title: a.body ?? 'Approval requested',
-      status: 'pending' as const,
-      requestedAt: a.createdAt,
-    }))
+  const outstandingCents = open.reduce(
+    (sum, inv) => sum + Math.max(0, inv.amountCents - inv.paidCents),
+    0,
+  )
 
-  if (fromActivities.length > 0) return fromActivities
+  const overdue = open.some((inv) => inv.status === 'overdue')
+  const dueSoon = open.some((inv) => {
+    if (!inv.dueAt) return false
+    const days = (inv.dueAt.getTime() - Date.now()) / 86400000
+    return days >= 0 && days <= 14
+  })
 
-  return [
-    {
-      id: 'approval-demo-1',
-      title: 'Q2 campaign creative — review and approve',
-      status: 'pending',
-      requestedAt: new Date(Date.now() - 2 * 86400000),
-    },
-  ]
-}
+  const nextDue = open
+    .map((inv) => inv.dueAt)
+    .filter((d): d is Date => d != null)
+    .sort((a, b) => a.getTime() - b.getTime())[0]
 
-function deriveBilling(projects: PortalProject[]): PortalBillingSummary {
-  const outstandingCents = projects.reduce((sum, p) => sum + Math.round(p.valueCents * 0.25), 0)
+  let status: PortalBillingSummary['status'] = 'current'
+  if (overdue) status = 'overdue'
+  else if (dueSoon || outstandingCents > 0) status = 'due_soon'
+
   return {
     outstandingCents,
-    nextDueDate: new Date(Date.now() + 14 * 86400000),
-    status: outstandingCents > 0 ? 'due_soon' : 'current',
+    nextDueDate: nextDue ?? null,
+    status,
+  }
+}
+
+function mapDocumentToDeliverable(doc: PortalDocument): PortalDeliverable {
+  let status: PortalDeliverable['status'] = 'delivered'
+  if (doc.requiresSignature && !doc.signedAt) {
+    status = 'in_review'
+  } else if (doc.requiresSignature && doc.signedAt) {
+    status = 'approved'
+  }
+
+  return {
+    id: doc.id,
+    title: doc.title,
+    status,
+    dueAt: null,
+    storageUrl: doc.storageUrl,
+  }
+}
+
+function mapDocumentToApproval(doc: PortalDocument): PortalApproval | null {
+  if (!doc.requiresSignature || doc.signedAt) return null
+
+  return {
+    id: doc.id,
+    title: doc.title,
+    status: 'pending',
+    requestedAt: doc.createdAt,
+    storageUrl: doc.storageUrl,
   }
 }
 
@@ -128,6 +153,108 @@ async function loadClientActivities(
   }))
 }
 
+async function loadPortalInvoices(
+  accountId: string,
+  contactId: string,
+): Promise<PortalInvoice[]> {
+  const rows = await db
+    .select({
+      id: invoices.id,
+      amountCents: invoices.amountCents,
+      paidCents: invoices.paidCents,
+      status: invoices.status,
+      dueAt: invoices.dueAt,
+      paidAt: invoices.paidAt,
+      paymentLinkUrl: invoices.paymentLinkUrl,
+      createdAt: invoices.createdAt,
+      recordTitle: records.title,
+    })
+    .from(invoices)
+    .leftJoin(records, eq(invoices.recordId, records.id))
+    .where(
+      and(
+        eq(invoices.accountId, accountId),
+        eq(invoices.contactId, contactId),
+        isNull(invoices.deletedAt),
+        inArray(invoices.status, ['sent', 'viewed', 'paid', 'overdue']),
+      ),
+    )
+    .orderBy(desc(invoices.createdAt))
+    .limit(20)
+
+  return rows.map((row) => ({
+    id: row.id,
+    recordTitle: row.recordTitle,
+    amountCents: row.amountCents,
+    paidCents: row.paidCents,
+    status: row.status,
+    dueAt: row.dueAt,
+    paidAt: row.paidAt,
+    paymentLinkUrl: row.paymentLinkUrl,
+    createdAt: row.createdAt,
+  }))
+}
+
+async function loadPortalDocuments(
+  accountId: string,
+  contactId: string,
+): Promise<PortalDocument[]> {
+  const rows = await db
+    .select()
+    .from(documents)
+    .where(
+      and(
+        eq(documents.accountId, accountId),
+        eq(documents.visibleToClient, true),
+        isNull(documents.deletedAt),
+        or(eq(documents.contactId, contactId), eq(documents.signerContactId, contactId)),
+      ),
+    )
+    .orderBy(desc(documents.createdAt))
+    .limit(24)
+
+  return rows.map((row) => ({
+    id: row.id,
+    title: row.title,
+    docType: row.docType,
+    storageUrl: row.storageUrl,
+    requiresSignature: row.requiresSignature,
+    signedAt: row.signedAt,
+    createdAt: row.createdAt,
+  }))
+}
+
+async function loadPortalMessages(
+  accountId: string,
+  contactId: string,
+): Promise<PortalMessage[]> {
+  const rows = await db
+    .select()
+    .from(messages)
+    .where(
+      and(
+        eq(messages.accountId, accountId),
+        eq(messages.contactId, contactId),
+        eq(messages.channel, 'portal'),
+        isNull(messages.deletedAt),
+      ),
+    )
+    .orderBy(desc(messages.createdAt))
+    .limit(50)
+
+  return rows
+    .map((row) => ({
+      id: row.id,
+      direction: row.direction,
+      body: row.body,
+      subject: row.subject,
+      sentAt: row.sentAt,
+      createdAt: row.createdAt,
+      readAt: row.readAt,
+    }))
+    .reverse()
+}
+
 export async function getPortalWorkspace(
   accountId: string,
   contactId: string,
@@ -142,29 +269,22 @@ export async function getPortalWorkspace(
 
   if (!contact) return null
 
-  const projects = await loadProjects(accountId, contactId)
-  let activityList = await loadClientActivities(accountId, contactId)
+  const [projects, activityList, invoiceRows, documentRows, messageRows] = await Promise.all([
+    loadProjects(accountId, contactId),
+    loadClientActivities(accountId, contactId),
+    loadPortalInvoices(accountId, contactId),
+    loadPortalDocuments(accountId, contactId),
+    loadPortalMessages(accountId, contactId),
+  ])
 
-  if (activityList.length === 0 && projects.length > 0) {
-    activityList = [
-      {
-        id: 'activity-welcome',
-        body: 'Your project workspace is ready. Track progress, deliverables, and approvals here.',
-        activityType: 'portal_update',
-        createdAt: new Date(),
-      },
-      ...projects.slice(0, 2).map((p, i) => ({
-        id: `activity-${p.id}`,
-        body: `${p.title} moved to ${p.stageLabel}.`,
-        activityType: 'stage_update',
-        createdAt: new Date(Date.now() - (i + 1) * 86400000),
-      })),
-    ]
-  }
-
-  const deliverables = deriveDeliverables(projects)
-  const approvals = deriveApprovals(activityList)
-  const billing = deriveBilling(projects)
+  const deliverables = documentRows.map(mapDocumentToDeliverable)
+  const approvals = documentRows
+    .map(mapDocumentToApproval)
+    .filter((item): item is PortalApproval => item != null)
+  const billing = deriveBillingFromInvoices(invoiceRows)
+  const unreadMessageCount = messageRows.filter(
+    (m) => m.direction === 'outbound' && !m.readAt,
+  ).length
 
   return {
     contactFirstName: contact.firstName,
@@ -174,10 +294,29 @@ export async function getPortalWorkspace(
     deliverables,
     approvals,
     billing,
+    invoices: invoiceRows,
+    documents: documentRows,
+    messages: messageRows,
+    unreadMessageCount,
   }
 }
 
 export async function findPreviewContactId(accountId: string): Promise<string | null> {
+  const [withPortal] = await db
+    .select({ id: contacts.id })
+    .from(contacts)
+    .where(
+      and(
+        eq(contacts.accountId, accountId),
+        eq(contacts.portalAccess, true),
+        isNull(contacts.deletedAt),
+      ),
+    )
+    .orderBy(desc(contacts.updatedAt))
+    .limit(1)
+
+  if (withPortal?.id) return withPortal.id
+
   const [withProject] = await db
     .select({ contactId: records.contactId })
     .from(records)

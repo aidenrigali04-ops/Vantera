@@ -20,6 +20,7 @@ export type PortalDeliverable = {
   title: string
   status: 'pending' | 'in_review' | 'approved' | 'delivered'
   dueAt: Date | null
+  storageUrl: string
 }
 
 export type PortalApproval = {
@@ -27,6 +28,39 @@ export type PortalApproval = {
   title: string
   status: 'pending' | 'approved' | 'rejected'
   requestedAt: Date
+  storageUrl: string
+}
+
+export type PortalInvoice = {
+  id: string
+  recordTitle: string | null
+  amountCents: number
+  paidCents: number
+  status: string
+  dueAt: Date | null
+  paidAt: Date | null
+  paymentLinkUrl: string | null
+  createdAt: Date
+}
+
+export type PortalDocument = {
+  id: string
+  title: string
+  docType: string
+  storageUrl: string
+  requiresSignature: boolean
+  signedAt: Date | null
+  createdAt: Date
+}
+
+export type PortalMessage = {
+  id: string
+  direction: 'inbound' | 'outbound'
+  body: string
+  subject: string | null
+  sentAt: Date | null
+  createdAt: Date
+  readAt: Date | null
 }
 
 export type PortalBillingSummary = {
@@ -43,10 +77,22 @@ export type PortalWorkspace = {
   deliverables: PortalDeliverable[]
   approvals: PortalApproval[]
   billing: PortalBillingSummary
+  invoices: PortalInvoice[]
+  documents: PortalDocument[]
+  messages: PortalMessage[]
+  unreadMessageCount: number
 }
 
 export type AdminPortalMeta = {
   portalUrl: string
   portalEnabledCount: number
   previewContactName: string | null
+}
+
+export type PortalAccessState = {
+  portalUrl: string
+  portalAccess: boolean
+  portalInvitedAt: Date | null
+  portalLastLoginAt: Date | null
+  email: string | null
 }

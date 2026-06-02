@@ -139,7 +139,12 @@ export function AuthCredentialsPanel({
 
   const authPathForMode = useCallback(
     (next: AuthMode) => {
-      if (pathname === AUTH_ENTRY_PATH) {
+      const isUnifiedEntry =
+        pathname === AUTH_ENTRY_PATH ||
+        pathname === '/auth' ||
+        pathname === '/auth/signup'
+
+      if (isUnifiedEntry) {
         return next === 'login' ? `${AUTH_ENTRY_PATH}?mode=login` : AUTH_ENTRY_PATH
       }
       return next === 'login' ? AUTH_LOGIN_PATH : AUTH_SIGNUP_PATH
@@ -426,10 +431,10 @@ export function AuthCredentialsPanel({
           <div className="space-y-1.5">
             <div className="flex items-center justify-between gap-2">
               <AuthFieldLabel htmlFor="login-password">Password</AuthFieldLabel>
-              {!showForgotPassword && !portal ? (
+              {!showForgotPassword ? (
                 <button
                   type="button"
-                  className="text-[12px] font-medium text-stone-500 underline-offset-2 hover:text-stone-800 hover:underline"
+                  className="text-[12px] font-medium text-[var(--text-secondary)] underline-offset-2 hover:text-[var(--text-primary)] hover:underline"
                   onClick={() => setShowForgotPassword(true)}
                 >
                   Forgot password?

@@ -10,10 +10,10 @@ export default async function PortalHomePage() {
 
   if (!workspace) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#fafaf9] p-8">
+      <div className="flex min-h-screen items-center justify-center bg-[var(--bg-base)] p-8">
         <div className="max-w-md text-center">
-          <h1 className="text-lg font-semibold text-stone-900">Portal unavailable</h1>
-          <p className="mt-2 text-sm text-stone-500">
+          <h1 className="text-lg font-semibold text-[var(--text-primary)]">Portal unavailable</h1>
+          <p className="mt-2 text-sm text-[var(--text-secondary)]">
             We couldn&apos;t load your workspace. Please contact your account manager.
           </p>
         </div>

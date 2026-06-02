@@ -225,6 +225,7 @@ export const contacts = pgTable(
     zip: varchar('zip', { length: 20 }),
     portalAccess: boolean('portal_access').notNull().default(false),
     portalLastLoginAt: timestamptz('portal_last_login_at'),
+    portalInvitedAt: timestamptz('portal_invited_at'),
     ltvCents: bigint('ltv_cents', { mode: 'number' }).notNull().default(0),
     churnRiskScore: smallint('churn_risk_score').notNull().default(0),
     upsellScore: smallint('upsell_score').notNull().default(0),

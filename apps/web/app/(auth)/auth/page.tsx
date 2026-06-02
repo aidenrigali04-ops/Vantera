@@ -1,18 +1,9 @@
-import { AuthShell } from '@/components/auth/auth-shell'
-import { authPageMetadata } from '@/lib/auth/metadata'
-import { Suspense } from 'react'
-import { UnifiedAuthClient } from './unified-auth-client'
+import { AUTH_ENTRY_PATH } from '@/lib/auth/routes'
+import { redirect } from 'next/navigation'
 
 export const dynamic = 'force-dynamic'
-export const metadata = authPageMetadata.signup
 
-/** Canonical auth entry — defaults to signup; use ?mode=login for sign-in. */
+/** Legacy entry — signup lives at `/`. */
 export default function AuthPage() {
-  return (
-    <AuthShell>
-      <Suspense fallback={null}>
-        <UnifiedAuthClient />
-      </Suspense>
-    </AuthShell>
-  )
+  redirect(AUTH_ENTRY_PATH)
 }
