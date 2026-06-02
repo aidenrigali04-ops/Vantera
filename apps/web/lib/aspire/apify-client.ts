@@ -7,7 +7,10 @@ import {
   extractPhone,
   readString as readApifyString,
 } from '@/lib/aspire/contact-fields'
-import { resolveApifyKeywordTargeting } from '@/lib/aspire/apify-targeting'
+import {
+  normalizeApifyLocations,
+  resolveApifyKeywordTargeting,
+} from '@/lib/aspire/apify-targeting'
 import { splitFullName } from '@/lib/aspire/contact-fields'
 import { stubResults } from '@/lib/aspire/prospect-stubs'
 import type { ApolloPersonResult, ApolloSearchFilters } from '@/lib/aspire/types'
@@ -62,14 +65,25 @@ function parseEmployeeCount(value: unknown): number | null {
   return Number.isFinite(parsed) ? parsed : null
 }
 
+function unwrapApifyRow(raw: Record<string, unknown>): Record<string, unknown> {
+  for (const key of ['person', 'lead', 'contact', 'data']) {
+    const nested = raw[key]
+    if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
+      return { ...(nested as Record<string, unknown>), ...raw }
+    }
+  }
+  return raw
+}
+
 export function mapApifyLead(raw: Record<string, unknown>): ApolloPersonResult | null {
-  const id = buildProspectId(raw)
+  const row = unwrapApifyRow(raw)
+  const id = buildProspectId(row)
   if (!id) return null
 
-  let firstName = readString(raw, ['first_name', 'firstName']) ?? ''
-  let lastName = readString(raw, ['last_name', 'lastName']) ?? ''
+  let firstName = readString(row, ['first_name', 'firstName']) ?? ''
+  let lastName = readString(row, ['last_name', 'lastName']) ?? ''
   if (!firstName && !lastName) {
-    const full = readString(raw, ['full_name', 'fullName', 'contact_full_name'])
+    const full = readString(row, ['full_name', 'fullName', 'contact_full_name'])
     if (full) {
       const split = splitFullName(full)
       firstName = split.firstName
@@ -77,32 +91,32 @@ export function mapApifyLead(raw: Record<string, unknown>): ApolloPersonResult |
     }
   }
   const contact = {
-    email: extractEmail(raw),
-    phone: extractPhone(raw),
-    linkedinUrl: extractLinkedIn(raw),
+    email: extractEmail(row),
+    phone: extractPhone(row),
+    linkedinUrl: extractLinkedIn(row),
   }
 
   return {
     id,
     firstName,
     lastName,
-    title: readString(raw, ['job_title', 'title']) ?? '',
+    title: readString(row, ['job_title', 'title', 'headline']) ?? '',
     email: contact.email,
     phone: contact.phone,
     linkedinUrl: contact.linkedinUrl,
     organizationName:
-      readString(raw, ['company_name', 'organizationName', 'company']) ??
-      readString(raw, ['company_domain', 'companyDomain']) ??
+      readString(row, ['company_name', 'organizationName', 'company']) ??
+      readString(row, ['company_domain', 'companyDomain']) ??
       'Unknown',
     organizationId: null,
-    websiteUrl: readString(raw, ['company_website', 'websiteUrl', 'website']),
-    city: readString(raw, ['city']),
-    state: readString(raw, ['state']),
-    employeeCount: parseEmployeeCount(raw.company_size ?? raw.employeeCount),
+    websiteUrl: readString(row, ['company_website', 'websiteUrl', 'website']),
+    city: readString(row, ['city', 'company_city']),
+    state: readString(row, ['state', 'company_state']),
+    employeeCount: parseEmployeeCount(row.company_size ?? row.employeeCount),
     revenue: null,
-    industry: readString(raw, ['industry', 'company_industry']),
+    industry: readString(row, ['industry', 'company_industry']),
     technologies: [],
-    photoUrl: readString(raw, ['photo_url', 'photoUrl']),
+    photoUrl: readString(row, ['photo_url', 'photoUrl']),
   }
 }
 
@@ -139,8 +153,7 @@ export function buildApifyActorInput(
 
   const input: Record<string, unknown> = {
     fetch_count: fetchCount,
-    // Broader than validated-only — Apify docs: add unknown/not_validated for higher volume
-    email_status: ['validated', 'unknown', 'not_validated'],
+    email_status: ['validated', 'unknown'],
   }
 
   if (filters.company?.trim()) {
@@ -161,10 +174,11 @@ export function buildApifyActorInput(
     }
   }
 
-  if (filters.locations?.length) {
-    input.contact_location = filters.locations
-  } else if (interactive) {
-    input.contact_location = ['united states']
+  const locations = normalizeApifyLocations(
+    filters.locations?.length ? filters.locations : interactive ? ['united states'] : undefined,
+  )
+  if (locations?.length) {
+    input.contact_location = locations
   }
 
   if (filters.industries?.length) {
@@ -219,16 +233,27 @@ function buildBroadRetryInput(
 ): Record<string, unknown> {
   const retry: Record<string, unknown> = {
     fetch_count: getAspireApifyFetchCount(pageSize),
-    email_status: base.email_status,
+    email_status: ['validated', 'unknown', 'not_validated'],
     contact_location: base.contact_location ?? ['united states'],
   }
   if (Array.isArray(base.functional_level) && base.functional_level.length > 0) {
     retry.functional_level = base.functional_level
+  } else if (Array.isArray(base.contact_job_title) && base.contact_job_title.length > 0) {
+    retry.contact_job_title = base.contact_job_title
   }
   if (base.company_keywords) {
     retry.company_keywords = base.company_keywords
   }
   return retry
+}
+
+/** Widest search — location + volume only (actor rejects invalid filter combos). */
+function buildMinimalRetryInput(pageSize: number): Record<string, unknown> {
+  return {
+    fetch_count: getAspireApifyFetchCount(pageSize),
+    contact_location: ['united states'],
+    email_status: ['validated', 'unknown', 'not_validated'],
+  }
 }
 
 async function fetchApifyLeads(
@@ -269,6 +294,20 @@ function apifyErrorMessage(body: unknown, fallback: string): string {
   return fallback
 }
 
+function apifyEmptyResultMessage(
+  rows: Record<string, unknown>[],
+  people: ApolloPersonResult[],
+  retriedBroad: boolean,
+  retriedMinimal: boolean,
+): string {
+  const unmapped = Math.max(0, rows.length - people.length)
+  if (rows.length > 0 && people.length === 0) {
+    return `Apify returned ${rows.length} leads but none could be mapped (missing email/LinkedIn/name). Check APIFY_LEADS_ACTOR_ID.`
+  }
+  const retries = retriedMinimal ? ' (tried broad and minimal filters)' : retriedBroad ? ' (tried broad filters)' : ''
+  return `Apify returned no leads for this search${retries}. Try a broader keyword, company name, or different filters.`
+}
+
 export async function searchApify(
   filters: ApolloSearchFilters,
   page = 1,
@@ -303,11 +342,15 @@ export async function searchApify(
   const pageSize = getAspireApifyFetchCount(perPage)
   const input = buildApifyActorInput(filters, pageSize, interactive)
 
-  try {
-    let { rows, people } = await fetchApifyLeads(input, token, actorId)
-    let retriedBroad = false
+  let rows: Record<string, unknown>[] = []
+  let people: ApolloPersonResult[] = []
+  let retriedBroad = false
+  let retriedMinimal = false
 
-    if (interactive && people.length < MIN_INTERACTIVE_RESULTS) {
+  try {
+    ;({ rows, people } = await fetchApifyLeads(input, token, actorId))
+
+    if (people.length < MIN_INTERACTIVE_RESULTS) {
       const retryInput = buildBroadRetryInput(input, pageSize)
       const retry = await fetchApifyLeads(retryInput, token, actorId)
       rows = rows.concat(retry.rows)
@@ -315,20 +358,17 @@ export async function searchApify(
       retriedBroad = true
     }
 
-    if (interactive && people.length === 0) {
-      const demo = stubResults(filters)
-      return {
-        people: demo,
-        total: demo.length,
-        hasMore: false,
-        meta: {
-          source: 'demo',
-          providerConfigured: true,
-          apifyRowCount: rows.length,
-          unmappedRowCount: Math.max(0, rows.length - people.length),
-          retriedBroad,
-        },
-      }
+    if (people.length < MIN_INTERACTIVE_RESULTS) {
+      const minimal = await fetchApifyLeads(buildMinimalRetryInput(pageSize), token, actorId)
+      rows = rows.concat(minimal.rows)
+      people = mergePeople(people, minimal.people, pageSize)
+      retriedMinimal = true
+    }
+
+    if (people.length === 0) {
+      throw new Error(
+        apifyEmptyResultMessage(rows, people, retriedBroad, retriedMinimal),
+      )
     }
 
     return {
@@ -345,19 +385,14 @@ export async function searchApify(
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Apify search failed'
-    if (interactive) {
-      const demo = stubResults(filters)
-      return {
-        people: demo,
-        total: demo.length,
-        hasMore: false,
-        meta: {
-          source: 'demo',
-          providerConfigured: true,
-          providerError: message,
-        },
-      }
-    }
+    console.error('[searchApify]', message, {
+      actorId,
+      input,
+      apifyRowCount: rows.length,
+      mapped: people.length,
+      retriedBroad,
+      retriedMinimal,
+    })
     throw new Error(message)
   }
 }

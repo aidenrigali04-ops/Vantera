@@ -1,21 +1,47 @@
-/** Map Aspire UI keywords to Leads Finder actor fields (code_crafter/leads-finder). */
+/**
+ * Map Aspire UI keywords to Leads Finder actor fields (code_crafter/leads-finder).
+ * @see https://apify.com/code_crafter/leads-finder/input-schema
+ */
 
-const FUNCTIONAL_LEVEL_BY_TERM: Record<string, string> = {
-  marketing: 'Marketing',
-  sales: 'Sales',
-  engineering: 'Engineering',
-  product: 'Product',
-  design: 'Design',
-  hr: 'HR',
-  it: 'IT',
-  legal: 'Legal',
-  finance: 'Finance',
-  operations: 'Operations',
-  support: 'Support',
+/** Apify `functional_level` enum values (snake_case, required by actor API). */
+export const APIFY_FUNCTIONAL_LEVELS = [
+  'c_suite',
+  'finance',
+  'product_management',
+  'engineering',
+  'design',
+  'education',
+  'human_resources',
+  'information_technology',
+  'legal',
+  'marketing',
+  'operations',
+  'sales',
+  'support',
+] as const
+
+export type ApifyFunctionalLevel = (typeof APIFY_FUNCTIONAL_LEVELS)[number]
+
+const FUNCTIONAL_LEVEL_BY_TERM: Record<string, ApifyFunctionalLevel> = {
+  marketing: 'marketing',
+  sales: 'sales',
+  engineering: 'engineering',
+  product: 'product_management',
+  design: 'design',
+  hr: 'human_resources',
+  'human resources': 'human_resources',
+  it: 'information_technology',
+  legal: 'legal',
+  finance: 'finance',
+  operations: 'operations',
+  support: 'support',
+  c_suite: 'c_suite',
+  'c-level': 'c_suite',
+  clevel: 'c_suite',
 }
 
-const TITLE_PACKS: Record<string, string[]> = {
-  Marketing: [
+const TITLE_PACKS: Record<ApifyFunctionalLevel, string[]> = {
+  marketing: [
     'Head of Marketing',
     'VP Marketing',
     'CMO',
@@ -23,7 +49,7 @@ const TITLE_PACKS: Record<string, string[]> = {
     'Director of Marketing',
     'Marketing Manager',
   ],
-  Sales: [
+  sales: [
     'VP Sales',
     'Head of Sales',
     'Director of Sales',
@@ -31,22 +57,51 @@ const TITLE_PACKS: Record<string, string[]> = {
     'Chief Revenue Officer',
     'CRO',
   ],
-  Engineering: [
+  engineering: [
     'CTO',
     'VP Engineering',
     'Head of Engineering',
     'Director of Engineering',
     'Engineering Manager',
   ],
-  Product: ['VP Product', 'Head of Product', 'Director of Product', 'Product Manager', 'CPO'],
-  Design: ['Head of Design', 'VP Design', 'Director of Design', 'Design Manager'],
-  HR: ['Head of HR', 'VP People', 'Chief People Officer', 'HR Director'],
-  Finance: ['CFO', 'VP Finance', 'Head of Finance', 'Finance Director'],
-  Operations: ['COO', 'VP Operations', 'Head of Operations', 'Operations Director'],
+  product_management: [
+    'VP Product',
+    'Head of Product',
+    'Director of Product',
+    'Product Manager',
+    'CPO',
+  ],
+  design: ['Head of Design', 'VP Design', 'Director of Design', 'Design Manager'],
+  human_resources: ['Head of HR', 'VP People', 'Chief People Officer', 'HR Director'],
+  finance: ['CFO', 'VP Finance', 'Head of Finance', 'Finance Director'],
+  operations: ['COO', 'VP Operations', 'Head of Operations', 'Operations Director'],
+  c_suite: ['CEO', 'COO', 'CFO', 'CMO', 'CTO', 'Founder', 'President'],
+  education: ['Dean', 'Director of Education', 'Head of Learning'],
+  information_technology: ['CIO', 'VP IT', 'IT Director', 'Head of IT'],
+  legal: ['General Counsel', 'Chief Legal Officer', 'Legal Director'],
+  support: ['Head of Support', 'VP Customer Success', 'Support Director'],
+}
+
+/** Normalize UI location strings to Apify `contact_location` enum (lowercase). */
+export function normalizeApifyLocations(locations: string[] | undefined): string[] | undefined {
+  if (!locations?.length) return undefined
+
+  const normalized = locations
+    .map((loc) => {
+      const key = loc.trim().toLowerCase()
+      if (key === 'us' || key === 'usa' || key === 'u.s.' || key === 'united states of america') {
+        return 'united states'
+      }
+      if (key === 'uk' || key === 'great britain') return 'united kingdom'
+      return key
+    })
+    .filter(Boolean)
+
+  return normalized.length > 0 ? [...new Set(normalized)] : undefined
 }
 
 export function resolveApifyKeywordTargeting(term: string): {
-  functional_level?: string[]
+  functional_level?: ApifyFunctionalLevel[]
   contact_job_title?: string[]
 } {
   const trimmed = term.trim()

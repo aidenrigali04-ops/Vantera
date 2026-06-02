@@ -49,6 +49,9 @@ export function extractLinkedIn(raw: Record<string, unknown>): string | null {
   ])
   if (!url) return null
   if (url.includes('linkedin.com')) return normalizeLinkedInUrl(url)
+  if (url.startsWith('in/') || url.startsWith('/in/')) {
+    return normalizeLinkedInUrl(`https://www.linkedin.com/${url.replace(/^\//, '')}`)
+  }
   return null
 }
 

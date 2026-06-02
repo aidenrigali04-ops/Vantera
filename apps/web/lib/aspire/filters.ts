@@ -38,7 +38,7 @@ export function normalizeApolloFilters(
     industries: filters.industries ?? icpConfig.targetIndustries,
     companySizeRanges:
       filters.companySizeRanges ?? [`${minSize},${maxSize}`, '1,10', '11,50', '51,200'],
-    locations: filters.locations ?? ['United States'],
+    locations: filters.locations ?? ['united states'],
     keywords: filters.keywords,
     contactEmailStatus: filters.contactEmailStatus ?? ['verified', 'guessed'],
     q: filters.q,

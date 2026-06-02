@@ -420,12 +420,6 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
           'Apify is not configured — showing sample leads. Set APIFY_API_TOKEN for live prospect data.',
           { duration: 6000 },
         )
-      } else if (json.meta?.source === 'demo') {
-        toast.message(
-          'No Apify matches — showing sample leads so you can test the pipeline.',
-          { duration: 6000 },
-        )
-      }
 
       toast.success(
         results.length > 0
@@ -775,7 +769,7 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
                 <p className="text-[13px] text-[var(--text-secondary)]">
                   Viewing saved search{' '}
                   <span className="font-medium text-[var(--text-primary)]">{activeSaved.name}</span>
-                  {searchMeta?.source === 'demo' || searchMeta?.source === 'stub'
+                  {searchMeta?.source === 'stub'
                     ? ' — sample leads (configure APIFY_API_TOKEN for live data)'
                     : ' — stored results'}
                 </p>
@@ -783,17 +777,10 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
               </div>
             ) : null}
 
-            {searchMeta?.source === 'demo' || searchMeta?.source === 'stub' ? (
+            {searchMeta?.source === 'stub' ? (
               <div className="rounded-lg border border-[var(--warning)]/30 bg-[var(--warning-muted)] px-4 py-3 text-sm text-[var(--text-primary)]">
-                {searchMeta.source === 'stub'
-                  ? 'Apify is not configured. Showing sample leads — add APIFY_API_TOKEN in Vercel for live prospect data.'
-                  : (
-                    <>
-                      Apify returned no live results for this search. Showing sample leads for{' '}
-                      <span className="font-medium">{query || company || 'your search'}</span> so you
-                      can test the pipeline.
-                    </>
-                  )}
+                Apify is not configured. Showing sample leads — add APIFY_API_TOKEN in Vercel (and
+                Trigger) for live prospect data.
               </div>
             ) : null}
 
