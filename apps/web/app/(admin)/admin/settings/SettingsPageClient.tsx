@@ -361,7 +361,7 @@ export function SettingsPageClient({
                   />
                 </div>
                 <Button variant="outline" size="sm" asChild>
-                  <Link href="/admin/portal">Preview client portal →</Link>
+                  <Link href="/admin/portal/preview">Preview client portal →</Link>
                 </Button>
               </div>
             </SettingsPanel>

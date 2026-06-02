@@ -5,7 +5,7 @@ import { findSavedSearches } from '@/lib/aspire/queries'
 import { getIcpConfigForVertical } from '@/lib/aspire/icp-score'
 import { db } from '@/lib/db/client'
 import { queueProspectScoutDiscovery } from '@/lib/prospect-scout/queue-discovery'
-import type { RunAccountResult } from '@/lib/prospect-scout/types'
+import type { QueueDiscoveryResult } from '@/lib/prospect-scout/queue-discovery'
 import type { AspireBindingInput } from '@/lib/sdr/aspire-config'
 import { saveSdrAspireConfig } from '@/lib/sdr/aspire-config'
 import { logSdrActivity } from '@/lib/sdr/activity-log'
@@ -94,9 +94,7 @@ async function normalizeLaunchInput(
   }
 }
 
-async function queueBootstrapDiscovery(
-  accountId: string,
-): Promise<RunAccountResult | { queued: true }> {
+async function queueBootstrapDiscovery(accountId: string): Promise<QueueDiscoveryResult> {
   return queueProspectScoutDiscovery(accountId)
 }
 
@@ -106,7 +104,7 @@ async function queueBootstrapDiscovery(
  */
 export async function launchSdrAgent(
   input: LaunchSdrAgentInput,
-): Promise<ActionResult<{ bootstrap: RunAccountResult | { queued: true } | null }>> {
+): Promise<ActionResult<{ bootstrap: QueueDiscoveryResult | null }>> {
   const { accountId, userId } = await requireSDREnabled()
 
   const normalized = await normalizeLaunchInput(accountId, userId, input)
@@ -164,6 +162,15 @@ export async function launchSdrAgent(
   })
 
   const bootstrap = await queueBootstrapDiscovery(accountId)
+
+  if (bootstrap.mode === 'failed') {
+    await logSdrActivity({
+      accountId,
+      configId,
+      eventType: 'discovery_failed',
+      metadata: { source: 'launch', error: bootstrap.error },
+    })
+  }
 
   revalidatePath('/admin/outreach/agents')
   revalidatePath('/admin/outreach/agents/scout')

@@ -63,7 +63,7 @@ export function PortalHomeView({ workspace, preview = false }: PortalHomeViewPro
                 title="Messages"
                 subtitle="Direct line to your account team — replies show up here."
               >
-                <PortalMessagesPanel messages={workspace.messages} />
+                <PortalMessagesPanel messages={workspace.messages} preview={preview} />
               </DashboardSection>
 
               <DashboardSection
@@ -112,7 +112,7 @@ export function PortalHomeView({ workspace, preview = false }: PortalHomeViewPro
             title="Messages"
             subtitle="Reach your team while your workspace is being prepared."
           >
-            <PortalMessagesPanel messages={workspace.messages} />
+            <PortalMessagesPanel messages={workspace.messages} preview={preview} />
           </DashboardSection>
         ) : null}
       </main>

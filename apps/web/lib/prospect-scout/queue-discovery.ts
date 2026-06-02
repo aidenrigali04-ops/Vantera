@@ -1,29 +1,72 @@
 import { runProspectScoutBootstrap } from '@/lib/prospect-scout/bootstrap'
 import type { RunAccountResult } from '@/lib/prospect-scout/types'
-import { tasks } from '@trigger.dev/sdk'
+import {
+  getSdrPipelineDiagnostics,
+  isTriggerConfigured,
+  triggerSdrBootstrapDiscovery,
+  TriggerNotConfiguredError,
+} from '@/lib/trigger/sdr-pipeline'
 
-export type QueueDiscoveryResult = RunAccountResult | { queued: true }
+export type QueueDiscoveryResult =
+  | (RunAccountResult & { mode: 'sync' })
+  | { queued: true; mode: 'trigger'; triggerRunId: string }
+  | { queued: false; mode: 'failed'; error: string; diagnostics: ReturnType<typeof getSdrPipelineDiagnostics> }
 
 /**
  * Prefer Trigger.dev for long Apify runs (avoids Vercel timeouts).
- * Falls back to a synchronous bootstrap when Trigger is unavailable.
+ * Falls back to synchronous bootstrap when Trigger is unavailable.
  */
 export async function queueProspectScoutDiscovery(
   accountId: string,
 ): Promise<QueueDiscoveryResult> {
-  try {
-    await tasks.trigger('sdr-bootstrap-discovery', { accountId })
-    return { queued: true }
-  } catch (err) {
-    console.error('[queueProspectScoutDiscovery] trigger failed, trying sync bootstrap', err)
+  const diagnostics = getSdrPipelineDiagnostics()
+
+  if (isTriggerConfigured()) {
+    try {
+      const { runId } = await triggerSdrBootstrapDiscovery(accountId)
+      return { queued: true, mode: 'trigger', triggerRunId: runId }
+    } catch (err) {
+      const message =
+        err instanceof TriggerNotConfiguredError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : 'Could not queue discovery in Trigger.dev'
+      console.error('[queueProspectScoutDiscovery] trigger failed, trying sync bootstrap', err)
+
+      if (!diagnostics.apifyConfigured) {
+        return {
+          queued: false,
+          mode: 'failed',
+          error: `${message}. Apify is also not configured (APIFY_API_TOKEN missing).`,
+          diagnostics,
+        }
+      }
+    }
+  } else {
+    console.warn('[queueProspectScoutDiscovery] TRIGGER_SECRET_KEY missing — using sync bootstrap')
   }
 
   try {
     const result = await runProspectScoutBootstrap(accountId)
-    if (result) return result
-  } catch (err) {
-    console.error('[queueProspectScoutDiscovery] sync bootstrap failed', err)
-  }
+    if (result) {
+      return { ...result, mode: 'sync' }
+    }
 
-  return { queued: true }
+    return {
+      queued: false,
+      mode: 'failed',
+      error: 'Prospect Scout is not active for this account.',
+      diagnostics,
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Discovery bootstrap failed'
+    console.error('[queueProspectScoutDiscovery] sync bootstrap failed', err)
+    return {
+      queued: false,
+      mode: 'failed',
+      error: message,
+      diagnostics,
+    }
+  }
 }

@@ -18,6 +18,11 @@ export const CORE_TENANT_TABLES = [
 
 /** Required Trigger.dev job identifiers (checked when API key is configured). */
 export const REQUIRED_TRIGGER_JOBS = [
+  'sdr-prospect-scout',
+  'sdr-bootstrap-discovery',
+  'sdr-outreach-scheduler',
+  'sdr-pipeline-analyst',
+  'aspire-weekly-search',
   'automation-engine.missed-call-capture',
   'automation-engine.stage-changed',
   'automation-engine.invoice-overdue-scan',

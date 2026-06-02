@@ -82,8 +82,17 @@ export async function POST(request: Request) {
     }
 
     const result = await queueProspectScoutDiscovery(session.accountId)
-    if ('queued' in result) {
-      return NextResponse.json({ success: true, data: { queued: true } })
+    if (result.mode === 'failed') {
+      return NextResponse.json(
+        { success: false, error: result.error, diagnostics: result.diagnostics },
+        { status: 503 },
+      )
+    }
+    if (result.mode === 'trigger') {
+      return NextResponse.json({
+        success: true,
+        data: { queued: true, triggerRunId: result.triggerRunId },
+      })
     }
     return NextResponse.json({ success: true, data: result })
   } catch (error) {

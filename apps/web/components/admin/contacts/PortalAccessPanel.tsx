@@ -9,8 +9,10 @@ import { Button } from '@/components/ui/button'
 import { StatusBadge } from '@/components/operational/table/StatusBadge'
 import { formatRelativeTime } from '@/lib/contacts/format'
 import type { PortalAccessState } from '@/lib/portal/types'
+import { adminPortalPreviewPath } from '@/lib/portal/url'
 import type { contacts } from '@vantera/db'
 import { Copy, ExternalLink, Mail, ShieldOff } from 'lucide-react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { toast } from 'sonner'
@@ -26,7 +28,8 @@ export function PortalAccessPanel({ contact, portal }: Props) {
   const router = useRouter()
   const [busy, setBusy] = useState<'invite' | 'resend' | 'revoke' | null>(null)
 
-  const loginUrl = `${portal.portalUrl}/auth/portal-login`
+  const loginUrl = portal.portalLoginUrl
+  const previewUrl = adminPortalPreviewPath(contact.id, 'client')
 
   async function runAction(
     action: 'invite' | 'resend' | 'revoke',
@@ -125,9 +128,14 @@ export function PortalAccessPanel({ contact, portal }: Props) {
                 Copy login URL
               </Button>
               <Button size="sm" variant="outline" asChild>
+                <Link href={previewUrl}>
+                  Preview portal
+                </Link>
+              </Button>
+              <Button size="sm" variant="outline" asChild>
                 <a href={loginUrl} target="_blank" rel="noopener noreferrer">
                   <ExternalLink className="mr-2 h-4 w-4" />
-                  Open portal
+                  Open client login
                 </a>
               </Button>
               <Button

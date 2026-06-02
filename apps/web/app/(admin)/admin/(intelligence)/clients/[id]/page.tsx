@@ -46,6 +46,7 @@ export default async function ActiveClientDetailPage({ params }: Props) {
       insights={insights}
       portal={{
         portalUrl: portalMeta.portalUrl,
+        portalLoginUrl: portalMeta.portalLoginUrl,
         portalAccess: contact.portalAccess,
         portalInvitedAt: contact.portalInvitedAt,
         portalLastLoginAt: contact.portalLastLoginAt,

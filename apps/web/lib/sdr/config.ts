@@ -5,6 +5,7 @@ import type { ICPConfig } from '@/lib/aspire/types'
 import { db } from '@/lib/db/client'
 import { logSdrActivity } from '@/lib/sdr/activity-log'
 import { requireSDREnabled } from '@/lib/sdr/guard'
+import { queueProspectScoutDiscovery } from '@/lib/prospect-scout/queue-discovery'
 import type { CreateSDRConfigInput, SDRAgentConfig, SdrOutreachWindow } from '@/lib/sdr/types'
 import { DEFAULT_OUTREACH_WINDOW } from '@/lib/sdr/types'
 import { createIntelligenceSignal } from '@/lib/webhooks/resend/signals'
@@ -151,6 +152,8 @@ export async function updateSDRConfig(
     }
   }
 
+  const activating = data.isActive === true && !existing.isActive
+
   const [updated] = await db
     .update(sdrAgentConfigs)
     .set({
@@ -180,6 +183,12 @@ export async function updateSDRConfig(
     })
     .where(eq(sdrAgentConfigs.id, existing.id))
     .returning()
+
+  if (activating) {
+    void queueProspectScoutDiscovery(accountId).catch((err) => {
+      console.error('[updateSDRConfig] failed to queue discovery after activation', err)
+    })
+  }
 
   revalidatePath('/admin/outreach/agents')
   return { success: true, data: mapConfig(updated!) }
@@ -222,7 +231,9 @@ export async function pauseSDRAgent(reason: string): Promise<ActionResult> {
   return { success: true, data: undefined }
 }
 
-export async function resumeSDRAgent(): Promise<ActionResult> {
+export async function resumeSDRAgent(): Promise<
+  ActionResult<{ discoveryQueued?: boolean; triggerRunId?: string }>
+> {
   const { accountId } = await requireSDREnabled()
 
   const [config] = await db
@@ -244,6 +255,20 @@ export async function resumeSDRAgent(): Promise<ActionResult> {
     eventType: 'agent_resumed',
   })
 
+  const queueResult = await queueProspectScoutDiscovery(accountId)
+  if (queueResult.mode === 'failed') {
+    return {
+      success: false,
+      error: queueResult.error,
+    }
+  }
+
   revalidatePath('/admin/outreach/agents')
-  return { success: true, data: undefined }
+  return {
+    success: true,
+    data: {
+      discoveryQueued: queueResult.mode === 'trigger',
+      triggerRunId: queueResult.mode === 'trigger' ? queueResult.triggerRunId : undefined,
+    },
+  }
 }

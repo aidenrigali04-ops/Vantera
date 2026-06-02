@@ -8,6 +8,8 @@ import { requireSDREnabled } from '@/lib/sdr/guard'
 import { SdrNotEnabledError } from '@/lib/sdr/guard'
 import { NextResponse } from 'next/server'
 
+export const maxDuration = 300
+
 /** Kick off Prospect Scout discovery after setup or from the command center. */
 export async function POST() {
   const session = await getAdminSession()
@@ -19,9 +21,34 @@ export async function POST() {
     await requireSDREnabled()
     await ensureProspectScoutActiveForDiscovery(session.accountId)
     const result = await queueProspectScoutDiscovery(session.accountId)
+
+    if (result.mode === 'failed') {
+      return NextResponse.json(
+        {
+          success: false,
+          error: result.error,
+          code: 'DISCOVERY_QUEUE_FAILED',
+          diagnostics: result.diagnostics,
+        },
+        { status: 503 },
+      )
+    }
+
+    if (result.mode === 'trigger') {
+      return NextResponse.json({
+        success: true,
+        data: {
+          queued: true,
+          mode: 'trigger',
+          triggerRunId: result.triggerRunId,
+          activated: true,
+        },
+      })
+    }
+
     return NextResponse.json({
       success: true,
-      data: 'queued' in result ? { ...result, activated: true } : { ...result, activated: true },
+      data: { ...result, activated: true },
     })
   } catch (error) {
     if (error instanceof ProspectScoutNotConfiguredError) {

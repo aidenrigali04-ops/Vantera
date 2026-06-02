@@ -85,12 +85,14 @@ export type PortalWorkspace = {
 
 export type AdminPortalMeta = {
   portalUrl: string
+  portalLoginUrl: string
   portalEnabledCount: number
   previewContactName: string | null
 }
 
 export type PortalAccessState = {
   portalUrl: string
+  portalLoginUrl: string
   portalAccess: boolean
   portalInvitedAt: Date | null
   portalLastLoginAt: Date | null

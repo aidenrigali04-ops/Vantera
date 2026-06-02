@@ -164,11 +164,17 @@ export function SdrSetupWizardClient({ accountVertical }: Props) {
       }
 
       const bootstrap = json.data?.bootstrap as
-        | { queued?: boolean; enrolled?: number; found?: number; searchesRun?: number }
+        | { mode?: string; queued?: boolean; enrolled?: number; found?: number; searchesRun?: number; error?: string }
         | null
         | undefined
 
-      if (bootstrap && 'queued' in bootstrap && bootstrap.queued && !bootstrap.found) {
+      if (bootstrap?.mode === 'failed') {
+        toast.error(bootstrap.error ?? 'Could not start discovery — check Trigger.dev and Apify configuration')
+        router.push('/admin/outreach/agents/scout?setup=complete')
+        return
+      }
+
+      if (bootstrap && (bootstrap.mode === 'trigger' || bootstrap.queued)) {
         toast.success(
           `${form.agentName} is live — first discovery run is in progress. Check the activity feed for results.`,
         )

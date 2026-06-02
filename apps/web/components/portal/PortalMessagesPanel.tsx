@@ -12,9 +12,10 @@ import { toast } from 'sonner'
 
 type PortalMessagesPanelProps = {
   messages: PortalMessage[]
+  preview?: boolean
 }
 
-export function PortalMessagesPanel({ messages }: PortalMessagesPanelProps) {
+export function PortalMessagesPanel({ messages, preview = false }: PortalMessagesPanelProps) {
   const router = useRouter()
   const [body, setBody] = useState('')
   const [sending, setSending] = useState(false)
@@ -76,24 +77,32 @@ export function PortalMessagesPanel({ messages }: PortalMessagesPanelProps) {
       )}
 
       <div className="space-y-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3">
-        <label htmlFor="portal-message" className="sr-only">
-          Message your team
-        </label>
-        <Textarea
-          id="portal-message"
-          value={body}
-          onChange={(event) => setBody(event.target.value)}
-          placeholder="Ask a question or share an update…"
-          rows={3}
-          disabled={sending}
-          className="min-h-[88px] resize-none border-[var(--border-default)] bg-[var(--bg-base)] text-[13px]"
-        />
-        <div className="flex justify-end">
-          <Button size="sm" disabled={sending || !body.trim()} onClick={() => void handleSend()}>
-            {sending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            Send message
-          </Button>
-        </div>
+        {preview ? (
+          <p className="text-[13px] text-[var(--text-secondary)]">
+            Messaging is disabled in preview mode. Clients send messages from their signed-in portal.
+          </p>
+        ) : (
+          <>
+            <label htmlFor="portal-message" className="sr-only">
+              Message your team
+            </label>
+            <Textarea
+              id="portal-message"
+              value={body}
+              onChange={(event) => setBody(event.target.value)}
+              placeholder="Ask a question or share an update…"
+              rows={3}
+              disabled={sending}
+              className="min-h-[88px] resize-none border-[var(--border-default)] bg-[var(--bg-base)] text-[13px]"
+            />
+            <div className="flex justify-end">
+              <Button size="sm" disabled={sending || !body.trim()} onClick={() => void handleSend()}>
+                {sending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Send message
+              </Button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   )

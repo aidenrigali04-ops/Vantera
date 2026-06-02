@@ -5,7 +5,7 @@ import type { ActionResult } from '@/lib/auth/types'
 import { db } from '@/lib/db/client'
 import { getAccount } from '@/lib/db/queries'
 import { env } from '@/lib/env'
-import { derivePortalUrl } from '@/lib/portal/url'
+import { derivePortalLoginUrl, derivePortalUrl } from '@/lib/portal/url'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { activities, contacts } from '@vantera/db'
 import { and, eq, isNull } from 'drizzle-orm'
@@ -283,11 +283,17 @@ export async function revokeContactPortalAccess(
   return { success: true, data: { revoked: true } }
 }
 
-export async function getPortalAccessMeta(accountId: string): Promise<{ portalUrl: string }> {
+export async function getPortalAccessMeta(accountId: string): Promise<{
+  portalUrl: string
+  portalLoginUrl: string
+}> {
   const account = await getAccount(accountId)
   const portalUrl = account
     ? derivePortalUrl(account.slug, account.portalDomain)
     : derivePortalUrl('workspace', null)
+  const portalLoginUrl = account
+    ? derivePortalLoginUrl(account.slug, account.portalDomain)
+    : derivePortalLoginUrl('workspace', null)
 
-  return { portalUrl }
+  return { portalUrl, portalLoginUrl }
 }

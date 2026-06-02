@@ -63,6 +63,7 @@ export function SdrCommandCenterClient({
   const [isPending, startTransition] = useTransition()
   const [activity, setActivity] = useState(initialActivity)
   const [paywallOpen, setPaywallOpen] = useState(false)
+  const [pipelineHints, setPipelineHints] = useState<string[]>([])
   const {
     credits,
     exhausted,
@@ -74,6 +75,21 @@ export function SdrCommandCenterClient({
   useEffect(() => {
     if (exhausted) setPaywallOpen(true)
   }, [exhausted])
+
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/sdr/pipeline/status')
+      .then((res) => res.json())
+      .then((json) => {
+        if (cancelled || !json.success) return
+        const hints = (json.data?.hints as string[] | undefined) ?? []
+        setPipelineHints(hints)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     if (searchParams.get('setup') !== 'complete') return
@@ -112,11 +128,15 @@ export function SdrCommandCenterClient({
       const res = await fetch('/api/sdr/bootstrap', { method: 'POST' })
       const json = await res.json()
       if (!json.success) {
-        toast.error(json.error ?? 'Discovery run failed')
+        toast.error(json.error ?? 'Discovery run failed', {
+          description: json.diagnostics?.triggerConfigured === false
+            ? 'Trigger.dev is not connected in production — add TRIGGER_SECRET_KEY to Vercel and redeploy tasks.'
+            : undefined,
+        })
         return
       }
-      if (json.data?.queued) {
-        toast.success('Discovery run started — Prospect Scout is now active')
+      if (json.data?.mode === 'trigger' || json.data?.queued) {
+        toast.success('Discovery queued in Trigger.dev — Apify run starting now')
         router.refresh()
         await refreshActivity()
         return
@@ -148,7 +168,7 @@ export function SdrCommandCenterClient({
         toast.error(json.error ?? 'Action failed')
         return
       }
-      toast.success(config.isPaused ? 'Agent resumed' : 'Agent paused')
+      toast.success(config.isPaused ? 'Agent resumed — discovery queued' : 'Agent paused')
       router.refresh()
     })
   }
@@ -186,6 +206,17 @@ export function SdrCommandCenterClient({
       )}
     >
       {!embedded ? <SdrOutreachHubTabs /> : null}
+
+      {pipelineHints.length > 0 ? (
+        <div className="rounded-lg border border-[var(--warning-muted)] bg-[var(--warning-muted)]/40 px-4 py-3 text-[13px] text-[var(--text-primary)]">
+          <p className="font-medium">Pipeline setup needed</p>
+          <ul className="mt-2 list-inside list-disc space-y-1 text-[var(--text-secondary)]">
+            {pipelineHints.map((hint) => (
+              <li key={hint}>{hint}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
       <SdrCreditStrip
         credits={credits}

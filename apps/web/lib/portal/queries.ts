@@ -12,7 +12,7 @@ import type {
   PortalProject,
   PortalWorkspace,
 } from '@/lib/portal/types'
-import { derivePortalUrl } from '@/lib/portal/url'
+import { derivePortalLoginUrl, derivePortalUrl } from '@/lib/portal/url'
 import { activities, contacts, documents, invoices, messages, records, stageDefinitions } from '@vantera/db'
 import { and, desc, eq, inArray, isNull, or, sql } from 'drizzle-orm'
 
@@ -347,6 +347,9 @@ export async function getAdminPortalMeta(accountId: string): Promise<AdminPortal
   const portalUrl = account
     ? derivePortalUrl(account.slug, account.portalDomain)
     : derivePortalUrl('workspace', null)
+  const portalLoginUrl = account
+    ? derivePortalLoginUrl(account.slug, account.portalDomain)
+    : derivePortalLoginUrl('workspace', null)
 
   const [enabledRow] = await db
     .select({ count: sql<number>`count(*)::int` })
@@ -375,6 +378,7 @@ export async function getAdminPortalMeta(accountId: string): Promise<AdminPortal
 
   return {
     portalUrl,
+    portalLoginUrl,
     portalEnabledCount: enabledRow?.count ?? 0,
     previewContactName,
   }

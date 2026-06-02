@@ -87,6 +87,12 @@ export async function runAccountProspectScout(
     enrolled += bindingResult.enrolled
     searchesRun += bindingResult.searchesRun
     runs.push(...bindingResult.runs)
+
+    if (mode === 'aspire_bound' && bindingResult.searchesRun === 0) {
+      console.warn(
+        `[prospect-scout] account ${accountId}: aspire_bound mode with no active bindings — no Apify run`,
+      )
+    }
   }
 
   return { accountId, searchesRun, found, enrolled, runs }
