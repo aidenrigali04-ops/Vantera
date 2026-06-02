@@ -1,5 +1,4 @@
-import { SdrSetupWizardClient } from '@/components/sdr/SdrSetupWizardClient'
-import { PageHeader } from '@/components/operational/PageHeader'
+import { SdrAgentSetupFlow } from '@/components/sdr/SdrAgentSetupFlow'
 import { requireAdminSession } from '@/lib/auth/require-session'
 import { db } from '@/lib/db/client'
 import { evaluateFlag } from '@/lib/feature-flags/evaluate'
@@ -21,23 +20,11 @@ export default async function SdrSetupPage() {
     .limit(1)
 
   const plan = (account?.plan ?? 'team') as Plan
-  const enabled = await evaluateFlag({
+  const sdrEnabled = await evaluateFlag({
     accountId: session.accountId,
     plan,
     flagName: 'sdr_agent_enabled',
   })
-
-  if (!enabled) {
-    return (
-      <div className="mx-auto max-w-lg py-16 text-center">
-        <h1 className="text-xl font-semibold">SDR Agents — Enterprise</h1>
-        <p className="mt-2 text-sm text-stone-600">
-          Deploy a 24/7 sales development rep inside your account. Contact your admin to enable
-          the SDR Agent module.
-        </p>
-      </div>
-    )
-  }
 
   const existing = await findSdrConfigByAccount(session.accountId)
   if (existing) {
@@ -45,15 +32,12 @@ export default async function SdrSetupPage() {
   }
 
   return (
-    <div className="space-y-8 py-4">
-      <PageHeader
-        title="Set up your SDR Agent"
-        description="Identity, ICP, schedule, and Prospect Scout bindings — launch in about 5 minutes."
-      />
-      <SdrSetupWizardClient
-        accountVertical={account?.vertical ?? 'agency'}
-        accountName={account?.name ?? 'Your business'}
-      />
-    </div>
+    <SdrAgentSetupFlow
+      sdrEnabled={sdrEnabled}
+      isOwner={session.role === 'owner'}
+      plan={plan}
+      accountVertical={account?.vertical ?? 'agency'}
+      accountName={account?.name ?? 'Your business'}
+    />
   )
 }

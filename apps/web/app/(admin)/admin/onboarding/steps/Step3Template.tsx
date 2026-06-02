@@ -9,7 +9,7 @@ import {
   getTemplatesForVertical,
   type TemplateSummary,
 } from '../actions'
-import { StepError, StepHeader, fadeUp, rethrowFrameworkNavigation, runStepAction, stepContainer } from '../_primitives'
+import { StepError, fadeUp, rethrowFrameworkNavigation, runStepAction, stepContainer } from '../_primitives'
 
 type Props = {
   accountId: string
@@ -119,21 +119,16 @@ export function Step3Template({ accountId, vertical, primaryColor, onComplete }:
   })
 
   return (
-    <motion.div variants={stepContainer} initial="hidden" animate="show" className="space-y-4">
-      <StepHeader
-        title="Pick a starter workflow"
-        subtitle="We'll load a vetted stage pipeline and automation set, personalized to your voice. You can adjust anything later from settings."
-      />
-
+    <motion.div variants={stepContainer} initial="hidden" animate="show" className="space-y-3">
       {loading ? (
         <motion.div
           variants={fadeUp}
-          className="h-32 animate-pulse rounded-2xl border border-white/[0.06] bg-white/[0.02]"
+          className="h-28 animate-pulse rounded-lg border border-[var(--border-default)] bg-[var(--bg-subtle)]"
         />
       ) : templates.length === 0 ? (
         <motion.div
           variants={fadeUp}
-          className="rounded-2xl border border-dashed border-white/[0.08] bg-white/[0.015] p-6 text-sm leading-relaxed text-white/55"
+          className="rounded-lg border border-dashed border-[var(--border-default)] bg-[var(--bg-subtle)] p-4 text-[13px] leading-relaxed text-[var(--text-secondary)]"
         >
           No templates are available for this business type yet. Contact support if you need help
           setting up your pipeline after onboarding.

@@ -119,7 +119,7 @@ function OnboardingWizardInner({
   const primaryLabel = useMemo(() => {
     if (nav.primaryLabel) return nav.primaryLabel
     if (meta.isLast) return 'Finish setup'
-    return 'Continue'
+    return 'Next'
   }, [nav.primaryLabel, meta.isLast])
 
   const headerLabel = useMemo(
@@ -137,12 +137,15 @@ function OnboardingWizardInner({
 
   return (
     <SlideWizardFrame
-      variant="page"
+      variant="overlay"
+      open
       headerLabel={headerLabel}
       slide={slide}
       stepIndex={stepIndex}
       totalSteps={ONBOARDING_WIZARD_SLIDES.length}
-      mediaPanel={<OnboardingMediaPanel media={slide.media} slideId={slide.id} className="h-full" />}
+      mediaPanel={
+        <OnboardingMediaPanel media={slide.media} slideId={slide.id} className="h-full lg:min-h-[320px]" />
+      }
       onBack={goBack}
       onPrimary={handlePrimary}
       primaryLabel={primaryLabel}

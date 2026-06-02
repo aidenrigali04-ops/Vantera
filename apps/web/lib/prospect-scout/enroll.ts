@@ -11,7 +11,7 @@ import {
   sdrAgentConfigs,
   sdrSequences,
 } from '@vantera/db'
-import { and, eq, isNull } from 'drizzle-orm'
+import { and, eq, isNull, sql } from 'drizzle-orm'
 import { tasks } from '@trigger.dev/sdk'
 import { runDraftSdrSequence } from '@/lib/sdr/run-draft-sequence'
 import type { EnrollProspectResult, SdrConfigRow } from '@/lib/prospect-scout/types'
@@ -135,7 +135,7 @@ export async function enrollProspect(input: {
         configId: config.id,
         leadId,
         aspireResultId: aspireRow!.id,
-        status: 'active',
+        status: 'drafting',
       })
       .returning({ id: sdrSequences.id })
 
@@ -158,14 +158,25 @@ export async function enrollProspect(input: {
       aspireResultId: aspireRow!.id,
     }
 
+    let drafted = false
     try {
       await tasks.trigger('sdr-lead-profiler', payload)
+      drafted = true
     } catch {
       try {
         await runDraftSdrSequence(payload)
+        drafted = true
       } catch (error) {
         console.error('[prospect-scout] lead profiler failed:', error)
       }
+    }
+
+    if (!drafted) {
+      await db
+        .update(sdrSequences)
+        .set({ status: 'failed' })
+        .where(eq(sdrSequences.id, sequenceId))
+      sequenceId = undefined
     }
 
     await db
@@ -235,7 +246,7 @@ export async function recordFoundProspects(input: {
           rawData: person,
           icpScore,
           icpSignals,
-          searchId,
+          searchId: sql`coalesce(excluded.search_id, ${aspireResults.searchId})`,
         },
       })
   }

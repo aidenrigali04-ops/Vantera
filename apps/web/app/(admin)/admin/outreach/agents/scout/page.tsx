@@ -29,7 +29,7 @@ export default async function ProspectScoutPage() {
   })
 
   if (!enabled) {
-    redirect('/admin/outreach/agents')
+    redirect('/admin/outreach/agents/setup')
   }
 
   const config = await findSdrConfigByAccount(session.accountId)

@@ -10,7 +10,6 @@ import { getBusinessProfile, updateBusinessProfile } from '../actions'
 import {
   FieldGroup,
   StepError,
-  StepHeader,
   fadeUp,
   rethrowFrameworkNavigation,
   runStepAction,
@@ -190,12 +189,11 @@ export function Step3Profile({ accountId, primaryColor, onComplete }: Props) {
 
   if (loading) {
     return (
-      <motion.div variants={stepContainer} initial="hidden" animate="show" className="space-y-6">
-        <StepHeader
-          title="Personalize your messaging"
-          subtitle="Loading your saved profile…"
+      <motion.div variants={stepContainer} initial="hidden" animate="show">
+        <motion.div
+          variants={fadeUp}
+          className="h-28 animate-pulse rounded-lg border border-[var(--border-default)] bg-[var(--bg-subtle)]"
         />
-        <motion.div variants={fadeUp} className="h-32 animate-pulse rounded-2xl border border-white/[0.06] bg-white/[0.02]" />
       </motion.div>
     )
   }
@@ -205,13 +203,8 @@ export function Step3Profile({ accountId, primaryColor, onComplete }: Props) {
       variants={stepContainer}
       initial="hidden"
       animate="show"
-      className={cn('space-y-6', embedded && 'max-h-[280px] overflow-y-auto pr-1')}
+      className={cn('space-y-4', embedded && 'max-h-[280px] overflow-y-auto pr-1')}
     >
-      <StepHeader
-        title="Personalize your messaging"
-        subtitle="We use these to tailor every automated message your customers receive. Everything's optional — skip a field and we'll fall back to a sensible default."
-      />
-
       <FieldGroup
         label="Voice"
         description="Sets the tone our AI uses when rewriting your template messages."

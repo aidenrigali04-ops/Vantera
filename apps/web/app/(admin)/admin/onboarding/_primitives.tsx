@@ -2,7 +2,7 @@
 
 import { cn } from '@/lib/utils'
 import { motion, type Variants } from 'framer-motion'
-import { Loader2, type LucideIcon } from 'lucide-react'
+import { Check, Loader2, type LucideIcon } from 'lucide-react'
 import type { MouseEventHandler, ReactNode } from 'react'
 import { useOnboardingNav } from './onboarding-nav'
 
@@ -173,76 +173,64 @@ export function SelectableTile({
     <motion.button
       type="button"
       onClick={onClick}
-      whileHover={{ y: -2 }}
+      whileHover={{ y: -1 }}
       whileTap={{ scale: 0.99 }}
-      transition={{ type: 'spring', stiffness: 320, damping: 24 }}
-      style={
-        selected
-          ? {
-              borderColor: `${primaryColor}66`,
-              boxShadow: `0 0 0 1px ${primaryColor}40, 0 12px 28px -16px ${primaryColor}aa`,
-            }
-          : undefined
-      }
+      transition={{ type: 'spring', stiffness: 380, damping: 26 }}
       className={cn(
-        'group relative overflow-hidden rounded-xl border p-3 text-left transition-colors duration-200',
+        'group relative overflow-hidden rounded-lg border p-3 text-left transition-colors duration-[120ms]',
+        'focus-visible:outline-none focus-visible:shadow-[var(--shadow-glow)]',
         theme === 'light'
           ? cn(
               'bg-[var(--bg-surface)]',
               selected
                 ? 'border-[var(--brand-accent-border)] bg-[var(--brand-accent-muted)]'
-                : 'border-[var(--border-default)] hover:border-[var(--border-strong)] hover:bg-[var(--bg-overlay)]',
+                : 'border-[var(--border-default)] hover:border-[var(--border-strong)] hover:bg-[var(--bg-subtle)]',
             )
           : cn(
               'rounded-2xl bg-white/[0.02] p-4',
               selected
-                ? 'bg-white/[0.04]'
+                ? 'border-[var(--brand-accent-border)] bg-white/[0.04]'
                 : 'border-white/[0.06] hover:border-white/[0.14] hover:bg-white/[0.035]',
             ),
-        layout === 'horizontal' ? 'flex items-start gap-3' : 'flex flex-col gap-3',
+        layout === 'horizontal' ? 'flex items-start gap-3' : 'flex flex-col gap-2.5',
         className,
       )}
     >
-      {/* Brand-tinted glow that fades in on selection. */}
-      <div
-        aria-hidden
-        className={cn(
-          'pointer-events-none absolute -right-12 -top-12 size-32 rounded-full blur-2xl transition-opacity duration-500',
-          selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-60',
-        )}
-        style={{ background: `radial-gradient(circle at center, ${accent}66, transparent 70%)` }}
-      />
-
-      {Icon ? (
-        <span
-          aria-hidden
-          style={{
-            background: selected
-              ? `linear-gradient(135deg, ${accent}33, ${accent}0a)`
-              : 'linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02))',
-            boxShadow: selected
-              ? `inset 0 0 0 1px ${accent}33`
-              : 'inset 0 0 0 1px rgba(255,255,255,0.06)',
-          }}
-          className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
-        >
-          <Icon
-            className="h-5 w-5 transition-colors"
-            style={{ color: selected ? accent : 'rgba(255,255,255,0.55)' }}
+      <div className="flex w-full items-start justify-between gap-2">
+        {Icon ? (
+          <span
             aria-hidden
-          />
-        </span>
-      ) : null}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ring-1 ring-inset ring-[var(--border-subtle)]"
+            style={{
+              backgroundColor: `${accent}14`,
+              color: selected ? accent : 'var(--text-tertiary)',
+            }}
+          >
+            <Icon className="h-4 w-4 transition-colors" aria-hidden />
+          </span>
+        ) : (
+          <span aria-hidden />
+        )}
+
+        {theme === 'light' ? (
+          selected ? (
+            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--text-primary)] text-[var(--text-inverse)]">
+              <Check className="h-3 w-3" aria-hidden />
+            </span>
+          ) : (
+            <span
+              className="h-5 w-5 shrink-0 rounded-full border border-[var(--border-default)] bg-[var(--bg-subtle)] opacity-0 transition-opacity duration-[120ms] group-hover:opacity-100"
+              aria-hidden
+            />
+          )
+        ) : null}
+      </div>
 
       <div className="relative min-w-0 flex-1">
         <p
           className={cn(
-            'text-sm font-semibold leading-tight',
-            theme === 'light'
-              ? 'text-[var(--text-primary)]'
-              : selected
-                ? 'text-white'
-                : 'text-white/90',
+            'text-[13px] font-medium leading-snug',
+            theme === 'light' ? 'text-[var(--text-primary)]' : selected ? 'text-white' : 'text-white/90',
           )}
         >
           {title}
@@ -250,7 +238,7 @@ export function SelectableTile({
         {description ? (
           <p
             className={cn(
-              'mt-1 text-xs leading-relaxed',
+              'mt-1 text-[12px] leading-relaxed',
               theme === 'light' ? 'text-[var(--text-secondary)]' : 'text-white/50',
             )}
           >

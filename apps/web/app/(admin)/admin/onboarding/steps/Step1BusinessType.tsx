@@ -17,7 +17,6 @@ import { updateVertical } from '../actions'
 import {
   SelectableTile,
   StepError,
-  StepHeader,
   fadeUp,
   rethrowFrameworkNavigation,
   runStepAction,
@@ -151,13 +150,8 @@ export function Step1BusinessType({ accountId, currentVertical, primaryColor, on
   })
 
   return (
-    <motion.div variants={stepContainer} initial="hidden" animate="show" className="space-y-4">
-      <StepHeader
-        title="What are you managing?"
-        subtitle="Choose a template — we tailor pipeline stages, client views, and AI tone to your workflow."
-      />
-
-      <motion.div variants={fadeUp} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+    <motion.div variants={stepContainer} initial="hidden" animate="show" className="space-y-3">
+      <motion.div variants={fadeUp} className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
         {VERTICALS.map((vertical) => (
           <SelectableTile
             key={vertical.value}
@@ -168,6 +162,7 @@ export function Step1BusinessType({ accountId, currentVertical, primaryColor, on
             icon={vertical.icon}
             title={vertical.label}
             description={vertical.description}
+            layout="vertical"
           />
         ))}
       </motion.div>

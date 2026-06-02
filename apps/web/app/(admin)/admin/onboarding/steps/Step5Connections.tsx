@@ -7,7 +7,7 @@ import { Check } from 'lucide-react'
 import { useCallback, useState } from 'react'
 import { useOnboardingNav, useRegisterOnboardingStep } from '../onboarding-nav'
 import { completeOnboarding, saveIntegrationCredentials } from '../actions'
-import { StepError, StepHeader, fadeUp, rethrowFrameworkNavigation, runStepAction, stepContainer } from '../_primitives'
+import { StepError, fadeUp, rethrowFrameworkNavigation, runStepAction, stepContainer } from '../_primitives'
 
 type ImmediateProvider = 'stripe' | 'twilio'
 type PlaceholderProvider = 'quickbooks' | 'google_calendar' | 'hubspot' | 'gohighlevel'
@@ -186,13 +186,8 @@ export function Step5Connections({ accountId, primaryColor, onComplete }: Props)
   const connectedCount = Object.values(connected).filter(Boolean).length
 
   return (
-    <motion.div variants={stepContainer} initial="hidden" animate="show" className="space-y-4">
-      <StepHeader
-        title="Connect your stack"
-        subtitle="Optional — bring your existing Stripe or Twilio account, or skip and use our native equivalents. Everything is editable later from the integrations page."
-      />
-
-      <motion.div variants={fadeUp} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+    <motion.div variants={stepContainer} initial="hidden" animate="show" className="space-y-3">
+      <motion.div variants={fadeUp} className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
         {TILES.map((tile) => (
           <IntegrationTile
             key={tile.provider}

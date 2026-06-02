@@ -1,25 +1,20 @@
 'use client'
 
+import { OperatingModelPicker } from '@/components/onboarding/OperatingModelPicker'
+import { ProductTourMediaPanel } from '@/components/onboarding/product-tour/ProductTourMediaPanel'
+import { SlideWizardFrame } from '@/components/onboarding/slide-wizard/SlideWizardFrame'
 import { saveOperatingModel } from '@/lib/onboarding/save-operating-model'
-import {
-  OPERATING_MODELS,
-  type OperatingModelId,
-} from '@/lib/onboarding/operating-models'
+import { type OperatingModelId } from '@/lib/onboarding/operating-models'
 import { writeOperatingModelId } from '@/lib/onboarding/operating-model-storage'
-import { DURATION, EASE_OUT } from '@/lib/motion'
-import { cn } from '@/lib/utils'
-import { Button } from '@/components/ui/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
-import { motion } from 'framer-motion'
-import { ArrowRight, Check } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { useState, useTransition } from 'react'
+import { useEffect, useState, useTransition } from 'react'
+
+const SLIDE = {
+  id: 'operating-model',
+  eyebrow: 'Getting started',
+  title: 'What are you managing?',
+  body: 'We tailor pipeline language, dashboard focus, and templates to how you run the business.',
+}
 
 type Props = {
   accountId: string
@@ -29,9 +24,20 @@ type Props = {
 
 export function OperatingModelModal({ accountId, open, onOpenChange }: Props) {
   const router = useRouter()
+  const [mounted, setMounted] = useState(false)
   const [selected, setSelected] = useState<OperatingModelId>('agency_ops')
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  useEffect(() => {
+    if (!open) {
+      setError(null)
+    }
+  }, [open])
 
   function handleContinue() {
     setError(null)
@@ -47,81 +53,38 @@ export function OperatingModelModal({ accountId, open, onOpenChange }: Props) {
     })
   }
 
+  if (!mounted || !open) return null
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] max-w-2xl gap-0 overflow-hidden border-[var(--border-default)] bg-[var(--bg-surface)] p-0 sm:rounded-xl">
-        <div className="border-b border-[var(--border-subtle)] px-6 py-5">
-          <DialogHeader className="space-y-2 text-left">
-            <DialogTitle className="text-xl font-semibold tracking-[-0.02em] text-[var(--text-primary)]">
-              What are you managing?
-            </DialogTitle>
-            <DialogDescription className="text-[13px] leading-relaxed text-[var(--text-secondary)]">
-              We&apos;ll tailor pipeline language, dashboard focus, and templates to how you run
-              the business — you can change this later in settings.
-            </DialogDescription>
-          </DialogHeader>
-        </div>
-
-        <div className="max-h-[min(52vh,520px)] overflow-y-auto px-6 py-5">
-          <div className="grid gap-3 sm:grid-cols-2">
-            {OPERATING_MODELS.map((model) => {
-              const Icon = model.icon
-              const active = selected === model.id
-              return (
-                <button
-                  key={model.id}
-                  type="button"
-                  onClick={() => setSelected(model.id)}
-                  className={cn(
-                    'rounded-xl border p-4 text-left transition-colors duration-150',
-                    active
-                      ? 'border-[var(--accent-border)] bg-[var(--accent-muted)] shadow-[var(--shadow-sm)]'
-                      : 'border-[var(--border-default)] bg-[var(--bg-surface)] hover:border-[var(--border-strong)] hover:bg-[var(--bg-subtle)]',
-                  )}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <span
-                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
-                      style={{ backgroundColor: `${model.accent}18`, color: model.accent }}
-                    >
-                      <Icon className="h-4 w-4" aria-hidden />
-                    </span>
-                    {active ? (
-                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--text-primary)] text-[var(--text-inverse)]">
-                        <Check className="h-3 w-3" aria-hidden />
-                      </span>
-                    ) : null}
-                  </div>
-                  <p className="mt-3 text-sm font-medium text-[var(--text-primary)]">{model.label}</p>
-                  <p className="mt-1 text-[12px] leading-relaxed text-[var(--text-secondary)]">
-                    {model.description}
-                  </p>
-                </button>
-              )
-            })}
-          </div>
-          {error ? <p className="mt-4 text-sm text-[var(--danger)]">{error}</p> : null}
-        </div>
-
-        <div className="flex items-center justify-end border-t border-[var(--border-subtle)] px-6 py-4">
-          <Button
-            onClick={handleContinue}
-            disabled={isPending}
-            className="bg-[var(--text-primary)] text-[var(--text-inverse)] hover:opacity-90"
-          >
-            {isPending ? 'Saving…' : 'Continue to workspace'}
-            <ArrowRight className="ml-2 h-4 w-4" aria-hidden />
-          </Button>
-        </div>
-
-        <motion.div
-          aria-hidden
-          className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[var(--border-strong)] to-transparent"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: DURATION.modal, ease: EASE_OUT }}
+    <SlideWizardFrame
+      variant="overlay"
+      open={open}
+      headerLabel="Workspace setup · 1 / 1"
+      slide={SLIDE}
+      stepIndex={0}
+      totalSteps={1}
+      mediaPanel={
+        <ProductTourMediaPanel
+          media={{ type: 'preview', previewId: 'welcome' }}
+          slideId="operating-model"
+          className="h-full lg:min-h-[320px]"
         />
-      </DialogContent>
-    </Dialog>
+      }
+      onBack={() => {}}
+      onPrimary={handleContinue}
+      primaryLabel="Continue to workspace"
+      primaryDisabled={isPending}
+      primaryLoading={isPending}
+      showSkip={false}
+      dialogTitleId="operating-model-title"
+      dialogBodyId="operating-model-body"
+    >
+      <OperatingModelPicker selected={selected} onSelect={setSelected} />
+      {error ? (
+        <p className="mt-3 text-[13px] text-[var(--danger)]" role="alert">
+          {error}
+        </p>
+      ) : null}
+    </SlideWizardFrame>
   )
 }

@@ -13,7 +13,6 @@ import { updateBranding } from '../actions'
 import {
   FieldGroup,
   StepError,
-  StepHeader,
   fadeUp,
   rethrowFrameworkNavigation,
   runStepAction,
@@ -201,20 +200,15 @@ export function Step2Branding({
   const previewDomain = portalDomain || 'portal.yourbusiness.com'
 
   return (
-    <motion.div variants={stepContainer} initial="hidden" animate="show" className="space-y-6">
-      <StepHeader
-        title="Make it yours"
-        subtitle="Upload a logo, pick your brand colors, and reserve your client portal domain. Everything here is editable later from settings."
-      />
-
+    <motion.div variants={stepContainer} initial="hidden" animate="show" className="space-y-4">
       <FieldGroup label="Logo">
         <div
           {...getRootProps()}
           className={cn(
-            'group flex cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border border-dashed bg-white/[0.02] p-10 text-center text-sm transition-all duration-200 hover:scale-[1.005]',
+            'group flex cursor-pointer flex-col items-center justify-center gap-3 rounded-lg border border-dashed p-8 text-center text-sm transition-colors duration-[120ms]',
             isDragActive
-              ? 'border-white/40 bg-white/[0.06]'
-              : 'border-white/[0.10] hover:border-white/[0.25] hover:bg-white/[0.035]',
+              ? 'border-[var(--brand-accent-border)] bg-[var(--brand-accent-muted)]'
+              : 'border-[var(--border-default)] bg-[var(--bg-subtle)] hover:border-[var(--border-strong)] hover:bg-[var(--bg-overlay)]',
           )}
         >
           <input {...getInputProps()} />

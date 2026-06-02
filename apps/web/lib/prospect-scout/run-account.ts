@@ -2,6 +2,7 @@ import { runProspectScoutDiscovery } from '@/lib/prospect-scout/discover'
 import { runBoundSearch } from '@/lib/prospect-scout/run-search'
 import type { ProspectMode, RunAccountResult, SdrConfigRow } from '@/lib/prospect-scout/types'
 import { countActiveSdrSequences, countSdrEnrolledToday } from '@/lib/sdr/queries'
+import { requireSDREnabledForAccount } from '@/lib/sdr/guard'
 import { findBindingsForConfig } from '@/lib/sdr/aspire-config'
 import { db } from '@/lib/db/client'
 import { accounts, sdrAgentConfigs } from '@vantera/db'
@@ -26,15 +27,31 @@ export async function runAccountProspectScout(
   accountId: string,
   options?: { searchId?: string; force?: boolean },
 ): Promise<RunAccountResult> {
-  const [config] = await db
-    .select()
+  const [row] = await db
+    .select({
+      config: sdrAgentConfigs,
+      plan: accounts.plan,
+    })
     .from(sdrAgentConfigs)
+    .innerJoin(accounts, eq(sdrAgentConfigs.accountId, accounts.id))
     .where(and(eq(sdrAgentConfigs.accountId, accountId), isNull(sdrAgentConfigs.deletedAt)))
     .limit(1)
 
-  if (!config) {
+  if (!row?.config) {
     return { accountId, searchesRun: 0, found: 0, enrolled: 0, runs: [] }
   }
+
+  if (!row.config.isActive || row.config.isPaused) {
+    return { accountId, searchesRun: 0, found: 0, enrolled: 0, runs: [] }
+  }
+
+  try {
+    await requireSDREnabledForAccount(accountId, row.plan as import('@/lib/feature-flags/flags').Plan)
+  } catch {
+    return { accountId, searchesRun: 0, found: 0, enrolled: 0, runs: [] }
+  }
+
+  const config = row.config
 
   const mode = (config.prospectMode ?? 'inline_icp') as ProspectMode
 

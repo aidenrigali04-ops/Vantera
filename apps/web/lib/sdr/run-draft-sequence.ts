@@ -119,6 +119,7 @@ export async function runDraftSdrSequence(payload: DraftSdrSequencePayload): Pro
   await db
     .update(sdrSequences)
     .set({
+      status: 'active',
       totalSteps: steps.length,
       nextStepAt: scheduledFor[0] ?? null,
     })

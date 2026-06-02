@@ -1,6 +1,12 @@
 import { runAccountProspectScout } from '@/lib/prospect-scout/run-account'
+import { db } from '@/lib/db/client'
+import { logSdrActivity } from '@/lib/sdr/activity-log'
+import { requireSDREnabledForAccount } from '@/lib/sdr/guard'
+import type { Plan } from '@/lib/feature-flags/flags'
 import { findSdrConfigByAccount } from '@/lib/sdr/queries'
 import type { RunAccountResult } from '@/lib/prospect-scout/types'
+import { accounts } from '@vantera/db'
+import { eq } from 'drizzle-orm'
 
 /**
  * First-run / post-setup discovery: Apify → ICP filter → pipeline leads (+ optional SDR sequence).
@@ -9,10 +15,39 @@ import type { RunAccountResult } from '@/lib/prospect-scout/types'
 export async function runProspectScoutBootstrap(
   accountId: string,
 ): Promise<RunAccountResult | null> {
+  const [account] = await db
+    .select({ plan: accounts.plan })
+    .from(accounts)
+    .where(eq(accounts.id, accountId))
+    .limit(1)
+
+  const plan = (account?.plan ?? 'team') as Plan
+  await requireSDREnabledForAccount(accountId, plan)
+
   const config = await findSdrConfigByAccount(accountId)
   if (!config || !config.isActive || config.isPaused) {
     return null
   }
 
-  return runAccountProspectScout(accountId)
+  await logSdrActivity({
+    accountId,
+    configId: config.id,
+    eventType: 'discovery_started',
+    metadata: { source: 'bootstrap' },
+  })
+
+  const result = await runAccountProspectScout(accountId)
+
+  await logSdrActivity({
+    accountId,
+    configId: config.id,
+    eventType: 'discovery_completed',
+    metadata: {
+      found: result.found,
+      enrolled: result.enrolled,
+      searchesRun: result.searchesRun,
+    },
+  })
+
+  return result
 }

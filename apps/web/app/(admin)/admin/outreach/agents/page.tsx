@@ -79,6 +79,12 @@ export default async function SdrAgentsPage() {
   if (sdrEnabled) {
     const configRow = await findSdrConfigByAccount(session.accountId)
     if (configRow) {
+      const autonomousMessaging = await evaluateFlag({
+        accountId: session.accountId,
+        plan,
+        flagName: 'autonomous_ai_messaging',
+      })
+
       const [stats, activity, upcoming] = await Promise.all([
         getSdrDashboardStats(session.accountId),
         getSdrActivityFeed(session.accountId),
@@ -91,18 +97,27 @@ export default async function SdrAgentsPage() {
           stats={stats}
           initialActivity={activity}
           upcoming={upcoming}
+          autonomousMessaging={autonomousMessaging}
         />
       )
     }
 
     return (
-      <div className="flex flex-col items-center justify-center gap-4 py-20 text-center">
-        <h1 className="text-2xl font-semibold text-stone-900">Set up your SDR Agent</h1>
-        <p className="max-w-md text-sm text-stone-600">
+      <div className="flex flex-col items-center justify-center gap-4 px-4 py-20 text-center">
+        <p className="text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--accent)]">
+          SDR Agents
+        </p>
+        <h1 className="text-2xl font-semibold tracking-[-0.02em] text-[var(--text-primary)]">
+          Set up your SDR Agent
+        </h1>
+        <p className="max-w-md text-[15px] leading-relaxed text-[var(--text-secondary)]">
           Deploy an always-on sales development rep that finds, profiles, and nurtures leads — then
           hands qualified replies to your pipeline.
         </p>
-        <Button asChild className="bg-stone-900 hover:bg-stone-800">
+        <Button
+          asChild
+          className="bg-[var(--accent)] text-[var(--text-primary)] hover:bg-[var(--accent-hover)]"
+        >
           <Link href="/admin/outreach/agents/setup">Set up in 5 minutes</Link>
         </Button>
       </div>

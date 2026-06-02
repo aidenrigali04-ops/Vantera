@@ -6,6 +6,7 @@ import type { Plan } from '@/lib/feature-flags/flags'
 import { listSdrSequences } from '@/lib/sdr/queries'
 import { accounts } from '@vantera/db'
 import { eq } from 'drizzle-orm'
+import { redirect } from 'next/navigation'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,11 +26,7 @@ export default async function SdrSequencesPage() {
   })
 
   if (!enabled) {
-    return (
-      <p className="py-12 text-center text-sm text-stone-500">
-        SDR Agent module is not enabled for this account.
-      </p>
-    )
+    redirect('/admin/outreach/agents/setup')
   }
 
   const rows = await listSdrSequences(session.accountId, { limit: 100 })

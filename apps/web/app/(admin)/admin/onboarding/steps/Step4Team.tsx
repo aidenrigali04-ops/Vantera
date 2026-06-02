@@ -15,7 +15,6 @@ import { useRegisterOnboardingStep } from '../onboarding-nav'
 import { inviteTeamMembers } from '../actions'
 import {
   StepError,
-  StepHeader,
   fadeUp,
   rethrowFrameworkNavigation,
   runStepAction,
@@ -112,24 +111,19 @@ export function Step4Team({ accountId, primaryColor, onComplete }: Props) {
   })
 
   return (
-    <motion.div variants={stepContainer} initial="hidden" animate="show" className="space-y-4">
-      <StepHeader
-        title="Invite your team"
-        subtitle={`Add up to ${MAX_MEMBERS} teammates. They'll receive an email with a magic sign-in link — no passwords needed.`}
-      />
-
-      <motion.div variants={fadeUp} className="space-y-3">
+    <motion.div variants={stepContainer} initial="hidden" animate="show" className="space-y-3">
+      <motion.div variants={fadeUp} className="space-y-2">
         {members.map((member, index) => (
           <motion.div
             key={index}
             initial={{ opacity: 0, x: -6 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.04 * index, ease: 'easeOut' }}
-            className="group flex items-center gap-2 rounded-xl border border-white/[0.06] bg-white/[0.02] p-2 transition-colors hover:border-white/[0.14] hover:bg-white/[0.035]"
+            className="group flex items-center gap-2 rounded-lg border border-[var(--border-default)] bg-[var(--bg-surface)] p-2 transition-colors duration-[120ms] hover:border-[var(--border-strong)] hover:bg-[var(--bg-subtle)]"
           >
             <span
               aria-hidden
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/[0.04] text-white/55 ring-1 ring-inset ring-white/[0.06]"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--bg-subtle)] text-[var(--text-tertiary)] ring-1 ring-inset ring-[var(--border-subtle)]"
             >
               <Mail className="h-4 w-4" aria-hidden />
             </span>

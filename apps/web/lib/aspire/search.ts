@@ -14,7 +14,7 @@ export { searchApify } from '@/lib/aspire/apify-client'
 export type { ProspectSearchMeta } from '@/lib/aspire/apify-client'
 import { db } from '@/lib/db/client'
 import { accounts, aspireResults } from '@vantera/db'
-import { and, eq, inArray, isNull } from 'drizzle-orm'
+import { and, eq, inArray, isNull, sql } from 'drizzle-orm'
 
 export async function filterExistingLeads(
   accountId: string,
@@ -82,7 +82,7 @@ async function persistAspireResults(
               rawData: row,
               icpScore: row.icpScore,
               icpSignals: row.icpSignals,
-              searchId,
+              searchId: sql`coalesce(excluded.search_id, ${aspireResults.searchId})`,
             },
           })
       } catch (error) {

@@ -2,7 +2,7 @@
 
 import type { SDRActivityEvent } from '@/lib/sdr/types'
 import { cn } from '@/lib/utils'
-import { Calendar, Mail, MessageCircle, Pause, Users, Zap } from 'lucide-react'
+import { Calendar, Mail, MessageCircle, Pause, Play, Radar, Rocket, Users, Zap } from 'lucide-react'
 import Link from 'next/link'
 
 type Props = {
@@ -44,6 +44,32 @@ const EVENT_META: Record<
     icon: Pause,
     label: () => 'Agent paused',
     tone: 'text-red-700',
+  },
+  agent_launched: {
+    icon: Rocket,
+    label: (e) => `${e.metadata.agentName ?? 'SDR agent'} launched`,
+    tone: 'text-emerald-700',
+  },
+  agent_resumed: {
+    icon: Play,
+    label: () => 'Agent resumed',
+    tone: 'text-emerald-700',
+  },
+  discovery_started: {
+    icon: Radar,
+    label: () => 'Prospect Scout discovery started',
+    tone: 'text-blue-700',
+  },
+  discovery_completed: {
+    icon: Radar,
+    label: (e) => {
+      const enrolled = Number(e.metadata.enrolled ?? 0)
+      const found = Number(e.metadata.found ?? 0)
+      if (enrolled > 0) return `Discovery complete — ${enrolled} enrolled`
+      if (found > 0) return `Discovery complete — ${found} scored`
+      return 'Discovery complete — no new matches'
+    },
+    tone: 'text-stone-600',
   },
   sequence_drafted: {
     icon: Mail,

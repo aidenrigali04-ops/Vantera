@@ -1,7 +1,13 @@
 'use client'
 
 import { AspireIntelligencePanel } from '@/components/aspire/AspireIntelligencePanel'
-import { IcpScoreRing } from '@/components/aspire/IcpScoreRing'
+import {
+  AspireContactCell,
+  AspireEnrollCell,
+  AspireIcpCell,
+  AspireIndustryCell,
+  AspireProspectCell,
+} from '@/components/aspire/AspireTableCells'
 import { BulkActionBar } from '@/components/operational/BulkActionBar'
 import { KpiStrip } from '@/components/operational/KpiStrip'
 import {
@@ -9,10 +15,8 @@ import {
   type OperationalSort,
 } from '@/components/operational/OperationalTable'
 import { PageHeader } from '@/components/operational/PageHeader'
-import { StatusBadge } from '@/components/operational/table/StatusBadge'
 import { TableSavedViews } from '@/components/operational/table/TableSavedViews'
 import { TableToolbar } from '@/components/operational/table/TableToolbar'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -23,20 +27,19 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { aspireCompanyName, aspireProspectName } from '@/lib/aspire/display'
+import { mergeAspireResults } from '@/lib/aspire/merge-results'
 import { getIcpConfigForVertical } from '@/lib/aspire/icp-score'
 import { normalizeApolloFilters } from '@/lib/aspire/filters'
 import type { AspireSearchResult } from '@/lib/aspire/types'
-import {
-  ASPIRE_TABLE_VIEWS,
-  aspireIntentTone,
-} from '@/lib/operational/aspire-table-views'
+import { ASPIRE_TABLE_VIEWS } from '@/lib/operational/aspire-table-views'
 import { LiveIndicator } from '@/components/operational/LiveIndicator'
 import { SectionEmptyState } from '@/components/onboarding/SectionEmptyState'
 import { useAccountRealtime } from '@/lib/supabase/account-realtime'
 import { cn } from '@/lib/utils'
 import type { aspireSavedSearches } from '@vantera/db'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Bookmark, Check, Loader2, Play, Plus, Search, Target, Trash2, TrendingUp, Users } from 'lucide-react'
+import { Bookmark, Loader2, Play, Plus, Search, Target, Trash2, TrendingUp, Users } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
@@ -44,6 +47,10 @@ import { toast } from 'sonner'
 type SavedSearch = typeof aspireSavedSearches.$inferSelect
 type AspireResultRow = AspireSearchResult & { id: string }
 type EnrollState = 'idle' | 'pending' | 'added' | 'exists'
+
+const LIVE_RESULTS_TTL_MS = 90_000
+const STORED_RESULTS_POLL_MS = 500
+const STORED_RESULTS_MAX_POLLS = 12
 
 type SearchMeta = {
   source?: 'apify' | 'stub' | 'demo'
@@ -55,14 +62,6 @@ type Props = {
   savedSearches: SavedSearch[]
   accountId: string
   accountVertical: string
-}
-
-function prospectName(row: AspireSearchResult): string {
-  return [row.firstName, row.lastName].filter(Boolean).join(' ') || 'Unknown'
-}
-
-function companyName(row: AspireSearchResult): string {
-  return row.organizationName ?? row.company ?? 'Unknown'
 }
 
 async function fetchAspireResultsFromApi(searchId: string | null): Promise<AspireSearchResult[]> {
@@ -108,6 +107,28 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
   /** Bumps when a new search starts so stale loadStoredResults cannot clear the table. */
   const resultsLoadSeqRef = useRef(0)
   const displayLeadsRef = useRef<AspireSearchResult[]>([])
+  const liveSearchRef = useRef<{ at: number; results: AspireSearchResult[] } | null>(null)
+
+  const applyDisplayLeads = useCallback(
+    (results: AspireSearchResult[], source: 'live' | 'stored' | 'merge') => {
+      setDisplayLeads((current) => {
+        const next =
+          source === 'merge'
+            ? mergeAspireResults(current, results)
+            : results
+        displayLeadsRef.current = next
+        return next
+      })
+      if (source === 'live') {
+        liveSearchRef.current = { at: Date.now(), results }
+      } else if (source === 'stored' && results.length > 0) {
+        liveSearchRef.current = null
+      }
+    },
+    [],
+  )
+
+  const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms))
 
   useEffect(() => {
     const id = searchParams.get('searchId')
@@ -128,7 +149,7 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
   const loadStoredResults = useCallback(
     async (
       searchId: string | null = activeSearchId,
-      options?: { force?: boolean },
+      options?: { force?: boolean; merge?: boolean },
     ): Promise<AspireSearchResult[]> => {
       const seq = resultsLoadSeqRef.current
       try {
@@ -136,17 +157,27 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
         if (seq !== resultsLoadSeqRef.current) {
           return displayLeadsRef.current
         }
-        if (list.length > 0 || options?.force) {
-          setDisplayLeads(list)
-          displayLeadsRef.current = list
-          return list
-        }
-        if (displayLeadsRef.current.length > 0) {
+
+        if (list.length > 0) {
+          applyDisplayLeads(list, options?.merge ? 'merge' : 'stored')
           return displayLeadsRef.current
         }
-        setDisplayLeads([])
-        displayLeadsRef.current = []
-        return []
+
+        const live = liveSearchRef.current
+        if (live && Date.now() - live.at < LIVE_RESULTS_TTL_MS && !options?.force) {
+          return live.results
+        }
+
+        if (displayLeadsRef.current.length > 0 && !options?.force) {
+          return displayLeadsRef.current
+        }
+
+        if (options?.force) {
+          applyDisplayLeads([], 'stored')
+          return []
+        }
+
+        return displayLeadsRef.current
       } catch {
         if (seq !== resultsLoadSeqRef.current) {
           return displayLeadsRef.current
@@ -154,27 +185,54 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
         if (displayLeadsRef.current.length > 0) {
           return displayLeadsRef.current
         }
-        setDisplayLeads([])
-        displayLeadsRef.current = []
-        return []
+        if (options?.force) {
+          applyDisplayLeads([], 'stored')
+          return []
+        }
+        return displayLeadsRef.current
       }
     },
-    [activeSearchId],
+    [activeSearchId, applyDisplayLeads],
+  )
+
+  const pollStoredResults = useCallback(
+    async (searchId: string | null) => {
+      for (let attempt = 0; attempt < STORED_RESULTS_MAX_POLLS; attempt += 1) {
+        const force = attempt === STORED_RESULTS_MAX_POLLS - 1
+        const list = await loadStoredResults(searchId, { force, merge: !force })
+        if (list.length > 0) return list
+        if (displayLeadsRef.current.length > 0) return displayLeadsRef.current
+        await sleep(STORED_RESULTS_POLL_MS)
+      }
+      return displayLeadsRef.current
+    },
+    [loadStoredResults],
   )
 
   useEffect(() => {
-    void loadStoredResults()
-  }, [loadStoredResults])
+    resultsLoadSeqRef.current += 1
+    liveSearchRef.current = null
+    void loadStoredResults(activeSearchId, { force: true })
+  }, [activeSearchId, loadStoredResults])
+
+  const reloadStoredResults = useCallback(() => {
+    if (isSearchingRef.current) return
+    void loadStoredResults(activeSearchId, { merge: true })
+  }, [activeSearchId, loadStoredResults])
 
   const { isLive: resultsLive } = useAccountRealtime({
     accountId,
     table: 'aspire_results',
     searchId: activeSearchId ?? undefined,
     enabled: true,
-    onChange: () => {
-      if (isSearchingRef.current) return
-      void loadStoredResults()
-    },
+    onChange: reloadStoredResults,
+  })
+
+  useAccountRealtime({
+    accountId,
+    table: 'aspire_search_runs',
+    enabled: Boolean(activeSearchId),
+    onChange: reloadStoredResults,
   })
 
   useEffect(() => {
@@ -189,7 +247,7 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
     () =>
       sourceResults.map((r, i) => ({
         ...r,
-        id: r.id || `${r.email ?? r.linkedinUrl ?? i}-${companyName(r)}`,
+        id: r.id || `${r.email ?? r.linkedinUrl ?? i}-${aspireCompanyName(r) || 'unknown'}`,
         icpScore: r.icpScore ?? r.intentScore ?? 0,
         intentScore: r.icpScore ?? r.intentScore ?? 0,
       })),
@@ -215,8 +273,8 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
       const q = tableSearch.toLowerCase()
       next = next.filter(
         (row) =>
-          prospectName(row).toLowerCase().includes(q) ||
-          companyName(row).toLowerCase().includes(q) ||
+          aspireProspectName(row).toLowerCase().includes(q) ||
+          aspireCompanyName(row).toLowerCase().includes(q) ||
           row.title.toLowerCase().includes(q) ||
           (row.email?.toLowerCase().includes(q) ?? false),
       )
@@ -239,8 +297,8 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
       let bv: string | number = ''
       switch (sort.columnId) {
         case 'name':
-          av = prospectName(a).toLowerCase()
-          bv = prospectName(b).toLowerCase()
+          av = aspireProspectName(a).toLowerCase()
+          bv = aspireProspectName(b).toLowerCase()
           break
         case 'icp':
           av = scoreOf(a)
@@ -360,10 +418,14 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
     },
     onMutate: (searchId) => {
       setRunningSearchId(searchId)
+      isSearchingRef.current = true
+      resultsLoadSeqRef.current += 1
+      liveSearchRef.current = null
     },
     onSuccess: async (data, searchId) => {
       setActiveSearchId(searchId)
-      const list = await loadStoredResults(searchId, { force: true })
+      setSearchMeta(null)
+      const list = await pollStoredResults(searchId)
       const listCount = list.length
       toast.success(
         listCount > 0
@@ -374,7 +436,10 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
       )
     },
     onError: (err: Error) => toast.error(err.message),
-    onSettled: () => setRunningSearchId(null),
+    onSettled: () => {
+      isSearchingRef.current = false
+      setRunningSearchId(null)
+    },
   })
 
   const handleSearch = async () => {
@@ -388,6 +453,7 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
     setIsSearching(true)
     isSearchingRef.current = true
     resultsLoadSeqRef.current += 1
+    liveSearchRef.current = null
     try {
       const res = await fetch('/api/aspire/search', {
         method: 'POST',
@@ -411,8 +477,7 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
       }
 
       const results = Array.isArray(json.data) ? json.data : []
-      setDisplayLeads(results)
-      displayLeadsRef.current = results
+      applyDisplayLeads(results, 'live')
       setSearchMeta(json.meta ?? null)
 
       if (json.meta?.source === 'stub') {
@@ -432,23 +497,17 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
     } finally {
       isSearchingRef.current = false
       setIsSearching(false)
-      if (displayLeadsRef.current.length > 0) {
-        window.setTimeout(() => {
-          void loadStoredResults(activeSearchId)
-        }, 400)
-      }
     }
   }
 
   const handleSelectSavedSearch = (search: SavedSearch) => {
-    resultsLoadSeqRef.current += 1
-    setActiveSearchId(search.id)
+    liveSearchRef.current = null
     setSearchMeta(null)
     router.replace(`/admin/outreach/aspire?searchId=${search.id}`)
     const filters = search.filters as { q?: string; company?: string }
     if (filters.q) setQuery(filters.q)
     if (filters.company) setCompany(filters.company)
-    void loadStoredResults(search.id, { force: true })
+    setActiveSearchId(search.id)
   }
 
   const enrollOne = useCallback(
@@ -494,119 +553,37 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
         id: 'name',
         header: 'Prospect',
         sortable: true,
-        cell: (row: AspireResultRow) => (
-          <div className="flex min-w-[200px] items-center gap-3">
-            <IcpScoreRing score={scoreOf(row)} size={36} strokeWidth={3} className="hidden sm:block" />
-            <div className="min-w-0">
-              <p className="truncate font-medium text-[var(--text-primary)]">{prospectName(row)}</p>
-              <p className="truncate text-[12px] text-[var(--text-secondary)]">
-                {row.title} · {companyName(row)}
-              </p>
-            </div>
-          </div>
-        ),
+        cell: (row: AspireResultRow) => <AspireProspectCell row={row} />,
       },
       {
         id: 'icp',
-        header: 'ICP',
+        header: 'ICP fit',
         sortable: true,
-        cell: (row: AspireResultRow) => (
-          <StatusBadge label={String(scoreOf(row))} tone={aspireIntentTone(scoreOf(row))} />
-        ),
+        cell: (row: AspireResultRow) => <AspireIcpCell score={scoreOf(row)} />,
       },
       {
         id: 'industry',
         header: 'Industry',
         sortable: true,
-        cell: (row: AspireResultRow) => (
-          <Badge
-            variant="outline"
-            className="border-[var(--border-default)] bg-[var(--bg-subtle)]/60 font-normal text-[var(--text-secondary)]"
-          >
-            {row.industry ?? '—'}
-          </Badge>
-        ),
+        cell: (row: AspireResultRow) => <AspireIndustryCell industry={row.industry} />,
       },
       {
-        id: 'email',
-        header: 'Email',
-        cell: (row: AspireResultRow) =>
-          row.email ? (
-            <a
-              href={`mailto:${row.email}`}
-              className="block max-w-[160px] truncate text-[var(--accent)] hover:underline"
-            >
-              {row.email}
-            </a>
-          ) : (
-            <span className="text-[var(--text-tertiary)]">—</span>
-          ),
-      },
-      {
-        id: 'phone',
-        header: 'Phone',
-        cell: (row: AspireResultRow) =>
-          row.phone ? (
-            <a
-              href={`tel:${row.phone}`}
-              className="block max-w-[120px] truncate text-[var(--text-primary)] hover:underline"
-            >
-              {row.phone}
-            </a>
-          ) : (
-            <span className="text-[var(--text-tertiary)]">—</span>
-          ),
-      },
-      {
-        id: 'linkedin',
-        header: 'LinkedIn',
-        cell: (row: AspireResultRow) =>
-          row.linkedinUrl ? (
-            <a
-              href={row.linkedinUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[var(--accent)] hover:underline"
-            >
-              Profile
-            </a>
-          ) : (
-            <span className="text-[var(--text-tertiary)]">—</span>
-          ),
+        id: 'contact',
+        header: 'Contact',
+        cell: (row: AspireResultRow) => <AspireContactCell row={row} />,
       },
       {
         id: 'actions',
         header: '',
         interactive: true,
         className: 'text-right',
-        cell: (row: AspireResultRow) => {
-          const state = enrollStates[row.id] ?? 'idle'
-          return (
-            <Button
-              size="sm"
-              variant={state === 'added' ? 'secondary' : 'outline'}
-              className="h-8"
-              onClick={(event) => {
-                event.stopPropagation()
-                if (state === 'idle') enrollOne(row)
-              }}
-              disabled={addMutation.isPending || state === 'pending' || state === 'added'}
-            >
-              {state === 'pending' ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : state === 'added' ? (
-                <>
-                  <Check className="mr-1 h-3.5 w-3.5" />
-                  Added
-                </>
-              ) : state === 'exists' ? (
-                'In CRM'
-              ) : (
-                'Add to pipeline'
-              )}
-            </Button>
-          )
-        },
+        cell: (row: AspireResultRow) => (
+          <AspireEnrollCell
+            state={enrollStates[row.id] ?? 'idle'}
+            disabled={addMutation.isPending}
+            onEnroll={() => enrollOne(row)}
+          />
+        ),
       },
     ],
     [addMutation.isPending, enrollOne, enrollStates],
@@ -765,18 +742,30 @@ export function AspirePageClient({ savedSearches: initialSaved, accountId, accou
 
         <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(240px,280px)]">
           <div className="min-w-0 space-y-4">
-            {activeSaved ? (
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-[13px] text-[var(--text-secondary)]">
-                  Viewing saved search{' '}
-                  <span className="font-medium text-[var(--text-primary)]">{activeSaved.name}</span>
-                  {searchMeta?.source === 'stub'
-                    ? ' — sample leads (configure APIFY_API_TOKEN for live data)'
-                    : ' — stored results'}
-                </p>
-                <LiveIndicator active={resultsLive} />
-              </div>
-            ) : null}
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-[13px] text-[var(--text-secondary)]">
+                {activeSaved ? (
+                  <>
+                    Viewing saved search{' '}
+                    <span className="font-medium text-[var(--text-primary)]">{activeSaved.name}</span>
+                    {searchMeta?.source === 'stub'
+                      ? ' — sample leads (configure APIFY_API_TOKEN for live data)'
+                      : ' — stored results'}
+                  </>
+                ) : rows.length > 0 ? (
+                  <>
+                    Showing{' '}
+                    <span className="font-medium text-[var(--text-primary)]">
+                      {rows.length} prospect{rows.length === 1 ? '' : 's'}
+                    </span>
+                    {searchMeta?.source === 'apify' ? ' from latest Apify run' : searchMeta?.source === 'stub' ? ' (sample data)' : ''}
+                  </>
+                ) : (
+                  'Run a search to discover ICP-matched prospects'
+                )}
+              </p>
+              <LiveIndicator active={resultsLive} />
+            </div>
 
             {searchMeta?.source === 'stub' ? (
               <div className="rounded-lg border border-[var(--warning)]/30 bg-[var(--warning-muted)] px-4 py-3 text-sm text-[var(--text-primary)]">

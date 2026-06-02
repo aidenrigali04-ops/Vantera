@@ -1,19 +1,19 @@
 'use client'
 
+import { SlideWizardFrame } from '@/components/onboarding/slide-wizard/SlideWizardFrame'
 import { SdrProspectScoutFields } from '@/components/sdr/SdrProspectScoutFields'
+import { SdrWizardMediaPanel } from '@/components/sdr/SdrWizardMediaPanel'
 import { bindingToApiInput, type BindingDraft, type SavedSearchOption } from '@/components/sdr/sdr-aspire-ui'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { getIcpConfigForVertical } from '@/lib/aspire/icp-score'
+import { getSdrWizardSlideMeta, SDR_WIZARD_SLIDES } from '@/lib/onboarding/sdr-wizard-slides'
 import type { CreateSDRConfigInput, ProspectMode } from '@/lib/sdr/types'
+import type { AspireBindingInput } from '@/lib/sdr/aspire-config'
 import { DEFAULT_OUTREACH_WINDOW } from '@/lib/sdr/types'
-import { cn } from '@/lib/utils'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState, useTransition } from 'react'
 import { toast } from 'sonner'
-
-const STEPS = ['Identity', 'ICP', 'Schedule', 'Prospect Scout', 'Launch'] as const
 
 type Props = {
   accountVertical: string
@@ -26,6 +26,9 @@ export function SdrSetupWizardClient({ accountVertical, accountName }: Props) {
   const [isPending, startTransition] = useTransition()
   const [savedSearches, setSavedSearches] = useState<SavedSearchOption[]>([])
   const [loadingSearches, setLoadingSearches] = useState(false)
+
+  const slide = SDR_WIZARD_SLIDES[step]!
+  const { total, isFirst, isLast } = getSdrWizardSlideMeta(step)
 
   const [form, setForm] = useState({
     agentName: 'Alex',
@@ -72,10 +75,10 @@ export function SdrSetupWizardClient({ accountVertical, accountName }: Props) {
     }
   }, [step])
 
-  function next() {
+  function validateStep(): boolean {
     if (step === 0 && (!form.agentName || !form.fromEmail || !form.fromName)) {
       toast.error('Complete agent identity fields')
-      return
+      return false
     }
     if (
       step === 3 &&
@@ -84,15 +87,24 @@ export function SdrSetupWizardClient({ accountVertical, accountName }: Props) {
       savedSearches.length > 0
     ) {
       toast.error('Add at least one saved search binding, or switch to inline ICP mode')
+      return false
+    }
+    return true
+  }
+
+  function handlePrimary() {
+    if (isLast) {
+      launch()
       return
     }
-    setStep((s) => Math.min(s + 1, STEPS.length - 1))
+    if (!validateStep()) return
+    setStep((s) => s + 1)
   }
 
   function launch() {
     startTransition(async () => {
       const icpConfig = getIcpConfigForVertical(accountVertical as 'agency')
-      const payload: CreateSDRConfigInput = {
+      const payload: CreateSDRConfigInput & { bindings: AspireBindingInput[] } = {
         agentName: form.agentName,
         agentTitle: form.agentTitle,
         fromEmail: form.fromEmail,
@@ -116,286 +128,260 @@ export function SdrSetupWizardClient({ accountVertical, accountName }: Props) {
         prospectMode: form.prospectMode,
         defaultMinIcpScore: form.defaultMinIcpScore,
         syncIcpToSavedSearches: form.syncIcpToSavedSearches,
+        bindings: form.bindings.map(bindingToApiInput),
       }
 
-      const res = await fetch('/api/sdr/config', {
+      const res = await fetch('/api/sdr/launch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       })
       const json = await res.json()
       if (!json.success) {
-        toast.error(json.error ?? 'Setup failed')
+        toast.error(json.error ?? 'Launch failed')
         return
       }
 
-      const aspireRes = await fetch('/api/sdr/aspire-config', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prospectMode: form.prospectMode,
-          defaultMinIcpScore: form.defaultMinIcpScore,
-          syncIcpToSavedSearches: form.syncIcpToSavedSearches,
-          bindings: form.bindings.map(bindingToApiInput),
-        }),
-      })
-      const aspireJson = await aspireRes.json()
-      if (!aspireJson.success) {
-        toast.error(aspireJson.error ?? 'Prospect Scout config failed')
-        return
+      const bootstrap = json.data?.bootstrap
+      if (bootstrap && 'queued' in bootstrap && bootstrap.queued) {
+        toast.success(
+          `${form.agentName} is live — first discovery run started. Watch the activity feed for results.`,
+        )
+      } else {
+        const enrolled = bootstrap?.enrolled ?? 0
+        const found = bootstrap?.found ?? 0
+        toast.success(
+          enrolled > 0
+            ? `${form.agentName} is live — ${enrolled} prospect${enrolled === 1 ? '' : 's'} added to your pipeline`
+            : found > 0
+              ? `${form.agentName} is live — ${found} prospects scored (none met your ICP floor yet)`
+              : `${form.agentName} is live — scheduled discovery runs ${form.searchFrequency}`,
+        )
       }
 
-      const bootstrapRes = await fetch('/api/sdr/bootstrap', { method: 'POST' })
-      const bootstrapJson = await bootstrapRes.json()
-      if (!bootstrapJson.success) {
-        toast.error(bootstrapJson.error ?? 'Agent saved but first discovery run failed')
-        router.push('/admin/outreach/agents/scout')
-        router.refresh()
-        return
-      }
-
-      const enrolled = bootstrapJson.data?.enrolled ?? 0
-      const found = bootstrapJson.data?.found ?? 0
-      toast.success(
-        enrolled > 0
-          ? `${form.agentName} is live — ${enrolled} prospect${enrolled === 1 ? '' : 's'} added to your pipeline`
-          : found > 0
-            ? `${form.agentName} is live — ${found} prospects scored (none met your ICP floor yet)`
-            : `${form.agentName} is live — scheduled discovery runs ${form.searchFrequency}`,
-      )
       router.push('/admin/outreach/agents')
       router.refresh()
     })
   }
 
   return (
-    <div className="mx-auto w-full max-w-2xl space-y-8 px-4 py-5 md:px-8 md:py-6">
-      <div className="flex justify-center gap-2" role="list" aria-label="Setup progress">
-        {STEPS.map((label, index) => (
-          <span
-            key={label}
-            role="listitem"
-            className={cn(
-              'h-2 rounded-full transition-all duration-150',
-              index <= step ? 'w-6 bg-[var(--accent)]' : 'w-2 bg-[var(--border-default)]',
-            )}
-            title={label}
+    <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center bg-[var(--bg-base)] p-4 sm:p-6">
+      <SlideWizardFrame
+        variant="page"
+        headerLabel="SDR Agent setup"
+        slide={slide}
+        stepIndex={step}
+        totalSteps={total}
+        mediaPanel={
+          <SdrWizardMediaPanel
+            media={slide.media}
+            slideId={slide.id}
+            className="h-full lg:min-h-[320px]"
           />
-        ))}
-      </div>
+        }
+        onBack={() => {
+          if (isFirst) {
+            router.push('/admin/outreach/agents')
+            return
+          }
+          setStep((s) => s - 1)
+        }}
+        onPrimary={handlePrimary}
+        primaryLabel={
+          isPending ? 'Launching…' : isLast ? 'Launch SDR Agent' : 'Continue'
+        }
+        primaryDisabled={isPending || (step === 0 && (!form.agentName || !form.fromEmail || !form.fromName))}
+        primaryLoading={isPending}
+        showSkip={false}
+        dialogTitleId="sdr-setup-title"
+        dialogBodyId="sdr-setup-body"
+      >
+        {step === 0 && (
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="agent-name">Agent first name</Label>
+              <Input
+                id="agent-name"
+                className="mt-1.5 border-[var(--border-default)] bg-[var(--bg-surface)]"
+                value={form.agentName}
+                onChange={(e) => setForm({ ...form, agentName: e.target.value })}
+              />
+            </div>
+            <div>
+              <Label htmlFor="agent-title">Job title</Label>
+              <Input
+                id="agent-title"
+                className="mt-1.5 border-[var(--border-default)] bg-[var(--bg-surface)]"
+                value={form.agentTitle}
+                onChange={(e) => setForm({ ...form, agentTitle: e.target.value })}
+              />
+            </div>
+            <div>
+              <Label htmlFor="from-email">From email</Label>
+              <Input
+                id="from-email"
+                type="email"
+                className="mt-1.5 border-[var(--border-default)] bg-[var(--bg-surface)]"
+                placeholder="alex@yourdomain.com"
+                value={form.fromEmail}
+                onChange={(e) => setForm({ ...form, fromEmail: e.target.value })}
+              />
+            </div>
+            <div>
+              <Label htmlFor="from-name">From name</Label>
+              <Input
+                id="from-name"
+                className="mt-1.5 border-[var(--border-default)] bg-[var(--bg-surface)]"
+                value={form.fromName}
+                onChange={(e) => setForm({ ...form, fromName: e.target.value })}
+              />
+            </div>
+          </div>
+        )}
 
-      {step === 0 && (
-        <div className="card-surface space-y-4 p-5">
-          <h2 className="text-lg font-semibold tracking-tight text-[var(--text-primary)]">
-            Agent identity
-          </h2>
-          <div>
-            <Label>Agent first name</Label>
-            <Input
-              className="mt-1 border-[var(--border-default)]"
-              value={form.agentName}
-              onChange={(e) => setForm({ ...form, agentName: e.target.value })}
-            />
-          </div>
-          <div>
-            <Label>Job title</Label>
-            <Input
-              className="mt-1 border-[var(--border-default)]"
-              value={form.agentTitle}
-              onChange={(e) => setForm({ ...form, agentTitle: e.target.value })}
-            />
-          </div>
-          <div>
-            <Label>From email</Label>
-            <Input
-              type="email"
-              className="mt-1 border-[var(--border-default)]"
-              placeholder="alex@yourdomain.com"
-              value={form.fromEmail}
-              onChange={(e) => setForm({ ...form, fromEmail: e.target.value })}
-            />
-          </div>
-          <div>
-            <Label>From name</Label>
-            <Input
-              className="mt-1 border-[var(--border-default)]"
-              value={form.fromName}
-              onChange={(e) => setForm({ ...form, fromName: e.target.value })}
-            />
-          </div>
-        </div>
-      )}
-
-      {step === 1 && (
-        <div className="card-surface space-y-4 p-5">
-          <h2 className="text-lg font-semibold tracking-tight text-[var(--text-primary)]">
-            Who to target
-          </h2>
-          <p className="text-sm text-[var(--text-secondary)]">
-            ICP defaults to your vertical ({accountVertical}). Adjust cities and exclusions below.
-          </p>
-          <div>
-            <Label>Target cities (comma-separated)</Label>
-            <Input
-              className="mt-1 border-[var(--border-default)]"
-              placeholder="Phoenix AZ, Dallas TX"
-              value={form.targetCities}
-              onChange={(e) => setForm({ ...form, targetCities: e.target.value })}
-            />
-          </div>
-          <div>
-            <Label>Exclude domains</Label>
-            <Input
-              className="mt-1 border-[var(--border-default)]"
-              placeholder="competitor.com"
-              value={form.excludeDomains}
-              onChange={(e) => setForm({ ...form, excludeDomains: e.target.value })}
-            />
-          </div>
-        </div>
-      )}
-
-      {step === 2 && (
-        <div className="card-surface space-y-4 p-5">
-          <h2 className="text-lg font-semibold tracking-tight text-[var(--text-primary)]">
-            Outreach schedule
-          </h2>
-          <p className="text-sm text-[var(--text-secondary)]">
-            Mon–Fri, 8am–5pm Eastern (default). Customize in settings later.
-          </p>
-          <div>
-            <Label>Max new leads per day</Label>
-            <Input
-              type="number"
-              className="mt-1 border-[var(--border-default)]"
-              value={form.maxNewLeadsDay}
-              onChange={(e) => setForm({ ...form, maxNewLeadsDay: Number(e.target.value) })}
-            />
-          </div>
-          <div>
-            <Label>Max active sequences</Label>
-            <Input
-              type="number"
-              className="mt-1 border-[var(--border-default)]"
-              value={form.maxActiveLeads}
-              onChange={(e) => setForm({ ...form, maxActiveLeads: Number(e.target.value) })}
-            />
-          </div>
-          <div>
-            <Label>Prospect Scout discovery</Label>
-            <select
-              className="mt-1.5 flex h-9 w-full rounded-md border border-[var(--border-default)] bg-[var(--bg-surface)] px-3 text-[13px]"
-              value={form.searchFrequency}
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  searchFrequency: e.target.value as 'daily' | 'weekly',
-                })
-              }
-            >
-              <option value="daily">Daily (6:00 UTC)</option>
-              <option value="weekly">Weekly (Mondays 6:00 UTC)</option>
-            </select>
-            <p className="mt-1.5 text-[12px] text-[var(--text-secondary)]">
-              Qualified prospects are added to your pipeline automatically — separate from the Aspire
-              search UI.
+        {step === 1 && (
+          <div className="space-y-4">
+            <p className="text-[13px] text-[var(--text-secondary)]">
+              ICP defaults to your vertical ({accountVertical}). Adjust cities and exclusions below.
             </p>
+            <div>
+              <Label htmlFor="target-cities">Target cities (comma-separated)</Label>
+              <Input
+                id="target-cities"
+                className="mt-1.5 border-[var(--border-default)] bg-[var(--bg-surface)]"
+                placeholder="Phoenix AZ, Dallas TX"
+                value={form.targetCities}
+                onChange={(e) => setForm({ ...form, targetCities: e.target.value })}
+              />
+            </div>
+            <div>
+              <Label htmlFor="exclude-domains">Exclude domains</Label>
+              <Input
+                id="exclude-domains"
+                className="mt-1.5 border-[var(--border-default)] bg-[var(--bg-surface)]"
+                placeholder="competitor.com"
+                value={form.excludeDomains}
+                onChange={(e) => setForm({ ...form, excludeDomains: e.target.value })}
+              />
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {step === 3 && (
-        <div className="space-y-4">
-          {loadingSearches ? (
-            <p className="text-center text-sm text-[var(--text-secondary)]">Loading saved searches…</p>
-          ) : (
-            <SdrProspectScoutFields
-              compact
-              prospectMode={form.prospectMode}
-              onProspectModeChange={(mode) => setForm({ ...form, prospectMode: mode })}
-              defaultMinIcpScore={form.defaultMinIcpScore}
-              onDefaultMinIcpScoreChange={(v) => setForm({ ...form, defaultMinIcpScore: v })}
-              syncIcpToSavedSearches={form.syncIcpToSavedSearches}
-              onSyncIcpChange={(v) => setForm({ ...form, syncIcpToSavedSearches: v })}
-              bindings={form.bindings}
-              onBindingsChange={(bindings) => setForm({ ...form, bindings })}
-              savedSearches={savedSearches}
-            />
-          )}
-        </div>
-      )}
-
-      {step === 4 && (
-        <div className="card-surface space-y-4 p-5">
-          <h2 className="text-lg font-semibold tracking-tight text-[var(--text-primary)]">
-            Review & launch
-          </h2>
-          <div className="rounded-[var(--radius-md)] border border-[var(--accent-border)] bg-[var(--accent-muted)] p-4 text-sm text-[var(--text-primary)]">
-            Once active, {form.agentName} will find and contact real prospects. You can pause anytime.
+        {step === 2 && (
+          <div className="space-y-4">
+            <p className="text-[13px] text-[var(--text-secondary)]">
+              Mon–Fri, 8am–5pm Eastern (default). Customize in settings later.
+            </p>
+            <div>
+              <Label htmlFor="max-leads">Max new leads per day</Label>
+              <Input
+                id="max-leads"
+                type="number"
+                className="mt-1.5 border-[var(--border-default)] bg-[var(--bg-surface)]"
+                value={form.maxNewLeadsDay}
+                onChange={(e) => setForm({ ...form, maxNewLeadsDay: Number(e.target.value) })}
+              />
+            </div>
+            <div>
+              <Label htmlFor="max-active">Max active sequences</Label>
+              <Input
+                id="max-active"
+                type="number"
+                className="mt-1.5 border-[var(--border-default)] bg-[var(--bg-surface)]"
+                value={form.maxActiveLeads}
+                onChange={(e) => setForm({ ...form, maxActiveLeads: Number(e.target.value) })}
+              />
+            </div>
+            <div>
+              <Label htmlFor="search-frequency">Prospect Scout discovery</Label>
+              <select
+                id="search-frequency"
+                className="mt-1.5 flex h-9 w-full rounded-md border border-[var(--border-default)] bg-[var(--bg-surface)] px-3 text-[13px] text-[var(--text-primary)]"
+                value={form.searchFrequency}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    searchFrequency: e.target.value as 'daily' | 'weekly',
+                  })
+                }
+              >
+                <option value="daily">Daily (6:00 UTC)</option>
+                <option value="weekly">Weekly (Mondays 6:00 UTC)</option>
+              </select>
+              <p className="mt-1.5 text-[12px] text-[var(--text-secondary)]">
+                Qualified prospects are added to your pipeline automatically — separate from the
+                Aspire search UI.
+              </p>
+            </div>
           </div>
-          <dl className="space-y-2 text-sm">
-            <div className="flex justify-between gap-4">
-              <dt className="text-[var(--text-tertiary)]">Agent</dt>
-              <dd className="font-medium text-[var(--text-primary)]">{form.agentName}</dd>
+        )}
+
+        {step === 3 && (
+          <div>
+            {loadingSearches ? (
+              <p className="text-center text-[13px] text-[var(--text-secondary)]">
+                Loading saved searches…
+              </p>
+            ) : (
+              <SdrProspectScoutFields
+                compact
+                prospectMode={form.prospectMode}
+                onProspectModeChange={(mode) => setForm({ ...form, prospectMode: mode })}
+                defaultMinIcpScore={form.defaultMinIcpScore}
+                onDefaultMinIcpScoreChange={(v) => setForm({ ...form, defaultMinIcpScore: v })}
+                syncIcpToSavedSearches={form.syncIcpToSavedSearches}
+                onSyncIcpChange={(v) => setForm({ ...form, syncIcpToSavedSearches: v })}
+                bindings={form.bindings}
+                onBindingsChange={(bindings) => setForm({ ...form, bindings })}
+                savedSearches={savedSearches}
+              />
+            )}
+          </div>
+        )}
+
+        {step === 4 && (
+          <div className="space-y-4">
+            <div className="rounded-lg border border-[var(--accent-border)] bg-[var(--accent-muted)] p-4 text-[13px] text-[var(--text-primary)]">
+              Once active, {form.agentName} will find and contact real prospects. You can pause
+              anytime from the command center.
             </div>
-            <div className="flex justify-between gap-4">
-              <dt className="text-[var(--text-tertiary)]">From</dt>
-              <dd className="text-right font-medium text-[var(--text-primary)]">
-                {form.fromName} &lt;{form.fromEmail}&gt;
-              </dd>
-            </div>
-            <div className="flex justify-between gap-4">
-              <dt className="text-[var(--text-tertiary)]">Daily cap</dt>
-              <dd className="font-medium text-[var(--text-primary)]">{form.maxNewLeadsDay} leads</dd>
-            </div>
-            <div className="flex justify-between gap-4">
-              <dt className="text-[var(--text-tertiary)]">Discovery</dt>
-              <dd className="font-medium text-[var(--text-primary)]">{form.searchFrequency}</dd>
-            </div>
-            <div className="flex justify-between gap-4">
-              <dt className="text-[var(--text-tertiary)]">Prospect mode</dt>
-              <dd className="font-medium text-[var(--text-primary)]">
-                {form.prospectMode.replace(/_/g, ' ')}
-              </dd>
-            </div>
-            {(form.prospectMode === 'aspire_bound' || form.prospectMode === 'hybrid') && (
+            <dl className="space-y-2 text-[13px]">
               <div className="flex justify-between gap-4">
-                <dt className="text-[var(--text-tertiary)]">Bindings</dt>
-                <dd className="font-medium text-[var(--text-primary)]">
-                  {form.bindings.length} saved search{form.bindings.length === 1 ? '' : 's'}
+                <dt className="text-[var(--text-tertiary)]">Agent</dt>
+                <dd className="font-medium text-[var(--text-primary)]">{form.agentName}</dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-[var(--text-tertiary)]">From</dt>
+                <dd className="text-right font-medium text-[var(--text-primary)]">
+                  {form.fromName} &lt;{form.fromEmail}&gt;
                 </dd>
               </div>
-            )}
-          </dl>
-        </div>
-      )}
-
-      <div className="flex justify-between">
-        <Button
-          variant="outline"
-          disabled={step === 0}
-          onClick={() => setStep((s) => s - 1)}
-          className="border-[var(--border-default)]"
-        >
-          Back
-        </Button>
-        {step < STEPS.length - 1 ? (
-          <Button
-            onClick={next}
-            className="bg-[var(--accent)] text-[var(--text-primary)] hover:bg-[var(--accent-hover)]"
-          >
-            Continue
-          </Button>
-        ) : (
-          <Button
-            disabled={isPending}
-            onClick={launch}
-            className="bg-[var(--accent)] text-[var(--text-primary)] hover:bg-[var(--accent-hover)]"
-          >
-            Launch SDR Agent
-          </Button>
+              <div className="flex justify-between gap-4">
+                <dt className="text-[var(--text-tertiary)]">Daily cap</dt>
+                <dd className="font-medium text-[var(--text-primary)]">{form.maxNewLeadsDay} leads</dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-[var(--text-tertiary)]">Discovery</dt>
+                <dd className="font-medium text-[var(--text-primary)]">{form.searchFrequency}</dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-[var(--text-tertiary)]">Prospect mode</dt>
+                <dd className="font-medium capitalize text-[var(--text-primary)]">
+                  {form.prospectMode.replace(/_/g, ' ')}
+                </dd>
+              </div>
+              {(form.prospectMode === 'aspire_bound' || form.prospectMode === 'hybrid') && (
+                <div className="flex justify-between gap-4">
+                  <dt className="text-[var(--text-tertiary)]">Bindings</dt>
+                  <dd className="font-medium text-[var(--text-primary)]">
+                    {form.bindings.length} saved search{form.bindings.length === 1 ? '' : 'es'}
+                  </dd>
+                </div>
+              )}
+            </dl>
+          </div>
         )}
-      </div>
+      </SlideWizardFrame>
     </div>
   )
 }

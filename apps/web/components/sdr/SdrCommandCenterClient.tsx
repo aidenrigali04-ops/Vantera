@@ -36,13 +36,20 @@ type Props = {
   stats: SDRDashboardStats
   initialActivity: SDRActivityEvent[]
   upcoming: UpcomingSend[]
+  autonomousMessaging?: boolean
 }
 
 function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
 }
 
-export function SdrCommandCenterClient({ config, stats, initialActivity, upcoming }: Props) {
+export function SdrCommandCenterClient({
+  config,
+  stats,
+  initialActivity,
+  upcoming,
+  autonomousMessaging = true,
+}: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [activity, setActivity] = useState(initialActivity)
@@ -77,6 +84,11 @@ export function SdrCommandCenterClient({ config, stats, initialActivity, upcomin
       const json = await res.json()
       if (!json.success) {
         toast.error(json.error ?? 'Discovery run failed')
+        return
+      }
+      if (json.data?.queued) {
+        toast.success('Discovery run started — results will appear in the activity feed')
+        await refreshActivity()
         return
       }
       const enrolled = json.data?.enrolled ?? 0
@@ -161,6 +173,16 @@ export function SdrCommandCenterClient({ config, stats, initialActivity, upcomin
           </div>
         }
       />
+
+      {!autonomousMessaging && config.isActive && !config.isPaused ? (
+        <div className="rounded-lg border border-[var(--warning)]/30 bg-[var(--warning-muted)] px-4 py-3 text-[13px] text-[var(--text-primary)]">
+          <p className="font-medium">Review mode — outbound is not auto-sent</p>
+          <p className="mt-1 text-[var(--text-secondary)]">
+            Sequences are drafted for your approval. Enable autonomous messaging in settings to let{' '}
+            {config.agentName} send on schedule.
+          </p>
+        </div>
+      ) : null}
 
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <span
