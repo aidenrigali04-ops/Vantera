@@ -13,8 +13,6 @@ type Props = {
   fromDomain: string
   inboundDomain: string
   fromLocalPart: string
-  previewFrom: string
-  previewReplyDomain: string
   domainStatus: string
   inboundDomainStatus: string
   hasDnsRecords: boolean
@@ -29,8 +27,6 @@ export function OutreachDomainSetupGuide({
   fromDomain,
   inboundDomain,
   fromLocalPart,
-  previewFrom,
-  previewReplyDomain,
   domainStatus,
   inboundDomainStatus,
   hasDnsRecords,
@@ -42,50 +38,47 @@ export function OutreachDomainSetupGuide({
 
   const steps: GuideStep[] = [
     {
-      title: 'Enter your domain in Vantera',
+      title: 'Use your website domain',
       body: (
         <>
-          Sending domain:{' '}
-          <code className="rounded bg-stone-100 px-1 py-0.5 text-xs">{exampleDomain}</code>.
-          Emails will send as{' '}
+          Enter the same domain as your website — for example{' '}
+          <code className="rounded bg-stone-100 px-1 py-0.5 text-xs">{exampleDomain}</code>, not a
+          different name. Outreach will send as{' '}
           <code className="rounded bg-stone-100 px-1 py-0.5 text-xs">
             {exampleLocal}@{exampleDomain}
           </code>
-          . Vantera registers everything with our email provider — you never need a Resend login.
+          .
         </>
       ),
     },
     {
-      title: 'Click Save domain',
+      title: 'Save domain in Vantera',
       body: (
         <>
-          Vantera generates your DNS records instantly in the two tables below — one for sending,
-          one for inbound replies. Each row has copy buttons for the host and value.
+          Click <strong>Save domain</strong> on this page. Vantera creates your DNS list in the two
+          tables below (sending + replies). Use the copy buttons — you do not need a separate email
+          provider account.
         </>
       ),
     },
     {
-      title: 'Paste records at your DNS host (only step outside Vantera)',
+      title: 'Paste DNS where your website lives',
       body: (
         <>
-          Open wherever you manage DNS — Cloudflare, GoDaddy, Namecheap, Google Domains, etc. Paste
-          the records from Vantera. This takes about 5 minutes. DNS propagation can take up to 48
-          hours, but is often much faster.
+          Open the same place you manage DNS for your website — Vercel, GoDaddy, Cloudflare,
+          Squarespace, Namecheap, etc. Add each row from Vantera (type, host, value). That is the
+          only step outside Vantera.
         </>
       ),
     },
     {
-      title: 'Return here and click Check verification',
+      title: 'Wait, then verify',
       body: (
         <>
-          Vantera checks DNS for you — no third-party dashboard. When <strong>Send</strong> shows
-          Verified, campaigns use{' '}
-          <code className="rounded bg-stone-100 px-1 py-0.5 text-xs">{previewFrom}</code>. When{' '}
-          <strong>Replies</strong> shows Verified, replies to{' '}
-          <code className="rounded bg-stone-100 px-1 py-0.5 text-xs">
-            replies+{'{id}'}@{exampleInbound}
-          </code>{' '}
-          are tracked on your campaign automatically.
+          DNS usually updates in <strong>15–60 minutes</strong> (sometimes up to a few hours). Come
+          back here and click <strong>Check verification</strong>. When status shows{' '}
+          <strong>Verified</strong>, email outreach is ready. Use <strong>Refresh DNS status</strong>{' '}
+          while you wait.
         </>
       ),
     },
@@ -96,19 +89,23 @@ export function OutreachDomainSetupGuide({
       <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg border border-stone-200 bg-stone-50/80 px-4 py-3 text-left transition-colors hover:bg-stone-50">
         <span className="flex items-center gap-2 text-sm font-medium text-stone-900">
           <BookOpen className="h-4 w-4 text-violet-600" />
-          Setup guide — stay in Vantera
+          How to set up email on your domain
         </span>
         <ChevronDown
           className={cn('h-4 w-4 text-stone-500 transition-transform', open && 'rotate-180')}
         />
       </CollapsibleTrigger>
       <CollapsibleContent className="pt-4">
-        <div className="space-y-4 rounded-lg border border-stone-100 bg-white p-4">
-          <p className="text-sm text-stone-600">
-            You only leave Vantera once — to paste DNS records at your domain provider. Everything
-            else (registration, verification, reply routing) happens inside this page.
+        <div className="space-y-4 rounded-lg border border-violet-200/60 bg-violet-50/50 p-4">
+          <p className="text-sm font-medium text-stone-900">In short</p>
+          <p className="text-sm leading-relaxed text-stone-700">
+            Use the <strong>same domain as your website</strong>. Save it here in Vantera Settings,
+            then paste the DNS records into wherever you already manage DNS for that domain (where
+            you would add a website or subdomain record).
           </p>
+        </div>
 
+        <div className="mt-4 space-y-4 rounded-lg border border-stone-100 bg-white p-4">
           <ol className="space-y-4">
             {steps.map((step, index) => (
               <li key={step.title} className="flex gap-3">
@@ -126,24 +123,39 @@ export function OutreachDomainSetupGuide({
           <div className="rounded-md border border-amber-200/80 bg-amber-50/80 px-3 py-2.5 text-xs text-amber-900">
             {!hasDnsRecords ? (
               <>
-                <strong>Start:</strong> Enter your domain and click Save domain.
+                <strong>Next:</strong> Enter your website domain and click Save domain.
               </>
             ) : domainStatus === 'verified' && inboundDomainStatus === 'verified' ? (
               <>
-                <strong>All set.</strong> Sending and reply tracking are active.
+                <strong>Done.</strong> Your domain is set up for sending and reply tracking.
               </>
             ) : domainStatus === 'verified' ? (
               <>
-                <strong>Almost there:</strong> Sending works. Add the inbound MX records and verify
-                replies.
+                <strong>Almost done:</strong> Sending works. Add the inbound (reply) DNS rows, then
+                check verification again.
+              </>
+            ) : domainStatus === 'pending' ? (
+              <>
+                <strong>Pending DNS</strong> — normal for up to an hour. If records are pasted
+                correctly at your DNS host, click Check verification again in 15–30 minutes.
               </>
             ) : (
               <>
-                <strong>Next:</strong> Paste the DNS records below, then click Check verification.
-                Use Refresh DNS status to update row statuses without leaving Vantera.
+                <strong>Next:</strong> Paste the DNS tables below at your DNS host, then click Check
+                verification.
               </>
             )}
           </div>
+
+          {hasDnsRecords && domainStatus !== 'verified' ? (
+            <p className="text-[12px] text-stone-500">
+              Replies use{' '}
+              <code className="rounded bg-stone-100 px-1 text-[11px]">
+                replies+@{'{id}'}@{exampleInbound}
+              </code>{' '}
+              after inbound DNS is verified.
+            </p>
+          ) : null}
         </div>
       </CollapsibleContent>
     </Collapsible>

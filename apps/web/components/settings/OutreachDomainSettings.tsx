@@ -189,9 +189,10 @@ export function OutreachDomainSettingsPanel({ initial }: Props) {
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 className="text-base font-semibold text-stone-900">Outreach email domain</h2>
-          <p className="mt-0.5 text-[13px] text-stone-500">
-            Everything you need is here in Vantera — no Resend account required. You only open your
-            DNS host (Cloudflare, GoDaddy, etc.) to paste the records below.
+          <p className="mt-0.5 text-[13px] leading-relaxed text-stone-500">
+            Send outreach from your own domain (e.g. outreach@yourcompany.com). Use the same domain
+            as your website — save it here, then paste the DNS records where you manage that
+            domain (Vercel, GoDaddy, Cloudflare, etc.).
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -221,8 +222,6 @@ export function OutreachDomainSettingsPanel({ initial }: Props) {
           fromDomain={fromDomain}
           inboundDomain={inboundDomain}
           fromLocalPart={fromLocalPart}
-          previewFrom={settings.previewFrom}
-          previewReplyDomain={settings.previewReplyDomain}
           domainStatus={settings.domainStatus}
           inboundDomainStatus={settings.inboundDomainStatus}
           hasDnsRecords={hasRecords}
@@ -245,7 +244,7 @@ export function OutreachDomainSettingsPanel({ initial }: Props) {
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <Label htmlFor="outreach-from-domain">Sending domain</Label>
+            <Label htmlFor="outreach-from-domain">Your website domain</Label>
             <Input
               id="outreach-from-domain"
               value={fromDomain}
@@ -256,9 +255,12 @@ export function OutreachDomainSettingsPanel({ initial }: Props) {
                   if (next.includes('.')) setInboundDomain(`inbound.${next}`)
                 }
               }}
-              placeholder="acmehvac.com"
+              placeholder="yourcompany.com"
               className="mt-1.5"
             />
+            <p className="mt-1.5 text-[12px] text-stone-500">
+              Same domain as your site — not a separate email-only domain.
+            </p>
           </div>
           <div>
             <Label htmlFor="outreach-local-part">From address prefix</Label>
@@ -313,22 +315,29 @@ export function OutreachDomainSettingsPanel({ initial }: Props) {
         </div>
 
         <DnsRecordsTable
-          title="Step 1 — Sending DNS records"
-          description={`Add these at your DNS provider for ${fromDomain || 'your sending domain'}. Use the copy buttons — no need to open Resend.`}
+          title="Step 1 — Paste these at your DNS host (sending)"
+          description={`In Vercel, GoDaddy, Cloudflare, or wherever ${fromDomain || 'your website'} DNS lives. Copy each row exactly.`}
           records={settings.sendingRecords}
-          emptyMessage="Save your domain to load sending DNS records here."
+          emptyMessage="Enter your website domain above and click Save domain — records will appear here."
         />
 
         <DnsRecordsTable
-          title="Step 2 — Inbound reply DNS records (MX)"
-          description={`Add these on ${inboundDomain || 'your inbound subdomain'} so campaign replies are tracked automatically.`}
+          title="Step 2 — Paste these at your DNS host (replies)"
+          description={`Add on ${inboundDomain || 'inbound.yourdomain.com'} so replies are tracked automatically.`}
           records={settings.inboundRecords}
           emptyMessage={
             settings.fromDomain
-              ? 'Inbound records will appear here after you save. If empty, click Refresh DNS status.'
+              ? 'Save domain first, then click Refresh DNS status if inbound rows are missing.'
               : undefined
           }
         />
+
+        {settings.fromDomain && settings.domainStatus === 'pending' ? (
+          <p className="text-[13px] text-stone-600">
+            Status <strong>Pending</strong> is normal for 15–60 minutes after you paste DNS. Click{' '}
+            <strong>Refresh DNS status</strong>, then <strong>Check verification</strong>.
+          </p>
+        ) : null}
 
         {settings.domainStatus === 'verified' ? (
           <div className="flex items-start gap-2 rounded-lg bg-emerald-50 px-3 py-2.5 text-sm text-emerald-800">
