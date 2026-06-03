@@ -9,9 +9,12 @@ import {
 import {
   clearAdminSession,
   clearPortalSession,
+  getPortalSession,
   setAdminSession,
   setPortalSession,
 } from '@/lib/auth/session'
+import { getAccount } from '@/lib/db/queries'
+import { derivePortalLoginPath } from '@/lib/portal/url'
 import type { ActionResult } from '@/lib/auth/types'
 import type { UserRole } from '@/lib/auth/constants'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
@@ -316,9 +319,18 @@ export async function adminLogoutAction(): Promise<void> {
 }
 
 export async function portalLogoutAction(): Promise<void> {
+  const session = await getPortalSession()
   const supabase = createSupabaseServerClient()
   await supabase.auth.signOut()
   await clearPortalSession()
+
+  if (session?.accountId) {
+    const account = await getAccount(session.accountId)
+    if (account) {
+      redirect(derivePortalLoginPath(account.slug, account.portalDomain))
+    }
+  }
+
   redirect('/auth/portal-login')
 }
 

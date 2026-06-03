@@ -1,5 +1,6 @@
 import 'server-only'
 
+import { toEnrichedAspireSearchResult } from '@/lib/aspire/enrich-prospect'
 import { getIcpConfigForVertical, scoreICP } from '@/lib/aspire/icp-score'
 import { stubResults } from '@/lib/aspire/prospect-stubs'
 import { searchProspects } from '@/lib/aspire/search'
@@ -37,13 +38,9 @@ function buildOnboardingPreviewStubLeads(args: {
   })
     .map((person) => {
       const scored = scoreICP(person, icpConfig)
-      return toPreviewLead({
-        ...person,
-        icpScore: scored.score,
-        icpSignals: scored.signals,
-        intentScore: scored.score,
-        company: person.organizationName,
-      })
+      return toPreviewLead(
+        toEnrichedAspireSearchResult(person, scored.score, scored.signals),
+      )
     })
     .sort((a, b) => b.icpScore - a.icpScore)
     .slice(0, 5)

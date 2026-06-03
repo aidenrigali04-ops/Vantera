@@ -29,7 +29,19 @@ export const authPageMetadata = {
 export function portalLoginMetadata(businessName?: string | null): Metadata {
   const name = businessName?.trim()
   return {
-    title: name ? `Client portal — ${name}` : 'Client portal — Vantera',
-    description: 'Sign in to view your projects, invoices, and updates.',
+    title: name ? `Sign in — ${name}` : 'Client portal sign in',
+    description: name
+      ? `Sign in to the ${name} client portal.`
+      : 'Sign in to view your projects, invoices, and updates.',
+  }
+}
+
+export function portalHomeMetadata(businessName?: string | null): Metadata {
+  const name = businessName?.trim()
+  return {
+    title: name ? `${name} — Client portal` : 'Client portal',
+    description: name
+      ? `Your ${name} client workspace for projects, documents, and billing.`
+      : 'Your client workspace for projects, documents, and billing.',
   }
 }

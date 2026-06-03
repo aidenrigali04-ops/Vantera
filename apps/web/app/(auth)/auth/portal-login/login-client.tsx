@@ -1,8 +1,16 @@
 'use client'
 
 import { AuthCredentialsPanel } from '@/components/auth/auth-credentials-panel'
+import { useBranding } from '@/lib/branding/context'
 
 export function PortalLoginClient() {
+  const { businessName } = useBranding()
+  const name = businessName.trim()
+  const title = name ? `${name} client portal` : 'Client portal'
+  const subtitle = name
+    ? `Sign in to view your projects, invoices, and updates from ${name}.`
+    : 'Sign in to view your projects, invoices, and updates.'
+
   return (
     <AuthCredentialsPanel
       initialMode="login"
@@ -10,8 +18,8 @@ export function PortalLoginClient() {
       allowModeToggle={false}
       portal
       loginFallbackPath="/portal"
-      heading="Client portal"
-      subheading="Sign in to view your projects, invoices, and updates."
+      heading={title}
+      subheading={subtitle}
     />
   )
 }

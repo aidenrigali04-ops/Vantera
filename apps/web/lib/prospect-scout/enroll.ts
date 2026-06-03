@@ -1,4 +1,8 @@
 import type { ApifyLead } from '@/lib/aspire/types'
+import {
+  buildLeadProspectEnrichment,
+  mergeLeadEnrichment,
+} from '@/lib/leads/enrichment'
 import { getSystemAutomationId } from '@/lib/automation/system-automation'
 import { db } from '@/lib/db/client'
 import {
@@ -37,7 +41,7 @@ async function upsertLeadFromApify(
 ): Promise<string> {
   if (person.email) {
     const [existing] = await db
-      .select({ id: leads.id })
+      .select({ id: leads.id, enrichment: leads.enrichment })
       .from(leads)
       .where(
         and(
@@ -49,13 +53,34 @@ async function upsertLeadFromApify(
       .limit(1)
 
     if (existing) {
+      const enrichment = buildLeadProspectEnrichment(
+        person,
+        score,
+        signals,
+        source === 'sdr_agent' ? 'scout' : 'aspire',
+      )
       await db
         .update(leads)
-        .set({ score, updatedAt: new Date() })
+        .set({
+          score,
+          avatarUrl: person.photoUrl,
+          enrichment: mergeLeadEnrichment(
+            existing.enrichment as Record<string, unknown>,
+            enrichment,
+          ),
+          updatedAt: new Date(),
+        })
         .where(eq(leads.id, existing.id))
       return existing.id
     }
   }
+
+  const enrichment = buildLeadProspectEnrichment(
+    person,
+    score,
+    signals,
+    source === 'sdr_agent' ? 'scout' : 'aspire',
+  )
 
   const [created] = await db
     .insert(leads)
@@ -68,9 +93,10 @@ async function upsertLeadFromApify(
       email: person.email,
       phone: person.phone,
       linkedinUrl: person.linkedinUrl,
+      avatarUrl: person.photoUrl,
       source,
       score,
-      enrichment: { apifyId: person.id, icpSignals: signals, industry: person.industry },
+      enrichment,
     })
     .returning({ id: leads.id })
 

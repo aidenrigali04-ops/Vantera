@@ -4,15 +4,13 @@ import { AspireIntelligencePanel } from '@/components/aspire/AspireIntelligenceP
 import { SdrCreditPaywall } from '@/components/sdr/SdrCreditPaywall'
 import { SdrCreditStrip } from '@/components/sdr/SdrCreditStrip'
 import { SdrOutreachHubTabs } from '@/components/sdr/SdrOutreachHubTabs'
+import { AspireMetricsBar } from '@/components/aspire/AspireMetricsBar'
+import { AspireQualityCell } from '@/components/aspire/AspireQualityCell'
 import {
-  AspireContactCell,
   AspireEnrollCell,
-  AspireIcpCell,
-  AspireIndustryCell,
   AspireProspectCell,
 } from '@/components/aspire/AspireTableCells'
 import { BulkActionBar } from '@/components/operational/BulkActionBar'
-import { KpiStrip } from '@/components/operational/KpiStrip'
 import {
   OperationalTable,
   type OperationalSort,
@@ -44,7 +42,7 @@ import { useSdrCredits } from '@/lib/sdr/use-sdr-credits'
 import { cn } from '@/lib/utils'
 import type { aspireSavedSearches } from '@vantera/db'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Bookmark, Loader2, Play, Plus, Search, Target, Trash2, TrendingUp, Users } from 'lucide-react'
+import { Bookmark, Loader2, Play, Plus, Search, Trash2 } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
@@ -626,30 +624,21 @@ export function AspirePageClient({
         id: 'name',
         header: 'Prospect',
         sortable: true,
+        className: 'w-[44%]',
         cell: (row: AspireResultRow) => <AspireProspectCell row={row} />,
       },
       {
         id: 'icp',
-        header: 'ICP fit',
+        header: 'Quality',
         sortable: true,
-        cell: (row: AspireResultRow) => <AspireIcpCell score={scoreOf(row)} />,
-      },
-      {
-        id: 'industry',
-        header: 'Industry',
-        sortable: true,
-        cell: (row: AspireResultRow) => <AspireIndustryCell industry={row.industry} />,
-      },
-      {
-        id: 'contact',
-        header: 'Contact',
-        cell: (row: AspireResultRow) => <AspireContactCell row={row} />,
+        className: 'w-[28%]',
+        cell: (row: AspireResultRow) => <AspireQualityCell row={row} />,
       },
       {
         id: 'actions',
         header: '',
         interactive: true,
-        className: 'text-right',
+        className: 'w-[28%] text-right',
         cell: (row: AspireResultRow) => (
           <AspireEnrollCell
             state={enrollStates[row.id] ?? 'idle'}
@@ -661,19 +650,6 @@ export function AspirePageClient({
       },
     ],
     [addMutation.isPending, enrollOne, enrollStates, pipelineActionLabel],
-  )
-
-  const kpiItems = useMemo(
-    () => [
-      { label: 'Results', value: rows.length, icon: Users },
-      { label: 'Strong ICP (70+)', value: rows.filter((r) => scoreOf(r) >= 70).length, icon: Target },
-      {
-        label: 'Added',
-        value: Object.values(enrollStates).filter((s) => s === 'added').length,
-        icon: TrendingUp,
-      },
-    ],
-    [rows, enrollStates],
   )
 
   const showTable = tableLoading || displayRows.length > 0
@@ -828,8 +804,7 @@ export function AspirePageClient({
           </div>
         </aside>
 
-        <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(240px,280px)]">
-          <div className="min-w-0 space-y-4">
+        <div className="min-w-0 space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-[13px] text-[var(--text-secondary)]">
                 {activeSaved ? (
@@ -869,9 +844,11 @@ export function AspirePageClient({
               </div>
             ) : null}
 
-            <KpiStrip items={kpiItems} />
+            {rows.length > 0 ? <AspireMetricsBar rows={rows} /> : null}
 
-            <section className="card-surface overflow-hidden">
+            <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(220px,260px)]">
+            <div className="min-w-0 space-y-3">
+            <section className="card-surface min-w-0 overflow-hidden">
               <div className="border-b border-[var(--border-default)] bg-[var(--bg-subtle)]/50 px-4 py-4 md:px-5">
                 <TableToolbar
                   search={tableSearch}
@@ -939,6 +916,7 @@ export function AspirePageClient({
                   sort={sort}
                   onSortChange={setSort}
                   loading={tableLoading}
+                  fluid
                   className="rounded-none border-0 shadow-none"
                 />
               ) : (
@@ -965,7 +943,7 @@ export function AspirePageClient({
                   : `Add ${selectedIds.length || ''} to pipeline`}
               </Button>
             </BulkActionBar>
-          </div>
+            </div>
 
           <div className="min-w-0 xl:sticky xl:top-6 xl:self-start">
             <AspireIntelligencePanel
@@ -983,6 +961,7 @@ export function AspirePageClient({
               }
             />
           </div>
+        </div>
         </div>
       </div>
 

@@ -5,6 +5,7 @@ import type { Plan } from '@/lib/feature-flags/flags'
 import { isAccountAutomaticOutreach } from '@/lib/sdr/outreach-automation-policy'
 import { flushAutomaticOutreachPipelines } from '@/lib/sdr/outreach-automation-policy'
 import { logSdrActivity } from '@/lib/sdr/activity-log'
+import { enrichAndProfileLead } from '@/lib/sdr/enrich-and-profile-lead'
 import { generateSdrSequenceSteps } from '@/lib/sdr/draft-sequence'
 import { requireSDREnabledForAccount } from '@/lib/sdr/guard'
 import type { DraftSdrSequencePayload, SdrOutreachWindow } from '@/lib/sdr/types'
@@ -69,6 +70,27 @@ export async function runDraftSdrSequence(payload: DraftSdrSequencePayload): Pro
     }
   }
 
+  await enrichAndProfileLead({
+    accountId: payload.accountId,
+    leadId: payload.leadId,
+    aspireData,
+    icpScore: lead.score,
+    icpSignals,
+    source: 'scout',
+  })
+
+  const [refreshedLead] = await db
+    .select()
+    .from(leads)
+    .where(and(eq(leads.id, payload.leadId), eq(leads.accountId, payload.accountId)))
+    .limit(1)
+
+  const leadForDraft = refreshedLead ?? lead
+  const refreshedEnrichment = (leadForDraft.enrichment ?? {}) as Record<string, unknown>
+  const profileSignals = Array.isArray(refreshedEnrichment.icpSignals)
+    ? (refreshedEnrichment.icpSignals as string[])
+    : icpSignals
+
   const employeeCount = aspireData?.employeeCount ?? null
   const window = (config.outreachWindow as SdrOutreachWindow) ?? {
     startHour: 8,
@@ -81,13 +103,13 @@ export async function runDraftSdrSequence(payload: DraftSdrSequencePayload): Pro
     agentName: config.agentName,
     accountDisplayName: account?.name ?? 'Your team',
     vertical: account?.vertical ?? 'agency',
-    firstName: lead.firstName ?? 'there',
-    lastName: lead.lastName ?? '',
-    title: lead.title ?? '',
-    company: lead.company,
+    firstName: leadForDraft.firstName ?? 'there',
+    lastName: leadForDraft.lastName ?? '',
+    title: leadForDraft.title ?? '',
+    company: leadForDraft.company,
     employeeCount,
-    icpScore: lead.score,
-    icpSignals,
+    icpScore: leadForDraft.score,
+    icpSignals: profileSignals,
     icpConfig: config.icpConfig as Parameters<typeof generateSdrSequenceSteps>[0]['icpConfig'],
     outreachDays: config.outreachDays ?? undefined,
     outreachWindow: window,

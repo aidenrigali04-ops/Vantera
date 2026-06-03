@@ -32,6 +32,8 @@ type OperationalTableProps<T extends { id: string }> = {
   onSortChange?: (sort: OperationalSort | null) => void
   loading?: boolean
   loadingMessage?: string
+  /** Fit parent width — no forced horizontal scroll on narrow layouts. */
+  fluid?: boolean
 }
 
 export function OperationalTable<T extends { id: string }>({
@@ -46,6 +48,7 @@ export function OperationalTable<T extends { id: string }>({
   onSortChange,
   loading = false,
   loadingMessage = 'Loading…',
+  fluid = false,
 }: OperationalTableProps<T>) {
   const allSelected = rows.length > 0 && selectedIds.length === rows.length
   const someSelected = selectedIds.length > 0 && !allSelected
@@ -80,8 +83,13 @@ export function OperationalTable<T extends { id: string }>({
 
   return (
     <div className={cn('card-surface overflow-hidden', className)}>
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[860px] text-[13px]">
+      <div className={cn(fluid ? 'overflow-hidden' : 'overflow-x-auto')}>
+        <table
+          className={cn(
+            'w-full text-[13px]',
+            fluid ? 'table-fixed' : 'min-w-[860px]',
+          )}
+        >
           <thead className="sticky top-0 z-10 bg-[var(--bg-subtle)]/80 backdrop-blur-sm">
             <tr className="border-b border-[var(--border-default)]">
               {onSelectionChange ? (

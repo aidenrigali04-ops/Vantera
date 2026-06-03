@@ -3,7 +3,9 @@
 import { IcpScoreRing, icpScoreLabel } from '@/components/aspire/IcpScoreRing'
 import { StatusBadge } from '@/components/operational/table/StatusBadge'
 import { Button } from '@/components/ui/button'
+import { getProspectEnrichmentFields } from '@/lib/aspire/enrich-prospect'
 import { scoreICP } from '@/lib/aspire/icp-score'
+import { qualityUiForTier } from '@/lib/aspire/lead-quality-ui'
 import type { AspireSearchResult } from '@/lib/aspire/types'
 import { aspireIntentTone } from '@/lib/operational/aspire-table-views'
 import { cn } from '@/lib/utils'
@@ -54,6 +56,15 @@ export function AspireIntelligencePanel({
   const scored = scoreICP(result, icpConfig)
   const score = result.icpScore ?? scored.score
   const signals = result.icpSignals?.length ? result.icpSignals : scored.signals
+  const enrichmentMeta =
+    result.enrichmentScore != null && result.enrichmentTier
+      ? {
+          enrichmentScore: result.enrichmentScore,
+          enrichmentTier: result.enrichmentTier,
+          enrichmentCompleteness: result.enrichmentCompleteness,
+        }
+      : getProspectEnrichmentFields(result, score, signals)
+  const tierUi = qualityUiForTier(enrichmentMeta.enrichmentTier)
 
   return (
     <div className="card-surface p-5">
@@ -142,6 +153,57 @@ export function AspireIntelligencePanel({
                 '—'
               )}
             </li>
+          </ul>
+        </div>
+
+        <div>
+          <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--text-secondary)]">
+            Enrichment
+          </p>
+          <div
+            className="rounded-lg px-3 py-2.5 ring-1 ring-inset"
+            style={{
+              backgroundColor: tierUi.mutedBg,
+              boxShadow: `inset 0 0 0 1px ${tierUi.ring}`,
+            }}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[12px] font-semibold" style={{ color: tierUi.barColor }}>
+                {tierUi.label} lead
+              </span>
+              <span className="text-[11px] tabular-nums text-[var(--text-secondary)]">
+                {enrichmentMeta.enrichmentScore}% score
+              </span>
+            </div>
+            <p className="mt-1 text-[11px] text-[var(--text-secondary)]">
+              {enrichmentMeta.enrichmentCompleteness}% profile complete
+            </p>
+          </div>
+          <ul className="mt-2 space-y-1 text-[12px] text-[var(--text-secondary)]">
+            {result.websiteUrl ? (
+              <li>
+                <span className="text-[var(--text-tertiary)]">Web:</span>{' '}
+                <a
+                  href={result.websiteUrl.startsWith('http') ? result.websiteUrl : `https://${result.websiteUrl}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[var(--accent)] hover:underline"
+                >
+                  {result.websiteUrl.replace(/^https?:\/\//, '')}
+                </a>
+              </li>
+            ) : null}
+            {result.revenue != null ? (
+              <li>
+                <span className="text-[var(--text-tertiary)]">Revenue:</span> ${result.revenue}
+              </li>
+            ) : null}
+            {result.technologies.length > 0 ? (
+              <li>
+                <span className="text-[var(--text-tertiary)]">Tech:</span>{' '}
+                {result.technologies.slice(0, 4).join(', ')}
+              </li>
+            ) : null}
           </ul>
         </div>
 

@@ -1,4 +1,5 @@
-import type { AspireSearchResult } from '@/lib/aspire/types'
+import { toEnrichedAspireSearchResult } from '@/lib/aspire/enrich-prospect'
+import type { ApifyLead, AspireSearchResult } from '@/lib/aspire/types'
 import { readProspectContact, splitFullName } from '@/lib/aspire/contact-fields'
 
 type RawAspireRow = Record<string, unknown>
@@ -23,7 +24,7 @@ export function hydrateAspireSearchResult(
   const fullName = String(raw.full_name ?? raw.fullName ?? raw.contact_full_name ?? '')
   const split = fullName ? splitFullName(fullName) : { firstName: '', lastName: '' }
 
-  return {
+  const person: ApifyLead = {
     id: row.apifyId ?? row.id,
     firstName: String(raw.firstName ?? raw.first_name ?? split.firstName),
     lastName: String(raw.lastName ?? raw.last_name ?? split.lastName),
@@ -43,10 +44,12 @@ export function hydrateAspireSearchResult(
       ? raw.technologies.filter((t): t is string => typeof t === 'string')
       : [],
     photoUrl: typeof raw.photoUrl === 'string' ? raw.photoUrl : null,
-    icpScore: row.icpScore,
-    icpSignals,
-    intentScore: row.icpScore,
-    company: String(raw.organizationName ?? raw.company_name ?? raw.company ?? ''),
+  }
+
+  const hydrated = toEnrichedAspireSearchResult(person, row.icpScore, icpSignals)
+
+  return {
+    ...hydrated,
     status: row.status,
     resultId: row.id,
     ...extra,

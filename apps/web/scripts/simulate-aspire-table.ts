@@ -9,6 +9,7 @@ import {
   readProspectContact,
 } from '../lib/aspire/contact-fields'
 import { normalizeApifyFilters } from '../lib/aspire/filters'
+import { toEnrichedAspireSearchResult } from '../lib/aspire/enrich-prospect'
 import { hydrateAspireSearchResult } from '../lib/aspire/hydrate-result'
 import { stubResults } from '../lib/aspire/prospect-stubs'
 import type { AspireSearchResult } from '../lib/aspire/types'
@@ -55,29 +56,29 @@ function printTable(rows: ReturnType<typeof toTableRows>) {
 
 function mapApifySample(raw: Record<string, unknown>): AspireSearchResult {
   const contact = readProspectContact(raw)
-  return {
-    id: `email:${contact.email}`,
-    firstName: String(raw.first_name ?? ''),
-    lastName: String(raw.last_name ?? ''),
-    title: String(raw.job_title ?? ''),
-    email: contact.email,
-    phone: contact.phone,
-    linkedinUrl: contact.linkedinUrl,
-    organizationName: String(raw.company_name ?? 'Unknown'),
-    organizationId: null,
-    websiteUrl: null,
-    city: typeof raw.city === 'string' ? raw.city : null,
-    state: typeof raw.state === 'string' ? raw.state : null,
-    employeeCount: null,
-    revenue: null,
-    industry: typeof raw.industry === 'string' ? raw.industry : null,
-    technologies: [],
-    photoUrl: null,
-    icpScore: 80,
-    icpSignals: ['Has email', 'Has phone', 'LinkedIn profile'],
-    intentScore: 80,
-    company: String(raw.company_name ?? 'Unknown'),
-  }
+  return toEnrichedAspireSearchResult(
+    {
+      id: `email:${contact.email}`,
+      firstName: String(raw.first_name ?? ''),
+      lastName: String(raw.last_name ?? ''),
+      title: String(raw.job_title ?? ''),
+      email: contact.email,
+      phone: contact.phone,
+      linkedinUrl: contact.linkedinUrl,
+      organizationName: String(raw.company_name ?? 'Unknown'),
+      organizationId: null,
+      websiteUrl: null,
+      city: typeof raw.city === 'string' ? raw.city : null,
+      state: typeof raw.state === 'string' ? raw.state : null,
+      employeeCount: null,
+      revenue: null,
+      industry: typeof raw.industry === 'string' ? raw.industry : null,
+      technologies: [],
+      photoUrl: null,
+    },
+    80,
+    ['Has email', 'Has phone', 'LinkedIn profile'],
+  )
 }
 
 async function main() {
@@ -100,13 +101,7 @@ async function main() {
   const filters = normalizeApifyFilters('agency', { q: 'marketing' }, { interactive: true })
   const stubPeople = stubResults(filters)
   const stubRows = toTableRows(
-    stubPeople.map((p) => ({
-      ...p,
-      icpScore: 72,
-      icpSignals: ['Has email'],
-      intentScore: 72,
-      company: p.organizationName,
-    })),
+    stubPeople.map((p) => toEnrichedAspireSearchResult(p, 72, ['Has email'])),
   )
 
   assert('Stub search returns leads for table', stubRows.length > 0, `got ${stubRows.length}`)

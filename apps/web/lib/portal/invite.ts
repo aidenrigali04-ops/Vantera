@@ -5,6 +5,8 @@ import type { ActionResult } from '@/lib/auth/types'
 import { db } from '@/lib/db/client'
 import { getAccount } from '@/lib/db/queries'
 import { env } from '@/lib/env'
+import { resolveOutreachSendIdentity } from '@/lib/outreach/email-domain'
+import { buildPortalInviteEmailHtml } from '@/lib/portal/invite-email'
 import { derivePortalLoginUrl, derivePortalUrl } from '@/lib/portal/url'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { activities, contacts } from '@vantera/db'
@@ -88,11 +90,14 @@ async function createPortalAuthLink(email: string, portalUrl: string): Promise<s
 }
 
 async function sendPortalInviteEmail(input: {
+  accountId: string
   to: string
   contactName: string
   accountName: string
   portalUrl: string
   magicLink: string
+  primaryColor: string
+  logoUrl: string | null
 }): Promise<boolean> {
   const resendKey = env.RESEND_API_KEY
   if (!resendKey) {
@@ -100,28 +105,19 @@ async function sendPortalInviteEmail(input: {
   }
 
   const resend = new Resend(resendKey)
-  const fromAddress = `${input.accountName} <onboarding@${env.NEXT_PUBLIC_APP_DOMAIN}>`
+  const sendIdentity = await resolveOutreachSendIdentity(input.accountId)
+  const fromAddress = sendIdentity.usesVerifiedCustomDomain
+    ? sendIdentity.from
+    : `${input.accountName} <onboarding@${env.NEXT_PUBLIC_APP_DOMAIN}>`
 
-  const html = `
-    <div style="font-family:system-ui,sans-serif;max-width:560px;margin:0 auto;padding:32px;color:#0f172a">
-      <h1 style="font-size:20px;margin:0 0 16px">Your client portal is ready</h1>
-      <p style="font-size:14px;line-height:1.6;color:#334155;margin:0 0 24px">
-        Hi ${input.contactName}, ${input.accountName} has invited you to your client portal.
-        View project progress, documents, invoices, and message your team in one place.
-      </p>
-      <p style="margin:0 0 32px">
-        <a href="${input.magicLink}"
-           style="background:#0a0a0a;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:500;display:inline-block">
-          Open client portal
-        </a>
-      </p>
-      <p style="font-size:12px;color:#64748b;margin:0">
-        Portal URL: <span style="word-break:break-all">${input.portalUrl}</span><br /><br />
-        If the button doesn't work, copy this link into your browser:<br />
-        <span style="word-break:break-all">${input.magicLink}</span>
-      </p>
-    </div>
-  `
+  const html = buildPortalInviteEmailHtml({
+    contactName: input.contactName,
+    accountName: input.accountName,
+    portalUrl: input.portalUrl,
+    magicLink: input.magicLink,
+    primaryColor: input.primaryColor,
+    logoUrl: input.logoUrl,
+  })
 
   const { error } = await resend.emails.send({
     from: fromAddress,
@@ -160,6 +156,7 @@ async function deliverPortalInvite(
   }
 
   const portalUrl = derivePortalUrl(account.slug, account.portalDomain)
+  const portalLoginUrl = derivePortalLoginUrl(account.slug, account.portalDomain)
   const magicLink = await createPortalAuthLink(email, portalUrl)
 
   if (!magicLink) {
@@ -170,11 +167,14 @@ async function deliverPortalInvite(
   const accountName = account.name || 'Your team'
 
   const sent = await sendPortalInviteEmail({
+    accountId: account.id,
     to: email,
     contactName,
     accountName,
-    portalUrl,
+    portalUrl: portalLoginUrl,
     magicLink,
+    primaryColor: account.brandPrimaryColor ?? '#1648A0',
+    logoUrl: account.brandLogoUrl ?? null,
   })
 
   if (!sent) {

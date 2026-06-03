@@ -1,5 +1,6 @@
 'use client'
 
+import { TenantBrandMark } from '@/components/branding/tenant-brand-mark'
 import { portalLogoutAction } from '@/lib/auth/actions'
 import { useBranding } from '@/lib/branding/context'
 import { Button } from '@/components/ui/button'
@@ -12,7 +13,7 @@ type PortalHeaderProps = {
 }
 
 export function PortalHeader({ contactName, preview = false, className }: PortalHeaderProps) {
-  const branding = useBranding()
+  const { primaryColor } = useBranding()
 
   return (
     <header
@@ -21,17 +22,13 @@ export function PortalHeader({ contactName, preview = false, className }: Portal
         preview && 'rounded-t-xl',
         className,
       )}
+      style={{ borderTopWidth: 3, borderTopColor: primaryColor }}
     >
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-6 sm:px-8">
-        <div className="min-w-0">
-          <p className="text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--text-tertiary)]">
-            Client portal
-          </p>
-          <h1 className="truncate text-lg font-semibold tracking-[-0.02em] text-[var(--text-primary)]">
-            {branding.businessName}
-          </h1>
+        <div className="min-w-0 flex-1">
+          <TenantBrandMark size="sm" />
           {contactName ? (
-            <p className="mt-0.5 text-[13px] text-[var(--text-secondary)]">
+            <p className="mt-1 truncate text-[13px] text-[var(--text-secondary)]">
               Welcome back, {contactName}
             </p>
           ) : null}

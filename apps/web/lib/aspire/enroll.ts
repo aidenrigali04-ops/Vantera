@@ -1,4 +1,8 @@
 import { getIcpConfigForVertical, scoreICP } from '@/lib/aspire/icp-score'
+import {
+  buildLeadProspectEnrichment,
+  mergeLeadEnrichment,
+} from '@/lib/leads/enrichment'
 import { EnrollError } from '@/lib/aspire/enroll-error'
 import type { ApifyLead, EnrollResult } from '@/lib/aspire/types'
 import { getSystemAutomationId } from '@/lib/automation/system-automation'
@@ -58,12 +62,13 @@ export async function enrollLeadFromAspire(
 
   const icpConfig = getIcpConfigForVertical(account?.vertical ?? 'agency')
   const icp = scoreICP(apifyLead, icpConfig)
+  const enrichment = buildLeadProspectEnrichment(apifyLead, icp.score, icp.signals, 'aspire')
 
   let leadId: string
 
   if (apifyLead.email) {
     const [existingLead] = await db
-      .select({ id: leads.id })
+      .select({ id: leads.id, enrichment: leads.enrichment })
       .from(leads)
       .where(
         and(
@@ -76,6 +81,18 @@ export async function enrollLeadFromAspire(
 
     if (existingLead) {
       leadId = existingLead.id
+      await db
+        .update(leads)
+        .set({
+          score: icp.score,
+          avatarUrl: apifyLead.photoUrl,
+          enrichment: mergeLeadEnrichment(
+            existingLead.enrichment as Record<string, unknown>,
+            enrichment,
+          ),
+          updatedAt: new Date(),
+        })
+        .where(eq(leads.id, existingLead.id))
     } else {
       const [created] = await db
         .insert(leads)
@@ -88,15 +105,12 @@ export async function enrollLeadFromAspire(
           email: apifyLead.email,
           phone: apifyLead.phone,
           linkedinUrl: apifyLead.linkedinUrl,
+          avatarUrl: apifyLead.photoUrl,
           source: 'aspire',
           score: icp.score,
           ownerId: session.userId,
           pipelineStage,
-          enrichment: {
-            industry: apifyLead.industry,
-            apifyId: apifyLead.id,
-            icpSignals: icp.signals,
-          },
+          enrichment,
         })
         .returning({ id: leads.id })
       leadId = created!.id
@@ -112,15 +126,12 @@ export async function enrollLeadFromAspire(
         company: apifyLead.organizationName,
         phone: apifyLead.phone,
         linkedinUrl: apifyLead.linkedinUrl,
+        avatarUrl: apifyLead.photoUrl,
         source: 'aspire',
         score: icp.score,
         ownerId: session.userId,
         pipelineStage,
-        enrichment: {
-          industry: apifyLead.industry,
-          apifyId: apifyLead.id,
-          icpSignals: icp.signals,
-        },
+        enrichment,
       })
       .returning({ id: leads.id })
     leadId = created!.id

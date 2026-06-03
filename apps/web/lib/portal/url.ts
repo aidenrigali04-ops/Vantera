@@ -13,12 +13,38 @@ export function derivePortalUrl(slug: string, portalDomain: string | null | unde
   return env.NEXT_PUBLIC_APP_URL.replace(/\/$/, '')
 }
 
+/** Path + query for portal login (server redirects). */
+export function derivePortalLoginPath(
+  slug: string,
+  portalDomain: string | null | undefined,
+): string {
+  const base = derivePortalUrl(slug, portalDomain).replace(/\/$/, '')
+  const path = '/auth/portal-login'
+
+  if (portalDomain && portalDomain.length > 0) {
+    try {
+      return new URL(path, `${base}/`).pathname
+    } catch {
+      return path
+    }
+  }
+
+  const params = new URLSearchParams({ workspace: slug })
+  return `${path}?${params.toString()}`
+}
+
 /** Client sign-in URL (share with clients or use in invite emails). */
 export function derivePortalLoginUrl(
   slug: string,
   portalDomain: string | null | undefined,
 ): string {
-  return `${derivePortalUrl(slug, portalDomain)}/auth/portal-login`
+  const base = derivePortalUrl(slug, portalDomain).replace(/\/$/, '')
+  const loginPath = derivePortalLoginPath(slug, portalDomain)
+  try {
+    return new URL(loginPath, `${base}/`).toString().replace(/\/$/, '')
+  } catch {
+    return `${base}${loginPath}`
+  }
 }
 
 /** In-app admin preview — same workspace, no client login required. */

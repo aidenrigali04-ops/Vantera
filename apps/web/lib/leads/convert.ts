@@ -3,6 +3,8 @@
 import type { ActionResult } from '@/lib/auth/types'
 import { requireAdminSession } from '@/lib/auth/require-session'
 import { db } from '@/lib/db/client'
+import type { LeadProspectEnrichment } from '@/lib/leads/enrichment'
+import { formatEnrichmentNotes } from '@/lib/leads/enrichment'
 import { findLeadById } from '@/lib/leads/queries'
 import { activities, contacts, leads, records, stageDefinitions } from '@vantera/db'
 import { and, asc, eq, isNull } from 'drizzle-orm'
@@ -27,6 +29,14 @@ export async function convertLeadToClient(leadId: string): Promise<ActionResult<
     .orderBy(asc(stageDefinitions.position))
     .limit(1)
 
+  const enrichment = lead.enrichment as LeadProspectEnrichment | Record<string, unknown>
+  const hasEnrichment =
+    enrichment && typeof enrichment === 'object' && 'enrichmentScore' in enrichment
+  const enrichmentBlock = hasEnrichment
+    ? formatEnrichmentNotes(enrichment as LeadProspectEnrichment)
+    : null
+  const mergedNotes = [lead.notes, enrichmentBlock].filter(Boolean).join('\n\n')
+
   const result = await db.transaction(async (tx) => {
     const [contact] = await tx
       .insert(contacts)
@@ -40,11 +50,19 @@ export async function convertLeadToClient(leadId: string): Promise<ActionResult<
         company: lead.company,
         jobTitle: lead.title,
         linkedinUrl: lead.linkedinUrl,
+        city:
+          typeof enrichment === 'object' && enrichment && 'city' in enrichment
+            ? (enrichment.city as string | null)
+            : undefined,
+        state:
+          typeof enrichment === 'object' && enrichment && 'state' in enrichment
+            ? (enrichment.state as string | null)
+            : undefined,
         lifecycleStage: 'active_client',
         convertedFromLeadId: lead.id,
         source: lead.source,
         tags: lead.tags,
-        notes: lead.notes,
+        notes: mergedNotes || null,
       })
       .returning()
 

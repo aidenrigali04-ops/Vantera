@@ -2,6 +2,7 @@ import { getSyncedAdminSession } from '@/lib/auth/require-session'
 import { isApifyConfigured } from '@/lib/aspire/apify-config'
 import { searchProspects } from '@/lib/aspire/search'
 import { stubResults } from '@/lib/aspire/prospect-stubs'
+import { toEnrichedAspireSearchResult } from '@/lib/aspire/enrich-prospect'
 import { getIcpConfigForVertical, scoreICP } from '@/lib/aspire/icp-score'
 import { normalizeApifyFilters, isInteractiveAspireSearch } from '@/lib/aspire/filters'
 import type { ApifySearchFilters, AspireSearchResult } from '@/lib/aspire/types'
@@ -26,13 +27,7 @@ function fallbackSearchResults(
   const results = people
     .map((person) => {
       const scored = scoreICP(person, icpConfig)
-      return {
-        ...person,
-        icpScore: scored.score,
-        icpSignals: scored.signals,
-        intentScore: scored.score,
-        company: person.organizationName,
-      }
+      return toEnrichedAspireSearchResult(person, scored.score, scored.signals)
     })
     .sort((a, b) => b.icpScore - a.icpScore)
 

@@ -431,7 +431,7 @@ export function AuthCredentialsPanel({
           <div className="space-y-1.5">
             <div className="flex items-center justify-between gap-2">
               <AuthFieldLabel htmlFor="login-password">Password</AuthFieldLabel>
-              {!showForgotPassword ? (
+              {!portal && !showForgotPassword ? (
                 <button
                   type="button"
                   className="text-[12px] font-medium text-[var(--text-secondary)] underline-offset-2 hover:text-[var(--text-primary)] hover:underline"
@@ -468,7 +468,12 @@ export function AuthCredentialsPanel({
 
           <Button
             type="submit"
-            className="h-11 w-full rounded-lg border border-[var(--accent-border)] bg-[var(--accent)] font-medium text-[var(--text-primary)] shadow-[var(--shadow-sm)] hover:bg-[var(--accent-hover)] disabled:opacity-60"
+            className={
+              portal
+                ? 'h-11 w-full rounded-lg border-0 font-medium text-white shadow-[var(--shadow-sm)] hover:opacity-90 disabled:opacity-60'
+                : 'h-11 w-full rounded-lg border border-[var(--accent-border)] bg-[var(--accent)] font-medium text-[var(--text-primary)] shadow-[var(--shadow-sm)] hover:bg-[var(--accent-hover)] disabled:opacity-60'
+            }
+            style={portal ? { backgroundColor: 'var(--brand-primary)' } : undefined}
             disabled={isBusy || showForgotPassword}
           >
             {isSubmitting ? (
@@ -476,10 +481,18 @@ export function AuthCredentialsPanel({
                 <Loader2 className="mr-2 size-4 animate-spin" aria-hidden />
                 Signing in…
               </>
+            ) : portal ? (
+              'Sign in'
             ) : (
               'Sign in to your workspace'
             )}
           </Button>
+
+          {portal ? (
+            <p className="text-center text-[11px] leading-relaxed text-[var(--text-tertiary)]">
+              Secure access for invited clients only.
+            </p>
+          ) : null}
         </form>
       )}
 

@@ -1,3 +1,5 @@
+import type { LeadQualityTier } from '@/lib/leads/enrichment'
+
 export interface ApifySearchFilters {
   jobTitles: string[]
   industries: string[]
@@ -77,6 +79,9 @@ export interface EnrollResult {
 export type AspireSearchResult = ApifyLead & {
   icpScore: number
   icpSignals: string[]
+  enrichmentScore: number
+  enrichmentCompleteness: number
+  enrichmentTier: LeadQualityTier
   /** @deprecated use icpScore */
   intentScore: number
   /** @deprecated use organizationName */

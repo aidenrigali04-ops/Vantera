@@ -10,6 +10,7 @@ import {
   DetailShell,
   DetailTimeline,
 } from '@/components/operational/detail/DetailShell'
+import { LeadEnrichmentPanel } from '@/components/leads/LeadEnrichmentPanel'
 import { EmbeddedInsightsPanel } from '@/components/intelligence/EmbeddedInsightsPanel'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -169,6 +170,8 @@ export function LeadDetailClient({ lead, profile, activities, insights }: Props)
         }
         aside={
           <>
+            <LeadEnrichmentPanel lead={lead} />
+
             <DetailSection>
               <EmbeddedInsightsPanel
                 insights={insights}

@@ -222,23 +222,64 @@ export async function findAccountByPortalEmail(email: string): Promise<AccountRo
   }
 }
 
+export async function resolveAccountBySlug(slug: string): Promise<AccountRow | null> {
+  const normalized = slug.trim().toLowerCase()
+  if (!normalized) return null
+
+  try {
+    const supabase = createSupabasePublicClient()
+    const { data } = await supabase
+      .from('accounts')
+      .select(ACCOUNT_SELECT)
+      .eq('slug', normalized)
+      .limit(1)
+      .maybeSingle()
+
+    return data ?? null
+  } catch {
+    return null
+  }
+}
+
+export function emptyBrandingData(): BrandingData {
+  return {
+    accountId: '',
+    businessName: '',
+    logoUrl: null,
+    primaryColor: '#1648A0',
+    secondaryColor: '#0D9488',
+    vertical: '',
+    plan: 'team',
+    portalDomain: '',
+    onboardingComplete: false,
+    onboardingKnown: false,
+  }
+}
+
+/** Resolve tenant branding from host and optional workspace slug (shared app URL). */
+export async function resolvePortalBranding(workspaceSlug?: string | null): Promise<BrandingData> {
+  const host = headers().get('host') ?? ''
+  const fromHost = await resolveAccountFromHost(host)
+  if (fromHost) {
+    return accountToBranding(fromHost)
+  }
+
+  if (workspaceSlug?.trim()) {
+    const fromSlug = await resolveAccountBySlug(workspaceSlug)
+    if (fromSlug) {
+      return accountToBranding(fromSlug)
+    }
+  }
+
+  return emptyBrandingData()
+}
+
 export async function resolveBrandingFromRequest(): Promise<BrandingData> {
   const host = headers().get('host') ?? ''
   const account = await resolveAccountFromHost(host)
 
   if (!account) {
-    return {
-      accountId: '',
-      businessName: '',
-      logoUrl: null,
-      primaryColor: '#1648A0',
-      secondaryColor: '#0D9488',
-      vertical: '',
-      plan: 'team',
-      portalDomain: '',
-      onboardingComplete: false,
-      onboardingKnown: false,
-    }
+    return emptyBrandingData()
   }
 
   return accountToBranding(account)

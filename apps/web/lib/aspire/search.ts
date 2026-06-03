@@ -5,11 +5,8 @@ import { searchApify, type ProspectSearchMeta } from '@/lib/aspire/apify-client'
 import { isInteractiveAspireSearch, normalizeApifyFilters } from '@/lib/aspire/filters'
 import { getIcpConfigForVertical, scoreICP } from '@/lib/aspire/icp-score'
 import { stubResults } from '@/lib/aspire/prospect-stubs'
-import type {
-  ApifyLead,
-  ApifySearchFilters,
-  AspireSearchResult,
-} from '@/lib/aspire/types'
+import { toEnrichedAspireSearchResult } from '@/lib/aspire/enrich-prospect'
+import type { ApifySearchFilters, AspireSearchResult } from '@/lib/aspire/types'
 
 export { normalizeApifyFilters } from '@/lib/aspire/filters'
 export { searchApify } from '@/lib/aspire/apify-client'
@@ -38,19 +35,6 @@ export async function filterExistingLeads(
   return rows.map((row) => row.apifyId!).filter(Boolean)
 }
 
-function toAspireSearchResult(
-  person: ApifyLead,
-  icpScore: number,
-  icpSignals: string[],
-): AspireSearchResult {
-  return {
-    ...person,
-    icpScore,
-    icpSignals,
-    intentScore: icpScore,
-    company: person.organizationName,
-  }
-}
 
 export type SearchProspectsResult = {
   results: AspireSearchResult[]
@@ -134,7 +118,7 @@ export async function searchProspects(
   const scored = people
     .map((person) => {
       const scoredResult = scoreICP(person, icpConfig)
-      return toAspireSearchResult(person, scoredResult.score, scoredResult.signals)
+      return toEnrichedAspireSearchResult(person, scoredResult.score, scoredResult.signals)
     })
     .sort((a, b) => b.icpScore - a.icpScore)
 

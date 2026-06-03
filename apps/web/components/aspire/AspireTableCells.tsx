@@ -22,12 +22,25 @@ type ProspectCellProps = {
   row: AspireSearchResult
 }
 
+function ContactChannelDot({ active, label }: { active: boolean; label: string }) {
+  return (
+    <span
+      title={label}
+      className={cn(
+        'h-1.5 w-1.5 rounded-full',
+        active ? 'bg-[var(--success)]' : 'bg-[var(--border-strong)]',
+      )}
+      aria-hidden
+    />
+  )
+}
+
 export function AspireProspectCell({ row }: ProspectCellProps) {
   const name = aspireProspectName(row)
   const location = aspireLocationLabel(row)
 
   return (
-    <div className="flex min-w-[220px] items-center gap-3">
+    <div className="flex min-w-0 items-center gap-3">
       <span
         className={cn(
           'flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ring-1 ring-inset',
@@ -44,12 +57,22 @@ export function AspireProspectCell({ row }: ProspectCellProps) {
         <p className="truncate text-[12px] leading-snug text-[var(--text-secondary)]">
           {aspireProspectSubtitle(row)}
         </p>
-        {location ? (
-          <p className="mt-0.5 flex items-center gap-1 truncate text-[11px] text-[var(--text-tertiary)]">
-            <MapPin className="h-3 w-3 shrink-0" aria-hidden />
-            {location}
-          </p>
-        ) : null}
+        <div className="mt-1 flex flex-wrap items-center gap-2">
+          {location ? (
+            <p className="flex items-center gap-1 truncate text-[11px] text-[var(--text-tertiary)]">
+              <MapPin className="h-3 w-3 shrink-0" aria-hidden />
+              {location}
+            </p>
+          ) : null}
+          <div className="flex items-center gap-1" aria-label="Contact channels">
+            <ContactChannelDot active={Boolean(row.email)} label="Email" />
+            <ContactChannelDot active={Boolean(row.phone)} label="Phone" />
+            <ContactChannelDot active={Boolean(row.linkedinUrl)} label="LinkedIn" />
+          </div>
+          {row.industry ? (
+            <span className="truncate text-[11px] text-[var(--text-tertiary)]">{row.industry}</span>
+          ) : null}
+        </div>
       </div>
     </div>
   )
