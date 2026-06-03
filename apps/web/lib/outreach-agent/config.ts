@@ -74,6 +74,15 @@ export async function launchOutreachAgent(
     })
   }
 
+  const { flushAutomaticOutreachPipelines } = await import(
+    '@/lib/sdr/outreach-automation-policy'
+  )
+  try {
+    await flushAutomaticOutreachPipelines(accountId)
+  } catch {
+    // Non-fatal: agent is active; user can run queue from command center.
+  }
+
   revalidateOutreachAgentPaths()
   return { success: true, data: { id: row!.id } }
 }
@@ -154,13 +163,19 @@ export async function resumeOutreachAgent(): Promise<ActionResult> {
 }
 
 export async function runLinkedCampaignQueueNow(): Promise<
-  ActionResult<{ sent: number; manualReady: number; failed: number }>
+  ActionResult<{ sent: number; manualReady: number; failed: number; processed: number }>
 > {
   const session = await requireAdminSession()
   const existing = await findOutreachAgentConfigByAccount(session.accountId)
   if (!existing) return { success: false, error: 'Configure Outreach Agent first' }
   if (existing.isPaused) {
     return { success: false, error: 'Resume Outreach Agent before processing the queue' }
+  }
+
+  const { getOutreachEmailSendReadiness } = await import('@/lib/outreach/send-identity')
+  const readiness = await getOutreachEmailSendReadiness(session.accountId)
+  if (!readiness.ready) {
+    return { success: false, error: readiness.message }
   }
 
   const { processDueCampaignSteps } = await import('@/lib/outreach/runner')
@@ -175,6 +190,7 @@ export async function runLinkedCampaignQueueNow(): Promise<
       sent: result.sent,
       manualReady: result.manualReady,
       failed: result.failed,
+      processed: result.processed,
     },
   }
 }

@@ -2,11 +2,8 @@ import type { ApifyLead } from '@/lib/aspire/types'
 import { getSystemAutomationId } from '@/lib/automation/system-automation'
 import { db } from '@/lib/db/client'
 import type { Plan } from '@/lib/feature-flags/flags'
-import {
-  isAutomaticOutreachMode,
-  resolveOutreachAutomationMode,
-} from '@/lib/sdr/outreach-automation'
-import { sendDueSdrStepsForAccount } from '@/lib/sdr/send-due-for-account'
+import { isAccountAutomaticOutreach } from '@/lib/sdr/outreach-automation-policy'
+import { flushAutomaticOutreachPipelines } from '@/lib/sdr/outreach-automation-policy'
 import { logSdrActivity } from '@/lib/sdr/activity-log'
 import { generateSdrSequenceSteps } from '@/lib/sdr/draft-sequence'
 import { requireSDREnabledForAccount } from '@/lib/sdr/guard'
@@ -149,12 +146,8 @@ export async function runDraftSdrSequence(payload: DraftSdrSequencePayload): Pro
     metadata: { steps: steps.length },
   })
 
-  const automationMode = await resolveOutreachAutomationMode(
-    payload.accountId,
-    plan,
-    config.outreachAutomationMode,
-  )
-  const automatic = isAutomaticOutreachMode(automationMode)
+  const automatic = await isAccountAutomaticOutreach(payload.accountId)
+  const automationMode = automatic ? 'automatic' : 'review'
 
   if (!automatic) {
     for (const inserted of insertedSteps) {
@@ -193,8 +186,8 @@ export async function runDraftSdrSequence(payload: DraftSdrSequencePayload): Pro
       }
     }
   } else {
-    void sendDueSdrStepsForAccount(payload.accountId).catch((err) => {
-      console.error('[runDraftSdrSequence] auto-send after draft failed', err)
+    void flushAutomaticOutreachPipelines(payload.accountId).catch((err) => {
+      console.error('[runDraftSdrSequence] automatic pipeline flush failed', err)
     })
   }
 

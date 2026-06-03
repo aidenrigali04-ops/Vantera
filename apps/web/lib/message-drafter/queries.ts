@@ -5,7 +5,7 @@ import type {
   MessageDrafterPayload,
   MessageDrafterStats,
 } from '@/lib/message-drafter/types'
-import { personalizeTemplate } from '@/lib/outreach/types'
+import { resolveOutboundCopy } from '@/lib/outreach/types'
 import {
   leadDrafts,
   leads,
@@ -97,7 +97,7 @@ export async function findPendingLinkedInDrafts(accountId: string): Promise<Link
     const metadata = step.metadata as { message?: string } | null
     const body =
       metadata?.message ??
-      personalizeTemplate(step.body, {
+      resolveOutboundCopy(step.body, {
         firstName: lead.firstName,
         lastName: lead.lastName,
         company: lead.company,

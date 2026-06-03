@@ -1,7 +1,8 @@
 import { env } from '@/lib/env'
 import { resolveOutreachSendIdentity } from '@/lib/outreach/email-domain'
-import { personalizeTemplate } from '@/lib/outreach/types'
+import { resolveOutboundCopy } from '@/lib/outreach/types'
 import { buildCampaignReplyAddress } from '@/lib/outreach/reply-address'
+import { validateOutreachSendIdentity } from '@/lib/outreach/send-identity'
 import { sendCampaignSms } from '@/lib/outreach/send-sms'
 import type { SdrOutreachWindow } from '@/lib/sdr/types'
 import { Resend } from 'resend'
@@ -30,14 +31,19 @@ export async function sendSdrEmail(input: {
   if (!apiKey) return { ok: false, reason: 'resend_not_configured' }
   if (!input.toEmail) return { ok: false, reason: 'missing_recipient_email' }
 
-  const subject = personalizeTemplate(input.subject, input.lead)
-  let text = personalizeTemplate(input.body, input.lead)
+  const subject = resolveOutboundCopy(input.subject, input.lead)
+  let text = resolveOutboundCopy(input.body, input.lead)
   if (input.signature) {
     text = `${text}\n\n${input.signature}`
   }
 
   const identity = await resolveOutreachSendIdentity(input.accountId)
-  const from = identity.from || `${input.fromName} <${input.fromEmail}>`
+  const validationError = validateOutreachSendIdentity(identity)
+  if (validationError) {
+    return { ok: false, reason: validationError }
+  }
+
+  const from = identity.from
   const replyTo = buildCampaignReplyAddress(input.stepId, identity.replyDomain)
   const html = text
     .split('\n')
@@ -71,7 +77,7 @@ export async function sendSdrSms(input: {
   const result = await sendCampaignSms({
     accountId: input.accountId,
     toPhone: input.toPhone,
-    body: personalizeTemplate(input.body, input.lead),
+    body: resolveOutboundCopy(input.body, input.lead),
     lead: input.lead,
   })
 

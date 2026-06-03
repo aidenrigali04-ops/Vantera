@@ -1,10 +1,7 @@
 import { getSystemAutomationId } from '@/lib/automation/system-automation'
 import { db } from '@/lib/db/client'
 import type { Plan } from '@/lib/feature-flags/flags'
-import {
-  isAutomaticOutreachMode,
-  resolveOutreachAutomationMode,
-} from '@/lib/sdr/outreach-automation'
+import { isAccountAutomaticOutreach } from '@/lib/sdr/outreach-automation-policy'
 import { consumeSdrCredits, outreachSendCostForChannel, SDR_TRIAL_DAYS, SdrCreditsExhaustedError } from '@/lib/sdr/credits'
 import { logSdrActivity } from '@/lib/sdr/activity-log'
 import { requireSDREnabledForAccount } from '@/lib/sdr/guard'
@@ -55,12 +52,7 @@ export async function runSdrAgentSend(options?: {
       continue
     }
 
-    const mode = await resolveOutreachAutomationMode(
-      config.accountId,
-      plan as Plan,
-      config.outreachAutomationMode,
-    )
-    if (!isAutomaticOutreachMode(mode)) continue
+    if (!(await isAccountAutomaticOutreach(config.accountId))) continue
 
     const window = (config.outreachWindow as SdrOutreachWindow) ?? {
       startHour: 8,

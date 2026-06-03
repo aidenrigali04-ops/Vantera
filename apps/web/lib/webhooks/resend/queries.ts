@@ -1,5 +1,5 @@
 import { db } from '@/lib/db/client'
-import { contacts, leads, messages, outreachCampaignSteps } from '@vantera/db'
+import { contacts, leads, messages, outreachCampaignSteps, sdrSequenceSteps } from '@vantera/db'
 import { and, eq, isNull, sql } from 'drizzle-orm'
 
 export type OutboundMessageContext = {
@@ -22,7 +22,18 @@ export type OutboundCampaignContext = {
   enrollmentId: string
 }
 
-export type OutboundEmailContext = OutboundMessageContext | OutboundCampaignContext
+export type OutboundSdrStepContext = {
+  kind: 'sdr_step'
+  accountId: string
+  stepId: string
+  sequenceId: string
+  leadId: string
+}
+
+export type OutboundEmailContext =
+  | OutboundMessageContext
+  | OutboundCampaignContext
+  | OutboundSdrStepContext
 
 export async function findOutboundByResendId(
   resendId: string,
@@ -67,6 +78,22 @@ export async function findOutboundByResendId(
       campaignId: step.campaignId,
       leadId: step.leadId,
       enrollmentId: step.enrollmentId,
+    }
+  }
+
+  const [sdrStep] = await db
+    .select()
+    .from(sdrSequenceSteps)
+    .where(eq(sdrSequenceSteps.resendId, resendId))
+    .limit(1)
+
+  if (sdrStep) {
+    return {
+      kind: 'sdr_step',
+      accountId: sdrStep.accountId,
+      stepId: sdrStep.id,
+      sequenceId: sdrStep.sequenceId,
+      leadId: sdrStep.leadId,
     }
   }
 

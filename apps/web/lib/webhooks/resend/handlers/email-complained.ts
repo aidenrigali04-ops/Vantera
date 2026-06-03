@@ -3,7 +3,8 @@ import { resolveAccountOwnerId } from '@/lib/webhooks/resend/actors'
 import { findOutboundByResendId } from '@/lib/webhooks/resend/queries'
 import { createIntelligenceSignal } from '@/lib/webhooks/resend/signals'
 import type { ResendHandlerResult, ResendWebhookEventData } from '@/lib/webhooks/resend/types'
-import { activities, messages } from '@vantera/db'
+import { findLeadDisplayName } from '@/lib/webhooks/resend/queries'
+import { activities, messages, sdrSequenceSteps } from '@vantera/db'
 import { eq } from 'drizzle-orm'
 
 export async function handleEmailComplained(
@@ -15,12 +16,43 @@ export async function handleEmailComplained(
   const outbound = await findOutboundByResendId(resendId)
   if (!outbound) return { handled: false, detail: 'outbound_not_found' }
 
-  if (outbound.kind !== 'message') {
-    return { handled: false, detail: 'campaign_complaint_not_tracked_yet' }
-  }
-
   const ownerId = await resolveAccountOwnerId(outbound.accountId)
   if (!ownerId) return { handled: false, detail: 'no_active_owner' }
+
+  if (outbound.kind === 'sdr_step' || outbound.kind === 'campaign_step') {
+    if (outbound.kind === 'sdr_step') {
+      await db
+        .update(sdrSequenceSteps)
+        .set({ status: 'failed' })
+        .where(eq(sdrSequenceSteps.id, outbound.stepId))
+    }
+
+    const leadName = await findLeadDisplayName(outbound.accountId, outbound.leadId)
+    await db.insert(activities).values({
+      accountId: outbound.accountId,
+      leadId: outbound.leadId,
+      actorType: 'automation',
+      actorId: ownerId,
+      activityType: 'email_complained',
+      body: `Spam complaint — ${leadName}`,
+      metadata: {
+        resendId,
+        stepId: outbound.stepId,
+        ...(outbound.kind === 'campaign_step'
+          ? { campaignId: outbound.campaignId }
+          : { sequenceId: outbound.sequenceId }),
+      },
+    })
+
+    return {
+      handled: true,
+      detail: outbound.kind === 'sdr_step' ? 'sdr_step_complained' : 'campaign_step_complained',
+    }
+  }
+
+  if (outbound.kind !== 'message') {
+    return { handled: false, detail: 'unknown_outbound_kind' }
+  }
 
   await db
     .update(messages)

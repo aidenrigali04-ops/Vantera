@@ -1,6 +1,7 @@
 import { runProspectScoutDiscovery } from '@/lib/prospect-scout/discover'
 import { runBoundSearch } from '@/lib/prospect-scout/run-search'
 import type { ProspectMode, RunAccountResult, SdrConfigRow } from '@/lib/prospect-scout/types'
+import { flushAutomaticOutreachPipelines } from '@/lib/sdr/outreach-automation-policy'
 import { countActiveSdrSequences, countSdrEnrolledToday } from '@/lib/sdr/queries'
 import { requireSDREnabledForAccount } from '@/lib/sdr/guard'
 import { findBindingsForConfig } from '@/lib/sdr/aspire-config'
@@ -93,6 +94,12 @@ export async function runAccountProspectScout(
         `[prospect-scout] account ${accountId}: aspire_bound mode with no active bindings — no Apify run`,
       )
     }
+  }
+
+  if (enrolled > 0) {
+    void flushAutomaticOutreachPipelines(accountId).catch((error) => {
+      console.error('[prospect-scout] automatic pipeline flush failed', error)
+    })
   }
 
   return { accountId, searchesRun, found, enrolled, runs }

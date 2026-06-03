@@ -57,13 +57,14 @@ export async function isFeatureEnabled(accountId: string, flagName: FlagName): P
   return evaluateFlag({ accountId, plan, flagName })
 }
 
-/** Gate autonomous AI sends — requires autonomous_ai_messaging flag. */
+/** Gate autonomous AI sends — uses the account SDR Automatic outreach toggle. */
 export async function assertAIMessagingEnabled(accountId: string): Promise<void> {
-  const enabled = await isFeatureEnabled(accountId, 'autonomous_ai_messaging')
+  const { isAccountAutomaticOutreach } = await import('@/lib/sdr/outreach-automation-policy')
+  const enabled = await isAccountAutomaticOutreach(accountId)
   if (!enabled) {
     throw new ApiError(
       403,
-      'Autonomous AI messaging is not enabled. Draft messages must be reviewed in lead_drafts first.',
+      'Automatic outreach is off. Approve drafts in Message Drafter or enable Automatic outreach in Prospect Scout.',
     )
   }
 }

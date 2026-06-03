@@ -5,7 +5,7 @@ import { recordObservation } from '@/lib/ai/memory'
 import { db } from '@/lib/db/client'
 import type { OutreachCampaignGoal } from '@/lib/outreach/types'
 import { CAMPAIGN_GOAL_INTENTS } from '@/lib/outreach/types'
-import type { LeadRow } from '@/lib/outreach/types'
+import { hasMergeTokens, type LeadRow } from '@/lib/outreach/types'
 import { accounts } from '@vantera/db'
 import { eq } from 'drizzle-orm'
 
@@ -37,7 +37,9 @@ Draft ONE cold outbound EMAIL.
 Rules:
 - Subject ≤ 80 chars — specific, peer-level (not clickbait)
 - Body ≤ 150 words, short paragraphs, one CTA
-- Use {{first_name}} for the recipient's first name
+- This copy is a reusable campaign template for many leads — NEVER use a specific person's name in the prose
+- Personalization MUST use merge tags only: {{first_name}}, {{last_name}}, {{company}}, {{title}}, {{email}}
+- Do not invent or hardcode recipient names from the sample prospect in the body or subject
 
 Return ONLY JSON:
 {
@@ -55,7 +57,7 @@ Rules:
 - ≤ 140 characters before opt-out line
 - Curiosity hook only — no full pitch
 - Must end with: Reply STOP to opt out
-- Use {{first_name}} if natural
+- Use {{first_name}} for the recipient (never a hardcoded name)
 
 Return ONLY JSON:
 {
@@ -170,6 +172,8 @@ export async function draftCampaignStepMessage(input: {
     return { ok: false, reason: 'parse_error' }
   }
 
+  const normalized = normalizeCampaignTemplateCopy(parsed, input.lead, input.channel)
+
   await recordObservation({
     accountId: input.accountId,
     kind: 'message_drafted',
@@ -178,9 +182,46 @@ export async function draftCampaignStepMessage(input: {
       channel: input.channel,
       leadId: input.lead.id,
       stepIndex: input.stepIndex,
-      rationale: parsed.rationale,
+      rationale: normalized.rationale,
     },
   })
 
-  return { ok: true, output: parsed }
+  return { ok: true, output: normalized }
+}
+
+/** If the model used the sample lead's name, swap it for merge tags for multi-recipient templates. */
+function normalizeCampaignTemplateCopy(
+  draft: DraftCampaignStepOutput,
+  lead: Pick<LeadRow, 'firstName' | 'lastName' | 'company' | 'title' | 'email'>,
+  channel: Channel,
+): DraftCampaignStepOutput {
+  return {
+    ...draft,
+    body: scrubSampleLeadTokens(draft.body, lead),
+    subject:
+      channel === 'email' && draft.subject ? scrubSampleLeadTokens(draft.subject, lead) : draft.subject,
+  }
+}
+
+function scrubSampleLeadTokens(
+  copy: string,
+  lead: Pick<LeadRow, 'firstName' | 'lastName' | 'company' | 'title' | 'email'>,
+): string {
+  if (hasMergeTokens(copy)) return copy
+
+  let result = copy
+  const first = lead.firstName?.trim()
+  const last = lead.lastName?.trim()
+  const company = lead.company?.trim()
+
+  if (first) result = replaceWholeWord(result, first, '{{first_name}}')
+  if (last) result = replaceWholeWord(result, last, '{{last_name}}')
+  if (company) result = replaceWholeWord(result, company, '{{company}}')
+
+  return result
+}
+
+function replaceWholeWord(text: string, word: string, token: string): string {
+  const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return text.replace(new RegExp(`\\b${escaped}\\b`, 'gi'), token)
 }

@@ -5,6 +5,7 @@ import { isAiMessageDraftingEnabled } from '@/lib/ai/drafting-enabled'
 import type { Plan } from '@/lib/feature-flags/flags'
 import { sendCampaignEmail } from '@/lib/outreach/send-email'
 import { sendCampaignSms } from '@/lib/outreach/send-sms'
+import { syncLeadDraftToSequenceStep } from '@/lib/sdr/sync-draft-to-step'
 import { sendSdrSequenceStepNow, SdrSendBlockedError } from '@/lib/sdr/send-single-step'
 import { accounts, activities, automationRuns, leadDrafts, leads } from '@vantera/db'
 import { and, eq, isNull } from 'drizzle-orm'
@@ -64,6 +65,16 @@ export async function POST(request: Request, { params }: RouteParams) {
   }
 
   if (metadata.sequenceStepId) {
+    const synced = await syncLeadDraftToSequenceStep({
+      accountId: session.accountId,
+      stepId: metadata.sequenceStepId,
+      subject: row.draft.subject,
+      body: row.draft.body,
+    })
+    if (!synced.ok) {
+      return NextResponse.json({ success: false, error: synced.error }, { status: 404 })
+    }
+
     try {
       await sendSdrSequenceStepNow({
         accountId: session.accountId,

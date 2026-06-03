@@ -3,8 +3,15 @@ import { resolveAccountOwnerId } from '@/lib/webhooks/resend/actors'
 import { findOutboundByResendId } from '@/lib/webhooks/resend/queries'
 import { createIntelligenceSignal } from '@/lib/webhooks/resend/signals'
 import type { ResendHandlerResult, ResendWebhookEventData } from '@/lib/webhooks/resend/types'
-import { activities, messages } from '@vantera/db'
-import { eq } from 'drizzle-orm'
+import { findLeadDisplayName } from '@/lib/webhooks/resend/queries'
+import {
+  activities,
+  leads,
+  messages,
+  outreachCampaignSteps,
+  sdrSequenceSteps,
+} from '@vantera/db'
+import { and, eq } from 'drizzle-orm'
 
 export async function handleEmailBounced(
   data: ResendWebhookEventData,
@@ -56,5 +63,53 @@ export async function handleEmailBounced(
     return { handled: true, detail: 'message_bounced' }
   }
 
-  return { handled: false, detail: 'campaign_bounce_not_tracked_yet' }
+  if (outbound.kind === 'sdr_step') {
+    await db
+      .update(sdrSequenceSteps)
+      .set({ status: 'failed' })
+      .where(eq(sdrSequenceSteps.id, outbound.stepId))
+
+    const leadName = await findLeadDisplayName(outbound.accountId, outbound.leadId)
+    await db.insert(activities).values({
+      accountId: outbound.accountId,
+      leadId: outbound.leadId,
+      actorType: 'automation',
+      actorId: ownerId,
+      activityType: 'email_bounced',
+      body: `${bounceMessage} — ${leadName}`,
+      metadata: { resendId, stepId: outbound.stepId, sequenceId: outbound.sequenceId },
+    })
+
+    return { handled: true, detail: 'sdr_step_bounced' }
+  }
+
+  await db
+    .update(outreachCampaignSteps)
+    .set({ status: 'failed', skipReason: bounceMessage })
+    .where(eq(outreachCampaignSteps.id, outbound.stepId))
+
+  const [lead] = await db
+    .select({ id: leads.id })
+    .from(leads)
+    .where(and(eq(leads.id, outbound.leadId), eq(leads.accountId, outbound.accountId)))
+    .limit(1)
+
+  if (lead) {
+    const leadName = await findLeadDisplayName(outbound.accountId, outbound.leadId)
+    await db.insert(activities).values({
+      accountId: outbound.accountId,
+      leadId: outbound.leadId,
+      actorType: 'automation',
+      actorId: ownerId,
+      activityType: 'email_bounced',
+      body: `${bounceMessage} — ${leadName}`,
+      metadata: {
+        resendId,
+        stepId: outbound.stepId,
+        campaignId: outbound.campaignId,
+      },
+    })
+  }
+
+  return { handled: true, detail: 'campaign_step_bounced' }
 }

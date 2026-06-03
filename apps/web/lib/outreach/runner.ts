@@ -1,8 +1,12 @@
 import { db } from '@/lib/db/client'
-import { findDueCampaignSteps, findOutreachCampaignById } from '@/lib/outreach/queries'
+import { findDueCampaignSteps, findLeadsByIds, findOutreachCampaignById } from '@/lib/outreach/queries'
 import { sendCampaignEmail } from '@/lib/outreach/send-email'
 import { sendCampaignSms } from '@/lib/outreach/send-sms'
-import { personalizeTemplate, parseCampaignMetrics, type OutreachCampaignWorkflow } from '@/lib/outreach/types'
+import {
+  parseCampaignMetrics,
+  resolveOutboundCopy,
+  type OutreachCampaignWorkflow,
+} from '@/lib/outreach/types'
 import { createIntelligenceSignal } from '@/lib/webhooks/resend/signals'
 import {
   accounts,
@@ -30,9 +34,12 @@ function leadDisplayName(lead: { firstName: string | null; lastName: string | nu
 export async function processDueCampaignSteps(
   accountId: string,
   actorUserId: string,
-  options?: { campaignIds?: string[] },
+  options?: { campaignIds?: string[]; excludeCampaignIds?: string[] },
 ): Promise<ProcessDueStepsResult> {
-  const dueSteps = await findDueCampaignSteps(accountId, 50, options?.campaignIds)
+  const dueSteps = await findDueCampaignSteps(accountId, 50, {
+    campaignIds: options?.campaignIds,
+    excludeCampaignIds: options?.excludeCampaignIds,
+  })
   const result: ProcessDueStepsResult = {
     processed: 0,
     sent: 0,
@@ -153,7 +160,7 @@ export async function processDueCampaignSteps(
         continue
       }
 
-      const personalizedBody = personalizeTemplate(step.body, lead)
+      const personalizedBody = resolveOutboundCopy(step.body, lead)
 
       await db
         .update(outreachCampaignSteps)
@@ -290,12 +297,22 @@ export async function materializeCampaignSteps(
     throw new Error('Campaign workflow has no complete steps')
   }
 
+  const leadRows = await findLeadsByIds(
+    accountId,
+    enrollments.map((enrollment) => enrollment.leadId),
+  )
+  const leadById = new Map(leadRows.map((lead) => [lead.id, lead]))
+
   const now = Date.now()
   const rows = []
 
   for (const enrollment of enrollments) {
+    const lead = leadById.get(enrollment.leadId)
+    if (!lead) continue
+
     for (const step of steps) {
       const sendAt = new Date(now + step.delayDays * 24 * 60 * 60 * 1000)
+      const subjectTemplate = step.channel === 'email' ? (step.subject ?? 'Quick intro') : null
       rows.push({
         accountId,
         campaignId,
@@ -303,8 +320,11 @@ export async function materializeCampaignSteps(
         leadId: enrollment.leadId,
         stepIndex: step.stepIndex,
         channel: step.channel,
-        subject: step.channel === 'email' ? (step.subject ?? 'Quick intro') : null,
-        body: step.body,
+        subject:
+          step.channel === 'email' && subjectTemplate
+            ? resolveOutboundCopy(subjectTemplate, lead)
+            : null,
+        body: resolveOutboundCopy(step.body, lead),
         sendAt,
         status: 'pending' as const,
       })

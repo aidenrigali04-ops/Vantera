@@ -1,7 +1,8 @@
 import { env } from '@/lib/env'
 import { resolveOutreachSendIdentity } from '@/lib/outreach/email-domain'
 import { buildCampaignReplyAddress } from '@/lib/outreach/reply-address'
-import { personalizeTemplate } from '@/lib/outreach/types'
+import { validateOutreachSendIdentity } from '@/lib/outreach/send-identity'
+import { resolveOutboundCopy } from '@/lib/outreach/types'
 import type { LeadRow } from '@/lib/outreach/types'
 import { Resend } from 'resend'
 
@@ -31,11 +32,16 @@ export async function sendCampaignEmail(
     return { ok: false, reason: 'missing_recipient_email' }
   }
 
-  const subject = personalizeTemplate(input.subject, input.lead)
-  const text = personalizeTemplate(input.body, input.lead)
+  const subject = resolveOutboundCopy(input.subject, input.lead)
+  const text = resolveOutboundCopy(input.body, input.lead)
 
   const identity = await resolveOutreachSendIdentity(input.accountId)
-  const from = identity.from || `${input.accountName} <outreach@${env.NEXT_PUBLIC_APP_DOMAIN}>`
+  const validationError = validateOutreachSendIdentity(identity)
+  if (validationError) {
+    return { ok: false, reason: validationError }
+  }
+
+  const from = identity.from
   const replyTo = buildCampaignReplyAddress(input.stepId, identity.replyDomain)
 
   const html = `

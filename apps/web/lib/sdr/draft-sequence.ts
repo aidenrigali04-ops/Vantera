@@ -28,6 +28,7 @@ Return ONLY valid JSON:
 }
 
 Constraints:
+- This sequence is for ONE specific lead (named in context) — write final send-ready copy using their real first name and company; do NOT use {{first_name}} or other merge tags
 - Email step 1: under 100 words, no generic openers, ends with one low-friction question
 - SMS step 2: under 140 chars, curiosity only, must end "Reply STOP to opt out"
 - Email step 3: vertical case study with a specific number, before/after

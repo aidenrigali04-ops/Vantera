@@ -1,6 +1,6 @@
 import { env } from '@/lib/env'
 import { db } from '@/lib/db/client'
-import { personalizeTemplate } from '@/lib/outreach/types'
+import { resolveOutboundCopy } from '@/lib/outreach/types'
 import type { LeadRow } from '@/lib/outreach/types'
 import { decryptCredentialValue } from '@/lib/integrations/credential-secrets'
 import { integrationCredentials } from '@vantera/db'
@@ -62,7 +62,7 @@ export async function sendCampaignSms(input: SendCampaignSmsInput): Promise<Send
     return { ok: false, reason: 'twilio_not_configured' }
   }
 
-  const text = personalizeTemplate(input.body, input.lead)
+  const text = resolveOutboundCopy(input.body, input.lead)
 
   try {
     const client = twilio(config.sid, config.token)

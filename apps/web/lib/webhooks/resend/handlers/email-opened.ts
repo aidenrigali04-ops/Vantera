@@ -2,7 +2,7 @@ import { db } from '@/lib/db/client'
 import { resolveAccountOwnerId } from '@/lib/webhooks/resend/actors'
 import { findOutboundByResendId } from '@/lib/webhooks/resend/queries'
 import type { ResendHandlerResult, ResendWebhookEventData } from '@/lib/webhooks/resend/types'
-import { activities, messages, outreachCampaignSteps } from '@vantera/db'
+import { activities, messages, outreachCampaignSteps, sdrSequenceSteps } from '@vantera/db'
 import { eq } from 'drizzle-orm'
 
 export async function handleEmailOpened(
@@ -36,6 +36,15 @@ export async function handleEmailOpened(
     })
 
     return { handled: true, detail: 'message_opened' }
+  }
+
+  if (outbound.kind === 'sdr_step') {
+    await db
+      .update(sdrSequenceSteps)
+      .set({ openedAt: new Date() })
+      .where(eq(sdrSequenceSteps.id, outbound.stepId))
+
+    return { handled: true, detail: 'sdr_step_opened' }
   }
 
   const [existingStep] = await db

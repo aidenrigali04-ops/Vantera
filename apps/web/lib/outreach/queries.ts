@@ -11,7 +11,7 @@ import {
   outreachCampaigns,
   outreachCampaignSteps,
 } from '@vantera/db'
-import { and, asc, desc, eq, inArray, isNull, lte, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, isNull, lte, notInArray, sql } from 'drizzle-orm'
 
 export async function findOutreachCampaigns(accountId: string): Promise<CampaignWithStats[]> {
   const rows = await db
@@ -75,8 +75,11 @@ export async function findCampaignEnrollments(
 export async function findDueCampaignSteps(
   accountId: string,
   limit = 50,
-  campaignIds?: string[],
+  options?: { campaignIds?: string[]; excludeCampaignIds?: string[] },
 ) {
+  const campaignIds = options?.campaignIds
+  const excludeCampaignIds = options?.excludeCampaignIds
+
   const filters = [
     eq(outreachCampaignSteps.accountId, accountId),
     eq(outreachCampaignSteps.status, 'pending'),
@@ -86,6 +89,10 @@ export async function findDueCampaignSteps(
 
   if (campaignIds && campaignIds.length > 0) {
     filters.push(inArray(outreachCampaignSteps.campaignId, campaignIds))
+  }
+
+  if (excludeCampaignIds && excludeCampaignIds.length > 0) {
+    filters.push(notInArray(outreachCampaignSteps.campaignId, excludeCampaignIds))
   }
 
   return db

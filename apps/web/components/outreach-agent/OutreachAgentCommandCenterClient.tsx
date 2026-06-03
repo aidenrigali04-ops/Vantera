@@ -147,13 +147,21 @@ export function OutreachAgentCommandCenterClient({
       }
       const sent = json.data?.sent ?? 0
       const manualReady = json.data?.manualReady ?? 0
-      toast.success(
-        sent > 0
-          ? `Processed queue — ${sent} message${sent === 1 ? '' : 's'} sent`
-          : manualReady > 0
-            ? `${manualReady} manual step${manualReady === 1 ? '' : 's'} ready for approval`
-            : 'Queue checked — nothing due right now',
-      )
+      const failed = json.data?.failed ?? 0
+
+      if (failed > 0) {
+        toast.error(
+          `${failed} step${failed === 1 ? '' : 's'} failed to send — check Settings → Outreach email domain and campaign lead emails`,
+        )
+      } else if (sent > 0) {
+        toast.success(`Processed queue — ${sent} message${sent === 1 ? '' : 's'} sent`)
+      } else if (manualReady > 0) {
+        toast.success(
+          `${manualReady} manual step${manualReady === 1 ? '' : 's'} ready for approval`,
+        )
+      } else {
+        toast.success('Queue checked — nothing due right now')
+      }
       router.refresh()
     })
   }

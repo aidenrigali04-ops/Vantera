@@ -1,6 +1,8 @@
 import { db } from '@/lib/db/client'
 import { env } from '@/lib/env'
+import { getPausedLinkedCampaignExclusions } from '@/lib/outreach-agent/queue-policy'
 import { findAccountsWithDueCampaignSteps } from '@/lib/outreach/queries'
+import { shouldCronAutoProcessCampaignSteps } from '@/lib/sdr/outreach-automation-policy'
 import { processDueCampaignSteps } from '@/lib/outreach/runner'
 import { users } from '@vantera/db'
 import { and, eq } from 'drizzle-orm'
@@ -24,6 +26,10 @@ export async function GET(req: Request): Promise<Response> {
   }> = []
 
   for (const accountId of accountIds) {
+    if (!(await shouldCronAutoProcessCampaignSteps(accountId))) {
+      continue
+    }
+
     const [owner] = await db
       .select({ id: users.id })
       .from(users)
@@ -36,7 +42,10 @@ export async function GET(req: Request): Promise<Response> {
     }
 
     try {
-      const summary = await processDueCampaignSteps(accountId, owner.id)
+      const excludeCampaignIds = await getPausedLinkedCampaignExclusions(accountId)
+      const summary = await processDueCampaignSteps(accountId, owner.id, {
+        excludeCampaignIds,
+      })
       results.push({
         accountId,
         ok: true,

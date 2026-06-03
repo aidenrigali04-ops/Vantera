@@ -66,6 +66,13 @@ export function parseCampaignMetrics(raw: unknown): OutreachCampaignMetrics {
   }
 }
 
+const MERGE_TOKEN_PATTERN =
+  /\{\{(first_name|last_name|company|title|email)\}\}/i
+
+export function hasMergeTokens(template: string): boolean {
+  return MERGE_TOKEN_PATTERN.test(template)
+}
+
 export function personalizeTemplate(
   template: string,
   lead: Pick<LeadRow, 'firstName' | 'lastName' | 'company' | 'email' | 'title'>,
@@ -78,4 +85,16 @@ export function personalizeTemplate(
     .replace(/\{\{company\}\}/gi, lead.company ?? 'your company')
     .replace(/\{\{title\}\}/gi, lead.title ?? 'your role')
     .replace(/\{\{email\}\}/gi, lead.email ?? '')
+}
+
+/**
+ * Sends stored copy as-is when it was already finalized (no merge tags).
+ * Applies merge tags only when the template still contains {{first_name}}, etc.
+ */
+export function resolveOutboundCopy(
+  template: string,
+  lead: Pick<LeadRow, 'firstName' | 'lastName' | 'company' | 'email' | 'title'>,
+): string {
+  if (!template || !hasMergeTokens(template)) return template
+  return personalizeTemplate(template, lead)
 }

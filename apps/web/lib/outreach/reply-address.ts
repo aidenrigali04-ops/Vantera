@@ -1,4 +1,5 @@
 import { env } from '@/lib/env'
+import { isValidOutreachDomain, normalizeDomain } from '@/lib/outreach/email-domain'
 
 const STEP_ID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -6,13 +7,22 @@ const STEP_ID_PATTERN =
 /** Platform fallback when account has no verified custom inbound domain. */
 export function getPlatformInboundDomain(): string {
   const configured = env.OUTREACH_INBOUND_DOMAIN?.trim()
-  if (configured) return configured.toLowerCase()
-  return `inbound.${env.NEXT_PUBLIC_APP_DOMAIN}`
+  if (configured) {
+    const normalized = normalizeDomain(configured)
+    if (normalized && isValidOutreachDomain(normalized)) return normalized
+  }
+  const appDomain = normalizeDomain(env.NEXT_PUBLIC_APP_DOMAIN)
+  const base = appDomain && isValidOutreachDomain(appDomain) ? appDomain : 'vantera.app'
+  return `inbound.${base}`
 }
 
 /** Plus-address encodes the campaign step id for deterministic reply routing. */
 export function buildCampaignReplyAddress(stepId: string, inboundDomain?: string): string {
-  const domain = (inboundDomain?.trim() || getPlatformInboundDomain()).toLowerCase()
+  const candidate = inboundDomain?.trim()
+    ? normalizeDomain(inboundDomain)
+    : getPlatformInboundDomain()
+  const domain =
+    candidate && isValidOutreachDomain(candidate) ? candidate : getPlatformInboundDomain()
   return `replies+${stepId}@${domain}`
 }
 

@@ -32,6 +32,7 @@ Rules:
 - Use the business display name provided — never say "Vantera" unless that is the seller
 - Under 120 words; subject ≤ 80 chars (pattern-interrupt, not "Quick question")
 - No "I hope this finds you well", "reaching out", or passive voice
+- This email is for ONE named prospect in context — use their real first name and company; do NOT use {{first_name}} merge tags
 
 Return ONLY JSON:
 {

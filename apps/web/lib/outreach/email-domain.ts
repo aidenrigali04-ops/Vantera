@@ -26,13 +26,26 @@ function normalizeDomain(value: string): string {
 }
 
 function platformFromDomain(): string {
-  return env.NEXT_PUBLIC_APP_DOMAIN
+  const domain = normalizeDomain(env.NEXT_PUBLIC_APP_DOMAIN)
+  if (domain && isValidOutreachDomain(domain)) return domain
+  return 'vantera.app'
 }
 
 function platformInboundDomain(): string {
   const configured = env.OUTREACH_INBOUND_DOMAIN?.trim()
-  if (configured) return normalizeDomain(configured)
+  if (configured) {
+    const normalized = normalizeDomain(configured)
+    if (normalized && isValidOutreachDomain(normalized)) return normalized
+  }
   return `inbound.${platformFromDomain()}`
+}
+
+function resolveReplyDomain(fromDomain: string, inboundDomain: string | null | undefined): string {
+  if (inboundDomain) {
+    const normalized = normalizeDomain(inboundDomain)
+    if (normalized && isValidOutreachDomain(normalized)) return normalized
+  }
+  return `inbound.${fromDomain}`
 }
 
 export function buildFromAddress(
@@ -74,9 +87,7 @@ export async function getAccountEmailDomainConfig(
 
   let replyDomain = platformInboundDomain()
   if (customFrom) {
-    replyDomain = account.outreachInboundDomain
-      ? normalizeDomain(account.outreachInboundDomain)
-      : `inbound.${customFrom}`
+    replyDomain = resolveReplyDomain(customFrom, account.outreachInboundDomain)
   }
 
   return {
@@ -144,9 +155,10 @@ export function buildConfiguredReplyDomain(input: {
   inboundDomain: string | null | undefined
 }): string {
   if (input.fromDomain) {
-    return input.inboundDomain
-      ? normalizeDomain(input.inboundDomain)
-      : `inbound.${normalizeDomain(input.fromDomain)}`
+    const fromDomain = normalizeDomain(input.fromDomain)
+    if (fromDomain && isValidOutreachDomain(fromDomain)) {
+      return resolveReplyDomain(fromDomain, input.inboundDomain)
+    }
   }
   return platformInboundDomain()
 }

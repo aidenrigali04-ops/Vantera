@@ -318,11 +318,11 @@ export function SdrCommandCenterClient({
         <div className="rounded-lg border border-[var(--warning)]/30 bg-[var(--warning-muted)] px-4 py-3 text-[13px] text-[var(--text-primary)]">
           <p className="font-medium">Review mode — outbound waits for your approval</p>
           <p className="mt-1 text-[var(--text-secondary)]">
-            Approve drafts in{' '}
+            Discovery and drafting still run automatically. Approve sends in{' '}
             <Link href="/admin/outreach/agents/drafter" className="text-[var(--accent)] hover:underline">
               Message Drafter
-            </Link>{' '}
-            or send individual steps from the upcoming list.
+            </Link>
+            , use Run queue on Outreach Agent, or send steps from the upcoming list.
           </p>
         </div>
       ) : null}
@@ -331,8 +331,8 @@ export function SdrCommandCenterClient({
         <div className="rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-4 py-3 text-[13px] text-[var(--text-primary)]">
           <p className="font-medium">Automatic outreach is on</p>
           <p className="mt-1 text-[var(--text-secondary)]">
-            {config.agentName} drafts sequences after each enroll and sends due email/SMS during your
-            outreach window.
+            Prospect Scout, Message Drafter, and linked Outreach Agent campaigns run on schedule — due
+            email/SMS sends go out during your outreach window without approval.
           </p>
         </div>
       ) : null}
