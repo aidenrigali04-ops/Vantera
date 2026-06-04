@@ -97,7 +97,7 @@ function SidebarContent({ session, collapsed, onNavigate }: SidebarProps & { col
             ))}
           </ul>
 
-          {!collapsed && ADMIN_NAV_SIDEBAR_SECONDARY.length > 0 ? (
+          {ADMIN_NAV_SIDEBAR_SECONDARY.length > 0 ? (
             <>
               <div className="my-3 border-t border-[var(--border-subtle)]" aria-hidden />
               <ul className="space-y-0.5">
@@ -108,7 +108,7 @@ function SidebarContent({ session, collapsed, onNavigate }: SidebarProps & { col
                     isActive={item.href ? isSidebarItemActive(pathname, item) : false}
                     collapsed={collapsed}
                     onNavigate={onNavigate}
-                    prefix="+"
+                    prefix={collapsed ? undefined : '+'}
                   />
                 ))}
               </ul>

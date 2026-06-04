@@ -16,6 +16,7 @@ import {
   updateWorkspaceBranding,
   updateWorkspaceGeneral,
 } from '@/lib/settings/actions'
+import { OperatingModelPicker } from '@/components/onboarding/OperatingModelPicker'
 import {
   OPERATING_MODELS,
   type OperatingModelId,
@@ -26,7 +27,7 @@ import {
   writeOperatingModelId,
 } from '@/lib/onboarding/operating-model-storage'
 import { cn } from '@/lib/utils'
-import { Check, ExternalLink, Mail, Palette, Settings2, Users } from 'lucide-react'
+import { ExternalLink, Mail, Palette, Settings2, Users } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState, useTransition } from 'react'
@@ -253,48 +254,15 @@ export function SettingsPageClient({
           {activeSection === 'operating-model' ? (
             <SettingsPanel
               title="Operating model"
-              description="Tailors pipeline language, dashboard focus, and vertical templates."
+              description="Choose how you run the business — we tailor pipeline language, dashboard focus, and templates."
               onSave={saveOperatingModelSelection}
               saving={isPending}
               saveLabel="Save operating model"
             >
-              <div className="grid gap-3 sm:grid-cols-2">
-                {OPERATING_MODELS.map((model) => {
-                  const Icon = model.icon
-                  const active = operatingModelId === model.id
-                  return (
-                    <button
-                      key={model.id}
-                      type="button"
-                      onClick={() => setOperatingModelId(model.id)}
-                      className={cn(
-                        'rounded-xl border p-4 text-left transition-colors',
-                        active
-                          ? 'border-stone-900 bg-stone-50 shadow-sm'
-                          : 'border-stone-200 bg-white hover:border-stone-300',
-                      )}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <span
-                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
-                          style={{ backgroundColor: `${model.accent}18`, color: model.accent }}
-                        >
-                          <Icon className="h-4 w-4" aria-hidden />
-                        </span>
-                        {active ? (
-                          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-stone-900 text-white">
-                            <Check className="h-3 w-3" aria-hidden />
-                          </span>
-                        ) : null}
-                      </div>
-                      <p className="mt-3 text-sm font-medium text-stone-900">{model.label}</p>
-                      <p className="mt-1 text-[12px] leading-relaxed text-stone-500">
-                        {model.description}
-                      </p>
-                    </button>
-                  )
-                })}
-              </div>
+              <OperatingModelPicker
+                selected={operatingModelId}
+                onSelect={setOperatingModelId}
+              />
             </SettingsPanel>
           ) : null}
 
@@ -464,17 +432,21 @@ function SettingsPanel({
   showSaveButton = true,
 }: SettingsPanelProps) {
   return (
-    <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm sm:p-6">
+    <section className="card-surface p-5 sm:p-6">
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h2 className="text-base font-semibold text-stone-900">{title}</h2>
-          <p className="mt-0.5 text-[13px] text-stone-500">{description}</p>
+          <h2 className="text-[15px] font-semibold tracking-[-0.02em] text-[var(--text-primary)]">
+            {title}
+          </h2>
+          <p className="mt-1 text-[13px] leading-relaxed text-[var(--text-secondary)]">
+            {description}
+          </p>
         </div>
         {showSaveButton && onSave ? (
           <Button
             onClick={onSave}
             disabled={saving}
-            className="shrink-0 bg-stone-900 hover:bg-stone-800"
+            className="shrink-0 bg-[var(--text-primary)] text-[var(--text-inverse)] hover:opacity-90"
           >
             {saving ? 'Saving…' : saveLabel}
           </Button>

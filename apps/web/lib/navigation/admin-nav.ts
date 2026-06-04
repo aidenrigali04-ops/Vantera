@@ -90,6 +90,13 @@ export const ADMIN_NAV_SIDEBAR: AdminNavItem[] = [
 
 /** Secondary sidebar links (below main nav divider). */
 export const ADMIN_NAV_SIDEBAR_SECONDARY: AdminNavItem[] = [
+  {
+    id: 'agents',
+    label: 'Agents',
+    icon: Bot,
+    href: '/admin/outreach/agents',
+    tourAnchor: 'nav-agents',
+  },
   { id: 'linkedin', label: 'LinkedIn', icon: Share2, href: '/admin/outreach/linkedin' },
 ]
 
@@ -222,7 +229,17 @@ export function isAdminNavItemActive(pathname: string, href: string): boolean {
 export function isSidebarItemActive(pathname: string, item: AdminNavItem): boolean {
   if (!item.href) return false
 
+  if (item.id === 'agents' && pathname.startsWith('/admin/outreach/agents')) {
+    return true
+  }
+
+  if (item.id === 'linkedin' && pathname.startsWith('/admin/outreach/linkedin')) {
+    return true
+  }
+
   if (item.id === 'outreach' && pathname.startsWith('/admin/outreach')) {
+    if (pathname.startsWith('/admin/outreach/agents')) return false
+    if (pathname.startsWith('/admin/outreach/linkedin')) return false
     return true
   }
 
@@ -273,7 +290,7 @@ export function getAvailableAdminNavItems(): AdminNavItem[] {
     })),
   )
 
-  const items = [...ADMIN_NAV_SIDEBAR, ...fromHubs, ...ADMIN_NAV_FOOTER]
+  const items = [...ADMIN_NAV_SIDEBAR, ...ADMIN_NAV_SIDEBAR_SECONDARY, ...fromHubs, ...ADMIN_NAV_FOOTER]
   const seen = new Set<string>()
   return items.filter((item) => {
     if (!item.href || seen.has(item.href)) return false
@@ -313,7 +330,7 @@ export function resolveAdminPageTitle(pathname: string): string {
   if (pathname.startsWith('/admin/outreach/campaigns')) return 'Outreach'
   if (pathname.startsWith('/admin/inbox')) return 'Inbox'
   if (pathname.startsWith('/admin/calendar')) return 'Calendar'
-  if (pathname.startsWith('/admin/outreach/agents')) return 'SDR Agents'
+  if (pathname.startsWith('/admin/outreach/agents')) return 'Agents'
   if (pathname.startsWith('/admin/outreach/aspire')) return 'Aspire'
   if (pathname.startsWith('/admin/outreach/linkedin')) return 'LinkedIn'
   if (pathname.startsWith('/admin/outreach/campaigns')) return 'Campaigns'
@@ -349,8 +366,11 @@ export function resolveWorkspacePrimaryAction(pathname: string): WorkspaceHeader
   if (pathname.startsWith('/admin/clients') || pathname.startsWith('/admin/portal')) {
     return { label: 'New contact', href: '/admin/clients' }
   }
+  if (pathname.startsWith('/admin/outreach/agents')) {
+    return { label: 'Configure agents', href: '/admin/outreach/agents/setup' }
+  }
   if (pathname.startsWith('/admin/pipeline') || pathname.startsWith('/admin/outreach')) {
-    return { label: 'Build SDR agents', href: '/admin/outreach/agents' }
+    return { label: 'Open agents', href: '/admin/outreach/agents' }
   }
   if (pathname.startsWith('/admin/records') || pathname.startsWith('/admin/deliverables')) {
     return { label: 'New project', href: '/admin/records' }

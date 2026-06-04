@@ -114,11 +114,15 @@ export function EmailOutreachPageClient({ initialHub, domainSettings }: Props) {
 
       <section className="card-surface border-[var(--border-subtle)] p-4">
         <p className="text-[13px] text-[var(--text-secondary)]">
-          LinkedIn outreach is separate —{' '}
+          SDR agents (Scout, drafter, sequences) live under{' '}
+          <Link href="/admin/outreach/agents" className="font-medium text-[var(--accent)] hover:underline">
+            Agents
+          </Link>{' '}
+          in the sidebar. LinkedIn outreach is separate —{' '}
           <Link href="/admin/outreach/linkedin" className="font-medium text-[var(--accent)] hover:underline">
             open LinkedIn hub
-          </Link>{' '}
-          for connection notes and the manual send queue.
+          </Link>
+          .
         </p>
       </section>
 
@@ -292,44 +296,6 @@ export function EmailOutreachPageClient({ initialHub, domainSettings }: Props) {
         </div>
 
         <div className="space-y-6 xl:col-span-5">
-          <section className="card-surface p-5">
-            <h2 className="text-[15px] font-semibold tracking-[-0.02em] text-[var(--text-primary)]">
-              Outreach workflows
-            </h2>
-            <p className="mt-1 text-[13px] text-[var(--text-secondary)]">
-              Pick a path after your domain is verified.
-            </p>
-            <ul className="mt-4 space-y-3">
-              <WorkflowCard
-                href="/admin/outreach/campaigns?channel=email"
-                title="Campaigns"
-                description="Goal-based bulk email with enrollments, drafts, and metrics."
-                disabled={!hub.domain.sendingVerified}
-                disabledHint="Verify sending DNS first"
-              />
-              <WorkflowCard
-                href="/admin/outreach/agents"
-                title="SDR agents"
-                description={`Scout → drafter → send. Mode: ${hub.sdr.automationMode === 'automatic' ? 'Automatic' : 'Review before send'}.`}
-                badge={
-                  hub.sdr.configured
-                    ? `${hub.sdr.activeSequences} active`
-                    : 'Not configured'
-                }
-              />
-              <WorkflowCard
-                href="/admin/outreach/agents/scout"
-                title="Prospect Scout"
-                description="Discover ICP leads and enroll into email sequences."
-              />
-              <WorkflowCard
-                href="/admin/outreach/aspire"
-                title="Aspire search"
-                description="Import prospects and push to pipeline with enrichment."
-              />
-            </ul>
-          </section>
-
           {showDomainPanel ? (
             <div id="email-domain-setup">
               <OutreachDomainSettingsPanel
@@ -360,55 +326,5 @@ export function EmailOutreachPageClient({ initialHub, domainSettings }: Props) {
         </div>
       </div>
     </div>
-  )
-}
-
-type WorkflowCardProps = {
-  href: string
-  title: string
-  description: string
-  badge?: string
-  disabled?: boolean
-  disabledHint?: string
-}
-
-function WorkflowCard({
-  href,
-  title,
-  description,
-  badge,
-  disabled,
-  disabledHint,
-}: WorkflowCardProps) {
-  const content = (
-    <div
-      className={cn(
-        'rounded-xl border border-[var(--border-subtle)] p-4 transition-colors duration-120 ease',
-        disabled
-          ? 'cursor-not-allowed opacity-60'
-          : 'hover:border-[var(--border-default)] hover:bg-[var(--bg-overlay)]',
-      )}
-    >
-      <div className="flex items-start justify-between gap-2">
-        <p className="text-[13px] font-medium text-[var(--text-primary)]">{title}</p>
-        {badge ? (
-          <span className="shrink-0 rounded-md bg-[var(--bg-elevated)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--text-secondary)]">
-            {badge}
-          </span>
-        ) : null}
-      </div>
-      <p className="mt-1 text-[12px] leading-relaxed text-[var(--text-secondary)]">{description}</p>
-      {disabled && disabledHint ? (
-        <p className="mt-2 text-[11px] font-medium text-[var(--warning)]">{disabledHint}</p>
-      ) : null}
-    </div>
-  )
-
-  if (disabled) return content
-
-  return (
-    <Link href={href} className="block focus-visible:outline-none focus-visible:shadow-[var(--shadow-glow)]">
-      {content}
-    </Link>
   )
 }
