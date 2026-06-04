@@ -1,17 +1,27 @@
 import { recoverStaleAspireSearchRuns } from '@/lib/prospect-scout/recover-stale-runs'
 import { scoreICP } from '@/lib/aspire/icp-score'
 import { getAspireApifyFetchCount } from '@/lib/aspire/apify-client'
-import { filterExistingLeads, searchApify } from '@/lib/aspire/search'
-import type { ApifySearchFilters } from '@/lib/aspire/types'
+import { searchApify } from '@/lib/aspire/search'
 import { getSystemAutomationId } from '@/lib/automation/system-automation'
 import { db } from '@/lib/db/client'
 import {
-  domainFromEmail,
   enrollProspect,
   notifyIcpMatches,
   recordFoundProspects,
 } from '@/lib/prospect-scout/enroll'
+import { buildScoutApifyFilters } from '@/lib/prospect-scout/filters'
+import {
+  filterKnownProspectIds,
+  partitionFreshProspects,
+} from '@/lib/prospect-scout/filter-known-prospects'
+import {
+  buildRotatedScoutApifyFilters,
+  persistScoutRotationIndex,
+  readScoutRotationIndex,
+} from '@/lib/prospect-scout/rotation'
 import type { SdrConfigRow } from '@/lib/prospect-scout/types'
+import type { ApifyLead } from '@/lib/aspire/types'
+import type { ProspectSearchMeta } from '@/lib/aspire/apify-client'
 import { launchAutomaticScoutRunCampaign } from '@/lib/outreach/automatic-scout-campaign'
 import { logSdrActivity } from '@/lib/sdr/activity-log'
 import { runAutomaticPipelineForAccount } from '@/lib/sdr/automatic-pipeline'
@@ -22,25 +32,10 @@ import type { ICPConfig } from '@/lib/aspire/types'
 import { aspireSearchRuns, automationRuns, sdrAgentConfigs } from '@vantera/db'
 import { eq } from 'drizzle-orm'
 
-export function buildScoutApifyFilters(config: SdrConfigRow): ApifySearchFilters {
-  const icp = config.icpConfig as {
-    targetTitles?: string[]
-    targetIndustries?: string[]
-    targetSizes?: [number, number]
-  }
+export { buildScoutApifyFilters } from '@/lib/prospect-scout/filters'
 
-  return {
-    jobTitles: icp.targetTitles ?? ['Owner', 'CEO', 'Founder', 'President'],
-    industries: config.targetVerticals.length
-      ? config.targetVerticals
-      : (icp.targetIndustries ?? []),
-    companySizeRanges: icp.targetSizes
-      ? [`${icp.targetSizes[0]},${icp.targetSizes[1]}`]
-      : ['1,10', '11,50', '51,200'],
-    locations: config.targetCities.length ? config.targetCities : ['united states'],
-    contactEmailStatus: undefined,
-  }
-}
+const ROTATION_ATTEMPTS = 4
+const MIN_FRESH_PER_RUN = 3
 
 export type ScoutDiscoveryResult = {
   runId: string
@@ -59,7 +54,6 @@ export async function runProspectScoutDiscovery(
   options?: { autoEnroll?: boolean; perPage?: number },
 ): Promise<ScoutDiscoveryResult> {
   const icpConfig = config.icpConfig as ICPConfig
-  const filters = buildScoutApifyFilters(config)
   const perPage = options?.perPage ?? getAspireApifyFetchCount()
   const autoEnroll = options?.autoEnroll ?? true
 
@@ -71,7 +65,7 @@ export async function runProspectScoutDiscovery(
       accountId: config.accountId,
       savedSearchId: null,
       configId: config.id,
-      query: filters,
+      query: buildScoutApifyFilters(config),
       status: 'running',
       resultCount: 0,
       enrolledCount: 0,
@@ -91,15 +85,42 @@ export async function runProspectScoutDiscovery(
             config.maxActiveLeads - activeCount,
           )
 
-    const { people } = await searchApify(filters, 1, perPage)
-    const existingIds = new Set(await filterExistingLeads(config.accountId, people.map((p) => p.id)))
+    const rotationIndex = readScoutRotationIndex(config.icpConfig)
     const excludeDomains = new Set((config.excludeDomains ?? []).map((d) => d.toLowerCase()))
 
-    const fresh = people.filter((p) => {
-      if (existingIds.has(p.id)) return false
-      const domain = domainFromEmail(p.email)
-      return !domain || !excludeDomains.has(domain)
-    })
+    let apifyReturned = 0
+    let skippedKnown = 0
+    let skippedDomain = 0
+    let rotationAttempts = 0
+    let searchMeta: ProspectSearchMeta | null = null
+    const freshById = new Map<string, ApifyLead>()
+
+    for (let attempt = 0; attempt < ROTATION_ATTEMPTS; attempt += 1) {
+      const rotatedFilters = buildRotatedScoutApifyFilters(
+        config,
+        rotationIndex + attempt,
+      )
+      const { people, meta } = await searchApify(rotatedFilters, 1, perPage)
+      rotationAttempts += 1
+      apifyReturned += people.length
+      searchMeta = meta
+
+      const knownIds = await filterKnownProspectIds(config.accountId, people)
+      const partition = partitionFreshProspects(people, knownIds, excludeDomains)
+      skippedKnown += partition.skippedKnown
+      skippedDomain += partition.skippedDomain
+
+      for (const person of partition.fresh) {
+        freshById.set(person.id, person)
+      }
+
+      if (freshById.size >= MIN_FRESH_PER_RUN) break
+      if (people.length === 0) break
+    }
+
+    const fresh = [...freshById.values()]
+
+    await persistScoutRotationIndex(config.id, config.icpConfig, rotationIndex + 1)
 
     const scored = fresh.map((person) => ({
       person,
@@ -119,11 +140,14 @@ export async function runProspectScoutDiscovery(
     let enrolled = 0
     const scoutEnrollments: ScoutRunEnrollment[] = []
     const minIcp = config.defaultMinIcpScore ?? 70
-    const shouldEnroll =
-      autoEnroll && config.isActive && !config.isPaused && headroom > 0
+    const shouldEnroll = autoEnroll && config.isActive && !config.isPaused
+    let skippedBelowIcp = 0
 
     for (const { person, icp } of scored.sort((a, b) => b.icp.score - a.icp.score)) {
-      if (icp.score < minIcp) continue
+      if (icp.score < minIcp) {
+        skippedBelowIcp += 1
+        continue
+      }
       if (!shouldEnroll) continue
 
       const withSequence = headroom > 0
@@ -193,11 +217,42 @@ export async function runProspectScoutDiscovery(
       }
     }
 
+    const discoveryMeta = {
+      found: fresh.length,
+      stored,
+      enrolled,
+      runId,
+      headroom,
+      enrolledToday,
+      activeSequences: activeCount,
+      rotationIndex,
+      rotationAttempts,
+      apifyReturned,
+      skippedKnown,
+      skippedDomain,
+      skippedBelowIcp,
+      minIcp,
+      apifySource: searchMeta?.source ?? null,
+      apifyError: searchMeta?.providerError ?? null,
+      zeroLeadsReason:
+        fresh.length === 0
+          ? apifyReturned === 0
+            ? 'apify_empty'
+            : skippedKnown >= apifyReturned
+              ? 'all_already_in_workspace'
+              : 'filters_or_icp'
+          : enrolled === 0 && headroom <= 0
+            ? 'daily_or_active_cap_reached'
+            : enrolled === 0 && skippedBelowIcp > 0
+              ? 'below_min_icp_score'
+              : null,
+    }
+
     await logSdrActivity({
       accountId: config.accountId,
       configId: config.id,
       eventType: 'discovery_completed',
-      metadata: { found: fresh.length, stored, enrolled, runId },
+      metadata: discoveryMeta,
     })
 
     const automationId = await getSystemAutomationId(config.accountId, 'sdr_find')
@@ -207,7 +262,7 @@ export async function runProspectScoutDiscovery(
       triggerEvent: 'prospect_scout_discover',
       actionType: 'lead_discovery',
       status: 'success',
-      resultPayload: { found: fresh.length, stored, enrolled, runId },
+      resultPayload: discoveryMeta,
     })
 
     return { runId, found: fresh.length, stored, enrolled, enrollments: scoutEnrollments }
