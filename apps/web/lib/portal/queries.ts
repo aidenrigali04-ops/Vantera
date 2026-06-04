@@ -12,7 +12,7 @@ import type {
   PortalProject,
   PortalWorkspace,
 } from '@/lib/portal/types'
-import { loadPortalConfig } from '@/lib/portal/config'
+import { loadPortalConfig } from '@/lib/portal/load-portal-config'
 import type { PortalNavCounts } from '@/lib/portal/types'
 import { derivePortalLoginUrl, derivePortalUrl } from '@/lib/portal/url'
 import { activities, contacts, documents, invoices, messages, records, stageDefinitions } from '@vantera/db'

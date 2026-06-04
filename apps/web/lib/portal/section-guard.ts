@@ -1,4 +1,4 @@
-import type { PortalConfig, PortalSectionId } from '@/lib/portal/config'
+import type { PortalConfig, PortalSectionId } from '@/lib/portal/portal-config'
 import { redirect } from 'next/navigation'
 
 export function assertPortalSectionEnabled(

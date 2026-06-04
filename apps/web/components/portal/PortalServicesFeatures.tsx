@@ -1,4 +1,4 @@
-import type { PortalConfig } from '@/lib/portal/config'
+import type { PortalConfig } from '@/lib/portal/portal-config'
 import { Sparkles, Wrench } from 'lucide-react'
 
 type PortalServicesFeaturesProps = {

@@ -69,7 +69,7 @@ export type PortalBillingSummary = {
   status: 'current' | 'due_soon' | 'overdue'
 }
 
-import type { PortalConfig } from '@/lib/portal/config'
+import type { PortalConfig } from '@/lib/portal/portal-config'
 
 export type PortalNavCounts = {
   projects: number

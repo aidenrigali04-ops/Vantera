@@ -6,8 +6,8 @@ import { PortalDocumentsView } from '@/components/portal/PortalDocumentsView'
 import { PortalMessagesView } from '@/components/portal/PortalMessagesView'
 import { PortalOverviewView } from '@/components/portal/PortalOverviewView'
 import { PortalProjectsView } from '@/components/portal/PortalProjectsView'
-import type { PortalSectionId } from '@/lib/portal/config'
-import { PORTAL_SECTION_IDS } from '@/lib/portal/config'
+import type { PortalSectionId } from '@/lib/portal/portal-config'
+import { PORTAL_SECTION_IDS } from '@/lib/portal/portal-config'
 import { useSearchParams } from 'next/navigation'
 
 function parseView(raw: string | null): PortalSectionId {

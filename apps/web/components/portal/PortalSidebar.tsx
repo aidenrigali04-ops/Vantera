@@ -2,7 +2,7 @@
 
 import { TenantBrandMark } from '@/components/branding/tenant-brand-mark'
 import { portalLogoutAction } from '@/lib/auth/actions'
-import { buildPortalNavItems, type PortalSectionId } from '@/lib/portal/config'
+import { buildPortalNavItems, type PortalSectionId } from '@/lib/portal/portal-config'
 import { usePortalShell } from '@/lib/portal/context'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'

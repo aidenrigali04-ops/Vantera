@@ -1,7 +1,11 @@
 import { AdminPortalPreviewFrame } from '@/components/portal/AdminPortalPreviewFrame'
 import { requireAdminSession } from '@/lib/auth/require-session'
 import { findContact } from '@/lib/db/queries'
-import { findPreviewContactId, getPortalWorkspace } from '@/lib/portal/queries'
+import {
+  findPreviewContactId,
+  getPortalNavCounts,
+  getPortalWorkspace,
+} from '@/lib/portal/queries'
 import { notFound } from 'next/navigation'
 
 export const dynamic = 'force-dynamic'
@@ -28,6 +32,18 @@ export default async function AdminPortalPreviewPage({ searchParams }: Props) {
     ? await getPortalWorkspace(session.accountId, contactId)
     : null
 
+  const navCounts = contactId
+    ? await getPortalNavCounts(session.accountId, contactId)
+    : {
+        projects: 0,
+        messages: 0,
+        unreadMessages: 0,
+        openInvoices: 0,
+        pendingApprovals: 0,
+        documents: 0,
+        activities: 0,
+      }
+
   const contactLabel = workspace
     ? `${workspace.contactFirstName} ${workspace.contactLastName}`.trim()
     : null
@@ -41,6 +57,8 @@ export default async function AdminPortalPreviewPage({ searchParams }: Props) {
     <AdminPortalPreviewFrame
       workspace={workspace}
       contactLabel={contactLabel}
+      contactId={contactId}
+      navCounts={navCounts}
       backHref={backHref}
     />
   )

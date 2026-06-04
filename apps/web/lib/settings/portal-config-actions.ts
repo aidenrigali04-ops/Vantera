@@ -10,7 +10,7 @@ import {
   type PortalFeatureHighlight,
   type PortalServiceOffering,
   parsePortalConfig,
-} from '@/lib/portal/config'
+} from '@/lib/portal/portal-config'
 import { accounts } from '@vantera/db'
 import { eq } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
