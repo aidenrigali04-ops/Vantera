@@ -143,6 +143,8 @@ export const accounts = pgTable('accounts', {
   brandPrimaryColor: varchar('brand_primary_color', { length: 7 }).default('#1648A0'),
   brandSecondaryColor: varchar('brand_secondary_color', { length: 7 }).default('#0D9488'),
   portalDomain: varchar('portal_domain', { length: 255 }),
+  /** Admin-driven client portal: sections, services, welcome copy, support links. */
+  portalConfig: jsonb('portal_config').notNull().default({}),
   timezone: varchar('timezone', { length: 60 }).notNull().default('America/Los_Angeles'),
   stripeCustomerId: varchar('stripe_customer_id', { length: 255 }),
   stripeSubscriptionId: varchar('stripe_subscription_id', { length: 255 }),
@@ -1090,8 +1092,20 @@ export type OutreachCampaignWorkflowStep = {
   body: string
 }
 
+export type CampaignDeliveryMode =
+  | 'sequence'
+  | 'single_email'
+  | 'linkedin_sequence'
+  | 'single_linkedin'
+
+export type CampaignChannelFocus = 'email' | 'linkedin'
+
 export type OutreachCampaignWorkflow = {
   steps: OutreachCampaignWorkflowStep[]
+  /** Email: sequence | single_email. LinkedIn: linkedin_sequence | single_linkedin */
+  deliveryMode?: CampaignDeliveryMode
+  /** Separates email-hub campaigns from LinkedIn-hub campaigns */
+  channelFocus?: CampaignChannelFocus
 }
 
 export type OutreachCampaignMetrics = {

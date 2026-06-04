@@ -1,4 +1,9 @@
 import type {
+  CampaignChannelFocus,
+  CampaignDeliveryMode,
+} from '@/lib/outreach/campaign-draft-guidelines'
+import { isLinkedInDeliveryMode } from '@/lib/outreach/campaign-draft-guidelines'
+import type {
   OutreachCampaignMetrics,
   OutreachCampaignWorkflow,
   outreachCampaigns,
@@ -41,10 +46,29 @@ export type EnrollmentWithLead = OutreachEnrollmentRow & {
 }
 
 export function parseCampaignWorkflow(raw: unknown): OutreachCampaignWorkflow {
-  if (!raw || typeof raw !== 'object') return { steps: [] }
+  if (!raw || typeof raw !== 'object') return { steps: [], deliveryMode: 'sequence', channelFocus: 'email' }
   const workflow = raw as OutreachCampaignWorkflow
-  if (!Array.isArray(workflow.steps)) return { steps: [] }
-  return workflow
+  const steps = Array.isArray(workflow.steps) ? workflow.steps : []
+
+  let deliveryMode: CampaignDeliveryMode = 'sequence'
+  if (workflow.deliveryMode === 'single_email') deliveryMode = 'single_email'
+  else if (workflow.deliveryMode === 'single_linkedin') deliveryMode = 'single_linkedin'
+  else if (workflow.deliveryMode === 'linkedin_sequence') deliveryMode = 'linkedin_sequence'
+
+  let channelFocus: CampaignChannelFocus =
+    workflow.channelFocus === 'linkedin' ? 'linkedin' : 'email'
+  if (isLinkedInDeliveryMode(deliveryMode)) channelFocus = 'linkedin'
+  if (deliveryMode === 'single_email') channelFocus = 'email'
+
+  return { steps, deliveryMode, channelFocus }
+}
+
+export function getCampaignDeliveryMode(workflow: OutreachCampaignWorkflow): CampaignDeliveryMode {
+  return parseCampaignWorkflow(workflow).deliveryMode ?? 'sequence'
+}
+
+export function getCampaignChannelFocus(workflow: OutreachCampaignWorkflow): CampaignChannelFocus {
+  return parseCampaignWorkflow(workflow).channelFocus ?? 'email'
 }
 
 export function parseCampaignMetrics(raw: unknown): OutreachCampaignMetrics {

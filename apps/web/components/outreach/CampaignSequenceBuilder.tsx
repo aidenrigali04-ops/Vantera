@@ -26,26 +26,30 @@ type Props = {
   steps: OutreachCampaignWorkflowStep[]
   onChange: (steps: OutreachCampaignWorkflowStep[]) => void
   disabled?: boolean
+  /** When set, only LinkedIn steps can be added (separate from email campaigns). */
+  linkedinOnly?: boolean
 }
 
-function emptyStep(index: number): OutreachCampaignWorkflowStep {
+function emptyStep(index: number, linkedinOnly?: boolean): OutreachCampaignWorkflowStep {
   return {
     stepIndex: index,
     delayDays: index === 0 ? 0 : 2,
-    channel: 'email',
-    intent: 'Write a concise outreach message.',
+    channel: linkedinOnly ? 'linkedin' : 'email',
+    intent: linkedinOnly
+      ? 'Write a short LinkedIn connection note — under 300 characters, no pitch.'
+      : 'Write a concise outreach message.',
     subject: '',
     body: '',
   }
 }
 
-export function CampaignSequenceBuilder({ steps, onChange, disabled }: Props) {
+export function CampaignSequenceBuilder({ steps, onChange, disabled, linkedinOnly }: Props) {
   function updateStep(index: number, patch: Partial<OutreachCampaignWorkflowStep>) {
     onChange(steps.map((step, i) => (i === index ? { ...step, ...patch, stepIndex: i } : step)))
   }
 
   function addStep() {
-    onChange([...steps, emptyStep(steps.length)])
+    onChange([...steps, emptyStep(steps.length, linkedinOnly)])
   }
 
   function removeStep(index: number) {
@@ -91,28 +95,37 @@ export function CampaignSequenceBuilder({ steps, onChange, disabled }: Props) {
             </div>
 
             <div className="mt-4 grid gap-3 sm:grid-cols-3">
-              <div className="space-y-2">
-                <Label>Channel</Label>
-                <Select
-                  value={step.channel}
-                  disabled={disabled}
-                  onValueChange={(value) =>
-                    updateStep(index, {
-                      channel: value as OutreachCampaignWorkflowStep['channel'],
-                      subject: value === 'email' ? step.subject : '',
-                    })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="email">Email</SelectItem>
-                    <SelectItem value="linkedin">LinkedIn</SelectItem>
-                    <SelectItem value="sms">SMS</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              {linkedinOnly ? (
+                <div className="space-y-2">
+                  <Label>Channel</Label>
+                  <p className="rounded-md border border-dashed border-stone-200 bg-white px-3 py-2 text-xs text-stone-600">
+                    LinkedIn only — manual send queue
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Label>Channel</Label>
+                  <Select
+                    value={step.channel}
+                    disabled={disabled}
+                    onValueChange={(value) =>
+                      updateStep(index, {
+                        channel: value as OutreachCampaignWorkflowStep['channel'],
+                        subject: value === 'email' ? step.subject : '',
+                      })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="email">Email</SelectItem>
+                      <SelectItem value="linkedin">LinkedIn</SelectItem>
+                      <SelectItem value="sms">SMS</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <div className="space-y-2">
                 <Label>Delay (days)</Label>
                 <Input
@@ -159,8 +172,13 @@ export function CampaignSequenceBuilder({ steps, onChange, disabled }: Props) {
                 }
               />
               {step.channel === 'linkedin' ? (
-                <p className="text-xs text-stone-500">
-                  LinkedIn steps are queued for manual send — copy the message from Results after launch.
+                <p
+                  className={cn(
+                    'text-xs',
+                    step.body.length > 300 ? 'font-medium text-red-600' : 'text-stone-500',
+                  )}
+                >
+                  {step.body.length}/300 characters · manual send from Results after launch
                 </p>
               ) : null}
             </div>

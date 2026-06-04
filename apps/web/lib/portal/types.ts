@@ -69,9 +69,22 @@ export type PortalBillingSummary = {
   status: 'current' | 'due_soon' | 'overdue'
 }
 
+import type { PortalConfig } from '@/lib/portal/config'
+
+export type PortalNavCounts = {
+  projects: number
+  messages: number
+  unreadMessages: number
+  openInvoices: number
+  pendingApprovals: number
+  documents: number
+  activities: number
+}
+
 export type PortalWorkspace = {
   contactFirstName: string
   contactLastName: string
+  config: PortalConfig
   projects: PortalProject[]
   activities: PortalActivity[]
   deliverables: PortalDeliverable[]

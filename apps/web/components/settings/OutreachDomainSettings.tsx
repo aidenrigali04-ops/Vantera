@@ -20,6 +20,10 @@ import { toast } from 'sonner'
 
 type Props = {
   initial: OutreachDomainSettings
+  /** Called after save / verify / refresh so parent views can reload hub stats */
+  onSaved?: () => void
+  /** Use operational design tokens (e.g. on Email outreach page) */
+  embedded?: boolean
 }
 
 function statusLabel(status: string): string {
@@ -48,7 +52,7 @@ function statusTone(status: string): string {
   }
 }
 
-export function OutreachDomainSettingsPanel({ initial }: Props) {
+export function OutreachDomainSettingsPanel({ initial, onSaved, embedded = false }: Props) {
   const router = useRouter()
   const [settings, setSettings] = useState(initial)
   const [fromDomain, setFromDomain] = useState(initial.fromDomain ?? '')
@@ -105,6 +109,7 @@ export function OutreachDomainSettingsPanel({ initial }: Props) {
       }
 
       router.refresh()
+      onSaved?.()
     })
   }
 
@@ -126,6 +131,7 @@ export function OutreachDomainSettingsPanel({ initial }: Props) {
           : 'Refreshed — records still pending from Resend. Try again shortly.',
       )
       router.refresh()
+      onSaved?.()
     })
   }
 
@@ -151,6 +157,7 @@ export function OutreachDomainSettingsPanel({ initial }: Props) {
         toast.success('Checked — DNS may still be propagating. Try again in a few minutes.')
       }
       router.refresh()
+      onSaved?.()
     })
   }
 
@@ -179,17 +186,37 @@ export function OutreachDomainSettingsPanel({ initial }: Props) {
       setFromLocalPart('outreach')
       toast.success('Using platform default domain for outreach')
       router.refresh()
+      onSaved?.()
     })
   }
 
   const hasRecords = settings.sendingRecords.length > 0 || settings.inboundRecords.length > 0
 
   return (
-    <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm sm:p-6">
+    <section
+      className={cn(
+        'rounded-xl border p-5 sm:p-6',
+        embedded
+          ? 'card-surface border-[var(--border-subtle)]'
+          : 'border-stone-200 bg-white shadow-sm',
+      )}
+    >
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h2 className="text-base font-semibold text-stone-900">Outreach email domain</h2>
-          <p className="mt-0.5 text-[13px] leading-relaxed text-stone-500">
+          <h2
+            className={cn(
+              'text-base font-semibold',
+              embedded ? 'text-[var(--text-primary)]' : 'text-stone-900',
+            )}
+          >
+            Outreach email domain
+          </h2>
+          <p
+            className={cn(
+              'mt-0.5 text-[13px] leading-relaxed',
+              embedded ? 'text-[var(--text-secondary)]' : 'text-stone-500',
+            )}
+          >
             Send outreach from your own domain (e.g. outreach@yourcompany.com). Use the same domain
             as your website — save it here, then paste the DNS records where you manage that
             domain (Vercel, GoDaddy, Cloudflare, etc.).

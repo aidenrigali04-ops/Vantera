@@ -88,6 +88,8 @@ export async function draftCampaignStepMessage(input: {
   intent: string
   goal: OutreachCampaignGoal
   stepIndex: number
+  /** When true, user-authored copy is passed as style reference for a rewrite */
+  existingDraft?: { subject?: string; body: string }
 }): Promise<{ ok: true; output: DraftCampaignStepOutput } | { ok: false; reason: string }> {
   if (!hasAnthropicConfigured()) {
     return {
@@ -131,6 +133,9 @@ export async function draftCampaignStepMessage(input: {
     account?.icpDescription ? `Ideal customer: ${account.icpDescription}` : null,
     account?.valueProposition ? `Value proposition: ${account.valueProposition}` : null,
     account?.vertical ? `Seller vertical: ${account.vertical}` : null,
+    input.existingDraft?.body.trim()
+      ? `\nUser draft to refine (keep their angle, apply all rules and merge tags):\nSubject: ${input.existingDraft.subject ?? '(none)'}\n${input.existingDraft.body}`
+      : null,
   ]
     .filter(Boolean)
     .join('\n')

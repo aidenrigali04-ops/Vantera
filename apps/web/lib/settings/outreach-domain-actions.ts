@@ -234,6 +234,7 @@ export async function saveOutreachDomain(input: {
       .where(eq(accounts.id, accountId))
 
     revalidatePath('/admin/settings')
+    revalidatePath('/admin/outreach/email')
 
     const refreshed = await getOutreachDomainSettings()
     if (!refreshed.success) {
@@ -296,6 +297,7 @@ export async function refreshOutreachDomainDns(): Promise<ActionResult<OutreachD
       .where(eq(accounts.id, accountId))
 
     revalidatePath('/admin/settings')
+    revalidatePath('/admin/outreach/email')
 
     const refreshed = await getOutreachDomainSettings()
     if (!refreshed.success || !refreshed.data) {
@@ -358,6 +360,7 @@ export async function verifyOutreachDomain(): Promise<ActionResult<OutreachDomai
       .where(eq(accounts.id, accountId))
 
     revalidatePath('/admin/settings')
+    revalidatePath('/admin/outreach/email')
 
     const refreshed = await getOutreachDomainSettings()
     if (!refreshed.success || !refreshed.data) {
@@ -391,6 +394,7 @@ export async function clearOutreachDomain(): Promise<ActionResult<{ cleared: tru
       .where(eq(accounts.id, accountId))
 
     revalidatePath('/admin/settings')
+    revalidatePath('/admin/outreach/email')
     return { success: true, data: { cleared: true } }
   } catch (error) {
     return {

@@ -2,6 +2,11 @@
 
 import { createOutreachCampaign } from '@/lib/outreach/actions'
 import {
+  EMAIL_DELIVERY_LABELS,
+  LINKEDIN_DELIVERY_LABELS,
+  type CampaignDeliveryMode,
+} from '@/lib/outreach/campaign-draft-guidelines'
+import {
   CAMPAIGN_GOAL_LABELS,
   type CampaignWithStats,
   type OutreachCampaignGoal,
@@ -28,6 +33,7 @@ import { toast } from 'sonner'
 
 type Props = {
   campaigns: CampaignWithStats[]
+  defaultChannel?: 'email' | 'linkedin'
 }
 
 const GOALS: OutreachCampaignGoal[] = ['book_meeting', 'fill_funnel', 're_engage']
@@ -47,16 +53,32 @@ function campaignStatusTone(status: CampaignWithStats['status']) {
   }
 }
 
-export function CampaignsPageClient({ campaigns }: Props) {
+export function CampaignsPageClient({ campaigns, defaultChannel = 'email' }: Props) {
   const router = useRouter()
+  const isLinkedIn = defaultChannel === 'linkedin'
   const [open, setOpen] = useState(false)
   const [name, setName] = useState('')
   const [goal, setGoal] = useState<OutreachCampaignGoal>('book_meeting')
+  const [deliveryMode, setDeliveryMode] = useState<CampaignDeliveryMode>(
+    isLinkedIn ? 'single_linkedin' : 'sequence',
+  )
   const [isPending, startTransition] = useTransition()
+
+  const deliveryLabels = isLinkedIn ? LINKEDIN_DELIVERY_LABELS : EMAIL_DELIVERY_LABELS
+  const deliveryOptions = (
+    isLinkedIn
+      ? (['linkedin_sequence', 'single_linkedin'] as const)
+      : (['sequence', 'single_email'] as const)
+  )
 
   function handleCreate() {
     startTransition(async () => {
-      const result = await createOutreachCampaign({ name, goal })
+      const result = await createOutreachCampaign({
+        name,
+        goal,
+        deliveryMode,
+        channelFocus: isLinkedIn ? 'linkedin' : 'email',
+      })
       if (!result.success) {
         toast.error(result.error)
         return
@@ -72,13 +94,24 @@ export function CampaignsPageClient({ campaigns }: Props) {
   return (
     <>
       <PageHeader
-        title="Campaigns"
-        description="Launch unified email outreach — goal, audience, message, and results in one flow."
+        title={isLinkedIn ? 'LinkedIn campaigns' : 'Email campaigns'}
+        description={
+          isLinkedIn
+            ? 'Connection notes and LinkedIn-only sequences — manual send from the LinkedIn hub.'
+            : 'Goal-based email outreach — domain, audience, message, and results in one flow.'
+        }
         actions={
-          <Button onClick={() => setOpen(true)}>
-            <Plus className="mr-1.5 h-4 w-4" />
-            New campaign
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" asChild>
+              <Link href={isLinkedIn ? '/admin/outreach/linkedin' : '/admin/outreach/email'}>
+                Back to {isLinkedIn ? 'LinkedIn' : 'email'} hub
+              </Link>
+            </Button>
+            <Button onClick={() => setOpen(true)}>
+              <Plus className="mr-1.5 h-4 w-4" />
+              New {isLinkedIn ? 'LinkedIn' : 'email'} campaign
+            </Button>
+          </div>
         }
       />
 
@@ -158,6 +191,38 @@ export function CampaignsPageClient({ campaigns }: Props) {
                 onChange={(event) => setName(event.target.value)}
                 placeholder="Q2 outbound — agencies"
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Delivery</Label>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {deliveryOptions.map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => setDeliveryMode(mode)}
+                    className={cn(
+                      'rounded-lg border px-3 py-2.5 text-left text-sm transition-colors',
+                      deliveryMode === mode
+                        ? 'border-violet-300 bg-violet-50/80'
+                        : 'border-stone-200 hover:border-stone-300',
+                    )}
+                  >
+                    <span className="font-medium text-stone-900">
+                      {deliveryLabels[mode as keyof typeof deliveryLabels]}
+                    </span>
+                    <span className="mt-0.5 block text-[12px] text-stone-500">
+                      {mode === 'single_email'
+                        ? 'One email to all leads — write your own copy + AI draft'
+                        : mode === 'single_linkedin'
+                          ? 'One connection note — manual send on LinkedIn'
+                          : isLinkedIn
+                            ? 'LinkedIn-only timed steps — manual queue'
+                            : 'Timed email, LinkedIn, and SMS steps'}
+                    </span>
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div className="space-y-2">

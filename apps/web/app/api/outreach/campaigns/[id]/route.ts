@@ -63,7 +63,9 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 
   if (action === 'draft_message') {
-    const result = await draftCampaignMessage(id, body.leadId ?? '')
+    const result = await draftCampaignMessage(id, body.leadId ?? '', body.stepIndex ?? 0, {
+      writerNotes: typeof body.writerNotes === 'string' ? body.writerNotes : undefined,
+    })
     return NextResponse.json(result, { status: result.success ? 200 : 400 })
   }
 

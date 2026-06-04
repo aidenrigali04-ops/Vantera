@@ -12,6 +12,8 @@ import type {
   PortalProject,
   PortalWorkspace,
 } from '@/lib/portal/types'
+import { loadPortalConfig } from '@/lib/portal/config'
+import type { PortalNavCounts } from '@/lib/portal/types'
 import { derivePortalLoginUrl, derivePortalUrl } from '@/lib/portal/url'
 import { activities, contacts, documents, invoices, messages, records, stageDefinitions } from '@vantera/db'
 import { and, desc, eq, inArray, isNull, or, sql } from 'drizzle-orm'
@@ -269,6 +271,8 @@ export async function getPortalWorkspace(
 
   if (!contact) return null
 
+  const config = await loadPortalConfig(accountId)
+
   const [projects, activityList, invoiceRows, documentRows, messageRows] = await Promise.all([
     loadProjects(accountId, contactId),
     loadClientActivities(accountId, contactId),
@@ -289,6 +293,7 @@ export async function getPortalWorkspace(
   return {
     contactFirstName: contact.firstName,
     contactLastName: contact.lastName,
+    config,
     projects,
     activities: activityList,
     deliverables,
@@ -298,6 +303,38 @@ export async function getPortalWorkspace(
     documents: documentRows,
     messages: messageRows,
     unreadMessageCount,
+  }
+}
+
+export async function getPortalNavCounts(
+  accountId: string,
+  contactId: string,
+): Promise<PortalNavCounts> {
+  const workspace = await getPortalWorkspace(accountId, contactId)
+  if (!workspace) {
+    return {
+      projects: 0,
+      messages: 0,
+      unreadMessages: 0,
+      openInvoices: 0,
+      pendingApprovals: 0,
+      documents: 0,
+      activities: 0,
+    }
+  }
+
+  const openInvoices = workspace.invoices.filter((inv) =>
+    ['sent', 'viewed', 'overdue'].includes(inv.status),
+  ).length
+
+  return {
+    projects: workspace.projects.length,
+    messages: workspace.messages.length,
+    unreadMessages: workspace.unreadMessageCount,
+    openInvoices,
+    pendingApprovals: workspace.approvals.length,
+    documents: workspace.documents.length,
+    activities: workspace.activities.length,
   }
 }
 

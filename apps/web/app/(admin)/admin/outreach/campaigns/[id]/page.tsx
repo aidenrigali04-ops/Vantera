@@ -6,6 +6,7 @@ import {
   findLeadsForCampaignPicker,
   findOutreachCampaignById,
 } from '@/lib/outreach/queries'
+import { getCampaignChannelFocus } from '@/lib/outreach/types'
 import { notFound } from 'next/navigation'
 
 export const dynamic = 'force-dynamic'
@@ -31,6 +32,7 @@ export default async function CampaignDetailPage({ params }: PageProps) {
       enrollments={enrollments}
       leads={leads}
       campaignSteps={campaignSteps}
+      channelFocus={getCampaignChannelFocus(campaign.workflow)}
     />
   )
 }

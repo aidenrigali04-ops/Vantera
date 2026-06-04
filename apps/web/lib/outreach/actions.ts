@@ -12,13 +12,22 @@ import { materializeCampaignSteps, markCampaignStepSentCore, processDueCampaignS
 import {
   CAMPAIGN_GOAL_INTENTS,
   parseCampaignMetrics,
+  parseCampaignWorkflow,
   type OutreachCampaignGoal,
   type OutreachCampaignWorkflow,
   type OutreachCampaignWorkflowStep,
 } from '@/lib/outreach/types'
+import type {
+  CampaignChannelFocus,
+  CampaignDeliveryMode,
+} from '@/lib/outreach/campaign-draft-guidelines'
+import { getCampaignChannelFocus, getCampaignDeliveryMode } from '@/lib/outreach/types'
 import {
   channelsFromWorkflow,
   defaultWorkflowForGoal,
+  linkedinSequenceWorkflowForGoal,
+  singleEmailWorkflowForGoal,
+  singleLinkedInWorkflowForGoal,
   validateWorkflowForLaunch,
 } from '@/lib/outreach/workflow-templates'
 import {
@@ -32,6 +41,8 @@ import { revalidatePath } from 'next/cache'
 type CreateCampaignInput = {
   name: string
   goal: OutreachCampaignGoal
+  deliveryMode?: CampaignDeliveryMode
+  channelFocus?: CampaignChannelFocus
 }
 
 type SaveCampaignMessageInput = {
@@ -46,7 +57,11 @@ export async function createOutreachCampaign(
 ): Promise<ActionResult<{ id: string }>> {
   const session = await requireAdminSession()
 
-  const workflow = defaultWorkflowForGoal(input.goal)
+  const channelFocus = input.channelFocus ?? 'email'
+  const deliveryMode =
+    input.deliveryMode ??
+    (channelFocus === 'linkedin' ? 'linkedin_sequence' : 'sequence')
+  const workflow = defaultWorkflowForGoal(input.goal, deliveryMode, channelFocus)
 
   const [campaign] = await db
     .insert(outreachCampaigns)
@@ -62,6 +77,8 @@ export async function createOutreachCampaign(
     .returning({ id: outreachCampaigns.id })
 
   revalidatePath('/admin/outreach/campaigns')
+  revalidatePath('/admin/outreach/email')
+  revalidatePath('/admin/outreach/linkedin')
   return { success: true, data: { id: campaign!.id } }
 }
 
@@ -88,7 +105,12 @@ export async function saveCampaignWorkflow(
     body: step.body?.trim() ?? '',
   }))
 
-  const workflow: OutreachCampaignWorkflow = { steps }
+  const parsed = parseCampaignWorkflow(campaign.workflow)
+  const workflow: OutreachCampaignWorkflow = {
+    steps,
+    deliveryMode: parsed.deliveryMode,
+    channelFocus: parsed.channelFocus,
+  }
 
   await db
     .update(outreachCampaigns)
@@ -101,6 +123,88 @@ export async function saveCampaignWorkflow(
 
   revalidatePath('/admin/outreach/campaigns')
   revalidatePath(`/admin/outreach/campaigns/${input.campaignId}`)
+  return { success: true, data: undefined }
+}
+
+export async function saveCampaignDeliveryMode(
+  campaignId: string,
+  deliveryMode: CampaignDeliveryMode,
+): Promise<ActionResult> {
+  const session = await requireAdminSession()
+  const campaign = await findOutreachCampaignById(session.accountId, campaignId)
+  if (!campaign) return { success: false, error: 'Campaign not found' }
+  if (campaign.status !== 'draft') {
+    return { success: false, error: 'Only draft campaigns can change delivery mode' }
+  }
+
+  const currentMode = getCampaignDeliveryMode(campaign.workflow)
+  if (currentMode === deliveryMode) {
+    return { success: true, data: undefined }
+  }
+
+  let workflow: OutreachCampaignWorkflow
+
+  const preserved = campaign.workflow.steps.find((s) => s.body.trim())
+
+  if (deliveryMode === 'single_email') {
+    const existingEmail = campaign.workflow.steps.find((s) => s.channel === 'email')
+    workflow = singleEmailWorkflowForGoal(campaign.goal)
+    const first = workflow.steps[0]
+    if (existingEmail && first) {
+      workflow.steps[0] = {
+        ...first,
+        subject: existingEmail.subject ?? '',
+        body: existingEmail.body ?? '',
+        intent: existingEmail.intent || first.intent,
+      }
+    }
+  } else if (deliveryMode === 'single_linkedin') {
+    const existing = campaign.workflow.steps.find((s) => s.channel === 'linkedin')
+    workflow = singleLinkedInWorkflowForGoal(campaign.goal)
+    const first = workflow.steps[0]
+    if (existing && first) {
+      workflow.steps[0] = {
+        ...first,
+        body: existing.body,
+        intent: existing.intent || first.intent,
+      }
+    }
+  } else if (deliveryMode === 'linkedin_sequence') {
+    workflow = linkedinSequenceWorkflowForGoal(campaign.goal)
+    const first = workflow.steps[0]
+    if (preserved?.channel === 'linkedin' && first) {
+      workflow.steps[0] = {
+        ...first,
+        body: preserved.body,
+        intent: preserved.intent || first.intent,
+      }
+    }
+  } else {
+    workflow = defaultWorkflowForGoal(campaign.goal, 'sequence', 'email')
+    const first = workflow.steps[0]
+    if (preserved && first) {
+      workflow.steps[0] = {
+        ...first,
+        subject: preserved.subject ?? first.subject,
+        body: preserved.body,
+        intent: preserved.intent || first.intent,
+        channel: preserved.channel === 'email' ? 'email' : first.channel,
+      }
+    }
+  }
+
+  await db
+    .update(outreachCampaigns)
+    .set({
+      workflow,
+      channels: channelsFromWorkflow(workflow),
+      updatedAt: new Date(),
+    })
+    .where(eq(outreachCampaigns.id, campaignId))
+
+  revalidatePath('/admin/outreach/email')
+  revalidatePath('/admin/outreach/linkedin')
+  revalidatePath(`/admin/outreach/campaigns/${campaignId}`)
   return { success: true, data: undefined }
 }
 
@@ -125,7 +229,15 @@ export async function saveCampaignMessage(
 
   await db
     .update(outreachCampaigns)
-    .set({ workflow, updatedAt: new Date() })
+    .set({
+      workflow: {
+        ...workflow,
+        deliveryMode: getCampaignDeliveryMode(campaign.workflow),
+        channelFocus: getCampaignChannelFocus(campaign.workflow),
+      },
+      channels: channelsFromWorkflow(workflow),
+      updatedAt: new Date(),
+    })
     .where(eq(outreachCampaigns.id, input.campaignId))
 
   revalidatePath('/admin/outreach/campaigns')
@@ -212,6 +324,7 @@ export async function draftCampaignMessage(
   campaignId: string,
   leadId: string,
   stepIndex = 0,
+  options?: { writerNotes?: string },
 ): Promise<ActionResult<{ subject: string; body: string; rationale: string }>> {
   const session = await requireAdminSession()
   const campaign = await findOutreachCampaignById(session.accountId, campaignId)
@@ -239,7 +352,11 @@ export async function draftCampaignMessage(
   const step = campaign.workflow.steps[stepIndex]
   if (!step) return { success: false, error: 'Invalid sequence step' }
 
-  const intent = step.intent?.trim() || CAMPAIGN_GOAL_INTENTS[campaign.goal]
+  let intent = step.intent?.trim() || CAMPAIGN_GOAL_INTENTS[campaign.goal]
+  const notes = options?.writerNotes?.trim()
+  if (notes) {
+    intent = `${intent}\n\nAdditional direction from the user: ${notes}`
+  }
 
   const draft = await draftCampaignStepMessage({
     accountId: session.accountId,
@@ -248,6 +365,10 @@ export async function draftCampaignMessage(
     intent,
     goal: campaign.goal,
     stepIndex,
+    existingDraft:
+      step.body.trim().length > 0
+        ? { subject: step.subject, body: step.body }
+        : undefined,
   })
 
   if (!draft.ok) {
