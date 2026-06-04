@@ -1,3 +1,4 @@
+import { accountCoreSelect, type AccountCoreRow } from '@/lib/db/account-core'
 import { db } from '@/lib/db/client'
 import {
   accounts,
@@ -12,9 +13,9 @@ import {
 } from '@vantera/db'
 import { and, asc, desc, eq, ilike, isNull, or, sql } from 'drizzle-orm'
 
-export async function getAccount(accountId: string) {
+export async function getAccount(accountId: string): Promise<AccountCoreRow | null> {
   const [account] = await db
-    .select()
+    .select(accountCoreSelect)
     .from(accounts)
     .where(eq(accounts.id, accountId))
     .limit(1)

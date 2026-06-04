@@ -3,6 +3,8 @@
 import type { ActionResult } from '@/lib/auth/types'
 import { getAdminSession } from '@/lib/auth/session'
 import { ROLE_RANK } from '@/lib/auth/constants'
+import { isMissingPortalConfigColumn } from '@/lib/db/account-core'
+import { getAccount } from '@/lib/db/queries'
 import { db } from '@/lib/db/client'
 import {
   PORTAL_SECTION_IDS,
@@ -75,31 +77,53 @@ export async function getPortalCustomizationSettings(): Promise<
     return err('You do not have permission to edit portal settings.')
   }
 
-  const [account] = await db
-    .select({
-      name: accounts.name,
-      portalConfig: accounts.portalConfig,
-      bookingLink: accounts.bookingLink,
-      paymentLink: accounts.paymentLink,
-      valueProposition: accounts.valueProposition,
-    })
-    .from(accounts)
-    .where(eq(accounts.id, session.accountId))
-    .limit(1)
+  try {
+    const [account] = await db
+      .select({
+        name: accounts.name,
+        portalConfig: accounts.portalConfig,
+        bookingLink: accounts.bookingLink,
+        paymentLink: accounts.paymentLink,
+        valueProposition: accounts.valueProposition,
+      })
+      .from(accounts)
+      .where(eq(accounts.id, session.accountId))
+      .limit(1)
 
-  if (!account) return err('Workspace not found')
+    if (!account) return err('Workspace not found')
 
-  return {
-    success: true,
-    data: {
-      accountName: account.name,
-      config: parsePortalConfig(account.portalConfig, {
-        name: account.name,
-        bookingLink: account.bookingLink,
-        paymentLink: account.paymentLink,
-        valueProposition: account.valueProposition,
-      }),
-    },
+    return {
+      success: true,
+      data: {
+        accountName: account.name,
+        config: parsePortalConfig(account.portalConfig, {
+          name: account.name,
+          bookingLink: account.bookingLink,
+          paymentLink: account.paymentLink,
+          valueProposition: account.valueProposition,
+        }),
+      },
+    }
+  } catch (error) {
+    if (!isMissingPortalConfigColumn(error)) {
+      throw error
+    }
+
+    const account = await getAccount(session.accountId)
+    if (!account) return err('Workspace not found')
+
+    return {
+      success: true,
+      data: {
+        accountName: account.name,
+        config: parsePortalConfig(null, {
+          name: account.name,
+          bookingLink: account.bookingLink,
+          paymentLink: account.paymentLink,
+          valueProposition: account.valueProposition,
+        }),
+      },
+    }
   }
 }
 
@@ -129,13 +153,22 @@ export async function updatePortalCustomization(
     features: withIds(parsed.data.features, 'feature') as PortalFeatureHighlight[],
   }
 
-  await db
-    .update(accounts)
-    .set({
-      portalConfig: payload,
-      updatedAt: new Date(),
-    })
-    .where(eq(accounts.id, session.accountId))
+  try {
+    await db
+      .update(accounts)
+      .set({
+        portalConfig: payload,
+        updatedAt: new Date(),
+      })
+      .where(eq(accounts.id, session.accountId))
+  } catch (error) {
+    if (isMissingPortalConfigColumn(error)) {
+      return err(
+        'Portal customization requires a database update. Run migration 0026_portal_config.sql, then try again.',
+      )
+    }
+    throw error
+  }
 
   revalidatePath('/admin/settings')
   revalidatePath('/admin/portal')

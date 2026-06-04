@@ -11,12 +11,13 @@ import { notFound } from 'next/navigation'
 export const dynamic = 'force-dynamic'
 
 type Props = {
-  searchParams: { contact?: string; from?: string }
+  searchParams: Promise<{ contact?: string; from?: string }>
 }
 
 export default async function AdminPortalPreviewPage({ searchParams }: Props) {
   const session = await requireAdminSession()
-  const requestedContactId = searchParams.contact?.trim()
+  const params = await searchParams
+  const requestedContactId = params.contact?.trim()
   let contactId = requestedContactId ?? null
 
   if (contactId) {
@@ -49,7 +50,7 @@ export default async function AdminPortalPreviewPage({ searchParams }: Props) {
     : null
 
   const backHref =
-    searchParams.from === 'client' && contactId
+    params.from === 'client' && contactId
       ? `/admin/clients/${contactId}`
       : '/admin/portal'
 

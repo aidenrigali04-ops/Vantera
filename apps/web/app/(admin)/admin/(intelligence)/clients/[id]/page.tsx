@@ -13,12 +13,13 @@ import { notFound } from 'next/navigation'
 export const dynamic = 'force-dynamic'
 
 type Props = {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }
 
 export default async function ActiveClientDetailPage({ params }: Props) {
   const session = await requireAdminSession()
-  const contact = await findContact(session.accountId, params.id)
+  const { id } = await params
+  const contact = await findContact(session.accountId, id)
 
   if (!contact) {
     notFound()
@@ -27,13 +28,13 @@ export default async function ActiveClientDetailPage({ params }: Props) {
   const [activities, relatedRecords, openRecordsCount, insights, portalMeta] = await Promise.all([
     findUnifiedContactActivities(
       session.accountId,
-      params.id,
+      id,
       contact.convertedFromLeadId,
       50,
     ),
-    findRecordsForContact(session.accountId, params.id),
-    countOpenRecordsForContact(session.accountId, params.id),
-    findContactEmbeddedInsights(session.accountId, params.id),
+    findRecordsForContact(session.accountId, id),
+    countOpenRecordsForContact(session.accountId, id),
+    findContactEmbeddedInsights(session.accountId, id),
     getPortalAccessMeta(session.accountId),
   ])
 
