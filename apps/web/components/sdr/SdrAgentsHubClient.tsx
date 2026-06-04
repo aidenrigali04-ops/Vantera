@@ -1,7 +1,7 @@
 'use client'
 
+import { AdminPageContent } from '@/components/admin/AdminPageContent'
 import { AgentsAutomationSection } from '@/components/sdr/AgentsAutomationSection'
-import { SdrOutreachHubTabs } from '@/components/sdr/SdrOutreachHubTabs'
 import { KpiStrip } from '@/components/operational/KpiStrip'
 import { PageHeader } from '@/components/operational/PageHeader'
 import { StatusBadge } from '@/components/operational/table/StatusBadge'
@@ -14,7 +14,6 @@ import {
 } from '@/lib/agents/sdr-agents'
 import type { SdrAgentCard, SdrAgentId } from '@/lib/agents/types'
 import type { OutreachAutomationMode } from '@/lib/sdr/outreach-automation-mode'
-import type { SDRActivityEvent } from '@/lib/sdr/types'
 import { cn } from '@/lib/utils'
 import { Bot, ChevronRight, Megaphone, Rocket, Sparkles, Users, Zap } from 'lucide-react'
 import Link from 'next/link'
@@ -26,7 +25,6 @@ type Props = {
   sdrEnabled: boolean
   outreachAutomationMode: OutreachAutomationMode
   sdrConfigured: boolean
-  recentActivity: SDRActivityEvent[]
 }
 
 const STATUS_TONE = {
@@ -73,7 +71,6 @@ export function SdrAgentsHubClient({
   sdrEnabled,
   outreachAutomationMode,
   sdrConfigured,
-  recentActivity,
 }: Props) {
   const pathname = usePathname()
 
@@ -105,9 +102,7 @@ export function SdrAgentsHubClient({
   ]
 
   return (
-    <div className="mx-auto w-full space-y-6 px-4 py-5 md:px-8 md:py-6">
-      {sdrEnabled ? <SdrOutreachHubTabs /> : null}
-
+    <AdminPageContent>
       <section className="card-surface overflow-hidden border-[var(--accent-border)] bg-gradient-to-br from-[var(--accent-muted)] via-[var(--bg-surface)] to-[var(--bg-subtle)] p-6 sm:p-8">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-2xl space-y-2">
@@ -139,7 +134,6 @@ export function SdrAgentsHubClient({
         <AgentsAutomationSection
           initialMode={outreachAutomationMode}
           sdrConfigured={sdrConfigured}
-          recentActivity={recentActivity}
         />
       ) : null}
 
@@ -161,7 +155,7 @@ export function SdrAgentsHubClient({
             <article
               key={agent.id}
               className={cn(
-                'card-surface card-surface-interactive flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between',
+                'card-surface flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between',
                 isScoutOpen && 'border-[var(--accent-border)] ring-1 ring-[var(--accent-border)]/50',
                 isOutreachOpen && 'border-[var(--accent-border)] ring-1 ring-[var(--accent-border)]/50',
                 isDrafterOpen && 'border-[var(--accent-border)] ring-1 ring-[var(--accent-border)]/50',
@@ -224,11 +218,11 @@ export function SdrAgentsHubClient({
               <li>1. Set Automatic above (or Manual if you want approval gates)</li>
               <li>2. Configure Prospect Scout → discovery into your pipeline</li>
               <li>3. Drafter personalizes sequences per lead automatically</li>
-              <li>4. Link campaigns on Outreach Agent — your only manual pick for sending</li>
+              <li>4. Outreach Agent launches a campaign per Scout run — check Campaigns for the lead list</li>
             </ol>
           </div>
         </div>
       </section>
-    </div>
+    </AdminPageContent>
   )
 }

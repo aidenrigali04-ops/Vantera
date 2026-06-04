@@ -5,7 +5,7 @@ import { OperationalTable } from '@/components/operational/OperationalTable'
 import { PageHeader } from '@/components/operational/PageHeader'
 import { SdrCreditPaywall } from '@/components/sdr/SdrCreditPaywall'
 import { SdrCreditStrip } from '@/components/sdr/SdrCreditStrip'
-import { SdrOutreachHubTabs } from '@/components/sdr/SdrOutreachHubTabs'
+import { AdminPageContent } from '@/components/admin/AdminPageContent'
 import { SectionEmptyState } from '@/components/onboarding/SectionEmptyState'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -141,9 +141,7 @@ export function SdrSequencesPageClient({ rows }: Props) {
   }
 
   return (
-    <div className="mx-auto w-full space-y-6 px-4 py-5 md:px-8 md:py-6">
-      <SdrOutreachHubTabs />
-
+    <AdminPageContent>
       <SdrCreditStrip
         credits={credits}
         loading={creditsLoading}
@@ -191,6 +189,6 @@ export function SdrSequencesPageClient({ rows }: Props) {
         credits={credits}
         onStartTrial={startTrial}
       />
-    </div>
+    </AdminPageContent>
   )
 }

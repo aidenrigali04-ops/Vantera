@@ -151,7 +151,7 @@ export function DashboardActionFeed({
                   </>
                 )
                 const itemClassName = cn(
-                  'flex gap-3 rounded-lg border border-[var(--border-default)] border-l-[3px] bg-[var(--bg-surface)] px-3 py-3 transition-colors duration-150 hover:border-[var(--border-strong)] hover:bg-[var(--bg-subtle)]/80',
+                  'flex gap-3 rounded-lg border border-[var(--border-default)] border-l-[3px] bg-[var(--bg-surface)] px-3 py-3 transition-colors duration-150 hover:border-[var(--border-strong)] hover:bg-[var(--bg-subtle)]',
                   ACCENT_STYLES[item.type] ?? 'border-l-stone-400',
                 )
 

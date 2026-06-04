@@ -3,8 +3,7 @@
 import type { ActionResult } from '@/lib/auth/types'
 import { requireAdminSession } from '@/lib/auth/require-session'
 import { db } from '@/lib/db/client'
-import { logSdrActivity } from '@/lib/sdr/activity-log'
-import { findSdrConfigByAccount } from '@/lib/sdr/queries'
+import { logOutreachAgentActivity } from '@/lib/outreach-agent/activity-log'
 import {
   assertCampaignsBelongToAccount,
   findOutreachAgentConfigByAccount,
@@ -13,9 +12,10 @@ import type {
   LaunchOutreachAgentInput,
   UpdateOutreachAgentInput,
 } from '@/lib/outreach-agent/types'
+import { isAccountAutomaticOutreach } from '@/lib/sdr/outreach-automation-account'
 import {
   normalizeLinkedCampaignIds,
-  validateLaunchOutreachAgentInput,
+  validateLaunchOutreachAgentForAccount,
   validateUpdateOutreachAgentInput,
 } from '@/lib/outreach-agent/validate'
 import { outreachAgentConfigs } from '@vantera/db'
@@ -37,7 +37,7 @@ export async function launchOutreachAgent(
   }
   const accountId = session.accountId
 
-  const validationError = validateLaunchOutreachAgentInput(input)
+  const validationError = await validateLaunchOutreachAgentForAccount(accountId, input)
   if (validationError) return { success: false, error: validationError }
 
   const existing = await findOutreachAgentConfigByAccount(accountId)
@@ -61,18 +61,13 @@ export async function launchOutreachAgent(
     })
     .returning({ id: outreachAgentConfigs.id })
 
-  const scoutConfig = await findSdrConfigByAccount(accountId)
-  if (scoutConfig) {
-    await logSdrActivity({
-      accountId,
-      configId: scoutConfig.id,
-      eventType: 'outreach_agent_launched',
-      metadata: {
-        agentName: input.agentName.trim(),
-        linkedCampaigns: linkedCampaignIds.length,
-      },
-    })
-  }
+  await logOutreachAgentActivity(accountId, {
+    eventType: 'outreach_agent_launched',
+    metadata: {
+      agentName: input.agentName.trim(),
+      linkedCampaigns: linkedCampaignIds.length,
+    },
+  })
 
   const { flushAutomaticOutreachPipelines } = await import(
     '@/lib/sdr/outreach-automation-policy'
@@ -91,7 +86,8 @@ export async function updateOutreachAgentConfig(
   input: UpdateOutreachAgentInput,
 ): Promise<ActionResult> {
   const session = await requireAdminSession()
-  const validationError = validateUpdateOutreachAgentInput(input)
+  const automaticOutreach = await isAccountAutomaticOutreach(session.accountId)
+  const validationError = validateUpdateOutreachAgentInput(input, { automaticOutreach })
   if (validationError) return { success: false, error: validationError }
 
   const existing = await findOutreachAgentConfigByAccount(session.accountId)
@@ -139,6 +135,11 @@ export async function pauseOutreachAgent(reason?: string): Promise<ActionResult>
     })
     .where(eq(outreachAgentConfigs.accountId, session.accountId))
 
+  await logOutreachAgentActivity(session.accountId, {
+    eventType: 'outreach_agent_paused',
+    metadata: { reason: reason?.trim() || 'Paused from command center' },
+  })
+
   revalidateOutreachAgentPaths()
   return { success: true, data: undefined }
 }
@@ -157,6 +158,10 @@ export async function resumeOutreachAgent(): Promise<ActionResult> {
       updatedAt: new Date(),
     })
     .where(eq(outreachAgentConfigs.accountId, session.accountId))
+
+  await logOutreachAgentActivity(session.accountId, {
+    eventType: 'outreach_agent_resumed',
+  })
 
   revalidateOutreachAgentPaths()
   return { success: true, data: undefined }
@@ -181,6 +186,16 @@ export async function runLinkedCampaignQueueNow(): Promise<
   const { processDueCampaignSteps } = await import('@/lib/outreach/runner')
   const result = await processDueCampaignSteps(session.accountId, session.userId, {
     campaignIds: existing.linkedCampaignIds,
+  })
+
+  await logOutreachAgentActivity(session.accountId, {
+    eventType: 'outreach_queue_run',
+    metadata: {
+      sent: result.sent,
+      manualReady: result.manualReady,
+      failed: result.failed,
+      processed: result.processed,
+    },
   })
 
   revalidateOutreachAgentPaths()

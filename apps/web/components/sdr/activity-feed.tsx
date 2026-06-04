@@ -2,7 +2,17 @@
 
 import type { SDRActivityEvent } from '@/lib/sdr/types'
 import { cn } from '@/lib/utils'
-import { Calendar, Mail, MessageCircle, Pause, Play, Radar, Rocket, Users, Zap } from 'lucide-react'
+import {
+  Calendar,
+  Mail,
+  MessageCircle,
+  Pause,
+  Play,
+  Radar,
+  Rocket,
+  Users,
+  Zap,
+} from 'lucide-react'
 import Link from 'next/link'
 
 type Props = {

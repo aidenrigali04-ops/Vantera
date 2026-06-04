@@ -33,6 +33,10 @@ export type SdrAgentSnapshot = {
   outreachAgentActive: boolean
   /** Linked campaigns currently active. */
   linkedActiveCampaigns: number
+  /** Workspace automatic outreach toggle. */
+  automaticOutreach: boolean
+  /** Active auto-generated Scout run campaigns. */
+  autoScoutActiveCampaigns: number
 }
 
 export type SdrAgentCard = SdrAgentDefinition & {

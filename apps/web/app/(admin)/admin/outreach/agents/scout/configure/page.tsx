@@ -1,3 +1,4 @@
+import { AdminPageContent } from '@/components/admin/AdminPageContent'
 import { SdrAspireConfigClient } from '@/components/sdr/SdrAspireConfigClient'
 import { requireAdminSession } from '@/lib/auth/require-session'
 import { db } from '@/lib/db/client'
@@ -40,8 +41,8 @@ export default async function ProspectScoutConfigurePage() {
   const payload = await getSdrAspireConfig(session.accountId)
 
   return (
-    <div className="mx-auto w-full max-w-4xl space-y-6 px-4 py-5 md:px-8 md:py-6">
+    <AdminPageContent narrow>
       <SdrAspireConfigClient accountId={session.accountId} initial={payload} />
-    </div>
+    </AdminPageContent>
   )
 }

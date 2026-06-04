@@ -4,6 +4,7 @@ import { KanbanBoard } from '@/components/admin/records/KanbanBoard'
 import { CalendarView } from '@/components/admin/records/CalendarView'
 import { ListView } from '@/components/admin/records/ListView'
 import { RecordCreateSheet } from '@/components/admin/records/RecordCreateSheet'
+import { AdminPageContent } from '@/components/admin/AdminPageContent'
 import { PageHeader } from '@/components/operational/PageHeader'
 import { SectionEmptyState } from '@/components/onboarding/SectionEmptyState'
 import { useVerticalLabels } from '@/lib/branding/use-vertical-labels'
@@ -56,7 +57,7 @@ export function RecordsPageClient({
   }
 
   return (
-    <div className="space-y-5">
+    <AdminPageContent className="space-y-5">
       <PageHeader
         title={labels.records}
         description={`Active client delivery — track ${labels.records.toLowerCase()}, stages, and team workload in one operational view.`}
@@ -120,7 +121,7 @@ export function RecordsPageClient({
         contactId={initialContactId}
         scheduledAt={prefillSchedule}
       />
-    </div>
+    </AdminPageContent>
   )
 }
 
@@ -138,7 +139,7 @@ function ViewSwitcher({
   ]
 
   return (
-    <div className="flex rounded-lg border border-stone-200 bg-white p-1 shadow-sm">
+    <div className="flex rounded-lg border border-[var(--border-default)] bg-[var(--bg-surface)] p-1">
       {items.map(({ id, icon: Icon, label }) => (
         <button
           key={id}
@@ -146,7 +147,9 @@ function ViewSwitcher({
           onClick={() => onChange(id)}
           className={cn(
             'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[13px] transition-colors',
-            view === id ? 'bg-stone-900 text-white' : 'text-stone-600 hover:bg-stone-50',
+            view === id
+              ? 'bg-[var(--text-primary)] text-[var(--text-inverse)]'
+              : 'text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)]',
           )}
         >
           <Icon className="h-4 w-4" aria-hidden />

@@ -3,7 +3,7 @@
 import { AspireIntelligencePanel } from '@/components/aspire/AspireIntelligencePanel'
 import { SdrCreditPaywall } from '@/components/sdr/SdrCreditPaywall'
 import { SdrCreditStrip } from '@/components/sdr/SdrCreditStrip'
-import { SdrOutreachHubTabs } from '@/components/sdr/SdrOutreachHubTabs'
+import { AdminPageContent } from '@/components/admin/AdminPageContent'
 import { AspireMetricsBar } from '@/components/aspire/AspireMetricsBar'
 import { AspireQualityCell } from '@/components/aspire/AspireQualityCell'
 import {
@@ -655,9 +655,7 @@ export function AspirePageClient({
   const showTable = tableLoading || displayRows.length > 0
 
   return (
-    <div className="mx-auto w-full space-y-6 px-4 py-5 md:px-8 md:py-6">
-      {sdrMode ? <SdrOutreachHubTabs /> : null}
-
+    <AdminPageContent>
       <PageHeader
         title={sdrMode ? 'Lead finder' : 'Aspire'}
         description={
@@ -1006,6 +1004,6 @@ export function AspirePageClient({
           onStartTrial={startTrial}
         />
       ) : null}
-    </div>
+    </AdminPageContent>
   )
 }

@@ -187,8 +187,8 @@ export function SettingsPageClient({
               className={cn(
                 'inline-flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors',
                 activeSection === id
-                  ? 'bg-stone-900 text-white'
-                  : 'text-stone-600 ring-1 ring-stone-200 hover:bg-stone-50',
+                  ? 'bg-[var(--text-primary)] text-[var(--text-inverse)]'
+                  : 'border border-[var(--border-default)] bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)]',
               )}
             >
               <Icon className="h-4 w-4" aria-hidden />
@@ -197,7 +197,7 @@ export function SettingsPageClient({
           ))}
           <Link
             href="/admin/integrations"
-            className="inline-flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-[13px] font-medium text-stone-600 ring-1 ring-stone-200 transition-colors hover:bg-stone-50"
+            className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-[var(--border-default)] bg-[var(--bg-surface)] px-3 py-2 text-[13px] font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-subtle)]"
           >
             <ExternalLink className="h-4 w-4" aria-hidden />
             Integrations

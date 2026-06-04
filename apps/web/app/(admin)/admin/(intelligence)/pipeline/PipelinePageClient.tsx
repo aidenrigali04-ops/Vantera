@@ -25,6 +25,7 @@ import { convertLeadToClient } from '@/lib/leads/convert'
 import { updateLead } from '@/lib/leads/actions'
 import { PIPELINE_TABLE_VIEWS } from '@/lib/operational/pipeline-table-views'
 import { SectionEmptyState } from '@/components/onboarding/SectionEmptyState'
+import { AdminPageContent } from '@/components/admin/AdminPageContent'
 import { SdrPipelineHubChrome } from '@/components/sdr/SdrPipelineHubChrome'
 import type { leads } from '@vantera/db'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -401,10 +402,7 @@ export function PipelinePageClient({
   const showTable = isLoading || sortedLeads.length > 0
 
   return (
-    <div
-      className="mx-auto w-full space-y-6 px-4 py-5 md:px-8 md:py-6"
-      data-tour="pipeline-leads"
-    >
+    <AdminPageContent data-tour="pipeline-leads">
       {sdrMode ? <SdrPipelineHubChrome /> : null}
 
       <PageHeader
@@ -614,6 +612,6 @@ export function PipelinePageClient({
           </SheetFooter>
         </SheetContent>
       </Sheet>
-    </div>
+    </AdminPageContent>
   )
 }

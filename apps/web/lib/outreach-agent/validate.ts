@@ -1,3 +1,4 @@
+import { isAccountAutomaticOutreach } from '@/lib/sdr/outreach-automation-account'
 import type { LaunchOutreachAgentInput } from '@/lib/outreach-agent/types'
 
 const UUID_RE =
@@ -17,29 +18,43 @@ export function normalizeLinkedCampaignIds(raw: unknown): string[] {
 
 export function validateLaunchOutreachAgentInput(
   input: LaunchOutreachAgentInput,
+  options?: { automaticOutreach?: boolean },
 ): string | null {
   const agentName = input.agentName?.trim()
   if (!agentName) return 'Agent name is required'
 
   const linkedCampaignIds = normalizeLinkedCampaignIds(input.linkedCampaignIds)
-  if (linkedCampaignIds.length === 0) {
-    return 'Link at least one campaign to activate Outreach Agent'
+  if (!options?.automaticOutreach && linkedCampaignIds.length === 0) {
+    return 'Link at least one campaign to activate Outreach Agent (or enable Automatic on the Agents hub)'
   }
 
   return null
 }
 
-export function validateUpdateOutreachAgentInput(input: {
-  agentName?: string
-  linkedCampaignIds?: unknown
-}): string | null {
+export async function validateLaunchOutreachAgentForAccount(
+  accountId: string,
+  input: LaunchOutreachAgentInput,
+): Promise<string | null> {
+  const automaticOutreach = await isAccountAutomaticOutreach(accountId)
+  return validateLaunchOutreachAgentInput(input, { automaticOutreach })
+}
+
+export function validateUpdateOutreachAgentInput(
+  input: {
+    agentName?: string
+    linkedCampaignIds?: unknown
+  },
+  options?: { automaticOutreach?: boolean },
+): string | null {
   if (input.agentName !== undefined && !input.agentName.trim()) {
     return 'Agent name cannot be empty'
   }
 
   if (input.linkedCampaignIds !== undefined) {
     const ids = normalizeLinkedCampaignIds(input.linkedCampaignIds)
-    if (ids.length === 0) return 'Keep at least one linked campaign'
+    if (!options?.automaticOutreach && ids.length === 0) {
+      return 'Keep at least one linked campaign (not required in Automatic mode)'
+    }
   }
 
   return null

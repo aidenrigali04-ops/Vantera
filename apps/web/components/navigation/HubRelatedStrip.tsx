@@ -39,7 +39,7 @@ export function HubRelatedStrip() {
     pathname === hub.primary.href || pathname.startsWith(`${hub.primary.href}/`)
 
   return (
-    <div className="border-b border-stone-200/80 bg-stone-50/70 px-4 py-2 md:px-6">
+    <div className="border-b border-stone-200/80 bg-stone-50/70 px-4 py-2 md:px-8">
       <div className="mx-auto flex max-w-[1280px] flex-wrap items-center gap-2">
         <span className="text-[11px] font-medium uppercase tracking-[0.06em] text-stone-400">
           {hub.title}

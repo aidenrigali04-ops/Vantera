@@ -3,7 +3,6 @@ import { getSystemAutomationId } from '@/lib/automation/system-automation'
 import { db } from '@/lib/db/client'
 import type { Plan } from '@/lib/feature-flags/flags'
 import { isAccountAutomaticOutreach } from '@/lib/sdr/outreach-automation-policy'
-import { runAutomaticPipelineForAccount } from '@/lib/sdr/automatic-pipeline'
 import { logSdrActivity } from '@/lib/sdr/activity-log'
 import { enrichAndProfileLead } from '@/lib/sdr/enrich-and-profile-lead'
 import { generateSdrSequenceSteps } from '@/lib/sdr/draft-sequence'
@@ -91,6 +90,16 @@ export async function runDraftSdrSequence(payload: DraftSdrSequencePayload): Pro
     ? (refreshedEnrichment.icpSignals as string[])
     : icpSignals
 
+  const profile = refreshedEnrichment.profile as
+    | {
+        disc?: string
+        awarenessLevel?: number
+        topTriggers?: string[]
+        primaryFear?: string
+        openingHook?: string
+      }
+    | undefined
+
   const employeeCount = aspireData?.employeeCount ?? null
   const window = (config.outreachWindow as SdrOutreachWindow) ?? {
     startHour: 8,
@@ -113,6 +122,17 @@ export async function runDraftSdrSequence(payload: DraftSdrSequencePayload): Pro
     icpConfig: config.icpConfig as Parameters<typeof generateSdrSequenceSteps>[0]['icpConfig'],
     outreachDays: config.outreachDays ?? undefined,
     outreachWindow: window,
+    personaContext: profile
+      ? [
+          profile.disc ? `DISC: ${profile.disc}` : null,
+          profile.awarenessLevel != null ? `Awareness: ${profile.awarenessLevel}/5` : null,
+          profile.topTriggers?.length ? `Triggers: ${profile.topTriggers.join(', ')}` : null,
+          profile.primaryFear ? `Primary fear: ${profile.primaryFear}` : null,
+          profile.openingHook ? `Opening hook: ${profile.openingHook}` : null,
+        ]
+          .filter(Boolean)
+          .join('\n')
+      : undefined,
   })
 
   await db
@@ -207,10 +227,6 @@ export async function runDraftSdrSequence(payload: DraftSdrSequencePayload): Pro
         })
       }
     }
-  } else {
-    void runAutomaticPipelineForAccount(payload.accountId).catch((err) => {
-      console.error('[runDraftSdrSequence] automatic pipeline failed', err)
-    })
   }
 
   const automationId = await getSystemAutomationId(payload.accountId, 'sdr_draft')

@@ -4,24 +4,12 @@ import { AnimatedMetricValue } from '@/components/dashboard/ventora/AnimatedMetr
 import type { VentoraMetric, VentoraMetricIcon } from '@/lib/dashboard/ventora-types'
 import { fadeUp, staggerContainer } from '@/lib/motion'
 import { motion } from 'framer-motion'
-import { Calendar, LayoutGrid, MoreHorizontal, Trophy, type LucideIcon } from 'lucide-react'
+import { Calendar, LayoutGrid, Trophy, type LucideIcon } from 'lucide-react'
 
 const ICONS: Record<VentoraMetricIcon, LucideIcon> = {
   trophy: Trophy,
   grid: LayoutGrid,
   calendar: Calendar,
-}
-
-function CardMenu() {
-  return (
-    <button
-      type="button"
-      aria-label="Card options"
-      className="icon-btn -mr-1 -mt-1 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
-    >
-      <MoreHorizontal size={16} strokeWidth={1.75} aria-hidden />
-    </button>
-  )
 }
 
 type Props = {
@@ -42,13 +30,10 @@ export function VentoraMetricCards({ metrics }: Props) {
           <motion.article
             key={label}
             variants={fadeUp}
-            className="card-surface card-surface-interactive group relative flex flex-col gap-3 p-4"
+            className="card-surface flex flex-col gap-3 p-4"
           >
-            <div className="flex items-start justify-between">
-              <div className="flex h-9 w-9 items-center justify-center rounded-md bg-[var(--accent-muted)] ring-1 ring-[var(--accent-border)]">
-                <Icon size={18} className="text-[var(--accent)]" strokeWidth={1.75} aria-hidden />
-              </div>
-              <CardMenu />
+            <div className="flex h-9 w-9 items-center justify-center rounded-md bg-[var(--accent-muted)] ring-1 ring-[var(--accent-border)]">
+              <Icon size={18} className="text-[var(--accent)]" strokeWidth={1.75} aria-hidden />
             </div>
             <div>
               <p className="text-sm text-[var(--text-secondary)]">{label}</p>

@@ -20,7 +20,7 @@ export const SDR_AGENT_DEFINITIONS: SdrAgentDefinition[] = [
     name: 'Outreach Agent',
     tagline: 'Runs email, LinkedIn, and SMS sequences',
     description:
-      'Links to your existing campaigns, runs multi-step outreach on schedule, and surfaces manual LinkedIn steps for one-click approval.',
+      'In Automatic mode, creates and launches a campaign per Scout run with personalized copy. In Manual mode, links your campaigns and runs the queue on schedule.',
     href: '/admin/outreach/agents/outreach/setup',
     ctaLabel: 'Set up Outreach Agent',
     iconName: 'megaphone',
@@ -85,11 +85,17 @@ export function buildSdrAgentCards(snapshot: SdrAgentSnapshot): SdrAgentCard[] {
       case 'outreach_agent': {
         const configured = snapshot.outreachAgentConfigured
         const active = snapshot.outreachAgentActive
+        const auto = snapshot.automaticOutreach
+        const statLabel = auto ? 'Auto campaigns' : 'Linked live'
+        const statValue = auto
+          ? String(snapshot.autoScoutActiveCampaigns)
+          : String(snapshot.linkedActiveCampaigns)
+
         if (!configured) {
           return {
             ...agent,
-            href: '/admin/outreach/agents/outreach/setup',
-            ctaLabel: 'Configure',
+            href: auto ? '/admin/outreach/agents/scout' : '/admin/outreach/agents/outreach/setup',
+            ctaLabel: auto ? 'Set up Scout' : 'Configure',
             status: 'needs_setup',
             statLabel: 'Status',
             statValue: 'Not configured',
@@ -101,17 +107,17 @@ export function buildSdrAgentCards(snapshot: SdrAgentSnapshot): SdrAgentCard[] {
             href: '/admin/outreach/agents/outreach',
             ctaLabel: 'Open agent',
             status: 'inactive',
-            statLabel: 'Linked live',
-            statValue: String(snapshot.linkedActiveCampaigns),
+            statLabel,
+            statValue,
           }
         }
         return {
           ...agent,
-          href: '/admin/outreach/agents/outreach',
-          ctaLabel: 'Open agent',
+          href: '/admin/outreach/campaigns',
+          ctaLabel: 'View campaigns',
           status: 'active',
-          statLabel: 'Linked live',
-          statValue: String(snapshot.linkedActiveCampaigns),
+          statLabel,
+          statValue,
         }
       }
       case 'message_drafter': {

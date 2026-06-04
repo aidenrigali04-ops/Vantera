@@ -3,8 +3,12 @@
 import { KpiStrip } from '@/components/operational/KpiStrip'
 import { PageHeader } from '@/components/operational/PageHeader'
 import { StatusBadge } from '@/components/operational/table/StatusBadge'
-import { SdrOutreachHubTabs } from '@/components/sdr/SdrOutreachHubTabs'
+import { AdminPageContent } from '@/components/admin/AdminPageContent'
+import { LiveIndicator } from '@/components/operational/LiveIndicator'
+import { OutreachAgentActivityFeed } from '@/components/outreach-agent/OutreachAgentActivityFeed'
 import { Button } from '@/components/ui/button'
+import { useAccountRealtime } from '@/lib/supabase/account-realtime'
+import type { SDRActivityEvent } from '@/lib/sdr/types'
 import { Checkbox } from '@/components/ui/checkbox'
 import { markCampaignStepSent } from '@/lib/outreach/actions'
 import {
@@ -32,7 +36,7 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useEffect, useMemo, useState, useTransition } from 'react'
+import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
 import { toast } from 'sonner'
 
 type Props = {
@@ -42,6 +46,7 @@ type Props = {
   allCampaigns: CampaignWithStats[]
   upcoming: OutreachAgentUpcomingStep[]
   manualSteps: OutreachAgentUpcomingStep[]
+  initialActivity: SDRActivityEvent[]
 }
 
 function campaignStatusTone(status: CampaignWithStats['status']) {
@@ -68,16 +73,30 @@ export function OutreachAgentCommandCenterClient({
   allCampaigns,
   upcoming,
   manualSteps,
+  initialActivity,
 }: Props) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [isPending, startTransition] = useTransition()
   const [manageLinksOpen, setManageLinksOpen] = useState(false)
   const [draftLinkedIds, setDraftLinkedIds] = useState(config.linkedCampaignIds)
+  const [activity, setActivity] = useState(initialActivity)
+
+  const refreshActivity = useCallback(async () => {
+    const res = await fetch('/api/outreach-agent/activity?limit=50')
+    const json = await res.json()
+    if (json.success) setActivity(json.data)
+  }, [])
+
+  const { isLive: activityLive } = useAccountRealtime({
+    accountId: config.accountId,
+    table: 'sdr_activity_log',
+    onChange: refreshActivity,
+  })
 
   useEffect(() => {
     if (searchParams.get('setup') !== 'complete') return
-    toast.message(`${config.agentName} is live — linked campaign activity appears below`, {
+    toast.message(`${config.agentName} is live — outreach activity appears below`, {
       duration: 5000,
     })
     router.replace('/admin/outreach/agents/outreach')
@@ -198,9 +217,7 @@ export function OutreachAgentCommandCenterClient({
   }
 
   return (
-    <div className="mx-auto w-full space-y-6 px-4 py-5 md:px-8 md:py-6">
-      <SdrOutreachHubTabs />
-
+    <AdminPageContent>
       <PageHeader
         title={`Outreach Agent — ${config.agentName}`}
         description={`${statusLabel} · ${stats.enrolledLeads} active enrollments · ${stats.repliesThisWeek} replies this week`}
@@ -247,6 +264,14 @@ export function OutreachAgentCommandCenterClient({
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(280px,320px)]">
         <div className="space-y-6">
+          <section className="card-surface min-w-0 p-5">
+            <div className="mb-4 flex items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold text-[var(--text-primary)]">Activity feed</h3>
+              <LiveIndicator active={activityLive} />
+            </div>
+            <OutreachAgentActivityFeed events={activity} />
+          </section>
+
           <section className="card-surface p-5">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <div>
@@ -438,6 +463,6 @@ export function OutreachAgentCommandCenterClient({
           </section>
         </aside>
       </div>
-    </div>
+    </AdminPageContent>
   )
 }

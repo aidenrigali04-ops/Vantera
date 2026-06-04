@@ -1,11 +1,6 @@
-import { OutreachSubNav } from '@/components/operational/OutreachSubNav'
+import { OutreachSectionLayout } from '@/components/admin/OutreachSectionLayout'
 import type { ReactNode } from 'react'
 
 export default function OutreachLayout({ children }: { children: ReactNode }) {
-  return (
-    <div className="space-y-6">
-      <OutreachSubNav />
-      {children}
-    </div>
-  )
+  return <OutreachSectionLayout>{children}</OutreachSectionLayout>
 }

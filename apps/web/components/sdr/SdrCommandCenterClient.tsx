@@ -3,7 +3,7 @@
 import type { SDRActivityEvent, SDRAgentConfig, SDRDashboardStats } from '@/lib/sdr/types'
 import { SdrCreditPaywall } from '@/components/sdr/SdrCreditPaywall'
 import { SdrCreditStrip } from '@/components/sdr/SdrCreditStrip'
-import { SdrOutreachHubTabs } from '@/components/sdr/SdrOutreachHubTabs'
+import { AdminPageContent } from '@/components/admin/AdminPageContent'
 import { useSdrCredits } from '@/lib/sdr/use-sdr-credits'
 import { cn } from '@/lib/utils'
 import {
@@ -197,14 +197,8 @@ export function SdrCommandCenterClient({
     { label: 'Meetings booked', value: stats.meetingsThisWeek, icon: Calendar },
   ]
 
-  return (
-    <div
-      className={cn(
-        embedded ? 'space-y-6' : 'mx-auto w-full space-y-6 px-4 py-5 md:px-8 md:py-6',
-      )}
-    >
-      {!embedded ? <SdrOutreachHubTabs /> : null}
-
+  const body = (
+    <>
       {pipelineHints.length > 0 ? (
         <div className="rounded-lg border border-[var(--warning-muted)] bg-[var(--warning-muted)]/40 px-4 py-3 text-[13px] text-[var(--text-primary)]">
           <p className="font-medium">Pipeline setup needed</p>
@@ -413,6 +407,12 @@ export function SdrCommandCenterClient({
         credits={credits}
         onStartTrial={startTrial}
       />
-    </div>
+    </>
   )
+
+  if (embedded) {
+    return <div className="space-y-6">{body}</div>
+  }
+
+  return <AdminPageContent>{body}</AdminPageContent>
 }

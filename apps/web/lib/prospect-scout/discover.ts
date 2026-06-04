@@ -12,7 +12,11 @@ import {
   recordFoundProspects,
 } from '@/lib/prospect-scout/enroll'
 import type { SdrConfigRow } from '@/lib/prospect-scout/types'
+import { launchAutomaticScoutRunCampaign } from '@/lib/outreach/automatic-scout-campaign'
+import { logSdrActivity } from '@/lib/sdr/activity-log'
 import { runAutomaticPipelineForAccount } from '@/lib/sdr/automatic-pipeline'
+import { isAccountAutomaticOutreach } from '@/lib/sdr/outreach-automation-account'
+import type { ScoutRunEnrollment } from '@/lib/outreach/automatic-scout-campaign'
 import { countActiveSdrSequences, countSdrEnrolledToday } from '@/lib/sdr/queries'
 import type { ICPConfig } from '@/lib/aspire/types'
 import { aspireSearchRuns, automationRuns, sdrAgentConfigs } from '@vantera/db'
@@ -43,6 +47,7 @@ export type ScoutDiscoveryResult = {
   found: number
   stored: number
   enrolled: number
+  enrollments: ScoutRunEnrollment[]
 }
 
 /**
@@ -112,6 +117,7 @@ export async function runProspectScoutDiscovery(
     })
 
     let enrolled = 0
+    const scoutEnrollments: ScoutRunEnrollment[] = []
     const minIcp = config.defaultMinIcpScore ?? 70
     const shouldEnroll =
       autoEnroll && config.isActive && !config.isPaused && headroom > 0
@@ -135,6 +141,12 @@ export async function runProspectScoutDiscovery(
       if (result.enrolled) {
         enrolled += 1
         if (withSequence) headroom -= 1
+      }
+      if (result.sequenceId && result.leadId) {
+        scoutEnrollments.push({
+          leadId: result.leadId,
+          sequenceId: result.sequenceId,
+        })
       }
     }
 
@@ -161,11 +173,30 @@ export async function runProspectScoutDiscovery(
       })
       .where(eq(aspireSearchRuns.id, runId))
 
-    if (enrolled > 0) {
+    if (enrolled > 0 && (await isAccountAutomaticOutreach(config.accountId))) {
+      if (scoutEnrollments.length > 0) {
+        try {
+          await launchAutomaticScoutRunCampaign({
+            accountId: config.accountId,
+            configId: config.id,
+            runId,
+            enrollments: scoutEnrollments,
+          })
+        } catch (error) {
+          console.error('[prospect-scout] auto campaign launch failed', error)
+        }
+      }
       void runAutomaticPipelineForAccount(config.accountId).catch((error) => {
-        console.error('[prospect-scout] automatic pipeline failed', error)
+        console.error('[prospect-scout] automatic send flush failed', error)
       })
     }
+
+    await logSdrActivity({
+      accountId: config.accountId,
+      configId: config.id,
+      eventType: 'discovery_completed',
+      metadata: { found: fresh.length, stored, enrolled, runId },
+    })
 
     const automationId = await getSystemAutomationId(config.accountId, 'sdr_find')
     await db.insert(automationRuns).values({
@@ -177,7 +208,7 @@ export async function runProspectScoutDiscovery(
       resultPayload: { found: fresh.length, stored, enrolled, runId },
     })
 
-    return { runId, found: fresh.length, stored, enrolled }
+    return { runId, found: fresh.length, stored, enrolled, enrollments: scoutEnrollments }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Discovery failed'
     await db

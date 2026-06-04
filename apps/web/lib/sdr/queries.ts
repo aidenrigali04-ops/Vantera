@@ -130,6 +130,8 @@ export async function getSdrActivityFeed(
   accountId: string,
   limit = 50,
 ): Promise<SDRActivityEvent[]> {
+  const { isScoutActivityEvent } = await import('@/lib/outreach-agent/activity-events')
+  const fetchLimit = Math.min(limit * 4, 200)
   const rows = await db
     .select({
       log: sdrActivityLog,
@@ -141,18 +143,25 @@ export async function getSdrActivityFeed(
     .leftJoin(leads, eq(sdrActivityLog.leadId, leads.id))
     .where(eq(sdrActivityLog.accountId, accountId))
     .orderBy(desc(sdrActivityLog.createdAt))
-    .limit(limit)
+    .limit(fetchLimit)
 
-  return rows.map(({ log, firstName, lastName, company }) => ({
-    id: log.id,
-    eventType: log.eventType,
-    leadId: log.leadId,
-    sequenceId: log.sequenceId,
-    metadata: (log.metadata ?? {}) as Record<string, unknown>,
-    createdAt: log.createdAt.toISOString(),
-    leadName: [firstName, lastName].filter(Boolean).join(' ') || undefined,
-    company: company ?? undefined,
-  }))
+  const events: SDRActivityEvent[] = []
+  for (const { log, firstName, lastName, company } of rows) {
+    const metadata = (log.metadata ?? {}) as Record<string, unknown>
+    if (!isScoutActivityEvent(log.eventType, metadata)) continue
+    events.push({
+      id: log.id,
+      eventType: log.eventType,
+      leadId: log.leadId,
+      sequenceId: log.sequenceId,
+      metadata,
+      createdAt: log.createdAt.toISOString(),
+      leadName: [firstName, lastName].filter(Boolean).join(' ') || undefined,
+      company: company ?? undefined,
+    })
+    if (events.length >= limit) break
+  }
+  return events
 }
 
 export async function getUpcomingSdrSends(accountId: string, limit = 5) {

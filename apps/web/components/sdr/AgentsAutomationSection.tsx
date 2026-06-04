@@ -1,13 +1,11 @@
 'use client'
 
 import { SdrOutreachAutomationToggle } from '@/components/sdr/SdrOutreachAutomationToggle'
-import type { SDRActivityEvent } from '@/lib/sdr/types'
 import {
   isAutomaticOutreachMode,
   type OutreachAutomationMode,
 } from '@/lib/sdr/outreach-automation-mode'
 import { cn } from '@/lib/utils'
-import { Activity, Link2 } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState, useTransition } from 'react'
@@ -16,27 +14,9 @@ import { toast } from 'sonner'
 type Props = {
   initialMode: OutreachAutomationMode
   sdrConfigured: boolean
-  recentActivity: SDRActivityEvent[]
 }
 
-const EVENT_LABELS: Record<string, string> = {
-  lead_enrolled: 'Prospect Scout enrolled lead',
-  sequence_drafted: 'Message Drafter wrote sequence',
-  email_sent: 'Outreach Agent sent email',
-  sms_sent: 'Outreach Agent sent SMS',
-  lead_found: 'Prospect Scout found lead',
-  sdr_step_sent: 'Outreach sent sequence step',
-}
-
-function formatEventLabel(eventType: string): string {
-  return EVENT_LABELS[eventType] ?? eventType.replace(/_/g, ' ')
-}
-
-export function AgentsAutomationSection({
-  initialMode,
-  sdrConfigured,
-  recentActivity,
-}: Props) {
+export function AgentsAutomationSection({ initialMode, sdrConfigured }: Props) {
   const router = useRouter()
   const [mode, setMode] = useState(initialMode)
   const [isPending, startTransition] = useTransition()
@@ -102,18 +82,22 @@ export function AgentsAutomationSection({
                 <strong>Prospect Scout</strong> pulls ICP-matched leads into your pipeline
               </li>
               <li>
-                <strong>Message Drafter</strong> writes a personalized 5-step sequence per lead
+                <strong>Message Drafter</strong> analyzes persona and drafts personalized email/SMS per lead
               </li>
               <li>
-                <strong>Outreach Agent</strong> sends due email/SMS during your outreach window
+                <strong>Outreach Agent</strong> creates a campaign for each Scout run and launches sends automatically
               </li>
             </ol>
             <p className="mt-3 text-[var(--text-secondary)]">
-              Link at least one campaign on{' '}
-              <Link href="/admin/outreach/agents/outreach" className="font-medium text-[var(--accent)] hover:underline">
-                Outreach Agent
-              </Link>{' '}
-              — that is the only step you choose manually.
+              View auto-created campaigns under{' '}
+              <Link href="/admin/outreach/campaigns" className="font-medium text-[var(--accent)] hover:underline">
+                Campaigns
+              </Link>
+              . Activity from each run appears on{' '}
+              <Link href="/admin/outreach/agents/scout" className="font-medium text-[var(--accent)] hover:underline">
+                Prospect Scout
+              </Link>
+              .
             </p>
           </>
         ) : (
@@ -121,56 +105,17 @@ export function AgentsAutomationSection({
             <p className="font-medium text-[var(--text-primary)]">Manual mode</p>
             <p className="mt-1 text-[var(--text-secondary)]">
               Scout and Drafter still run on schedule. You approve sends in{' '}
-              <Link href="/admin/outreach/agents/drafter" className="text-[var(--accent)] hover:underline">
+              <Link href="/admin/outreach/agents/drafter" className="font-medium text-[var(--accent)] hover:underline">
                 Message Drafter
               </Link>{' '}
               or run the queue on{' '}
-              <Link href="/admin/outreach/agents/outreach" className="text-[var(--accent)] hover:underline">
+              <Link href="/admin/outreach/agents/outreach" className="font-medium text-[var(--accent)] hover:underline">
                 Outreach Agent
               </Link>
               .
             </p>
           </>
         )}
-      </div>
-
-      <div className="space-y-2">
-        <div className="flex items-center gap-2">
-          <Activity className="h-4 w-4 text-[var(--text-tertiary)]" />
-          <h3 className="text-sm font-semibold text-[var(--text-primary)]">Recent agent activity</h3>
-        </div>
-        {recentActivity.length === 0 ? (
-          <p className="text-[13px] text-[var(--text-secondary)]">
-            Activity from Scout, Drafter, and sends will appear here after the first run.
-          </p>
-        ) : (
-          <ul className="max-h-48 space-y-2 overflow-y-auto rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-subtle)]/40 p-3">
-            {recentActivity.slice(0, 12).map((event) => (
-              <li key={event.id} className="text-[12px] text-[var(--text-secondary)]">
-                <span className="font-medium text-[var(--text-primary)]">
-                  {formatEventLabel(event.eventType)}
-                </span>
-                {event.leadName || event.company ? (
-                  <span>
-                    {' '}
-                    — {event.leadName}
-                    {event.company ? ` @ ${event.company}` : ''}
-                  </span>
-                ) : null}
-                <span className="ml-1 text-[var(--text-tertiary)]">
-                  {new Date(event.createdAt).toLocaleString()}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-        <Link
-          href="/admin/outreach/agents/scout"
-          className="inline-flex items-center gap-1 text-[12px] font-medium text-[var(--accent)] hover:underline"
-        >
-          <Link2 className="h-3 w-3" />
-          Full activity feed on Prospect Scout
-        </Link>
       </div>
     </section>
   )

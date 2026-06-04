@@ -2,6 +2,11 @@ import { db } from '@/lib/db/client'
 import type { SdrAgentCard, SdrAgentSnapshot } from '@/lib/agents/types'
 import { SDR_AGENT_DEFINITIONS, buildSdrAgentCards } from '@/lib/agents/sdr-agents'
 import {
+  isAutoScoutCampaignWorkflow,
+  parseCampaignWorkflow,
+} from '@/lib/outreach/types'
+import { isAccountAutomaticOutreach } from '@/lib/sdr/outreach-automation-account'
+import {
   aspireSavedSearches,
   leadDrafts,
   leads,
@@ -132,6 +137,24 @@ export async function getSdrAgentSnapshot(accountId: string): Promise<SdrAgentSn
     linkedActiveCampaigns = linkedActive?.count ?? 0
   }
 
+  const automaticOutreach = await isAccountAutomaticOutreach(accountId)
+  let autoScoutActiveCampaigns = 0
+  if (automaticOutreach) {
+    const activeRows = await db
+      .select({ workflow: outreachCampaigns.workflow })
+      .from(outreachCampaigns)
+      .where(
+        and(
+          eq(outreachCampaigns.accountId, accountId),
+          eq(outreachCampaigns.status, 'active'),
+          isNull(outreachCampaigns.deletedAt),
+        ),
+      )
+    autoScoutActiveCampaigns = activeRows.filter((row) =>
+      isAutoScoutCampaignWorkflow(parseCampaignWorkflow(row.workflow)),
+    ).length
+  }
+
   const pendingEmailDrafts = emailDraftStats?.pending ?? 0
   const pendingLinkedInDrafts =
     (campaignLinkedInStats?.pending ?? 0) + (sdrLinkedInStats?.pending ?? 0)
@@ -147,11 +170,19 @@ export async function getSdrAgentSnapshot(accountId: string): Promise<SdrAgentSn
     enrolledLeads: enrollmentStats?.active ?? 0,
     prospectScoutConfigured: Boolean(scoutConfig),
     prospectScoutActive: Boolean(scoutConfig?.isActive && !scoutConfig?.isPaused),
-    outreachAgentConfigured: linkedCampaignIds.length > 0,
-    outreachAgentActive: Boolean(
-      outreachConfig?.isActive && !outreachConfig?.isPaused && linkedCampaignIds.length > 0,
-    ),
+    outreachAgentConfigured: automaticOutreach
+      ? Boolean(scoutConfig)
+      : Boolean(outreachConfig && linkedCampaignIds.length > 0),
+    outreachAgentActive: automaticOutreach
+      ? Boolean(scoutConfig?.isActive && !scoutConfig?.isPaused)
+      : Boolean(
+          outreachConfig?.isActive &&
+            !outreachConfig?.isPaused &&
+            linkedCampaignIds.length > 0,
+        ),
     linkedActiveCampaigns,
+    automaticOutreach,
+    autoScoutActiveCampaigns,
   }
 }
 

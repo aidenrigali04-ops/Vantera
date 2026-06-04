@@ -2,7 +2,6 @@
 
 import { SdrCreditPaywall } from '@/components/sdr/SdrCreditPaywall'
 import { SdrCreditStrip } from '@/components/sdr/SdrCreditStrip'
-import { SdrOutreachHubTabs } from '@/components/sdr/SdrOutreachHubTabs'
 import { useSdrCredits } from '@/lib/sdr/use-sdr-credits'
 import { useEffect, useState } from 'react'
 
@@ -21,7 +20,6 @@ export function SdrPipelineHubChrome({ children }: Props) {
 
   return (
     <div className="space-y-4">
-      <SdrOutreachHubTabs />
       <SdrCreditStrip
         credits={credits}
         loading={isLoading}

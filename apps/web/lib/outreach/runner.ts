@@ -3,10 +3,13 @@ import { findDueCampaignSteps, findLeadsByIds, findOutreachCampaignById } from '
 import { sendCampaignEmail } from '@/lib/outreach/send-email'
 import { sendCampaignSms } from '@/lib/outreach/send-sms'
 import {
+  isAutoScoutCampaignWorkflow,
   parseCampaignMetrics,
+  parseCampaignWorkflow,
   resolveOutboundCopy,
   type OutreachCampaignWorkflow,
 } from '@/lib/outreach/types'
+import { logOutreachAgentActivity } from '@/lib/outreach-agent/activity-log'
 import { createIntelligenceSignal } from '@/lib/webhooks/resend/signals'
 import {
   accounts,
@@ -15,8 +18,10 @@ import {
   outreachCampaignEnrollments,
   outreachCampaigns,
   outreachCampaignSteps,
+  sdrSequenceSteps,
+  sdrSequences,
 } from '@vantera/db'
-import { and, eq } from 'drizzle-orm'
+import { and, asc, eq } from 'drizzle-orm'
 
 export type ProcessDueStepsResult = {
   processed: number
@@ -29,6 +34,52 @@ export type ProcessDueStepsResult = {
 function leadDisplayName(lead: { firstName: string | null; lastName: string | null; company: string | null }) {
   const name = [lead.firstName, lead.lastName].filter(Boolean).join(' ')
   return name || lead.company || 'Lead'
+}
+
+async function logAutoScoutCampaignSend(input: {
+  accountId: string
+  leadId: string
+  campaignId: string
+  stepIndex: number
+  channel: 'email' | 'sms'
+  company: string | null
+}) {
+  await logOutreachAgentActivity(input.accountId, {
+    leadId: input.leadId,
+    eventType: input.channel === 'sms' ? 'sms_sent' : 'email_sent',
+    metadata: {
+      stepNumber: input.stepIndex + 1,
+      company: input.company,
+      campaignId: input.campaignId,
+      source: 'auto_scout_campaign',
+    },
+  })
+}
+
+async function maybeLogAutoScoutCampaignSend(
+  input: {
+    accountId: string
+    lead: { id: string; company: string | null }
+    step: { campaignId: string; stepIndex: number }
+    channel: 'email' | 'sms'
+  },
+  autoScoutCampaignIds: Set<string>,
+) {
+  if (!autoScoutCampaignIds.has(input.step.campaignId)) {
+    const campaign = await findOutreachCampaignById(input.accountId, input.step.campaignId)
+    if (!campaign || !isAutoScoutCampaignWorkflow(parseCampaignWorkflow(campaign.workflow))) {
+      return
+    }
+    autoScoutCampaignIds.add(input.step.campaignId)
+  }
+  await logAutoScoutCampaignSend({
+    accountId: input.accountId,
+    leadId: input.lead.id,
+    campaignId: input.step.campaignId,
+    stepIndex: input.step.stepIndex,
+    channel: input.channel,
+    company: input.lead.company,
+  })
 }
 
 export async function processDueCampaignSteps(
@@ -57,6 +108,7 @@ export async function processDueCampaignSteps(
     .limit(1)
 
   const accountName = account?.name ?? 'Your team'
+  const autoScoutCampaignIds = new Set<string>()
 
   for (const step of dueSteps) {
     result.processed += 1
@@ -110,6 +162,15 @@ export async function processDueCampaignSteps(
       await markStepSent(step.id, sendResult.providerMessageId)
       await recordSendActivity(accountId, actorUserId, lead.id, step, 'email_sent', lead.email)
       await touchLeadContacted(lead)
+      await maybeLogAutoScoutCampaignSend(
+        {
+          accountId,
+          lead,
+          step,
+          channel: 'email',
+        },
+        autoScoutCampaignIds,
+      )
       result.sent += 1
       await incrementCampaignMetric(accountId, step.campaignId, 'sent')
       continue
@@ -145,6 +206,15 @@ export async function processDueCampaignSteps(
       await markStepSent(step.id, sendResult.providerMessageId)
       await recordSendActivity(accountId, actorUserId, lead.id, step, 'sms_sent', lead.phone)
       await touchLeadContacted(lead)
+      await maybeLogAutoScoutCampaignSend(
+        {
+          accountId,
+          lead,
+          step,
+          channel: 'sms',
+        },
+        autoScoutCampaignIds,
+      )
       result.sent += 1
       await incrementCampaignMetric(accountId, step.campaignId, 'sent')
       continue
@@ -327,6 +397,96 @@ export async function materializeCampaignSteps(
         body: resolveOutboundCopy(step.body, lead),
         sendAt,
         status: 'pending' as const,
+      })
+    }
+  }
+
+  if (rows.length === 0) return 0
+
+  await db.insert(outreachCampaignSteps).values(rows)
+  return rows.length
+}
+
+/** Copy finalized SDR sequence steps (personalized per lead) into a scout auto-campaign. */
+export async function materializeCampaignStepsFromSdrSequences(input: {
+  accountId: string
+  campaignId: string
+  sequenceIds: string[]
+}): Promise<number> {
+  if (input.sequenceIds.length === 0) return 0
+
+  const enrollments = await db
+    .select()
+    .from(outreachCampaignEnrollments)
+    .where(
+      and(
+        eq(outreachCampaignEnrollments.accountId, input.accountId),
+        eq(outreachCampaignEnrollments.campaignId, input.campaignId),
+        eq(outreachCampaignEnrollments.status, 'active'),
+      ),
+    )
+
+  const enrollmentByLead = new Map(enrollments.map((row) => [row.leadId, row.id]))
+
+  const rows: Array<{
+    accountId: string
+    campaignId: string
+    enrollmentId: string
+    leadId: string
+    stepIndex: number
+    channel: 'email' | 'sms' | 'linkedin'
+    subject: string | null
+    body: string
+    sendAt: Date
+    status: 'pending'
+  }> = []
+
+  for (const sequenceId of input.sequenceIds) {
+    const [sequence] = await db
+      .select({ leadId: sdrSequences.leadId })
+      .from(sdrSequences)
+      .where(
+        and(
+          eq(sdrSequences.id, sequenceId),
+          eq(sdrSequences.accountId, input.accountId),
+        ),
+      )
+      .limit(1)
+
+    if (!sequence) continue
+
+    const enrollmentId = enrollmentByLead.get(sequence.leadId)
+    if (!enrollmentId) continue
+
+    const steps = await db
+      .select()
+      .from(sdrSequenceSteps)
+      .where(
+        and(
+          eq(sdrSequenceSteps.sequenceId, sequenceId),
+          eq(sdrSequenceSteps.accountId, input.accountId),
+        ),
+      )
+      .orderBy(asc(sdrSequenceSteps.stepNumber))
+
+    for (const step of steps) {
+      if (!step.body?.trim()) continue
+      if (step.channel === 'email' && !step.subject?.trim()) continue
+      if (step.channel !== 'email' && step.channel !== 'sms' && step.channel !== 'linkedin') {
+        continue
+      }
+
+      rows.push({
+        accountId: input.accountId,
+        campaignId: input.campaignId,
+        enrollmentId,
+        leadId: sequence.leadId,
+        stepIndex: Math.max(0, step.stepNumber - 1),
+        channel: step.channel as 'email' | 'sms' | 'linkedin',
+        subject: step.channel === 'email' ? step.subject : null,
+        body: step.body,
+        sendAt: step.scheduledFor ?? new Date(),
+        status: 'pending',
       })
     }
   }

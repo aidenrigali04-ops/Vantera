@@ -67,7 +67,7 @@ export function SubscriptionBillingClient({ currentPlan, hasStripeCustomer }: Pr
   const isFree = displayPlan === 'Free'
 
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-8 px-4 py-5 md:px-8 md:py-6">
+    <div className="mx-auto w-full max-w-5xl space-y-8">
       <PageHeader
         title="Plan & billing"
         description="Upgrade your workspace for more SDR credits, live discovery, and automations. All plans bill monthly through Stripe."

@@ -3,7 +3,7 @@
 import { KpiStrip } from '@/components/operational/KpiStrip'
 import { PageHeader } from '@/components/operational/PageHeader'
 import { StatusBadge } from '@/components/operational/table/StatusBadge'
-import { SdrOutreachHubTabs } from '@/components/sdr/SdrOutreachHubTabs'
+import { AdminPageContent } from '@/components/admin/AdminPageContent'
 import { Button } from '@/components/ui/button'
 import type {
   EmailDraftItem,
@@ -216,9 +216,7 @@ export function MessageDrafterCommandCenterClient({ initialPayload }: Props) {
   }
 
   return (
-    <div className="mx-auto w-full space-y-6 px-4 py-5 md:px-8 md:py-6">
-      <SdrOutreachHubTabs />
-
+    <AdminPageContent>
       <section className="card-surface overflow-hidden border-[var(--accent-border)] bg-gradient-to-br from-[var(--accent-muted)] via-[var(--bg-surface)] to-[var(--bg-subtle)] p-6 sm:p-8">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-2xl space-y-2">
@@ -415,7 +413,7 @@ export function MessageDrafterCommandCenterClient({ initialPayload }: Props) {
           ) : null}
         </div>
       )}
-    </div>
+    </AdminPageContent>
   )
 }
 

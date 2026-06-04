@@ -92,7 +92,7 @@ export function CampaignsPageClient({ campaigns, defaultChannel = 'email' }: Pro
   }
 
   return (
-    <>
+    <div className="space-y-6">
       <PageHeader
         title={isLinkedIn ? 'LinkedIn campaigns' : 'Email campaigns'}
         description={
@@ -268,6 +268,6 @@ export function CampaignsPageClient({ campaigns, defaultChannel = 'email' }: Pro
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </>
+    </div>
   )
 }

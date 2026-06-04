@@ -4,6 +4,7 @@ import { db } from '@/lib/db/client'
 import { evaluateFlag } from '@/lib/feature-flags/evaluate'
 import type { Plan } from '@/lib/feature-flags/flags'
 import { findOutreachCampaigns } from '@/lib/outreach/queries'
+import { getOutreachAgentActivityFeed } from '@/lib/outreach-agent/activity-queries'
 import {
   findOutreachAgentConfigByAccount,
   getLinkedCampaignSummaries,
@@ -45,12 +46,13 @@ export default async function OutreachAgentPage() {
     redirect('/admin/outreach/agents/setup')
   }
 
-  const [stats, linkedCampaigns, allCampaigns, upcoming, manualSteps] = await Promise.all([
+  const [stats, linkedCampaigns, allCampaigns, upcoming, manualSteps, activity] = await Promise.all([
     getOutreachAgentDashboardStats(session.accountId, config.linkedCampaignIds),
     getLinkedCampaignSummaries(session.accountId, config.linkedCampaignIds),
     findOutreachCampaigns(session.accountId),
     getUpcomingStepsForLinkedCampaigns(session.accountId, config.linkedCampaignIds),
     getManualStepsForLinkedCampaigns(session.accountId, config.linkedCampaignIds),
+    getOutreachAgentActivityFeed(session.accountId),
   ])
 
   return (
@@ -62,6 +64,7 @@ export default async function OutreachAgentPage() {
         allCampaigns={allCampaigns}
         upcoming={upcoming}
         manualSteps={manualSteps}
+        initialActivity={activity}
       />
     </Suspense>
   )

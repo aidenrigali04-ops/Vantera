@@ -67,6 +67,7 @@ export async function generateSdrSequenceSteps(input: {
   icpConfig: ICPConfig
   outreachDays?: string[]
   outreachWindow?: SdrOutreachWindow
+  personaContext?: string
 }): Promise<{ steps: SDRSequenceStep[]; scheduledFor: Date[] }> {
   const memoryContext = await fetchSdrSegmentMemory(
     input.accountId,
@@ -83,6 +84,7 @@ export async function generateSdrSequenceSteps(input: {
     `ICP score: ${payload.icpScore}`,
     payload.icpSignals.length ? `ICP signals: ${payload.icpSignals.slice(0, 5).join(', ')}` : null,
     memoryContext ? `What worked before:\n${memoryContext}` : null,
+    input.personaContext ? `Persona analysis:\n${input.personaContext}` : null,
     `Target titles: ${input.icpConfig.targetTitles.join(', ')}`,
   ]
     .filter(Boolean)

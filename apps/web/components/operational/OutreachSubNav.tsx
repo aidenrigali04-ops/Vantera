@@ -4,8 +4,9 @@ import { SubNavTabs } from '@/components/operational/SubNavTabs'
 import { usePathname } from 'next/navigation'
 
 const TABS = [
-  { href: '/admin/outreach/agents', label: 'SDR Agents' },
-  { href: '/admin/outreach/aspire', label: 'Aspire' },
+  { href: '/admin/outreach/agents', label: 'Agents' },
+  { href: '/admin/outreach/agents/sequences', label: 'Sequences' },
+  { href: '/admin/outreach/aspire', label: 'Lead finder' },
   { href: '/admin/outreach/linkedin', label: 'LinkedIn' },
   { href: '/admin/outreach/campaigns', label: 'Campaigns' },
   { href: '/admin/outreach/email', label: 'Email' },
