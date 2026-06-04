@@ -12,7 +12,7 @@ import {
   recordFoundProspects,
 } from '@/lib/prospect-scout/enroll'
 import type { SdrConfigRow } from '@/lib/prospect-scout/types'
-import { flushAutomaticOutreachPipelines } from '@/lib/sdr/outreach-automation-policy'
+import { runAutomaticPipelineForAccount } from '@/lib/sdr/automatic-pipeline'
 import { countActiveSdrSequences, countSdrEnrolledToday } from '@/lib/sdr/queries'
 import type { ICPConfig } from '@/lib/aspire/types'
 import { aspireSearchRuns, automationRuns, sdrAgentConfigs } from '@vantera/db'
@@ -162,8 +162,8 @@ export async function runProspectScoutDiscovery(
       .where(eq(aspireSearchRuns.id, runId))
 
     if (enrolled > 0) {
-      void flushAutomaticOutreachPipelines(config.accountId).catch((error) => {
-        console.error('[prospect-scout] automatic pipeline flush failed', error)
+      void runAutomaticPipelineForAccount(config.accountId).catch((error) => {
+        console.error('[prospect-scout] automatic pipeline failed', error)
       })
     }
 

@@ -3,7 +3,7 @@ import { getSystemAutomationId } from '@/lib/automation/system-automation'
 import { db } from '@/lib/db/client'
 import type { Plan } from '@/lib/feature-flags/flags'
 import { isAccountAutomaticOutreach } from '@/lib/sdr/outreach-automation-policy'
-import { flushAutomaticOutreachPipelines } from '@/lib/sdr/outreach-automation-policy'
+import { runAutomaticPipelineForAccount } from '@/lib/sdr/automatic-pipeline'
 import { logSdrActivity } from '@/lib/sdr/activity-log'
 import { enrichAndProfileLead } from '@/lib/sdr/enrich-and-profile-lead'
 import { generateSdrSequenceSteps } from '@/lib/sdr/draft-sequence'
@@ -208,8 +208,8 @@ export async function runDraftSdrSequence(payload: DraftSdrSequencePayload): Pro
       }
     }
   } else {
-    void flushAutomaticOutreachPipelines(payload.accountId).catch((err) => {
-      console.error('[runDraftSdrSequence] automatic pipeline flush failed', err)
+    void runAutomaticPipelineForAccount(payload.accountId).catch((err) => {
+      console.error('[runDraftSdrSequence] automatic pipeline failed', err)
     })
   }
 

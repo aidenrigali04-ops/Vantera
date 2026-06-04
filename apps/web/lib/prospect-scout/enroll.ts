@@ -24,6 +24,7 @@ import {
 } from '@vantera/db'
 import { and, eq, isNull, sql } from 'drizzle-orm'
 import { tasks } from '@trigger.dev/sdk'
+import { isAccountAutomaticOutreach } from '@/lib/sdr/outreach-automation-account'
 import { runDraftSdrSequence } from '@/lib/sdr/run-draft-sequence'
 import type { EnrollProspectResult, SdrConfigRow } from '@/lib/prospect-scout/types'
 
@@ -203,15 +204,26 @@ export async function enrollProspect(input: {
     }
 
     let drafted = false
-    try {
-      await tasks.trigger('sdr-lead-profiler', payload)
-      drafted = true
-    } catch {
+    const automaticOutreach = await isAccountAutomaticOutreach(accountId)
+
+    if (automaticOutreach) {
       try {
         await runDraftSdrSequence(payload)
         drafted = true
       } catch (error) {
-        console.error('[prospect-scout] lead profiler failed:', error)
+        console.error('[prospect-scout] automatic sequence draft failed:', error)
+      }
+    } else {
+      try {
+        await tasks.trigger('sdr-lead-profiler', payload)
+        drafted = true
+      } catch {
+        try {
+          await runDraftSdrSequence(payload)
+          drafted = true
+        } catch (error) {
+          console.error('[prospect-scout] lead profiler failed:', error)
+        }
       }
     }
 

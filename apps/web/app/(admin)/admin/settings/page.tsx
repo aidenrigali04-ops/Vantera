@@ -27,7 +27,6 @@ export default async function SettingsPage() {
           logoUrl: account?.brand_logo_url ?? null,
           primaryColor: account?.brand_primary_color ?? '#1648A0',
           secondaryColor: account?.brand_secondary_color ?? '#0D9488',
-          portalDomain: account?.portal_domain ?? '',
         }}
         team={team.map((member) => ({
           id: member.id,

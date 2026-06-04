@@ -4,6 +4,8 @@ import { getSdrAgentCards, getSdrAgentSnapshot } from '@/lib/agents/queries'
 import { db } from '@/lib/db/client'
 import { evaluateFlag } from '@/lib/feature-flags/evaluate'
 import type { Plan } from '@/lib/feature-flags/flags'
+import { findSdrConfigByAccount, getSdrActivityFeed } from '@/lib/sdr/queries'
+import { normalizeOutreachAutomationMode } from '@/lib/sdr/outreach-automation-mode'
 import { accounts } from '@vantera/db'
 import { eq } from 'drizzle-orm'
 import { Suspense } from 'react'
@@ -13,7 +15,7 @@ export const dynamic = 'force-dynamic'
 export default async function SdrAgentsPage() {
   const session = await requireAdminSession()
 
-  const [account, agents, snapshot] = await Promise.all([
+  const [account, agents, snapshot, sdrConfig, recentActivity] = await Promise.all([
     db
       .select({ plan: accounts.plan })
       .from(accounts)
@@ -21,7 +23,11 @@ export default async function SdrAgentsPage() {
       .limit(1),
     getSdrAgentCards(session.accountId),
     getSdrAgentSnapshot(session.accountId),
+    findSdrConfigByAccount(session.accountId),
+    getSdrActivityFeed(session.accountId, 15),
   ])
+
+  const outreachMode = normalizeOutreachAutomationMode(sdrConfig?.outreachAutomationMode)
 
   const plan = (account[0]?.plan ?? 'team') as Plan
   const sdrEnabled = await evaluateFlag({
@@ -36,6 +42,9 @@ export default async function SdrAgentsPage() {
         agents={agents}
         enrolledLeads={snapshot.enrolledLeads}
         sdrEnabled={sdrEnabled}
+        outreachAutomationMode={outreachMode}
+        sdrConfigured={Boolean(sdrConfig)}
+        recentActivity={recentActivity}
       />
     </Suspense>
   )

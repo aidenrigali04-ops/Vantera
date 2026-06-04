@@ -8,6 +8,7 @@ import type { AdminSession } from '@/lib/auth/types'
 import { canAccessAdminRoute } from '@/lib/auth/rbac'
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { createClient } from '@supabase/supabase-js'
+import { PRODUCTION_APP_DOMAIN } from '@/config/public-env-defaults'
 import {
   applyRateLimit,
   getClientIp,
@@ -231,7 +232,7 @@ export async function middleware(request: NextRequest) {
 
   const host = request.headers.get('host') ?? ''
   const hostname = host.split(':')[0] ?? ''
-  const appDomain = process.env.NEXT_PUBLIC_APP_DOMAIN ?? 'vantera.app'
+  const appDomain = process.env.NEXT_PUBLIC_APP_DOMAIN?.trim() || PRODUCTION_APP_DOMAIN
 
   // A valid session cookie means the user has a real account — let
   // resolveAccountByHost figure out which tenant via the session fallback,

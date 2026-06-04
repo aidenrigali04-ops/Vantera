@@ -1,11 +1,6 @@
 'use client'
 
-import { SdrOutreachAutomationToggle } from '@/components/sdr/SdrOutreachAutomationToggle'
 import type { SDRActivityEvent, SDRAgentConfig, SDRDashboardStats } from '@/lib/sdr/types'
-import {
-  isAutomaticOutreachMode,
-  type OutreachAutomationMode,
-} from '@/lib/sdr/outreach-automation-mode'
 import { SdrCreditPaywall } from '@/components/sdr/SdrCreditPaywall'
 import { SdrCreditStrip } from '@/components/sdr/SdrCreditStrip'
 import { SdrOutreachHubTabs } from '@/components/sdr/SdrOutreachHubTabs'
@@ -67,9 +62,6 @@ export function SdrCommandCenterClient({
   const [activity, setActivity] = useState(initialActivity)
   const [paywallOpen, setPaywallOpen] = useState(false)
   const [pipelineHints, setPipelineHints] = useState<string[]>([])
-  const [automationMode, setAutomationMode] = useState<OutreachAutomationMode>(
-    config.outreachAutomationMode,
-  )
   const {
     credits,
     exhausted,
@@ -77,12 +69,6 @@ export function SdrCommandCenterClient({
     startTrial,
     refreshCredits,
   } = useSdrCredits(true)
-
-  useEffect(() => {
-    setAutomationMode(config.outreachAutomationMode)
-  }, [config.outreachAutomationMode])
-
-  const automaticOutreach = isAutomaticOutreachMode(automationMode)
 
   useEffect(() => {
     if (exhausted) setPaywallOpen(true)
@@ -278,64 +264,13 @@ export function SdrCommandCenterClient({
         }
       />
 
-      <section className="card-surface space-y-3 p-5">
-        <div>
-          <h3 className="text-sm font-semibold text-[var(--text-primary)]">Outreach pipeline</h3>
-          <p className="mt-1 text-[12px] text-[var(--text-secondary)]">
-            Find leads → AI drafts a 5-step sequence → email/SMS outreach on your schedule.
-          </p>
-        </div>
-        <SdrOutreachAutomationToggle
-          value={automationMode}
-          disabled={isPending}
-          onChange={(mode) => {
-            setAutomationMode(mode)
-            startTransition(async () => {
-              const res = await fetch('/api/sdr/config', {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'same-origin',
-                body: JSON.stringify({ outreachAutomationMode: mode }),
-              })
-              const json = await res.json()
-              if (!json.success) {
-                toast.error(json.error ?? 'Could not save outreach mode')
-                setAutomationMode(config.outreachAutomationMode)
-                return
-              }
-              toast.success(
-                mode === 'automatic'
-                  ? 'Automatic outreach enabled'
-                  : 'Review-before-send enabled',
-              )
-              router.refresh()
-            })
-          }}
-        />
-      </section>
-
-      {!automaticOutreach && config.isActive && !config.isPaused ? (
-        <div className="rounded-lg border border-[var(--warning)]/30 bg-[var(--warning-muted)] px-4 py-3 text-[13px] text-[var(--text-primary)]">
-          <p className="font-medium">Review mode — outbound waits for your approval</p>
-          <p className="mt-1 text-[var(--text-secondary)]">
-            Discovery and drafting still run automatically. Approve sends in{' '}
-            <Link href="/admin/outreach/agents/drafter" className="text-[var(--accent)] hover:underline">
-              Message Drafter
-            </Link>
-            , use Run queue on Outreach Agent, or send steps from the upcoming list.
-          </p>
-        </div>
-      ) : null}
-
-      {automaticOutreach && config.isActive && !config.isPaused ? (
-        <div className="rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-4 py-3 text-[13px] text-[var(--text-primary)]">
-          <p className="font-medium">Automatic outreach is on</p>
-          <p className="mt-1 text-[var(--text-secondary)]">
-            Prospect Scout, Message Drafter, and linked Outreach Agent campaigns run on schedule — due
-            email/SMS sends go out during your outreach window without approval.
-          </p>
-        </div>
-      ) : null}
+      <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-subtle)]/50 px-4 py-3 text-[13px] text-[var(--text-secondary)]">
+        Automatic vs manual outreach is configured on{' '}
+        <Link href="/admin/outreach/agents" className="font-medium text-[var(--accent)] hover:underline">
+          Agents
+        </Link>
+        . Scout runs discovery here; sends follow that workspace setting.
+      </div>
 
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <span

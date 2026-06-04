@@ -61,10 +61,10 @@ export default function TermsPage() {
         <p>
           Questions about these terms? Contact{' '}
           <a
-            href="mailto:legal@vantera.app"
+            href="mailto:legal@vanterasystem.dev"
             className="font-medium text-stone-900 underline-offset-2 hover:underline"
           >
-            legal@vantera.app
+            legal@vanterasystem.dev
           </a>
           .
         </p>

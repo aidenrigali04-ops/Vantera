@@ -327,7 +327,11 @@ export async function portalLogoutAction(): Promise<void> {
   if (session?.accountId) {
     const account = await getAccount(session.accountId)
     if (account) {
-      redirect(derivePortalLoginPath(account.slug, account.portalDomain))
+      redirect(
+        derivePortalLoginPath(account.slug, account.portalDomain, {
+          portalDomainStatus: account.portalDomainStatus,
+        }),
+      )
     }
   }
 

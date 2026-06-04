@@ -48,7 +48,6 @@ type AccountSettings = {
   logoUrl: string | null
   primaryColor: string
   secondaryColor: string
-  portalDomain: string
 }
 
 type Props = {
@@ -99,7 +98,6 @@ export function SettingsPageClient({
   const [primaryColor, setPrimaryColor] = useState(account.primaryColor)
   const [secondaryColor, setSecondaryColor] = useState(account.secondaryColor)
   const [logoUrl, setLogoUrl] = useState(account.logoUrl ?? '')
-  const [portalDomain, setPortalDomain] = useState(account.portalDomain)
   const [operatingModelId, setOperatingModelId] = useState<OperatingModelId>('agency_ops')
 
   const [inviteEmail, setInviteEmail] = useState('')
@@ -133,7 +131,6 @@ export function SettingsPageClient({
         logoUrl: logoUrl.trim() || null,
         primaryColor,
         secondaryColor,
-        portalDomain,
       })
       if (!result.success) {
         toast.error(result.error)
@@ -318,16 +315,15 @@ export function SettingsPageClient({
                     </div>
                   </div>
                 </div>
-                <div>
-                  <Label htmlFor="portal-domain">Client portal domain</Label>
-                  <Input
-                    id="portal-domain"
-                    value={portalDomain}
-                    onChange={(event) => setPortalDomain(event.target.value)}
-                    placeholder="clients.yourcompany.com"
-                    className="mt-1.5 max-w-md"
-                  />
-                </div>
+                <p className="text-[13px] text-stone-500">
+                  Use your own hostname for client sign-in (e.g.{' '}
+                  <code className="rounded bg-stone-100 px-1 text-xs">portal.yourcompany.com</code>) — configure
+                  DNS in{' '}
+                  <Link href="/admin/portal#portal-domain" className="font-medium text-stone-800 underline">
+                    Client portal → Portal domain
+                  </Link>
+                  .
+                </p>
                 <Button variant="outline" size="sm" asChild>
                   <Link href="/admin/portal/preview">Preview client portal →</Link>
                 </Button>

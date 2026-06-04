@@ -1,3 +1,4 @@
+import { resolveAppDomain } from '@/lib/app-base-url'
 import { db } from '@/lib/db/client'
 import { env } from '@/lib/env'
 import { accounts } from '@vantera/db'
@@ -28,7 +29,7 @@ function normalizeDomain(value: string): string {
 function platformFromDomain(): string {
   const domain = normalizeDomain(env.NEXT_PUBLIC_APP_DOMAIN)
   if (domain && isValidOutreachDomain(domain)) return domain
-  return 'vantera.app'
+  return resolveAppDomain()
 }
 
 function platformInboundDomain(): string {

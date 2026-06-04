@@ -1,7 +1,7 @@
 import { runProspectScoutDiscovery } from '@/lib/prospect-scout/discover'
 import { runBoundSearch } from '@/lib/prospect-scout/run-search'
 import type { ProspectMode, RunAccountResult, SdrConfigRow } from '@/lib/prospect-scout/types'
-import { flushAutomaticOutreachPipelines } from '@/lib/sdr/outreach-automation-policy'
+import { runAutomaticPipelineForAccount } from '@/lib/sdr/automatic-pipeline'
 import { countActiveSdrSequences, countSdrEnrolledToday } from '@/lib/sdr/queries'
 import { requireSDREnabledForAccount } from '@/lib/sdr/guard'
 import { findBindingsForConfig } from '@/lib/sdr/aspire-config'
@@ -97,8 +97,8 @@ export async function runAccountProspectScout(
   }
 
   if (enrolled > 0) {
-    void flushAutomaticOutreachPipelines(accountId).catch((error) => {
-      console.error('[prospect-scout] automatic pipeline flush failed', error)
+    void runAutomaticPipelineForAccount(accountId).catch((error) => {
+      console.error('[prospect-scout] automatic pipeline failed', error)
     })
   }
 

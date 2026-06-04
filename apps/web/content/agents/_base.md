@@ -15,7 +15,7 @@ It replaces generic CRMs (HubSpot, Salesforce, Jobber) with a purpose-built syst
 service business workflows — HVAC, landscaping, construction, property management, real estate,
 and agency — out of the box.
 
-Every client gets a branded portal at `{their-slug}.vantera.app` (or their own domain).
+Every client gets a branded portal at `{their-slug}.vanterasystem.dev` (or their own domain).
 Their clients see their brand, not Vantera. This is core to the value proposition.
 
 ---

@@ -1,27 +1,40 @@
-import { env } from '@/lib/env'
+import { resolveAppBaseUrl } from '@/lib/app-base-url'
+import { effectivePortalDomainForLinks } from '@/lib/portal/domain-utils'
 
 /** Base URL clients use to reach the portal (custom domain or app origin). */
-export function derivePortalUrl(slug: string, portalDomain: string | null | undefined): string {
-  if (portalDomain && portalDomain.length > 0) {
-    const host = portalDomain.replace(/^https?:\/\//, '').replace(/\/$/, '')
-    return `https://${host}`
+export function derivePortalUrl(
+  slug: string,
+  portalDomain: string | null | undefined,
+  options?: { portalDomainStatus?: string | null },
+): string {
+  const host = effectivePortalDomainForLinks(
+    portalDomain,
+    options?.portalDomainStatus ?? (portalDomain ? 'verified' : null),
+  )
+  if (host) {
+    return `https://${host.replace(/^https?:\/\//, '').replace(/\/$/, '')}`
   }
 
-  // Same-origin portal — subdomains like `{slug}.vantera-web.vercel.app` are not
-  // provisioned by default, so always fall back to the deployed app URL.
+  // Same-origin portal — subdomains like `{slug}.vanterasystem.dev` are not
+  // provisioned by default, so always fall back to the live app URL (see resolveAppBaseUrl).
   void slug
-  return env.NEXT_PUBLIC_APP_URL.replace(/\/$/, '')
+  return resolveAppBaseUrl()
 }
 
 /** Path + query for portal login (server redirects). */
 export function derivePortalLoginPath(
   slug: string,
   portalDomain: string | null | undefined,
+  options?: { portalDomainStatus?: string | null },
 ): string {
-  const base = derivePortalUrl(slug, portalDomain).replace(/\/$/, '')
+  const base = derivePortalUrl(slug, portalDomain, options).replace(/\/$/, '')
   const path = '/auth/portal-login'
+  const brandedHost = effectivePortalDomainForLinks(
+    portalDomain,
+    options?.portalDomainStatus ?? (portalDomain ? 'verified' : null),
+  )
 
-  if (portalDomain && portalDomain.length > 0) {
+  if (brandedHost) {
     try {
       return new URL(path, `${base}/`).pathname
     } catch {
@@ -37,9 +50,10 @@ export function derivePortalLoginPath(
 export function derivePortalLoginUrl(
   slug: string,
   portalDomain: string | null | undefined,
+  options?: { portalDomainStatus?: string | null },
 ): string {
-  const base = derivePortalUrl(slug, portalDomain).replace(/\/$/, '')
-  const loginPath = derivePortalLoginPath(slug, portalDomain)
+  const base = derivePortalUrl(slug, portalDomain, options).replace(/\/$/, '')
+  const loginPath = derivePortalLoginPath(slug, portalDomain, options)
   try {
     return new URL(loginPath, `${base}/`).toString().replace(/\/$/, '')
   } catch {

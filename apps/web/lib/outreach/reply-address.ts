@@ -1,3 +1,4 @@
+import { resolveAppDomain } from '@/lib/app-base-url'
 import { env } from '@/lib/env'
 import { isValidOutreachDomain, normalizeDomain } from '@/lib/outreach/email-domain'
 
@@ -12,7 +13,7 @@ export function getPlatformInboundDomain(): string {
     if (normalized && isValidOutreachDomain(normalized)) return normalized
   }
   const appDomain = normalizeDomain(env.NEXT_PUBLIC_APP_DOMAIN)
-  const base = appDomain && isValidOutreachDomain(appDomain) ? appDomain : 'vantera.app'
+  const base = appDomain && isValidOutreachDomain(appDomain) ? appDomain : resolveAppDomain()
   return `inbound.${base}`
 }
 

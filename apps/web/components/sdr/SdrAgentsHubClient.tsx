@@ -1,5 +1,6 @@
 'use client'
 
+import { AgentsAutomationSection } from '@/components/sdr/AgentsAutomationSection'
 import { SdrOutreachHubTabs } from '@/components/sdr/SdrOutreachHubTabs'
 import { KpiStrip } from '@/components/operational/KpiStrip'
 import { PageHeader } from '@/components/operational/PageHeader'
@@ -12,6 +13,8 @@ import {
   SDR_AGENTS_SUBHEADLINE,
 } from '@/lib/agents/sdr-agents'
 import type { SdrAgentCard, SdrAgentId } from '@/lib/agents/types'
+import type { OutreachAutomationMode } from '@/lib/sdr/outreach-automation-mode'
+import type { SDRActivityEvent } from '@/lib/sdr/types'
 import { cn } from '@/lib/utils'
 import { Bot, ChevronRight, Megaphone, Rocket, Sparkles, Users, Zap } from 'lucide-react'
 import Link from 'next/link'
@@ -21,6 +24,9 @@ type Props = {
   agents: SdrAgentCard[]
   enrolledLeads: number
   sdrEnabled: boolean
+  outreachAutomationMode: OutreachAutomationMode
+  sdrConfigured: boolean
+  recentActivity: SDRActivityEvent[]
 }
 
 const STATUS_TONE = {
@@ -61,7 +67,14 @@ function agentHref(agent: SdrAgentCard): string {
   return agent.href
 }
 
-export function SdrAgentsHubClient({ agents, enrolledLeads, sdrEnabled }: Props) {
+export function SdrAgentsHubClient({
+  agents,
+  enrolledLeads,
+  sdrEnabled,
+  outreachAutomationMode,
+  sdrConfigured,
+  recentActivity,
+}: Props) {
   const pathname = usePathname()
 
   const orderedAgents = AGENT_ORDER.map((id) => agents.find((agent) => agent.id === id)).filter(
@@ -121,6 +134,14 @@ export function SdrAgentsHubClient({ agents, enrolledLeads, sdrEnabled }: Props)
       </section>
 
       <KpiStrip items={kpiItems} className="lg:grid-cols-4" />
+
+      {sdrEnabled && sdrConfigured ? (
+        <AgentsAutomationSection
+          initialMode={outreachAutomationMode}
+          sdrConfigured={sdrConfigured}
+          recentActivity={recentActivity}
+        />
+      ) : null}
 
       <PageHeader
         title="Agent roster"
@@ -200,10 +221,10 @@ export function SdrAgentsHubClient({ agents, enrolledLeads, sdrEnabled }: Props)
           <div>
             <h3 className="text-sm font-semibold text-[var(--text-primary)]">Recommended deploy order</h3>
             <ol className="mt-2 space-y-1 text-sm text-[var(--text-secondary)]">
-              <li>1. Configure Prospect Scout → daily or weekly discovery into your pipeline</li>
-              <li>2. Enroll matches → Message Drafter writes personalized outreach</li>
-              <li>3. Link Outreach Agent → runs your linked campaigns 24/7</li>
-              <li>4. Pipeline Analyst scores engagement and surfaces follow-ups</li>
+              <li>1. Set Automatic above (or Manual if you want approval gates)</li>
+              <li>2. Configure Prospect Scout → discovery into your pipeline</li>
+              <li>3. Drafter personalizes sequences per lead automatically</li>
+              <li>4. Link campaigns on Outreach Agent — your only manual pick for sending</li>
             </ol>
           </div>
         </div>

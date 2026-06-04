@@ -175,7 +175,7 @@ function buildSetupSteps(
     {
       id: 'domain',
       title: 'Add your domain',
-      description: 'Use the same domain as your website (e.g. yourcompany.com).',
+      description: 'Use the same domain as your work email (e.g. yourcompany.com).',
       status: domainStatus,
     },
     {

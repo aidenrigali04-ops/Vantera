@@ -24,14 +24,14 @@ const OPTIONS: Array<{
     id: 'review',
     title: OUTREACH_AUTOMATION_LABELS.review,
     description:
-      'Prospect Scout and Pipeline Analyst still run on schedule. Sequences are drafted for you, but email/SMS sends and Outreach Agent queue runs require approval in Message Drafter or manual Run queue.',
+      'Scout finds leads and Drafter writes copy. You approve email/SMS in Message Drafter or run the Outreach Agent queue yourself.',
     icon: Check,
   },
   {
     id: 'automatic',
     title: OUTREACH_AUTOMATION_LABELS.automatic,
     description:
-      'Full autopilot: Scout discovery, 5-step sequences, due SDR sends, and linked Outreach Agent campaigns all process on your outreach window without manual steps.',
+      'Scout → personalized drafts → sends on your schedule. Link campaigns on Outreach Agent; everything else runs without approval.',
     icon: Zap,
   },
 ]

@@ -143,6 +143,10 @@ export const accounts = pgTable('accounts', {
   brandPrimaryColor: varchar('brand_primary_color', { length: 7 }).default('#1648A0'),
   brandSecondaryColor: varchar('brand_secondary_color', { length: 7 }).default('#0D9488'),
   portalDomain: varchar('portal_domain', { length: 255 }),
+  /** not_configured | pending | verified | failed */
+  portalDomainStatus: varchar('portal_domain_status', { length: 32 }).default('not_configured'),
+  /** DNS / Vercel verification hints shown in Settings */
+  portalDomainDns: jsonb('portal_domain_dns').default({}),
   /** Admin-driven client portal: sections, services, welcome copy, support links. */
   portalConfig: jsonb('portal_config').notNull().default({}),
   timezone: varchar('timezone', { length: 60 }).notNull().default('America/Los_Angeles'),

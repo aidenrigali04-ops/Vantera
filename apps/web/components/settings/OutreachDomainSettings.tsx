@@ -218,8 +218,8 @@ export function OutreachDomainSettingsPanel({ initial, onSaved, embedded = false
             )}
           >
             Send outreach from your own domain (e.g. outreach@yourcompany.com). Use the same domain
-            as your website — save it here, then paste the DNS records where you manage that
-            domain (Vercel, GoDaddy, Cloudflare, etc.).
+            as your work email — save it here, then paste the DNS records where you manage that
+            domain (Google Workspace, Microsoft 365, Cloudflare, etc.).
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -271,7 +271,7 @@ export function OutreachDomainSettingsPanel({ initial, onSaved, embedded = false
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <Label htmlFor="outreach-from-domain">Your website domain</Label>
+            <Label htmlFor="outreach-from-domain">Your work email domain</Label>
             <Input
               id="outreach-from-domain"
               value={fromDomain}
@@ -286,7 +286,7 @@ export function OutreachDomainSettingsPanel({ initial, onSaved, embedded = false
               className="mt-1.5"
             />
             <p className="mt-1.5 text-[12px] text-stone-500">
-              Same domain as your site — not a separate email-only domain.
+              Same domain as your work email — not a separate email-only domain.
             </p>
           </div>
           <div>
@@ -343,9 +343,9 @@ export function OutreachDomainSettingsPanel({ initial, onSaved, embedded = false
 
         <DnsRecordsTable
           title="Step 1 — Paste these at your DNS host (sending)"
-          description={`In Vercel, GoDaddy, Cloudflare, or wherever ${fromDomain || 'your website'} DNS lives. Copy each row exactly.`}
+          description={`At Google Workspace, Microsoft 365, Cloudflare, or wherever ${fromDomain || 'your work email'} DNS lives. Copy each row exactly.`}
           records={settings.sendingRecords}
-          emptyMessage="Enter your website domain above and click Save domain — records will appear here."
+          emptyMessage="Enter your work email domain above and click Save domain — records will appear here."
         />
 
         <DnsRecordsTable

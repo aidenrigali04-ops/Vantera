@@ -11,6 +11,7 @@ export const accountCoreSelect = {
   brandPrimaryColor: accounts.brandPrimaryColor,
   brandSecondaryColor: accounts.brandSecondaryColor,
   portalDomain: accounts.portalDomain,
+  portalDomainStatus: accounts.portalDomainStatus,
   timezone: accounts.timezone,
   bookingLink: accounts.bookingLink,
   paymentLink: accounts.paymentLink,
@@ -27,6 +28,7 @@ export type AccountCoreRow = {
   brandPrimaryColor: string | null
   brandSecondaryColor: string | null
   portalDomain: string | null
+  portalDomainStatus: string | null
   timezone: string
   bookingLink: string | null
   paymentLink: string | null

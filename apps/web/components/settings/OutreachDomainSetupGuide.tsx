@@ -38,10 +38,10 @@ export function OutreachDomainSetupGuide({
 
   const steps: GuideStep[] = [
     {
-      title: 'Use your website domain',
+      title: 'Use your work email domain',
       body: (
         <>
-          Enter the same domain as your website — for example{' '}
+          Enter the same domain as your work email — for example{' '}
           <code className="rounded bg-stone-100 px-1 py-0.5 text-xs">{exampleDomain}</code>, not a
           different name. Outreach will send as{' '}
           <code className="rounded bg-stone-100 px-1 py-0.5 text-xs">
@@ -62,12 +62,12 @@ export function OutreachDomainSetupGuide({
       ),
     },
     {
-      title: 'Paste DNS where your website lives',
+      title: 'Paste DNS where your email DNS lives',
       body: (
         <>
-          Open the same place you manage DNS for your website — Vercel, GoDaddy, Cloudflare,
-          Squarespace, Namecheap, etc. Add each row from Vantera (type, host, value). That is the
-          only step outside Vantera.
+          Open the same place you manage DNS for your work email — Google Workspace, Microsoft 365,
+          Cloudflare, GoDaddy, etc. Add each row from Vantera (type, host, value). That is the only
+          step outside Vantera.
         </>
       ),
     },
@@ -99,9 +99,9 @@ export function OutreachDomainSetupGuide({
         <div className="space-y-4 rounded-lg border border-violet-200/60 bg-violet-50/50 p-4">
           <p className="text-sm font-medium text-stone-900">In short</p>
           <p className="text-sm leading-relaxed text-stone-700">
-            Use the <strong>same domain as your website</strong>. Save it here in Vantera Settings,
-            then paste the DNS records into wherever you already manage DNS for that domain (where
-            you would add a website or subdomain record).
+            Use the <strong>same domain as your work email</strong>. Save it here in Vantera
+            Settings, then paste the DNS records into wherever you already manage DNS for that
+            domain (the same host you use for email).
           </p>
         </div>
 
@@ -123,7 +123,7 @@ export function OutreachDomainSetupGuide({
           <div className="rounded-md border border-amber-200/80 bg-amber-50/80 px-3 py-2.5 text-xs text-amber-900">
             {!hasDnsRecords ? (
               <>
-                <strong>Next:</strong> Enter your website domain and click Save domain.
+                <strong>Next:</strong> Enter your work email domain and click Save domain.
               </>
             ) : domainStatus === 'verified' && inboundDomainStatus === 'verified' ? (
               <>

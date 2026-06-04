@@ -120,7 +120,7 @@ export async function createSDRConfig(
       defaultMinIcpScore: data.defaultMinIcpScore ?? 70,
       syncIcpToSavedSearches: data.syncIcpToSavedSearches ?? true,
       outreachAutomationMode: normalizeOutreachAutomationMode(
-        data.outreachAutomationMode ?? 'review',
+        data.outreachAutomationMode ?? 'automatic',
       ),
       isActive: data.isActive ?? false,
     })

@@ -60,6 +60,9 @@ export function AdminPortalPageClient({ meta, workspace }: Props) {
               ) : null}
             </dl>
             <div className="mt-4 flex flex-wrap gap-2">
+              <Button size="sm" variant="outline" asChild>
+                <Link href="/admin/portal#portal-domain">Portal domain</Link>
+              </Button>
               <Button size="sm" asChild>
                 <Link href={adminPortalPreviewPath()}>
                   <Eye className="mr-2 h-4 w-4" />

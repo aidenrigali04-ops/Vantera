@@ -66,10 +66,10 @@ export default function PrivacyPage() {
         <p>
           Privacy questions? Contact{' '}
           <a
-            href="mailto:privacy@vantera.app"
+            href="mailto:privacy@vanterasystem.dev"
             className="font-medium text-stone-900 underline-offset-2 hover:underline"
           >
-            privacy@vantera.app
+            privacy@vanterasystem.dev
           </a>
           .
         </p>

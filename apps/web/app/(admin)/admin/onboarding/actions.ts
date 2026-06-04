@@ -424,14 +424,17 @@ export async function updateBranding(
       return err(parsed.error.issues[0]?.message ?? 'Invalid branding data')
     }
 
+    const portalHost =
+      parsed.data.portalDomain && parsed.data.portalDomain.length > 0
+        ? parsed.data.portalDomain
+        : null
+
     const saved = await patchAccountRow(workspaceId, {
       brand_logo_url: parsed.data.logoUrl ?? null,
       brand_primary_color: parsed.data.primaryColor,
       brand_secondary_color: parsed.data.secondaryColor,
-      portal_domain:
-        parsed.data.portalDomain && parsed.data.portalDomain.length > 0
-          ? parsed.data.portalDomain
-          : null,
+      portal_domain: portalHost,
+      portal_domain_status: portalHost ? 'pending' : 'not_configured',
     })
 
     if (!saved.ok) {

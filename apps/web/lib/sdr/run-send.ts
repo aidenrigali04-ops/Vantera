@@ -1,10 +1,12 @@
 import { getSystemAutomationId } from '@/lib/automation/system-automation'
 import { db } from '@/lib/db/client'
 import type { Plan } from '@/lib/feature-flags/flags'
-import { isAccountAutomaticOutreach } from '@/lib/sdr/outreach-automation-policy'
+import { isAccountAutomaticOutreach } from '@/lib/sdr/outreach-automation-account'
 import { consumeSdrCredits, outreachSendCostForChannel, SDR_TRIAL_DAYS, SdrCreditsExhaustedError } from '@/lib/sdr/credits'
 import { logSdrActivity } from '@/lib/sdr/activity-log'
 import { requireSDREnabledForAccount } from '@/lib/sdr/guard'
+import { DEFAULT_OUTREACH_DAYS, diagnoseOutreachSend } from '@/lib/sdr/diagnose-outreach-send'
+import type { OutreachSendDiagnostics } from '@/lib/sdr/diagnose-outreach-send'
 import { findDueSdrSteps } from '@/lib/sdr/queries'
 import { isOutreachDay, isWithinOutreachWindow } from '@/lib/sdr/schedule'
 import { sendSdrEmail, sendSdrSms } from '@/lib/sdr/send-step'
@@ -22,7 +24,12 @@ import { and, eq, isNull } from 'drizzle-orm'
 
 export async function runSdrAgentSend(options?: {
   accountId?: string
-}): Promise<{ sent: number; failed: number }> {
+  /** When true, run all guards but do not send or mutate step status. */
+  dryRun?: boolean
+}): Promise<{ sent: number; failed: number; diagnostics: OutreachSendDiagnostics }> {
+  const diagnostics = await diagnoseOutreachSend({
+    accountId: options?.accountId,
+  })
   const filters = [
     eq(sdrAgentConfigs.isActive, true),
     eq(sdrAgentConfigs.isPaused, false),
@@ -61,11 +68,19 @@ export async function runSdrAgentSend(options?: {
     }
 
     if (!isWithinOutreachWindow(now, window)) continue
-    if (!isOutreachDay(now, config.outreachDays ?? [], window.tz)) continue
+    const outreachDays =
+      config.outreachDays && config.outreachDays.length > 0
+        ? config.outreachDays
+        : [...DEFAULT_OUTREACH_DAYS]
+    if (!isOutreachDay(now, outreachDays, window.tz)) continue
 
     const dueSteps = await findDueSdrSteps(config.accountId, 50)
 
     for (const step of dueSteps) {
+      if (options?.dryRun) {
+        continue
+      }
+
       const [sequence] = await db
         .select()
         .from(sdrSequences)
@@ -257,7 +272,7 @@ export async function runSdrAgentSend(options?: {
       sent += 1
     }
 
-    if (dueSteps.length > 0) {
+    if (!options?.dryRun && dueSteps.length > 0 && (sent > 0 || failed > 0)) {
       const automationId = await getSystemAutomationId(config.accountId, 'sdr_send')
       await db.insert(automationRuns).values({
         accountId: config.accountId,
@@ -265,10 +280,21 @@ export async function runSdrAgentSend(options?: {
         triggerEvent: 'sdr_agent_send',
         actionType: 'sequence_send',
         status: 'success',
-        resultPayload: { sent, failed },
+        resultPayload: { sent, failed, diagnostics: diagnostics.pipelineHints },
       })
     }
   }
 
-  return { sent, failed }
+  if (options?.dryRun) {
+    return {
+      sent: 0,
+      failed: 0,
+      diagnostics: {
+        ...diagnostics,
+        wouldSendWithoutDryRun: diagnostics.readyToSendTotal,
+      },
+    }
+  }
+
+  return { sent, failed, diagnostics }
 }

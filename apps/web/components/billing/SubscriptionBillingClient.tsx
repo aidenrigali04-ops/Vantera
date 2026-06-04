@@ -187,7 +187,7 @@ export function SubscriptionBillingClient({ currentPlan, hasStripeCustomer }: Pr
 
       <p className="text-xs text-[var(--text-tertiary)]">
         Questions about billing?{' '}
-        <a href="mailto:sales@vantera.app" className="text-[var(--brand-accent)] hover:underline">
+        <a href="mailto:sales@vanterasystem.dev" className="text-[var(--brand-accent)] hover:underline">
           Contact support
         </a>{' '}
         or visit{' '}

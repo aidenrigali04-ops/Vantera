@@ -381,11 +381,14 @@ export async function findPreviewContactId(accountId: string): Promise<string | 
 
 export async function getAdminPortalMeta(accountId: string): Promise<AdminPortalMeta> {
   const account = await getAccount(accountId)
+  const portalOpts = account
+    ? { portalDomainStatus: account.portalDomainStatus }
+    : undefined
   const portalUrl = account
-    ? derivePortalUrl(account.slug, account.portalDomain)
+    ? derivePortalUrl(account.slug, account.portalDomain, portalOpts)
     : derivePortalUrl('workspace', null)
   const portalLoginUrl = account
-    ? derivePortalLoginUrl(account.slug, account.portalDomain)
+    ? derivePortalLoginUrl(account.slug, account.portalDomain, portalOpts)
     : derivePortalLoginUrl('workspace', null)
 
   const [enabledRow] = await db

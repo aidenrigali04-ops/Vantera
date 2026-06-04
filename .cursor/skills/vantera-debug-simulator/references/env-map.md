@@ -25,7 +25,7 @@
 
 ```
 Core API:          $INTERNAL_API_BASE_URL/api/v1
-Portal (default):  https://{account.slug}.vantera.app
+Portal (default):  https://{account.slug}.vanterasystem.dev
 Portal (CNAME):    https://{account.portal_domain}
 Supabase:          $SUPABASE_URL
 Trigger.dev:       https://api.trigger.dev/api/v1
@@ -45,7 +45,7 @@ TEST_CONTACT_ID_B=<uuid>            # Different contact, same account
 TEST_CONTACT_ID_OTHER_ACCOUNT=<uuid> # Contact in a different account (used for isolation tests)
 TEST_USER_ID_OWNER=<uuid>           # Owner role user
 TEST_USER_ID_STAFF=<uuid>           # Staff role user
-TEST_PORTAL_DOMAIN=<slug>.vantera.app
+TEST_PORTAL_DOMAIN=<slug>.vanterasystem.dev
 ```
 
 ## Curl Templates

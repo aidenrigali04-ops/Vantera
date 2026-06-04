@@ -1,3 +1,4 @@
+import { PRODUCTION_APP_DOMAIN } from '@/config/public-env-defaults'
 import type { BrandingData } from '@/lib/branding/context'
 import { ADMIN_SESSION_COOKIE, PORTAL_SESSION_COOKIE } from '@/lib/auth/constants'
 import { verifySessionToken } from '@/lib/auth/jwt'
@@ -40,7 +41,7 @@ async function resolveAccountFromHostname(
   hostname: string,
   supabase: ReturnType<typeof createSupabasePublicClient>,
 ): Promise<AccountRow | null> {
-  const appDomain = process.env.NEXT_PUBLIC_APP_DOMAIN ?? 'vantera.app'
+  const appDomain = process.env.NEXT_PUBLIC_APP_DOMAIN?.trim() || PRODUCTION_APP_DOMAIN
 
   if (hostname && hostname.endsWith(`.${appDomain}`)) {
     const dotIndex = hostname.indexOf('.')

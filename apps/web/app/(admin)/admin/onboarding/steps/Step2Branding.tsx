@@ -248,7 +248,7 @@ export function Step2Branding({
       <FieldGroup
         label="Portal domain"
         description={
-          'Point your subdomain CNAME to portals.vantera.app. Setup instructions are emailed after onboarding.'
+          'After onboarding, open Client portal → Portal domain for DNS steps and verification.'
         }
       >
         <Input

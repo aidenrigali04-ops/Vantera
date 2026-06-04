@@ -155,8 +155,9 @@ async function deliverPortalInvite(
     return err('Workspace not found')
   }
 
-  const portalUrl = derivePortalUrl(account.slug, account.portalDomain)
-  const portalLoginUrl = derivePortalLoginUrl(account.slug, account.portalDomain)
+  const portalOpts = { portalDomainStatus: account.portalDomainStatus }
+  const portalUrl = derivePortalUrl(account.slug, account.portalDomain, portalOpts)
+  const portalLoginUrl = derivePortalLoginUrl(account.slug, account.portalDomain, portalOpts)
   const magicLink = await createPortalAuthLink(email, portalUrl)
 
   if (!magicLink) {
@@ -288,11 +289,14 @@ export async function getPortalAccessMeta(accountId: string): Promise<{
   portalLoginUrl: string
 }> {
   const account = await getAccount(accountId)
+  const portalOpts = account
+    ? { portalDomainStatus: account.portalDomainStatus }
+    : undefined
   const portalUrl = account
-    ? derivePortalUrl(account.slug, account.portalDomain)
+    ? derivePortalUrl(account.slug, account.portalDomain, portalOpts)
     : derivePortalUrl('workspace', null)
   const portalLoginUrl = account
-    ? derivePortalLoginUrl(account.slug, account.portalDomain)
+    ? derivePortalLoginUrl(account.slug, account.portalDomain, portalOpts)
     : derivePortalLoginUrl('workspace', null)
 
   return { portalUrl, portalLoginUrl }

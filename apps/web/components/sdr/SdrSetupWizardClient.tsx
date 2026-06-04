@@ -1,7 +1,6 @@
 'use client'
 
 import { SlideWizardFrame } from '@/components/onboarding/slide-wizard/SlideWizardFrame'
-import { SdrOutreachAutomationToggle } from '@/components/sdr/SdrOutreachAutomationToggle'
 import { SdrProspectScoutFields } from '@/components/sdr/SdrProspectScoutFields'
 import { SdrWizardMediaPanel } from '@/components/sdr/SdrWizardMediaPanel'
 import { bindingToApiInput, type BindingDraft, type SavedSearchOption } from '@/components/sdr/sdr-aspire-ui'
@@ -53,7 +52,7 @@ export function SdrSetupWizardClient({ accountVertical }: Props) {
     defaultMinIcpScore: 70,
     syncIcpToSavedSearches: true,
     bindings: [],
-    outreachAutomationMode: 'review',
+    outreachAutomationMode: 'automatic',
   })
 
   useEffect(() => {
@@ -388,24 +387,14 @@ export function SdrSetupWizardClient({ accountVertical }: Props) {
             )}
             <div className="flex justify-between gap-4">
               <dt className="text-[var(--text-tertiary)]">Outreach</dt>
-              <dd className="font-medium text-[var(--text-primary)]">
-                {form.outreachAutomationMode === 'automatic'
-                  ? 'Automatic'
-                  : 'Review before send'}
-              </dd>
+              <dd className="font-medium text-[var(--text-primary)]">Automatic (default)</dd>
             </div>
           </dl>
-          <div>
-            <p className="mb-2 text-[13px] font-medium text-[var(--text-primary)]">
-              After leads are found
-            </p>
-            <SdrOutreachAutomationToggle
-              compact
-              value={form.outreachAutomationMode}
-              disabled={isPending}
-              onChange={(mode) => setForm({ ...form, outreachAutomationMode: mode })}
-            />
-          </div>
+          <p className="text-[13px] text-[var(--text-secondary)]">
+            Change to manual anytime under{' '}
+            <span className="font-medium text-[var(--text-primary)]">Agents → Outreach mode</span>.
+            Link campaigns on Outreach Agent after setup.
+          </p>
         </div>
       )}
     </SlideWizardFrame>
