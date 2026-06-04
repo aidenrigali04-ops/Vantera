@@ -122,9 +122,13 @@ export function buildSdrAgentCards(snapshot: SdrAgentSnapshot): SdrAgentCard[] {
       }
       case 'message_drafter': {
         const pendingTotal = snapshot.pendingEmailDrafts + snapshot.pendingLinkedInDrafts
+        const inAutoPipeline =
+          snapshot.automaticOutreach && snapshot.prospectScoutActive && pendingTotal === 0
         const statValue =
           pendingTotal === 0
-            ? '0'
+            ? inAutoPipeline
+              ? 'Auto pipeline'
+              : '0'
             : snapshot.pendingEmailDrafts > 0 && snapshot.pendingLinkedInDrafts > 0
               ? `${snapshot.pendingEmailDrafts} email · ${snapshot.pendingLinkedInDrafts} LinkedIn`
               : snapshot.pendingEmailDrafts > 0
@@ -133,8 +137,8 @@ export function buildSdrAgentCards(snapshot: SdrAgentSnapshot): SdrAgentCard[] {
         return {
           ...agent,
           href: '/admin/outreach/agents/drafter',
-          status: pendingTotal > 0 ? 'active' : 'idle',
-          statLabel: 'Drafts to review',
+          status: pendingTotal > 0 || inAutoPipeline ? 'active' : 'idle',
+          statLabel: inAutoPipeline && pendingTotal === 0 ? 'Mode' : 'Drafts to review',
           statValue,
         }
       }

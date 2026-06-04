@@ -186,11 +186,14 @@ export function MessageDrafterCommandCenterClient({ initialPayload }: Props) {
   }
 
   function handleCopyLinkedIn(body: string) {
-    navigator.clipboard.writeText(body).then(() => {
-      setCopied(true)
-      toast.success('Message copied')
-      window.setTimeout(() => setCopied(false), 2000)
-    })
+    void navigator.clipboard.writeText(body).then(
+      () => {
+        setCopied(true)
+        toast.success('Message copied')
+        window.setTimeout(() => setCopied(false), 2000)
+      },
+      () => toast.error('Could not copy — check browser clipboard permissions'),
+    )
   }
 
   function handleMarkLinkedInSent() {

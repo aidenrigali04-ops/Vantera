@@ -69,6 +69,9 @@ export type ClientAgentContext = {
   primaryVerticalPain: string
   proofPoint: string
   bookingLink: string | null
+  icpDescription: string | null
+  valueProposition: string | null
+  icpSummary: string | null
   autonomousOutreach: boolean
   sdrEnabled: boolean
 }
@@ -81,6 +84,9 @@ export async function resolveClientContext(accountId: string): Promise<ClientAge
       plan: accounts.plan,
       bookingLink: accounts.bookingLink,
       voicePreference: accounts.voicePreference,
+      icpDescription: accounts.icpDescription,
+      valueProposition: accounts.valueProposition,
+      icpSummary: accounts.icpSummary,
     })
     .from(accounts)
     .where(eq(accounts.id, accountId))
@@ -110,7 +116,7 @@ export async function resolveClientContext(accountId: string): Promise<ClientAge
     .where(and(eq(sdrAgentConfigs.accountId, accountId), isNull(sdrAgentConfigs.deletedAt)))
     .limit(1)
 
-  if (!config || !config.isActive) return null
+  if (!config) return null
 
   const vertical = account.vertical ?? 'agency'
   const verticalKey = vertical in VERTICAL_PAIN ? vertical : 'agency'
@@ -148,28 +154,42 @@ export async function resolveClientContext(accountId: string): Promise<ClientAge
       account.voicePreference ??
       (verticalString(VOICE_BY_VERTICAL, verticalKey) || 'direct and professional'),
     keyDifferentiator:
+      account.valueProposition?.trim() ||
       'white-label client portal, stage-aware automations, and missed-call text-back in under 90 seconds',
-    primaryVerticalPain: verticalString(VERTICAL_PAIN, verticalKey) || verticalString(VERTICAL_PAIN, 'agency'),
+    primaryVerticalPain:
+      account.icpDescription?.trim() ||
+      verticalString(VERTICAL_PAIN, verticalKey) ||
+      verticalString(VERTICAL_PAIN, 'agency'),
     proofPoint: verticalString(VERTICAL_PROOF, verticalKey) || verticalString(VERTICAL_PROOF, 'agency'),
     bookingLink: account.bookingLink,
+    icpDescription: account.icpDescription,
+    valueProposition: account.valueProposition,
+    icpSummary: account.icpSummary,
     autonomousOutreach,
     sdrEnabled,
   }
 }
 
 export function clientContextToPromptBlock(ctx: ClientAgentContext): string {
+  const targetTitles = ctx.icpConfig.targetTitles?.length
+    ? ctx.icpConfig.targetTitles.join(', ')
+    : 'any'
+
   return [
     `Rep: ${ctx.agentName}, ${ctx.agentTitle} at ${ctx.businessName}`,
     `From: ${ctx.fromName} <${ctx.fromEmail}>`,
+    ctx.signature?.trim() ? `Email signature: ${ctx.signature.trim()}` : null,
     `Vertical: ${ctx.vertical}`,
     `Voice: ${ctx.voiceTone}`,
+    ctx.icpSummary?.trim() ? `ICP summary: ${ctx.icpSummary.trim()}` : null,
     `What we do: ${ctx.keyDifferentiator}`,
     `Primary pain: ${ctx.primaryVerticalPain}`,
     `Proof: ${ctx.proofPoint}`,
     ctx.bookingLink ? `Booking link: ${ctx.bookingLink}` : null,
+    `Target titles: ${targetTitles}`,
     `Target cities: ${ctx.targetCities.join(', ') || 'any'}`,
     `Exclude domains: ${ctx.excludeDomains.join(', ') || 'none'}`,
-    `Autonomous send: ${ctx.autonomousOutreach ? 'yes' : 'review required'}`,
+    `Autonomous send: ${ctx.autonomousOutreach ? 'yes (copy goes to campaigns/sequences, not the review queue)' : 'review required in Message Drafter'}`,
   ]
     .filter(Boolean)
     .join('\n')
