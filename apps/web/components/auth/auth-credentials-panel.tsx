@@ -108,9 +108,9 @@ export function AuthCredentialsPanel({
   }, [isOAuthCallback, searchParams])
 
   const loginUrlError = useMemo(() => {
-    if (mode !== 'login' || isOAuthCallback || portal) return null
+    if (mode !== 'login' || isOAuthCallback) return null
     return resolveUrlError(searchParams?.get('error') ?? null, false)
-  }, [mode, isOAuthCallback, portal, searchParams])
+  }, [mode, isOAuthCallback, searchParams])
 
   const signupForm = useForm<SignupFormValues>({
     resolver: zodResolver(signupFormSchema),

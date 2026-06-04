@@ -8,8 +8,8 @@ export function PortalLoginClient() {
   const name = businessName.trim()
   const title = name ? `${name} client portal` : 'Client portal'
   const subtitle = name
-    ? `Sign in to view your projects, invoices, and updates from ${name}.`
-    : 'Sign in to view your projects, invoices, and updates.'
+    ? `Sign in with the email and password you created for your ${name} client portal.`
+    : 'Sign in with the email and password from your portal invite.'
 
   return (
     <AuthCredentialsPanel

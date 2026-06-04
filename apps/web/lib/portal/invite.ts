@@ -7,8 +7,8 @@ import { getAccount } from '@/lib/db/queries'
 import { env } from '@/lib/env'
 import { resolveOutreachSendIdentity } from '@/lib/outreach/email-domain'
 import { buildPortalInviteEmailHtml } from '@/lib/portal/invite-email'
+import { createPortalInviteLink, revokePortalInviteTokens } from '@/lib/portal/auth-tokens'
 import { derivePortalLoginUrl, derivePortalUrl } from '@/lib/portal/url'
-import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { activities, contacts } from '@vantera/db'
 import { and, eq, isNull } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
@@ -62,40 +62,13 @@ async function logPortalActivity(
   })
 }
 
-async function createPortalAuthLink(email: string, portalUrl: string): Promise<string | null> {
-  const supabase = getSupabaseAdmin()
-  const redirectTo = `${portalUrl.replace(/\/$/, '')}/auth/portal-callback`
-
-  const invite = await supabase.auth.admin.generateLink({
-    type: 'invite',
-    email,
-    options: { redirectTo },
-  })
-
-  if (!invite.error && invite.data?.properties?.action_link) {
-    return invite.data.properties.action_link
-  }
-
-  const magic = await supabase.auth.admin.generateLink({
-    type: 'magiclink',
-    email,
-    options: { redirectTo },
-  })
-
-  if (magic.error || !magic.data?.properties?.action_link) {
-    return null
-  }
-
-  return magic.data.properties.action_link
-}
-
 async function sendPortalInviteEmail(input: {
   accountId: string
   to: string
   contactName: string
   accountName: string
   portalUrl: string
-  magicLink: string
+  activateLink: string
   primaryColor: string
   logoUrl: string | null
 }): Promise<boolean> {
@@ -114,7 +87,7 @@ async function sendPortalInviteEmail(input: {
     contactName: input.contactName,
     accountName: input.accountName,
     portalUrl: input.portalUrl,
-    magicLink: input.magicLink,
+    activateLink: input.activateLink,
     primaryColor: input.primaryColor,
     logoUrl: input.logoUrl,
   })
@@ -158,10 +131,14 @@ async function deliverPortalInvite(
   const portalOpts = { portalDomainStatus: account.portalDomainStatus }
   const portalUrl = derivePortalUrl(account.slug, account.portalDomain, portalOpts)
   const portalLoginUrl = derivePortalLoginUrl(account.slug, account.portalDomain, portalOpts)
-  const magicLink = await createPortalAuthLink(email, portalUrl)
+  const inviteLink = await createPortalInviteLink({
+    contactId: contact.id,
+    accountId: session.accountId,
+    portalBaseUrl: portalUrl,
+  })
 
-  if (!magicLink) {
-    return err('Could not create a secure sign-in link. Try again in a moment.')
+  if (!inviteLink) {
+    return err('Could not create a secure invite link. Try again in a moment.')
   }
 
   const contactName = `${contact.firstName} ${contact.lastName}`.trim() || email
@@ -173,7 +150,7 @@ async function deliverPortalInvite(
     contactName,
     accountName,
     portalUrl: portalLoginUrl,
-    magicLink,
+    activateLink: inviteLink.activateUrl,
     primaryColor: account.brandPrimaryColor ?? '#1648A0',
     logoUrl: account.brandLogoUrl ?? null,
   })
@@ -262,10 +239,14 @@ export async function revokeContactPortalAccess(
     return { success: true, data: { revoked: true } }
   }
 
+  await revokePortalInviteTokens(contact.id)
+
   await db
     .update(contacts)
     .set({
       portalAccess: false,
+      portalPasswordHash: null,
+      portalAccountCreatedAt: null,
       updatedAt: new Date(),
     })
     .where(and(eq(contacts.id, contact.id), eq(contacts.accountId, session.accountId)))

@@ -186,9 +186,11 @@ export async function runProspectScoutDiscovery(
           console.error('[prospect-scout] auto campaign launch failed', error)
         }
       }
-      void runAutomaticPipelineForAccount(config.accountId).catch((error) => {
+      try {
+        await runAutomaticPipelineForAccount(config.accountId)
+      } catch (error) {
         console.error('[prospect-scout] automatic send flush failed', error)
-      })
+      }
     }
 
     await logSdrActivity({

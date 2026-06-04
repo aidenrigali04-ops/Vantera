@@ -11,7 +11,7 @@ function signalHref(row: {
   if (row.contactId) return `/admin/clients/${row.contactId}`
   if (row.recordId) return `/admin/records/${row.recordId}`
   if (row.signalType.includes('lead') || row.signalType.includes('prospect')) {
-    return '/admin/pipeline'
+    return '/admin/crm/pipeline'
   }
   return '/admin/dashboard'
 }
@@ -142,7 +142,7 @@ async function deriveAccountInsights(accountId: string, limit: number): Promise<
       recommendation: `No activity in 7+ days while status is ${lead.relationshipStatus.replace(/_/g, ' ')}. Re-engage or move stage.`,
       severity: 'yellow',
       actionLabel: 'Open prospect',
-      actionHref: `/admin/pipeline/${lead.id}`,
+      actionHref: `/admin/crm/pipeline/${lead.id}`,
       dismissible: true,
       source: 'derived',
     })
@@ -156,7 +156,7 @@ async function deriveAccountInsights(accountId: string, limit: number): Promise<
       recommendation: `${overdue} scheduled items are overdue across active clients. Reassign or reschedule to protect delivery.`,
       severity: 'red',
       actionLabel: 'Review pipeline',
-      actionHref: '/admin/pipeline',
+      actionHref: '/admin/crm/pipeline',
       dismissible: true,
       source: 'derived',
     })
@@ -248,7 +248,7 @@ export async function findContactEmbeddedInsights(
       recommendation: `Expansion score ${contact.upsellScore}. Package the next phase while delivery momentum is high.`,
       severity: 'green',
       actionLabel: 'Create deal',
-      actionHref: '/admin/pipeline',
+      actionHref: '/admin/crm/pipeline',
       dismissible: true,
       source: 'derived',
     })
@@ -296,7 +296,7 @@ export async function findLeadEmbeddedInsights(
       recommendation: `No updates in ${daysIdle} days. Send a follow-up or advance the stage to keep the pipeline moving.`,
       severity: 'yellow',
       actionLabel: 'Update status',
-      actionHref: `/admin/pipeline/${lead.id}`,
+      actionHref: `/admin/crm/pipeline/${lead.id}`,
       dismissible: true,
       source: 'derived',
     })
@@ -309,7 +309,7 @@ export async function findLeadEmbeddedInsights(
       recommendation: `Score ${lead.score} with status ${lead.relationshipStatus.replace(/_/g, ' ')}. Move to qualified or book discovery.`,
       severity: 'green',
       actionLabel: 'Mark qualified',
-      actionHref: `/admin/pipeline/${lead.id}`,
+      actionHref: `/admin/crm/pipeline/${lead.id}`,
       dismissible: true,
       source: 'derived',
     })
@@ -348,7 +348,7 @@ export async function findLeadEmbeddedInsights(
       recommendation: recentReply[0].body ?? 'Prospect responded recently. Prioritize a human follow-up today.',
       severity: 'green',
       actionLabel: 'View timeline',
-      actionHref: `/admin/pipeline/${lead.id}`,
+      actionHref: `/admin/crm/pipeline/${lead.id}`,
       dismissible: true,
       source: 'derived',
     })

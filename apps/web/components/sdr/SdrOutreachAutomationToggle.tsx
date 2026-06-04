@@ -1,85 +1,71 @@
 'use client'
 
+import { Switch } from '@/components/ui/switch'
 import { cn } from '@/lib/utils'
 import {
+  isAutomaticOutreachMode,
   OUTREACH_AUTOMATION_LABELS,
   type OutreachAutomationMode,
 } from '@/lib/sdr/outreach-automation-mode'
-import { Check, Zap } from 'lucide-react'
 
 type Props = {
   value: OutreachAutomationMode
   onChange: (mode: OutreachAutomationMode) => void
   disabled?: boolean
+  /** @deprecated Layout is always compact switch row */
   compact?: boolean
 }
 
-const OPTIONS: Array<{
-  id: OutreachAutomationMode
-  title: string
-  description: string
-  icon: typeof Check
-}> = [
-  {
-    id: 'review',
-    title: OUTREACH_AUTOMATION_LABELS.review,
-    description:
-      'Scout finds leads and Drafter writes copy. You approve email/SMS in Message Drafter or run the Outreach Agent queue yourself.',
-    icon: Check,
-  },
-  {
-    id: 'automatic',
-    title: OUTREACH_AUTOMATION_LABELS.automatic,
-    description:
-      'Scout → personalized drafts → sends on your schedule. Link campaigns on Outreach Agent; everything else runs without approval.',
-    icon: Zap,
-  },
-]
+export function SdrOutreachAutomationToggle({ value, onChange, disabled }: Props) {
+  const automatic = isAutomaticOutreachMode(value)
 
-export function SdrOutreachAutomationToggle({ value, onChange, disabled, compact }: Props) {
+  function handleCheckedChange(checked: boolean) {
+    onChange(checked ? 'automatic' : 'review')
+  }
+
   return (
-    <div className={cn('grid gap-2', compact ? 'sm:grid-cols-2' : 'gap-3')}>
-      {OPTIONS.map((option) => {
-        const active = value === option.id
-        const Icon = option.icon
-        return (
-          <button
-            key={option.id}
-            type="button"
-            disabled={disabled}
-            onClick={() => onChange(option.id)}
+    <div
+      className={cn(
+        'flex items-start justify-between gap-4 rounded-lg border border-[var(--border-default)] bg-[var(--bg-surface)] px-4 py-3.5',
+        disabled && 'opacity-60',
+      )}
+    >
+      <div className="min-w-0 flex-1 space-y-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-sm font-semibold text-[var(--text-primary)]">
+            {OUTREACH_AUTOMATION_LABELS.automatic} pipeline
+          </p>
+          <span
             className={cn(
-              'rounded-lg border p-4 text-left transition-colors',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]',
-              active
-                ? 'border-[var(--accent-border)] bg-[var(--accent-muted)]'
-                : 'border-[var(--border-default)] bg-[var(--bg-surface)] hover:border-[var(--border-strong)]',
-              disabled && 'cursor-not-allowed opacity-60',
+              'rounded-full px-2 py-0.5 text-[11px] font-medium',
+              automatic
+                ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400'
+                : 'bg-[var(--bg-subtle)] text-[var(--text-secondary)]',
             )}
           >
-            <div className="flex items-start gap-3">
-              <span
-                className={cn(
-                  'flex h-9 w-9 shrink-0 items-center justify-center rounded-md border',
-                  active
-                    ? 'border-[var(--accent-border)] bg-[var(--bg-surface)]'
-                    : 'border-[var(--border-subtle)]',
-                )}
-              >
-                <Icon className="h-4 w-4 text-[var(--accent)]" />
-              </span>
-              <span>
-                <span className="block text-sm font-semibold text-[var(--text-primary)]">
-                  {option.title}
-                </span>
-                <span className="mt-1 block text-[12px] leading-relaxed text-[var(--text-secondary)]">
-                  {option.description}
-                </span>
-              </span>
-            </div>
-          </button>
-        )
-      })}
+            {automatic ? 'On' : 'Off — manual review'}
+          </span>
+        </div>
+        <p className="text-[13px] leading-relaxed text-[var(--text-secondary)]">
+          {automatic
+            ? 'Scout pulls leads daily at 8:00 AM, Message Drafter personalizes copy, and Outreach Agent launches campaigns without approval.'
+            : 'Scout and Drafter still run, but you approve email and SMS in Message Drafter or run the Outreach Agent queue yourself.'}
+        </p>
+      </div>
+
+      <div className="flex shrink-0 flex-col items-center gap-1.5 pt-0.5">
+        <Switch
+          id="outreach-automation-toggle"
+          checked={automatic}
+          onCheckedChange={handleCheckedChange}
+          disabled={disabled}
+          aria-label={`${OUTREACH_AUTOMATION_LABELS.automatic} pipeline ${automatic ? 'on' : 'off'}`}
+          className="data-[state=checked]:bg-[var(--text-primary)] data-[state=unchecked]:bg-[var(--border-strong)]"
+        />
+        <span className="text-[10px] font-medium uppercase tracking-[0.06em] text-[var(--text-tertiary)]">
+          {automatic ? 'Auto' : 'Manual'}
+        </span>
+      </div>
     </div>
   )
 }

@@ -115,14 +115,14 @@ export function onboardingSuccessLabel(notice: OnboardingSuccessNotice): string 
 export function onboardingSuccessHref(notice: OnboardingSuccessNotice): string {
   switch (notice.kind) {
     case 'import':
-      return notice.entity === 'leads' ? '/admin/pipeline' : '/admin/clients'
+      return notice.entity === 'leads' ? '/admin/crm/pipeline' : '/admin/clients'
     case 'client':
       return '/admin/clients'
     case 'deal':
     case 'project':
       return '/admin/clients'
     case 'lead':
-      return '/admin/pipeline'
+      return '/admin/crm/pipeline'
     default:
       return '/admin/dashboard'
   }

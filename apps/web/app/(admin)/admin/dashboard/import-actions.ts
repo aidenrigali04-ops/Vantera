@@ -260,7 +260,7 @@ export async function importLeadsFromCsv(
 
   if (imported > 0) {
     await finalizeOnboardingIfOwner(session.accountId, session.role)
-    revalidatePath('/admin/pipeline')
+    revalidatePath('/admin/crm/pipeline')
     revalidatePath('/admin/dashboard')
   }
 

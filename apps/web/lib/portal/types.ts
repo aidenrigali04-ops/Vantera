@@ -107,6 +107,7 @@ export type PortalAccessState = {
   portalUrl: string
   portalLoginUrl: string
   portalAccess: boolean
+  portalAccountCreatedAt: Date | null
   portalInvitedAt: Date | null
   portalLastLoginAt: Date | null
   email: string | null

@@ -130,7 +130,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
             Create {labels.record.toLowerCase()}
             <CommandShortcut>⇧J</CommandShortcut>
           </CommandItem>
-          <CommandItem onSelect={() => navigate('/admin/pipeline?action=lead')}>
+          <CommandItem onSelect={() => navigate('/admin/crm/pipeline?action=lead')}>
             <TrendingUp className="mr-2 h-4 w-4" />
             Add lead
           </CommandItem>

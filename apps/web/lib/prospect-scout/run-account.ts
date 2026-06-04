@@ -97,9 +97,11 @@ export async function runAccountProspectScout(
   }
 
   if (enrolled > 0) {
-    void runAutomaticPipelineForAccount(accountId).catch((error) => {
+    try {
+      await runAutomaticPipelineForAccount(accountId)
+    } catch (error) {
       console.error('[prospect-scout] automatic pipeline failed', error)
-    })
+    }
   }
 
   return { accountId, searchesRun, found, enrolled, runs }

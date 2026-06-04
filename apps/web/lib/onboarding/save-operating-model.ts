@@ -23,7 +23,7 @@ export async function saveOperatingModel(
 
   revalidatePath('/admin/dashboard')
   revalidatePath('/admin/clients')
-  revalidatePath('/admin/pipeline')
+  revalidatePath('/admin/crm/pipeline')
 
   return { success: true, data: { vertical: model.vertical } }
 }

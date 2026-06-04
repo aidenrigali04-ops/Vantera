@@ -9,7 +9,6 @@ import {
   CheckSquare,
   ClipboardList,
   CreditCard,
-  ExternalLink,
   FileCheck,
   FileText,
   FolderKanban,
@@ -71,12 +70,11 @@ export type AdminNavHub = {
 /** Sidebar — four destinations only. Everything else lives in dashboard hubs. */
 export const ADMIN_NAV_SIDEBAR: AdminNavItem[] = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, href: '/admin/dashboard' },
-  { id: 'clients', label: 'CRM', icon: Users, href: '/admin/clients' },
   {
-    id: 'pipeline',
-    label: 'Pipeline',
-    icon: Handshake,
-    href: '/admin/pipeline',
+    id: 'clients',
+    label: 'CRM',
+    icon: Users,
+    href: '/admin/crm/pipeline',
     tourAnchor: 'nav-pipeline',
   },
   {
@@ -107,40 +105,11 @@ export const ADMIN_NAV_SIDEBAR_SECONDARY: AdminNavItem[] = [
 export const ADMIN_NAV_HUBS: AdminNavHub[] = [
   {
     id: 'clients',
-    title: 'Clients',
-    description: 'Relationships, portal access, and billing in one place.',
+    title: 'CRM',
+    description: 'Pipeline and active clients — use the tabs under CRM. Portal and billing are in Settings.',
     sidebarId: 'clients',
-    primary: { id: 'contacts', label: 'Open contacts', href: '/admin/clients', icon: Users },
-    related: [
-      {
-        id: 'portal',
-        label: 'Client portal',
-        href: '/admin/portal',
-        icon: ExternalLink,
-        tourAnchor: 'nav-portal',
-      },
-      { id: 'billing', label: 'Billing', href: '/admin/billing', icon: CreditCard },
-    ],
-  },
-  {
-    id: 'pipeline',
-    title: 'Pipeline',
-    description: 'Deals plus AI SDR agents — find, contact, and nurture around the clock.',
-    sidebarId: 'pipeline',
-    primary: {
-      id: 'sdr-agents',
-      label: 'Build SDR agents',
-      href: '/admin/outreach/agents',
-      icon: Bot,
-      tourAnchor: 'nav-sdr-agents',
-    },
-    related: [
-      { id: 'deals', label: 'View deals', href: '/admin/pipeline', icon: Handshake },
-      { id: 'aspire', label: 'Aspire', href: '/admin/outreach/aspire', icon: Telescope },
-      { id: 'linkedin', label: 'LinkedIn', href: '/admin/outreach/linkedin', icon: Share2 },
-      { id: 'campaigns', label: 'Campaigns', href: '/admin/outreach/campaigns', icon: Megaphone },
-      { id: 'email', label: 'Email', href: '/admin/outreach/email', icon: Mail },
-    ],
+    primary: { id: 'pipeline', label: 'Pipeline', href: '/admin/crm/pipeline', icon: Handshake },
+    related: [],
   },
   {
     id: 'projects',
@@ -178,13 +147,9 @@ export const ADMIN_NAV_HUBS: AdminNavHub[] = [
   {
     id: 'workspace',
     title: 'Workspace',
-    description: 'Inbox, calendar, integrations, and settings.',
+    description: 'Inbox and day-to-day ops. Calendar, portal, billing, and integrations live in Settings.',
     primary: { id: 'inbox', label: 'Open inbox', href: '/admin/inbox', icon: Inbox },
-    related: [
-      { id: 'calendar', label: 'Calendar', href: '/admin/calendar', icon: Calendar },
-      { id: 'integrations', label: 'Integrations', href: '/admin/integrations', icon: Plug },
-      { id: 'settings', label: 'Settings', href: '/admin/settings', icon: Settings },
-    ],
+    related: [],
   },
 ]
 
@@ -235,6 +200,22 @@ export function isSidebarItemActive(pathname: string, item: AdminNavItem): boole
 
   if (item.id === 'linkedin' && pathname.startsWith('/admin/outreach/linkedin')) {
     return true
+  }
+
+  if (item.id === 'clients') {
+    return (
+      pathname.startsWith('/admin/crm') ||
+      pathname.startsWith('/admin/pipeline') ||
+      pathname.startsWith('/admin/clients')
+    )
+  }
+
+  if (item.id === 'settings' && item.href) {
+    if (pathname.startsWith('/admin/portal')) return true
+    if (pathname.startsWith('/admin/billing')) return true
+    if (pathname.startsWith('/admin/calendar')) return true
+    if (pathname.startsWith('/admin/integrations')) return true
+    return isAdminNavItemActive(pathname, item.href)
   }
 
   if (item.id === 'outreach' && pathname.startsWith('/admin/outreach')) {
@@ -324,6 +305,9 @@ export function getRoadmapAdminNavItems(): AdminNavItem[] {
 
 export function resolveAdminPageTitle(pathname: string): string {
   if (pathname.startsWith('/admin/dashboard')) return 'Dashboard'
+  if (pathname.startsWith('/admin/crm/pipeline')) return 'Pipeline'
+  if (pathname.startsWith('/admin/crm/clients')) return 'Active clients'
+  if (pathname.startsWith('/admin/crm')) return 'CRM'
   if (pathname.startsWith('/admin/clients')) return 'Clients'
   if (pathname.startsWith('/admin/pipeline')) return 'Pipeline'
   if (pathname.startsWith('/admin/records')) return 'Projects'
@@ -363,13 +347,19 @@ export function resolveWorkspacePrimaryAction(pathname: string): WorkspaceHeader
   if (pathname.startsWith('/admin/dashboard')) {
     return { label: 'Add client', href: '/admin/clients' }
   }
-  if (pathname.startsWith('/admin/clients') || pathname.startsWith('/admin/portal')) {
-    return { label: 'New contact', href: '/admin/clients' }
+  if (pathname.startsWith('/admin/crm/clients') || pathname.startsWith('/admin/clients')) {
+    return { label: 'New contact', href: '/admin/crm/clients' }
+  }
+  if (pathname.startsWith('/admin/crm/pipeline') || pathname.startsWith('/admin/pipeline')) {
+    return { label: 'Add lead', href: '/admin/crm/pipeline' }
+  }
+  if (pathname.startsWith('/admin/portal')) {
+    return { label: 'New contact', href: '/admin/crm/clients' }
   }
   if (pathname.startsWith('/admin/outreach/agents')) {
     return { label: 'Configure agents', href: '/admin/outreach/agents/setup' }
   }
-  if (pathname.startsWith('/admin/pipeline') || pathname.startsWith('/admin/outreach')) {
+  if (pathname.startsWith('/admin/outreach')) {
     return { label: 'Open agents', href: '/admin/outreach/agents' }
   }
   if (pathname.startsWith('/admin/records') || pathname.startsWith('/admin/deliverables')) {

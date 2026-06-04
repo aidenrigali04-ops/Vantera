@@ -19,7 +19,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Bell, Menu, MoreHorizontal, Plus, Search } from 'lucide-react'
+import { Bell, Inbox, Menu, MoreHorizontal, Plus, Search } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
@@ -105,6 +105,19 @@ export function TopHeader({ session, showDemoWorkspace = false }: TopHeaderProps
             </Link>
           </Button>
         ) : null}
+
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="h-9 w-9"
+          aria-label="Inbox"
+          asChild
+        >
+          <Link href="/admin/inbox">
+            <Inbox className="h-5 w-5" />
+          </Link>
+        </Button>
 
         <Button
           type="button"

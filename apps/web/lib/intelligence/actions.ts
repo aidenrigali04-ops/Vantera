@@ -34,7 +34,7 @@ export async function dismissEmbeddedInsight(signalId: string): Promise<ActionRe
 
   revalidatePath('/admin/dashboard')
   revalidatePath('/admin/clients')
-  revalidatePath('/admin/pipeline')
+  revalidatePath('/admin/crm/pipeline')
   revalidatePath('/admin/ai-brain')
 
   return { success: true, data: undefined }

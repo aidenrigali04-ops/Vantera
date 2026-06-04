@@ -102,7 +102,7 @@ export async function convertLeadToClient(leadId: string): Promise<ActionResult<
   })
 
   revalidatePath('/admin/clients')
-  revalidatePath('/admin/pipeline')
+  revalidatePath('/admin/crm/pipeline')
 
   return { success: true, data: { contactId: result.id } }
 }

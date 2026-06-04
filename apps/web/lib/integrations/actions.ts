@@ -29,7 +29,7 @@ export async function connectCrmAction(
   if (!result.ok) return { success: false, error: result.reason }
 
   revalidatePath('/admin/integrations')
-  revalidatePath('/admin/pipeline')
+  revalidatePath('/admin/crm/pipeline')
   return { success: true, data: undefined }
 }
 
@@ -60,7 +60,7 @@ export async function importCrmLeadsAction(
     limit,
   )
 
-  revalidatePath('/admin/pipeline')
+  revalidatePath('/admin/crm/pipeline')
   revalidatePath('/admin/dashboard')
   return { success: true, data: result }
 }
@@ -81,6 +81,6 @@ export async function exportCrmLeadsAction(
     leadIds,
   )
 
-  revalidatePath('/admin/pipeline')
+  revalidatePath('/admin/crm/pipeline')
   return { success: true, data: result }
 }

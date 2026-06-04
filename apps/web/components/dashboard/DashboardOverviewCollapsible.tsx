@@ -91,7 +91,7 @@ export function DashboardOverviewCollapsible({
             <OverviewBlock
               title="Pipeline snapshot"
               subtitle="Open opportunities by stage"
-              href="/admin/pipeline"
+              href="/admin/crm/pipeline"
               linkLabel="View pipeline"
               tourAnchor="dashboard-pipeline"
             >
@@ -111,7 +111,7 @@ export function DashboardOverviewCollapsible({
               <OverviewBlock
                 title="Team workload"
                 subtitle="Overdue tasks and active delivery"
-                href="/admin/pipeline"
+                href="/admin/crm/pipeline"
                 linkLabel="View tasks"
               >
                 <DashboardTeamWorkloadPanel projects={snapshot.projects} actionFeed={actionFeed} />

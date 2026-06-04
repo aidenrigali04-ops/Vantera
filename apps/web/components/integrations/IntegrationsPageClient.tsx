@@ -62,7 +62,7 @@ const CREDENTIAL_FIELDS: Record<
   ],
 }
 
-export function IntegrationsPageClient({ connections }: Props) {
+export function CrmConnectionsSection({ connections }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [openProvider, setOpenProvider] = useState<CrmProvider | null>(null)
@@ -144,20 +144,10 @@ export function IntegrationsPageClient({ connections }: Props) {
   }
 
   return (
-    <div className="space-y-8">
-      <PageHeader
-        title="Integrations"
-        description="Connect HubSpot, GoHighLevel, and Salesforce to import and export pipeline leads."
-        actions={
-          <Button variant="outline" asChild>
-            <Link href="/admin/settings">Workspace settings</Link>
-          </Button>
-        }
-      />
-
-      <section className="rounded-xl border border-stone-200 bg-stone-50/60 p-5">
-        <h3 className="text-sm font-semibold text-stone-900">Vantera plan</h3>
-        <p className="mt-1 text-sm text-stone-600">
+    <div className="space-y-6">
+      <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)]/60 p-5">
+        <h3 className="text-sm font-semibold text-[var(--text-primary)]">Vantera plan</h3>
+        <p className="mt-1 text-sm text-[var(--text-secondary)]">
           Upgrade to Team, manage your subscription, or update your payment method in Stripe.
         </p>
         <Button variant="outline" size="sm" className="mt-4" asChild>
@@ -165,9 +155,9 @@ export function IntegrationsPageClient({ connections }: Props) {
         </Button>
       </section>
 
-      <section className="rounded-xl border border-stone-200 bg-stone-50/60 p-5">
-        <h3 className="text-sm font-semibold text-stone-900">CSV import / export</h3>
-        <p className="mt-1 text-sm text-stone-600">
+      <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)]/60 p-5">
+        <h3 className="text-sm font-semibold text-[var(--text-primary)]">CSV import / export</h3>
+        <p className="mt-1 text-sm text-[var(--text-secondary)]">
           No CRM connected yet? Import leads from a spreadsheet or export your pipeline anytime.
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
@@ -191,7 +181,7 @@ export function IntegrationsPageClient({ connections }: Props) {
           return (
             <article
               key={provider}
-              className="flex flex-col rounded-xl border border-stone-200 bg-white shadow-sm"
+              className="card-surface flex flex-col"
             >
               <div className="p-5">
                 <div className="flex items-start justify-between gap-3">
@@ -311,6 +301,23 @@ export function IntegrationsPageClient({ connections }: Props) {
           )
         })}
       </div>
+    </div>
+  )
+}
+
+export function IntegrationsPageClient(props: Props) {
+  return (
+    <div className="space-y-8">
+      <PageHeader
+        title="Integrations"
+        description="CRM connections, outreach email domain, and data import tools."
+        actions={
+          <Button variant="outline" asChild>
+            <Link href="/admin/settings">Workspace settings</Link>
+          </Button>
+        }
+      />
+      <CrmConnectionsSection {...props} />
     </div>
   )
 }

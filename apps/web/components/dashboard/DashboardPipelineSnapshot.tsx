@@ -66,7 +66,7 @@ export function DashboardPipelineSnapshot({ deals, showCleanSlate = false }: Pro
           </button>
         ) : (
           <Link
-            href="/admin/pipeline"
+            href="/admin/crm/pipeline"
             className="mt-4 inline-flex h-9 items-center rounded-lg border border-stone-200 bg-white px-4 text-[13px] font-medium text-stone-800 hover:bg-stone-50"
           >
             Open pipeline
@@ -90,7 +90,7 @@ export function DashboardPipelineSnapshot({ deals, showCleanSlate = false }: Pro
           {stages.map((stage) => (
             <tr key={stage.label} className="group transition-colors hover:bg-stone-50/80">
               <td className="py-3 pr-4">
-                <Link href="/admin/pipeline" className="inline-flex items-center gap-2">
+                <Link href="/admin/crm/pipeline" className="inline-flex items-center gap-2">
                   <span
                     className="size-2 shrink-0 rounded-full"
                     style={{ backgroundColor: stage.color }}

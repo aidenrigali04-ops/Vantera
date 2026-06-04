@@ -1,9 +1,1 @@
-import { redirect } from 'next/navigation'
-
-type Props = {
-  params: { id: string }
-}
-
-export default function CrmLeadDetailRedirect({ params }: Props) {
-  redirect(`/admin/pipeline/${params.id}`)
-}
+export { default } from '@/app/(admin)/admin/(intelligence)/pipeline/[id]/page'

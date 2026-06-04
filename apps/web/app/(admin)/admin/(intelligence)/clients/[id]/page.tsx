@@ -49,6 +49,7 @@ export default async function ActiveClientDetailPage({ params }: Props) {
         portalUrl: portalMeta.portalUrl,
         portalLoginUrl: portalMeta.portalLoginUrl,
         portalAccess: contact.portalAccess,
+        portalAccountCreatedAt: contact.portalAccountCreatedAt,
         portalInvitedAt: contact.portalInvitedAt,
         portalLastLoginAt: contact.portalLastLoginAt,
         email: contact.email,

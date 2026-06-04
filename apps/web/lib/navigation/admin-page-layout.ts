@@ -2,6 +2,7 @@
 export function isAdminFullBleedPath(pathname: string): boolean {
   const isSdrSetupWizard = pathname.startsWith('/admin/outreach/agents/setup')
   return (
+    pathname.startsWith('/admin/crm/pipeline') ||
     pathname.startsWith('/admin/pipeline') ||
     pathname.startsWith('/admin/records') ||
     pathname.startsWith('/admin/outreach/aspire') ||

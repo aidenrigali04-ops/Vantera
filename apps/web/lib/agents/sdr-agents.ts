@@ -41,7 +41,7 @@ export const SDR_AGENT_DEFINITIONS: SdrAgentDefinition[] = [
     tagline: 'Scores interest and flags follow-ups',
     description:
       'Combines ICP fit with engagement signals daily, updates lead scores, and surfaces who to contact next in your action feed.',
-    href: '/admin/pipeline',
+    href: '/admin/crm/pipeline',
     ctaLabel: 'View pipeline',
     iconName: 'brain',
   },

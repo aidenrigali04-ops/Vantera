@@ -67,10 +67,11 @@ export function PortalDomainSetupGuide({
             is <strong>Verified</strong>.
           </li>
           <li>
-            In Supabase → Authentication → Redirect URLs, add{' '}
+            Client invites use a one-time setup link at{' '}
             <code className="break-all rounded bg-stone-100 px-1 text-xs">
-              https://{example}/auth/portal-callback
+              https://{example}/auth/portal-activate
             </code>
+            — separate from your Vantera dashboard login.
           </li>
         </ol>
       </CollapsibleContent>

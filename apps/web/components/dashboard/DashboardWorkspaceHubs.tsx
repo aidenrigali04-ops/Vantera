@@ -54,15 +54,14 @@ function HubCard({ hub }: { hub: AdminNavHub }) {
 
       {hub.related.length > 0 ? (
         <div className={cn('mt-3 flex flex-wrap gap-1', !inSidebar && 'mt-4 border-t border-stone-100 pt-3')}>
-          {inSidebar ? (
-            <p className="mb-1 w-full text-[11px] font-medium uppercase tracking-[0.06em] text-stone-400">
-              Also here
-            </p>
-          ) : null}
           {hub.related.map((link) => (
             <HubRelatedLink key={link.id} link={link} />
           ))}
         </div>
+      ) : inSidebar ? (
+        <p className="mt-3 text-[12px] text-stone-500">
+          Open from the sidebar — section tabs where needed, or Settings for portal and billing.
+        </p>
       ) : null}
     </article>
   )

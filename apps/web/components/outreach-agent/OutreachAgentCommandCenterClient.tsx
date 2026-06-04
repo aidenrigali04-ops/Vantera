@@ -170,7 +170,7 @@ export function OutreachAgentCommandCenterClient({
 
       if (failed > 0) {
         toast.error(
-          `${failed} step${failed === 1 ? '' : 's'} failed to send — check Settings → Outreach email domain and campaign lead emails`,
+          `${failed} step${failed === 1 ? '' : 's'} failed to send — check Integrations → Email domain and campaign lead emails`,
         )
       } else if (sent > 0) {
         toast.success(`Processed queue — ${sent} message${sent === 1 ? '' : 's'} sent`)

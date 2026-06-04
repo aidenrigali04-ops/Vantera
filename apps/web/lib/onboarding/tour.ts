@@ -75,7 +75,7 @@ function isStepEligible(accountId: string, id: TourStepId, ctx: TourContext): bo
     case 'pipeline_revenue':
       return ctx.pathname === '/admin/dashboard' && ctx.pipelineSectionVisible
     case 'prospect_pipeline':
-      return ctx.pathname.startsWith('/admin/pipeline')
+      return ctx.pathname.startsWith('/admin/crm/pipeline')
     case 'client_portal':
       return ctx.pathname.startsWith('/admin/portal')
     default:

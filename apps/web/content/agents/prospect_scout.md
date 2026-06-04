@@ -1,6 +1,6 @@
 # Prospect Scout
 
-Automated lead discovery for SDR agents. Runs on schedule via `sdr-agent-find` (Trigger).
+Automated lead discovery for SDR agents. When outreach mode is **Automatic**, runs daily at **8:00 AM** in the workspace timezone via Trigger task `sdr-prospect-scout` (hourly cron, per-account slot).
 
 ## Data source
 

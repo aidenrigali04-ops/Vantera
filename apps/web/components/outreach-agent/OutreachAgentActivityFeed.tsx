@@ -127,7 +127,7 @@ export function OutreachAgentActivityFeed({ events }: Props) {
             </div>
             {event.leadId ? (
               <Link
-                href={`/admin/pipeline?leadId=${event.leadId}`}
+                href={`/admin/crm/pipeline?leadId=${event.leadId}`}
                 className="shrink-0 text-xs font-medium text-[var(--accent)] hover:underline"
               >
                 View

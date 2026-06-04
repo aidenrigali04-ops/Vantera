@@ -445,7 +445,7 @@ export function LinkedInPageClient({
             </p>
           </div>
           <Button variant="outline" size="sm" asChild className="shrink-0">
-            <Link href="/admin/pipeline">View full pipeline</Link>
+            <Link href="/admin/crm/pipeline">View full pipeline</Link>
           </Button>
         </div>
 
@@ -494,7 +494,7 @@ export function LinkedInPageClient({
           rows={sortedLeads}
           selectedIds={selectedLeadIds}
           onSelectionChange={setSelectedLeadIds}
-          onRowClick={(row) => router.push(`/admin/pipeline/${row.id}`)}
+          onRowClick={(row) => router.push(`/admin/crm/pipeline/${row.id}`)}
           sort={sort}
           onSortChange={setSort}
           loading={isLoading}
@@ -503,7 +503,7 @@ export function LinkedInPageClient({
               title="No leads to enroll"
               description="Add prospects to your pipeline or import from Aspire, then return here to start a sequence."
               actionLabel="Go to pipeline"
-              onAction={() => router.push('/admin/pipeline')}
+              onAction={() => router.push('/admin/crm/pipeline')}
             />
           }
         />

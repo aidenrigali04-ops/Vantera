@@ -100,10 +100,10 @@ export async function getOperationalActionFeed(accountId: string, limit = 8): Pr
       href: metadata?.campaignId
         ? `/admin/outreach/campaigns/${metadata.campaignId}`
         : activity.leadId
-          ? `/admin/pipeline/${activity.leadId}`
+          ? `/admin/crm/pipeline/${activity.leadId}`
           : activity.contactId
             ? `/admin/clients/${activity.contactId}`
-            : '/admin/pipeline',
+            : '/admin/crm/pipeline',
       createdAt: activity.createdAt,
     })
   }
@@ -128,7 +128,7 @@ export async function getOperationalActionFeed(accountId: string, limit = 8): Pr
       type: 'stalled_deal',
       title: `Stalled prospect: ${lead.company}`,
       subtitle: `No activity in 7+ days · ${lead.relationshipStatus}`,
-      href: `/admin/pipeline/${lead.id}`,
+      href: `/admin/crm/pipeline/${lead.id}`,
       createdAt: lead.updatedAt,
     })
   }
@@ -165,14 +165,14 @@ export async function getOperationalActionFeed(accountId: string, limit = 8): Pr
       rawSignalType === 'aspire_icp_match' &&
       payload.source === 'prospect_scout'
     ) {
-      href = '/admin/pipeline'
+      href = '/admin/crm/pipeline'
     } else if (rawSignalType === 'aspire_icp_match' && payload.searchId) {
       href = `/admin/outreach/aspire?searchId=${payload.searchId}`
     } else if (payload.campaignId) {
       campaignId = String(payload.campaignId)
       href = `/admin/outreach/campaigns/${payload.campaignId}`
     } else if (payload.leadId) {
-      href = `/admin/pipeline/${payload.leadId}`
+      href = `/admin/crm/pipeline/${payload.leadId}`
     } else if (payload.contactId) {
       href = `/admin/clients/${payload.contactId}`
     }

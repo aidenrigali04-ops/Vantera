@@ -323,7 +323,7 @@ export async function notifyIcpMatches(
     severity: 'yellow',
     headline: `${count} new ICP-matched prospects from ${searchName}`,
     actionLabel: 'View pipeline',
-    actionPayload: { searchId, source: 'prospect_scout', href: '/admin/pipeline' },
+    actionPayload: { searchId, source: 'prospect_scout', href: '/admin/crm/pipeline' },
     expiresInDays: 7,
   })
 }

@@ -46,6 +46,13 @@ export function derivePortalLoginPath(
   return `${path}?${params.toString()}`
 }
 
+/** One-time link for clients to set their portal password (separate from admin auth). */
+export function derivePortalActivateUrl(portalBaseUrl: string, rawToken: string): string {
+  const base = portalBaseUrl.replace(/\/$/, '')
+  const params = new URLSearchParams({ token: rawToken })
+  return `${base}/auth/portal-activate?${params.toString()}`
+}
+
 /** Client sign-in URL (share with clients or use in invite emails). */
 export function derivePortalLoginUrl(
   slug: string,

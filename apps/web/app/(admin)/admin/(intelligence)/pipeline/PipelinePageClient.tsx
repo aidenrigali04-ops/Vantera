@@ -519,7 +519,7 @@ export function PipelinePageClient({
             rows={sortedLeads}
             selectedIds={selectedIds}
             onSelectionChange={setSelectedIds}
-            onRowClick={(row) => router.push(`/admin/pipeline/${row.id}`)}
+            onRowClick={(row) => router.push(`/admin/crm/pipeline/${row.id}`)}
             sort={sort}
             onSortChange={setSort}
             loading={isLoading}

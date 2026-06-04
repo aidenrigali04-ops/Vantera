@@ -13,7 +13,10 @@ import {
   setAdminSession,
   setPortalSession,
 } from '@/lib/auth/session'
+import { db } from '@/lib/db/client'
 import { getAccount } from '@/lib/db/queries'
+import { findPortalContactForLogin } from '@/lib/portal/contact-auth'
+import { verifyPortalPassword } from '@/lib/portal/password'
 import { derivePortalLoginPath } from '@/lib/portal/url'
 import type { ActionResult } from '@/lib/auth/types'
 import type { UserRole } from '@/lib/auth/constants'
@@ -23,6 +26,8 @@ import { DEMO_WORKSPACE_NAME } from '@/lib/onboarding/constants'
 import { AUTH_DASHBOARD_PATH, AUTH_ONBOARDING_PATH } from '@/lib/auth/routes'
 import { seedSampleWorkspace } from '@/lib/sample-data/seed'
 import { headers } from 'next/headers'
+import { contacts } from '@vantera/db'
+import { eq } from 'drizzle-orm'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
 
@@ -48,11 +53,6 @@ type AdminUserRow = {
   id: string
   email: string
   role: string
-}
-
-type PortalContactRow = {
-  id: string
-  email: string | null
 }
 
 type AdminUserWithAccount = AdminUserRow & { account_id: string; is_active: boolean }
@@ -165,27 +165,6 @@ async function findActiveAdminUser(accountId: string, email: string): Promise<Ad
   return { id: data.id, email: data.email, role: data.role }
 }
 
-async function findPortalContact(accountId: string, email: string): Promise<PortalContactRow | null> {
-  const admin = getSupabaseAdmin()
-  const normalized = email.toLowerCase().trim()
-  const { data, error } = await admin
-    .from('contacts')
-    .select('id, email, portal_access, deleted_at, account_id, created_at')
-    .eq('account_id', accountId)
-    .eq('email', normalized)
-    .eq('portal_access', true)
-    .is('deleted_at', null)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-
-  if (error || !data) {
-    return null
-  }
-
-  return { id: data.id, email: data.email }
-}
-
 export async function adminLoginAction(
   input: z.infer<typeof loginSchema>,
 ): Promise<ActionResult<{ redirectTo: string }>> {
@@ -279,36 +258,35 @@ export async function portalLoginAction(
     return { success: false, error: 'Invalid email or password' }
   }
 
-  const supabase = createSupabaseServerClient()
-  const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-    email: validated.data.email,
-    password: validated.data.password,
-  })
-
-  if (authError || !authData.user) {
-    return { success: false, error: 'Invalid email or password' }
-  }
-
-  const contact = await findPortalContact(account.id, validated.data.email)
+  const normalizedEmail = validated.data.email.toLowerCase().trim()
+  const contact = await findPortalContactForLogin(account.id, normalizedEmail)
 
   if (!contact) {
-    await supabase.auth.signOut()
     return { success: false, error: 'Invalid email or password' }
   }
 
-  await getSupabaseAdmin()
-    .from('contacts')
-    .update({ portal_last_login_at: new Date().toISOString() })
-    .eq('id', contact.id)
+  const passwordOk = await verifyPortalPassword(
+    validated.data.password,
+    contact.portalPasswordHash,
+  )
+
+  if (!passwordOk) {
+    return { success: false, error: 'Invalid email or password' }
+  }
+
+  await db
+    .update(contacts)
+    .set({ portalLastLoginAt: new Date(), updatedAt: new Date() })
+    .where(eq(contacts.id, contact.id))
 
   await setPortalSession({
     type: 'portal',
     contactId: contact.id,
     accountId: account.id,
-    email: contact.email ?? validated.data.email,
+    email: contact.email ?? normalizedEmail,
   })
 
-  redirect('/portal')
+  return { success: true, data: { redirectTo: '/portal' } }
 }
 
 export async function adminLogoutAction(): Promise<void> {
@@ -320,8 +298,6 @@ export async function adminLogoutAction(): Promise<void> {
 
 export async function portalLogoutAction(): Promise<void> {
   const session = await getPortalSession()
-  const supabase = createSupabaseServerClient()
-  await supabase.auth.signOut()
   await clearPortalSession()
 
   if (session?.accountId) {

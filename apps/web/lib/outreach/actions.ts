@@ -308,7 +308,7 @@ export async function launchOutreachCampaign(
 
   revalidatePath('/admin/outreach/campaigns')
   revalidatePath(`/admin/outreach/campaigns/${campaignId}`)
-  revalidatePath('/admin/pipeline')
+  revalidatePath('/admin/crm/pipeline')
 
   return {
     success: true,

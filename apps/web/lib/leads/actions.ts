@@ -55,7 +55,7 @@ export async function createLead(input: CreateLeadInput): Promise<ActionResult<{
 
   await tryCompleteOnboardingForOwner(session.accountId, session.role)
 
-  revalidatePath('/admin/pipeline')
+  revalidatePath('/admin/crm/pipeline')
   revalidatePath('/admin/dashboard')
   return { success: true, data: { id: lead!.id } }
 }
@@ -78,8 +78,8 @@ export async function updateLead(
     .set({ ...patch, updatedAt: new Date() })
     .where(and(eq(leads.id, leadId), eq(leads.accountId, session.accountId)))
 
-  revalidatePath('/admin/pipeline')
-  revalidatePath(`/admin/pipeline/${leadId}`)
+  revalidatePath('/admin/crm/pipeline')
+  revalidatePath(`/admin/crm/pipeline/${leadId}`)
   return { success: true, data: undefined }
 }
 
@@ -105,6 +105,6 @@ export async function bulkUpdateLeads(
     )
     .returning({ id: leads.id })
 
-  revalidatePath('/admin/pipeline')
+  revalidatePath('/admin/crm/pipeline')
   return { success: true, data: { updated: result.length } }
 }

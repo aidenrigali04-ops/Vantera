@@ -83,7 +83,7 @@ export function LeadDetailClient({ lead, profile, activities, insights }: Props)
 
   return (
     <DetailShell className="mx-auto w-full max-w-[1280px] px-4 py-5 md:px-8 md:py-6">
-      <DetailBackLink href="/admin/pipeline" label="Back to pipeline" />
+      <DetailBackLink href="/admin/crm/pipeline" label="Back to pipeline" />
 
       <DetailHeader
         eyebrow="Prospect"

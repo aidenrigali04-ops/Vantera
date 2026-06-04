@@ -79,6 +79,19 @@ export function PortalAccessPanel({ contact, portal }: Props) {
           <dt className="text-[var(--text-secondary)]">Portal URL</dt>
           <dd className="mt-0.5 break-all font-medium text-[var(--text-primary)]">{loginUrl}</dd>
         </div>
+        {contact.portalAccountCreatedAt ? (
+          <div>
+            <dt className="text-[var(--text-secondary)]">Portal account</dt>
+            <dd className="mt-0.5 text-[var(--text-primary)]">
+              Created {formatRelativeTime(contact.portalAccountCreatedAt)}
+            </dd>
+          </div>
+        ) : contact.portalAccess ? (
+          <div>
+            <dt className="text-[var(--text-secondary)]">Portal account</dt>
+            <dd className="mt-0.5 text-[var(--text-primary)]">Awaiting password setup</dd>
+          </div>
+        ) : null}
         {contact.portalInvitedAt ? (
           <div>
             <dt className="text-[var(--text-secondary)]">Last invited</dt>

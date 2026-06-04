@@ -27,7 +27,16 @@ import {
   writeOperatingModelId,
 } from '@/lib/onboarding/operating-model-storage'
 import { cn } from '@/lib/utils'
-import { ExternalLink, Mail, Palette, Settings2, Users } from 'lucide-react'
+import {
+  Calendar,
+  CreditCard,
+  ExternalLink,
+  Mail,
+  Palette,
+  Plug,
+  Settings2,
+  Users,
+} from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState, useTransition } from 'react'
@@ -73,14 +82,21 @@ const TIMEZONES = [
 
 const INVITE_ROLES = ['admin', 'manager', 'staff', 'technician', 'agent'] as const
 
-const NAV = [
+const NAV_SECTIONS = [
   { id: 'workspace', label: 'Workspace', icon: Settings2 },
   { id: 'operating-model', label: 'Operating model', icon: Settings2 },
   { id: 'branding', label: 'Branding', icon: Palette },
   { id: 'team', label: 'Team', icon: Users },
 ] as const
 
-type SectionId = (typeof NAV)[number]['id']
+const NAV_LINKS = [
+  { href: '/admin/portal', label: 'Client portal', icon: ExternalLink, tourAnchor: 'nav-portal' },
+  { href: '/admin/billing', label: 'Billing', icon: CreditCard },
+  { href: '/admin/calendar', label: 'Calendar', icon: Calendar },
+  { href: '/admin/integrations', label: 'Integrations', icon: Plug },
+] as const
+
+type SectionId = (typeof NAV_SECTIONS)[number]['id']
 
 export function SettingsPageClient({
   accountId,
@@ -178,8 +194,11 @@ export function SettingsPageClient({
       />
 
       <div className="grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)] lg:items-start">
-        <nav className="flex gap-2 overflow-x-auto lg:flex-col lg:overflow-visible">
-          {NAV.map(({ id, label, icon: Icon }) => (
+        <nav
+          className="flex gap-2 overflow-x-auto lg:flex-col lg:overflow-visible"
+          aria-label="Settings sections"
+        >
+          {NAV_SECTIONS.map(({ id, label, icon: Icon }) => (
             <button
               key={id}
               type="button"
@@ -195,13 +214,23 @@ export function SettingsPageClient({
               {label}
             </button>
           ))}
-          <Link
-            href="/admin/integrations"
-            className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-[var(--border-default)] bg-[var(--bg-surface)] px-3 py-2 text-[13px] font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-subtle)]"
-          >
-            <ExternalLink className="h-4 w-4" aria-hidden />
-            Integrations
-          </Link>
+          <p className="hidden px-3 pt-3 text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--text-tertiary)] lg:block">
+            Workspace tools
+          </p>
+          {NAV_LINKS.map(({ href, label, icon: Icon, ...linkMeta }) => (
+            <Link
+              key={href}
+              href={href}
+              data-tour={'tourAnchor' in linkMeta ? linkMeta.tourAnchor : undefined}
+              className={cn(
+                'inline-flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors',
+                'border border-[var(--border-default)] bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)]',
+              )}
+            >
+              <Icon className="h-4 w-4" aria-hidden />
+              {label}
+            </Link>
+          ))}
         </nav>
 
         <div className="space-y-6">

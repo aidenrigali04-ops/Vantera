@@ -230,6 +230,8 @@ export const contacts = pgTable(
     state: varchar('state', { length: 50 }),
     zip: varchar('zip', { length: 20 }),
     portalAccess: boolean('portal_access').notNull().default(false),
+    portalPasswordHash: text('portal_password_hash'),
+    portalAccountCreatedAt: timestamptz('portal_account_created_at'),
     portalLastLoginAt: timestamptz('portal_last_login_at'),
     portalInvitedAt: timestamptz('portal_invited_at'),
     ltvCents: bigint('ltv_cents', { mode: 'number' }).notNull().default(0),
@@ -250,6 +252,27 @@ export const contacts = pgTable(
   (table) => ({
     accountIdx: index('contacts_account_id_idx').on(table.accountId),
     emailAccountIdx: index('contacts_email_account_idx').on(table.email, table.accountId),
+  }),
+)
+
+export const portalInviteTokens = pgTable(
+  'portal_invite_tokens',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    contactId: uuid('contact_id')
+      .notNull()
+      .references(() => contacts.id, { onDelete: 'cascade' }),
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    tokenHash: text('token_hash').notNull(),
+    expiresAt: timestamptz('expires_at').notNull(),
+    usedAt: timestamptz('used_at'),
+    createdAt: timestamptz('created_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    contactIdx: index('portal_invite_tokens_contact_idx').on(table.contactId),
+    tokenHashIdx: uniqueIndex('portal_invite_tokens_hash_idx').on(table.tokenHash),
   }),
 )
 

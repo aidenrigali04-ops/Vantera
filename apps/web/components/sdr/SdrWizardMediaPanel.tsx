@@ -76,7 +76,7 @@ function PreviewSchedule() {
           </div>
           <div className="rounded-md border border-[var(--border-default)] bg-[var(--bg-surface)] p-2">
             <p className="text-[var(--text-tertiary)]">Discovery</p>
-            <p className="mt-0.5 font-semibold text-[var(--text-primary)]">Daily 6:00 UTC</p>
+            <p className="mt-0.5 font-semibold text-[var(--text-primary)]">Daily 8:00 AM (your timezone)</p>
           </div>
         </div>
       </div>

@@ -316,8 +316,8 @@ export function SdrSetupWizardClient({ accountVertical }: Props) {
                 })
               }
             >
-              <option value="daily">Daily (6:00 UTC)</option>
-              <option value="weekly">Weekly (Mondays 6:00 UTC)</option>
+              <option value="daily">Daily (8:00 AM workspace time)</option>
+              <option value="weekly">Weekly (Mondays 8:00 AM workspace time)</option>
             </select>
             <p className="mt-1.5 text-[12px] text-[var(--text-secondary)]">
               Qualified prospects are added to your pipeline automatically.

@@ -20,7 +20,7 @@ export async function tryCompleteOnboardingForOwner(
   revalidatePath('/admin', 'layout')
   revalidatePath('/admin/dashboard')
   revalidatePath('/admin/clients')
-  revalidatePath('/admin/pipeline')
+  revalidatePath('/admin/crm/pipeline')
 
   return true
 }
