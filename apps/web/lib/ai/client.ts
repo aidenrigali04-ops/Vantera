@@ -2,7 +2,7 @@
 //
 // Every AI tool in this codebase goes through `callModel()`. It centralizes:
 //   * API key sourcing (env.ANTHROPIC_API_KEY) and "no key → skip" semantics
-//   * Soft timeouts (default 12s)
+//   * Soft timeouts (default 30s — extended for Opus adaptive thinking)
 //   * Telemetry — every successful or failed call is recorded in
 //     `ai_observations` as a `tool_called` row so the learning loop can see
 //     what the brain has been doing
@@ -17,9 +17,11 @@ import { env } from '@/lib/env'
 import { db } from '@/lib/db/client'
 import { aiObservations } from '@vantera/db'
 
-const DEFAULT_MODEL = 'claude-3-5-sonnet-latest'
-const DEFAULT_MAX_TOKENS = 2048
-const DEFAULT_TIMEOUT_MS = 12_000
+const DEFAULT_MODEL = 'claude-opus-4-8'
+const DEFAULT_MAX_TOKENS = 4096
+// Opus 4.8 with adaptive thinking can take longer on complex reasoning passes;
+// 30s gives it room without blocking the request path on simple tool calls.
+const DEFAULT_TIMEOUT_MS = 30_000
 
 export type CallModelArgs = {
   accountId: string
@@ -46,6 +48,7 @@ export type CallModelResult =
       stopReason: string | null
       inputTokens: number
       outputTokens: number
+      thinkingTokens: number
     }
   | {
       ok: false
@@ -73,14 +76,18 @@ export async function callModel(args: CallModelArgs): Promise<CallModelResult> {
       client.messages.create({
         model,
         max_tokens: maxTokens,
+        // Adaptive thinking: Opus 4.8 decides when and how long to reason.
+        // Ignored by older models (they strip unknown params client-side).
+        thinking: { type: 'adaptive' },
         system: args.system,
         messages: [{ role: 'user', content: args.user }],
-      }),
+      } as Parameters<typeof client.messages.create>[0]),
       timeoutMs,
     )
 
     const latencyMs = Date.now() - start
     const text = extractText(response)
+    const thinkingTokens = extractThinkingTokens(response)
     const result: CallModelResult = {
       ok: true,
       text,
@@ -89,6 +96,7 @@ export async function callModel(args: CallModelArgs): Promise<CallModelResult> {
       stopReason: response.stop_reason ?? null,
       inputTokens: response.usage?.input_tokens ?? 0,
       outputTokens: response.usage?.output_tokens ?? 0,
+      thinkingTokens,
     }
 
     await recordObservation(args, result)
@@ -161,6 +169,7 @@ async function recordObservation(args: CallModelArgs, result: CallModelResult): 
         latencyMs: result.ok ? result.latencyMs : (result.latencyMs ?? null),
         inputTokens: result.ok ? result.inputTokens : null,
         outputTokens: result.ok ? result.outputTokens : null,
+        thinkingTokens: result.ok ? result.thinkingTokens : null,
         model: result.ok ? result.model : null,
         errorMessage: result.ok ? null : (result.errorMessage ?? null),
         ...(args.metadata ?? {}),
@@ -176,6 +185,14 @@ function extractText(response: Anthropic.Message): string {
   const block = response.content.find((c) => c.type === 'text')
   if (!block || block.type !== 'text') return ''
   return block.text
+}
+
+function extractThinkingTokens(response: Anthropic.Message): number {
+  // Thinking blocks carry their own token count in the usage field when
+  // the model actually used adaptive thinking for this call.
+  const usage = response.usage as Record<string, unknown> | undefined
+  const thinking = usage?.['thinking_tokens']
+  return typeof thinking === 'number' ? thinking : 0
 }
 
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
