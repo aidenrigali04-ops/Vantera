@@ -43,13 +43,13 @@ export function SdrOutreachAutomationToggle({ value, onChange, disabled }: Props
                 : 'bg-[var(--bg-subtle)] text-[var(--text-secondary)]',
             )}
           >
-            {automatic ? 'On' : 'Off — manual review'}
+            {automatic ? 'On' : 'Off — review before send'}
           </span>
         </div>
         <p className="text-[13px] leading-relaxed text-[var(--text-secondary)]">
           {automatic
-            ? 'Scout pulls leads daily at 8:00 AM, Message Drafter personalizes copy, and Outreach Agent launches campaigns without approval.'
-            : 'Scout and Drafter still run, but you approve email and SMS in Message Drafter or run the Outreach Agent queue yourself.'}
+            ? 'Scout finds leads each morning, drafts personalized email, and launches campaigns. Email sends automatically; LinkedIn uses the Vantera LinkedIn add-on to queue profiles for you to message on LinkedIn.'
+            : 'Scout and Drafter still run, but you approve email and SMS before they send. LinkedIn messages wait in Message Drafter or the LinkedIn hub until you send them on LinkedIn.'}
         </p>
       </div>
 
@@ -63,7 +63,7 @@ export function SdrOutreachAutomationToggle({ value, onChange, disabled }: Props
           className="data-[state=checked]:bg-[var(--text-primary)] data-[state=unchecked]:bg-[var(--border-strong)]"
         />
         <span className="text-[10px] font-medium uppercase tracking-[0.06em] text-[var(--text-tertiary)]">
-          {automatic ? 'Auto' : 'Manual'}
+          {automatic ? 'Auto' : 'Review'}
         </span>
       </div>
     </div>

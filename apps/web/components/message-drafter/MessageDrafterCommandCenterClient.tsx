@@ -69,7 +69,7 @@ function EmptyQueue({ tab }: { tab: SequenceTab }) {
       <p className="mt-1 max-w-sm text-[13px] leading-relaxed text-[var(--text-secondary)]">
         {tab === 'email'
           ? 'When prospects enroll, Message Drafter writes personalized email and SMS for your review.'
-          : 'Manual LinkedIn steps from linked campaigns and SDR sequences appear here when ready to send.'}
+          : 'LinkedIn messages from your campaigns and outreach agent show up here when it is time to send them.'}
       </p>
     </div>
   )
@@ -105,7 +105,7 @@ export function MessageDrafterCommandCenterClient({ initialPayload }: Props) {
 
   const kpiItems = [
     { label: 'Email & SMS pending', value: stats.emailPending, icon: Mail },
-    { label: 'LinkedIn pending', value: stats.linkedInPending, icon: Link2 },
+    { label: 'LinkedIn waiting', value: stats.linkedInPending, icon: Link2 },
     { label: 'Sent this week', value: stats.sentThisWeek, icon: Check },
   ]
 
@@ -231,8 +231,8 @@ export function MessageDrafterCommandCenterClient({ initialPayload }: Props) {
               Review outbound sequences
             </h1>
             <p className="text-[15px] leading-relaxed text-[var(--text-secondary)]">
-              Email and SMS drafts are one workflow — approve to send. LinkedIn is a separate manual
-              sequence — copy the message, connect on LinkedIn, then mark sent.
+              Email and SMS: review here and approve to send automatically. LinkedIn: copy each
+              message, send it on LinkedIn yourself, then mark it done here or in the Vantera add-on.
             </p>
           </div>
           <Button variant="outline" size="sm" asChild>
@@ -248,7 +248,7 @@ export function MessageDrafterCommandCenterClient({ initialPayload }: Props) {
 
       <PageHeader
         title="Draft queues"
-        description="Two separate review flows — automated email/SMS approval and manual LinkedIn steps."
+        description="Email and SMS approval in one place; LinkedIn messages you send yourself on LinkedIn."
       />
 
       <nav
@@ -362,7 +362,7 @@ export function MessageDrafterCommandCenterClient({ initialPayload }: Props) {
             <div className="border-b border-[var(--border-subtle)] px-4 py-3">
               <h3 className="text-sm font-semibold text-[var(--text-primary)]">LinkedIn queue</h3>
               <p className="mt-0.5 text-[12px] text-[var(--text-secondary)]">
-                Copy, send on LinkedIn, then mark complete
+                Copy the note, send on LinkedIn, then mark done
               </p>
             </div>
             <ul className="max-h-[520px] divide-y divide-[var(--border-subtle)] overflow-y-auto">
@@ -528,10 +528,10 @@ function LinkedInDraftDetail({
 
       <div className="flex-1 space-y-5 px-5 py-5">
         <div className="rounded-lg border border-[var(--warning)]/30 bg-[var(--warning-muted)] px-4 py-3 text-[13px] text-[var(--text-primary)]">
-          <p className="font-medium">Manual send on LinkedIn</p>
+          <p className="font-medium">You send this on LinkedIn</p>
           <p className="mt-1 text-[var(--text-secondary)]">
-            Copy the message below, send it on LinkedIn, then mark this step complete so the
-            sequence can advance.
+            Copy the message below, paste it into LinkedIn, send the connection note, then mark it
+            done here so Vantera knows to move to the next step.
           </p>
         </div>
 

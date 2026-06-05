@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vantera LinkedIn</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Vantera LinkedIn</h1>
+      <p id="status">Not connected</p>
+    </header>
+    <section id="settings">
+      <label>
+        Vantera web address
+        <input id="apiBaseUrl" type="url" placeholder="https://your-team.vantera.app" />
+      </label>
+      <p class="hint">Use the same address you use to sign in to Vantera.</p>
+      <label>
+        Connection code
+        <input id="token" type="password" placeholder="Paste code from Vantera" autocomplete="off" />
+      </label>
+      <button id="save" type="button">Save and connect</button>
+    </section>
+    <section id="queue-panel" hidden>
+      <p id="mode-line"></p>
+      <p id="pacing-line"></p>
+      <p id="queue-count"></p>
+      <ul id="queue-preview"></ul>
+      <button id="open-next" type="button">Open next person on LinkedIn</button>
+      <button id="mark-sent" type="button" class="secondary">Mark current message as sent</button>
+    </section>
+    <p id="error" class="error" hidden></p>
+    <script src="api.js"></script>
+    <script src="popup.js"></script>
+  </body>
+</html>

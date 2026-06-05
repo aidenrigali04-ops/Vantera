@@ -41,7 +41,7 @@ export function AgentsAutomationSection({ initialMode, sdrConfigured }: Props) {
         return
       }
       toast.success(
-        next === 'automatic' ? 'Automatic pipeline turned on' : 'Manual review turned on',
+        next === 'automatic' ? 'Automatic outreach turned on' : 'Review before send turned on',
       )
       router.refresh()
     })
@@ -58,10 +58,11 @@ export function AgentsAutomationSection({ initialMode, sdrConfigured }: Props) {
           Outreach mode
         </p>
         <h2 className="mt-1 text-base font-semibold text-[var(--text-primary)]">
-          Automatic or manual
+          Automatic or review before send
         </h2>
         <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-[var(--text-secondary)]">
-          One switch for all agents — flip on for hands-free outreach, off to approve each send.
+          One switch for your outreach agents. Email can send without you; LinkedIn always goes
+          through you on LinkedIn (with help from the Vantera LinkedIn add-on).
         </p>
       </div>
 

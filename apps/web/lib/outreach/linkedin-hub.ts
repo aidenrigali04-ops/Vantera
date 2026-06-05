@@ -1,12 +1,13 @@
-import { db } from '@/lib/db/client'
+import { findExtensionLinkedInQueue } from '@/lib/extension/linkedin/queue'
 import { findLinkedinAccount } from '@/lib/linkedin/queries'
 import { findOutreachCampaigns } from '@/lib/outreach/queries'
 import type { CampaignWithStats } from '@/lib/outreach/types'
 import { getCampaignChannelFocus, getCampaignDeliveryMode } from '@/lib/outreach/types'
 import { isLinkedInDeliveryMode } from '@/lib/outreach/campaign-draft-guidelines'
 import { getSdrDashboardStats } from '@/lib/sdr/queries'
-import { leads, outreachCampaignSteps } from '@vantera/db'
-import { and, asc, eq, isNull, lte, sql } from 'drizzle-orm'
+import { db } from '@/lib/db/client'
+import { leads } from '@vantera/db'
+import { and, eq, isNull, sql } from 'drizzle-orm'
 
 export type LinkedInSetupStepId = 'connect' | 'audience' | 'message' | 'launch'
 
@@ -21,6 +22,7 @@ export type LinkedInSetupStep = {
 
 export type LinkedInManualQueueItem = {
   id: string
+  source: 'campaign' | 'sdr_sequence'
   leadName: string
   campaignName: string
   message: string
@@ -67,59 +69,25 @@ export function filterEmailCampaigns(campaigns: CampaignWithStats[]): CampaignWi
   return campaigns.filter((c) => getCampaignChannelFocus(c.workflow) === 'email')
 }
 
-function leadDisplayName(lead: {
-  firstName: string | null
-  lastName: string | null
-  company: string | null
-}): string {
-  const name = [lead.firstName, lead.lastName].filter(Boolean).join(' ')
-  return name || lead.company || 'Unknown lead'
-}
-
 export async function findLinkedInManualQueue(
   accountId: string,
   limit = 12,
 ): Promise<LinkedInManualQueueItem[]> {
-  const now = new Date()
+  const snapshot = await findExtensionLinkedInQueue(accountId, { limit })
 
-  const rows = await db
-    .select({
-      step: outreachCampaignSteps,
-      lead: leads,
-    })
-    .from(outreachCampaignSteps)
-    .innerJoin(leads, eq(leads.id, outreachCampaignSteps.leadId))
-    .where(
-      and(
-        eq(outreachCampaignSteps.accountId, accountId),
-        eq(outreachCampaignSteps.status, 'pending'),
-        eq(outreachCampaignSteps.channel, 'linkedin'),
-        lte(outreachCampaignSteps.sendAt, now),
-        isNull(leads.deletedAt),
-        sql`COALESCE(${outreachCampaignSteps.metadata}->>'manualSend', 'false') = 'true'`,
-      ),
-    )
-    .orderBy(asc(outreachCampaignSteps.sendAt))
-    .limit(limit)
-
-  const campaignNames = new Map<string, string>()
-  const allCampaigns = await findOutreachCampaigns(accountId)
-  for (const c of filterLinkedInCampaigns(allCampaigns)) {
-    campaignNames.set(c.id, c.name)
-  }
-
-  return rows.map((row) => {
-    const metadata = row.step.metadata as { message?: string } | null
-    return {
-      id: row.step.id,
-      leadName: leadDisplayName(row.lead),
-      campaignName: campaignNames.get(row.step.campaignId) ?? 'Campaign',
-      message: metadata?.message ?? row.step.body,
-      linkedinUrl: row.lead.linkedinUrl,
-      scheduledAt: row.step.sendAt.toISOString(),
-      href: `/admin/outreach/campaigns/${row.step.campaignId}`,
-    }
-  })
+  return snapshot.items.map((item) => ({
+    id: item.id,
+    source: item.source,
+    leadName: item.leadName,
+    campaignName: item.campaignName ?? 'SDR sequence',
+    message: item.message,
+    linkedinUrl: item.linkedinUrl,
+    scheduledAt: item.scheduledAt,
+    href:
+      item.source === 'campaign' && item.campaignId
+        ? `/admin/outreach/campaigns/${item.campaignId}`
+        : '/admin/outreach/agents',
+  }))
 }
 
 function buildSetupSteps(
@@ -131,25 +99,25 @@ function buildSetupSteps(
     {
       id: 'connect',
       title: 'Connect LinkedIn',
-      description: 'Install the browser extension so Vantera can pace outreach safely.',
+      description: 'Install the Vantera LinkedIn add-on in Chrome and link it with a connection code.',
       status: connected ? 'complete' : 'current',
     },
     {
       id: 'audience',
       title: 'Enroll leads with LinkedIn URLs',
-      description: 'Prospects need a LinkedIn profile link on their contact record.',
+      description: 'Each prospect needs a LinkedIn profile link on their contact in Vantera.',
       status: hasLinkedInLeads ? 'complete' : connected ? 'current' : 'pending',
     },
     {
       id: 'message',
       title: 'Write connection notes',
-      description: 'Custom copy or AI draft — manual send from the queue after launch.',
+      description: 'Write your own note or use an AI draft — then send from the queue after launch.',
       status: hasLaunch ? 'complete' : hasLinkedInLeads ? 'current' : 'pending',
     },
     {
       id: 'launch',
       title: 'Launch & send on LinkedIn',
-      description: 'Copy messages from the queue, connect in LinkedIn, mark sent in Vantera.',
+      description: 'Send each note on LinkedIn, then mark it done in Vantera or the add-on.',
       status: hasLaunch ? 'current' : 'pending',
     },
   ]

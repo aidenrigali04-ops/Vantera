@@ -34,6 +34,7 @@ import {
   Mail,
   Palette,
   Plug,
+  LifeBuoy,
   Settings2,
   Users,
 } from 'lucide-react'
@@ -90,6 +91,7 @@ const NAV_SECTIONS = [
 ] as const
 
 const NAV_LINKS = [
+  { href: '/admin/help', label: 'Help Center', icon: LifeBuoy },
   { href: '/admin/portal', label: 'Client portal', icon: ExternalLink, tourAnchor: 'nav-portal' },
   { href: '/admin/billing', label: 'Billing', icon: CreditCard },
   { href: '/admin/calendar', label: 'Calendar', icon: Calendar },

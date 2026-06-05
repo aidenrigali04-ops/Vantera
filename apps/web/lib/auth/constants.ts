@@ -23,6 +23,7 @@ export const ROLE_RANK: Record<UserRole, number> = {
 export const ADMIN_ROUTE_MIN_RANK: Array<{ prefix: string; minRank: number }> = [
   { prefix: '/admin/billing', minRank: ROLE_RANK.owner },
   { prefix: '/admin/settings', minRank: ROLE_RANK.admin },
+  { prefix: '/admin/help', minRank: ROLE_RANK.admin },
   { prefix: '/admin/team', minRank: ROLE_RANK.manager },
   { prefix: '/admin/automations', minRank: ROLE_RANK.manager },
 ]

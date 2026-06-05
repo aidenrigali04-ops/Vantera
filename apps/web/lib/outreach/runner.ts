@@ -237,6 +237,7 @@ export async function processDueCampaignSteps(
         .set({
           metadata: {
             manualSend: true,
+            deliveryMethod: 'extension',
             readyAt: new Date().toISOString(),
             linkedinUrl: lead.linkedinUrl,
             message: personalizedBody,
@@ -263,7 +264,7 @@ export async function processDueCampaignSteps(
         signalType: 'linkedin_step_ready',
         severity: 'yellow',
         headline: `LinkedIn step ready — ${leadDisplayName(lead)}`,
-        recommendation: 'Copy the message and mark sent after connecting on LinkedIn',
+        recommendation: 'Copy the note, send it on LinkedIn, then mark it done in Vantera or the LinkedIn add-on',
         actionLabel: 'Open campaign',
         actionPayload: { campaignId: step.campaignId, stepId: step.id, leadId: lead.id },
         expiresInDays: 7,

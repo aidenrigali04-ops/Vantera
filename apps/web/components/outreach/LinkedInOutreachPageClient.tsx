@@ -1,5 +1,6 @@
 'use client'
 
+import { LinkedInExtensionConnectPanel } from '@/components/outreach/LinkedInExtensionConnectPanel'
 import { LinkedInSetupPipeline } from '@/components/outreach/LinkedInSetupPipeline'
 import { KpiStrip } from '@/components/operational/KpiStrip'
 import { PageHeader } from '@/components/operational/PageHeader'
@@ -62,6 +63,7 @@ export function LinkedInOutreachPageClient({ initialHub }: Props) {
   const router = useRouter()
   const queryClient = useQueryClient()
   const [createOpen, setCreateOpen] = useState(false)
+  const [connectOpen, setConnectOpen] = useState(false)
   const [name, setName] = useState('')
   const [goal, setGoal] = useState<OutreachCampaignGoal>('book_meeting')
   const [deliveryMode, setDeliveryMode] = useState<CampaignDeliveryMode>('single_linkedin')
@@ -107,7 +109,7 @@ export function LinkedInOutreachPageClient({ initialHub }: Props) {
     <div className="space-y-6">
       <PageHeader
         title="LinkedIn outreach"
-        description="Connection notes and LinkedIn-only sequences — separate from email. Manual send queue with AI draft."
+        description="Connection notes and LinkedIn-only sequences — separate from email. See who is ready to message on LinkedIn, with AI-drafted notes."
         actions={
           <div className="flex flex-wrap gap-2">
             <Button
@@ -145,10 +147,20 @@ export function LinkedInOutreachPageClient({ initialHub }: Props) {
           )}
         >
           <Link2 className="h-3 w-3" aria-hidden />
-          Extension: {hub.connectionStatus === 'connected' ? 'Connected' : 'Not connected'}
+          LinkedIn add-on: {hub.connectionStatus === 'connected' ? 'Connected' : 'Not set up'}
         </span>
-        <Link href="/admin/integrations" className="font-medium text-[var(--accent)] hover:underline">
-          Connect extension
+        <button
+          type="button"
+          className="font-medium text-[var(--accent)] hover:underline"
+          onClick={() => setConnectOpen(true)}
+        >
+          Set up LinkedIn add-on
+        </button>
+        <Link
+          href="/admin/help?article=linkedin-outreach"
+          className="font-medium text-[var(--accent)] hover:underline"
+        >
+          Setup guide
         </Link>
         {dataUpdatedAt ? (
           <span className="ml-auto tabular-nums">
@@ -172,7 +184,7 @@ export function LinkedInOutreachPageClient({ initialHub }: Props) {
       <KpiStrip
         items={[
           { label: 'Active campaigns', value: hub.kpis.activeCampaigns, icon: Link2 },
-          { label: 'Manual queue', value: hub.kpis.manualQueue, icon: ClipboardCopy },
+          { label: 'Waiting on LinkedIn', value: hub.kpis.manualQueue, icon: ClipboardCopy },
           { label: 'Leads w/ LinkedIn', value: hub.kpis.leadsWithLinkedIn, icon: Users },
           { label: 'Pipeline adds (today)', value: hub.kpis.enrolledThisWeek, icon: Target },
         ]}
@@ -181,9 +193,9 @@ export function LinkedInOutreachPageClient({ initialHub }: Props) {
       <div className="grid gap-6 xl:grid-cols-12">
         <section className="card-surface overflow-hidden xl:col-span-7">
           <div className="border-b border-[var(--border-subtle)] px-5 py-4">
-            <h2 className="text-[15px] font-semibold text-[var(--text-primary)]">Manual send queue</h2>
+            <h2 className="text-[15px] font-semibold text-[var(--text-primary)]">Ready to send on LinkedIn</h2>
             <p className="mt-0.5 text-[13px] text-[var(--text-secondary)]">
-              Copy the note, send on LinkedIn, then mark sent on the campaign.
+              Copy the note, send it on LinkedIn, then mark it done here or in the Vantera LinkedIn add-on.
             </p>
           </div>
           {hub.manualQueue.length === 0 ? (
@@ -363,6 +375,14 @@ export function LinkedInOutreachPageClient({ initialHub }: Props) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <LinkedInExtensionConnectPanel
+        open={connectOpen}
+        onOpenChange={setConnectOpen}
+        onConnected={() =>
+          void queryClient.invalidateQueries({ queryKey: ['linkedin-outreach-hub'] })
+        }
+      />
     </div>
   )
 }

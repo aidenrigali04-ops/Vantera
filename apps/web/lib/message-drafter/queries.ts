@@ -14,7 +14,7 @@ import {
   sdrSequenceSteps,
   sdrSequences,
 } from '@vantera/db'
-import { and, desc, eq, gte, inArray, isNull, sql } from 'drizzle-orm'
+import { and, desc, eq, gte, inArray, isNull, lte, sql } from 'drizzle-orm'
 
 export async function findPendingEmailDrafts(accountId: string): Promise<EmailDraftItem[]> {
   const rows = await db
@@ -87,6 +87,7 @@ export async function findPendingLinkedInDrafts(accountId: string): Promise<Link
         eq(sdrSequenceSteps.accountId, accountId),
         eq(sdrSequenceSteps.channel, 'linkedin'),
         eq(sdrSequenceSteps.status, 'scheduled'),
+        lte(sdrSequenceSteps.scheduledFor, new Date()),
         isNull(sdrSequenceSteps.deletedAt),
         isNull(leads.deletedAt),
       ),

@@ -97,7 +97,7 @@ export function CampaignsPageClient({ campaigns, defaultChannel = 'email' }: Pro
         title={isLinkedIn ? 'LinkedIn campaigns' : 'Email campaigns'}
         description={
           isLinkedIn
-            ? 'Connection notes and LinkedIn-only sequences — manual send from the LinkedIn hub.'
+            ? 'Connection notes and LinkedIn-only sequences — send on LinkedIn from the LinkedIn hub.'
             : 'Goal-based email outreach — domain, audience, message, and results in one flow.'
         }
         actions={
@@ -215,7 +215,7 @@ export function CampaignsPageClient({ campaigns, defaultChannel = 'email' }: Pro
                       {mode === 'single_email'
                         ? 'One email to all leads — write your own copy + AI draft'
                         : mode === 'single_linkedin'
-                          ? 'One connection note — manual send on LinkedIn'
+                          ? 'One connection note — you send on LinkedIn'
                           : isLinkedIn
                             ? 'LinkedIn-only timed steps — manual queue'
                             : 'Timed email, LinkedIn, and SMS steps'}

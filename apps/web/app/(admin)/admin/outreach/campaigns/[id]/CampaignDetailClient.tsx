@@ -444,12 +444,12 @@ export function CampaignDetailClient({
               </h3>
               <p className="mt-1 text-sm text-stone-500">
                 {isSingleLinkedIn
-                  ? 'One note for every enrolled lead — manual send on LinkedIn after launch. AI draft follows Message Drafter rules (≤300 chars, merge tags).'
+                  ? 'One note for every enrolled lead — you send on LinkedIn after launch. AI draft follows Message Drafter rules (≤300 chars, merge tags).'
                   : isSingleEmail
                     ? 'One email goes to every enrolled lead on launch. Write your own copy or use AI draft (Message Drafter rules, merge tags for personalization).'
                     : isLinkedInHub
-                      ? 'LinkedIn-only timed steps — each queues for manual send. AI draft per step.'
-                      : 'Email and SMS send automatically. LinkedIn steps queue for manual send in Results. AI draft uses your ICP and value prop per step.'}
+                      ? 'LinkedIn-only timed steps — each waits for you to send on LinkedIn. AI draft per step.'
+                      : 'Email and SMS send automatically. LinkedIn steps appear in Results when ready for you to send. AI draft uses your ICP and value prop per step.'}
               </p>
             </div>
           </div>

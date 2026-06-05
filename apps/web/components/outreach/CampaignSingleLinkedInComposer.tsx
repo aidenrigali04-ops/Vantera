@@ -118,9 +118,9 @@ export function CampaignSingleLinkedInComposer({
       </Collapsible>
 
       <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-subtle)]/40 px-4 py-3 text-[12px] text-[var(--text-secondary)]">
-        LinkedIn steps are <strong className="text-[var(--text-primary)]">manual send</strong> — after
-        launch, copy each note from Results, send on LinkedIn, then mark sent. Separate from automated
-        email.
+        LinkedIn messages are <strong className="text-[var(--text-primary)]">sent by you on LinkedIn</strong> — after
+        launch, copy each note from Results, send on LinkedIn, then mark it done. Email still sends
+        automatically from Vantera.
       </div>
 
       <div className="space-y-2">

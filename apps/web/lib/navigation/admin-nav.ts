@@ -155,7 +155,7 @@ export const ADMIN_NAV_HUBS: AdminNavHub[] = [
 
 export const ADMIN_NAV_FOOTER: AdminNavItem[] = [
   { id: 'settings', label: 'Settings', icon: Settings, href: '/admin/settings' },
-  { id: 'help', label: 'Help Center', icon: LifeBuoy, href: '/admin/settings' },
+  { id: 'help', label: 'Help Center', icon: LifeBuoy, href: '/admin/help' },
 ]
 
 /** Roadmap — command palette only. */
@@ -323,6 +323,7 @@ export function resolveAdminPageTitle(pathname: string): string {
   if (pathname.startsWith('/admin/ai-brain')) return 'AI Insights'
   if (pathname.startsWith('/admin/forecasting')) return 'Forecasting'
   if (pathname.startsWith('/admin/reports')) return 'Reports'
+  if (pathname.startsWith('/admin/help')) return 'Help Center'
   if (pathname.startsWith('/admin/settings')) return 'Settings'
   if (pathname.startsWith('/admin/integrations')) return 'Integrations'
   if (pathname.startsWith('/admin/portal')) return 'Client Portal'

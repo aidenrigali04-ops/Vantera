@@ -3,7 +3,7 @@
 export type OutreachAutomationMode = 'review' | 'automatic'
 
 export const OUTREACH_AUTOMATION_LABELS: Record<OutreachAutomationMode, string> = {
-  review: 'Manual',
+  review: 'Review before send',
   automatic: 'Automatic',
 }
 

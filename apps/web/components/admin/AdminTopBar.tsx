@@ -15,6 +15,7 @@ const ROUTE_LABELS: Record<string, string> = {
   '/admin/portal': 'Client Portal',
   '/admin/portal/preview': 'Client Portal Preview',
   '/admin/settings': 'Settings',
+  '/admin/help': 'Help Center',
   '/admin/onboarding': 'Onboarding',
 }
 

@@ -375,8 +375,8 @@ export function LinkedInPageClient({
               />
               <span className="text-sm text-stone-600">
                 {connectionStatus === 'connected'
-                  ? 'Extension connected · pacing active'
-                  : 'Install Chrome extension to connect'}
+                  ? 'LinkedIn add-on connected · daily limits active'
+                  : 'Set up the Vantera LinkedIn add-on in Chrome'}
               </span>
             </div>
           </div>

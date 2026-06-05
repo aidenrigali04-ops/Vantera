@@ -99,7 +99,7 @@ export function CampaignSequenceBuilder({ steps, onChange, disabled, linkedinOnl
                 <div className="space-y-2">
                   <Label>Channel</Label>
                   <p className="rounded-md border border-dashed border-stone-200 bg-white px-3 py-2 text-xs text-stone-600">
-                    LinkedIn only — manual send queue
+                    LinkedIn only — send on LinkedIn yourself
                   </p>
                 </div>
               ) : (
@@ -178,7 +178,7 @@ export function CampaignSequenceBuilder({ steps, onChange, disabled, linkedinOnl
                     step.body.length > 300 ? 'font-medium text-red-600' : 'text-stone-500',
                   )}
                 >
-                  {step.body.length}/300 characters · manual send from Results after launch
+                  {step.body.length}/300 characters · send on LinkedIn from Results after launch
                 </p>
               ) : null}
             </div>

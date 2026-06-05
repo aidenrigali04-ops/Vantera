@@ -401,7 +401,7 @@ export async function markCampaignStepSent(stepId: string): Promise<ActionResult
     const messages: Record<string, string> = {
       step_not_found: 'Step not found',
       already_sent: 'Step already marked as sent',
-      step_not_ready: 'Step is not ready for manual send',
+      step_not_ready: 'This LinkedIn message is not ready to send yet',
     }
     return { success: false, error: messages[result.reason] ?? 'Could not mark step sent' }
   }

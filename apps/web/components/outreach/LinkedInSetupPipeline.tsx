@@ -50,7 +50,7 @@ export function LinkedInSetupPipeline({ steps, progress }: LinkedInSetupPipeline
             LinkedIn setup pipeline
           </h2>
           <p className="mt-1 text-[13px] text-[var(--text-secondary)]">
-            Connect → enroll profiles → write notes → manual send queue.
+            Connect add-on → add LinkedIn profiles → write notes → send on LinkedIn.
           </p>
         </div>
         <div className="min-w-[140px]">
