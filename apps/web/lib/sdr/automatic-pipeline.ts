@@ -1,4 +1,8 @@
 import { db } from '@/lib/db/client'
+import {
+  launchAutomaticScoutRunCampaign,
+  type ScoutRunEnrollment,
+} from '@/lib/outreach/automatic-scout-campaign'
 import { flushAutomaticOutreachPipelines } from '@/lib/sdr/outreach-automation-policy'
 import { isAccountAutomaticOutreach } from '@/lib/sdr/outreach-automation-account'
 import { runDraftSdrSequence } from '@/lib/sdr/run-draft-sequence'
@@ -12,6 +16,8 @@ export type AutomaticPipelineResult = {
   sdrSent: number
   sdrFailed: number
   campaignSent: number
+  campaignLaunched: number
+  campaignStepsCreated: number
   skipped: boolean
 }
 
@@ -31,7 +37,7 @@ async function draftPendingSequences(accountId: string): Promise<{
     .where(
       and(eq(sdrSequences.accountId, accountId), eq(sdrSequences.status, 'drafting')),
     )
-    .limit(25)
+    .limit(50)
 
   let drafted = 0
   let failed = 0
@@ -75,6 +81,8 @@ export async function runAutomaticPipelineForAccount(
     sdrSent: 0,
     sdrFailed: 0,
     campaignSent: 0,
+    campaignLaunched: 0,
+    campaignStepsCreated: 0,
     skipped: true,
   }
 
@@ -91,7 +99,59 @@ export async function runAutomaticPipelineForAccount(
     sdrSent: sendSummary.sdrSent,
     sdrFailed: sendSummary.sdrFailed,
     campaignSent: sendSummary.campaignSent,
+    campaignLaunched: 0,
+    campaignStepsCreated: 0,
     skipped: false,
+  }
+}
+
+/**
+ * After Prospect Scout enrolls leads: finish any drafting, launch the per-run auto
+ * campaign with personalized SDR copy, then send due email/SMS steps immediately.
+ */
+export async function runAutomaticOutreachAfterScout(
+  accountId: string,
+  scout?: {
+    configId: string
+    runId: string
+    enrollments: ScoutRunEnrollment[]
+  },
+): Promise<AutomaticPipelineResult> {
+  const base = await runAutomaticPipelineForAccount(accountId)
+
+  if (base.skipped || !scout?.enrollments.length) {
+    return base
+  }
+
+  let campaignSent = base.campaignSent
+  let campaignLaunched = 0
+  let campaignStepsCreated = 0
+
+  try {
+    const launch = await launchAutomaticScoutRunCampaign({
+      accountId,
+      configId: scout.configId,
+      runId: scout.runId,
+      enrollments: scout.enrollments,
+    })
+
+    if (launch.campaignId) campaignLaunched += 1
+    campaignStepsCreated += launch.stepsCreated
+    campaignSent += launch.sent
+
+    if (launch.stepsCreated > 0 && launch.sent === 0) {
+      const flush = await flushAutomaticOutreachPipelines(accountId)
+      campaignSent += flush.campaignSent
+    }
+  } catch (error) {
+    console.error('[automatic-pipeline] post-scout campaign launch failed', accountId, error)
+  }
+
+  return {
+    ...base,
+    campaignSent,
+    campaignLaunched,
+    campaignStepsCreated,
   }
 }
 
@@ -119,6 +179,8 @@ export async function runAutomaticPipelineForAllAccounts(): Promise<AutomaticPip
     sdrSent: 0,
     sdrFailed: 0,
     campaignSent: 0,
+    campaignLaunched: 0,
+    campaignStepsCreated: 0,
     skipped: true,
   }
 
@@ -132,6 +194,8 @@ export async function runAutomaticPipelineForAllAccounts(): Promise<AutomaticPip
     totals.sdrSent += result.sdrSent
     totals.sdrFailed += result.sdrFailed
     totals.campaignSent += result.campaignSent
+    totals.campaignLaunched += result.campaignLaunched
+    totals.campaignStepsCreated += result.campaignStepsCreated
     totals.skipped = false
   }
 

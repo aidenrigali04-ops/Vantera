@@ -215,6 +215,7 @@ export async function launchAutomaticScoutRunCampaign(input: {
     accountId: input.accountId,
     campaignId,
     sequenceIds: ready.map((r) => r.sequenceId),
+    immediateFirstStep: true,
   })
 
   if (stepsCreated === 0) {

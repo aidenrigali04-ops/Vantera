@@ -22,9 +22,8 @@ import {
 import type { SdrConfigRow } from '@/lib/prospect-scout/types'
 import type { ApifyLead } from '@/lib/aspire/types'
 import type { ProspectSearchMeta } from '@/lib/aspire/apify-client'
-import { launchAutomaticScoutRunCampaign } from '@/lib/outreach/automatic-scout-campaign'
 import { logSdrActivity } from '@/lib/sdr/activity-log'
-import { runAutomaticPipelineForAccount } from '@/lib/sdr/automatic-pipeline'
+import { runAutomaticOutreachAfterScout } from '@/lib/sdr/automatic-pipeline'
 import { isAccountAutomaticOutreach } from '@/lib/sdr/outreach-automation-account'
 import type { ScoutRunEnrollment } from '@/lib/outreach/automatic-scout-campaign'
 import { countActiveSdrSequences, countSdrEnrolledToday } from '@/lib/sdr/queries'
@@ -198,22 +197,26 @@ export async function runProspectScoutDiscovery(
       .where(eq(aspireSearchRuns.id, runId))
 
     if (enrolled > 0 && (await isAccountAutomaticOutreach(config.accountId))) {
-      if (scoutEnrollments.length > 0) {
-        try {
-          await launchAutomaticScoutRunCampaign({
-            accountId: config.accountId,
-            configId: config.id,
-            runId,
-            enrollments: scoutEnrollments,
-          })
-        } catch (error) {
-          console.error('[prospect-scout] auto campaign launch failed', error)
-        }
-      }
       try {
-        await runAutomaticPipelineForAccount(config.accountId)
+        const pipeline = await runAutomaticOutreachAfterScout(config.accountId, {
+          configId: config.id,
+          runId,
+          enrollments: scoutEnrollments,
+        })
+        await logSdrActivity({
+          accountId: config.accountId,
+          configId: config.id,
+          eventType: 'auto_outreach_flush',
+          metadata: {
+            runId,
+            drafted: pipeline.drafted,
+            campaignLaunched: pipeline.campaignLaunched,
+            campaignStepsCreated: pipeline.campaignStepsCreated,
+            campaignSent: pipeline.campaignSent,
+          },
+        })
       } catch (error) {
-        console.error('[prospect-scout] automatic send flush failed', error)
+        console.error('[prospect-scout] automatic outreach after scout failed', error)
       }
     }
 

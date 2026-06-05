@@ -1,7 +1,6 @@
 import { runProspectScoutDiscovery } from '@/lib/prospect-scout/discover'
 import { runBoundSearch } from '@/lib/prospect-scout/run-search'
 import type { ProspectMode, RunAccountResult, SdrConfigRow } from '@/lib/prospect-scout/types'
-import { runAutomaticPipelineForAccount } from '@/lib/sdr/automatic-pipeline'
 import { countActiveSdrSequences, countSdrEnrolledToday } from '@/lib/sdr/queries'
 import { requireSDREnabledForAccount } from '@/lib/sdr/guard'
 import { findBindingsForConfig } from '@/lib/sdr/aspire-config'
@@ -93,14 +92,6 @@ export async function runAccountProspectScout(
       console.warn(
         `[prospect-scout] account ${accountId}: aspire_bound mode with no active bindings — no Apify run`,
       )
-    }
-  }
-
-  if (enrolled > 0) {
-    try {
-      await runAutomaticPipelineForAccount(accountId)
-    } catch (error) {
-      console.error('[prospect-scout] automatic pipeline failed', error)
     }
   }
 

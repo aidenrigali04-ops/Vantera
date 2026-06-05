@@ -413,6 +413,8 @@ export async function materializeCampaignStepsFromSdrSequences(input: {
   accountId: string
   campaignId: string
   sequenceIds: string[]
+  /** Scout automatic mode: send step 1 as soon as the campaign launches (not next 8 AM window). */
+  immediateFirstStep?: boolean
 }): Promise<number> {
   if (input.sequenceIds.length === 0) return 0
 
@@ -470,12 +472,23 @@ export async function materializeCampaignStepsFromSdrSequences(input: {
       )
       .orderBy(asc(sdrSequenceSteps.stepNumber))
 
+    const minStepNumber = steps.reduce(
+      (min, s) => Math.min(min, s.stepNumber),
+      steps[0]?.stepNumber ?? 1,
+    )
+
     for (const step of steps) {
       if (!step.body?.trim()) continue
       if (step.channel === 'email' && !step.subject?.trim()) continue
       if (step.channel !== 'email' && step.channel !== 'sms' && step.channel !== 'linkedin') {
         continue
       }
+
+      const scheduledFor = step.scheduledFor ?? new Date()
+      const sendNow =
+        input.immediateFirstStep &&
+        step.stepNumber === minStepNumber &&
+        (step.channel === 'email' || step.channel === 'sms')
 
       rows.push({
         accountId: input.accountId,
@@ -486,7 +499,7 @@ export async function materializeCampaignStepsFromSdrSequences(input: {
         channel: step.channel as 'email' | 'sms' | 'linkedin',
         subject: step.channel === 'email' ? step.subject : null,
         body: step.body,
-        sendAt: step.scheduledFor ?? new Date(),
+        sendAt: sendNow ? new Date() : scheduledFor,
         status: 'pending',
       })
     }
