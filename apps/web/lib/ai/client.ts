@@ -72,7 +72,10 @@ export async function callModel(args: CallModelArgs): Promise<CallModelResult> {
   const start = Date.now()
 
   try {
-    const response = await withTimeout(
+    // Cast params to the base param type to allow `thinking`, then narrow the
+    // result to Message: the base-param overload returns `Message | Stream`, but
+    // we never stream here, so assert Message for downstream field access.
+    const response = (await withTimeout(
       client.messages.create({
         model,
         max_tokens: maxTokens,
@@ -83,7 +86,7 @@ export async function callModel(args: CallModelArgs): Promise<CallModelResult> {
         messages: [{ role: 'user', content: args.user }],
       } as Parameters<typeof client.messages.create>[0]),
       timeoutMs,
-    )
+    )) as Anthropic.Message
 
     const latencyMs = Date.now() - start
     const text = extractText(response)
@@ -190,7 +193,7 @@ function extractText(response: Anthropic.Message): string {
 function extractThinkingTokens(response: Anthropic.Message): number {
   // Thinking blocks carry their own token count in the usage field when
   // the model actually used adaptive thinking for this call.
-  const usage = response.usage as Record<string, unknown> | undefined
+  const usage = response.usage as unknown as Record<string, unknown> | undefined
   const thinking = usage?.['thinking_tokens']
   return typeof thinking === 'number' ? thinking : 0
 }
