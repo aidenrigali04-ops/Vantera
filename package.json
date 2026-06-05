@@ -27,7 +27,8 @@
     "trigger:dev": "dotenv -e .env -- trigger dev",
     "trigger:deploy": "dotenv -e .env -- trigger deploy",
     "larry:run": "pnpm exec dotenv -e .env -- pnpm exec tsx --tsconfig apps/web/tsconfig.json apps/web/lib/debug/run-cli.ts",
-    "debug:run": "pnpm exec dotenv -e .env -- pnpm exec tsx --tsconfig apps/web/tsconfig.json apps/web/lib/debug/run-cli.ts"
+    "debug:run": "pnpm exec dotenv -e .env -- pnpm exec tsx --tsconfig apps/web/tsconfig.json apps/web/lib/debug/run-cli.ts",
+    "pack:linkedin-extension": "sh scripts/pack-linkedin-extension.sh"
   },
   "devDependencies": {
     "@eslint/js": "^9.9.0",

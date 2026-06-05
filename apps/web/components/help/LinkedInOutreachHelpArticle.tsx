@@ -1,3 +1,4 @@
+import { LinkedInExtensionInstallSteps } from '@/components/outreach/LinkedInExtensionInstallSteps'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 
@@ -35,18 +36,19 @@ export function LinkedInOutreachHelpArticle({ appOrigin }: Props) {
             .
           </li>
           <li>
-            <span className="font-medium text-[var(--text-primary)]">Set up the Chrome add-on.</span>
+            <span className="font-medium text-[var(--text-primary)]">Install the Chrome add-on.</span>
+            <div className="mt-3">
+              <LinkedInExtensionInstallSteps />
+            </div>
+          </li>
+          <li>
+            <span className="font-medium text-[var(--text-primary)]">Connect to Vantera.</span>
             <ul className="mt-2 list-disc space-y-1.5 pl-5">
-              <li>Click <strong>Set up LinkedIn add-on</strong>.</li>
               <li>
-                Click <strong>Get connection code</strong> and copy the code right away (it is only
-                shown once).
+                In Vantera, click <strong>Set up LinkedIn add-on</strong> →{' '}
+                <strong>Get connection code</strong> (copy immediately — shown once).
               </li>
-              <li>
-                In Chrome, open <strong>Extensions</strong> and install the Vantera LinkedIn add-on
-                (your workspace admin can share install steps if you need them).
-              </li>
-              <li>Open the add-on from the Chrome toolbar.</li>
+              <li>Open the add-on from the Chrome toolbar (puzzle icon → Vantera LinkedIn Outreach).</li>
               <li>
                 Paste your <strong>Vantera web address</strong> — the same link you use to sign in.
                 {appOrigin ? (
@@ -59,7 +61,7 @@ export function LinkedInOutreachHelpArticle({ appOrigin }: Props) {
                   </>
                 ) : null}
               </li>
-              <li>Paste your <strong>connection code</strong> and click save.</li>
+              <li>Paste your <strong>connection code</strong> and click <strong>Save and connect</strong>.</li>
             </ul>
           </li>
           <li>

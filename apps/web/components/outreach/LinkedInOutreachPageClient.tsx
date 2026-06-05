@@ -156,6 +156,13 @@ export function LinkedInOutreachPageClient({ initialHub }: Props) {
         >
           Set up LinkedIn add-on
         </button>
+        <a
+          href="/vantera-linkedin-extension.zip"
+          download="vantera-linkedin-extension.zip"
+          className="font-medium text-[var(--accent)] hover:underline"
+        >
+          Download add-on
+        </a>
         <Link
           href="/admin/help?article=linkedin-outreach"
           className="font-medium text-[var(--accent)] hover:underline"

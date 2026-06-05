@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { LinkedInExtensionInstallSteps } from '@/components/outreach/LinkedInExtensionInstallSteps'
 import type { ExtensionConnectionStatus } from '@/lib/extension/linkedin/types'
 import { cn } from '@/lib/utils'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -155,13 +156,9 @@ export function LinkedInExtensionConnectPanel({ open, onOpenChange, onConnected 
             </p>
           ) : null}
 
+          <LinkedInExtensionInstallSteps />
+
           <ol className="list-decimal space-y-3 pl-5 text-[var(--text-secondary)]">
-            <li>
-              <span className="font-medium text-[var(--text-primary)]">Install the add-on in Chrome.</span>{' '}
-              Open Chrome → <span className="font-medium text-[var(--text-primary)]">Extensions</span> →
-              install the Vantera LinkedIn add-on (your admin can share the installer if you do not
-              have it yet).
-            </li>
             <li>
               <span className="font-medium text-[var(--text-primary)]">Get a connection code</span> with
               the button below, then paste it into the add-on when it asks for your code.
