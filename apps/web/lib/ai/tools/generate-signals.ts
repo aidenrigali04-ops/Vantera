@@ -12,7 +12,11 @@
 import { db } from '@/lib/db/client'
 import { intelligenceSignals } from '@vantera/db'
 import { callModel, parseJsonResponse } from '../client'
-import { toPromptContext, type BusinessContext } from '../context'
+
+export type AgentContext = {
+  accountId: string
+  promptContext: string
+}
 import { recordObservation } from '../memory'
 
 const TOOL_NAME = 'generate-signals'
@@ -62,10 +66,10 @@ Return ONLY a JSON array (max 5 items):
 ]`
 
 export async function generateSignals(
-  ctx: BusinessContext,
+  ctx: AgentContext,
 ): Promise<{ ok: true; signals: GeneratedSignal[] } | { ok: false; reason: string }> {
   const userPrompt = [
-    toPromptContext(ctx),
+    ctx.promptContext,
     '',
     `Today is ${new Date().toISOString().slice(0, 10)}. Produce up to ${MAX_SIGNALS} recommendations.`,
   ].join('\n')

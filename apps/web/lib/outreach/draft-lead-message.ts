@@ -1,7 +1,8 @@
-import { callModel, parseJsonResponse } from '@/lib/ai/client'
-import { loadBusinessContext, toPromptContext } from '@/lib/ai/context'
-import { recordObservation } from '@/lib/ai/memory'
-import { env } from '@/lib/env'
+import { callModel, parseJsonResponse, recordObservation } from '@/lib/ai'
+import { db } from '@/lib/db/client'
+import { resolveClientContext, clientContextToPromptBlock } from '@/lib/sdr/resolve-client-context'
+import { accounts } from '@vantera/db'
+import { eq } from 'drizzle-orm'
 import type { LeadRow } from '@/lib/outreach/types'
 
 const TOOL_NAME = 'draft-lead-message'
@@ -31,21 +32,22 @@ Return ONLY JSON:
 
 export async function draftLeadMessage(input: {
   accountId: string
-  userId: string
   lead: Pick<LeadRow, 'id' | 'firstName' | 'lastName' | 'company' | 'title' | 'email'>
   intent: string
 }): Promise<{ ok: true; output: DraftLeadMessageOutput } | { ok: false; reason: string }> {
-  const ctx = await loadBusinessContext(
-    input.accountId,
-    input.userId,
-    env.NEXT_PUBLIC_APP_URL,
-    env.RESEND_API_KEY || null,
-  )
+  const [[accountRow], clientCtx] = await Promise.all([
+    db.select({ name: accounts.name }).from(accounts).where(eq(accounts.id, input.accountId)).limit(1),
+    resolveClientContext(input.accountId),
+  ])
+
+  const accountBlock = clientCtx
+    ? clientContextToPromptBlock(clientCtx)
+    : `Account: ${accountRow?.name ?? 'Vantera workspace'}`
 
   const leadName = [input.lead.firstName, input.lead.lastName].filter(Boolean).join(' ') || 'Prospect'
 
   const userPrompt = [
-    toPromptContext(ctx),
+    accountBlock,
     '',
     `Lead: ${leadName}`,
     input.lead.title ? `Title: ${input.lead.title}` : null,

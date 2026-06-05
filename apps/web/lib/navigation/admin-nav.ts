@@ -67,19 +67,19 @@ export type AdminNavHub = {
   related: AdminNavHubLink[]
 }
 
-/** Sidebar — four destinations only. Everything else lives in dashboard hubs. */
+/** Sidebar — primary destinations. */
 export const ADMIN_NAV_SIDEBAR: AdminNavItem[] = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, href: '/admin/dashboard' },
   {
-    id: 'clients',
-    label: 'CRM',
-    icon: Users,
-    href: '/admin/crm/pipeline',
-    tourAnchor: 'nav-pipeline',
+    id: 'prospects',
+    label: 'Prospects',
+    icon: Telescope,
+    href: '/admin/outreach/aspire',
+    tourAnchor: 'nav-prospects',
   },
   {
     id: 'outreach',
-    label: 'Outreach',
+    label: 'Campaigns',
     icon: Megaphone,
     href: '/admin/outreach/campaigns',
     tourAnchor: 'nav-outreach',
@@ -96,60 +96,44 @@ export const ADMIN_NAV_SIDEBAR_SECONDARY: AdminNavItem[] = [
     tourAnchor: 'nav-agents',
   },
   { id: 'linkedin', label: 'LinkedIn', icon: Share2, href: '/admin/outreach/linkedin' },
+  { id: 'email', label: 'Email', icon: Mail, href: '/admin/outreach/email' },
 ]
 
 /**
  * Grouped areas shown on the dashboard — one primary CTA per hub plus compact related links.
- * Replaces long sidebar lists and “More tools” sections.
  */
 export const ADMIN_NAV_HUBS: AdminNavHub[] = [
   {
-    id: 'clients',
-    title: 'CRM',
-    description: 'Pipeline and active clients — use the tabs under CRM. Portal and billing are in Settings.',
-    sidebarId: 'clients',
-    primary: { id: 'pipeline', label: 'Pipeline', href: '/admin/crm/pipeline', icon: Handshake },
-    related: [],
-  },
-  {
-    id: 'projects',
-    title: 'Projects',
-    description: 'Delivery, handoffs, and the automations behind them.',
-    sidebarId: 'projects',
-    primary: { id: 'records', label: 'View projects', href: '/admin/records', icon: FolderKanban },
+    id: 'prospects',
+    title: 'Prospect Scout',
+    description: 'Find and qualify leads from 285M prospects using your ICP filters.',
+    sidebarId: 'prospects',
+    primary: { id: 'aspire', label: 'Browse prospects', href: '/admin/outreach/aspire', icon: Telescope },
     related: [
-      { id: 'deliverables', label: 'Deliverables', href: '/admin/deliverables', icon: Package },
-      { id: 'automations', label: 'Automations', href: '/admin/automations', icon: Zap },
+      { id: 'agents-scout', label: 'Scout agent', href: '/admin/outreach/agents/scout', icon: Bot },
     ],
   },
   {
-    id: 'intelligence',
-    title: 'Intelligence',
-    description: 'AI recommendations and executive reporting.',
-    primary: { id: 'ai-brain', label: 'AI insights', href: '/admin/ai-brain', icon: Brain },
+    id: 'outreach',
+    title: 'Outreach',
+    description: 'LinkedIn, email, and SMS sequences — drafted by AI, sent automatically.',
+    sidebarId: 'outreach',
+    primary: { id: 'campaigns', label: 'Campaigns', href: '/admin/outreach/campaigns', icon: Megaphone },
     related: [
-      {
-        id: 'reports',
-        label: 'Reports',
-        href: '/admin/reports',
-        icon: PieChart,
-        flag: 'executive_dashboard',
-      },
-      {
-        id: 'forecasting',
-        label: 'Forecasting',
-        href: '/admin/forecasting',
-        icon: BarChart2,
-        flag: 'executive_dashboard',
-      },
+      { id: 'linkedin', label: 'LinkedIn', href: '/admin/outreach/linkedin', icon: Share2 },
+      { id: 'email', label: 'Email', href: '/admin/outreach/email', icon: Mail },
+      { id: 'sequences', label: 'Sequences', href: '/admin/outreach/agents/sequences', icon: Workflow },
     ],
   },
   {
-    id: 'workspace',
-    title: 'Workspace',
-    description: 'Inbox and day-to-day ops. Calendar, portal, billing, and integrations live in Settings.',
-    primary: { id: 'inbox', label: 'Open inbox', href: '/admin/inbox', icon: Inbox },
-    related: [],
+    id: 'agents',
+    title: 'Agents',
+    description: 'Configure and monitor the four AI outreach agents.',
+    primary: { id: 'agents-hub', label: 'Agent monitor', href: '/admin/outreach/agents', icon: Bot },
+    related: [
+      { id: 'drafter', label: 'Drafter', href: '/admin/outreach/agents/drafter', icon: Brain },
+      { id: 'outreach-agent', label: 'Outreach', href: '/admin/outreach/agents/outreach', icon: Zap },
+    ],
   },
 ]
 
@@ -202,18 +186,12 @@ export function isSidebarItemActive(pathname: string, item: AdminNavItem): boole
     return true
   }
 
-  if (item.id === 'clients') {
-    return (
-      pathname.startsWith('/admin/crm') ||
-      pathname.startsWith('/admin/pipeline') ||
-      pathname.startsWith('/admin/clients')
-    )
+  if (item.id === 'prospects') {
+    return pathname.startsWith('/admin/outreach/aspire')
   }
 
   if (item.id === 'settings' && item.href) {
-    if (pathname.startsWith('/admin/portal')) return true
     if (pathname.startsWith('/admin/billing')) return true
-    if (pathname.startsWith('/admin/calendar')) return true
     if (pathname.startsWith('/admin/integrations')) return true
     return isAdminNavItemActive(pathname, item.href)
   }
@@ -305,30 +283,21 @@ export function getRoadmapAdminNavItems(): AdminNavItem[] {
 
 export function resolveAdminPageTitle(pathname: string): string {
   if (pathname.startsWith('/admin/dashboard')) return 'Dashboard'
-  if (pathname.startsWith('/admin/crm/pipeline')) return 'Pipeline'
-  if (pathname.startsWith('/admin/crm/clients')) return 'Active clients'
-  if (pathname.startsWith('/admin/crm')) return 'CRM'
-  if (pathname.startsWith('/admin/clients')) return 'Clients'
-  if (pathname.startsWith('/admin/pipeline')) return 'Pipeline'
-  if (pathname.startsWith('/admin/records')) return 'Projects'
-  if (pathname.startsWith('/admin/outreach/campaigns')) return 'Outreach'
-  if (pathname.startsWith('/admin/inbox')) return 'Inbox'
-  if (pathname.startsWith('/admin/calendar')) return 'Calendar'
+  if (pathname.startsWith('/admin/outreach/aspire')) return 'Prospects'
+  if (pathname.startsWith('/admin/outreach/agents/scout')) return 'Scout Agent'
+  if (pathname.startsWith('/admin/outreach/agents/drafter')) return 'Drafter Agent'
+  if (pathname.startsWith('/admin/outreach/agents/outreach')) return 'Outreach Agent'
+  if (pathname.startsWith('/admin/outreach/agents/sequences')) return 'Sequences'
   if (pathname.startsWith('/admin/outreach/agents')) return 'Agents'
-  if (pathname.startsWith('/admin/outreach/aspire')) return 'Aspire'
   if (pathname.startsWith('/admin/outreach/linkedin')) return 'LinkedIn'
-  if (pathname.startsWith('/admin/outreach/campaigns')) return 'Campaigns'
   if (pathname.startsWith('/admin/outreach/email')) return 'Email'
-  if (pathname.startsWith('/admin/outreach')) return 'Pipeline'
-  if (pathname.startsWith('/admin/ai-brain')) return 'AI Insights'
-  if (pathname.startsWith('/admin/forecasting')) return 'Forecasting'
-  if (pathname.startsWith('/admin/reports')) return 'Reports'
+  if (pathname.startsWith('/admin/outreach/campaigns')) return 'Campaigns'
+  if (pathname.startsWith('/admin/outreach')) return 'Outreach'
+  if (pathname.startsWith('/admin/inbox')) return 'Inbox'
   if (pathname.startsWith('/admin/help')) return 'Help Center'
   if (pathname.startsWith('/admin/settings')) return 'Settings'
   if (pathname.startsWith('/admin/integrations')) return 'Integrations'
-  if (pathname.startsWith('/admin/portal')) return 'Client Portal'
   if (pathname.startsWith('/admin/billing')) return 'Billing'
-  if (pathname.startsWith('/admin/deliverables')) return 'Deliverables'
   if (pathname.startsWith('/admin/automations')) return 'Automations'
 
   const tail = pathname.split('/').filter(Boolean).pop() ?? 'Dashboard'
@@ -346,31 +315,22 @@ export type WorkspaceHeaderAction = {
 
 export function resolveWorkspacePrimaryAction(pathname: string): WorkspaceHeaderAction | null {
   if (pathname.startsWith('/admin/dashboard')) {
-    return { label: 'Add client', href: '/admin/clients' }
+    return { label: 'Find prospects', href: '/admin/outreach/aspire' }
   }
-  if (pathname.startsWith('/admin/crm/clients') || pathname.startsWith('/admin/clients')) {
-    return { label: 'New contact', href: '/admin/crm/clients' }
-  }
-  if (pathname.startsWith('/admin/crm/pipeline') || pathname.startsWith('/admin/pipeline')) {
-    return { label: 'Add lead', href: '/admin/crm/pipeline' }
-  }
-  if (pathname.startsWith('/admin/portal')) {
-    return { label: 'New contact', href: '/admin/crm/clients' }
+  if (pathname.startsWith('/admin/outreach/aspire')) {
+    return { label: 'Launch scout', href: '/admin/outreach/agents/scout' }
   }
   if (pathname.startsWith('/admin/outreach/agents')) {
     return { label: 'Configure agents', href: '/admin/outreach/agents/setup' }
   }
+  if (pathname.startsWith('/admin/outreach/campaigns')) {
+    return { label: 'New campaign', href: '/admin/outreach/campaigns' }
+  }
   if (pathname.startsWith('/admin/outreach')) {
     return { label: 'Open agents', href: '/admin/outreach/agents' }
   }
-  if (pathname.startsWith('/admin/records') || pathname.startsWith('/admin/deliverables')) {
-    return { label: 'New project', href: '/admin/records' }
-  }
   if (pathname.startsWith('/admin/integrations')) {
-    return { label: 'Connect CRM', href: '/admin/integrations' }
-  }
-  if (pathname.startsWith('/admin/ai-brain')) {
-    return { label: 'View insights', href: '/admin/ai-brain' }
+    return { label: 'Connect channels', href: '/admin/integrations' }
   }
   return null
 }

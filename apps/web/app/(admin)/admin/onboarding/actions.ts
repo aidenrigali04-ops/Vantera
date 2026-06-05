@@ -1,6 +1,5 @@
 'use server'
 
-import { bootstrapBusinessContext } from '@/lib/ai'
 import { upsertMemory } from '@/lib/ai/memory'
 import { personalizeVoiceWithAI } from '@/lib/ai/personalize-voice'
 import { getAdminSession, setAdminSession } from '@/lib/auth/session'
@@ -30,7 +29,6 @@ import {
 } from '@/lib/onboarding/pricing-plans'
 import { provisionOwnerWorkspace } from '@/lib/onboarding/provision-workspace'
 import { initSdrCreditAccountFromOnboarding } from '@/lib/sdr/credits'
-import { replaceAccountStageDefinitions } from '@/lib/onboarding/replace-stage-definitions'
 import {
   trackOnboardingStep,
   type OnboardingStepEvent,
@@ -381,10 +379,6 @@ export async function completeOnboardingWithPlan(
     revalidatePath('/admin/onboarding')
     revalidatePath('/admin/dashboard')
 
-    void bootstrapBusinessContext(workspaceId, session.userId).catch(() => {
-      /* swallow — workflow already logs */
-    })
-
     return {
       success: true,
       data: {
@@ -611,10 +605,6 @@ export async function finishOnboardingSetup(
     revalidatePath('/admin', 'layout')
     revalidatePath('/admin/onboarding')
     revalidatePath('/admin/dashboard')
-
-    void bootstrapBusinessContext(workspaceId, session.userId).catch(() => {
-      /* swallow — workflow already logs */
-    })
 
     return {
       success: true,
@@ -983,13 +973,6 @@ async function applyTemplateForAccount(
     throw new Error(deleteAutomationsError.message)
   }
 
-  stageCount = await replaceAccountStageDefinitions(
-    admin,
-    accountId,
-    stages,
-    template.record_type,
-  )
-
   if (flowAutomations.length > 0) {
     const { error: insertAutomationsError } = await admin.from('automations').insert(
       flowAutomations.map((flow) => ({
@@ -1288,10 +1271,6 @@ export async function completeOnboarding(
     revalidatePath('/admin', 'layout')
     revalidatePath('/admin/onboarding')
     revalidatePath('/admin/dashboard')
-
-    void bootstrapBusinessContext(workspaceId, session.userId).catch(() => {
-      /* swallow — workflow already logs */
-    })
 
     return {
       success: true,

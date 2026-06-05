@@ -8,7 +8,6 @@ import { evaluateAllFlags } from '@/lib/feature-flags/evaluate'
 import type { Plan } from '@/lib/feature-flags/flags'
 import { isOnboardingCompleteForAccount } from '@/lib/onboarding/status'
 import { isAdminFullBleedPath } from '@/lib/navigation/admin-page-layout'
-import { hasSampleDataForAccount } from '@/lib/sample-data/queries'
 import { headers } from 'next/headers'
 import type { ReactNode } from 'react'
 
@@ -39,22 +38,12 @@ export default async function AdminLayout({ children }: { children: ReactNode })
     flags = {} as Awaited<ReturnType<typeof evaluateAllFlags>>
   }
 
-  let hasSampleData = false
-  try {
-    if (branding.accountId) {
-      hasSampleData = await hasSampleDataForAccount(branding.accountId)
-    }
-  } catch (err) {
-    console.error('[admin-layout] sample data check threw:', err)
-  }
-
   const pathname = headers().get('x-pathname') ?? ''
   const isOnboardingWizard = pathname.startsWith('/admin/onboarding')
   const isSdrSetupWizard = pathname.startsWith('/admin/outreach/agents/setup')
-  const isPortalPreview = pathname.startsWith('/admin/portal/preview')
   const workspaceFullBleed = isAdminFullBleedPath(pathname)
 
-  if (isOnboardingWizard || isSdrSetupWizard || isPortalPreview) {
+  if (isOnboardingWizard || isSdrSetupWizard) {
     return (
       <BrandingProvider branding={branding}>
         <FeatureFlagProvider flags={flags}>
@@ -70,7 +59,6 @@ export default async function AdminLayout({ children }: { children: ReactNode })
         <ReactQueryProvider>
           <AdminShell
             session={session}
-            hasSampleData={hasSampleData}
             onboardingIncomplete={session.role === 'owner' && !onboardingComplete}
             workspaceFullBleed={workspaceFullBleed}
           >

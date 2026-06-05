@@ -7,7 +7,6 @@
 import { findAuthUserByEmail } from '@/lib/auth/reconcile-orphan'
 import { DEMO_WORKSPACE_NAME } from '@/lib/onboarding/constants'
 import { loadProjectEnv } from '@/lib/load-project-env'
-import { seedSampleWorkspace } from '@/lib/sample-data/seed'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 
 export const DEMO_ONBOARDING_EMAIL = 'demo-onboarding@vantera.demo'
@@ -133,8 +132,6 @@ async function main(): Promise<void> {
     await admin.auth.admin.deleteUser(authUserId)
     throw new Error(userError.message)
   }
-
-  await seedSampleWorkspace(account.id)
 
   const appDomain = process.env.NEXT_PUBLIC_APP_DOMAIN ?? 'lvh.me'
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? `http://${appDomain}:3000`

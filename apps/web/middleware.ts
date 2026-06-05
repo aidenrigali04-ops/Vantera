@@ -1,6 +1,5 @@
 import {
   ADMIN_SESSION_COOKIE,
-  PORTAL_SESSION_COOKIE,
 } from '@/lib/auth/constants'
 import { AUTH_LOGIN_ENTRY } from '@/lib/auth/routes'
 import { verifySessionToken } from '@/lib/auth/jwt'
@@ -25,12 +24,11 @@ type AccountRow = {
   brand_logo_url: string | null
   brand_primary_color: string | null
   brand_secondary_color: string | null
-  portal_domain: string | null
   onboarding_completed_at: string | null
 }
 
 const ACCOUNT_SELECT =
-  'id, slug, name, vertical, plan, brand_logo_url, brand_primary_color, brand_secondary_color, portal_domain, onboarding_completed_at'
+  'id, slug, name, vertical, plan, brand_logo_url, brand_primary_color, brand_secondary_color, onboarding_completed_at'
 
 function shouldSkipTenantResolution(pathname: string): boolean {
   return (
@@ -122,7 +120,6 @@ function applyAccountHeaders(
     'x-brand-logo-url': account.brand_logo_url ?? '',
     'x-brand-primary': account.brand_primary_color ?? '#1648A0',
     'x-brand-secondary': account.brand_secondary_color ?? '#0D9488',
-    'x-portal-domain': account.portal_domain ?? '',
     'x-onboarding-complete': account.onboarding_completed_at ? 'true' : 'false',
   }
 
@@ -159,17 +156,6 @@ async function resolveAccountByHost(
     }
   }
 
-  const { data: portalAccount } = await supabase
-    .from('accounts')
-    .select(ACCOUNT_SELECT)
-    .eq('portal_domain', hostname)
-    .limit(1)
-    .maybeSingle()
-
-  if (portalAccount) {
-    return portalAccount
-  }
-
   // Session fallback: when a freshly-signed-up user is still on the marketing
   // apex (or *.vercel.app, or localhost) before custom DNS is wired up, their
   // admin session cookie is the only signal that tells us which tenant they
@@ -186,17 +172,6 @@ async function resolveAccountByHost(
   if (adminToken && !verifiedAdmin) {
     const payload = await verifySessionToken(adminToken)
     if (payload && payload.type === 'admin' && payload.accountId) {
-      const bySession = await resolveAccountById(String(payload.accountId))
-      if (bySession) {
-        return bySession
-      }
-    }
-  }
-
-  const portalToken = request.cookies.get(PORTAL_SESSION_COOKIE)?.value
-  if (portalToken) {
-    const payload = await verifySessionToken(portalToken)
-    if (payload && payload.type === 'portal' && payload.accountId) {
       const bySession = await resolveAccountById(String(payload.accountId))
       if (bySession) {
         return bySession
@@ -239,9 +214,7 @@ export async function middleware(request: NextRequest) {
   // even on marketing/apex/*.vercel.app hosts. Without this guard a fresh
   // signup on a Vercel preview URL would be bounced back to signup
   // before middleware ever got a chance to read its admin session.
-  const hasAdminSession = Boolean(request.cookies.get(ADMIN_SESSION_COOKIE)?.value)
-  const hasPortalSession = Boolean(request.cookies.get(PORTAL_SESSION_COOKIE)?.value)
-  const hasAnySession = hasAdminSession || hasPortalSession
+  const hasAnySession = Boolean(request.cookies.get(ADMIN_SESSION_COOKIE)?.value)
 
   if (isMarketingHost(hostname, appDomain) && !hasAnySession) {
     return NextResponse.redirect(new URL('/', request.url))
@@ -349,27 +322,6 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/admin/dashboard', request.url))
     }
 
-    // First-session onboarding is explore-first on the demo dashboard.
-    // Owners with incomplete onboarding can access all admin routes until
-    // they choose "keep sample" or "clean slate" via the sample-data banner.
-  }
-
-  if (pathname.startsWith('/portal')) {
-    const sessionToken = request.cookies.get(PORTAL_SESSION_COOKIE)?.value
-
-    if (!sessionToken) {
-      return NextResponse.redirect(new URL('/auth/portal-login', request.url))
-    }
-
-    const payload = await verifySessionToken(sessionToken)
-
-    if (!payload || payload.type !== 'portal') {
-      return NextResponse.redirect(new URL('/auth/portal-login', request.url))
-    }
-
-    if (!resolvedAccount || String(payload.accountId) !== String(resolvedAccount.id)) {
-      return NextResponse.redirect(new URL('/auth/portal-login', request.url))
-    }
   }
 
   response.cookies.getAll().forEach(({ name, value }) => {

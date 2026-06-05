@@ -8,9 +8,19 @@ import type { OnboardingSuccessNotice } from '@/lib/import/fields'
 import { onboardingSuccessStorageKey } from '@/lib/import/fields'
 import { useEffect, useState } from 'react'
 
+const EMPTY_VENTORA: VentoraDashboardPayload = {
+  metrics: [],
+  chartData: [],
+  highlightMonth: null,
+  aiHeadline: '',
+  aiBody: '',
+  aiProgress: null,
+  campaignGroups: [],
+}
+
 type DashboardClientProps = {
   email: string
-  ventora: VentoraDashboardPayload
+  ventora?: VentoraDashboardPayload
   actionFeed: ActionFeedItem[]
   accountId: string
   onboardingIncomplete?: boolean
@@ -20,7 +30,7 @@ type DashboardClientProps = {
 
 export function DashboardClient({
   email,
-  ventora,
+  ventora = EMPTY_VENTORA,
   actionFeed,
   accountId,
   onboardingIncomplete = false,

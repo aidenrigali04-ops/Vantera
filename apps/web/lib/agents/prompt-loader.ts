@@ -1,12 +1,10 @@
-import { loadBusinessContext, toPromptContext } from '@/lib/ai/context'
 import { db } from '@/lib/db/client'
-import { env } from '@/lib/env'
 import {
   clientContextToPromptBlock,
   resolveClientContext,
 } from '@/lib/sdr/resolve-client-context'
-import { users } from '@vantera/db'
-import { and, eq } from 'drizzle-orm'
+import { accounts } from '@vantera/db'
+import { eq } from 'drizzle-orm'
 import { readFile } from 'fs/promises'
 import { join } from 'path'
 
@@ -31,19 +29,13 @@ export function agentIdForTool(toolName: string): AgentPromptId {
   return TOOL_TO_AGENT[toolName] ?? 'message_drafter'
 }
 
-async function loadContextForAccount(accountId: string) {
-  const [owner] = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(and(eq(users.accountId, accountId), eq(users.role, 'owner'), eq(users.isActive, true)))
+async function loadAccountName(accountId: string): Promise<string> {
+  const [row] = await db
+    .select({ name: accounts.name })
+    .from(accounts)
+    .where(eq(accounts.id, accountId))
     .limit(1)
-
-  return loadBusinessContext(
-    accountId,
-    owner?.id ?? accountId,
-    env.NEXT_PUBLIC_APP_URL,
-    env.RESEND_API_KEY || null,
-  )
+  return row?.name ?? 'Vantera workspace'
 }
 
 async function readAgentFile(filename: string): Promise<string | null> {
@@ -85,20 +77,19 @@ export type AssembledAgentPrompt = {
 export async function assembleAgentPrompt(
   input: AssembleAgentPromptInput,
 ): Promise<AssembledAgentPrompt> {
-  const [baseFile, agentFile, businessCtx, clientCtx] = await Promise.all([
+  const [baseFile, agentFile, accountName, clientCtx] = await Promise.all([
     readAgentFile('_base.md'),
     readAgentFile(`${input.agentId}.md`),
-    loadContextForAccount(input.accountId),
+    loadAccountName(input.accountId),
     resolveClientContext(input.accountId),
   ])
 
-  const businessBlock = toPromptContext(businessCtx)
   const clientBlock = clientCtx ? clientContextToPromptBlock(clientCtx) : null
 
   const systemParts = [
     baseFile ? `## Base context\n${baseFile}` : null,
     agentFile ? `## Agent: ${input.agentId}\n${agentFile}` : null,
-    `## Platform profile\n${businessBlock}`,
+    `## Workspace\nAccount: ${accountName}`,
     clientBlock ? `## SDR agent (this account)\n${clientBlock}` : null,
     input.clientOverride?.trim() ? `## Client notes\n${input.clientOverride.trim()}` : null,
     `## Task\n${input.taskInstructions.trim()}`,

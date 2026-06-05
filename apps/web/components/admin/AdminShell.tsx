@@ -4,12 +4,6 @@ import type { AdminSession } from '@/lib/auth/types'
 import type { ReactNode } from 'react'
 import { CommandPalette } from './CommandPalette'
 import { MobileBottomNav } from './MobileBottomNav'
-import { CsvImportModal } from '@/components/onboarding/CsvImportModal'
-import { OnboardingAutoPrompt } from '@/components/onboarding/OnboardingAutoPrompt'
-import { GuidedExplorationHost } from '@/components/onboarding/GuidedExplorationHost'
-import { ProductTourHost } from '@/components/onboarding/product-tour/ProductTourHost'
-import { NewClientDrawer } from '@/components/onboarding/NewClientDrawer'
-import { SampleDataBanner } from './SampleDataBanner'
 import { Sidebar, SidebarMobile } from './Sidebar'
 import { TopHeader } from './TopHeader'
 import { WorkspaceMain } from './WorkspaceMain'
@@ -18,21 +12,15 @@ import { cn } from '@/lib/utils'
 
 type AdminShellProps = {
   session: AdminSession
-  hasSampleData: boolean
   onboardingIncomplete?: boolean
   bare?: boolean
-  /** Allow page content to span full width (tables, kanban). */
+  /** Allow page content to span full width (tables, agents, aspire). */
   workspaceFullBleed?: boolean
   children: ReactNode
 }
 
-/**
- * Vantera application shell — Step 1 global layout.
- * Sidebar (240px) + workspace header + scrollable main canvas.
- */
 export function AdminShell({
   session,
-  hasSampleData,
   onboardingIncomplete = false,
   bare,
   workspaceFullBleed = false,
@@ -40,15 +28,8 @@ export function AdminShell({
 }: AdminShellProps) {
   const { commandPaletteOpen, setCommandPaletteOpen, sidebarCollapsed } = useUIStore()
 
-  const showSampleExperience = hasSampleData && onboardingIncomplete
-
   if (bare) {
-    return (
-      <div className="min-h-screen bg-[#fafaf9]">
-        {showSampleExperience ? <SampleDataBanner accountId={session.accountId} /> : null}
-        {children}
-      </div>
-    )
+    return <div className="min-h-screen bg-[#fafaf9]">{children}</div>
   }
 
   return (
@@ -67,11 +48,10 @@ export function AdminShell({
         </div>
 
         <div className="col-start-1 row-start-1 md:col-start-2">
-          <TopHeader session={session} showDemoWorkspace={showSampleExperience} />
+          <TopHeader session={session} showDemoWorkspace={false} />
         </div>
 
         <div className="col-start-1 row-start-2 flex min-h-0 flex-col overflow-hidden md:col-start-2">
-          {showSampleExperience ? <SampleDataBanner accountId={session.accountId} /> : null}
           <WorkspaceMain constrained={!workspaceFullBleed}>{children}</WorkspaceMain>
         </div>
       </div>
@@ -79,15 +59,6 @@ export function AdminShell({
       <SidebarMobile session={session} />
       <MobileBottomNav />
       <CommandPalette open={commandPaletteOpen} onOpenChange={setCommandPaletteOpen} />
-      <ProductTourHost accountId={session.accountId} enabled={session.role === 'owner'} />
-      <GuidedExplorationHost accountId={session.accountId} enabled={showSampleExperience} deferUntilProductTour />
-      <OnboardingAutoPrompt accountId={session.accountId} enabled={showSampleExperience} />
-      {onboardingIncomplete ? (
-        <>
-          <NewClientDrawer session={session} />
-          <CsvImportModal accountId={session.accountId} />
-        </>
-      ) : null}
     </>
   )
 }

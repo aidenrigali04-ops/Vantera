@@ -10,13 +10,18 @@
 // language patterns work.
 
 import { callModel, parseJsonResponse } from '../client'
-import { toPromptContext, type BusinessContext } from '../context'
 import { recordObservation } from '../memory'
 
 const TOOL_NAME = 'draft-message'
 
+export type AgentContext = {
+  accountId: string
+  /** Pre-formatted prompt block describing the account/agent config. */
+  promptContext: string
+}
+
 export type DraftMessageInput = {
-  ctx: BusinessContext
+  ctx: AgentContext
   contact: {
     id: string
     firstName: string
@@ -72,7 +77,7 @@ export async function draftMessage(
     .join('\n')
 
   const userPrompt = [
-    toPromptContext(input.ctx),
+    input.ctx.promptContext,
     '',
     `Recipient: ${input.contact.firstName}${input.contact.lastName ? ` ${input.contact.lastName}` : ''}`,
     input.contact.memorySummary ? `What we know about them: ${input.contact.memorySummary}` : null,

@@ -11,7 +11,11 @@
 // surface it to the human).
 
 import { callModel, parseJsonResponse } from '../client'
-import { toPromptContext, type BusinessContext } from '../context'
+
+export type AgentContext = {
+  accountId: string
+  promptContext: string
+}
 
 const TOOL_NAME = 'classify-message-intent'
 
@@ -41,7 +45,7 @@ export type RecommendedAction =
   | 'log_only'
 
 export type ClassifyIntentInput = {
-  ctx: BusinessContext
+  ctx: AgentContext
   message: {
     body: string
     channel: 'sms' | 'email' | 'portal'
@@ -91,7 +95,7 @@ export async function classifyMessageIntent(
   input: ClassifyIntentInput,
 ): Promise<{ ok: true; output: ClassifyIntentOutput } | { ok: false; reason: string }> {
   const userPrompt = [
-    toPromptContext(input.ctx),
+    input.ctx.promptContext,
     '',
     `Inbound channel: ${input.message.channel}`,
     `From: ${input.message.contactKnown ? `existing contact (${input.message.contactFirstName ?? 'unknown name'})` : 'NEW / unknown contact'}`,

@@ -2,31 +2,22 @@
 
 import {
   findAccountByAdminEmail,
-  findAccountByPortalEmail,
   resolveAccountFromHost,
   resolveTenantAccountFromHost,
 } from '@/lib/auth/resolve-account'
 import {
   clearAdminSession,
-  clearPortalSession,
-  getPortalSession,
   setAdminSession,
-  setPortalSession,
 } from '@/lib/auth/session'
 import { db } from '@/lib/db/client'
 import { getAccount } from '@/lib/db/queries'
-import { findPortalContactForLogin } from '@/lib/portal/contact-auth'
-import { verifyPortalPassword } from '@/lib/portal/password'
-import { derivePortalLoginPath } from '@/lib/portal/url'
 import type { ActionResult } from '@/lib/auth/types'
 import type { UserRole } from '@/lib/auth/constants'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { DEMO_WORKSPACE_NAME } from '@/lib/onboarding/constants'
 import { AUTH_DASHBOARD_PATH, AUTH_ONBOARDING_PATH } from '@/lib/auth/routes'
-import { seedSampleWorkspace } from '@/lib/sample-data/seed'
 import { headers } from 'next/headers'
-import { contacts } from '@vantera/db'
 import { eq } from 'drizzle-orm'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
@@ -238,80 +229,11 @@ function isOnboardingComplete(account: { onboarding_completed_at?: string | null
   return Boolean(account.onboarding_completed_at)
 }
 
-export async function portalLoginAction(
-  input: z.infer<typeof loginSchema>,
-): Promise<ActionResult<{ redirectTo: string }>> {
-  const validated = loginSchema.safeParse(input)
-
-  if (!validated.success) {
-    return { success: false, error: 'Invalid email or password' }
-  }
-
-  const host = headers().get('host') ?? ''
-
-  let account = await resolveAccountFromHost(host)
-  if (!account) {
-    account = await findAccountByPortalEmail(validated.data.email)
-  }
-
-  if (!account) {
-    return { success: false, error: 'Invalid email or password' }
-  }
-
-  const normalizedEmail = validated.data.email.toLowerCase().trim()
-  const contact = await findPortalContactForLogin(account.id, normalizedEmail)
-
-  if (!contact) {
-    return { success: false, error: 'Invalid email or password' }
-  }
-
-  const passwordOk = await verifyPortalPassword(
-    validated.data.password,
-    contact.portalPasswordHash,
-  )
-
-  if (!passwordOk) {
-    return { success: false, error: 'Invalid email or password' }
-  }
-
-  await db
-    .update(contacts)
-    .set({ portalLastLoginAt: new Date(), updatedAt: new Date() })
-    .where(eq(contacts.id, contact.id))
-
-  await setPortalSession({
-    type: 'portal',
-    contactId: contact.id,
-    accountId: account.id,
-    email: contact.email ?? normalizedEmail,
-  })
-
-  return { success: true, data: { redirectTo: '/portal' } }
-}
-
 export async function adminLogoutAction(): Promise<void> {
   const supabase = createSupabaseServerClient()
   await supabase.auth.signOut()
   await clearAdminSession()
   redirect('/auth/login')
-}
-
-export async function portalLogoutAction(): Promise<void> {
-  const session = await getPortalSession()
-  await clearPortalSession()
-
-  if (session?.accountId) {
-    const account = await getAccount(session.accountId)
-    if (account) {
-      redirect(
-        derivePortalLoginPath(account.slug, account.portalDomain, {
-          portalDomainStatus: account.portalDomainStatus,
-        }),
-      )
-    }
-  }
-
-  redirect('/auth/portal-login')
 }
 
 function slugify(input: string): string {
@@ -517,12 +439,6 @@ export async function signupAction(
     email: normalizedEmail,
   })
 
-  try {
-    await seedSampleWorkspace(account.id)
-  } catch (seedErr) {
-    console.error('[signupAction] sample seed failed:', seedErr)
-  }
-
   if (process.env.NODE_ENV !== 'production') {
     console.log('[signupAction] minted admin session', {
       accountId: account.id,
@@ -675,12 +591,6 @@ export async function completeOAuthSignupAction(
     role: 'owner',
     email,
   })
-
-  try {
-    await seedSampleWorkspace(account.id)
-  } catch (seedErr) {
-    console.error('[completeOAuthSignupAction] sample seed failed:', seedErr)
-  }
 
   return { success: true, data: { redirectTo: AUTH_ONBOARDING_PATH } }
 }

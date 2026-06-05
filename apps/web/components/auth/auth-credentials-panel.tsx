@@ -11,7 +11,6 @@ import { Button } from '@/components/ui/button'
 import {
   adminLoginAction,
   checkEmailAvailableAction,
-  portalLoginAction,
   signupAction,
 } from '@/lib/auth/actions'
 import {
@@ -260,9 +259,8 @@ export function AuthCredentialsPanel({
     setGlobalError(null)
 
     try {
-      const loginFn = portal ? portalLoginAction : adminLoginAction
       const result = await invokeAuthAction(
-        () => loginFn(values),
+        () => adminLoginAction(values),
         loginFallbackPath,
       )
 
