@@ -36,7 +36,7 @@ export function LinkedInOutreachHelpArticle({ appOrigin }: Props) {
             .
           </li>
           <li>
-            <span className="font-medium text-[var(--text-primary)]">Install the Chrome add-on.</span>
+            <span className="font-medium text-[var(--text-primary)]">Install from the Chrome Web Store.</span>
             <div className="mt-3">
               <LinkedInExtensionInstallSteps />
             </div>
@@ -45,10 +45,10 @@ export function LinkedInOutreachHelpArticle({ appOrigin }: Props) {
             <span className="font-medium text-[var(--text-primary)]">Connect to Vantera.</span>
             <ul className="mt-2 list-disc space-y-1.5 pl-5">
               <li>
-                In Vantera, click <strong>Set up LinkedIn add-on</strong> →{' '}
+                In Vantera, open <strong>Set up LinkedIn add-on</strong> →{' '}
                 <strong>Get connection code</strong> (copy immediately — shown once).
               </li>
-              <li>Open the add-on from the Chrome toolbar (puzzle icon → Vantera LinkedIn Outreach).</li>
+              <li>Open the extension from the Chrome toolbar (puzzle icon → Vantera LinkedIn Outreach).</li>
               <li>
                 Paste your <strong>Vantera web address</strong> — the same link you use to sign in.
                 {appOrigin ? (

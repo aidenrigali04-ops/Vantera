@@ -1,20 +1,5 @@
-# Vantera LinkedIn add-on (Chrome)
+# Vantera LinkedIn extension (Chrome)
 
-This is **not** listed in the Chrome Web Store. Install it manually:
+**Users:** install from the [Chrome Web Store](https://chromewebstore.google.com/) (search “Vantera LinkedIn Outreach”), then connect with a code from Vantera → Outreach → LinkedIn.
 
-## For Vantera users (recommended)
-
-1. In Vantera: **Outreach → LinkedIn → Set up LinkedIn add-on**, or **Help Center → Set up LinkedIn outreach**.
-2. Click **Download Vantera LinkedIn add-on (zip)**.
-3. Unzip the file.
-4. Chrome → `chrome://extensions` → **Developer mode** on → **Load unpacked** → select the unzipped folder.
-5. Pin **Vantera LinkedIn Outreach** from the extensions puzzle icon.
-6. Paste your Vantera web address and connection code in the add-on popup.
-
-## For developers
-
-```bash
-./scripts/pack-linkedin-extension.sh
-```
-
-Updates `apps/web/public/vantera-linkedin-extension.zip` for production download.
+**Developers:** edit files here, then run `pnpm pack:linkedin-extension` only if you need a local zip for testing. Production users should use the store listing, not a manual zip.

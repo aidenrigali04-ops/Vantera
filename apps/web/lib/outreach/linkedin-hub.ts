@@ -99,7 +99,7 @@ function buildSetupSteps(
     {
       id: 'connect',
       title: 'Connect LinkedIn',
-      description: 'Install the Vantera LinkedIn add-on in Chrome and link it with a connection code.',
+      description: 'Install Vantera LinkedIn Outreach from the Chrome Web Store and link it with a connection code.',
       status: connected ? 'complete' : 'current',
     },
     {

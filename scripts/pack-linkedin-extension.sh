@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Rebuild the Chrome extension zip served from /vantera-linkedin-extension.zip
+# Optional: local zip for dev testing (not linked in the Vantera UI — users use Chrome Web Store).
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SRC="$ROOT/apps/linkedin-extension"
