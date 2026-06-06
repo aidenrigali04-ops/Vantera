@@ -3,6 +3,7 @@
 import { VentoraDashboardView } from '@/components/dashboard/ventora/VentoraDashboardView'
 import type { SdrAgentCard } from '@/lib/agents/types'
 import type { ActionFeedItem } from '@/lib/dashboard/action-feed'
+import type { RevenueProgress } from '@/components/dashboard/MrrProgressPanel'
 import type { VentoraDashboardPayload } from '@/lib/dashboard/ventora-types'
 import type { OnboardingSuccessNotice } from '@/lib/import/fields'
 import { onboardingSuccessStorageKey } from '@/lib/import/fields'
@@ -26,6 +27,7 @@ type DashboardClientProps = {
   onboardingIncomplete?: boolean
   isEmpty?: boolean
   sdrAgents?: SdrAgentCard[]
+  revenueProgress: RevenueProgress
 }
 
 export function DashboardClient({
@@ -36,6 +38,7 @@ export function DashboardClient({
   onboardingIncomplete = false,
   isEmpty = false,
   sdrAgents = [],
+  revenueProgress,
 }: DashboardClientProps) {
   const showCleanSlate = isEmpty && onboardingIncomplete
   const showDemoGuide = onboardingIncomplete && !showCleanSlate
@@ -74,6 +77,7 @@ export function DashboardClient({
         email={email}
         actionFeed={actionFeed}
         sdrAgents={sdrAgents}
+        revenueProgress={revenueProgress}
         showCleanSlate={showCleanSlate}
         showDemoGuide={showDemoGuide}
         successNotice={successNotice}

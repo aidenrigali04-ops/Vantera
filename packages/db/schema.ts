@@ -154,6 +154,11 @@ export const accounts = pgTable('accounts', {
   stripeSubscriptionId: varchar('stripe_subscription_id', { length: 255 }),
   onboardingCompletedAt: timestamptz('onboarding_completed_at'),
 
+  /** Monthly revenue goal (MRR target, whole dollars) set during onboarding. */
+  mrrGoal: integer('mrr_goal'),
+  /** Average monthly revenue per won client — powers MRR progress on the dashboard. */
+  avgClientValue: integer('avg_client_value'),
+
   // Personalization profile (used by `personalizeTemplate` at apply time).
   // All optional — falls back to portal-URL defaults when null.
   bookingLink: text('booking_link'),

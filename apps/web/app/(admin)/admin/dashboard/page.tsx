@@ -2,6 +2,7 @@ import { requireAdminSession } from '@/lib/auth/require-session'
 import { getBrandingFromHeaders } from '@/lib/branding/server'
 import { getOperationalActionFeed, type ActionFeedItem } from '@/lib/dashboard/action-feed'
 import { getSdrAgentCards } from '@/lib/agents/queries'
+import { getRevenueProgress } from '@/lib/revenue/queries'
 import { isOnboardingCompleteForAccount } from '@/lib/onboarding/status'
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
@@ -40,9 +41,10 @@ export default async function AdminDashboardPage() {
     redirect(AUTH_ONBOARDING_PATH)
   }
 
-  const [actionFeed, sdrAgents] = await Promise.all([
+  const [actionFeed, sdrAgents, revenueProgress] = await Promise.all([
     getOperationalActionFeed(session.accountId),
     getSdrAgentCards(session.accountId),
+    getRevenueProgress(session.accountId),
   ])
 
   return (
@@ -52,6 +54,7 @@ export default async function AdminDashboardPage() {
       accountId={session.accountId}
       onboardingIncomplete={onboardingIncomplete}
       sdrAgents={sdrAgents}
+      revenueProgress={revenueProgress}
     />
   )
 }

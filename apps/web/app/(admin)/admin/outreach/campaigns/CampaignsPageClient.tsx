@@ -94,26 +94,34 @@ export function CampaignsPageClient({ campaigns, defaultChannel = 'email' }: Pro
   return (
     <div className="space-y-6">
       <PageHeader
-        title={isLinkedIn ? 'LinkedIn campaigns' : 'Email campaigns'}
-        description={
-          isLinkedIn
-            ? 'Connection notes and LinkedIn-only sequences — send on LinkedIn from the LinkedIn hub.'
-            : 'Goal-based email outreach — domain, audience, message, and results in one flow.'
-        }
+        title="Campaigns"
+        description="Goal-based outreach — pick a goal, choose leads from your pipeline, draft, and launch."
         actions={
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" asChild>
-              <Link href={isLinkedIn ? '/admin/outreach/linkedin' : '/admin/outreach/email'}>
-                Back to {isLinkedIn ? 'LinkedIn' : 'email'} hub
-              </Link>
-            </Button>
-            <Button onClick={() => setOpen(true)}>
-              <Plus className="mr-1.5 h-4 w-4" />
-              New {isLinkedIn ? 'LinkedIn' : 'email'} campaign
-            </Button>
-          </div>
+          <Button onClick={() => setOpen(true)}>
+            <Plus className="mr-1.5 h-4 w-4" />
+            New campaign
+          </Button>
         }
       />
+
+      {/* Channel is a filter on one Campaigns surface — not a separate page. */}
+      <div className="inline-flex rounded-lg border border-stone-200 bg-stone-50 p-0.5 text-sm">
+        {(['email', 'linkedin'] as const).map((ch) => (
+          <Link
+            key={ch}
+            href={`/admin/outreach/campaigns?channel=${ch}`}
+            scroll={false}
+            className={cn(
+              'rounded-md px-3 py-1.5 font-medium transition-colors',
+              defaultChannel === ch
+                ? 'bg-white text-stone-900 shadow-sm'
+                : 'text-stone-500 hover:text-stone-800',
+            )}
+          >
+            {ch === 'email' ? 'Email' : 'LinkedIn'}
+          </Link>
+        ))}
+      </div>
 
       {campaigns.length === 0 ? (
         <div className="rounded-xl border border-dashed border-stone-200 bg-stone-50/50 px-6 py-12 text-center">

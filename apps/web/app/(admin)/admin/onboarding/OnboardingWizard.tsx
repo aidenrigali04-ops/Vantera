@@ -18,6 +18,7 @@ import { Step1BusinessDetails } from './steps/Step1BusinessDetails'
 import { Step2AiOverview } from './steps/Step2AiOverview'
 import { Step3LeadPreview } from './steps/Step3LeadPreview'
 import { Step4Subscription } from './steps/Step4Subscription'
+import { StepRevenueGoal } from './steps/StepRevenueGoal'
 
 type StoredWizardState = {
   step?: number
@@ -29,6 +30,7 @@ const STEP_IDS: OnboardingStepId[] = [
   'business_details',
   'ai_overview',
   'lead_preview',
+  'revenue_goal',
   'subscription',
 ]
 
@@ -200,7 +202,9 @@ function OnboardingWizardInner({
 
           {stepIndex === 2 ? <Step3LeadPreview leads={previewLeads} /> : null}
 
-          {stepIndex === 3 ? (
+          {stepIndex === 3 ? <StepRevenueGoal accountId={accountId} /> : null}
+
+          {stepIndex === 4 ? (
             <Step4Subscription accountId={accountId} onComplete={() => {}} />
           ) : null}
         </motion.div>

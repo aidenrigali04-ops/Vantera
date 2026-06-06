@@ -6,6 +6,7 @@ import { VentoraMetricCards } from '@/components/dashboard/ventora/VentoraMetric
 import { VentoraOverviewChart } from '@/components/dashboard/ventora/VentoraOverviewChart'
 import { VentoraPageChrome } from '@/components/dashboard/ventora/VentoraPageChrome'
 import { SdrAgentsPromo } from '@/components/dashboard/SdrAgentsPromo'
+import { MrrProgressPanel, type RevenueProgress } from '@/components/dashboard/MrrProgressPanel'
 import { CleanSlateWelcome } from '@/components/onboarding/CleanSlateWelcome'
 import type { VentoraDashboardPayload } from '@/lib/dashboard/ventora-types'
 import type { SdrAgentCard } from '@/lib/agents/types'
@@ -20,6 +21,7 @@ type Props = {
   email: string
   actionFeed: ActionFeedItem[]
   sdrAgents: SdrAgentCard[]
+  revenueProgress: RevenueProgress
   showCleanSlate: boolean
   showDemoGuide: boolean
   successNotice: OnboardingSuccessNotice | null
@@ -37,6 +39,7 @@ function DashboardSections({
   ventora,
   actionFeed,
   sdrAgents,
+  revenueProgress,
   successNotice,
   onDismissSuccessNotice,
 }: Pick<
@@ -44,6 +47,7 @@ function DashboardSections({
   | 'ventora'
   | 'actionFeed'
   | 'sdrAgents'
+  | 'revenueProgress'
   | 'successNotice'
   | 'onDismissSuccessNotice'
 >) {
@@ -53,7 +57,12 @@ function DashboardSections({
 
   return (
     <>
-      {/* Core loop first: the agent, then what needs your attention today. */}
+      {/* The number that matters most: progress to the revenue goal. */}
+      <motion.div variants={fadeUp}>
+        <MrrProgressPanel data={revenueProgress} />
+      </motion.div>
+
+      {/* Core loop: the agent, then what needs your attention today. */}
       {sdrAgents.length > 0 ? (
         <motion.div variants={fadeUp}>
           <SdrAgentsPromo agents={sdrAgents} />
@@ -95,6 +104,7 @@ export function VentoraDashboardView({
   email,
   actionFeed,
   sdrAgents,
+  revenueProgress,
   showCleanSlate,
   showDemoGuide,
   successNotice,
@@ -120,6 +130,7 @@ export function VentoraDashboardView({
           ventora={ventora}
           actionFeed={actionFeed}
           sdrAgents={sdrAgents}
+          revenueProgress={revenueProgress}
           successNotice={successNotice}
           onDismissSuccessNotice={onDismissSuccessNotice}
         />
@@ -139,6 +150,7 @@ export function VentoraDashboardView({
         ventora={ventora}
         actionFeed={actionFeed}
         sdrAgents={sdrAgents}
+        revenueProgress={revenueProgress}
         successNotice={successNotice}
         onDismissSuccessNotice={onDismissSuccessNotice}
       />
