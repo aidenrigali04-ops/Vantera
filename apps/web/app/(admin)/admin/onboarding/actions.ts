@@ -38,6 +38,7 @@ import { getBrandingFromHeaders } from '@/lib/branding/server'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { headers } from 'next/headers'
 import {
+  accounts,
   integrationCredentials,
   personalizeTemplate,
   users,
@@ -273,7 +274,7 @@ export async function fetchPreviewLeadsAction(
       icpSummary: account.icp_summary ?? account.icp_description,
     })
 
-    void trackOnboardingStep(workspaceId, 'ai_overview', 'completed', {
+    void trackOnboardingStep(workspaceId, 'lead_preview', 'completed', {
       leadCount: leads.length,
       usedStubFallback,
     })
@@ -322,9 +323,24 @@ export async function completeOnboardingWithPlan(
     const account = await fetchAccountById(workspaceId)
     const icpDescription = account?.icp_description?.trim() ?? ''
     const valueProposition = account?.value_proposition?.trim() ?? ''
+    const websiteUrl = account?.website_url?.trim() ?? ''
+
+    if (websiteUrl.length < 4) {
+      return err('Complete the business details step first')
+    }
 
     if (icpDescription.length < 20) {
-      return err('Complete the earlier onboarding steps first')
+      return err('Confirm your ideal customer profile before finishing setup')
+    }
+
+    const [revenueGoal] = await db
+      .select({ mrrGoal: accounts.mrrGoal })
+      .from(accounts)
+      .where(eq(accounts.id, workspaceId))
+      .limit(1)
+
+    if (!revenueGoal?.mrrGoal || revenueGoal.mrrGoal <= 0) {
+      return err('Set your revenue goal before finishing setup')
     }
 
     const saved = await patchAccountRow(workspaceId, {
@@ -501,6 +517,8 @@ export async function saveOnboardingIcp(
       return err(saved.message)
     }
 
+    void trackOnboardingStep(workspaceId, 'icp', 'completed')
+
     revalidatePath('/admin/onboarding')
     return { success: true, data: { saved: true } }
   } catch (error) {
@@ -597,22 +615,7 @@ export async function finishOnboardingSetup(
       console.error('[finishOnboardingSetup] ai_memory upsert failed', memoryErr)
     }
 
-    const marked = await markOnboardingComplete(workspaceId)
-    if (!marked.ok) {
-      return err(marked.message)
-    }
-
-    revalidatePath('/admin', 'layout')
-    revalidatePath('/admin/onboarding')
-    revalidatePath('/admin/dashboard')
-
-    return {
-      success: true,
-      data: {
-        completed: true,
-        redirectTo: '/admin/dashboard',
-      },
-    }
+    return err('Complete all setup steps in the onboarding wizard before accessing the platform.')
   } catch (error) {
     rethrowFrameworkSignals(error)
     return err(error instanceof Error ? error.message : 'Failed to complete onboarding')
@@ -1258,27 +1261,7 @@ export async function completeOnboarding(
       return err('Only the account owner can complete onboarding')
     }
 
-    const marked = await markOnboardingComplete(workspaceId)
-    if (!marked.ok) {
-      console.error('[completeOnboarding] markOnboardingComplete failed', {
-        workspaceId,
-        userId: session.userId,
-        message: marked.message,
-      })
-      return err(marked.message)
-    }
-
-    revalidatePath('/admin', 'layout')
-    revalidatePath('/admin/onboarding')
-    revalidatePath('/admin/dashboard')
-
-    return {
-      success: true,
-      data: {
-        completed: true,
-        redirectTo: '/admin/dashboard',
-      },
-    }
+    return err('Complete all setup steps in the onboarding wizard before accessing the platform.')
   } catch (error) {
     rethrowFrameworkSignals(error)
     return err(error instanceof Error ? error.message : 'Failed to complete onboarding')

@@ -3,22 +3,14 @@
 import type { BusinessAnalysis } from '@/lib/onboarding/onboarding-wizard-types'
 import { motion } from 'framer-motion'
 import { Building2, Target, Users } from 'lucide-react'
-import { useCallback, useState } from 'react'
+import { useCallback } from 'react'
 import { useRegisterOnboardingStep } from '../onboarding-nav'
-import { fetchPreviewLeadsAction } from '../actions'
-import type { PreviewLead } from '@/lib/onboarding/onboarding-wizard-types'
-import {
-  StepError,
-  fadeUp,
-  rethrowFrameworkNavigation,
-  runStepAction,
-  stepContainer,
-} from '../_primitives'
+import { recordOnboardingStepEvent } from '../actions'
+import { StepError, fadeUp, stepContainer } from '../_primitives'
 
 type Props = {
   accountId: string
   analysis: BusinessAnalysis | null
-  onLeadsReady: (leads: PreviewLead[]) => void
 }
 
 function InsightCard({
@@ -47,48 +39,17 @@ function InsightCard({
   )
 }
 
-export function Step2AiOverview({ accountId, analysis, onLeadsReady }: Props) {
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
+export function Step2AiOverview({ accountId, analysis }: Props) {
   const submit = useCallback(async (): Promise<boolean> => {
-    if (!analysis) {
-      setError('Go back and enter your business details first.')
-      return false
-    }
-
-    setError(null)
-    setLoading(true)
-
-    try {
-      const result = await runStepAction(() => fetchPreviewLeadsAction(accountId))
-
-      if (result == null) {
-        setError('The server did not respond. Refresh the page and try again.')
-        return false
-      }
-
-      if (result.success !== true) {
-        setError(('error' in result && result.error) || 'Could not find leads. Try again.')
-        return false
-      }
-
-      onLeadsReady(result.data.leads)
-      return true
-    } catch (err) {
-      rethrowFrameworkNavigation(err)
-      setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
-      return false
-    } finally {
-      setLoading(false)
-    }
-  }, [accountId, analysis, onLeadsReady])
+    if (!analysis) return false
+    void recordOnboardingStepEvent(accountId, 'ai_overview', 'completed')
+    return true
+  }, [accountId, analysis])
 
   useRegisterOnboardingStep({
     canAdvance: Boolean(analysis),
-    isSubmitting: loading,
+    isSubmitting: false,
     submit,
-    primaryLabel: loading ? 'Finding leads…' : 'Find My Leads',
   })
 
   if (!analysis) {
@@ -105,7 +66,6 @@ export function Step2AiOverview({ accountId, analysis, onLeadsReady }: Props) {
         <InsightCard icon={Users} label="Who you reach" value={analysis.icpDescription} />
       </motion.div>
 
-      {error ? <StepError message={error} /> : null}
     </motion.div>
   )
 }

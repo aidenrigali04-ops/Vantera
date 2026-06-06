@@ -1,26 +1,12 @@
 'use server'
 
-import { markOnboardingComplete } from '@/lib/onboarding/account-store'
-import { isOnboardingCompleteForAccount } from '@/lib/onboarding/status'
-import { revalidatePath } from 'next/cache'
-
-/** Marks onboarding complete for workspace owners on their first real action. */
+/**
+ * @deprecated Onboarding completion is only allowed through the setup wizard.
+ * Kept as a no-op so stale imports fail loudly at compile time if reintroduced.
+ */
 export async function tryCompleteOnboardingForOwner(
-  accountId: string,
-  role: string,
+  _accountId: string,
+  _role: string,
 ): Promise<boolean> {
-  if (role !== 'owner') return false
-
-  const alreadyComplete = await isOnboardingCompleteForAccount(accountId)
-  if (alreadyComplete) return false
-
-  const marked = await markOnboardingComplete(accountId)
-  if (!marked.ok) return false
-
-  revalidatePath('/admin', 'layout')
-  revalidatePath('/admin/dashboard')
-  revalidatePath('/admin/clients')
-  revalidatePath('/admin/crm/pipeline')
-
-  return true
+  return false
 }

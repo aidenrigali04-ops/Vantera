@@ -1,7 +1,8 @@
 import {
   ADMIN_SESSION_COOKIE,
 } from '@/lib/auth/constants'
-import { AUTH_LOGIN_ENTRY } from '@/lib/auth/routes'
+import { AUTH_LOGIN_ENTRY, AUTH_ONBOARDING_PATH } from '@/lib/auth/routes'
+import { shouldRedirectOwnerToOnboardingByTimestamp } from '@/lib/onboarding/admin-access'
 import { verifySessionToken } from '@/lib/auth/jwt'
 import type { AdminSession } from '@/lib/auth/types'
 import { canAccessAdminRoute } from '@/lib/auth/rbac'
@@ -322,6 +323,16 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/admin/dashboard', request.url))
     }
 
+    if (
+      resolvedAccount &&
+      shouldRedirectOwnerToOnboardingByTimestamp({
+        role: payload.role,
+        onboardingCompletedAt: resolvedAccount.onboarding_completed_at,
+        pathname,
+      })
+    ) {
+      return NextResponse.redirect(new URL(AUTH_ONBOARDING_PATH, request.url))
+    }
   }
 
   response.cookies.getAll().forEach(({ name, value }) => {

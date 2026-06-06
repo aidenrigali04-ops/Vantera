@@ -6,9 +6,12 @@ import { getBrandingFromHeaders } from '@/lib/branding/server'
 import { FeatureFlagProvider } from '@/lib/feature-flags/context'
 import { evaluateAllFlags } from '@/lib/feature-flags/evaluate'
 import type { Plan } from '@/lib/feature-flags/flags'
+import { AUTH_ONBOARDING_PATH } from '@/lib/auth/routes'
+import { shouldRedirectOwnerToOnboarding } from '@/lib/onboarding/admin-access'
 import { isOnboardingCompleteForAccount } from '@/lib/onboarding/status'
 import { isAdminFullBleedPath } from '@/lib/navigation/admin-page-layout'
 import { headers } from 'next/headers'
+import { redirect } from 'next/navigation'
 import type { ReactNode } from 'react'
 
 export const dynamic = 'force-dynamic'
@@ -42,6 +45,16 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   const isOnboardingWizard = pathname.startsWith('/admin/onboarding')
   const isSdrSetupWizard = pathname.startsWith('/admin/outreach/agents/setup')
   const workspaceFullBleed = isAdminFullBleedPath(pathname)
+
+  if (
+    shouldRedirectOwnerToOnboarding({
+      role: session.role,
+      onboardingComplete,
+      pathname,
+    })
+  ) {
+    redirect(AUTH_ONBOARDING_PATH)
+  }
 
   if (isOnboardingWizard || isSdrSetupWizard) {
     return (

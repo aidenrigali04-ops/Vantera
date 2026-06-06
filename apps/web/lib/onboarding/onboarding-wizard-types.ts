@@ -45,6 +45,7 @@ export type PreviewLead = {
 export type OnboardingStepId =
   | 'business_details'
   | 'ai_overview'
+  | 'icp'
   | 'lead_preview'
   | 'revenue_goal'
   | 'subscription'

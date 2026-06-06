@@ -4,7 +4,6 @@ import type { ActionResult } from '@/lib/auth/types'
 import { requireAdminSession } from '@/lib/auth/require-session'
 import { db } from '@/lib/db/client'
 import { findLeadById } from '@/lib/leads/queries'
-import { tryCompleteOnboardingForOwner } from '@/lib/onboarding/complete-on-first-action'
 import { activities, leads } from '@vantera/db'
 import { and, eq, inArray, isNull } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
@@ -52,8 +51,6 @@ export async function createLead(input: CreateLeadInput): Promise<ActionResult<{
     activityType: 'lead_created',
     body: 'Lead added to pipeline',
   })
-
-  await tryCompleteOnboardingForOwner(session.accountId, session.role)
 
   revalidatePath('/admin/crm/pipeline')
   revalidatePath('/admin/dashboard')

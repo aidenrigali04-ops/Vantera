@@ -3,7 +3,6 @@
 import type { ActionResult } from '@/lib/auth/types'
 import { requireAdminSession } from '@/lib/auth/require-session'
 import { db } from '@/lib/db/client'
-import { tryCompleteOnboardingForOwner } from '@/lib/onboarding/complete-on-first-action'
 import type { ImportEntity } from '@/lib/import/fields'
 import { activities, contacts, leads, records, stageDefinitions } from '@vantera/db'
 import { and, eq, ilike, isNull, or } from 'drizzle-orm'
@@ -115,10 +114,6 @@ const LEAD_STATUSES = new Set([
   'lost',
 ])
 
-async function finalizeOnboardingIfOwner(accountId: string, role: string) {
-  await tryCompleteOnboardingForOwner(accountId, role)
-}
-
 export async function importClientsFromCsv(
   rows: Record<string, string>[],
 ): Promise<ActionResult<ImportResult>> {
@@ -188,7 +183,6 @@ export async function importClientsFromCsv(
   }
 
   if (imported > 0) {
-    await finalizeOnboardingIfOwner(session.accountId, session.role)
     revalidatePath('/admin/clients')
     revalidatePath('/admin/dashboard')
   }
@@ -259,7 +253,6 @@ export async function importLeadsFromCsv(
   }
 
   if (imported > 0) {
-    await finalizeOnboardingIfOwner(session.accountId, session.role)
     revalidatePath('/admin/crm/pipeline')
     revalidatePath('/admin/dashboard')
   }
@@ -391,7 +384,6 @@ export async function importDealsFromCsv(
   }
 
   if (imported > 0) {
-    await finalizeOnboardingIfOwner(session.accountId, session.role)
     revalidatePath('/admin/dashboard')
     revalidatePath('/admin/clients')
   }

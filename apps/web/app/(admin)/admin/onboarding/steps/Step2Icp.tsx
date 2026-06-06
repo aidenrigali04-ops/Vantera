@@ -4,7 +4,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { motion } from 'framer-motion'
 import { useCallback, useEffect, useState } from 'react'
 import { useRegisterOnboardingStep } from '../onboarding-nav'
-import { getOnboardingProfile, saveOnboardingIcp } from '../actions'
+import type { PreviewLead } from '@/lib/onboarding/onboarding-wizard-types'
+import { fetchPreviewLeadsAction, getOnboardingProfile, saveOnboardingIcp } from '../actions'
 import {
   FieldGroup,
   StepError,
@@ -19,9 +20,10 @@ const MAX_LENGTH = 2000
 
 type Props = {
   accountId: string
+  onLeadsReady: (leads: PreviewLead[]) => void
 }
 
-export function Step2Icp({ accountId }: Props) {
+export function Step2Icp({ accountId, onLeadsReady }: Props) {
   const [icp, setIcp] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -71,6 +73,13 @@ export function Step2Icp({ accountId }: Props) {
         return false
       }
 
+      const leadsResult = await runStepAction(() => fetchPreviewLeadsAction(accountId))
+      if (!leadsResult?.success) {
+        setError(leadsResult?.error ?? 'Could not find leads. Try again.')
+        return false
+      }
+
+      onLeadsReady(leadsResult.data.leads)
       return true
     } catch (err) {
       rethrowFrameworkNavigation(err)
@@ -79,12 +88,13 @@ export function Step2Icp({ accountId }: Props) {
     } finally {
       setSaving(false)
     }
-  }, [accountId, canAdvance, trimmed])
+  }, [accountId, canAdvance, onLeadsReady, trimmed])
 
   useRegisterOnboardingStep({
     canAdvance: !loading && canAdvance,
     isSubmitting: saving,
     submit,
+    primaryLabel: saving ? 'Finding leads…' : 'Confirm & find leads',
   })
 
   if (loading) {
