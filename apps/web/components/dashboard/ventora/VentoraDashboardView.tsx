@@ -47,8 +47,13 @@ function DashboardSections({
   | 'successNotice'
   | 'onDismissSuccessNotice'
 >) {
+  const hasMetrics = ventora.metrics.length > 0
+  const hasChart = ventora.chartData.length > 0
+  const hasCampaigns = ventora.campaignGroups.length > 0
+
   return (
     <>
+      {/* Core loop first: the agent, then what needs your attention today. */}
       {sdrAgents.length > 0 ? (
         <motion.div variants={fadeUp}>
           <SdrAgentsPromo agents={sdrAgents} />
@@ -61,28 +66,26 @@ function DashboardSections({
             items={actionFeed}
             successNotice={successNotice}
             onDismissSuccessNotice={onDismissSuccessNotice}
-            maxVisible={4}
+            maxVisible={5}
           />
         </motion.div>
       ) : null}
 
-      <VentoraMetricCards metrics={ventora.metrics} />
+      {/* Analytics render only when there is real data — no empty husks. */}
+      {hasMetrics ? <VentoraMetricCards metrics={ventora.metrics} /> : null}
 
-      <motion.div variants={fadeUp} className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="lg:col-span-2">
-          <VentoraOverviewChart
-            data={ventora.chartData}
-            highlightMonth={ventora.highlightMonth}
-          />
-        </div>
-        <VentoraAiOverview
-          headline={ventora.aiHeadline}
-          body={ventora.aiBody}
-          progress={ventora.aiProgress}
-        />
-      </motion.div>
+      {hasChart ? (
+        <motion.div variants={fadeUp} className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <div className="lg:col-span-2">
+            <VentoraOverviewChart data={ventora.chartData} highlightMonth={ventora.highlightMonth} />
+          </div>
+          {ventora.aiHeadline ? (
+            <VentoraAiOverview headline={ventora.aiHeadline} body={ventora.aiBody} progress={ventora.aiProgress} />
+          ) : null}
+        </motion.div>
+      ) : null}
 
-      <VentoraCampaignsTable groups={ventora.campaignGroups} />
+      {hasCampaigns ? <VentoraCampaignsTable groups={ventora.campaignGroups} /> : null}
     </>
   )
 }

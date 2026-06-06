@@ -4,7 +4,6 @@ import {
   BarChart2,
   Bell,
   Bot,
-  Brain,
   Calendar,
   CheckSquare,
   ClipboardList,
@@ -29,12 +28,10 @@ import {
   Share2,
   Shield,
   Sparkles,
-  Telescope,
   UserPlus,
   Users,
   UsersRound,
   Workflow,
-  Zap,
 } from 'lucide-react'
 
 export type AdminNavItem = {
@@ -67,73 +64,54 @@ export type AdminNavHub = {
   related: AdminNavHubLink[]
 }
 
-/** Sidebar — primary destinations. */
+/** Sidebar — primary destinations, ordered by the core loop. */
 export const ADMIN_NAV_SIDEBAR: AdminNavItem[] = [
-  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, href: '/admin/dashboard' },
-  {
-    id: 'prospects',
-    label: 'Prospects',
-    icon: Telescope,
-    href: '/admin/outreach/aspire',
-    tourAnchor: 'nav-prospects',
-  },
-  {
-    id: 'outreach',
-    label: 'Campaigns',
-    icon: Megaphone,
-    href: '/admin/outreach/campaigns',
-    tourAnchor: 'nav-outreach',
-  },
+  { id: 'dashboard', label: 'Home', icon: LayoutDashboard, href: '/admin/dashboard' },
+  { id: 'pipeline', label: 'Pipeline', icon: FolderKanban, href: '/admin/leads', tourAnchor: 'nav-pipeline' },
+  { id: 'agent', label: 'Agent', icon: Bot, href: '/admin/sdr-agents', tourAnchor: 'nav-agents' },
+  { id: 'outreach', label: 'Campaigns', icon: Megaphone, href: '/admin/outreach/campaigns', tourAnchor: 'nav-outreach' },
+  { id: 'inbox', label: 'Inbox', icon: Inbox, href: '/admin/inbox' },
 ]
 
-/** Secondary sidebar links (below main nav divider). */
-export const ADMIN_NAV_SIDEBAR_SECONDARY: AdminNavItem[] = [
-  {
-    id: 'agents',
-    label: 'Agents',
-    icon: Bot,
-    href: '/admin/outreach/agents',
-    tourAnchor: 'nav-agents',
-  },
-  { id: 'linkedin', label: 'LinkedIn', icon: Share2, href: '/admin/outreach/linkedin' },
-  { id: 'email', label: 'Email', icon: Mail, href: '/admin/outreach/email' },
-]
+/**
+ * Secondary sidebar links. Channels (LinkedIn/Email/SMS) are attributes of a
+ * sequence, not destinations — they live as tabs inside Agent/Campaigns.
+ */
+export const ADMIN_NAV_SIDEBAR_SECONDARY: AdminNavItem[] = []
 
 /**
  * Grouped areas shown on the dashboard — one primary CTA per hub plus compact related links.
  */
 export const ADMIN_NAV_HUBS: AdminNavHub[] = [
   {
-    id: 'prospects',
-    title: 'Prospect Scout',
-    description: 'Find and qualify leads from 285M prospects using your ICP filters.',
-    sidebarId: 'prospects',
-    primary: { id: 'aspire', label: 'Browse prospects', href: '/admin/outreach/aspire', icon: Telescope },
+    id: 'agent',
+    title: 'SDR Agent',
+    description: 'Your autonomous agent — it prospects, profiles, writes the copy, and runs multi-channel sequences.',
+    sidebarId: 'agent',
+    primary: { id: 'agent-overview', label: 'Open agent', href: '/admin/sdr-agents', icon: Bot },
     related: [
-      { id: 'agents-scout', label: 'Scout agent', href: '/admin/outreach/agents/scout', icon: Bot },
+      { id: 'agent-setup', label: 'Setup', href: '/admin/outreach/agents/setup', icon: Settings },
+      { id: 'agent-sequences', label: 'Sequences', href: '/admin/outreach/agents/sequences', icon: Workflow },
     ],
   },
   {
     id: 'outreach',
-    title: 'Outreach',
-    description: 'LinkedIn, email, and SMS sequences — drafted by AI, sent automatically.',
+    title: 'Campaigns',
+    description: 'Build and launch manual multi-channel campaigns — LinkedIn, email, and SMS.',
     sidebarId: 'outreach',
     primary: { id: 'campaigns', label: 'Campaigns', href: '/admin/outreach/campaigns', icon: Megaphone },
     related: [
       { id: 'linkedin', label: 'LinkedIn', href: '/admin/outreach/linkedin', icon: Share2 },
       { id: 'email', label: 'Email', href: '/admin/outreach/email', icon: Mail },
-      { id: 'sequences', label: 'Sequences', href: '/admin/outreach/agents/sequences', icon: Workflow },
     ],
   },
   {
-    id: 'agents',
-    title: 'Agents',
-    description: 'Configure and monitor the four AI outreach agents.',
-    primary: { id: 'agents-hub', label: 'Agent monitor', href: '/admin/outreach/agents', icon: Bot },
-    related: [
-      { id: 'drafter', label: 'Drafter', href: '/admin/outreach/agents/drafter', icon: Brain },
-      { id: 'outreach-agent', label: 'Outreach', href: '/admin/outreach/agents/outreach', icon: Zap },
-    ],
+    id: 'pipeline',
+    title: 'Pipeline',
+    description: 'Every lead across stages — see what is moving and what needs attention.',
+    sidebarId: 'pipeline',
+    primary: { id: 'pipeline-open', label: 'Open pipeline', href: '/admin/leads', icon: FolderKanban },
+    related: [],
   },
 ]
 
@@ -178,16 +156,13 @@ export function isAdminNavItemActive(pathname: string, href: string): boolean {
 export function isSidebarItemActive(pathname: string, item: AdminNavItem): boolean {
   if (!item.href) return false
 
-  if (item.id === 'agents' && pathname.startsWith('/admin/outreach/agents')) {
-    return true
+  // The Agent area spans the SDR agent surface and the agent sub-pages.
+  if (item.id === 'agent') {
+    return pathname.startsWith('/admin/sdr-agents') || pathname.startsWith('/admin/outreach/agents')
   }
 
-  if (item.id === 'linkedin' && pathname.startsWith('/admin/outreach/linkedin')) {
-    return true
-  }
-
-  if (item.id === 'prospects') {
-    return pathname.startsWith('/admin/outreach/aspire')
+  if (item.id === 'pipeline') {
+    return pathname.startsWith('/admin/leads')
   }
 
   if (item.id === 'settings' && item.href) {
@@ -196,9 +171,9 @@ export function isSidebarItemActive(pathname: string, item: AdminNavItem): boole
     return isAdminNavItemActive(pathname, item.href)
   }
 
+  // Campaigns own all of /admin/outreach except the Agent sub-pages.
   if (item.id === 'outreach' && pathname.startsWith('/admin/outreach')) {
     if (pathname.startsWith('/admin/outreach/agents')) return false
-    if (pathname.startsWith('/admin/outreach/linkedin')) return false
     return true
   }
 
@@ -282,7 +257,9 @@ export function getRoadmapAdminNavItems(): AdminNavItem[] {
 }
 
 export function resolveAdminPageTitle(pathname: string): string {
-  if (pathname.startsWith('/admin/dashboard')) return 'Dashboard'
+  if (pathname.startsWith('/admin/dashboard')) return 'Home'
+  if (pathname.startsWith('/admin/leads')) return 'Pipeline'
+  if (pathname.startsWith('/admin/sdr-agents')) return 'Agent'
   if (pathname.startsWith('/admin/outreach/aspire')) return 'Prospects'
   if (pathname.startsWith('/admin/outreach/agents/scout')) return 'Scout Agent'
   if (pathname.startsWith('/admin/outreach/agents/drafter')) return 'Drafter Agent'
@@ -315,13 +292,10 @@ export type WorkspaceHeaderAction = {
 
 export function resolveWorkspacePrimaryAction(pathname: string): WorkspaceHeaderAction | null {
   if (pathname.startsWith('/admin/dashboard')) {
-    return { label: 'Find prospects', href: '/admin/outreach/aspire' }
+    return { label: 'Open agent', href: '/admin/sdr-agents' }
   }
-  if (pathname.startsWith('/admin/outreach/aspire')) {
-    return { label: 'Launch scout', href: '/admin/outreach/agents/scout' }
-  }
-  if (pathname.startsWith('/admin/outreach/agents')) {
-    return { label: 'Configure agents', href: '/admin/outreach/agents/setup' }
+  if (pathname.startsWith('/admin/sdr-agents') || pathname.startsWith('/admin/outreach/agents')) {
+    return { label: 'Configure agent', href: '/admin/outreach/agents/setup' }
   }
   if (pathname.startsWith('/admin/outreach/campaigns')) {
     return { label: 'New campaign', href: '/admin/outreach/campaigns' }
