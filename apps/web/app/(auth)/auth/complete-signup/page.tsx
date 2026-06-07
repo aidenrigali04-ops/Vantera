@@ -52,7 +52,13 @@ export default async function CompleteSignupPage({ searchParams }: { searchParam
       email: existingUser.email,
     })
 
-    redirect('/admin/dashboard')
+    const { data: acct } = await admin
+      .from('accounts')
+      .select('onboarding_completed_at')
+      .eq('id', existingUser.account_id)
+      .maybeSingle()
+
+    redirect(acct?.onboarding_completed_at ? '/admin/dashboard' : '/admin/onboarding')
   }
 
   const prefilledEmail = searchParams.email ?? email

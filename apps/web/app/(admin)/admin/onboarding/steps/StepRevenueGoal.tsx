@@ -1,5 +1,6 @@
 'use client'
 
+import { markOnboardingCompleteAction } from '@/app/(admin)/admin/onboarding/actions'
 import { saveRevenueGoal } from '@/lib/revenue/actions'
 import { Target } from 'lucide-react'
 import { useState } from 'react'
@@ -23,6 +24,7 @@ export function StepRevenueGoal({ accountId }: { accountId: string }) {
       setSubmitting(true)
       try {
         await saveRevenueGoal({ mrrGoal: g, avgClientValue: avg ? digits(avg) : null })
+        await markOnboardingCompleteAction()
         return true
       } catch {
         setSubmitting(false)

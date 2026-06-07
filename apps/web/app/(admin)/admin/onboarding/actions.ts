@@ -38,7 +38,6 @@ import { getBrandingFromHeaders } from '@/lib/branding/server'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { headers } from 'next/headers'
 import {
-  accounts,
   integrationCredentials,
   personalizeTemplate,
   users,
@@ -333,16 +332,6 @@ export async function completeOnboardingWithPlan(
       return err('Confirm your ideal customer profile before finishing setup')
     }
 
-    const [revenueGoal] = await db
-      .select({ mrrGoal: accounts.mrrGoal })
-      .from(accounts)
-      .where(eq(accounts.id, workspaceId))
-      .limit(1)
-
-    if (!revenueGoal?.mrrGoal || revenueGoal.mrrGoal <= 0) {
-      return err('Set your revenue goal before finishing setup')
-    }
-
     const saved = await patchAccountRow(workspaceId, {
       plan: resolveAccountPlan(planId),
     })
@@ -384,27 +373,35 @@ export async function completeOnboardingWithPlan(
       console.error('[completeOnboardingWithPlan] sdr credit init failed', creditErr)
     }
 
-    const marked = await markOnboardingComplete(workspaceId)
-    if (!marked.ok) {
-      return err(marked.message)
-    }
-
     void trackOnboardingStep(workspaceId, 'subscription', 'completed', { planId })
-
-    revalidatePath('/admin', 'layout')
-    revalidatePath('/admin/onboarding')
-    revalidatePath('/admin/dashboard')
 
     return {
       success: true,
       data: {
         completed: true,
-        redirectTo: '/admin/dashboard',
+        redirectTo: '/admin/onboarding',
       },
     }
   } catch (error) {
     rethrowFrameworkSignals(error)
     return err(error instanceof Error ? error.message : 'Failed to complete onboarding')
+  }
+}
+
+export async function markOnboardingCompleteAction(): Promise<ActionResult<{ marked: true }>> {
+  try {
+    const { accountId: workspaceId } = await assertOwnAccount()
+    const marked = await markOnboardingComplete(workspaceId)
+    if (!marked.ok) {
+      return err(marked.message)
+    }
+    revalidatePath('/admin', 'layout')
+    revalidatePath('/admin/onboarding')
+    revalidatePath('/admin/dashboard')
+    return { success: true, data: { marked: true } }
+  } catch (error) {
+    rethrowFrameworkSignals(error)
+    return err(error instanceof Error ? error.message : 'Failed to mark onboarding complete')
   }
 }
 

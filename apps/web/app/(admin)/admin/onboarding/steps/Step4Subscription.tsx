@@ -50,6 +50,15 @@ export function Step4Subscription({ accountId, onComplete }: Props) {
       }
 
       if (planRequiresPayment(selectedPlan)) {
+        // Advance localStorage past subscription so wizard resumes at step 5 (team) after Stripe
+        try {
+          const storageKey = `vantera_onboarding_step_${accountId}`
+          const raw = window.localStorage.getItem(storageKey)
+          const stored = raw ? (JSON.parse(raw) as Record<string, unknown>) : {}
+          window.localStorage.setItem(storageKey, JSON.stringify({ ...stored, step: 5 }))
+        } catch {
+          /* ignore */
+        }
         openStripePaymentLink(selectedPlan)
         return false
       }
