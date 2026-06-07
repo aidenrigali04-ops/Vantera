@@ -41,6 +41,8 @@ const serverEnvSchema = z.object({
   /** Stripe Price ID for Vantera Team (subscription checkout). */
   STRIPE_PRICE_TEAM_MONTHLY: z.string().optional().default(''),
   STRIPE_PRICE_ENTERPRISE_MONTHLY: z.string().optional().default(''),
+  /** Stripe Price ID for an additional team seat ($25/mo recurring). */
+  STRIPE_PRICE_SEAT_MONTHLY: z.string().optional().default(''),
   TRIGGER_SECRET_KEY: z.string().optional().default(''),
   TRIGGER_API_URL: z.string().optional().default('https://api.trigger.dev'),
   CRON_SECRET: z.string().optional().default(''),

@@ -12,7 +12,7 @@ import { motion } from 'framer-motion'
 import { Mail, Plus, X } from 'lucide-react'
 import { useCallback, useState } from 'react'
 import { useRegisterOnboardingStep } from '../onboarding-nav'
-import { inviteTeamMembers } from '../actions'
+import { inviteTeamSeat } from '@/lib/team/actions'
 import {
   StepError,
   fadeUp,
@@ -32,17 +32,15 @@ const ROLE_LABELS: Record<InviteRole, string> = {
   agent: 'Agent',
 }
 
-const MAX_MEMBERS = 3
+const MAX_MEMBERS = 10
 
 type Member = { email: string; role: InviteRole }
 
 type Props = {
-  accountId: string
-  primaryColor: string
   onComplete: (data?: { invited: number; skipped: boolean }) => void
 }
 
-export function Step4Team({ accountId, primaryColor, onComplete }: Props) {
+export function Step4Team({ onComplete }: Props) {
   const [members, setMembers] = useState<Member[]>([{ email: '', role: 'manager' }])
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -76,27 +74,32 @@ export function Step4Team({ accountId, primaryColor, onComplete }: Props) {
     setSending(true)
 
     try {
-      const result = await runStepAction(() => inviteTeamMembers(accountId, toSend))
-
-      if (!result || result.success !== true) {
-        setError(
-          (result && 'error' in result && result.error) ||
-            'Could not send invites. You can invite teammates later from settings.',
-        )
-        return false
+      let invited = 0
+      for (const member of toSend) {
+        const result = await runStepAction(() => inviteTeamSeat(member))
+        if (!result || result.success !== true) {
+          setError(
+            (result && 'error' in result && result.error) ||
+              'Could not send some invites. You can invite teammates later from Settings.',
+          )
+          // Report partial success if at least one invite went through
+          if (invited > 0) onComplete({ invited, skipped: false })
+          return false
+        }
+        invited++
       }
 
-      onComplete({ invited: result.data.invited, skipped: false })
+      onComplete({ invited, skipped: false })
       return true
     } catch (err) {
       rethrowFrameworkNavigation(err)
-      console.error('[Step4Team] inviteTeamMembers threw', err)
+      console.error('[Step4Team] inviteTeamSeat threw', err)
       setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
       return false
     } finally {
       setSending(false)
     }
-  }, [accountId, members, onComplete])
+  }, [members, onComplete])
 
   const skip = useCallback(() => {
     onComplete({ invited: 0, skipped: true })
@@ -179,7 +182,7 @@ export function Step4Team({ accountId, primaryColor, onComplete }: Props) {
           </motion.button>
         ) : (
           <p className="text-xs text-white/45">
-            Team plan supports up to {MAX_MEMBERS} invited members.
+            Up to {MAX_MEMBERS} invites at once — add more from Settings anytime.
           </p>
         )}
       </motion.div>

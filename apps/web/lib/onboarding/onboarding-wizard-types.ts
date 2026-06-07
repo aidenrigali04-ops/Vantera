@@ -47,7 +47,8 @@ export type OnboardingStepId =
   | 'ai_overview'
   | 'icp'
   | 'lead_preview'
-  | 'revenue_goal'
   | 'subscription'
+  | 'team'
+  | 'revenue_goal'
 
 export type OnboardingStepEvent = 'viewed' | 'completed'

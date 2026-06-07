@@ -11,7 +11,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { inviteTeamMembers } from '@/app/(admin)/admin/onboarding/actions'
+import {
+  inviteTeamSeat,
+  revokeTeamInvite,
+  removeTeamMember,
+} from '@/lib/team/actions'
 import {
   updateWorkspaceBranding,
   updateWorkspaceGeneral,
@@ -27,6 +31,8 @@ import {
   writeOperatingModelId,
 } from '@/lib/onboarding/operating-model-storage'
 import { cn } from '@/lib/utils'
+import type { SeatUsage } from '@/lib/team/seats'
+import type { TeamMemberRow, PendingInviteRow } from '@/lib/team/queries'
 import {
   Calendar,
   CreditCard,
@@ -37,18 +43,13 @@ import {
   LifeBuoy,
   Settings2,
   Users,
+  X,
+  UserMinus,
 } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState, useTransition } from 'react'
 import { toast } from 'sonner'
-
-type TeamMember = {
-  id: string
-  fullName: string
-  email: string
-  role: string
-}
 
 type AccountSettings = {
   name: string
@@ -64,8 +65,11 @@ type Props = {
   accountId: string
   sessionEmail: string
   sessionRole: string
+  sessionUserId: string
   account: AccountSettings
-  team: TeamMember[]
+  team: TeamMemberRow[]
+  pendingInvites: PendingInviteRow[]
+  seatUsage: SeatUsage
 }
 
 const TIMEZONES = [
@@ -104,8 +108,11 @@ export function SettingsPageClient({
   accountId,
   sessionEmail,
   sessionRole,
+  sessionUserId,
   account,
   team,
+  pendingInvites,
+  seatUsage,
 }: Props) {
   const router = useRouter()
   const [activeSection, setActiveSection] = useState<SectionId>('workspace')
@@ -177,7 +184,7 @@ export function SettingsPageClient({
     if (!email) return
 
     startTransition(async () => {
-      const result = await inviteTeamMembers(accountId, [{ email, role: inviteRole }])
+      const result = await inviteTeamSeat({ email, role: inviteRole })
       if (!result.success) {
         toast.error(result.error)
         return
@@ -187,6 +194,32 @@ export function SettingsPageClient({
       router.refresh()
     })
   }
+
+  function handleRevoke(inviteId: string) {
+    startTransition(async () => {
+      const result = await revokeTeamInvite(inviteId)
+      if (!result.success) {
+        toast.error(result.error)
+        return
+      }
+      toast.success('Invite revoked')
+      router.refresh()
+    })
+  }
+
+  function handleRemoveMember(userId: string, name: string) {
+    startTransition(async () => {
+      const result = await removeTeamMember(userId)
+      if (!result.success) {
+        toast.error(result.error)
+        return
+      }
+      toast.success(`${name} removed`)
+      router.refresh()
+    })
+  }
+
+  const canManageTeam = sessionRole === 'owner' || sessionRole === 'admin'
 
   return (
     <div className="space-y-6">
@@ -369,6 +402,30 @@ export function SettingsPageClient({
               showSaveButton={false}
             >
               <div className="space-y-5">
+                {/* Seat usage strip */}
+                <div className="flex items-center gap-3 rounded-lg border border-stone-100 bg-stone-50 px-4 py-3 text-[13px] text-stone-600">
+                  <span>
+                    <span className="font-medium text-stone-900">{seatUsage.activeMembers}</span> active
+                    {seatUsage.pendingInvites > 0 ? (
+                      <> · <span className="font-medium text-stone-900">{seatUsage.pendingInvites}</span> pending</>
+                    ) : null}
+                  </span>
+                  <span className="text-stone-300">·</span>
+                  <span className="capitalize">{seatUsage.plan} plan</span>
+                  {seatUsage.billableSeats > 0 ? (
+                    <>
+                      <span className="text-stone-300">·</span>
+                      <span>${seatUsage.monthlySeatCostUsd}/mo for {seatUsage.billableSeats} extra {seatUsage.billableSeats === 1 ? 'seat' : 'seats'}</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-stone-300">·</span>
+                      <span>{seatUsage.includedSeats - seatUsage.totalSeats > 0 ? `${seatUsage.includedSeats - seatUsage.totalSeats} seat${seatUsage.includedSeats - seatUsage.totalSeats !== 1 ? 's' : ''} remaining` : 'All included seats used'}</span>
+                    </>
+                  )}
+                </div>
+
+                {/* Active members */}
                 <div className="overflow-hidden rounded-xl border border-stone-200">
                   <table className="w-full text-[13px]">
                     <thead className="border-b border-stone-200 bg-stone-50">
@@ -376,60 +433,127 @@ export function SettingsPageClient({
                         <th className="px-4 py-2.5 text-left font-medium text-stone-500">Name</th>
                         <th className="px-4 py-2.5 text-left font-medium text-stone-500">Email</th>
                         <th className="px-4 py-2.5 text-left font-medium text-stone-500">Role</th>
+                        {canManageTeam ? <th className="px-4 py-2.5" /> : null}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-stone-100">
-                      {team.map((member) => (
-                        <tr key={member.id}>
-                          <td className="px-4 py-3 font-medium text-stone-900">{member.fullName}</td>
-                          <td className="px-4 py-3 text-stone-600">{member.email}</td>
-                          <td className="px-4 py-3 capitalize text-stone-600">{member.role}</td>
-                        </tr>
-                      ))}
+                      {team.map((member) => {
+                        const isSelf = member.id === sessionUserId
+                        const isOwner = member.role === 'owner'
+                        const canRemove = canManageTeam && !isSelf && !isOwner
+                        return (
+                          <tr key={member.id}>
+                            <td className="px-4 py-3 font-medium text-stone-900">
+                              {member.fullName}
+                              {isSelf ? <span className="ml-1.5 text-[11px] text-stone-400">(you)</span> : null}
+                            </td>
+                            <td className="px-4 py-3 text-stone-600">{member.email}</td>
+                            <td className="px-4 py-3 capitalize text-stone-600">{member.role}</td>
+                            {canManageTeam ? (
+                              <td className="px-4 py-3 text-right">
+                                {canRemove ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveMember(member.id, member.fullName)}
+                                    disabled={isPending}
+                                    className="inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] text-stone-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-40"
+                                    title="Remove member"
+                                  >
+                                    <UserMinus className="h-3.5 w-3.5" />
+                                    Remove
+                                  </button>
+                                ) : null}
+                              </td>
+                            ) : null}
+                          </tr>
+                        )
+                      })}
                     </tbody>
                   </table>
                 </div>
 
-                <div className="rounded-xl border border-dashed border-stone-200 bg-stone-50/50 p-4">
-                  <p className="text-sm font-medium text-stone-800">Invite teammate</p>
-                  <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end">
-                    <div className="flex-1">
-                      <Label htmlFor="invite-email">Email</Label>
-                      <Input
-                        id="invite-email"
-                        type="email"
-                        value={inviteEmail}
-                        onChange={(event) => setInviteEmail(event.target.value)}
-                        placeholder="name@company.com"
-                        className="mt-1.5"
-                      />
-                    </div>
-                    <div className="w-full sm:w-[160px]">
-                      <Label htmlFor="invite-role">Role</Label>
-                      <Select value={inviteRole} onValueChange={(value) => setInviteRole(value as typeof inviteRole)}>
-                        <SelectTrigger id="invite-role" className="mt-1.5">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {INVITE_ROLES.map((role) => (
-                            <SelectItem key={role} value={role}>
-                              {role}
-                            </SelectItem>
+                {/* Pending invites */}
+                {pendingInvites.length > 0 ? (
+                  <div>
+                    <p className="mb-2 text-[12px] font-medium uppercase tracking-wide text-stone-400">
+                      Pending invites
+                    </p>
+                    <div className="overflow-hidden rounded-xl border border-dashed border-stone-200">
+                      <table className="w-full text-[13px]">
+                        <tbody className="divide-y divide-stone-100">
+                          {pendingInvites.map((invite) => (
+                            <tr key={invite.id}>
+                              <td className="px-4 py-3 text-stone-700">{invite.email}</td>
+                              <td className="px-4 py-3 capitalize text-stone-500">{invite.role}</td>
+                              <td className="px-4 py-3 text-stone-400 text-[12px]">
+                                Expires {new Date(invite.expiresAt).toLocaleDateString()}
+                              </td>
+                              {canManageTeam ? (
+                                <td className="px-4 py-3 text-right">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRevoke(invite.id)}
+                                    disabled={isPending}
+                                    className="inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] text-stone-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-40"
+                                    title="Revoke invite"
+                                  >
+                                    <X className="h-3.5 w-3.5" />
+                                    Revoke
+                                  </button>
+                                </td>
+                              ) : null}
+                            </tr>
                           ))}
-                        </SelectContent>
-                      </Select>
+                        </tbody>
+                      </table>
                     </div>
-                    <Button
-                      type="button"
-                      onClick={sendInvite}
-                      disabled={isPending || !inviteEmail.trim()}
-                      className="bg-stone-900 hover:bg-stone-800"
-                    >
-                      <Mail className="mr-2 h-4 w-4" />
-                      Send invite
-                    </Button>
                   </div>
-                </div>
+                ) : null}
+
+                {/* Invite form */}
+                {canManageTeam ? (
+                  <div className="rounded-xl border border-dashed border-stone-200 bg-stone-50/50 p-4">
+                    <p className="text-sm font-medium text-stone-800">Invite teammate</p>
+                    <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end">
+                      <div className="flex-1">
+                        <Label htmlFor="invite-email">Email</Label>
+                        <Input
+                          id="invite-email"
+                          type="email"
+                          value={inviteEmail}
+                          onChange={(event) => setInviteEmail(event.target.value)}
+                          onKeyDown={(e) => { if (e.key === 'Enter') sendInvite() }}
+                          placeholder="name@company.com"
+                          className="mt-1.5"
+                        />
+                      </div>
+                      <div className="w-full sm:w-[160px]">
+                        <Label htmlFor="invite-role">Role</Label>
+                        <Select value={inviteRole} onValueChange={(value) => setInviteRole(value as typeof inviteRole)}>
+                          <SelectTrigger id="invite-role" className="mt-1.5">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {INVITE_ROLES.map((role) => (
+                              <SelectItem key={role} value={role}>
+                                {role}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <Button
+                        type="button"
+                        onClick={sendInvite}
+                        disabled={isPending || !inviteEmail.trim()}
+                        className="bg-stone-900 hover:bg-stone-800"
+                      >
+                        <Mail className="mr-2 h-4 w-4" />
+                        Send invite
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
               </div>
             </SettingsPanel>
           ) : null}

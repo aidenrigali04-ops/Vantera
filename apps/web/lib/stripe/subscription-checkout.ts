@@ -2,6 +2,7 @@ import { env } from '@/lib/env'
 import type { OnboardingPlanId } from '@/lib/onboarding/pricing-plans'
 import { assertPlatformStripe } from '@/lib/stripe/platform'
 import {
+  getSeatPriceId,
   getStripePriceId,
   planRequiresCheckout,
   type BillablePlanId,
@@ -37,6 +38,8 @@ export async function createSubscriptionCheckoutSession(params: {
   context: CheckoutContext
   /** Existing Stripe customer — used when changing plan. */
   stripeCustomerId?: string | null
+  /** Billable seats to bill alongside the base plan (0 = none). */
+  seatQuantity?: number
 }): Promise<{ url: string; sessionId: string }> {
   const stripe = assertPlatformStripe()
   const priceId = getStripePriceId(params.planId)
@@ -47,11 +50,21 @@ export async function createSubscriptionCheckoutSession(params: {
     )
   }
 
+  const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [
+    { price: priceId, quantity: 1 },
+  ]
+
+  const seatQuantity = Math.max(0, Math.trunc(params.seatQuantity ?? 0))
+  const seatPriceId = getSeatPriceId()
+  if (seatQuantity > 0 && seatPriceId) {
+    lineItems.push({ price: seatPriceId, quantity: seatQuantity })
+  }
+
   const session = await stripe.checkout.sessions.create({
     mode: 'subscription',
     customer: params.stripeCustomerId ?? undefined,
     customer_email: params.stripeCustomerId ? undefined : params.customerEmail,
-    line_items: [{ price: priceId, quantity: 1 }],
+    line_items: lineItems,
     allow_promotion_codes: true,
     success_url: checkoutSuccessUrl(params.context),
     cancel_url: checkoutCancelUrl(params.context),

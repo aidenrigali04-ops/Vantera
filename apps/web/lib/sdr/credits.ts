@@ -6,11 +6,13 @@ import {
   SDR_CREDIT_COSTS,
   SDR_MONTHLY_ALLOWANCE,
   SDR_TRIAL_DAYS,
+  monthlyAllowance,
   parseStoredCredits,
   type SdrBillingTier,
   type SdrCreditAction,
   type SdrCreditStatus,
 } from '@/lib/sdr/credit-types'
+import { getBillableSeatCount } from '@/lib/team/seats'
 export type { SdrBillingTier, SdrCreditAction, SdrCreditStatus } from '@/lib/sdr/credit-types'
 export {
   SDR_CREDIT_COSTS,
@@ -64,8 +66,26 @@ function effectiveTier(
   return billingTier
 }
 
-function allowanceForTier(tier: SdrBillingTier): number | null {
-  return SDR_MONTHLY_ALLOWANCE[tier]
+/**
+ * Shared-pool allowance for the period, including the per-seat top-up. Metered
+ * tiers (free/standard) gain SEAT_CREDIT_BONUS per billable seat; premium is
+ * already unlimited so seats don't change its limit (and we skip the seat read).
+ */
+async function allowanceForAccount(
+  accountId: string,
+  tier: SdrBillingTier,
+): Promise<number | null> {
+  const base = SDR_MONTHLY_ALLOWANCE[tier]
+  if (base === null) return null
+
+  const [account] = await db
+    .select({ plan: accounts.plan })
+    .from(accounts)
+    .where(eq(accounts.id, accountId))
+    .limit(1)
+  const plan = (account?.plan ?? 'team') as 'team' | 'enterprise'
+  const billableSeats = await getBillableSeatCount(accountId, plan)
+  return monthlyAllowance(tier, billableSeats)
 }
 
 async function resetPeriodIfNeeded(
@@ -159,7 +179,7 @@ export async function getSdrCreditStatus(accountId: string): Promise<SdrCreditSt
   const billingTier = current.billingTier as SdrBillingTier
   const trialEndsAt = current.trialEndsAt
   const tier = effectiveTier(billingTier, trialEndsAt)
-  const limit = allowanceForTier(tier)
+  const limit = await allowanceForAccount(accountId, tier)
   const used = parseStoredCredits(current.usedThisPeriod)
   const unlimited = limit === null
   const remaining = unlimited ? null : Math.max(0, Math.round((limit - used) * 10) / 10)

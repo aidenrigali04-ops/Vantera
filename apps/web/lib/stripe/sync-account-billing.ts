@@ -34,10 +34,15 @@ export async function applyStripeBillingToAccount(params: {
 }
 
 export function planIdFromSubscription(subscription: Stripe.Subscription): BillablePlanId | null {
-  const item = subscription.items.data[0]
-  const priceId = item?.price?.id
-  if (!priceId) return null
-  return planIdFromStripePriceId(priceId)
+  // Scan every item — a subscription may carry a seat add-on alongside the
+  // plan, in any order, so we match by known plan price IDs rather than [0].
+  for (const item of subscription.items.data) {
+    const priceId = item?.price?.id
+    if (!priceId) continue
+    const planId = planIdFromStripePriceId(priceId)
+    if (planId) return planId
+  }
+  return null
 }
 
 export function customerIdFromStripe(

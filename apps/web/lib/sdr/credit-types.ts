@@ -21,6 +21,24 @@ export const SDR_MONTHLY_ALLOWANCE: Record<SdrBillingTier, number | null> = {
   premium: null,
 }
 
+/**
+ * Credits each paid seat adds to the shared account pool. Seats top up one
+ * shared pool (not per-seat buckets) — the agents spend on the whole account's
+ * behalf, so adding a teammate means "more capacity for everyone." Only lifts
+ * metered tiers; `premium` is already unlimited and `free` bills no seats.
+ */
+export const SEAT_CREDIT_BONUS = 250
+
+/** Monthly allowance including the seat top-up for the shared pool. */
+export function monthlyAllowance(
+  tier: SdrBillingTier,
+  billableSeats = 0,
+): number | null {
+  const base = SDR_MONTHLY_ALLOWANCE[tier]
+  if (base === null) return null
+  return base + SEAT_CREDIT_BONUS * Math.max(0, billableSeats)
+}
+
 /** SDR Standard-tier trial length in days. */
 export const SDR_TRIAL_DAYS = 3
 

@@ -39,6 +39,13 @@ export const roleEnum = pgEnum('role', [
   'agent',
 ])
 
+export const accountInviteStatusEnum = pgEnum('account_invite_status', [
+  'pending',
+  'accepted',
+  'revoked',
+  'expired',
+])
+
 export const contactTypeEnum = pgEnum('contact_type', [
   'customer',
   'tenant',
@@ -214,6 +221,40 @@ export const users = pgTable(
   (table) => ({
     accountIdx: index('users_account_id_idx').on(table.accountId),
     emailAccountIdx: uniqueIndex('users_email_account_idx').on(table.email, table.accountId),
+  }),
+)
+
+/**
+ * Pending team-seat invitations. A seat is occupied by an active `users` row
+ * OR a pending invite here — kept separate so invites can be resent/revoked
+ * and seat counts stay honest. On accept, an active `users` row is created and
+ * the invite is marked `accepted`.
+ */
+export const accountInvites = pgTable(
+  'account_invites',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    email: varchar('email', { length: 255 }).notNull(),
+    role: roleEnum('role').notNull().default('staff'),
+    status: accountInviteStatusEnum('status').notNull().default('pending'),
+    tokenHash: varchar('token_hash', { length: 128 }).notNull(),
+    invitedBy: uuid('invited_by').references(() => users.id, { onDelete: 'set null' }),
+    expiresAt: timestamptz('expires_at').notNull(),
+    acceptedAt: timestamptz('accepted_at'),
+    createdAt: timestamptz('created_at').notNull().defaultNow(),
+    updatedAt: timestamptz('updated_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    accountIdx: index('account_invites_account_idx').on(table.accountId),
+    statusIdx: index('account_invites_status_idx').on(table.accountId, table.status),
+    tokenHashIdx: uniqueIndex('account_invites_token_hash_idx').on(table.tokenHash),
+    // One live (pending) invite per email per account.
+    pendingEmailIdx: uniqueIndex('account_invites_pending_email_idx')
+      .on(table.accountId, table.email)
+      .where(sql`${table.status} = 'pending'`),
   }),
 )
 

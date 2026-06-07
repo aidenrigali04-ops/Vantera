@@ -7,9 +7,9 @@ import { db } from '@/lib/db/client'
 import { accounts } from '@vantera/db'
 import { eq } from 'drizzle-orm'
 import type { OnboardingPlanId } from '@/lib/onboarding/pricing-plans'
-import { getPaidPlanPaymentLink } from '@/lib/onboarding/pricing-plans'
 import {
   createBillingPortalSession,
+  createSubscriptionCheckoutSession,
   retrieveCheckoutSession,
   resolvePlanIdFromCheckout,
   type CheckoutContext,
@@ -18,6 +18,8 @@ import {
   applyStripeBillingToAccount,
   customerIdFromStripe,
 } from '@/lib/stripe/sync-account-billing'
+import { syncSeatQuantityForAccount } from '@/lib/stripe/seats'
+import { getBillableSeatCount } from '@/lib/team/seats'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 
@@ -35,9 +37,34 @@ export async function startPlanCheckoutAction(
     return { success: false, error: 'Invalid plan selection' }
   }
 
-  return {
-    success: true,
-    data: { url: getPaidPlanPaymentLink(parsed.data.planId) },
+  const session = await requireAdminSession()
+
+  try {
+    const [account] = await db
+      .select({ stripeCustomerId: accounts.stripeCustomerId })
+      .from(accounts)
+      .where(eq(accounts.id, session.accountId))
+      .limit(1)
+
+    // Carry any already-occupied seats into the new plan's billing.
+    const seatQuantity = await getBillableSeatCount(session.accountId, parsed.data.planId)
+
+    const { url } = await createSubscriptionCheckoutSession({
+      accountId: session.accountId,
+      planId: parsed.data.planId,
+      customerEmail: session.email,
+      context: parsed.data.context,
+      stripeCustomerId: account?.stripeCustomerId ?? null,
+      seatQuantity,
+    })
+
+    return { success: true, data: { url } }
+  } catch (err) {
+    console.error('[startPlanCheckoutAction]', err)
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Could not start checkout',
+    }
   }
 }
 
@@ -112,6 +139,10 @@ export async function finalizeCheckoutSessionAction(
     if (!applied.ok) {
       return { success: false, error: applied.message }
     }
+
+    // Plan change shifts included-seat counts (Team 1 vs Enterprise 5), so
+    // reconcile the seat line item against the now-current plan. Best-effort.
+    await syncSeatQuantityForAccount(session.accountId)
 
     const context = checkout.metadata?.context as CheckoutContext | undefined
 

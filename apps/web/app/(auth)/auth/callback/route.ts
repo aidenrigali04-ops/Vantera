@@ -121,6 +121,53 @@ export async function GET(request: NextRequest) {
     (supaUser.user_metadata?.name as string | undefined) ??
     ''
 
+  // No existing membership — but this email may have a pending team invite.
+  // Accept it: create the active member in the inviting account and sign in,
+  // rather than sending them off to create a brand-new workspace.
+  const { data: invite } = await admin
+    .from('account_invites')
+    .select('id, account_id, role, expires_at')
+    .eq('email', email)
+    .eq('status', 'pending')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (invite?.account_id && new Date(invite.expires_at).getTime() > Date.now()) {
+    await admin.from('users').upsert(
+      {
+        id: supaUser.id,
+        account_id: invite.account_id,
+        email,
+        full_name: fullName || email.split('@')[0] || email,
+        role: invite.role,
+        is_active: true,
+        deleted_at: null,
+      },
+      { onConflict: 'id' },
+    )
+
+    await admin
+      .from('account_invites')
+      .update({
+        status: 'accepted',
+        accepted_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', invite.id)
+
+    // Accept converts pending→active (no net seat change), so no billing sync needed.
+    await setAdminSession({
+      type: 'admin',
+      userId: supaUser.id,
+      accountId: invite.account_id,
+      role: invite.role,
+      email,
+    })
+
+    return NextResponse.redirect(new URL(next, request.url))
+  }
+
   const completeUrl = new URL('/auth/complete-signup', request.url)
   completeUrl.searchParams.set('email', email)
   if (fullName) completeUrl.searchParams.set('name', fullName)

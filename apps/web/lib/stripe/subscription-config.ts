@@ -21,6 +21,12 @@ export function getStripePriceId(planId: BillablePlanId): string | null {
   return null
 }
 
+/** Stripe Price ID for the per-seat add-on ($25/mo). `null` when unconfigured. */
+export function getSeatPriceId(): string | null {
+  const id = env.STRIPE_PRICE_SEAT_MONTHLY?.trim()
+  return id || null
+}
+
 export function planIdFromStripePriceId(priceId: string): BillablePlanId | null {
   const team = env.STRIPE_PRICE_TEAM_MONTHLY?.trim()
   const enterprise = env.STRIPE_PRICE_ENTERPRISE_MONTHLY?.trim()
