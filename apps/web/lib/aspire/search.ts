@@ -2,6 +2,7 @@ import 'server-only'
 
 import { isApifyConfigured } from '@/lib/aspire/apify-config'
 import { searchApify, type ProspectSearchMeta } from '@/lib/aspire/apify-client'
+import { isExploriumConfigured, searchExplorium } from '@/lib/aspire/explorium-client'
 import { isInteractiveAspireSearch, normalizeApifyFilters } from '@/lib/aspire/filters'
 import { getIcpConfigForVertical, scoreICP } from '@/lib/aspire/icp-score'
 import { stubResults } from '@/lib/aspire/prospect-stubs'
@@ -97,21 +98,50 @@ export async function searchProspects(
   let people: import('@/lib/aspire/types').ApifyLead[]
   let meta: ProspectSearchMeta
 
-  try {
-    ;({ people, meta } = await searchApify(
-      normalizedFilters,
-      1,
-      options?.limit,
-      interactive,
-    ))
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Search failed'
-    console.error('[searchProspects] Apify failed — stub fallback', message)
-    people = stubResults(normalizedFilters)
-    meta = {
-      source: 'stub',
-      providerConfigured: isApifyConfigured(),
-      providerError: message,
+  // --- Primary: Explorium (Vibe Prospecting) ---
+  if (isExploriumConfigured()) {
+    try {
+      const result = await searchExplorium(normalizedFilters, icpConfig, {
+        limit: options?.limit,
+        hasEmail: icpConfig.mustHaveEmail,
+        hasPhone: icpConfig.mustHavePhone,
+      })
+      people = result.people
+      meta = {
+        source: 'explorium',
+        providerConfigured: true,
+        totalFound: result.meta.totalFound,
+      }
+    } catch (expErr) {
+      const message = expErr instanceof Error ? expErr.message : 'Explorium search failed'
+      console.error('[searchProspects] Explorium failed — falling back to Apify', message)
+      // Fall through to Apify below
+      people = []
+      meta = { source: 'stub', providerConfigured: false, providerError: message }
+    }
+
+    if (people.length > 0) {
+      // Explorium returned results — skip Apify
+    } else {
+      // Explorium returned empty or failed — try Apify
+      try {
+        ;({ people, meta } = await searchApify(normalizedFilters, 1, options?.limit, interactive))
+      } catch (apifyErr) {
+        const message = apifyErr instanceof Error ? apifyErr.message : 'Search failed'
+        console.error('[searchProspects] Apify also failed — stub fallback', message)
+        people = stubResults(normalizedFilters)
+        meta = { source: 'stub', providerConfigured: isApifyConfigured(), providerError: message }
+      }
+    }
+  } else {
+    // --- Explorium not configured: use Apify ---
+    try {
+      ;({ people, meta } = await searchApify(normalizedFilters, 1, options?.limit, interactive))
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Search failed'
+      console.error('[searchProspects] Apify failed — stub fallback', message)
+      people = stubResults(normalizedFilters)
+      meta = { source: 'stub', providerConfigured: isApifyConfigured(), providerError: message }
     }
   }
 

@@ -47,12 +47,14 @@ export function getAspireApifyFetchCount(requested?: number): number {
   return Math.min(Math.max(n, 1), APIFY_MAX_FETCH)
 }
 
-export type ProspectSearchSource = 'apify' | 'stub' | 'demo'
+export type ProspectSearchSource = 'apify' | 'stub' | 'demo' | 'explorium'
 
 export type ProspectSearchMeta = {
   source: ProspectSearchSource
   providerConfigured: boolean
   providerError?: string
+  /** Total matching records reported by the provider (may exceed returned rows). */
+  totalFound?: number
   /** Raw rows from Apify dataset before mapping. */
   apifyRowCount?: number
   /** Rows dropped because mapApifyLead returned null. */
