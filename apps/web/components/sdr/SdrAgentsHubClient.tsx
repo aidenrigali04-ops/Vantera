@@ -328,10 +328,10 @@ export function SdrAgentsHubClient({
                     lastRun={`${agent.statLabel}: ${agent.statValue}`}
                     pendingLabel={pendingLabel(agent, snapshot)}
                     menuItems={[
-                      { label: agent.ctaLabel, href },
-                      ...(agent.status === 'needs_setup'
-                        ? [{ label: 'Configure', href }]
-                        : [{ label: 'Open details', href }]),
+                      {
+                        label: agent.status === 'needs_setup' ? 'Configure' : 'Open details',
+                        href,
+                      },
                     ]}
                   />
                 )

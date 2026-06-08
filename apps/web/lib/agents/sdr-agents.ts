@@ -10,7 +10,7 @@ export const SDR_AGENT_DEFINITIONS: SdrAgentDefinition[] = [
     name: 'Prospect Scout',
     tagline: 'Finds ICP-matched leads while you sleep',
     description:
-      'Runs on your schedule from agent ICP rules, discovers prospects via Apify, scores them, and adds qualified matches to your pipeline automatically.',
+      'Runs on your schedule from agent ICP rules, discovers prospects via Explorium, scores them, and adds qualified matches to your pipeline automatically.',
     href: '/admin/outreach/agents/setup',
     ctaLabel: 'Set up Prospect Scout',
     iconName: 'telescope',

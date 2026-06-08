@@ -134,7 +134,7 @@ export function SdrCommandCenterClient({
         return
       }
       if (json.data?.mode === 'trigger' || json.data?.queued) {
-        toast.success('Discovery queued in Trigger.dev — Apify run starting now')
+        toast.success('Discovery queued in Trigger.dev — Explorium search starting now')
         router.refresh()
         await refreshActivity()
         return

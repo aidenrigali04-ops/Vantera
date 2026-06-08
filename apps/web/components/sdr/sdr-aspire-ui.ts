@@ -27,7 +27,7 @@ export const PROSPECT_MODE_OPTIONS: Array<{
     value: 'inline_icp',
     title: 'Autonomous scout (recommended)',
     description:
-      'Prospect Scout pulls from Apify using your agent ICP, scores matches, and adds qualified prospects to your pipeline on schedule.',
+      'Prospect Scout pulls from Explorium using your agent ICP, scores matches, and adds qualified prospects to your pipeline on schedule.',
   },
   {
     value: 'aspire_bound',

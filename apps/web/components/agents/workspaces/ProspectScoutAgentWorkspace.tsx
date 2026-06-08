@@ -394,8 +394,8 @@ export function ProspectScoutAgentWorkspace({
         />
         <AgentCapabilityCard
           icon={Globe}
-          title="Apify lead finder"
-          description="Search the web for prospects matching your ICP filters."
+          title="Explorium lead discovery"
+          description="Search for prospects matching your ICP filters via Explorium agentsource."
           checked
           onCheckedChange={() => {}}
           disabled

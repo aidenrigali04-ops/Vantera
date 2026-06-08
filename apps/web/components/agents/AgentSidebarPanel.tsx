@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils'
 import { Mail, MessageCircle, Radar, Link2 } from 'lucide-react'
 import type { ReactNode } from 'react'
 
-type ConnectedAppIcon = 'mail' | 'sms' | 'linkedin' | 'apify'
+type ConnectedAppIcon = 'mail' | 'sms' | 'linkedin' | 'explorium'
 
 type ConnectedApp = {
   id: string
@@ -18,7 +18,7 @@ const ICON_MAP = {
   mail: Mail,
   sms: MessageCircle,
   linkedin: Link2,
-  apify: Radar,
+  explorium: Radar,
 } as const
 
 type Props = {
@@ -72,7 +72,7 @@ export function AgentSidebarPanel({ instructions, connectedApps = [], agentIcon 
 }
 
 export const DEFAULT_SDR_CONNECTED_APPS: ConnectedApp[] = [
-  { id: 'apify', name: 'Apify lead discovery', icon: 'apify' },
+  { id: 'explorium', name: 'Explorium lead discovery', icon: 'explorium' },
   { id: 'resend', name: 'Resend email', icon: 'mail' },
   { id: 'twilio', name: 'Twilio SMS', icon: 'sms' },
   { id: 'linkedin', name: 'LinkedIn add-on', icon: 'linkedin' },

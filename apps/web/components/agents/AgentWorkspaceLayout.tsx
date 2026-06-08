@@ -3,7 +3,7 @@
 import { AdminPageContent } from '@/components/admin/AdminPageContent'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { ArrowLeft, Loader2, Rocket, Share2 } from 'lucide-react'
+import { ArrowLeft, Loader2, Rocket } from 'lucide-react'
 import Link from 'next/link'
 import type { ReactNode } from 'react'
 
@@ -85,7 +85,7 @@ export function AgentWorkspaceLayout({
           <div className="flex shrink-0 flex-wrap gap-2">
             <Button variant="outline" size="sm" asChild>
               <Link href={backHref}>
-                <Share2 className="mr-1.5 h-4 w-4" aria-hidden />
+                <ArrowLeft className="mr-1.5 h-4 w-4" aria-hidden />
                 Back to hub
               </Link>
             </Button>

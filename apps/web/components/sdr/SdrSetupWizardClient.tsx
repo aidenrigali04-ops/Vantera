@@ -173,7 +173,7 @@ export function SdrSetupWizardClient({ accountVertical }: Props) {
         | undefined
 
       if (bootstrap?.mode === 'failed') {
-        toast.error(bootstrap.error ?? 'Could not start discovery — check Trigger.dev and Apify configuration')
+        toast.error(bootstrap.error ?? 'Could not start discovery — check Trigger.dev and Explorium configuration')
         router.push('/admin/outreach/agents/scout?setup=complete')
         return
       }
@@ -197,7 +197,7 @@ export function SdrSetupWizardClient({ accountVertical }: Props) {
           )
         } else if (searchesRun > 0) {
           toast.message(
-            `${form.agentName} is live — discovery ran but no matches yet. Try broader ICP settings or check Apify configuration.`,
+            `${form.agentName} is live — discovery ran but no matches yet. Try broader ICP settings or check Explorium configuration.`,
             { duration: 6000 },
           )
         } else {
