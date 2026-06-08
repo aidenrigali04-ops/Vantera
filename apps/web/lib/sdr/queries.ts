@@ -155,7 +155,10 @@ export async function getSdrActivityFeed(
       leadId: log.leadId,
       sequenceId: log.sequenceId,
       metadata,
-      createdAt: log.createdAt.toISOString(),
+      createdAt:
+        log.createdAt instanceof Date
+          ? log.createdAt.toISOString()
+          : new Date(log.createdAt as string | number).toISOString(),
       leadName: [firstName, lastName].filter(Boolean).join(' ') || undefined,
       company: company ?? undefined,
     })

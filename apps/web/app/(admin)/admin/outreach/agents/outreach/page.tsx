@@ -1,4 +1,5 @@
 import { OutreachAgentWorkspace } from '@/components/agents/workspaces/OutreachAgentWorkspace'
+import { serializeForClient } from '@/lib/agents/serialize'
 import { requireAdminSession } from '@/lib/auth/require-session'
 import { db } from '@/lib/db/client'
 import { evaluateFlag } from '@/lib/feature-flags/evaluate'
@@ -51,7 +52,7 @@ export default async function OutreachAgentPage() {
           config={null}
           stats={null}
           linkedCampaigns={[]}
-          allCampaigns={allCampaigns}
+          allCampaigns={serializeForClient(allCampaigns)}
           upcoming={[]}
           initialActivity={[]}
           accountId={session.accountId}
@@ -71,11 +72,20 @@ export default async function OutreachAgentPage() {
     <Suspense fallback={<div className="p-6 text-sm text-[var(--text-secondary)]">Loading outreach agent…</div>}>
       <OutreachAgentWorkspace
         mode="configured"
-        config={config}
+        config={serializeForClient(config)}
         stats={stats}
-        linkedCampaigns={linkedCampaigns}
-        allCampaigns={allCampaigns}
-        upcoming={upcoming}
+        linkedCampaigns={serializeForClient(linkedCampaigns)}
+        allCampaigns={serializeForClient(allCampaigns)}
+        upcoming={upcoming.map((row) => ({
+          ...row,
+          step: {
+            ...row.step,
+            sendAt:
+              row.step.sendAt instanceof Date
+                ? row.step.sendAt.toISOString()
+                : String(row.step.sendAt),
+          },
+        }))}
         initialActivity={activity}
         accountId={session.accountId}
       />

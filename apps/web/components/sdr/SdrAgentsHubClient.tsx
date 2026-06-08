@@ -11,7 +11,8 @@ import { Button } from '@/components/ui/button'
 import type { SdrAgentCard, SdrAgentId, SdrAgentSnapshot } from '@/lib/agents/types'
 import type { OutreachAutomationMode } from '@/lib/sdr/outreach-automation-mode'
 import { isAutomaticOutreachMode } from '@/lib/sdr/outreach-automation-mode'
-import type { SDRActivityEvent, SDRAgentConfig } from '@/lib/sdr/types'
+import type { HubAgentConfigSummary } from '@/lib/agents/serialize'
+import type { SDRActivityEvent } from '@/lib/sdr/types'
 import { useAccountRealtime } from '@/lib/supabase/account-realtime'
 import { ArrowRight, Bot, Pause, Play, Radar } from 'lucide-react'
 import Link from 'next/link'
@@ -26,7 +27,7 @@ type Props = {
   sdrEnabled: boolean
   outreachAutomationMode: OutreachAutomationMode
   sdrConfigured: boolean
-  config: SDRAgentConfig | null
+  config: HubAgentConfigSummary | null
   initialActivity: SDRActivityEvent[]
   accountId: string
 }
@@ -99,7 +100,7 @@ function agentHref(agent: SdrAgentCard): string {
   return agent.href
 }
 
-function discoveryScheduleLabel(config: SDRAgentConfig | null): string {
+function discoveryScheduleLabel(config: HubAgentConfigSummary | null): string {
   if (!config) return 'Daily · scheduled discovery'
   const freq = config.searchFrequency === 'weekly' ? 'Weekly' : 'Daily'
   const hour = config.outreachWindow.startHour

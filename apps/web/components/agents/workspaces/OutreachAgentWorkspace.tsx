@@ -65,8 +65,8 @@ function campaignStatusTone(status: CampaignWithStats['status']) {
   }
 }
 
-function formatTime(date: Date): string {
-  return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+function formatTime(date: Date | string): string {
+  return new Date(date).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
 }
 
 export function OutreachAgentWorkspace({

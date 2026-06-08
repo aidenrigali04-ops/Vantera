@@ -48,8 +48,19 @@ export type SdrAspireConfigPayload = {
     autoEnrollSdr: boolean
     isActive: boolean
   }>
-  savedSearches: Awaited<ReturnType<typeof findSavedSearches>>
-  recentRuns: Array<typeof aspireSearchRuns.$inferSelect>
+  savedSearches: Array<
+    Omit<Awaited<ReturnType<typeof findSavedSearches>>[number], 'createdAt' | 'updatedAt' | 'lastRunAt'> & {
+      createdAt: string
+      updatedAt: string
+      lastRunAt: string | null
+    }
+  >
+  recentRuns: Array<
+    Omit<typeof aspireSearchRuns.$inferSelect, 'runAt' | 'finishedAt'> & {
+      runAt: string
+      finishedAt: string | null
+    }
+  >
 }
 
 export async function findBindingsForConfig(
@@ -79,6 +90,41 @@ export async function findBindingsForConfig(
   }))
 }
 
+function serializeAspireRuns(runs: Array<typeof aspireSearchRuns.$inferSelect>) {
+  return runs.map((run) => ({
+    ...run,
+    runAt: run.runAt instanceof Date ? run.runAt.toISOString() : String(run.runAt),
+    finishedAt:
+      run.finishedAt instanceof Date
+        ? run.finishedAt.toISOString()
+        : run.finishedAt
+          ? String(run.finishedAt)
+          : null,
+  }))
+}
+
+function serializeSavedSearches(
+  searches: Awaited<ReturnType<typeof findSavedSearches>>,
+) {
+  return searches.map((search) => ({
+    ...search,
+    createdAt:
+      search.createdAt instanceof Date
+        ? search.createdAt.toISOString()
+        : String(search.createdAt),
+    updatedAt:
+      search.updatedAt instanceof Date
+        ? search.updatedAt.toISOString()
+        : String(search.updatedAt),
+    lastRunAt:
+      search.lastRunAt instanceof Date
+        ? search.lastRunAt.toISOString()
+        : search.lastRunAt
+          ? String(search.lastRunAt)
+          : null,
+  }))
+}
+
 export async function getSdrAspireConfig(accountId: string): Promise<SdrAspireConfigPayload> {
   const [config] = await db
     .select()
@@ -86,14 +132,16 @@ export async function getSdrAspireConfig(accountId: string): Promise<SdrAspireCo
     .where(and(eq(sdrAgentConfigs.accountId, accountId), isNull(sdrAgentConfigs.deletedAt)))
     .limit(1)
 
-  const savedSearches = await findSavedSearches(accountId)
+  const savedSearches = serializeSavedSearches(await findSavedSearches(accountId))
 
-  const recentRuns = await db
-    .select()
-    .from(aspireSearchRuns)
-    .where(eq(aspireSearchRuns.accountId, accountId))
-    .orderBy(desc(aspireSearchRuns.runAt))
-    .limit(10)
+  const recentRuns = serializeAspireRuns(
+    await db
+      .select()
+      .from(aspireSearchRuns)
+      .where(eq(aspireSearchRuns.accountId, accountId))
+      .orderBy(desc(aspireSearchRuns.runAt))
+      .limit(10),
+  )
 
   if (!config) {
     return { config: null, bindings: [], savedSearches, recentRuns }

@@ -4,13 +4,13 @@ import { db } from '@/lib/db/client'
 import type { Plan } from '@/lib/feature-flags/flags'
 import { accounts } from '@vantera/db'
 import { eq } from 'drizzle-orm'
+import { serializeForClient } from '@/lib/agents/serialize'
 import { mapSdrAgentConfigRow } from '@/lib/sdr/map-agent-config'
 import { getSdrAspireConfig } from '@/lib/sdr/aspire-config'
 import {
   findSdrConfigByAccount,
   getSdrActivityFeed,
   getSdrDashboardStats,
-  getUpcomingSdrSends,
 } from '@/lib/sdr/queries'
 import { evaluateFlag } from '@/lib/feature-flags/evaluate'
 import { redirect } from 'next/navigation'
@@ -46,10 +46,9 @@ export default async function ProspectScoutPage() {
   }
 
   const config = mapSdrAgentConfigRow(configRow)
-  const [stats, activity, upcoming, aspirePayload] = await Promise.all([
+  const [stats, activity, aspirePayload] = await Promise.all([
     getSdrDashboardStats(session.accountId),
     getSdrActivityFeed(session.accountId),
-    getUpcomingSdrSends(session.accountId),
     getSdrAspireConfig(session.accountId),
   ])
 
@@ -59,11 +58,10 @@ export default async function ProspectScoutPage() {
         mode="configured"
         accountId={session.accountId}
         accountVertical={config.targetVerticals[0] ?? 'agency'}
-        config={config}
-        aspirePayload={aspirePayload}
+        config={serializeForClient(config)}
+        aspirePayload={serializeForClient(aspirePayload)}
         stats={stats}
         initialActivity={activity}
-        upcoming={upcoming}
       />
     </Suspense>
   )

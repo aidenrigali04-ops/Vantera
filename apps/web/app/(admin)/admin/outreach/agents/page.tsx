@@ -4,6 +4,7 @@ import { getSdrAgentCards, getSdrAgentSnapshot } from '@/lib/agents/queries'
 import { db } from '@/lib/db/client'
 import { evaluateFlag } from '@/lib/feature-flags/evaluate'
 import type { Plan } from '@/lib/feature-flags/flags'
+import { toHubAgentConfigSummary } from '@/lib/agents/serialize'
 import { mapSdrAgentConfigRow } from '@/lib/sdr/map-agent-config'
 import { findSdrConfigByAccount, getSdrActivityFeed } from '@/lib/sdr/queries'
 import { normalizeOutreachAutomationMode } from '@/lib/sdr/outreach-automation-mode'
@@ -28,10 +29,17 @@ export default async function SdrAgentsPage() {
   ])
 
   const outreachMode = normalizeOutreachAutomationMode(sdrConfigRow?.outreachAutomationMode)
-  const config = sdrConfigRow ? mapSdrAgentConfigRow(sdrConfigRow) : null
-  const activity = sdrConfigRow
-    ? await getSdrActivityFeed(session.accountId)
-    : []
+  const hubConfig = sdrConfigRow
+    ? toHubAgentConfigSummary(mapSdrAgentConfigRow(sdrConfigRow))
+    : null
+  let activity: Awaited<ReturnType<typeof getSdrActivityFeed>> = []
+  if (sdrConfigRow) {
+    try {
+      activity = await getSdrActivityFeed(session.accountId)
+    } catch (error) {
+      console.error('[agents] activity feed failed:', error)
+    }
+  }
 
   const plan = (account[0]?.plan ?? 'team') as Plan
   const sdrEnabled = await evaluateFlag({
@@ -49,7 +57,7 @@ export default async function SdrAgentsPage() {
         sdrEnabled={sdrEnabled}
         outreachAutomationMode={outreachMode}
         sdrConfigured={Boolean(sdrConfigRow)}
-        config={config}
+        config={hubConfig}
         initialActivity={activity}
         accountId={session.accountId}
       />

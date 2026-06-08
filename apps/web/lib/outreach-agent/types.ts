@@ -26,7 +26,7 @@ export type OutreachAgentUpcomingStep = {
     id: string
     stepIndex: number
     channel: string
-    sendAt: Date
+    sendAt: Date | string
     campaignId: string
   }
   campaignName: string

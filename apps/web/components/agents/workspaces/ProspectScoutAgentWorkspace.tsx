@@ -36,13 +36,6 @@ import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
 import { toast } from 'sonner'
 
-type UpcomingSend = {
-  step: { id: string; stepNumber: number; channel: string; scheduledFor: Date }
-  firstName: string | null
-  lastName: string | null
-  company: string
-}
-
 type Props = {
   mode: 'setup' | 'configured'
   accountId: string
@@ -51,7 +44,6 @@ type Props = {
   aspirePayload: SdrAspireConfigPayload | null
   stats: SDRDashboardStats | null
   initialActivity: SDRActivityEvent[]
-  upcoming?: UpcomingSend[]
 }
 
 type FormState = {

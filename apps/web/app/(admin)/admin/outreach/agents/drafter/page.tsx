@@ -1,4 +1,5 @@
 import { MessageDrafterAgentWorkspace } from '@/components/agents/workspaces/MessageDrafterAgentWorkspace'
+import { serializeForClient } from '@/lib/agents/serialize'
 import { requireAdminSession } from '@/lib/auth/require-session'
 import { db } from '@/lib/db/client'
 import { evaluateFlag } from '@/lib/feature-flags/evaluate'
@@ -46,7 +47,7 @@ export default async function MessageDrafterPage() {
       }
     >
       <MessageDrafterAgentWorkspace
-        initialPayload={payload}
+        initialPayload={serializeForClient(payload)}
         outreachAutomationMode={outreachMode}
       />
     </Suspense>
