@@ -1,4 +1,4 @@
-import type { ApifyLead, ICPConfig, ICPScoreResult } from '@/lib/aspire/types'
+import type { ProspectLead, ICPConfig, ICPScoreResult } from '@/lib/aspire/types'
 
 const OWNER_TITLES = ['owner', 'founder', 'ceo', 'president', 'co-founder', 'principal']
 const SENIOR_TITLES = ['vp', 'vice president', 'director', 'managing partner', 'head of']
@@ -102,7 +102,7 @@ function scoreSizeMatch(count: number | null, config: ICPConfig): { points: numb
   return { points: 0 }
 }
 
-function scoreContactQuality(person: ApifyLead): { points: number; signals: string[] } {
+function scoreContactQuality(person: ProspectLead): { points: number; signals: string[] } {
   let points = 0
   const signals: string[] = []
   if (person.email) {
@@ -120,7 +120,7 @@ function scoreContactQuality(person: ApifyLead): { points: number; signals: stri
   return { points, signals }
 }
 
-function scoreTechBonus(person: ApifyLead, config: ICPConfig): { points: number; signals: string[] } {
+function scoreTechBonus(person: ProspectLead, config: ICPConfig): { points: number; signals: string[] } {
   const bonus = config.bonusTechnologies ?? []
   if (bonus.length === 0 || person.technologies.length === 0) return { points: 0, signals: [] }
 
@@ -135,7 +135,7 @@ function scoreTechBonus(person: ApifyLead, config: ICPConfig): { points: number;
   return { points: Math.min(matches * 2, 10), signals }
 }
 
-export function scoreICP(person: ApifyLead, config: ICPConfig): ICPScoreResult {
+export function scoreICP(person: ProspectLead, config: ICPConfig): ICPScoreResult {
   const title = scoreTitleMatch(person.title, config)
   const industry = scoreIndustryMatch(person.industry, config)
   const size = scoreSizeMatch(person.employeeCount, config)

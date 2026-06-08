@@ -1,7 +1,6 @@
 import { recoverStaleAspireSearchRuns } from '@/lib/prospect-scout/recover-stale-runs'
 import { scoreICP } from '@/lib/aspire/icp-score'
-import { getAspireApifyFetchCount } from '@/lib/aspire/apify-client'
-import { searchApify } from '@/lib/aspire/search'
+import { searchProspects } from '@/lib/aspire/search'
 import { getSystemAutomationId } from '@/lib/automation/system-automation'
 import { db } from '@/lib/db/client'
 import {
@@ -20,14 +19,13 @@ import {
   readScoutRotationIndex,
 } from '@/lib/prospect-scout/rotation'
 import type { SdrConfigRow } from '@/lib/prospect-scout/types'
-import type { ApifyLead } from '@/lib/aspire/types'
-import type { ProspectSearchMeta } from '@/lib/aspire/apify-client'
+import type { ProspectLead, ICPConfig } from '@/lib/aspire/types'
+import type { ProspectSearchMeta } from '@/lib/aspire/types'
 import { logSdrActivity } from '@/lib/sdr/activity-log'
 import { runAutomaticOutreachAfterScout } from '@/lib/sdr/automatic-pipeline'
 import { isAccountAutomaticOutreach } from '@/lib/sdr/outreach-automation-account'
 import type { ScoutRunEnrollment } from '@/lib/outreach/automatic-scout-campaign'
 import { countActiveSdrSequences, countSdrEnrolledToday } from '@/lib/sdr/queries'
-import type { ICPConfig } from '@/lib/aspire/types'
 import { aspireSearchRuns, automationRuns, sdrAgentConfigs } from '@vantera/db'
 import { eq } from 'drizzle-orm'
 
@@ -53,7 +51,7 @@ export async function runProspectScoutDiscovery(
   options?: { autoEnroll?: boolean; perPage?: number },
 ): Promise<ScoutDiscoveryResult> {
   const icpConfig = config.icpConfig as ICPConfig
-  const perPage = options?.perPage ?? getAspireApifyFetchCount()
+  const perPage = options?.perPage ?? 50
   const autoEnroll = options?.autoEnroll ?? true
 
   await recoverStaleAspireSearchRuns(config.accountId)
@@ -92,14 +90,15 @@ export async function runProspectScoutDiscovery(
     let skippedDomain = 0
     let rotationAttempts = 0
     let searchMeta: ProspectSearchMeta | null = null
-    const freshById = new Map<string, ApifyLead>()
+    const freshById = new Map<string, ProspectLead>()
 
     for (let attempt = 0; attempt < ROTATION_ATTEMPTS; attempt += 1) {
       const rotatedFilters = buildRotatedScoutApifyFilters(
         config,
         rotationIndex + attempt,
       )
-      const { people, meta } = await searchApify(rotatedFilters, 1, perPage)
+      const { results: searchResults, meta } = await searchProspects(config.accountId, rotatedFilters, { persist: false, limit: perPage })
+      const people = searchResults
       rotationAttempts += 1
       apifyReturned += people.length
       searchMeta = meta

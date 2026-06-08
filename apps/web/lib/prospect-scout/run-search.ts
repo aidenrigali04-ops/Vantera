@@ -1,8 +1,7 @@
 import { getIcpConfigForVertical, scoreICP } from '@/lib/aspire/icp-score'
-import { isInteractiveAspireSearch, normalizeApifyFilters } from '@/lib/aspire/filters'
-import { getAspireApifyFetchCount } from '@/lib/aspire/apify-client'
-import { filterExistingLeads, searchApify } from '@/lib/aspire/search'
-import type { ApifySearchFilters, ApifyLead } from '@/lib/aspire/types'
+import { isInteractiveAspireSearch, normalizeProspectFilters } from '@/lib/aspire/filters'
+import { filterExistingLeads, searchProspects } from '@/lib/aspire/search'
+import type { ProspectSearchFilters, ProspectLead } from '@/lib/aspire/types'
 import { getSystemAutomationId } from '@/lib/automation/system-automation'
 import { db } from '@/lib/db/client'
 import {
@@ -46,7 +45,7 @@ async function startRun(input: {
   accountId: string
   savedSearchId: string
   configId?: string
-  query: ApifySearchFilters
+  query: ProspectSearchFilters
 }): Promise<string> {
   const [row] = await db
     .insert(aspireSearchRuns)
@@ -85,10 +84,10 @@ async function finishRun(
 }
 
 function filterCandidates(
-  people: ApifyLead[],
+  people: ProspectLead[],
   accountId: string,
   excludeDomains: string[],
-): Promise<ApifyLead[]> {
+): Promise<ProspectLead[]> {
   return filterExistingLeads(accountId, people.map((p) => p.id)).then((existing) => {
     const existingIds = new Set(existing)
     const exclude = new Set(excludeDomains.map((d) => d.toLowerCase()))
@@ -103,10 +102,10 @@ function filterCandidates(
 export async function runBoundSearch(input: RunBoundSearchInput): Promise<RunSearchResult> {
   const { binding, config, headroom } = input
   const search = binding.search
-  const rawFilters = search.filters as Partial<ApifySearchFilters>
+  const rawFilters = search.filters as Partial<ProspectSearchFilters>
   const vertical = input.vertical ?? 'agency'
   const interactive = isInteractiveAspireSearch(rawFilters)
-  const filters = normalizeApifyFilters(vertical, rawFilters, { interactive })
+  const filters = normalizeProspectFilters(vertical, rawFilters, { interactive })
   const icpConfig = resolveIcpConfig(config, search)
   const minIcp = effectiveMinIcp(binding, config)
   const limit = Math.min(headroom, binding.maxLeadsPerRun, 25)
@@ -119,7 +118,8 @@ export async function runBoundSearch(input: RunBoundSearchInput): Promise<RunSea
   })
 
   try {
-    const { people } = await searchApify(filters, 1, getAspireApifyFetchCount(), interactive)
+    const { results: searchResults } = await searchProspects(config.accountId, filters, { persist: false })
+    const people = searchResults
     const fresh = await filterCandidates(people, config.accountId, config.excludeDomains ?? [])
 
     const scored = fresh
@@ -235,9 +235,9 @@ export async function runBoundSearch(input: RunBoundSearchInput): Promise<RunSea
 /** Weekly/manual run for a saved search without an SDR binding. */
 export async function runUnboundSearch(input: RunUnboundSearchInput): Promise<RunSearchResult> {
   const { search, accountId, vertical } = input
-  const rawFilters = search.filters as Partial<ApifySearchFilters>
+  const rawFilters = search.filters as Partial<ProspectSearchFilters>
   const interactive = isInteractiveAspireSearch(rawFilters)
-  const filters = normalizeApifyFilters(vertical, rawFilters, { interactive })
+  const filters = normalizeProspectFilters(vertical, rawFilters, { interactive })
   const icpConfig =
     (search.icpConfig as ReturnType<typeof resolveIcpConfig> | null) ??
     getIcpConfigForVertical(vertical)
@@ -250,7 +250,8 @@ export async function runUnboundSearch(input: RunUnboundSearchInput): Promise<Ru
   })
 
   try {
-    const { people } = await searchApify(filters, 1, getAspireApifyFetchCount(), interactive)
+    const { results: searchResults } = await searchProspects(accountId, filters, { persist: false })
+    const people = searchResults
     const fresh = await filterCandidates(
       people,
       accountId,

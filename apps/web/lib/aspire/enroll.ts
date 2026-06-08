@@ -4,7 +4,7 @@ import {
   mergeLeadEnrichment,
 } from '@/lib/leads/enrichment'
 import { EnrollError } from '@/lib/aspire/enroll-error'
-import type { ApifyLead, EnrollResult } from '@/lib/aspire/types'
+import type { ProspectLead, EnrollResult } from '@/lib/aspire/types'
 import { getSystemAutomationId } from '@/lib/automation/system-automation'
 import { getAdminSession } from '@/lib/auth/session'
 import { db } from '@/lib/db/client'
@@ -42,7 +42,7 @@ async function findExistingResult(accountId: string, apifyId: string) {
 }
 
 export async function enrollLeadFromAspire(
-  apifyLead: ApifyLead,
+  apifyLead: ProspectLead,
   searchId: string,
   pipelineStage = 'prospect',
 ): Promise<EnrollResult> {
@@ -238,7 +238,7 @@ export async function enrollLeadFromAspire(
 
 async function findLeadIdForAspirePerson(
   accountId: string,
-  person: ApifyLead,
+  person: ProspectLead,
 ): Promise<string | null> {
   if (person.id) {
     const [byApify] = await db
@@ -274,7 +274,7 @@ async function findLeadIdForAspirePerson(
 }
 
 export async function bulkEnrollFromAspire(
-  apifyLeads: ApifyLead[],
+  apifyLeads: ProspectLead[],
   searchId: string,
   pipelineStage = 'prospect',
 ): Promise<{ enrolled: number; skipped: number; errors: number; leadIds: string[] }> {

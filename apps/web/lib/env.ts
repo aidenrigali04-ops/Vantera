@@ -46,11 +46,7 @@ const serverEnvSchema = z.object({
   TRIGGER_SECRET_KEY: z.string().optional().default(''),
   TRIGGER_API_URL: z.string().optional().default('https://api.trigger.dev'),
   CRON_SECRET: z.string().optional().default(''),
-  APIFY_API_TOKEN: z.string().optional().default(''),
-  APIFY_LEADS_ACTOR_ID: z.string().optional().default('code_crafter~leads-finder'),
-  /** Max leads per Apify run for Aspire (1–100, default 50 in code). */
-  ASPIRE_APIFY_FETCH_COUNT: z.string().optional().default(''),
-  /** Explorium (Vibe Prospecting) API key — primary lead source replacing Apify. */
+  /** Explorium (Vibe Prospecting) API key — primary lead source. */
   EXPLORIUM_API_KEY: z.string().optional().default(''),
   EXPLORIUM_API_BASE_URL: z.string().optional().default('https://api.explorium.ai/v1'),
 })
@@ -118,8 +114,6 @@ function buildEnvInput(): Record<string, string | undefined> {
   out.SUPABASE_SERVICE_ROLE_KEY = out.SUPABASE_SERVICE_ROLE_KEY ?? out.SUPABASE_SERVICE_KEY
   out.SUPABASE_JWT_SECRET = out.SUPABASE_JWT_SECRET ?? out.JWT_SECRET
   out.DATABASE_URL = out.DATABASE_URL ?? out.POSTGRES_URL ?? out.POSTGRES_PRISMA_URL
-  out.APIFY_API_TOKEN = out.APIFY_API_TOKEN ?? out.APIFY_TOKEN ?? out.APIFY_API_KEY
-  out.APIFY_LEADS_ACTOR_ID = out.APIFY_LEADS_ACTOR_ID ?? out.APIFY_ACTOR_ID
 
   return out
 }

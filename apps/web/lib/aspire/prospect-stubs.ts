@@ -1,11 +1,11 @@
-import type { ApifyLead, ApifySearchFilters } from '@/lib/aspire/types'
+import type { ProspectLead, ProspectSearchFilters } from '@/lib/aspire/types'
 
-/** Sample leads when Apify is not configured or returns no matches (interactive search). */
-export function stubResults(filters: Partial<ApifySearchFilters> = {}): ApifyLead[] {
+/** Sample leads when the provider is not configured or returns no matches (interactive search). */
+export function stubResults(filters: Partial<ProspectSearchFilters> = {}): ProspectLead[] {
   const keyword = (filters.q ?? filters.keywords?.join(' ') ?? '').trim().toLowerCase()
   const company = filters.company?.trim() || 'Northstar SaaS'
 
-  const pool: ApifyLead[] = [
+  const pool: ProspectLead[] = [
     {
       id: 'stub-alex-chen',
       firstName: 'Alex',

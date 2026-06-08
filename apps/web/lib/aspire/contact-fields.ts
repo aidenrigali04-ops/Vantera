@@ -1,4 +1,4 @@
-/** Normalize contact fields from Apify actor rows or stored aspire rawData. */
+/** Normalize contact fields from prospect provider rows or stored aspire rawData. */
 
 export function readString(raw: Record<string, unknown>, keys: string[]): string | null {
   for (const key of keys) {

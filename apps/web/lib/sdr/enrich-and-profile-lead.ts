@@ -1,6 +1,6 @@
 import { assembleAgentPrompt } from '@/lib/agents/prompt-loader'
 import { callModel, parseJsonResponse } from '@/lib/ai/client'
-import type { ApifyLead } from '@/lib/aspire/types'
+import type { ProspectLead } from '@/lib/aspire/types'
 import {
   buildLeadProspectEnrichment,
   mergeLeadEnrichment,
@@ -41,7 +41,7 @@ type ProfilePayload = {
 export async function enrichAndProfileLead(input: {
   accountId: string
   leadId: string
-  aspireData: ApifyLead | null
+  aspireData: ProspectLead | null
   icpScore: number
   icpSignals: string[]
   source: LeadProspectEnrichment['source']
@@ -54,7 +54,7 @@ export async function enrichAndProfileLead(input: {
 
   if (!lead) return
 
-  const person: ApifyLead = input.aspireData ?? {
+  const person: ProspectLead = input.aspireData ?? {
     id: String((lead.enrichment as Record<string, unknown>)?.apifyId ?? lead.id),
     firstName: lead.firstName ?? '',
     lastName: lead.lastName ?? '',

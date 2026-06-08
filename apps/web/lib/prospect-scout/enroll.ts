@@ -1,4 +1,4 @@
-import type { ApifyLead } from '@/lib/aspire/types'
+import type { ProspectLead } from '@/lib/aspire/types'
 import {
   buildLeadProspectEnrichment,
   mergeLeadEnrichment,
@@ -35,7 +35,7 @@ function domainFromEmail(email: string | null): string | null {
 
 async function upsertLeadFromApify(
   accountId: string,
-  person: ApifyLead,
+  person: ProspectLead,
   score: number,
   signals: string[],
   source: 'sdr_agent' | 'aspire',
@@ -107,7 +107,7 @@ async function upsertLeadFromApify(
 export async function enrollProspect(input: {
   accountId: string
   config: SdrConfigRow
-  person: ApifyLead
+  person: ProspectLead
   searchId: string | null
   icpScore: number
   icpSignals: string[]
@@ -279,7 +279,7 @@ export async function recordFoundProspects(input: {
   accountId: string
   /** null = Prospect Scout pool (not tied to a saved Aspire search) */
   searchId: string | null
-  people: Array<{ person: ApifyLead; icpScore: number; icpSignals: string[] }>
+  people: Array<{ person: ProspectLead; icpScore: number; icpSignals: string[] }>
 }): Promise<number> {
   if (input.people.length === 0) return 0
 

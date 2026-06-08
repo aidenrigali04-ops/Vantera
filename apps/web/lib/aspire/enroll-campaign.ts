@@ -1,11 +1,11 @@
 import { bulkEnrollFromAspire } from '@/lib/aspire/enroll'
-import type { ApifyLead } from '@/lib/aspire/types'
+import type { ProspectLead } from '@/lib/aspire/types'
 import { requireAdminSession } from '@/lib/auth/require-session'
 import { enrollLeadsInCampaignCore } from '@/lib/outreach/enroll-leads'
 
 export async function enrollAspireProspectsInCampaign(input: {
   campaignId: string
-  people: ApifyLead[]
+  people: ProspectLead[]
   searchId?: string
 }): Promise<
   | { success: true; data: { enrolled: number; skipped: number; campaignEnrolled: number } }

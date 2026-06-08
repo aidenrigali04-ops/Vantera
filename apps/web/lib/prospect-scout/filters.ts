@@ -1,7 +1,7 @@
-import type { ApifySearchFilters } from '@/lib/aspire/types'
+import type { ProspectSearchFilters } from '@/lib/aspire/types'
 import type { SdrConfigRow } from '@/lib/prospect-scout/types'
 
-export function buildScoutApifyFilters(config: SdrConfigRow): ApifySearchFilters {
+export function buildScoutApifyFilters(config: SdrConfigRow): ProspectSearchFilters {
   const icp = config.icpConfig as {
     targetTitles?: string[]
     targetIndustries?: string[]

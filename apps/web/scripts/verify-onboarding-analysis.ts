@@ -2,7 +2,6 @@
  * Quick sanity checks for onboarding URL analysis helpers.
  * Run: pnpm exec tsx apps/web/scripts/verify-onboarding-analysis.ts
  */
-import { isApifyAuthError, parseApifyErrorMessage } from '../lib/aspire/apify-errors'
 import { buildAnalysisFromAccount } from '../lib/onboarding/onboarding-analysis-utils'
 import { parseWebsiteSnapshotHtml } from '../lib/onboarding/parse-website-snapshot'
 
@@ -43,15 +42,6 @@ const rebuilt = buildAnalysisFromAccount({
 assert(rebuilt?.vertical === 'hvac', 'expected hvac vertical when rebuilding analysis')
 assert(rebuilt?.icpSummary.includes('Denver') === true, 'expected persisted icp_summary')
 assert(rebuilt?.icpDescription.includes('Homeowners') === true, 'expected icp_description')
-
-const apifyAuthBody = JSON.stringify({
-  error: {
-    type: 'user-or-token-not-found',
-    message: 'User was not found or authentication token is not valid',
-  },
-})
-const apifyMessage = parseApifyErrorMessage(apifyAuthBody, 'fallback')
-assert(isApifyAuthError(apifyMessage), 'expected Apify auth error detection')
 
 console.log('verify-onboarding-analysis: all checks passed')
 console.log(JSON.stringify({ snapshot, rebuilt }, null, 2))

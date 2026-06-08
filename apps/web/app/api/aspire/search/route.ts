@@ -1,26 +1,26 @@
 import { getSyncedAdminSession } from '@/lib/auth/require-session'
-import { isApifyConfigured } from '@/lib/aspire/apify-config'
+import { isExploriumConfigured } from '@/lib/aspire/explorium-client'
 import { searchProspects } from '@/lib/aspire/search'
 import { stubResults } from '@/lib/aspire/prospect-stubs'
 import { toEnrichedAspireSearchResult } from '@/lib/aspire/enrich-prospect'
 import { getIcpConfigForVertical, scoreICP } from '@/lib/aspire/icp-score'
-import { normalizeApifyFilters, isInteractiveAspireSearch } from '@/lib/aspire/filters'
-import type { ApifySearchFilters, AspireSearchResult } from '@/lib/aspire/types'
+import { normalizeProspectFilters, isInteractiveAspireSearch } from '@/lib/aspire/filters'
+import type { ProspectSearchFilters, AspireSearchResult } from '@/lib/aspire/types'
 import { db } from '@/lib/db/client'
 import { accounts } from '@vantera/db'
 import { eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
-/** Apify sync runs can take several minutes. */
+/** Live search can take several seconds. */
 export const maxDuration = 300
 
 function fallbackSearchResults(
   accountId: string,
-  filters: Partial<ApifySearchFilters>,
+  filters: Partial<ProspectSearchFilters>,
   vertical: string,
 ): { results: AspireSearchResult[]; meta: { source: 'stub'; providerConfigured: boolean; providerError: string } } {
   const interactive = isInteractiveAspireSearch(filters)
-  const normalized = normalizeApifyFilters(vertical, filters, { interactive })
+  const normalized = normalizeProspectFilters(vertical, filters, { interactive })
   const icpConfig = getIcpConfigForVertical(vertical)
   const people = stubResults(normalized)
 
@@ -36,8 +36,8 @@ function fallbackSearchResults(
     results,
     meta: {
       source: 'stub',
-      providerConfigured: isApifyConfigured(),
-      providerError: 'Search fallback — live Apify run unavailable',
+      providerConfigured: isExploriumConfigured(),
+      providerError: 'Search fallback — live search unavailable',
     },
   }
 }
@@ -49,7 +49,7 @@ export async function GET(request: Request) {
   }
 
   const { searchParams } = new URL(request.url)
-  const filters: ApifySearchFilters = {
+  const filters: ProspectSearchFilters = {
     jobTitles: [],
     industries: [],
     companySizeRanges: [],
@@ -69,7 +69,7 @@ export async function GET(request: Request) {
       const fallback = fallbackSearchResults(session.accountId, filters, account?.vertical ?? 'agency')
       const message = error instanceof Error ? error.message : 'Search failed'
       fallback.meta.providerError = message
-      fallback.meta.providerConfigured = isApifyConfigured()
+      fallback.meta.providerConfigured = isExploriumConfigured()
       return fallback
     },
   )
@@ -82,7 +82,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
   }
 
-  const body = (await request.json()) as Partial<ApifySearchFilters> & {
+  const body = (await request.json()) as Partial<ProspectSearchFilters> & {
     searchId?: string
     limit?: number
   }
@@ -112,7 +112,7 @@ export async function POST(request: Request) {
     )
     const message = error instanceof Error ? error.message : 'Search failed'
     fallback.meta.providerError = message
-    fallback.meta.providerConfigured = isApifyConfigured()
+    fallback.meta.providerConfigured = isExploriumConfigured()
     return NextResponse.json({
       success: true,
       data: fallback.results,

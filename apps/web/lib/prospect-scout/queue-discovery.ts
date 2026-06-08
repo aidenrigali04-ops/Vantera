@@ -13,7 +13,7 @@ export type QueueDiscoveryResult =
   | { queued: false; mode: 'failed'; error: string; diagnostics: ReturnType<typeof getSdrPipelineDiagnostics> }
 
 /**
- * Prefer Trigger.dev for long Apify runs (avoids Vercel timeouts).
+ * Prefer Trigger.dev for long prospect-search runs (avoids Vercel timeouts).
  * Falls back to synchronous bootstrap when Trigger is unavailable.
  */
 export async function queueProspectScoutDiscovery(
@@ -34,11 +34,11 @@ export async function queueProspectScoutDiscovery(
             : 'Could not queue discovery in Trigger.dev'
       console.error('[queueProspectScoutDiscovery] trigger failed, trying sync bootstrap', err)
 
-      if (!diagnostics.apifyConfigured) {
+      if (!diagnostics.exploriumConfigured) {
         return {
           queued: false,
           mode: 'failed',
-          error: `${message}. Apify is also not configured (APIFY_API_TOKEN missing).`,
+          error: `${message}. Explorium is also not configured (EXPLORIUM_API_KEY missing).`,
           diagnostics,
         }
       }

@@ -29,10 +29,10 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { aspireCompanyName, aspireProspectName } from '@/lib/aspire/display'
-import { getAspireSearchNotice } from '@/lib/aspire/apify-errors'
+import { getAspireSearchNotice } from '@/lib/aspire/prospect-search-notice'
 import { mergeAspireResults } from '@/lib/aspire/merge-results'
 import { getIcpConfigForVertical } from '@/lib/aspire/icp-score'
-import { normalizeApifyFilters } from '@/lib/aspire/filters'
+import { normalizeProspectFilters } from '@/lib/aspire/filters'
 import type { AspireSearchResult } from '@/lib/aspire/types'
 import { ASPIRE_TABLE_VIEWS } from '@/lib/operational/aspire-table-views'
 import { LiveIndicator } from '@/components/operational/LiveIndicator'
@@ -426,7 +426,7 @@ export function AspirePageClient({
 
   const saveSearchMutation = useMutation({
     mutationFn: async (name: string) => {
-      const filters = normalizeApifyFilters(accountVertical, {
+      const filters = normalizeProspectFilters(accountVertical, {
         q: query || undefined,
         company: company || undefined,
       })

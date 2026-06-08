@@ -1,5 +1,5 @@
 import { draftOutreachMessages } from '@/lib/ai/draft-message'
-import type { ApifyLead } from '@/lib/aspire/types'
+import type { ProspectLead } from '@/lib/aspire/types'
 import { getSystemAutomationId } from '@/lib/automation/system-automation'
 import { db } from '@/lib/db/client'
 import { isAiMessageDraftingEnabled } from '@/lib/ai/drafting-enabled'
@@ -13,7 +13,7 @@ import { eq } from 'drizzle-orm'
 export type DraftOnEnrollPayload = {
   accountId: string
   leadId: string
-  apifyLead: ApifyLead
+  apifyLead: ProspectLead
   icpScore: number
   icpSignals: string[]
 }

@@ -1,6 +1,6 @@
 import type { LeadQualityTier } from '@/lib/leads/enrichment'
 
-export interface ApifySearchFilters {
+export interface ProspectSearchFilters {
   jobTitles: string[]
   industries: string[]
   companySizeRanges: string[]
@@ -12,8 +12,11 @@ export interface ApifySearchFilters {
   company?: string
 }
 
-/** Normalized lead row from Apify (code_crafter/leads-finder) — not Apollo.io. */
-export interface ApifyLead {
+/** @deprecated Use ProspectSearchFilters */
+export type ApifySearchFilters = ProspectSearchFilters
+
+/** Normalized prospect row from the active lead provider (Explorium). */
+export interface ProspectLead {
   id: string
   firstName: string
   lastName: string
@@ -32,6 +35,9 @@ export interface ApifyLead {
   technologies: string[]
   photoUrl: string | null
 }
+
+/** @deprecated Use ProspectLead */
+export type ApifyLead = ProspectLead
 
 export interface ICPConfig {
   targetTitles: string[]
@@ -76,7 +82,7 @@ export interface EnrollResult {
 }
 
 /** UI-facing search row — includes ICP score from scoring engine */
-export type AspireSearchResult = ApifyLead & {
+export type AspireSearchResult = ProspectLead & {
   icpScore: number
   icpSignals: string[]
   enrichmentScore: number
@@ -86,4 +92,20 @@ export type AspireSearchResult = ApifyLead & {
   intentScore: number
   /** @deprecated use organizationName */
   company: string
+}
+
+export type ProspectSearchSource = 'apify' | 'stub' | 'demo' | 'explorium'
+
+export type ProspectSearchMeta = {
+  source: ProspectSearchSource
+  providerConfigured: boolean
+  providerError?: string
+  /** Total matching records reported by the provider (may exceed returned rows). */
+  totalFound?: number
+  /** Raw rows from provider dataset before mapping. */
+  apifyRowCount?: number
+  /** Rows dropped because mapping returned null. */
+  unmappedRowCount?: number
+  /** True when a second broader run was used to fill volume. */
+  retriedBroad?: boolean
 }

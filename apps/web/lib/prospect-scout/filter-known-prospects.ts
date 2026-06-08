@@ -1,4 +1,4 @@
-import type { ApifyLead } from '@/lib/aspire/types'
+import type { ProspectLead } from '@/lib/aspire/types'
 import { filterExistingLeads } from '@/lib/aspire/search'
 import { db } from '@/lib/db/client'
 import { contacts, leads } from '@vantera/db'
@@ -9,7 +9,7 @@ import { and, eq, inArray, isNull, sql } from 'drizzle-orm'
  */
 export async function filterKnownProspectIds(
   accountId: string,
-  people: ApifyLead[],
+  people: ProspectLead[],
 ): Promise<Set<string>> {
   if (people.length === 0) return new Set()
 
@@ -70,13 +70,13 @@ export async function filterKnownProspectIds(
 }
 
 export function partitionFreshProspects(
-  people: ApifyLead[],
+  people: ProspectLead[],
   knownIds: Set<string>,
   excludeDomains: Set<string>,
-): { fresh: ApifyLead[]; skippedKnown: number; skippedDomain: number } {
+): { fresh: ProspectLead[]; skippedKnown: number; skippedDomain: number } {
   let skippedKnown = 0
   let skippedDomain = 0
-  const fresh: ApifyLead[] = []
+  const fresh: ProspectLead[] = []
 
   for (const person of people) {
     if (knownIds.has(person.id)) {

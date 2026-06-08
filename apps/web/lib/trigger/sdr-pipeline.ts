@@ -1,4 +1,4 @@
-import { isApifyConfigured } from '@/lib/aspire/apify-config'
+import { isExploriumConfigured } from '@/lib/aspire/explorium-client'
 import { env } from '@/lib/env'
 import { tasks } from '@trigger.dev/sdk'
 
@@ -15,7 +15,7 @@ export function isTriggerConfigured(): boolean {
   return Boolean(env.TRIGGER_SECRET_KEY?.trim())
 }
 
-/** Queue the SDR bootstrap discovery task in Trigger.dev (long Apify runs). */
+/** Queue the SDR bootstrap discovery task in Trigger.dev. */
 export async function triggerSdrBootstrapDiscovery(accountId: string): Promise<{ runId: string }> {
   if (!isTriggerConfigured()) {
     throw new TriggerNotConfiguredError()
@@ -33,14 +33,14 @@ export async function triggerSdrBootstrapDiscovery(accountId: string): Promise<{
 
 export type SdrPipelineDiagnostics = {
   triggerConfigured: boolean
-  apifyConfigured: boolean
+  exploriumConfigured: boolean
   triggerProjectRef: string | null
 }
 
 export function getSdrPipelineDiagnostics(): SdrPipelineDiagnostics {
   return {
     triggerConfigured: isTriggerConfigured(),
-    apifyConfigured: isApifyConfigured(),
+    exploriumConfigured: isExploriumConfigured(),
     triggerProjectRef: process.env.TRIGGER_PROJECT_REF?.trim() || null,
   }
 }
