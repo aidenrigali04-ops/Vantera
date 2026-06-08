@@ -23,17 +23,20 @@ export function PipelineAnalystAgentWorkspace({ snapshot }: Props) {
   const [agentName, setAgentName] = useState(copy.defaultName)
   const [agentDescription, setAgentDescription] = useState(copy.defaultDescription)
   const [instructions, setInstructions] = useState(AGENT_DEFAULT_INSTRUCTIONS.pipeline_analyst)
+  const [conversationStarters, setConversationStarters] = useState(
+    'Show me the top 10 highest-intent leads right now\nWhich sequences have the best reply rates this month?\nFlag leads that haven\'t moved in 7 days',
+  )
   const [dailyScoring, setDailyScoring] = useState(true)
   const [engagementSignals, setEngagementSignals] = useState(true)
 
   const configPanel = (
     <>
-      <AgentConfigSection title="Agent identity">
+      <AgentConfigSection title="Agent Identity">
         <div>
           <Label htmlFor="analyst-name">Name</Label>
           <Input
             id="analyst-name"
-            className="mt-1.5 border-[var(--border-default)] bg-[var(--bg-subtle)]/50"
+            className="mt-1.5 border-[var(--border-default)] bg-[var(--bg-surface)]"
             value={agentName}
             onChange={(e) => setAgentName(e.target.value)}
           />
@@ -42,22 +45,33 @@ export function PipelineAnalystAgentWorkspace({ snapshot }: Props) {
           <Label htmlFor="analyst-description">Description</Label>
           <Input
             id="analyst-description"
-            className="mt-1.5 border-[var(--border-default)] bg-[var(--bg-subtle)]/50"
+            className="mt-1.5 border-[var(--border-default)] bg-[var(--bg-surface)]"
             value={agentDescription}
             onChange={(e) => setAgentDescription(e.target.value)}
           />
         </div>
       </AgentConfigSection>
 
-      <AgentConfigSection title="Instructions">
+      <AgentConfigSection title="Instructions System">
         <div>
           <Label htmlFor="analyst-instructions">Instruction</Label>
           <Textarea
             id="analyst-instructions"
-            rows={6}
-            className="mt-1.5 resize-y border-[var(--border-default)] bg-[var(--bg-subtle)]/50 font-mono text-[13px]"
+            rows={7}
+            className="mt-1.5 resize-y border-[var(--border-default)] bg-[var(--bg-surface)] font-mono text-[13px]"
             value={instructions}
             onChange={(e) => setInstructions(e.target.value)}
+          />
+        </div>
+        <div>
+          <Label htmlFor="analyst-starters">Conversation Starters</Label>
+          <Textarea
+            id="analyst-starters"
+            rows={3}
+            placeholder="One starter per line…"
+            className="mt-1.5 resize-y border-[var(--border-default)] bg-[var(--bg-surface)] text-[13px]"
+            value={conversationStarters}
+            onChange={(e) => setConversationStarters(e.target.value)}
           />
         </div>
       </AgentConfigSection>

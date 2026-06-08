@@ -24,11 +24,12 @@ export function AgentCapabilityCard({
   return (
     <div
       className={cn(
-        'flex items-center gap-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)]/40 p-4',
-        disabled && 'opacity-60',
+        'flex items-center gap-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] p-4 transition-colors',
+        checked && !disabled && 'border-[var(--accent-border)]',
+        disabled && 'opacity-50',
       )}
     >
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--accent)]">
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--bg-elevated)] text-[var(--accent)]">
         <Icon className="h-5 w-5" aria-hidden />
       </span>
       <div className="min-w-0 flex-1">

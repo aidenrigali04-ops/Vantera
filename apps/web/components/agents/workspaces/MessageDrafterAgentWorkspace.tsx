@@ -32,6 +32,9 @@ export function MessageDrafterAgentWorkspace({
   const [agentName, setAgentName] = useState(copy.defaultName)
   const [agentDescription, setAgentDescription] = useState(copy.defaultDescription)
   const [instructions, setInstructions] = useState(AGENT_DEFAULT_INSTRUCTIONS.message_drafter)
+  const [conversationStarters, setConversationStarters] = useState(
+    'Draft a personalized cold email for the next lead in queue\nGenerate a 5-step sequence for a high-scoring HVAC owner\nReview and improve the last batch of drafted messages',
+  )
   const [requireReview, setRequireReview] = useState(!automatic)
   const [linkedinManual, setLinkedinManual] = useState(true)
 
@@ -40,12 +43,12 @@ export function MessageDrafterAgentWorkspace({
 
   const configPanel = (
     <>
-      <AgentConfigSection title="Agent identity">
+      <AgentConfigSection title="Agent Identity">
         <div>
           <Label htmlFor="drafter-name">Name</Label>
           <Input
             id="drafter-name"
-            className="mt-1.5 border-[var(--border-default)] bg-[var(--bg-subtle)]/50"
+            className="mt-1.5 border-[var(--border-default)] bg-[var(--bg-surface)]"
             value={agentName}
             onChange={(e) => setAgentName(e.target.value)}
           />
@@ -54,22 +57,33 @@ export function MessageDrafterAgentWorkspace({
           <Label htmlFor="drafter-description">Description</Label>
           <Input
             id="drafter-description"
-            className="mt-1.5 border-[var(--border-default)] bg-[var(--bg-subtle)]/50"
+            className="mt-1.5 border-[var(--border-default)] bg-[var(--bg-surface)]"
             value={agentDescription}
             onChange={(e) => setAgentDescription(e.target.value)}
           />
         </div>
       </AgentConfigSection>
 
-      <AgentConfigSection title="Instructions">
+      <AgentConfigSection title="Instructions System">
         <div>
           <Label htmlFor="drafter-instructions">Instruction</Label>
           <Textarea
             id="drafter-instructions"
-            rows={6}
-            className="mt-1.5 resize-y border-[var(--border-default)] bg-[var(--bg-subtle)]/50 font-mono text-[13px]"
+            rows={7}
+            className="mt-1.5 resize-y border-[var(--border-default)] bg-[var(--bg-surface)] font-mono text-[13px]"
             value={instructions}
             onChange={(e) => setInstructions(e.target.value)}
+          />
+        </div>
+        <div>
+          <Label htmlFor="drafter-starters">Conversation Starters</Label>
+          <Textarea
+            id="drafter-starters"
+            rows={3}
+            placeholder="One starter per line…"
+            className="mt-1.5 resize-y border-[var(--border-default)] bg-[var(--bg-surface)] text-[13px]"
+            value={conversationStarters}
+            onChange={(e) => setConversationStarters(e.target.value)}
           />
         </div>
         <p className="text-[12px] text-[var(--text-secondary)]">

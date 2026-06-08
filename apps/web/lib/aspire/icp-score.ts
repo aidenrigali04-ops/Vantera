@@ -87,7 +87,7 @@ function scoreIndustryMatch(industry: string | null, config: ICPConfig): { point
       return { points: 25, signal: `${target} industry match` }
     }
   }
-  return { points: 12, signal: 'Adjacent vertical' }
+  return { points: 0 }
 }
 
 function scoreSizeMatch(count: number | null, config: ICPConfig): { points: number; signal?: string } {

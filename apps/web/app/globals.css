@@ -81,6 +81,50 @@
     --shadow-glow: 0 0 0 3px var(--brand-accent-muted);
   }
 
+  /* Agent workspace dark theme — scoped override for all agent configuration pages */
+  .agent-dark {
+    /* shadcn base vars (inputs, popovers, selects use these) */
+    --background: 222 13% 9%;
+    --foreground: 0 0% 94%;
+    --card: 222 13% 12%;
+    --card-foreground: 0 0% 94%;
+    --popover: 222 13% 12%;
+    --popover-foreground: 0 0% 94%;
+    --primary: 43 74% 54%;
+    --primary-foreground: 222 13% 9%;
+    --secondary: 222 13% 16%;
+    --secondary-foreground: 0 0% 94%;
+    --muted: 222 13% 14%;
+    --muted-foreground: 0 0% 53%;
+    --accent: 222 13% 16%;
+    --accent-foreground: 0 0% 94%;
+    --destructive: 0 63% 48%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 222 13% 18%;
+    --input: 222 13% 15%;
+    --ring: 43 74% 54%;
+
+    /* Vantera tokens — dark */
+    --bg-base: #0f0f12;
+    --bg-subtle: #1a1a1e;
+    --bg-surface: #1e1e24;
+    --bg-elevated: #242430;
+    --bg-overlay: #2a2a36;
+    --border-subtle: rgba(255, 255, 255, 0.06);
+    --border-default: rgba(255, 255, 255, 0.1);
+    --border-strong: rgba(255, 255, 255, 0.16);
+    --border-focus: rgba(255, 255, 255, 0.28);
+    --text-primary: #f0f0f2;
+    --text-secondary: #888896;
+    --text-tertiary: #55555e;
+    --text-disabled: #333340;
+    --text-inverse: #0a0a0e;
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.5);
+    --shadow-lg: 0 8px 40px rgba(0, 0, 0, 0.6);
+    color-scheme: dark;
+  }
+
   .dark {
     --background: 222.2 84% 4.9%;
     --foreground: 210 40% 98%;

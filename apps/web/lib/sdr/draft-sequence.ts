@@ -79,6 +79,7 @@ export async function generateSdrSequenceSteps(input: {
 
   const callContext = [
     `Rep name: ${payload.agentName}`,
+    `Vertical: ${input.vertical}`,
     `Lead: ${payload.firstName} ${payload.lastName}, ${payload.title} at ${payload.company}`,
     payload.employeeCount ? `Company size: ${payload.employeeCount} employees` : null,
     `ICP score: ${payload.icpScore}`,
@@ -86,6 +87,7 @@ export async function generateSdrSequenceSteps(input: {
     memoryContext ? `What worked before:\n${memoryContext}` : null,
     input.personaContext ? `Persona analysis:\n${input.personaContext}` : null,
     `Target titles: ${input.icpConfig.targetTitles.join(', ')}`,
+    `Target industries: ${input.icpConfig.targetIndustries.join(', ')}`,
   ]
     .filter(Boolean)
     .join('\n')

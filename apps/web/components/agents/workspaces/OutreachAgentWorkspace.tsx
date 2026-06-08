@@ -89,6 +89,9 @@ export function OutreachAgentWorkspace({
   const [agentName, setAgentName] = useState(config?.agentName ?? copy.defaultName)
   const [agentDescription, setAgentDescription] = useState(copy.defaultDescription)
   const [instructions, setInstructions] = useState(AGENT_DEFAULT_INSTRUCTIONS.outreach_agent)
+  const [conversationStarters, setConversationStarters] = useState(
+    'Send all overdue steps for active sequences now\nShow me the reply rate across campaigns this week\nPause outreach for leads that haven\'t engaged in 14 days',
+  )
   const [selectedIds, setSelectedIds] = useState<string[]>(config?.linkedCampaignIds ?? [])
   const [queueEnabled, setQueueEnabled] = useState(true)
   const [linkedinManual, setLinkedinManual] = useState(true)
@@ -242,12 +245,12 @@ export function OutreachAgentWorkspace({
 
   const configPanel = (
     <>
-      <AgentConfigSection title="Agent identity">
+      <AgentConfigSection title="Agent Identity">
         <div>
           <Label htmlFor="outreach-name">Name</Label>
           <Input
             id="outreach-name"
-            className="mt-1.5 border-[var(--border-default)] bg-[var(--bg-subtle)]/50"
+            className="mt-1.5 border-[var(--border-default)] bg-[var(--bg-surface)]"
             value={agentName}
             onChange={(e) => setAgentName(e.target.value)}
           />
@@ -256,22 +259,33 @@ export function OutreachAgentWorkspace({
           <Label htmlFor="outreach-description">Description</Label>
           <Input
             id="outreach-description"
-            className="mt-1.5 border-[var(--border-default)] bg-[var(--bg-subtle)]/50"
+            className="mt-1.5 border-[var(--border-default)] bg-[var(--bg-surface)]"
             value={agentDescription}
             onChange={(e) => setAgentDescription(e.target.value)}
           />
         </div>
       </AgentConfigSection>
 
-      <AgentConfigSection title="Instructions">
+      <AgentConfigSection title="Instructions System">
         <div>
           <Label htmlFor="outreach-instructions">Instruction</Label>
           <Textarea
             id="outreach-instructions"
-            rows={6}
-            className="mt-1.5 resize-y border-[var(--border-default)] bg-[var(--bg-subtle)]/50 font-mono text-[13px]"
+            rows={7}
+            className="mt-1.5 resize-y border-[var(--border-default)] bg-[var(--bg-surface)] font-mono text-[13px]"
             value={instructions}
             onChange={(e) => setInstructions(e.target.value)}
+          />
+        </div>
+        <div>
+          <Label htmlFor="outreach-starters">Conversation Starters</Label>
+          <Textarea
+            id="outreach-starters"
+            rows={3}
+            placeholder="One starter per line…"
+            className="mt-1.5 resize-y border-[var(--border-default)] bg-[var(--bg-surface)] text-[13px]"
+            value={conversationStarters}
+            onChange={(e) => setConversationStarters(e.target.value)}
           />
         </div>
       </AgentConfigSection>

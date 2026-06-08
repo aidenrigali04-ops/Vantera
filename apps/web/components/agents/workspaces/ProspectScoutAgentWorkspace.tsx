@@ -26,6 +26,7 @@ import {
 import { Textarea } from '@/components/ui/textarea'
 import { AGENT_DEFAULT_INSTRUCTIONS, AGENT_PAGE_COPY } from '@/lib/agents/default-instructions'
 import { getIcpConfigForVertical } from '@/lib/aspire/icp-score'
+import type { ICPConfig } from '@/lib/aspire/types'
 import type { SdrAspireConfigPayload } from '@/lib/sdr/aspire-config'
 import type { AspireBindingInput } from '@/lib/sdr/aspire-config'
 import type { CreateSDRConfigInput, ProspectMode, SDRActivityEvent, SDRAgentConfig, SDRDashboardStats } from '@/lib/sdr/types'
@@ -50,6 +51,9 @@ type FormState = {
   agentName: string
   agentDescription: string
   instructions: string
+  conversationStarters: string
+  targetTitles: string
+  targetIndustries: string
   targetCities: string
   excludeDomains: string
   maxNewLeadsDay: number
@@ -78,10 +82,16 @@ export function ProspectScoutAgentWorkspace({
 
   const copy = AGENT_PAGE_COPY.prospect_scout
 
+  const defaultIcp = getIcpConfigForVertical(accountVertical as 'agency')
+  const savedIcp = config?.icpConfig as ICPConfig | undefined
+
   const [form, setForm] = useState<FormState>(() => ({
     agentName: config?.agentName ?? copy.defaultName,
     agentDescription: config?.agentTitle || copy.defaultDescription,
     instructions: AGENT_DEFAULT_INSTRUCTIONS.prospect_scout,
+    conversationStarters: 'Find 25 qualified prospects in my target market this week\nScore and enrich new leads from yesterday\'s run\nCheck pipeline for leads ready for follow-up',
+    targetTitles: (savedIcp?.targetTitles ?? defaultIcp.targetTitles).join(', '),
+    targetIndustries: (savedIcp?.targetIndustries ?? defaultIcp.targetIndustries).join(', '),
     targetCities: config?.targetCities.join(', ') ?? '',
     excludeDomains: config?.excludeDomains.join(', ') ?? '',
     maxNewLeadsDay: config?.maxNewLeadsDay ?? 10,
@@ -192,7 +202,18 @@ export function ProspectScoutAgentWorkspace({
 
     if (mode === 'setup') {
       startTransition(async () => {
-        const icpConfig = getIcpConfigForVertical(accountVertical as 'agency')
+        const baseIcp = getIcpConfigForVertical(accountVertical as 'agency')
+        const icpConfig = {
+          ...baseIcp,
+          targetTitles: form.targetTitles
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean),
+          targetIndustries: form.targetIndustries
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean),
+        }
         const payload: CreateSDRConfigInput & { bindings: AspireBindingInput[] } = {
           agentName: form.agentName.trim(),
           agentTitle: form.agentDescription.trim(),
@@ -235,12 +256,24 @@ export function ProspectScoutAgentWorkspace({
     }
 
     startTransition(async () => {
+      const patchedIcp = {
+        ...(savedIcp ?? defaultIcp),
+        targetTitles: form.targetTitles
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean),
+        targetIndustries: form.targetIndustries
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean),
+      }
       const patchRes = await fetch('/api/sdr/config', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           agentName: form.agentName.trim(),
           agentTitle: form.agentDescription.trim(),
+          icpConfig: patchedIcp,
           targetCities: form.targetCities
             .split(',')
             .map((s) => s.trim())
@@ -297,12 +330,12 @@ export function ProspectScoutAgentWorkspace({
 
   const configPanel = (
     <>
-      <AgentConfigSection title="Agent identity">
+      <AgentConfigSection title="Agent Identity">
         <div>
           <Label htmlFor="scout-name">Name</Label>
           <Input
             id="scout-name"
-            className="mt-1.5 border-[var(--border-default)] bg-[var(--bg-subtle)]/50"
+            className="mt-1.5 border-[var(--border-default)] bg-[var(--bg-surface)]"
             value={form.agentName}
             onChange={(e) => setForm({ ...form, agentName: e.target.value })}
           />
@@ -311,7 +344,7 @@ export function ProspectScoutAgentWorkspace({
           <Label htmlFor="scout-description">Description</Label>
           <Input
             id="scout-description"
-            className="mt-1.5 border-[var(--border-default)] bg-[var(--bg-subtle)]/50"
+            className="mt-1.5 border-[var(--border-default)] bg-[var(--bg-surface)]"
             value={form.agentDescription}
             onChange={(e) => setForm({ ...form, agentDescription: e.target.value })}
           />
@@ -324,7 +357,7 @@ export function ProspectScoutAgentWorkspace({
               setForm({ ...form, searchFrequency: value })
             }
           >
-            <SelectTrigger id="scout-frequency" className="mt-1.5 border-[var(--border-default)] bg-[var(--bg-subtle)]/50">
+            <SelectTrigger id="scout-frequency" className="mt-1.5 border-[var(--border-default)] bg-[var(--bg-surface)]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -335,25 +368,59 @@ export function ProspectScoutAgentWorkspace({
         </div>
       </AgentConfigSection>
 
+      <AgentConfigSection title="ICP targeting">
+        <div>
+          <Label htmlFor="scout-target-titles">Target job titles (comma-separated)</Label>
+          <Input
+            id="scout-target-titles"
+            className="mt-1.5 border-[var(--border-default)] bg-[var(--bg-surface)]"
+            placeholder="Owner, CEO, Founder"
+            value={form.targetTitles}
+            onChange={(e) => setForm({ ...form, targetTitles: e.target.value })}
+          />
+        </div>
+        <div>
+          <Label htmlFor="scout-target-industries">Target industries (comma-separated)</Label>
+          <Input
+            id="scout-target-industries"
+            className="mt-1.5 border-[var(--border-default)] bg-[var(--bg-surface)]"
+            placeholder="hvac, heating, air conditioning"
+            value={form.targetIndustries}
+            onChange={(e) => setForm({ ...form, targetIndustries: e.target.value })}
+          />
+        </div>
+      </AgentConfigSection>
+
       <AgentConfigSection
-        title="Instructions"
+        title="Instructions System"
         description="How this agent discovers, scores, and enrolls prospects."
       >
         <div>
           <Label htmlFor="scout-instructions">Instruction</Label>
           <Textarea
             id="scout-instructions"
-            rows={6}
-            className="mt-1.5 resize-y border-[var(--border-default)] bg-[var(--bg-subtle)]/50 font-mono text-[13px]"
+            rows={7}
+            className="mt-1.5 resize-y border-[var(--border-default)] bg-[var(--bg-surface)] font-mono text-[13px]"
             value={form.instructions}
             onChange={(e) => setForm({ ...form, instructions: e.target.value })}
+          />
+        </div>
+        <div>
+          <Label htmlFor="scout-starters">Conversation Starters</Label>
+          <Textarea
+            id="scout-starters"
+            rows={3}
+            placeholder="One starter per line…"
+            className="mt-1.5 resize-y border-[var(--border-default)] bg-[var(--bg-surface)] text-[13px]"
+            value={form.conversationStarters}
+            onChange={(e) => setForm({ ...form, conversationStarters: e.target.value })}
           />
         </div>
         <div>
           <Label htmlFor="scout-cities">Target locations</Label>
           <Input
             id="scout-cities"
-            className="mt-1.5 border-[var(--border-default)] bg-[var(--bg-subtle)]/50"
+            className="mt-1.5 border-[var(--border-default)] bg-[var(--bg-surface)]"
             placeholder="United States, Texas, Phoenix AZ"
             value={form.targetCities}
             onChange={(e) => setForm({ ...form, targetCities: e.target.value })}
@@ -363,7 +430,7 @@ export function ProspectScoutAgentWorkspace({
           <Label htmlFor="scout-exclude">Exclude domains</Label>
           <Input
             id="scout-exclude"
-            className="mt-1.5 border-[var(--border-default)] bg-[var(--bg-subtle)]/50"
+            className="mt-1.5 border-[var(--border-default)] bg-[var(--bg-surface)]"
             placeholder="competitor.com"
             value={form.excludeDomains}
             onChange={(e) => setForm({ ...form, excludeDomains: e.target.value })}
@@ -375,7 +442,7 @@ export function ProspectScoutAgentWorkspace({
             id="scout-max-leads"
             type="number"
             min={1}
-            className="mt-1.5 border-[var(--border-default)] bg-[var(--bg-subtle)]/50"
+            className="mt-1.5 border-[var(--border-default)] bg-[var(--bg-surface)]"
             value={form.maxNewLeadsDay}
             onChange={(e) =>
               setForm({ ...form, maxNewLeadsDay: Number.parseInt(e.target.value, 10) || 1 })

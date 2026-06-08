@@ -55,7 +55,7 @@ export async function enrichAndProfileLead(input: {
   if (!lead) return
 
   const person: ProspectLead = input.aspireData ?? {
-    id: String((lead.enrichment as Record<string, unknown>)?.apifyId ?? lead.id),
+    id: String(lead.id),
     firstName: lead.firstName ?? '',
     lastName: lead.lastName ?? '',
     title: lead.title ?? '',
