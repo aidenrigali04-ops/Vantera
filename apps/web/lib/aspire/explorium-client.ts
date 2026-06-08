@@ -126,8 +126,8 @@ export function buildExploriumFilters(
   // Contact availability — guided by ICP config and caller options
   const needEmail = options.hasEmail ?? icpConfig.mustHaveEmail
   const needPhone = options.hasPhone ?? icpConfig.mustHavePhone
-  if (needEmail) requestFilters.has_email = true
-  if (needPhone) requestFilters.has_phone_number = true
+  if (needEmail) requestFilters.has_email = { value: true }
+  if (needPhone) requestFilters.has_phone_number = { value: true }
 
   // Remove undefined values
   for (const key of Object.keys(requestFilters)) {
@@ -165,26 +165,26 @@ function normalizeLinkedIn(raw: unknown): string | null {
 function mapExploriumProspect(row: any, enriched?: any): ProspectLead {
   const id = String(row.prospect_id ?? row.id ?? Math.random().toString(36).slice(2))
 
-  // Actual Explorium discover response uses prospect_* prefixed fields
-  const fullName: string = row.prospect_full_name ?? row.full_name ?? ''
+  // REST API uses bare field names; Vibe Prospecting MCP uses prospect_* prefix — handle both
+  const fullName: string = row.full_name ?? row.prospect_full_name ?? ''
   const fullParts = fullName.trim().split(' ')
-  const firstName: string = row.prospect_first_name ?? row.first_name ?? fullParts[0] ?? ''
+  const firstName: string = row.first_name ?? row.prospect_first_name ?? fullParts[0] ?? ''
   const lastName: string =
-    row.prospect_last_name ?? row.last_name ?? (fullParts.length > 1 ? fullParts.slice(1).join(' ') : '')
+    row.last_name ?? row.prospect_last_name ?? (fullParts.length > 1 ? fullParts.slice(1).join(' ') : '')
 
   return {
     id,
     firstName,
     lastName,
-    title: row.prospect_job_title ?? row.job_title ?? row.title ?? '',
+    title: row.job_title ?? row.prospect_job_title ?? row.title ?? '',
     email: enriched?.email ?? row.email ?? null,
     phone: enriched?.phone ?? row.phone_number ?? row.phone ?? null,
-    linkedinUrl: normalizeLinkedIn(row.prospect_linkedin ?? row.linkedin_url ?? row.linkedin),
-    organizationName: row.prospect_company_name ?? row.company_name ?? row.organization_name ?? '',
+    linkedinUrl: normalizeLinkedIn(row.linkedin ?? row.prospect_linkedin ?? row.linkedin_url),
+    organizationName: row.company_name ?? row.prospect_company_name ?? row.organization_name ?? '',
     organizationId: row.business_id ?? row.company_id ?? null,
-    websiteUrl: row.prospect_company_website ?? row.website ?? row.company_website ?? null,
-    city: row.prospect_city ?? row.city ?? null,
-    state: row.prospect_region_name ?? row.state ?? null,
+    websiteUrl: row.company_website ?? row.prospect_company_website ?? row.website ?? null,
+    city: row.city ?? row.prospect_city ?? null,
+    state: row.region_name ?? row.prospect_region_name ?? row.state ?? null,
     employeeCount: parseEmployeeCount(row.company_size ?? row.employee_count),
     revenue: null,
     industry: row.industry ?? row.company_industry ?? null,
@@ -218,40 +218,38 @@ export async function searchExplorium(
   const limit = options.limit ?? 50
   const base = apiBase()
 
-  // --- Step 1: discover prospects ---
-  const discoverBody = {
+  // --- Step 1: fetch prospects (POST /v1/prospects) ---
+  const fetchBody = {
+    mode: 'full',
     filters: buildExploriumFilters(filters, icpConfig, options),
-    limit,
+    size: limit,
+    page_size: Math.min(limit, 500),
   }
 
-  const discoverRes = await fetch(`${base}/prospects/discover`, {
+  const fetchRes = await fetch(`${base}/prospects`, {
     method: 'POST',
     headers: authHeaders(),
-    body: JSON.stringify(discoverBody),
+    body: JSON.stringify(fetchBody),
     signal: AbortSignal.timeout(30_000),
   })
 
-  if (!discoverRes.ok) {
-    const text = await discoverRes.text().catch(() => '')
-    throw new Error(`Explorium /prospects/discover ${discoverRes.status}: ${text.slice(0, 200)}`)
+  if (!fetchRes.ok) {
+    const text = await fetchRes.text().catch(() => '')
+    throw new Error(`Explorium /v1/prospects ${fetchRes.status}: ${text.slice(0, 200)}`)
   }
 
-  const discoverData = await discoverRes.json() as {
-    prospects?: unknown[]
-    results?: unknown[]
+  const fetchData = await fetchRes.json() as {
     data?: unknown[]
-    total?: number
-    count?: number
+    total_results?: number
   }
 
-  const rawProspects: unknown[] =
-    discoverData.prospects ?? discoverData.results ?? discoverData.data ?? []
+  const rawProspects: unknown[] = fetchData.data ?? []
 
   if (rawProspects.length === 0) {
     return { people: [], meta: { source: 'explorium', providerConfigured: true, totalFound: 0 } }
   }
 
-  // --- Step 2: enrich with contact info (email / phone) ---
+  // --- Step 2: enrich with contact info (POST /v1/prospects/contacts_information/bulk_enrich) ---
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const prospectRows = rawProspects as any[]
   const prospectIds = prospectRows
@@ -262,25 +260,19 @@ export async function searchExplorium(
 
   if (prospectIds.length > 0) {
     try {
-      const enrichRes = await fetch(`${base}/prospects/enrich`, {
+      const enrichRes = await fetch(`${base}/prospects/contacts_information/bulk_enrich`, {
         method: 'POST',
         headers: authHeaders(),
-        body: JSON.stringify({
-          prospect_ids: prospectIds,
-          enrichments: ['contacts'],
-          contact_types: ['email', 'phone'],
-        }),
+        body: JSON.stringify({ prospect_ids: prospectIds.slice(0, 50) }),
         signal: AbortSignal.timeout(30_000),
       })
 
       if (enrichRes.ok) {
         const enrichData = await enrichRes.json() as {
-          prospects?: unknown[]
-          results?: unknown[]
           data?: unknown[]
+          results?: unknown[]
         }
-        const enrichRows: unknown[] =
-          enrichData.prospects ?? enrichData.results ?? enrichData.data ?? []
+        const enrichRows: unknown[] = enrichData.data ?? enrichData.results ?? []
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         for (const row of enrichRows as any[]) {
           const pid = row.prospect_id ?? row.id
@@ -305,7 +297,7 @@ export async function searchExplorium(
     meta: {
       source: 'explorium',
       providerConfigured: true,
-      totalFound: discoverData.total ?? discoverData.count ?? people.length,
+      totalFound: fetchData.total_results ?? people.length,
     },
   }
 }
