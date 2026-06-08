@@ -155,29 +155,36 @@ function parseEmployeeCount(raw: unknown): number | null {
   return null
 }
 
+function normalizeLinkedIn(raw: unknown): string | null {
+  if (typeof raw !== 'string' || !raw) return null
+  if (raw.startsWith('http')) return raw
+  return `https://${raw}`
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mapExploriumProspect(row: any, enriched?: any): ProspectLead {
   const id = String(row.prospect_id ?? row.id ?? Math.random().toString(36).slice(2))
-  const fullName: string = row.full_name ?? row.name ?? ''
-  const parts = fullName.trim().split(' ')
-  const firstName = row.first_name ?? parts[0] ?? ''
-  const lastName = row.last_name ?? parts.slice(1).join(' ') ?? ''
 
-  const company = row.company_name ?? row.organization_name ?? row.current_company ?? ''
+  // Actual Explorium discover response uses prospect_* prefixed fields
+  const fullName: string = row.prospect_full_name ?? row.full_name ?? ''
+  const fullParts = fullName.trim().split(' ')
+  const firstName: string = row.prospect_first_name ?? row.first_name ?? fullParts[0] ?? ''
+  const lastName: string =
+    row.prospect_last_name ?? row.last_name ?? (fullParts.length > 1 ? fullParts.slice(1).join(' ') : '')
 
   return {
     id,
     firstName,
     lastName,
-    title: row.job_title ?? row.title ?? '',
+    title: row.prospect_job_title ?? row.job_title ?? row.title ?? '',
     email: enriched?.email ?? row.email ?? null,
     phone: enriched?.phone ?? row.phone_number ?? row.phone ?? null,
-    linkedinUrl: row.linkedin_url ?? row.linkedin ?? null,
-    organizationName: company,
+    linkedinUrl: normalizeLinkedIn(row.prospect_linkedin ?? row.linkedin_url ?? row.linkedin),
+    organizationName: row.prospect_company_name ?? row.company_name ?? row.organization_name ?? '',
     organizationId: row.business_id ?? row.company_id ?? null,
-    websiteUrl: row.website ?? row.company_website ?? null,
-    city: row.city ?? row.prospect_city ?? null,
-    state: row.state ?? row.prospect_state ?? null,
+    websiteUrl: row.prospect_company_website ?? row.website ?? row.company_website ?? null,
+    city: row.prospect_city ?? row.city ?? null,
+    state: row.prospect_region_name ?? row.state ?? null,
     employeeCount: parseEmployeeCount(row.company_size ?? row.employee_count),
     revenue: null,
     industry: row.industry ?? row.company_industry ?? null,
