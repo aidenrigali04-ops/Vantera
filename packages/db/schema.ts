@@ -809,7 +809,6 @@ export const sdrAgentConfigs = pgTable(
     id: uuid('id').primaryKey().defaultRandom(),
     accountId: uuid('account_id')
       .notNull()
-      .unique()
       .references(() => accounts.id, { onDelete: 'cascade' }),
     agentName: text('agent_name').notNull(),
     agentTitle: text('agent_title').notNull().default('Sales Development Rep'),
@@ -848,6 +847,9 @@ export const sdrAgentConfigs = pgTable(
   },
   (table) => ({
     activeIdx: index('sdr_agent_configs_active_idx').on(table.isActive, table.isPaused),
+    accountActiveUidx: uniqueIndex('sdr_agent_configs_account_id_active_uidx')
+      .on(table.accountId)
+      .where(sql`${table.deletedAt} IS NULL`),
   }),
 )
 
@@ -1239,7 +1241,6 @@ export const outreachAgentConfigs = pgTable(
     id: uuid('id').primaryKey().defaultRandom(),
     accountId: uuid('account_id')
       .notNull()
-      .unique()
       .references(() => accounts.id, { onDelete: 'cascade' }),
     agentName: text('agent_name').notNull().default('Outreach Agent'),
     linkedCampaignIds: jsonb('linked_campaign_ids').notNull().default([]),
@@ -1252,6 +1253,9 @@ export const outreachAgentConfigs = pgTable(
   },
   (table) => ({
     activeIdx: index('outreach_agent_configs_active_idx').on(table.isActive, table.isPaused),
+    accountActiveUidx: uniqueIndex('outreach_agent_configs_account_id_active_uidx')
+      .on(table.accountId)
+      .where(sql`${table.deletedAt} IS NULL`),
   }),
 )
 
