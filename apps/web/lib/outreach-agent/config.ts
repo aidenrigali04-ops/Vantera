@@ -49,17 +49,45 @@ export async function launchOutreachAgent(
   const ownership = await assertCampaignsBelongToAccount(accountId, linkedCampaignIds)
   if (!ownership.ok) return { success: false, error: ownership.error }
 
-  const [row] = await db
-    .insert(outreachAgentConfigs)
-    .values({
-      accountId,
-      agentName: input.agentName.trim(),
-      linkedCampaignIds,
-      isActive: true,
-      isPaused: false,
-      pausedReason: null,
-    })
-    .returning({ id: outreachAgentConfigs.id })
+  const [archived] = await db
+    .select()
+    .from(outreachAgentConfigs)
+    .where(eq(outreachAgentConfigs.accountId, accountId))
+    .limit(1)
+
+  const row = archived?.deletedAt
+    ? (
+        await db
+          .update(outreachAgentConfigs)
+          .set({
+            agentName: input.agentName.trim(),
+            linkedCampaignIds,
+            isActive: true,
+            isPaused: false,
+            pausedReason: null,
+            deletedAt: null,
+            updatedAt: new Date(),
+          })
+          .where(eq(outreachAgentConfigs.id, archived.id))
+          .returning({ id: outreachAgentConfigs.id })
+      )[0]
+    : (
+        await db
+          .insert(outreachAgentConfigs)
+          .values({
+            accountId,
+            agentName: input.agentName.trim(),
+            linkedCampaignIds,
+            isActive: true,
+            isPaused: false,
+            pausedReason: null,
+          })
+          .returning({ id: outreachAgentConfigs.id })
+      )[0]
+
+  if (!row) {
+    return { success: false, error: 'Could not save Outreach Agent configuration' }
+  }
 
   await logOutreachAgentActivity(accountId, {
     eventType: 'outreach_agent_launched',

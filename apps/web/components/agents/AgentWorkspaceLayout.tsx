@@ -96,6 +96,7 @@ export function AgentWorkspaceLayout({
             </Button>
             {onDeploy ? (
               <Button
+                type="button"
                 size="sm"
                 disabled={deployDisabled || deployLoading}
                 onClick={onDeploy}

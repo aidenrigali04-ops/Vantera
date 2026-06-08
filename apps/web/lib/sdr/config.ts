@@ -88,61 +88,85 @@ export async function createSDRConfig(
     }
   }
 
-  const [existing] = await db
-    .select({ id: sdrAgentConfigs.id })
+  const [existingRow] = await db
+    .select()
     .from(sdrAgentConfigs)
-    .where(and(eq(sdrAgentConfigs.accountId, accountId), isNull(sdrAgentConfigs.deletedAt)))
+    .where(eq(sdrAgentConfigs.accountId, accountId))
     .limit(1)
 
-  if (existing) {
+  if (existingRow && !existingRow.deletedAt) {
     return { success: false, error: 'SDR agent already configured — use update instead' }
   }
 
-  const [created] = await db
-    .insert(sdrAgentConfigs)
-    .values({
-      accountId,
-      agentName: data.agentName.trim(),
-      agentTitle: data.agentTitle?.trim() || 'Prospecting Agent',
-      fromEmail,
-      fromName,
-      signature: data.signature ?? null,
-      icpConfig: data.icpConfig,
-      targetVerticals: data.targetVerticals ?? [],
-      targetCities: data.targetCities ?? [],
-      excludeDomains: data.excludeDomains ?? [],
-      searchFrequency: data.searchFrequency ?? 'daily',
-      outreachDays: data.outreachDays ?? ['mon', 'tue', 'wed', 'thu', 'fri'],
-      outreachWindow: data.outreachWindow ?? DEFAULT_OUTREACH_WINDOW,
-      maxNewLeadsDay: data.maxNewLeadsDay ?? 10,
-      maxActiveLeads: data.maxActiveLeads ?? 200,
-      prospectMode: data.prospectMode ?? 'inline_icp',
-      defaultMinIcpScore: data.defaultMinIcpScore ?? 70,
-      syncIcpToSavedSearches: data.syncIcpToSavedSearches ?? true,
-      outreachAutomationMode: normalizeOutreachAutomationMode(
-        data.outreachAutomationMode ?? 'automatic',
-      ),
-      isActive: data.isActive ?? false,
-    })
-    .returning()
+  const configValues = {
+    agentName: data.agentName.trim(),
+    agentTitle: data.agentTitle?.trim() || 'Prospecting Agent',
+    fromEmail,
+    fromName,
+    signature: data.signature ?? null,
+    icpConfig: data.icpConfig,
+    targetVerticals: data.targetVerticals ?? [],
+    targetCities: data.targetCities ?? [],
+    excludeDomains: data.excludeDomains ?? [],
+    searchFrequency: data.searchFrequency ?? 'daily',
+    outreachDays: data.outreachDays ?? ['mon', 'tue', 'wed', 'thu', 'fri'],
+    outreachWindow: data.outreachWindow ?? DEFAULT_OUTREACH_WINDOW,
+    maxNewLeadsDay: data.maxNewLeadsDay ?? 10,
+    maxActiveLeads: data.maxActiveLeads ?? 200,
+    prospectMode: data.prospectMode ?? 'inline_icp',
+    defaultMinIcpScore: data.defaultMinIcpScore ?? 70,
+    syncIcpToSavedSearches: data.syncIcpToSavedSearches ?? true,
+    outreachAutomationMode: normalizeOutreachAutomationMode(
+      data.outreachAutomationMode ?? 'automatic',
+    ),
+    isActive: data.isActive ?? false,
+    isPaused: false,
+    pausedReason: null,
+    deletedAt: null,
+    updatedAt: new Date(),
+  }
+
+  const saved = existingRow?.deletedAt
+    ? (
+        await db
+          .update(sdrAgentConfigs)
+          .set(configValues)
+          .where(eq(sdrAgentConfigs.id, existingRow.id))
+          .returning()
+      )[0]
+    : (
+        await db
+          .insert(sdrAgentConfigs)
+          .values({
+            accountId,
+            ...configValues,
+          })
+          .returning()
+      )[0]
+
+  if (!saved) {
+    return { success: false, error: 'Could not save agent configuration' }
+  }
 
   await setOutreachAutomationMode(
     accountId,
-    normalizeOutreachAutomationMode(created!.outreachAutomationMode),
+    normalizeOutreachAutomationMode(saved.outreachAutomationMode),
   )
 
-  await db.insert(aiMemory).values({
-    accountId,
-    kind: 'business_context',
-    subjectType: 'account',
-    subjectId: accountId,
-    summary: `Prospecting agent ${data.agentName} configured for discovery`,
-    evidence: { sdrAgent: true },
-    confidence: 60,
-  })
+  if (!existingRow?.deletedAt) {
+    await db.insert(aiMemory).values({
+      accountId,
+      kind: 'business_context',
+      subjectType: 'account',
+      subjectId: accountId,
+      summary: `Prospecting agent ${data.agentName} configured for discovery`,
+      evidence: { sdrAgent: true },
+      confidence: 60,
+    })
+  }
 
   revalidatePath('/admin/outreach/agents')
-  return { success: true, data: mapConfig(created!) }
+  return { success: true, data: mapConfig(saved) }
 }
 
 export async function updateSDRConfig(

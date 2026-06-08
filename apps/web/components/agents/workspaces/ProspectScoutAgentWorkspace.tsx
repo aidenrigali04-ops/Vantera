@@ -202,6 +202,8 @@ export function ProspectScoutAgentWorkspace({
 
     if (mode === 'setup') {
       startTransition(async () => {
+        const toastId = toast.loading('Deploying Prospect Scout…')
+        try {
         const baseIcp = getIcpConfigForVertical(accountVertical as 'agency')
         const icpConfig = {
           ...baseIcp,
@@ -245,12 +247,41 @@ export function ProspectScoutAgentWorkspace({
         })
         const json = await res.json()
         if (!json.success) {
-          toast.error(json.error ?? 'Could not deploy agent')
+          toast.error(json.error ?? 'Could not deploy agent', { id: toastId })
           return
         }
-        toast.success(`${form.agentName} deployed — discovery is starting`)
+
+        const bootstrap = json.data?.bootstrap as
+          | { mode: 'trigger'; triggerRunId: string }
+          | { mode: 'sync'; enrolled: number }
+          | { mode: 'failed'; error: string }
+          | null
+          | undefined
+
+        if (bootstrap?.mode === 'failed') {
+          toast.warning(`${form.agentName} deployed, but discovery did not start: ${bootstrap.error}`, {
+            id: toastId,
+            duration: 8000,
+          })
+        } else if (bootstrap?.mode === 'trigger') {
+          toast.success(`${form.agentName} deployed — first discovery run queued`, { id: toastId })
+        } else if (bootstrap?.mode === 'sync') {
+          toast.success(
+            `${form.agentName} deployed — ${bootstrap.enrolled} prospect${bootstrap.enrolled === 1 ? '' : 's'} enrolled`,
+            { id: toastId },
+          )
+        } else {
+          toast.success(`${form.agentName} deployed`, { id: toastId })
+        }
+
         router.push('/admin/outreach/agents/scout?setup=complete')
         router.refresh()
+        } catch (error) {
+          toast.error(
+            error instanceof Error ? error.message : 'Deploy failed — check your connection and try again',
+            { id: toastId },
+          )
+        }
       })
       return
     }

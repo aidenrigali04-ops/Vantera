@@ -169,23 +169,31 @@ export function OutreachAgentWorkspace({
 
     if (mode === 'setup') {
       startTransition(async () => {
-        const res = await fetch('/api/outreach-agent/launch', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'same-origin',
-          body: JSON.stringify({
-            agentName: agentName.trim(),
-            linkedCampaignIds: selectedIds,
-          }),
-        })
-        const json = await res.json()
-        if (!json.success) {
-          toast.error(json.error ?? 'Could not deploy agent')
-          return
+        const toastId = toast.loading('Deploying Outreach Agent…')
+        try {
+          const res = await fetch('/api/outreach-agent/launch', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({
+              agentName: agentName.trim(),
+              linkedCampaignIds: selectedIds,
+            }),
+          })
+          const json = await res.json()
+          if (!json.success) {
+            toast.error(json.error ?? 'Could not deploy agent', { id: toastId })
+            return
+          }
+          toast.success(`${agentName.trim()} deployed — linked campaigns are live`, { id: toastId })
+          router.push('/admin/outreach/agents/outreach?setup=complete')
+          router.refresh()
+        } catch (error) {
+          toast.error(
+            error instanceof Error ? error.message : 'Deploy failed — check your connection and try again',
+            { id: toastId },
+          )
         }
-        toast.success(`${agentName.trim()} deployed`)
-        router.push('/admin/outreach/agents/outreach?setup=complete')
-        router.refresh()
       })
       return
     }
