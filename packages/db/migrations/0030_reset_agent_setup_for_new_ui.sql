@@ -27,9 +27,7 @@ WITH reset_scout_configs AS (
   RETURNING id
 )
 UPDATE sdr_aspire_bindings b
-SET
-  is_active = false,
-  updated_at = now()
+SET is_active = false
 FROM reset_scout_configs r
 WHERE b.config_id = r.id
   AND b.is_active = true;
