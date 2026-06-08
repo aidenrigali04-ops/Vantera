@@ -8,7 +8,7 @@ import { accounts, sdrActivityLog } from '@vantera/db'
 import { and, desc, eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
-/** Pipeline health for SDR / Prospect Scout — Trigger, Apify, flag, last discovery. */
+/** Pipeline health for SDR / Prospect Scout — Trigger, Explorium, flag, last discovery. */
 export async function GET() {
   const session = await getAdminSession()
   if (!session) {
@@ -60,7 +60,7 @@ export async function GET() {
       lastDiscovery: lastDiscovery[0] ?? null,
       ready:
         diagnostics.triggerConfigured &&
-        diagnostics.apifyConfigured &&
+        diagnostics.exploriumConfigured &&
         sdrEnabled &&
         Boolean(config?.isActive && !config?.isPaused),
       hints: buildHints(diagnostics, sdrEnabled, config),
@@ -78,8 +78,8 @@ function buildHints(
   if (!diagnostics.triggerConfigured) {
     hints.push('Add TRIGGER_SECRET_KEY to Vercel and run pnpm trigger:deploy from the repo root.')
   }
-  if (!diagnostics.apifyConfigured) {
-    hints.push('Add APIFY_API_TOKEN to Vercel and Trigger.dev (synced on deploy).')
+  if (!diagnostics.exploriumConfigured) {
+    hints.push('Add EXPLORIUM_API_KEY to Vercel environment variables and redeploy.')
   }
   if (!sdrEnabled) {
     hints.push('Enable SDR Agents for this workspace (owner activation on setup).')

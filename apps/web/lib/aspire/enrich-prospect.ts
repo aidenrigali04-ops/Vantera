@@ -2,7 +2,7 @@ import {
   buildLeadProspectEnrichment,
   type LeadQualityTier,
 } from '@/lib/leads/enrichment'
-import type { ApifyLead, AspireSearchResult } from '@/lib/aspire/types'
+import type { ProspectLead, AspireSearchResult } from '@/lib/aspire/types'
 
 export type ProspectEnrichmentFields = {
   enrichmentScore: number
@@ -11,7 +11,7 @@ export type ProspectEnrichmentFields = {
 }
 
 export function getProspectEnrichmentFields(
-  person: ApifyLead,
+  person: ProspectLead,
   icpScore: number,
   icpSignals: string[],
 ): ProspectEnrichmentFields {
@@ -24,7 +24,7 @@ export function getProspectEnrichmentFields(
 }
 
 export function toEnrichedAspireSearchResult(
-  person: ApifyLead,
+  person: ProspectLead,
   icpScore: number,
   icpSignals: string[],
 ): AspireSearchResult {

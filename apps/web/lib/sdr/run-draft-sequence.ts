@@ -1,4 +1,4 @@
-import type { ApifyLead } from '@/lib/aspire/types'
+import type { ProspectLead } from '@/lib/aspire/types'
 import { getSystemAutomationId } from '@/lib/automation/system-automation'
 import { db } from '@/lib/db/client'
 import type { Plan } from '@/lib/feature-flags/flags'
@@ -53,7 +53,7 @@ export async function runDraftSdrSequence(payload: DraftSdrSequencePayload): Pro
     throw new Error('Missing config or lead for sequence draft')
   }
 
-  let aspireData: ApifyLead | null = null
+  let aspireData: ProspectLead | null = null
   let icpSignals: string[] = []
 
   if (payload.aspireResultId) {
@@ -64,7 +64,7 @@ export async function runDraftSdrSequence(payload: DraftSdrSequencePayload): Pro
       .limit(1)
 
     if (aspireRow) {
-      aspireData = aspireRow.rawData as ApifyLead
+      aspireData = aspireRow.rawData as ProspectLead
       icpSignals = (aspireRow.icpSignals as string[]) ?? []
     }
   }

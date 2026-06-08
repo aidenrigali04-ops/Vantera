@@ -1,5 +1,5 @@
 import { enrollAspireProspectsInCampaign } from '@/lib/aspire/enroll-campaign'
-import type { ApifyLead } from '@/lib/aspire/types'
+import type { ProspectLead } from '@/lib/aspire/types'
 import { getSyncedAdminSession } from '@/lib/auth/require-session'
 import { NextResponse } from 'next/server'
 
@@ -11,7 +11,7 @@ export async function POST(request: Request) {
 
   const body = (await request.json()) as {
     campaignId: string
-    people: ApifyLead[]
+    people: ProspectLead[]
     searchId?: string
   }
 

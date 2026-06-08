@@ -1,20 +1,19 @@
 import 'server-only'
 
-import { isApifyConfigured } from '@/lib/aspire/apify-config'
-import { searchApify, type ProspectSearchMeta } from '@/lib/aspire/apify-client'
 import { isExploriumConfigured, searchExplorium } from '@/lib/aspire/explorium-client'
-import { isInteractiveAspireSearch, normalizeApifyFilters } from '@/lib/aspire/filters'
+import { isInteractiveAspireSearch, normalizeProspectFilters } from '@/lib/aspire/filters'
 import { getIcpConfigForVertical, scoreICP } from '@/lib/aspire/icp-score'
 import { stubResults } from '@/lib/aspire/prospect-stubs'
 import { toEnrichedAspireSearchResult } from '@/lib/aspire/enrich-prospect'
-import type { ApifySearchFilters, AspireSearchResult } from '@/lib/aspire/types'
-
-export { normalizeApifyFilters } from '@/lib/aspire/filters'
-export { searchApify } from '@/lib/aspire/apify-client'
-export type { ProspectSearchMeta } from '@/lib/aspire/apify-client'
+import type { ProspectSearchFilters, AspireSearchResult, ProspectSearchMeta } from '@/lib/aspire/types'
 import { db } from '@/lib/db/client'
 import { accounts, aspireResults } from '@vantera/db'
 import { and, eq, inArray, isNull, sql } from 'drizzle-orm'
+
+export { normalizeProspectFilters } from '@/lib/aspire/filters'
+/** @deprecated Use normalizeProspectFilters */
+export { normalizeProspectFilters as normalizeApifyFilters } from '@/lib/aspire/filters'
+export type { ProspectSearchMeta } from '@/lib/aspire/types'
 
 export async function filterExistingLeads(
   accountId: string,
@@ -81,7 +80,7 @@ async function persistAspireResults(
 
 export async function searchProspects(
   accountId: string,
-  filters: Partial<ApifySearchFilters> = {},
+  filters: Partial<ProspectSearchFilters> = {},
   options?: { searchId?: string; persist?: boolean; limit?: number },
 ): Promise<SearchProspectsResult> {
   const [account] = await db
@@ -93,9 +92,9 @@ export async function searchProspects(
   const vertical = account?.vertical ?? 'agency'
   const icpConfig = getIcpConfigForVertical(vertical)
   const interactive = isInteractiveAspireSearch(filters)
-  const normalizedFilters = normalizeApifyFilters(vertical, filters, { interactive })
+  const normalizedFilters = normalizeProspectFilters(vertical, filters, { interactive })
 
-  let people: import('@/lib/aspire/types').ApifyLead[]
+  let people: import('@/lib/aspire/types').ProspectLead[]
   let meta: ProspectSearchMeta
 
   // --- Primary: Explorium (Vibe Prospecting) ---
@@ -114,34 +113,30 @@ export async function searchProspects(
       }
     } catch (expErr) {
       const message = expErr instanceof Error ? expErr.message : 'Explorium search failed'
-      console.error('[searchProspects] Explorium failed — falling back to Apify', message)
-      // Fall through to Apify below
+      console.error('[searchProspects] Explorium failed — falling back to stubs', message)
       people = []
       meta = { source: 'stub', providerConfigured: false, providerError: message }
     }
 
-    if (people.length > 0) {
-      // Explorium returned results — skip Apify
-    } else {
-      // Explorium returned empty or failed — try Apify
-      try {
-        ;({ people, meta } = await searchApify(normalizedFilters, 1, options?.limit, interactive))
-      } catch (apifyErr) {
-        const message = apifyErr instanceof Error ? apifyErr.message : 'Search failed'
-        console.error('[searchProspects] Apify also failed — stub fallback', message)
-        people = stubResults(normalizedFilters)
-        meta = { source: 'stub', providerConfigured: isApifyConfigured(), providerError: message }
+    if (people.length === 0) {
+      // Explorium returned empty or failed — fall back to stubs
+      const stubPeople = stubResults(normalizedFilters)
+      people = stubPeople
+      if (meta.source !== 'stub') {
+        meta = {
+          source: 'stub',
+          providerConfigured: true,
+          providerError: 'Explorium returned no results for this search.',
+        }
       }
     }
   } else {
-    // --- Explorium not configured: use Apify ---
-    try {
-      ;({ people, meta } = await searchApify(normalizedFilters, 1, options?.limit, interactive))
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Search failed'
-      console.error('[searchProspects] Apify failed — stub fallback', message)
-      people = stubResults(normalizedFilters)
-      meta = { source: 'stub', providerConfigured: isApifyConfigured(), providerError: message }
+    // --- Explorium not configured: use stubs ---
+    people = stubResults(normalizedFilters)
+    meta = {
+      source: 'stub',
+      providerConfigured: false,
+      providerError: 'EXPLORIUM_API_KEY is not set',
     }
   }
 

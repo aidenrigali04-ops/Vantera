@@ -1,7 +1,7 @@
 import 'server-only'
 
 import { env } from '@/lib/env'
-import type { ApifyLead, ApifySearchFilters, ICPConfig } from '@/lib/aspire/types'
+import type { ProspectLead, ProspectSearchFilters, ICPConfig } from '@/lib/aspire/types'
 
 // ---------------------------------------------------------------------------
 // Config helpers
@@ -100,7 +100,7 @@ export type ExploriumSearchOptions = {
 
 /** Build the Explorium fetch-prospects request body from our filter + ICP types. */
 export function buildExploriumFilters(
-  filters: ApifySearchFilters,
+  filters: ProspectSearchFilters,
   icpConfig: ICPConfig,
   options: ExploriumSearchOptions = {},
 ) {
@@ -138,7 +138,7 @@ export function buildExploriumFilters(
 }
 
 // ---------------------------------------------------------------------------
-// Response mapping: Explorium prospect row → ApifyLead
+// Response mapping: Explorium prospect row → ProspectLead
 // ---------------------------------------------------------------------------
 
 function parseEmployeeCount(raw: unknown): number | null {
@@ -156,7 +156,7 @@ function parseEmployeeCount(raw: unknown): number | null {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function mapExploriumProspect(row: any, enriched?: any): ApifyLead {
+function mapExploriumProspect(row: any, enriched?: any): ProspectLead {
   const id = String(row.prospect_id ?? row.id ?? Math.random().toString(36).slice(2))
   const fullName: string = row.full_name ?? row.name ?? ''
   const parts = fullName.trim().split(' ')
@@ -198,13 +198,13 @@ export type ExploriumSearchMeta = {
 }
 
 export type ExploriumSearchResult = {
-  people: ApifyLead[]
+  people: ProspectLead[]
   meta: ExploriumSearchMeta
 }
 
 /** Primary: fetch prospects from Explorium, then enrich with email/phone. */
 export async function searchExplorium(
-  filters: ApifySearchFilters,
+  filters: ProspectSearchFilters,
   icpConfig: ICPConfig,
   options: ExploriumSearchOptions = {},
 ): Promise<ExploriumSearchResult> {

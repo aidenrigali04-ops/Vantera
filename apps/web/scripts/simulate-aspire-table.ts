@@ -8,7 +8,7 @@ import {
   extractPhone,
   readProspectContact,
 } from '../lib/aspire/contact-fields'
-import { normalizeApifyFilters } from '../lib/aspire/filters'
+import { normalizeProspectFilters } from '../lib/aspire/filters'
 import { toEnrichedAspireSearchResult } from '../lib/aspire/enrich-prospect'
 import { hydrateAspireSearchResult } from '../lib/aspire/hydrate-result'
 import { stubResults } from '../lib/aspire/prospect-stubs'
@@ -98,7 +98,7 @@ async function main() {
   console.log('=== Aspire table simulation ===\n')
 
   // 1) Stub path (no APIFY_API_TOKEN — same as production fallback)
-  const filters = normalizeApifyFilters('agency', { q: 'marketing' }, { interactive: true })
+  const filters = normalizeProspectFilters('agency', { q: 'marketing' }, { interactive: true })
   const stubPeople = stubResults(filters)
   const stubRows = toTableRows(
     stubPeople.map((p) => toEnrichedAspireSearchResult(p, 72, ['Has email'])),

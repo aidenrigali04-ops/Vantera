@@ -1,4 +1,4 @@
-import type { ApifyLead } from '@/lib/aspire/types'
+import type { ProspectLead } from '@/lib/aspire/types'
 
 export type LeadQualityTier = 'excellent' | 'strong' | 'moderate' | 'weak'
 
@@ -32,7 +32,7 @@ export type LeadProspectEnrichment = {
   }
 }
 
-export function computeEnrichmentScore(person: ApifyLead): {
+export function computeEnrichmentScore(person: ProspectLead): {
   score: number
   completenessPct: number
   contactChannels: LeadProspectEnrichment['contactChannels']
@@ -88,7 +88,7 @@ export function qualityTierFromScores(icpScore: number, enrichmentScore: number)
 }
 
 export function buildLeadProspectEnrichment(
-  person: ApifyLead,
+  person: ProspectLead,
   icpScore: number,
   icpSignals: string[],
   source: LeadProspectEnrichment['source'],

@@ -1,4 +1,4 @@
-import type { ApifySearchFilters } from '@/lib/aspire/types'
+import type { ProspectSearchFilters } from '@/lib/aspire/types'
 import { buildScoutApifyFilters } from '@/lib/prospect-scout/filters'
 import type { SdrConfigRow } from '@/lib/prospect-scout/types'
 import { db } from '@/lib/db/client'
@@ -52,7 +52,7 @@ function rotateSlice<T>(items: T[], runIndex: number, take: number): T[] {
 export function buildRotatedScoutApifyFilters(
   config: SdrConfigRow,
   runIndex: number,
-): ApifySearchFilters {
+): ProspectSearchFilters {
   const base = buildScoutApifyFilters(config)
 
   const titles = base.jobTitles ?? []
