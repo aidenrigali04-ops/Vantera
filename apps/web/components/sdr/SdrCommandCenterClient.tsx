@@ -279,7 +279,7 @@ export function SdrCommandCenterClient({
         ) : null}
         <span className="text-[var(--text-disabled)]">·</span>
         <Link
-          href="/admin/outreach/agents/scout/configure"
+          href="/admin/outreach/agents/scout"
           className="status-pill bg-[var(--accent-muted)] text-[var(--text-primary)] hover:opacity-90"
         >
           {config.prospectMode.replace(/_/g, ' ')}
@@ -351,7 +351,7 @@ export function SdrCommandCenterClient({
             <div className="flex items-center justify-between gap-2">
               <h3 className="text-sm font-semibold text-[var(--text-primary)]">Prospect Scout</h3>
               <Button variant="ghost" size="sm" className="h-7 text-xs" asChild>
-                <Link href="/admin/outreach/agents/scout/configure">Configure</Link>
+                <Link href="/admin/outreach/agents/scout">Configure</Link>
               </Button>
             </div>
             <p className="mt-2 text-xs text-[var(--text-secondary)]">

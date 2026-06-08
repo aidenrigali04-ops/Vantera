@@ -1,10 +1,11 @@
-import { SdrCommandCenterClient } from '@/components/sdr/SdrCommandCenterClient'
+import { ProspectScoutAgentWorkspace } from '@/components/agents/workspaces/ProspectScoutAgentWorkspace'
 import { requireAdminSession } from '@/lib/auth/require-session'
 import { db } from '@/lib/db/client'
 import type { Plan } from '@/lib/feature-flags/flags'
 import { accounts } from '@vantera/db'
 import { eq } from 'drizzle-orm'
 import { mapSdrAgentConfigRow } from '@/lib/sdr/map-agent-config'
+import { getSdrAspireConfig } from '@/lib/sdr/aspire-config'
 import {
   findSdrConfigByAccount,
   getSdrActivityFeed,
@@ -17,7 +18,6 @@ import { Suspense } from 'react'
 
 export const dynamic = 'force-dynamic'
 
-/** Prospect Scout command center — discovery runs, activity feed, and live controls. */
 export default async function ProspectScoutPage() {
   const session = await requireAdminSession()
 
@@ -46,17 +46,21 @@ export default async function ProspectScoutPage() {
   }
 
   const config = mapSdrAgentConfigRow(configRow)
-
-  const [stats, activity, upcoming] = await Promise.all([
+  const [stats, activity, upcoming, aspirePayload] = await Promise.all([
     getSdrDashboardStats(session.accountId),
     getSdrActivityFeed(session.accountId),
     getUpcomingSdrSends(session.accountId),
+    getSdrAspireConfig(session.accountId),
   ])
 
   return (
     <Suspense fallback={<div className="p-6 text-sm text-[var(--text-secondary)]">Loading scout…</div>}>
-      <SdrCommandCenterClient
+      <ProspectScoutAgentWorkspace
+        mode="configured"
+        accountId={session.accountId}
+        accountVertical={config.targetVerticals[0] ?? 'agency'}
         config={config}
+        aspirePayload={aspirePayload}
         stats={stats}
         initialActivity={activity}
         upcoming={upcoming}

@@ -1,9 +1,11 @@
-import { MessageDrafterCommandCenterClient } from '@/components/message-drafter/MessageDrafterCommandCenterClient'
+import { MessageDrafterAgentWorkspace } from '@/components/agents/workspaces/MessageDrafterAgentWorkspace'
 import { requireAdminSession } from '@/lib/auth/require-session'
 import { db } from '@/lib/db/client'
 import { evaluateFlag } from '@/lib/feature-flags/evaluate'
 import type { Plan } from '@/lib/feature-flags/flags'
 import { getMessageDrafterPayload } from '@/lib/message-drafter/queries'
+import { findSdrConfigByAccount } from '@/lib/sdr/queries'
+import { normalizeOutreachAutomationMode } from '@/lib/sdr/outreach-automation-mode'
 import { accounts } from '@vantera/db'
 import { eq } from 'drizzle-orm'
 import { redirect } from 'next/navigation'
@@ -14,13 +16,16 @@ export const dynamic = 'force-dynamic'
 export default async function MessageDrafterPage() {
   const session = await requireAdminSession()
 
-  const [account] = await db
-    .select({ plan: accounts.plan })
-    .from(accounts)
-    .where(eq(accounts.id, session.accountId))
-    .limit(1)
+  const [account, sdrConfig] = await Promise.all([
+    db
+      .select({ plan: accounts.plan })
+      .from(accounts)
+      .where(eq(accounts.id, session.accountId))
+      .limit(1),
+    findSdrConfigByAccount(session.accountId),
+  ])
 
-  const plan = (account?.plan ?? 'team') as Plan
+  const plan = (account[0]?.plan ?? 'team') as Plan
   const sdrEnabled = await evaluateFlag({
     accountId: session.accountId,
     plan,
@@ -32,6 +37,7 @@ export default async function MessageDrafterPage() {
   }
 
   const payload = await getMessageDrafterPayload(session.accountId)
+  const outreachMode = normalizeOutreachAutomationMode(sdrConfig?.outreachAutomationMode)
 
   return (
     <Suspense
@@ -39,7 +45,10 @@ export default async function MessageDrafterPage() {
         <div className="p-6 text-sm text-[var(--text-secondary)]">Loading message drafter…</div>
       }
     >
-      <MessageDrafterCommandCenterClient initialPayload={payload} />
+      <MessageDrafterAgentWorkspace
+        initialPayload={payload}
+        outreachAutomationMode={outreachMode}
+      />
     </Suspense>
   )
 }

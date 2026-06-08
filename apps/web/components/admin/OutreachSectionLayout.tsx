@@ -15,10 +15,13 @@ export function OutreachSectionLayout({ children }: { children: ReactNode }) {
   // Campaigns/channels bar. Each area asks the user to understand only itself.
   const inAgentArea = pathname.startsWith('/admin/outreach/agents')
 
-  // Full-screen flows (the SDR setup wizard, scout config) own the whole screen.
+  // Agent workspaces use a dedicated config + analytics layout (no sub-nav chrome).
   const isFullScreenFlow =
     pathname.startsWith('/admin/outreach/agents/setup') ||
-    pathname.startsWith('/admin/outreach/agents/scout/configure')
+    pathname.startsWith('/admin/outreach/agents/scout') ||
+    pathname.startsWith('/admin/outreach/agents/outreach') ||
+    pathname.startsWith('/admin/outreach/agents/drafter') ||
+    pathname.startsWith('/admin/outreach/agents/analyst')
 
   return (
     <>

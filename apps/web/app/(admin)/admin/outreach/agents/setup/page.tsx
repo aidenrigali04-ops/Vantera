@@ -28,7 +28,7 @@ export default async function SdrSetupPage() {
 
   const existing = await findSdrConfigByAccount(session.accountId)
   if (existing) {
-    redirect('/admin/outreach/agents')
+    redirect('/admin/outreach/agents/scout')
   }
 
   return (
@@ -38,6 +38,7 @@ export default async function SdrSetupPage() {
       plan={plan}
       accountVertical={account?.vertical ?? 'agency'}
       accountName={account?.name ?? 'Your business'}
+      accountId={session.accountId}
     />
   )
 }

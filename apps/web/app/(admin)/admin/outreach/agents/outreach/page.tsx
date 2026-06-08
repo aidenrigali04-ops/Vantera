@@ -1,4 +1,4 @@
-import { OutreachAgentCommandCenterClient } from '@/components/outreach-agent/OutreachAgentCommandCenterClient'
+import { OutreachAgentWorkspace } from '@/components/agents/workspaces/OutreachAgentWorkspace'
 import { requireAdminSession } from '@/lib/auth/require-session'
 import { db } from '@/lib/db/client'
 import { evaluateFlag } from '@/lib/feature-flags/evaluate'
@@ -8,7 +8,6 @@ import { getOutreachAgentActivityFeed } from '@/lib/outreach-agent/activity-quer
 import {
   findOutreachAgentConfigByAccount,
   getLinkedCampaignSummaries,
-  getManualStepsForLinkedCampaigns,
   getOutreachAgentDashboardStats,
   getUpcomingStepsForLinkedCampaigns,
 } from '@/lib/outreach-agent/queries'
@@ -31,10 +30,6 @@ export default async function OutreachAgentPage() {
     findOutreachAgentConfigByAccount(session.accountId),
   ])
 
-  if (!config) {
-    redirect('/admin/outreach/agents/outreach/setup')
-  }
-
   const plan = (account[0]?.plan ?? 'team') as Plan
   const sdrEnabled = await evaluateFlag({
     accountId: session.accountId,
@@ -46,25 +41,43 @@ export default async function OutreachAgentPage() {
     redirect('/admin/outreach/agents/setup')
   }
 
-  const [stats, linkedCampaigns, allCampaigns, upcoming, manualSteps, activity] = await Promise.all([
+  const allCampaigns = await findOutreachCampaigns(session.accountId)
+
+  if (!config) {
+    return (
+      <Suspense fallback={<div className="p-6 text-sm text-[var(--text-secondary)]">Loading…</div>}>
+        <OutreachAgentWorkspace
+          mode="setup"
+          config={null}
+          stats={null}
+          linkedCampaigns={[]}
+          allCampaigns={allCampaigns}
+          upcoming={[]}
+          initialActivity={[]}
+          accountId={session.accountId}
+        />
+      </Suspense>
+    )
+  }
+
+  const [stats, linkedCampaigns, upcoming, activity] = await Promise.all([
     getOutreachAgentDashboardStats(session.accountId, config.linkedCampaignIds),
     getLinkedCampaignSummaries(session.accountId, config.linkedCampaignIds),
-    findOutreachCampaigns(session.accountId),
     getUpcomingStepsForLinkedCampaigns(session.accountId, config.linkedCampaignIds),
-    getManualStepsForLinkedCampaigns(session.accountId, config.linkedCampaignIds),
     getOutreachAgentActivityFeed(session.accountId),
   ])
 
   return (
     <Suspense fallback={<div className="p-6 text-sm text-[var(--text-secondary)]">Loading outreach agent…</div>}>
-      <OutreachAgentCommandCenterClient
+      <OutreachAgentWorkspace
+        mode="configured"
         config={config}
         stats={stats}
         linkedCampaigns={linkedCampaigns}
         allCampaigns={allCampaigns}
         upcoming={upcoming}
-        manualSteps={manualSteps}
         initialActivity={activity}
+        accountId={session.accountId}
       />
     </Suspense>
   )

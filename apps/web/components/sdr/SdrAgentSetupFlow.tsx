@@ -1,7 +1,7 @@
 'use client'
 
+import { ProspectScoutAgentWorkspace } from '@/components/agents/workspaces/ProspectScoutAgentWorkspace'
 import { SdrModuleActivationClient } from '@/components/sdr/SdrModuleActivationClient'
-import { SdrSetupWizardClient } from '@/components/sdr/SdrSetupWizardClient'
 import type { Plan } from '@/lib/feature-flags/flags'
 import { useState } from 'react'
 
@@ -11,6 +11,7 @@ type Props = {
   plan: Plan
   accountVertical: string
   accountName: string
+  accountId: string
 }
 
 export function SdrAgentSetupFlow({
@@ -18,6 +19,7 @@ export function SdrAgentSetupFlow({
   isOwner,
   plan,
   accountVertical,
+  accountId,
 }: Props) {
   const [sdrEnabled, setSdrEnabled] = useState(initialEnabled)
 
@@ -31,5 +33,15 @@ export function SdrAgentSetupFlow({
     )
   }
 
-  return <SdrSetupWizardClient accountVertical={accountVertical} />
+  return (
+    <ProspectScoutAgentWorkspace
+      mode="setup"
+      accountId={accountId}
+      accountVertical={accountVertical}
+      config={null}
+      aspirePayload={null}
+      stats={null}
+      initialActivity={[]}
+    />
+  )
 }

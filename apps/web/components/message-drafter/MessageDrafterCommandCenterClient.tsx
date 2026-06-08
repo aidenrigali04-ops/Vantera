@@ -30,6 +30,8 @@ import { toast } from 'sonner'
 
 type Props = {
   initialPayload: MessageDrafterPayload
+  /** Render queue only inside agent workspace footer. */
+  embedded?: boolean
 }
 
 type SequenceTab = 'email' | 'linkedin'
@@ -75,7 +77,7 @@ function EmptyQueue({ tab }: { tab: SequenceTab }) {
   )
 }
 
-export function MessageDrafterCommandCenterClient({ initialPayload }: Props) {
+export function MessageDrafterCommandCenterClient({ initialPayload, embedded = false }: Props) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [isPending, startTransition] = useTransition()
@@ -218,38 +220,16 @@ export function MessageDrafterCommandCenterClient({ initialPayload }: Props) {
     })
   }
 
-  return (
-    <AdminPageContent>
-      <section className="card-surface overflow-hidden border-[var(--accent-border)] bg-gradient-to-br from-[var(--accent-muted)] via-[var(--bg-surface)] to-[var(--bg-subtle)] p-6 sm:p-8">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div className="max-w-2xl space-y-2">
-            <p className="inline-flex items-center gap-1.5 rounded-md border border-[var(--accent-border)] bg-[var(--accent-muted)] px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--text-primary)]">
-              <PenLine className="h-3.5 w-3.5" aria-hidden />
-              Message Drafter
-            </p>
-            <h1 className="text-2xl font-semibold tracking-[-0.02em] text-[var(--text-primary)] sm:text-3xl">
-              Review outbound sequences
-            </h1>
-            <p className="text-[15px] leading-relaxed text-[var(--text-secondary)]">
-              Email and SMS: review here and approve to send automatically. LinkedIn: copy each
-              message, send it on LinkedIn yourself, then mark it done here or in the Vantera add-on.
-            </p>
-          </div>
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/admin/outreach/agents">
-              <Bot className="mr-1.5 h-3.5 w-3.5" aria-hidden />
-              Agent roster
-            </Link>
-          </Button>
-        </div>
-      </section>
+  const queue = (
+    <>
+      {!embedded ? <KpiStrip items={kpiItems} className="lg:grid-cols-3" /> : null}
 
-      <KpiStrip items={kpiItems} className="lg:grid-cols-3" />
-
-      <PageHeader
-        title="Draft queues"
-        description="Email and SMS approval in one place; LinkedIn messages you send yourself on LinkedIn."
-      />
+      {!embedded ? (
+        <PageHeader
+          title="Draft queues"
+          description="Email and SMS approval in one place; LinkedIn messages you send yourself on LinkedIn."
+        />
+      ) : null}
 
       <nav
         className="flex gap-1 overflow-x-auto border-b border-[var(--border-default)] pb-px"
@@ -416,6 +396,39 @@ export function MessageDrafterCommandCenterClient({ initialPayload }: Props) {
           ) : null}
         </div>
       )}
+    </>
+  )
+
+  if (embedded) {
+    return <div className="space-y-4">{queue}</div>
+  }
+
+  return (
+    <AdminPageContent>
+      <section className="card-surface overflow-hidden border-[var(--accent-border)] bg-gradient-to-br from-[var(--accent-muted)] via-[var(--bg-surface)] to-[var(--bg-subtle)] p-6 sm:p-8">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div className="max-w-2xl space-y-2">
+            <p className="inline-flex items-center gap-1.5 rounded-md border border-[var(--accent-border)] bg-[var(--accent-muted)] px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--text-primary)]">
+              <PenLine className="h-3.5 w-3.5" aria-hidden />
+              Message Drafter
+            </p>
+            <h1 className="text-2xl font-semibold tracking-[-0.02em] text-[var(--text-primary)] sm:text-3xl">
+              Review outbound sequences
+            </h1>
+            <p className="text-[15px] leading-relaxed text-[var(--text-secondary)]">
+              Email and SMS: review here and approve to send automatically. LinkedIn: copy each
+              message, send it on LinkedIn yourself, then mark it done here or in the Vantera add-on.
+            </p>
+          </div>
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/admin/outreach/agents">
+              <Bot className="mr-1.5 h-3.5 w-3.5" aria-hidden />
+              Agent roster
+            </Link>
+          </Button>
+        </div>
+      </section>
+      {queue}
     </AdminPageContent>
   )
 }

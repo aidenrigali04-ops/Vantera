@@ -1,26 +1,37 @@
 'use client'
 
+import { AgentDetailShell } from '@/components/agents/AgentDetailShell'
+import { AgentScenarioCard } from '@/components/agents/AgentScenarioCard'
+import { AgentSidebarPanel, DEFAULT_SDR_CONNECTED_APPS } from '@/components/agents/AgentSidebarPanel'
 import { AdminPageContent } from '@/components/admin/AdminPageContent'
 import { AgentsAutomationSection } from '@/components/sdr/AgentsAutomationSection'
-import { KpiStrip } from '@/components/operational/KpiStrip'
-import { PageHeader } from '@/components/operational/PageHeader'
-import { StatusBadge } from '@/components/operational/table/StatusBadge'
+import { LiveIndicator } from '@/components/operational/LiveIndicator'
+import { SdrActivityFeed } from '@/components/sdr/activity-feed'
 import { Button } from '@/components/ui/button'
-import { SdrAgentIcon } from '@/components/agents/SdrAgentIcon'
-import { countActiveAgents } from '@/lib/agents/sdr-agents'
-import type { SdrAgentCard, SdrAgentId } from '@/lib/agents/types'
+import type { SdrAgentCard, SdrAgentId, SdrAgentSnapshot } from '@/lib/agents/types'
 import type { OutreachAutomationMode } from '@/lib/sdr/outreach-automation-mode'
-import { cn } from '@/lib/utils'
-import { ArrowRight, Bot, ChevronRight, Megaphone, Sparkles, Users } from 'lucide-react'
+import { isAutomaticOutreachMode } from '@/lib/sdr/outreach-automation-mode'
+import type { SDRActivityEvent, SDRAgentConfig } from '@/lib/sdr/types'
+import { useAccountRealtime } from '@/lib/supabase/account-realtime'
+import { ArrowRight, Bot, Pause, Play, Radar } from 'lucide-react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { useCallback, useState, useTransition } from 'react'
+import { toast } from 'sonner'
 
 type Props = {
   agents: SdrAgentCard[]
+  snapshot: SdrAgentSnapshot
   enrolledLeads: number
   sdrEnabled: boolean
   outreachAutomationMode: OutreachAutomationMode
   sdrConfigured: boolean
+  config: SDRAgentConfig | null
+  initialActivity: SDRActivityEvent[]
+  accountId: string
 }
+
+type TabId = 'scenarios' | 'approvals' | 'runs' | 'settings'
 
 const STATUS_TONE = {
   active: 'success',
@@ -36,16 +47,36 @@ const STATUS_LABEL = {
   needs_setup: 'Configure',
 } as const
 
-/**
- * The agents are a pipeline: each one hands off to the next. Ordered and
- * labeled by the real data flow — find → write → send → score — so the screen
- * mirrors how the work actually moves, not the order things were built.
- */
-const PIPELINE: { id: SdrAgentId; stage: string }[] = [
-  { id: 'prospect_scout', stage: 'Find' },
-  { id: 'message_drafter', stage: 'Write' },
-  { id: 'outreach_agent', stage: 'Send' },
-  { id: 'pipeline_analyst', stage: 'Score' },
+const PIPELINE: {
+  id: SdrAgentId
+  scenarioTitle: string
+  schedule: string
+  steps: string
+}[] = [
+  {
+    id: 'prospect_scout',
+    scenarioTitle: 'ICP lead discovery',
+    schedule: 'Daily · scheduled discovery',
+    steps: '3 steps',
+  },
+  {
+    id: 'message_drafter',
+    scenarioTitle: 'Personalized copy drafting',
+    schedule: 'On demand · when leads arrive',
+    steps: '2 steps',
+  },
+  {
+    id: 'outreach_agent',
+    scenarioTitle: 'Multi-channel outreach',
+    schedule: 'Per outreach window',
+    steps: '5 steps',
+  },
+  {
+    id: 'pipeline_analyst',
+    scenarioTitle: 'Pipeline interest scoring',
+    schedule: 'Daily · engagement scoring',
+    steps: '1 step',
+  },
 ]
 
 function agentHref(agent: SdrAgentCard): string {
@@ -56,197 +87,347 @@ function agentHref(agent: SdrAgentCard): string {
   }
   if (agent.id === 'outreach_agent') {
     return agent.status === 'needs_setup'
-      ? '/admin/outreach/agents/outreach/setup'
+      ? '/admin/outreach/agents/outreach'
       : '/admin/outreach/agents/outreach'
   }
   if (agent.id === 'message_drafter') {
     return '/admin/outreach/agents/drafter'
   }
+  if (agent.id === 'pipeline_analyst') {
+    return '/admin/outreach/agents/analyst'
+  }
   return agent.href
 }
 
-function PipelineAgent({
-  agent,
-  stage,
-  step,
-  isLast,
-}: {
-  agent: SdrAgentCard
-  stage: string
-  step: number
-  isLast: boolean
-}) {
-  const href = agentHref(agent)
-  // The agent wants the user when it's unconfigured, or (Drafter) has work waiting.
-  const needsYou = agent.status === 'needs_setup'
+function discoveryScheduleLabel(config: SDRAgentConfig | null): string {
+  if (!config) return 'Daily · scheduled discovery'
+  const freq = config.searchFrequency === 'weekly' ? 'Weekly' : 'Daily'
+  const hour = config.outreachWindow.startHour
+  const ampm = hour >= 12 ? 'pm' : 'am'
+  const h12 = hour % 12 || 12
+  return `${freq} · ${String(h12).padStart(2, '0')}:00 ${ampm}`
+}
 
-  return (
-    <li className="relative">
-      {/* Hand-off connector: this agent feeds the next. */}
-      {!isLast ? (
-        <span
-          aria-hidden
-          className="absolute left-[1.625rem] top-[3.75rem] bottom-[-0.75rem] w-px bg-[var(--border-default)]"
-        />
-      ) : null}
-
-      <article
-        className={cn(
-          'card-surface relative flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between',
-          needsYou && 'border-[var(--accent-border)] ring-1 ring-[var(--accent-border)]/40',
-        )}
-      >
-        <Link href={href} className="flex min-w-0 flex-1 items-start gap-4 text-left">
-          <span className="relative z-[1] flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-[var(--accent-border)] bg-[var(--accent-muted)] text-[var(--text-primary)]">
-            <SdrAgentIcon name={agent.iconName} className="h-5 w-5" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-tertiary)]">
-              Step {step} · {stage}
-            </p>
-            <div className="mt-0.5 flex flex-wrap items-center gap-2">
-              <h3 className="text-base font-semibold text-[var(--text-primary)]">{agent.name}</h3>
-              <StatusBadge label={STATUS_LABEL[agent.status]} tone={STATUS_TONE[agent.status]} />
-            </div>
-            <p className="mt-1 text-sm leading-relaxed text-[var(--text-secondary)]">
-              {agent.description}
-            </p>
-            <p className="mt-2 text-[12px] text-[var(--text-tertiary)]">
-              {agent.statLabel}:{' '}
-              <span className="font-medium text-[var(--text-primary)]">{agent.statValue}</span>
-            </p>
-          </div>
-        </Link>
-
-        <div className="flex shrink-0 items-center gap-2 sm:pl-2">
-          <Button
-            size="sm"
-            asChild
-            variant={needsYou ? 'default' : 'outline'}
-            className={cn(needsYou && 'bg-[var(--text-primary)] text-[var(--text-inverse)] hover:opacity-90')}
-          >
-            <Link href={href}>
-              {needsYou ? 'Configure' : agent.ctaLabel}
-              <ChevronRight className="ml-1 h-4 w-4" />
-            </Link>
-          </Button>
-        </div>
-      </article>
-    </li>
-  )
+function pendingLabel(agent: SdrAgentCard, snapshot: SdrAgentSnapshot): string | undefined {
+  if (agent.id === 'message_drafter' && snapshot.pendingDrafts > 0) {
+    return `Pending: ${snapshot.pendingDrafts} draft${snapshot.pendingDrafts === 1 ? '' : 's'}`
+  }
+  if (agent.id === 'outreach_agent' && snapshot.pendingLinkedInDrafts > 0) {
+    return `Pending: ${snapshot.pendingLinkedInDrafts} LinkedIn`
+  }
+  if (agent.status === 'needs_setup') {
+    return 'Needs setup'
+  }
+  return undefined
 }
 
 export function SdrAgentsHubClient({
   agents,
+  snapshot,
   enrolledLeads,
   sdrEnabled,
   outreachAutomationMode,
   sdrConfigured,
+  config,
+  initialActivity,
+  accountId,
 }: Props) {
+  const router = useRouter()
+  const [activeTab, setActiveTab] = useState<TabId>('scenarios')
+  const [activity, setActivity] = useState(initialActivity)
+  const [isPending, startTransition] = useTransition()
+
+  const automatic = isAutomaticOutreachMode(outreachAutomationMode)
   const byId = new Map(agents.map((a) => [a.id, a]))
   const pipeline = PIPELINE.map((p) => ({ ...p, agent: byId.get(p.id) })).filter(
-    (p): p is { id: SdrAgentId; stage: string; agent: SdrAgentCard } => Boolean(p.agent),
+    (p): p is (typeof PIPELINE)[number] & { agent: SdrAgentCard } => Boolean(p.agent),
   )
 
-  const activeCount = countActiveAgents(agents)
+  const reviewCount = snapshot.pendingDrafts + snapshot.pendingLinkedInDrafts
+  const agentTitle = config?.agentName ?? 'SDR Agent'
+  const isRunning = Boolean(config?.isActive && !config?.isPaused)
 
-  const kpiItems = [
-    { label: 'Agents active', value: activeCount, icon: Bot },
-    { label: 'In sequences', value: enrolledLeads, icon: Users },
-    {
-      label: 'Drafts waiting',
-      value: (() => {
-        const raw = agents.find((a) => a.id === 'message_drafter')?.statValue ?? '0'
-        return raw === '0' ? '—' : raw
-      })(),
-      icon: Sparkles,
-    },
-    {
-      label: 'Linked campaigns',
-      value: (() => {
-        const raw = agents.find((a) => a.id === 'outreach_agent')?.statValue ?? '—'
-        return raw === '0' || raw === 'Not configured' ? '—' : raw
-      })(),
-      icon: Megaphone,
-    },
-  ]
+  const refreshActivity = useCallback(async () => {
+    const res = await fetch('/api/sdr/activity?limit=50')
+    const json = await res.json()
+    if (json.success) setActivity(json.data)
+  }, [])
 
-  return (
-    <AdminPageContent>
-      {/* Returning user: lean header. New user: an onboarding surface that teaches the flow. */}
-      {sdrEnabled ? (
-        <div className="space-y-1">
-          <h1 className="text-2xl font-semibold tracking-[-0.02em] text-[var(--text-primary)]">
-            Your AI SDR workforce
-          </h1>
-          <p className="text-[15px] leading-relaxed text-[var(--text-secondary)]">
-            Four agents run your pipeline end to end — find, write, send, and score — around the clock.
-          </p>
-        </div>
-      ) : (
-        <section className="card-surface p-6 sm:p-8">
+  const { isLive: activityLive } = useAccountRealtime({
+    accountId,
+    table: 'sdr_activity_log',
+    onChange: refreshActivity,
+    enabled: sdrConfigured,
+  })
+
+  async function handleRunNow() {
+    startTransition(async () => {
+      const res = await fetch('/api/sdr/bootstrap', { method: 'POST' })
+      const json = await res.json()
+      if (!json.success) {
+        toast.error(json.error ?? 'Run failed')
+        return
+      }
+      toast.success('Discovery run queued')
+      router.refresh()
+      await refreshActivity()
+    })
+  }
+
+  function handlePauseResume() {
+    if (!config) return
+    startTransition(async () => {
+      const url = config.isPaused ? '/api/sdr/config/resume' : '/api/sdr/config/pause'
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: config.isPaused ? undefined : JSON.stringify({ reason: 'Paused from agent dashboard' }),
+      })
+      const json = await res.json()
+      if (!json.success) {
+        toast.error(json.error ?? 'Action failed')
+        return
+      }
+      toast.success(config.isPaused ? 'Agent resumed' : 'Agent paused')
+      router.refresh()
+    })
+  }
+
+  if (!sdrEnabled) {
+    return (
+      <AdminPageContent>
+        <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-6 sm:p-8">
           <p className="inline-flex items-center gap-1.5 rounded-md border border-[var(--accent-border)] bg-[var(--accent-muted)] px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--text-primary)]">
-            <Bot className="h-3.5 w-3.5" />
-            AI SDR workforce
+            <Bot className="h-3.5 w-3.5" aria-hidden />
+            SDR Agent
           </p>
-          <h1 className="mt-3 max-w-xl text-2xl font-semibold tracking-[-0.02em] text-[var(--text-primary)] sm:text-3xl">
+          <h1 className="mt-3 max-w-xl text-[28px] font-semibold tracking-[-0.03em] text-[var(--text-primary)]">
             Put your pipeline on autopilot
           </h1>
           <p className="mt-2 max-w-xl text-[15px] leading-relaxed text-[var(--text-secondary)]">
-            Deploy four agents that find ICP-matched leads, draft personalized outreach, run the
-            sequences, and score who to talk to next — without adding headcount.
+            One autonomous agent that finds ICP-matched leads, drafts personalized outreach, runs
+            sequences, and scores who needs attention next — without adding headcount.
           </p>
-
-          {/* The flow, taught once: this is the order to deploy in. */}
-          <ol className="mt-5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] font-medium text-[var(--text-secondary)]">
-            {PIPELINE.map((p, i) => (
-              <li key={p.id} className="flex items-center gap-2">
-                <span>
-                  <span className="text-[var(--text-tertiary)]">{i + 1}.</span> {p.stage}
-                </span>
-                {i < PIPELINE.length - 1 ? (
-                  <ArrowRight className="h-3.5 w-3.5 text-[var(--text-tertiary)]" aria-hidden />
-                ) : null}
-              </li>
-            ))}
-          </ol>
-
           <Button
             asChild
-            className="mt-6 bg-[var(--text-primary)] text-[var(--text-inverse)] hover:opacity-90"
+            className="mt-6 bg-[var(--accent)] text-[var(--text-inverse)] hover:bg-[var(--accent-hover)]"
           >
             <Link href="/admin/outreach/agents/setup">
               Get started
-              <ArrowRight className="ml-1.5 h-4 w-4" />
+              <ArrowRight className="ml-1.5 h-4 w-4" aria-hidden />
             </Link>
           </Button>
         </section>
-      )}
+      </AdminPageContent>
+    )
+  }
 
-      {sdrEnabled ? <KpiStrip items={kpiItems} className="lg:grid-cols-4" /> : null}
+  return (
+    <AdminPageContent>
+      <AgentDetailShell
+        breadcrumbs={[{ label: 'Agents' }]}
+        title={agentTitle}
+        description="Monitors your pipeline, drafts personalized outreach, and runs multi-channel sequences on schedule — so your team focuses on closing."
+        reviewBadge={reviewCount > 0 ? `${reviewCount} to review` : undefined}
+        actions={
+          sdrConfigured ? (
+            <>
+              <Button variant="outline" size="sm" disabled={isPending} onClick={handleRunNow}>
+                <Radar className="mr-1.5 h-4 w-4" aria-hidden />
+                Run now
+              </Button>
+              <Button
+                size="sm"
+                disabled={isPending || !config}
+                onClick={handlePauseResume}
+                className="bg-[var(--accent)] text-[var(--text-inverse)] hover:bg-[var(--accent-hover)]"
+              >
+                {config?.isPaused ? (
+                  <>
+                    <Play className="mr-1.5 h-4 w-4" aria-hidden /> Resume
+                  </>
+                ) : (
+                  <>
+                    <Pause className="mr-1.5 h-4 w-4" aria-hidden /> Pause
+                  </>
+                )}
+              </Button>
+            </>
+          ) : (
+            <Button
+              asChild
+              size="sm"
+              className="bg-[var(--accent)] text-[var(--text-inverse)] hover:bg-[var(--accent-hover)]"
+            >
+              <Link href="/admin/outreach/agents/setup">Set up agent</Link>
+            </Button>
+          )
+        }
+        tabs={[
+          { id: 'scenarios', label: 'Scenarios', badge: pipeline.length, badgeTone: 'accent' },
+          {
+            id: 'approvals',
+            label: 'Approvals',
+            badge: reviewCount || undefined,
+            badgeTone: 'review',
+          },
+          { id: 'runs', label: 'Runs', badge: activity.length || undefined },
+          { id: 'settings', label: 'Settings' },
+        ]}
+        activeTab={activeTab}
+        onTabChange={(id) => setActiveTab(id as TabId)}
+        sidebar={
+          <AgentSidebarPanel
+            instructions="Your SDR agent runs as a coordinated pipeline: discover and score leads, draft personalized copy for review, deliver multi-channel sequences, and flag high-intent prospects. Keep ICP rules accurate and review pending drafts daily for best results."
+            connectedApps={DEFAULT_SDR_CONNECTED_APPS}
+          />
+        }
+      >
+        {activeTab === 'scenarios' ? (
+          <section className="space-y-4">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <h2 className="text-[17px] font-semibold tracking-[-0.02em] text-[var(--text-primary)]">
+                  Configured scenarios
+                </h2>
+                <p className="mt-1 text-[13px] text-[var(--text-secondary)]">
+                  {isRunning ? 'Running' : config?.isPaused ? 'Paused' : 'Standby'} · {enrolledLeads}{' '}
+                  in sequences
+                </p>
+              </div>
+              <Button
+                asChild
+                size="sm"
+                className="bg-[var(--accent)] text-[var(--text-inverse)] hover:bg-[var(--accent-hover)]"
+              >
+                <Link href="/admin/outreach/agents/setup">New scenario</Link>
+              </Button>
+            </div>
 
-      {sdrEnabled && sdrConfigured ? (
-        <AgentsAutomationSection initialMode={outreachAutomationMode} sdrConfigured={sdrConfigured} />
-      ) : null}
+            <div className="space-y-3">
+              {pipeline.map((p) => {
+                const agent = p.agent
+                const href = agentHref(agent)
+                const schedule =
+                  p.id === 'prospect_scout'
+                    ? discoveryScheduleLabel(config)
+                    : p.id === 'outreach_agent' && automatic
+                      ? 'Automatic · after each discovery run'
+                      : p.schedule
 
-      <div className="space-y-4">
-        <PageHeader
-          title="The pipeline"
-          description="Each agent hands off to the next. Configure one, then open it for live controls and activity."
-        />
+                return (
+                  <AgentScenarioCard
+                    key={p.id}
+                    title={p.scenarioTitle}
+                    description={agent.description}
+                    statusLabel={STATUS_LABEL[agent.status]}
+                    statusTone={STATUS_TONE[agent.status]}
+                    schedule={schedule}
+                    stepsLabel={p.steps}
+                    lastRun={`${agent.statLabel}: ${agent.statValue}`}
+                    pendingLabel={pendingLabel(agent, snapshot)}
+                    menuItems={[
+                      { label: agent.ctaLabel, href },
+                      ...(agent.status === 'needs_setup'
+                        ? [{ label: 'Configure', href }]
+                        : [{ label: 'Open details', href }]),
+                    ]}
+                  />
+                )
+              })}
+            </div>
+          </section>
+        ) : null}
 
-        <ol className="space-y-3">
-          {pipeline.map((p, i) => (
-            <PipelineAgent
-              key={p.id}
-              agent={p.agent}
-              stage={p.stage}
-              step={i + 1}
-              isLast={i === pipeline.length - 1}
-            />
-          ))}
-        </ol>
-      </div>
+        {activeTab === 'approvals' ? (
+          <section className="space-y-4">
+            <div>
+              <h2 className="text-[17px] font-semibold tracking-[-0.02em] text-[var(--text-primary)]">
+                Pending approvals
+              </h2>
+              <p className="mt-1 text-[13px] text-[var(--text-secondary)]">
+                Review drafts and manual sends before they go out.
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <AgentScenarioCard
+                title="Email & SMS drafts"
+                description="Personalized copy waiting for your review before send."
+                statusLabel={snapshot.pendingEmailDrafts > 0 ? 'Review' : 'Clear'}
+                statusTone={snapshot.pendingEmailDrafts > 0 ? 'warning' : 'success'}
+                pendingLabel={
+                  snapshot.pendingEmailDrafts > 0
+                    ? `Pending: ${snapshot.pendingEmailDrafts} draft${snapshot.pendingEmailDrafts === 1 ? '' : 's'}`
+                    : undefined
+                }
+                menuItems={[{ label: 'Open drafter', href: '/admin/outreach/agents/drafter' }]}
+              />
+              <AgentScenarioCard
+                title="LinkedIn manual sends"
+                description="Connection requests and messages queued for manual delivery via the LinkedIn add-on."
+                statusLabel={snapshot.pendingLinkedInDrafts > 0 ? 'Review' : 'Clear'}
+                statusTone={snapshot.pendingLinkedInDrafts > 0 ? 'warning' : 'success'}
+                pendingLabel={
+                  snapshot.pendingLinkedInDrafts > 0
+                    ? `Pending: ${snapshot.pendingLinkedInDrafts} step${snapshot.pendingLinkedInDrafts === 1 ? '' : 's'}`
+                    : undefined
+                }
+                menuItems={[
+                  { label: 'Open drafter', href: '/admin/outreach/agents/drafter' },
+                  { label: 'LinkedIn hub', href: '/admin/outreach/linkedin' },
+                ]}
+              />
+            </div>
+          </section>
+        ) : null}
+
+        {activeTab === 'runs' ? (
+          <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5">
+            <div className="mb-4 flex items-center justify-between gap-2">
+              <h2 className="text-[15px] font-semibold text-[var(--text-primary)]">Run history</h2>
+              <LiveIndicator active={activityLive} />
+            </div>
+            {sdrConfigured ? (
+              <SdrActivityFeed events={activity} accountId={accountId} />
+            ) : (
+              <p className="text-[13px] text-[var(--text-secondary)]">
+                Complete setup to start logging agent runs.
+              </p>
+            )}
+          </section>
+        ) : null}
+
+        {activeTab === 'settings' ? (
+          <section className="space-y-6">
+            {sdrConfigured ? (
+              <AgentsAutomationSection
+                initialMode={outreachAutomationMode}
+                sdrConfigured={sdrConfigured}
+              />
+            ) : null}
+
+            <div className="space-y-3">
+              <h2 className="text-[17px] font-semibold tracking-[-0.02em] text-[var(--text-primary)]">
+                Configuration
+              </h2>
+              {pipeline.map((p) => {
+                const agent = p.agent
+                return (
+                  <AgentScenarioCard
+                    key={p.id}
+                    title={agent.name}
+                    description={agent.tagline}
+                    statusLabel={STATUS_LABEL[agent.status]}
+                    statusTone={STATUS_TONE[agent.status]}
+                    menuItems={[{ label: 'Configure', href: agentHref(agent) }]}
+                  />
+                )
+              })}
+            </div>
+          </section>
+        ) : null}
+      </AgentDetailShell>
     </AdminPageContent>
   )
 }
