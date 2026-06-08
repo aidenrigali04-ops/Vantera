@@ -3,15 +3,20 @@
 import { AgentAnalyticsPanel } from '@/components/agents/AgentAnalyticsPanel'
 import { AgentCapabilityCard } from '@/components/agents/AgentCapabilityCard'
 import { AgentConfigSection } from '@/components/agents/AgentConfigSection'
+import {
+  AgentFormField,
+  agentInputClassName,
+  agentTextareaClassName,
+} from '@/components/agents/AgentFormField'
 import { AgentWorkspaceLayout } from '@/components/agents/AgentWorkspaceLayout'
 import { MessageDrafterCommandCenterClient } from '@/components/message-drafter/MessageDrafterCommandCenterClient'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { AGENT_DEFAULT_INSTRUCTIONS, AGENT_PAGE_COPY } from '@/lib/agents/default-instructions'
 import type { MessageDrafterPayload } from '@/lib/message-drafter/types'
 import { isAutomaticOutreachMode } from '@/lib/sdr/outreach-automation-mode'
 import type { OutreachAutomationMode } from '@/lib/sdr/outreach-automation-mode'
+import { cn } from '@/lib/utils'
 import { Check, Mail, MessageCircle, PenLine, Shield } from 'lucide-react'
 import Link from 'next/link'
 import { useState } from 'react'
@@ -44,48 +49,44 @@ export function MessageDrafterAgentWorkspace({
   const configPanel = (
     <>
       <AgentConfigSection title="Agent Identity">
-        <div>
-          <Label htmlFor="drafter-name">Name</Label>
+        <AgentFormField id="drafter-name" label="Name">
           <Input
             id="drafter-name"
-            className="mt-1.5 border-[var(--border-default)] bg-[var(--bg-surface)]"
+            className={agentInputClassName}
             value={agentName}
             onChange={(e) => setAgentName(e.target.value)}
           />
-        </div>
-        <div>
-          <Label htmlFor="drafter-description">Description</Label>
+        </AgentFormField>
+        <AgentFormField id="drafter-description" label="Description">
           <Input
             id="drafter-description"
-            className="mt-1.5 border-[var(--border-default)] bg-[var(--bg-surface)]"
+            className={agentInputClassName}
             value={agentDescription}
             onChange={(e) => setAgentDescription(e.target.value)}
           />
-        </div>
+        </AgentFormField>
       </AgentConfigSection>
 
       <AgentConfigSection title="Instructions System">
-        <div>
-          <Label htmlFor="drafter-instructions">Instruction</Label>
+        <AgentFormField id="drafter-instructions" label="Instruction">
           <Textarea
             id="drafter-instructions"
             rows={7}
-            className="mt-1.5 resize-y border-[var(--border-default)] bg-[var(--bg-surface)] font-mono text-[13px]"
+            className={cn(agentTextareaClassName, 'font-mono')}
             value={instructions}
             onChange={(e) => setInstructions(e.target.value)}
           />
-        </div>
-        <div>
-          <Label htmlFor="drafter-starters">Conversation Starters</Label>
+        </AgentFormField>
+        <AgentFormField id="drafter-starters" label="Conversation starters">
           <Textarea
             id="drafter-starters"
             rows={3}
             placeholder="One starter per line…"
-            className="mt-1.5 resize-y border-[var(--border-default)] bg-[var(--bg-surface)] text-[13px]"
+            className={agentTextareaClassName}
             value={conversationStarters}
             onChange={(e) => setConversationStarters(e.target.value)}
           />
-        </div>
+        </AgentFormField>
         <p className="text-[12px] text-[var(--text-secondary)]">
           Workspace outreach mode is{' '}
           <Link href="/admin/outreach/agents" className="font-medium text-[var(--accent)] hover:underline">
@@ -96,30 +97,32 @@ export function MessageDrafterAgentWorkspace({
       </AgentConfigSection>
 
       <AgentConfigSection title="Capabilities">
-        <AgentCapabilityCard
-          icon={Shield}
-          title="Require review before send"
-          description="Hold email and SMS drafts for approval when workspace mode is Manual."
-          checked={requireReview}
-          onCheckedChange={setRequireReview}
-          disabled={automatic}
-        />
-        <AgentCapabilityCard
-          icon={MessageCircle}
-          title="LinkedIn manual sequence"
-          description="Surface LinkedIn steps separately for copy-and-send via the add-on."
-          checked={linkedinManual}
-          onCheckedChange={setLinkedinManual}
-          disabled
-        />
-        <AgentCapabilityCard
-          icon={PenLine}
-          title="Personalized copy generation"
-          description="Draft using lead context, company signals, and sequence goals."
-          checked
-          onCheckedChange={() => {}}
-          disabled
-        />
+        <div className="space-y-3">
+          <AgentCapabilityCard
+            icon={Shield}
+            title="Require review before send"
+            description="Hold email and SMS drafts for approval when workspace mode is Manual."
+            checked={requireReview}
+            onCheckedChange={setRequireReview}
+            disabled={automatic}
+          />
+          <AgentCapabilityCard
+            icon={MessageCircle}
+            title="LinkedIn manual sequence"
+            description="Surface LinkedIn steps separately for copy-and-send via the add-on."
+            checked={linkedinManual}
+            onCheckedChange={setLinkedinManual}
+            disabled
+          />
+          <AgentCapabilityCard
+            icon={PenLine}
+            title="Personalized copy generation"
+            description="Draft using lead context, company signals, and sequence goals."
+            checked
+            onCheckedChange={() => {}}
+            disabled
+          />
+        </div>
       </AgentConfigSection>
     </>
   )
@@ -171,8 +174,10 @@ export function MessageDrafterAgentWorkspace({
       config={configPanel}
       analytics={analyticsPanel}
       footer={
-        <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5">
-          <h2 className="text-[15px] font-semibold text-[var(--text-primary)]">Review queue</h2>
+        <section className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-6 shadow-[var(--shadow-sm)]">
+          <h2 className="text-[20px] font-semibold tracking-[-0.02em] text-[var(--text-primary)]">
+            Review queue
+          </h2>
           <p className="mt-1 text-[13px] text-[var(--text-secondary)]">
             Approve, edit, or discard drafts before they go out.
           </p>

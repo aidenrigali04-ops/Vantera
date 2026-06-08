@@ -81,48 +81,26 @@
     --shadow-glow: 0 0 0 3px var(--brand-accent-muted);
   }
 
-  /* Agent workspace dark theme — scoped override for all agent configuration pages */
-  .agent-dark {
-    /* shadcn base vars (inputs, popovers, selects use these) */
-    --background: 222 13% 9%;
-    --foreground: 0 0% 94%;
-    --card: 222 13% 12%;
-    --card-foreground: 0 0% 94%;
-    --popover: 222 13% 12%;
-    --popover-foreground: 0 0% 94%;
+  /* Agent workspace — light Vantera tokens; gold --accent inherited from :root */
+  .agent-workspace {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 4%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 4%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 4%;
     --primary: 43 74% 54%;
-    --primary-foreground: 222 13% 9%;
-    --secondary: 222 13% 16%;
-    --secondary-foreground: 0 0% 94%;
-    --muted: 222 13% 14%;
-    --muted-foreground: 0 0% 53%;
-    --accent: 222 13% 16%;
-    --accent-foreground: 0 0% 94%;
-    --destructive: 0 63% 48%;
+    --primary-foreground: 0 0% 4%;
+    --secondary: 40 10% 94%;
+    --secondary-foreground: 0 0% 4%;
+    --muted: 40 10% 96%;
+    --muted-foreground: 0 0% 40%;
+    --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 98%;
-    --border: 222 13% 18%;
-    --input: 222 13% 15%;
+    --border: 0 0% 90%;
+    --input: 0 0% 90%;
     --ring: 43 74% 54%;
-
-    /* Vantera tokens — dark */
-    --bg-base: #0f0f12;
-    --bg-subtle: #1a1a1e;
-    --bg-surface: #1e1e24;
-    --bg-elevated: #242430;
-    --bg-overlay: #2a2a36;
-    --border-subtle: rgba(255, 255, 255, 0.06);
-    --border-default: rgba(255, 255, 255, 0.1);
-    --border-strong: rgba(255, 255, 255, 0.16);
-    --border-focus: rgba(255, 255, 255, 0.28);
-    --text-primary: #f0f0f2;
-    --text-secondary: #888896;
-    --text-tertiary: #55555e;
-    --text-disabled: #333340;
-    --text-inverse: #0a0a0e;
-    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
-    --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.5);
-    --shadow-lg: 0 8px 40px rgba(0, 0, 0, 0.6);
-    color-scheme: dark;
+    color-scheme: light;
   }
 
   .dark {
@@ -273,6 +251,40 @@
       180deg,
       var(--sidebar-gradient-top) 0%,
       var(--sidebar-gradient-bottom) 100%
+    );
+  }
+
+  .agent-workspace .agent-label {
+    display: block;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+  }
+
+  .agent-workspace .agent-input {
+    border-color: var(--border-default);
+    background-color: var(--bg-surface);
+    border-radius: var(--radius-lg);
+    transition: border-color 120ms ease, box-shadow 120ms ease;
+  }
+
+  .agent-workspace .agent-input:focus-visible {
+    outline: none;
+    border-color: var(--border-focus);
+    box-shadow: var(--shadow-glow);
+  }
+
+  .agent-workspace .agent-switch[data-state='checked'] {
+    background-color: var(--accent);
+  }
+
+  .agent-workspace .agent-analytics-glow {
+    background: radial-gradient(
+      ellipse 80% 50% at 50% 0%,
+      var(--accent-muted) 0%,
+      transparent 70%
     );
   }
 }

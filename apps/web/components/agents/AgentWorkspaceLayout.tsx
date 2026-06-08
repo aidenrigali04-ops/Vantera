@@ -1,5 +1,6 @@
 'use client'
 
+import { AgentConfigPanel } from '@/components/agents/AgentConfigPanel'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { ArrowLeft, Loader2, Rocket, Share2 } from 'lucide-react'
@@ -36,10 +37,9 @@ export function AgentWorkspaceLayout({
   footer,
 }: Props) {
   return (
-    <div className="agent-dark min-h-screen bg-[var(--bg-base)]">
-      <div className="mx-auto w-full max-w-[1320px] px-5 py-6 md:px-10 md:py-8">
+    <div className="agent-workspace min-h-full bg-[var(--bg-base)]">
+      <div className="mx-auto w-full max-w-[1280px] px-5 py-6 md:px-8 md:py-8">
 
-        {/* Back nav */}
         <Link
           href={backHref}
           className="mb-6 inline-flex items-center gap-1.5 text-[12px] font-medium text-[var(--text-tertiary)] transition-colors hover:text-[var(--text-secondary)]"
@@ -48,11 +48,10 @@ export function AgentWorkspaceLayout({
           Agents
         </Link>
 
-        {/* Page header */}
         <header className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-          <div className="min-w-0 space-y-1.5">
+          <div className="min-w-0 space-y-2">
             <div className="flex flex-wrap items-center gap-3">
-              <h1 className="text-[28px] font-bold tracking-[-0.03em] text-[var(--text-primary)] lg:text-[32px]">
+              <h1 className="text-[30px] font-bold tracking-[-0.03em] text-[var(--text-primary)] lg:text-[32px]">
                 {title}
               </h1>
               {statusLabel ? (
@@ -77,7 +76,7 @@ export function AgentWorkspaceLayout({
                 </span>
               ) : null}
             </div>
-            <p className="max-w-2xl text-[14px] leading-relaxed text-[var(--text-secondary)]">
+            <p className="max-w-2xl text-[15px] leading-relaxed text-[var(--text-secondary)]">
               {subtitle}
             </p>
           </div>
@@ -85,8 +84,8 @@ export function AgentWorkspaceLayout({
           <div className="flex shrink-0 items-center gap-2">
             <Button
               variant="outline"
-              size="sm"
-              className="border-[var(--border-default)] bg-[var(--bg-subtle)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)]"
+              size="default"
+              className="h-10 rounded-lg border-[var(--border-default)] bg-[var(--bg-surface)] px-4 text-[var(--text-secondary)] shadow-[var(--shadow-sm)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]"
               asChild
             >
               <Link href={backHref}>
@@ -97,10 +96,10 @@ export function AgentWorkspaceLayout({
             {onDeploy ? (
               <Button
                 type="button"
-                size="sm"
+                size="default"
                 disabled={deployDisabled || deployLoading}
                 onClick={onDeploy}
-                className="bg-[var(--accent)] font-semibold text-[var(--text-inverse)] hover:bg-[var(--accent-hover)]"
+                className="h-10 rounded-lg bg-[var(--accent)] px-5 font-semibold text-[var(--text-inverse)] shadow-[var(--shadow-sm)] hover:bg-[var(--accent-hover)] focus-visible:shadow-[var(--shadow-glow)]"
               >
                 {deployLoading ? (
                   <Loader2 className="mr-1.5 h-4 w-4 animate-spin" aria-hidden />
@@ -113,13 +112,11 @@ export function AgentWorkspaceLayout({
           </div>
         </header>
 
-        {/* Two-column workspace */}
-        <div className="mt-8 grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px] xl:items-start 2xl:grid-cols-[minmax(0,1fr)_420px]">
-          {/* Left — configuration */}
-          <div className="min-w-0 space-y-0">{config}</div>
-
-          {/* Right — analytics panel */}
-          <div className="min-w-0 xl:sticky xl:top-6">{analytics}</div>
+        <div className="mt-8 grid grid-cols-1 items-start gap-8 lg:grid-cols-2">
+          <div className="min-w-0">
+            <AgentConfigPanel>{config}</AgentConfigPanel>
+          </div>
+          <div className="min-w-0 lg:sticky lg:top-6">{analytics}</div>
         </div>
 
         {footer ? <div className="mt-8 min-w-0">{footer}</div> : null}

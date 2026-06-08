@@ -3,6 +3,11 @@
 import { AgentAnalyticsPanel } from '@/components/agents/AgentAnalyticsPanel'
 import { AgentCapabilityCard } from '@/components/agents/AgentCapabilityCard'
 import { AgentConfigSection } from '@/components/agents/AgentConfigSection'
+import {
+  AgentFormField,
+  agentInputClassName,
+  agentTextareaClassName,
+} from '@/components/agents/AgentFormField'
 import { AgentWorkspaceLayout } from '@/components/agents/AgentWorkspaceLayout'
 import { OutreachAgentActivityFeed } from '@/components/outreach-agent/OutreachAgentActivityFeed'
 import { StatusBadge } from '@/components/operational/table/StatusBadge'
@@ -254,74 +259,72 @@ export function OutreachAgentWorkspace({
   const configPanel = (
     <>
       <AgentConfigSection title="Agent Identity">
-        <div>
-          <Label htmlFor="outreach-name">Name</Label>
+        <AgentFormField id="outreach-name" label="Name">
           <Input
             id="outreach-name"
-            className="mt-1.5 border-[var(--border-default)] bg-[var(--bg-surface)]"
+            className={agentInputClassName}
             value={agentName}
             onChange={(e) => setAgentName(e.target.value)}
           />
-        </div>
-        <div>
-          <Label htmlFor="outreach-description">Description</Label>
+        </AgentFormField>
+        <AgentFormField id="outreach-description" label="Description">
           <Input
             id="outreach-description"
-            className="mt-1.5 border-[var(--border-default)] bg-[var(--bg-surface)]"
+            className={agentInputClassName}
             value={agentDescription}
             onChange={(e) => setAgentDescription(e.target.value)}
           />
-        </div>
+        </AgentFormField>
       </AgentConfigSection>
 
       <AgentConfigSection title="Instructions System">
-        <div>
-          <Label htmlFor="outreach-instructions">Instruction</Label>
+        <AgentFormField id="outreach-instructions" label="Instruction">
           <Textarea
             id="outreach-instructions"
             rows={7}
-            className="mt-1.5 resize-y border-[var(--border-default)] bg-[var(--bg-surface)] font-mono text-[13px]"
+            className={cn(agentTextareaClassName, 'font-mono')}
             value={instructions}
             onChange={(e) => setInstructions(e.target.value)}
           />
-        </div>
-        <div>
-          <Label htmlFor="outreach-starters">Conversation Starters</Label>
+        </AgentFormField>
+        <AgentFormField id="outreach-starters" label="Conversation starters">
           <Textarea
             id="outreach-starters"
             rows={3}
             placeholder="One starter per line…"
-            className="mt-1.5 resize-y border-[var(--border-default)] bg-[var(--bg-surface)] text-[13px]"
+            className={agentTextareaClassName}
             value={conversationStarters}
             onChange={(e) => setConversationStarters(e.target.value)}
           />
-        </div>
+        </AgentFormField>
       </AgentConfigSection>
 
       <AgentConfigSection title="Capabilities">
-        <AgentCapabilityCard
-          icon={Zap}
-          title="Scheduled queue processing"
-          description="Process due email and SMS steps during outreach windows."
-          checked={queueEnabled}
-          onCheckedChange={setQueueEnabled}
-        />
-        <AgentCapabilityCard
-          icon={Link2}
-          title="Manual LinkedIn approval"
-          description="LinkedIn steps always wait for human approval before marking sent."
-          checked={linkedinManual}
-          onCheckedChange={setLinkedinManual}
-          disabled
-        />
-        <AgentCapabilityCard
-          icon={Megaphone}
-          title="Multi-channel sequences"
-          description="Orchestrate email, SMS, and LinkedIn from linked campaigns."
-          checked
-          onCheckedChange={() => {}}
-          disabled
-        />
+        <div className="space-y-3">
+          <AgentCapabilityCard
+            icon={Zap}
+            title="Scheduled queue processing"
+            description="Process due email and SMS steps during outreach windows."
+            checked={queueEnabled}
+            onCheckedChange={setQueueEnabled}
+          />
+          <AgentCapabilityCard
+            icon={Link2}
+            title="Manual LinkedIn approval"
+            description="LinkedIn steps always wait for human approval before marking sent."
+            checked={linkedinManual}
+            onCheckedChange={setLinkedinManual}
+            disabled
+          />
+          <AgentCapabilityCard
+            icon={Megaphone}
+            title="Multi-channel sequences"
+            description="Orchestrate email, SMS, and LinkedIn from linked campaigns."
+            checked
+            onCheckedChange={() => {}}
+            disabled
+          />
+        </div>
       </AgentConfigSection>
 
       <AgentConfigSection
@@ -344,8 +347,8 @@ export function OutreachAgentWorkspace({
                 <label
                   key={campaign.id}
                   className={cn(
-                    'flex cursor-pointer items-start gap-3 rounded-xl border border-[var(--border-subtle)] p-4 transition-colors',
-                    checked && 'border-[var(--accent-border)] bg-[var(--accent-muted)]/30',
+                    'flex cursor-pointer items-start gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] p-4 transition-colors duration-[120ms]',
+                    checked && 'border-[var(--accent-border)] bg-[var(--accent-muted)]/25',
                   )}
                 >
                   <Checkbox
@@ -432,15 +435,15 @@ export function OutreachAgentWorkspace({
           </div>
         </div>
       ) : (
-        <div className="flex h-full flex-col items-center justify-center py-12 text-center">
-          <span className="flex h-12 w-12 items-center justify-center rounded-xl border border-[var(--accent-border)] bg-[var(--accent-muted)]">
-            <Megaphone className="h-6 w-6 text-[var(--text-primary)]" aria-hidden />
+        <div className="flex h-full min-h-[320px] flex-col items-center justify-center py-12 text-center">
+          <span className="flex h-14 w-14 items-center justify-center rounded-2xl border border-[var(--accent-border)] bg-[var(--accent-muted)] shadow-[var(--shadow-sm)]">
+            <Megaphone className="h-7 w-7 text-[var(--accent)]" aria-hidden />
           </span>
-          <p className="mt-4 text-[15px] font-semibold text-[var(--text-primary)]">
+          <p className="mt-5 text-[17px] font-semibold tracking-[-0.02em] text-[var(--text-primary)]">
             Analytics activate after deploy
           </p>
-          <p className="mt-2 max-w-xs text-[13px] leading-relaxed text-[var(--text-secondary)]">
-            Link campaigns on the left, then deploy to see send volume, replies, and queue activity here.
+          <p className="mt-2 max-w-[280px] text-[13px] leading-relaxed text-[var(--text-secondary)]">
+            Link campaigns, then deploy to see send volume, replies, and queue activity here.
           </p>
         </div>
       )}
@@ -462,8 +465,10 @@ export function OutreachAgentWorkspace({
         analytics={analyticsPanel}
         footer={
           mode === 'configured' && linkedCampaigns.length > 0 ? (
-            <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5">
-              <h2 className="text-[15px] font-semibold text-[var(--text-primary)]">Linked campaign performance</h2>
+            <section className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-6 shadow-[var(--shadow-sm)]">
+              <h2 className="text-[20px] font-semibold tracking-[-0.02em] text-[var(--text-primary)]">
+                Linked campaign performance
+              </h2>
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
                 {linkedCampaigns.map((campaign) => (
                   <div

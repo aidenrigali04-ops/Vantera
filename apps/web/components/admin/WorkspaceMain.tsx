@@ -23,7 +23,7 @@ export function WorkspaceMain({ children, className, constrained = true }: Works
       <div
         className={cn(
           constrained && 'mx-auto w-full max-w-[1280px] px-4 py-5 md:px-8 md:py-6',
-          !constrained && 'min-h-full',
+          !constrained && 'min-h-full w-full',
         )}
       >
         {children}

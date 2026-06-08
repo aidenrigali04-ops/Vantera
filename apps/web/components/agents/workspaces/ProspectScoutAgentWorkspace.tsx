@@ -3,6 +3,12 @@
 import { AgentAnalyticsPanel } from '@/components/agents/AgentAnalyticsPanel'
 import { AgentCapabilityCard } from '@/components/agents/AgentCapabilityCard'
 import { AgentConfigSection } from '@/components/agents/AgentConfigSection'
+import {
+  AgentFormField,
+  agentInputClassName,
+  agentSelectTriggerClassName,
+  agentTextareaClassName,
+} from '@/components/agents/AgentFormField'
 import { AgentWorkspaceLayout } from '@/components/agents/AgentWorkspaceLayout'
 import { LiveIndicator } from '@/components/operational/LiveIndicator'
 import { SdrActivityFeed } from '@/components/sdr/activity-feed'
@@ -15,7 +21,6 @@ import {
   type SavedSearchOption,
 } from '@/components/sdr/sdr-aspire-ui'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import {
   Select,
   SelectContent,
@@ -362,33 +367,30 @@ export function ProspectScoutAgentWorkspace({
   const configPanel = (
     <>
       <AgentConfigSection title="Agent Identity">
-        <div>
-          <Label htmlFor="scout-name">Name</Label>
+        <AgentFormField id="scout-name" label="Name">
           <Input
             id="scout-name"
-            className="mt-1.5 border-[var(--border-default)] bg-[var(--bg-surface)]"
+            className={agentInputClassName}
             value={form.agentName}
             onChange={(e) => setForm({ ...form, agentName: e.target.value })}
           />
-        </div>
-        <div>
-          <Label htmlFor="scout-description">Description</Label>
+        </AgentFormField>
+        <AgentFormField id="scout-description" label="Description">
           <Input
             id="scout-description"
-            className="mt-1.5 border-[var(--border-default)] bg-[var(--bg-surface)]"
+            className={agentInputClassName}
             value={form.agentDescription}
             onChange={(e) => setForm({ ...form, agentDescription: e.target.value })}
           />
-        </div>
-        <div>
-          <Label htmlFor="scout-frequency">Discovery schedule</Label>
+        </AgentFormField>
+        <AgentFormField id="scout-frequency" label="Discovery schedule">
           <Select
             value={form.searchFrequency}
             onValueChange={(value: 'daily' | 'weekly') =>
               setForm({ ...form, searchFrequency: value })
             }
           >
-            <SelectTrigger id="scout-frequency" className="mt-1.5 border-[var(--border-default)] bg-[var(--bg-surface)]">
+            <SelectTrigger id="scout-frequency" className={agentSelectTriggerClassName}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -396,117 +398,112 @@ export function ProspectScoutAgentWorkspace({
               <SelectItem value="weekly">Weekly discovery</SelectItem>
             </SelectContent>
           </Select>
-        </div>
+        </AgentFormField>
       </AgentConfigSection>
 
       <AgentConfigSection title="ICP targeting">
-        <div>
-          <Label htmlFor="scout-target-titles">Target job titles (comma-separated)</Label>
+        <AgentFormField id="scout-target-titles" label="Target job titles">
           <Input
             id="scout-target-titles"
-            className="mt-1.5 border-[var(--border-default)] bg-[var(--bg-surface)]"
+            className={agentInputClassName}
             placeholder="Owner, CEO, Founder"
             value={form.targetTitles}
             onChange={(e) => setForm({ ...form, targetTitles: e.target.value })}
           />
-        </div>
-        <div>
-          <Label htmlFor="scout-target-industries">Target industries (comma-separated)</Label>
+        </AgentFormField>
+        <AgentFormField id="scout-target-industries" label="Target industries">
           <Input
             id="scout-target-industries"
-            className="mt-1.5 border-[var(--border-default)] bg-[var(--bg-surface)]"
+            className={agentInputClassName}
             placeholder="hvac, heating, air conditioning"
             value={form.targetIndustries}
             onChange={(e) => setForm({ ...form, targetIndustries: e.target.value })}
           />
-        </div>
+        </AgentFormField>
       </AgentConfigSection>
 
       <AgentConfigSection
         title="Instructions System"
         description="How this agent discovers, scores, and enrolls prospects."
       >
-        <div>
-          <Label htmlFor="scout-instructions">Instruction</Label>
+        <AgentFormField id="scout-instructions" label="Instruction">
           <Textarea
             id="scout-instructions"
             rows={7}
-            className="mt-1.5 resize-y border-[var(--border-default)] bg-[var(--bg-surface)] font-mono text-[13px]"
+            className={cn(agentTextareaClassName, 'font-mono')}
             value={form.instructions}
             onChange={(e) => setForm({ ...form, instructions: e.target.value })}
           />
-        </div>
-        <div>
-          <Label htmlFor="scout-starters">Conversation Starters</Label>
+        </AgentFormField>
+        <AgentFormField id="scout-starters" label="Conversation starters">
           <Textarea
             id="scout-starters"
             rows={3}
             placeholder="One starter per line…"
-            className="mt-1.5 resize-y border-[var(--border-default)] bg-[var(--bg-surface)] text-[13px]"
+            className={agentTextareaClassName}
             value={form.conversationStarters}
             onChange={(e) => setForm({ ...form, conversationStarters: e.target.value })}
           />
-        </div>
-        <div>
-          <Label htmlFor="scout-cities">Target locations</Label>
+        </AgentFormField>
+        <AgentFormField id="scout-cities" label="Target locations">
           <Input
             id="scout-cities"
-            className="mt-1.5 border-[var(--border-default)] bg-[var(--bg-surface)]"
+            className={agentInputClassName}
             placeholder="United States, Texas, Phoenix AZ"
             value={form.targetCities}
             onChange={(e) => setForm({ ...form, targetCities: e.target.value })}
           />
-        </div>
-        <div>
-          <Label htmlFor="scout-exclude">Exclude domains</Label>
+        </AgentFormField>
+        <AgentFormField id="scout-exclude" label="Exclude domains">
           <Input
             id="scout-exclude"
-            className="mt-1.5 border-[var(--border-default)] bg-[var(--bg-surface)]"
+            className={agentInputClassName}
             placeholder="competitor.com"
             value={form.excludeDomains}
             onChange={(e) => setForm({ ...form, excludeDomains: e.target.value })}
           />
-        </div>
-        <div>
-          <Label htmlFor="scout-max-leads">Max new prospects per day</Label>
+        </AgentFormField>
+        <AgentFormField id="scout-max-leads" label="Max new prospects per day">
           <Input
             id="scout-max-leads"
             type="number"
             min={1}
-            className="mt-1.5 border-[var(--border-default)] bg-[var(--bg-surface)]"
+            className={agentInputClassName}
             value={form.maxNewLeadsDay}
             onChange={(e) =>
               setForm({ ...form, maxNewLeadsDay: Number.parseInt(e.target.value, 10) || 1 })
             }
           />
-        </div>
+        </AgentFormField>
       </AgentConfigSection>
 
       <AgentConfigSection title="Capabilities">
-        <AgentCapabilityCard
-          icon={Calendar}
-          title="Scheduled discovery"
-          description="Run lead discovery on the configured daily or weekly schedule."
-          checked={form.scheduledDiscovery}
-          onCheckedChange={(checked) => setForm({ ...form, scheduledDiscovery: checked })}
-        />
-        <AgentCapabilityCard
-          icon={Globe}
-          title="Explorium lead discovery"
-          description="Search for prospects matching your ICP filters via Explorium agentsource."
-          checked
-          onCheckedChange={() => {}}
-          disabled
-        />
-        <AgentCapabilityCard
-          icon={RefreshCw}
-          title="Sync ICP to saved searches"
-          description="Keep Aspire saved searches aligned with workspace ICP rules."
-          checked={form.syncIcpToSavedSearches}
-          onCheckedChange={(checked) =>
-            setForm({ ...form, syncIcpToSavedSearches: checked })
-          }
-        />
+        <div className="space-y-3">
+          <AgentCapabilityCard
+            icon={Calendar}
+            title="Scheduled discovery"
+            description="Run lead discovery on the configured daily or weekly schedule."
+            checked={form.scheduledDiscovery}
+            onCheckedChange={(checked) => setForm({ ...form, scheduledDiscovery: checked })}
+          />
+          <AgentCapabilityCard
+            icon={Globe}
+            title="Explorium lead discovery"
+            description="Search for prospects matching your ICP filters via Explorium agentsource."
+            checked
+            onCheckedChange={() => {}}
+            disabled
+          />
+          <AgentCapabilityCard
+            icon={RefreshCw}
+            title="Sync ICP to saved searches"
+            description="Keep Aspire saved searches aligned with workspace ICP rules."
+            checked={form.syncIcpToSavedSearches}
+            onCheckedChange={(checked) =>
+              setForm({ ...form, syncIcpToSavedSearches: checked })
+            }
+          />
+        </div>
       </AgentConfigSection>
 
       <AgentConfigSection title="Discovery & scoring">
@@ -589,16 +586,16 @@ export function ProspectScoutAgentWorkspace({
           </div>
         </div>
       ) : (
-        <div className="flex h-full flex-col items-center justify-center py-12 text-center">
-          <span className="flex h-12 w-12 items-center justify-center rounded-xl border border-[var(--accent-border)] bg-[var(--accent-muted)]">
-            <Search className="h-6 w-6 text-[var(--text-primary)]" aria-hidden />
+        <div className="flex h-full min-h-[320px] flex-col items-center justify-center py-12 text-center">
+          <span className="flex h-14 w-14 items-center justify-center rounded-2xl border border-[var(--accent-border)] bg-[var(--accent-muted)] shadow-[var(--shadow-sm)]">
+            <Search className="h-7 w-7 text-[var(--accent)]" aria-hidden />
           </span>
-          <p className="mt-4 text-[15px] font-semibold text-[var(--text-primary)]">
+          <p className="mt-5 text-[17px] font-semibold tracking-[-0.02em] text-[var(--text-primary)]">
             Analytics activate after deploy
           </p>
-          <p className="mt-2 max-w-xs text-[13px] leading-relaxed text-[var(--text-secondary)]">
-            Configure identity, instructions, and capabilities on the left — then deploy to start
-            live discovery analytics.
+          <p className="mt-2 max-w-[280px] text-[13px] leading-relaxed text-[var(--text-secondary)]">
+            Configure identity, instructions, and capabilities — then deploy to start live
+            discovery analytics.
           </p>
         </div>
       )}
