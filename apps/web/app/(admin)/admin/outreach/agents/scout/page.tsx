@@ -1,4 +1,5 @@
 import { ProspectScoutAgentWorkspace } from '@/components/agents/workspaces/ProspectScoutAgentWorkspace'
+import { ScoutRunList } from '@/components/scout/ScoutRunList'
 import { requireAdminSession } from '@/lib/auth/require-session'
 import { db } from '@/lib/db/client'
 import type { Plan } from '@/lib/feature-flags/flags'
@@ -12,6 +13,7 @@ import {
   getSdrActivityFeed,
   getSdrDashboardStats,
 } from '@/lib/sdr/queries'
+import { listScoutRuns } from '@/lib/sdr/scout-queries'
 import { evaluateFlag } from '@/lib/feature-flags/evaluate'
 import { redirect } from 'next/navigation'
 import { Suspense } from 'react'
@@ -46,23 +48,33 @@ export default async function ProspectScoutPage() {
   }
 
   const config = mapSdrAgentConfigRow(configRow)
-  const [stats, activity, aspirePayload] = await Promise.all([
+  const [stats, activity, aspirePayload, runs] = await Promise.all([
     getSdrDashboardStats(session.accountId),
     getSdrActivityFeed(session.accountId),
     getSdrAspireConfig(session.accountId),
+    listScoutRuns(session.accountId, 5),
   ])
 
+  const serialize = (v: unknown): any => JSON.parse(JSON.stringify(v))
+
   return (
-    <Suspense fallback={<div className="p-6 text-sm text-[var(--text-secondary)]">Loading scout…</div>}>
-      <ProspectScoutAgentWorkspace
-        mode="configured"
-        accountId={session.accountId}
-        accountVertical={config.targetVerticals[0] ?? 'agency'}
-        config={serializeForClient(config)}
-        aspirePayload={serializeForClient(aspirePayload)}
-        stats={stats}
-        initialActivity={activity}
-      />
-    </Suspense>
+    <div className="space-y-4">
+      <Suspense fallback={<div className="p-6 text-sm text-[var(--text-secondary)]">Loading scout…</div>}>
+        <ProspectScoutAgentWorkspace
+          mode="configured"
+          accountId={session.accountId}
+          accountVertical={config.targetVerticals[0] ?? 'agency'}
+          config={serializeForClient(config)}
+          aspirePayload={serializeForClient(aspirePayload)}
+          stats={stats}
+          initialActivity={activity}
+        />
+      </Suspense>
+      {runs.length > 0 ? (
+        <div className="px-4 pb-4 sm:px-6">
+          <ScoutRunList runs={serialize(runs)} />
+        </div>
+      ) : null}
+    </div>
   )
 }
