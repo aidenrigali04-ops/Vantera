@@ -29,16 +29,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { useEffect, useMemo, useState } from 'react'
 
-/* ─── per-item icon accent colours ─── */
-const ICON_ACCENT: Record<string, string> = {
-  dashboard: '#47a3f3',
-  pipeline: '#63e6be',
-  agent: '#bae3ff',
-  outreach: '#f3a847',
-  inbox: '#a78bfa',
-  settings: '#829ab1',
-  help: '#829ab1',
-}
+/* icons are monochrome — accent only comes from the active gradient pill */
 
 type SidebarProps = {
   session: AdminSession
@@ -308,11 +299,10 @@ function NavItemRow({
   onNavigate?: () => void
 }) {
   const Icon = item.icon
-  const accentColor = ICON_ACCENT[item.id] ?? '#829ab1'
 
   const content = (
     <motion.div
-      whileHover={collapsed ? undefined : { x: 2 }}
+      whileHover={isActive || collapsed ? undefined : { x: 2 }}
       transition={{ duration: 0.12, ease: 'easeOut' }}
     >
       <Link
@@ -324,8 +314,8 @@ function NavItemRow({
           'group relative flex w-full items-center rounded-xl transition-all duration-150',
           collapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2.5',
           isActive
-            ? 'nav-pill-active'
-            : 'hover:bg-[rgba(186,227,255,0.05)] hover:text-[var(--text-primary)]',
+            ? 'nav-pill-active cursor-default'
+            : 'hover:bg-[rgba(186,227,255,0.05)]',
         )}
       >
         {/* icon container */}
@@ -334,13 +324,15 @@ function NavItemRow({
             'flex shrink-0 items-center justify-center rounded-lg transition-all duration-150',
             collapsed ? 'h-9 w-9' : 'h-8 w-8',
             isActive
-              ? 'bg-[rgba(0,33,89,0.25)]'
-              : 'bg-[rgba(186,227,255,0.06)] group-hover:bg-[rgba(186,227,255,0.1)]',
+              ? 'bg-[rgba(0,33,89,0.2)]'
+              : 'bg-[rgba(186,227,255,0.05)] group-hover:bg-[rgba(186,227,255,0.09)]',
           )}
         >
           <Icon
-            className="h-4 w-4 transition-colors duration-150"
-            style={{ color: isActive ? '#002159' : accentColor }}
+            className={cn(
+              'h-4 w-4 transition-colors duration-150',
+              isActive ? 'text-[#002159]' : 'text-[var(--text-disabled)] group-hover:text-[var(--text-tertiary)]',
+            )}
           />
         </span>
 
@@ -349,8 +341,10 @@ function NavItemRow({
           <span className="flex flex-1 items-center justify-between gap-2 overflow-hidden">
             <span
               className={cn(
-                'truncate text-[13px] font-medium transition-colors duration-150',
-                isActive ? 'font-semibold text-[#002159]' : 'text-[var(--text-tertiary)]',
+                'truncate text-[13px] transition-colors duration-150',
+                isActive
+                  ? 'font-semibold text-[#002159]'
+                  : 'font-medium text-[var(--text-tertiary)] group-hover:text-[var(--text-primary)]',
               )}
             >
               {item.label}

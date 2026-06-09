@@ -36,42 +36,42 @@ export function MrrProgressPanel({ data }: { data: RevenueProgress }) {
 
   if (editing) {
     return (
-      <div className="rounded-xl border border-stone-200 bg-white p-5">
+      <div className="vision-panel-card rounded-2xl p-5">
         <div className="flex items-center gap-2">
-          <Target className="h-4 w-4 text-emerald-600" aria-hidden />
-          <h2 className="text-sm font-semibold text-stone-900">Set your revenue goal</h2>
+          <Target className="h-4 w-4 text-emerald-400" aria-hidden />
+          <h2 className="text-sm font-semibold text-[var(--text-primary)]">Set your revenue goal</h2>
         </div>
-        <p className="mt-1 text-sm text-stone-500">
+        <p className="mt-1 text-sm text-[var(--text-tertiary)]">
           Track progress toward it every time your agent wins a client.
         </p>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <label className="block">
-            <span className="text-[11px] font-medium uppercase tracking-wide text-stone-400">
+            <span className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-tertiary)]">
               Monthly revenue goal
             </span>
-            <div className="mt-1 flex items-center rounded-lg border border-stone-200 px-3 focus-within:border-stone-400">
-              <span className="text-stone-400">$</span>
+            <div className="mt-1 flex items-center rounded-lg border border-[var(--border-default)] px-3 focus-within:border-[var(--border-focus)]">
+              <span className="text-[var(--text-tertiary)]">$</span>
               <input
                 value={goal}
                 onChange={(event) => setGoal(event.target.value)}
                 inputMode="numeric"
                 placeholder="50,000"
-                className="w-full bg-transparent px-2 py-2 text-sm text-stone-900 outline-none"
+                className="w-full bg-transparent px-2 py-2 text-sm text-[var(--text-primary)] outline-none"
               />
             </div>
           </label>
           <label className="block">
-            <span className="text-[11px] font-medium uppercase tracking-wide text-stone-400">
+            <span className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-tertiary)]">
               Avg value / client / mo
             </span>
-            <div className="mt-1 flex items-center rounded-lg border border-stone-200 px-3 focus-within:border-stone-400">
-              <span className="text-stone-400">$</span>
+            <div className="mt-1 flex items-center rounded-lg border border-[var(--border-default)] px-3 focus-within:border-[var(--border-focus)]">
+              <span className="text-[var(--text-tertiary)]">$</span>
               <input
                 value={avg}
                 onChange={(event) => setAvg(event.target.value)}
                 inputMode="numeric"
                 placeholder="2,500"
-                className="w-full bg-transparent px-2 py-2 text-sm text-stone-900 outline-none"
+                className="w-full bg-transparent px-2 py-2 text-sm text-[var(--text-primary)] outline-none"
               />
             </div>
           </label>
@@ -81,7 +81,7 @@ export function MrrProgressPanel({ data }: { data: RevenueProgress }) {
             type="button"
             onClick={save}
             disabled={pending || !digits(goal)}
-            className="rounded-lg bg-stone-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-stone-700 disabled:opacity-50"
+            className="rounded-lg vision-cta-btn px-4 py-2 text-sm font-medium text-[#002159] transition-opacity hover:opacity-90 disabled:opacity-50"
           >
             {pending ? 'Saving…' : 'Save goal'}
           </button>
@@ -89,7 +89,7 @@ export function MrrProgressPanel({ data }: { data: RevenueProgress }) {
             <button
               type="button"
               onClick={() => setEditing(false)}
-              className="rounded-lg px-4 py-2 text-sm font-medium text-stone-500 transition-colors hover:text-stone-800"
+              className="rounded-lg px-4 py-2 text-sm font-medium text-[var(--text-tertiary)] transition-colors hover:text-[var(--text-primary)]"
             >
               Cancel
             </button>
@@ -105,38 +105,38 @@ export function MrrProgressPanel({ data }: { data: RevenueProgress }) {
     data.avgValue && data.avgValue > 0 ? Math.ceil(remaining / data.avgValue) : null
 
   return (
-    <div className="rounded-xl border border-stone-200 bg-white p-5">
+    <div className="vision-panel-card rounded-2xl p-5">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Target className="h-4 w-4 text-emerald-600" aria-hidden />
-          <h2 className="text-sm font-semibold text-stone-900">Monthly revenue goal</h2>
+          <Target className="h-4 w-4 text-emerald-400" aria-hidden />
+          <h2 className="text-sm font-semibold text-[var(--text-primary)]">Monthly revenue goal</h2>
         </div>
         <button
           type="button"
           onClick={() => setEditing(true)}
-          className="text-xs font-medium text-stone-400 transition-colors hover:text-stone-700"
+          className="text-xs font-medium text-[var(--text-tertiary)] transition-colors hover:text-[var(--text-primary)]"
         >
           Edit
         </button>
       </div>
 
       <div className="mt-3 flex items-baseline gap-2">
-        <span className="text-2xl font-semibold tracking-[-0.02em] text-stone-900">
+        <span className="text-2xl font-semibold tracking-[-0.02em] text-[var(--text-primary)]">
           {money(data.currentMrr)}
         </span>
-        <span className="text-sm text-stone-400">
+        <span className="text-sm text-[var(--text-tertiary)]">
           / {money(goalNum)} · {data.pct}%
         </span>
       </div>
 
-      <div className="mt-3 h-2 overflow-hidden rounded-full bg-stone-100">
+      <div className="mt-3 h-2 overflow-hidden rounded-full bg-[var(--bg-surface)]">
         <div
           className="h-full rounded-full bg-emerald-500 transition-all"
           style={{ width: `${data.pct}%` }}
         />
       </div>
 
-      <p className="mt-2 text-sm text-stone-500">
+      <p className="mt-2 text-sm text-[var(--text-tertiary)]">
         {data.wonCount} {data.wonCount === 1 ? 'client' : 'clients'} won
         {data.pct >= 100
           ? ' · goal reached 🎉'

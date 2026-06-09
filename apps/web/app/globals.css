@@ -262,6 +262,47 @@
     box-shadow: 0 4px 16px -4px rgba(71, 163, 243, 0.5);
   }
 
+  /* ── Vision UI dashboard panels ── */
+  .vision-kpi-card {
+    background: rgba(16, 42, 67, 0.7);
+    border: 1px solid rgba(186, 227, 255, 0.1);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 4px 24px -8px rgba(0, 0, 0, 0.4),
+                inset 0 1px 0 rgba(186, 227, 255, 0.06);
+    transition: border-color 150ms ease, box-shadow 150ms ease;
+  }
+  .vision-kpi-card:hover {
+    border-color: rgba(186, 227, 255, 0.16);
+    box-shadow: 0 8px 32px -8px rgba(0, 0, 0, 0.5),
+                inset 0 1px 0 rgba(186, 227, 255, 0.08);
+  }
+
+  .vision-panel-card {
+    background: rgba(16, 42, 67, 0.6);
+    border: 1px solid rgba(186, 227, 255, 0.09);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 4px 24px -8px rgba(0, 0, 0, 0.35),
+                inset 0 1px 0 rgba(186, 227, 255, 0.05);
+  }
+
+  .vision-welcome-card {
+    background: linear-gradient(
+      135deg,
+      rgba(16, 42, 67, 0.9) 0%,
+      rgba(9, 12, 19, 0.95) 100%
+    );
+    border: 1px solid rgba(186, 227, 255, 0.1);
+    box-shadow: 0 4px 24px -8px rgba(71, 163, 243, 0.1),
+                inset 0 1px 0 rgba(186, 227, 255, 0.07);
+  }
+
+  .vision-cta-btn {
+    background: linear-gradient(97.89deg, #47a3f3 0%, #bae3ff 100%);
+    box-shadow: 0 4px 16px -4px rgba(71, 163, 243, 0.45);
+  }
+
   /* client detail page — Adventure dashboard dark tokens */
   .client-detail {
     --cd-bg-outer: #1f2933;

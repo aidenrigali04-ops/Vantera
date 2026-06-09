@@ -1,20 +1,23 @@
 'use client'
 
-import { VentoraAiOverview } from '@/components/dashboard/ventora/VentoraAiOverview'
-import { VentoraCampaignsTable } from '@/components/dashboard/ventora/VentoraCampaignsTable'
-import { VentoraMetricCards } from '@/components/dashboard/ventora/VentoraMetricCards'
+import { DashboardKpiStrip } from '@/components/dashboard/vision/DashboardKpiStrip'
+import { DashboardWelcomeHero } from '@/components/dashboard/vision/DashboardWelcomeHero'
+import { DashboardRevenueGauge } from '@/components/dashboard/vision/DashboardRevenueGauge'
+import { DashboardPriorityFeed } from '@/components/dashboard/vision/DashboardPriorityFeed'
+import { DashboardAgentPanel } from '@/components/dashboard/vision/DashboardAgentPanel'
 import { VentoraOverviewChart } from '@/components/dashboard/ventora/VentoraOverviewChart'
-import { VentoraPageChrome } from '@/components/dashboard/ventora/VentoraPageChrome'
-import { SdrAgentsPromo } from '@/components/dashboard/SdrAgentsPromo'
-import { MrrProgressPanel, type RevenueProgress } from '@/components/dashboard/MrrProgressPanel'
+import { VentoraCampaignsTable } from '@/components/dashboard/ventora/VentoraCampaignsTable'
+import { VentoraAiOverview } from '@/components/dashboard/ventora/VentoraAiOverview'
 import { CleanSlateWelcome } from '@/components/onboarding/CleanSlateWelcome'
 import type { VentoraDashboardPayload } from '@/lib/dashboard/ventora-types'
 import type { SdrAgentCard } from '@/lib/agents/types'
 import type { ActionFeedItem } from '@/lib/dashboard/action-feed'
-import { DashboardActionFeed } from '@/app/(admin)/admin/dashboard/DashboardActionFeed'
+import type { RevenueProgress } from '@/components/dashboard/MrrProgressPanel'
 import type { OnboardingSuccessNotice } from '@/lib/import/fields'
 import { fadeUp, staggerContainer } from '@/lib/motion'
 import { motion } from 'framer-motion'
+import { ChevronRight, Sparkles } from 'lucide-react'
+import { useBranding } from '@/lib/branding/context'
 
 type Props = {
   ventora: VentoraDashboardPayload
@@ -28,74 +31,30 @@ type Props = {
   onDismissSuccessNotice: () => void
 }
 
-function firstNameFromEmail(email: string): string {
+function firstName(email: string): string {
   const local = email.split('@')[0] ?? ''
   const first = local.split(/[._+-]/)[0] ?? local
   if (!first) return 'there'
   return first.charAt(0).toUpperCase() + first.slice(1)
 }
 
-function DashboardSections({
-  ventora,
-  actionFeed,
-  sdrAgents,
-  revenueProgress,
-  successNotice,
-  onDismissSuccessNotice,
-}: Pick<
-  Props,
-  | 'ventora'
-  | 'actionFeed'
-  | 'sdrAgents'
-  | 'revenueProgress'
-  | 'successNotice'
-  | 'onDismissSuccessNotice'
->) {
-  const hasMetrics = ventora.metrics.length > 0
-  const hasChart = ventora.chartData.length > 0
-  const hasCampaigns = ventora.campaignGroups.length > 0
-
+function PageHeader({ email }: { email: string }) {
+  const { businessName } = useBranding()
+  const workspace = businessName?.trim() || 'Vantera'
   return (
-    <>
-      {/* The number that matters most: progress to the revenue goal. */}
-      <motion.div variants={fadeUp}>
-        <MrrProgressPanel data={revenueProgress} />
-      </motion.div>
-
-      {/* Core loop: the agent, then what needs your attention today. */}
-      {sdrAgents.length > 0 ? (
-        <motion.div variants={fadeUp}>
-          <SdrAgentsPromo agents={sdrAgents} />
-        </motion.div>
-      ) : null}
-
-      {actionFeed.length > 0 || successNotice ? (
-        <motion.div variants={fadeUp}>
-          <DashboardActionFeed
-            items={actionFeed}
-            successNotice={successNotice}
-            onDismissSuccessNotice={onDismissSuccessNotice}
-            maxVisible={5}
-          />
-        </motion.div>
-      ) : null}
-
-      {/* Analytics render only when there is real data — no empty husks. */}
-      {hasMetrics ? <VentoraMetricCards metrics={ventora.metrics} /> : null}
-
-      {hasChart ? (
-        <motion.div variants={fadeUp} className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <div className="lg:col-span-2">
-            <VentoraOverviewChart data={ventora.chartData} highlightMonth={ventora.highlightMonth} />
-          </div>
-          {ventora.aiHeadline ? (
-            <VentoraAiOverview headline={ventora.aiHeadline} body={ventora.aiBody} progress={ventora.aiProgress} />
-          ) : null}
-        </motion.div>
-      ) : null}
-
-      {hasCampaigns ? <VentoraCampaignsTable groups={ventora.campaignGroups} /> : null}
-    </>
+    <motion.header variants={fadeUp} className="space-y-1">
+      <nav className="flex items-center gap-1.5 text-[12px] text-[var(--text-tertiary)]">
+        <span>Pages</span>
+        <ChevronRight size={12} />
+        <span className="inline-flex items-center gap-1 font-medium text-[var(--text-primary)]">
+          <Sparkles size={11} className="text-[var(--accent-solid)]" />
+          Dashboard
+        </span>
+      </nav>
+      <h1 className="text-[22px] font-bold tracking-[-0.03em] text-[var(--text-secondary)]">
+        Dashboard
+      </h1>
+    </motion.header>
   )
 }
 
@@ -106,54 +65,76 @@ export function VentoraDashboardView({
   sdrAgents,
   revenueProgress,
   showCleanSlate,
-  showDemoGuide,
   successNotice,
   onDismissSuccessNotice,
 }: Props) {
-  const subtitle = showCleanSlate
-    ? 'Add your first client or campaign to get started.'
-    : `Good to see you, ${firstNameFromEmail(email)} — conversion, pipeline, and outreach in one place.`
-
-  if (showCleanSlate) {
-    return (
-      <motion.div
-        className="space-y-6"
-        variants={staggerContainer}
-        initial="hidden"
-        animate="visible"
-      >
-        <VentoraPageChrome subtitle={subtitle} />
-        <motion.div variants={fadeUp}>
-          <CleanSlateWelcome />
-        </motion.div>
-        <DashboardSections
-          ventora={ventora}
-          actionFeed={actionFeed}
-          sdrAgents={sdrAgents}
-          revenueProgress={revenueProgress}
-          successNotice={successNotice}
-          onDismissSuccessNotice={onDismissSuccessNotice}
-        />
-      </motion.div>
-    )
-  }
+  const hasChart = ventora.chartData.length > 0
+  const hasCampaigns = ventora.campaignGroups.length > 0
 
   return (
     <motion.div
-      className="space-y-6"
+      className="space-y-5"
       variants={staggerContainer}
       initial="hidden"
       animate="visible"
     >
-      <VentoraPageChrome subtitle={subtitle} />
-      <DashboardSections
-        ventora={ventora}
-        actionFeed={actionFeed}
-        sdrAgents={sdrAgents}
+      {/* breadcrumb + title */}
+      <PageHeader email={email} />
+
+      {/* clean slate onboarding */}
+      {showCleanSlate && (
+        <motion.div variants={fadeUp}>
+          <CleanSlateWelcome />
+        </motion.div>
+      )}
+
+      {/* ── Row 1: KPI strip ── */}
+      <DashboardKpiStrip
         revenueProgress={revenueProgress}
-        successNotice={successNotice}
-        onDismissSuccessNotice={onDismissSuccessNotice}
+        sdrAgents={sdrAgents}
+        actionFeed={actionFeed}
+        ventora={ventora}
       />
+
+      {/* ── Row 2: Welcome | Priority feed | Revenue gauge ── */}
+      <motion.div
+        variants={fadeUp}
+        className="grid grid-cols-1 gap-4 lg:grid-cols-[2fr_2fr_1.5fr]"
+      >
+        <DashboardWelcomeHero email={email} sdrAgents={sdrAgents} />
+        <DashboardPriorityFeed
+          items={actionFeed}
+          successNotice={successNotice}
+          onDismissSuccessNotice={onDismissSuccessNotice}
+          maxVisible={6}
+        />
+        <DashboardRevenueGauge data={revenueProgress} />
+      </motion.div>
+
+      {/* ── Row 3: Chart | Agent panel ── */}
+      <motion.div
+        variants={fadeUp}
+        className="grid grid-cols-1 gap-4 lg:grid-cols-[2fr_1fr]"
+      >
+        <div className="flex flex-col">
+          <VentoraOverviewChart data={ventora.chartData} highlightMonth={ventora.highlightMonth} />
+        </div>
+        <DashboardAgentPanel agents={sdrAgents} />
+      </motion.div>
+
+      {/* ── Row 4: AI overview (if present) ── */}
+      {ventora.aiHeadline ? (
+        <motion.div variants={fadeUp}>
+          <VentoraAiOverview
+            headline={ventora.aiHeadline}
+            body={ventora.aiBody}
+            progress={ventora.aiProgress}
+          />
+        </motion.div>
+      ) : null}
+
+      {/* ── Row 5: Campaigns table (if present) ── */}
+      {hasCampaigns ? <VentoraCampaignsTable groups={ventora.campaignGroups} /> : null}
     </motion.div>
   )
 }

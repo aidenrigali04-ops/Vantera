@@ -26,7 +26,7 @@ export function VentoraOverviewChart({ data, highlightMonth = null }: Props) {
 
   return (
     <motion.section
-      className="card-surface flex h-full min-h-[280px] flex-col p-4 sm:p-5"
+      className="vision-panel-card flex h-full min-h-[280px] flex-col rounded-2xl p-4 sm:p-5"
       variants={fadeUp}
       initial="hidden"
       animate="visible"
