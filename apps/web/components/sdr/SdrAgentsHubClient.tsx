@@ -3,6 +3,7 @@
 import { AgentDetailShell } from '@/components/agents/AgentDetailShell'
 import { AgentScenarioCard } from '@/components/agents/AgentScenarioCard'
 import { AgentSidebarPanel, DEFAULT_SDR_CONNECTED_APPS } from '@/components/agents/AgentSidebarPanel'
+import { VisionAgentCard } from '@/components/agents/VisionAgentCard'
 import { AdminPageContent } from '@/components/admin/AdminPageContent'
 import { AgentsAutomationSection } from '@/components/sdr/AgentsAutomationSection'
 import { LiveIndicator } from '@/components/operational/LiveIndicator'
@@ -285,57 +286,37 @@ export function SdrAgentsHubClient({
         }
       >
         {activeTab === 'scenarios' ? (
-          <section className="space-y-4">
+          <section className="space-y-5">
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
                 <h2 className="text-[17px] font-semibold tracking-[-0.02em] text-[var(--text-primary)]">
-                  Configured scenarios
+                  Agent pipeline
                 </h2>
                 <p className="mt-1 text-[13px] text-[var(--text-secondary)]">
                   {isRunning ? 'Running' : config?.isPaused ? 'Paused' : 'Standby'} · {enrolledLeads}{' '}
                   in sequences
                 </p>
               </div>
-              <Button
-                asChild
-                size="sm"
-                className="bg-[var(--accent)] text-[var(--text-inverse)] hover:bg-[var(--accent-hover)]"
-              >
-                <Link href="/admin/outreach/agents/setup">New scenario</Link>
-              </Button>
+              {!sdrConfigured && (
+                <Button
+                  asChild
+                  size="sm"
+                  className="vision-cta-btn text-[#002159] hover:opacity-90"
+                >
+                  <Link href="/admin/outreach/agents/setup">Set up agents</Link>
+                </Button>
+              )}
             </div>
 
-            <div className="space-y-3">
-              {pipeline.map((p) => {
-                const agent = p.agent
-                const href = agentHref(agent)
-                const schedule =
-                  p.id === 'prospect_scout'
-                    ? discoveryScheduleLabel(config)
-                    : p.id === 'outreach_agent' && automatic
-                      ? 'Automatic · after each discovery run'
-                      : p.schedule
-
-                return (
-                  <AgentScenarioCard
-                    key={p.id}
-                    title={p.scenarioTitle}
-                    description={agent.description}
-                    statusLabel={STATUS_LABEL[agent.status]}
-                    statusTone={STATUS_TONE[agent.status]}
-                    schedule={schedule}
-                    stepsLabel={p.steps}
-                    lastRun={`${agent.statLabel}: ${agent.statValue}`}
-                    pendingLabel={pendingLabel(agent, snapshot)}
-                    menuItems={[
-                      {
-                        label: agent.status === 'needs_setup' ? 'Configure' : 'Open details',
-                        href,
-                      },
-                    ]}
-                  />
-                )
-              })}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {pipeline.map((p) => (
+                <VisionAgentCard
+                  key={p.id}
+                  agent={p.agent}
+                  href={agentHref(p.agent)}
+                  snapshot={snapshot}
+                />
+              ))}
             </div>
           </section>
         ) : null}

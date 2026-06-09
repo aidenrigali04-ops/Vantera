@@ -1,18 +1,15 @@
 'use client'
 
 import { AgentAnalyticsPanel } from '@/components/agents/AgentAnalyticsPanel'
-import { AgentCapabilityCard } from '@/components/agents/AgentCapabilityCard'
 import { AgentConfigSection } from '@/components/agents/AgentConfigSection'
 import {
   AgentFormField,
   agentInputClassName,
   agentSelectTriggerClassName,
-  agentTextareaClassName,
 } from '@/components/agents/AgentFormField'
 import { AgentWorkspaceLayout } from '@/components/agents/AgentWorkspaceLayout'
 import { LiveIndicator } from '@/components/operational/LiveIndicator'
 import { SdrActivityFeed } from '@/components/sdr/activity-feed'
-import { SdrProspectScoutFields } from '@/components/sdr/SdrProspectScoutFields'
 import {
   bindingFromApi,
   bindingToApiInput,
@@ -29,7 +26,6 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
-import { Textarea } from '@/components/ui/textarea'
 import { AGENT_DEFAULT_INSTRUCTIONS, AGENT_PAGE_COPY } from '@/lib/agents/default-instructions'
 import { getIcpConfigForVertical } from '@/lib/aspire/icp-score'
 import type { ICPConfig } from '@/lib/aspire/types'
@@ -38,7 +34,7 @@ import type { AspireBindingInput } from '@/lib/sdr/aspire-config'
 import type { CreateSDRConfigInput, ProspectMode, SDRActivityEvent, SDRAgentConfig, SDRDashboardStats } from '@/lib/sdr/types'
 import { useAccountRealtime } from '@/lib/supabase/account-realtime'
 import { cn } from '@/lib/utils'
-import { Calendar, Globe, RefreshCw, Search } from 'lucide-react'
+import { Search } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
 import { toast } from 'sonner'
@@ -387,21 +383,15 @@ export function ProspectScoutAgentWorkspace({
 
   const configPanel = (
     <>
-      <AgentConfigSection title="Agent Identity">
-        <AgentFormField id="scout-name" label="Name">
+      {/* ── Scout Identity ── */}
+      <AgentConfigSection title="Scout identity">
+        <AgentFormField id="scout-name" label="Agent name">
           <Input
             id="scout-name"
             className={agentInputClassName}
+            placeholder="Prospect Scout"
             value={form.agentName}
             onChange={(e) => setForm({ ...form, agentName: e.target.value })}
-          />
-        </AgentFormField>
-        <AgentFormField id="scout-description" label="Description">
-          <Input
-            id="scout-description"
-            className={agentInputClassName}
-            value={form.agentDescription}
-            onChange={(e) => setForm({ ...form, agentDescription: e.target.value })}
           />
         </AgentFormField>
         <AgentFormField id="scout-frequency" label="Discovery schedule">
@@ -415,13 +405,14 @@ export function ProspectScoutAgentWorkspace({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="daily">Daily discovery (recommended)</SelectItem>
-              <SelectItem value="weekly">Weekly discovery</SelectItem>
+              <SelectItem value="daily">Daily (recommended)</SelectItem>
+              <SelectItem value="weekly">Weekly</SelectItem>
             </SelectContent>
           </Select>
         </AgentFormField>
       </AgentConfigSection>
 
+      {/* ── ICP targeting ── */}
       <AgentConfigSection title="ICP targeting">
         <AgentFormField id="scout-target-titles" label="Target job titles">
           <Input
@@ -441,82 +432,6 @@ export function ProspectScoutAgentWorkspace({
             onChange={(e) => setForm({ ...form, targetIndustries: e.target.value })}
           />
         </AgentFormField>
-        <AgentFormField id="scout-size-range" label="Company size (employees)">
-          <div className="flex items-center gap-2">
-            <Input
-              id="scout-size-min"
-              type="number"
-              min={1}
-              className={cn(agentInputClassName, 'w-28')}
-              placeholder="Min"
-              value={form.targetSizeMin}
-              onChange={(e) =>
-                setForm({ ...form, targetSizeMin: Number.parseInt(e.target.value, 10) || 1 })
-              }
-            />
-            <span className="text-[13px] text-[var(--text-tertiary)]">–</span>
-            <Input
-              id="scout-size-max"
-              type="number"
-              min={1}
-              className={cn(agentInputClassName, 'w-28')}
-              placeholder="Max"
-              value={form.targetSizeMax}
-              onChange={(e) =>
-                setForm({ ...form, targetSizeMax: Number.parseInt(e.target.value, 10) || 500 })
-              }
-            />
-          </div>
-        </AgentFormField>
-        <div className="flex flex-col gap-3">
-          <label className="flex items-center justify-between gap-3 rounded-lg border border-[var(--border-subtle)] px-4 py-3">
-            <div>
-              <p className="text-[13px] font-medium text-[var(--text-primary)]">Require verified email</p>
-              <p className="text-[12px] text-[var(--text-secondary)]">Only include leads with a confirmed email address</p>
-            </div>
-            <Switch
-              checked={form.mustHaveEmail}
-              onCheckedChange={(checked) => setForm({ ...form, mustHaveEmail: checked })}
-              className="data-[state=checked]:bg-[var(--accent)]"
-            />
-          </label>
-          <label className="flex items-center justify-between gap-3 rounded-lg border border-[var(--border-subtle)] px-4 py-3">
-            <div>
-              <p className="text-[13px] font-medium text-[var(--text-primary)]">Require phone number</p>
-              <p className="text-[12px] text-[var(--text-secondary)]">Only include leads with a direct phone on file</p>
-            </div>
-            <Switch
-              checked={form.mustHavePhone}
-              onCheckedChange={(checked) => setForm({ ...form, mustHavePhone: checked })}
-              className="data-[state=checked]:bg-[var(--accent)]"
-            />
-          </label>
-        </div>
-      </AgentConfigSection>
-
-      <AgentConfigSection
-        title="Instructions System"
-        description="How this agent discovers, scores, and enrolls prospects."
-      >
-        <AgentFormField id="scout-instructions" label="Instruction">
-          <Textarea
-            id="scout-instructions"
-            rows={7}
-            className={cn(agentTextareaClassName, 'font-mono')}
-            value={form.instructions}
-            onChange={(e) => setForm({ ...form, instructions: e.target.value })}
-          />
-        </AgentFormField>
-        <AgentFormField id="scout-starters" label="Conversation starters">
-          <Textarea
-            id="scout-starters"
-            rows={3}
-            placeholder="One starter per line…"
-            className={agentTextareaClassName}
-            value={form.conversationStarters}
-            onChange={(e) => setForm({ ...form, conversationStarters: e.target.value })}
-          />
-        </AgentFormField>
         <AgentFormField id="scout-cities" label="Target locations">
           <Input
             id="scout-cities"
@@ -526,6 +441,55 @@ export function ProspectScoutAgentWorkspace({
             onChange={(e) => setForm({ ...form, targetCities: e.target.value })}
           />
         </AgentFormField>
+        <div className="grid grid-cols-2 gap-3">
+          <AgentFormField id="scout-max-leads" label="Max leads / day">
+            <Input
+              id="scout-max-leads"
+              type="number"
+              min={1}
+              className={agentInputClassName}
+              value={form.maxNewLeadsDay}
+              onChange={(e) =>
+                setForm({ ...form, maxNewLeadsDay: Number.parseInt(e.target.value, 10) || 1 })
+              }
+            />
+          </AgentFormField>
+          <AgentFormField id="scout-size-min" label="Min company size">
+            <Input
+              id="scout-size-min"
+              type="number"
+              min={1}
+              className={agentInputClassName}
+              placeholder="1"
+              value={form.targetSizeMin}
+              onChange={(e) =>
+                setForm({ ...form, targetSizeMin: Number.parseInt(e.target.value, 10) || 1 })
+              }
+            />
+          </AgentFormField>
+        </div>
+        <div className="flex gap-4">
+          <label className="flex flex-1 items-center justify-between gap-2 rounded-lg border border-[var(--border-subtle)] px-3 py-2.5">
+            <p className="text-[12px] font-medium text-[var(--text-primary)]">Verified email</p>
+            <Switch
+              checked={form.mustHaveEmail}
+              onCheckedChange={(checked) => setForm({ ...form, mustHaveEmail: checked })}
+              className="data-[state=checked]:bg-[var(--accent)]"
+            />
+          </label>
+          <label className="flex flex-1 items-center justify-between gap-2 rounded-lg border border-[var(--border-subtle)] px-3 py-2.5">
+            <p className="text-[12px] font-medium text-[var(--text-primary)]">Phone required</p>
+            <Switch
+              checked={form.mustHavePhone}
+              onCheckedChange={(checked) => setForm({ ...form, mustHavePhone: checked })}
+              className="data-[state=checked]:bg-[var(--accent)]"
+            />
+          </label>
+        </div>
+      </AgentConfigSection>
+
+      {/* ── Outreach ── */}
+      <AgentConfigSection title="Outreach">
         <AgentFormField id="scout-exclude" label="Exclude domains">
           <Input
             id="scout-exclude"
@@ -535,64 +499,17 @@ export function ProspectScoutAgentWorkspace({
             onChange={(e) => setForm({ ...form, excludeDomains: e.target.value })}
           />
         </AgentFormField>
-        <AgentFormField id="scout-max-leads" label="Max new prospects per day">
-          <Input
-            id="scout-max-leads"
-            type="number"
-            min={1}
-            className={agentInputClassName}
-            value={form.maxNewLeadsDay}
-            onChange={(e) =>
-              setForm({ ...form, maxNewLeadsDay: Number.parseInt(e.target.value, 10) || 1 })
-            }
-          />
-        </AgentFormField>
-      </AgentConfigSection>
-
-      <AgentConfigSection title="Capabilities">
-        <div className="space-y-3">
-          <AgentCapabilityCard
-            icon={Calendar}
-            title="Scheduled discovery"
-            description="Run lead discovery on the configured daily or weekly schedule."
+        <label className="flex items-center justify-between gap-3 rounded-lg border border-[var(--border-subtle)] px-4 py-3">
+          <div>
+            <p className="text-[13px] font-medium text-[var(--text-primary)]">Scheduled discovery</p>
+            <p className="text-[12px] text-[var(--text-secondary)]">Run on your configured schedule automatically</p>
+          </div>
+          <Switch
             checked={form.scheduledDiscovery}
             onCheckedChange={(checked) => setForm({ ...form, scheduledDiscovery: checked })}
+            className="data-[state=checked]:bg-[var(--accent)]"
           />
-          <AgentCapabilityCard
-            icon={Globe}
-            title="Explorium lead discovery"
-            description="Search for prospects matching your ICP filters via Explorium agentsource."
-            checked
-            onCheckedChange={() => {}}
-            disabled
-          />
-          <AgentCapabilityCard
-            icon={RefreshCw}
-            title="Sync ICP to saved searches"
-            description="Keep Aspire saved searches aligned with workspace ICP rules."
-            checked={form.syncIcpToSavedSearches}
-            onCheckedChange={(checked) =>
-              setForm({ ...form, syncIcpToSavedSearches: checked })
-            }
-          />
-        </div>
-      </AgentConfigSection>
-
-      <AgentConfigSection title="Discovery & scoring">
-        <SdrProspectScoutFields
-          prospectMode={form.prospectMode}
-          onProspectModeChange={(mode) => setForm({ ...form, prospectMode: mode })}
-          defaultMinIcpScore={form.defaultMinIcpScore}
-          onDefaultMinIcpScoreChange={(value) =>
-            setForm({ ...form, defaultMinIcpScore: value })
-          }
-          syncIcpToSavedSearches={form.syncIcpToSavedSearches}
-          onSyncIcpChange={(value) => setForm({ ...form, syncIcpToSavedSearches: value })}
-          bindings={form.bindings}
-          onBindingsChange={(bindings) => setForm({ ...form, bindings })}
-          savedSearches={savedSearches}
-          compact
-        />
+        </label>
       </AgentConfigSection>
     </>
   )

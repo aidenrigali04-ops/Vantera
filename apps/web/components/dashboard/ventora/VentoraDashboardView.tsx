@@ -10,7 +10,7 @@ import { VentoraCampaignsTable } from '@/components/dashboard/ventora/VentoraCam
 import { VentoraAiOverview } from '@/components/dashboard/ventora/VentoraAiOverview'
 import { CleanSlateWelcome } from '@/components/onboarding/CleanSlateWelcome'
 import type { VentoraDashboardPayload } from '@/lib/dashboard/ventora-types'
-import type { SdrAgentCard } from '@/lib/agents/types'
+import type { SdrAgentCard, SdrAgentSnapshot } from '@/lib/agents/types'
 import type { ActionFeedItem } from '@/lib/dashboard/action-feed'
 import type { RevenueProgress } from '@/components/dashboard/MrrProgressPanel'
 import type { OnboardingSuccessNotice } from '@/lib/import/fields'
@@ -24,6 +24,7 @@ type Props = {
   email: string
   actionFeed: ActionFeedItem[]
   sdrAgents: SdrAgentCard[]
+  sdrSnapshot?: SdrAgentSnapshot
   revenueProgress: RevenueProgress
   showCleanSlate: boolean
   showDemoGuide: boolean
@@ -63,6 +64,7 @@ export function VentoraDashboardView({
   email,
   actionFeed,
   sdrAgents,
+  sdrSnapshot,
   revenueProgress,
   showCleanSlate,
   successNotice,
@@ -119,7 +121,7 @@ export function VentoraDashboardView({
         <div className="flex flex-col">
           <VentoraOverviewChart data={ventora.chartData} highlightMonth={ventora.highlightMonth} />
         </div>
-        <DashboardAgentPanel agents={sdrAgents} />
+        <DashboardAgentPanel agents={sdrAgents} snapshot={sdrSnapshot} />
       </motion.div>
 
       {/* ── Row 4: AI overview (if present) ── */}

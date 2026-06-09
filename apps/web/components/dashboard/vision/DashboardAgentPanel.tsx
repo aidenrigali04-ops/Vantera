@@ -2,7 +2,9 @@
 
 import { motion } from 'framer-motion'
 import { fadeUp } from '@/lib/motion'
-import type { SdrAgentCard } from '@/lib/agents/types'
+import type { SdrAgentCard, SdrAgentSnapshot } from '@/lib/agents/types'
+import { getPipelineStage } from '@/components/agents/VisionAgentCard'
+import { cn } from '@/lib/utils'
 import {
   ArrowRight,
   Bot,
@@ -14,27 +16,19 @@ import Link from 'next/link'
 
 type Props = {
   agents: SdrAgentCard[]
+  snapshot?: SdrAgentSnapshot
 }
 
-function statusLabel(status: SdrAgentCard['status']) {
-  switch (status) {
-    case 'active': return 'Running'
-    case 'needs_setup': return 'Needs setup'
-    case 'idle': return 'Idle'
-    case 'inactive': return 'Inactive'
-    default: return status
-  }
+const EMPTY_SNAPSHOT: SdrAgentSnapshot = {
+  activeCampaigns: 0, draftCampaigns: 0, activeSavedSearches: 0,
+  pendingDrafts: 0, pendingEmailDrafts: 0, pendingLinkedInDrafts: 0,
+  leadsInPipeline: 0, enrolledLeads: 0,
+  prospectScoutConfigured: false, prospectScoutActive: false,
+  outreachAgentConfigured: false, outreachAgentActive: false,
+  linkedActiveCampaigns: 0, automaticOutreach: false, autoScoutActiveCampaigns: 0,
 }
 
-function statusColor(status: SdrAgentCard['status']) {
-  switch (status) {
-    case 'active': return { bg: 'rgba(34,165,88,0.12)', text: '#22a558', dot: 'bg-emerald-400 animate-pulse' }
-    case 'needs_setup': return { bg: 'rgba(243,168,71,0.12)', text: '#f3a847', dot: 'bg-amber-400' }
-    default: return { bg: 'rgba(186,227,255,0.08)', text: '#829ab1', dot: 'bg-[#829ab1]' }
-  }
-}
-
-export function DashboardAgentPanel({ agents }: Props) {
+export function DashboardAgentPanel({ agents, snapshot = EMPTY_SNAPSHOT }: Props) {
   const active = agents.filter((a) => a.status === 'active').length
   const noAgents = agents.length === 0
 
@@ -98,11 +92,11 @@ export function DashboardAgentPanel({ agents }: Props) {
             {/* agent list */}
             <ul className="space-y-2">
               {agents.slice(0, 3).map((agent) => {
-                const { bg, text, dot } = statusColor(agent.status)
+                const stage = getPipelineStage(agent, snapshot)
                 return (
                   <li key={agent.id}>
                     <Link
-                      href={`/admin/sdr-agents`}
+                      href="/admin/outreach/agents"
                       className="group flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-[rgba(186,227,255,0.05)]"
                     >
                       <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[rgba(186,227,255,0.06)]">
@@ -112,12 +106,12 @@ export function DashboardAgentPanel({ agents }: Props) {
                         <p className="truncate text-[12px] font-medium text-[var(--text-primary)]">
                           {agent.name || 'SDR Agent'}
                         </p>
-                        <span
-                          className="mt-0.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium"
-                          style={{ background: bg, color: text }}
-                        >
-                          <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
-                          {statusLabel(agent.status)}
+                        <span className="mt-0.5 inline-flex items-center gap-1 text-[10px] font-medium text-[var(--text-tertiary)]">
+                          <span
+                            className={cn('h-1.5 w-1.5 rounded-full', stage.dot, stage.pulse && 'animate-pulse')}
+                            style={stage.glow ? { boxShadow: stage.glow } : undefined}
+                          />
+                          {stage.label}
                         </span>
                       </div>
                       <ArrowRight className="h-3.5 w-3.5 shrink-0 text-[var(--text-disabled)] opacity-0 transition-opacity group-hover:opacity-100" />
