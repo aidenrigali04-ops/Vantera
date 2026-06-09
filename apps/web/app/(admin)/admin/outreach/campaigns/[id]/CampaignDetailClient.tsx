@@ -391,7 +391,7 @@ export function CampaignDetailClient({
               {enrollableLeads.length === 0 ? (
                 <p className="text-sm text-[var(--text-tertiary)]">
                   No leads with contact info yet.{' '}
-                  <Link href="/admin/crm/pipeline" className="text-violet-700 hover:underline">
+                  <Link href="/admin/leads" className="text-violet-700 hover:underline">
                     Add leads in Pipeline
                   </Link>
                 </p>

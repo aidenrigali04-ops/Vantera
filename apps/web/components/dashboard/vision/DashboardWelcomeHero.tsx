@@ -34,15 +34,6 @@ export function DashboardWelcomeHero({ email, sdrAgents }: Props) {
       {/* decorative orb */}
       <div className="pointer-events-none absolute -right-8 -top-8 h-40 w-40 rounded-full opacity-30"
         style={{ background: 'radial-gradient(circle, #47a3f3 0%, transparent 70%)' }} />
-      <div className="pointer-events-none absolute -bottom-10 -left-6 h-32 w-32 rounded-full opacity-20"
-        style={{ background: 'radial-gradient(circle, #a78bfa 0%, transparent 70%)' }} />
-
-      {/* mesh grid overlay */}
-      <div className="pointer-events-none absolute inset-0 opacity-[0.04]"
-        style={{
-          backgroundImage: 'linear-gradient(rgba(186,227,255,0.4) 1px, transparent 1px), linear-gradient(90deg, rgba(186,227,255,0.4) 1px, transparent 1px)',
-          backgroundSize: '24px 24px',
-        }} />
 
       <div className="relative">
         {/* greeting */}

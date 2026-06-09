@@ -49,6 +49,11 @@ const serverEnvSchema = z.object({
   /** Explorium (Vibe Prospecting) API key — primary lead source. */
   EXPLORIUM_API_KEY: z.string().optional().default(''),
   EXPLORIUM_API_BASE_URL: z.string().optional().default('https://api.explorium.ai/v1'),
+  /** Unipile — cloud LinkedIn automation (connection requests + DMs). */
+  UNIPILE_API_KEY: z.string().optional().default(''),
+  UNIPILE_DSN: z.string().optional().default(''),
+  /** Shared secret to verify inbound Unipile webhook signatures. */
+  UNIPILE_WEBHOOK_SECRET: z.string().optional().default(''),
 })
 
 type PublicEnv = z.infer<typeof publicEnvSchema>

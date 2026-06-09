@@ -169,22 +169,27 @@ export function Step4Team({ onComplete }: Props) {
           </motion.div>
         ))}
 
-        {members.length < MAX_MEMBERS ? (
-          <motion.button
-            variants={fadeUp}
-            type="button"
-            onClick={addMember}
-            whileHover={{ x: 2 }}
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-white/55 transition-colors hover:text-white"
-          >
-            <Plus className="h-3.5 w-3.5" aria-hidden />
-            Add another member
-          </motion.button>
-        ) : (
-          <p className="text-xs text-white/45">
-            Up to {MAX_MEMBERS} invites at once — add more from Settings anytime.
-          </p>
-        )}
+        <div className="flex items-center justify-between">
+          {members.length < MAX_MEMBERS ? (
+            <motion.button
+              variants={fadeUp}
+              type="button"
+              onClick={addMember}
+              whileHover={{ x: 2 }}
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-white/55 transition-colors hover:text-white"
+            >
+              <Plus className="h-3.5 w-3.5" aria-hidden />
+              Add another member
+            </motion.button>
+          ) : (
+            <p className="text-xs text-white/45">
+              Max reached — add more from Settings anytime.
+            </p>
+          )}
+          <span className="text-[11px] text-white/30">
+            {members.length} / {MAX_MEMBERS}
+          </span>
+        </div>
       </motion.div>
 
       {error ? <StepError message={error} /> : null}

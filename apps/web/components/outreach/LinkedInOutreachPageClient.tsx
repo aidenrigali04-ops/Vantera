@@ -1,6 +1,6 @@
 'use client'
 
-import { LinkedInExtensionConnectPanel } from '@/components/outreach/LinkedInExtensionConnectPanel'
+import { LinkedInConnectPanel } from '@/components/outreach/LinkedInConnectPanel'
 import { LinkedInSetupPipeline } from '@/components/outreach/LinkedInSetupPipeline'
 import { KpiStrip } from '@/components/operational/KpiStrip'
 import { PageHeader } from '@/components/operational/PageHeader'
@@ -154,7 +154,7 @@ export function LinkedInOutreachPageClient({ initialHub }: Props) {
           className="font-medium text-[var(--accent)] hover:underline"
           onClick={() => setConnectOpen(true)}
         >
-          Set up LinkedIn add-on
+          Connect LinkedIn
         </button>
         <Link
           href="/admin/help?article=linkedin-outreach"
@@ -308,7 +308,7 @@ export function LinkedInOutreachPageClient({ initialHub }: Props) {
           <DialogHeader>
             <DialogTitle>New LinkedIn campaign</DialogTitle>
             <DialogDescription>
-              LinkedIn-only — not mixed with email. Choose a one-time note or a timed sequence.
+              LinkedIn-only — not mixed with email. Messages are sent automatically once your LinkedIn account is connected.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
@@ -376,7 +376,7 @@ export function LinkedInOutreachPageClient({ initialHub }: Props) {
         </DialogContent>
       </Dialog>
 
-      <LinkedInExtensionConnectPanel
+      <LinkedInConnectPanel
         open={connectOpen}
         onOpenChange={setConnectOpen}
         onConnected={() =>

@@ -24,12 +24,11 @@ export function PostCleanSlatePrompt() {
     <div className="rounded-xl border border-stone-200 bg-white p-6 shadow-sm">
       <h3 className="text-lg font-semibold text-stone-900">Your workspace is ready</h3>
       <p className="mt-2 text-sm leading-relaxed text-stone-600">
-        Sample data cleared. Add your first client to start building your system — or import from
-        CSV when that&rsquo;s available.
+        Sample data cleared. Head to your pipeline to start prospecting and building outreach campaigns.
       </p>
       <div className="mt-4 flex flex-wrap gap-2">
         <Button asChild size="sm">
-          <Link href="/admin/clients">Add your first client →</Link>
+          <Link href="/admin/leads">Go to pipeline →</Link>
         </Button>
         <Button variant="outline" size="sm" onClick={dismiss}>
           Dismiss

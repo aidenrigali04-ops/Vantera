@@ -12,8 +12,7 @@ const ROUTE_LABELS: Record<string, string> = {
   '/admin/integrations': 'Integrations',
   '/admin/ai-brain': 'AI Agents',
   '/admin/reports': 'Reports',
-  '/admin/portal': 'Client Portal',
-  '/admin/portal/preview': 'Client Portal Preview',
+
   '/admin/settings': 'Settings',
   '/admin/help': 'Help Center',
   '/admin/onboarding': 'Onboarding',

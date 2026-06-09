@@ -33,8 +33,6 @@ type Props = {
   accountId: string
 }
 
-type TabId = 'scenarios' | 'approvals' | 'runs' | 'settings'
-
 const STATUS_TONE = {
   active: 'success',
   inactive: 'warning',
@@ -135,7 +133,6 @@ export function SdrAgentsHubClient({
   accountId,
 }: Props) {
   const router = useRouter()
-  const [activeTab, setActiveTab] = useState<TabId>('scenarios')
   const [activity, setActivity] = useState(initialActivity)
   const [isPending, startTransition] = useTransition()
 
@@ -227,7 +224,7 @@ export function SdrAgentsHubClient({
   return (
     <AdminPageContent>
       <AgentDetailShell
-        breadcrumbs={[{ label: 'Agents' }]}
+        breadcrumbs={[{ label: 'Agent' }]}
         title={agentTitle}
         description="Monitors your pipeline, drafts personalized outreach, and runs multi-channel sequences on schedule — so your team focuses on closing."
         reviewBadge={reviewCount > 0 ? `${reviewCount} to review` : undefined}
@@ -265,19 +262,6 @@ export function SdrAgentsHubClient({
             </Button>
           )
         }
-        tabs={[
-          { id: 'scenarios', label: 'Scenarios', badge: pipeline.length, badgeTone: 'accent' },
-          {
-            id: 'approvals',
-            label: 'Approvals',
-            badge: reviewCount || undefined,
-            badgeTone: 'review',
-          },
-          { id: 'runs', label: 'Runs', badge: activity.length || undefined },
-          { id: 'settings', label: 'Settings' },
-        ]}
-        activeTab={activeTab}
-        onTabChange={(id) => setActiveTab(id as TabId)}
         sidebar={
           <AgentSidebarPanel
             instructions="Your SDR agent runs as a coordinated pipeline: discover and score leads, draft personalized copy for review, deliver multi-channel sequences, and flag high-intent prospects. Keep ICP rules accurate and review pending drafts daily for best results."
@@ -285,29 +269,66 @@ export function SdrAgentsHubClient({
           />
         }
       >
-        {activeTab === 'scenarios' ? (
-          <section className="space-y-5">
+        <div className="space-y-6">
+          {/* Automation mode — primary control, always first */}
+          {sdrConfigured ? (
+            <AgentsAutomationSection
+              initialMode={outreachAutomationMode}
+              sdrConfigured={sdrConfigured}
+            />
+          ) : null}
+
+          {/* Pending approvals — surface immediately when action needed */}
+          {reviewCount > 0 ? (
+            <section className="space-y-3">
+              <h2 className="text-[15px] font-semibold text-[var(--text-primary)]">
+                Needs your attention
+              </h2>
+              <div className="space-y-2">
+                {snapshot.pendingEmailDrafts > 0 ? (
+                  <AgentScenarioCard
+                    title="Email & SMS drafts"
+                    description="Personalized copy waiting for your review before send."
+                    statusLabel="Review"
+                    statusTone="warning"
+                    pendingLabel={`Pending: ${snapshot.pendingEmailDrafts} draft${snapshot.pendingEmailDrafts === 1 ? '' : 's'}`}
+                    menuItems={[{ label: 'Open drafter', href: '/admin/outreach/agents/drafter' }]}
+                  />
+                ) : null}
+                {snapshot.pendingLinkedInDrafts > 0 ? (
+                  <AgentScenarioCard
+                    title="LinkedIn manual sends"
+                    description="Connection requests and messages queued for manual delivery."
+                    statusLabel="Review"
+                    statusTone="warning"
+                    pendingLabel={`Pending: ${snapshot.pendingLinkedInDrafts} step${snapshot.pendingLinkedInDrafts === 1 ? '' : 's'}`}
+                    menuItems={[
+                      { label: 'Open drafter', href: '/admin/outreach/agents/drafter' },
+                      { label: 'LinkedIn hub', href: '/admin/outreach/linkedin' },
+                    ]}
+                  />
+                ) : null}
+              </div>
+            </section>
+          ) : null}
+
+          {/* Agent pipeline */}
+          <section className="space-y-4">
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
                 <h2 className="text-[17px] font-semibold tracking-[-0.02em] text-[var(--text-primary)]">
                   Agent pipeline
                 </h2>
                 <p className="mt-1 text-[13px] text-[var(--text-secondary)]">
-                  {isRunning ? 'Running' : config?.isPaused ? 'Paused' : 'Standby'} · {enrolledLeads}{' '}
-                  in sequences
+                  {isRunning ? 'Running' : config?.isPaused ? 'Paused' : 'Standby'} · {enrolledLeads} in sequences
                 </p>
               </div>
-              {!sdrConfigured && (
-                <Button
-                  asChild
-                  size="sm"
-                  className="vision-cta-btn text-[#002159] hover:opacity-90"
-                >
+              {!sdrConfigured ? (
+                <Button asChild size="sm" className="vision-cta-btn text-[#002159] hover:opacity-90">
                   <Link href="/admin/outreach/agents/setup">Set up agents</Link>
                 </Button>
-              )}
+              ) : null}
             </div>
-
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               {pipeline.map((p) => (
                 <VisionAgentCard
@@ -319,52 +340,8 @@ export function SdrAgentsHubClient({
               ))}
             </div>
           </section>
-        ) : null}
 
-        {activeTab === 'approvals' ? (
-          <section className="space-y-4">
-            <div>
-              <h2 className="text-[17px] font-semibold tracking-[-0.02em] text-[var(--text-primary)]">
-                Pending approvals
-              </h2>
-              <p className="mt-1 text-[13px] text-[var(--text-secondary)]">
-                Review drafts and manual sends before they go out.
-              </p>
-            </div>
-
-            <div className="space-y-3">
-              <AgentScenarioCard
-                title="Email & SMS drafts"
-                description="Personalized copy waiting for your review before send."
-                statusLabel={snapshot.pendingEmailDrafts > 0 ? 'Review' : 'Clear'}
-                statusTone={snapshot.pendingEmailDrafts > 0 ? 'warning' : 'success'}
-                pendingLabel={
-                  snapshot.pendingEmailDrafts > 0
-                    ? `Pending: ${snapshot.pendingEmailDrafts} draft${snapshot.pendingEmailDrafts === 1 ? '' : 's'}`
-                    : undefined
-                }
-                menuItems={[{ label: 'Open drafter', href: '/admin/outreach/agents/drafter' }]}
-              />
-              <AgentScenarioCard
-                title="LinkedIn manual sends"
-                description="Connection requests and messages queued for manual delivery via the LinkedIn add-on."
-                statusLabel={snapshot.pendingLinkedInDrafts > 0 ? 'Review' : 'Clear'}
-                statusTone={snapshot.pendingLinkedInDrafts > 0 ? 'warning' : 'success'}
-                pendingLabel={
-                  snapshot.pendingLinkedInDrafts > 0
-                    ? `Pending: ${snapshot.pendingLinkedInDrafts} step${snapshot.pendingLinkedInDrafts === 1 ? '' : 's'}`
-                    : undefined
-                }
-                menuItems={[
-                  { label: 'Open drafter', href: '/admin/outreach/agents/drafter' },
-                  { label: 'LinkedIn hub', href: '/admin/outreach/linkedin' },
-                ]}
-              />
-            </div>
-          </section>
-        ) : null}
-
-        {activeTab === 'runs' ? (
+          {/* Activity feed */}
           <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5">
             <div className="mb-4 flex items-center justify-between gap-2">
               <h2 className="text-[15px] font-semibold text-[var(--text-primary)]">Run history</h2>
@@ -378,37 +355,7 @@ export function SdrAgentsHubClient({
               </p>
             )}
           </section>
-        ) : null}
-
-        {activeTab === 'settings' ? (
-          <section className="space-y-6">
-            {sdrConfigured ? (
-              <AgentsAutomationSection
-                initialMode={outreachAutomationMode}
-                sdrConfigured={sdrConfigured}
-              />
-            ) : null}
-
-            <div className="space-y-3">
-              <h2 className="text-[17px] font-semibold tracking-[-0.02em] text-[var(--text-primary)]">
-                Configuration
-              </h2>
-              {pipeline.map((p) => {
-                const agent = p.agent
-                return (
-                  <AgentScenarioCard
-                    key={p.id}
-                    title={agent.name}
-                    description={agent.tagline}
-                    statusLabel={STATUS_LABEL[agent.status]}
-                    statusTone={STATUS_TONE[agent.status]}
-                    menuItems={[{ label: 'Configure', href: agentHref(agent) }]}
-                  />
-                )
-              })}
-            </div>
-          </section>
-        ) : null}
+        </div>
       </AgentDetailShell>
     </AdminPageContent>
   )

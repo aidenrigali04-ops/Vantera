@@ -20,9 +20,9 @@ type Props = {
   description: string
   reviewBadge?: string
   actions?: ReactNode
-  tabs: AgentTab[]
-  activeTab: string
-  onTabChange: (id: string) => void
+  tabs?: AgentTab[]
+  activeTab?: string
+  onTabChange?: (id: string) => void
   sidebar: ReactNode
   children: ReactNode
 }
@@ -33,7 +33,7 @@ export function AgentDetailShell({
   description,
   reviewBadge,
   actions,
-  tabs,
+  tabs = [],
   activeTab,
   onTabChange,
   sidebar,
@@ -76,46 +76,48 @@ export function AgentDetailShell({
           {actions ? <div className="flex shrink-0 flex-wrap gap-2">{actions}</div> : null}
         </div>
 
-        <div
-          className="inline-flex flex-wrap gap-1 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] p-1"
-          role="tablist"
-          aria-label="Agent sections"
-        >
-          {tabs.map((tab) => {
-            const active = tab.id === activeTab
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                role="tab"
-                aria-selected={active}
-                onClick={() => onTabChange(tab.id)}
-                className={cn(
-                  'inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-[13px] font-medium transition-colors duration-120 ease',
-                  active
-                    ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-[var(--shadow-sm)]'
-                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]',
-                )}
-              >
-                {tab.label}
-                {tab.badge !== undefined && tab.badge !== 0 && tab.badge !== '0' && tab.badge !== '—' ? (
-                  <span
-                    className={cn(
-                      'inline-flex min-w-[1.25rem] items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums',
-                      tab.badgeTone === 'review'
-                        ? 'bg-[var(--danger-muted)] text-[var(--danger)]'
-                        : tab.badgeTone === 'accent' || active
-                          ? 'bg-[var(--accent-muted)] text-[var(--text-primary)]'
-                          : 'bg-[var(--bg-overlay)] text-[var(--text-tertiary)]',
-                    )}
-                  >
-                    {tab.badge}
-                  </span>
-                ) : null}
-              </button>
-            )
-          })}
-        </div>
+        {tabs.length > 0 ? (
+          <div
+            className="inline-flex flex-wrap gap-1 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] p-1"
+            role="tablist"
+            aria-label="Agent sections"
+          >
+            {tabs.map((tab) => {
+              const active = tab.id === activeTab
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => onTabChange?.(tab.id)}
+                  className={cn(
+                    'inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-[13px] font-medium transition-colors duration-120 ease',
+                    active
+                      ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-[var(--shadow-sm)]'
+                      : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]',
+                  )}
+                >
+                  {tab.label}
+                  {tab.badge !== undefined && tab.badge !== 0 && tab.badge !== '0' && tab.badge !== '—' ? (
+                    <span
+                      className={cn(
+                        'inline-flex min-w-[1.25rem] items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums',
+                        tab.badgeTone === 'review'
+                          ? 'bg-[var(--danger-muted)] text-[var(--danger)]'
+                          : tab.badgeTone === 'accent' || active
+                            ? 'bg-[var(--accent-muted)] text-[var(--text-primary)]'
+                            : 'bg-[var(--bg-overlay)] text-[var(--text-tertiary)]',
+                      )}
+                    >
+                      {tab.badge}
+                    </span>
+                  ) : null}
+                </button>
+              )
+            })}
+          </div>
+        ) : null}
       </header>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_300px] xl:items-start">

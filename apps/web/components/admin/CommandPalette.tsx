@@ -120,9 +120,9 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
         <CommandSeparator />
 
         <CommandGroup heading="Quick actions">
-          <CommandItem onSelect={() => navigate('/admin/clients?action=create')}>
+          <CommandItem onSelect={() => navigate('/admin/leads')}>
             <Users className="mr-2 h-4 w-4" />
-            Add new {labels.contact.toLowerCase()}
+            View pipeline
             <CommandShortcut>⇧C</CommandShortcut>
           </CommandItem>
           <CommandItem onSelect={() => navigate('/admin/records?action=create')}>
@@ -130,7 +130,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
             Create {labels.record.toLowerCase()}
             <CommandShortcut>⇧J</CommandShortcut>
           </CommandItem>
-          <CommandItem onSelect={() => navigate('/admin/crm/pipeline?action=lead')}>
+          <CommandItem onSelect={() => navigate('/admin/leads')}>
             <TrendingUp className="mr-2 h-4 w-4" />
             Add lead
           </CommandItem>

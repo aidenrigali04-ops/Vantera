@@ -14,7 +14,6 @@ import {
   FormInput,
   GitBranch,
   Handshake,
-  HeartPulse,
   Inbox,
   LayoutDashboard,
   LifeBuoy,
@@ -69,7 +68,7 @@ export const ADMIN_NAV_SIDEBAR: AdminNavItem[] = [
   { id: 'dashboard', label: 'Home', icon: LayoutDashboard, href: '/admin/dashboard' },
   { id: 'pipeline', label: 'Pipeline', icon: FolderKanban, href: '/admin/leads', tourAnchor: 'nav-pipeline' },
   { id: 'agent', label: 'Agent', icon: Bot, href: '/admin/sdr-agents', tourAnchor: 'nav-agents' },
-  { id: 'outreach', label: 'Campaigns', icon: Megaphone, href: '/admin/outreach/campaigns', tourAnchor: 'nav-outreach' },
+  { id: 'outreach', label: 'Outreach', icon: Megaphone, href: '/admin/outreach/campaigns', tourAnchor: 'nav-outreach' },
   { id: 'inbox', label: 'Inbox', icon: Inbox, href: '/admin/inbox' },
 ]
 
@@ -137,7 +136,6 @@ export const ADMIN_NAV_ROADMAP: AdminNavItem[] = [
   { id: 'lead-sources', label: 'Lead sources', icon: Link2 },
   { id: 'permissions', label: 'Permissions', icon: Shield },
   { id: 'white-label', label: 'White label', icon: Sparkles },
-  { id: 'client-health', label: 'Client health score', icon: HeartPulse },
   { id: 'git-tools', label: 'Version control', icon: GitBranch },
 ]
 

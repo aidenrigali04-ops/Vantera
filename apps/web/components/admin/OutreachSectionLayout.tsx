@@ -13,7 +13,10 @@ export function OutreachSectionLayout({ children }: { children: ReactNode }) {
 
   // The Agent surface gets its own focused tabs; everything else keeps the
   // Campaigns/channels bar. Each area asks the user to understand only itself.
-  const inAgentArea = pathname.startsWith('/admin/outreach/agents')
+  // Sequences are output (live in Outreach nav), not agent config
+  const inAgentArea =
+    pathname.startsWith('/admin/outreach/agents') &&
+    !pathname.startsWith('/admin/outreach/agents/sequences')
 
   // Agent workspaces use a dedicated config + analytics layout (no sub-nav chrome).
   const isFullScreenFlow =

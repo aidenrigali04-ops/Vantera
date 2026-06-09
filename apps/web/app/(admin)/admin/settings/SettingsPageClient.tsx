@@ -34,9 +34,7 @@ import { cn } from '@/lib/utils'
 import type { SeatUsage } from '@/lib/team/seats'
 import type { TeamMemberRow, PendingInviteRow } from '@/lib/team/queries'
 import {
-  Calendar,
   CreditCard,
-  ExternalLink,
   Mail,
   Palette,
   Plug,
@@ -96,9 +94,7 @@ const NAV_SECTIONS = [
 
 const NAV_LINKS = [
   { href: '/admin/help', label: 'Help Center', icon: LifeBuoy },
-  { href: '/admin/portal', label: 'Client portal', icon: ExternalLink, tourAnchor: 'nav-portal' },
   { href: '/admin/billing', label: 'Billing', icon: CreditCard },
-  { href: '/admin/calendar', label: 'Calendar', icon: Calendar },
   { href: '/admin/integrations', label: 'Integrations', icon: Plug },
 ] as const
 
@@ -330,7 +326,7 @@ export function SettingsPageClient({
           {activeSection === 'branding' ? (
             <SettingsPanel
               title="Branding"
-              description="Logo, colors, and client portal domain."
+              description="Logo and brand colors."
               onSave={saveBranding}
               saving={isPending}
             >
@@ -379,18 +375,6 @@ export function SettingsPageClient({
                     </div>
                   </div>
                 </div>
-                <p className="text-[13px] text-[var(--text-tertiary)]">
-                  Use your own hostname for client sign-in (e.g.{' '}
-                  <code className="rounded bg-[var(--bg-surface)] px-1 text-xs">portal.yourcompany.com</code>) — configure
-                  DNS in{' '}
-                  <Link href="/admin/portal#portal-domain" className="font-medium text-[var(--text-primary)] underline">
-                    Client portal → Portal domain
-                  </Link>
-                  .
-                </p>
-                <Button variant="outline" size="sm" asChild>
-                  <Link href="/admin/portal/preview">Preview client portal →</Link>
-                </Button>
               </div>
             </SettingsPanel>
           ) : null}
@@ -403,7 +387,7 @@ export function SettingsPageClient({
             >
               <div className="space-y-5">
                 {/* Seat usage strip */}
-                <div className="flex items-center gap-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-subtle)]px-4 py-3 text-[13px] text-[var(--text-secondary)]">
+                <div className="flex items-center gap-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-subtle)] px-4 py-3 text-[13px] text-[var(--text-secondary)]">
                   <span>
                     <span className="font-medium text-[var(--text-primary)]">{seatUsage.activeMembers}</span> active
                     {seatUsage.pendingInvites > 0 ? (

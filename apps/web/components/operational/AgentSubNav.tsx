@@ -11,7 +11,6 @@ import { usePathname } from 'next/navigation'
  */
 const TABS = [
   { href: '/admin/outreach/agents', label: 'Overview' },
-  { href: '/admin/outreach/agents/sequences', label: 'Sequences' },
   { href: '/admin/outreach/agents/setup', label: 'Setup' },
 ] as const
 

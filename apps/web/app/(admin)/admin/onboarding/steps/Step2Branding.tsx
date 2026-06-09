@@ -5,7 +5,7 @@ import { createSupabaseBrowserClient } from '@/lib/supabase/browser'
 import { cn } from '@/lib/utils'
 import imageCompression from 'browser-image-compression'
 import { motion } from 'framer-motion'
-import { ImageIcon, Upload } from 'lucide-react'
+import { Upload } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { useDropzone } from 'react-dropzone'
 import { useRegisterOnboardingStep } from '../onboarding-nav'
@@ -28,7 +28,6 @@ const ACCEPTED = {
   'image/svg+xml': ['.svg'],
 }
 const HEX = /^#[0-9a-fA-F]{6}$/
-const DOMAIN = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/
 
 type Props = {
   accountId: string
@@ -36,12 +35,10 @@ type Props = {
   initialLogoUrl: string | null
   initialPrimary: string
   initialSecondary: string
-  initialPortalDomain: string
   onComplete: (data: {
     logoUrl: string | null
     primaryColor: string
     secondaryColor: string
-    portalDomain: string
   }) => void
 }
 
@@ -51,14 +48,12 @@ export function Step2Branding({
   initialLogoUrl,
   initialPrimary,
   initialSecondary,
-  initialPortalDomain,
   onComplete,
 }: Props) {
   const [logoUrl, setLogoUrl] = useState<string | null>(initialLogoUrl)
   const [logoUploading, setLogoUploading] = useState(false)
   const [primary, setPrimary] = useState(initialPrimary)
   const [secondary, setSecondary] = useState(initialSecondary)
-  const [portalDomain, setPortalDomain] = useState(initialPortalDomain)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
@@ -148,11 +143,6 @@ export function Step2Branding({
       return false
     }
 
-    if (portalDomain && !DOMAIN.test(portalDomain)) {
-      setError('Portal domain looks invalid — leave blank to skip')
-      return false
-    }
-
     setError(null)
     setSaving(true)
 
@@ -162,7 +152,6 @@ export function Step2Branding({
           logoUrl: logoUrl,
           primaryColor: primary,
           secondaryColor: secondary,
-          portalDomain: portalDomain || undefined,
         }),
       )
 
@@ -178,7 +167,6 @@ export function Step2Branding({
         logoUrl,
         primaryColor: primary,
         secondaryColor: secondary,
-        portalDomain,
       })
       return true
     } catch (err) {
@@ -189,15 +177,13 @@ export function Step2Branding({
     } finally {
       setSaving(false)
     }
-  }, [accountId, logoUrl, onComplete, portalDomain, primary, secondary])
+  }, [accountId, logoUrl, onComplete, primary, secondary])
 
   useRegisterOnboardingStep({
     canAdvance: HEX.test(primary) && HEX.test(secondary),
     isSubmitting: saving || logoUploading,
     submit,
   })
-
-  const previewDomain = portalDomain || 'portal.yourbusiness.com'
 
   return (
     <motion.div variants={stepContainer} initial="hidden" animate="show" className="space-y-4">
@@ -244,65 +230,6 @@ export function Step2Branding({
         <ColorField label="Primary color" value={primary} onChange={setPrimary} />
         <ColorField label="Secondary color" value={secondary} onChange={setSecondary} />
       </motion.section>
-
-      <FieldGroup
-        label="Portal domain"
-        description={
-          'After onboarding, open Client portal → Portal domain for DNS steps and verification.'
-        }
-      >
-        <Input
-          id="portal-domain"
-          type="text"
-          placeholder="portal.yourbusiness.com"
-          value={portalDomain}
-          onChange={(e) => setPortalDomain(e.target.value.trim())}
-          className="h-11 border-white/[0.08] bg-white/[0.02] text-sm text-white placeholder:text-white/30 focus-visible:border-white/[0.2] focus-visible:ring-1 focus-visible:ring-white/10"
-        />
-      </FieldGroup>
-
-      <FieldGroup label="Portal preview" description="A peek at how your portal will look to clients.">
-        <motion.div
-          variants={fadeUp}
-          className="overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.015]"
-        >
-          <div
-            style={{ background: `linear-gradient(135deg, ${primary}, ${primary}cc)` }}
-            className="flex items-center justify-between px-4 py-3 text-white"
-          >
-            <div className="flex items-center gap-2">
-              {logoUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={logoUrl} alt="" className="h-6 w-auto max-w-[100px] object-contain" />
-              ) : (
-                <span className="text-sm font-semibold">{businessName || 'Your Business'}</span>
-              )}
-            </div>
-            <span className="text-xs opacity-80">{previewDomain}</span>
-          </div>
-          <div className="space-y-3 p-4">
-            <div className="flex items-center gap-2">
-              <ImageIcon className="h-4 w-4 text-white/30" aria-hidden />
-              <div className="h-2 w-3/4 rounded bg-white/10" />
-            </div>
-            <div className="h-2 w-1/2 rounded bg-white/[0.06]" />
-            <div className="mt-3 flex gap-2">
-              <span
-                style={{ background: `linear-gradient(135deg, ${primary}, ${primary}cc)` }}
-                className="rounded-md px-3 py-1.5 text-xs font-medium text-white shadow-sm"
-              >
-                Primary
-              </span>
-              <span
-                style={{ background: `linear-gradient(135deg, ${secondary}, ${secondary}cc)` }}
-                className="rounded-md px-3 py-1.5 text-xs font-medium text-white shadow-sm"
-              >
-                Secondary
-              </span>
-            </div>
-          </div>
-        </motion.div>
-      </FieldGroup>
 
       {error ? <StepError message={error} /> : null}
     </motion.div>

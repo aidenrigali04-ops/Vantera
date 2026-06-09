@@ -2,6 +2,8 @@ import { db } from '@/lib/db/client'
 import { findDueCampaignSteps, findLeadsByIds, findOutreachCampaignById } from '@/lib/outreach/queries'
 import { sendCampaignEmail } from '@/lib/outreach/send-email'
 import { sendCampaignSms } from '@/lib/outreach/send-sms'
+import { findFirstUnipileAccountForWorkspace } from '@/lib/integrations/unipile/account'
+import { sendLinkedInConnectionRequest, sendLinkedInMessage } from '@/lib/integrations/unipile/client'
 import {
   isAutoScoutCampaignWorkflow,
   parseCampaignMetrics,
@@ -231,46 +233,65 @@ export async function processDueCampaignSteps(
       }
 
       const personalizedBody = resolveOutboundCopy(step.body, lead)
+      const liAccount = await findFirstUnipileAccountForWorkspace(accountId)
 
-      await db
-        .update(outreachCampaignSteps)
-        .set({
-          metadata: {
-            manualSend: true,
-            deliveryMethod: 'extension',
-            readyAt: new Date().toISOString(),
-            linkedinUrl: lead.linkedinUrl,
-            message: personalizedBody,
-          },
+      if (!liAccount?.unipileAccountId) {
+        // No Unipile account connected — queue as manual fallback
+        await db
+          .update(outreachCampaignSteps)
+          .set({
+            metadata: {
+              manualSend: true,
+              deliveryMethod: 'manual',
+              readyAt: new Date().toISOString(),
+              linkedinUrl: lead.linkedinUrl,
+              message: personalizedBody,
+            },
+          })
+          .where(eq(outreachCampaignSteps.id, step.id))
+
+        await createIntelligenceSignal({
+          accountId,
+          signalType: 'linkedin_step_ready',
+          severity: 'yellow',
+          headline: `LinkedIn step ready — ${leadDisplayName(lead)}`,
+          recommendation: 'Connect LinkedIn in Settings to send automatically, or send manually from the LinkedIn hub.',
+          actionLabel: 'Open LinkedIn hub',
+          actionPayload: { campaignId: step.campaignId, stepId: step.id, leadId: lead.id },
+          expiresInDays: 7,
         })
-        .where(eq(outreachCampaignSteps.id, step.id))
 
-      await db.insert(activities).values({
-        accountId,
-        leadId: lead.id,
-        actorType: 'automation',
-        actorId: actorUserId,
-        activityType: 'linkedin_step_ready',
-        body: `LinkedIn message ready for ${leadDisplayName(lead)}`,
-        metadata: {
-          campaignId: step.campaignId,
-          stepId: step.id,
-          linkedinUrl: lead.linkedinUrl,
-        },
-      })
+        result.manualReady += 1
+        continue
+      }
 
-      await createIntelligenceSignal({
-        accountId,
-        signalType: 'linkedin_step_ready',
-        severity: 'yellow',
-        headline: `LinkedIn step ready — ${leadDisplayName(lead)}`,
-        recommendation: 'Copy the note, send it on LinkedIn, then mark it done in Vantera or the LinkedIn add-on',
-        actionLabel: 'Open campaign',
-        actionPayload: { campaignId: step.campaignId, stepId: step.id, leadId: lead.id },
-        expiresInDays: 7,
-      })
+      // Determine message type: step 0 = connection request, subsequent = DM
+      const isConnectionRequest = step.stepIndex === 0
+      try {
+        const sendFn = isConnectionRequest
+          ? () => sendLinkedInConnectionRequest(liAccount.unipileAccountId!, lead.linkedinUrl!, personalizedBody)
+          : () => sendLinkedInMessage(liAccount.unipileAccountId!, lead.linkedinUrl!, personalizedBody)
 
-      result.manualReady += 1
+        const res = await sendFn()
+
+        if (res.object === 'Error' || res.error) {
+          throw new Error(res.error ?? 'Unipile send failed')
+        }
+
+        await markStepSent(step.id, res.id)
+        await recordSendActivity(accountId, actorUserId, lead.id, step, 'linkedin_sent', lead.linkedinUrl!)
+        await touchLeadContacted(lead)
+        result.sent += 1
+        await incrementCampaignMetric(accountId, step.campaignId, 'sent')
+      } catch (err) {
+        const reason = err instanceof Error ? err.message : 'unipile_error'
+        await db
+          .update(outreachCampaignSteps)
+          .set({ status: 'failed', skipReason: reason })
+          .where(eq(outreachCampaignSteps.id, step.id))
+        result.failed += 1
+        await incrementCampaignMetric(accountId, step.campaignId, 'failed')
+      }
       continue
     }
 

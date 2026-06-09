@@ -16,8 +16,6 @@ import type { RevenueProgress } from '@/components/dashboard/MrrProgressPanel'
 import type { OnboardingSuccessNotice } from '@/lib/import/fields'
 import { fadeUp, staggerContainer } from '@/lib/motion'
 import { motion } from 'framer-motion'
-import { ChevronRight, Sparkles } from 'lucide-react'
-import { useBranding } from '@/lib/branding/context'
 
 type Props = {
   ventora: VentoraDashboardPayload
@@ -32,26 +30,9 @@ type Props = {
   onDismissSuccessNotice: () => void
 }
 
-function firstName(email: string): string {
-  const local = email.split('@')[0] ?? ''
-  const first = local.split(/[._+-]/)[0] ?? local
-  if (!first) return 'there'
-  return first.charAt(0).toUpperCase() + first.slice(1)
-}
-
-function PageHeader({ email }: { email: string }) {
-  const { businessName } = useBranding()
-  const workspace = businessName?.trim() || 'Vantera'
+function PageHeader() {
   return (
-    <motion.header variants={fadeUp} className="space-y-1">
-      <nav className="flex items-center gap-1.5 text-[12px] text-[var(--text-tertiary)]">
-        <span>Pages</span>
-        <ChevronRight size={12} />
-        <span className="inline-flex items-center gap-1 font-medium text-[var(--text-primary)]">
-          <Sparkles size={11} className="text-[var(--accent-solid)]" />
-          Dashboard
-        </span>
-      </nav>
+    <motion.header variants={fadeUp}>
       <h1 className="text-[22px] font-bold tracking-[-0.03em] text-[var(--text-secondary)]">
         Dashboard
       </h1>
@@ -80,8 +61,8 @@ export function VentoraDashboardView({
       initial="hidden"
       animate="visible"
     >
-      {/* breadcrumb + title */}
-      <PageHeader email={email} />
+      {/* page title */}
+      <PageHeader />
 
       {/* clean slate onboarding */}
       {showCleanSlate && (

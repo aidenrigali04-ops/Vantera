@@ -1,5 +1,6 @@
 import { findExtensionLinkedInQueue } from '@/lib/extension/linkedin/queue'
 import { findLinkedinAccount } from '@/lib/linkedin/queries'
+import { findFirstUnipileAccountForWorkspace } from '@/lib/integrations/unipile/account'
 import { findOutreachCampaigns } from '@/lib/outreach/queries'
 import type { CampaignWithStats } from '@/lib/outreach/types'
 import { getCampaignChannelFocus, getCampaignDeliveryMode } from '@/lib/outreach/types'
@@ -99,7 +100,7 @@ function buildSetupSteps(
     {
       id: 'connect',
       title: 'Connect LinkedIn',
-      description: 'Install Vantera LinkedIn Outreach from the Chrome Web Store and link it with a connection code.',
+      description: 'Link your LinkedIn account to Vantera — takes 30 seconds, no extension required.',
       status: connected ? 'complete' : 'current',
     },
     {
@@ -116,8 +117,8 @@ function buildSetupSteps(
     },
     {
       id: 'launch',
-      title: 'Launch & send on LinkedIn',
-      description: 'Send each note on LinkedIn, then mark it done in Vantera or the add-on.',
+      title: 'Launch campaign',
+      description: 'Activate a campaign — Vantera sends connection requests and follow-up DMs automatically.',
       status: hasLaunch ? 'current' : 'pending',
     },
   ]
@@ -127,9 +128,10 @@ export async function getLinkedInOutreachHubSnapshot(
   accountId: string,
   userId: string,
 ): Promise<LinkedInOutreachHubSnapshot> {
-  const [allCampaigns, account, manualQueue, leadsWithLi] = await Promise.all([
+  const [allCampaigns, account, unipileAccount, manualQueue, leadsWithLi] = await Promise.all([
     findOutreachCampaigns(accountId),
     findLinkedinAccount(accountId, userId),
+    findFirstUnipileAccountForWorkspace(accountId),
     findLinkedInManualQueue(accountId, 12),
     db
       .select({ count: sql<number>`count(*)::int` })
@@ -149,7 +151,11 @@ export async function getLinkedInOutreachHubSnapshot(
   const replied = campaigns.reduce((sum, c) => sum + c.metrics.replied, 0)
   const hasLaunch = activeCampaigns.length > 0
 
-  const connectionStatus = account?.extensionConnected ? 'connected' : 'disconnected'
+  const connectionStatus = unipileAccount?.unipileConnected
+    ? 'connected'
+    : account?.extensionConnected
+      ? 'connected'
+      : 'disconnected'
   const setupSteps = buildSetupSteps(
     connectionStatus === 'connected',
     hasLaunch,

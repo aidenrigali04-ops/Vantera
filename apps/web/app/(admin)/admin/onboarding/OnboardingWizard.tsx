@@ -53,7 +53,7 @@ function OnboardingWizardInner({
 }: Props) {
   const router = useRouter()
   const storageKey = `vantera_onboarding_step_${accountId}`
-  const { runSubmit, nav } = useOnboardingNavActions()
+  const { runSubmit, runSecondary, nav } = useOnboardingNavActions()
 
   const [stepIndex, setStepIndex] = useState(0)
   const [hydrated, setHydrated] = useState(false)
@@ -141,6 +141,11 @@ function OnboardingWizardInner({
     advance()
   }, [runSubmit, meta.isLast, advance, handleFinalComplete])
 
+  const handleSecondary = useCallback(async () => {
+    await runSecondary()
+    advance()
+  }, [runSecondary, advance])
+
   const primaryLabel = useMemo(() => {
     if (nav.primaryLabel) return nav.primaryLabel
     if (meta.isLast) return 'Finish setup'
@@ -171,6 +176,8 @@ function OnboardingWizardInner({
       primaryLabel={primaryLabel}
       primaryDisabled={!nav.canAdvance}
       primaryLoading={nav.isSubmitting}
+      secondaryLabel={nav.secondaryLabel}
+      onSecondary={nav.secondaryLabel ? handleSecondary : undefined}
       dialogTitleId="onboarding-wizard-title"
       dialogBodyId="onboarding-wizard-body"
     >

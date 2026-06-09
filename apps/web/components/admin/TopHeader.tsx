@@ -56,9 +56,6 @@ export function TopHeader({ session, showDemoWorkspace = false }: TopHeaderProps
             <h1 className="truncate text-[15px] font-semibold tracking-[-0.02em] text-[var(--text-primary)] md:text-base">
               {pageTitle}
             </h1>
-            <p className="hidden truncate text-[11px] text-[var(--text-tertiary)] md:block">
-              Vantera operating system
-            </p>
           </div>
         ) : showDemoWorkspace ? (
           <p className="hidden text-[11px] font-medium text-[var(--text-secondary)] md:block">

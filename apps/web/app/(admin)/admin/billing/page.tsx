@@ -22,7 +22,13 @@ export default async function BillingPage() {
   const row = account ?? { plan: 'team', stripeCustomerId: null }
 
   return (
-    <Suspense fallback={<div className="p-6 text-sm text-[var(--text-secondary)]">Loading…</div>}>
+    <Suspense fallback={
+      <div className="space-y-4 p-6">
+        <div className="h-6 w-40 animate-pulse rounded-lg bg-[var(--bg-overlay)]" />
+        <div className="h-32 w-full animate-pulse rounded-xl bg-[var(--bg-overlay)]" />
+        <div className="h-24 w-full animate-pulse rounded-xl bg-[var(--bg-overlay)]" />
+      </div>
+    }>
       <SubscriptionBillingClient
         currentPlan={row.plan}
         hasStripeCustomer={Boolean(row.stripeCustomerId)}

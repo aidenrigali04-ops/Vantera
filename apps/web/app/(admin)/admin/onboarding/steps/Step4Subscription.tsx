@@ -98,10 +98,12 @@ export function Step4Subscription({ accountId, onComplete }: Props) {
               key={plan.id}
               type="button"
               variants={fadeUp}
-              onClick={() => setSelectedPlan(plan.id)}
+              onClick={() => !submitting && setSelectedPlan(plan.id)}
+              disabled={submitting}
               className={cn(
                 'relative flex flex-col rounded-lg border p-3 text-left transition-colors duration-[120ms]',
                 'focus-visible:outline-none focus-visible:shadow-[var(--shadow-glow)]',
+                submitting ? 'pointer-events-none opacity-60' : '',
                 active
                   ? 'border-[var(--accent-border)] bg-[var(--accent-muted)]'
                   : 'border-[var(--border-default)] bg-[var(--bg-surface)] hover:border-[var(--border-strong)]',

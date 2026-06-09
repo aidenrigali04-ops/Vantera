@@ -4,8 +4,7 @@ import { SubNavTabs } from '@/components/operational/SubNavTabs'
 import { usePathname } from 'next/navigation'
 
 const TABS = [
-  { href: '/admin/pipeline', label: 'Pipeline' },
-  { href: '/admin/clients', label: 'Active Clients' },
+  { href: '/admin/leads', label: 'Pipeline' },
 ] as const
 
 export function IntelligenceTabNav() {

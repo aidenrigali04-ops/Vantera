@@ -167,12 +167,8 @@ export function DashboardActionFeed({
             {hiddenCount > 0 ? (
               <p className="mt-3 text-center text-[12px] text-[var(--text-tertiary)]">
                 {hiddenCount} more {hiddenCount === 1 ? 'item' : 'items'} in your workspace — open{' '}
-                <Link href="/admin/crm/pipeline" className="font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
+                <Link href="/admin/leads" className="font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
                   pipeline
-                </Link>{' '}
-                or{' '}
-                <Link href="/admin/clients" className="font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
-                  clients
                 </Link>{' '}
                 to review.
               </p>

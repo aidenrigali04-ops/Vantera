@@ -47,9 +47,18 @@ export function VentoraCampaignsTable({ groups }: Props) {
 
       <div className="card-surface overflow-hidden">
         {groups.length === 0 ? (
-          <p className="px-4 py-10 text-center text-sm text-[var(--text-secondary)]">
-            No outreach campaigns yet. Launch a campaign to track conversion here.
-          </p>
+          <div className="flex flex-col items-center gap-3 px-4 py-10 text-center">
+            <p className="text-[13px] font-medium text-[var(--text-primary)]">No campaigns yet</p>
+            <p className="text-[12px] text-[var(--text-secondary)]">
+              Conversion tracking appears here once you launch one.
+            </p>
+            <Link
+              href="/admin/outreach/campaigns"
+              className="mt-1 inline-flex items-center gap-1.5 rounded-lg bg-[var(--accent)] px-3 py-1.5 text-[12px] font-semibold text-[var(--text-primary)] transition-opacity hover:opacity-90"
+            >
+              Launch a campaign →
+            </Link>
+          </div>
         ) : (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[640px] border-collapse text-left text-sm">

@@ -12,6 +12,7 @@ export function StepRevenueGoal({ accountId }: { accountId: string }) {
   const [goal, setGoal] = useState('')
   const [avg, setAvg] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const goalNum = digits(goal)
 
@@ -22,11 +23,13 @@ export function StepRevenueGoal({ accountId }: { accountId: string }) {
       const g = digits(goal)
       if (!g || g <= 0) return false
       setSubmitting(true)
+      setError(null)
       try {
         await saveRevenueGoal({ mrrGoal: g, avgClientValue: avg ? digits(avg) : null })
         await markOnboardingCompleteAction()
         return true
       } catch {
+        setError('Something went wrong saving your goal. Please try again.')
         setSubmitting(false)
         return false
       }
@@ -35,6 +38,11 @@ export function StepRevenueGoal({ accountId }: { accountId: string }) {
 
   return (
     <div className="mx-auto w-full max-w-md">
+      {error ? (
+        <p className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-400">
+          {error}
+        </p>
+      ) : null}
       <div className="flex items-center gap-2">
         <Target className="h-5 w-5 text-emerald-600" aria-hidden />
         <h2 className="text-lg font-semibold tracking-[-0.01em] text-[var(--text-primary)]">

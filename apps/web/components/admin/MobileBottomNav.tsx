@@ -16,7 +16,7 @@ export function MobileBottomNav() {
       style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
       aria-label="Primary navigation"
     >
-      <div className="grid grid-cols-4">
+      <div className="grid grid-cols-5">
         {MOBILE_NAV.map((item) => {
           const active = item.href ? isSidebarItemActive(pathname, item) : false
           const Icon = item.icon
