@@ -39,17 +39,17 @@ const ICONS = {
 } as const
 
 const ACCENT_STYLES = {
-  stalled_deal: 'border-l-amber-500',
+  stalled_deal: 'border-l-[var(--accent-solid)]',
   overdue_task: 'border-l-red-500',
   churn_risk: 'border-l-red-500',
   reply_detected: 'border-l-blue-500',
-  lead_activity: 'border-l-stone-400',
+  lead_activity: 'border-l-[var(--text-disabled)]',
   aspire_icp_match: 'border-l-teal-500',
   draft_ready: 'border-l-violet-500',
-  score_increased: 'border-l-amber-500',
+  score_increased: 'border-l-[var(--accent-solid)]',
   email_clicked: 'border-l-teal-500',
   email_bounced: 'border-l-red-500',
-  high_icp_no_outreach: 'border-l-amber-500',
+  high_icp_no_outreach: 'border-l-[var(--accent-solid)]',
   linkedin_step_ready: 'border-l-blue-500',
 } as const
 
@@ -140,19 +140,19 @@ export function DashboardActionFeed({
                 const Icon = ICONS[item.type] ?? MessageSquare
                 const content = (
                   <>
-                    <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-stone-50 ring-1 ring-stone-200/80">
-                      <Icon className="h-4 w-4 text-stone-600" />
+                    <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--bg-surface)] ring-1 ring-[var(--border-default)]">
+                      <Icon className="h-4 w-4 text-[var(--text-tertiary)]" />
                     </span>
                     <div className="min-w-0 flex-1">
-                      <p className="text-[13px] font-medium text-stone-900">{item.title}</p>
-                      <p className="mt-0.5 text-[12px] text-stone-500">{item.subtitle}</p>
+                      <p className="text-[13px] font-medium text-[var(--text-primary)]">{item.title}</p>
+                      <p className="mt-0.5 text-[12px] text-[var(--text-tertiary)]">{item.subtitle}</p>
                     </div>
-                    <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-stone-300" aria-hidden />
+                    <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-[var(--text-disabled)]" aria-hidden />
                   </>
                 )
                 const itemClassName = cn(
                   'flex gap-3 rounded-lg border border-[var(--border-default)] border-l-[3px] bg-[var(--bg-surface)] px-3 py-3 transition-colors duration-150 hover:border-[var(--border-strong)] hover:bg-[var(--bg-subtle)]',
-                  ACCENT_STYLES[item.type] ?? 'border-l-stone-400',
+                  ACCENT_STYLES[item.type] ?? 'border-l-[var(--text-disabled)]',
                 )
 
                 return (
@@ -165,13 +165,13 @@ export function DashboardActionFeed({
               })}
             </ul>
             {hiddenCount > 0 ? (
-              <p className="mt-3 text-center text-[12px] text-stone-500">
+              <p className="mt-3 text-center text-[12px] text-[var(--text-tertiary)]">
                 {hiddenCount} more {hiddenCount === 1 ? 'item' : 'items'} in your workspace — open{' '}
-                <Link href="/admin/crm/pipeline" className="font-medium text-stone-700 hover:text-stone-900">
+                <Link href="/admin/crm/pipeline" className="font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
                   pipeline
                 </Link>{' '}
                 or{' '}
-                <Link href="/admin/clients" className="font-medium text-stone-700 hover:text-stone-900">
+                <Link href="/admin/clients" className="font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
                   clients
                 </Link>{' '}
                 to review.

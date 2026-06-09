@@ -75,7 +75,7 @@ export function TopHeader({ session, showDemoWorkspace = false }: TopHeaderProps
         >
           <Search className="h-4 w-4 shrink-0" aria-hidden />
           <span className="flex-1 text-left">Search workspace…</span>
-          <kbd className="rounded border border-stone-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-stone-500">
+          <kbd className="rounded border border-[var(--border-default)] bg-[var(--bg-surface)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--text-tertiary)]">
             ⌘K
           </kbd>
         </button>
@@ -135,7 +135,7 @@ export function TopHeader({ session, showDemoWorkspace = false }: TopHeaderProps
           </Button>
         ) : null}
 
-        <Badge variant="secondary" className="hidden border border-stone-200 bg-stone-50 text-stone-600 sm:inline-flex">
+        <Badge variant="secondary" className="hidden border border-[var(--border-default)] bg-[var(--bg-surface)] text-[var(--text-tertiary)] sm:inline-flex">
           {planLabel}
         </Badge>
 
@@ -144,13 +144,13 @@ export function TopHeader({ session, showDemoWorkspace = false }: TopHeaderProps
             <button
               type="button"
               className={cn(
-                'flex items-center gap-2 rounded-lg border border-stone-200/80 px-1.5 py-1 transition-colors duration-150 hover:bg-stone-50',
+                'flex items-center gap-2 rounded-lg border border-[var(--border-default)] px-1.5 py-1 transition-colors duration-150 hover:bg-[var(--bg-overlay)]',
               )}
             >
               <Avatar className="h-7 w-7">
-                <AvatarFallback className="bg-stone-100 text-xs text-stone-700">{initials}</AvatarFallback>
+                <AvatarFallback className="bg-[var(--bg-surface)] text-xs text-[var(--text-secondary)]">{initials}</AvatarFallback>
               </Avatar>
-              <span className="hidden max-w-[120px] truncate text-[13px] text-stone-700 lg:inline">
+              <span className="hidden max-w-[120px] truncate text-[13px] text-[var(--text-secondary)] lg:inline">
                 {session.email.split('@')[0]}
               </span>
             </button>

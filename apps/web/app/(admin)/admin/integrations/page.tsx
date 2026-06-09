@@ -24,7 +24,7 @@ export default async function IntegrationsPage() {
       {domain ? (
         <IntegrationsHubClient connections={connections} outreachDomain={domain} />
       ) : (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">
+        <div className="rounded-xl border border-[var(--accent-border)] bg-[var(--accent-muted)] p-5 text-sm text-[var(--accent)]">
           <p className="font-medium">Email domain settings could not be loaded</p>
           <p className="mt-1 text-[13px]">
             {!outreachDomain.success

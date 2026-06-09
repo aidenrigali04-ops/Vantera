@@ -12,7 +12,7 @@ export function MobileBottomNav() {
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-50 border-t border-stone-200 bg-white/95 backdrop-blur md:hidden"
+      className="fixed inset-x-0 bottom-0 z-50 border-t border-[var(--border-default)] bg-[#090c13]/95 backdrop-blur md:hidden"
       style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
       aria-label="Primary navigation"
     >
@@ -28,11 +28,11 @@ export function MobileBottomNav() {
               href={item.href!}
               className={cn(
                 'flex flex-col items-center gap-0.5 px-1 py-2 text-[10px] font-medium transition-colors',
-                active ? 'text-stone-900' : 'text-stone-500',
+                active ? 'text-[var(--text-primary)]' : 'text-[var(--text-tertiary)]',
               )}
               aria-current={active ? 'page' : undefined}
             >
-              <Icon className={cn('h-5 w-5', active && 'text-stone-900')} />
+              <Icon className={cn('h-5 w-5', active && 'text-[var(--text-primary)]')} />
               {label}
             </Link>
           )

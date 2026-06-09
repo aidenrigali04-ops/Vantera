@@ -105,7 +105,7 @@ export function CampaignsPageClient({ campaigns, defaultChannel = 'email' }: Pro
       />
 
       {/* Channel is a filter on one Campaigns surface — not a separate page. */}
-      <div className="inline-flex rounded-lg border border-stone-200 bg-stone-50 p-0.5 text-sm">
+      <div className="inline-flex rounded-lg border border-[var(--border-default)] bg-[var(--bg-subtle)] p-0.5 text-sm">
         {(['email', 'linkedin'] as const).map((ch) => (
           <Link
             key={ch}
@@ -114,8 +114,8 @@ export function CampaignsPageClient({ campaigns, defaultChannel = 'email' }: Pro
             className={cn(
               'rounded-md px-3 py-1.5 font-medium transition-colors',
               defaultChannel === ch
-                ? 'bg-white text-stone-900 shadow-sm'
-                : 'text-stone-500 hover:text-stone-800',
+                ? 'bg-[var(--bg-elevated)] text-[var(--text-primary)] shadow-sm'
+                : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)]',
             )}
           >
             {ch === 'email' ? 'Email' : 'LinkedIn'}
@@ -124,10 +124,10 @@ export function CampaignsPageClient({ campaigns, defaultChannel = 'email' }: Pro
       </div>
 
       {campaigns.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-stone-200 bg-stone-50/50 px-6 py-12 text-center">
-          <Megaphone className="mx-auto h-8 w-8 text-stone-300" />
-          <h3 className="mt-3 text-sm font-medium text-stone-900">No campaigns yet</h3>
-          <p className="mt-1 text-sm text-stone-500">
+        <div className="rounded-xl border border-dashed border-[var(--border-default)] bg-[var(--bg-subtle)] px-6 py-12 text-center">
+          <Megaphone className="mx-auto h-8 w-8 text-[var(--text-disabled)]" />
+          <h3 className="mt-3 text-sm font-medium text-[var(--text-primary)]">No campaigns yet</h3>
+          <p className="mt-1 text-sm text-[var(--text-tertiary)]">
             Start with a goal, pick leads from your pipeline, draft a message, and launch.
           </p>
           <Button className="mt-4" onClick={() => setOpen(true)}>
@@ -135,43 +135,43 @@ export function CampaignsPageClient({ campaigns, defaultChannel = 'email' }: Pro
           </Button>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm">
-          <table className="min-w-full divide-y divide-stone-100 text-sm">
-            <thead className="bg-stone-50/80">
+        <div className="overflow-hidden rounded-xl border border-[var(--border-default)] bg-[var(--bg-surface)] shadow-sm">
+          <table className="min-w-full divide-y divide-[var(--border-subtle)] text-sm">
+            <thead className="bg-[var(--bg-subtle)]">
               <tr>
-                <th className="px-4 py-3 text-left font-medium text-stone-500">Campaign</th>
-                <th className="px-4 py-3 text-left font-medium text-stone-500">Goal</th>
-                <th className="px-4 py-3 text-left font-medium text-stone-500">Status</th>
-                <th className="px-4 py-3 text-right font-medium text-stone-500">Enrolled</th>
-                <th className="px-4 py-3 text-right font-medium text-stone-500">Sent</th>
-                <th className="px-4 py-3 text-right font-medium text-stone-500">Replied</th>
+                <th className="px-4 py-3 text-left font-medium text-[var(--text-tertiary)]">Campaign</th>
+                <th className="px-4 py-3 text-left font-medium text-[var(--text-tertiary)]">Goal</th>
+                <th className="px-4 py-3 text-left font-medium text-[var(--text-tertiary)]">Status</th>
+                <th className="px-4 py-3 text-right font-medium text-[var(--text-tertiary)]">Enrolled</th>
+                <th className="px-4 py-3 text-right font-medium text-[var(--text-tertiary)]">Sent</th>
+                <th className="px-4 py-3 text-right font-medium text-[var(--text-tertiary)]">Replied</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-stone-100">
+            <tbody className="divide-y divide-[var(--border-subtle)]">
               {campaigns.map((campaign) => (
-                <tr key={campaign.id} className="hover:bg-stone-50/60">
+                <tr key={campaign.id} className="hover:bg-[var(--bg-overlay)]">
                   <td className="px-4 py-3">
                     <Link
                       href={`/admin/outreach/campaigns/${campaign.id}`}
-                      className="font-medium text-stone-900 hover:text-violet-700"
+                      className="font-medium text-[var(--text-primary)] hover:text-violet-700"
                     >
                       {campaign.name}
                     </Link>
                   </td>
-                  <td className="px-4 py-3 text-stone-600">{CAMPAIGN_GOAL_LABELS[campaign.goal]}</td>
+                  <td className="px-4 py-3 text-[var(--text-secondary)]">{CAMPAIGN_GOAL_LABELS[campaign.goal]}</td>
                   <td className="px-4 py-3">
                     <StatusBadge
                       label={campaign.status}
                       tone={campaignStatusTone(campaign.status)}
                     />
                   </td>
-                  <td className="px-4 py-3 text-right tabular-nums text-stone-700">
+                  <td className="px-4 py-3 text-right tabular-nums text-[var(--text-secondary)]">
                     {campaign.metrics.enrolled}
                   </td>
-                  <td className="px-4 py-3 text-right tabular-nums text-stone-700">
+                  <td className="px-4 py-3 text-right tabular-nums text-[var(--text-secondary)]">
                     {campaign.metrics.sent}
                   </td>
-                  <td className="px-4 py-3 text-right tabular-nums text-stone-700">
+                  <td className="px-4 py-3 text-right tabular-nums text-[var(--text-secondary)]">
                     {campaign.metrics.replied}
                   </td>
                 </tr>
@@ -212,14 +212,14 @@ export function CampaignsPageClient({ campaigns, defaultChannel = 'email' }: Pro
                     className={cn(
                       'rounded-lg border px-3 py-2.5 text-left text-sm transition-colors',
                       deliveryMode === mode
-                        ? 'border-violet-300 bg-violet-50/80'
-                        : 'border-stone-200 hover:border-stone-300',
+                        ? 'border-[var(--accent-border)] bg-[var(--accent-muted)]'
+                        : 'border-[var(--border-default)] hover:border-[var(--border-strong)]',
                     )}
                   >
-                    <span className="font-medium text-stone-900">
+                    <span className="font-medium text-[var(--text-primary)]">
                       {deliveryLabels[mode as keyof typeof deliveryLabels]}
                     </span>
-                    <span className="mt-0.5 block text-[12px] text-stone-500">
+                    <span className="mt-0.5 block text-[12px] text-[var(--text-tertiary)]">
                       {mode === 'single_email'
                         ? 'One email to all leads — write your own copy + AI draft'
                         : mode === 'single_linkedin'
@@ -244,8 +244,8 @@ export function CampaignsPageClient({ campaigns, defaultChannel = 'email' }: Pro
                     className={cn(
                       'flex items-start gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors',
                       goal === option
-                        ? 'border-violet-300 bg-violet-50/80'
-                        : 'border-stone-200 hover:border-stone-300',
+                        ? 'border-[var(--accent-border)] bg-[var(--accent-muted)]'
+                        : 'border-[var(--border-default)] hover:border-[var(--border-strong)]',
                     )}
                   >
                     {option === 'book_meeting' ? (
@@ -256,7 +256,7 @@ export function CampaignsPageClient({ campaigns, defaultChannel = 'email' }: Pro
                       <Target className="mt-0.5 h-4 w-4 shrink-0 text-violet-600" />
                     )}
                     <span>
-                      <span className="block text-sm font-medium text-stone-900">
+                      <span className="block text-sm font-medium text-[var(--text-primary)]">
                         {CAMPAIGN_GOAL_LABELS[option]}
                       </span>
                     </span>

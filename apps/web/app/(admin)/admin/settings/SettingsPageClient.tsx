@@ -301,9 +301,9 @@ export function SettingsPageClient({
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="rounded-lg border border-stone-100 bg-stone-50/80 px-4 py-3 text-[13px] text-stone-600">
+                <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-subtle)] px-4 py-3 text-[13px] text-[var(--text-secondary)]">
                   <p>
-                    Signed in as <span className="font-medium text-stone-900">{sessionEmail}</span>{' '}
+                    Signed in as <span className="font-medium text-[var(--text-primary)]">{sessionEmail}</span>{' '}
                     · {sessionRole}
                   </p>
                   <p className="mt-1 capitalize">Plan: {account.plan}</p>
@@ -356,7 +356,7 @@ export function SettingsPageClient({
                         className="max-w-[140px] font-mono text-[13px]"
                       />
                       <span
-                        className="h-9 w-9 rounded-lg border border-stone-200"
+                        className="h-9 w-9 rounded-lg border border-[var(--border-default)]"
                         style={{ backgroundColor: primaryColor }}
                         aria-hidden
                       />
@@ -372,18 +372,18 @@ export function SettingsPageClient({
                         className="max-w-[140px] font-mono text-[13px]"
                       />
                       <span
-                        className="h-9 w-9 rounded-lg border border-stone-200"
+                        className="h-9 w-9 rounded-lg border border-[var(--border-default)]"
                         style={{ backgroundColor: secondaryColor }}
                         aria-hidden
                       />
                     </div>
                   </div>
                 </div>
-                <p className="text-[13px] text-stone-500">
+                <p className="text-[13px] text-[var(--text-tertiary)]">
                   Use your own hostname for client sign-in (e.g.{' '}
-                  <code className="rounded bg-stone-100 px-1 text-xs">portal.yourcompany.com</code>) — configure
+                  <code className="rounded bg-[var(--bg-surface)] px-1 text-xs">portal.yourcompany.com</code>) — configure
                   DNS in{' '}
-                  <Link href="/admin/portal#portal-domain" className="font-medium text-stone-800 underline">
+                  <Link href="/admin/portal#portal-domain" className="font-medium text-[var(--text-primary)] underline">
                     Client portal → Portal domain
                   </Link>
                   .
@@ -403,52 +403,52 @@ export function SettingsPageClient({
             >
               <div className="space-y-5">
                 {/* Seat usage strip */}
-                <div className="flex items-center gap-3 rounded-lg border border-stone-100 bg-stone-50 px-4 py-3 text-[13px] text-stone-600">
+                <div className="flex items-center gap-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-subtle)]px-4 py-3 text-[13px] text-[var(--text-secondary)]">
                   <span>
-                    <span className="font-medium text-stone-900">{seatUsage.activeMembers}</span> active
+                    <span className="font-medium text-[var(--text-primary)]">{seatUsage.activeMembers}</span> active
                     {seatUsage.pendingInvites > 0 ? (
-                      <> · <span className="font-medium text-stone-900">{seatUsage.pendingInvites}</span> pending</>
+                      <> · <span className="font-medium text-[var(--text-primary)]">{seatUsage.pendingInvites}</span> pending</>
                     ) : null}
                   </span>
-                  <span className="text-stone-300">·</span>
+                  <span className="text-[var(--text-disabled)]">·</span>
                   <span className="capitalize">{seatUsage.plan} plan</span>
                   {seatUsage.billableSeats > 0 ? (
                     <>
-                      <span className="text-stone-300">·</span>
+                      <span className="text-[var(--text-disabled)]">·</span>
                       <span>${seatUsage.monthlySeatCostUsd}/mo for {seatUsage.billableSeats} extra {seatUsage.billableSeats === 1 ? 'seat' : 'seats'}</span>
                     </>
                   ) : (
                     <>
-                      <span className="text-stone-300">·</span>
+                      <span className="text-[var(--text-disabled)]">·</span>
                       <span>{seatUsage.includedSeats - seatUsage.totalSeats > 0 ? `${seatUsage.includedSeats - seatUsage.totalSeats} seat${seatUsage.includedSeats - seatUsage.totalSeats !== 1 ? 's' : ''} remaining` : 'All included seats used'}</span>
                     </>
                   )}
                 </div>
 
                 {/* Active members */}
-                <div className="overflow-hidden rounded-xl border border-stone-200">
+                <div className="overflow-hidden rounded-xl border border-[var(--border-default)]">
                   <table className="w-full text-[13px]">
-                    <thead className="border-b border-stone-200 bg-stone-50">
+                    <thead className="border-b border-[var(--border-default)] bg-[var(--bg-subtle)]">
                       <tr>
-                        <th className="px-4 py-2.5 text-left font-medium text-stone-500">Name</th>
-                        <th className="px-4 py-2.5 text-left font-medium text-stone-500">Email</th>
-                        <th className="px-4 py-2.5 text-left font-medium text-stone-500">Role</th>
+                        <th className="px-4 py-2.5 text-left font-medium text-[var(--text-tertiary)]">Name</th>
+                        <th className="px-4 py-2.5 text-left font-medium text-[var(--text-tertiary)]">Email</th>
+                        <th className="px-4 py-2.5 text-left font-medium text-[var(--text-tertiary)]">Role</th>
                         {canManageTeam ? <th className="px-4 py-2.5" /> : null}
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-stone-100">
+                    <tbody className="divide-y divide-[var(--border-subtle)]">
                       {team.map((member) => {
                         const isSelf = member.id === sessionUserId
                         const isOwner = member.role === 'owner'
                         const canRemove = canManageTeam && !isSelf && !isOwner
                         return (
                           <tr key={member.id}>
-                            <td className="px-4 py-3 font-medium text-stone-900">
+                            <td className="px-4 py-3 font-medium text-[var(--text-primary)]">
                               {member.fullName}
-                              {isSelf ? <span className="ml-1.5 text-[11px] text-stone-400">(you)</span> : null}
+                              {isSelf ? <span className="ml-1.5 text-[11px] text-[var(--text-tertiary)]">(you)</span> : null}
                             </td>
-                            <td className="px-4 py-3 text-stone-600">{member.email}</td>
-                            <td className="px-4 py-3 capitalize text-stone-600">{member.role}</td>
+                            <td className="px-4 py-3 text-[var(--text-secondary)]">{member.email}</td>
+                            <td className="px-4 py-3 capitalize text-[var(--text-secondary)]">{member.role}</td>
                             {canManageTeam ? (
                               <td className="px-4 py-3 text-right">
                                 {canRemove ? (
@@ -456,7 +456,7 @@ export function SettingsPageClient({
                                     type="button"
                                     onClick={() => handleRemoveMember(member.id, member.fullName)}
                                     disabled={isPending}
-                                    className="inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] text-stone-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-40"
+                                    className="inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] text-[var(--text-tertiary)] hover:bg-[var(--danger-muted)] hover:text-red-400 disabled:opacity-40"
                                     title="Remove member"
                                   >
                                     <UserMinus className="h-3.5 w-3.5" />
@@ -475,17 +475,17 @@ export function SettingsPageClient({
                 {/* Pending invites */}
                 {pendingInvites.length > 0 ? (
                   <div>
-                    <p className="mb-2 text-[12px] font-medium uppercase tracking-wide text-stone-400">
+                    <p className="mb-2 text-[12px] font-medium uppercase tracking-wide text-[var(--text-tertiary)]">
                       Pending invites
                     </p>
-                    <div className="overflow-hidden rounded-xl border border-dashed border-stone-200">
+                    <div className="overflow-hidden rounded-xl border border-dashed border-[var(--border-default)]">
                       <table className="w-full text-[13px]">
-                        <tbody className="divide-y divide-stone-100">
+                        <tbody className="divide-y divide-[var(--border-subtle)]">
                           {pendingInvites.map((invite) => (
                             <tr key={invite.id}>
-                              <td className="px-4 py-3 text-stone-700">{invite.email}</td>
-                              <td className="px-4 py-3 capitalize text-stone-500">{invite.role}</td>
-                              <td className="px-4 py-3 text-stone-400 text-[12px]">
+                              <td className="px-4 py-3 text-[var(--text-secondary)]">{invite.email}</td>
+                              <td className="px-4 py-3 capitalize text-[var(--text-tertiary)]">{invite.role}</td>
+                              <td className="px-4 py-3 text-[var(--text-tertiary)] text-[12px]">
                                 Expires {new Date(invite.expiresAt).toLocaleDateString()}
                               </td>
                               {canManageTeam ? (
@@ -494,7 +494,7 @@ export function SettingsPageClient({
                                     type="button"
                                     onClick={() => handleRevoke(invite.id)}
                                     disabled={isPending}
-                                    className="inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] text-stone-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-40"
+                                    className="inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] text-[var(--text-tertiary)] hover:bg-[var(--danger-muted)] hover:text-red-400 disabled:opacity-40"
                                     title="Revoke invite"
                                   >
                                     <X className="h-3.5 w-3.5" />
@@ -512,8 +512,8 @@ export function SettingsPageClient({
 
                 {/* Invite form */}
                 {canManageTeam ? (
-                  <div className="rounded-xl border border-dashed border-stone-200 bg-stone-50/50 p-4">
-                    <p className="text-sm font-medium text-stone-800">Invite teammate</p>
+                  <div className="rounded-xl border border-dashed border-[var(--border-default)] bg-[var(--bg-subtle)] p-4">
+                    <p className="text-sm font-medium text-[var(--text-primary)]">Invite teammate</p>
                     <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end">
                       <div className="flex-1">
                         <Label htmlFor="invite-email">Email</Label>
@@ -546,7 +546,7 @@ export function SettingsPageClient({
                         type="button"
                         onClick={sendInvite}
                         disabled={isPending || !inviteEmail.trim()}
-                        className="bg-stone-900 hover:bg-stone-800"
+                        className="bg-[var(--accent)] text-[var(--text-inverse)] hover:bg-[var(--accent-hover)]"
                       >
                         <Mail className="mr-2 h-4 w-4" />
                         Send invite

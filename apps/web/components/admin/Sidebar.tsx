@@ -218,7 +218,7 @@ function NavItemRow({
             {item.label}
           </span>
           {item.highlightLabel ? (
-            <span className="rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 ring-1 ring-amber-200/80">
+            <span className="rounded-full bg-[var(--accent-muted)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--accent)] ring-1 ring-[var(--accent-border)]">
               {item.highlightLabel}
             </span>
           ) : null}

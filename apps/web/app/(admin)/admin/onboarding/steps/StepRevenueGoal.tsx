@@ -37,49 +37,49 @@ export function StepRevenueGoal({ accountId }: { accountId: string }) {
     <div className="mx-auto w-full max-w-md">
       <div className="flex items-center gap-2">
         <Target className="h-5 w-5 text-emerald-600" aria-hidden />
-        <h2 className="text-lg font-semibold tracking-[-0.01em] text-stone-900">
+        <h2 className="text-lg font-semibold tracking-[-0.01em] text-[var(--text-primary)]">
           Set your revenue goal
         </h2>
       </div>
-      <p className="mt-1 text-sm text-stone-500">
+      <p className="mt-1 text-sm text-[var(--text-tertiary)]">
         Your dashboard tracks real progress toward this as your agent books and wins clients.
       </p>
 
       <div className="mt-5 space-y-4">
         <label className="block">
-          <span className="text-[11px] font-medium uppercase tracking-wide text-stone-400">
+          <span className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-tertiary)]">
             Monthly revenue goal
           </span>
-          <div className="mt-1 flex items-center rounded-lg border border-stone-200 px-3 focus-within:border-stone-400">
-            <span className="text-stone-400">$</span>
+          <div className="mt-1 flex items-center rounded-lg border border-[var(--border-default)] px-3 focus-within:border-[var(--border-focus)]">
+            <span className="text-[var(--text-tertiary)]">$</span>
             <input
               value={goal}
               onChange={(event) => setGoal(event.target.value)}
               inputMode="numeric"
               placeholder="50,000"
               autoFocus
-              className="w-full bg-transparent px-2 py-2.5 text-sm text-stone-900 outline-none"
+              className="w-full bg-transparent px-2 py-2.5 text-sm text-[var(--text-primary)] outline-none"
             />
-            <span className="text-sm text-stone-400">/mo</span>
+            <span className="text-sm text-[var(--text-tertiary)]">/mo</span>
           </div>
         </label>
 
         <label className="block">
-          <span className="text-[11px] font-medium uppercase tracking-wide text-stone-400">
+          <span className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-tertiary)]">
             Average value per client / mo{' '}
-            <span className="normal-case text-stone-300">(optional)</span>
+            <span className="normal-case text-[var(--text-disabled)]">(optional)</span>
           </span>
-          <div className="mt-1 flex items-center rounded-lg border border-stone-200 px-3 focus-within:border-stone-400">
-            <span className="text-stone-400">$</span>
+          <div className="mt-1 flex items-center rounded-lg border border-[var(--border-default)] px-3 focus-within:border-[var(--border-focus)]">
+            <span className="text-[var(--text-tertiary)]">$</span>
             <input
               value={avg}
               onChange={(event) => setAvg(event.target.value)}
               inputMode="numeric"
               placeholder="2,500"
-              className="w-full bg-transparent px-2 py-2.5 text-sm text-stone-900 outline-none"
+              className="w-full bg-transparent px-2 py-2.5 text-sm text-[var(--text-primary)] outline-none"
             />
           </div>
-          <span className="mt-1 block text-[12px] text-stone-400">
+          <span className="mt-1 block text-[12px] text-[var(--text-tertiary)]">
             Lets us turn each won client into real MRR progress.
           </span>
         </label>

@@ -305,14 +305,14 @@ export function CampaignDetailClient({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-2 text-sm text-stone-500">
+      <div className="flex items-center gap-2 text-sm text-[var(--text-tertiary)]">
         <Link
           href={
             isLinkedInHub
               ? '/admin/outreach/campaigns?channel=linkedin'
               : '/admin/outreach/campaigns?channel=email'
           }
-          className="inline-flex items-center gap-1 hover:text-stone-800"
+          className="inline-flex items-center gap-1 hover:text-[var(--text-primary)]"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
           {isLinkedInHub ? 'LinkedIn campaigns' : 'Email campaigns'}
@@ -344,8 +344,8 @@ export function CampaignDetailClient({
                 className={cn(
                   'rounded-full px-2.5 py-0.5 text-[11px] font-medium',
                   step === wizardStep
-                    ? 'bg-violet-100 text-violet-800'
-                    : 'bg-stone-100 text-stone-500',
+                    ? 'bg-[var(--accent-muted)] text-[var(--accent)]'
+                    : 'bg-[var(--bg-surface)] text-[var(--text-tertiary)]',
                 )}
               >
                 {index + 1}.{' '}
@@ -367,9 +367,9 @@ export function CampaignDetailClient({
       {isActive || step === 'results' ? <KpiStrip items={kpiItems} className="lg:grid-cols-4" /> : null}
 
       {isDraft && step === 'audience' ? (
-        <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
-          <h3 className="text-sm font-semibold text-stone-900">Select leads</h3>
-          <p className="mt-1 text-sm text-stone-500">
+        <section className="rounded-xl border border-[var(--border-default)] bg-[var(--bg-surface)] p-5 shadow-sm">
+          <h3 className="text-sm font-semibold text-[var(--text-primary)]">Select leads</h3>
+          <p className="mt-1 text-sm text-[var(--text-tertiary)]">
             {isLinkedInHub
               ? 'Leads must have a LinkedIn profile URL. Add URLs in Pipeline or pick prospects below.'
               : 'Choose from your pipeline, or find new ICP-matched prospects with Aspire below.'}
@@ -383,13 +383,13 @@ export function CampaignDetailClient({
             }}
           />
 
-          <div className="my-5 border-t border-stone-100 pt-5">
-            <p className="mb-3 text-xs font-medium uppercase tracking-wide text-stone-500">
+          <div className="my-5 border-t border-[var(--border-subtle)] pt-5">
+            <p className="mb-3 text-xs font-medium uppercase tracking-wide text-[var(--text-tertiary)]">
               Or pick from pipeline
             </p>
             <div className="max-h-80 space-y-2 overflow-y-auto">
               {enrollableLeads.length === 0 ? (
-                <p className="text-sm text-stone-500">
+                <p className="text-sm text-[var(--text-tertiary)]">
                   No leads with contact info yet.{' '}
                   <Link href="/admin/crm/pipeline" className="text-violet-700 hover:underline">
                     Add leads in Pipeline
@@ -399,15 +399,15 @@ export function CampaignDetailClient({
                 enrollableLeads.map((lead) => (
                   <label
                     key={lead.id}
-                    className="flex cursor-pointer items-start gap-3 rounded-lg border border-stone-100 px-3 py-2.5 hover:bg-stone-50"
+                    className="flex cursor-pointer items-start gap-3 rounded-lg border border-[var(--border-subtle)] px-3 py-2.5 hover:bg-[var(--bg-overlay)]"
                   >
                     <Checkbox
                       checked={selectedLeadIds.includes(lead.id)}
                       onCheckedChange={() => toggleLead(lead.id)}
                     />
                     <span>
-                      <span className="block text-sm font-medium text-stone-900">{leadName(lead)}</span>
-                      <span className="block text-xs text-stone-500">
+                      <span className="block text-sm font-medium text-[var(--text-primary)]">{leadName(lead)}</span>
+                      <span className="block text-xs text-[var(--text-tertiary)]">
                         {[lead.title, lead.company, lead.email, lead.phone, lead.linkedinUrl]
                           .filter(Boolean)
                           .join(' · ')}
@@ -430,10 +430,10 @@ export function CampaignDetailClient({
       ) : null}
 
       {isDraft && step === 'message' ? (
-        <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
+        <section className="rounded-xl border border-[var(--border-default)] bg-[var(--bg-surface)] p-5 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <h3 className="text-sm font-semibold text-stone-900">
+              <h3 className="text-sm font-semibold text-[var(--text-primary)]">
                 {isSingleLinkedIn
                   ? 'Write your connection note'
                   : isSingleEmail
@@ -442,7 +442,7 @@ export function CampaignDetailClient({
                       ? 'Build your LinkedIn sequence'
                       : 'Build your sequence'}
               </h3>
-              <p className="mt-1 text-sm text-stone-500">
+              <p className="mt-1 text-sm text-[var(--text-tertiary)]">
                 {isSingleLinkedIn
                   ? 'One note for every enrolled lead — you send on LinkedIn after launch. AI draft follows Message Drafter rules (≤300 chars, merge tags).'
                   : isSingleEmail
@@ -467,8 +467,8 @@ export function CampaignDetailClient({
                 className={cn(
                   'rounded-lg border px-3 py-2 text-[13px] font-medium transition-colors',
                   deliveryMode === mode
-                    ? 'border-violet-300 bg-violet-50 text-violet-900'
-                    : 'border-stone-200 text-stone-600 hover:border-stone-300',
+                    ? 'border-[var(--accent-border)] bg-[var(--accent-muted)] text-[var(--accent)]'
+                    : 'border-[var(--border-default)] text-[var(--text-secondary)] hover:border-[var(--border-strong)]',
                 )}
               >
                 {deliveryLabels[mode as keyof typeof deliveryLabels]}
@@ -536,7 +536,7 @@ export function CampaignDetailClient({
             <>
               <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
                 <select
-                  className="rounded-md border border-stone-200 bg-white px-2 py-1.5 text-xs"
+                  className="rounded-md border border-[var(--border-default)] bg-[var(--bg-surface)] px-2 py-1.5 text-xs text-[var(--text-primary)]"
                   value={draftStepIndex}
                   onChange={(event) => setDraftStepIndex(Number(event.target.value))}
                 >
@@ -553,7 +553,7 @@ export function CampaignDetailClient({
               </div>
 
               {draftRationale ? (
-                <p className="mt-3 rounded-lg bg-violet-50 px-3 py-2 text-xs text-violet-800">
+                <p className="mt-3 rounded-lg bg-[var(--accent-muted)] px-3 py-2 text-xs text-[var(--accent)]">
                   {draftRationale}
                 </p>
               ) : null}
@@ -581,9 +581,9 @@ export function CampaignDetailClient({
       ) : null}
 
       {isDraft && step === 'launch' ? (
-        <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
-          <h3 className="text-sm font-semibold text-stone-900">Ready to launch</h3>
-          <p className="mt-1 text-sm text-stone-500">
+        <section className="rounded-xl border border-[var(--border-default)] bg-[var(--bg-surface)] p-5 shadow-sm">
+          <h3 className="text-sm font-semibold text-[var(--text-primary)]">Ready to launch</h3>
+          <p className="mt-1 text-sm text-[var(--text-tertiary)]">
             {campaign.metrics.enrolled} lead{campaign.metrics.enrolled === 1 ? '' : 's'} enrolled ·{' '}
             {isSingleEmail
               ? 'one-time email blast'
@@ -596,14 +596,14 @@ export function CampaignDetailClient({
             {workflowSteps
               .filter((row) => row.body.trim())
               .map((row, index) => (
-                <div key={index} className="rounded-lg border border-stone-100 bg-stone-50/80 p-4">
-                  <p className="text-xs font-medium uppercase tracking-wide text-stone-500">
+                <div key={index} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-subtle)] p-4">
+                  <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-tertiary)]">
                     Day {row.delayDays} · {CHANNEL_LABELS[row.channel]}
                   </p>
                   {row.channel === 'email' && row.subject ? (
-                    <p className="mt-2 text-sm font-medium text-stone-900">{row.subject}</p>
+                    <p className="mt-2 text-sm font-medium text-[var(--text-primary)]">{row.subject}</p>
                   ) : null}
-                  <p className="mt-2 whitespace-pre-wrap text-sm text-stone-600">{row.body}</p>
+                  <p className="mt-2 whitespace-pre-wrap text-sm text-[var(--text-secondary)]">{row.body}</p>
                 </div>
               ))}
           </div>
@@ -621,9 +621,9 @@ export function CampaignDetailClient({
       ) : null}
 
       {manualSteps.length > 0 ? (
-        <section className="rounded-xl border border-amber-200 bg-amber-50/50 p-5 shadow-sm">
-          <h3 className="text-sm font-semibold text-amber-950">LinkedIn steps ready</h3>
-          <p className="mt-1 text-sm text-amber-900/80">
+        <section className="rounded-xl border border-[var(--accent-border)] bg-[var(--accent-muted)] p-5 shadow-sm">
+          <h3 className="text-sm font-semibold text-[var(--text-primary)]">LinkedIn steps ready</h3>
+          <p className="mt-1 text-sm text-[var(--text-secondary)]">
             Copy each message, send on LinkedIn, then mark as sent.
           </p>
           <div className="mt-4 space-y-3">
@@ -634,10 +634,10 @@ export function CampaignDetailClient({
               }
               const enrollment = enrollments.find((item) => item.leadId === row.leadId)
               return (
-                <div key={row.id} className="rounded-lg border border-amber-200/80 bg-white p-4">
+                <div key={row.id} className="rounded-lg border border-[var(--border-default)] bg-[var(--bg-surface)] p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                      <p className="text-sm font-medium text-stone-900">
+                      <p className="text-sm font-medium text-[var(--text-primary)]">
                         {enrollment ? leadName(enrollment.lead) : 'Lead'}
                       </p>
                       {metadata.linkedinUrl ? (
@@ -666,7 +666,7 @@ export function CampaignDetailClient({
                       </Button>
                     </div>
                   </div>
-                  <p className="mt-3 whitespace-pre-wrap text-sm text-stone-600">
+                  <p className="mt-3 whitespace-pre-wrap text-sm text-[var(--text-secondary)]">
                     {metadata.message ?? row.body}
                   </p>
                 </div>
@@ -677,27 +677,27 @@ export function CampaignDetailClient({
       ) : null}
 
       {(isActive || step === 'results') && enrollments.length > 0 ? (
-        <section className="rounded-xl border border-stone-200 bg-white shadow-sm">
-          <div className="border-b border-stone-100 px-5 py-4">
-            <h3 className="text-sm font-semibold text-stone-900">Results by lead</h3>
-            <p className="mt-0.5 text-sm text-stone-500">
+        <section className="rounded-xl border border-[var(--border-default)] bg-[var(--bg-surface)] shadow-sm">
+          <div className="border-b border-[var(--border-subtle)] px-5 py-4">
+            <h3 className="text-sm font-semibold text-[var(--text-primary)]">Results by lead</h3>
+            <p className="mt-0.5 text-sm text-[var(--text-tertiary)]">
               Email replies are detected automatically when Resend inbound is configured.
             </p>
           </div>
-          <table className="min-w-full divide-y divide-stone-100 text-sm">
-            <thead className="bg-stone-50/80">
+          <table className="min-w-full divide-y divide-[var(--border-subtle)] text-sm">
+            <thead className="bg-[var(--bg-subtle)]">
               <tr>
-                <th className="px-4 py-3 text-left font-medium text-stone-500">Lead</th>
-                <th className="px-4 py-3 text-left font-medium text-stone-500">Status</th>
-                <th className="px-4 py-3 text-right font-medium text-stone-500">Actions</th>
+                <th className="px-4 py-3 text-left font-medium text-[var(--text-tertiary)]">Lead</th>
+                <th className="px-4 py-3 text-left font-medium text-[var(--text-tertiary)]">Status</th>
+                <th className="px-4 py-3 text-right font-medium text-[var(--text-tertiary)]">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-stone-100">
+            <tbody className="divide-y divide-[var(--border-subtle)]">
               {enrollments.map((enrollment) => (
                 <tr key={enrollment.id}>
                   <td className="px-4 py-3">
-                    <span className="font-medium text-stone-900">{leadName(enrollment.lead)}</span>
-                    <span className="block text-xs text-stone-500">{enrollment.lead.email}</span>
+                    <span className="font-medium text-[var(--text-primary)]">{leadName(enrollment.lead)}</span>
+                    <span className="block text-xs text-[var(--text-tertiary)]">{enrollment.lead.email}</span>
                   </td>
                   <td className="px-4 py-3">
                     <StatusBadge
@@ -709,7 +709,7 @@ export function CampaignDetailClient({
                       }
                     />
                     {enrollment.repliedAt ? (
-                      <span className="mt-1 block text-xs text-stone-500">
+                      <span className="mt-1 block text-xs text-[var(--text-tertiary)]">
                         Replied {new Date(enrollment.repliedAt).toLocaleString()}
                       </span>
                     ) : null}

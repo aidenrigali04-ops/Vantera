@@ -190,8 +190,8 @@ export function LinkedInPageClient({
         sortable: true,
         cell: (row: LeadRow) => (
           <div>
-            <p className="font-medium text-stone-900">{leadDisplayName(row)}</p>
-            <p className="text-[12px] text-stone-500">
+            <p className="font-medium text-[var(--text-primary)]">{leadDisplayName(row)}</p>
+            <p className="text-[12px] text-[var(--text-tertiary)]">
               {row.title ? `${row.title} · ` : ''}
               {row.company}
             </p>
@@ -226,7 +226,7 @@ export function LinkedInPageClient({
         header: 'Score',
         sortable: true,
         cell: (row: LeadRow) => (
-          <span className="tabular-nums font-medium text-stone-800">{row.score ?? 0}</span>
+          <span className="tabular-nums font-medium text-[var(--text-primary)]">{row.score ?? 0}</span>
         ),
       },
     ],
@@ -321,11 +321,11 @@ export function LinkedInPageClient({
 
       <div className="grid gap-5 lg:grid-cols-12">
         <div className="space-y-3 lg:col-span-3">
-          <div className="rounded-xl border border-stone-200/90 bg-white p-4 shadow-sm">
-            <h3 className="mb-3 text-sm font-semibold text-stone-900">Campaigns</h3>
+          <div className="rounded-xl border border-[var(--border-default)] bg-[var(--bg-surface)] p-4 shadow-sm">
+            <h3 className="mb-3 text-sm font-semibold text-[var(--text-primary)]">Campaigns</h3>
             <div className="space-y-2">
               {campaigns.length === 0 ? (
-                <p className="text-sm text-stone-500">No campaigns yet.</p>
+                <p className="text-sm text-[var(--text-tertiary)]">No campaigns yet.</p>
               ) : (
                 campaigns.map((c) => (
                   <button
@@ -334,11 +334,11 @@ export function LinkedInPageClient({
                     onClick={() => setSelectedCampaignId(c.id)}
                     className={
                       selectedCampaignId === c.id
-                        ? 'w-full rounded-lg border border-stone-900 bg-stone-50 px-3 py-2 text-left text-sm'
-                        : 'w-full rounded-lg border border-stone-200 px-3 py-2 text-left text-sm transition-colors hover:bg-stone-50'
+                        ? 'w-full rounded-lg border border-[var(--border-strong)] bg-[var(--bg-surface)] px-3 py-2 text-left text-sm'
+                        : 'w-full rounded-lg border border-[var(--border-default)] px-3 py-2 text-left text-sm transition-colors hover:bg-[var(--bg-overlay)]'
                     }
                   >
-                    <p className="font-medium text-stone-900">{c.name}</p>
+                    <p className="font-medium text-[var(--text-primary)]">{c.name}</p>
                     <Badge variant="outline" className="mt-1 text-[10px] font-normal">
                       {c.status}
                     </Badge>
@@ -346,7 +346,7 @@ export function LinkedInPageClient({
                 ))
               )}
             </div>
-            <div className="mt-4 space-y-2 border-t border-stone-100 pt-4">
+            <div className="mt-4 space-y-2 border-t border-[var(--border-subtle)] pt-4">
               <Input
                 placeholder="New campaign name"
                 value={campaignName}
@@ -354,7 +354,7 @@ export function LinkedInPageClient({
               />
               <Button
                 size="sm"
-                className="w-full bg-stone-900 hover:bg-stone-800"
+                className="w-full bg-[var(--accent)] text-[var(--text-inverse)] hover:bg-[var(--accent-hover)]"
                 onClick={handleCreateCampaign}
               >
                 <Plus className="mr-2 h-4 w-4" />
@@ -363,17 +363,17 @@ export function LinkedInPageClient({
             </div>
           </div>
 
-          <div className="rounded-xl border border-stone-200/90 bg-white p-4 shadow-sm">
-            <h3 className="text-sm font-semibold text-stone-900">Connection status</h3>
+          <div className="rounded-xl border border-[var(--border-default)] bg-[var(--bg-surface)] p-4 shadow-sm">
+            <h3 className="text-sm font-semibold text-[var(--text-primary)]">Connection status</h3>
             <div className="mt-2 flex items-center gap-2">
               <span
                 className={
                   connectionStatus === 'connected'
                     ? 'h-2 w-2 rounded-full bg-emerald-500'
-                    : 'h-2 w-2 rounded-full bg-amber-500'
+                    : 'h-2 w-2 rounded-full bg-[var(--accent-solid)]'
                 }
               />
-              <span className="text-sm text-stone-600">
+              <span className="text-sm text-[var(--text-secondary)]">
                 {connectionStatus === 'connected'
                   ? 'LinkedIn add-on connected · daily limits active'
                   : 'Set up the Vantera LinkedIn add-on in Chrome'}
@@ -413,23 +413,23 @@ export function LinkedInPageClient({
         </div>
 
         <div className="lg:col-span-4">
-          <div className="rounded-xl border border-stone-200/90 bg-white p-4 shadow-sm">
-            <h3 className="mb-1 text-sm font-semibold text-stone-900">Insights</h3>
-            <p className="mb-4 text-[12px] text-stone-500">
+          <div className="rounded-xl border border-[var(--border-default)] bg-[var(--bg-surface)] p-4 shadow-sm">
+            <h3 className="mb-1 text-sm font-semibold text-[var(--text-primary)]">Insights</h3>
+            <p className="mb-4 text-[12px] text-[var(--text-tertiary)]">
               Sequence execution runs via Trigger.dev. Enroll leads from the table below.
             </p>
-            <ul className="space-y-2 text-sm text-stone-700">
+            <ul className="space-y-2 text-sm text-[var(--text-secondary)]">
               <li>Reply rate: —</li>
               <li>Connections sent today: —</li>
               <li>Pending steps: —</li>
             </ul>
             {selectedCampaign ? (
-              <p className="mt-4 text-[12px] text-stone-500">
+              <p className="mt-4 text-[12px] text-[var(--text-tertiary)]">
                 Enrolling into:{' '}
-                <span className="font-medium text-stone-800">{selectedCampaign.name}</span>
+                <span className="font-medium text-[var(--text-primary)]">{selectedCampaign.name}</span>
               </p>
             ) : (
-              <p className="mt-4 text-[12px] text-amber-700">Select a campaign to enroll leads.</p>
+              <p className="mt-4 text-[12px] text-[var(--accent)]">Select a campaign to enroll leads.</p>
             )}
           </div>
         </div>
@@ -438,8 +438,8 @@ export function LinkedInPageClient({
       <div className="space-y-4">
         <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h3 className="text-sm font-semibold text-stone-900">Pipeline leads</h3>
-            <p className="text-[12px] text-stone-500">
+            <h3 className="text-sm font-semibold text-[var(--text-primary)]">Pipeline leads</h3>
+            <p className="text-[12px] text-[var(--text-tertiary)]">
               Select prospects and enroll them into{' '}
               {selectedCampaign ? selectedCampaign.name : 'a campaign'}.
             </p>
