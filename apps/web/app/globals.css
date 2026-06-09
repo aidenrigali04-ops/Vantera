@@ -226,6 +226,42 @@
     );
   }
 
+  /* Vision UI-inspired sidebar */
+  .sidebar-vision {
+    background: rgba(6, 11, 28, 0.97);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+  }
+
+  /* Active nav pill — gradient fill */
+  .nav-pill-active {
+    background: linear-gradient(97.89deg, #47a3f3 0%, #bae3ff 100%);
+    box-shadow: 0 4px 20px -4px rgba(71, 163, 243, 0.45);
+  }
+
+  /* Sidebar search button */
+  .sidebar-search-btn {
+    background: rgba(186, 227, 255, 0.04);
+    border: 1px solid rgba(186, 227, 255, 0.07);
+    transition: background 120ms ease, border-color 120ms ease;
+  }
+  .sidebar-search-btn:hover {
+    background: rgba(186, 227, 255, 0.07);
+    border-color: rgba(186, 227, 255, 0.12);
+  }
+
+  /* Bottom help card */
+  .sidebar-help-card {
+    background: linear-gradient(127deg, rgba(16, 42, 67, 0.95) 0%, rgba(6, 11, 28, 0.9) 100%);
+    border: 1px solid rgba(71, 163, 243, 0.2);
+    box-shadow: 0 4px 24px -8px rgba(71, 163, 243, 0.15), inset 0 1px 0 rgba(186, 227, 255, 0.06);
+  }
+
+  .sidebar-help-btn {
+    background: linear-gradient(97.89deg, #47a3f3 0%, #bae3ff 100%);
+    box-shadow: 0 4px 16px -4px rgba(71, 163, 243, 0.5);
+  }
+
   /* client detail page — Adventure dashboard dark tokens */
   .client-detail {
     --cd-bg-outer: #1f2933;
