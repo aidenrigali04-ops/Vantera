@@ -228,12 +228,7 @@ function PreviewIntegrations() {
             key={app.label}
             className="rounded-lg border border-[var(--border-default)] bg-[var(--bg-surface)] p-2.5"
           >
-            <span
-              className={cn(
-                'inline-flex h-7 w-7 items-center justify-center rounded-md bg-gradient-to-br text-[10px] font-bold text-white',
-                app.grad,
-              )}
-            >
+            <span className="icon-tile inline-flex h-7 w-7 items-center justify-center rounded-md text-[10px] font-semibold text-[var(--text-secondary)]">
               {app.label[0]}
             </span>
             <p className="mt-2 text-[10px] font-medium text-[var(--text-primary)]">{app.label}</p>
@@ -252,8 +247,8 @@ function PreviewIntegrations() {
 function PreviewFinish() {
   return (
     <div className="flex h-[220px] flex-col items-center justify-center rounded-lg border border-[var(--border-default)] bg-[var(--bg-surface)] shadow-[var(--shadow-md)]">
-      <span className="flex h-14 w-14 items-center justify-center rounded-full bg-[var(--success-muted)] text-[var(--success)]">
-        <CheckCircle2 className="h-7 w-7" />
+      <span className="icon-tile flex h-14 w-14 items-center justify-center rounded-full">
+        <CheckCircle2 className="h-6 w-6 text-[var(--success)]" strokeWidth={1.75} />
       </span>
       <p className="mt-3 text-[13px] font-semibold text-[var(--text-primary)]">Workspace ready</p>
       <p className="mt-1 text-[11px] text-[var(--text-tertiary)]">Head to your dashboard</p>

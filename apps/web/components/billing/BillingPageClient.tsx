@@ -136,7 +136,7 @@ export function BillingPageClient({ stripe, invoices, targets }: Props) {
       <section className="rounded-xl border border-[var(--border-default)] bg-[var(--bg-surface)] p-5 shadow-[var(--shadow-sm)]">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-start gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-[#635BFF] to-[#7A6BFF] text-sm font-bold text-white">
+            <span className="icon-tile flex h-10 w-10 items-center justify-center rounded-lg text-sm font-semibold text-[var(--text-secondary)]">
               S
             </span>
             <div>

@@ -207,8 +207,8 @@ export function ScoutLeadEnrichmentPage({ result, lead, profile, searchId }: Pro
           <div className="flex items-start justify-between gap-6 p-5">
             <div className="flex items-start gap-4">
               {/* Avatar */}
-              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#102a43]">
-                <User className="h-6 w-6 text-[var(--cd-accent)]" aria-hidden />
+              <div className="icon-tile flex h-14 w-14 shrink-0 items-center justify-center rounded-full">
+                <User className="h-5 w-5 text-[var(--text-secondary)]" strokeWidth={1.75} aria-hidden />
               </div>
               <div>
                 <h1 className="text-[20px] font-semibold text-[var(--cd-text-primary)]">{name}</h1>
@@ -322,7 +322,7 @@ export function ScoutLeadEnrichmentPage({ result, lead, profile, searchId }: Pro
               <div className="space-y-3">
                 {profile.disc ? (
                   <div className="flex items-center gap-3">
-                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#102a43] text-[16px] font-bold text-[var(--cd-accent)]">
+                    <span className="icon-tile flex h-9 w-9 items-center justify-center rounded-full text-[14px] font-semibold text-[var(--text-secondary)]">
                       {profile.disc}
                     </span>
                     <div>

@@ -1,5 +1,6 @@
 'use client'
 
+import { IconTile } from '@/components/shared/IconTile'
 import { DURATION, EASE_OUT, fadeUp } from '@/lib/motion'
 import { motion, useReducedMotion } from 'framer-motion'
 import { MoreHorizontal, Sparkles } from 'lucide-react'
@@ -36,11 +37,10 @@ export function VentoraAiOverview({
       <div className="flex flex-1 flex-col rounded-lg border border-[var(--border-default)] bg-[var(--bg-subtle)]/60 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
         <div className="flex items-center gap-2">
           <motion.div
-            className="flex h-8 w-8 items-center justify-center rounded-md bg-[var(--accent-muted)] ring-1 ring-[var(--accent-border)]"
             animate={reduced ? undefined : { scale: [1, 1.04, 1] }}
             transition={{ duration: 2.8, repeat: Infinity, ease: 'easeInOut' }}
           >
-            <Sparkles size={16} className="text-[var(--accent)]" strokeWidth={1.75} aria-hidden />
+            <IconTile icon={Sparkles} size="sm" />
           </motion.div>
           <p className="text-sm font-semibold text-[var(--text-primary)]">{headline}</p>
         </div>

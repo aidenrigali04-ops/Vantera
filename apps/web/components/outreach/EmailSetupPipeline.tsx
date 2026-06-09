@@ -9,30 +9,33 @@ type EmailSetupPipelineProps = {
   progress: number
 }
 
+const stepTileClass =
+  'icon-tile flex h-8 w-8 items-center justify-center rounded-full'
+
 function StepIcon({ status }: { status: EmailSetupStep['status'] }) {
   switch (status) {
     case 'complete':
       return (
-        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--success-muted)] text-[var(--success)]">
-          <Check className="h-4 w-4" aria-hidden />
+        <span className={stepTileClass}>
+          <Check className="h-4 w-4 text-[var(--success)]" strokeWidth={1.75} aria-hidden />
         </span>
       )
     case 'failed':
       return (
-        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--danger-muted)] text-[var(--danger)]">
-          <X className="h-4 w-4" aria-hidden />
+        <span className={stepTileClass}>
+          <X className="h-4 w-4 text-[var(--danger)]" strokeWidth={1.75} aria-hidden />
         </span>
       )
     case 'current':
       return (
-        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--accent-muted)] text-[var(--accent)] ring-2 ring-[var(--accent-border)]">
-          <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+        <span className={cn(stepTileClass, 'ring-1 ring-inset ring-[var(--border-default)]')}>
+          <Loader2 className="h-4 w-4 animate-spin text-[var(--text-primary)]" strokeWidth={1.75} aria-hidden />
         </span>
       )
     default:
       return (
-        <span className="flex h-8 w-8 items-center justify-center rounded-full border border-[var(--border-default)] bg-[var(--bg-surface)] text-[var(--text-tertiary)]">
-          <Circle className="h-3 w-3" aria-hidden />
+        <span className={stepTileClass}>
+          <Circle className="h-3 w-3 text-[var(--text-tertiary)]" strokeWidth={1.75} aria-hidden />
         </span>
       )
   }
@@ -74,11 +77,11 @@ export function EmailSetupPipeline({ steps, progress }: EmailSetupPipelineProps)
             className={cn(
               'relative rounded-xl border p-4 transition-colors duration-120 ease',
               step.status === 'current' &&
-                'border-[var(--accent-border)] bg-[var(--accent-muted)]/40',
+                'border-[var(--border-default)] bg-[var(--bg-surface)]',
               step.status === 'complete' &&
                 'border-[var(--border-subtle)] bg-[var(--bg-surface)]',
               step.status === 'failed' &&
-                'border-[var(--danger)]/30 bg-[var(--danger-muted)]',
+                'border-[var(--danger)]/30 bg-[var(--bg-surface)]',
               step.status === 'pending' &&
                 'border-[var(--border-subtle)] bg-[var(--bg-subtle)]/50',
             )}

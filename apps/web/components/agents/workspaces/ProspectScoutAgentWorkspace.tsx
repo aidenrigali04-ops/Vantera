@@ -582,8 +582,8 @@ export function ProspectScoutAgentWorkspace({
         </div>
       ) : (
         <div className="flex h-full min-h-[320px] flex-col items-center justify-center py-12 text-center">
-          <span className="flex h-14 w-14 items-center justify-center rounded-2xl border border-[var(--accent-border)] bg-[var(--accent-muted)] shadow-[var(--shadow-sm)]">
-            <Search className="h-7 w-7 text-[var(--accent)]" aria-hidden />
+          <span className="icon-tile flex h-14 w-14 items-center justify-center rounded-2xl shadow-[var(--shadow-sm)]">
+            <Search className="h-6 w-6 text-[var(--text-secondary)]" strokeWidth={1.75} aria-hidden />
           </span>
           <p className="mt-5 text-[17px] font-semibold tracking-[-0.02em] text-[var(--text-primary)]">
             Analytics activate after deploy

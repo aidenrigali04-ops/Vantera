@@ -61,8 +61,8 @@ function WizardMediaPanel({ slideId }: { slideId: string }) {
   return (
     <div className="flex h-full flex-col justify-between rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[var(--bg-subtle)]/70 p-6">
       <div className="space-y-3">
-        <span className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-[var(--accent-border)] bg-[var(--accent-muted)]">
-          <Megaphone className="h-5 w-5 text-[var(--text-primary)]" />
+        <span className="icon-tile inline-flex h-11 w-11 items-center justify-center rounded-lg">
+          <Megaphone className="h-5 w-5 text-[var(--text-secondary)]" strokeWidth={1.75} />
         </span>
         <p className="text-sm font-medium text-[var(--text-primary)]">Outreach Agent</p>
         <p className="text-sm leading-relaxed text-[var(--text-secondary)]">
@@ -75,7 +75,7 @@ function WizardMediaPanel({ slideId }: { slideId: string }) {
             key={label}
             className="flex items-center gap-2 text-[13px] text-[var(--text-secondary)]"
           >
-            <Sparkles className="h-3.5 w-3.5 shrink-0 text-[var(--accent)]" />
+            <Sparkles className="h-3.5 w-3.5 shrink-0 text-[var(--text-secondary)]" strokeWidth={1.75} />
             {label}
           </li>
         ))}

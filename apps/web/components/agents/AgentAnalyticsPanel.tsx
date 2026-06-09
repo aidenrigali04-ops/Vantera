@@ -1,8 +1,9 @@
 'use client'
 
 import { LiveIndicator } from '@/components/operational/LiveIndicator'
+import { IconTile } from '@/components/shared/IconTile'
 import { cn } from '@/lib/utils'
-import { Maximize2, RefreshCw } from 'lucide-react'
+import { Activity, Maximize2, RefreshCw } from 'lucide-react'
 import type { ReactNode } from 'react'
 
 type Kpi = { label: string; value: string | number }
@@ -41,12 +42,7 @@ export function AgentAnalyticsPanel({
       >
         <div className="flex items-center justify-between gap-3 border-b border-[var(--border-subtle)] px-4 py-3.5">
           <div className="flex min-w-0 items-center gap-2.5">
-            <span
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--text-primary)] text-[var(--text-inverse)]"
-              aria-hidden
-            >
-              <span className="text-[11px] font-bold">V</span>
-            </span>
+            <IconTile icon={Activity} size="sm" />
             <div className="min-w-0">
               <h2 className="truncate text-[13px] font-semibold text-[var(--text-primary)]">{title}</h2>
               {subtitle ? (

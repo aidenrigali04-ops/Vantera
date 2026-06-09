@@ -257,11 +257,7 @@ function IntegrationTile({
         <div className="flex items-start gap-3">
           <span
             aria-hidden
-            style={{
-              background: `linear-gradient(135deg, ${g1}, ${g2})`,
-              boxShadow: `inset 0 0 0 1px rgba(255,255,255,0.12), 0 8px 20px -8px ${g1}66`,
-            }}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-sm font-semibold text-white"
+            className="icon-tile flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-sm font-semibold text-[var(--text-secondary)]"
           >
             {tile.monogram}
           </span>

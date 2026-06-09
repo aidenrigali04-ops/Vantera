@@ -575,7 +575,7 @@ export function OutreachAgentWorkspace({
                     className="flex items-start gap-2 rounded-lg border border-[var(--border-subtle)] px-3 py-2 text-[12px]"
                   >
                     {row.step.channel === 'sms' ? (
-                      <MessageCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--accent)]" aria-hidden />
+                      <MessageCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--text-secondary)]" strokeWidth={1.75} aria-hidden />
                     ) : (
                       <Mail className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--text-secondary)]" aria-hidden />
                     )}
@@ -595,8 +595,8 @@ export function OutreachAgentWorkspace({
         </div>
       ) : (
         <div className="flex h-full min-h-[320px] flex-col items-center justify-center py-12 text-center">
-          <span className="flex h-14 w-14 items-center justify-center rounded-2xl border border-[var(--accent-border)] bg-[var(--accent-muted)] shadow-[var(--shadow-sm)]">
-            <Megaphone className="h-7 w-7 text-[var(--accent)]" aria-hidden />
+          <span className="icon-tile flex h-14 w-14 items-center justify-center rounded-2xl shadow-[var(--shadow-sm)]">
+            <Megaphone className="h-6 w-6 text-[var(--text-secondary)]" strokeWidth={1.75} aria-hidden />
           </span>
           <p className="mt-5 text-[17px] font-semibold tracking-[-0.02em] text-[var(--text-primary)]">
             Analytics activate after deploy

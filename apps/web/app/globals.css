@@ -160,6 +160,13 @@
     box-shadow: var(--shadow-glow);
   }
 
+  .icon-tile {
+    background: #ffffff;
+    border: 1px solid var(--border-subtle);
+    box-shadow: var(--shadow-sm);
+    color: var(--text-secondary);
+  }
+
   .status-pill {
     display: inline-flex;
     align-items: center;

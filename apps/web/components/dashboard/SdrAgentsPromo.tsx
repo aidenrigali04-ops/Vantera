@@ -1,5 +1,6 @@
 'use client'
 
+import { IconTile } from '@/components/shared/IconTile'
 import {
   countActiveAgents,
   SDR_AGENTS_HEADLINE,
@@ -32,9 +33,7 @@ export function SdrAgentsPromo({ agents, className }: Props) {
     >
       <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 items-start gap-3">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-muted)] text-[var(--accent)] ring-1 ring-[var(--accent-border)]">
-            <Bot className="h-5 w-5" />
-          </span>
+          <IconTile icon={Bot} size="md" />
           <div className="min-w-0">
             <h2 className="text-[15px] font-semibold tracking-[-0.01em] text-[var(--text-primary)]">
               {SDR_AGENTS_HEADLINE}

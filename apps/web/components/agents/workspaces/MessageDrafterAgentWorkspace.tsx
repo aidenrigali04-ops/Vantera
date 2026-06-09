@@ -317,7 +317,7 @@ export function MessageDrafterAgentWorkspace({
         </div>
         <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-subtle)]/40 p-4">
           <div className="flex items-center gap-2 text-[13px] font-semibold text-[var(--text-primary)]">
-            <MessageCircle className="h-4 w-4 text-[var(--accent)]" aria-hidden />
+            <MessageCircle className="h-4 w-4 text-[var(--text-secondary)]" strokeWidth={1.75} aria-hidden />
             LinkedIn manual queue
           </div>
           <p className="mt-2 text-[24px] font-semibold tracking-[-0.02em] text-[var(--text-primary)]">

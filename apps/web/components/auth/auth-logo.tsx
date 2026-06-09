@@ -18,7 +18,7 @@ export function AuthLogo({ className }: AuthLogoProps) {
       )}
     >
       <span
-        className="flex size-8 items-center justify-center rounded-[var(--radius-md)] bg-[var(--accent)] text-[14px] font-bold tracking-tight text-[var(--text-primary)]"
+        className="icon-tile flex size-8 items-center justify-center rounded-[var(--radius-md)] text-[14px] font-semibold tracking-tight text-[var(--text-secondary)]"
         aria-hidden
       >
         V

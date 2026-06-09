@@ -1,5 +1,6 @@
 'use client'
 
+import { IconTile } from '@/components/shared/IconTile'
 import { motion } from 'framer-motion'
 import { fadeUp } from '@/lib/motion'
 import type { SdrAgentCard, SdrAgentSnapshot } from '@/lib/agents/types'
@@ -37,9 +38,7 @@ export function DashboardAgentPanel({ agents, snapshot = EMPTY_SNAPSHOT }: Props
       {/* header */}
       <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-5 py-4">
         <div className="flex items-center gap-2">
-          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[rgba(186,227,255,0.08)]">
-            <Bot className="h-4 w-4 text-[var(--accent-solid)]" />
-          </span>
+          <IconTile icon={Bot} size="xs" />
           <h3 className="text-sm font-semibold text-[var(--text-primary)]">SDR Agents</h3>
         </div>
         <Link
@@ -53,8 +52,8 @@ export function DashboardAgentPanel({ agents, snapshot = EMPTY_SNAPSHOT }: Props
       <div className="flex-1 px-5 py-4">
         {noAgents ? (
           <div className="flex flex-col items-center py-6 text-center">
-            <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-[rgba(186,227,255,0.06)]">
-              <Bot className="h-6 w-6 text-[var(--text-disabled)]" />
+            <div className="icon-tile mb-3 flex h-12 w-12 items-center justify-center rounded-2xl">
+              <Bot className="h-5 w-5 text-[var(--text-secondary)]" strokeWidth={1.75} />
             </div>
             <p className="text-[13px] font-medium text-[var(--text-primary)]">No agents yet</p>
             <p className="mt-1 text-[11px] text-[var(--text-tertiary)]">
@@ -99,8 +98,8 @@ export function DashboardAgentPanel({ agents, snapshot = EMPTY_SNAPSHOT }: Props
                       href="/admin/outreach/agents"
                       className="group flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-[rgba(186,227,255,0.05)]"
                     >
-                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[rgba(186,227,255,0.06)]">
-                        <Bot className="h-4 w-4 text-[var(--text-tertiary)]" />
+                      <span className="icon-tile flex h-8 w-8 shrink-0 items-center justify-center rounded-lg">
+                        <Bot className="h-4 w-4 text-[var(--text-secondary)]" strokeWidth={1.75} />
                       </span>
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-[12px] font-medium text-[var(--text-primary)]">
@@ -109,7 +108,6 @@ export function DashboardAgentPanel({ agents, snapshot = EMPTY_SNAPSHOT }: Props
                         <span className="mt-0.5 inline-flex items-center gap-1 text-[10px] font-medium text-[var(--text-tertiary)]">
                           <span
                             className={cn('h-1.5 w-1.5 rounded-full', stage.dot, stage.pulse && 'animate-pulse')}
-                            style={stage.glow ? { boxShadow: stage.glow } : undefined}
                           />
                           {stage.label}
                         </span>

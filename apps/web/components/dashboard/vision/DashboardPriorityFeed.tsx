@@ -1,5 +1,6 @@
 'use client'
 
+import { IconTile } from '@/components/shared/IconTile'
 import { motion } from 'framer-motion'
 import { fadeUp } from '@/lib/motion'
 import type { ActionFeedItem } from '@/lib/dashboard/action-feed'
@@ -40,21 +41,6 @@ const ICONS = {
   linkedin_step_ready: Link2,
 } as const
 
-const ACCENT: Record<string, string> = {
-  stalled_deal: '#47a3f3',
-  overdue_task: '#ef4444',
-  churn_risk: '#ef4444',
-  reply_detected: '#47a3f3',
-  lead_activity: '#829ab1',
-  aspire_icp_match: '#22a558',
-  draft_ready: '#a78bfa',
-  score_increased: '#47a3f3',
-  email_clicked: '#22a558',
-  email_bounced: '#ef4444',
-  high_icp_no_outreach: '#bae3ff',
-  linkedin_step_ready: '#0a66c2',
-}
-
 type Props = {
   items: ActionFeedItem[]
   successNotice?: OnboardingSuccessNotice | null
@@ -85,7 +71,7 @@ export function DashboardPriorityFeed({
           </p>
         </div>
         {totalCount > 0 && (
-          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[rgba(186,227,255,0.1)] text-[11px] font-bold text-[var(--accent)]">
+          <span className="icon-tile flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-semibold text-[var(--text-secondary)]">
             {totalCount}
           </span>
         )}
@@ -122,9 +108,7 @@ export function DashboardPriorityFeed({
 
         {showEmpty ? (
           <div className="flex flex-col items-center justify-center py-8 text-center">
-            <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-[rgba(186,227,255,0.06)]">
-              <CheckCircle2 className="h-5 w-5 text-emerald-400" />
-            </div>
+            <IconTile icon={CheckCircle2} size="md" iconClassName="text-[var(--success)]" className="mb-2 rounded-full" />
             <p className="text-[13px] font-medium text-[var(--text-primary)]">All caught up</p>
             <p className="mt-1 text-[11px] text-[var(--text-tertiary)]">
               No urgent actions — check back as activity picks up.
@@ -134,19 +118,13 @@ export function DashboardPriorityFeed({
           <ul className="space-y-1.5">
             {visibleItems.map((item) => {
               const Icon = ICONS[item.type as keyof typeof ICONS] ?? MessageSquare
-              const accentColor = ACCENT[item.type] ?? '#829ab1'
               return (
                 <li key={item.id}>
                   <Link
                     href={item.href}
                     className="group flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-[rgba(186,227,255,0.05)]"
                   >
-                    <span
-                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
-                      style={{ background: `${accentColor}18` }}
-                    >
-                      <Icon className="h-4 w-4" style={{ color: accentColor }} />
-                    </span>
+                    <IconTile icon={Icon} size="sm" />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-[12px] font-medium text-[var(--text-primary)]">
                         {item.title}

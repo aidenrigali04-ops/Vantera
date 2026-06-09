@@ -4,6 +4,7 @@ import type { PreviewLead } from '@/lib/onboarding/onboarding-wizard-types'
 import { cn } from '@/lib/utils'
 import { motion } from 'framer-motion'
 import { MapPin, Sparkles } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import { useRegisterOnboardingStep } from '../onboarding-nav'
 import { fadeUp, stepContainer } from '../_primitives'
 
@@ -17,7 +18,7 @@ function LeadRow({ lead, rank }: { lead: PreviewLead; rank: number }) {
 
   return (
     <div className="flex items-start gap-3 rounded-lg border border-[var(--border-default)] bg-[var(--bg-surface)] px-3 py-2.5">
-      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--accent-muted)] text-[11px] font-semibold text-[var(--accent)]">
+      <span className="icon-tile flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold text-[var(--text-secondary)]">
         {rank}
       </span>
       <div className="min-w-0 flex-1">
@@ -54,9 +55,15 @@ export function Step3LeadPreview({ leads }: Props) {
   return (
     <motion.div variants={stepContainer} initial="hidden" animate="show" className="space-y-2">
       {leads.length === 0 ? (
-        <p className="text-[13px] text-[var(--text-secondary)]">
-          No preview leads yet. Go back and run lead discovery.
-        </p>
+        <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-[var(--border-default)] py-8 text-center">
+          <span className="icon-tile flex h-10 w-10 items-center justify-center rounded-full">
+            <ArrowLeft className="h-5 w-5 text-[var(--text-secondary)]" strokeWidth={1.75} aria-hidden />
+          </span>
+          <p className="text-[13px] font-medium text-[var(--text-primary)]">No leads found yet</p>
+          <p className="max-w-[220px] text-[12px] text-[var(--text-tertiary)]">
+            Go back and confirm your AI overview to run lead discovery.
+          </p>
+        </div>
       ) : (
         leads.map((lead, index) => (
           <motion.div key={lead.id} variants={fadeUp}>

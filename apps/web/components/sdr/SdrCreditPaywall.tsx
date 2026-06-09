@@ -1,5 +1,6 @@
 'use client'
 
+import { IconTile } from '@/components/shared/IconTile'
 import { PlanUpgradeButtons } from '@/components/billing/PlanUpgradeButtons'
 import { Button } from '@/components/ui/button'
 import {
@@ -96,9 +97,7 @@ export function SdrCreditPaywall({ open, onOpenChange, credits, onStartTrial }: 
           {!trialUsed ? (
             <div className="rounded-lg border border-[var(--accent-border)] bg-[var(--accent-muted)]/40 p-4">
               <div className="flex items-start gap-3">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-muted)] text-[var(--text-primary)]">
-                  <Sparkles className="h-4 w-4" />
-                </span>
+                <IconTile icon={Sparkles} size="sm" />
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-[var(--text-primary)]">
                     Or start a {SDR_TRIAL_DAYS}-day free trial

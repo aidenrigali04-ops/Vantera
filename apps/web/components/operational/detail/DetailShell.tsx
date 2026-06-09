@@ -162,8 +162,8 @@ export function DetailTimeline({
         const Icon = timelineIcon(item)
         return (
           <li key={item.id} className="flex gap-3">
-            <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[var(--bg-subtle)]">
-              <Icon className="h-4 w-4 text-[var(--text-secondary)]" aria-hidden />
+            <span className="icon-tile mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full">
+              <Icon className="h-4 w-4 text-[var(--text-secondary)]" strokeWidth={1.75} aria-hidden />
             </span>
             <div className="min-w-0">
               <p className="text-[13px] leading-relaxed text-[var(--text-primary)]">

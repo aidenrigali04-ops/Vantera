@@ -27,8 +27,8 @@ function PreviewIdentity() {
   return (
     <MockChrome>
       <div className="flex items-center gap-3 p-4">
-        <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-[var(--brand-accent-muted)] text-[var(--brand-accent)]">
-          <Bot className="h-5 w-5" />
+        <span className="icon-tile flex h-11 w-11 items-center justify-center rounded-lg">
+          <Bot className="h-5 w-5 text-[var(--text-secondary)]" strokeWidth={1.75} />
         </span>
         <div className="min-w-0 flex-1">
           <p className="text-[13px] font-semibold text-[var(--text-primary)]">Alex · SDR</p>
@@ -114,8 +114,8 @@ function PreviewLaunch() {
   return (
     <MockChrome>
       <div className="flex flex-col items-center justify-center gap-2 p-6 text-center">
-        <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--success-muted)] text-[var(--success)]">
-          <Rocket className="h-5 w-5" />
+        <span className="icon-tile flex h-12 w-12 items-center justify-center rounded-full">
+          <Rocket className="h-5 w-5 text-[var(--success)]" strokeWidth={1.75} />
         </span>
         <p className="text-[12px] font-semibold text-[var(--text-primary)]">Agent deploying</p>
         <p className="text-[10px] text-[var(--text-secondary)]">First discovery run starts now</p>

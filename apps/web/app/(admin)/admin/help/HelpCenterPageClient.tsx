@@ -1,5 +1,6 @@
 'use client'
 
+import { IconTile } from '@/components/shared/IconTile'
 import { LinkedInOutreachHelpArticle } from '@/components/help/LinkedInOutreachHelpArticle'
 import { PageHeader } from '@/components/operational/PageHeader'
 import {
@@ -131,9 +132,7 @@ function HelpOverview({ onSelectArticle }: { onSelectArticle: (id: HelpArticleId
               className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4 transition-colors hover:border-[var(--border-default)] hover:bg-[var(--bg-subtle)]/40"
             >
               <div className="flex items-start gap-3">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-muted)] text-[var(--accent)]">
-                  <Icon className="h-4 w-4" aria-hidden />
-                </span>
+                <IconTile icon={Icon} size="sm" />
                 <div className="min-w-0">
                   <p className="text-[14px] font-medium text-[var(--text-primary)]">{article.title}</p>
                   <p className="mt-1 text-[12px] leading-relaxed text-[var(--text-secondary)]">

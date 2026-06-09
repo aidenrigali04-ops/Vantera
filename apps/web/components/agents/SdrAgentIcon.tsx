@@ -17,5 +17,5 @@ type Props = {
 
 export function SdrAgentIcon({ name, className }: Props) {
   const Icon = ICONS[name]
-  return <Icon className={className} aria-hidden />
+  return <Icon className={className} strokeWidth={1.75} aria-hidden />
 }

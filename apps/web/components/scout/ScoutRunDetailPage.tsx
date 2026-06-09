@@ -163,8 +163,8 @@ export function ScoutRunDetailPage({ search, results }: Props) {
                       >
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2.5">
-                            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#102a43]">
-                              <User className="h-3.5 w-3.5 text-[var(--cd-accent)]" aria-hidden />
+                            <div className="icon-tile flex h-7 w-7 shrink-0 items-center justify-center rounded-full">
+                              <User className="h-3.5 w-3.5 text-[var(--text-secondary)]" strokeWidth={1.75} aria-hidden />
                             </div>
                             <div className="min-w-0">
                               <p className="text-[13px] font-medium text-[var(--cd-text-primary)]">{name}</p>

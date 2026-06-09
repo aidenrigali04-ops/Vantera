@@ -41,19 +41,9 @@ export function linkedInHandle(url: string): string {
     .replace(/\b\w/g, (char) => char.toUpperCase())
 }
 
-export function aspireAvatarTone(name: string): string {
-  const tones = [
-    'bg-[var(--accent-muted)] text-[var(--accent)] ring-[var(--accent-border)]',
-    'bg-[var(--success-muted)] text-[var(--success)] ring-[var(--success)]/25',
-    'bg-[var(--warning-muted)] text-[var(--warning)] ring-[var(--warning)]/25',
-    'bg-[var(--bg-overlay)] text-[var(--text-secondary)] ring-[var(--border-default)]',
-  ] as const
-
-  let hash = 0
-  for (let i = 0; i < name.length; i++) {
-    hash = name.charCodeAt(i) + ((hash << 5) - hash)
-  }
-  return tones[Math.abs(hash) % tones.length]!
+/** Neutral prospect avatar — white tile, no per-name color rotation. */
+export function aspireAvatarTone(_name: string): string {
+  return 'icon-tile bg-white text-[var(--text-secondary)] ring-1 ring-inset ring-[var(--border-subtle)]'
 }
 
 export function aspireInitials(row: AspireSearchResult): string {

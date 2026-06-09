@@ -1,5 +1,6 @@
 'use client'
 
+import { IconTile } from '@/components/shared/IconTile'
 import { motion } from 'framer-motion'
 import { fadeUp } from '@/lib/motion'
 import type { RevenueProgress } from '@/components/dashboard/MrrProgressPanel'
@@ -88,9 +89,7 @@ export function DashboardRevenueGauge({ data }: Props) {
     return (
       <motion.div variants={fadeUp} className="vision-panel-card flex flex-col rounded-2xl p-5">
         <div className="mb-3 flex items-center gap-2">
-          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[rgba(186,227,255,0.08)]">
-            <Target className="h-3.5 w-3.5 text-[var(--accent-solid)]" />
-          </span>
+          <IconTile icon={Target} size="xs" />
           <h3 className="text-sm font-semibold text-[var(--text-primary)]">Revenue goal</h3>
         </div>
         <p className="mb-4 text-[12px] text-[var(--text-tertiary)]">
@@ -156,9 +155,7 @@ export function DashboardRevenueGauge({ data }: Props) {
     <motion.div variants={fadeUp} className="vision-panel-card flex flex-col rounded-2xl p-5">
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[rgba(186,227,255,0.08)]">
-            <Target className="h-3.5 w-3.5 text-[var(--accent-solid)]" />
-          </span>
+          <IconTile icon={Target} size="xs" />
           <h3 className="text-sm font-semibold text-[var(--text-primary)]">Revenue goal</h3>
         </div>
         <button

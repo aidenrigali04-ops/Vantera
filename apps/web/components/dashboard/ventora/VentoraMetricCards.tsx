@@ -1,6 +1,7 @@
 'use client'
 
 import { AnimatedMetricValue } from '@/components/dashboard/ventora/AnimatedMetricValue'
+import { IconTile } from '@/components/shared/IconTile'
 import type { VentoraMetric, VentoraMetricIcon } from '@/lib/dashboard/ventora-types'
 import { fadeUp, staggerContainer } from '@/lib/motion'
 import { motion } from 'framer-motion'
@@ -32,9 +33,7 @@ export function VentoraMetricCards({ metrics }: Props) {
             variants={fadeUp}
             className="card-surface flex flex-col gap-3 p-4"
           >
-            <div className="flex h-9 w-9 items-center justify-center rounded-md bg-[var(--accent-muted)] ring-1 ring-[var(--accent-border)]">
-              <Icon size={18} className="text-[var(--accent)]" strokeWidth={1.75} aria-hidden />
-            </div>
+            <IconTile icon={Icon} size="sm" />
             <div>
               <p className="text-sm text-[var(--text-secondary)]">{label}</p>
               <AnimatedMetricValue

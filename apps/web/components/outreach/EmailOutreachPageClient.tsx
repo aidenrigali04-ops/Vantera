@@ -12,6 +12,7 @@ import { CAMPAIGN_GOAL_LABELS } from '@/lib/outreach/types'
 import { cn } from '@/lib/utils'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { formatDistanceToNow } from 'date-fns'
+import { IconTile } from '@/components/shared/IconTile'
 import {
   ArrowRight,
   Bot,
@@ -203,9 +204,7 @@ export function EmailOutreachPageClient({ initialHub, domainSettings }: Props) {
                       href={item.href}
                       className="flex items-center gap-4 px-5 py-3 transition-colors duration-120 ease hover:bg-[var(--bg-overlay)] focus-visible:outline-none focus-visible:shadow-[var(--shadow-glow)]"
                     >
-                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-muted)] text-[var(--accent)]">
-                        <Send className="h-4 w-4" aria-hidden />
-                      </span>
+                      <IconTile icon={Send} size="sm" />
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-[13px] font-medium text-[var(--text-primary)]">
                           {item.leadName}
@@ -307,9 +306,7 @@ export function EmailOutreachPageClient({ initialHub, domainSettings }: Props) {
           ) : (
             <section className="card-surface border-[var(--success)]/20 bg-[var(--success-muted)]/30 p-5">
               <div className="flex items-start gap-3">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--success-muted)] text-[var(--success)]">
-                  <Bot className="h-4 w-4" aria-hidden />
-                </span>
+                <IconTile icon={Bot} size="sm" iconClassName="text-[var(--success)]" />
                 <div>
                   <p className="text-sm font-medium text-[var(--text-primary)]">Email channel ready</p>
                   <p className="mt-1 text-[13px] leading-relaxed text-[var(--text-secondary)]">

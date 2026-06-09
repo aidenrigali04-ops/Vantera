@@ -1,5 +1,6 @@
 'use client'
 
+import { IconTile } from '@/components/shared/IconTile'
 import { qualityUiForTier } from '@/lib/aspire/lead-quality-ui'
 import type { AspireSearchResult } from '@/lib/aspire/types'
 import { getProspectEnrichmentFields } from '@/lib/aspire/enrich-prospect'
@@ -17,8 +18,7 @@ type MetricCard = {
   value: string | number
   hint?: string
   icon: LucideIcon
-  accent?: string
-  muted?: string
+  iconClassName?: string
 }
 
 function resolveRowMetrics(row: AspireSearchResult) {
@@ -64,23 +64,19 @@ export function AspireMetricsBar({ rows, className }: Props) {
       value: strongIcp,
       hint: '70+ fit',
       icon: Target,
-      accent: 'var(--accent)',
-      muted: 'var(--accent-muted)',
     },
     {
       label: 'Excellent quality',
       value: excellent,
       hint: 'ICP + enrichment',
       icon: Sparkles,
-      accent: qualityUiForTier('excellent').barColor,
-      muted: qualityUiForTier('excellent').mutedBg,
+      iconClassName: qualityUiForTier('excellent').barColor,
     },
     {
       label: 'With email',
       value: withEmail,
       icon: Mail,
-      accent: 'var(--success)',
-      muted: 'var(--success-muted)',
+      iconClassName: 'text-[var(--success)]',
     },
     {
       label: 'Avg enrichment',
@@ -101,26 +97,14 @@ export function AspireMetricsBar({ rows, className }: Props) {
         <div
           key={card.label}
           className="rounded-xl border border-[var(--border-default)] bg-[var(--bg-surface)] px-4 py-3 shadow-[var(--shadow-sm)]"
-          style={
-            card.muted
-              ? { background: `linear-gradient(135deg, ${card.muted}, var(--bg-surface))` }
-              : undefined
-          }
         >
           <div className="flex items-center justify-between gap-2">
             <p className="text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--text-tertiary)]">
               {card.label}
             </p>
-            <card.icon
-              className="h-4 w-4 shrink-0"
-              style={{ color: card.accent ?? 'var(--text-tertiary)' }}
-              aria-hidden
-            />
+            <IconTile icon={card.icon} size="xs" iconClassName={card.iconClassName} />
           </div>
-          <p
-            className="mt-1 text-xl font-semibold tabular-nums tracking-[-0.02em] text-[var(--text-primary)]"
-            style={card.accent ? { color: card.accent } : undefined}
-          >
+          <p className="mt-1 text-xl font-semibold tabular-nums tracking-[-0.02em] text-[var(--text-primary)]">
             {card.value}
           </p>
           {card.hint ? (

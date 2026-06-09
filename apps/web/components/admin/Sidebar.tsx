@@ -84,21 +84,13 @@ function SidebarContent({
                 <img
                   src={logoUrl}
                   alt=""
-                  className="h-9 w-9 rounded-xl object-contain p-0.5"
-                  style={{ background: 'linear-gradient(135deg, #47a3f3 0%, #bae3ff 100%)' }}
+                  className="icon-tile h-9 w-9 rounded-xl object-contain p-1"
                 />
               ) : (
-                <span
-                  className="flex h-9 w-9 items-center justify-center rounded-xl text-sm font-bold text-[#002159]"
-                  style={{ background: 'linear-gradient(135deg, #47a3f3 0%, #bae3ff 100%)' }}
-                >
+                <span className="icon-tile flex h-9 w-9 items-center justify-center rounded-xl text-sm font-semibold text-[var(--text-secondary)]">
                   {initial}
                 </span>
               )}
-              {/* pulse dot */}
-              <span className="absolute -right-0.5 -top-0.5 flex h-2.5 w-2.5 items-center justify-center rounded-full bg-[#090c13]">
-                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
-              </span>
             </div>
 
             {!collapsed && (
@@ -197,16 +189,11 @@ function SidebarContent({
         {!collapsed && (
           <div className="px-3 pb-3">
             <div className="sidebar-help-card relative overflow-hidden rounded-2xl p-4">
-              {/* decorative glow orb */}
-              <div
-                className="pointer-events-none absolute -right-6 -top-6 h-20 w-20 rounded-full opacity-40"
-                style={{ background: 'radial-gradient(circle, #47a3f3 0%, transparent 70%)' }}
-              />
               <div className="relative">
-                <div className="mb-2 flex h-8 w-8 items-center justify-center rounded-xl bg-[rgba(186,227,255,0.12)]">
-                  <Zap className="h-4 w-4 text-[#47a3f3]" />
+                <div className="icon-tile mb-2 flex h-8 w-8 items-center justify-center rounded-lg">
+                  <Zap className="h-4 w-4 text-[var(--text-secondary)]" strokeWidth={1.75} aria-hidden />
                 </div>
-                <p className="text-[13px] font-bold text-[var(--text-secondary)]">Need help?</p>
+                <p className="text-[13px] font-bold text-[var(--text-secondary)]">Get started</p>
                 <p className="mt-0.5 text-[11px] leading-relaxed text-[var(--text-disabled)]">
                   Launch your AI SDR agent and start closing more deals.
                 </p>
@@ -321,18 +308,20 @@ function NavItemRow({
         {/* icon container */}
         <span
           className={cn(
-            'flex shrink-0 items-center justify-center rounded-lg transition-all duration-150',
+            'icon-tile flex shrink-0 items-center justify-center rounded-lg transition-all duration-150',
             collapsed ? 'h-9 w-9' : 'h-8 w-8',
-            isActive
-              ? 'bg-[rgba(0,33,89,0.2)]'
-              : 'bg-[rgba(186,227,255,0.05)] group-hover:bg-[rgba(186,227,255,0.09)]',
+            isActive && 'ring-1 ring-inset ring-[var(--border-default)]',
           )}
         >
           <Icon
             className={cn(
               'h-4 w-4 transition-colors duration-150',
-              isActive ? 'text-[#002159]' : 'text-[var(--text-disabled)] group-hover:text-[var(--text-tertiary)]',
+              isActive
+                ? 'text-[var(--text-primary)]'
+                : 'text-[var(--text-tertiary)] group-hover:text-[var(--text-secondary)]',
             )}
+            strokeWidth={1.75}
+            aria-hidden
           />
         </span>
 

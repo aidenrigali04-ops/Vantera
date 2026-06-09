@@ -58,11 +58,11 @@ function formatWhen(date: Date): string {
 function EmptyQueue({ tab }: { tab: SequenceTab }) {
   return (
     <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-[var(--border-default)] bg-[var(--bg-subtle)]/60 px-6 py-16 text-center">
-      <span className="flex h-11 w-11 items-center justify-center rounded-lg border border-[var(--border-default)] bg-[var(--bg-surface)]">
+      <span className="icon-tile flex h-11 w-11 items-center justify-center rounded-lg">
         {tab === 'email' ? (
-          <Mail className="h-5 w-5 text-[var(--text-tertiary)]" aria-hidden />
+          <Mail className="h-5 w-5 text-[var(--text-secondary)]" strokeWidth={1.75} aria-hidden />
         ) : (
-          <Link2 className="h-5 w-5 text-[var(--text-tertiary)]" aria-hidden />
+          <Link2 className="h-5 w-5 text-[var(--text-secondary)]" strokeWidth={1.75} aria-hidden />
         )}
       </span>
       <p className="mt-4 text-sm font-medium text-[var(--text-primary)]">

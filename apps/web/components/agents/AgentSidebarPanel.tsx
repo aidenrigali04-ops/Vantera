@@ -47,13 +47,9 @@ export function AgentSidebarPanel({ instructions, connectedApps = [], agentIcon 
                   key={app.id}
                   className="flex items-center gap-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-subtle)]/50 px-3 py-2.5"
                 >
-                  <span
-                    className={cn(
-                      'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-secondary)]',
-                    )}
-                  >
+                  <span className="icon-tile flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[var(--text-secondary)]">
                     {LucideIcon ? (
-                      <LucideIcon className="h-4 w-4" aria-hidden />
+                      <LucideIcon className="h-4 w-4" strokeWidth={1.75} aria-hidden />
                     ) : agentIcon && app.id === 'scout' ? (
                       <SdrAgentIcon name={agentIcon} className="h-4 w-4" />
                     ) : (

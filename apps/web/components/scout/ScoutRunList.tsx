@@ -44,11 +44,11 @@ export function ScoutRunList({ runs }: { runs: RunSummary[] }) {
               href={`/admin/outreach/agents/scout/runs/${encodeURIComponent(run.id)}`}
               className="group flex items-center gap-3 px-4 py-3 transition-colors hover:bg-[#0d1a26]"
             >
-              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#102a43]">
+              <div className="icon-tile flex h-7 w-7 shrink-0 items-center justify-center rounded-full">
                 {run.isActive ? (
-                  <CheckCircle2 className="h-3.5 w-3.5 text-[var(--cd-accent)]" aria-hidden />
+                  <CheckCircle2 className="h-3.5 w-3.5 text-[var(--success)]" strokeWidth={1.75} aria-hidden />
                 ) : (
-                  <Pause className="h-3.5 w-3.5 text-[var(--cd-text-muted)]" aria-hidden />
+                  <Pause className="h-3.5 w-3.5 text-[var(--text-tertiary)]" strokeWidth={1.75} aria-hidden />
                 )}
               </div>
 

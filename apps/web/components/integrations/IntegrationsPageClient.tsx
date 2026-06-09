@@ -185,12 +185,7 @@ export function CrmConnectionsSection({ connections }: Props) {
             >
               <div className="p-5">
                 <div className="flex items-start justify-between gap-3">
-                  <span
-                    className={cn(
-                      'flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br text-xs font-bold text-white',
-                      style.gradient,
-                    )}
-                  >
+                  <span className="icon-tile flex h-10 w-10 items-center justify-center rounded-lg text-xs font-semibold text-[var(--text-secondary)]">
                     {style.monogram}
                   </span>
                   {connected ? (

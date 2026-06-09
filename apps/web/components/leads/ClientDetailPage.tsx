@@ -407,7 +407,7 @@ export function ClientDetailPage({ lead, profile, drafts, sequence, steps, activ
                   {lead.email ? (
                     <a
                       href={`mailto:${lead.email}`}
-                      className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#102a43] text-[var(--cd-accent)] transition-colors hover:bg-[#163552]"
+                      className="icon-tile flex h-8 w-8 items-center justify-center rounded-lg text-[var(--text-secondary)] transition-opacity hover:opacity-80"
                       title={lead.email}
                     >
                       <Mail className="h-3.5 w-3.5" aria-hidden />
@@ -418,7 +418,7 @@ export function ClientDetailPage({ lead, profile, drafts, sequence, steps, activ
                       href={lead.linkedinUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#102a43] text-[var(--cd-accent)] transition-colors hover:bg-[#163552]"
+                      className="icon-tile flex h-8 w-8 items-center justify-center rounded-lg text-[var(--text-secondary)] transition-opacity hover:opacity-80"
                     >
                       <Globe className="h-3.5 w-3.5" aria-hidden />
                     </a>
@@ -426,7 +426,7 @@ export function ClientDetailPage({ lead, profile, drafts, sequence, steps, activ
                   {lead.phone ? (
                     <a
                       href={`tel:${lead.phone}`}
-                      className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#102a43] text-[var(--cd-accent)] transition-colors hover:bg-[#163552]"
+                      className="icon-tile flex h-8 w-8 items-center justify-center rounded-lg text-[var(--text-secondary)] transition-opacity hover:opacity-80"
                       title={lead.phone}
                     >
                       <Phone className="h-3.5 w-3.5" aria-hidden />

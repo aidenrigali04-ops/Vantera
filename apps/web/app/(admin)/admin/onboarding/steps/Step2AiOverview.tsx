@@ -1,5 +1,6 @@
 'use client'
 
+import { IconTile } from '@/components/shared/IconTile'
 import type { BusinessAnalysis, PreviewLead } from '@/lib/onboarding/onboarding-wizard-types'
 import { motion } from 'framer-motion'
 import { Building2, Target, Users } from 'lucide-react'
@@ -26,9 +27,7 @@ function InsightCard({
   return (
     <div className="rounded-lg border border-[var(--border-default)] bg-[var(--bg-surface)] p-3">
       <div className="flex items-start gap-3">
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-muted)] text-[var(--accent)]">
-          <Icon className="h-4 w-4" aria-hidden />
-        </span>
+        <IconTile icon={Icon} size="sm" />
         <div className="min-w-0">
           <p className="text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--text-tertiary)]">
             {label}

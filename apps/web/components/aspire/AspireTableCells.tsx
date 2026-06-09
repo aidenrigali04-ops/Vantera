@@ -79,7 +79,7 @@ export function AspireProspectCell({ row }: ProspectCellProps) {
             </span>
           ) : null}
           {row.leadProfile?.disc ? (
-            <span className="rounded-md bg-[var(--accent-muted)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--accent)]">
+            <span className="rounded-md border border-[var(--border-subtle)] bg-white px-1.5 py-0.5 text-[10px] font-semibold text-[var(--text-secondary)]">
               {row.leadProfile.disc}
             </span>
           ) : null}

@@ -1,5 +1,6 @@
 'use client'
 
+import { IconTile } from '@/components/shared/IconTile'
 import { SlideWizardFrame } from '@/components/onboarding/slide-wizard/SlideWizardFrame'
 import { SdrWizardMediaPanel } from '@/components/sdr/SdrWizardMediaPanel'
 import type { Plan } from '@/lib/feature-flags/flags'
@@ -101,9 +102,7 @@ export function SdrModuleActivationClient({ isOwner, plan, onActivated }: Props)
               className="rounded-lg border border-[var(--border-default)] bg-[var(--bg-surface)] p-3"
             >
               <div className="flex items-start gap-2.5">
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-muted)] text-[var(--accent)]">
-                  <Icon className="h-4 w-4" aria-hidden />
-                </span>
+                <IconTile icon={Icon} size="sm" />
                 <div className="min-w-0">
                   <p className="text-[13px] font-medium text-[var(--text-primary)]">{title}</p>
                   <p className="mt-0.5 text-[12px] leading-relaxed text-[var(--text-secondary)]">
