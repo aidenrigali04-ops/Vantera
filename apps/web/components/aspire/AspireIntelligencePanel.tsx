@@ -1,5 +1,6 @@
 'use client'
 
+import { AspireLeadDataSections } from '@/components/aspire/AspireLeadDataSections'
 import { IcpScoreRing, icpScoreLabel } from '@/components/aspire/IcpScoreRing'
 import { StatusBadge } from '@/components/operational/table/StatusBadge'
 import { Button } from '@/components/ui/button'
@@ -210,7 +211,7 @@ export function AspireIntelligencePanel({
         {signals.length > 0 ? (
           <div>
             <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--text-secondary)]">
-              Key signals
+              ICP signals
             </p>
             <ul className="space-y-1">
               {signals.map((signal) => (
@@ -222,9 +223,7 @@ export function AspireIntelligencePanel({
           </div>
         ) : null}
 
-        {result.employeeCount ? (
-          <p className="text-[12px] text-[var(--text-tertiary)]">~{result.employeeCount} employees</p>
-        ) : null}
+        <AspireLeadDataSections result={result} />
       </div>
 
       <div className="mt-5 flex flex-col gap-2">

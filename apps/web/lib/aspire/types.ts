@@ -1,3 +1,4 @@
+import type { AspireLeadProfile } from '@/lib/aspire/lead-display'
 import type { LeadQualityTier } from '@/lib/leads/enrichment'
 
 export interface ProspectSearchFilters {
@@ -88,6 +89,18 @@ export type AspireSearchResult = ProspectLead & {
   enrichmentScore: number
   enrichmentCompleteness: number
   enrichmentTier: LeadQualityTier
+  /** aspire_results.id */
+  resultId?: string
+  /** aspire_results.status */
+  status?: string
+  /** aspire_results.enrolled_at */
+  enrolledAt?: string | null
+  /** Linked CRM lead when enrolled */
+  leadId?: string | null
+  /** leads.enrichment jsonb when lead is linked */
+  leadEnrichment?: Record<string, unknown> | null
+  /** lead_profiles row or enrichment.profile fallback */
+  leadProfile?: AspireLeadProfile | null
   /** @deprecated use icpScore */
   intentScore: number
   /** @deprecated use organizationName */

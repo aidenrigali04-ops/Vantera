@@ -16,14 +16,15 @@ export function WorkspaceMain({ children, className, constrained = true }: Works
   return (
     <main
       className={cn(
-        'min-h-0 flex-1 overflow-y-auto bg-[var(--bg-base)] pb-20 md:pb-6',
+        'min-h-0 flex-1 bg-[var(--bg-base)]',
+        constrained ? 'overflow-y-auto pb-20 md:pb-6' : 'overflow-hidden',
         className,
       )}
     >
       <div
         className={cn(
           constrained && 'mx-auto w-full max-w-[1280px] px-4 py-5 md:px-8 md:py-6',
-          !constrained && 'min-h-full w-full',
+          !constrained && 'flex min-h-full w-full flex-col',
         )}
       >
         {children}

@@ -4,9 +4,22 @@ import {
   aspireSavedSearches,
   aspireSearchRuns,
   leadDrafts,
+  leadProfiles,
   leads,
 } from '@vantera/db'
 import { and, desc, eq, isNull } from 'drizzle-orm'
+
+export type AspireResultWithContext = {
+  result: typeof aspireResults.$inferSelect
+  lead: typeof leads.$inferSelect | null
+  profile: typeof leadProfiles.$inferSelect | null
+}
+
+const aspireResultWithContextSelect = {
+  result: aspireResults,
+  lead: leads,
+  profile: leadProfiles,
+} as const
 
 export async function findSavedSearches(accountId: string) {
   return db
@@ -28,10 +41,19 @@ export async function findRecentSearchRuns(accountId: string, limit = 10) {
 }
 
 /** Recent Aspire discoveries for the default (non–saved-search) table view. */
-export async function findProspectScoutResults(accountId: string, limit = 50, offset = 0) {
+export async function findProspectScoutResults(
+  accountId: string,
+  limit = 50,
+  offset = 0,
+): Promise<AspireResultWithContext[]> {
   return db
-    .select()
+    .select(aspireResultWithContextSelect)
     .from(aspireResults)
+    .leftJoin(
+      leads,
+      and(eq(aspireResults.leadId, leads.id), isNull(leads.deletedAt)),
+    )
+    .leftJoin(leadProfiles, eq(leadProfiles.leadId, leads.id))
     .where(and(eq(aspireResults.accountId, accountId), isNull(aspireResults.deletedAt)))
     .orderBy(desc(aspireResults.createdAt))
     .limit(limit)
@@ -43,10 +65,15 @@ export async function findAspireResults(
   searchId: string,
   limit = 50,
   offset = 0,
-) {
+): Promise<AspireResultWithContext[]> {
   return db
-    .select()
+    .select(aspireResultWithContextSelect)
     .from(aspireResults)
+    .leftJoin(
+      leads,
+      and(eq(aspireResults.leadId, leads.id), isNull(leads.deletedAt)),
+    )
+    .leftJoin(leadProfiles, eq(leadProfiles.leadId, leads.id))
     .where(
       and(
         eq(aspireResults.accountId, accountId),

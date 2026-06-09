@@ -11,45 +11,107 @@ import {
 import { AgentWorkspaceLayout } from '@/components/agents/AgentWorkspaceLayout'
 import { MessageDrafterCommandCenterClient } from '@/components/message-drafter/MessageDrafterCommandCenterClient'
 import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { AGENT_DEFAULT_INSTRUCTIONS, AGENT_PAGE_COPY } from '@/lib/agents/default-instructions'
 import type { MessageDrafterPayload } from '@/lib/message-drafter/types'
+import type { SdrProfile } from '@/lib/sdr/profile'
 import { isAutomaticOutreachMode } from '@/lib/sdr/outreach-automation-mode'
 import type { OutreachAutomationMode } from '@/lib/sdr/outreach-automation-mode'
 import { cn } from '@/lib/utils'
-import { Check, Mail, MessageCircle, PenLine, Shield } from 'lucide-react'
+import { Check, Link2, Mail, MessageCircle, PenLine, Shield } from 'lucide-react'
 import Link from 'next/link'
-import { useState } from 'react'
+import { useState, useTransition } from 'react'
+import { toast } from 'sonner'
 
 type Props = {
   initialPayload: MessageDrafterPayload
   outreachAutomationMode: OutreachAutomationMode
+  profile: SdrProfile
 }
+
+const VOICE_OPTIONS = [
+  { value: 'professional', label: 'Professional' },
+  { value: 'friendly', label: 'Friendly & Conversational' },
+  { value: 'direct', label: 'Direct & Concise' },
+  { value: 'consultative', label: 'Consultative' },
+  { value: 'bold', label: 'Bold & Confident' },
+]
 
 export function MessageDrafterAgentWorkspace({
   initialPayload,
   outreachAutomationMode,
+  profile,
 }: Props) {
   const copy = AGENT_PAGE_COPY.message_drafter
   const automatic = isAutomaticOutreachMode(outreachAutomationMode)
   const { stats } = initialPayload
+  const [isPending, startTransition] = useTransition()
 
   const [agentName, setAgentName] = useState(copy.defaultName)
   const [agentDescription, setAgentDescription] = useState(copy.defaultDescription)
+  const [fromName, setFromName] = useState(profile.fromName ?? '')
+  const [fromEmail, setFromEmail] = useState(profile.fromEmail ?? '')
+  const [agentTitle, setAgentTitle] = useState(profile.agentTitle ?? '')
+  const [valueProposition, setValueProposition] = useState(profile.valueProposition ?? '')
+  const [icpDescription, setIcpDescription] = useState(profile.icpDescription ?? '')
+  const [icpSummary, setIcpSummary] = useState(profile.icpSummary ?? '')
+  const [voicePreference, setVoicePreference] = useState(profile.voicePreference ?? 'professional')
+  const [signature, setSignature] = useState(profile.signature ?? '')
+  const [bookingLink, setBookingLink] = useState(profile.bookingLink ?? '')
   const [instructions, setInstructions] = useState(AGENT_DEFAULT_INSTRUCTIONS.message_drafter)
   const [conversationStarters, setConversationStarters] = useState(
-    'Draft a personalized cold email for the next lead in queue\nGenerate a 5-step sequence for a high-scoring HVAC owner\nReview and improve the last batch of drafted messages',
+    'Draft a personalized cold email for the next lead in queue\nGenerate a 5-step sequence for a high-scoring lead\nReview and improve the last batch of drafted messages',
   )
   const [requireReview, setRequireReview] = useState(!automatic)
   const [linkedinManual, setLinkedinManual] = useState(true)
 
-  const statusLabel = stats.emailPending + stats.linkedInPending > 0 ? 'Review needed' : 'Clear'
+  const statusLabel = stats.emailPending + stats.linkedInPending > 0 ? 'Review needed' : 'Trained'
   const statusTone = stats.emailPending + stats.linkedInPending > 0 ? 'warning' : 'success'
+  const statusDetail = `${stats.emailPending + stats.linkedInPending} drafts in queue · ${stats.sentThisWeek} sent this week`
+
+  function save() {
+    startTransition(async () => {
+      const toastId = toast.loading('Saving…')
+      try {
+        const res = await fetch('/api/sdr/profile', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({
+            fromName: fromName.trim() || null,
+            fromEmail: fromEmail.trim() || null,
+            agentTitle: agentTitle.trim() || null,
+            signature: signature.trim() || null,
+            bookingLink: bookingLink.trim() || null,
+            voicePreference: voicePreference || null,
+            valueProposition: valueProposition.trim() || null,
+            icpDescription: icpDescription.trim() || null,
+            icpSummary: icpSummary.trim() || null,
+          }),
+        })
+        const json = await res.json()
+        if (!json.success) {
+          toast.error(json.error ?? 'Could not save profile', { id: toastId })
+          return
+        }
+        toast.success('Profile saved — outreach copy will use the updated context', { id: toastId })
+      } catch {
+        toast.error('Save failed — check your connection', { id: toastId })
+      }
+    })
+  }
 
   const configPanel = (
     <>
       <AgentConfigSection title="Agent Identity">
-        <AgentFormField id="drafter-name" label="Name">
+        <AgentFormField id="drafter-name" label="Agent name">
           <Input
             id="drafter-name"
             className={agentInputClassName}
@@ -57,14 +119,118 @@ export function MessageDrafterAgentWorkspace({
             onChange={(e) => setAgentName(e.target.value)}
           />
         </AgentFormField>
-        <AgentFormField id="drafter-description" label="Description">
+        <AgentFormField id="drafter-from-name" label="Sender name">
           <Input
-            id="drafter-description"
+            id="drafter-from-name"
             className={agentInputClassName}
-            value={agentDescription}
-            onChange={(e) => setAgentDescription(e.target.value)}
+            placeholder="Jane Smith"
+            value={fromName}
+            onChange={(e) => setFromName(e.target.value)}
           />
         </AgentFormField>
+        <AgentFormField id="drafter-from-email" label="Sender email">
+          <Input
+            id="drafter-from-email"
+            type="email"
+            className={agentInputClassName}
+            placeholder="jane@yourcompany.com"
+            value={fromEmail}
+            onChange={(e) => setFromEmail(e.target.value)}
+          />
+        </AgentFormField>
+        <AgentFormField id="drafter-agent-title" label="Sender title">
+          <Input
+            id="drafter-agent-title"
+            className={agentInputClassName}
+            placeholder="Sales Development Rep"
+            value={agentTitle}
+            onChange={(e) => setAgentTitle(e.target.value)}
+          />
+        </AgentFormField>
+      </AgentConfigSection>
+
+      <AgentConfigSection title="Voice & Value">
+        <p className="mb-4 text-[12px] leading-relaxed text-[var(--text-secondary)]">
+          These fields power every piece of outreach copy. The more specific you are, the more
+          personalized and conversion-focused each sequence will be.
+        </p>
+        <AgentFormField id="drafter-value-prop" label="Value proposition">
+          <Textarea
+            id="drafter-value-prop"
+            rows={3}
+            className={agentTextareaClassName}
+            placeholder="We help HVAC companies book 3–5 new installs per week using automated follow-up sequences…"
+            value={valueProposition}
+            onChange={(e) => setValueProposition(e.target.value)}
+          />
+        </AgentFormField>
+        <AgentFormField id="drafter-icp-desc" label="Primary pain point">
+          <Textarea
+            id="drafter-icp-desc"
+            rows={2}
+            className={agentTextareaClassName}
+            placeholder="Owners losing leads due to slow follow-up, no CRM, competing with big franchises…"
+            value={icpDescription}
+            onChange={(e) => setIcpDescription(e.target.value)}
+          />
+        </AgentFormField>
+        <AgentFormField id="drafter-icp-summary" label="ICP summary">
+          <Input
+            id="drafter-icp-summary"
+            className={agentInputClassName}
+            placeholder="Home service business owners, 2–20 employees, $500k–$5M revenue"
+            value={icpSummary}
+            onChange={(e) => setIcpSummary(e.target.value)}
+          />
+        </AgentFormField>
+        <AgentFormField id="drafter-voice" label="Voice tone">
+          <Select value={voicePreference} onValueChange={setVoicePreference}>
+            <SelectTrigger className={cn(agentInputClassName, 'w-full')}>
+              <SelectValue placeholder="Select tone…" />
+            </SelectTrigger>
+            <SelectContent>
+              {VOICE_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </AgentFormField>
+      </AgentConfigSection>
+
+      <AgentConfigSection title="Signature & Booking">
+        <AgentFormField id="drafter-signature" label="Email signature">
+          <Textarea
+            id="drafter-signature"
+            rows={4}
+            className={agentTextareaClassName}
+            placeholder={'Jane Smith\nSales Development Rep\njane@yourcompany.com\n(555) 123-4567'}
+            value={signature}
+            onChange={(e) => setSignature(e.target.value)}
+          />
+        </AgentFormField>
+        <AgentFormField id="drafter-booking" label="Booking link">
+          <div className="relative">
+            <Link2 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-tertiary)]" aria-hidden />
+            <Input
+              id="drafter-booking"
+              type="url"
+              className={cn(agentInputClassName, 'pl-9')}
+              placeholder="https://cal.com/jane/30min"
+              value={bookingLink}
+              onChange={(e) => setBookingLink(e.target.value)}
+            />
+          </div>
+        </AgentFormField>
+        <button
+          type="button"
+          disabled={isPending}
+          onClick={save}
+          className="mt-2 inline-flex h-9 items-center gap-2 rounded-lg bg-[var(--accent)] px-4 text-[13px] font-semibold text-[var(--text-inverse)] shadow-[var(--shadow-sm)] transition-opacity hover:opacity-90 disabled:opacity-50"
+        >
+          Save profile
+        </button>
       </AgentConfigSection>
 
       <AgentConfigSection title="Instructions System">
@@ -129,6 +295,8 @@ export function MessageDrafterAgentWorkspace({
 
   const analyticsPanel = (
     <AgentAnalyticsPanel
+      title={agentName}
+      subtitle="Message Drafter · review queue"
       kpis={[
         { label: 'Email & SMS pending', value: stats.emailPending },
         { label: 'LinkedIn waiting', value: stats.linkedInPending },
@@ -170,21 +338,17 @@ export function MessageDrafterAgentWorkspace({
       title={copy.title}
       subtitle={copy.subtitle}
       statusLabel={statusLabel}
+      statusDetail={statusDetail}
       statusTone={statusTone}
       config={configPanel}
       analytics={analyticsPanel}
       footer={
-        <section className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-6 shadow-[var(--shadow-sm)]">
-          <h2 className="text-[20px] font-semibold tracking-[-0.02em] text-[var(--text-primary)]">
-            Review queue
-          </h2>
-          <p className="mt-1 text-[13px] text-[var(--text-secondary)]">
-            Approve, edit, or discard drafts before they go out.
-          </p>
-          <div className="mt-4">
-            <MessageDrafterCommandCenterClient initialPayload={initialPayload} embedded />
-          </div>
-        </section>
+        <AgentConfigSection
+          title="Review queue"
+          description="Approve, edit, or discard drafts before they go out."
+        >
+          <MessageDrafterCommandCenterClient initialPayload={initialPayload} embedded />
+        </AgentConfigSection>
       }
     />
   )

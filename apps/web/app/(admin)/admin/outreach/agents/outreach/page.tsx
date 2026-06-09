@@ -12,6 +12,9 @@ import {
   getOutreachAgentDashboardStats,
   getUpcomingStepsForLinkedCampaigns,
 } from '@/lib/outreach-agent/queries'
+import { findSdrConfigByAccount } from '@/lib/sdr/queries'
+import type { SdrOutreachWindow } from '@/lib/sdr/types'
+import { DEFAULT_OUTREACH_WINDOW } from '@/lib/sdr/types'
 import { accounts } from '@vantera/db'
 import { eq } from 'drizzle-orm'
 import { redirect } from 'next/navigation'
@@ -22,13 +25,14 @@ export const dynamic = 'force-dynamic'
 export default async function OutreachAgentPage() {
   const session = await requireAdminSession()
 
-  const [account, config] = await Promise.all([
+  const [account, config, sdrConfig] = await Promise.all([
     db
       .select({ plan: accounts.plan })
       .from(accounts)
       .where(eq(accounts.id, session.accountId))
       .limit(1),
     findOutreachAgentConfigByAccount(session.accountId),
+    findSdrConfigByAccount(session.accountId),
   ])
 
   const plan = (account[0]?.plan ?? 'team') as Plan
@@ -56,6 +60,8 @@ export default async function OutreachAgentPage() {
           upcoming={[]}
           initialActivity={[]}
           accountId={session.accountId}
+          outreachDays={sdrConfig?.outreachDays ?? ['mon', 'tue', 'wed', 'thu', 'fri']}
+          outreachWindow={(sdrConfig?.outreachWindow as SdrOutreachWindow | undefined) ?? DEFAULT_OUTREACH_WINDOW}
         />
       </Suspense>
     )
@@ -88,6 +94,8 @@ export default async function OutreachAgentPage() {
         }))}
         initialActivity={activity}
         accountId={session.accountId}
+        outreachDays={sdrConfig?.outreachDays ?? ['mon', 'tue', 'wed', 'thu', 'fri']}
+        outreachWindow={(sdrConfig?.outreachWindow as SdrOutreachWindow | undefined) ?? DEFAULT_OUTREACH_WINDOW}
       />
     </Suspense>
   )

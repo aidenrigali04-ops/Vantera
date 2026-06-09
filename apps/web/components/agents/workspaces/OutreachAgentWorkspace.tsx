@@ -6,6 +6,7 @@ import { AgentConfigSection } from '@/components/agents/AgentConfigSection'
 import {
   AgentFormField,
   agentInputClassName,
+  agentSelectTriggerClassName,
   agentTextareaClassName,
 } from '@/components/agents/AgentFormField'
 import { AgentWorkspaceLayout } from '@/components/agents/AgentWorkspaceLayout'
@@ -13,6 +14,13 @@ import { OutreachAgentActivityFeed } from '@/components/outreach-agent/OutreachA
 import { StatusBadge } from '@/components/operational/table/StatusBadge'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   Dialog,
   DialogContent,
@@ -30,7 +38,7 @@ import type {
   OutreachCampaignGoal,
 } from '@/lib/outreach/types'
 import { CAMPAIGN_GOAL_LABELS } from '@/lib/outreach/types'
-import type { SDRActivityEvent } from '@/lib/sdr/types'
+import type { SDRActivityEvent, SdrOutreachWindow } from '@/lib/sdr/types'
 import type {
   OutreachAgentConfig,
   OutreachAgentDashboardStats,
@@ -53,7 +61,25 @@ type Props = {
   upcoming: OutreachAgentUpcomingStep[]
   initialActivity: SDRActivityEvent[]
   accountId: string
+  outreachDays: string[]
+  outreachWindow: SdrOutreachWindow
 }
+
+const DAYS = [
+  { value: 'mon', label: 'Mon' },
+  { value: 'tue', label: 'Tue' },
+  { value: 'wed', label: 'Wed' },
+  { value: 'thu', label: 'Thu' },
+  { value: 'fri', label: 'Fri' },
+  { value: 'sat', label: 'Sat' },
+  { value: 'sun', label: 'Sun' },
+]
+
+const HOUR_OPTIONS = Array.from({ length: 24 }, (_, i) => {
+  const h = i % 12 === 0 ? 12 : i % 12
+  const ampm = i < 12 ? 'AM' : 'PM'
+  return { value: i, label: `${h}:00 ${ampm}` }
+})
 
 const GOALS: OutreachCampaignGoal[] = ['book_meeting', 'fill_funnel', 're_engage']
 
@@ -83,6 +109,8 @@ export function OutreachAgentWorkspace({
   upcoming,
   initialActivity,
   accountId,
+  outreachDays: initialOutreachDays,
+  outreachWindow: initialOutreachWindow,
 }: Props) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -100,6 +128,10 @@ export function OutreachAgentWorkspace({
   const [selectedIds, setSelectedIds] = useState<string[]>(config?.linkedCampaignIds ?? [])
   const [queueEnabled, setQueueEnabled] = useState(true)
   const [linkedinManual, setLinkedinManual] = useState(true)
+  const [activeDays, setActiveDays] = useState<string[]>(initialOutreachDays)
+  const [windowStart, setWindowStart] = useState(initialOutreachWindow.startHour)
+  const [windowEnd, setWindowEnd] = useState(initialOutreachWindow.endHour)
+  const [scheduleIsPending, startScheduleTransition] = useTransition()
   const [createOpen, setCreateOpen] = useState(false)
   const [newCampaignName, setNewCampaignName] = useState('')
   const [newCampaignGoal, setNewCampaignGoal] = useState<OutreachCampaignGoal>('book_meeting')
@@ -125,8 +157,14 @@ export function OutreachAgentWorkspace({
     enabled: mode === 'configured',
   })
 
-  const statusLabel = config?.isPaused ? 'Paused' : config?.isActive ? 'Active' : 'Inactive'
+  const statusLabel = config?.isPaused ? 'Paused' : config?.isActive ? 'Trained' : 'Inactive'
   const statusTone = config?.isPaused ? 'warning' : config?.isActive ? 'success' : 'neutral'
+  const statusDetail =
+    mode === 'configured' && config
+      ? config.isPaused
+        ? 'Outreach sequences are paused'
+        : `${stats?.linkedCampaigns ?? 0} campaigns linked · ${stats?.activeCampaigns ?? 0} active`
+      : undefined
 
   const aggregateMetrics = useMemo(
     () =>
@@ -160,6 +198,50 @@ export function OutreachAgentWorkspace({
     setSelectedIds((current) =>
       current.includes(id) ? current.filter((value) => value !== id) : [...current, id],
     )
+  }
+
+  function toggleDay(day: string) {
+    setActiveDays((current) =>
+      current.includes(day) ? current.filter((d) => d !== day) : [...current, day],
+    )
+  }
+
+  function saveSchedule() {
+    if (activeDays.length === 0) {
+      toast.error('Select at least one active day')
+      return
+    }
+    if (windowEnd <= windowStart) {
+      toast.error('End hour must be after start hour')
+      return
+    }
+
+    startScheduleTransition(async () => {
+      const toastId = toast.loading('Saving schedule…')
+      try {
+        const res = await fetch('/api/sdr/config', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({
+            outreachDays: activeDays,
+            outreachWindow: {
+              startHour: windowStart,
+              endHour: windowEnd,
+              tz: initialOutreachWindow.tz,
+            },
+          }),
+        })
+        const json = await res.json()
+        if (!json.success) {
+          toast.error(json.error ?? 'Could not save schedule', { id: toastId })
+          return
+        }
+        toast.success('Delivery schedule saved', { id: toastId })
+      } catch {
+        toast.error('Save failed — check your connection', { id: toastId })
+      }
+    })
   }
 
   function deploy() {
@@ -327,6 +409,77 @@ export function OutreachAgentWorkspace({
         </div>
       </AgentConfigSection>
 
+      <AgentConfigSection title="Delivery schedule">
+        <p className="mb-4 text-[12px] leading-relaxed text-[var(--text-secondary)]">
+          Outreach only sends during active days and within the configured time window.
+        </p>
+        <AgentFormField id="outreach-days" label="Active days">
+          <div className="flex flex-wrap gap-2">
+            {DAYS.map((day) => {
+              const active = activeDays.includes(day.value)
+              return (
+                <button
+                  key={day.value}
+                  type="button"
+                  onClick={() => toggleDay(day.value)}
+                  className={cn(
+                    'h-8 min-w-[44px] rounded-lg border px-3 text-[12px] font-medium transition-colors duration-[120ms]',
+                    active
+                      ? 'border-[var(--accent-border)] bg-[var(--accent-muted)]/30 text-[var(--accent)]'
+                      : 'border-[var(--border-subtle)] bg-[var(--bg-subtle)] text-[var(--text-secondary)] hover:border-[var(--border-default)]',
+                  )}
+                >
+                  {day.label}
+                </button>
+              )
+            })}
+          </div>
+        </AgentFormField>
+        <AgentFormField id="outreach-window" label="Send window">
+          <div className="flex items-center gap-3">
+            <Select
+              value={String(windowStart)}
+              onValueChange={(v) => setWindowStart(Number(v))}
+            >
+              <SelectTrigger id="outreach-window-start" className={cn(agentSelectTriggerClassName, 'w-36')}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {HOUR_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={String(opt.value)}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <span className="text-[13px] text-[var(--text-tertiary)]">to</span>
+            <Select
+              value={String(windowEnd)}
+              onValueChange={(v) => setWindowEnd(Number(v))}
+            >
+              <SelectTrigger id="outreach-window-end" className={cn(agentSelectTriggerClassName, 'w-36')}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {HOUR_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={String(opt.value)}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </AgentFormField>
+        <button
+          type="button"
+          disabled={scheduleIsPending}
+          onClick={saveSchedule}
+          className="mt-2 inline-flex h-9 items-center gap-2 rounded-lg bg-[var(--accent)] px-4 text-[13px] font-semibold text-[var(--text-inverse)] shadow-[var(--shadow-sm)] transition-opacity hover:opacity-90 disabled:opacity-50"
+        >
+          Save schedule
+        </button>
+      </AgentConfigSection>
+
       <AgentConfigSection
         title="Linked campaigns"
         description="Campaigns this agent orchestrates. Changes apply on save."
@@ -381,7 +534,13 @@ export function OutreachAgentWorkspace({
   )
 
   const analyticsPanel = (
-    <AgentAnalyticsPanel live={mode === 'configured' && activityLive} kpis={analyticsKpis}>
+    <AgentAnalyticsPanel
+      title={agentName}
+      subtitle="Outreach Agent · send & reply logs"
+      live={mode === 'configured' && activityLive}
+      kpis={analyticsKpis}
+      onRefresh={mode === 'configured' ? refreshActivity : undefined}
+    >
       {mode === 'configured' ? (
         <div className="space-y-6">
           <dl className="grid grid-cols-3 gap-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-subtle)]/40 p-4 text-[12px]">
@@ -455,7 +614,9 @@ export function OutreachAgentWorkspace({
       <AgentWorkspaceLayout
         title={copy.title}
         subtitle={copy.subtitle}
+        isDraft={mode === 'setup'}
         statusLabel={mode === 'configured' ? statusLabel : undefined}
+        statusDetail={statusDetail}
         statusTone={statusTone}
         onDeploy={deploy}
         deployLabel={mode === 'setup' ? 'Deploy' : 'Save changes'}
@@ -465,11 +626,8 @@ export function OutreachAgentWorkspace({
         analytics={analyticsPanel}
         footer={
           mode === 'configured' && linkedCampaigns.length > 0 ? (
-            <section className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-6 shadow-[var(--shadow-sm)]">
-              <h2 className="text-[20px] font-semibold tracking-[-0.02em] text-[var(--text-primary)]">
-                Linked campaign performance
-              </h2>
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <AgentConfigSection title="Linked campaign performance">
+              <div className="grid gap-3 sm:grid-cols-2">
                 {linkedCampaigns.map((campaign) => (
                   <div
                     key={campaign.id}
@@ -488,7 +646,7 @@ export function OutreachAgentWorkspace({
                   </div>
                 ))}
               </div>
-            </section>
+            </AgentConfigSection>
           ) : null
         }
       />

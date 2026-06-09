@@ -53,25 +53,25 @@ function SidebarContent({ session, collapsed, onNavigate }: SidebarProps & { col
 
   return (
     <TooltipProvider delayDuration={0}>
-      <div className="sidebar-gradient flex h-full flex-col text-stone-900">
-        <div className={cn('border-b border-stone-200/80 px-3 py-3.5', collapsed && 'px-2')}>
+      <div className="sidebar-gradient flex h-full flex-col text-[var(--sidebar-nav-text)]">
+        <div className={cn('border-b border-[var(--sidebar-nav-border)] px-3 py-3.5', collapsed && 'px-2')}>
           <div className={cn('flex items-center gap-2.5', collapsed && 'justify-center')}>
             {logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={logoUrl}
                 alt=""
-                className="h-8 w-8 shrink-0 rounded-md border border-stone-200 bg-stone-50 object-contain p-0.5"
+                className="h-8 w-8 shrink-0 rounded-md border border-[var(--sidebar-nav-border)] bg-[#102a43] object-contain p-0.5"
               />
             ) : (
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-[var(--border-default)] bg-[var(--text-primary)] text-sm font-bold text-[var(--text-inverse)]">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-[var(--sidebar-nav-border)] bg-[#102a43] text-sm font-bold text-[var(--sidebar-nav-text)]">
                 {initial}
               </span>
             )}
             {!collapsed ? (
               <div className="min-w-0">
-                <p className="truncate text-[13px] font-semibold tracking-[-0.01em]">{displayName}</p>
-                <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-stone-400">
+                <p className="truncate text-[13px] font-semibold tracking-[-0.01em] text-[var(--sidebar-nav-text)]">{displayName}</p>
+                <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--sidebar-nav-text-muted)]">
                   Workspace
                 </p>
               </div>
@@ -81,7 +81,7 @@ function SidebarContent({ session, collapsed, onNavigate }: SidebarProps & { col
 
         <nav className="flex-1 overflow-y-auto px-2 py-3" aria-label="Platform navigation">
           {!collapsed ? (
-            <p className="mb-1.5 px-2 text-[11px] font-medium uppercase tracking-[0.08em] text-stone-400">
+            <p className="mb-1.5 px-2 text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--sidebar-nav-text-muted)]">
               Go to
             </p>
           ) : null}
@@ -122,7 +122,7 @@ function SidebarContent({ session, collapsed, onNavigate }: SidebarProps & { col
                   <button
                     type="button"
                     onClick={() => setCommandPaletteOpen(true)}
-                    className="flex w-full items-center justify-center rounded-md px-2 py-2 text-stone-500 transition-colors hover:bg-stone-50 hover:text-stone-800"
+                    className="flex w-full items-center justify-center rounded-md px-2 py-2 text-[var(--sidebar-nav-text-muted)] transition-colors hover:bg-[var(--sidebar-nav-hover)] hover:text-[var(--sidebar-nav-text)]"
                     aria-label="Search all tools"
                   >
                     <Search className="h-4 w-4" aria-hidden />
@@ -132,9 +132,9 @@ function SidebarContent({ session, collapsed, onNavigate }: SidebarProps & { col
               </Tooltip>
             </div>
           ) : (
-            <p className="mt-4 px-2 text-[11px] leading-relaxed text-stone-400">
+            <p className="mt-4 px-2 text-[11px] leading-relaxed text-[var(--sidebar-nav-text-muted)]">
               More tools are grouped on the dashboard. Press{' '}
-              <kbd className="rounded border border-stone-200 bg-stone-50 px-1 py-0.5 text-[10px] font-medium text-stone-500">
+              <kbd className="rounded border border-[var(--sidebar-nav-border)] bg-[#102a43] px-1 py-0.5 text-[10px] font-medium text-[var(--sidebar-nav-text-muted)]">
                 ⌘K
               </kbd>{' '}
               to jump anywhere.
@@ -142,7 +142,7 @@ function SidebarContent({ session, collapsed, onNavigate }: SidebarProps & { col
           )}
         </nav>
 
-        <div className="border-t border-stone-200/80 p-2">
+        <div className="border-t border-[var(--sidebar-nav-border)] p-2">
           <ul className="space-y-0.5">
             <li>
               <motion.button
@@ -154,7 +154,7 @@ function SidebarContent({ session, collapsed, onNavigate }: SidebarProps & { col
                   onNavigate?.()
                 }}
                 className={cn(
-                  'flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-[13px] text-stone-600 transition-colors duration-150 hover:bg-stone-50 hover:text-stone-900',
+                  'flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-[13px] text-[var(--sidebar-nav-text-muted)] transition-colors duration-150 hover:bg-[var(--sidebar-nav-hover)] hover:text-[var(--sidebar-nav-text)]',
                   collapsed && 'justify-center px-2',
                 )}
               >
@@ -176,7 +176,7 @@ function SidebarContent({ session, collapsed, onNavigate }: SidebarProps & { col
             <button
               type="submit"
               className={cn(
-                'flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-[13px] text-stone-500 transition-colors duration-150 hover:bg-stone-100 hover:text-stone-800',
+                'flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-[13px] text-[var(--sidebar-nav-text-muted)] transition-colors duration-150 hover:bg-[var(--sidebar-nav-hover)] hover:text-[var(--sidebar-nav-text)]',
                 collapsed && 'justify-center px-2',
               )}
             >
@@ -185,7 +185,7 @@ function SidebarContent({ session, collapsed, onNavigate }: SidebarProps & { col
             </button>
           </form>
           {!collapsed ? (
-            <p className="mt-2 truncate px-2 text-[11px] text-stone-400">{session.email}</p>
+            <p className="mt-2 truncate px-2 text-[11px] text-[var(--sidebar-nav-text-muted)]">{session.email}</p>
           ) : null}
         </div>
       </div>
@@ -229,7 +229,7 @@ function NavItemRow({
 
   const className = cn(
     'flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-[13px] transition-colors duration-150',
-    isActive ? 'nav-item-active' : 'text-stone-600 hover:bg-stone-50 hover:text-stone-900',
+    isActive ? 'nav-item-active' : 'text-[var(--sidebar-nav-text)] hover:bg-[var(--sidebar-nav-hover)] hover:text-[var(--sidebar-nav-text)]',
     collapsed && 'justify-center px-2',
   )
 
@@ -267,7 +267,7 @@ export function Sidebar({ session, mobile, onNavigate }: SidebarProps) {
   if (mobile) {
     return (
       <Sheet open={mobileSidebarOpen} onOpenChange={setMobileSidebarOpen}>
-        <SheetContent side="left" className="sidebar-gradient w-[240px] border-stone-200 p-0 text-stone-900">
+        <SheetContent side="left" className="sidebar-gradient w-[240px] border-[var(--sidebar-nav-border)] p-0 text-[var(--sidebar-nav-text)]">
           <SidebarContent
             session={session}
             onNavigate={() => {
@@ -284,18 +284,18 @@ export function Sidebar({ session, mobile, onNavigate }: SidebarProps) {
   return (
     <aside
       className={cn(
-        'sidebar-gradient hidden h-full shrink-0 flex-col border-r border-stone-200/80 transition-[width] duration-150 md:flex',
+        'sidebar-gradient hidden h-full shrink-0 flex-col border-r border-[var(--sidebar-nav-border)] transition-[width] duration-150 md:flex',
         sidebarCollapsed ? 'w-16' : 'w-[240px]',
       )}
     >
       <SidebarContent session={session} collapsed={sidebarCollapsed} />
-      <div className="border-t border-stone-200/80 p-2">
+      <div className="border-t border-[var(--sidebar-nav-border)] p-2">
         <Button
           type="button"
           variant="ghost"
           size="sm"
           onClick={toggleSidebar}
-          className="h-8 w-full justify-start text-stone-500 hover:bg-stone-100 hover:text-stone-800"
+          className="h-8 w-full justify-start text-[var(--sidebar-nav-text-muted)] hover:bg-[var(--sidebar-nav-hover)] hover:text-[var(--sidebar-nav-text)]"
           aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
           {sidebarCollapsed ? (

@@ -9,14 +9,5 @@ type Props = {
 }
 
 export function AgentConfigPanel({ children, className }: Props) {
-  return (
-    <div
-      className={cn(
-        'rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-6 shadow-[var(--shadow-sm)] md:p-8',
-        className,
-      )}
-    >
-      <div className="space-y-8">{children}</div>
-    </div>
-  )
+  return <div className={cn('space-y-4', className)}>{children}</div>
 }

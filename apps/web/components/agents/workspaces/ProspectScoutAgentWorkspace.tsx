@@ -28,6 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { AGENT_DEFAULT_INSTRUCTIONS, AGENT_PAGE_COPY } from '@/lib/agents/default-instructions'
 import { getIcpConfigForVertical } from '@/lib/aspire/icp-score'
@@ -59,6 +60,10 @@ type FormState = {
   conversationStarters: string
   targetTitles: string
   targetIndustries: string
+  targetSizeMin: number
+  targetSizeMax: number
+  mustHaveEmail: boolean
+  mustHavePhone: boolean
   targetCities: string
   excludeDomains: string
   maxNewLeadsDay: number
@@ -97,6 +102,10 @@ export function ProspectScoutAgentWorkspace({
     conversationStarters: 'Find 25 qualified prospects in my target market this week\nScore and enrich new leads from yesterday\'s run\nCheck pipeline for leads ready for follow-up',
     targetTitles: (savedIcp?.targetTitles ?? defaultIcp.targetTitles).join(', '),
     targetIndustries: (savedIcp?.targetIndustries ?? defaultIcp.targetIndustries).join(', '),
+    targetSizeMin: savedIcp?.targetSizes?.[0] ?? defaultIcp.targetSizes?.[0] ?? 1,
+    targetSizeMax: savedIcp?.targetSizes?.[1] ?? defaultIcp.targetSizes?.[1] ?? 500,
+    mustHaveEmail: savedIcp?.mustHaveEmail ?? defaultIcp.mustHaveEmail ?? true,
+    mustHavePhone: savedIcp?.mustHavePhone ?? defaultIcp.mustHavePhone ?? false,
     targetCities: config?.targetCities.join(', ') ?? '',
     excludeDomains: config?.excludeDomains.join(', ') ?? '',
     maxNewLeadsDay: config?.maxNewLeadsDay ?? 10,
@@ -162,8 +171,14 @@ export function ProspectScoutAgentWorkspace({
     enabled: mode === 'configured',
   })
 
-  const statusLabel = config?.isPaused ? 'Paused' : config?.isActive ? 'Active' : 'Inactive'
+  const statusLabel = config?.isPaused ? 'Paused' : config?.isActive ? 'Trained' : 'Inactive'
   const statusTone = config?.isPaused ? 'warning' : config?.isActive ? 'success' : 'neutral'
+  const statusDetail =
+    mode === 'configured' && config
+      ? config.isPaused
+        ? 'Discovery and enrollment are paused'
+        : `Last discovery ${config.searchFrequency === 'daily' ? 'daily' : 'weekly'} · max ${config.maxNewLeadsDay} leads/day`
+      : undefined
 
   const analyticsKpis = useMemo(
     () =>
@@ -210,7 +225,7 @@ export function ProspectScoutAgentWorkspace({
         const toastId = toast.loading('Deploying Prospect Scout…')
         try {
         const baseIcp = getIcpConfigForVertical(accountVertical as 'agency')
-        const icpConfig = {
+        const icpConfig: ICPConfig = {
           ...baseIcp,
           targetTitles: form.targetTitles
             .split(',')
@@ -220,6 +235,9 @@ export function ProspectScoutAgentWorkspace({
             .split(',')
             .map((s) => s.trim())
             .filter(Boolean),
+          targetSizes: [form.targetSizeMin, form.targetSizeMax],
+          mustHaveEmail: form.mustHaveEmail,
+          mustHavePhone: form.mustHavePhone,
         }
         const payload: CreateSDRConfigInput & { bindings: AspireBindingInput[] } = {
           agentName: form.agentName.trim(),
@@ -292,7 +310,7 @@ export function ProspectScoutAgentWorkspace({
     }
 
     startTransition(async () => {
-      const patchedIcp = {
+      const patchedIcp: ICPConfig = {
         ...(savedIcp ?? defaultIcp),
         targetTitles: form.targetTitles
           .split(',')
@@ -302,6 +320,9 @@ export function ProspectScoutAgentWorkspace({
           .split(',')
           .map((s) => s.trim())
           .filter(Boolean),
+        targetSizes: [form.targetSizeMin, form.targetSizeMax],
+        mustHaveEmail: form.mustHaveEmail,
+        mustHavePhone: form.mustHavePhone,
       }
       const patchRes = await fetch('/api/sdr/config', {
         method: 'PATCH',
@@ -420,6 +441,57 @@ export function ProspectScoutAgentWorkspace({
             onChange={(e) => setForm({ ...form, targetIndustries: e.target.value })}
           />
         </AgentFormField>
+        <AgentFormField id="scout-size-range" label="Company size (employees)">
+          <div className="flex items-center gap-2">
+            <Input
+              id="scout-size-min"
+              type="number"
+              min={1}
+              className={cn(agentInputClassName, 'w-28')}
+              placeholder="Min"
+              value={form.targetSizeMin}
+              onChange={(e) =>
+                setForm({ ...form, targetSizeMin: Number.parseInt(e.target.value, 10) || 1 })
+              }
+            />
+            <span className="text-[13px] text-[var(--text-tertiary)]">–</span>
+            <Input
+              id="scout-size-max"
+              type="number"
+              min={1}
+              className={cn(agentInputClassName, 'w-28')}
+              placeholder="Max"
+              value={form.targetSizeMax}
+              onChange={(e) =>
+                setForm({ ...form, targetSizeMax: Number.parseInt(e.target.value, 10) || 500 })
+              }
+            />
+          </div>
+        </AgentFormField>
+        <div className="flex flex-col gap-3">
+          <label className="flex items-center justify-between gap-3 rounded-lg border border-[var(--border-subtle)] px-4 py-3">
+            <div>
+              <p className="text-[13px] font-medium text-[var(--text-primary)]">Require verified email</p>
+              <p className="text-[12px] text-[var(--text-secondary)]">Only include leads with a confirmed email address</p>
+            </div>
+            <Switch
+              checked={form.mustHaveEmail}
+              onCheckedChange={(checked) => setForm({ ...form, mustHaveEmail: checked })}
+              className="data-[state=checked]:bg-[var(--accent)]"
+            />
+          </label>
+          <label className="flex items-center justify-between gap-3 rounded-lg border border-[var(--border-subtle)] px-4 py-3">
+            <div>
+              <p className="text-[13px] font-medium text-[var(--text-primary)]">Require phone number</p>
+              <p className="text-[12px] text-[var(--text-secondary)]">Only include leads with a direct phone on file</p>
+            </div>
+            <Switch
+              checked={form.mustHavePhone}
+              onCheckedChange={(checked) => setForm({ ...form, mustHavePhone: checked })}
+              className="data-[state=checked]:bg-[var(--accent)]"
+            />
+          </label>
+        </div>
       </AgentConfigSection>
 
       <AgentConfigSection
@@ -526,7 +598,13 @@ export function ProspectScoutAgentWorkspace({
   )
 
   const analyticsPanel = (
-    <AgentAnalyticsPanel live={mode === 'configured' && activityLive} kpis={analyticsKpis}>
+    <AgentAnalyticsPanel
+      title={form.agentName}
+      subtitle="Prospect Scout · live pipeline"
+      live={mode === 'configured' && activityLive}
+      kpis={analyticsKpis}
+      onRefresh={mode === 'configured' ? refreshActivity : undefined}
+    >
       {mode === 'configured' ? (
         <div className="space-y-6">
           <div>
@@ -606,7 +684,10 @@ export function ProspectScoutAgentWorkspace({
     <AgentWorkspaceLayout
       title={copy.title}
       subtitle={copy.subtitle}
+      standalone={mode === 'setup'}
+      isDraft={mode === 'setup'}
       statusLabel={mode === 'configured' ? statusLabel : undefined}
+      statusDetail={statusDetail}
       statusTone={statusTone}
       onDeploy={deploy}
       deployLabel={mode === 'setup' ? 'Deploy' : 'Save changes'}

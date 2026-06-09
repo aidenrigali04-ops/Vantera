@@ -16,14 +16,17 @@ import type { SdrAgentSnapshot } from '@/lib/agents/types'
 import { cn } from '@/lib/utils'
 import { Activity, Brain, TrendingUp } from 'lucide-react'
 import Link from 'next/link'
-import { useState } from 'react'
+import { useState, useTransition } from 'react'
+import { toast } from 'sonner'
 
 type Props = {
   snapshot: SdrAgentSnapshot
+  defaultMinIcpScore?: number
 }
 
-export function PipelineAnalystAgentWorkspace({ snapshot }: Props) {
+export function PipelineAnalystAgentWorkspace({ snapshot, defaultMinIcpScore: initialScore = 70 }: Props) {
   const copy = AGENT_PAGE_COPY.pipeline_analyst
+  const [isPending, startTransition] = useTransition()
 
   const [agentName, setAgentName] = useState(copy.defaultName)
   const [agentDescription, setAgentDescription] = useState(copy.defaultDescription)
@@ -33,6 +36,29 @@ export function PipelineAnalystAgentWorkspace({ snapshot }: Props) {
   )
   const [dailyScoring, setDailyScoring] = useState(true)
   const [engagementSignals, setEngagementSignals] = useState(true)
+  const [minIcpScore, setMinIcpScore] = useState(initialScore)
+
+  function saveScoreThreshold() {
+    startTransition(async () => {
+      const toastId = toast.loading('Saving…')
+      try {
+        const res = await fetch('/api/sdr/config', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ defaultMinIcpScore: minIcpScore }),
+        })
+        const json = await res.json()
+        if (!json.success) {
+          toast.error(json.error ?? 'Could not save threshold', { id: toastId })
+          return
+        }
+        toast.success('Score threshold saved', { id: toastId })
+      } catch {
+        toast.error('Save failed — check your connection', { id: toastId })
+      }
+    })
+  }
 
   const configPanel = (
     <>
@@ -77,6 +103,38 @@ export function PipelineAnalystAgentWorkspace({ snapshot }: Props) {
         </AgentFormField>
       </AgentConfigSection>
 
+      <AgentConfigSection title="Scoring settings">
+        <p className="mb-4 text-[12px] leading-relaxed text-[var(--text-secondary)]">
+          Leads below the minimum ICP score are hidden from action-feed surfacing and automatic follow-up priority.
+        </p>
+        <AgentFormField id="analyst-min-score" label="Minimum ICP score (0–100)">
+          <div className="flex items-center gap-3">
+            <Input
+              id="analyst-min-score"
+              type="number"
+              min={0}
+              max={100}
+              className={cn(agentInputClassName, 'w-24')}
+              value={minIcpScore}
+              onChange={(e) =>
+                setMinIcpScore(Math.min(100, Math.max(0, Number.parseInt(e.target.value, 10) || 0)))
+              }
+            />
+            <span className="text-[12px] text-[var(--text-tertiary)]">
+              leads scoring below this are deprioritized
+            </span>
+          </div>
+        </AgentFormField>
+        <button
+          type="button"
+          disabled={isPending}
+          onClick={saveScoreThreshold}
+          className="mt-2 inline-flex h-9 items-center gap-2 rounded-lg bg-[var(--accent)] px-4 text-[13px] font-semibold text-[var(--text-inverse)] shadow-[var(--shadow-sm)] transition-opacity hover:opacity-90 disabled:opacity-50"
+        >
+          Save threshold
+        </button>
+      </AgentConfigSection>
+
       <AgentConfigSection title="Capabilities">
         <div className="space-y-3">
           <AgentCapabilityCard
@@ -108,6 +166,8 @@ export function PipelineAnalystAgentWorkspace({ snapshot }: Props) {
 
   const analyticsPanel = (
     <AgentAnalyticsPanel
+      title={agentName}
+      subtitle="Pipeline Analyst · health snapshot"
       kpis={[
         { label: 'Leads in pipeline', value: snapshot.leadsInPipeline },
         { label: 'Enrolled', value: snapshot.enrolledLeads },
@@ -134,7 +194,8 @@ export function PipelineAnalystAgentWorkspace({ snapshot }: Props) {
     <AgentWorkspaceLayout
       title={copy.title}
       subtitle={copy.subtitle}
-      statusLabel="Active"
+      statusLabel="Trained"
+      statusDetail={`${snapshot.leadsInPipeline} leads in pipeline · ${snapshot.activeCampaigns} active campaigns`}
       statusTone="success"
       config={configPanel}
       analytics={analyticsPanel}

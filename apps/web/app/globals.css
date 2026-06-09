@@ -63,8 +63,15 @@
     --brand-accent-hover: var(--accent-hover);
     --brand-accent-muted: var(--accent-muted);
     --brand-accent-border: var(--accent-border);
-    --sidebar-gradient-top: #fafaf8;
-    --sidebar-gradient-bottom: #f3e4d4;
+    --sidebar-gradient-top: #090c13;
+    --sidebar-gradient-bottom: #0d1520;
+    /* Adventure dashboard sidebar tokens */
+    --sidebar-nav-text: #d9e2ec;
+    --sidebar-nav-text-muted: #829ab1;
+    --sidebar-nav-border: rgba(186, 227, 255, 0.08);
+    --sidebar-nav-hover: rgba(16, 42, 67, 0.8);
+    --sidebar-nav-active-bg: #bae3ff;
+    --sidebar-nav-active-text: #002159;
     --radius-sm: 6px;
     --radius-md: 8px;
     --radius-lg: 12px;
@@ -236,10 +243,9 @@
   }
 
   .nav-item-active {
-    background: var(--bg-overlay);
-    color: var(--text-primary);
-    font-weight: 500;
-    box-shadow: inset 0 0 0 1px var(--border-subtle);
+    background: var(--sidebar-nav-active-bg, #bae3ff);
+    color: var(--sidebar-nav-active-text, #002159) !important;
+    font-weight: 600;
   }
 
   .chart-bar-hatch {
@@ -254,13 +260,36 @@
     );
   }
 
+  /* client detail page — Adventure dashboard dark tokens */
+  .client-detail {
+    --cd-bg-outer: #1f2933;
+    --cd-bg-card: #090c13;
+    --cd-bg-footer: #1f2933;
+    --cd-bg-tag-cyan: #c1fef6;
+    --cd-text-tag-cyan: #044e54;
+    --cd-bg-tag-orange: #ffe8d9;
+    --cd-text-tag-orange: #841003;
+    --cd-bg-tag-red: #ffe3e3;
+    --cd-text-tag-red: #610316;
+    --cd-bg-tag-blue: #e6f6ff;
+    --cd-text-tag-blue: #002159;
+    --cd-text-primary: #d9e2ec;
+    --cd-text-secondary: #f0f4f8;
+    --cd-text-muted: #829ab1;
+    --cd-text-label: #e4e7eb;
+    --cd-accent: #bae3ff;
+    --cd-accent-dark: #47a3f3;
+    --cd-accent-text: #002159;
+    --cd-border: rgba(186, 227, 255, 0.1);
+    --cd-shadow: 0px 2px 1px 0px rgba(240, 240, 240, 0.05);
+  }
+
   .agent-workspace .agent-label {
     display: block;
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 500;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--text-tertiary);
+    letter-spacing: 0.01em;
+    color: var(--text-secondary);
   }
 
   .agent-workspace .agent-input {
@@ -286,6 +315,17 @@
       var(--accent-muted) 0%,
       transparent 70%
     );
+  }
+
+  .agent-playground-grid {
+    background-color: var(--bg-subtle);
+    background-image: radial-gradient(
+      circle,
+      color-mix(in srgb, var(--border-default) 65%, transparent) 1px,
+      transparent 1px
+    );
+    background-size: 18px 18px;
+    background-position: center;
   }
 }
 

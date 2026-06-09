@@ -299,7 +299,10 @@ export function AspirePageClient({
     () =>
       sourceResults.map((r, i) => ({
         ...r,
-        id: r.id || `${r.email ?? r.linkedinUrl ?? i}-${aspireCompanyName(r) || 'unknown'}`,
+        id:
+          r.resultId ||
+          r.id ||
+          `${r.email ?? r.linkedinUrl ?? i}-${aspireCompanyName(r) || 'unknown'}`,
         icpScore: r.icpScore ?? r.intentScore ?? 0,
         intentScore: r.icpScore ?? r.intentScore ?? 0,
       })),

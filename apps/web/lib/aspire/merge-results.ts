@@ -1,7 +1,7 @@
 import type { AspireSearchResult } from '@/lib/aspire/types'
 
 export function aspireResultKey(row: AspireSearchResult, fallbackIndex = 0): string {
-  return row.id || row.email || row.linkedinUrl || `row-${fallbackIndex}`
+  return row.resultId || row.id || row.email || row.linkedinUrl || `row-${fallbackIndex}`
 }
 
 /** Merge DB/live rows by stable key, preferring incoming scores and contact fields. */

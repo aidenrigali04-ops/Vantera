@@ -103,15 +103,37 @@ export default async function PipelinePage() {
             </thead>
             <tbody className="divide-y divide-stone-100">
               {leads.map((lead) => (
-                <tr key={lead.id} className="transition-colors hover:bg-stone-50">
-                  <td className="px-4 py-2.5 font-medium text-stone-900">{fullName(lead)}</td>
-                  <td className="px-4 py-2.5 text-stone-600">{lead.company}</td>
-                  <td className="px-4 py-2.5 text-stone-600">{lead.title ?? '—'}</td>
-                  <td className="px-4 py-2.5 font-semibold text-stone-900">{lead.score ?? 0}</td>
-                  <td className="px-4 py-2.5 text-stone-600">
-                    {STATUS_LABELS[lead.relationshipStatus] ?? lead.relationshipStatus}
+                <tr key={lead.id} className="cursor-pointer transition-colors hover:bg-stone-50">
+                  <td className="px-4 py-2.5 font-medium text-stone-900">
+                    <Link href={`/admin/leads/${lead.id}`} className="block hover:text-stone-700">
+                      {fullName(lead)}
+                    </Link>
                   </td>
-                  <td className="px-4 py-2.5 text-stone-400">{lead.source}</td>
+                  <td className="px-4 py-2.5 text-stone-600">
+                    <Link href={`/admin/leads/${lead.id}`} className="block">
+                      {lead.company}
+                    </Link>
+                  </td>
+                  <td className="px-4 py-2.5 text-stone-600">
+                    <Link href={`/admin/leads/${lead.id}`} className="block">
+                      {lead.title ?? '—'}
+                    </Link>
+                  </td>
+                  <td className="px-4 py-2.5 font-semibold text-stone-900">
+                    <Link href={`/admin/leads/${lead.id}`} className="block">
+                      {lead.score ?? 0}
+                    </Link>
+                  </td>
+                  <td className="px-4 py-2.5 text-stone-600">
+                    <Link href={`/admin/leads/${lead.id}`} className="block">
+                      {STATUS_LABELS[lead.relationshipStatus] ?? lead.relationshipStatus}
+                    </Link>
+                  </td>
+                  <td className="px-4 py-2.5 text-stone-400">
+                    <Link href={`/admin/leads/${lead.id}`} className="block">
+                      {lead.source}
+                    </Link>
+                  </td>
                 </tr>
               ))}
             </tbody>

@@ -2,6 +2,7 @@
 
 import { icpScoreColor, icpScoreLabel } from '@/components/aspire/IcpScoreRing'
 import { Button } from '@/components/ui/button'
+import { aspireStatusLabel } from '@/lib/aspire/lead-display'
 import {
   aspireAvatarTone,
   aspireInitials,
@@ -71,6 +72,16 @@ export function AspireProspectCell({ row }: ProspectCellProps) {
           </div>
           {row.industry ? (
             <span className="truncate text-[11px] text-[var(--text-tertiary)]">{row.industry}</span>
+          ) : null}
+          {row.status && row.status !== 'found' ? (
+            <span className="rounded-md bg-[var(--bg-subtle)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--text-secondary)] ring-1 ring-inset ring-[var(--border-default)]">
+              {aspireStatusLabel(row.status)}
+            </span>
+          ) : null}
+          {row.leadProfile?.disc ? (
+            <span className="rounded-md bg-[var(--accent-muted)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--accent)]">
+              {row.leadProfile.disc}
+            </span>
           ) : null}
         </div>
       </div>
