@@ -197,6 +197,19 @@ export const OPTIMIZATION_FINDINGS: OptimizationFinding[] = [
     recommendation: 'Add a "Notify me" capture, or hide behind a flag until the feature exists.',
   },
 
+  {
+    id: 'UX-010',
+    category: 'ux',
+    title: 'New accounts skipped onboarding and landed on the dashboard (FIXED)',
+    severity: 'high',
+    status: 'done',
+    location: 'app/(admin)/layout.tsx, app/(admin)/admin/dashboard/page.tsx',
+    summary:
+      'The admin layout + dashboard gate decided onboarding completion from the middleware branding header (defaulting to true), which carries a host/tenant-resolved signal that could be stale or cross-tenant — so brand-new owners skipped the wizard and landed straight on the dashboard (every account showed onboarded=null yet reached a dashboard). Activation-blocking.',
+    recommendation:
+      'Fixed (commit 5ab0aa2): both gates now read onboarding_completed_at directly from the session account via isOnboardingCompleteForAccount; owners stay locked to /admin/onboarding until onboarding actually completes.',
+  },
+
   // ── A/B experiments ──
   {
     id: 'AB-001',

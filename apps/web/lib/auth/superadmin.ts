@@ -9,7 +9,7 @@
  * finding the security audit flags. The owner already proves identity at login.
  */
 
-const DEFAULT_SUPERADMINS = ['aidenrigali04@gmail.com']
+const DEFAULT_SUPERADMINS = ['aiden@vanterasystem.com']
 
 function allowlist(): string[] {
   const fromEnv = process.env.SUPERADMIN_EMAILS

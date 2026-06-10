@@ -38,7 +38,7 @@ A/B experimentation (as a growth/CRO operator).
 | Area | Open findings | Highest severity |
 |---|---|---|
 | Security | 6 | **High** (SEC-001) |
-| UX / Onboarding / Aha | 9 | **High** (UX-001, UX-002) |
+| UX / Onboarding / Aha | 10 (1 fixed) | **High** (UX-001, UX-002; UX-010 ✅) |
 | A/B experiments | 6 | n/a (opportunities) |
 
 Priority order to tackle first: **SEC-001 → UX-001 → SEC-002 → UX-002 → UX-003**.
@@ -170,6 +170,19 @@ Priority order to tackle first: **SEC-001 → UX-001 → SEC-002 → UX-002 → 
 - **Where:** `AgentsHubView.tsx` `CallingAgentCard` — shows "Soon", no action, no backend.
 - **Fix:** add a "Notify me" capture (validates demand + gives the click somewhere to go)
   or hide the card behind a flag until the feature exists.
+
+---
+
+### UX-010 — New accounts skipped onboarding onto the dashboard · **HIGH** · ✅ done
+- **Where:** `app/(admin)/layout.tsx`, `app/(admin)/admin/dashboard/page.tsx`
+- **Evidence:** both gates derived onboarding completion from the middleware
+  branding **header** (defaulting to `true`); that header is host/tenant-resolved
+  and could be stale or cross-tenant, so brand-new owners skipped the wizard and
+  landed on the dashboard. Every account in the DB showed `onboarded=null` yet
+  users reached dashboards. Activation-blocking.
+- **Fixed (commit `5ab0aa2`):** both gates now read `onboarding_completed_at`
+  directly from the session account via `isOnboardingCompleteForAccount`; owners
+  stay locked to `/admin/onboarding` until onboarding actually completes.
 
 ---
 
