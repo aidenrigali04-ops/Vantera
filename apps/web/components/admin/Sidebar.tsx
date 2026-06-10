@@ -5,6 +5,7 @@ import type { AdminSession } from '@/lib/auth/types'
 import { useBranding } from '@/lib/branding/context'
 import {
   ADMIN_NAV_FOOTER,
+  ADMIN_NAV_SIDEBAR_SECONDARY,
   getSidebarNavItems,
   isSidebarItemActive,
   type AdminNavItem,
@@ -68,7 +69,7 @@ function SidebarContent({
     [startHereActive],
   )
 
-  const footerItems = ADMIN_NAV_FOOTER
+  const footerItems = [...ADMIN_NAV_SIDEBAR_SECONDARY, ...ADMIN_NAV_FOOTER]
 
   return (
     <TooltipProvider delayDuration={0}>
@@ -288,21 +289,16 @@ function NavItemRow({
   const Icon = item.icon
 
   const content = (
-    <motion.div
-      whileHover={isActive || collapsed ? undefined : { x: 2 }}
-      transition={{ duration: 0.12, ease: 'easeOut' }}
-    >
+    <motion.div transition={{ duration: 0.12, ease: 'easeOut' }}>
       <Link
         href={item.href!}
         onClick={onNavigate}
         aria-current={isActive ? 'page' : undefined}
         data-tour={item.tourAnchor}
         className={cn(
-          'group relative flex w-full items-center rounded-xl transition-all duration-150',
+          'group relative flex w-full items-center rounded-[14px] transition-all duration-150',
           collapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2.5',
-          isActive
-            ? 'nav-pill-active cursor-default'
-            : 'hover:bg-white/[0.04]',
+          isActive ? 'nav-pill-active cursor-default' : 'nav-pill-hover',
         )}
       >
         {/* icon */}
@@ -315,9 +311,7 @@ function NavItemRow({
           <Icon
             className={cn(
               'h-4 w-4 transition-colors duration-150',
-              isActive
-                ? 'text-white'
-                : 'text-[var(--text-tertiary)] group-hover:text-[var(--text-secondary)]',
+              isActive ? 'text-white' : 'text-[var(--text-tertiary)] group-hover:text-white',
             )}
             strokeWidth={1.75}
             aria-hidden
@@ -332,7 +326,7 @@ function NavItemRow({
                 'truncate text-[13px] transition-colors duration-150',
                 isActive
                   ? 'font-semibold text-white'
-                  : 'font-medium text-[var(--text-tertiary)] group-hover:text-[var(--text-primary)]',
+                  : 'font-medium text-[var(--text-tertiary)] group-hover:text-white',
               )}
             >
               {item.label}
@@ -393,7 +387,7 @@ export function Sidebar({ session, mobile, onNavigate }: SidebarProps) {
   return (
     <aside
       className={cn(
-        'hidden h-full shrink-0 flex-col border-r border-[var(--border-subtle)] transition-[width] duration-200 md:flex',
+        'sidebar-edge hidden h-full shrink-0 flex-col transition-[width] duration-200 md:flex',
         sidebarCollapsed ? 'w-16' : 'w-[240px]',
       )}
       style={{ background: 'rgba(0,0,0,0.97)' }}

@@ -5,6 +5,7 @@ import { getSdrDashboardStats } from '@/lib/sdr/queries'
 import {
   buildRevenueSeries,
   buildStageBreakdown,
+  buildWelcomeUpdates,
   type DashboardPanels,
 } from '@/lib/dashboard/panels'
 import {
@@ -74,6 +75,12 @@ export default async function AdminDashboardPage() {
       status: lead.relationshipStatus,
     })),
     revenueSeries: buildRevenueSeries(timeline, revenueProgress.avgValue),
+    updates: buildWelcomeUpdates({
+      repliesThisWeek: sdrStats.repliesThisWeek,
+      leadsFoundToday: sdrStats.leadsFoundToday,
+      meetingsThisWeek: sdrStats.meetingsThisWeek,
+      currentMrr: revenueProgress.currentMrr,
+    }),
   }
 
   return (

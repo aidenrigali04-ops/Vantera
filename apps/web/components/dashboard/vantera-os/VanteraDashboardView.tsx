@@ -69,7 +69,7 @@ export function VanteraDashboardView({
 
       {/* ── Row 1: Welcome | metric gauges ── */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[2fr_3fr]">
-        <WelcomePanel email={email} sdrAgents={sdrAgents} />
+        <WelcomePanel email={email} sdrAgents={sdrAgents} updates={panels.updates} />
         <MetricGaugesPanel
           replyRate={panels.replyRate}
           closeRate={panels.closeRate}

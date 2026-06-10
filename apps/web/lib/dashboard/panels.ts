@@ -26,6 +26,13 @@ export type RevenuePoint = {
   pipeline: number
 }
 
+/** "Here's what's new" chip in the welcome panel. */
+export type WelcomeUpdate = {
+  id: string
+  text: string
+  href: string
+}
+
 export type DashboardPanels = {
   /** Replies / contacted over the last 30 days (0–100). */
   replyRate: number
@@ -35,6 +42,7 @@ export type DashboardPanels = {
   stageBreakdown: StageSlice[]
   leads: DashboardLeadRow[]
   revenueSeries: RevenuePoint[]
+  updates: WelcomeUpdate[]
 }
 
 const STAGE_LABELS: Record<string, string> = {
@@ -51,6 +59,48 @@ const STAGE_LABELS: Record<string, string> = {
 
 /** Won + late-stage statuses that count as pipeline value. */
 const PIPELINE_STATUSES = new Set(['qualified', 'discovery_booked', 'proposal_sent', 'won'])
+
+/** Build "Here's what's new" chips from real activity — most newsworthy first, max 3. */
+export function buildWelcomeUpdates(input: {
+  repliesThisWeek: number
+  leadsFoundToday: number
+  meetingsThisWeek: number
+  currentMrr: number
+}): WelcomeUpdate[] {
+  const updates: WelcomeUpdate[] = []
+
+  if (input.repliesThisWeek > 0) {
+    updates.push({
+      id: 'replies',
+      text: `${input.repliesThisWeek} new ${input.repliesThisWeek === 1 ? 'reply' : 'replies'} this week`,
+      href: '/admin/inbox',
+    })
+  }
+  if (input.meetingsThisWeek > 0) {
+    updates.push({
+      id: 'meetings',
+      text: `${input.meetingsThisWeek} ${input.meetingsThisWeek === 1 ? 'meeting' : 'meetings'} booked this week`,
+      href: '/admin/leads',
+    })
+  }
+  if (input.leadsFoundToday > 0) {
+    updates.push({
+      id: 'scout',
+      text: `Scout pulled ${input.leadsFoundToday} more ${input.leadsFoundToday === 1 ? 'lead' : 'leads'} today`,
+      href: '/admin/leads',
+    })
+  }
+  if (input.currentMrr > 0) {
+    const k = input.currentMrr / 1000
+    updates.push({
+      id: 'revenue',
+      text: `Revenue reached $${k >= 1 ? `${Math.floor(k)}k` : Math.round(input.currentMrr).toLocaleString()}`,
+      href: '/admin/dashboard',
+    })
+  }
+
+  return updates.slice(0, 3)
+}
 
 export function buildStageBreakdown(
   byStatus: { status: string; count: number }[],

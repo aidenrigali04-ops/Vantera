@@ -7,6 +7,7 @@ import {
   Calendar,
   CheckSquare,
   ClipboardList,
+  Cpu,
   CreditCard,
   FileCheck,
   FileText,
@@ -15,7 +16,9 @@ import {
   GitBranch,
   Handshake,
   Inbox,
+  Layers,
   LayoutDashboard,
+  LayoutGrid,
   LifeBuoy,
   Link2,
   Mail,
@@ -23,6 +26,7 @@ import {
   Package,
   PieChart,
   Plug,
+  Send,
   Settings,
   Share2,
   Shield,
@@ -63,20 +67,23 @@ export type AdminNavHub = {
   related: AdminNavHubLink[]
 }
 
-/** Sidebar — primary destinations, ordered by the core loop. */
+/** Sidebar — primary destinations per the Figma tab bar. */
 export const ADMIN_NAV_SIDEBAR: AdminNavItem[] = [
-  { id: 'dashboard', label: 'Home', icon: LayoutDashboard, href: '/admin/dashboard' },
-  { id: 'pipeline', label: 'Pipeline', icon: FolderKanban, href: '/admin/leads', tourAnchor: 'nav-pipeline' },
-  { id: 'agent', label: 'Agent', icon: Bot, href: '/admin/sdr-agents', tourAnchor: 'nav-agents' },
-  { id: 'outreach', label: 'Outreach', icon: Megaphone, href: '/admin/outreach/campaigns', tourAnchor: 'nav-outreach' },
-  { id: 'inbox', label: 'Inbox', icon: Inbox, href: '/admin/inbox' },
+  { id: 'dashboard', label: 'Dashboard', icon: LayoutGrid, href: '/admin/dashboard' },
+  { id: 'agent', label: 'Agents', icon: Cpu, href: '/admin/sdr-agents', tourAnchor: 'nav-agents' },
+  { id: 'outreach', label: 'Outreach', icon: Send, href: '/admin/outreach/campaigns', tourAnchor: 'nav-outreach' },
+  { id: 'integrations', label: 'Integrations', icon: Layers, href: '/admin/integrations' },
 ]
 
 /**
- * Secondary sidebar links. Channels (LinkedIn/Email/SMS) are attributes of a
- * sequence, not destinations — they live as tabs inside Agent/Campaigns.
+ * Secondary sidebar links — workspace destinations outside the Figma tab bar.
+ * Channels (LinkedIn/Email/SMS) are attributes of a sequence, not
+ * destinations — they live as tabs inside Agent/Campaigns.
  */
-export const ADMIN_NAV_SIDEBAR_SECONDARY: AdminNavItem[] = []
+export const ADMIN_NAV_SIDEBAR_SECONDARY: AdminNavItem[] = [
+  { id: 'pipeline', label: 'Pipeline', icon: FolderKanban, href: '/admin/leads', tourAnchor: 'nav-pipeline' },
+  { id: 'inbox', label: 'Inbox', icon: Inbox, href: '/admin/inbox' },
+]
 
 /**
  * Grouped areas shown on the dashboard — one primary CTA per hub plus compact related links.
@@ -163,9 +170,12 @@ export function isSidebarItemActive(pathname: string, item: AdminNavItem): boole
     return pathname.startsWith('/admin/leads')
   }
 
+  if (item.id === 'integrations') {
+    return pathname.startsWith('/admin/integrations')
+  }
+
   if (item.id === 'settings' && item.href) {
     if (pathname.startsWith('/admin/billing')) return true
-    if (pathname.startsWith('/admin/integrations')) return true
     return isAdminNavItemActive(pathname, item.href)
   }
 

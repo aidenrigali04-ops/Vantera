@@ -248,12 +248,36 @@
     -webkit-backdrop-filter: blur(20px);
   }
 
-  /* Active nav pill — Figma: solid blue capsule with white ring + soft glow */
-  .nav-pill-active {
+  /* Pressed nav pill — Figma: solid blue rounded rect with white ring + soft glow.
+     Hover uses the same treatment per the Figma tab bar. */
+  .nav-pill-active,
+  .nav-pill-hover:hover {
     background: var(--accent);
     box-shadow:
       0 0 0 1.5px rgba(255, 255, 255, 0.85),
       0 0 16px rgba(6, 151, 255, 0.45);
+  }
+
+  /* Figma tab bar edge — 1px blue line fading out toward the bottom */
+  .sidebar-edge {
+    position: relative;
+  }
+  .sidebar-edge::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: -1px;
+    bottom: 0;
+    width: 1.5px;
+    background: linear-gradient(
+      180deg,
+      #0697ff 0%,
+      #0697ff 62%,
+      rgba(6, 151, 255, 0.4) 82%,
+      rgba(6, 151, 255, 0) 100%
+    );
+    pointer-events: none;
+    z-index: 10;
   }
 
   /* Sidebar search button */
