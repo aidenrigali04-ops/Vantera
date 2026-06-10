@@ -22,16 +22,14 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   const branding = getBrandingFromHeaders(headers())
   const plan = (branding.plan === 'enterprise' ? 'enterprise' : 'team') as Plan
 
-  const brandingMatchesSession =
-    !branding.accountId || String(branding.accountId) === String(session.accountId)
-
+  // Onboarding completion is ALWAYS read from the session's own account in the
+  // DB — never from middleware branding headers. Host/tenant bleed in those
+  // headers was marking brand-new accounts "complete" and letting owners skip
+  // the signup/onboarding flow straight onto the dashboard. Owners stay locked
+  // to the wizard until onboarding_completed_at is actually set.
   let onboardingComplete = true
   if (session.role === 'owner') {
-    if (brandingMatchesSession && branding.onboardingKnown) {
-      onboardingComplete = branding.onboardingComplete
-    } else {
-      onboardingComplete = await isOnboardingCompleteForAccount(session.accountId)
-    }
+    onboardingComplete = await isOnboardingCompleteForAccount(session.accountId)
   }
 
   let flags

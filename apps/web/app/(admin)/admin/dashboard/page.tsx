@@ -1,5 +1,4 @@
 import { requireAdminSession } from '@/lib/auth/require-session'
-import { getBrandingFromHeaders } from '@/lib/branding/server'
 import { getSdrAgentCards } from '@/lib/agents/queries'
 import { getSdrDashboardStats } from '@/lib/sdr/queries'
 import {
@@ -16,7 +15,6 @@ import {
 } from '@/lib/leads/queries'
 import { getRevenueProgress } from '@/lib/revenue/queries'
 import { isOnboardingCompleteForAccount } from '@/lib/onboarding/status'
-import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { DashboardClient } from './dashboard-client'
 import { AUTH_ONBOARDING_PATH } from '@/lib/auth/routes'
@@ -25,24 +23,17 @@ export const dynamic = 'force-dynamic'
 
 export default async function AdminDashboardPage() {
   const session = await requireAdminSession()
-  const branding = getBrandingFromHeaders(headers())
 
-  let onboardingIncomplete = false
+  // Onboarding gate is DB-authoritative on the session's own account — never
+  // trust middleware branding headers here (host/tenant bleed was letting
+  // brand-new accounts skip the wizard and land on the dashboard). Every new
+  // owner runs the full signup/onboarding flow until onboarding_completed_at
+  // is actually set.
   if (session.role === 'owner') {
-    const brandingMatchesSession =
-      !branding.accountId || String(branding.accountId) === String(session.accountId)
-
-    let onboardingComplete = true
-    if (brandingMatchesSession && branding.onboardingKnown) {
-      onboardingComplete = branding.onboardingComplete
-    } else {
-      onboardingComplete = await isOnboardingCompleteForAccount(session.accountId)
+    const onboardingComplete = await isOnboardingCompleteForAccount(session.accountId)
+    if (!onboardingComplete) {
+      redirect(AUTH_ONBOARDING_PATH)
     }
-    onboardingIncomplete = !onboardingComplete
-  }
-
-  if (onboardingIncomplete) {
-    redirect(AUTH_ONBOARDING_PATH)
   }
 
   const [sdrAgents, revenueProgress, sdrStats, pipelineStats, recentLeads, timeline] =
@@ -99,7 +90,7 @@ export default async function AdminDashboardPage() {
       email={session.email}
       accountId={session.accountId}
       panels={panels}
-      onboardingIncomplete={onboardingIncomplete}
+      onboardingIncomplete={false}
       sdrAgents={sdrAgents}
       revenueProgress={revenueProgress}
     />
