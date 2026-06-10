@@ -96,7 +96,7 @@ export function MetricGaugesPanel({ replyRate, closeRate, revenueProgress }: Pro
   return (
     <motion.section
       variants={fadeUp}
-      className="vision-panel-card grid grid-cols-1 gap-8 rounded-3xl p-6 sm:grid-cols-3"
+      className="vision-panel-card grid min-w-0 grid-cols-1 gap-8 rounded-3xl p-6 sm:grid-cols-3 sm:gap-4 xl:gap-8"
     >
       <Gauge
         label="Reply rate"

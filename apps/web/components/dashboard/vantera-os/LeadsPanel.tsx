@@ -25,7 +25,7 @@ const STATUS_LABELS: Record<string, string> = {
 /** Figma: Leads panel — capsule rows with hairline rings, blue fill on hover/active. */
 export function LeadsPanel({ leads }: Props) {
   return (
-    <motion.section variants={fadeUp} className="vantera-leads-panel rounded-3xl p-5 sm:p-6">
+    <motion.section variants={fadeUp} className="vantera-leads-panel rounded-3xl p-6">
       <div className="mb-4 flex items-center justify-between px-1">
         <h2 className="text-[15px] font-semibold text-[var(--text-primary)]">Leads</h2>
         <Link

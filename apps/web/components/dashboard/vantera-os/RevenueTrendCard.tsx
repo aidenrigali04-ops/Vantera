@@ -39,7 +39,7 @@ export function RevenueTrendCard({ series, currentMrr, hasGoalConfig }: Props) {
   return (
     <motion.section
       variants={fadeUp}
-      className="vantera-chart-card flex min-h-[300px] flex-col rounded-2xl p-6"
+      className="vantera-chart-card flex min-h-[300px] min-w-0 flex-col rounded-3xl p-6"
     >
       <div className="flex items-start justify-between">
         <div>

@@ -37,7 +37,7 @@ export function AdminShell({
       <div
         className={cn(
           'grid h-[100dvh] overflow-hidden bg-[var(--bg-base)]',
-          'grid-rows-[3.5rem_1fr]',
+          'grid-rows-[3.5rem_minmax(0,1fr)]',
           sidebarCollapsed
             ? 'md:grid-cols-[4rem_1fr] grid-cols-1'
             : 'md:grid-cols-[240px_1fr] grid-cols-1',

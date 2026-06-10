@@ -32,7 +32,7 @@ export function WelcomePanel({ email, sdrAgents, updates }: Props) {
   return (
     <motion.section
       variants={fadeUp}
-      className="vision-welcome-card flex flex-col gap-6 rounded-3xl p-6 sm:flex-row"
+      className="vision-welcome-card flex min-w-0 flex-col gap-6 rounded-3xl p-6 sm:flex-row"
     >
       {/* left — greeting + what's new */}
       <div className="flex min-w-0 flex-1 flex-col">
@@ -73,7 +73,7 @@ export function WelcomePanel({ email, sdrAgents, updates }: Props) {
       {/* right — blue agent status card */}
       <Link
         href="/admin/agents"
-        className="group flex w-full shrink-0 flex-col rounded-2xl p-4 transition-transform duration-150 hover:-translate-y-0.5 sm:w-[170px]"
+        className="group flex w-full flex-col rounded-2xl p-4 transition-transform duration-150 hover:-translate-y-0.5 sm:w-[170px] sm:shrink-0"
         style={{
           background: 'linear-gradient(165deg, #0697ff 0%, #0366ad 100%)',
           boxShadow: '0 8px 24px -8px rgba(6, 151, 255, 0.5)',

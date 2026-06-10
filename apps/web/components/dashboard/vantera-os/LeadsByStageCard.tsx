@@ -65,7 +65,7 @@ function SegmentedDonut({ slices }: { slices: StageSlice[] }) {
 /** Figma: "Leads by vertical" chart card — donut + center total + legend. */
 export function LeadsByStageCard({ slices, total }: Props) {
   return (
-    <motion.section variants={fadeUp} className="vantera-chart-card flex flex-col rounded-2xl p-6">
+    <motion.section variants={fadeUp} className="vantera-chart-card flex min-w-0 flex-col rounded-3xl p-6">
       <h2 className="text-[13px] font-medium text-[var(--text-tertiary)]">Leads by stage</h2>
 
       {total === 0 ? (
