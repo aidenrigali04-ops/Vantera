@@ -200,7 +200,7 @@ function SidebarContent({
                 <Link
                   href="/admin/sdr-agents"
                   onClick={onNavigate}
-                  className="sidebar-help-btn mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl py-2 text-[11px] font-semibold text-[#002159] transition-opacity hover:opacity-90"
+                  className="sidebar-help-btn mt-3 flex w-full items-center justify-center gap-1.5 rounded-full py-2 text-[11px] font-semibold text-white transition-opacity hover:opacity-90"
                 >
                   <Rocket className="h-3.5 w-3.5" />
                   Launch Agent
@@ -316,7 +316,7 @@ function NavItemRow({
             className={cn(
               'h-4 w-4 transition-colors duration-150',
               isActive
-                ? 'text-[var(--text-primary)]'
+                ? 'text-white'
                 : 'text-[var(--text-tertiary)] group-hover:text-[var(--text-secondary)]',
             )}
             strokeWidth={1.75}
@@ -331,7 +331,7 @@ function NavItemRow({
               className={cn(
                 'truncate text-[13px] transition-colors duration-150',
                 isActive
-                  ? 'font-semibold text-[var(--text-primary)]'
+                  ? 'font-semibold text-white'
                   : 'font-medium text-[var(--text-tertiary)] group-hover:text-[var(--text-primary)]',
               )}
             >
@@ -375,7 +375,7 @@ export function Sidebar({ session, mobile, onNavigate }: SidebarProps) {
         <SheetContent
           side="left"
           className="w-[260px] border-[var(--border-subtle)] p-0"
-          style={{ background: 'rgba(6,11,28,0.97)' }}
+          style={{ background: 'rgba(0,0,0,0.97)' }}
         >
           <SidebarContent
             session={session}
@@ -396,7 +396,7 @@ export function Sidebar({ session, mobile, onNavigate }: SidebarProps) {
         'hidden h-full shrink-0 flex-col border-r border-[var(--border-subtle)] transition-[width] duration-200 md:flex',
         sidebarCollapsed ? 'w-16' : 'w-[240px]',
       )}
-      style={{ background: 'rgba(6,11,28,0.97)' }}
+      style={{ background: 'rgba(0,0,0,0.97)' }}
     >
       <SidebarContent session={session} collapsed={sidebarCollapsed} />
 

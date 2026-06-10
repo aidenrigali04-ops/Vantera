@@ -1,49 +1,33 @@
 'use client'
 
-import { VentoraDashboardView } from '@/components/dashboard/ventora/VentoraDashboardView'
-import type { SdrAgentCard, SdrAgentSnapshot } from '@/lib/agents/types'
-import type { ActionFeedItem } from '@/lib/dashboard/action-feed'
+import { VanteraDashboardView } from '@/components/dashboard/vantera-os/VanteraDashboardView'
+import type { SdrAgentCard } from '@/lib/agents/types'
 import type { RevenueProgress } from '@/components/dashboard/MrrProgressPanel'
-import type { VentoraDashboardPayload } from '@/lib/dashboard/ventora-types'
+import type { DashboardPanels } from '@/lib/dashboard/panels'
 import type { OnboardingSuccessNotice } from '@/lib/import/fields'
 import { onboardingSuccessStorageKey } from '@/lib/import/fields'
 import { useEffect, useState } from 'react'
 
-const EMPTY_VENTORA: VentoraDashboardPayload = {
-  metrics: [],
-  chartData: [],
-  highlightMonth: null,
-  aiHeadline: '',
-  aiBody: '',
-  aiProgress: null,
-  campaignGroups: [],
-}
-
 type DashboardClientProps = {
   email: string
-  ventora?: VentoraDashboardPayload
-  actionFeed: ActionFeedItem[]
   accountId: string
+  panels: DashboardPanels
   onboardingIncomplete?: boolean
   isEmpty?: boolean
   sdrAgents?: SdrAgentCard[]
-  sdrSnapshot?: SdrAgentSnapshot
   revenueProgress: RevenueProgress
 }
 
 export function DashboardClient({
   email,
-  ventora = EMPTY_VENTORA,
-  actionFeed,
   accountId,
+  panels,
   onboardingIncomplete = false,
   isEmpty = false,
   sdrAgents = [],
-  sdrSnapshot,
   revenueProgress,
 }: DashboardClientProps) {
   const showCleanSlate = isEmpty && onboardingIncomplete
-  const showDemoGuide = onboardingIncomplete && !showCleanSlate
   const [successNotice, setSuccessNotice] = useState<OnboardingSuccessNotice | null>(null)
 
   useEffect(() => {
@@ -73,19 +57,14 @@ export function DashboardClient({
   }
 
   return (
-    <>
-      <VentoraDashboardView
-        ventora={ventora}
-        email={email}
-        actionFeed={actionFeed}
-        sdrAgents={sdrAgents}
-        sdrSnapshot={sdrSnapshot}
-        revenueProgress={revenueProgress}
-        showCleanSlate={showCleanSlate}
-        showDemoGuide={showDemoGuide}
-        successNotice={successNotice}
-        onDismissSuccessNotice={dismissSuccessNotice}
-      />
-    </>
+    <VanteraDashboardView
+      email={email}
+      sdrAgents={sdrAgents}
+      revenueProgress={revenueProgress}
+      panels={panels}
+      showCleanSlate={showCleanSlate}
+      successNotice={successNotice}
+      onDismissSuccessNotice={dismissSuccessNotice}
+    />
   )
 }

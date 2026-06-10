@@ -1,6 +1,6 @@
 import { db } from '@/lib/db/client'
 import { activities, leadProfiles, leads } from '@vantera/db'
-import { and, desc, eq, ilike, inArray, isNull, or, sql } from 'drizzle-orm'
+import { and, desc, eq, gte, ilike, inArray, isNull, or, sql } from 'drizzle-orm'
 
 export type LeadFilters = {
   search?: string
@@ -104,4 +104,19 @@ export async function getLeadPipelineStats(accountId: string) {
   const qualified = rows.find((r) => r.status === 'qualified')?.count ?? 0
 
   return { total, qualified, byStatus: rows }
+}
+
+/** Slim creation timeline for the current year — feeds the dashboard revenue trend. */
+export async function getLeadCreationTimeline(accountId: string) {
+  const yearStart = new Date(new Date().getFullYear(), 0, 1)
+  return db
+    .select({ createdAt: leads.createdAt, relationshipStatus: leads.relationshipStatus })
+    .from(leads)
+    .where(
+      and(
+        eq(leads.accountId, accountId),
+        isNull(leads.deletedAt),
+        gte(leads.createdAt, yearStart),
+      ),
+    )
 }
