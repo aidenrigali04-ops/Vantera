@@ -313,6 +313,13 @@ export async function signupAction(
   const { fullName, email, password } = validated.data
   const normalizedEmail = email.toLowerCase().trim()
 
+  // Clear any stale admin session cookie (both scopes) before provisioning —
+  // a leftover cookie from a prior/deleted account would otherwise make the
+  // post-signup navigation read the wrong session and bounce to sign-on.
+  // This only touches v_admin_session, NOT the sb-* cookies (see note below),
+  // so it does not trigger the Supabase cookie race.
+  await clearAdminSession()
+
   // DO NOT call supabase.auth.signOut() here. signOut() pushes Set-Cookie
   // headers that delete the sb-* cookies into this response, and on some
   // edge-runtime / hosted setups those delete headers race with the

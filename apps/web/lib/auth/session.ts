@@ -69,12 +69,34 @@ export async function setPortalSession(session: PortalSession): Promise<void> {
   cookies().set(PORTAL_SESSION_COOKIE, token, buildCookieOptions())
 }
 
+/**
+ * Delete a session cookie across BOTH possible scopes — the `.<appDomain>`
+ * domain cookie set by current deploys AND a host-only cookie that older
+ * deploys (or empty-env builds) may have left behind. When both exist the
+ * browser sends both and the server reads an arbitrary one, which caused
+ * "log in succeeds then bounces straight back to sign-on." Clearing both
+ * scopes on every login/logout/signup makes stale sessions self-heal.
+ */
+function clearCookieAllScopes(name: string): void {
+  const opts = buildCookieOptions()
+  // current scope (domain-scoped when on the app domain, host-only otherwise)
+  cookies().set(name, '', { ...opts, maxAge: 0 })
+  // the opposite scope, so a leftover cookie can't survive
+  if ('domain' in opts && opts.domain) {
+    const { domain: _omit, ...hostOnly } = opts
+    cookies().set(name, '', { ...hostOnly, maxAge: 0 })
+  } else {
+    const domain = getCookieDomainForCurrentRequest()
+    if (domain) cookies().set(name, '', { ...baseCookieOptions, domain, maxAge: 0 })
+  }
+}
+
 export async function clearAdminSession(): Promise<void> {
-  cookies().set(ADMIN_SESSION_COOKIE, '', { ...buildCookieOptions(), maxAge: 0 })
+  clearCookieAllScopes(ADMIN_SESSION_COOKIE)
 }
 
 export async function clearPortalSession(): Promise<void> {
-  cookies().set(PORTAL_SESSION_COOKIE, '', { ...buildCookieOptions(), maxAge: 0 })
+  clearCookieAllScopes(PORTAL_SESSION_COOKIE)
 }
 
 export async function getAdminSession(): Promise<AdminSession | null> {
