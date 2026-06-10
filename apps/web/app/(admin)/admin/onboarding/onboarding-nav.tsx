@@ -36,6 +36,15 @@ const DEFAULT_NAV: OnboardingNavState = {
   isSubmitting: false,
 }
 
+function navStateEqual(a: OnboardingNavState, b: OnboardingNavState): boolean {
+  return (
+    a.canAdvance === b.canAdvance &&
+    a.isSubmitting === b.isSubmitting &&
+    a.primaryLabel === b.primaryLabel &&
+    a.secondaryLabel === b.secondaryLabel
+  )
+}
+
 export function OnboardingNavProvider({ children }: { children: ReactNode }) {
   const submitRef = useRef<(() => Promise<boolean>) | null>(null)
   const secondaryRef = useRef<(() => void | Promise<void>) | null>(null)
@@ -50,7 +59,10 @@ export function OnboardingNavProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const reportNav = useCallback((patch: Partial<OnboardingNavState>) => {
-    setNav((prev) => ({ ...prev, ...patch }))
+    setNav((prev) => {
+      const next = { ...prev, ...patch }
+      return navStateEqual(prev, next) ? prev : next
+    })
   }, [])
 
   const value = useMemo(
@@ -99,21 +111,39 @@ export function useRegisterOnboardingStep(options: {
 }) {
   const ctx = useOnboardingNav()
   const { canAdvance, isSubmitting, submit, primaryLabel, secondary } = options
+  const secondaryLabel = secondary?.label
+
+  const submitRef = useRef(submit)
+  submitRef.current = submit
+
+  const secondaryActionRef = useRef(secondary?.action ?? null)
+  secondaryActionRef.current = secondary?.action ?? null
 
   useEffect(() => {
     if (!ctx) return
-    ctx.registerSubmit(submit)
-    ctx.registerSecondary(secondary?.action ?? null)
+
+    ctx.registerSubmit(() => submitRef.current())
+    ctx.registerSecondary(() => {
+      const action = secondaryActionRef.current
+      return action ? action() : undefined
+    })
+
+    return () => {
+      ctx.registerSubmit(null)
+      ctx.registerSecondary(null)
+    }
+  }, [ctx])
+
+  useEffect(() => {
+    if (!ctx) return
     ctx.reportNav({
       canAdvance,
       isSubmitting,
       primaryLabel,
-      secondaryLabel: secondary?.label,
+      secondaryLabel,
     })
     return () => {
-      ctx.registerSubmit(null)
-      ctx.registerSecondary(null)
       ctx.reportNav(DEFAULT_NAV)
     }
-  }, [ctx, canAdvance, isSubmitting, submit, primaryLabel, secondary])
+  }, [ctx, canAdvance, isSubmitting, primaryLabel, secondaryLabel])
 }

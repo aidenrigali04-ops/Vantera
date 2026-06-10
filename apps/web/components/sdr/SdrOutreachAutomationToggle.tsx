@@ -39,7 +39,7 @@ export function SdrOutreachAutomationToggle({ value, onChange, disabled }: Props
             className={cn(
               'rounded-full px-2 py-0.5 text-[11px] font-medium',
               automatic
-                ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400'
+                ? 'bg-emerald-500/15 text-emerald-700'
                 : 'bg-[var(--bg-subtle)] text-[var(--text-secondary)]',
             )}
           >

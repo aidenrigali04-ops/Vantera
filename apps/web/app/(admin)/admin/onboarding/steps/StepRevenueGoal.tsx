@@ -3,7 +3,7 @@
 import { markOnboardingCompleteAction } from '@/app/(admin)/admin/onboarding/actions'
 import { saveRevenueGoal } from '@/lib/revenue/actions'
 import { Target } from 'lucide-react'
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { useRegisterOnboardingStep } from '../onboarding-nav'
 
 const digits = (s: string) => Number(s.replace(/[^0-9.]/g, ''))
@@ -16,24 +16,26 @@ export function StepRevenueGoal({ accountId }: { accountId: string }) {
 
   const goalNum = digits(goal)
 
+  const submit = useCallback(async () => {
+    const g = digits(goal)
+    if (!g || g <= 0) return false
+    setSubmitting(true)
+    setError(null)
+    try {
+      await saveRevenueGoal({ mrrGoal: g, avgClientValue: avg ? digits(avg) : null })
+      await markOnboardingCompleteAction()
+      return true
+    } catch {
+      setError('Something went wrong saving your goal. Please try again.')
+      setSubmitting(false)
+      return false
+    }
+  }, [avg, goal])
+
   useRegisterOnboardingStep({
     canAdvance: goalNum > 0,
     isSubmitting: submitting,
-    submit: async () => {
-      const g = digits(goal)
-      if (!g || g <= 0) return false
-      setSubmitting(true)
-      setError(null)
-      try {
-        await saveRevenueGoal({ mrrGoal: g, avgClientValue: avg ? digits(avg) : null })
-        await markOnboardingCompleteAction()
-        return true
-      } catch {
-        setError('Something went wrong saving your goal. Please try again.')
-        setSubmitting(false)
-        return false
-      }
-    },
+    submit,
   })
 
   return (

@@ -157,6 +157,12 @@ function OnboardingWizardInner({
     [meta.index, meta.total],
   )
 
+  const handleStep1Complete = useCallback((data: { analysis: BusinessAnalysis }) => {
+    setAnalysis(data.analysis)
+  }, [])
+
+  const noopComplete = useCallback(() => {}, [])
+
   if (!hydrated) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[var(--bg-base)]">
@@ -195,9 +201,7 @@ function OnboardingWizardInner({
               initialBusinessName={businessName}
               initialWebsiteUrl={websiteUrl}
               currentVertical={currentVertical}
-              onComplete={(data) => {
-                setAnalysis(data.analysis)
-              }}
+              onComplete={handleStep1Complete}
             />
           ) : null}
 
@@ -212,10 +216,10 @@ function OnboardingWizardInner({
           {stepIndex === 2 ? <Step3LeadPreview leads={previewLeads} /> : null}
 
           {stepIndex === 3 ? (
-            <Step4Subscription accountId={accountId} onComplete={() => {}} />
+            <Step4Subscription accountId={accountId} onComplete={noopComplete} />
           ) : null}
 
-          {stepIndex === 4 ? <Step4Team onComplete={() => {}} /> : null}
+          {stepIndex === 4 ? <Step4Team onComplete={noopComplete} /> : null}
 
           {stepIndex === 5 ? <StepRevenueGoal accountId={accountId} /> : null}
         </motion.div>

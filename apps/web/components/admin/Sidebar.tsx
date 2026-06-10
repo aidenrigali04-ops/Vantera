@@ -173,7 +173,7 @@ function SidebarContent({
                   <button
                     type="button"
                     onClick={() => setCommandPaletteOpen(true)}
-                    className="flex w-full items-center justify-center rounded-xl px-2 py-2 text-[var(--text-disabled)] transition-colors hover:bg-[rgba(186,227,255,0.06)] hover:text-[var(--text-tertiary)]"
+                    className="flex w-full items-center justify-center rounded-xl px-2 py-2 text-[var(--text-disabled)] transition-colors hover:bg-white/[0.04] hover:text-[var(--text-tertiary)]"
                     aria-label="Search"
                   >
                     <Search className="h-4 w-4" />
@@ -221,7 +221,7 @@ function SidebarContent({
                 onNavigate?.()
               }}
               className={cn(
-                'flex items-center gap-2 rounded-xl px-2 py-2 text-[12px] text-[var(--text-disabled)] transition-colors hover:bg-[rgba(186,227,255,0.06)] hover:text-[var(--text-tertiary)]',
+                'flex items-center gap-2 rounded-xl px-2 py-2 text-[12px] text-[var(--text-disabled)] transition-colors hover:bg-white/[0.04] hover:text-[var(--text-tertiary)]',
                 collapsed && 'w-full justify-center',
               )}
               aria-label="Refresh"
@@ -234,7 +234,7 @@ function SidebarContent({
               <form action={adminLogoutAction} className="ml-auto">
                 <button
                   type="submit"
-                  className="flex items-center gap-1.5 rounded-xl px-2 py-2 text-[12px] text-[var(--text-disabled)] transition-colors hover:bg-[rgba(186,227,255,0.06)] hover:text-red-400"
+                  className="flex items-center gap-1.5 rounded-xl px-2 py-2 text-[12px] text-[var(--text-disabled)] transition-colors hover:bg-white/[0.04] hover:text-red-400"
                 >
                   <LogOut className="h-3.5 w-3.5" />
                   <span>Sign out</span>
@@ -255,7 +255,7 @@ function SidebarContent({
                 <TooltipTrigger asChild>
                   <button
                     type="submit"
-                    className="flex w-full items-center justify-center rounded-xl px-2 py-2 text-[var(--text-disabled)] transition-colors hover:bg-[rgba(186,227,255,0.06)] hover:text-red-400"
+                    className="flex w-full items-center justify-center rounded-xl px-2 py-2 text-[var(--text-disabled)] transition-colors hover:bg-white/[0.04] hover:text-red-400"
                   >
                     <LogOut className="h-3.5 w-3.5" />
                   </button>
@@ -302,15 +302,14 @@ function NavItemRow({
           collapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2.5',
           isActive
             ? 'nav-pill-active cursor-default'
-            : 'hover:bg-[rgba(186,227,255,0.05)]',
+            : 'hover:bg-white/[0.04]',
         )}
       >
-        {/* icon container */}
+        {/* icon */}
         <span
           className={cn(
-            'icon-tile flex shrink-0 items-center justify-center rounded-lg transition-all duration-150',
+            'flex shrink-0 items-center justify-center rounded-lg transition-all duration-150',
             collapsed ? 'h-9 w-9' : 'h-8 w-8',
-            isActive && 'ring-1 ring-inset ring-[var(--border-default)]',
           )}
         >
           <Icon
@@ -332,14 +331,14 @@ function NavItemRow({
               className={cn(
                 'truncate text-[13px] transition-colors duration-150',
                 isActive
-                  ? 'font-semibold text-[#002159]'
+                  ? 'font-semibold text-[var(--text-primary)]'
                   : 'font-medium text-[var(--text-tertiary)] group-hover:text-[var(--text-primary)]',
               )}
             >
               {item.label}
             </span>
             {item.highlightLabel && (
-              <span className="shrink-0 rounded-full bg-[rgba(0,33,89,0.2)] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-[#002159]">
+              <span className="shrink-0 rounded-full bg-white/[0.1] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-[var(--text-secondary)]">
                 {item.highlightLabel}
               </span>
             )}
@@ -408,7 +407,7 @@ export function Sidebar({ session, mobile, onNavigate }: SidebarProps) {
           variant="ghost"
           size="sm"
           onClick={toggleSidebar}
-          className="h-8 w-full justify-start text-[var(--text-disabled)] hover:bg-[rgba(186,227,255,0.06)] hover:text-[var(--text-tertiary)]"
+          className="h-8 w-full justify-start text-[var(--text-disabled)] hover:bg-white/[0.04] hover:text-[var(--text-tertiary)]"
           aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
           {sidebarCollapsed ? (

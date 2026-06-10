@@ -29,7 +29,7 @@ export function AdminShell({
   const { commandPaletteOpen, setCommandPaletteOpen, sidebarCollapsed } = useUIStore()
 
   if (bare) {
-    return <div className="min-h-screen bg-[#fafaf9]">{children}</div>
+    return <div className="min-h-screen bg-[var(--bg-base)]">{children}</div>
   }
 
   return (

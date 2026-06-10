@@ -80,15 +80,15 @@ export function DashboardPriorityFeed({
       <div className="flex-1 overflow-y-auto px-4 py-3">
         {/* success notice */}
         {successNotice && (
-          <div className="mb-3 flex items-start gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-3">
-            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
+          <div className="mb-3 flex items-start gap-3 rounded-xl border border-emerald-600/20 bg-emerald-50 px-3 py-3">
+            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
             <div className="min-w-0 flex-1">
-              <p className="text-[12px] font-medium text-emerald-300">
+              <p className="text-[12px] font-medium text-emerald-800">
                 {onboardingSuccessLabel(successNotice)}
               </p>
               <Link
                 href={onboardingSuccessHref(successNotice)}
-                className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-emerald-400 hover:text-emerald-300"
+                className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-emerald-700 hover:text-emerald-900"
                 onClick={onDismissSuccessNotice}
               >
                 Review workspace <ArrowRight className="h-3 w-3" />
@@ -98,7 +98,7 @@ export function DashboardPriorityFeed({
               <button
                 type="button"
                 onClick={onDismissSuccessNotice}
-                className="text-[11px] text-emerald-500 hover:text-emerald-300"
+                className="text-[11px] text-emerald-600 hover:text-emerald-800"
               >
                 ✕
               </button>
@@ -122,7 +122,7 @@ export function DashboardPriorityFeed({
                 <li key={item.id}>
                   <Link
                     href={item.href}
-                    className="group flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-[rgba(186,227,255,0.05)]"
+                    className="group flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-[rgba(0,0,0,0.04)]"
                   >
                     <IconTile icon={Icon} size="sm" />
                     <div className="min-w-0 flex-1">

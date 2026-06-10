@@ -116,13 +116,13 @@ export function LinkedInConnectPanel({ open, onOpenChange, onConnected }: Props)
             className={cn(
               'flex items-center justify-between rounded-lg border px-3 py-2.5',
               connected
-                ? 'border-emerald-500/30 bg-emerald-500/10'
+                ? 'border-[var(--success)]/30 bg-[var(--success-muted)]/30'
                 : 'border-[var(--border-subtle)] bg-[var(--bg-subtle)]',
             )}
           >
             <span className="flex items-center gap-2 font-medium text-[var(--text-primary)]">
               {connected ? (
-                <CheckCircle2 className="h-4 w-4 text-emerald-500" aria-hidden />
+                <CheckCircle2 className="h-4 w-4 text-[var(--success)]" aria-hidden />
               ) : (
                 <Link2 className="h-4 w-4 text-[var(--text-disabled)]" aria-hidden />
               )}
@@ -152,7 +152,7 @@ export function LinkedInConnectPanel({ open, onOpenChange, onConnected }: Props)
           ) : null}
 
           {status?.lastError ? (
-            <p className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-[12px] text-red-400">
+            <p className="rounded-lg border border-[var(--danger)]/20 bg-[var(--danger)]/10 px-3 py-2 text-[12px] text-[var(--danger)]">
               Last error: {status.lastError}
             </p>
           ) : null}

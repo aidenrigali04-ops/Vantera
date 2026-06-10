@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils'
 import { motion } from 'framer-motion'
 import { MapPin, Sparkles } from 'lucide-react'
 import { ArrowLeft } from 'lucide-react'
+import { useCallback } from 'react'
 import { useRegisterOnboardingStep } from '../onboarding-nav'
 import { fadeUp, stepContainer } from '../_primitives'
 
@@ -45,10 +46,12 @@ function LeadRow({ lead, rank }: { lead: PreviewLead; rank: number }) {
 }
 
 export function Step3LeadPreview({ leads }: Props) {
+  const submit = useCallback(async () => true, [])
+
   useRegisterOnboardingStep({
     canAdvance: leads.length > 0,
     isSubmitting: false,
-    submit: async () => true,
+    submit,
     primaryLabel: 'Get Started',
   })
 

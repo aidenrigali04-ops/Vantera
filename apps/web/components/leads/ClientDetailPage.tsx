@@ -132,7 +132,7 @@ function ChannelTag({ channel }: { channel: string }) {
     sms: { bg: 'bg-[var(--cd-bg-tag-orange)]', text: 'text-[var(--cd-text-tag-orange)]', label: 'SMS' },
     call: { bg: 'bg-[var(--cd-bg-tag-red)]', text: 'text-[var(--cd-text-tag-red)]', label: 'Call' },
   }
-  const style = map[channel.toLowerCase()] ?? { bg: 'bg-[#102a43]', text: 'text-[var(--cd-accent)]', label: channel }
+  const style = map[channel.toLowerCase()] ?? { bg: 'bg-[var(--accent-muted)]', text: 'text-[var(--accent)]', label: channel }
   return (
     <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-medium', style.bg, style.text)}>
       {style.label}
@@ -151,7 +151,7 @@ function StageTag({ status }: { status: string }) {
         won && 'bg-[var(--cd-bg-tag-cyan)] text-[var(--cd-text-tag-cyan)]',
         lost && 'bg-[var(--cd-bg-tag-red)] text-[var(--cd-text-tag-red)]',
         booked && 'bg-[var(--cd-bg-tag-orange)] text-[var(--cd-text-tag-orange)]',
-        !won && !lost && !booked && 'bg-[#102a43] text-[var(--cd-accent)]',
+        !won && !lost && !booked && 'bg-[var(--accent-muted)] text-[var(--accent)]',
       )}
     >
       {STATUS_LABELS[status] ?? status}
@@ -168,7 +168,7 @@ function ScoreBadge({ score }: { score: number }) {
         'flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[12px] font-bold',
         high ? 'bg-[var(--cd-bg-tag-cyan)] text-[var(--cd-text-tag-cyan)]' :
         mid ? 'bg-[var(--cd-bg-tag-orange)] text-[var(--cd-text-tag-orange)]' :
-        'bg-[#102a43] text-[var(--cd-text-muted)]',
+        'bg-[var(--bg-subtle)] text-[var(--cd-text-muted)]',
       )}
     >
       {score}
@@ -304,8 +304,8 @@ export function ClientDetailPage({ lead, profile, drafts, sequence, steps, activ
                     className="h-[160px] w-full rounded-[8px] object-cover"
                   />
                 ) : (
-                  <div className="flex h-[160px] w-full items-center justify-center rounded-[8px] bg-[#102a43]">
-                    <User className="h-12 w-12 text-[var(--cd-accent)]" aria-hidden />
+                  <div className="flex h-[160px] w-full items-center justify-center rounded-[8px] bg-[var(--bg-subtle)]">
+                    <User className="h-12 w-12 text-[var(--cd-text-muted)]" aria-hidden />
                   </div>
                 )}
               </div>
@@ -363,15 +363,15 @@ export function ClientDetailPage({ lead, profile, drafts, sequence, steps, activ
                 ].map(({ label, done }) => (
                   <div key={label} className="flex items-center gap-2 rounded-[6px] px-2 py-1.5">
                     <CheckCircle2
-                      className={cn('h-4 w-4 shrink-0', done ? 'text-[var(--cd-accent)]' : 'text-[#2d4a62]')}
+                      className={cn('h-4 w-4 shrink-0', done ? 'text-[var(--cd-accent)]' : 'text-[var(--cd-text-muted)]')}
                       aria-hidden
                     />
-                    <span className={cn('text-[13px]', done ? 'text-[var(--cd-text-secondary)]' : 'text-[#4a6078]')}>
+                    <span className={cn('text-[13px]', done ? 'text-[var(--cd-text-secondary)]' : 'text-[var(--cd-text-muted)]')}>
                       {label}
                     </span>
                     {done ? null : null}
                     {done ? (
-                      <ExternalLink className="ml-auto h-4 w-4 text-[#2d4a62] hover:text-[var(--cd-accent)] cursor-pointer" aria-hidden />
+                      <ExternalLink className="ml-auto h-4 w-4 text-[var(--cd-text-muted)] hover:text-[var(--cd-accent)] cursor-pointer" aria-hidden />
                     ) : null}
                   </div>
                 ))}
@@ -380,7 +380,7 @@ export function ClientDetailPage({ lead, profile, drafts, sequence, steps, activ
                   <div className="mt-3 border-t border-[var(--cd-border)] pt-3">
                     <p className="mb-1 text-[10px] uppercase tracking-wide text-[var(--cd-text-muted)]">DISC Profile</p>
                     {profile.disc ? (
-                      <span className="rounded-full bg-[#102a43] px-2.5 py-0.5 text-[12px] font-semibold text-[var(--cd-accent)]">
+                      <span className="rounded-full bg-[var(--cd-bg-tag-blue)] px-2.5 py-0.5 text-[12px] font-semibold text-[var(--cd-text-tag-blue)]">
                         {profile.disc} — {DISC_LABELS[profile.disc] ?? profile.disc}
                       </span>
                     ) : null}
@@ -440,7 +440,7 @@ export function ClientDetailPage({ lead, profile, drafts, sequence, steps, activ
             <div className="flex items-center justify-between bg-[var(--cd-bg-footer)] px-4 py-3">
               <div className="flex items-center gap-3">
                 {pendingDrafts.length > 0 ? (
-                  <span className="flex items-center gap-1.5 rounded-full bg-[#102a43] px-3 py-1 text-[12px] font-medium text-[var(--cd-accent)]">
+                  <span className="flex items-center gap-1.5 rounded-full bg-[var(--cd-bg-tag-blue)] px-3 py-1 text-[12px] font-medium text-[var(--cd-text-tag-blue)]">
                     <Zap className="h-3.5 w-3.5" aria-hidden />
                     {pendingDrafts.length} draft{pendingDrafts.length !== 1 ? 's' : ''} pending review
                   </span>

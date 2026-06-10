@@ -62,7 +62,7 @@ function formatDate(d: string | null | undefined) {
 function icpScoreColor(score: number) {
   if (score >= 75) return { ring: 'ring-[var(--cd-text-tag-cyan)]', text: 'text-[var(--cd-text-tag-cyan)]', bg: 'bg-[var(--cd-bg-tag-cyan)]' }
   if (score >= 50) return { ring: 'ring-[var(--cd-text-tag-orange)]', text: 'text-[var(--cd-text-tag-orange)]', bg: 'bg-[var(--cd-bg-tag-orange)]' }
-  return { ring: 'ring-[#2d4a62]', text: 'text-[var(--cd-text-muted)]', bg: 'bg-[#102a43]' }
+  return { ring: 'ring-[var(--border-default)]', text: 'text-[var(--cd-text-muted)]', bg: 'bg-[var(--bg-subtle)]' }
 }
 
 function EnrichSection({ title, icon: Icon, children }: { title: string; icon: React.ElementType; children: React.ReactNode }) {
@@ -92,7 +92,7 @@ function TagList({ tags }: { tags: string[] }) {
   return (
     <div className="flex flex-wrap gap-1.5">
       {tags.map((t) => (
-        <span key={t} className="rounded-[4px] bg-[#102a43] px-2 py-0.5 text-[11px] font-medium text-[var(--cd-accent)]">
+        <span key={t} className="rounded-[4px] bg-[var(--cd-bg-tag-blue)] px-2 py-0.5 text-[11px] font-medium text-[var(--cd-text-tag-blue)]">
           {t}
         </span>
       ))}
@@ -253,7 +253,7 @@ export function ScoutLeadEnrichmentPage({ result, lead, profile, searchId }: Pro
             <div className="flex flex-wrap gap-2 border-t border-[var(--cd-border)] bg-[var(--cd-bg-footer)] px-5 py-3">
               <Zap className="h-3.5 w-3.5 shrink-0 text-[var(--cd-accent)]" aria-hidden />
               {signals.map((sig) => (
-                <span key={sig} className="rounded-[4px] bg-[#102a43] px-2 py-0.5 text-[11px] font-medium text-[var(--cd-accent)]">
+                <span key={sig} className="rounded-[4px] bg-[var(--cd-bg-tag-blue)] px-2 py-0.5 text-[11px] font-medium text-[var(--cd-text-tag-blue)]">
                   {sig}
                 </span>
               ))}
@@ -399,7 +399,7 @@ export function ScoutLeadEnrichmentPage({ result, lead, profile, searchId }: Pro
             Raw Enrichment JSON
           </summary>
           <div className="border-t border-[var(--cd-border)] p-4">
-            <pre className="overflow-auto rounded-[4px] bg-[#090c13] p-3 text-[11px] leading-relaxed text-[var(--cd-accent)]">
+            <pre className="overflow-auto rounded-[4px] bg-[var(--bg-subtle)] p-3 text-[11px] leading-relaxed text-[var(--cd-text-secondary)]">
               {JSON.stringify(result.rawData, null, 2)}
             </pre>
           </div>

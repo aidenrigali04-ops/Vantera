@@ -32,8 +32,8 @@ export function DashboardWelcomeHero({ email, sdrAgents }: Props) {
       className="vision-welcome-card relative overflow-hidden rounded-2xl p-6"
     >
       {/* decorative orb */}
-      <div className="pointer-events-none absolute -right-8 -top-8 h-40 w-40 rounded-full opacity-30"
-        style={{ background: 'radial-gradient(circle, #47a3f3 0%, transparent 70%)' }} />
+      <div className="pointer-events-none absolute -right-8 -top-8 h-40 w-40 rounded-full opacity-[0.08]"
+        style={{ background: 'radial-gradient(circle, var(--accent) 0%, transparent 70%)' }} />
 
       <div className="relative">
         {/* greeting */}
@@ -52,7 +52,7 @@ export function DashboardWelcomeHero({ email, sdrAgents }: Props) {
         {/* agent status chips */}
         <div className="mt-4 flex flex-wrap gap-2">
           {sdrAgents.length === 0 ? (
-            <span className="flex items-center gap-1.5 rounded-full bg-[rgba(186,227,255,0.08)] px-3 py-1.5 text-[11px] font-medium text-[var(--text-tertiary)]">
+            <span className="flex items-center gap-1.5 rounded-full bg-[var(--bg-subtle)] px-3 py-1.5 text-[11px] font-medium text-[var(--text-tertiary)]">
               <Bot className="h-3 w-3" />
               No agents deployed
             </span>
@@ -63,9 +63,9 @@ export function DashboardWelcomeHero({ email, sdrAgents }: Props) {
                 className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-medium"
                 style={{
                   background: agent.status === 'active'
-                    ? 'rgba(34,165,88,0.12)'
-                    : 'rgba(186,227,255,0.07)',
-                  color: agent.status === 'active' ? '#22a558' : 'var(--text-tertiary)',
+                    ? 'rgba(34,165,88,0.1)'
+                    : 'var(--bg-subtle)',
+                  color: agent.status === 'active' ? '#16a34a' : 'var(--text-tertiary)',
                 }}
               >
                 <span className={`h-1.5 w-1.5 rounded-full ${agent.status === 'active' ? 'animate-pulse bg-emerald-400' : 'bg-[var(--text-disabled)]'}`} />
@@ -79,7 +79,7 @@ export function DashboardWelcomeHero({ email, sdrAgents }: Props) {
         <div className="mt-5 flex items-center gap-2">
           <Link
             href="/admin/sdr-agents"
-            className="vision-cta-btn inline-flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-[12px] font-semibold text-[#002159] transition-opacity hover:opacity-90"
+            className="vision-cta-btn inline-flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-[12px] font-semibold text-white transition-opacity hover:opacity-90"
           >
             <Sparkles className="h-3.5 w-3.5" />
             {needsSetup ? 'Set up agent' : 'Open agent'}

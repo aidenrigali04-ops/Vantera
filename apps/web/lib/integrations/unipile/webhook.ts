@@ -153,7 +153,7 @@ async function handleInvitationAccepted(event: UnipileWebhookEvent): Promise<voi
 
 async function findLeadBySenderId(accountId: string, senderId: string) {
   // Unipile sender_id is the LinkedIn member URN or ID — try matching against stored URLs
-  const [row] = await db
+  const rows = await db
     .select()
     .from(leads)
     .where(
@@ -166,18 +166,16 @@ async function findLeadBySenderId(accountId: string, senderId: string) {
 
   // senderId may appear as part of the linkedin URL (e.g. in:someId)
   const normalized = senderId.replace(/^.*:/, '').toLowerCase()
-  return (
-    (row && [row].find((l) => l.linkedinUrl?.toLowerCase().includes(normalized))) ?? null
-  )
+  return rows.find((l) => l.linkedinUrl?.toLowerCase().includes(normalized)) ?? null
 }
 
 async function findLeadByLinkedInUrl(accountId: string, linkedinUrl: string) {
   const normalized = linkedinUrl.replace(/\/$/, '').toLowerCase()
-  const [row] = await db
+  const rows = await db
     .select()
     .from(leads)
     .where(and(eq(leads.accountId, accountId), isNotNull(leads.linkedinUrl)))
     .limit(500)
 
-  return [row].find((l) => l?.linkedinUrl?.replace(/\/$/, '').toLowerCase() === normalized) ?? null
+  return rows.find((l) => l?.linkedinUrl?.replace(/\/$/, '').toLowerCase() === normalized) ?? null
 }

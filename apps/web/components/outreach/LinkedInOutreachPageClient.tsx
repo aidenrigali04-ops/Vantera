@@ -333,11 +333,11 @@ export function LinkedInOutreachPageClient({ initialHub }: Props) {
                     className={cn(
                       'rounded-lg border px-3 py-2.5 text-left text-sm transition-colors',
                       deliveryMode === mode
-                        ? 'border-violet-300 bg-violet-50/80'
-                        : 'border-stone-200 hover:border-stone-300',
+                        ? 'border-[var(--accent)] bg-[var(--accent-muted)]'
+                        : 'border-[var(--border-default)] hover:border-[var(--border-strong)]',
                     )}
                   >
-                    <span className="font-medium text-stone-900">
+                    <span className="font-medium text-[var(--text-primary)]">
                       {LINKEDIN_DELIVERY_LABELS[mode as keyof typeof LINKEDIN_DELIVERY_LABELS]}
                     </span>
                   </button>
@@ -355,8 +355,8 @@ export function LinkedInOutreachPageClient({ initialHub }: Props) {
                     className={cn(
                       'rounded-lg border px-3 py-2 text-left text-sm transition-colors',
                       goal === option
-                        ? 'border-violet-300 bg-violet-50/80'
-                        : 'border-stone-200',
+                        ? 'border-[var(--accent)] bg-[var(--accent-muted)]'
+                        : 'border-[var(--border-default)]',
                     )}
                   >
                     {CAMPAIGN_GOAL_LABELS[option]}

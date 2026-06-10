@@ -34,25 +34,25 @@ export function AdminTopBar({ businessName, aiEnabled }: Props) {
   const label = ROUTE_LABELS[pathname] ?? friendlyFromPath(pathname)
 
   return (
-    <header className="sticky top-0 z-20 flex h-14 items-center justify-between gap-3 border-b border-white/[0.06] bg-[#0B1015]/85 px-6 backdrop-blur-md">
+    <header className="sticky top-0 z-20 flex h-14 items-center justify-between gap-3 border-b border-[var(--border-default)] bg-[var(--bg-surface)]/90 px-6 backdrop-blur-md">
       <div className="flex items-center gap-2 text-sm">
-        <span className="text-white/40">{businessName || 'Workspace'}</span>
-        <span aria-hidden className="text-white/20">
+        <span className="text-[var(--text-tertiary)]">{businessName || 'Workspace'}</span>
+        <span aria-hidden className="text-[var(--text-disabled)]">
           /
         </span>
-        <span className="font-semibold text-white">{label}</span>
+        <span className="font-semibold text-[var(--text-primary)]">{label}</span>
       </div>
 
       <div className="flex items-center gap-2">
         <button
           type="button"
-          className="flex h-8 items-center gap-2 rounded-md border border-white/[0.06] bg-white/[0.02] px-3 text-xs text-white/40 transition-colors hover:border-white/[0.12] hover:text-white/70"
+          className="flex h-8 items-center gap-2 rounded-md border border-[var(--border-default)] bg-[var(--bg-subtle)] px-3 text-xs text-[var(--text-tertiary)] transition-colors hover:border-[var(--border-strong)] hover:text-[var(--text-primary)]"
           aria-label="Search (coming soon)"
           disabled
         >
           <Search className="h-3.5 w-3.5" aria-hidden />
           <span className="hidden sm:inline">Search</span>
-          <kbd className="hidden rounded border border-white/10 bg-white/[0.04] px-1.5 py-0.5 text-[9px] font-medium text-white/40 sm:inline">
+          <kbd className="hidden rounded border border-[var(--border-default)] bg-[var(--bg-surface)] px-1.5 py-0.5 text-[9px] font-medium text-[var(--text-disabled)] sm:inline">
             ⌘K
           </kbd>
         </button>
@@ -61,8 +61,8 @@ export function AdminTopBar({ businessName, aiEnabled }: Props) {
           className={cn(
             'inline-flex h-8 items-center gap-2 rounded-md border px-2.5 text-[10px] font-medium uppercase tracking-wider',
             aiEnabled
-              ? 'border-emerald-400/20 bg-emerald-400/5 text-emerald-300'
-              : 'border-white/[0.06] bg-white/[0.02] text-white/40',
+              ? 'border-emerald-600/20 bg-emerald-50 text-emerald-700'
+              : 'border-[var(--border-default)] bg-[var(--bg-subtle)] text-[var(--text-disabled)]',
           )}
           title={aiEnabled ? 'AI brain is live' : 'AI brain is dormant'}
         >
@@ -70,7 +70,7 @@ export function AdminTopBar({ businessName, aiEnabled }: Props) {
             aria-hidden
             className={cn(
               'inline-flex h-1.5 w-1.5 rounded-full',
-              aiEnabled ? 'bg-emerald-400 shadow-[0_0_6px_rgba(16,185,129,0.7)]' : 'bg-white/30',
+              aiEnabled ? 'bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.5)]' : 'bg-[var(--text-disabled)]',
             )}
           />
           AI {aiEnabled ? 'Live' : 'Offline'}
@@ -78,7 +78,7 @@ export function AdminTopBar({ businessName, aiEnabled }: Props) {
 
         <button
           type="button"
-          className="flex h-8 w-8 items-center justify-center rounded-md border border-white/[0.06] bg-white/[0.02] text-white/40 transition-colors hover:border-white/[0.12] hover:text-white/70"
+          className="flex h-8 w-8 items-center justify-center rounded-md border border-[var(--border-default)] bg-[var(--bg-subtle)] text-[var(--text-tertiary)] transition-colors hover:border-[var(--border-strong)] hover:text-[var(--text-primary)]"
           aria-label="Notifications (coming soon)"
           disabled
         >

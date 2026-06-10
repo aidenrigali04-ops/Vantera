@@ -124,7 +124,7 @@ export function VisionAgentCard({ agent, href, snapshot }: Props) {
               className={cn(
                 'inline-flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-[12px] font-semibold transition-opacity group-hover:opacity-90',
                 needsSetup
-                  ? 'vision-cta-btn text-[#002159]'
+                  ? 'vision-cta-btn text-[var(--text-primary)]'
                   : 'border border-[var(--border-default)] bg-[var(--bg-surface)] text-[var(--text-secondary)] group-hover:bg-[var(--bg-subtle)]',
               )}
             >

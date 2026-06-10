@@ -61,7 +61,7 @@ export function DashboardAgentPanel({ agents, snapshot = EMPTY_SNAPSHOT }: Props
             </p>
             <Link
               href="/admin/sdr-agents"
-              className="vision-cta-btn mt-4 inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-[12px] font-semibold text-[#002159] transition-opacity hover:opacity-90"
+              className="vision-cta-btn mt-4 inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-[12px] font-semibold text-white transition-opacity hover:opacity-90"
             >
               <Zap className="h-3.5 w-3.5" />
               Deploy agent
@@ -79,7 +79,7 @@ export function DashboardAgentPanel({ agents, snapshot = EMPTY_SNAPSHOT }: Props
                 <div
                   key={label}
                   className="flex flex-col items-center rounded-xl py-2.5"
-                  style={{ background: 'rgba(186,227,255,0.04)', border: '1px solid rgba(186,227,255,0.07)' }}
+                  style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border-subtle)' }}
                 >
                   <Icon className="h-4 w-4 mb-1" style={{ color }} />
                   <span className="text-[18px] font-bold text-[var(--text-primary)]">{value}</span>
@@ -96,7 +96,7 @@ export function DashboardAgentPanel({ agents, snapshot = EMPTY_SNAPSHOT }: Props
                   <li key={agent.id}>
                     <Link
                       href="/admin/outreach/agents"
-                      className="group flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-[rgba(186,227,255,0.05)]"
+                      className="group flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-[rgba(0,0,0,0.04)]"
                     >
                       <span className="icon-tile flex h-8 w-8 shrink-0 items-center justify-center rounded-lg">
                         <Bot className="h-4 w-4 text-[var(--text-secondary)]" strokeWidth={1.75} />

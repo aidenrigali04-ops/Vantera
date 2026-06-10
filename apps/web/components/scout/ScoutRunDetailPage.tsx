@@ -40,9 +40,9 @@ type Props = {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  found: 'bg-[#102a43] text-[var(--cd-accent)]',
+  found: 'bg-[var(--cd-bg-tag-blue)] text-[var(--cd-text-tag-blue)]',
   enrolled: 'bg-[var(--cd-bg-tag-cyan)] text-[var(--cd-text-tag-cyan)]',
-  skipped: 'bg-[#1f2933] text-[var(--cd-text-muted)]',
+  skipped: 'bg-[var(--bg-subtle)] text-[var(--cd-text-muted)]',
   rejected: 'bg-[var(--cd-bg-tag-red)] text-[var(--cd-text-tag-red)]',
 }
 
@@ -92,7 +92,7 @@ export function ScoutRunDetailPage({ search, results }: Props) {
                 'mt-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide',
                 search.isActive
                   ? 'bg-[var(--cd-bg-tag-cyan)] text-[var(--cd-text-tag-cyan)]'
-                  : 'bg-[#102a43] text-[var(--cd-text-muted)]',
+                  : 'bg-[var(--bg-subtle)] text-[var(--cd-text-muted)]',
               )}
             >
               {search.isActive ? 'Active' : 'Paused'}
@@ -201,7 +201,7 @@ export function ScoutRunDetailPage({ search, results }: Props) {
                               {signals.slice(0, 2).map((sig) => (
                                 <span
                                   key={sig}
-                                  className="rounded bg-[#102a43] px-1.5 py-0.5 text-[10px] text-[var(--cd-accent)]"
+                                  className="rounded bg-[var(--cd-bg-tag-blue)] px-1.5 py-0.5 text-[10px] text-[var(--cd-text-tag-blue)]"
                                 >
                                   {sig}
                                 </span>

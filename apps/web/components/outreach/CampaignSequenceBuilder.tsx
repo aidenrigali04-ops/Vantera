@@ -64,20 +64,20 @@ export function CampaignSequenceBuilder({ steps, onChange, disabled, linkedinOnl
         return (
           <div
             key={`${step.stepIndex}-${index}`}
-            className="rounded-xl border border-stone-200 bg-stone-50/40 p-4"
+            className="rounded-xl border border-[var(--border-default)] bg-[var(--bg-subtle)]/40 p-4"
           >
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <span
                   className={cn(
-                    'flex h-8 w-8 items-center justify-center rounded-full bg-white ring-1 ring-stone-200',
+                    'flex h-8 w-8 items-center justify-center rounded-full bg-[var(--bg-surface)] ring-1 ring-[var(--border-default)]',
                   )}
                 >
-                  <Icon className="h-4 w-4 text-stone-600" />
+                  <Icon className="h-4 w-4 text-[var(--text-secondary)]" />
                 </span>
                 <div>
-                  <p className="text-sm font-medium text-stone-900">Step {index + 1}</p>
-                  <p className="text-xs text-stone-500">{CHANNEL_LABELS[step.channel]}</p>
+                  <p className="text-sm font-medium text-[var(--text-primary)]">Step {index + 1}</p>
+                  <p className="text-xs text-[var(--text-tertiary)]">{CHANNEL_LABELS[step.channel]}</p>
                 </div>
               </div>
               {steps.length > 1 ? (
@@ -98,7 +98,7 @@ export function CampaignSequenceBuilder({ steps, onChange, disabled, linkedinOnl
               {linkedinOnly ? (
                 <div className="space-y-2">
                   <Label>Channel</Label>
-                  <p className="rounded-md border border-dashed border-stone-200 bg-white px-3 py-2 text-xs text-stone-600">
+                  <p className="rounded-md border border-dashed border-[var(--border-default)] bg-[var(--bg-surface)] px-3 py-2 text-xs text-[var(--text-secondary)]">
                     LinkedIn only — send on LinkedIn yourself
                   </p>
                 </div>
@@ -139,8 +139,8 @@ export function CampaignSequenceBuilder({ steps, onChange, disabled, linkedinOnl
                 />
               </div>
               <div className="space-y-2 sm:col-span-1">
-                <Label className="text-stone-400">Send timing</Label>
-                <p className="rounded-md border border-dashed border-stone-200 bg-white px-3 py-2 text-xs text-stone-500">
+                <Label className="text-[var(--text-disabled)]">Send timing</Label>
+                <p className="rounded-md border border-dashed border-[var(--border-default)] bg-[var(--bg-surface)] px-3 py-2 text-xs text-[var(--text-tertiary)]">
                   {step.delayDays === 0 ? 'Sends immediately on launch' : `Day ${step.delayDays} after launch`}
                 </p>
               </div>

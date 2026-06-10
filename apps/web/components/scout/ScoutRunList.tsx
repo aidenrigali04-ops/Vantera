@@ -33,7 +33,7 @@ export function ScoutRunList({ runs }: { runs: RunSummary[] }) {
         <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--cd-text-primary)]">
           Prospecting Runs
         </p>
-        <span className="rounded-full bg-[#102a43] px-2 py-0.5 text-[11px] font-medium text-[var(--cd-accent)]">
+        <span className="rounded-full bg-[var(--cd-bg-tag-blue)] px-2 py-0.5 text-[11px] font-medium text-[var(--cd-text-tag-blue)]">
           {runs.length}
         </span>
       </div>

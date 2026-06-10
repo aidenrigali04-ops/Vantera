@@ -4,27 +4,27 @@
 
 @layer base {
   :root {
-    /* shadcn/ui HSL vars — Adventure dark palette */
-    --background: 215 39% 6%;
-    --foreground: 214 29% 82%;
-    --card: 211 60% 16%;
-    --card-foreground: 214 29% 82%;
-    --popover: 211 60% 16%;
-    --popover-foreground: 214 29% 82%;
-    --primary: 207 100% 87%;
-    --primary-foreground: 221 100% 17%;
-    --secondary: 210 27% 16%;
-    --secondary-foreground: 214 29% 82%;
-    --muted: 211 60% 16%;
-    --muted-foreground: 210 23% 59%;
-    --accent: 211 60% 16%;
-    --accent-foreground: 214 29% 82%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 207 100% 87% / 0.1;
-    --input: 211 60% 16%;
-    --ring: 207 100% 87%;
-    --chart-1: 207 100% 87%;
+    /* shadcn/ui HSL vars — light palette */
+    --background: 210 40% 98%;
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 221 83% 53%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 210 40% 96%;
+    --accent-foreground: 222 47% 11%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 221 83% 53%;
+    --chart-1: 221 83% 53%;
     --chart-2: 160 60% 45%;
     --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
@@ -39,54 +39,54 @@
     --sidebar-border: 207 100% 87% / 0.08;
     --sidebar-ring: 207 100% 87%;
 
-    /* Vantera Adventure dark tokens */
-    --bg-base: #090c13;
-    --bg-subtle: #0d1520;
-    --bg-surface: #102a43;
-    --bg-elevated: #1f2933;
-    --bg-overlay: #162535;
-    --border-subtle: rgba(186, 227, 255, 0.06);
-    --border-default: rgba(186, 227, 255, 0.1);
-    --border-strong: rgba(186, 227, 255, 0.18);
-    --border-focus: rgba(186, 227, 255, 0.4);
-    --text-primary: #d9e2ec;
-    --text-secondary: #f0f4f8;
-    --text-tertiary: #829ab1;
-    --text-disabled: #4a6078;
-    --text-inverse: #002159;
-    --accent: #bae3ff;
-    --accent-hover: #47a3f3;
-    --accent-muted: rgba(186, 227, 255, 0.08);
-    --accent-border: rgba(186, 227, 255, 0.2);
-    --accent-solid: #47a3f3;
-    --accent-hatch: #e6f6ff;
+    /* Vantera light tokens */
+    --bg-base: #f8fafc;
+    --bg-subtle: #f1f5f9;
+    --bg-surface: #ffffff;
+    --bg-elevated: #ffffff;
+    --bg-overlay: #f1f5f9;
+    --border-subtle: rgba(0, 0, 0, 0.06);
+    --border-default: rgba(0, 0, 0, 0.1);
+    --border-strong: rgba(0, 0, 0, 0.18);
+    --border-focus: rgba(37, 99, 235, 0.5);
+    --text-primary: #0f172a;
+    --text-secondary: #334155;
+    --text-tertiary: #64748b;
+    --text-disabled: #94a3b8;
+    --text-inverse: #ffffff;
+    --accent: #2563eb;
+    --accent-hover: #1d4ed8;
+    --accent-muted: rgba(37, 99, 235, 0.08);
+    --accent-border: rgba(37, 99, 235, 0.2);
+    --accent-solid: #2563eb;
+    --accent-hatch: #dbeafe;
     --brand-accent: var(--accent);
     --brand-accent-hover: var(--accent-hover);
     --brand-accent-muted: var(--accent-muted);
     --brand-accent-border: var(--accent-border);
-    --sidebar-gradient-top: #090c13;
+    --sidebar-gradient-top: #060b1c;
     --sidebar-gradient-bottom: #0d1520;
-    /* Adventure dashboard sidebar tokens */
+    /* Sidebar tokens — sidebar stays dark */
     --sidebar-nav-text: #d9e2ec;
     --sidebar-nav-text-muted: #829ab1;
     --sidebar-nav-border: rgba(186, 227, 255, 0.08);
-    --sidebar-nav-hover: rgba(16, 42, 67, 0.8);
-    --sidebar-nav-active-bg: #bae3ff;
-    --sidebar-nav-active-text: #002159;
+    --sidebar-nav-hover: rgba(255, 255, 255, 0.04);
+    --sidebar-nav-active-bg: rgba(255, 255, 255, 0.08);
+    --sidebar-nav-active-text: #f0f4f8;
     --radius-sm: 6px;
     --radius-md: 8px;
     --radius-lg: 12px;
     --radius-xl: 16px;
-    --success: #22a558;
-    --success-muted: rgba(34, 165, 88, 0.12);
-    --warning: #47a3f3;
-    --warning-muted: rgba(71, 163, 243, 0.12);
+    --success: #16a34a;
+    --success-muted: rgba(22, 163, 74, 0.1);
+    --warning: #d97706;
+    --warning-muted: rgba(217, 119, 6, 0.1);
     --danger: #dc2626;
-    --danger-muted: rgba(220, 38, 38, 0.12);
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
-    --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
-    --shadow-glow: 0 0 0 3px rgba(186, 227, 255, 0.2);
+    --danger-muted: rgba(220, 38, 38, 0.1);
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+    --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.12);
+    --shadow-glow: 0 0 0 3px rgba(37, 99, 235, 0.15);
   }
 
   /* agent workspace — same dark tokens */
@@ -161,10 +161,17 @@
   }
 
   .icon-tile {
-    background: #ffffff;
+    background: var(--bg-subtle);
     border: 1px solid var(--border-subtle);
-    box-shadow: var(--shadow-sm);
-    color: var(--text-secondary);
+    box-shadow: none;
+    color: var(--text-tertiary);
+  }
+
+  /* Sidebar nav icons — no container, just the icon */
+  .sidebar-vision .icon-tile {
+    background: transparent;
+    border: none;
+    box-shadow: none;
   }
 
   .status-pill {
@@ -240,10 +247,9 @@
     -webkit-backdrop-filter: blur(20px);
   }
 
-  /* Active nav pill — gradient fill */
+  /* Active nav pill — clean, no gradient */
   .nav-pill-active {
-    background: linear-gradient(97.89deg, #47a3f3 0%, #bae3ff 100%);
-    box-shadow: 0 4px 20px -4px rgba(71, 163, 243, 0.45);
+    background: rgba(255, 255, 255, 0.08);
   }
 
   /* Sidebar search button */
@@ -265,73 +271,62 @@
   }
 
   .sidebar-help-btn {
-    background: linear-gradient(97.89deg, #47a3f3 0%, #bae3ff 100%);
-    box-shadow: 0 4px 16px -4px rgba(71, 163, 243, 0.5);
+    background: #2563eb;
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.35);
+    color: #ffffff;
   }
 
   /* ── Vision UI dashboard panels ── */
   .vision-kpi-card {
-    background: rgba(16, 42, 67, 0.7);
-    border: 1px solid rgba(186, 227, 255, 0.1);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    box-shadow: 0 4px 24px -8px rgba(0, 0, 0, 0.4),
-                inset 0 1px 0 rgba(186, 227, 255, 0.06);
+    background: #ffffff;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
     transition: border-color 150ms ease, box-shadow 150ms ease;
   }
   .vision-kpi-card:hover {
-    border-color: rgba(186, 227, 255, 0.16);
-    box-shadow: 0 8px 32px -8px rgba(0, 0, 0, 0.5),
-                inset 0 1px 0 rgba(186, 227, 255, 0.08);
+    border-color: rgba(0, 0, 0, 0.14);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
   }
 
   .vision-panel-card {
-    background: rgba(16, 42, 67, 0.6);
-    border: 1px solid rgba(186, 227, 255, 0.09);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    box-shadow: 0 4px 24px -8px rgba(0, 0, 0, 0.35),
-                inset 0 1px 0 rgba(186, 227, 255, 0.05);
+    background: #ffffff;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
   }
 
   .vision-welcome-card {
-    background: linear-gradient(
-      135deg,
-      rgba(16, 42, 67, 0.9) 0%,
-      rgba(9, 12, 19, 0.95) 100%
-    );
-    border: 1px solid rgba(186, 227, 255, 0.1);
-    box-shadow: 0 4px 24px -8px rgba(71, 163, 243, 0.1),
-                inset 0 1px 0 rgba(186, 227, 255, 0.07);
+    background: #f8fafc;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
   }
 
   .vision-cta-btn {
-    background: linear-gradient(97.89deg, #47a3f3 0%, #bae3ff 100%);
-    box-shadow: 0 4px 16px -4px rgba(71, 163, 243, 0.45);
+    background: #2563eb;
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
   }
 
-  /* client detail page — Adventure dashboard dark tokens */
+  /* client detail page — light tokens */
   .client-detail {
-    --cd-bg-outer: #1f2933;
-    --cd-bg-card: #090c13;
-    --cd-bg-footer: #1f2933;
-    --cd-bg-tag-cyan: #c1fef6;
-    --cd-text-tag-cyan: #044e54;
-    --cd-bg-tag-orange: #ffe8d9;
-    --cd-text-tag-orange: #841003;
-    --cd-bg-tag-red: #ffe3e3;
-    --cd-text-tag-red: #610316;
-    --cd-bg-tag-blue: #e6f6ff;
-    --cd-text-tag-blue: #002159;
-    --cd-text-primary: #d9e2ec;
-    --cd-text-secondary: #f0f4f8;
-    --cd-text-muted: #829ab1;
-    --cd-text-label: #e4e7eb;
-    --cd-accent: #bae3ff;
-    --cd-accent-dark: #47a3f3;
-    --cd-accent-text: #002159;
-    --cd-border: rgba(186, 227, 255, 0.1);
-    --cd-shadow: 0px 2px 1px 0px rgba(240, 240, 240, 0.05);
+    --cd-bg-outer: #f8fafc;
+    --cd-bg-card: #ffffff;
+    --cd-bg-footer: #f1f5f9;
+    --cd-bg-tag-cyan: #ccfbf1;
+    --cd-text-tag-cyan: #0f766e;
+    --cd-bg-tag-orange: #ffedd5;
+    --cd-text-tag-orange: #9a3412;
+    --cd-bg-tag-red: #fee2e2;
+    --cd-text-tag-red: #991b1b;
+    --cd-bg-tag-blue: #dbeafe;
+    --cd-text-tag-blue: #1e40af;
+    --cd-text-primary: #0f172a;
+    --cd-text-secondary: #334155;
+    --cd-text-muted: #64748b;
+    --cd-text-label: #0f172a;
+    --cd-accent: #2563eb;
+    --cd-accent-dark: #1d4ed8;
+    --cd-accent-text: #ffffff;
+    --cd-border: rgba(0, 0, 0, 0.08);
+    --cd-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
   }
 
   .agent-workspace .agent-label {
@@ -368,10 +363,10 @@
   }
 
   .agent-playground-grid {
-    background-color: var(--bg-base);
+    background-color: #090c13;
     background-image: radial-gradient(
       circle,
-      color-mix(in srgb, var(--border-default) 65%, transparent) 1px,
+      rgba(186, 227, 255, 0.07) 1px,
       transparent 1px
     );
     background-size: 18px 18px;

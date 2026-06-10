@@ -324,7 +324,7 @@ export function SdrAgentsHubClient({
                 </p>
               </div>
               {!sdrConfigured ? (
-                <Button asChild size="sm" className="vision-cta-btn text-[#002159] hover:opacity-90">
+                <Button asChild size="sm" className="vision-cta-btn text-[var(--text-primary)] hover:opacity-90">
                   <Link href="/admin/outreach/agents/setup">Set up agents</Link>
                 </Button>
               ) : null}

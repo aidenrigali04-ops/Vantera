@@ -40,14 +40,14 @@ function ArcGauge({ pct }: { pct: number }) {
         cy={size / 2}
         r={r}
         fill="none"
-        stroke="rgba(186,227,255,0.08)"
+        stroke="rgba(0,0,0,0.08)"
         strokeWidth={stroke}
       />
       {/* gradient def */}
       <defs>
         <linearGradient id="gauge-grad" x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" stopColor="#47a3f3" />
-          <stop offset="100%" stopColor="#bae3ff" />
+          <stop offset="0%" stopColor="#2563eb" />
+          <stop offset="100%" stopColor="#60a5fa" />
         </linearGradient>
       </defs>
       {/* progress */}
@@ -128,7 +128,7 @@ export function DashboardRevenueGauge({ data }: Props) {
             type="button"
             onClick={save}
             disabled={pending || !digits(goal)}
-            className="vision-cta-btn flex-1 rounded-xl py-2 text-[12px] font-semibold text-[#002159] disabled:opacity-50"
+            className="vision-cta-btn flex-1 rounded-xl py-2 text-[12px] font-semibold text-white disabled:opacity-50"
           >
             {pending ? 'Saving…' : 'Save goal'}
           </button>
@@ -197,7 +197,7 @@ export function DashboardRevenueGauge({ data }: Props) {
       </div>
 
       {data.pct >= 100 && (
-        <p className="mt-3 text-center text-[12px] font-semibold text-emerald-400">
+        <p className="mt-3 text-center text-[12px] font-semibold text-emerald-600">
           🎉 Goal reached!
         </p>
       )}

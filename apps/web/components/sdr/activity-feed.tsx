@@ -33,7 +33,7 @@ const EVENT_META: Record<
   email_sent: {
     icon: Mail,
     label: (e) => `Email sent → ${e.leadName ?? 'prospect'}${e.company ? `, ${e.company}` : ''}`,
-    tone: 'text-stone-700',
+    tone: 'text-[var(--text-secondary)]',
   },
   sms_sent: {
     icon: MessageCircle,
@@ -79,7 +79,7 @@ const EVENT_META: Record<
       if (found > 0) return `Discovery complete — ${found} scored`
       return 'Discovery complete — no new matches'
     },
-    tone: 'text-stone-600',
+    tone: 'text-[var(--text-secondary)]',
   },
   discovery_failed: {
     icon: Radar,
@@ -92,7 +92,7 @@ const EVENT_META: Record<
   sequence_drafted: {
     icon: Mail,
     label: (e) => `Sequence drafted → ${e.leadName ?? 'prospect'}`,
-    tone: 'text-stone-600',
+    tone: 'text-[var(--text-secondary)]',
   },
 }
 

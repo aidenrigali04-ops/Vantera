@@ -81,7 +81,7 @@ export function MrrProgressPanel({ data }: { data: RevenueProgress }) {
             type="button"
             onClick={save}
             disabled={pending || !digits(goal)}
-            className="rounded-lg vision-cta-btn px-4 py-2 text-sm font-medium text-[#002159] transition-opacity hover:opacity-90 disabled:opacity-50"
+            className="rounded-lg vision-cta-btn px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
           >
             {pending ? 'Saving…' : 'Save goal'}
           </button>
