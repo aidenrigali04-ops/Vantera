@@ -392,7 +392,7 @@ function NavItemRow({
 /*  EXPORTED SIDEBAR                                                           */
 /* ─────────────────────────────────────────────────────────────────────────── */
 
-export function Sidebar({ session, mobile, onNavigate }: SidebarProps) {
+export function Sidebar({ session, mobile, onNavigate, isSuperAdmin }: SidebarProps) {
   const { sidebarCollapsed, toggleSidebar, mobileSidebarOpen, setMobileSidebarOpen } = useUIStore()
 
   if (mobile) {
@@ -405,6 +405,7 @@ export function Sidebar({ session, mobile, onNavigate }: SidebarProps) {
         >
           <SidebarContent
             session={session}
+            isSuperAdmin={isSuperAdmin}
             onNavigate={() => {
               setMobileSidebarOpen(false)
               onNavigate?.()
@@ -425,7 +426,7 @@ export function Sidebar({ session, mobile, onNavigate }: SidebarProps) {
       style={{ background: 'var(--sidebar-solid-bg)' }}
     >
       <div className="min-h-0 flex-1 overflow-hidden">
-        <SidebarContent session={session} collapsed={sidebarCollapsed} />
+        <SidebarContent session={session} collapsed={sidebarCollapsed} isSuperAdmin={isSuperAdmin} />
       </div>
 
       {/* collapse toggle */}
@@ -452,6 +453,12 @@ export function Sidebar({ session, mobile, onNavigate }: SidebarProps) {
   )
 }
 
-export function SidebarMobile({ session }: { session: AdminSession }) {
-  return <Sidebar session={session} mobile />
+export function SidebarMobile({
+  session,
+  isSuperAdmin,
+}: {
+  session: AdminSession
+  isSuperAdmin?: boolean
+}) {
+  return <Sidebar session={session} mobile isSuperAdmin={isSuperAdmin} />
 }

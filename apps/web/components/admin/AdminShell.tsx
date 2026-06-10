@@ -16,6 +16,8 @@ type AdminShellProps = {
   bare?: boolean
   /** Allow page content to span full width (tables, agents, aspire). */
   workspaceFullBleed?: boolean
+  /** Owner-only: reveal the optimization dashboard nav link. */
+  isSuperAdmin?: boolean
   children: ReactNode
 }
 
@@ -24,6 +26,7 @@ export function AdminShell({
   onboardingIncomplete = false,
   bare,
   workspaceFullBleed = false,
+  isSuperAdmin = false,
   children,
 }: AdminShellProps) {
   const { commandPaletteOpen, setCommandPaletteOpen, sidebarCollapsed } = useUIStore()
@@ -44,7 +47,7 @@ export function AdminShell({
         )}
       >
         <div className="col-start-1 row-span-2 row-start-1 hidden md:block">
-          <Sidebar session={session} />
+          <Sidebar session={session} isSuperAdmin={isSuperAdmin} />
         </div>
 
         <div className="col-start-1 row-start-1 md:col-start-2">
@@ -56,7 +59,7 @@ export function AdminShell({
         </div>
       </div>
 
-      <SidebarMobile session={session} />
+      <SidebarMobile session={session} isSuperAdmin={isSuperAdmin} />
       <MobileBottomNav />
       <CommandPalette open={commandPaletteOpen} onOpenChange={setCommandPaletteOpen} />
     </>

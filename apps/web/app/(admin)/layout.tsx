@@ -1,6 +1,7 @@
 import { AdminShell } from '@/components/admin/AdminShell'
 import { ReactQueryProvider } from '@/components/shared/ReactQueryProvider'
 import { requireAdminSession } from '@/lib/auth/require-session'
+import { isSuperAdmin } from '@/lib/auth/superadmin'
 import { BrandingProvider } from '@/lib/branding/context'
 import { getBrandingFromHeaders } from '@/lib/branding/server'
 import { FeatureFlagProvider } from '@/lib/feature-flags/context'
@@ -74,6 +75,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
             session={session}
             onboardingIncomplete={session.role === 'owner' && !onboardingComplete}
             workspaceFullBleed={workspaceFullBleed}
+            isSuperAdmin={isSuperAdmin(session.email)}
           >
             {children}
           </AdminShell>
