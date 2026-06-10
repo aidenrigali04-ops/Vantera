@@ -7,7 +7,7 @@ const TONE_CLASSES: Record<StatusTone, string> = {
   warning: 'bg-amber-50 text-amber-800 ring-amber-200/80',
   danger: 'bg-red-50 text-red-700 ring-red-200/80',
   info: 'bg-blue-50 text-blue-700 ring-blue-200/80',
-  accent: 'bg-violet-50 text-violet-700 ring-violet-200/80',
+  accent: 'bg-[var(--accent-muted)] text-[var(--accent)] ring-[var(--accent-border)]',
   neutral: 'bg-stone-100 text-stone-700 ring-stone-200/80',
 }
 

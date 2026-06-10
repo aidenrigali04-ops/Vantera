@@ -1,47 +1,38 @@
+import { LeadsTable } from '@/components/leads/LeadsTable'
 import { requireAdminSession } from '@/lib/auth/require-session'
-import { findLeads, getLeadPipelineStats } from '@/lib/leads/queries'
+import { findLeadsWithProfiles, getLeadPipelineStats } from '@/lib/leads/queries'
+import {
+  LEAD_STAGE_LABELS,
+  LEAD_STAGE_ORDER,
+  buildEnrichedLeadRow,
+} from '@/lib/leads/table-rows'
+import { cn } from '@/lib/utils'
 import { Bot } from 'lucide-react'
 import Link from 'next/link'
 
 export const dynamic = 'force-dynamic'
 
-const STATUS_LABELS: Record<string, string> = {
-  new: 'New',
-  contacted: 'Contacted',
-  connected: 'Connected',
-  nurturing: 'Nurturing',
-  qualified: 'Qualified',
-  discovery_booked: 'Call booked',
-  proposal_sent: 'Proposal',
-  won: 'Won',
-  lost: 'Lost',
-}
-const STAGE_ORDER = [
-  'new',
-  'contacted',
-  'connected',
-  'nurturing',
-  'qualified',
-  'discovery_booked',
-  'proposal_sent',
-  'won',
-  'lost',
-]
-
-type LeadRow = Awaited<ReturnType<typeof findLeads>>[number]
-
-function fullName(lead: LeadRow): string {
-  const name = `${lead.firstName ?? ''} ${lead.lastName ?? ''}`.trim()
-  return name || '—'
+type PageProps = {
+  searchParams: Promise<{ stage?: string }>
 }
 
-export default async function PipelinePage() {
+export default async function PipelinePage({ searchParams }: PageProps) {
   const session = await requireAdminSession()
-  const [leads, stats] = await Promise.all([
-    findLeads(session.accountId, { limit: 100 }),
+  const params = await searchParams
+  const stage =
+    params.stage && LEAD_STAGE_ORDER.includes(params.stage as (typeof LEAD_STAGE_ORDER)[number])
+      ? params.stage
+      : undefined
+
+  const [rows, stats] = await Promise.all([
+    findLeadsWithProfiles(session.accountId, {
+      limit: 100,
+      relationshipStatus: stage,
+    }),
     getLeadPipelineStats(session.accountId),
   ])
 
+  const leads = rows.map(({ lead, profile }) => buildEnrichedLeadRow(lead, profile))
   const countByStage = new Map<string, number>(
     stats.byStatus.map((row): [string, number] => [row.status, Number(row.count)]),
   )
@@ -51,24 +42,40 @@ export default async function PipelinePage() {
   return (
     <div className="space-y-6 p-4 sm:p-6">
       <header>
-        <h1 className="text-lg font-semibold tracking-[-0.01em] text-[var(--text-primary)]">Pipeline</h1>
+        <h1 className="text-lg font-semibold tracking-[-0.01em] text-[var(--text-primary)]">
+          Pipeline
+        </h1>
         <p className="mt-0.5 text-sm text-[var(--text-tertiary)]">
           Every lead your agent has sourced — {total.toLocaleString()} total
-          {shown < total ? ` · ${shown} shown` : ''}.
+          {shown < total && !stage ? ` · ${shown} shown` : ''}.
         </p>
       </header>
 
-      {/* Stage counts — answer "where is everything?" at a glance. */}
+      {/* Stage counts — click to filter the table to one stage. */}
       {total > 0 ? (
         <div className="flex flex-wrap gap-2">
-          {STAGE_ORDER.filter((stage) => (countByStage.get(stage) ?? 0) > 0).map((stage) => (
-            <div key={stage} className="rounded-lg border border-[var(--border-default)] bg-[var(--bg-surface)] px-3 py-2">
-              <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-tertiary)]">
-                {STATUS_LABELS[stage] ?? stage}
-              </p>
-              <p className="text-lg font-semibold text-[var(--text-primary)]">{countByStage.get(stage)}</p>
-            </div>
-          ))}
+          {LEAD_STAGE_ORDER.filter((s) => (countByStage.get(s) ?? 0) > 0).map((s) => {
+            const active = stage === s
+            return (
+              <Link
+                key={s}
+                href={active ? '/admin/leads' : `/admin/leads?stage=${s}`}
+                className={cn(
+                  'rounded-lg border px-3 py-2 transition-colors',
+                  active
+                    ? 'border-[var(--accent-border)] bg-[var(--accent-muted)]'
+                    : 'border-[var(--border-default)] bg-[var(--bg-surface)] hover:border-[var(--border-strong)]',
+                )}
+              >
+                <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-tertiary)]">
+                  {LEAD_STAGE_LABELS[s] ?? s}
+                </p>
+                <p className="text-lg font-semibold text-[var(--text-primary)]">
+                  {countByStage.get(s)}
+                </p>
+              </Link>
+            )
+          })}
         </div>
       ) : null}
 
@@ -81,64 +88,25 @@ export default async function PipelinePage() {
           </p>
           <Link
             href="/admin/sdr-agents"
-            className="mt-4 rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-[var(--text-inverse)] transition-colors hover:bg-[var(--accent-hover)]"
+            className="mt-4 rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-hover)]"
           >
             Open agent
           </Link>
         </div>
-      ) : (
-        <div className="overflow-hidden rounded-xl border border-[var(--border-default)]">
-          <table className="w-full text-sm">
-            <thead className="border-b border-[var(--border-default)] bg-[var(--bg-subtle)] text-left">
-              <tr>
-                {['Name', 'Company', 'Title', 'Score', 'Stage', 'Source'].map((heading) => (
-                  <th
-                    key={heading}
-                    className="px-4 py-2.5 text-[11px] font-medium uppercase tracking-wide text-[var(--text-tertiary)]"
-                  >
-                    {heading}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--border-subtle)]">
-              {leads.map((lead) => (
-                <tr key={lead.id} className="cursor-pointer transition-colors hover:bg-[var(--bg-overlay)]">
-                  <td className="px-4 py-2.5 font-medium text-[var(--text-primary)]">
-                    <Link href={`/admin/leads/${lead.id}`} className="block hover:text-[var(--accent)]">
-                      {fullName(lead)}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-2.5 text-[var(--text-secondary)]">
-                    <Link href={`/admin/leads/${lead.id}`} className="block">
-                      {lead.company}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-2.5 text-[var(--text-secondary)]">
-                    <Link href={`/admin/leads/${lead.id}`} className="block">
-                      {lead.title ?? '—'}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-2.5 font-semibold text-[var(--text-primary)]">
-                    <Link href={`/admin/leads/${lead.id}`} className="block">
-                      {lead.score ?? 0}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-2.5 text-[var(--text-secondary)]">
-                    <Link href={`/admin/leads/${lead.id}`} className="block">
-                      {STATUS_LABELS[lead.relationshipStatus] ?? lead.relationshipStatus}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-2.5 text-[var(--text-tertiary)]">
-                    <Link href={`/admin/leads/${lead.id}`} className="block">
-                      {lead.source}
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      ) : leads.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-[var(--border-default)] px-6 py-12 text-center">
+          <p className="text-sm text-[var(--text-tertiary)]">
+            No leads in {LEAD_STAGE_LABELS[stage ?? ''] ?? 'this stage'} yet.
+          </p>
+          <Link
+            href="/admin/leads"
+            className="mt-2 inline-block text-sm font-medium text-[var(--accent)] hover:underline"
+          >
+            Show all stages
+          </Link>
         </div>
+      ) : (
+        <LeadsTable rows={leads} />
       )}
     </div>
   )

@@ -8,6 +8,7 @@ import {
   buildWelcomeUpdates,
   type DashboardPanels,
 } from '@/lib/dashboard/panels'
+import { storedEnrichmentMetrics } from '@/lib/aspire/lead-display'
 import {
   findLeads,
   getLeadCreationTimeline,
@@ -64,16 +65,26 @@ export default async function AdminDashboardPage() {
       pipelineStats.total > 0 ? Math.round((wonCount / pipelineStats.total) * 100) : 0,
     totalLeads: total,
     stageBreakdown: slices,
-    leads: recentLeads.map((lead) => ({
-      id: lead.id,
-      name:
-        [lead.firstName, lead.lastName].filter(Boolean).join(' ') ||
-        lead.email ||
-        lead.company,
-      company: lead.company,
-      title: lead.title,
-      status: lead.relationshipStatus,
-    })),
+    leads: recentLeads.map((lead) => {
+      const metrics = storedEnrichmentMetrics(lead.enrichment)
+      return {
+        id: lead.id,
+        name:
+          [lead.firstName, lead.lastName].filter(Boolean).join(' ') ||
+          lead.email ||
+          lead.company,
+        company: lead.company,
+        title: lead.title,
+        status: lead.relationshipStatus,
+        score: lead.score,
+        qualityTier: metrics?.enrichmentTier ?? null,
+        channels: {
+          email: Boolean(lead.email),
+          phone: Boolean(lead.phone),
+          linkedin: Boolean(lead.linkedinUrl),
+        },
+      }
+    }),
     revenueSeries: buildRevenueSeries(timeline, revenueProgress.avgValue),
     updates: buildWelcomeUpdates({
       repliesThisWeek: sdrStats.repliesThisWeek,

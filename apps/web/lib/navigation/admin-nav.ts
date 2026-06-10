@@ -71,7 +71,7 @@ export type AdminNavHub = {
 export const ADMIN_NAV_SIDEBAR: AdminNavItem[] = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutGrid, href: '/admin/dashboard' },
   { id: 'agent', label: 'Agents', icon: Cpu, href: '/admin/sdr-agents', tourAnchor: 'nav-agents' },
-  { id: 'outreach', label: 'Outreach', icon: Send, href: '/admin/outreach/campaigns', tourAnchor: 'nav-outreach' },
+  { id: 'outreach', label: 'Outreach', icon: Send, href: '/admin/outreach', tourAnchor: 'nav-outreach' },
   { id: 'integrations', label: 'Integrations', icon: Layers, href: '/admin/integrations' },
 ]
 
@@ -268,7 +268,6 @@ export function resolveAdminPageTitle(pathname: string): string {
   if (pathname.startsWith('/admin/dashboard')) return 'Home'
   if (pathname.startsWith('/admin/leads')) return 'Pipeline'
   if (pathname.startsWith('/admin/sdr-agents')) return 'Agent'
-  if (pathname.startsWith('/admin/outreach/aspire')) return 'Prospects'
   if (pathname.startsWith('/admin/outreach/agents/scout')) return 'Scout Agent'
   if (pathname.startsWith('/admin/outreach/agents/drafter')) return 'Drafter Agent'
   if (pathname.startsWith('/admin/outreach/agents/outreach')) return 'Outreach Agent'
@@ -309,7 +308,7 @@ export function resolveWorkspacePrimaryAction(pathname: string): WorkspaceHeader
     return { label: 'New campaign', href: '/admin/outreach/campaigns' }
   }
   if (pathname.startsWith('/admin/outreach')) {
-    return { label: 'Open agents', href: '/admin/outreach/agents' }
+    return { label: 'New campaign', href: '/admin/outreach/campaigns' }
   }
   if (pathname.startsWith('/admin/integrations')) {
     return { label: 'Connect channels', href: '/admin/integrations' }

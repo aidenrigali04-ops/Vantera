@@ -11,7 +11,6 @@ export const FLAG_DEFAULTS = {
   lead_scoring: { team: true, enterprise: true },
 
   lead_pipeline: { team: true, enterprise: true },
-  aspire: { team: true, enterprise: true },
   linkedin_automation: { team: true, enterprise: true },
 
   autonomous_ai_messaging: { team: false, enterprise: true },

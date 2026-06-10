@@ -33,7 +33,7 @@ export function CleanSlateWelcome({ primaryColor: _primaryColor }: Props) {
           className="min-w-[200px] bg-[var(--text-primary)] text-[var(--text-inverse)] hover:opacity-90"
           asChild
         >
-          <Link href="/admin/outreach/aspire">Find prospects</Link>
+          <Link href="/admin/sdr-agents">Find prospects</Link>
         </Button>
         <Button
           type="button"

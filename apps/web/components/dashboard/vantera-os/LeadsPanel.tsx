@@ -22,6 +22,27 @@ const STATUS_LABELS: Record<string, string> = {
   lost: 'Lost',
 }
 
+const TIER_COLORS: Record<string, string> = {
+  excellent: 'var(--success)',
+  strong: 'var(--accent)',
+  moderate: 'var(--warning)',
+  weak: 'var(--text-tertiary)',
+}
+
+function ChannelDot({ active, label }: { active: boolean; label: string }) {
+  return (
+    <span
+      title={label}
+      className={
+        active
+          ? 'h-1.5 w-1.5 rounded-full bg-[var(--success)] group-hover:bg-white group-data-[active]:bg-white'
+          : 'h-1.5 w-1.5 rounded-full bg-[var(--border-strong)] group-hover:bg-white/40 group-data-[active]:bg-white/40'
+      }
+      aria-hidden
+    />
+  )
+}
+
 /** Figma: Leads panel — capsule rows with hairline rings, blue fill on hover/active. */
 export function LeadsPanel({ leads }: Props) {
   return (
@@ -66,8 +87,26 @@ export function LeadsPanel({ leads }: Props) {
                 <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-[var(--text-primary)] group-hover:text-white group-data-[active]:text-white">
                   {lead.name}
                   <span className="ml-2 font-normal text-[var(--text-tertiary)] group-hover:text-white/70 group-data-[active]:text-white/70">
-                    {lead.company}
+                    {lead.title ? `${lead.title} · ${lead.company}` : lead.company}
                   </span>
+                </span>
+                <span className="hidden shrink-0 items-center gap-1 sm:flex" aria-label="Contact channels">
+                  <ChannelDot active={lead.channels.email} label="Email" />
+                  <ChannelDot active={lead.channels.phone} label="Phone" />
+                  <ChannelDot active={lead.channels.linkedin} label="LinkedIn" />
+                </span>
+                <span
+                  className="flex shrink-0 items-center gap-1.5 text-[11px] font-semibold tabular-nums text-[var(--text-secondary)] group-hover:text-white group-data-[active]:text-white"
+                  title={lead.qualityTier ? `Quality: ${lead.qualityTier}` : 'Lead score'}
+                >
+                  <span
+                    className="h-1.5 w-1.5 rounded-full"
+                    style={{
+                      backgroundColor: TIER_COLORS[lead.qualityTier ?? ''] ?? 'var(--border-strong)',
+                    }}
+                    aria-hidden
+                  />
+                  {lead.score}
                 </span>
                 <span className="shrink-0 text-[11px] text-[var(--text-tertiary)] group-hover:text-white/80 group-data-[active]:text-white/80">
                   {STATUS_LABELS[lead.status] ?? lead.status}

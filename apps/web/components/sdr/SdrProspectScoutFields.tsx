@@ -8,7 +8,6 @@ import { Switch } from '@/components/ui/switch'
 import type { ProspectMode } from '@/lib/sdr/types'
 import { cn } from '@/lib/utils'
 import { Bookmark, Plus, Trash2 } from 'lucide-react'
-import Link from 'next/link'
 import {
   PROSPECT_MODE_OPTIONS,
   type BindingDraft,
@@ -204,17 +203,9 @@ export function SdrProspectScoutFields({
             <div className="card-surface flex flex-col items-center gap-3 px-6 py-10 text-center">
               <Bookmark className="h-8 w-8 text-[var(--text-tertiary)]" aria-hidden />
               <p className="text-sm text-[var(--text-secondary)]">
-                Optional: create saved searches in Lead finder, then bind them here for
-                hybrid mode. Autonomous scout does not require this.
+                No saved searches yet — the autonomous scout finds ICP-matched prospects
+                on its own, so binding a search is optional.
               </p>
-              <Button
-                asChild
-                variant="outline"
-                size="sm"
-                className="border-[var(--border-default)]"
-              >
-                <Link href="/admin/outreach/aspire">Lead finder (optional)</Link>
-              </Button>
             </div>
           ) : bindings.length === 0 ? (
             <div className="card-surface border-dashed px-6 py-8 text-center text-sm text-[var(--text-secondary)]">

@@ -6,6 +6,8 @@ import Link from 'next/link'
 export type SubNavTab = {
   href: string
   label: string
+  /** Match only the exact path — for section-root "Overview" tabs. */
+  exact?: boolean
 }
 
 type SubNavTabsProps = {
@@ -26,7 +28,9 @@ export function SubNavTabs({ tabs, activePath, ariaLabel, className }: SubNavTab
       aria-label={ariaLabel}
     >
       {tabs.map((tab) => {
-        const active = activePath === tab.href || activePath.startsWith(`${tab.href}/`)
+        const active = tab.exact
+          ? activePath === tab.href
+          : activePath === tab.href || activePath.startsWith(`${tab.href}/`)
         return (
           <Link
             key={tab.href}

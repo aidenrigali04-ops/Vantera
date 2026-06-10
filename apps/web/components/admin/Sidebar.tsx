@@ -19,6 +19,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import {
   ChevronLeft,
   ChevronRight,
+  Gauge,
   LogOut,
   RefreshCw,
   Rocket,
@@ -37,6 +38,8 @@ type SidebarProps = {
   session: AdminSession
   mobile?: boolean
   onNavigate?: () => void
+  /** Owner-only: reveal the optimization dashboard link. */
+  isSuperAdmin?: boolean
 }
 
 /* ─────────────────────────────────────────────────────────────────────────── */
@@ -47,6 +50,7 @@ function SidebarContent({
   session,
   collapsed,
   onNavigate,
+  isSuperAdmin = false,
 }: SidebarProps & { collapsed: boolean }) {
   const pathname = usePathname() ?? ''
   const router = useRouter()
@@ -83,7 +87,13 @@ function SidebarContent({
     [startHereActive],
   )
 
-  const footerItems = [...ADMIN_NAV_SIDEBAR_SECONDARY, ...ADMIN_NAV_FOOTER]
+  const footerItems: AdminNavItem[] = [
+    ...ADMIN_NAV_SIDEBAR_SECONDARY,
+    ...ADMIN_NAV_FOOTER,
+    ...(isSuperAdmin
+      ? [{ id: 'optimization', label: 'Optimization', icon: Gauge, href: '/admin/optimization' }]
+      : []),
+  ]
 
   return (
     <TooltipProvider delayDuration={0}>

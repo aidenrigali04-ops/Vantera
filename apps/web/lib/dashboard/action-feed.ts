@@ -167,7 +167,7 @@ export async function getOperationalActionFeed(accountId: string, limit = 8): Pr
     ) {
       href = '/admin/crm/pipeline'
     } else if (rawSignalType === 'aspire_icp_match' && payload.searchId) {
-      href = `/admin/outreach/aspire?searchId=${payload.searchId}`
+      href = `/admin/outreach/agents/scout/runs/${payload.searchId}`
     } else if (payload.campaignId) {
       campaignId = String(payload.campaignId)
       href = `/admin/outreach/campaigns/${payload.campaignId}`

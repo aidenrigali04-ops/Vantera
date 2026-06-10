@@ -13,7 +13,7 @@ export type LeadFilters = {
   offset?: number
 }
 
-export async function findLeads(accountId: string, filters: LeadFilters = {}) {
+function buildLeadConditions(accountId: string, filters: LeadFilters) {
   const conditions = [eq(leads.accountId, accountId), isNull(leads.deletedAt)]
 
   if (filters.source) {
@@ -45,12 +45,33 @@ export async function findLeads(accountId: string, filters: LeadFilters = {}) {
     conditions.push(inArray(leads.id, filters.ids))
   }
 
+  return conditions
+}
+
+export async function findLeads(accountId: string, filters: LeadFilters = {}) {
+  const conditions = buildLeadConditions(accountId, filters)
   const limit = filters.limit ?? 50
   const offset = filters.offset ?? 0
 
   return db
     .select()
     .from(leads)
+    .where(and(...conditions))
+    .orderBy(desc(leads.createdAt))
+    .limit(limit)
+    .offset(offset)
+}
+
+/** Leads joined with their AI profile rows — feeds the enriched pipeline table. */
+export async function findLeadsWithProfiles(accountId: string, filters: LeadFilters = {}) {
+  const conditions = buildLeadConditions(accountId, filters)
+  const limit = filters.limit ?? 50
+  const offset = filters.offset ?? 0
+
+  return db
+    .select({ lead: leads, profile: leadProfiles })
+    .from(leads)
+    .leftJoin(leadProfiles, eq(leadProfiles.leadId, leads.id))
     .where(and(...conditions))
     .orderBy(desc(leads.createdAt))
     .limit(limit)

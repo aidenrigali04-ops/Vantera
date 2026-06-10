@@ -153,7 +153,7 @@ export function CampaignsPageClient({ campaigns, defaultChannel = 'email' }: Pro
                   <td className="px-4 py-3">
                     <Link
                       href={`/admin/outreach/campaigns/${campaign.id}`}
-                      className="font-medium text-[var(--text-primary)] hover:text-violet-700"
+                      className="font-medium text-[var(--text-primary)] hover:text-[var(--accent)]"
                     >
                       {campaign.name}
                     </Link>
@@ -249,11 +249,11 @@ export function CampaignsPageClient({ campaigns, defaultChannel = 'email' }: Pro
                     )}
                   >
                     {option === 'book_meeting' ? (
-                      <CalendarCheck className="mt-0.5 h-4 w-4 shrink-0 text-violet-600" />
+                      <CalendarCheck className="mt-0.5 h-4 w-4 shrink-0 text-[var(--accent)]" />
                     ) : option === 'fill_funnel' ? (
-                      <Users className="mt-0.5 h-4 w-4 shrink-0 text-violet-600" />
+                      <Users className="mt-0.5 h-4 w-4 shrink-0 text-[var(--accent)]" />
                     ) : (
-                      <Target className="mt-0.5 h-4 w-4 shrink-0 text-violet-600" />
+                      <Target className="mt-0.5 h-4 w-4 shrink-0 text-[var(--accent)]" />
                     )}
                     <span>
                       <span className="block text-sm font-medium text-[var(--text-primary)]">

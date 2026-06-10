@@ -372,7 +372,7 @@ export function CampaignDetailClient({
           <p className="mt-1 text-sm text-[var(--text-tertiary)]">
             {isLinkedInHub
               ? 'Leads must have a LinkedIn profile URL. Add URLs in Pipeline or pick prospects below.'
-              : 'Choose from your pipeline, or find new ICP-matched prospects with Aspire below.'}
+              : 'Choose from your pipeline, or find new ICP-matched prospects below.'}
           </p>
 
           <CampaignAspireFinder
@@ -391,7 +391,7 @@ export function CampaignDetailClient({
               {enrollableLeads.length === 0 ? (
                 <p className="text-sm text-[var(--text-tertiary)]">
                   No leads with contact info yet.{' '}
-                  <Link href="/admin/leads" className="text-violet-700 hover:underline">
+                  <Link href="/admin/leads" className="text-[var(--accent)] hover:underline">
                     Add leads in Pipeline
                   </Link>
                 </p>
@@ -645,7 +645,7 @@ export function CampaignDetailClient({
                           href={metadata.linkedinUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className="mt-1 inline-flex items-center gap-1 text-xs text-violet-700 hover:underline"
+                          className="mt-1 inline-flex items-center gap-1 text-xs text-[var(--accent)] hover:underline"
                         >
                           Open LinkedIn
                           <ExternalLink className="h-3 w-3" />

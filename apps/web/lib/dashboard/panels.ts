@@ -12,6 +12,16 @@ export type DashboardLeadRow = {
   company: string
   title: string | null
   status: string
+  /** Lead score 0–100. */
+  score: number
+  /** Enrichment quality tier when the lead has been enriched. */
+  qualityTier: 'excellent' | 'strong' | 'moderate' | 'weak' | null
+  /** Which contact channels are on file. */
+  channels: {
+    email: boolean
+    phone: boolean
+    linkedin: boolean
+  }
 }
 
 export type StageSlice = {

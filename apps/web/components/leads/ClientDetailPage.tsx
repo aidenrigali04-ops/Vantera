@@ -230,6 +230,16 @@ export function ClientDetailPage({ lead, profile, drafts, sequence, steps, activ
   const icpSignals = Array.isArray(enrichment.icpSignals)
     ? (enrichment.icpSignals as string[])
     : []
+  const websiteUrl = typeof enrichment.websiteUrl === 'string' ? enrichment.websiteUrl : ''
+  const locationLabel = [enrichment.city, enrichment.state]
+    .filter((v): v is string => typeof v === 'string' && v.trim().length > 0)
+    .join(', ')
+  const revenue = typeof enrichment.revenue === 'number' ? enrichment.revenue : null
+  const enrichmentScore =
+    typeof enrichment.enrichmentScore === 'number' ? enrichment.enrichmentScore : null
+  const completenessPct =
+    typeof enrichment.completenessPct === 'number' ? enrichment.completenessPct : null
+  const qualityTier = typeof enrichment.qualityTier === 'string' ? enrichment.qualityTier : null
   const topTriggers = profile?.topTriggers
     ? Array.isArray(profile.topTriggers)
       ? (profile.topTriggers as string[])
@@ -539,13 +549,38 @@ export function ClientDetailPage({ lead, profile, drafts, sequence, steps, activ
           </section>
         ) : null}
 
-        {/* ── Scout / Aspire enrichment ── */}
-        {(industry || companySize || technologies.length > 0 || icpSignals.length > 0) ? (
+        {/* ── Prospect enrichment ── */}
+        {(industry ||
+          companySize ||
+          technologies.length > 0 ||
+          icpSignals.length > 0 ||
+          websiteUrl ||
+          locationLabel ||
+          enrichmentScore != null) ? (
           <section>
-            <div className="flex items-center px-1 py-3">
+            <div className="flex items-center gap-2 px-1 py-3">
               <p className="flex-1 text-[11px] uppercase tracking-[0.08em] text-[var(--cd-text-primary)]">
                 Prospect enrichment
               </p>
+              {qualityTier ? (
+                <span
+                  className={cn(
+                    'rounded-full px-2.5 py-0.5 text-[11px] font-semibold capitalize',
+                    qualityTier === 'excellent' && 'bg-[var(--cd-bg-tag-cyan)] text-[var(--cd-text-tag-cyan)]',
+                    qualityTier === 'strong' && 'bg-[var(--cd-bg-tag-blue)] text-[var(--cd-text-tag-blue)]',
+                    qualityTier === 'moderate' && 'bg-[var(--cd-bg-tag-orange)] text-[var(--cd-text-tag-orange)]',
+                    qualityTier === 'weak' && 'bg-[var(--bg-subtle)] text-[var(--cd-text-muted)]',
+                  )}
+                >
+                  {qualityTier} data
+                </span>
+              ) : null}
+              {enrichmentScore != null ? (
+                <span className="text-[11px] tabular-nums text-[var(--cd-text-muted)]">
+                  {enrichmentScore}% data score
+                  {completenessPct != null ? ` · ${completenessPct}% complete` : ''}
+                </span>
+              ) : null}
             </div>
             <div
               className="grid gap-4 rounded-[8px] bg-[var(--cd-bg-card)] p-5 sm:grid-cols-2"
@@ -561,6 +596,34 @@ export function ClientDetailPage({ lead, profile, drafts, sequence, steps, activ
                 <div>
                   <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--cd-text-muted)]">Company size</p>
                   <p className="text-[13px] text-[var(--cd-text-secondary)]">{companySize} employees</p>
+                </div>
+              ) : null}
+              {locationLabel ? (
+                <div>
+                  <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--cd-text-muted)]">Location</p>
+                  <p className="text-[13px] text-[var(--cd-text-secondary)]">{locationLabel}</p>
+                </div>
+              ) : null}
+              {revenue != null ? (
+                <div>
+                  <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--cd-text-muted)]">Est. revenue</p>
+                  <p className="text-[13px] text-[var(--cd-text-secondary)]">
+                    ${revenue.toLocaleString()}
+                  </p>
+                </div>
+              ) : null}
+              {websiteUrl ? (
+                <div>
+                  <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--cd-text-muted)]">Website</p>
+                  <a
+                    href={websiteUrl.startsWith('http') ? websiteUrl : `https://${websiteUrl}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-[13px] text-[var(--cd-accent)] hover:underline"
+                  >
+                    {websiteUrl.replace(/^https?:\/\//, '')}
+                    <ExternalLink className="h-3 w-3" aria-hidden />
+                  </a>
                 </div>
               ) : null}
               {technologies.length > 0 ? (

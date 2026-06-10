@@ -61,9 +61,9 @@ function AgentCard({ card, agent }: { card: (typeof FIGMA_CARDS)[number]; agent?
       variants={fadeUp}
       className="vantera-agent-card flex items-center gap-4 rounded-2xl p-5"
     >
-      <Icon className="h-8 w-8 shrink-0 text-[#f5f6f6]" strokeWidth={2} aria-hidden />
+      <Icon className="h-8 w-8 shrink-0 text-[var(--text-primary)]" strokeWidth={2} aria-hidden />
       <div className="min-w-0 flex-1">
-        <h3 className="truncate text-[18px] font-semibold text-white">{card.title}</h3>
+        <h3 className="truncate text-[18px] font-semibold text-[var(--text-primary)]">{card.title}</h3>
         {agent ? (
           <p className="mt-0.5 truncate text-[12px] text-[var(--text-tertiary)]">
             {agent.statLabel}: {agent.statValue}
@@ -88,10 +88,10 @@ function CallingAgentCard() {
     >
       <PhoneOutgoing className="h-8 w-8 shrink-0 text-[#f5f6f6]" strokeWidth={2} aria-hidden />
       <div className="min-w-0 flex-1">
-        <h3 className="truncate text-[18px] font-semibold text-white">Calling Agent</h3>
+        <h3 className="truncate text-[18px] font-semibold text-[var(--text-primary)]">Calling Agent</h3>
         <p className="mt-0.5 text-[12px] text-[var(--text-tertiary)]">AI cold calls</p>
       </div>
-      <span className="inline-flex shrink-0 items-center justify-center rounded-2xl border border-white/30 px-6 py-3 text-[15px] font-semibold text-[var(--text-tertiary)]">
+      <span className="inline-flex shrink-0 items-center justify-center rounded-2xl border border-[var(--border-strong)] px-6 py-3 text-[15px] font-semibold text-[var(--text-tertiary)] dark:border-white/30">
         Soon
       </span>
     </motion.article>
@@ -101,8 +101,12 @@ function CallingAgentCard() {
 function ActivityRow({ event }: { event: SDRActivityEvent }) {
   const inner = (
     <>
-      <Check className="h-4 w-4 shrink-0 text-white" strokeWidth={2.25} aria-hidden />
-      <span className="min-w-0 flex-1 truncate text-[14px] font-semibold text-white">
+      <Check
+        className="h-4 w-4 shrink-0 text-[var(--text-primary)] group-hover:text-white dark:text-white"
+        strokeWidth={2.25}
+        aria-hidden
+      />
+      <span className="min-w-0 flex-1 truncate text-[14px] font-semibold text-[var(--text-primary)] group-hover:text-white dark:text-white">
         {eventLabel(event)}
       </span>
       {event.company ? (
@@ -111,14 +115,14 @@ function ActivityRow({ event }: { event: SDRActivityEvent }) {
         </span>
       ) : null}
       <ChevronRight
-        className="h-3.5 w-3.5 shrink-0 text-[#5e5e5e] group-hover:text-white"
+        className="h-3.5 w-3.5 shrink-0 text-[var(--text-disabled)] group-hover:text-white"
         aria-hidden
       />
     </>
   )
 
   const className =
-    'group flex items-center gap-3 rounded-[18px] border border-white/80 px-4 py-3 transition-colors hover:border-white/45 hover:bg-[var(--accent)]'
+    'group flex items-center gap-3 rounded-[18px] border border-[var(--border-strong)] px-4 py-3 transition-colors hover:border-white/45 hover:bg-[var(--accent)] dark:border-white/80'
 
   if (event.leadId) {
     return (
@@ -176,7 +180,7 @@ export function AgentsHubView({ agents, activity, sdrEnabled }: Props) {
 
         {/* ── Right panel: Agent Overview ── */}
         <motion.section variants={fadeUp} className="vantera-glass-panel rounded-2xl p-6">
-          <h2 className="pb-5 pt-1 text-center text-[20px] font-semibold text-white">
+          <h2 className="pb-5 pt-1 text-center text-[20px] font-semibold text-[var(--text-primary)]">
             Agent Overview
           </h2>
 

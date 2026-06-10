@@ -319,10 +319,10 @@ export async function findLeadEmbeddedInsights(
     derived.push({
       id: `derived-enrich-${lead.id}`,
       headline: 'Missing contact channels',
-      recommendation: `${name} has no email or LinkedIn on file. Enrich via Aspire before enrolling outreach.`,
+      recommendation: `${name} has no email or LinkedIn on file. Run the Scout agent to enrich it before outreach.`,
       severity: 'yellow',
-      actionLabel: 'Find in Aspire',
-      actionHref: '/admin/outreach/aspire',
+      actionLabel: 'Open Scout agent',
+      actionHref: '/admin/outreach/agents/scout',
       dismissible: true,
       source: 'derived',
     })
