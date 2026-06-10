@@ -54,7 +54,7 @@ export function VanteraDashboardView({
             type="button"
             onClick={onDismissSuccessNotice}
             aria-label="Dismiss"
-            className="flex h-6 w-6 items-center justify-center rounded-full text-[var(--text-tertiary)] transition-colors hover:bg-white/[0.06] hover:text-[var(--text-primary)]"
+            className="flex h-6 w-6 items-center justify-center rounded-full text-[var(--text-tertiary)] transition-colors hover:bg-black/[0.05] hover:text-[var(--text-primary)] dark:hover:bg-white/[0.06]"
           >
             <X className="h-3.5 w-3.5" aria-hidden />
           </button>

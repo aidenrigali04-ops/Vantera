@@ -35,7 +35,7 @@ function RingGauge({ pct, id }: { pct: number; id: string }) {
         cy={size / 2}
         r={r}
         fill="none"
-        stroke="rgba(255,255,255,0.09)"
+        stroke="var(--chart-track)"
         strokeWidth={stroke}
       />
       <defs>

@@ -23,6 +23,7 @@ import {
   RefreshCw,
   Rocket,
   Search,
+  X,
   Zap,
 } from 'lucide-react'
 import Link from 'next/link'
@@ -52,12 +53,25 @@ function SidebarContent({
   const { businessName, logoUrl } = useBranding()
   const { setCommandPaletteOpen } = useUIStore()
   const [startHereActive, setStartHereActive] = useState(false)
+  // hidden until localStorage is read so a dismissed card never flashes in
+  const [helpCardDismissed, setHelpCardDismissed] = useState(true)
   const displayName = (businessName || 'Workspace').slice(0, 18)
   const initial = (businessName?.trim()?.[0] ?? 'V').toUpperCase()
 
   useEffect(() => {
     setStartHereActive(isStartHereBadgeActive(session.accountId))
   }, [session.accountId, pathname])
+
+  useEffect(() => {
+    setHelpCardDismissed(
+      window.localStorage.getItem('vantera:sidebar-help-dismissed') === '1',
+    )
+  }, [])
+
+  function dismissHelpCard() {
+    window.localStorage.setItem('vantera:sidebar-help-dismissed', '1')
+    setHelpCardDismissed(true)
+  }
 
   const sidebarItems = useMemo(
     () =>
@@ -133,7 +147,7 @@ function SidebarContent({
               Core
             </p>
           )}
-          <ul className="space-y-0.5">
+          <ul className="space-y-1.5">
             {sidebarItems.map((item) => (
               <NavItemRow
                 key={item.id}
@@ -153,7 +167,7 @@ function SidebarContent({
               </p>
             )}
             {collapsed && <div className="my-3 border-t border-[var(--border-subtle)]" />}
-            <ul className="space-y-0.5">
+            <ul className="space-y-1.5">
               {footerItems.map((item) => (
                 <NavItemRow
                   key={item.id}
@@ -174,22 +188,30 @@ function SidebarContent({
                   <button
                     type="button"
                     onClick={() => setCommandPaletteOpen(true)}
-                    className="flex w-full items-center justify-center rounded-xl px-2 py-2 text-[var(--text-disabled)] transition-colors hover:bg-white/[0.04] hover:text-[var(--text-tertiary)]"
+                    className="flex w-full items-center justify-center rounded-xl px-2 py-2 text-[var(--text-disabled)] transition-colors hover:bg-black/[0.04] dark:hover:bg-white/[0.04] hover:text-[var(--text-tertiary)]"
                     aria-label="Search"
                   >
                     <Search className="h-4 w-4" />
                   </button>
                 </TooltipTrigger>
-                <TooltipContent side="right">Search (⌘K)</TooltipContent>
+                <TooltipContent side="right" sideOffset={10}>Search (⌘K)</TooltipContent>
               </Tooltip>
             </div>
           )}
         </nav>
 
-        {/* ── Help card (expanded only) ── */}
-        {!collapsed && (
+        {/* ── Help card (expanded only, dismissible) ── */}
+        {!collapsed && !helpCardDismissed && (
           <div className="px-3 pb-3">
             <div className="sidebar-help-card relative overflow-hidden rounded-2xl p-4">
+              <button
+                type="button"
+                onClick={dismissHelpCard}
+                aria-label="Dismiss"
+                className="absolute right-2 top-2 z-10 flex h-6 w-6 items-center justify-center rounded-full text-[var(--text-disabled)] transition-colors hover:bg-black/[0.05] hover:text-[var(--text-secondary)] dark:hover:bg-white/[0.08]"
+              >
+                <X className="h-3.5 w-3.5" aria-hidden />
+              </button>
               <div className="relative">
                 <div className="icon-tile mb-2 flex h-8 w-8 items-center justify-center rounded-lg">
                   <Zap className="h-4 w-4 text-[var(--text-secondary)]" strokeWidth={1.75} aria-hidden />
@@ -222,7 +244,7 @@ function SidebarContent({
                 onNavigate?.()
               }}
               className={cn(
-                'flex items-center gap-2 rounded-xl px-2 py-2 text-[12px] text-[var(--text-disabled)] transition-colors hover:bg-white/[0.04] hover:text-[var(--text-tertiary)]',
+                'flex items-center gap-2 rounded-xl px-2 py-2 text-[12px] text-[var(--text-disabled)] transition-colors hover:bg-black/[0.04] dark:hover:bg-white/[0.04] hover:text-[var(--text-tertiary)]',
                 collapsed && 'w-full justify-center',
               )}
               aria-label="Refresh"
@@ -235,7 +257,7 @@ function SidebarContent({
               <form action={adminLogoutAction} className="ml-auto">
                 <button
                   type="submit"
-                  className="flex items-center gap-1.5 rounded-xl px-2 py-2 text-[12px] text-[var(--text-disabled)] transition-colors hover:bg-white/[0.04] hover:text-red-400"
+                  className="flex items-center gap-1.5 rounded-xl px-2 py-2 text-[12px] text-[var(--text-disabled)] transition-colors hover:bg-black/[0.04] dark:hover:bg-white/[0.04] hover:text-red-400"
                 >
                   <LogOut className="h-3.5 w-3.5" />
                   <span>Sign out</span>
@@ -256,12 +278,12 @@ function SidebarContent({
                 <TooltipTrigger asChild>
                   <button
                     type="submit"
-                    className="flex w-full items-center justify-center rounded-xl px-2 py-2 text-[var(--text-disabled)] transition-colors hover:bg-white/[0.04] hover:text-red-400"
+                    className="flex w-full items-center justify-center rounded-xl px-2 py-2 text-[var(--text-disabled)] transition-colors hover:bg-black/[0.04] dark:hover:bg-white/[0.04] hover:text-red-400"
                   >
                     <LogOut className="h-3.5 w-3.5" />
                   </button>
                 </TooltipTrigger>
-                <TooltipContent side="right">Sign out</TooltipContent>
+                <TooltipContent side="right" sideOffset={10}>Sign out</TooltipContent>
               </Tooltip>
             </form>
           )}
@@ -332,7 +354,7 @@ function NavItemRow({
               {item.label}
             </span>
             {item.highlightLabel && (
-              <span className="shrink-0 rounded-full bg-white/[0.1] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-[var(--text-secondary)]">
+              <span className="shrink-0 rounded-full bg-black/[0.08] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-[var(--text-secondary)] dark:bg-white/[0.1]">
                 {item.highlightLabel}
               </span>
             )}
@@ -347,7 +369,7 @@ function NavItemRow({
       <li>
         <Tooltip>
           <TooltipTrigger asChild>{content}</TooltipTrigger>
-          <TooltipContent side="right">{item.label}</TooltipContent>
+          <TooltipContent side="right" sideOffset={10}>{item.label}</TooltipContent>
         </Tooltip>
       </li>
     )
@@ -369,7 +391,7 @@ export function Sidebar({ session, mobile, onNavigate }: SidebarProps) {
         <SheetContent
           side="left"
           className="w-[260px] border-[var(--border-subtle)] p-0"
-          style={{ background: 'rgba(0,0,0,0.97)' }}
+          style={{ background: 'var(--sidebar-solid-bg)' }}
         >
           <SidebarContent
             session={session}
@@ -390,9 +412,11 @@ export function Sidebar({ session, mobile, onNavigate }: SidebarProps) {
         'sidebar-edge hidden h-full shrink-0 flex-col transition-[width] duration-200 md:flex',
         sidebarCollapsed ? 'w-16' : 'w-[240px]',
       )}
-      style={{ background: 'rgba(0,0,0,0.97)' }}
+      style={{ background: 'var(--sidebar-solid-bg)' }}
     >
-      <SidebarContent session={session} collapsed={sidebarCollapsed} />
+      <div className="min-h-0 flex-1 overflow-hidden">
+        <SidebarContent session={session} collapsed={sidebarCollapsed} />
+      </div>
 
       {/* collapse toggle */}
       <div className="border-t border-[var(--border-subtle)] p-2">
@@ -401,7 +425,7 @@ export function Sidebar({ session, mobile, onNavigate }: SidebarProps) {
           variant="ghost"
           size="sm"
           onClick={toggleSidebar}
-          className="h-8 w-full justify-start text-[var(--text-disabled)] hover:bg-white/[0.04] hover:text-[var(--text-tertiary)]"
+          className="h-8 w-full justify-start text-[var(--text-disabled)] hover:bg-black/[0.04] dark:hover:bg-white/[0.04] hover:text-[var(--text-tertiary)]"
           aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
           {sidebarCollapsed ? (

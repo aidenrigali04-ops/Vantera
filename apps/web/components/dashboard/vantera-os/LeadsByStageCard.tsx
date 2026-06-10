@@ -54,7 +54,7 @@ function SegmentedDonut({ slices }: { slices: StageSlice[] }) {
         cy={size / 2}
         r={r}
         fill="none"
-        stroke="rgba(255,255,255,0.07)"
+        stroke="var(--chart-track)"
         strokeWidth={stroke}
       />
       {segments}

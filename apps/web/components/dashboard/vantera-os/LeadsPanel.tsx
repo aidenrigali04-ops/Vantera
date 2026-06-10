@@ -31,7 +31,7 @@ export function LeadsPanel({ leads }: Props) {
         <Link
           href="/admin/leads"
           aria-label="View all leads"
-          className="flex h-7 w-7 items-center justify-center rounded-full text-[var(--text-tertiary)] transition-colors hover:bg-white/[0.06] hover:text-[var(--text-primary)]"
+          className="flex h-7 w-7 items-center justify-center rounded-full text-[var(--text-tertiary)] transition-colors hover:bg-black/[0.05] hover:text-[var(--text-primary)] dark:hover:bg-white/[0.06]"
         >
           <ArrowUpRight className="h-4 w-4" aria-hidden />
         </Link>

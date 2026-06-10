@@ -88,6 +88,77 @@
     --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
     --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.6);
     --shadow-glow: 0 0 0 3px rgba(6, 151, 255, 0.25);
+    /* chart strokes + solid sidebar fill — themed */
+    --chart-track: rgba(255, 255, 255, 0.09);
+    --chart-grid: rgba(255, 255, 255, 0.06);
+    --sidebar-solid-bg: rgba(0, 0, 0, 0.97);
+  }
+
+  /* ── Light theme — same blue accent, white canvas + panels ── */
+  .light {
+    --background: 0 0% 100%;
+    --foreground: 240 6% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 6% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 6% 10%;
+    --primary: 206 100% 51%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 5% 96%;
+    --secondary-foreground: 240 6% 10%;
+    --muted: 240 5% 96%;
+    --muted-foreground: 240 4% 46%;
+    --accent: 240 5% 94%;
+    --accent-foreground: 240 6% 10%;
+    --destructive: 0 74% 50%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 0% / 0.1;
+    --input: 0 0% 0% / 0.12;
+    --ring: 206 100% 51%;
+    --chart-4: 240 4% 75%;
+    --chart-5: 240 4% 55%;
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 240 6% 12%;
+    --sidebar-accent: 240 5% 96%;
+    --sidebar-accent-foreground: 240 6% 12%;
+    --sidebar-border: 0 0% 0% / 0.08;
+    color-scheme: light;
+
+    /* Vantera OS light tokens — declared after the HSL set, mirroring :root order */
+    --bg-base: #f5f5f7;
+    --bg-subtle: #ededf0;
+    --bg-surface: #ffffff;
+    --bg-elevated: #ffffff;
+    --bg-overlay: #f4f4f6;
+    --border-subtle: rgba(0, 0, 0, 0.06);
+    --border-default: rgba(0, 0, 0, 0.1);
+    --border-strong: rgba(0, 0, 0, 0.2);
+    --text-primary: #1d1d1f;
+    --text-secondary: #3f3f46;
+    --text-tertiary: #71717a;
+    --text-disabled: #a1a1aa;
+    --text-inverse: #ffffff;
+    --accent: #0697ff;
+    --accent-hover: #0084e6;
+    --accent-muted: rgba(6, 151, 255, 0.1);
+    --sidebar-gradient-top: #ffffff;
+    --sidebar-gradient-bottom: #ffffff;
+    --sidebar-nav-text: #1d1d1f;
+    --sidebar-nav-text-muted: #71717a;
+    --sidebar-nav-border: rgba(0, 0, 0, 0.08);
+    --sidebar-nav-hover: rgba(0, 0, 0, 0.04);
+    --success: #1f9d4a;
+    --success-muted: rgba(31, 157, 74, 0.12);
+    --warning: #b25e09;
+    --warning-muted: rgba(178, 94, 9, 0.12);
+    --danger: #dc2626;
+    --danger-muted: rgba(220, 38, 38, 0.1);
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.07), 0 1px 2px rgba(0, 0, 0, 0.04);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+    --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.12);
+    --chart-track: rgba(0, 0, 0, 0.08);
+    --chart-grid: rgba(0, 0, 0, 0.06);
+    --sidebar-solid-bg: rgba(255, 255, 255, 0.97);
   }
 
   /* agent workspace — same dark tokens */
@@ -490,6 +561,85 @@
     );
     background-size: 18px 18px;
     background-position: center;
+  }
+
+  /* ── Light-theme overrides for surfaces with hardcoded dark-mode borders/shadows ── */
+  .light .vision-kpi-card,
+  .light .vision-panel-card,
+  .light .vision-welcome-card {
+    border-color: rgba(0, 0, 0, 0.08);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 2px 12px rgba(0, 0, 0, 0.04);
+  }
+  .light .vision-kpi-card:hover {
+    border-color: rgba(0, 0, 0, 0.14);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 4px 16px rgba(0, 0, 0, 0.08);
+  }
+
+  .light .vantera-chart-card {
+    border-color: rgba(0, 0, 0, 0.08);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  }
+
+  .light .vantera-leads-panel {
+    box-shadow: 0 0 24px -8px rgba(6, 151, 255, 0.15);
+  }
+
+  .light .vantera-lead-row {
+    border-color: rgba(0, 0, 0, 0.14);
+  }
+  .light .vantera-lead-row:hover,
+  .light .vantera-lead-row[data-active='true'] {
+    border-color: rgba(6, 151, 255, 0.45);
+  }
+
+  .light .sidebar-vision {
+    background: rgba(255, 255, 255, 0.97);
+  }
+
+  .light .sidebar-search-btn {
+    background: rgba(0, 0, 0, 0.03);
+    border-color: rgba(0, 0, 0, 0.08);
+  }
+  .light .sidebar-search-btn:hover {
+    background: rgba(0, 0, 0, 0.05);
+    border-color: rgba(0, 0, 0, 0.12);
+  }
+
+  .light .sidebar-help-card {
+    background: linear-gradient(127deg, rgba(6, 151, 255, 0.1) 0%, rgba(255, 255, 255, 0.9) 100%);
+    border-color: rgba(6, 151, 255, 0.25);
+    box-shadow: 0 4px 24px -8px rgba(6, 151, 255, 0.15);
+  }
+
+  .light .vantera-glass-panel {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 6px 10px 4px rgba(0, 0, 0, 0.04);
+  }
+  .light .vantera-glass-panel::before {
+    background: linear-gradient(
+      135deg,
+      rgba(0, 0, 0, 0.14) 0%,
+      rgba(0, 0, 0, 0.08) 40%,
+      rgba(0, 0, 0, 0.05) 100%
+    );
+  }
+
+  .light .vantera-agent-card {
+    background: #ffffff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 6px 10px 4px rgba(0, 0, 0, 0.04);
+  }
+  .light .vantera-agent-card::before {
+    background: linear-gradient(
+      135deg,
+      rgba(6, 151, 255, 0.7) 0%,
+      rgba(6, 151, 255, 0.25) 30%,
+      rgba(0, 0, 0, 0.1) 60%,
+      rgba(0, 0, 0, 0.16) 100%
+    );
+  }
+
+  .light .agent-playground-grid {
+    background-color: #f1f5f9;
+    background-image: radial-gradient(circle, rgba(15, 23, 42, 0.09) 1px, transparent 1px);
   }
 }
 

@@ -19,6 +19,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { ThemeToggle } from '@/components/admin/ThemeToggle'
 import { Bell, Inbox, Menu, MoreHorizontal, Plus, Search } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -125,6 +126,8 @@ export function TopHeader({ session, showDemoWorkspace = false }: TopHeaderProps
         >
           <Bell className="h-5 w-5" />
         </Button>
+
+        <ThemeToggle />
 
         {isDashboard ? (
           <Button type="button" variant="ghost" size="icon" className="h-9 w-9" aria-label="More options">

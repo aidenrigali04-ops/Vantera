@@ -86,7 +86,7 @@ export function RevenueTrendCard({ series, currentMrr, hasGoalConfig }: Props) {
               </defs>
               <CartesianGrid
                 vertical={false}
-                stroke="rgba(255,255,255,0.06)"
+                stroke="var(--chart-grid)"
                 strokeDasharray="4 4"
               />
               <XAxis
@@ -104,10 +104,10 @@ export function RevenueTrendCard({ series, currentMrr, hasGoalConfig }: Props) {
                 tickFormatter={tick}
               />
               <Tooltip
-                cursor={{ stroke: 'rgba(255,255,255,0.15)', strokeWidth: 1 }}
+                cursor={{ stroke: 'var(--border-strong)', strokeWidth: 1 }}
                 contentStyle={{
                   background: 'var(--bg-overlay)',
-                  border: '1px solid rgba(255,255,255,0.1)',
+                  border: '1px solid var(--border-default)',
                   borderRadius: 10,
                   fontSize: 12,
                   color: 'var(--text-primary)',
