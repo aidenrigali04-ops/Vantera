@@ -32,7 +32,7 @@ function LegendDot({ color, label }: { color: string; label: string }) {
   )
 }
 
-/** Figma Metrics UI Kit: Revenue area chart — blue series over a muted gray series. */
+/** Revenue area chart — yellow series over a muted gray pipeline series. */
 export function RevenueTrendCard({ series, currentMrr, hasGoalConfig }: Props) {
   const hasData = series.some((p) => p.revenue > 0 || p.pipeline > 0)
 
@@ -49,7 +49,7 @@ export function RevenueTrendCard({ series, currentMrr, hasGoalConfig }: Props) {
           </p>
         </div>
         <div className="flex items-center gap-4 pt-1">
-          <LegendDot color="#0a84ff" label="Revenue" />
+          <LegendDot color="#eab308" label="Revenue" />
           <LegendDot color="#6b6b73" label="Pipeline" />
         </div>
       </div>
@@ -76,8 +76,8 @@ export function RevenueTrendCard({ series, currentMrr, hasGoalConfig }: Props) {
             <AreaChart data={series} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
               <defs>
                 <linearGradient id="revenue-fill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#0a84ff" stopOpacity={0.28} />
-                  <stop offset="100%" stopColor="#0a84ff" stopOpacity={0.02} />
+                  <stop offset="0%" stopColor="#eab308" stopOpacity={0.28} />
+                  <stop offset="100%" stopColor="#eab308" stopOpacity={0.02} />
                 </linearGradient>
                 <linearGradient id="pipeline-fill" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="#6b6b73" stopOpacity={0.18} />
@@ -129,12 +129,12 @@ export function RevenueTrendCard({ series, currentMrr, hasGoalConfig }: Props) {
               <Area
                 type="monotone"
                 dataKey="revenue"
-                stroke="#0a84ff"
+                stroke="#eab308"
                 strokeWidth={2}
                 fill="url(#revenue-fill)"
                 isAnimationActive={false}
                 dot={false}
-                activeDot={{ r: 4, fill: '#0a84ff', stroke: '#fff', strokeWidth: 1.5 }}
+                activeDot={{ r: 4, fill: "#eab308", stroke: "var(--bg-surface)", strokeWidth: 1.5 }}
               />
             </AreaChart>
           </ResponsiveContainer>

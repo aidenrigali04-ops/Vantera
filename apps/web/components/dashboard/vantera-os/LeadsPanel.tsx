@@ -35,15 +35,15 @@ function ChannelDot({ active, label }: { active: boolean; label: string }) {
       title={label}
       className={
         active
-          ? 'h-1.5 w-1.5 rounded-full bg-[var(--success)] group-hover:bg-white group-data-[active]:bg-white'
-          : 'h-1.5 w-1.5 rounded-full bg-[var(--border-strong)] group-hover:bg-white/40 group-data-[active]:bg-white/40'
+          ? 'h-1.5 w-1.5 rounded-full bg-[var(--success)] group-hover:bg-[var(--text-inverse)]'
+          : 'h-1.5 w-1.5 rounded-full bg-[var(--border-strong)] group-hover:bg-[var(--text-inverse)] group-hover:opacity-40'
       }
       aria-hidden
     />
   )
 }
 
-/** Figma: Leads panel — capsule rows with hairline rings, blue fill on hover/active. */
+/** Leads panel — capsule rows with hairline rings, accent fill on hover. */
 export function LeadsPanel({ leads }: Props) {
   return (
     <motion.section variants={fadeUp} className="vantera-leads-panel rounded-3xl p-6">
@@ -72,21 +72,20 @@ export function LeadsPanel({ leads }: Props) {
         </div>
       ) : (
         <ul className="space-y-2.5">
-          {leads.map((lead, i) => (
+          {leads.map((lead) => (
             <li key={lead.id}>
               <Link
                 href={`/admin/leads/${lead.id}`}
-                data-active={i === 0 || undefined}
                 className="vantera-lead-row group flex items-center gap-3 rounded-full px-4 py-2.5"
               >
                 <Check
-                  className="h-3.5 w-3.5 shrink-0 text-[var(--text-secondary)] group-hover:text-[var(--text-inverse)] group-data-[active]:text-[var(--text-inverse)]"
+                  className="h-3.5 w-3.5 shrink-0 text-[var(--text-secondary)] group-hover:text-[var(--text-inverse)]"
                   strokeWidth={2.25}
                   aria-hidden
                 />
-                <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-[var(--text-primary)] group-hover:text-[var(--text-inverse)] group-data-[active]:text-[var(--text-inverse)]">
+                <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-[var(--text-primary)] group-hover:text-[var(--text-inverse)]">
                   {lead.name}
-                  <span className="ml-2 font-normal text-[var(--text-tertiary)] group-hover:text-[var(--text-inverse)] group-data-[active]:text-[var(--text-inverse)]">
+                  <span className="ml-2 font-normal text-[var(--text-tertiary)] group-hover:text-[var(--text-inverse)]">
                     {lead.title ? `${lead.title} · ${lead.company}` : lead.company}
                   </span>
                 </span>
@@ -96,7 +95,7 @@ export function LeadsPanel({ leads }: Props) {
                   <ChannelDot active={lead.channels.linkedin} label="LinkedIn" />
                 </span>
                 <span
-                  className="flex shrink-0 items-center gap-1.5 text-[11px] font-semibold tabular-nums text-[var(--text-secondary)] group-hover:text-[var(--text-inverse)] group-data-[active]:text-[var(--text-inverse)]"
+                  className="flex shrink-0 items-center gap-1.5 text-[11px] font-semibold tabular-nums text-[var(--text-secondary)] group-hover:text-[var(--text-inverse)]"
                   title={lead.qualityTier ? `Quality: ${lead.qualityTier}` : 'Lead score'}
                 >
                   <span
@@ -108,11 +107,11 @@ export function LeadsPanel({ leads }: Props) {
                   />
                   {lead.score}
                 </span>
-                <span className="shrink-0 text-[11px] text-[var(--text-tertiary)] group-hover:text-[var(--text-inverse)] group-data-[active]:text-[var(--text-inverse)]">
+                <span className="shrink-0 text-[11px] text-[var(--text-tertiary)] group-hover:text-[var(--text-inverse)]">
                   {STATUS_LABELS[lead.status] ?? lead.status}
                 </span>
                 <ChevronRight
-                  className="h-3.5 w-3.5 shrink-0 text-[var(--text-disabled)] group-hover:text-[var(--text-inverse)] group-data-[active]:text-[var(--text-inverse)]"
+                  className="h-3.5 w-3.5 shrink-0 text-[var(--text-disabled)] group-hover:text-[var(--text-inverse)]"
                   aria-hidden
                 />
               </Link>

@@ -5,7 +5,7 @@ import type { SdrAgentCard } from '@/lib/agents/types'
 import type { WelcomeUpdate } from '@/lib/dashboard/panels'
 import { fadeUp } from '@/lib/motion'
 import { motion } from 'framer-motion'
-import { ArrowUpRight, Bot } from 'lucide-react'
+import { ArrowUpRight, Bot, ChevronRight } from 'lucide-react'
 import Link from 'next/link'
 
 type Props = {
@@ -43,25 +43,30 @@ export function WelcomePanel({ email, sdrAgents, updates }: Props) {
           Here&rsquo;s what&rsquo;s new in {workspace}
         </p>
 
-        <div className="mt-5 flex flex-col items-start gap-3">
+        <div className="mt-5 flex w-full flex-col items-start gap-1">
           {updates.length > 0 ? (
             updates.map((update) => (
               <Link
                 key={update.id}
                 href={update.href}
-                className="vision-cta-btn inline-flex max-w-full items-center rounded-[14px] px-4 py-2.5 text-[13px] font-medium text-white transition-colors"
+                className="group/update flex w-full max-w-full items-center gap-2.5 rounded-lg px-2 py-2 text-[13px] font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-overlay)]"
               >
-                <span className="truncate">{update.text}</span>
+                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--highlight)]" aria-hidden />
+                <span className="min-w-0 flex-1 truncate">{update.text}</span>
+                <ChevronRight
+                  className="h-3.5 w-3.5 shrink-0 text-[var(--text-disabled)] transition-transform group-hover/update:translate-x-0.5"
+                  aria-hidden
+                />
               </Link>
             ))
           ) : (
             <>
-              <span className="inline-flex items-center rounded-[14px] border border-[var(--border-subtle)] px-4 py-2.5 text-[13px] text-[var(--text-tertiary)]">
-                No new updates yet
-              </span>
+              <p className="px-2 py-2 text-[13px] text-[var(--text-tertiary)]">
+                Quiet so far — your agent reports replies, meetings, and new leads here.
+              </p>
               <Link
                 href="/admin/sdr-agents"
-                className="vision-cta-btn inline-flex items-center rounded-[14px] px-4 py-2.5 text-[13px] font-semibold text-white transition-colors"
+                className="vision-cta-btn mt-1 inline-flex items-center rounded-[14px] px-4 py-2.5 text-[13px] font-semibold text-[var(--text-inverse)] transition-colors"
               >
                 {needsSetup ? 'Launch agent' : 'Open agent'}
               </Link>

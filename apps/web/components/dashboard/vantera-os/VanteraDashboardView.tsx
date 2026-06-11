@@ -1,9 +1,9 @@
 'use client'
 
 import { CleanSlateWelcome } from '@/components/onboarding/CleanSlateWelcome'
+import { GoalProgressPanel } from './GoalProgressPanel'
 import { LeadsByStageCard } from './LeadsByStageCard'
 import { LeadsPanel } from './LeadsPanel'
-import { MetricGaugesPanel } from './MetricGaugesPanel'
 import { RevenueTrendCard } from './RevenueTrendCard'
 import { WelcomePanel } from './WelcomePanel'
 import type { RevenueProgress } from '@/components/dashboard/MrrProgressPanel'
@@ -67,12 +67,13 @@ export function VanteraDashboardView({
         </motion.div>
       )}
 
-      {/* ── Row 1: Welcome | metric gauges ── */}
+      {/* ── Row 1: Welcome | goal progress + key rates ── */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[2fr_3fr]">
         <WelcomePanel email={email} sdrAgents={sdrAgents} updates={panels.updates} />
-        <MetricGaugesPanel
+        <GoalProgressPanel
           replyRate={panels.replyRate}
           closeRate={panels.closeRate}
+          totalLeads={panels.totalLeads}
           revenueProgress={revenueProgress}
         />
       </div>

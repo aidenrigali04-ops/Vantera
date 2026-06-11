@@ -3,14 +3,15 @@
 import type { StageSlice } from '@/lib/dashboard/panels'
 import { fadeUp } from '@/lib/motion'
 import { motion } from 'framer-motion'
+import Link from 'next/link'
 
 type Props = {
   slices: StageSlice[]
   total: number
 }
 
-/** Figma "Leads by vertical" palette — blues stepping down to neutral gray. */
-const SLICE_COLORS = ['#0a84ff', '#409cff', '#7dc2ff', '#54545b', '#36363c']
+/** Stage palette — yellow lead, monochrome steps. */
+const SLICE_COLORS = ['#facc15', '#111113', '#71717a', '#a1a1aa', '#d4d4d8']
 
 function SegmentedDonut({ slices }: { slices: StageSlice[] }) {
   const size = 160
@@ -69,10 +70,16 @@ export function LeadsByStageCard({ slices, total }: Props) {
       <h2 className="text-[13px] font-medium text-[var(--text-tertiary)]">Leads by stage</h2>
 
       {total === 0 ? (
-        <div className="flex flex-1 items-center justify-center py-12">
+        <div className="flex flex-1 flex-col items-center justify-center gap-2 py-12 text-center">
           <p className="text-[13px] text-[var(--text-disabled)]">
             Stage breakdown appears once leads enter your pipeline.
           </p>
+          <Link
+            href="/admin/sdr-agents"
+            className="text-[12px] font-medium text-[var(--text-primary)] underline-offset-2 hover:underline"
+          >
+            Launch your agent to start filling it
+          </Link>
         </div>
       ) : (
         <div className="mt-5 flex flex-1 flex-col items-center gap-8 sm:flex-row">
