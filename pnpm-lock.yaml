@@ -126,6 +126,15 @@ importers:
         specifier: ^4.0.0
         version: 4.1.8(@opentelemetry/api@1.9.0)(@types/node@20.19.43)(vite@8.0.16(@types/node@20.19.43)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4))
 
+  packages/help-content:
+    devDependencies:
+      typescript:
+        specifier: ^5.8.0
+        version: 5.9.3
+      vitest:
+        specifier: ^4.0.0
+        version: 4.1.8(@opentelemetry/api@1.9.0)(@types/node@20.19.43)(vite@8.0.16(@types/node@20.19.43)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4))
+
   packages/jobs:
     dependencies:
       '@supabase/supabase-js':
