@@ -1,10 +1,8 @@
 'use client'
 
 import type { PreviewLead } from '@/lib/onboarding/onboarding-wizard-types'
-import { cn } from '@/lib/utils'
 import { motion } from 'framer-motion'
-import { MapPin, Sparkles } from 'lucide-react'
-import { ArrowLeft } from 'lucide-react'
+import { MapPin, Radar, Sparkles } from 'lucide-react'
 import { useCallback } from 'react'
 import { useRegisterOnboardingStep } from '../onboarding-nav'
 import { fadeUp, stepContainer } from '../_primitives'
@@ -36,7 +34,7 @@ function LeadRow({ lead, rank }: { lead: PreviewLead; rank: number }) {
         ) : null}
       </div>
       <div className="shrink-0 text-right">
-        <p className="inline-flex items-center gap-1 text-[11px] font-medium text-[var(--accent)]">
+        <p className="inline-flex items-center gap-1 rounded-full bg-[var(--accent-muted)] px-2 py-0.5 text-[11px] font-semibold text-[var(--highlight-text)]">
           <Sparkles className="h-3 w-3" aria-hidden />
           {lead.icpScore}% match
         </p>
@@ -48,11 +46,13 @@ function LeadRow({ lead, rank }: { lead: PreviewLead; rank: number }) {
 export function Step3LeadPreview({ leads }: Props) {
   const submit = useCallback(async () => true, [])
 
+  // Zero leads is never a dead end: discovery keeps running server-side after
+  // setup, so the user always continues to plan selection.
   useRegisterOnboardingStep({
-    canAdvance: leads.length > 0,
+    canAdvance: true,
     isSubmitting: false,
     submit,
-    primaryLabel: 'Get Started',
+    primaryLabel: 'Choose my plan',
   })
 
   return (
@@ -60,29 +60,32 @@ export function Step3LeadPreview({ leads }: Props) {
       {leads.length === 0 ? (
         <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-[var(--border-default)] py-8 text-center">
           <span className="icon-tile flex h-10 w-10 items-center justify-center rounded-full">
-            <ArrowLeft className="h-5 w-5 text-[var(--text-secondary)]" strokeWidth={1.75} aria-hidden />
+            <Radar className="h-5 w-5 text-[var(--highlight-text)]" strokeWidth={1.75} aria-hidden />
           </span>
-          <p className="text-[13px] font-medium text-[var(--text-primary)]">No leads found yet</p>
-          <p className="max-w-[220px] text-[12px] text-[var(--text-tertiary)]">
-            Go back and confirm your AI overview to run lead discovery.
+          <p className="text-[13px] font-medium text-[var(--text-primary)]">
+            Lead discovery is warming up
+          </p>
+          <p className="max-w-[260px] text-[12px] leading-relaxed text-[var(--text-tertiary)]">
+            Your agent keeps hunting in the background — fresh matches land on your dashboard.
+            Keep going; setup takes one more minute.
           </p>
         </div>
       ) : (
-        leads.map((lead, index) => (
-          <motion.div key={lead.id} variants={fadeUp}>
-            <LeadRow lead={lead} rank={index + 1} />
-          </motion.div>
-        ))
+        <>
+          <motion.p variants={fadeUp} className="pb-1 text-[13px] text-[var(--text-secondary)]">
+            <span className="font-semibold text-[var(--text-primary)]">{leads.length}</span>{' '}
+            decision-maker{leads.length === 1 ? '' : 's'} matched your ideal customer profile.
+          </motion.p>
+          {leads.map((lead, index) => (
+            <motion.div key={lead.id} variants={fadeUp}>
+              <LeadRow lead={lead} rank={index + 1} />
+            </motion.div>
+          ))}
+          <motion.p variants={fadeUp} className="pt-1 text-[12px] text-[var(--text-tertiary)]">
+            This is a preview — pick a plan next and your agent starts reaching out to the full list.
+          </motion.p>
+        </>
       )}
-
-      {leads.length > 0 ? (
-        <motion.p
-          variants={fadeUp}
-          className={cn('pt-1 text-[12px] text-[var(--text-tertiary)]')}
-        >
-          These are a preview — unlock full discovery and outreach on the next step.
-        </motion.p>
-      ) : null}
     </motion.div>
   )
 }

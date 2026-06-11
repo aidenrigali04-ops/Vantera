@@ -210,6 +210,7 @@ function OnboardingWizardInner({
               accountId={accountId}
               analysis={analysis}
               onLeadsReady={setPreviewLeads}
+              onAnalysisChange={setAnalysis}
             />
           ) : null}
 

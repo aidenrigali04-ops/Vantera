@@ -105,12 +105,14 @@ export function Step4Team({ onComplete }: Props) {
     onComplete({ invited: 0, skipped: true })
   }, [onComplete])
 
+  const hasEmails = members.some((m) => m.email.trim().length > 0)
+
   useRegisterOnboardingStep({
     canAdvance: true,
     isSubmitting: sending,
-    primaryLabel: sending ? 'Sending…' : 'Send invites',
+    primaryLabel: sending ? 'Sending…' : hasEmails ? 'Send invites' : 'Continue',
     submit,
-    secondary: { label: 'Skip for now', action: skip },
+    secondary: hasEmails ? { label: 'Skip for now', action: skip } : undefined,
   })
 
   return (
@@ -161,7 +163,7 @@ export function Step4Team({ onComplete }: Props) {
                 type="button"
                 onClick={() => removeMember(index)}
                 aria-label="Remove member"
-                className="flex h-9 w-9 items-center justify-center rounded-md text-[var(--text-disabled)] transition-colors hover:bg-red-500/10 hover:text-red-300"
+                className="flex h-9 w-9 items-center justify-center rounded-md text-[var(--text-disabled)] transition-colors hover:bg-[var(--danger-muted)] hover:text-[var(--danger)]"
               >
                 <X className="h-4 w-4" />
               </button>

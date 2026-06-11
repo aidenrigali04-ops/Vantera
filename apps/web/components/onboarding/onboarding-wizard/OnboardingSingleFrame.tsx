@@ -52,13 +52,25 @@ export function OnboardingSingleFrame({
   const isLast = stepIndex === totalSteps - 1
 
   useEffect(() => {
+    function isEditingElement(target: EventTarget | null): boolean {
+      if (!(target instanceof HTMLElement)) return false
+      if (target.isContentEditable) return true
+      const tag = target.tagName
+      return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT'
+    }
+
     function onKeyDown(event: KeyboardEvent) {
+      const editing = isEditingElement(event.target)
+      // Arrow keys must keep moving the text cursor while typing; never hijack them mid-input.
+      if (editing && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) return
+
       if (event.key === 'ArrowLeft' && !isFirst) {
         event.preventDefault()
         onBack()
         return
       }
       if (event.key === 'ArrowRight' || event.key === 'Enter') {
+        if (editing && event.key === 'Enter' && event.target instanceof HTMLTextAreaElement) return
         if (primaryDisabled || primaryLoading) return
         event.preventDefault()
         onPrimary()
@@ -96,7 +108,7 @@ export function OnboardingSingleFrame({
         </div>
 
         <div className="px-5 py-5 sm:px-8 sm:py-6">
-          <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--accent)]">
+          <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--highlight-text)]">
             {slide.eyebrow}
           </p>
           <h1
@@ -122,7 +134,11 @@ export function OnboardingSingleFrame({
                 key={index}
                 className={cn(
                   'h-1.5 rounded-full transition-all duration-[160ms]',
-                  index === stepIndex ? 'w-6 bg-[var(--accent)]' : 'w-1.5 bg-[var(--border-strong)]',
+                  index === stepIndex
+                    ? 'w-6 bg-[var(--highlight)]'
+                    : index < stepIndex
+                      ? 'w-1.5 bg-[var(--highlight)] opacity-50'
+                      : 'w-1.5 bg-[var(--border-strong)]',
                 )}
               />
             ))}

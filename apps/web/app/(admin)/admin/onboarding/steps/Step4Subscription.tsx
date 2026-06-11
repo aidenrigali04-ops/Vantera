@@ -107,11 +107,11 @@ export function Step4Subscription({ accountId, onComplete }: Props) {
                 active
                   ? 'border-[var(--accent-border)] bg-[var(--accent-muted)]'
                   : 'border-[var(--border-default)] bg-[var(--bg-surface)] hover:border-[var(--border-strong)]',
-                plan.highlighted && !active && 'ring-1 ring-[var(--accent-border)]/40',
+                plan.highlighted && !active && 'ring-1 ring-[var(--border-strong)]',
               )}
             >
               {plan.highlighted ? (
-                <span className="absolute -top-2 right-2 rounded-full bg-[var(--accent)] px-2 py-0.5 text-[10px] font-medium text-[var(--text-primary)]">
+                <span className="absolute -top-2 right-2 rounded-full bg-[var(--highlight)] px-2 py-0.5 text-[10px] font-semibold text-[#1d1d1f]">
                   Popular
                 </span>
               ) : null}

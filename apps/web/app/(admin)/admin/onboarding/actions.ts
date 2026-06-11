@@ -506,8 +506,11 @@ export async function saveOnboardingIcp(
       return err(parsed.error.issues[0]?.message ?? 'Invalid ICP description')
     }
 
+    // A user-corrected ICP must win over the AI-derived summary — lead
+    // discovery reads icp_summary first, so keep both in sync.
     const saved = await patchAccountRow(workspaceId, {
       icp_description: parsed.data,
+      icp_summary: parsed.data,
     })
 
     if (!saved.ok) {
