@@ -11,7 +11,11 @@
   },
   "dependencies": {
     "@trigger.dev/sdk": "^4.0.0",
-    "@supabase/supabase-js": "^2.108.1"
+    "@supabase/supabase-js": "^2.108.1",
+    "@vantera/agent-brains": "workspace:*",
+    "@vantera/db": "workspace:*",
+    "@vantera/prospect-data": "workspace:*",
+    "drizzle-orm": "^0.45.0"
   },
   "devDependencies": {
     "trigger.dev": "^4.0.0",
