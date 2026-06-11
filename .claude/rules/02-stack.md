@@ -10,3 +10,4 @@
 | AI | Anthropic via Vercel AI SDK, single client wrapper | Never scatter direct SDK calls |
 | Billing | Stripe | |
 | Transactional email | Resend | Auth emails, notifications only — never cold outreach |
+| Hosting | Vercel | Web app; preview deploy per PR, production from `main` (rule 10) |
