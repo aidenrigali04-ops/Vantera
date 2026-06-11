@@ -17,10 +17,12 @@
       "Bash(git add *)"
     ],
     "deny": [
-      "Read(./.env)",
-      "Read(./.env.*)",
       "Read(./**/.env)",
-      "Read(./**/.env.*)"
+      "Read(./**/.env.local)",
+      "Read(./**/.env.development)",
+      "Read(./**/.env.production)",
+      "Read(./**/.env.test)",
+      "Read(./**/.env.*.local)"
     ]
   }
 }
