@@ -14,3 +14,4 @@ Foundational decisions were locked 2026-06-11. The detailed rules live in `.clau
 - [Lead scoring](.claude/rules/06-lead-scoring.md) — rules gate + AI rank, the "only high-quality leads" gate
 - [UI/UX workflow](.claude/rules/07-ui-ux.md) — UI Designer Reference sheet, UX Brain, prompting loop
 - [Campaign pipeline](.claude/rules/08-campaign-pipeline.md) — campaign creation wizard + SDR agent behavior contract
+- [Help copilot](.claude/rules/09-help-copilot.md) — in-app LLM overlay, action tiers, knowledge whitelist, knowledge-sync rule
