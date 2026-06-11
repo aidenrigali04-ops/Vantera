@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
   BarChart3,
+  Bot,
   LayoutDashboard,
   LogOut,
   Megaphone,
@@ -16,6 +17,7 @@ import { NavLink } from "@/components/nav-link";
 
 const NAV = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/agents", label: "Agents", icon: Bot },
   { href: "/leads", label: "Leads", icon: Users },
   { href: "/campaigns", label: "Campaigns", icon: Megaphone },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },

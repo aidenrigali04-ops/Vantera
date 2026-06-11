@@ -1,0 +1,197 @@
+"use client";
+
+import { useActionState, useState } from "react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { FormError } from "@/components/form-error";
+import { WizardShell } from "@/components/wizard/wizard-shell";
+import { deployCopyAgent, type AgentActionState } from "./actions";
+
+const STEPS = ["Name", "Targeting", "CTA", "Content", "Channels", "Deploy"] as const;
+
+export function CopyWizard({ scoutName, icpNames }: { scoutName: string; icpNames: string[] }) {
+  const [step, setStep] = useState(0);
+  const [name, setName] = useState("");
+  const [cta, setCta] = useState("");
+  const [links, setLinks] = useState("");
+  const [linkedin, setLinkedin] = useState(true);
+  const [email, setEmail] = useState(true);
+  const [state, action, pending] = useActionState<AgentActionState, FormData>(
+    deployCopyAgent,
+    {}
+  );
+
+  const canNext =
+    (step === 0 && name.trim().length > 0) ||
+    step === 1 ||
+    (step === 2 && cta.trim().length >= 3) ||
+    step === 3 ||
+    (step === 4 && (linkedin || email)) ||
+    step === 5;
+
+  return (
+    <WizardShell
+      stepLabels={[...STEPS]}
+      step={step}
+      endowed={1}
+      endowedNote={`Targeting inherited from ${scoutName} ✓`}
+      title={
+        [
+          "Name your agent",
+          "Who it writes to",
+          "What's the ask?",
+          "Give it material",
+          "Where it reaches out",
+          `Deploy ${name.trim() || "your agent"}`,
+        ][step]!
+      }
+      hint={
+        [
+          "This teammate writes every message, tailored to each lead.",
+          "Set by your Prospect Agent — every draft targets these people.",
+          "The one thing each message invites the prospect to do.",
+          "Links, case studies, or files it can reference. Optional.",
+          "Enable at least one channel.",
+          "Every draft lands in your review queue — nothing sends without you.",
+        ][step]
+      }
+    >
+      <form action={action} className="flex flex-col gap-5">
+        <input type="hidden" name="name" value={name} />
+        <input type="hidden" name="cta" value={cta} />
+        <input type="hidden" name="links" value={links} />
+        {linkedin && <input type="hidden" name="channelLinkedin" value="on" />}
+        {email && <input type="hidden" name="channelEmail" value="on" />}
+
+        {step === 0 && (
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="copy-name">Agent name</Label>
+            <Input
+              id="copy-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Penn, Quill, Sage"
+              maxLength={60}
+              autoFocus
+            />
+          </div>
+        )}
+
+        {step === 1 && (
+          <div className="flex flex-wrap gap-2">
+            {icpNames.map((icp) => (
+              <Badge key={icp} variant="secondary" className="py-1 px-3 text-sm">
+                {icp}
+              </Badge>
+            ))}
+            <p className="w-full pt-2 text-xs text-muted-foreground">
+              To change targeting, edit {scoutName} — both agents stay in sync.
+            </p>
+          </div>
+        )}
+
+        {step === 2 && (
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="copy-cta">Call to action</Label>
+            <Textarea
+              id="copy-cta"
+              value={cta}
+              onChange={(e) => setCta(e.target.value)}
+              placeholder="e.g. book a 15-minute intro call"
+              maxLength={200}
+              autoFocus
+            />
+          </div>
+        )}
+
+        {/* stays mounted across steps so the chosen files survive to the final submit */}
+        <div className={step === 3 ? "flex flex-col gap-4" : "hidden"}>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="copy-links">Links (one per line)</Label>
+            <Textarea
+              id="copy-links"
+              value={links}
+              onChange={(e) => setLinks(e.target.value)}
+              placeholder={"https://yoursite.com/case-study\nhttps://yoursite.com/demo"}
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="copy-files">Files or images (up to 5, 5 MB each)</Label>
+            <Input id="copy-files" name="files" type="file" multiple />
+          </div>
+        </div>
+
+        {step === 4 && (
+          <div className="flex flex-col gap-3">
+            {(
+              [
+                { key: "linkedin", label: "LinkedIn", on: linkedin, set: setLinkedin },
+                { key: "email", label: "Email", on: email, set: setEmail },
+              ] as const
+            ).map(({ key, label, on, set }) => (
+              <button
+                key={key}
+                type="button"
+                role="switch"
+                aria-checked={on}
+                onClick={() => set(!on)}
+                className={`flex items-center justify-between rounded-lg border px-4 py-3 text-left text-sm transition-colors ${
+                  on ? "border-primary bg-primary/5" : "border-border text-muted-foreground"
+                }`}
+              >
+                <span className="font-medium">{label}</span>
+                <span
+                  className={`relative h-5 w-9 rounded-full transition-colors ${on ? "bg-primary" : "bg-muted"}`}
+                >
+                  <span
+                    className={`absolute top-0.5 size-4 rounded-full bg-background shadow transition-[left] ${on ? "left-4.5" : "left-0.5"}`}
+                  />
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {step === 5 && (
+          <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
+            <dt className="text-muted-foreground">Agent</dt>
+            <dd className="font-medium">{name}</dd>
+            <dt className="text-muted-foreground">Writes to</dt>
+            <dd>{icpNames.join(" · ")}</dd>
+            <dt className="text-muted-foreground">CTA</dt>
+            <dd>{cta}</dd>
+            <dt className="text-muted-foreground">Channels</dt>
+            <dd>{[linkedin && "LinkedIn", email && "Email"].filter(Boolean).join(" + ")}</dd>
+            <dt className="text-muted-foreground">Review</dt>
+            <dd>every draft waits for your approval</dd>
+          </dl>
+        )}
+
+        <FormError message={state.error} />
+
+        <div className="flex justify-between">
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => setStep(Math.max(0, step - 1))}
+            disabled={step === 0 || pending}
+          >
+            Back
+          </Button>
+          {step < STEPS.length - 1 ? (
+            <Button type="button" onClick={() => setStep(step + 1)} disabled={!canNext}>
+              {step === STEPS.length - 2 ? "Finish" : "Next"}
+            </Button>
+          ) : (
+            <Button type="submit" disabled={pending}>
+              {pending ? "Deploying…" : `Deploy ${name.trim() || "agent"}`}
+            </Button>
+          )}
+        </div>
+      </form>
+    </WizardShell>
+  );
+}
