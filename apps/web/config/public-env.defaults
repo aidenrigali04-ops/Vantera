@@ -1,7 +1,0 @@
-# Committed NEXT_PUBLIC defaults for production builds (Vercel).
-# These are safe to expose in the browser. Override via Vercel env or local .env.
-NEXT_PUBLIC_APP_DOMAIN=vanterasystem.dev
-NEXT_PUBLIC_APP_URL=https://vanterasystem.dev
-NEXT_PUBLIC_SUPABASE_URL=https://kchaqjyvubbrrjpisxpy.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtjaGFxanl2dWJicnJqcGlzeHB5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk0ODAzMjEsImV4cCI6MjA5NTA1NjMyMX0.WMwX86WCr7hl6rOamuJRvrxCwz2YfBUK3IgwMdr9jSQ
-NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_placeholder
