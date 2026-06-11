@@ -1,0 +1,21 @@
+# Dependencies
+node_modules/
+
+# Env & secrets — never commit
+.env
+.env.*
+!.env.example
+
+# Build outputs
+.next/
+dist/
+out/
+.turbo/
+*.tsbuildinfo
+
+# Claude Code — personal/local files stay out of git
+CLAUDE.local.md
+.claude/settings.local.json
+
+# OS
+.DS_Store

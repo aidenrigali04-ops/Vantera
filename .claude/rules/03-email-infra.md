@@ -1,0 +1,3 @@
+# Email outreach infrastructure
+
+Vantera provisions sending domains + mailboxes per customer — fully in-platform, users never leave to set anything up. Implementation: **Smartlead API** (SmartSenders provisioning, warmup network, inbox rotation, reply webhooks), white-labeled so users never see Smartlead. All of Vantera's code talks only to a Vantera-owned `email-infra` interface (provision / send / warmup-status / replies) so the provider is swappable later (e.g. to owned raw infra) without touching product code. Building raw deliverability infra in-house was evaluated and rejected for now: warmup is time-gated (2–4 weeks) and requires an inbox network no greenfield build can replicate.

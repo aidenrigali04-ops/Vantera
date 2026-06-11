@@ -1,0 +1,3 @@
+# Prospect data & enrichment
+
+Primary discovery + signal provider: **Explorium AgentSource** (agent-native API/MCP, 100 QPS; 150M+ companies, 800M+ contacts, firmographic/technographic/signal data aggregated across 50+ providers). One query feeds both scoring stages: firmographics/technographics for the rules gate, signals (hiring, funding, tech changes, intent) for the AI rank. On top of it sits a Vantera-orchestrated **enrichment waterfall**, spent only on leads that pass the scoring gate: email verification before any send (protects provisioned mailboxes), phone validation for the AI caller, and optional premium enrichment (e.g. Clay) for verticals that need it. The industry/ICP-tailoring logic lives in Vantera's enrichment orchestrator, not in any one provider.
