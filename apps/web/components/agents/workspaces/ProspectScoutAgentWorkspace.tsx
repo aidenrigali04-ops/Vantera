@@ -34,7 +34,6 @@ import type { AspireBindingInput } from '@/lib/sdr/aspire-config'
 import type { CreateSDRConfigInput, ProspectMode, SDRActivityEvent, SDRAgentConfig, SDRDashboardStats } from '@/lib/sdr/types'
 import { useAccountRealtime } from '@/lib/supabase/account-realtime'
 import { cn } from '@/lib/utils'
-import { Search } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
 import { toast } from 'sonner'
@@ -381,39 +380,43 @@ export function ProspectScoutAgentWorkspace({
     })
   }
 
+  const identitySection = (
+    <AgentConfigSection title="Scout identity">
+      <AgentFormField id="scout-name" label="Agent name">
+        <Input
+          id="scout-name"
+          className={agentInputClassName}
+          placeholder="Prospect Scout"
+          value={form.agentName}
+          onChange={(e) => setForm({ ...form, agentName: e.target.value })}
+        />
+      </AgentFormField>
+      <AgentFormField id="scout-frequency" label="Discovery schedule">
+        <Select
+          value={form.searchFrequency}
+          onValueChange={(value: 'daily' | 'weekly') =>
+            setForm({ ...form, searchFrequency: value })
+          }
+        >
+          <SelectTrigger id="scout-frequency" className={agentSelectTriggerClassName}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="daily">Daily (recommended)</SelectItem>
+            <SelectItem value="weekly">Weekly</SelectItem>
+          </SelectContent>
+        </Select>
+      </AgentFormField>
+    </AgentConfigSection>
+  )
+
   const configPanel = (
     <>
-      {/* ── Scout Identity ── */}
-      <AgentConfigSection title="Scout identity">
-        <AgentFormField id="scout-name" label="Agent name">
-          <Input
-            id="scout-name"
-            className={agentInputClassName}
-            placeholder="Prospect Scout"
-            value={form.agentName}
-            onChange={(e) => setForm({ ...form, agentName: e.target.value })}
-          />
-        </AgentFormField>
-        <AgentFormField id="scout-frequency" label="Discovery schedule">
-          <Select
-            value={form.searchFrequency}
-            onValueChange={(value: 'daily' | 'weekly') =>
-              setForm({ ...form, searchFrequency: value })
-            }
-          >
-            <SelectTrigger id="scout-frequency" className={agentSelectTriggerClassName}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="daily">Daily (recommended)</SelectItem>
-              <SelectItem value="weekly">Weekly</SelectItem>
-            </SelectContent>
-          </Select>
-        </AgentFormField>
-      </AgentConfigSection>
+      {/* Setup leads with the section users actually edit — who to find. */}
+      {mode === 'configured' ? identitySection : null}
 
       {/* ── ICP targeting ── */}
-      <AgentConfigSection title="ICP targeting">
+      <AgentConfigSection title="ICP targeting" description="Who your agent hunts for — pre-filled from your onboarding.">
         <AgentFormField id="scout-target-titles" label="Target job titles">
           <Input
             id="scout-target-titles"
@@ -511,6 +514,8 @@ export function ProspectScoutAgentWorkspace({
           />
         </label>
       </AgentConfigSection>
+
+      {mode === 'setup' ? identitySection : null}
     </>
   )
 
@@ -581,17 +586,48 @@ export function ProspectScoutAgentWorkspace({
           </div>
         </div>
       ) : (
-        <div className="flex h-full min-h-[320px] flex-col items-center justify-center py-12 text-center">
-          <span className="icon-tile flex h-14 w-14 items-center justify-center rounded-2xl shadow-[var(--shadow-sm)]">
-            <Search className="h-6 w-6 text-[var(--text-secondary)]" strokeWidth={1.75} aria-hidden />
-          </span>
-          <p className="mt-5 text-[17px] font-semibold tracking-[-0.02em] text-[var(--text-primary)]">
-            Analytics activate after deploy
-          </p>
-          <p className="mt-2 max-w-[280px] text-[13px] leading-relaxed text-[var(--text-secondary)]">
-            Configure identity, instructions, and capabilities — then deploy to start live
-            discovery analytics.
-          </p>
+        <div className="flex h-full min-h-[320px] flex-col justify-center px-2 py-12">
+          <div className="mx-auto w-full max-w-[360px]">
+            <h3 className="text-[15px] font-semibold tracking-[-0.01em] text-[var(--text-primary)]">
+              What happens when you deploy
+            </h3>
+            <ol className="mt-5 flex flex-col gap-5">
+              {[
+                {
+                  title: 'First run kicks off today',
+                  detail: `Scout pulls up to ${form.maxNewLeadsDay} matching ${form.maxNewLeadsDay === 1 ? 'lead' : 'leads'}, then repeats ${form.searchFrequency === 'daily' ? 'every day' : 'every week'}.`,
+                },
+                {
+                  title: 'Every lead is scored against your ICP',
+                  detail: `Only prospects scoring ${form.defaultMinIcpScore}%+ against your targeting enter the pipeline.`,
+                },
+                {
+                  title: 'Replies and meetings come to you',
+                  detail: 'Wins land in your inbox and on the dashboard the moment they happen.',
+                },
+              ].map((step, index) => (
+                <li key={step.title} className="flex items-start gap-3">
+                  <span
+                    className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--accent-muted)] text-[11px] font-semibold text-[var(--highlight-text)]"
+                    aria-hidden
+                  >
+                    {index + 1}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-[13px] font-medium text-[var(--text-primary)]">
+                      {step.title}
+                    </span>
+                    <span className="mt-0.5 block text-[12px] leading-relaxed text-[var(--text-tertiary)]">
+                      {step.detail}
+                    </span>
+                  </span>
+                </li>
+              ))}
+            </ol>
+            <p className="mt-6 text-[12px] text-[var(--text-tertiary)]">
+              Everything stays adjustable after deploy — this screen becomes your live analytics.
+            </p>
+          </div>
         </div>
       )}
     </AgentAnalyticsPanel>

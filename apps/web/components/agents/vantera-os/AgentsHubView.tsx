@@ -48,7 +48,7 @@ function AgentCard({
   return (
     <motion.article
       variants={fadeUp}
-      className="vantera-agent-card relative flex items-center gap-4 rounded-2xl p-5"
+      className="relative flex items-center gap-3 rounded-2xl border border-[var(--border-default)] bg-[var(--bg-surface)] p-4 transition-colors hover:border-[var(--border-strong)]"
     >
       {startHere ? (
         <span className="absolute -top-2 left-4 rounded-full bg-[var(--highlight)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#1d1d1f]">
@@ -57,15 +57,20 @@ function AgentCard({
       ) : null}
 
       <span
-        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[var(--border-strong)] text-[12px] font-semibold text-[var(--text-tertiary)] dark:border-white/30 dark:text-white/70"
+        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[var(--border-default)] text-[11px] font-semibold text-[var(--text-tertiary)]"
         aria-hidden
       >
         {step}
       </span>
-      <Icon className="h-7 w-7 shrink-0 text-[var(--text-primary)] dark:text-white" strokeWidth={2} aria-hidden />
+      <span
+        className="icon-tile flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--radius-md)]"
+        aria-hidden
+      >
+        <Icon className="h-4 w-4 text-[var(--text-secondary)]" strokeWidth={2} />
+      </span>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <h3 className="truncate text-[17px] font-semibold text-[var(--text-primary)] dark:text-white">
+          <h3 className="truncate text-[14px] font-semibold text-[var(--text-primary)]">
             {card.title}
           </h3>
           {active ? (
@@ -81,7 +86,7 @@ function AgentCard({
       </div>
       <Link
         href={href}
-        className="vision-cta-btn inline-flex shrink-0 items-center justify-center rounded-2xl px-6 py-3 text-[15px] font-semibold text-[var(--text-inverse)] transition-colors"
+        className="inline-flex h-9 shrink-0 items-center justify-center rounded-lg bg-[var(--accent)] px-4 text-[13px] font-medium text-[var(--text-inverse)] shadow-[var(--shadow-sm)] transition-colors hover:bg-[var(--accent-hover)] focus-visible:outline-none focus-visible:shadow-[var(--shadow-glow)]"
       >
         {needsSetup ? 'Set up' : 'Open'}
       </Link>
@@ -109,9 +114,9 @@ export function AgentsHubView({ agents, activity, sdrEnabled }: Props) {
         className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2"
       >
         {/* ── Left panel: the agent chain ── */}
-        <motion.section variants={fadeUp} className="vantera-glass-panel rounded-2xl p-6">
+        <motion.section variants={fadeUp} className="vision-panel-card rounded-3xl p-6">
           <div className="pb-5">
-            <h2 className="text-[20px] font-semibold text-[var(--text-primary)]">Your agent team</h2>
+            <h2 className="text-[15px] font-semibold text-[var(--text-primary)]">Your agent team</h2>
             <p className="mt-1 text-[13px] text-[var(--text-tertiary)]">
               Three agents, one relay: find buyers, write the outreach, book the replies.
             </p>
@@ -124,7 +129,7 @@ export function AgentsHubView({ agents, activity, sdrEnabled }: Props) {
             </p>
           )}
 
-          <div className="flex flex-col gap-5">
+          <div className="flex flex-col gap-3">
             {AGENT_CHAIN.map((card, index) => (
               <AgentCard
                 key={card.id}
@@ -157,28 +162,29 @@ export function AgentsHubView({ agents, activity, sdrEnabled }: Props) {
         </motion.section>
 
         {/* ── Right panel: live activity ── */}
-        <motion.section variants={fadeUp} className="vantera-glass-panel rounded-2xl p-6">
-          <h2 className="pb-5 pt-1 text-center text-[20px] font-semibold text-[var(--text-primary)]">
-            Live activity
-          </h2>
-
-          <div className="vantera-overview-list rounded-[24px] p-3">
-            {rows.length === 0 ? (
-              <div className="flex flex-col items-center gap-3 px-6 py-12 text-center">
-                <p className="text-[13px] text-[var(--text-tertiary)]">
-                  Every reply, meeting, and scout run lands here the moment it happens.
-                </p>
-                <Link
-                  href="/admin/outreach/agents/setup"
-                  className="vision-cta-btn rounded-full px-4 py-2 text-[12px] font-semibold text-[var(--text-inverse)]"
-                >
-                  Set up the Scouting Agent
-                </Link>
-              </div>
-            ) : (
-              <AgentActivityTimeline events={rows} />
-            )}
+        <motion.section variants={fadeUp} className="vision-panel-card rounded-3xl p-6">
+          <div className="pb-5">
+            <h2 className="text-[15px] font-semibold text-[var(--text-primary)]">Live activity</h2>
+            <p className="mt-1 text-[13px] text-[var(--text-tertiary)]">
+              Every reply, meeting, and scout run, the moment it happens.
+            </p>
           </div>
+
+          {rows.length === 0 ? (
+            <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-[var(--border-subtle)] px-6 py-12 text-center">
+              <p className="text-[13px] text-[var(--text-tertiary)]">
+                Activity lands here as soon as your first agent runs.
+              </p>
+              <Link
+                href="/admin/outreach/agents/setup"
+                className="inline-flex h-9 items-center rounded-lg bg-[var(--accent)] px-4 text-[13px] font-medium text-[var(--text-inverse)] transition-colors hover:bg-[var(--accent-hover)]"
+              >
+                Set up the Scouting Agent
+              </Link>
+            </div>
+          ) : (
+            <AgentActivityTimeline events={rows} />
+          )}
         </motion.section>
       </motion.div>
     </AdminPageContent>
