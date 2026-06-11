@@ -16,15 +16,15 @@ Each entry stays short — the detail lives in that phase's spec (`docs/superpow
   Scope: Supabase signup/login/logout/reset pages; `create_account` flow; onboarding wizard capturing **industry/ICP + revenue goal** (becomes the campaign-wizard default, rule 08); dashboard shell + nav (rule 07 reference workflow); account settings incl. **account deletion** (GDPR groundwork, rule 11); team invites (schema only — UI can defer to Phase 7); scaffold `packages/help-content` so knowledge-sync (rule 09) has a home from the first feature.
   Depends on: nothing. Key rules: 02, 07, 09, 11.
 
-- [ ] **Phase 3 — Lead pipeline backend**
-  Goal: the SDR Prospect Agent can source, gate, score, and enrich leads end-to-end (no outreach yet).
-  Scope: prospect/lead/ICP schema (RLS + retention windows); Vantera-owned `enrichment` interface + Explorium adapter behind it (same pattern as email/linkedin-infra, rule 05); rules gate (deterministic ICP-fit); AI rank via `@vantera/ai` with dashboard-visible rationale (rule 06); enrichment waterfall orchestrator (email verification before sends, phone validation for the AI caller — stubs OK); Trigger.dev pipeline tasks; basic leads table UI with score rationale.
-  Depends on: Phase 2 (accounts, ICP from onboarding). Key rules: 05, 06, 11.
+- [x] **Phase 3 — SDR agents: Scout + Copy (agent-centric front door)**
+  Goal: deploy a Prospect (Scout) Agent and a Copy Agent through setup wizards; the pipeline sources, gates, scores, enriches, and drafts personalized outreach into the review queue. Shipped 2026-06-11 (rule 08 rewritten to the agent model).
+  Scope shipped: `agents`/`agent_icps`/`agent_assets` schema (RLS, 0007); `packages/prospect-data` (interface + in-memory fake + Explorium adapter); `packages/agent-brains` (rules gate, batched AI rank with `ai_insights`, website scan, email + LinkedIn copy brains, humanizer); Trigger.dev scheduler cron + scout-run + copy-draft tasks; **suppression enforced before every draft, with tests** (rule 11); agent wizards + `/agents` page with Live cards.
+  Descoped to later phases: leads table UI (Phase 4), review-queue UI (Phase 4), automatic/manual send modes + preview step + user-drafted copy path (Phase 5), LinkedIn follow-up sequencing (Phase 5).
 
-- [ ] **Phase 4 — Campaign wizard & scheduler core**
-  Goal: a user can create and launch a campaign; the scheduler runs it against fake infra.
-  Scope: full rule 08 wizard (channels → targeting type-ahead, max 3 + onboarding default → copywriting paths → run options with mode preselection → preview for automatic mode → launch); Prospect Agent **(Live)** indicator; scheduler with run time + cadence, channel safety limits (rule 04 ceilings), per-lead copy tailoring via `@vantera/ai`; review-before-send draft queue; **suppression list table + enforcement at the scheduler boundary with tests** (rule 11).
-  Depends on: Phase 3 (leads to campaign against). Key rules: 04, 08, 11.
+- [ ] **Phase 4 — Leads & review queue UI**
+  Goal: users see what their agents produced and approve outreach.
+  Scope: leads table UI with score + rationale + tailored insights panel (rule 06 dashboard surface); review-before-send queue UI (approve/edit/decline drafts, humanizer style flags visible); suppression list management UI (manual adds, rule 11); retention purge job for never-qualified leads (90-day window stated in 0002); channel safety-limit scaffolding at the scheduler (rule 04 ceilings, enforced when sends go live).
+  Depends on: Phase 3. Key rules: 04, 06, 08, 11.
 
 - [ ] **Phase 5 — Live channel adapters**
   Goal: real sends through real providers, replies flowing back in.
