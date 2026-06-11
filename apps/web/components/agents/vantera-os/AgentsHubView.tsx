@@ -7,8 +7,6 @@ import { fadeUp, staggerContainer } from '@/lib/motion'
 import { motion } from 'framer-motion'
 import {
   ArrowRight,
-  Check,
-  ChevronRight,
   PenLine,
   PhoneOutgoing,
   Search,
@@ -16,6 +14,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import Link from 'next/link'
+import { AgentActivityTimeline } from './AgentActivityTimeline'
 
 type Props = {
   agents: SdrAgentCard[]
@@ -29,27 +28,6 @@ const AGENT_CHAIN: { id: SdrAgentId; title: string; role: string; icon: LucideIc
   { id: 'message_drafter', title: 'Copywrite Agent', role: 'Writes the outreach in your voice', icon: PenLine },
   { id: 'outreach_agent', title: 'Messaging Agent', role: 'Runs the sequences and books the replies', icon: Send },
 ]
-
-const EVENT_LABELS: Record<string, string> = {
-  lead_enrolled: 'Lead enrolled',
-  email_sent: 'Email sent',
-  sms_sent: 'SMS sent',
-  linkedin_sent: 'LinkedIn message sent',
-  linkedin_connection_sent: 'LinkedIn invite sent',
-  reply_received: 'Reply received',
-  meeting_booked: 'Meeting booked',
-  draft_created: 'Draft ready for review',
-  scout_run: 'Scout run completed',
-  sequence_started: 'Sequence started',
-  sequence_completed: 'Sequence completed',
-}
-
-function eventLabel(event: SDRActivityEvent): string {
-  const base =
-    EVENT_LABELS[event.eventType] ??
-    event.eventType.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase())
-  return event.leadName ? `${base} — ${event.leadName}` : base
-}
 
 function AgentCard({
   card,
@@ -109,42 +87,6 @@ function AgentCard({
       </Link>
     </motion.article>
   )
-}
-
-function ActivityRow({ event }: { event: SDRActivityEvent }) {
-  const inner = (
-    <>
-      <Check
-        className="h-4 w-4 shrink-0 text-[var(--text-primary)] group-hover:text-[var(--text-inverse)] dark:text-white"
-        strokeWidth={2.25}
-        aria-hidden
-      />
-      <span className="min-w-0 flex-1 truncate text-[14px] font-semibold text-[var(--text-primary)] group-hover:text-[var(--text-inverse)] dark:text-white">
-        {eventLabel(event)}
-      </span>
-      {event.company ? (
-        <span className="shrink-0 truncate text-[13px] text-[var(--text-tertiary)] group-hover:text-[var(--text-inverse)]">
-          {event.company}
-        </span>
-      ) : null}
-      <ChevronRight
-        className="h-3.5 w-3.5 shrink-0 text-[var(--text-disabled)] group-hover:text-[var(--text-inverse)]"
-        aria-hidden
-      />
-    </>
-  )
-
-  const className =
-    'group flex items-center gap-3 rounded-[18px] border border-[var(--border-default)] px-4 py-3 transition-colors hover:border-transparent hover:bg-[var(--accent)] dark:border-white/30'
-
-  if (event.leadId) {
-    return (
-      <Link href={`/admin/leads/${event.leadId}`} className={className}>
-        {inner}
-      </Link>
-    )
-  }
-  return <div className={className}>{inner}</div>
 }
 
 /** Agents hub — the agent chain in working order + live activity. */
@@ -234,11 +176,7 @@ export function AgentsHubView({ agents, activity, sdrEnabled }: Props) {
                 </Link>
               </div>
             ) : (
-              <div className="flex flex-col gap-2">
-                {rows.map((event) => (
-                  <ActivityRow key={event.id} event={event} />
-                ))}
-              </div>
+              <AgentActivityTimeline events={rows} />
             )}
           </div>
         </motion.section>

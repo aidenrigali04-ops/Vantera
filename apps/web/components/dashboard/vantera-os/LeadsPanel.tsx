@@ -3,7 +3,7 @@
 import type { DashboardLeadRow } from '@/lib/dashboard/panels'
 import { fadeUp } from '@/lib/motion'
 import { motion } from 'framer-motion'
-import { ArrowUpRight, Check, ChevronRight } from 'lucide-react'
+import { ArrowUpRight, ChevronRight } from 'lucide-react'
 import Link from 'next/link'
 
 type Props = {
@@ -27,6 +27,17 @@ const TIER_COLORS: Record<string, string> = {
   strong: 'var(--accent)',
   moderate: 'var(--warning)',
   weak: 'var(--text-tertiary)',
+}
+
+function initials(name: string): string {
+  return (
+    name
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase())
+      .join('') || '?'
+  )
 }
 
 function ChannelDot({ active, label }: { active: boolean; label: string }) {
@@ -78,11 +89,12 @@ export function LeadsPanel({ leads }: Props) {
                 href={`/admin/leads/${lead.id}`}
                 className="vantera-lead-row group flex items-center gap-3 rounded-full px-4 py-2.5"
               >
-                <Check
-                  className="h-3.5 w-3.5 shrink-0 text-[var(--text-secondary)] group-hover:text-[var(--text-inverse)]"
-                  strokeWidth={2.25}
+                <span
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[var(--bg-subtle)] text-[10px] font-semibold text-[var(--text-secondary)]"
                   aria-hidden
-                />
+                >
+                  {initials(lead.name)}
+                </span>
                 <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-[var(--text-primary)] group-hover:text-[var(--text-inverse)]">
                   {lead.name}
                   <span className="ml-2 font-normal text-[var(--text-tertiary)] group-hover:text-[var(--text-inverse)]">
