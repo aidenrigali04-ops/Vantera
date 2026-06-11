@@ -30,7 +30,8 @@ describe("loadArticles", () => {
   });
 
   it("never leaks vendor names (white-label, rule 09)", () => {
-    const banned = /smartlead|unipile|explorium|trigger\.dev|supabase/i;
+    const banned =
+      /smartlead|smartsenders|unipile|explorium|agentsource|trigger\.dev|supabase|anthropic|claude|higgsfield/i;
     for (const a of loadArticles()) {
       expect(a.title + a.body).not.toMatch(banned);
     }
