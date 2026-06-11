@@ -13,6 +13,11 @@ out/
 .turbo/
 *.tsbuildinfo
 
+# Tooling artifacts
+.vercel/
+.trigger/
+coverage/
+
 # Claude Code — personal/local files stay out of git
 CLAUDE.local.md
 .claude/settings.local.json

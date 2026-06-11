@@ -19,8 +19,8 @@
     "deny": [
       "Read(./.env)",
       "Read(./.env.*)",
-      "Read(./apps/web/.env)",
-      "Read(./apps/web/.env.*)"
+      "Read(./**/.env)",
+      "Read(./**/.env.*)"
     ]
   }
 }
