@@ -11,8 +11,8 @@ Each entry stays short — the detail lives in that phase's spec (`docs/superpow
 - [x] **Phase 1 — Platform scaffold**
   Monorepo, Next.js 16 app, `@vantera/db` with RLS from migration #1, `@vantera/ai`, email/linkedin infra interfaces + fakes, Trigger.dev jobs, CI. Shipped 2026-06-11.
 
-- [ ] **Phase 2 — Auth, onboarding & app shell**
-  Goal: a user can sign up, create an account, complete onboarding, and land on a real dashboard shell.
+- [x] **Phase 2 — Auth, onboarding & app shell**
+  Goal: a user can sign up, create an account, complete onboarding, and land on a real dashboard shell. Shipped 2026-06-11.
   Scope: Supabase signup/login/logout/reset pages; `create_account` flow; onboarding wizard capturing **industry/ICP + revenue goal** (becomes the campaign-wizard default, rule 08); dashboard shell + nav (rule 07 reference workflow); account settings incl. **account deletion** (GDPR groundwork, rule 11); team invites (schema only — UI can defer to Phase 7); scaffold `packages/help-content` so knowledge-sync (rule 09) has a home from the first feature.
   Depends on: nothing. Key rules: 02, 07, 09, 11.
 
