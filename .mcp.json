@@ -1,0 +1,34 @@
+{
+  "mcpServers": {
+    "stripe": {
+      "type": "http",
+      "url": "https://mcp.stripe.com"
+    },
+    "smartlead": {
+      "command": "npx",
+      "args": ["-y", "smartlead-mcp-by-leadmagic"],
+      "env": {
+        "SMARTLEAD_API_KEY": "${SMARTLEAD_API_KEY}",
+        "SMARTLEAD_ADVANCED_TOOLS": "true"
+      }
+    },
+    "unipile": {
+      "type": "http",
+      "url": "https://developer.unipile.com/mcp?branch=v1.0",
+      "headers": {
+        "X-API-KEY": "${UNIPILE_API_KEY}"
+      }
+    },
+    "explorium": {
+      "type": "http",
+      "url": "https://mcp.explorium.ai/mcp",
+      "headers": {
+        "Authorization": "Bearer ${EXPLORIUM_API_KEY}"
+      }
+    },
+    "playwright": {
+      "command": "npx",
+      "args": ["-y", "@playwright/mcp@latest"]
+    }
+  }
+}
