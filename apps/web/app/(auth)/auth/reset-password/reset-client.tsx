@@ -98,14 +98,14 @@ export function ResetPasswordClient() {
     return (
       <div className="space-y-6">
         <div className="space-y-2">
-          <h1 className="text-2xl font-semibold tracking-[-0.02em] text-stone-900">Password updated</h1>
-          <p className="text-[13px] leading-relaxed text-stone-500">
+          <h1 className="font-heading text-[24px] font-semibold leading-[1.2] tracking-[-0.03em] text-[var(--text-primary)]">Password updated</h1>
+          <p className="text-[13px] leading-relaxed text-[var(--text-secondary)]">
             You can now sign in with your new password.
           </p>
         </div>
         <Link
           href={AUTH_LOGIN_ENTRY}
-          className="inline-flex h-11 items-center justify-center rounded-lg bg-stone-900 px-4 text-sm font-medium text-white hover:bg-stone-800"
+          className="inline-flex h-11 items-center justify-center rounded-[var(--radius-lg)] bg-[var(--accent)] px-4 text-sm font-medium text-white shadow-[var(--shadow-sm)] transition-colors duration-150 hover:bg-[var(--accent-hover)]"
         >
           Go to sign in
         </Link>
@@ -116,8 +116,8 @@ export function ResetPasswordClient() {
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <h1 className="text-2xl font-semibold tracking-[-0.02em] text-stone-900">Choose a new password</h1>
-        <p className="text-[13px] leading-relaxed text-stone-500">
+        <h1 className="font-heading text-[24px] font-semibold leading-[1.2] tracking-[-0.03em] text-[var(--text-primary)]">Choose a new password</h1>
+        <p className="text-[13px] leading-relaxed text-[var(--text-secondary)]">
           Use at least 8 characters with one number — something you&rsquo;ll remember.
         </p>
       </div>
@@ -168,7 +168,7 @@ export function ResetPasswordClient() {
 
         <Button
           type="submit"
-          className="h-11 w-full rounded-lg bg-stone-900 text-white hover:bg-stone-800 disabled:opacity-60"
+          className="h-11 w-full rounded-[var(--radius-lg)] border-0 bg-[var(--accent)] font-medium text-white shadow-[var(--shadow-sm)] hover:bg-[var(--accent-hover)] disabled:opacity-60"
           disabled={!ready || isSubmitting}
         >
           {isSubmitting ? (
@@ -183,10 +183,10 @@ export function ResetPasswordClient() {
       </form>
 
       {!ready ? (
-        <p className="text-center text-[13px] text-stone-500">
+        <p className="text-center text-[13px] text-[var(--text-tertiary)]">
           <Link
             href="/auth/forgot-password"
-            className="font-medium text-stone-900 underline-offset-2 hover:underline"
+            className="font-medium text-[var(--accent)] underline-offset-2 transition-colors duration-150 hover:text-[var(--accent-hover)] hover:underline"
           >
             Request a new reset link
           </Link>

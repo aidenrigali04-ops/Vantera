@@ -99,10 +99,10 @@ export function OAuthButtons({ intent = 'signup', className, disabled = false }:
             type="button"
             variant="outline"
             className={cn(
-              'h-11 w-full justify-start gap-3 rounded-lg border-stone-200 bg-white px-4',
-              'text-[15px] font-medium text-stone-800 shadow-sm',
-              'transition-colors duration-150 hover:bg-stone-50 hover:text-stone-900',
-              'focus-visible:ring-2 focus-visible:ring-stone-900/10 focus-visible:ring-offset-2',
+              'h-11 w-full justify-start gap-3 rounded-[var(--radius-lg)] border-[var(--border-default)] bg-[var(--bg-elevated)] px-4',
+              'text-[15px] font-medium text-[var(--text-primary)] shadow-[var(--shadow-sm)]',
+              'transition-colors duration-150 hover:bg-[var(--bg-overlay)] hover:text-[var(--text-primary)]',
+              'focus-visible:ring-2 focus-visible:ring-[var(--accent-border)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-base)]',
             )}
             onClick={() => go(provider)}
             disabled={isDisabled}
@@ -113,11 +113,11 @@ export function OAuthButtons({ intent = 'signup', className, disabled = false }:
               {pending === provider ? 'Redirecting…' : PROVIDER_LABELS[provider]}
             </span>
             {pending === provider ? (
-              <Loader2 className="size-4 shrink-0 animate-spin text-stone-400" aria-hidden />
+              <Loader2 className="size-4 shrink-0 animate-spin text-[var(--text-tertiary)]" aria-hidden />
             ) : null}
           </Button>
           {errors[provider] ? (
-            <p className="text-[13px] text-red-600" role="alert">
+            <p className="text-[13px] text-[var(--danger)]" role="alert">
               {errors[provider]}
             </p>
           ) : null}

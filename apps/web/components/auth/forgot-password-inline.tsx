@@ -50,22 +50,22 @@ export function ForgotPasswordInline({ defaultEmail = '', onCancel, className }:
     return (
       <div
         className={cn(
-          'rounded-lg border border-stone-200 bg-stone-50 px-3 py-3 text-[13px] leading-relaxed text-stone-700',
+          'rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[var(--bg-elevated)] px-3 py-3 text-[13px] leading-relaxed text-[var(--text-secondary)]',
           className,
         )}
         role="status"
       >
         Check your inbox. We sent a reset link to{' '}
-        <span className="font-medium text-stone-900">{sentTo}</span>.
+        <span className="font-medium text-[var(--text-primary)]">{sentTo}</span>.
       </div>
     )
   }
 
   return (
-    <div className={cn('space-y-3 rounded-lg border border-stone-200 bg-stone-50/80 p-3', className)}>
-      <p className="text-[13px] text-stone-600">Enter your email to reset your password.</p>
+    <div className={cn('space-y-3 rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[var(--bg-elevated)] p-3', className)}>
+      <p className="text-[13px] text-[var(--text-secondary)]">Enter your email to reset your password.</p>
       <div className="space-y-1.5">
-        <Label htmlFor="forgot-email" className="text-[13px] font-medium text-stone-700">
+        <Label htmlFor="forgot-email" className="text-[13px] font-medium text-[var(--text-secondary)]">
           Business email
         </Label>
         <Input
@@ -78,11 +78,11 @@ export function ForgotPasswordInline({ defaultEmail = '', onCancel, className }:
           onChange={(event) => setEmail(event.target.value)}
           placeholder="alex@acmeagency.com"
           disabled={isSubmitting}
-          className="h-11 rounded-lg border-stone-200 bg-white text-[15px] shadow-sm"
+          className="h-11 rounded-[var(--radius-lg)] border-[var(--border-default)] bg-[var(--bg-surface)] text-[15px] text-[var(--text-primary)] shadow-[var(--shadow-sm)] placeholder:text-[var(--text-tertiary)]"
         />
       </div>
       {error ? (
-        <p className="text-[13px] text-red-600" role="alert">
+        <p className="text-[13px] text-[var(--danger)]" role="alert">
           {error}
         </p>
       ) : null}
@@ -90,7 +90,7 @@ export function ForgotPasswordInline({ defaultEmail = '', onCancel, className }:
         <Button
           type="button"
           variant="outline"
-          className="h-10 flex-1 rounded-lg border-stone-200"
+          className="h-10 flex-1 rounded-[var(--radius-lg)] border-[var(--border-default)] bg-[var(--bg-elevated)] text-[var(--text-primary)] hover:bg-[var(--bg-overlay)]"
           onClick={handleSend}
           disabled={isSubmitting}
         >
@@ -106,7 +106,7 @@ export function ForgotPasswordInline({ defaultEmail = '', onCancel, className }:
         <Button
           type="button"
           variant="ghost"
-          className="h-10 text-stone-600 hover:text-stone-900"
+          className="h-10 text-[var(--text-tertiary)] hover:text-[var(--text-primary)]"
           onClick={onCancel}
           disabled={isSubmitting}
         >

@@ -78,13 +78,13 @@ export function CompleteSignupClient({
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <h1 className="text-2xl font-semibold tracking-[-0.02em] text-stone-900">One more step</h1>
-        <p className="text-[13px] leading-relaxed text-stone-500">
+        <h1 className="font-heading text-[24px] font-semibold leading-[1.2] tracking-[-0.03em] text-[var(--text-primary)]">One more step</h1>
+        <p className="text-[13px] leading-relaxed text-[var(--text-secondary)]">
           We&rsquo;ve verified your email
           {prefilledEmail ? (
             <>
               {' '}
-              (<span className="font-medium text-stone-800">{prefilledEmail}</span>)
+              (<span className="font-medium text-[var(--text-primary)]">{prefilledEmail}</span>)
             </>
           ) : null}
           . Confirm your name and we&rsquo;ll set up your workspace.
@@ -116,7 +116,7 @@ export function CompleteSignupClient({
 
         <Button
           type="submit"
-          className="h-11 w-full rounded-lg bg-stone-900 text-white hover:bg-stone-800 disabled:opacity-60"
+          className="h-11 w-full rounded-[var(--radius-lg)] border-0 bg-[var(--accent)] font-medium text-white shadow-[var(--shadow-sm)] hover:bg-[var(--accent-hover)] disabled:opacity-60"
           disabled={isSubmitting}
         >
           {isSubmitting ? (

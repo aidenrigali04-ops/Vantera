@@ -67,12 +67,12 @@ type AuthCredentialsPanelProps = {
 
 const HEADINGS: Record<AuthMode, { title: string; subtitle: string }> = {
   signup: {
-    title: 'Create your account',
-    subtitle: 'Sign up in seconds with Google, Apple, or email. No credit card required.',
+    title: 'Run your business from one system',
+    subtitle: 'The intelligent operating system for service businesses. No credit card required.',
   },
   login: {
-    title: 'Welcome back',
-    subtitle: 'Sign in to your operating system.',
+    title: 'Sign in to your workspace',
+    subtitle: 'Pick up where your pipeline left off.',
   },
 }
 
@@ -292,8 +292,10 @@ export function AuthCredentialsPanel({
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <h1 className="text-2xl font-semibold tracking-[-0.02em] text-[var(--text-primary)]">{title}</h1>
-        <p className="text-[13px] leading-relaxed text-[var(--text-secondary)]">{subtitle}</p>
+        <h1 className="font-heading text-[28px] font-semibold leading-[1.2] tracking-[-0.03em] text-[var(--text-primary)]">
+          {title}
+        </h1>
+        <p className="text-[14px] leading-relaxed text-[var(--text-secondary)]">{subtitle}</p>
       </div>
 
       <div aria-live="polite" aria-atomic="true">
@@ -348,11 +350,11 @@ export function AuthCredentialsPanel({
               })}
             />
             {emailTaken ? (
-              <p className="text-[13px] text-red-600" role="alert">
+              <p className="text-[13px] text-[var(--danger)]" role="alert">
                 An account with this email already exists.{' '}
                 <button
                   type="button"
-                  className="font-medium underline underline-offset-2"
+                  className="font-medium underline underline-offset-2 hover:text-[var(--text-primary)]"
                   onClick={() => {
                     loginForm.setValue('email', signupForm.getValues('email'))
                     switchMode('login')
@@ -387,7 +389,7 @@ export function AuthCredentialsPanel({
 
           <Button
             type="submit"
-            className="h-11 w-full rounded-lg border border-[var(--accent-border)] bg-[var(--accent)] font-medium text-[var(--text-primary)] shadow-[var(--shadow-sm)] hover:bg-[var(--accent-hover)] disabled:opacity-60"
+            className="h-11 w-full rounded-[var(--radius-lg)] border-0 bg-[var(--accent)] font-medium text-white shadow-[var(--shadow-sm)] hover:bg-[var(--accent-hover)] disabled:opacity-60"
             disabled={isBusy || emailTaken}
           >
             {isSubmitting ? (
@@ -396,7 +398,7 @@ export function AuthCredentialsPanel({
                 Creating your workspace…
               </>
             ) : (
-              'Get started for free'
+              'Create workspace'
             )}
           </Button>
 
@@ -469,7 +471,7 @@ export function AuthCredentialsPanel({
             className={
               portal
                 ? 'h-11 w-full rounded-lg border-0 font-medium text-white shadow-[var(--shadow-sm)] hover:opacity-90 disabled:opacity-60'
-                : 'h-11 w-full rounded-lg border border-[var(--accent-border)] bg-[var(--accent)] font-medium text-[var(--text-primary)] shadow-[var(--shadow-sm)] hover:bg-[var(--accent-hover)] disabled:opacity-60'
+                : 'h-11 w-full rounded-[var(--radius-lg)] border-0 bg-[var(--accent)] font-medium text-white shadow-[var(--shadow-sm)] hover:bg-[var(--accent-hover)] disabled:opacity-60'
             }
             style={portal ? { backgroundColor: 'var(--brand-primary)' } : undefined}
             disabled={isBusy || showForgotPassword}
@@ -495,27 +497,27 @@ export function AuthCredentialsPanel({
       )}
 
       {allowModeToggle && showOAuth ? (
-        <p className="text-center text-[13px] text-stone-500">
+        <p className="text-center text-[13px] text-[var(--text-tertiary)]">
           {mode === 'signup' ? (
             <>
-              Already have an account?{' '}
+              Already have a workspace?{' '}
               <button
                 type="button"
-                className="font-medium text-stone-900 underline-offset-2 hover:underline"
+                className="font-medium text-[var(--accent)] underline-offset-2 transition-colors duration-150 hover:text-[var(--accent-hover)] hover:underline"
                 onClick={() => switchMode('login')}
               >
-                Sign in →
+                Sign in
               </button>
             </>
           ) : (
             <>
-              Don&rsquo;t have an account?{' '}
+              New to Vantera?{' '}
               <button
                 type="button"
-                className="font-medium text-stone-900 underline-offset-2 hover:underline"
+                className="font-medium text-[var(--accent)] underline-offset-2 transition-colors duration-150 hover:text-[var(--accent-hover)] hover:underline"
                 onClick={() => switchMode('signup')}
               >
-                Get started for free
+                Create your workspace
               </button>
             </>
           )}

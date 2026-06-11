@@ -17,7 +17,7 @@ export const AuthInput = forwardRef<HTMLInputElement, AuthInputProps>(
           'placeholder:text-[var(--text-tertiary)] transition-[border-color,box-shadow] duration-150',
           'focus-visible:border-[var(--accent-border)] focus-visible:outline-none focus-visible:shadow-[var(--shadow-glow)]',
           'disabled:cursor-not-allowed disabled:opacity-60',
-          invalid && 'border-red-500 focus-visible:ring-red-500/20',
+          invalid && 'border-[var(--danger)] focus-visible:ring-[var(--danger-muted)]',
           className,
         )}
         aria-invalid={invalid || undefined}
@@ -46,7 +46,7 @@ export function AuthFieldLabel({
 export function AuthFieldError({ message }: { message?: string }) {
   if (!message) return null
   return (
-    <p className="text-[13px] text-red-600" role="alert">
+    <p className="text-[13px] text-[var(--danger)]" role="alert">
       {message}
     </p>
   )

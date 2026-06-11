@@ -71,6 +71,7 @@
     "date-fns": "^4.2.1",
     "drizzle-orm": "^0.30.10",
     "framer-motion": "^11.18.2",
+    "geist": "^1.7.2",
     "googleapis": "^172.0.0",
     "hono": "^4.12.21",
     "immer": "^11.1.8",

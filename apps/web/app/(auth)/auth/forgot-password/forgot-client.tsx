@@ -58,24 +58,24 @@ export function ForgotPasswordClient() {
     return (
       <div className="space-y-6">
         <div className="space-y-2">
-          <h1 className="text-2xl font-semibold tracking-[-0.02em] text-stone-900">Check your inbox</h1>
-          <p className="text-[13px] leading-relaxed text-stone-500">
+          <h1 className="font-heading text-[24px] font-semibold leading-[1.2] tracking-[-0.03em] text-[var(--text-primary)]">Check your inbox</h1>
+          <p className="text-[13px] leading-relaxed text-[var(--text-secondary)]">
             If an account exists for that email, we sent a link you can use to set a new password.
             The link expires in 1 hour.
           </p>
         </div>
 
         <div
-          className="rounded-lg border border-stone-200 bg-stone-50 px-3 py-3 text-[13px] leading-relaxed text-stone-700"
+          className="rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[var(--bg-elevated)] px-3 py-3 text-[13px] leading-relaxed text-[var(--text-secondary)]"
           role="status"
         >
           Check your inbox. We sent a reset link to{' '}
-          <span className="font-medium text-stone-900">{submittedEmail}</span>.
+          <span className="font-medium text-[var(--text-primary)]">{submittedEmail}</span>.
         </div>
 
         <Link
           href={AUTH_LOGIN_ENTRY}
-          className="inline-block text-[13px] font-medium text-stone-900 underline-offset-2 hover:underline"
+          className="inline-block text-[13px] font-medium text-[var(--accent)] underline-offset-2 transition-colors duration-150 hover:text-[var(--accent-hover)] hover:underline"
         >
           Back to sign in
         </Link>
@@ -86,8 +86,8 @@ export function ForgotPasswordClient() {
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <h1 className="text-2xl font-semibold tracking-[-0.02em] text-stone-900">Reset your password</h1>
-        <p className="text-[13px] leading-relaxed text-stone-500">
+        <h1 className="font-heading text-[24px] font-semibold leading-[1.2] tracking-[-0.03em] text-[var(--text-primary)]">Reset your password</h1>
+        <p className="text-[13px] leading-relaxed text-[var(--text-secondary)]">
           Enter the email associated with your account and we&rsquo;ll send you a link to set a new
           password.
         </p>
@@ -120,7 +120,7 @@ export function ForgotPasswordClient() {
 
         <Button
           type="submit"
-          className="h-11 w-full rounded-lg bg-stone-900 text-white hover:bg-stone-800 disabled:opacity-60"
+          className="h-11 w-full rounded-[var(--radius-lg)] border-0 bg-[var(--accent)] font-medium text-white shadow-[var(--shadow-sm)] hover:bg-[var(--accent-hover)] disabled:opacity-60"
           disabled={isSubmitting}
         >
           {isSubmitting ? (
@@ -134,11 +134,11 @@ export function ForgotPasswordClient() {
         </Button>
       </form>
 
-      <p className="text-center text-[13px] text-stone-500">
+      <p className="text-center text-[13px] text-[var(--text-tertiary)]">
         Remembered it?{' '}
         <Link
           href={AUTH_LOGIN_ENTRY}
-          className="font-medium text-stone-900 underline-offset-2 hover:underline"
+          className="font-medium text-[var(--accent)] underline-offset-2 transition-colors duration-150 hover:text-[var(--accent-hover)] hover:underline"
         >
           Sign in
         </Link>
