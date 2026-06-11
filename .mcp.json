@@ -6,7 +6,10 @@
     },
     "smartlead": {
       "command": "npx",
-      "args": ["-y", "smartlead-mcp-by-leadmagic"],
+      "args": [
+        "-y",
+        "smartlead-mcp-by-leadmagic"
+      ],
       "env": {
         "SMARTLEAD_API_KEY": "${SMARTLEAD_API_KEY}",
         "SMARTLEAD_ADVANCED_TOOLS": "true"
@@ -28,11 +31,18 @@
     },
     "playwright": {
       "command": "npx",
-      "args": ["-y", "@playwright/mcp@latest"]
+      "args": [
+        "-y",
+        "@playwright/mcp@latest"
+      ]
     },
     "vercel": {
       "type": "http",
       "url": "https://mcp.vercel.com"
+    },
+    "supabase": {
+      "type": "http",
+      "url": "https://mcp.supabase.com/mcp?project_ref=batyjchztbrqzkcvhkmk"
     }
   }
 }
