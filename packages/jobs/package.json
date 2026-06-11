@@ -6,13 +6,16 @@
   "scripts": {
     "type-check": "tsc --noEmit",
     "dev": "trigger dev",
-    "deploy": "trigger deploy"
+    "deploy": "trigger deploy",
+    "test": "vitest run"
   },
   "dependencies": {
-    "@trigger.dev/sdk": "^4.0.0"
+    "@trigger.dev/sdk": "^4.0.0",
+    "@supabase/supabase-js": "^2.108.1"
   },
   "devDependencies": {
     "trigger.dev": "^4.0.0",
-    "typescript": "^5.8.0"
+    "typescript": "^5.8.0",
+    "vitest": "^4.0.0"
   }
 }
