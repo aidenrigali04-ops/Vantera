@@ -13,8 +13,8 @@ Clean, minimal, professional SaaS. Monochrome black & white with **yellow as a m
 ## Color (tokens in apps/web/app/globals.css; light = default `.light`, dark = `:root`)
 - Light: canvas `#f5f5f7`, surfaces `#ffffff`, text `#1d1d1f`/`#3f3f46`/`#71717a`.
 - Primary actions: **black** (`--accent #111113`, hover `#2d2d31`), white text via `--text-inverse`.
-- Yellow appears ONLY as minimal features: `--highlight #eab308` (decorative fills — stars, needles, chart-1), `--highlight-text #a16207` (AA text on white), focus rings/glow (`--border-focus`, `--shadow-glow`, shadcn `--ring` 45 93% 47%), `--accent-muted` yellow tints.
-- Dark theme mirrors this: white primary buttons, `--highlight #facc15`.
+- Yellow appears ONLY as minimal features: `--highlight #facc15` (decorative fills — stars, needles, chart-1, progress dots, Popular badges), `--highlight-text #a16207` (AA text on white — never brighten small yellow text on white), focus rings/glow (`--border-focus`, `--shadow-glow`, shadcn `--ring` 48 96% 53%), `--accent-muted` yellow tints.
+- Dark theme mirrors this: white primary buttons, `--highlight #fde047`.
 - Never blue accents (legacy #0697FF is retired), never purple gradients, never stone-* grays.
 
 ## Shape & space
