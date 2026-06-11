@@ -13,3 +13,4 @@ Foundational decisions were locked 2026-06-11. The detailed rules live in `.clau
 - [Prospect data & enrichment](.claude/rules/05-enrichment.md) — Explorium AgentSource + enrichment waterfall
 - [Lead scoring](.claude/rules/06-lead-scoring.md) — rules gate + AI rank, the "only high-quality leads" gate
 - [UI/UX workflow](.claude/rules/07-ui-ux.md) — UI Designer Reference sheet, UX Brain, prompting loop
+- [Campaign pipeline](.claude/rules/08-campaign-pipeline.md) — campaign creation wizard + SDR agent behavior contract
