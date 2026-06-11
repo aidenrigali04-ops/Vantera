@@ -108,7 +108,7 @@ export function DraftReviewSheet({ draftId, onClose, onActionComplete }: Props) 
       }
     >
       {loading ? (
-        <div className="flex items-center justify-center py-12 text-sm text-stone-500">
+        <div className="flex items-center justify-center py-12 text-sm text-[var(--text-tertiary)]">
           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
           Loading draft…
         </div>
@@ -116,17 +116,17 @@ export function DraftReviewSheet({ draftId, onClose, onActionComplete }: Props) 
         <div className="space-y-4">
           {draft.channel === 'email' && draft.subject ? (
             <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-stone-500">Subject</p>
-              <p className="mt-1 text-sm text-stone-900">{draft.subject}</p>
+              <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-tertiary)]">Subject</p>
+              <p className="mt-1 text-sm text-[var(--text-primary)]">{draft.subject}</p>
             </div>
           ) : null}
           <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-stone-500">Message</p>
-            <p className="mt-2 whitespace-pre-wrap text-sm text-stone-700">{draft.body}</p>
+            <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-tertiary)]">Message</p>
+            <p className="mt-2 whitespace-pre-wrap text-sm text-[var(--text-secondary)]">{draft.body}</p>
           </div>
         </div>
       ) : (
-        <p className="text-sm text-stone-500">Draft not found or already processed.</p>
+        <p className="text-sm text-[var(--text-tertiary)]">Draft not found or already processed.</p>
       )}
     </DetailSidePanel>
   )

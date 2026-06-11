@@ -42,14 +42,14 @@ export function ExploreGuideStrip({ accountId, className }: Props) {
     <nav
       aria-label="Explore your workspace"
       className={cn(
-        'rounded-xl border border-stone-200/90 bg-white px-4 py-3 shadow-sm',
+        'rounded-xl border border-[var(--border-default)] bg-white px-4 py-3 shadow-sm',
         className,
       )}
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          <p className="text-[13px] font-medium text-stone-900">Quick tour</p>
-          <p className="mt-0.5 text-[12px] leading-relaxed text-stone-500">
+          <p className="text-[13px] font-medium text-[var(--text-primary)]">Quick tour</p>
+          <p className="mt-0.5 text-[12px] leading-relaxed text-[var(--text-tertiary)]">
             {operatingModel.exploreIntro}
           </p>
           <button
@@ -75,18 +75,18 @@ export function ExploreGuideStrip({ accountId, className }: Props) {
                   className={cn(
                     'inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-[12px] font-medium transition-colors',
                     isActive
-                      ? 'border-stone-900 bg-stone-900 text-white'
-                      : 'border-stone-200 bg-stone-50/80 text-stone-700 hover:border-stone-300 hover:bg-white',
+                      ? 'border-[var(--accent)] bg-[var(--accent)] text-[var(--text-inverse)]'
+                      : 'border-[var(--border-default)] bg-[var(--bg-subtle)] text-[var(--text-secondary)] hover:border-[var(--border-default)] hover:bg-white',
                   )}
                 >
                   <span
                     className={cn(
                       'flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold',
                       isActive
-                        ? 'bg-white/15 text-white'
+                        ? 'bg-[var(--accent-muted)] text-[var(--text-inverse)]'
                         : isDone
                           ? 'bg-emerald-100 text-emerald-700'
-                          : 'bg-white text-stone-500 ring-1 ring-stone-200',
+                          : 'bg-[var(--bg-surface)] text-[var(--text-tertiary)] ring-1 ring-[var(--border-default)]',
                     )}
                   >
                     {isDone ? '✓' : index + 1}

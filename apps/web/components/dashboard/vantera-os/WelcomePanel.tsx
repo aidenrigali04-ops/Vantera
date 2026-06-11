@@ -70,13 +70,13 @@ export function WelcomePanel({ email, sdrAgents, updates }: Props) {
         </div>
       </div>
 
-      {/* right — blue agent status card */}
+      {/* right — agent status card (self-contained dark surface, both themes) */}
       <Link
         href="/admin/agents"
         className="group flex w-full flex-col rounded-2xl p-4 transition-transform duration-150 hover:-translate-y-0.5 sm:w-[170px] sm:shrink-0"
         style={{
-          background: 'linear-gradient(165deg, #0697ff 0%, #0366ad 100%)',
-          boxShadow: '0 8px 24px -8px rgba(6, 151, 255, 0.5)',
+          background: 'linear-gradient(165deg, #1c1c21 0%, #0a0a0b 100%)',
+          boxShadow: '0 8px 24px -8px rgba(0, 0, 0, 0.5)',
         }}
       >
         <div className="flex items-start justify-between">

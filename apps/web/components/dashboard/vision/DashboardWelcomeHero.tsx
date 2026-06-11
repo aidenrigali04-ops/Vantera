@@ -79,7 +79,7 @@ export function DashboardWelcomeHero({ email, sdrAgents }: Props) {
         <div className="mt-5 flex items-center gap-2">
           <Link
             href="/admin/sdr-agents"
-            className="vision-cta-btn inline-flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-[12px] font-semibold text-white transition-opacity hover:opacity-90"
+            className="vision-cta-btn inline-flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-[12px] font-semibold text-[var(--text-inverse)] transition-opacity hover:opacity-90"
           >
             <Sparkles className="h-3.5 w-3.5" />
             {needsSetup ? 'Set up agent' : 'Open agent'}

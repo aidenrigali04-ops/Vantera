@@ -81,7 +81,7 @@ export function GuidedExplorationTooltip({ stepId, accountId, onDismiss }: Props
 
   return createPortal(
     <>
-      <div className="fixed inset-0 z-[90] bg-stone-900/10" aria-hidden onClick={dismiss} />
+      <div className="fixed inset-0 z-[90] bg-[var(--accent)]/10" aria-hidden onClick={dismiss} />
       <AnimatePresence>
         <motion.div
           key={stepId}
@@ -92,18 +92,18 @@ export function GuidedExplorationTooltip({ stepId, accountId, onDismiss }: Props
           exit={{ opacity: 0, y: -4, scale: 0.98 }}
           transition={{ duration: DURATION.modal, ease: EASE_OUT }}
           className={cn(
-            'fixed z-[91] rounded-xl border border-stone-200 bg-white p-4 shadow-sm',
+            'fixed z-[91] rounded-xl border border-[var(--border-default)] bg-white p-4 shadow-sm',
           )}
           style={{ top: position.top, left: position.left, width: position.width }}
         >
           <div className="flex items-start justify-between gap-3">
-            <p id={`tour-title-${stepId}`} className="text-sm leading-relaxed text-stone-700">
+            <p id={`tour-title-${stepId}`} className="text-sm leading-relaxed text-[var(--text-secondary)]">
               {step.message}
             </p>
             <button
               type="button"
               onClick={dismiss}
-              className="shrink-0 rounded-md p-1 text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-700"
+              className="shrink-0 rounded-md p-1 text-[var(--text-disabled)] transition-colors hover:bg-[var(--bg-overlay)] hover:text-[var(--text-secondary)]"
               aria-label="Dismiss"
             >
               <X className="h-4 w-4" />
@@ -114,9 +114,9 @@ export function GuidedExplorationTooltip({ stepId, accountId, onDismiss }: Props
               type="button"
               onClick={dismiss}
               className={cn(
-                'rounded-lg px-3 py-1.5 text-xs font-medium text-stone-700',
-                'transition-colors hover:bg-stone-100',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-400 focus-visible:ring-offset-2',
+                'rounded-lg px-3 py-1.5 text-xs font-medium text-[var(--text-secondary)]',
+                'transition-colors hover:bg-[var(--bg-overlay)]',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2',
               )}
             >
               Got it

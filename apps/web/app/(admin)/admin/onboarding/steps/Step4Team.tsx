@@ -135,21 +135,21 @@ export function Step4Team({ onComplete }: Props) {
               placeholder="teammate@email.com"
               value={member.email}
               onChange={(e) => updateMember(index, { email: e.target.value })}
-              className="h-9 flex-1 border-0 bg-transparent text-sm text-white placeholder:text-white/30 shadow-none focus-visible:ring-0"
+              className="h-9 flex-1 border-0 bg-transparent text-sm text-[var(--text-primary)] placeholder:text-[var(--text-disabled)] shadow-none focus-visible:ring-0"
             />
             <Select
               value={member.role}
               onValueChange={(value) => updateMember(index, { role: value as InviteRole })}
             >
-              <SelectTrigger className="h-9 w-[140px] border border-white/[0.06] bg-white/[0.03] text-xs text-white shadow-none focus:ring-0">
+              <SelectTrigger className="h-9 w-[140px] border border-[var(--border-subtle)] bg-[var(--bg-overlay)] text-xs text-[var(--text-primary)] shadow-none focus:ring-0">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent className="border-white/[0.08] bg-[#0F141B] text-white">
+              <SelectContent className="border-[var(--border-default)] bg-[var(--bg-elevated)] text-[var(--text-primary)]">
                 {INVITE_ROLES.map((role) => (
                   <SelectItem
                     key={role}
                     value={role}
-                    className="text-xs text-white focus:bg-white/[0.06] focus:text-white"
+                    className="text-xs text-[var(--text-primary)] focus:bg-[var(--bg-overlay)] focus:text-[var(--text-primary)]"
                   >
                     {ROLE_LABELS[role]}
                   </SelectItem>
@@ -161,7 +161,7 @@ export function Step4Team({ onComplete }: Props) {
                 type="button"
                 onClick={() => removeMember(index)}
                 aria-label="Remove member"
-                className="flex h-9 w-9 items-center justify-center rounded-md text-white/40 transition-colors hover:bg-red-500/10 hover:text-red-300"
+                className="flex h-9 w-9 items-center justify-center rounded-md text-[var(--text-disabled)] transition-colors hover:bg-red-500/10 hover:text-red-300"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -176,17 +176,17 @@ export function Step4Team({ onComplete }: Props) {
               type="button"
               onClick={addMember}
               whileHover={{ x: 2 }}
-              className="inline-flex items-center gap-1.5 text-sm font-medium text-white/55 transition-colors hover:text-white"
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-[var(--text-tertiary)] transition-colors hover:text-[var(--text-primary)]"
             >
               <Plus className="h-3.5 w-3.5" aria-hidden />
               Add another member
             </motion.button>
           ) : (
-            <p className="text-xs text-white/45">
+            <p className="text-xs text-[var(--text-tertiary)]">
               Max reached — add more from Settings anytime.
             </p>
           )}
-          <span className="text-[11px] text-white/30">
+          <span className="text-[11px] text-[var(--text-disabled)]">
             {members.length} / {MAX_MEMBERS}
           </span>
         </div>

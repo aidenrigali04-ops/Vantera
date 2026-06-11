@@ -238,12 +238,12 @@ function IntegrationTile({
       whileHover={{ y: -2 }}
       transition={{ type: 'spring', stiffness: 320, damping: 24 }}
       className={cn(
-        'group relative overflow-hidden rounded-2xl border bg-white/[0.02] p-5 transition-colors',
+        'group relative overflow-hidden rounded-2xl border bg-[var(--bg-surface)] p-5 transition-colors',
         isConnected
           ? 'border-emerald-400/30'
           : isOpen
-            ? 'border-white/[0.14]'
-            : 'border-white/[0.06] hover:border-white/[0.14] hover:bg-white/[0.035]',
+            ? 'border-[var(--border-strong)]'
+            : 'border-[var(--border-subtle)] hover:border-[var(--border-strong)] hover:bg-[var(--bg-overlay)]',
       )}
     >
       {/* Brand-colored corner glow — same vocabulary as the dashboard KPI tiles. */}
@@ -265,8 +265,8 @@ function IntegrationTile({
           <div className="min-w-0 flex-1">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-white">{tile.name}</p>
-                <p className="mt-0.5 truncate text-xs text-white/50">{tile.description}</p>
+                <p className="truncate text-sm font-semibold text-[var(--text-primary)]">{tile.name}</p>
+                <p className="mt-0.5 truncate text-xs text-[var(--text-tertiary)]">{tile.description}</p>
               </div>
               <StatusPill
                 connected={isConnected}
@@ -280,7 +280,7 @@ function IntegrationTile({
               {tile.tags.map((tag) => (
                 <span
                   key={tag}
-                  className="text-[10px] font-medium uppercase tracking-wider text-white/40"
+                  className="text-[10px] font-medium uppercase tracking-wider text-[var(--text-disabled)]"
                 >
                   {tag}
                 </span>
@@ -288,7 +288,7 @@ function IntegrationTile({
                 acc.push(el)
                 if (idx < arr.length - 1) {
                   acc.push(
-                    <span key={`dot-${idx}`} aria-hidden className="text-white/20">
+                    <span key={`dot-${idx}`} aria-hidden className="text-[var(--text-disabled)]">
                       ·
                     </span>,
                   )
@@ -353,8 +353,8 @@ function StatusPill({
         className={cn(
           'inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider transition-colors',
           isOpen
-            ? 'border-white/20 bg-white/10 text-white'
-            : 'border-emerald-400/30 bg-emerald-400/[0.06] text-emerald-300 hover:border-emerald-400/50 hover:bg-emerald-400/[0.1]',
+            ? 'border-[var(--border-strong)] bg-[var(--bg-overlay)] text-[var(--text-primary)]'
+            : 'border-transparent bg-[var(--success-muted)] text-[var(--success)] hover:border-[var(--success)]',
         )}
       >
         {isOpen ? 'Cancel' : 'Connect'}
@@ -363,7 +363,7 @@ function StatusPill({
   }
 
   return (
-    <span className="inline-flex items-center rounded-full border border-white/[0.08] bg-white/[0.03] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white/50">
+    <span className="inline-flex items-center rounded-full border border-[var(--border-default)] bg-[var(--bg-overlay)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-tertiary)]">
       Available
     </span>
   )
@@ -420,10 +420,10 @@ function ImmediateConnectForm({
   }
 
   return (
-    <div className="space-y-2 border-t border-white/[0.06] pt-4">
+    <div className="space-y-2 border-t border-[var(--border-subtle)] pt-4">
       {tile.fields.map((field) => (
         <div key={field.key} className="space-y-1">
-          <label htmlFor={`${tile.provider}-${field.key}`} className="text-[11px] text-white/55">
+          <label htmlFor={`${tile.provider}-${field.key}`} className="text-[11px] text-[var(--text-tertiary)]">
             {field.label}
           </label>
           <Input
@@ -433,7 +433,7 @@ function ImmediateConnectForm({
             value={values[field.key] ?? ''}
             onChange={(e) => setValues((prev) => ({ ...prev, [field.key]: e.target.value }))}
             autoComplete="off"
-            className="h-10 border-white/[0.08] bg-white/[0.02] text-sm text-white placeholder:text-white/30 focus-visible:border-white/[0.2] focus-visible:ring-1 focus-visible:ring-white/10"
+            className="h-10 border-[var(--border-default)] bg-[var(--bg-surface)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-disabled)] focus-visible:border-[var(--border-focus)] focus-visible:ring-1 focus-visible:ring-[var(--accent-muted)]"
           />
         </div>
       ))}
@@ -446,13 +446,13 @@ function ImmediateConnectForm({
         disabled={saving}
         style={{
           background: saving
-            ? 'rgba(255,255,255,0.06)'
+            ? 'var(--bg-overlay)'
             : `linear-gradient(135deg, ${primaryColor}, ${primaryColor}cc)`,
           boxShadow: saving
             ? 'none'
             : `0 8px 20px -10px ${primaryColor}aa, inset 0 1px 0 rgba(255,255,255,0.18)`,
         }}
-        className="mt-1 inline-flex h-9 w-full items-center justify-center rounded-md text-xs font-medium text-white transition-colors disabled:cursor-not-allowed disabled:text-white/40"
+        className="mt-1 inline-flex h-9 w-full items-center justify-center rounded-md text-xs font-medium text-white transition-colors disabled:cursor-not-allowed disabled:text-[var(--text-disabled)]"
       >
         {saving ? 'Verifying…' : `Connect ${tile.name}`}
       </button>

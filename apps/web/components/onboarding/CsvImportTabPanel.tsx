@@ -169,22 +169,22 @@ export function CsvImportTabPanel({ entity, accountId }: Props) {
           onClick={() => fileInputRef.current?.click()}
           onDragOver={(event) => {
             event.preventDefault()
-            event.currentTarget.classList.add('border-stone-400', 'bg-stone-100/80')
+            event.currentTarget.classList.add('border-[var(--border-strong)]', 'bg-[var(--bg-overlay)]')
           }}
           onDragLeave={(event) => {
-            event.currentTarget.classList.remove('border-stone-400', 'bg-stone-100/80')
+            event.currentTarget.classList.remove('border-[var(--border-strong)]', 'bg-[var(--bg-overlay)]')
           }}
           onDrop={(event) => {
             event.preventDefault()
-            event.currentTarget.classList.remove('border-stone-400', 'bg-stone-100/80')
+            event.currentTarget.classList.remove('border-[var(--border-strong)]', 'bg-[var(--bg-overlay)]')
             const file = event.dataTransfer.files?.[0]
             if (file) handleFile(file)
           }}
-          className="flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-stone-200 bg-stone-50/80 px-6 py-10 text-center transition-colors"
+          className="flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-[var(--border-default)] bg-[var(--bg-subtle)] px-6 py-10 text-center transition-colors"
         >
-          <Upload className="mb-3 h-8 w-8 text-stone-400" aria-hidden />
-          <p className="text-sm font-medium text-stone-800">Upload CSV file</p>
-          <p className="mt-1 max-w-xs text-xs leading-relaxed text-stone-500">
+          <Upload className="mb-3 h-8 w-8 text-[var(--text-disabled)]" aria-hidden />
+          <p className="text-sm font-medium text-[var(--text-primary)]">Upload CSV file</p>
+          <p className="mt-1 max-w-xs text-xs leading-relaxed text-[var(--text-tertiary)]">
             Drag and drop a .csv file, or click to browse. Up to 500 rows per import.
           </p>
           <Button type="button" variant="outline" size="sm" className="mt-4 pointer-events-none">
@@ -197,14 +197,14 @@ export function CsvImportTabPanel({ entity, accountId }: Props) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-xs text-stone-600">
-        <FileSpreadsheet className="h-4 w-4 shrink-0 text-stone-500" aria-hidden />
+      <div className="flex items-center gap-2 rounded-lg border border-[var(--border-default)] bg-[var(--bg-subtle)] px-3 py-2 text-xs text-[var(--text-secondary)]">
+        <FileSpreadsheet className="h-4 w-4 shrink-0 text-[var(--text-tertiary)]" aria-hidden />
         <span className="truncate font-medium">{fileName}</span>
-        <span className="text-stone-400">·</span>
+        <span className="text-[var(--text-disabled)]">·</span>
         <span>{rawRows.length} rows</span>
         <button
           type="button"
-          className="ml-auto text-stone-500 underline-offset-2 hover:text-stone-800 hover:underline"
+          className="ml-auto text-[var(--text-tertiary)] underline-offset-2 hover:text-[var(--text-primary)] hover:underline"
           onClick={reset}
         >
           Replace file
@@ -213,13 +213,13 @@ export function CsvImportTabPanel({ entity, accountId }: Props) {
 
       {step === 'map' ? (
         <>
-          <p className="text-xs text-stone-500">
+          <p className="text-xs text-[var(--text-tertiary)]">
             Match each Vantera field to a column in your file. Required fields are marked with *.
           </p>
           <div className="max-h-64 space-y-3 overflow-y-auto pr-1">
             {fields.map((field) => (
               <div key={field.key} className="grid grid-cols-[1fr_1.2fr] items-center gap-3">
-                <Label className="text-xs text-stone-700">
+                <Label className="text-xs text-[var(--text-secondary)]">
                   {field.label}
                   {field.required ? <span className="text-red-500"> *</span> : null}
                 </Label>
@@ -271,13 +271,13 @@ export function CsvImportTabPanel({ entity, accountId }: Props) {
 
       {step === 'preview' ? (
         <>
-          <p className="text-xs text-stone-500">
+          <p className="text-xs text-[var(--text-tertiary)]">
             First {previewRows.length} row{previewRows.length === 1 ? '' : 's'} after mapping — review
             before importing {rawRows.length} total.
           </p>
-          <div className="overflow-x-auto rounded-lg border border-stone-200">
+          <div className="overflow-x-auto rounded-lg border border-[var(--border-default)]">
             <table className="min-w-full text-left text-xs">
-              <thead className="bg-stone-50 text-stone-500">
+              <thead className="bg-[var(--bg-subtle)] text-[var(--text-tertiary)]">
                 <tr>
                   {previewColumns.map((field) => (
                     <th key={field.key} className="whitespace-nowrap px-3 py-2 font-medium">
@@ -286,11 +286,11 @@ export function CsvImportTabPanel({ entity, accountId }: Props) {
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-stone-100">
+              <tbody className="divide-y divide-[var(--border-subtle)]">
                 {previewRows.map((row, rowIndex) => (
                   <tr key={rowIndex}>
                     {previewColumns.map((field) => (
-                      <td key={field.key} className="max-w-[10rem] truncate px-3 py-2 text-stone-800">
+                      <td key={field.key} className="max-w-[10rem] truncate px-3 py-2 text-[var(--text-primary)]">
                         {row[field.key] || '—'}
                       </td>
                     ))}

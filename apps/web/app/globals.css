@@ -4,7 +4,7 @@
 
 @layer base {
   :root {
-    /* shadcn/ui HSL vars — Vantera OS dark palette (Figma: visionOS black + #0697FF) */
+    /* shadcn/ui HSL vars — Vantera dark palette (monochrome + yellow accents) */
     --background: 0 0% 0%;
     --foreground: 240 6% 96%;
     --card: 240 3% 5%;
@@ -312,7 +312,7 @@
   }
 
   .nav-item-active {
-    background: var(--sidebar-nav-active-bg, #0697ff);
+    background: var(--sidebar-nav-active-bg, #111113);
     color: var(--sidebar-nav-active-text, #ffffff) !important;
     font-weight: 600;
   }
@@ -343,7 +343,7 @@
     background: var(--accent);
     box-shadow:
       0 0 0 1.5px rgba(255, 255, 255, 0.85),
-      0 0 16px rgba(6, 151, 255, 0.45);
+      0 0 16px rgba(0, 0, 0, 0.35);
   }
 
   /* Figma tab bar edge — 1px blue line fading out toward the bottom */
@@ -359,10 +359,10 @@
     width: 1.5px;
     background: linear-gradient(
       180deg,
-      #0697ff 0%,
-      #0697ff 62%,
-      rgba(6, 151, 255, 0.4) 82%,
-      rgba(6, 151, 255, 0) 100%
+      #eab308 0%,
+      #eab308 62%,
+      rgba(234, 179, 8, 0.4) 82%,
+      rgba(234, 179, 8, 0) 100%
     );
     pointer-events: none;
     z-index: 10;
@@ -381,15 +381,15 @@
 
   /* Bottom help card */
   .sidebar-help-card {
-    background: linear-gradient(127deg, rgba(6, 151, 255, 0.12) 0%, rgba(0, 0, 0, 0.9) 100%);
-    border: 1px solid rgba(6, 151, 255, 0.25);
-    box-shadow: 0 4px 24px -8px rgba(6, 151, 255, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    background: linear-gradient(127deg, rgba(250, 204, 21, 0.1) 0%, rgba(0, 0, 0, 0.9) 100%);
+    border: 1px solid rgba(250, 204, 21, 0.25);
+    box-shadow: 0 4px 24px -8px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.06);
   }
 
   .sidebar-help-btn {
     background: var(--accent);
-    box-shadow: 0 2px 8px rgba(6, 151, 255, 0.4);
-    color: #ffffff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+    color: var(--text-inverse);
   }
 
   /* ── Vantera OS dashboard panels (Figma Group Box) ── */
@@ -418,7 +418,8 @@
 
   .vision-cta-btn {
     background: var(--accent);
-    box-shadow: 0 2px 12px rgba(6, 151, 255, 0.35);
+    color: var(--text-inverse);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
   }
   .vision-cta-btn:hover {
     background: var(--accent-hover);
@@ -434,8 +435,8 @@
   /* Leads panel — Figma: panel with subtle blue outline */
   .vantera-leads-panel {
     background: var(--bg-surface);
-    border: 1px solid rgba(6, 151, 255, 0.3);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 0 24px -8px rgba(6, 151, 255, 0.2);
+    border: 1px solid var(--border-strong);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 0 24px -8px rgba(0, 0, 0, 0.3);
   }
 
   /* ── Agents screen (Figma Group Boxes) ── */
@@ -467,7 +468,7 @@
     pointer-events: none;
   }
 
-  /* Agent card — dual-tone ring: accent blue top-left → white bottom-right */
+  /* Agent card — dual-tone ring: bright top-left → white bottom-right */
   .vantera-agent-card {
     position: relative;
     background: #111113;
@@ -483,8 +484,8 @@
     padding: 1px;
     background: linear-gradient(
       135deg,
-      rgba(6, 151, 255, 0.85) 0%,
-      rgba(6, 151, 255, 0.3) 30%,
+      rgba(255, 255, 255, 0.85) 0%,
+      rgba(255, 255, 255, 0.3) 30%,
       rgba(130, 140, 150, 0.3) 60%,
       rgba(255, 255, 255, 0.95) 100%
     );
@@ -495,10 +496,10 @@
     pointer-events: none;
   }
 
-  /* Agent Overview list container — accent-blue ring */
+  /* Agent Overview list container — hairline ring, brighter top edge */
   .vantera-overview-list {
-    border: 1px solid rgba(6, 151, 255, 0.55);
-    border-top-color: rgba(6, 151, 255, 0.9);
+    border: 1px solid var(--border-strong);
+    border-top-color: var(--border-strong);
   }
 
   /* Leads row capsule — hairline ring, fills blue when active/hovered */
@@ -529,8 +530,8 @@
     --cd-text-secondary: #334155;
     --cd-text-muted: #64748b;
     --cd-text-label: #0f172a;
-    --cd-accent: #2563eb;
-    --cd-accent-dark: #1d4ed8;
+    --cd-accent: #111113;
+    --cd-accent-dark: #2d2d31;
     --cd-accent-text: #ffffff;
     --cd-border: rgba(0, 0, 0, 0.08);
     --cd-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
@@ -598,7 +599,7 @@
   }
 
   .light .vantera-leads-panel {
-    box-shadow: 0 0 24px -8px rgba(6, 151, 255, 0.15);
+    box-shadow: 0 0 24px -8px rgba(0, 0, 0, 0.08);
   }
 
   .light .vantera-lead-row {
@@ -606,7 +607,7 @@
   }
   .light .vantera-lead-row:hover,
   .light .vantera-lead-row[data-active='true'] {
-    border-color: rgba(6, 151, 255, 0.45);
+    border-color: rgba(0, 0, 0, 0.45);
   }
 
   .light .sidebar-vision {
@@ -623,9 +624,9 @@
   }
 
   .light .sidebar-help-card {
-    background: linear-gradient(127deg, rgba(6, 151, 255, 0.1) 0%, rgba(255, 255, 255, 0.9) 100%);
-    border-color: rgba(6, 151, 255, 0.25);
-    box-shadow: 0 4px 24px -8px rgba(6, 151, 255, 0.15);
+    background: linear-gradient(127deg, rgba(234, 179, 8, 0.1) 0%, rgba(255, 255, 255, 0.9) 100%);
+    border-color: rgba(234, 179, 8, 0.3);
+    box-shadow: 0 4px 24px -8px rgba(0, 0, 0, 0.12);
   }
 
   .light .vantera-glass-panel {
@@ -647,8 +648,8 @@
   .light .vantera-agent-card::before {
     background: linear-gradient(
       135deg,
-      rgba(6, 151, 255, 0.7) 0%,
-      rgba(6, 151, 255, 0.25) 30%,
+      rgba(0, 0, 0, 0.25) 0%,
+      rgba(0, 0, 0, 0.1) 30%,
       rgba(0, 0, 0, 0.1) 60%,
       rgba(0, 0, 0, 0.16) 100%
     );

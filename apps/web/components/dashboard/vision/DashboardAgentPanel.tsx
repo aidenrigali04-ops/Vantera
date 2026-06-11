@@ -61,7 +61,7 @@ export function DashboardAgentPanel({ agents, snapshot = EMPTY_SNAPSHOT }: Props
             </p>
             <Link
               href="/admin/sdr-agents"
-              className="vision-cta-btn mt-4 inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-[12px] font-semibold text-white transition-opacity hover:opacity-90"
+              className="vision-cta-btn mt-4 inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-[12px] font-semibold text-[var(--text-inverse)] transition-opacity hover:opacity-90"
             >
               <Zap className="h-3.5 w-3.5" />
               Deploy agent

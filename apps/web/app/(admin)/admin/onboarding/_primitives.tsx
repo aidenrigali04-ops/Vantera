@@ -88,8 +88,8 @@ export function StepHeader({
 
   return (
     <motion.div variants={fadeUp} className="space-y-2">
-      <h1 className="text-3xl font-semibold leading-tight tracking-tight text-white">{title}</h1>
-      <p className="max-w-2xl text-sm leading-relaxed text-white/55">{subtitle}</p>
+      <h1 className="text-3xl font-semibold leading-tight tracking-tight text-[var(--text-primary)]">{title}</h1>
+      <p className="max-w-2xl text-sm leading-relaxed text-[var(--text-tertiary)]">{subtitle}</p>
     </motion.div>
   )
 }
@@ -125,7 +125,7 @@ export function FieldGroup({
         <p
           className={cn(
             'text-xs leading-relaxed',
-            theme === 'light' ? 'text-[var(--text-tertiary)]' : 'text-white/45',
+            theme === 'light' ? 'text-[var(--text-tertiary)]' : 'text-[var(--text-tertiary)]',
           )}
         >
           {description}
@@ -187,10 +187,10 @@ export function SelectableTile({
                 : 'border-[var(--border-default)] hover:border-[var(--border-strong)] hover:bg-[var(--bg-subtle)]',
             )
           : cn(
-              'rounded-2xl bg-white/[0.02] p-4',
+              'rounded-2xl bg-[var(--bg-surface)] p-4',
               selected
-                ? 'border-[var(--brand-accent-border)] bg-white/[0.04]'
-                : 'border-white/[0.06] hover:border-white/[0.14] hover:bg-white/[0.035]',
+                ? 'border-[var(--brand-accent-border)] bg-[var(--bg-overlay)]'
+                : 'border-[var(--border-subtle)] hover:border-[var(--border-strong)] hover:bg-[var(--bg-overlay)]',
             ),
         layout === 'horizontal' ? 'flex items-start gap-3' : 'flex flex-col gap-2.5',
         className,
@@ -239,7 +239,7 @@ export function SelectableTile({
           <p
             className={cn(
               'mt-1 text-[12px] leading-relaxed',
-              theme === 'light' ? 'text-[var(--text-secondary)]' : 'text-white/50',
+              theme === 'light' ? 'text-[var(--text-secondary)]' : 'text-[var(--text-tertiary)]',
             )}
           >
             {description}
@@ -284,7 +284,7 @@ export function PrimaryCTA({
       transition={{ type: 'spring', stiffness: 380, damping: 22 }}
       style={{
         background: inert
-          ? 'rgba(255,255,255,0.06)'
+          ? 'var(--bg-overlay)'
           : `linear-gradient(135deg, ${primaryColor}, ${primaryColor}cc)`,
         boxShadow: inert
           ? 'none'
@@ -292,7 +292,7 @@ export function PrimaryCTA({
       }}
       className={cn(
         'inline-flex h-11 min-w-[160px] items-center justify-center gap-2 rounded-lg px-5 text-sm font-medium text-white transition-colors',
-        inert ? 'cursor-not-allowed text-white/40' : '',
+        inert ? 'cursor-not-allowed text-[var(--text-disabled)]' : '',
         className,
       )}
     >
@@ -317,7 +317,7 @@ export function GhostCTA({ onClick, type = 'button', children, className }: Ghos
       type={type}
       onClick={onClick}
       className={cn(
-        'inline-flex h-9 items-center gap-1 rounded-md px-3 text-xs font-medium text-white/45 transition-colors hover:bg-white/[0.04] hover:text-white/80',
+        'inline-flex h-9 items-center gap-1 rounded-md px-3 text-xs font-medium text-[var(--text-tertiary)] transition-colors hover:bg-[var(--bg-overlay)] hover:text-[var(--text-primary)]',
         className,
       )}
     >

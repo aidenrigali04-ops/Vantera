@@ -72,7 +72,7 @@ function AgentCard({ card, agent }: { card: (typeof FIGMA_CARDS)[number]; agent?
       </div>
       <Link
         href={href}
-        className="vision-cta-btn inline-flex shrink-0 items-center justify-center rounded-2xl border border-white/85 px-6 py-3 text-[15px] font-semibold text-white transition-colors"
+        className="vision-cta-btn inline-flex shrink-0 items-center justify-center rounded-2xl border border-white/85 px-6 py-3 text-[15px] font-semibold text-[var(--text-inverse)] transition-colors"
       >
         {needsSetup ? 'Set Up' : 'Open'}
       </Link>
@@ -102,20 +102,20 @@ function ActivityRow({ event }: { event: SDRActivityEvent }) {
   const inner = (
     <>
       <Check
-        className="h-4 w-4 shrink-0 text-[var(--text-primary)] group-hover:text-white dark:text-white"
+        className="h-4 w-4 shrink-0 text-[var(--text-primary)] group-hover:text-[var(--text-inverse)] dark:text-white"
         strokeWidth={2.25}
         aria-hidden
       />
-      <span className="min-w-0 flex-1 truncate text-[14px] font-semibold text-[var(--text-primary)] group-hover:text-white dark:text-white">
+      <span className="min-w-0 flex-1 truncate text-[14px] font-semibold text-[var(--text-primary)] group-hover:text-[var(--text-inverse)] dark:text-white">
         {eventLabel(event)}
       </span>
       {event.company ? (
-        <span className="shrink-0 truncate text-[13px] text-[var(--text-tertiary)] group-hover:text-white/80">
+        <span className="shrink-0 truncate text-[13px] text-[var(--text-tertiary)] group-hover:text-[var(--text-inverse)]">
           {event.company}
         </span>
       ) : null}
       <ChevronRight
-        className="h-3.5 w-3.5 shrink-0 text-[var(--text-disabled)] group-hover:text-white"
+        className="h-3.5 w-3.5 shrink-0 text-[var(--text-disabled)] group-hover:text-[var(--text-inverse)]"
         aria-hidden
       />
     </>
@@ -192,7 +192,7 @@ export function AgentsHubView({ agents, activity, sdrEnabled }: Props) {
                 </p>
                 <Link
                   href="/admin/outreach/agents/setup"
-                  className="vision-cta-btn rounded-full px-4 py-2 text-[12px] font-semibold text-white"
+                  className="vision-cta-btn rounded-full px-4 py-2 text-[12px] font-semibold text-[var(--text-inverse)]"
                 >
                   Set up Scouting Agent
                 </Link>

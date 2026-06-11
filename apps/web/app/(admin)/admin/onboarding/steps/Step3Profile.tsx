@@ -283,7 +283,7 @@ export function Step3Profile({ accountId, primaryColor, onComplete }: Props) {
       >
         <div className="relative">
           <Phone
-            className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30"
+            className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-disabled)]"
             aria-hidden
           />
           <Input
@@ -292,7 +292,7 @@ export function Step3Profile({ accountId, primaryColor, onComplete }: Props) {
             placeholder="+1 (555) 555-0911"
             value={emergencyLine}
             onChange={(e) => setEmergencyLine(e.target.value)}
-            className="h-11 border-white/[0.08] bg-white/[0.02] pl-10 text-sm text-white placeholder:text-white/30 focus-visible:border-white/[0.2] focus-visible:ring-1 focus-visible:ring-white/10"
+            className="h-11 border-[var(--border-default)] bg-[var(--bg-surface)] pl-10 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-disabled)] focus-visible:border-[var(--border-focus)] focus-visible:ring-1 focus-visible:ring-[var(--accent-muted)]"
           />
         </div>
       </FieldGroup>
@@ -330,10 +330,10 @@ function VoiceTile({
           : undefined
       }
       className={cn(
-        'group relative overflow-hidden rounded-2xl border bg-white/[0.02] p-4 text-left transition-colors duration-200',
+        'group relative overflow-hidden rounded-2xl border bg-[var(--bg-surface)] p-4 text-left transition-colors duration-200',
         selected
-          ? 'bg-white/[0.04]'
-          : 'border-white/[0.06] hover:border-white/[0.14] hover:bg-white/[0.035]',
+          ? 'bg-[var(--bg-overlay)]'
+          : 'border-[var(--border-subtle)] hover:border-[var(--border-strong)] hover:bg-[var(--bg-overlay)]',
       )}
     >
       <div
@@ -351,22 +351,22 @@ function VoiceTile({
           style={{
             background: selected
               ? `linear-gradient(135deg, ${voice.accent}33, ${voice.accent}0a)`
-              : 'linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02))',
+              : 'var(--bg-overlay)',
             boxShadow: selected
               ? `inset 0 0 0 1px ${voice.accent}33`
-              : 'inset 0 0 0 1px rgba(255,255,255,0.06)',
+              : 'inset 0 0 0 1px var(--border-default)',
           }}
           className="flex h-8 w-8 items-center justify-center rounded-lg"
         >
           <Icon
             className="h-4 w-4"
-            style={{ color: selected ? voice.accent : 'rgba(255,255,255,0.55)' }}
+            style={{ color: selected ? voice.accent : 'var(--text-tertiary)' }}
             aria-hidden
           />
         </span>
-        <p className="text-sm font-semibold text-white">{voice.label}</p>
+        <p className="text-sm font-semibold text-[var(--text-primary)]">{voice.label}</p>
       </div>
-      <p className="relative mt-3 text-xs italic leading-relaxed text-white/55">{voice.example}</p>
+      <p className="relative mt-3 text-xs italic leading-relaxed text-[var(--text-tertiary)]">{voice.example}</p>
     </motion.button>
   )
 }
@@ -384,20 +384,20 @@ function HourSelect({
 }) {
   return (
     <div className="space-y-1">
-      <label htmlFor={id} className="text-xs text-white/55">
+      <label htmlFor={id} className="text-xs text-[var(--text-tertiary)]">
         {label}
       </label>
       <select
         id={id}
         value={value ?? ''}
         onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))}
-        className="h-11 w-full appearance-none rounded-md border border-white/[0.08] bg-white/[0.02] px-3 text-sm text-white outline-none transition-colors hover:border-white/[0.16] focus:border-white/[0.25]"
+        className="h-11 w-full appearance-none rounded-md border border-[var(--border-default)] bg-[var(--bg-surface)] px-3 text-sm text-[var(--text-primary)] outline-none transition-colors hover:border-[var(--border-strong)] focus:border-[var(--border-focus)]"
       >
-        <option value="" className="bg-[#0B1015] text-white">
+        <option value="" className="bg-[var(--bg-elevated)] text-[var(--text-primary)]">
           — Not set —
         </option>
         {HOURS.map((h) => (
-          <option key={h} value={h} className="bg-[#0B1015] text-white">
+          <option key={h} value={h} className="bg-[var(--bg-elevated)] text-[var(--text-primary)]">
             {fmtHour(h)}
           </option>
         ))}
@@ -421,7 +421,7 @@ function LinkField({
 }) {
   return (
     <div className="space-y-1">
-      <label htmlFor={id} className="text-xs text-white/55">
+      <label htmlFor={id} className="text-xs text-[var(--text-tertiary)]">
         {label}
       </label>
       <Input
@@ -430,7 +430,7 @@ function LinkField({
         placeholder={placeholder}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="h-11 border-white/[0.08] bg-white/[0.02] text-sm text-white placeholder:text-white/30 focus-visible:border-white/[0.2] focus-visible:ring-1 focus-visible:ring-white/10"
+        className="h-11 border-[var(--border-default)] bg-[var(--bg-surface)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-disabled)] focus-visible:border-[var(--border-focus)] focus-visible:ring-1 focus-visible:ring-[var(--accent-muted)]"
       />
     </div>
   )

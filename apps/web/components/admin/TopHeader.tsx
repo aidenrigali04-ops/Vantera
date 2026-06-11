@@ -95,7 +95,7 @@ export function TopHeader({ session, showDemoWorkspace = false }: TopHeaderProps
           <Button
             asChild
             size="sm"
-            className="hidden h-9 bg-[var(--accent)] text-white shadow-sm hover:bg-[var(--accent-hover)] sm:inline-flex"
+            className="hidden h-9 bg-[var(--accent)] text-[var(--text-inverse)] shadow-sm hover:bg-[var(--accent-hover)] sm:inline-flex"
           >
             <Link href={primaryAction.href}>
               <Plus className="mr-1.5 h-4 w-4" aria-hidden />

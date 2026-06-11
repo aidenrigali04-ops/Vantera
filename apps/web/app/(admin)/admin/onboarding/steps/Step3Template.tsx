@@ -161,10 +161,10 @@ export function Step3Template({ accountId, vertical, primaryColor, onComplete }:
                     : undefined
                 }
                 className={cn(
-                  'group relative block w-full overflow-hidden rounded-2xl border bg-white/[0.02] p-5 text-left transition-colors',
+                  'group relative block w-full overflow-hidden rounded-2xl border bg-[var(--bg-surface)] p-5 text-left transition-colors',
                   isSelected
-                    ? 'bg-white/[0.04]'
-                    : 'border-white/[0.06] hover:border-white/[0.14] hover:bg-white/[0.035]',
+                    ? 'bg-[var(--bg-overlay)]'
+                    : 'border-[var(--border-subtle)] hover:border-[var(--border-strong)] hover:bg-[var(--bg-overlay)]',
                 )}
               >
                 <div
@@ -180,18 +180,18 @@ export function Step3Template({ accountId, vertical, primaryColor, onComplete }:
 
                 <div className="relative flex items-start justify-between gap-4">
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-white">{templateLabel(template)}</p>
+                    <p className="text-sm font-semibold text-[var(--text-primary)]">{templateLabel(template)}</p>
                     {template.templateData.description ? (
-                      <p className="mt-1 text-xs leading-relaxed text-white/55">
+                      <p className="mt-1 text-xs leading-relaxed text-[var(--text-tertiary)]">
                         {template.templateData.description}
                       </p>
                     ) : null}
                   </div>
                   <div className="flex shrink-0 flex-col items-end gap-1 text-[10px]">
-                    <span className="rounded-full border border-white/[0.08] bg-white/[0.04] px-2 py-0.5 font-medium uppercase tracking-wider text-white/65">
+                    <span className="rounded-full border border-[var(--border-default)] bg-[var(--bg-overlay)] px-2 py-0.5 font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
                       {stageCount} stages
                     </span>
-                    <span className="rounded-full border border-white/[0.08] bg-white/[0.04] px-2 py-0.5 font-medium uppercase tracking-wider text-white/65">
+                    <span className="rounded-full border border-[var(--border-default)] bg-[var(--bg-overlay)] px-2 py-0.5 font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
                       {automationCount} automations
                     </span>
                   </div>
@@ -206,10 +206,10 @@ export function Step3Template({ accountId, vertical, primaryColor, onComplete }:
       Array.isArray(selected.templateData.stages) &&
       selected.templateData.stages.length > 0 ? (
         <motion.div variants={fadeUp} className="space-y-3">
-          <p className="text-[11px] font-medium uppercase tracking-wider text-white/45">
+          <p className="text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
             Pipeline preview
           </p>
-          <div className="overflow-x-auto rounded-2xl border border-white/[0.06] bg-white/[0.015] p-3">
+          <div className="overflow-x-auto rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3">
             <div className="flex gap-1.5">
               {selected.templateData.stages.map((stage, index) => {
                 const color = stage.color ?? '#64748B'

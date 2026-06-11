@@ -128,7 +128,7 @@ export function DashboardRevenueGauge({ data }: Props) {
             type="button"
             onClick={save}
             disabled={pending || !digits(goal)}
-            className="vision-cta-btn flex-1 rounded-xl py-2 text-[12px] font-semibold text-white disabled:opacity-50"
+            className="vision-cta-btn flex-1 rounded-xl py-2 text-[12px] font-semibold text-[var(--text-inverse)] disabled:opacity-50"
           >
             {pending ? 'Saving…' : 'Save goal'}
           </button>

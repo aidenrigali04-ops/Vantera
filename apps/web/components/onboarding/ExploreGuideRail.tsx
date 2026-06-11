@@ -43,15 +43,15 @@ export function ExploreGuideRail({ accountId, businessName, className }: Props) 
   return (
     <aside
       className={cn(
-        'rounded-xl border border-stone-200 bg-white p-5 shadow-sm',
+        'rounded-xl border border-[var(--border-default)] bg-white p-5 shadow-sm',
         className,
       )}
     >
-      <p className="text-[11px] font-medium uppercase tracking-wider text-stone-500">
+      <p className="text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
         Explore your workspace
       </p>
-      <h2 className="mt-1 text-lg font-semibold text-stone-900">{displayName}</h2>
-      <p className="mt-2 text-sm leading-relaxed text-stone-600">{operatingModel.exploreIntro}</p>
+      <h2 className="mt-1 text-lg font-semibold text-[var(--text-primary)]">{displayName}</h2>
+      <p className="mt-2 text-sm leading-relaxed text-[var(--text-secondary)]">{operatingModel.exploreIntro}</p>
 
       <ol className="mt-5 space-y-3">
         {steps.map((step, index) => {
@@ -66,8 +66,8 @@ export function ExploreGuideRail({ accountId, businessName, className }: Props) 
                 className={cn(
                   'flex gap-3 rounded-lg border p-3 transition-colors',
                   isActive
-                    ? 'border-stone-900 bg-stone-50'
-                    : 'border-stone-100 hover:border-stone-200 hover:bg-stone-50/80',
+                    ? 'border-[var(--accent)] bg-[var(--bg-subtle)]'
+                    : 'border-[var(--border-subtle)] hover:border-[var(--border-default)] hover:bg-[var(--bg-subtle)]',
                 )}
               >
                 <span
@@ -76,22 +76,22 @@ export function ExploreGuideRail({ accountId, businessName, className }: Props) 
                     isDone
                       ? 'bg-emerald-100 text-emerald-700'
                       : isActive
-                        ? 'bg-stone-900 text-white'
-                        : 'bg-stone-100 text-stone-500',
+                        ? 'bg-[var(--accent)] text-[var(--text-inverse)]'
+                        : 'bg-[var(--bg-overlay)] text-[var(--text-tertiary)]',
                   )}
                 >
                   {isDone ? '✓' : index + 1}
                 </span>
                 <span className="min-w-0">
-                  <span className="flex items-center gap-1.5 text-sm font-medium text-stone-900">
-                    <Icon className="h-3.5 w-3.5 text-stone-400" aria-hidden />
+                  <span className="flex items-center gap-1.5 text-sm font-medium text-[var(--text-primary)]">
+                    <Icon className="h-3.5 w-3.5 text-[var(--text-disabled)]" aria-hidden />
                     {step.title}
                   </span>
-                  <span className="mt-0.5 block text-xs leading-relaxed text-stone-500">
+                  <span className="mt-0.5 block text-xs leading-relaxed text-[var(--text-tertiary)]">
                     {step.body}
                   </span>
                 </span>
-                <ArrowRight className="ml-auto h-4 w-4 shrink-0 self-center text-stone-300" />
+                <ArrowRight className="ml-auto h-4 w-4 shrink-0 self-center text-[var(--text-disabled)]" />
               </Link>
             </li>
           )

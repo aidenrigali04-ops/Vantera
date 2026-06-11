@@ -54,7 +54,7 @@ export function VentoraCampaignsTable({ groups }: Props) {
             </p>
             <Link
               href="/admin/outreach/campaigns"
-              className="mt-1 inline-flex items-center gap-1.5 rounded-lg bg-[var(--accent)] px-3 py-1.5 text-[12px] font-semibold text-white transition-opacity hover:opacity-90"
+              className="mt-1 inline-flex items-center gap-1.5 rounded-lg bg-[var(--accent)] px-3 py-1.5 text-[12px] font-semibold text-[var(--text-inverse)] transition-opacity hover:opacity-90"
             >
               Launch a campaign →
             </Link>

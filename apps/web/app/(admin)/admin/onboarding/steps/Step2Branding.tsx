@@ -214,14 +214,14 @@ export function Step2Branding({
             )}
           </span>
           <div>
-            <p className="text-sm font-medium text-white/90">
+            <p className="text-sm font-medium text-[var(--text-primary)]">
               {logoUploading
                 ? 'Uploading…'
                 : logoUrl
                   ? 'Drag a new file or click to replace'
                   : 'Drag your logo here, or click to browse'}
             </p>
-            <p className="mt-1 text-xs text-white/45">PNG, JPG, WebP, or SVG · up to 2MB</p>
+            <p className="mt-1 text-xs text-[var(--text-tertiary)]">PNG, JPG, WebP, or SVG · up to 2MB</p>
           </div>
         </div>
       </FieldGroup>
@@ -248,14 +248,14 @@ function ColorField({
   const valid = HEX.test(value)
   return (
     <div className="space-y-2">
-      <label className="text-sm font-semibold text-white">{label}</label>
+      <label className="text-sm font-semibold text-[var(--text-primary)]">{label}</label>
       <div className="flex items-center gap-2">
         <div
           aria-hidden
           style={valid ? { backgroundColor: value, boxShadow: `0 0 18px -6px ${value}` } : undefined}
           className={cn(
             'relative h-11 w-14 shrink-0 overflow-hidden rounded-md border transition-all',
-            valid ? 'border-white/[0.15]' : 'border-white/[0.08] bg-white/[0.02]',
+            valid ? 'border-[var(--border-strong)]' : 'border-[var(--border-default)] bg-[var(--bg-surface)]',
           )}
         >
           <input
@@ -272,7 +272,7 @@ function ColorField({
           onChange={(e) => onChange(e.target.value.trim())}
           placeholder="#1648A0"
           maxLength={7}
-          className="h-11 border-white/[0.08] bg-white/[0.02] font-mono uppercase tracking-wide text-white placeholder:text-white/30 focus-visible:border-white/[0.2] focus-visible:ring-1 focus-visible:ring-white/10"
+          className="h-11 border-[var(--border-default)] bg-[var(--bg-surface)] font-mono uppercase tracking-wide text-[var(--text-primary)] placeholder:text-[var(--text-disabled)] focus-visible:border-[var(--border-focus)] focus-visible:ring-1 focus-visible:ring-[var(--accent-muted)]"
         />
       </div>
     </div>

@@ -21,9 +21,9 @@ export function PostCleanSlatePrompt() {
   }
 
   return (
-    <div className="rounded-xl border border-stone-200 bg-white p-6 shadow-sm">
-      <h3 className="text-lg font-semibold text-stone-900">Your workspace is ready</h3>
-      <p className="mt-2 text-sm leading-relaxed text-stone-600">
+    <div className="rounded-xl border border-[var(--border-default)] bg-white p-6 shadow-sm">
+      <h3 className="text-lg font-semibold text-[var(--text-primary)]">Your workspace is ready</h3>
+      <p className="mt-2 text-sm leading-relaxed text-[var(--text-secondary)]">
         Sample data cleared. Head to your pipeline to start prospecting and building outreach campaigns.
       </p>
       <div className="mt-4 flex flex-wrap gap-2">
