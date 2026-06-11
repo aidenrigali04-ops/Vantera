@@ -510,8 +510,9 @@ export const agents = pgTable(
   },
   (t) => [
     // one agent per kind per account in v1 (the Copy wizard reads "the" Scout's ICPs)
-    uniqueIndex("agents_account_kind_idx").on(t.accountId, t.kind),
+    uniqueIndex("agents_account_kind_unique").on(t.accountId, t.kind),
     index("agents_due_idx").on(t.status, t.nextRunAt),
+    index("agents_campaign_idx").on(t.campaignId),
   ]
 );
 

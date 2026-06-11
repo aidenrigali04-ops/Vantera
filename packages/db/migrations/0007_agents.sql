@@ -121,6 +121,10 @@ create policy agent_assets_objects_read on storage.objects
 create policy agent_assets_objects_insert on storage.objects
   for insert to authenticated
   with check (bucket_id = 'agent-assets' and public.is_account_admin(((storage.foldername(name))[1])::uuid));
+create policy agent_assets_objects_update on storage.objects
+  for update to authenticated
+  using (bucket_id = 'agent-assets' and public.is_account_admin(((storage.foldername(name))[1])::uuid))
+  with check (bucket_id = 'agent-assets' and public.is_account_admin(((storage.foldername(name))[1])::uuid));
 create policy agent_assets_objects_delete on storage.objects
   for delete to authenticated
   using (bucket_id = 'agent-assets' and public.is_account_admin(((storage.foldername(name))[1])::uuid));
