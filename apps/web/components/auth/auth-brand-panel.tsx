@@ -3,15 +3,9 @@
 import { DURATION, EASE_OUT } from '@/lib/motion'
 import { cn } from '@/lib/utils'
 import { motion, useReducedMotion } from 'framer-motion'
-import { UiPreviewMock } from './ui-preview-mock'
+import { TestimonialCards } from './testimonial-cards'
 
-const TRUST_LINES = [
-  'Automated lead capture & routing',
-  'Real-time revenue intelligence',
-  'Unified client communication',
-] as const
-
-/** Right column — brand reinforcement during auth with live dashboard preview. */
+/** Right column — social proof during auth: operator testimonials. */
 export function AuthBrandPanel() {
   const reduceMotion = useReducedMotion()
 
@@ -29,36 +23,21 @@ export function AuthBrandPanel() {
       aria-label="Vantera product overview"
     >
       <div
-        className="pointer-events-none absolute inset-y-0 left-0 w-px bg-[var(--accent)]"
+        className="pointer-events-none absolute inset-y-0 left-0 w-px bg-[var(--highlight)]"
         aria-hidden
       />
 
       <div className="mx-auto w-full max-w-[440px] space-y-8">
         <div className="space-y-3">
-          <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--accent-hover)]">
-            Your workspace preview
+          <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--highlight-text)]">
+            Trusted by operators
           </p>
-          <h2 className="font-heading text-[28px] font-semibold leading-[1.2] tracking-[-0.03em] text-[var(--text-primary)]">
-            Total visibility across your entire operation.
+          <h2 className="font-heading text-[26px] font-semibold leading-[1.25] tracking-[-0.02em] text-[var(--text-primary)]">
+            Service businesses run tighter on Vantera.
           </h2>
         </div>
 
-        <ul className="space-y-3" aria-label="Product highlights">
-          {TRUST_LINES.map((line) => (
-            <li
-              key={line}
-              className="flex items-start gap-3 text-[13px] leading-snug text-[var(--text-secondary)]"
-            >
-              <span
-                className="mt-[6px] size-1.5 shrink-0 rounded-full bg-[var(--accent)]"
-                aria-hidden
-              />
-              {line}
-            </li>
-          ))}
-        </ul>
-
-        <UiPreviewMock />
+        <TestimonialCards />
       </div>
     </motion.aside>
   )

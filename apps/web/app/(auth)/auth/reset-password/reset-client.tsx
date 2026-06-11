@@ -105,7 +105,7 @@ export function ResetPasswordClient() {
         </div>
         <Link
           href={AUTH_LOGIN_ENTRY}
-          className="inline-flex h-11 items-center justify-center rounded-[var(--radius-lg)] bg-[var(--accent)] px-4 text-sm font-medium text-white shadow-[var(--shadow-sm)] transition-colors duration-150 hover:bg-[var(--accent-hover)]"
+          className="inline-flex h-11 items-center justify-center rounded-[var(--radius-lg)] bg-[var(--accent)] px-4 text-sm font-medium text-[var(--text-inverse)] shadow-[var(--shadow-sm)] transition-colors duration-150 hover:bg-[var(--accent-hover)]"
         >
           Go to sign in
         </Link>
@@ -168,7 +168,7 @@ export function ResetPasswordClient() {
 
         <Button
           type="submit"
-          className="h-11 w-full rounded-[var(--radius-lg)] border-0 bg-[var(--accent)] font-medium text-white shadow-[var(--shadow-sm)] hover:bg-[var(--accent-hover)] disabled:opacity-60"
+          className="h-11 w-full rounded-[var(--radius-lg)] border-0 bg-[var(--accent)] font-medium text-[var(--text-inverse)] shadow-[var(--shadow-sm)] hover:bg-[var(--accent-hover)] disabled:opacity-60"
           disabled={!ready || isSubmitting}
         >
           {isSubmitting ? (

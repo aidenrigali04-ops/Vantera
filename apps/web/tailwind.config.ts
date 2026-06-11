@@ -12,7 +12,7 @@ const config: Config = {
   	extend: {
   		fontFamily: {
   			sans: ['var(--font-geist-sans)', 'system-ui', 'sans-serif'],
-  			heading: ['var(--font-sora)', 'var(--font-geist-sans)', 'sans-serif']
+  			heading: ['var(--font-montserrat)', 'var(--font-geist-sans)', 'sans-serif']
   		},
   		colors: {
   			background: 'hsl(var(--background))',

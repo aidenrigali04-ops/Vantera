@@ -389,7 +389,7 @@ export function AuthCredentialsPanel({
 
           <Button
             type="submit"
-            className="h-11 w-full rounded-[var(--radius-lg)] border-0 bg-[var(--accent)] font-medium text-white shadow-[var(--shadow-sm)] hover:bg-[var(--accent-hover)] disabled:opacity-60"
+            className="h-11 w-full rounded-[var(--radius-lg)] border-0 bg-[var(--accent)] font-medium text-[var(--text-inverse)] shadow-[var(--shadow-sm)] hover:bg-[var(--accent-hover)] disabled:opacity-60"
             disabled={isBusy || emailTaken}
           >
             {isSubmitting ? (
@@ -471,7 +471,7 @@ export function AuthCredentialsPanel({
             className={
               portal
                 ? 'h-11 w-full rounded-lg border-0 font-medium text-white shadow-[var(--shadow-sm)] hover:opacity-90 disabled:opacity-60'
-                : 'h-11 w-full rounded-[var(--radius-lg)] border-0 bg-[var(--accent)] font-medium text-white shadow-[var(--shadow-sm)] hover:bg-[var(--accent-hover)] disabled:opacity-60'
+                : 'h-11 w-full rounded-[var(--radius-lg)] border-0 bg-[var(--accent)] font-medium text-[var(--text-inverse)] shadow-[var(--shadow-sm)] hover:bg-[var(--accent-hover)] disabled:opacity-60'
             }
             style={portal ? { backgroundColor: 'var(--brand-primary)' } : undefined}
             disabled={isBusy || showForgotPassword}

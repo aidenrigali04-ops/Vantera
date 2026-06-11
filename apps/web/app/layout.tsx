@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
-import { Sora } from "next/font/google";
+import { Montserrat } from "next/font/google";
 import { GeistSans } from "geist/font/sans";
 import { ThemeProvider } from "@/components/shared/ThemeProvider";
 import "./globals.css";
 
-const sora = Sora({
+const montserrat = Montserrat({
   subsets: ["latin"],
-  variable: "--font-sora",
+  variable: "--font-montserrat",
   weight: ["400", "500", "600", "700"],
 });
 
@@ -21,7 +21,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning className={`${sora.variable} ${GeistSans.variable}`}>
+    <html lang="en" suppressHydrationWarning className={`${montserrat.variable} ${GeistSans.variable}`}>
       <body className="font-sans">
         <ThemeProvider>{children}</ThemeProvider>
       </body>
