@@ -33,6 +33,10 @@ export const accounts = pgTable("accounts", {
   stripeCustomerId: text("stripe_customer_id").unique(),
   stripeSubscriptionId: text("stripe_subscription_id"),
   outreachPaused: boolean("outreach_paused").notNull().default(false),
+  // 0007: website context for the Scout agent (scan fields are service-role-written)
+  websiteUrl: text("website_url"),
+  websiteScan: jsonb("website_scan"),
+  websiteScannedAt: timestamp("website_scanned_at", { withTimezone: true }),
 });
 
 export const accountMembers = pgTable(
@@ -152,6 +156,8 @@ export const leads = pgTable(
     rulesGateReasons: jsonb("rules_gate_reasons"),
     aiScore: integer("ai_score"),
     aiRationale: text("ai_rationale"),
+    // 0007: structured prospect-brain output (pain_points, triggers, motivations, value_angle, aha_moment, summary)
+    aiInsights: jsonb("ai_insights"),
     scoredAt: timestamp("scored_at", { withTimezone: true }),
     status: text("status", {
       enum: [
@@ -473,6 +479,83 @@ export const unsubscribeTokens = pgTable(
     index("unsubscribe_tokens_lead_idx").on(t.leadId),
     index("unsubscribe_tokens_account_idx").on(t.accountId),
   ]
+);
+
+// ── 0007 SDR agents (Scout + Copy) ───────────────────────────────────────────
+
+export const agents = pgTable(
+  "agents",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: ["scout", "copy"] }).notNull(),
+    name: text("name").notNull(),
+    status: text("status", { enum: ["draft", "live", "paused"] }).notNull().default("draft"),
+    // scout: {prospects_per_run, min_score}; copy: {cta, channels: {linkedin, email}}
+    config: jsonb("config").notNull().default({}),
+    // scheduling block (scout agents only)
+    runAtTime: time("run_at_time"),
+    cadence: text("cadence", { enum: ["daily", "weekly"] }),
+    timezone: text("timezone").notNull().default("UTC"),
+    nextRunAt: timestamp("next_run_at", { withTimezone: true }),
+    lastRunAt: timestamp("last_run_at", { withTimezone: true }),
+    // copy agent's internal execution campaign (composite same-tenant FK in SQL)
+    campaignId: uuid("campaign_id").references(() => campaigns.id, { onDelete: "set null" }),
+    deployedAt: timestamp("deployed_at", { withTimezone: true }),
+    createdBy: uuid("created_by"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    // one agent per kind per account in v1 (the Copy wizard reads "the" Scout's ICPs)
+    uniqueIndex("agents_account_kind_idx").on(t.accountId, t.kind),
+    index("agents_due_idx").on(t.status, t.nextRunAt),
+  ]
+);
+
+export const agentIcps = pgTable(
+  "agent_icps",
+  {
+    agentId: uuid("agent_id")
+      .notNull()
+      .references(() => agents.id, { onDelete: "cascade" }),
+    icpId: uuid("icp_id")
+      .notNull()
+      .references(() => icps.id, { onDelete: "cascade" }),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    position: integer("position").notNull().default(0),
+  },
+  (t) => [
+    primaryKey({ columns: [t.agentId, t.icpId] }),
+    index("agent_icps_account_idx").on(t.accountId),
+    index("agent_icps_icp_idx").on(t.icpId),
+  ]
+);
+
+export const agentAssets = pgTable(
+  "agent_assets",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    agentId: uuid("agent_id")
+      .notNull()
+      .references(() => agents.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: ["file", "image", "link"] }).notNull(),
+    storagePath: text("storage_path"),
+    url: text("url"),
+    filename: text("filename"),
+    mimeType: text("mime_type"),
+    sizeBytes: bigint("size_bytes", { mode: "number" }),
+    createdBy: uuid("created_by"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("agent_assets_agent_idx").on(t.agentId), index("agent_assets_account_idx").on(t.accountId)]
 );
 
 // ── 0005 copilot ─────────────────────────────────────────────────────────────
