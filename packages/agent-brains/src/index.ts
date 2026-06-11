@@ -1,0 +1,32 @@
+export { applyRulesGate, type RulesGateResult } from "./prospect/rules-gate";
+export {
+  compactLead,
+  rankLeads,
+  RANK_BATCH_SIZE,
+  type RankCandidate,
+  type RankContext,
+} from "./prospect/rank";
+export {
+  leadInsightsSchema,
+  rankBatchSchema,
+  toStoredInsights,
+  type LeadInsights,
+  type StoredInsights,
+} from "./prospect/schema";
+export {
+  isScanStale,
+  scanWebsite,
+  websiteScanSchema,
+  SCAN_STALE_AFTER_DAYS,
+  type WebsiteScan,
+} from "./prospect/website-scan";
+export { validateHumanity, describeViolations, type Violation } from "./copy/humanizer";
+export { draftEmail, validateEmailDraft, EMAIL_MAX_WORDS, type EmailDraft } from "./copy/email";
+export {
+  draftLinkedIn,
+  validateLinkedInDraft,
+  CONNECTION_NOTE_MAX_CHARS,
+  FOLLOWUP_MAX_CHARS,
+  type LinkedInDraft,
+} from "./copy/linkedin";
+export { leadBlock, type CopyLead, type CopyContext, type DraftInput } from "./copy/shared";
