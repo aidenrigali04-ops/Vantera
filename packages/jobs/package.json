@@ -1,0 +1,18 @@
+{
+  "name": "@vantera/jobs",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "type-check": "tsc --noEmit",
+    "dev": "trigger dev",
+    "deploy": "trigger deploy"
+  },
+  "dependencies": {
+    "@trigger.dev/sdk": "^4.0.0"
+  },
+  "devDependencies": {
+    "trigger.dev": "^4.0.0",
+    "typescript": "^5.8.0"
+  }
+}
