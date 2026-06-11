@@ -1,9 +1,38 @@
-import { pgTable, primaryKey, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import {
+  bigint,
+  boolean,
+  index,
+  integer,
+  jsonb,
+  pgTable,
+  primaryKey,
+  text,
+  time,
+  timestamp,
+  uniqueIndex,
+  uuid,
+} from "drizzle-orm/pg-core";
+
+// The SQL migrations in ../migrations are the source of truth. This file mirrors them for
+// type-safe queries. SQL-only details without a first-class Drizzle representation: FKs to
+// auth.users, check constraints (campaigns.targeting max-3, suppression value = lower(value)),
+// and the composite same-tenant FKs (lead/campaign/icp refs pair with account_id) — the
+// .references() calls below are simplified relational hints.
+
+// ── 0000 foundation ──────────────────────────────────────────────────────────
 
 export const accounts = pgTable("accounts", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  // 0001: onboarding capture + billing refs + per-account kill switch
+  onboardingIndustry: text("onboarding_industry"),
+  onboardingIcp: text("onboarding_icp"),
+  revenueGoalCents: bigint("revenue_goal_cents", { mode: "number" }),
+  onboardingCompletedAt: timestamp("onboarding_completed_at", { withTimezone: true }),
+  stripeCustomerId: text("stripe_customer_id").unique(),
+  stripeSubscriptionId: text("stripe_subscription_id"),
+  outreachPaused: boolean("outreach_paused").notNull().default(false),
 });
 
 export const accountMembers = pgTable(
@@ -18,4 +47,470 @@ export const accountMembers = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [primaryKey({ columns: [t.accountId, t.userId] })]
+);
+
+// ── 0001 profiles, onboarding, invites, deletion ─────────────────────────────
+
+export const userProfiles = pgTable("user_profiles", {
+  // user-scoped (not tenant-scoped); FK to auth.users in SQL only
+  userId: uuid("user_id").primaryKey(),
+  displayName: text("display_name"),
+  avatarUrl: text("avatar_url"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const accountInvites = pgTable(
+  "account_invites",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    email: text("email").notNull(),
+    role: text("role", { enum: ["admin", "member"] }).notNull(),
+    token: uuid("token").notNull().unique().defaultRandom(),
+    status: text("status", { enum: ["pending", "accepted", "revoked", "expired"] })
+      .notNull()
+      .default("pending"),
+    invitedBy: uuid("invited_by"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("account_invites_account_idx").on(t.accountId)]
+);
+
+export const accountDeletionRequests = pgTable(
+  "account_deletion_requests",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    requestedBy: uuid("requested_by"),
+    status: text("status", { enum: ["pending", "vendor_cleanup", "completed", "canceled"] })
+      .notNull()
+      .default("pending"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+  },
+  (t) => [index("account_deletion_requests_account_idx").on(t.accountId)]
+);
+
+// ── 0002 ICPs, leads, enrichment ─────────────────────────────────────────────
+
+export const icps = pgTable(
+  "icps",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    description: text("description"),
+    criteria: jsonb("criteria").notNull().default({}),
+    source: text("source", { enum: ["onboarding", "manual"] }).notNull().default("manual"),
+    isDefault: boolean("is_default").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("icps_account_idx").on(t.accountId)]
+);
+
+export const leads = pgTable(
+  "leads",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    icpId: uuid("icp_id").references(() => icps.id, { onDelete: "set null" }),
+    source: text("source", { enum: ["explorium", "manual", "import"] })
+      .notNull()
+      .default("explorium"),
+    externalRef: text("external_ref"),
+    companyName: text("company_name"),
+    companyDomain: text("company_domain"),
+    companySize: text("company_size"),
+    industry: text("industry"),
+    location: text("location"),
+    techStack: jsonb("tech_stack"),
+    firstName: text("first_name"),
+    lastName: text("last_name"),
+    title: text("title"),
+    email: text("email"),
+    emailStatus: text("email_status", { enum: ["unverified", "valid", "invalid", "risky"] })
+      .notNull()
+      .default("unverified"),
+    phone: text("phone"),
+    phoneStatus: text("phone_status", { enum: ["unvalidated", "valid", "invalid"] })
+      .notNull()
+      .default("unvalidated"),
+    linkedinUrl: text("linkedin_url"),
+    rulesGatePassed: boolean("rules_gate_passed"),
+    rulesGateReasons: jsonb("rules_gate_reasons"),
+    aiScore: integer("ai_score"),
+    aiRationale: text("ai_rationale"),
+    scoredAt: timestamp("scored_at", { withTimezone: true }),
+    status: text("status", {
+      enum: [
+        "sourced",
+        "rejected",
+        "qualified",
+        "enriched",
+        "in_campaign",
+        "replied",
+        "converted",
+        "archived",
+      ],
+    })
+      .notNull()
+      .default("sourced"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("leads_account_status_idx").on(t.accountId, t.status),
+    index("leads_icp_idx").on(t.icpId),
+    // expression/partial indexes (lower(email), ai_score where rules_gate_passed) live in SQL only
+  ]
+);
+
+export const enrichmentResults = pgTable(
+  "enrichment_results",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    leadId: uuid("lead_id")
+      .notNull()
+      .references(() => leads.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: ["email_verification", "phone_validation", "premium"] }).notNull(),
+    provider: text("provider"),
+    status: text("status", { enum: ["pending", "success", "failed"] }).notNull().default("pending"),
+    payload: jsonb("payload"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("enrichment_results_lead_idx").on(t.leadId),
+    index("enrichment_results_account_idx").on(t.accountId),
+  ]
+);
+
+// ── 0003 campaigns, scheduler, suppression ───────────────────────────────────
+
+export const campaigns = pgTable(
+  "campaigns",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    status: text("status", { enum: ["draft", "active", "paused", "completed", "archived"] })
+      .notNull()
+      .default("draft"),
+    channels: text("channels").array().notNull(),
+    // max-3 targeting check (rule 08) enforced in SQL
+    targeting: jsonb("targeting").notNull().default([]),
+    copywritingMode: text("copywriting_mode", { enum: ["user", "agent"] }),
+    userCopy: jsonb("user_copy"),
+    sendMode: text("send_mode", { enum: ["automatic", "review", "manual"] }),
+    runAtTime: time("run_at_time").notNull().default("08:00"),
+    cadence: text("cadence", { enum: ["daily", "weekly"] }).notNull().default("daily"),
+    timezone: text("timezone").notNull().default("UTC"),
+    createdBy: uuid("created_by"),
+    launchedAt: timestamp("launched_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("campaigns_account_status_idx").on(t.accountId, t.status)]
+);
+
+export const campaignLeads = pgTable(
+  "campaign_leads",
+  {
+    campaignId: uuid("campaign_id")
+      .notNull()
+      .references(() => campaigns.id, { onDelete: "cascade" }),
+    leadId: uuid("lead_id")
+      .notNull()
+      .references(() => leads.id, { onDelete: "cascade" }),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    status: text("status", {
+      enum: ["pending", "queued", "sent", "replied", "suppressed", "skipped", "completed"],
+    })
+      .notNull()
+      .default("pending"),
+    addedAt: timestamp("added_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.campaignId, t.leadId] }),
+    index("campaign_leads_account_idx").on(t.accountId),
+    index("campaign_leads_campaign_status_idx").on(t.campaignId, t.status),
+    index("campaign_leads_lead_idx").on(t.leadId),
+  ]
+);
+
+export const scheduledSends = pgTable(
+  "scheduled_sends",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    campaignId: uuid("campaign_id")
+      .notNull()
+      .references(() => campaigns.id, { onDelete: "cascade" }),
+    leadId: uuid("lead_id")
+      .notNull()
+      .references(() => leads.id, { onDelete: "cascade" }),
+    channel: text("channel", { enum: ["email", "linkedin"] }).notNull(),
+    status: text("status", {
+      enum: [
+        "drafting",
+        "pending_review",
+        "approved",
+        "scheduled",
+        "sending",
+        "sent",
+        "failed",
+        "canceled",
+        "suppressed",
+      ],
+    })
+      .notNull()
+      .default("drafting"),
+    subject: text("subject"),
+    body: text("body"),
+    scheduledFor: timestamp("scheduled_for", { withTimezone: true }),
+    approvedBy: uuid("approved_by"),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    error: text("error"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("scheduled_sends_account_status_idx").on(t.accountId, t.status),
+    index("scheduled_sends_campaign_idx").on(t.campaignId),
+    index("scheduled_sends_lead_idx").on(t.leadId),
+  ]
+);
+
+export const suppressionEntries = pgTable(
+  "suppression_entries",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: ["email", "linkedin"] }).notNull(),
+    value: text("value").notNull(),
+    source: text("source", {
+      enum: ["unsubscribe", "bounce", "complaint", "manual", "not_interested", "gdpr"],
+    }).notNull(),
+    note: text("note"),
+    // set null, never cascade: suppression survives lead deletion
+    leadId: uuid("lead_id").references(() => leads.id, { onDelete: "set null" }),
+    createdBy: uuid("created_by"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("suppression_lookup_idx").on(t.accountId, t.kind, t.value),
+    index("suppression_entries_lead_idx").on(t.leadId),
+  ]
+);
+
+// global/system table (platform kill switch); service-role only — no account_id by design
+export const appSettings = pgTable("app_settings", {
+  key: text("key").primaryKey(),
+  value: jsonb("value").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ── 0004 channel identities, outreach audit ──────────────────────────────────
+
+export const mailboxes = pgTable(
+  "mailboxes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    emailAddress: text("email_address").notNull(),
+    domain: text("domain"),
+    providerRef: text("provider_ref"),
+    status: text("status", { enum: ["provisioning", "warming", "active", "paused", "error"] })
+      .notNull()
+      .default("provisioning"),
+    warmupStartedAt: timestamp("warmup_started_at", { withTimezone: true }),
+    health: jsonb("health"),
+    dailySendLimit: integer("daily_send_limit"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("mailboxes_account_email_idx").on(t.accountId, t.emailAddress),
+    index("mailboxes_account_status_idx").on(t.accountId, t.status),
+  ]
+);
+
+export const linkedinAccounts = pgTable(
+  "linkedin_accounts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    providerRef: text("provider_ref").notNull(),
+    profileUrl: text("profile_url"),
+    displayName: text("display_name"),
+    status: text("status", { enum: ["connecting", "active", "restricted", "disconnected"] })
+      .notNull()
+      .default("connecting"),
+    connectedBy: uuid("connected_by"),
+    connectedAt: timestamp("connected_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("linkedin_accounts_provider_idx").on(t.accountId, t.providerRef),
+    index("linkedin_accounts_account_status_idx").on(t.accountId, t.status),
+  ]
+);
+
+export const outreachSends = pgTable(
+  "outreach_sends",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    campaignId: uuid("campaign_id").references(() => campaigns.id, { onDelete: "set null" }),
+    leadId: uuid("lead_id").references(() => leads.id, { onDelete: "set null" }),
+    scheduledSendId: uuid("scheduled_send_id").references(() => scheduledSends.id, {
+      onDelete: "set null",
+    }),
+    channel: text("channel", { enum: ["email", "linkedin"] }).notNull(),
+    mailboxId: uuid("mailbox_id").references(() => mailboxes.id, { onDelete: "set null" }),
+    linkedinAccountId: uuid("linkedin_account_id").references(() => linkedinAccounts.id, {
+      onDelete: "set null",
+    }),
+    messageRef: text("message_ref"),
+    sentAt: timestamp("sent_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("outreach_sends_account_sent_idx").on(t.accountId, t.sentAt),
+    index("outreach_sends_campaign_idx").on(t.campaignId),
+    index("outreach_sends_lead_idx").on(t.leadId),
+    index("outreach_sends_scheduled_send_idx").on(t.scheduledSendId),
+    index("outreach_sends_mailbox_idx").on(t.mailboxId),
+    index("outreach_sends_linkedin_account_idx").on(t.linkedinAccountId),
+  ]
+);
+
+export const replies = pgTable(
+  "replies",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    leadId: uuid("lead_id")
+      .notNull()
+      .references(() => leads.id, { onDelete: "cascade" }),
+    campaignId: uuid("campaign_id").references(() => campaigns.id, { onDelete: "set null" }),
+    outreachSendId: uuid("outreach_send_id").references(() => outreachSends.id, {
+      onDelete: "set null",
+    }),
+    channel: text("channel", { enum: ["email", "linkedin"] }).notNull(),
+    providerMessageRef: text("provider_message_ref"),
+    body: text("body"),
+    receivedAt: timestamp("received_at", { withTimezone: true }).notNull(),
+    classification: text("classification", {
+      enum: [
+        "interested",
+        "not_interested",
+        "neutral",
+        "out_of_office",
+        "bounce",
+        "unsubscribe",
+        "other",
+      ],
+    }),
+    classificationRationale: text("classification_rationale"),
+    classifiedAt: timestamp("classified_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("replies_account_received_idx").on(t.accountId, t.receivedAt),
+    index("replies_lead_idx").on(t.leadId),
+    index("replies_campaign_idx").on(t.campaignId),
+    index("replies_outreach_send_idx").on(t.outreachSendId),
+  ]
+);
+
+export const unsubscribeTokens = pgTable(
+  "unsubscribe_tokens",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    leadId: uuid("lead_id")
+      .notNull()
+      .references(() => leads.id, { onDelete: "cascade" }),
+    email: text("email").notNull(),
+    token: uuid("token").notNull().unique().defaultRandom(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    usedAt: timestamp("used_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("unsubscribe_tokens_lead_idx").on(t.leadId),
+    index("unsubscribe_tokens_account_idx").on(t.accountId),
+  ]
+);
+
+// ── 0005 copilot ─────────────────────────────────────────────────────────────
+
+export const copilotActions = pgTable(
+  "copilot_actions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").notNull(),
+    toolName: text("tool_name").notNull(),
+    tier: text("tier", { enum: ["read", "navigate", "mutate", "critical"] }).notNull(),
+    input: jsonb("input"),
+    resultStatus: text("result_status", {
+      enum: ["success", "error", "denied", "undone"],
+    }).notNull(),
+    error: text("error"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("copilot_actions_account_created_idx").on(t.accountId, t.createdAt),
+    index("copilot_actions_user_idx").on(t.userId),
+  ]
+);
+
+export const copilotKnowledgeGaps = pgTable(
+  "copilot_knowledge_gaps",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    question: text("question").notNull(),
+    surface: text("surface"),
+    status: text("status", { enum: ["open", "resolved", "dismissed"] }).notNull().default("open"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("copilot_knowledge_gaps_account_status_idx").on(t.accountId, t.status)]
 );
