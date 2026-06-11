@@ -231,7 +231,7 @@ function SidebarContent({
                   Launch your AI SDR agent and start closing more deals.
                 </p>
                 <Link
-                  href="/admin/sdr-agents"
+                  href="/admin/outreach/agents"
                   onClick={onNavigate}
                   className="sidebar-help-btn mt-3 flex w-full items-center justify-center gap-1.5 rounded-full py-2 text-[11px] font-semibold text-white transition-opacity hover:opacity-90"
                 >

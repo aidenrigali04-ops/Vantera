@@ -64,7 +64,7 @@ export function LeadsPanel({ leads }: Props) {
             No leads yet — your agent&rsquo;s prospects will land here.
           </p>
           <Link
-            href="/admin/sdr-agents"
+            href="/admin/outreach/agents"
             className="vision-cta-btn rounded-full px-4 py-2 text-[12px] font-semibold text-[var(--text-inverse)]"
           >
             Launch agent

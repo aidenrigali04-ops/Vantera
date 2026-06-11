@@ -11,6 +11,10 @@ import type { ReactNode } from 'react'
 type Props = {
   title: string
   subtitle: string
+  /** Header eyebrow — defaults to the playground label; setup flows override it. */
+  eyebrow?: string
+  /** Config column heading — defaults to "Playground"; setup flows override it. */
+  asideTitle?: string
   /** Full viewport height when rendered outside AdminShell (initial setup wizard). */
   standalone?: boolean
   backHref?: string
@@ -31,6 +35,8 @@ type Props = {
 export function AgentWorkspaceLayout({
   title,
   subtitle,
+  eyebrow = 'Agent playground',
+  asideTitle = 'Playground',
   standalone,
   backHref = '/admin/outreach/agents',
   statusLabel,
@@ -53,9 +59,9 @@ export function AgentWorkspaceLayout({
         ? 'warning'
         : 'neutral'
 
-  const statusCardLabel = isDraft ? 'Draft configuration' : (statusLabel ?? 'Ready to configure')
+  const statusCardLabel = isDraft ? 'Ready to deploy' : (statusLabel ?? 'Ready to configure')
   const statusCardDetail = isDraft
-    ? 'Deploy to activate analytics and pipeline runs'
+    ? 'Everything below is pre-filled from your onboarding — deploy now and tune anytime.'
     : statusDetail
 
   return (
@@ -76,7 +82,7 @@ export function AgentWorkspaceLayout({
           </Link>
           <div className="min-w-0">
             <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--text-tertiary)]">
-              Agent playground
+              {eyebrow}
             </p>
             <h1 className="truncate text-[15px] font-semibold tracking-[-0.01em] text-[var(--text-primary)]">
               {title}
@@ -85,17 +91,19 @@ export function AgentWorkspaceLayout({
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 rounded-lg border-[var(--border-default)] bg-[var(--bg-surface)] px-3 text-[12px] text-[var(--text-secondary)] shadow-none hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]"
-            asChild
-          >
-            <Link href={backHref}>
-              <Share2 className="mr-1.5 h-3.5 w-3.5" aria-hidden />
-              Share
-            </Link>
-          </Button>
+          {!isDraft ? (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 rounded-lg border-[var(--border-default)] bg-[var(--bg-surface)] px-3 text-[12px] text-[var(--text-secondary)] shadow-none hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]"
+              asChild
+            >
+              <Link href={backHref}>
+                <Share2 className="mr-1.5 h-3.5 w-3.5" aria-hidden />
+                Share
+              </Link>
+            </Button>
+          ) : null}
           {onDeploy ? (
             <Button
               type="button"
@@ -119,7 +127,7 @@ export function AgentWorkspaceLayout({
         <aside className="flex min-h-0 w-full shrink-0 flex-col border-b border-[var(--border-subtle)] bg-[var(--bg-base)] lg:w-[min(440px,42%)] lg:border-b-0 lg:border-r">
           <div className="shrink-0 border-b border-[var(--border-subtle)] px-4 py-4 md:px-6">
             <h2 className="text-[22px] font-semibold tracking-[-0.02em] text-[var(--text-primary)]">
-              Playground
+              {asideTitle}
             </h2>
             <p className="mt-1 text-[13px] leading-relaxed text-[var(--text-secondary)]">{subtitle}</p>
           </div>

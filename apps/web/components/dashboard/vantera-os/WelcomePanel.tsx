@@ -65,7 +65,7 @@ export function WelcomePanel({ email, sdrAgents, updates }: Props) {
                 Quiet so far — your agent reports replies, meetings, and new leads here.
               </p>
               <Link
-                href="/admin/sdr-agents"
+                href="/admin/outreach/agents"
                 className="vision-cta-btn mt-1 inline-flex items-center rounded-[14px] px-4 py-2.5 text-[13px] font-semibold text-[var(--text-inverse)] transition-colors"
               >
                 {needsSetup ? 'Launch agent' : 'Open agent'}
@@ -77,7 +77,7 @@ export function WelcomePanel({ email, sdrAgents, updates }: Props) {
 
       {/* right — agent status card (self-contained dark surface, both themes) */}
       <Link
-        href="/admin/agents"
+        href="/admin/outreach/agents"
         className="group flex w-full flex-col rounded-2xl p-4 transition-transform duration-150 hover:-translate-y-0.5 sm:w-[170px] sm:shrink-0"
         style={{
           background: 'linear-gradient(165deg, #1c1c21 0%, #0a0a0b 100%)',

@@ -75,7 +75,7 @@ export function LeadsByStageCard({ slices, total }: Props) {
             Stage breakdown appears once leads enter your pipeline.
           </p>
           <Link
-            href="/admin/sdr-agents"
+            href="/admin/outreach/agents"
             className="text-[12px] font-medium text-[var(--text-primary)] underline-offset-2 hover:underline"
           >
             Launch your agent to start filling it

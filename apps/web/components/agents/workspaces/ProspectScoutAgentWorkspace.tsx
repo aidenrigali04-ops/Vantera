@@ -600,14 +600,20 @@ export function ProspectScoutAgentWorkspace({
   return (
     <AgentWorkspaceLayout
       title={copy.title}
-      subtitle={copy.subtitle}
+      subtitle={
+        mode === 'setup'
+          ? 'Review the pre-filled setup and deploy — your agent starts hunting today.'
+          : copy.subtitle
+      }
+      eyebrow={mode === 'setup' ? 'Agent setup' : undefined}
+      asideTitle={mode === 'setup' ? 'Set up your Scouting Agent' : undefined}
       standalone={mode === 'setup'}
       isDraft={mode === 'setup'}
       statusLabel={mode === 'configured' ? statusLabel : undefined}
       statusDetail={statusDetail}
       statusTone={statusTone}
       onDeploy={deploy}
-      deployLabel={mode === 'setup' ? 'Deploy' : 'Save changes'}
+      deployLabel={mode === 'setup' ? 'Deploy agent' : 'Save changes'}
       deployLoading={isPending}
       deployDisabled={!form.agentName.trim()}
       config={configPanel}
