@@ -22,9 +22,9 @@ export const EMAIL_STEADY_DAILY_PER_MAILBOX = 30; // warmup-safe; revisited with
 export type SafetyChannel = "linkedin" | "email";
 export type LinkedInSendKind = "invite" | "message";
 
-function channelCeiling(channel: SafetyChannel, accountAgeDays: number, kind: LinkedInSendKind = "invite"): number {
+function channelCeiling(channel: SafetyChannel, accountAgeDays: number, kind: LinkedInSendKind): number {
   if (channel === "email") return EMAIL_STEADY_DAILY_PER_MAILBOX;
-  if (channel === "linkedin" && kind === "message") return LINKEDIN_STEADY_DAILY_MESSAGES;
+  if (kind === "message") return LINKEDIN_STEADY_DAILY_MESSAGES;
   const step = LINKEDIN_RAMP.find((s) => accountAgeDays < s.maxAgeDays);
   return step ? step.daily : LINKEDIN_STEADY_DAILY_INVITES;
 }
@@ -33,12 +33,11 @@ function channelCeiling(channel: SafetyChannel, accountAgeDays: number, kind: Li
 export function dailyAllowance(
   channel: SafetyChannel,
   accountAgeDays: number,
-  requested?: number,
-  kind: LinkedInSendKind = "invite"
+  options?: { requested?: number; kind?: LinkedInSendKind }
 ): number {
-  const ceiling = channelCeiling(channel, Math.max(0, accountAgeDays), kind);
-  if (requested === undefined) return ceiling;
-  return Math.max(0, Math.min(requested, ceiling));
+  const ceiling = channelCeiling(channel, Math.max(0, accountAgeDays), options?.kind ?? "invite");
+  if (options?.requested === undefined) return ceiling;
+  return Math.max(0, Math.min(options.requested, ceiling));
 }
 
 /** Deterministic ±30% jitter so sends pace like a human, not a metronome. */

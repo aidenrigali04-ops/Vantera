@@ -15,6 +15,11 @@ describe("compliance footer (rule 11: unsubscribe + physical address)", () => {
     expect(out).toContain("https://app.example.com/api/unsubscribe/tok1");
     expect(out.indexOf("short pitch")).toBeLessThan(out.indexOf("unsubscribe/tok1"));
   });
+  it("round-trips a full address through parse → format", () => {
+    const parsed = parseSenderAddress({ ...address });
+    expect(parsed).not.toBeNull();
+    expect(formatSenderAddress(parsed!)).toBe("100 Main St, Suite 4, Austin, TX 78701, USA");
+  });
   it("parseSenderAddress rejects rows missing required fields", () => {
     expect(parseSenderAddress({ line1: "x", city: "y", postal: "1", country: "US" })).not.toBeNull();
     expect(parseSenderAddress({ city: "y" })).toBeNull();

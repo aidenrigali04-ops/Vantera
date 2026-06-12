@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   LINKEDIN_WEEKLY_INVITE_CEILING,
   LINKEDIN_STEADY_DAILY_INVITES,
+  LINKEDIN_STEADY_DAILY_MESSAGES,
   dailyAllowance,
   paceWithJitter,
 } from "./safety-limits";
@@ -18,17 +19,17 @@ describe("dailyAllowance", () => {
   });
 
   it("clamps user-requested volumes to the safety ceiling (non-configurable above)", () => {
-    expect(dailyAllowance("linkedin", 60, 500)).toBe(LINKEDIN_STEADY_DAILY_INVITES);
-    expect(dailyAllowance("email", 60, 10_000)).toBe(dailyAllowance("email", 60));
+    expect(dailyAllowance("linkedin", 60, { requested: 500 })).toBe(LINKEDIN_STEADY_DAILY_INVITES);
+    expect(dailyAllowance("email", 60, { requested: 10_000 })).toBe(dailyAllowance("email", 60));
   });
 
   it("lets users request LESS than the ceiling", () => {
-    expect(dailyAllowance("linkedin", 60, 3)).toBe(3);
+    expect(dailyAllowance("linkedin", 60, { requested: 3 })).toBe(3);
   });
 
   it("never returns a negative allowance", () => {
     expect(dailyAllowance("linkedin", -5)).toBeGreaterThanOrEqual(0);
-    expect(dailyAllowance("email", 60, -10)).toBe(0);
+    expect(dailyAllowance("email", 60, { requested: -10 })).toBe(0);
   });
 });
 
@@ -47,13 +48,15 @@ describe("paceWithJitter", () => {
 });
 
 describe("linkedin message cap", () => {
-  it("caps messages at 25/day regardless of account age", () => {
-    expect(dailyAllowance("linkedin", 365, undefined, "message")).toBe(25);
-    expect(dailyAllowance("linkedin", 3, undefined, "message")).toBe(25);
+  it("caps messages at the steady daily cap regardless of account age", () => {
+    expect(dailyAllowance("linkedin", 365, { kind: "message" })).toBe(LINKEDIN_STEADY_DAILY_MESSAGES);
+    expect(dailyAllowance("linkedin", 3, { kind: "message" })).toBe(LINKEDIN_STEADY_DAILY_MESSAGES);
   });
   it("requested lowers but never raises the message cap", () => {
-    expect(dailyAllowance("linkedin", 365, 10, "message")).toBe(10);
-    expect(dailyAllowance("linkedin", 365, 500, "message")).toBe(25);
+    expect(dailyAllowance("linkedin", 365, { requested: 10, kind: "message" })).toBe(10);
+    expect(dailyAllowance("linkedin", 365, { requested: 500, kind: "message" })).toBe(
+      LINKEDIN_STEADY_DAILY_MESSAGES
+    );
   });
   it("defaults to invite behavior when kind is omitted", () => {
     expect(dailyAllowance("linkedin", 3)).toBe(5); // ramp step unchanged

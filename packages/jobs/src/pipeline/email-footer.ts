@@ -29,12 +29,13 @@ export function parseSenderAddress(value: unknown): SenderAddress | null {
 }
 
 export function formatSenderAddress(a: SenderAddress): string {
-  // city and "region postal" — region + postal join with space when both present,
-  // city and postal join with space when region is absent
+  // postal-style segment: "Austin, TX 78701" (or "Austin 78701" without a region)
   const cityLine = [[a.city, a.region].filter(Boolean).join(", "), a.postal].filter(Boolean).join(" ");
   return [a.line1, a.line2, cityLine, a.country].filter(Boolean).join(", ");
 }
 
+const UNSUBSCRIBE_LABEL = "Don't want these emails? Unsubscribe:";
+
 export function appendComplianceFooter(body: string, unsubscribeUrl: string, address: SenderAddress): string {
-  return `${body}\n\n--\n${formatSenderAddress(address)}\nDon't want these emails? Unsubscribe: ${unsubscribeUrl}`;
+  return `${body}\n\n--\n${formatSenderAddress(address)}\n${UNSUBSCRIBE_LABEL} ${unsubscribeUrl}`;
 }
