@@ -3,104 +3,100 @@
 import Link from "next/link";
 import { useActionState } from "react";
 import { signup, type AuthFormState } from "../actions";
+import { GlassEffect } from "@/components/ui/liquid-glass";
+import { AnimatedPanelBorder } from "@/components/ui/animated-border";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { FormError } from "@/components/form-error";
+
+const inputClass =
+  "border-white/60 bg-white/40 backdrop-blur-sm placeholder:text-zinc-500 focus-visible:border-white";
 
 export function SignupForm() {
   const [state, action, pending] = useActionState<AuthFormState, FormData>(signup, {});
 
   if (state.sent) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-[#121212] relative overflow-hidden w-full rounded-xl">
-        <div className="relative z-10 w-full max-w-sm rounded-3xl bg-gradient-to-r from-[#ffffff10] to-[#121212] backdrop-blur-sm  shadow-2xl p-8 flex flex-col items-center">
-          <div className="flex items-center justify-center w-12 h-12 rounded-full bg-white/20 mb-6 shadow-lg">
-            <span className="text-xl font-semibold text-white">V</span>
-          </div>
-          <h2 className="text-2xl font-semibold text-white mb-6 text-center">
-            Check your email
-          </h2>
-          <p className="text-sm text-gray-300 text-center">
-            We sent a confirmation link to your inbox. Click it to continue setting up
-            your workspace.
-          </p>
-          <div className="w-full text-center mt-6">
-            <span className="text-xs text-gray-400">
+      <div className="relative w-full rounded-3xl">
+        <GlassEffect className="w-full rounded-3xl">
+          <div className="flex flex-col gap-4 p-8">
+            <h1 className="text-xl font-semibold tracking-tight">Check your email</h1>
+            <p className="text-sm text-zinc-700">
+              We sent a confirmation link to your inbox. Click it to continue setting up
+              your workspace.
+            </p>
+            <p className="text-sm text-zinc-700">
               Already confirmed?{" "}
-              <Link href="/login" className="underline text-white/80 hover:text-white">
+              <Link className="text-zinc-950 hover:underline" href="/login">
                 Sign in
               </Link>
-            </span>
+            </p>
           </div>
-        </div>
+        </GlassEffect>
+        <AnimatedPanelBorder />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-[#121212] relative overflow-hidden w-full rounded-xl">
-      {/* Centered glass card */}
-      <div className="relative z-10 w-full max-w-sm rounded-3xl bg-gradient-to-r from-[#ffffff10] to-[#121212] backdrop-blur-sm  shadow-2xl p-8 flex flex-col items-center">
-        {/* Logo */}
-        <div className="flex items-center justify-center w-12 h-12 rounded-full bg-white/20 mb-6 shadow-lg">
-          <span className="text-xl font-semibold text-white">V</span>
-        </div>
-        {/* Title */}
-        <h2 className="text-2xl font-semibold text-white mb-6 text-center">
-          Create your account
-        </h2>
-        {/* Form */}
-        <form action={action} className="flex flex-col w-full gap-4">
-          <div className="w-full flex flex-col gap-3">
-            <input
-              placeholder="Name"
-              type="text"
-              name="companyName"
-              autoComplete="organization"
-              required
-              className="w-full px-5 py-3 rounded-xl  bg-white/10 text-white placeholder-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400"
-            />
-            <input
-              placeholder="Email"
-              type="email"
-              name="email"
-              autoComplete="email"
-              required
-              className="w-full px-5 py-3 rounded-xl  bg-white/10 text-white placeholder-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400"
-            />
-            <input
-              placeholder="Password (at least 8 characters)"
-              type="password"
-              name="password"
-              autoComplete="new-password"
-              minLength={8}
-              required
-              className="w-full px-5 py-3 rounded-xl  bg-white/10 text-white placeholder-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400"
-            />
-            {state.error && (
-              <div className="text-sm text-red-400 text-left">{state.error}</div>
-            )}
-          </div>
-          <hr className="opacity-10" />
-          <div>
+    <div className="relative w-full rounded-3xl">
+      <GlassEffect className="w-full rounded-3xl">
+        <div className="flex flex-col gap-6 p-8">
+          <h1 className="text-xl font-semibold tracking-tight">Create your account</h1>
+          <form action={action} className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="companyName">Name</Label>
+              <Input
+                id="companyName"
+                name="companyName"
+                autoComplete="organization"
+                placeholder="Acme Inc"
+                className={inputClass}
+                required
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                className={inputClass}
+                required
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                autoComplete="new-password"
+                minLength={8}
+                className={inputClass}
+                required
+              />
+              <p className="text-xs text-zinc-600">At least 8 characters.</p>
+            </div>
+            <FormError message={state.error} />
             <button
               type="submit"
               disabled={pending}
-              className="w-full bg-white/10 text-white font-medium px-5 py-3 rounded-full shadow hover:bg-white/20 transition mb-3  text-sm disabled:opacity-60"
+              className="rounded-[18px] bg-[#121317] px-6 py-2.5 font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-60"
             >
               {pending ? "Creating account…" : "Create account"}
             </button>
-            <div className="w-full text-center mt-2">
-              <span className="text-xs text-gray-400">
-                Already have an account?{" "}
-                <Link
-                  href="/login"
-                  className="underline text-white/80 hover:text-white"
-                >
-                  Sign in
-                </Link>
-              </span>
-            </div>
-          </div>
-        </form>
-      </div>
+            <p className="text-center text-sm text-zinc-700">
+              Already have an account?{" "}
+              <Link className="text-zinc-950 hover:underline" href="/login">
+                Sign in
+              </Link>
+            </p>
+          </form>
+        </div>
+      </GlassEffect>
+      <AnimatedPanelBorder />
     </div>
   );
 }
