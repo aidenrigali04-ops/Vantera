@@ -83,9 +83,11 @@ export function DottedSurface({ className, ...props }: DottedSurfaceProps) {
 				if (theme === 'dark') {
 					colors.push(200, 200, 200);
 				} else {
-					const [r, g, b] = lerpPalette(
-						(ix / (AMOUNTX - 1) + iy / (AMOUNTY - 1)) / 2,
-					);
+					// Compress the gradient into the camera's visible band so all
+					// three palette stops actually show on screen
+					const tx = ix / (AMOUNTX - 1);
+					const t = Math.min(1, Math.max(0, (tx - 0.25) * 2));
+					const [r, g, b] = lerpPalette(t);
 					colors.push(r, g, b);
 				}
 			}
