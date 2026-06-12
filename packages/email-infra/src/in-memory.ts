@@ -1,4 +1,5 @@
 import type {
+  EmailEvent,
   EmailInfra,
   InboundReply,
   Mailbox,
@@ -13,6 +14,8 @@ export class InMemoryEmailInfra implements EmailInfra {
   readonly sentEmails: OutboundEmail[] = [];
   private readonly mailboxes = new Map<string, Mailbox>();
   private counter = 0;
+
+  constructor(private readonly webhookSecret = "in-memory-secret") {}
 
   async provision(req: ProvisionRequest): Promise<Mailbox[]> {
     const created: Mailbox[] = [];
@@ -55,5 +58,32 @@ export class InMemoryEmailInfra implements EmailInfra {
       return null;
     }
     return { mailboxId: p.mailbox_id, from: p.from, body: p.body, receivedAt: p.received_at };
+  }
+
+  verifyWebhook(headers: Record<string, string>, _rawBody: string): boolean {
+    return headers["x-webhook-secret"] === this.webhookSecret;
+  }
+
+  parseEventWebhook(payload: unknown): EmailEvent | null {
+    if (typeof payload !== "object" || payload === null) return null;
+    const p = payload as Record<string, unknown>;
+    if (typeof p.event_id !== "string" || typeof p.mailbox_ref !== "string") return null;
+    const base = { providerEventId: p.event_id, mailboxRef: p.mailbox_ref };
+    switch (p.event_type) {
+      case "reply":
+        if (typeof p.from !== "string" || typeof p.body !== "string" || typeof p.received_at !== "string") return null;
+        return { type: "reply", ...base, from: p.from, body: p.body, receivedAt: p.received_at,
+          messageRef: typeof p.message_ref === "string" ? p.message_ref : null };
+      case "bounce":
+      case "complaint":
+      case "unsubscribe":
+        if (typeof p.recipient !== "string") return null;
+        return { type: p.event_type, ...base, recipient: p.recipient };
+      case "warmup_update":
+        if ((p.phase !== "warming" && p.phase !== "ready") || typeof p.daily_cap !== "number") return null;
+        return { type: "warmup_update", ...base, phase: p.phase, dailyCap: p.daily_cap };
+      default:
+        return null;
+    }
   }
 }
