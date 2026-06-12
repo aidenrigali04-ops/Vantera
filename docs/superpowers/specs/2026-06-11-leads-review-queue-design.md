@@ -35,8 +35,8 @@ Linked from a card on `/settings`. Rule 11 surface.
 
 - Table: kind, value, source badge, note, created date.
 - Manual add form: kind (email / LinkedIn URL), value, optional note. Values normalized (`lower(value)`; LinkedIn URLs trimmed of trailing slashes) to match the pipeline check and the DB check constraint. `created_by` from session.
-- **Adding an entry immediately flips matching `pending_review`/`approved` drafts to `suppressed`** — shipped with a test proving a suppressed value never stays queued (rule 11 definition of done).
-- Delete allowed **only** for `source = 'manual'` entries; unsubscribe/bounce/complaint/not_interested/gdpr entries are immutable from the UI (entries never expire, rule 11).
+- **Adding an entry immediately flips matching `pending_review`/`approved` drafts (same channel) to `suppressed`** — shipped with a test proving a suppressed value never stays queued (rule 11 definition of done).
+- **Add and view only — no delete or edit.** The 0003 migration has no update/delete RLS policy on `suppression_entries` by design (entries never expire, rule 11); the UI honors that rather than adding policies.
 
 ## 5. Retention purge job
 
