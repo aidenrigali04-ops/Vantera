@@ -1,4 +1,6 @@
+import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/server";
 import { getGateData } from "@/lib/auth/context";
@@ -65,6 +67,20 @@ export default async function SettingsPage() {
             ))}
           </ul>
           <p className="mt-3 text-sm text-muted-foreground">Team invites are coming soon.</p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Suppression list</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            Contacts your agents must never message — unsubscribes, bounces, and manual adds.
+          </p>
+          <Button asChild variant="outline" size="sm" className="mt-3">
+            <Link href="/settings/suppression">Manage suppression</Link>
+          </Button>
         </CardContent>
       </Card>
 
