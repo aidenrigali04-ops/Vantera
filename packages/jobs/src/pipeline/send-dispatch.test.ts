@@ -247,6 +247,35 @@ describe("runSendDispatch — linkedin channel", () => {
     expect(store.canceled[0]?.error).toMatch(/expired/);
   });
 
+  it("mixed account: email rows scheduled (capacity available), linkedin rows skipped (no active identity), counters exact", async () => {
+    const store = new FakeDispatchStore();
+    store.linkedInAgeDays = null; // no connected LinkedIn identity
+    store.emailCapacity = 10;
+    store.sends = [
+      makeSend({ id: "email1", channel: "email" }),
+      makeSend({ id: "email2", channel: "email" }),
+      makeSend({ id: "li1", channel: "linkedin", linkedinStage: "invite" }),
+      makeSend({ id: "li2", channel: "linkedin", linkedinStage: "invite" }),
+    ];
+    const enqueued: { sendId: string; runAt: Date }[] = [];
+    const deps = makeDeps(store, enqueued);
+
+    const result = await runSendDispatch(deps);
+
+    // Email rows should be scheduled (capacity available, sender address present)
+    expect(result.scheduled).toBe(2);
+    // LinkedIn rows skipped because no active identity
+    expect(result.skipped).toBe(2);
+    expect(result.canceled).toBe(0);
+    expect(result.status).toBe("completed");
+    // Only email rows enqueued
+    const enqueuedIds = enqueued.map((e) => e.sendId);
+    expect(enqueuedIds).toContain("email1");
+    expect(enqueuedIds).toContain("email2");
+    expect(enqueuedIds).not.toContain("li1");
+    expect(enqueuedIds).not.toContain("li2");
+  });
+
   it("invite rows for already-invited leads skipped", async () => {
     const store = new FakeDispatchStore();
     store.linkedInAgeDays = 30;

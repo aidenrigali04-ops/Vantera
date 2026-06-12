@@ -38,6 +38,20 @@ export async function runOutreachSend(
 
   if (!(await deps.store.claimSending(ctx.id))) return "skipped";
 
+  // ── Provider call ────────────────────────────────────────────────────────────
+  // Only the provider call is wrapped in try/catch so that markFailed is ONLY
+  // possible when the message was never delivered. If the provider succeeds but
+  // bookkeeping later throws, the error propagates (the row stays "sending").
+  //
+  // Invariant: the dispatcher never re-dispatches "sending" rows, and
+  // getSendContext's `status !== "scheduled"` guard makes any task retry a no-op,
+  // so there is zero double-send risk. A stuck "sending" row is the ops signal
+  // that bookkeeping needs a manual fix.
+  let providerResult:
+    | { channel: "email"; mailboxId: string; messageId: string }
+    | { channel: "linkedin"; linkedinAccountId: string; messageRef: string | null; inviteSent: boolean }
+    | { parked: true };
+
   try {
     if (ctx.channel === "email") {
       const mailbox = await deps.store.pickActiveMailbox(ctx.accountId);
@@ -58,11 +72,7 @@ export async function runOutreachSend(
         leadId: ctx.leadId,
         unsubscribeUrl,
       });
-      await deps.store.markSent(ctx.id);
-      await deps.store.recordOutreachSend({
-        accountId: ctx.accountId, campaignId: ctx.campaignId, leadId: ctx.leadId,
-        scheduledSendId: ctx.id, channel: "email", mailboxId: mailbox.id, messageRef: result.messageId,
-      });
+      providerResult = { channel: "email", mailboxId: mailbox.id, messageId: result.messageId };
     } else {
       const identity = await deps.store.getActiveLinkedInIdentity(ctx.accountId);
       if (!identity || identity.status !== "active") {
@@ -70,6 +80,7 @@ export async function runOutreachSend(
         return "parked";
       }
       let messageRef: string | null = null;
+      let inviteSent = false;
       if (ctx.linkedinStage === "message") {
         const r = await deps.linkedinInfra.sendMessage({
           connectedAccountId: identity.providerRef,
@@ -83,19 +94,40 @@ export async function runOutreachSend(
           profileUrl: ctx.lead.linkedinUrl as string,
           note: (ctx.body ?? "").slice(0, LINKEDIN_NOTE_MAX),
         });
-        await deps.store.setLeadInvited(ctx.leadId, now);
         messageRef = r.id;
+        inviteSent = true;
       }
-      await deps.store.markSent(ctx.id);
-      await deps.store.recordOutreachSend({
-        accountId: ctx.accountId, campaignId: ctx.campaignId, leadId: ctx.leadId,
-        scheduledSendId: ctx.id, channel: "linkedin", linkedinAccountId: identity.id, messageRef,
-      });
+      providerResult = { channel: "linkedin", linkedinAccountId: identity.id, messageRef, inviteSent };
     }
-    await deps.store.setCampaignLeadStatus(ctx.campaignId, ctx.leadId, "sent");
-    return "sent";
   } catch (err) {
     await deps.store.markFailed(ctx.id, err instanceof Error ? err.message : String(err));
     return "failed";
   }
+
+  if ("parked" in providerResult) return "parked";
+
+  // ── Post-send bookkeeping (OUTSIDE the try/catch) ────────────────────────────
+  // Rule 11: audit row first — recordOutreachSend before markSent so the audit
+  // trail is never absent for a row the DB considers "sent".
+  // Any throw here propagates; see invariant comment above.
+  if (providerResult.channel === "email") {
+    await deps.store.recordOutreachSend({
+      accountId: ctx.accountId, campaignId: ctx.campaignId, leadId: ctx.leadId,
+      scheduledSendId: ctx.id, channel: "email",
+      mailboxId: providerResult.mailboxId, messageRef: providerResult.messageId,
+    });
+    await deps.store.markSent(ctx.id);
+  } else {
+    if (providerResult.inviteSent) {
+      await deps.store.setLeadInvited(ctx.leadId, now);
+    }
+    await deps.store.recordOutreachSend({
+      accountId: ctx.accountId, campaignId: ctx.campaignId, leadId: ctx.leadId,
+      scheduledSendId: ctx.id, channel: "linkedin",
+      linkedinAccountId: providerResult.linkedinAccountId, messageRef: providerResult.messageRef,
+    });
+    await deps.store.markSent(ctx.id);
+  }
+  await deps.store.setCampaignLeadStatus(ctx.campaignId, ctx.leadId, "sent");
+  return "sent";
 }

@@ -329,3 +329,62 @@ describe("runOutreachSend — failure and skip paths", () => {
     expect(store.reverted).toHaveLength(0);
   });
 });
+
+describe("runOutreachSend — state integrity: bookkeeping isolation", () => {
+  it("bookkeeping failure after a successful send NEVER marks the row failed — row stays 'sending'", async () => {
+    // If bookkeeping throws AFTER the provider delivers the message, markFailed must NOT be called.
+    // The row stays in "sending" (the invariant: dispatcher never re-dispatches "sending" rows;
+    // a task retry is a no-op because getSendContext's status !== "scheduled" guard fires first).
+    // A stuck "sending" row is the visible ops signal that bookkeeping needs a manual fix.
+    class BookkeepingFailStore extends FakeOutreachStore {
+      override async recordOutreachSend(_rec: Parameters<FakeOutreachStore["recordOutreachSend"]>[0]) {
+        throw new Error("DB write failed after provider success");
+      }
+    }
+    const store = new BookkeepingFailStore();
+    store.ctx = makeCtx();
+    store.mailbox = { id: "mbx1", providerRef: "mbx_1", status: "active" };
+    const deps = makeDeps(store);
+
+    // The run should reject (bookkeeping error propagates)
+    await expect(runOutreachSend({ sendId: "send1" }, deps)).rejects.toThrow(
+      "DB write failed after provider success"
+    );
+
+    // Provider was called exactly once — the message IS in the inbox
+    expect(deps.emailInfra.sentEmails).toHaveLength(1);
+    // markFailed MUST NOT have been called — the send is not a failure, it's a bookkeeping gap
+    expect(store.failed).toHaveLength(0);
+    // Status was never flipped to "sent" (bookkeeping threw before markSent)
+    expect(store.sent).toHaveLength(0);
+  });
+
+  it("audit row (recordOutreachSend) is written BEFORE markSent — rule 11 audit-first ordering", async () => {
+    // recordOutreachSend must be called before markSent so the audit trail
+    // is never absent for a row the DB considers "sent".
+    class OrderTrackingStore extends FakeOutreachStore {
+      callOrder: string[] = [];
+
+      override async recordOutreachSend(rec: Parameters<FakeOutreachStore["recordOutreachSend"]>[0]) {
+        this.callOrder.push("recordOutreachSend");
+        return super.recordOutreachSend(rec);
+      }
+      override async markSent(sendId: string) {
+        this.callOrder.push("markSent");
+        return super.markSent(sendId);
+      }
+    }
+    const store = new OrderTrackingStore();
+    store.ctx = makeCtx();
+    store.mailbox = { id: "mbx1", providerRef: "mbx_1", status: "active" };
+    const deps = makeDeps(store);
+
+    await runOutreachSend({ sendId: "send1" }, deps);
+
+    const auditIdx = store.callOrder.indexOf("recordOutreachSend");
+    const sentIdx = store.callOrder.indexOf("markSent");
+    expect(auditIdx).toBeGreaterThanOrEqual(0);
+    expect(sentIdx).toBeGreaterThanOrEqual(0);
+    expect(auditIdx).toBeLessThan(sentIdx);
+  });
+});
