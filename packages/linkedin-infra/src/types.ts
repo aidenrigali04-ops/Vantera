@@ -27,6 +27,11 @@ export interface InboundLinkedInReply {
   receivedAt: string;
 }
 
+export type LinkedInEvent =
+  | { type: "reply"; providerEventId: string; connectedAccountRef: string; fromProfileUrl: string; body: string; receivedAt: string }
+  | { type: "relationship_accepted"; providerEventId: string; connectedAccountRef: string; profileUrl: string }
+  | { type: "account_status"; providerEventId: string; connectedAccountRef: string; status: "active" | "disconnected"; profileUrl: string | null; displayName: string | null; vanteraAccountId: string | null };
+
 /**
  * Provider-agnostic LinkedIn outreach interface (rule 04). Unipile is an
  * implementation detail behind it. Safety limits (ramp, weekly invite
@@ -37,4 +42,6 @@ export interface LinkedInInfra {
   sendInvite(req: InviteRequest): Promise<SendOutcome>;
   sendMessage(req: MessageRequest): Promise<SendOutcome>;
   parseReplyWebhook(payload: unknown): InboundLinkedInReply | null;
+  verifyWebhook(headers: Record<string, string>, rawBody: string): boolean;
+  parseEventWebhook(payload: unknown): LinkedInEvent | null;
 }

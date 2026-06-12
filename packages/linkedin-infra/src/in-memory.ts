@@ -2,6 +2,7 @@ import type {
   HostedAuthLink,
   InboundLinkedInReply,
   InviteRequest,
+  LinkedInEvent,
   LinkedInInfra,
   MessageRequest,
   SendOutcome,
@@ -12,6 +13,8 @@ export class InMemoryLinkedInInfra implements LinkedInInfra {
   readonly sentInvites: InviteRequest[] = [];
   readonly sentMessages: MessageRequest[] = [];
   private counter = 0;
+
+  constructor(private readonly webhookSecret = "in-memory-secret") {}
 
   async createHostedAuthLink(accountId: string): Promise<HostedAuthLink> {
     return {
@@ -47,5 +50,34 @@ export class InMemoryLinkedInInfra implements LinkedInInfra {
       body: p.body,
       receivedAt: p.received_at,
     };
+  }
+
+  verifyWebhook(headers: Record<string, string>, _rawBody: string): boolean {
+    return headers["x-webhook-secret"] === this.webhookSecret;
+  }
+
+  parseEventWebhook(payload: unknown): LinkedInEvent | null {
+    if (typeof payload !== "object" || payload === null) return null;
+    const p = payload as Record<string, unknown>;
+    if (typeof p.event_id !== "string" || typeof p.connected_account !== "string") return null;
+    const base = { providerEventId: p.event_id, connectedAccountRef: p.connected_account };
+    switch (p.event_type) {
+      case "reply":
+        if (typeof p.from_profile_url !== "string" || typeof p.body !== "string" || typeof p.received_at !== "string") return null;
+        return { type: "reply", ...base, fromProfileUrl: p.from_profile_url, body: p.body, receivedAt: p.received_at };
+      case "relationship_accepted":
+        if (typeof p.profile_url !== "string") return null;
+        return { type: "relationship_accepted", ...base, profileUrl: p.profile_url };
+      case "account_status":
+        if ((p.status !== "active" && p.status !== "disconnected")) return null;
+        return {
+          type: "account_status", ...base, status: p.status,
+          profileUrl: typeof p.profile_url === "string" ? p.profile_url : null,
+          displayName: typeof p.display_name === "string" ? p.display_name : null,
+          vanteraAccountId: typeof p.metadata_account_id === "string" ? p.metadata_account_id : null,
+        };
+      default:
+        return null;
+    }
   }
 }
