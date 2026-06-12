@@ -9,6 +9,16 @@ const fetchMock = (responses: Record<string, unknown>) =>
       if (!key) throw new Error(`unmocked url: ${url}`);
       return responses[key];
     },
+    text: async () => "",
+  })) as unknown as typeof fetch;
+
+/** Returns a fetch mock whose response is !ok with given status and body text. */
+const fetchError = (status: number, body: string) =>
+  vi.fn(async () => ({
+    ok: false,
+    status,
+    json: async () => { throw new Error("not json"); },
+    text: async () => body,
   })) as unknown as typeof fetch;
 
 const infra = (responses: Record<string, unknown>) =>
@@ -222,6 +232,69 @@ describe("SmartleadEmailInfra", () => {
       expect(adapter.parseEventWebhook({ event_type: "UNKNOWN_EVENT" })).toBeNull();
       expect(adapter.parseEventWebhook(null)).toBeNull();
       expect(adapter.parseEventWebhook("string")).toBeNull();
+    });
+  });
+
+  describe("error handling — Fix 2", () => {
+    it("throws with status and body detail on non-ok response", async () => {
+      const adapter = new SmartleadEmailInfra({
+        apiKey: "sk_test",
+        webhookSecret: "whsec",
+        fetchFn: fetchError(422, "validation failed: to is required"),
+      });
+      await expect(
+        adapter.send({ mailboxId: "mbx_1", to: "x@x.com", subject: "s", body: "b", campaignId: "c", leadId: "l" })
+      ).rejects.toThrow(/422/);
+      await expect(
+        adapter.send({ mailboxId: "mbx_1", to: "x@x.com", subject: "s", body: "b", campaignId: "c", leadId: "l" })
+      ).rejects.toThrow(/validation failed/);
+    });
+  });
+
+  describe("response shape guards — Fix 3", () => {
+    it("send rejects when response is missing message_id", async () => {
+      const adapter = new SmartleadEmailInfra({
+        apiKey: "sk_test",
+        webhookSecret: "whsec",
+        fetchFn: fetchMock({ "/email-accounts/mbx_1/send": {} }),
+      });
+      await expect(
+        adapter.send({ mailboxId: "mbx_1", to: "x@x.com", subject: "s", body: "b", campaignId: "c", leadId: "l" })
+      ).rejects.toThrow(/missing message_id/);
+    });
+
+    it("provision rejects when response is missing accounts array", async () => {
+      const adapter = new SmartleadEmailInfra({
+        apiKey: "sk_test",
+        webhookSecret: "whsec",
+        fetchFn: fetchMock({ "/smart-senders/order": {} }),
+      });
+      await expect(
+        adapter.provision({ accountId: "a", domainCount: 1, mailboxesPerDomain: 1 })
+      ).rejects.toThrow(/missing accounts/);
+    });
+
+    it("provision rejects when an account entry is missing id", async () => {
+      const adapter = new SmartleadEmailInfra({
+        apiKey: "sk_test",
+        webhookSecret: "whsec",
+        fetchFn: fetchMock({
+          "/smart-senders/order": { accounts: [{ email: "sdr@d.com", domain: "d.com" }] },
+        }),
+      });
+      await expect(
+        adapter.provision({ accountId: "a", domainCount: 1, mailboxesPerDomain: 1 })
+      ).rejects.toThrow(/missing id/);
+    });
+  });
+
+  describe("warmupStatus dailyCap guard — Fix 4", () => {
+    it("returns dailyCap 0 when max_email_per_day is null", async () => {
+      const adapter = infra({
+        "/email-accounts/mbx_null/warmup-stats": { warmup_status: "ONGOING", max_email_per_day: null },
+      });
+      const status = await adapter.warmupStatus("mbx_null");
+      expect(status).toEqual({ mailboxId: "mbx_null", phase: "warming", dailyCap: 0 });
     });
   });
 });

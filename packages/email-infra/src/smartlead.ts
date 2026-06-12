@@ -6,6 +6,11 @@ const PATH_PROVISION = "/smart-senders/order";
 const PATH_SEND = (mailboxId: string) => `/email-accounts/${mailboxId}/send`;
 const PATH_WARMUP = (mailboxId: string) => `/email-accounts/${mailboxId}/warmup-stats`;
 
+function requireString(value: unknown, label: string): string {
+  if (typeof value !== "string" || value === "") throw new Error(`provider response missing ${label}`);
+  return value;
+}
+
 export interface SmartleadConfig {
   apiKey: string;
   webhookSecret: string;
@@ -32,18 +37,19 @@ export class SmartleadEmailInfra implements EmailInfra {
     const separator = path.includes("?") ? "&" : "?";
     const url = `${this.baseUrl}${path}${separator}api_key=${this.apiKey}`;
     const res = await this.fetchFn(url, {
-      headers: { "Content-Type": "application/json" },
       ...init,
+      headers: { "Content-Type": "application/json", ...(init?.headers as Record<string, string> | undefined) },
     });
     if (!res.ok) {
-      throw new Error(`email provider error ${res.status} on ${path}`);
+      const detail = await res.text().then((t) => t.slice(0, 300)).catch(() => "");
+      throw new Error(`email provider error ${res.status} on ${path}${detail ? `: ${detail}` : ""}`);
     }
     return res.json() as Promise<T>;
   }
 
   // ── EmailInfra implementation ────────────────────────────────────────────
   async provision(req: ProvisionRequest): Promise<Mailbox[]> {
-    const data = await this.call<{ accounts: Array<{ id: number | string; email: string; domain: string }> }>(
+    const data = await this.call<{ accounts?: unknown }>(
       PATH_PROVISION,
       {
         method: "POST",
@@ -54,11 +60,15 @@ export class SmartleadEmailInfra implements EmailInfra {
         }),
       }
     );
-    return data.accounts.map((a) => ({
-      id: String(a.id),
-      address: a.email,
-      domain: a.domain,
-    }));
+    if (!Array.isArray(data.accounts)) throw new Error("provider response missing accounts");
+    return (data.accounts as Array<Record<string, unknown>>).map((a) => {
+      if (a.id == null) throw new Error("provider response missing id");
+      return {
+        id: String(a.id),
+        address: requireString(a.email, "email"),
+        domain: requireString(a.domain, "domain"),
+      };
+    });
   }
 
   async send(email: OutboundEmail): Promise<SendResult> {
@@ -73,21 +83,22 @@ export class SmartleadEmailInfra implements EmailInfra {
         "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
       };
     }
-    const data = await this.call<{ message_id: string; sent_at: string }>(
+    const data = await this.call<{ message_id?: unknown; sent_at?: unknown }>(
       PATH_SEND(email.mailboxId),
       { method: "POST", body: JSON.stringify(body) }
     );
-    return { messageId: data.message_id, sentAt: data.sent_at };
+    return { messageId: requireString(data.message_id, "message_id"), sentAt: requireString(data.sent_at, "sent_at") };
   }
 
   async warmupStatus(mailboxId: string): Promise<WarmupStatus> {
-    const data = await this.call<{ warmup_status: string; max_email_per_day: number }>(
+    const data = await this.call<{ warmup_status: string; max_email_per_day: unknown }>(
       PATH_WARMUP(mailboxId)
     );
+    const dailyCap = typeof data.max_email_per_day === "number" ? data.max_email_per_day : 0;
     return {
       mailboxId,
       phase: data.warmup_status === "COMPLETED" ? "ready" : "warming",
-      dailyCap: data.max_email_per_day,
+      dailyCap,
     };
   }
 
@@ -95,6 +106,10 @@ export class SmartleadEmailInfra implements EmailInfra {
    * Timing-safe comparison: digest both sides with SHA-256 first so lengths
    * are always equal, then use timingSafeEqual on the digests.
    * Missing header → false.
+   *
+   * Note: `rawBody` is unused by design — the provider supports only a static
+   * shared-secret header (no body HMAC).  The timing-safe digest compare
+   * prevents secret recovery via timing even though no body signing occurs.
    */
   verifyWebhook(headers: Record<string, string>, _rawBody: string): boolean {
     const presented = headers["x-smartlead-secret"];

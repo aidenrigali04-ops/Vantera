@@ -9,6 +9,16 @@ const fetchMock = (responses: Record<string, unknown>) =>
       if (!key) throw new Error(`unmocked url: ${url}`);
       return responses[key];
     },
+    text: async () => "",
+  })) as unknown as typeof fetch;
+
+/** Returns a fetch mock whose response is !ok with given status and body text. */
+const fetchError = (status: number, body: string) =>
+  vi.fn(async () => ({
+    ok: false,
+    status,
+    json: async () => { throw new Error("not json"); },
+    text: async () => body,
   })) as unknown as typeof fetch;
 
 const infra = (responses: Record<string, unknown>) =>
@@ -217,6 +227,55 @@ describe("UnipileLinkedInInfra", () => {
       expect(adapter.parseEventWebhook(null)).toBeNull();
       expect(adapter.parseEventWebhook("junk")).toBeNull();
       expect(adapter.parseEventWebhook({})).toBeNull();
+    });
+  });
+
+  describe("error handling — Fix 2", () => {
+    it("throws with status and body detail on non-ok response", async () => {
+      const adapter = new UnipileLinkedInInfra({
+        apiKey: "key_test",
+        dsn: "api.unipile.example.com:13000",
+        webhookSecret: "whsec_li",
+        fetchFn: fetchError(403, "account not authorized"),
+      });
+      await expect(adapter.sendInvite({ connectedAccountId: "c", profileUrl: "https://linkedin.com/in/x" }))
+        .rejects.toThrow(/403/);
+      await expect(adapter.sendInvite({ connectedAccountId: "c", profileUrl: "https://linkedin.com/in/x" }))
+        .rejects.toThrow(/account not authorized/);
+    });
+  });
+
+  describe("response shape guards — Fix 3", () => {
+    it("createHostedAuthLink rejects when response is missing url", async () => {
+      const adapter = new UnipileLinkedInInfra({
+        apiKey: "key_test",
+        dsn: "api.unipile.example.com:13000",
+        webhookSecret: "whsec_li",
+        fetchFn: fetchMock({ "/api/v1/hosted/accounts/link": {} }),
+      });
+      await expect(adapter.createHostedAuthLink("acct-1")).rejects.toThrow(/missing url/);
+    });
+
+    it("sendInvite rejects when response is missing invitation_id", async () => {
+      const adapter = new UnipileLinkedInInfra({
+        apiKey: "key_test",
+        dsn: "api.unipile.example.com:13000",
+        webhookSecret: "whsec_li",
+        fetchFn: fetchMock({ "/api/v1/users/invite": {} }),
+      });
+      await expect(adapter.sendInvite({ connectedAccountId: "c", profileUrl: "https://linkedin.com/in/x" }))
+        .rejects.toThrow(/missing invitation_id/);
+    });
+
+    it("sendMessage rejects when response is missing message_id", async () => {
+      const adapter = new UnipileLinkedInInfra({
+        apiKey: "key_test",
+        dsn: "api.unipile.example.com:13000",
+        webhookSecret: "whsec_li",
+        fetchFn: fetchMock({ "/api/v1/chats": {} }),
+      });
+      await expect(adapter.sendMessage({ connectedAccountId: "c", profileUrl: "https://linkedin.com/in/x", body: "hi" }))
+        .rejects.toThrow(/missing message_id/);
     });
   });
 });
