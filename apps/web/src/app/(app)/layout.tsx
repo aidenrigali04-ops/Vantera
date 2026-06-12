@@ -1,28 +1,11 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import {
-  BarChart3,
-  Bot,
-  Inbox,
-  LayoutDashboard,
-  LogOut,
-  Settings,
-  Users,
-} from "lucide-react";
+import { LogOut } from "lucide-react";
 import { getGateData, toGateContext } from "@/lib/auth/context";
 import { resolveGate } from "@/lib/auth/gate";
 import { signOut } from "./actions";
 import { Button } from "@/components/ui/button";
-import { NavLink } from "@/components/nav-link";
-
-const NAV = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/agents", label: "Agents", icon: Bot },
-  { href: "/leads", label: "Leads", icon: Users },
-  { href: "/review", label: "Review", icon: Inbox },
-  { href: "/analytics", label: "Analytics", icon: BarChart3 },
-  { href: "/settings", label: "Settings", icon: Settings },
-];
+import { SidebarNav } from "@/components/nav-link";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const data = await getGateData();
@@ -35,11 +18,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <Link href="/dashboard" className="px-2 text-lg font-semibold tracking-tight">
           Vantera
         </Link>
-        <nav className="mt-6 flex flex-1 flex-col gap-1">
-          {NAV.map((item) => (
-            <NavLink key={item.href} {...item} />
-          ))}
-        </nav>
+        <SidebarNav />
         <div className="border-t border-border pt-3">
           <p className="truncate px-2 text-xs text-muted-foreground">{data.user?.email}</p>
           <form action={signOut} className="mt-2">

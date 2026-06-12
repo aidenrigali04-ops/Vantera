@@ -2,8 +2,37 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { type LucideIcon } from "lucide-react";
+import {
+  BarChart3,
+  Bot,
+  Inbox,
+  LayoutDashboard,
+  Settings,
+  Users,
+  type LucideIcon,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
+
+// Icons live in this client module: component objects can't be passed as
+// props from a server component (RSC serialization).
+const NAV: { href: string; label: string; icon: LucideIcon }[] = [
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/agents", label: "Agents", icon: Bot },
+  { href: "/leads", label: "Leads", icon: Users },
+  { href: "/review", label: "Review", icon: Inbox },
+  { href: "/analytics", label: "Analytics", icon: BarChart3 },
+  { href: "/settings", label: "Settings", icon: Settings },
+];
+
+export function SidebarNav() {
+  return (
+    <nav className="mt-6 flex flex-1 flex-col gap-1">
+      {NAV.map((item) => (
+        <NavLink key={item.href} {...item} />
+      ))}
+    </nav>
+  );
+}
 
 export function NavLink({
   href,
