@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getGateData } from "@/lib/auth/context";
+import { AuthShell } from "../auth-shell";
 import { ResetPasswordForm } from "./reset-password-form";
 
 // Runs inside the recovery session created by the email link — requires a signed-in
@@ -7,5 +8,9 @@ import { ResetPasswordForm } from "./reset-password-form";
 export default async function ResetPasswordPage() {
   const { user } = await getGateData();
   if (!user) redirect("/login?error=link-expired");
-  return <ResetPasswordForm />;
+  return (
+    <AuthShell>
+      <ResetPasswordForm />
+    </AuthShell>
+  );
 }

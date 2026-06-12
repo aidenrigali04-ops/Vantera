@@ -1,0 +1,22 @@
+import Link from "next/link";
+import { Montserrat } from "next/font/google";
+import { DottedSurface } from "@/components/ui/dotted-surface";
+
+const montserrat = Montserrat({ subsets: ["latin"], weight: ["500", "600"] });
+
+/** Centered light wrapper for the secondary auth pages (forgot/reset password). */
+export function AuthShell({ children }: { children: React.ReactNode }) {
+  return (
+    <main
+      className={`${montserrat.className} flex min-h-screen flex-col items-center justify-center px-6 py-12 font-medium`}
+    >
+      <DottedSurface />
+      <div className="mb-8 text-center">
+        <Link href="/" className="text-2xl font-semibold tracking-tight">
+          Vantera
+        </Link>
+      </div>
+      <div className="w-full max-w-sm">{children}</div>
+    </main>
+  );
+}
