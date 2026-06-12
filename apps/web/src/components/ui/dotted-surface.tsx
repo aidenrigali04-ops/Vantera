@@ -46,6 +46,8 @@ export function DottedSurface({ className, ...props }: DottedSurfaceProps) {
 		renderer.setSize(window.innerWidth, window.innerHeight);
 		renderer.setClearColor(scene.fog.color, 0);
 
+		// Effects can replay (StrictMode, route transitions) — never stack canvases
+		containerRef.current.replaceChildren();
 		containerRef.current.appendChild(renderer.domElement);
 
 		// Create particles
@@ -195,8 +197,11 @@ export function DottedSurface({ className, ...props }: DottedSurfaceProps) {
 		return () => {
 			window.removeEventListener('resize', handleResize);
 
+			// animationId is reassigned every frame — cancel via the closure,
+			// not the stale id stored in sceneRef at mount
+			cancelAnimationFrame(animationId);
+
 			if (sceneRef.current) {
-				cancelAnimationFrame(sceneRef.current.animationId);
 
 				// Clean up Three.js objects
 				sceneRef.current.scene.traverse((object) => {
