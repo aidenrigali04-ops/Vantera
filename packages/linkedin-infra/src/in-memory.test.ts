@@ -25,22 +25,8 @@ describe("InMemoryLinkedInInfra", () => {
     expect(infra.sentMessages).toHaveLength(1);
   });
 
-  it("parses reply webhooks and rejects malformed payloads", () => {
-    const infra = new InMemoryLinkedInInfra();
-    expect(
-      infra.parseReplyWebhook({
-        connected_account_id: "conn-1",
-        from_profile_url: "https://linkedin.com/in/lead",
-        body: "interested",
-        received_at: "2026-06-11T00:00:00Z",
-      })
-    ).toEqual({
-      connectedAccountId: "conn-1",
-      fromProfileUrl: "https://linkedin.com/in/lead",
-      body: "interested",
-      receivedAt: "2026-06-11T00:00:00Z",
-    });
-    expect(infra.parseReplyWebhook("nope")).toBeNull();
+  it("rejects malformed webhook payloads", () => {
+    expect(new InMemoryLinkedInInfra().parseEventWebhook("nope")).toBeNull();
   });
 
   describe("webhook events", () => {
@@ -67,6 +53,9 @@ describe("InMemoryLinkedInInfra", () => {
       expect(
         infra.parseEventWebhook({ event_id: "le_3", event_type: "account_status", connected_account: "li_acc_1", status: "active", profile_url: null, display_name: "Jane Doe", metadata_account_id: "acct-uuid" })
       ).toEqual({ type: "account_status", providerEventId: "le_3", connectedAccountRef: "li_acc_1", status: "active", profileUrl: null, displayName: "Jane Doe", vanteraAccountId: "acct-uuid" });
+      expect(
+        infra.parseEventWebhook({ event_id: "le_4", event_type: "account_status", connected_account: "li_acc_1", status: "disconnected" })
+      ).toEqual({ type: "account_status", providerEventId: "le_4", connectedAccountRef: "li_acc_1", status: "disconnected", profileUrl: null, displayName: null, vanteraAccountId: null });
       expect(infra.parseEventWebhook({})).toBeNull();
     });
   });

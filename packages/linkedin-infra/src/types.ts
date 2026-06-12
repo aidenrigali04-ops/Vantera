@@ -20,13 +20,6 @@ export interface SendOutcome {
   sentAt: string;
 }
 
-export interface InboundLinkedInReply {
-  connectedAccountId: string;
-  fromProfileUrl: string;
-  body: string;
-  receivedAt: string;
-}
-
 export type LinkedInEvent =
   | { type: "reply"; providerEventId: string; connectedAccountRef: string; fromProfileUrl: string; body: string; receivedAt: string }
   | { type: "relationship_accepted"; providerEventId: string; connectedAccountRef: string; profileUrl: string }
@@ -46,7 +39,11 @@ export interface LinkedInInfra {
   createHostedAuthLink(accountId: string): Promise<HostedAuthLink>;
   sendInvite(req: InviteRequest): Promise<SendOutcome>;
   sendMessage(req: MessageRequest): Promise<SendOutcome>;
-  parseReplyWebhook(payload: unknown): InboundLinkedInReply | null;
+  /**
+   * Reject forged payloads BEFORE parsing. Real adapters must use a timing-safe
+   * comparison (e.g. compare digests via crypto.timingSafeEqual); the in-memory
+   * fake uses plain equality.
+   */
   verifyWebhook(headers: Record<string, string>, rawBody: string): boolean;
   parseEventWebhook(payload: unknown): LinkedInEvent | null;
 }

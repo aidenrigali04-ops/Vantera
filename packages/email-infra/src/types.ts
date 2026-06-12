@@ -32,13 +32,6 @@ export interface WarmupStatus {
   dailyCap: number;
 }
 
-export interface InboundReply {
-  mailboxId: string;
-  from: string;
-  body: string;
-  receivedAt: string;
-}
-
 /** One inbound provider event, already vendor-neutral. providerEventId feeds webhook_events dedupe. */
 export type EmailEvent =
   | { type: "reply"; providerEventId: string; mailboxRef: string; from: string; body: string; receivedAt: string; messageRef: string | null }
@@ -52,8 +45,11 @@ export interface EmailInfra {
   provision(req: ProvisionRequest): Promise<Mailbox[]>;
   send(email: OutboundEmail): Promise<SendResult>;
   warmupStatus(mailboxId: string): Promise<WarmupStatus>;
-  parseReplyWebhook(payload: unknown): InboundReply | null;
-  /** reject forged payloads BEFORE parsing; constant-time compare on the shared secret */
+  /**
+   * Reject forged payloads BEFORE parsing. Real adapters must use a timing-safe
+   * comparison (e.g. compare digests via crypto.timingSafeEqual); the in-memory
+   * fake uses plain equality.
+   */
   verifyWebhook(headers: Record<string, string>, rawBody: string): boolean;
   parseEventWebhook(payload: unknown): EmailEvent | null;
 }

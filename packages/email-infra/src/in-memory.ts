@@ -1,7 +1,6 @@
 import type {
   EmailEvent,
   EmailInfra,
-  InboundReply,
   Mailbox,
   OutboundEmail,
   ProvisionRequest,
@@ -46,24 +45,12 @@ export class InMemoryEmailInfra implements EmailInfra {
     return { mailboxId, phase: "warming", dailyCap: 10 };
   }
 
-  parseReplyWebhook(payload: unknown): InboundReply | null {
-    if (typeof payload !== "object" || payload === null) return null;
-    const p = payload as Record<string, unknown>;
-    if (
-      typeof p.mailbox_id !== "string" ||
-      typeof p.from !== "string" ||
-      typeof p.body !== "string" ||
-      typeof p.received_at !== "string"
-    ) {
-      return null;
-    }
-    return { mailboxId: p.mailbox_id, from: p.from, body: p.body, receivedAt: p.received_at };
-  }
-
+  // fake: plain equality; real adapters use a timing-safe compare (see interface doc)
   verifyWebhook(headers: Record<string, string>, _rawBody: string): boolean {
     return headers["x-webhook-secret"] === this.webhookSecret;
   }
 
+  // mirrors the structure in linkedin-infra's fake — keep the two in sync
   parseEventWebhook(payload: unknown): EmailEvent | null {
     if (typeof payload !== "object" || payload === null) return null;
     const p = payload as Record<string, unknown>;

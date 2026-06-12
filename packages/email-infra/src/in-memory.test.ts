@@ -14,7 +14,7 @@ describe("InMemoryEmailInfra", () => {
     await expect(infra.warmupStatus(first.id)).resolves.toMatchObject({ phase: "warming" });
   });
 
-  it("records sends and surfaces replies parsed from webhooks", async () => {
+  it("records sends", async () => {
     const infra = new InMemoryEmailInfra();
     const [mailbox] = await infra.provision({
       accountId: "acct-1",
@@ -31,19 +31,6 @@ describe("InMemoryEmailInfra", () => {
     });
     expect(result.messageId).toBeTruthy();
     expect(infra.sentEmails).toHaveLength(1);
-
-    const reply = infra.parseReplyWebhook({
-      mailbox_id: mailbox!.id,
-      from: "lead@example.com",
-      body: "interested",
-      received_at: "2026-06-11T00:00:00Z",
-    });
-    expect(reply).toEqual({
-      mailboxId: mailbox!.id,
-      from: "lead@example.com",
-      body: "interested",
-      receivedAt: "2026-06-11T00:00:00Z",
-    });
   });
 
   it("rejects sends from unknown mailboxes", async () => {
@@ -60,7 +47,7 @@ describe("InMemoryEmailInfra", () => {
   });
 
   it("returns null for malformed webhook payloads", () => {
-    expect(new InMemoryEmailInfra().parseReplyWebhook({ junk: true })).toBeNull();
+    expect(new InMemoryEmailInfra().parseEventWebhook({ junk: true })).toBeNull();
   });
 
   describe("webhook events", () => {
@@ -89,6 +76,9 @@ describe("InMemoryEmailInfra", () => {
       expect(
         infra.parseEventWebhook({ event_id: "evt_2", event_type: "bounce", mailbox_ref: "m", recipient: "a@b.c" })
       ).toEqual({ type: "bounce", providerEventId: "evt_2", mailboxRef: "m", recipient: "a@b.c" });
+      expect(
+        infra.parseEventWebhook({ event_id: "evt_4", event_type: "complaint", mailbox_ref: "m", recipient: "a@b.c" })
+      ).toEqual({ type: "complaint", providerEventId: "evt_4", mailboxRef: "m", recipient: "a@b.c" });
       expect(
         infra.parseEventWebhook({ event_id: "evt_3", event_type: "warmup_update", mailbox_ref: "m", phase: "ready", daily_cap: 40 })
       ).toEqual({ type: "warmup_update", providerEventId: "evt_3", mailboxRef: "m", phase: "ready", dailyCap: 40 });

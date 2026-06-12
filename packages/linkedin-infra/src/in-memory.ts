@@ -1,6 +1,5 @@
 import type {
   HostedAuthLink,
-  InboundLinkedInReply,
   InviteRequest,
   LinkedInEvent,
   LinkedInInfra,
@@ -33,29 +32,12 @@ export class InMemoryLinkedInInfra implements LinkedInInfra {
     return { id: `msg_${++this.counter}`, sentAt: new Date().toISOString() };
   }
 
-  parseReplyWebhook(payload: unknown): InboundLinkedInReply | null {
-    if (typeof payload !== "object" || payload === null) return null;
-    const p = payload as Record<string, unknown>;
-    if (
-      typeof p.connected_account_id !== "string" ||
-      typeof p.from_profile_url !== "string" ||
-      typeof p.body !== "string" ||
-      typeof p.received_at !== "string"
-    ) {
-      return null;
-    }
-    return {
-      connectedAccountId: p.connected_account_id,
-      fromProfileUrl: p.from_profile_url,
-      body: p.body,
-      receivedAt: p.received_at,
-    };
-  }
-
+  // fake: plain equality; real adapters use a timing-safe compare (see interface doc)
   verifyWebhook(headers: Record<string, string>, _rawBody: string): boolean {
     return headers["x-webhook-secret"] === this.webhookSecret;
   }
 
+  // mirrors the structure in email-infra's fake — keep the two in sync
   parseEventWebhook(payload: unknown): LinkedInEvent | null {
     if (typeof payload !== "object" || payload === null) return null;
     const p = payload as Record<string, unknown>;
