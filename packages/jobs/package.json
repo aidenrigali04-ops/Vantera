@@ -14,6 +14,8 @@
     "@supabase/supabase-js": "^2.108.1",
     "@vantera/agent-brains": "workspace:*",
     "@vantera/db": "workspace:*",
+    "@vantera/email-infra": "workspace:*",
+    "@vantera/linkedin-infra": "workspace:*",
     "@vantera/prospect-data": "workspace:*",
     "drizzle-orm": "^0.45.0"
   },
