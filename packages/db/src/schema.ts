@@ -293,6 +293,8 @@ export const scheduledSends = pgTable(
       .default("drafting"),
     subject: text("subject"),
     body: text("body"),
+    // unresolved humanizer violations, shown as review-queue badges (0008)
+    styleFlags: text("style_flags"),
     scheduledFor: timestamp("scheduled_for", { withTimezone: true }),
     approvedBy: uuid("approved_by"),
     approvedAt: timestamp("approved_at", { withTimezone: true }),

@@ -267,8 +267,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         status: send.status,
         subject: send.subject,
         body: send.body,
-        // review-queue style flags ride the error column until a metadata column exists
-        error: send.styleFlags ? `style: ${send.styleFlags}` : null,
+        styleFlags: send.styleFlags,
       });
     },
 
