@@ -11,6 +11,7 @@ import type {
   DraftInput,
   RankCandidate,
   RankContext,
+  ReplyVerdict,
   RulesGateResult,
   StoredInsights,
   WebsiteScan,
@@ -262,4 +263,60 @@ export interface RetentionSummary {
   status: "completed";
   purged: number;
   cutoff: string;
+}
+
+export interface InboundPayload {
+  source: "email" | "linkedin";
+  payload: unknown;
+}
+
+export interface InboundStore {
+  findMailboxByProviderRef(ref: string): Promise<{ id: string; accountId: string } | null>;
+  findLinkedInAccountByProviderRef(ref: string): Promise<{ id: string; accountId: string } | null>;
+  /** insert-or-update by (accountId, providerRef); sets connected_at when turning active */
+  upsertLinkedInAccountStatus(e: {
+    vanteraAccountId: string;
+    providerRef: string;
+    status: "active" | "disconnected";
+    profileUrl: string | null;
+    displayName: string | null;
+  }): Promise<void>;
+  findLeadByEmail(accountId: string, email: string): Promise<{ id: string; campaignId: string | null } | null>;
+  findLeadByLinkedInUrl(accountId: string, normalizedUrl: string): Promise<{ id: string; campaignId: string | null } | null>;
+  insertReply(r: {
+    accountId: string;
+    leadId: string;
+    campaignId: string | null;
+    channel: "email" | "linkedin";
+    providerMessageRef: string | null;
+    body: string;
+    receivedAt: Date;
+  }): Promise<string>;
+  setReplyClassification(replyId: string, verdict: ReplyVerdict): Promise<void>;
+  addSuppression(
+    accountId: string,
+    kind: "email" | "linkedin",
+    value: string,
+    source: "unsubscribe" | "bounce" | "complaint" | "not_interested",
+    leadId?: string
+  ): Promise<void>;
+  pauseMailbox(mailboxId: string): Promise<void>;
+  updateMailboxWarmup(mailboxId: string, status: "warming" | "active", dailyCap: number): Promise<void>;
+  setLeadConnected(leadId: string, at: Date): Promise<void>;
+  setLeadReplied(leadId: string, campaignId: string | null): Promise<void>;
+  /** pending_review/approved/scheduled drafts for the lead → canceled; returns count */
+  cancelPendingSends(leadId: string): Promise<number>;
+}
+
+export interface InboundDeps {
+  store: InboundStore;
+  emailInfra: Pick<EmailInfra, "parseEventWebhook">;
+  linkedinInfra: Pick<LinkedInInfra, "parseEventWebhook">;
+  classifyFn: (body: string) => Promise<ReplyVerdict>;
+  now?: () => Date;
+}
+
+export interface InboundSummary {
+  handled: boolean;
+  action: string;
 }
