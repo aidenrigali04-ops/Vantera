@@ -30,3 +30,4 @@ export {
   type LinkedInDraft,
 } from "./copy/linkedin";
 export { leadBlock, type CopyLead, type CopyContext, type DraftInput } from "./copy/shared";
+export { classifyReply, preClassify, replyVerdictSchema, type ReplyVerdict } from "./reply/classify";
