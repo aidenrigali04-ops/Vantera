@@ -45,3 +45,17 @@ describe("paceWithJitter", () => {
     }
   });
 });
+
+describe("linkedin message cap", () => {
+  it("caps messages at 25/day regardless of account age", () => {
+    expect(dailyAllowance("linkedin", 365, undefined, "message")).toBe(25);
+    expect(dailyAllowance("linkedin", 3, undefined, "message")).toBe(25);
+  });
+  it("requested lowers but never raises the message cap", () => {
+    expect(dailyAllowance("linkedin", 365, 10, "message")).toBe(10);
+    expect(dailyAllowance("linkedin", 365, 500, "message")).toBe(25);
+  });
+  it("defaults to invite behavior when kind is omitted", () => {
+    expect(dailyAllowance("linkedin", 3)).toBe(5); // ramp step unchanged
+  });
+});
