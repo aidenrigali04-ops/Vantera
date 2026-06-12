@@ -37,6 +37,8 @@ export const accounts = pgTable("accounts", {
   websiteUrl: text("website_url"),
   websiteScan: jsonb("website_scan"),
   websiteScannedAt: timestamp("website_scanned_at", { withTimezone: true }),
+  // 0009: CAN-SPAM physical mailing address for cold-email footer (rule 11)
+  senderAddress: jsonb("sender_address"),
 });
 
 export const accountMembers = pgTable(
@@ -130,9 +132,9 @@ export const leads = pgTable(
       .notNull()
       .references(() => accounts.id, { onDelete: "cascade" }),
     icpId: uuid("icp_id").references(() => icps.id, { onDelete: "set null" }),
-    source: text("source", { enum: ["explorium", "manual", "import"] })
+    source: text("source", { enum: ["discovery", "manual", "import"] })
       .notNull()
-      .default("explorium"),
+      .default("discovery"),
     externalRef: text("external_ref"),
     companyName: text("company_name"),
     companyDomain: text("company_domain"),
@@ -152,6 +154,9 @@ export const leads = pgTable(
       .notNull()
       .default("unvalidated"),
     linkedinUrl: text("linkedin_url"),
+    // 0009: LinkedIn invite→accept→message sequencing state (rule 04/08)
+    linkedinInvitedAt: timestamp("linkedin_invited_at", { withTimezone: true }),
+    linkedinConnectedAt: timestamp("linkedin_connected_at", { withTimezone: true }),
     rulesGatePassed: boolean("rules_gate_passed"),
     rulesGateReasons: jsonb("rules_gate_reasons"),
     aiScore: integer("ai_score"),
@@ -295,6 +300,8 @@ export const scheduledSends = pgTable(
     body: text("body"),
     // unresolved humanizer violations, shown as review-queue badges (0008)
     styleFlags: text("style_flags"),
+    // 0009: LinkedIn invite/message pair sequencing (null for email)
+    linkedinStage: text("linkedin_stage", { enum: ["invite", "message"] }),
     scheduledFor: timestamp("scheduled_for", { withTimezone: true }),
     approvedBy: uuid("approved_by"),
     approvedAt: timestamp("approved_at", { withTimezone: true }),
@@ -339,6 +346,20 @@ export const appSettings = pgTable("app_settings", {
   value: jsonb("value").notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+// webhook intake idempotency + debugging; service-role only (RLS, no policies);
+// retention: purged after 30 days by retention-purge (rule 11)
+export const webhookEvents = pgTable(
+  "webhook_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    source: text("source", { enum: ["email", "linkedin"] }).notNull(),
+    providerEventId: text("provider_event_id").notNull(),
+    payload: jsonb("payload").notNull(),
+    receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("webhook_events_source_event_idx").on(t.source, t.providerEventId)]
+);
 
 // ── 0004 channel identities, outreach audit ──────────────────────────────────
 

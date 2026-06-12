@@ -93,7 +93,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           .values({
             accountId,
             icpId,
-            source: "explorium",
+            source: "discovery",
             externalRef: candidate.externalRef,
             companyName: candidate.companyName,
             companyDomain: candidate.companyDomain,

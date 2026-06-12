@@ -20,7 +20,7 @@ const allTables = Object.values(schema)
   .map((t) => getTableName(t as Parameters<typeof getTableName>[0]));
 
 // exceptions to the account_id tenancy rule, each justified in its migration comment
-const tenantExempt = new Set(["accounts", "account_members", "user_profiles", "app_settings"]);
+const tenantExempt = new Set(["accounts", "account_members", "user_profiles", "app_settings", "webhook_events"]);
 
 // returns the create-table DDL block for a table from the concatenated migrations
 function tableDdl(table: string): string {
