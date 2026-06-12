@@ -28,7 +28,7 @@ export function DottedSurface({ className, ...props }: DottedSurfaceProps) {
 
 		// Scene setup
 		const scene = new THREE.Scene();
-		scene.fog = new THREE.Fog(0xffffff, 4000, 10000);
+		scene.fog = new THREE.Fog(0xffffff, 6000, 10000);
 
 		const camera = new THREE.PerspectiveCamera(
 			60,
@@ -55,9 +55,9 @@ export function DottedSurface({ className, ...props }: DottedSurfaceProps) {
 
 		// Warm-to-cool palette (coral → magenta → indigo), normalized 0–1
 		const PALETTE: [number, number, number][] = [
-			[0.96, 0.42, 0.18],
-			[0.87, 0.22, 0.55],
-			[0.33, 0.28, 0.92],
+			[1.0, 0.45, 0.12],
+			[1.0, 0.2, 0.62],
+			[0.45, 0.38, 1.0],
 		];
 		const lerpPalette = (t: number): [number, number, number] => {
 			const scaled = t * (PALETTE.length - 1);
@@ -108,7 +108,7 @@ export function DottedSurface({ className, ...props }: DottedSurfaceProps) {
 
 		// Create material
 		const material = new THREE.PointsMaterial({
-			size: 8,
+			size: 12,
 			vertexColors: true,
 			transparent: true,
 			opacity: 1,
