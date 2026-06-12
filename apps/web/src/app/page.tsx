@@ -1,16 +1,20 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { DottedSurface } from "@/components/ui/dotted-surface";
+import { TextEffect } from "@/components/ui/text-effect";
 
 export default function Home() {
   return (
     <main className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
       <DottedSurface />
-      <h1 className="text-4xl font-semibold tracking-tight">Vantera</h1>
-      <p className="max-w-md text-lg text-zinc-600 dark:text-zinc-400">
-        Sales intelligence run by SDR agents — prospect, score, and outreach
-        only high-quality leads.
-      </p>
+      <TextEffect
+        as="h1"
+        per="word"
+        preset="blur"
+        className="max-w-3xl text-4xl font-semibold tracking-tight"
+      >
+        Welcome to Your Agentic SDR Sales Intelligence System
+      </TextEffect>
       <div className="mt-2 flex gap-3">
         <Button asChild>
           <Link href="/signup">Get started</Link>

@@ -28,7 +28,7 @@ export function DottedSurface({ className, ...props }: DottedSurfaceProps) {
 
 		// Scene setup
 		const scene = new THREE.Scene();
-		scene.fog = new THREE.Fog(0xffffff, 2000, 10000);
+		scene.fog = new THREE.Fog(0xffffff, 4000, 10000);
 
 		const camera = new THREE.PerspectiveCamera(
 			60,
@@ -55,9 +55,9 @@ export function DottedSurface({ className, ...props }: DottedSurfaceProps) {
 
 		// Warm-to-cool palette (coral → magenta → indigo), normalized 0–1
 		const PALETTE: [number, number, number][] = [
-			[0.93, 0.5, 0.31],
-			[0.8, 0.36, 0.58],
-			[0.42, 0.39, 0.84],
+			[0.96, 0.42, 0.18],
+			[0.87, 0.22, 0.55],
+			[0.33, 0.28, 0.92],
 		];
 		const lerpPalette = (t: number): [number, number, number] => {
 			const scaled = t * (PALETTE.length - 1);
@@ -95,13 +95,26 @@ export function DottedSurface({ className, ...props }: DottedSurfaceProps) {
 		);
 		geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
 
+		// Round sprite so points render as circles instead of squares
+		const spriteCanvas = document.createElement('canvas');
+		spriteCanvas.width = 64;
+		spriteCanvas.height = 64;
+		const spriteCtx = spriteCanvas.getContext('2d')!;
+		spriteCtx.beginPath();
+		spriteCtx.arc(32, 32, 30, 0, Math.PI * 2);
+		spriteCtx.fillStyle = '#ffffff';
+		spriteCtx.fill();
+		const circleTexture = new THREE.CanvasTexture(spriteCanvas);
+
 		// Create material
 		const material = new THREE.PointsMaterial({
 			size: 8,
 			vertexColors: true,
 			transparent: true,
-			opacity: 0.8,
+			opacity: 1,
 			sizeAttenuation: true,
+			map: circleTexture,
+			alphaTest: 0.5,
 		});
 
 		// Create points object
@@ -189,6 +202,7 @@ export function DottedSurface({ className, ...props }: DottedSurfaceProps) {
 					}
 				});
 
+				circleTexture.dispose();
 				sceneRef.current.renderer.dispose();
 
 				if (containerRef.current && sceneRef.current.renderer.domElement) {
