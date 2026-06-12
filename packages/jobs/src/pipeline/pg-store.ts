@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull, lte, or } from "drizzle-orm";
+import { and, eq, inArray, isNull, lt, lte, or } from "drizzle-orm";
 import {
   accounts,
   agentAssets,
@@ -21,13 +21,15 @@ import type {
   DraftableLead,
   FreshLead,
   NewScheduledSend,
+  PurgeCandidate,
+  RetentionStore,
   ScoutConfig,
   ScoutContext,
   ScoutStore,
 } from "./types";
 
 /** Drizzle-backed store used by the Trigger.dev tasks (service-role DATABASE_URL). */
-export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerStore {
+export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerStore & RetentionStore {
   return {
     async getScoutContext(agentId: string): Promise<ScoutContext | null> {
       const [agent] = await db.select().from(agents).where(eq(agents.id, agentId));
@@ -298,6 +300,26 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
 
     async advanceSchedule(agentId: string, nextRunAt: Date) {
       await db.update(agents).set({ nextRunAt }).where(eq(agents.id, agentId));
+    },
+
+    // ── RetentionStore ───────────────────────────────────────────────────────
+
+    async getPurgeCandidates(cutoff: Date): Promise<PurgeCandidate[]> {
+      return db
+        .select({
+          id: leads.id,
+          status: leads.status,
+          rulesGatePassed: leads.rulesGatePassed,
+          scoredAt: leads.scoredAt,
+        })
+        .from(leads)
+        .where(and(lt(leads.createdAt, cutoff), inArray(leads.status, ["sourced", "rejected"])));
+    },
+
+    async deleteLeads(ids: string[]): Promise<number> {
+      // enrichment_results cascade with the lead; suppression entries set-null and survive (0003)
+      const rows = await db.delete(leads).where(inArray(leads.id, ids)).returning({ id: leads.id });
+      return rows.length;
     },
   };
 }

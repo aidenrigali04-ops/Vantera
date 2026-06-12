@@ -138,3 +138,27 @@ export interface CopyDraftSummary {
   suppressed: number;
   skipped: number;
 }
+
+export interface PurgeCandidate {
+  id: string;
+  status: string;
+  rulesGatePassed: boolean | null;
+  scoredAt: Date | null;
+}
+
+export interface RetentionStore {
+  /** leads with created_at < cutoff and status in ('sourced','rejected') — pre-filter only, isPurgeable decides */
+  getPurgeCandidates(cutoff: Date): Promise<PurgeCandidate[]>;
+  deleteLeads(ids: string[]): Promise<number>;
+}
+
+export interface RetentionDeps {
+  store: RetentionStore;
+  now?: () => Date;
+}
+
+export interface RetentionSummary {
+  status: "completed";
+  purged: number;
+  cutoff: string;
+}
