@@ -124,6 +124,8 @@ export interface CopyDraftStore {
     status: "queued" | "suppressed" | "skipped"
   ): Promise<void>;
   insertScheduledSend(send: NewScheduledSend): Promise<void>;
+  /** Both rows or neither — the dispatch core assumes complete pairs. */
+  insertLinkedInSendPair(invite: NewScheduledSend, message: NewScheduledSend): Promise<void>;
   setLeadStatus(leadId: string, status: "in_campaign"): Promise<void>;
 }
 

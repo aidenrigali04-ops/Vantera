@@ -29,6 +29,21 @@ import type {
   ScoutStore,
 } from "./types";
 
+/** Maps a NewScheduledSend to the drizzle insert values shape. */
+function toRow(send: NewScheduledSend) {
+  return {
+    accountId: send.accountId,
+    campaignId: send.campaignId,
+    leadId: send.leadId,
+    channel: send.channel,
+    status: send.status,
+    subject: send.subject,
+    body: send.body,
+    linkedinStage: send.linkedinStage,
+    styleFlags: send.styleFlags,
+  };
+}
+
 /** Drizzle-backed store used by the Trigger.dev tasks (service-role DATABASE_URL). */
 export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerStore & RetentionStore {
   return {
@@ -266,16 +281,13 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
     },
 
     async insertScheduledSend(send: NewScheduledSend) {
-      await db.insert(scheduledSends).values({
-        accountId: send.accountId,
-        campaignId: send.campaignId,
-        leadId: send.leadId,
-        channel: send.channel,
-        status: send.status,
-        subject: send.subject,
-        body: send.body,
-        linkedinStage: send.linkedinStage,
-        styleFlags: send.styleFlags,
+      await db.insert(scheduledSends).values(toRow(send));
+    },
+
+    async insertLinkedInSendPair(invite: NewScheduledSend, message: NewScheduledSend) {
+      await db.transaction(async (tx) => {
+        await tx.insert(scheduledSends).values(toRow(invite));
+        await tx.insert(scheduledSends).values(toRow(message));
       });
     },
 

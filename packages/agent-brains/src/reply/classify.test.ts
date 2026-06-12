@@ -12,6 +12,11 @@ function textResponse(json: unknown) {
 }
 
 describe("preClassify (deterministic, no model call)", () => {
+  it("does not fire on redirections or idioms that merely contain contact verbs", () => {
+    expect(preClassify("please don't contact my assistant, contact me directly")).toBeNull();
+    expect(preClassify("let me remove any ambiguity — I'm interested")).toBeNull();
+  });
+
   it("catches unsubscribe requests", () => {
     expect(preClassify("please remove me from your list")?.classification).toBe("unsubscribe");
     expect(preClassify("STOP EMAILING ME")?.classification).toBe("unsubscribe");

@@ -39,6 +39,8 @@ class FakeCopyStore implements CopyDraftStore {
   campaignLeads = new Map<string, string>();
   leadStatuses = new Map<string, string>();
   suppressionLookups: string[] = [];
+  /** tracks which store method was used per LinkedIn draft: 'pair' or 'single' */
+  linkedInCallKinds: ("pair" | "single")[] = [];
 
   constructor(channels = { linkedin: true, email: true }, sendMode: "review" | "automatic" = "review") {
     this.context = {
@@ -71,7 +73,12 @@ class FakeCopyStore implements CopyDraftStore {
     this.campaignLeads.set(leadId, status);
   }
   async insertScheduledSend(send: NewScheduledSend) {
+    this.linkedInCallKinds.push("single");
     this.sends.push(send);
+  }
+  async insertLinkedInSendPair(invite: NewScheduledSend, message: NewScheduledSend) {
+    this.linkedInCallKinds.push("pair");
+    this.sends.push(invite, message);
   }
   async setLeadStatus(leadId: string, status: string) {
     this.leadStatuses.set(leadId, status);
@@ -150,7 +157,7 @@ describe("runCopyDraft — suppression gate (rule 11)", () => {
 });
 
 describe("runCopyDraft — drafted queue", () => {
-  it("drafts per enabled channel into pending_review and never beyond", async () => {
+  it("drafts per enabled channel into pending_review (default review mode)", async () => {
     const store = new FakeCopyStore();
     store.leads = [lead("l1")];
 
@@ -220,6 +227,16 @@ describe("normalizeLinkedInUrl", () => {
 });
 
 describe("runCopyDraft — LinkedIn invite+message pair", () => {
+  it("uses insertLinkedInSendPair (not two single inserts) for the LinkedIn pair", async () => {
+    const store = new FakeCopyStore({ linkedin: true, email: false });
+    store.leads = [lead("l1")];
+
+    await runCopyDraft(PAYLOAD, makeDeps(store));
+
+    expect(store.linkedInCallKinds).toEqual(["pair"]);
+    expect(store.sends).toHaveLength(2);
+  });
+
   it("inserts an invite AND a message row per LinkedIn lead", async () => {
     const store = new FakeCopyStore({ linkedin: true, email: false });
     store.leads = [lead("l1")];

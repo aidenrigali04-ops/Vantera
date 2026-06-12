@@ -113,9 +113,19 @@ export async function runCopyDraft(
         const draft = await deps.draftLinkedInFn(input);
         const status = draftStatus(ctx.agent.sendMode, draft.violations);
         const flags = draft.violations.length > 0 ? describeViolations(draft.violations) : null;
-        const common = { accountId, campaignId, leadId: lead.id, channel: "linkedin" as const, subject: null, status, styleFlags: flags };
-        await deps.store.insertScheduledSend({ ...common, linkedinStage: "invite", body: draft.connectionNote });
-        await deps.store.insertScheduledSend({ ...common, linkedinStage: "message", body: draft.followupMessage });
+        const common = {
+          accountId,
+          campaignId,
+          leadId: lead.id,
+          channel: "linkedin" as const,
+          subject: null,
+          status,
+          styleFlags: flags,
+        };
+        await deps.store.insertLinkedInSendPair(
+          { ...common, linkedinStage: "invite", body: draft.connectionNote },
+          { ...common, linkedinStage: "message", body: draft.followupMessage }
+        );
         leadDrafted += 1;
       }
     }

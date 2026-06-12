@@ -10,11 +10,11 @@ export const replyVerdictSchema = z.object({
 export type ReplyVerdict = z.infer<typeof replyVerdictSchema>;
 
 const UNSUB_PATTERNS = [
-  /unsubscribe/i,
-  /remove me/i,
-  /take me off/i,
-  /stop (emailing|messaging|contacting)/i,
-  /don'?t contact/i,
+  /\bunsubscribe\b/i,
+  /\bremove me from\b/i,
+  /\btake me off (your|the|this)\b/i,
+  /\bstop (emailing|messaging|contacting) (me|us)\b/i,
+  /\bdon'?t contact (me|us)\b/i,
 ];
 
 const OOO_PATTERNS = [
