@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull, lt, lte, or } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, lt, lte, or, sql } from "drizzle-orm";
 import {
   accounts,
   agentAssets,
@@ -9,8 +9,14 @@ import {
   enrichmentResults,
   icps,
   leads,
+  linkedinAccounts,
+  mailboxes,
+  outreachSends,
+  replies,
   scheduledSends,
   suppressionEntries,
+  unsubscribeTokens,
+  appSettings,
   type Db,
 } from "@vantera/db";
 import type { EnrichedProspect, IcpCriteria, ProspectCandidate } from "@vantera/prospect-data";
@@ -19,15 +25,23 @@ import type {
   CopyConfig,
   CopyContext,
   CopyDraftStore,
+  DispatchableSend,
   DraftableLead,
   FreshLead,
+  InboundStore,
   NewScheduledSend,
+  OutreachSendStore,
   PurgeCandidate,
   RetentionStore,
   ScoutConfig,
   ScoutContext,
   ScoutStore,
+  SendContext,
+  SendDispatchStore,
 } from "./types";
+import { EMAIL_STEADY_DAILY_PER_MAILBOX } from "./safety-limits";
+import { parseSenderAddress } from "./email-footer";
+import { normalizeLinkedInUrl } from "./copy-draft";
 
 /** Maps a NewScheduledSend to the drizzle insert values shape. */
 function toRow(send: NewScheduledSend) {
@@ -45,7 +59,7 @@ function toRow(send: NewScheduledSend) {
 }
 
 /** Drizzle-backed store used by the Trigger.dev tasks (service-role DATABASE_URL). */
-export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerStore & RetentionStore {
+export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerStore & RetentionStore & SendDispatchStore & OutreachSendStore & InboundStore {
   return {
     async getScoutContext(agentId: string): Promise<ScoutContext | null> {
       const [agent] = await db.select().from(agents).where(eq(agents.id, agentId));
@@ -337,6 +351,388 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
     async deleteLeads(ids: string[]): Promise<number> {
       // enrichment_results cascade with the lead; suppression entries set-null and survive (0003)
       const rows = await db.delete(leads).where(inArray(leads.id, ids)).returning({ id: leads.id });
+      return rows.length;
+    },
+
+    // ── SendDispatchStore ────────────────────────────────────────────────────
+
+    async isKillSwitchOn() {
+      const [row] = await db.select().from(appSettings).where(eq(appSettings.key, "outreach_kill_switch"));
+      return row?.value === true;
+    },
+
+    async getDispatchableSends(staleCutoff: Date): Promise<DispatchableSend[]> {
+      const rows = await db
+        .select({
+          id: scheduledSends.id,
+          accountId: scheduledSends.accountId,
+          campaignId: scheduledSends.campaignId,
+          leadId: scheduledSends.leadId,
+          channel: scheduledSends.channel,
+          linkedinStage: scheduledSends.linkedinStage,
+          status: scheduledSends.status,
+          accountPaused: accounts.outreachPaused,
+          senderAddress: accounts.senderAddress,
+          campaignStatus: campaigns.status,
+          leadInvitedAt: leads.linkedinInvitedAt,
+          leadConnectedAt: leads.linkedinConnectedAt,
+        })
+        .from(scheduledSends)
+        .innerJoin(accounts, eq(scheduledSends.accountId, accounts.id))
+        .innerJoin(campaigns, eq(scheduledSends.campaignId, campaigns.id))
+        .innerJoin(leads, eq(scheduledSends.leadId, leads.id))
+        .where(
+          or(
+            eq(scheduledSends.status, "approved"),
+            and(eq(scheduledSends.status, "scheduled"), lt(scheduledSends.scheduledFor, staleCutoff))
+          )
+        );
+      return rows.map((r) => ({
+        id: r.id,
+        accountId: r.accountId,
+        campaignId: r.campaignId,
+        leadId: r.leadId,
+        channel: r.channel as "email" | "linkedin",
+        linkedinStage: r.linkedinStage as "invite" | "message" | null,
+        status: r.status as "approved" | "scheduled",
+        accountPaused: r.accountPaused,
+        hasSenderAddress: parseSenderAddress(r.senderAddress) !== null,
+        campaignStatus: r.campaignStatus,
+        leadInvitedAt: r.leadInvitedAt,
+        leadConnectedAt: r.leadConnectedAt,
+      }));
+    },
+
+    async getEmailCapacity(accountId: string, dayStart: Date): Promise<number> {
+      const boxes = await db
+        .select({ id: mailboxes.id, dailySendLimit: mailboxes.dailySendLimit })
+        .from(mailboxes)
+        .where(and(eq(mailboxes.accountId, accountId), eq(mailboxes.status, "active"))); // warming NEVER counts
+      if (boxes.length === 0) return 0;
+      const sent = await db
+        .select({ mailboxId: outreachSends.mailboxId })
+        .from(outreachSends)
+        .where(and(eq(outreachSends.accountId, accountId), eq(outreachSends.channel, "email"), gte(outreachSends.sentAt, dayStart)));
+      const sentByBox = new Map<string, number>();
+      for (const s of sent) if (s.mailboxId) sentByBox.set(s.mailboxId, (sentByBox.get(s.mailboxId) ?? 0) + 1);
+      return boxes.reduce((sum, b) => {
+        const cap = Math.min(b.dailySendLimit ?? EMAIL_STEADY_DAILY_PER_MAILBOX, EMAIL_STEADY_DAILY_PER_MAILBOX);
+        return sum + Math.max(0, cap - (sentByBox.get(b.id) ?? 0));
+      }, 0);
+    },
+
+    async getLinkedInAccountAgeDays(accountId: string, now: Date): Promise<number | null> {
+      const [acct] = await db
+        .select({ connectedAt: linkedinAccounts.connectedAt })
+        .from(linkedinAccounts)
+        .where(and(eq(linkedinAccounts.accountId, accountId), eq(linkedinAccounts.status, "active")))
+        .limit(1);
+      if (!acct) return null;
+      if (!acct.connectedAt) return 0;
+      return Math.floor((now.getTime() - acct.connectedAt.getTime()) / 86_400_000);
+    },
+
+    async countLinkedInSentToday(accountId: string, kind: "invite" | "message", dayStart: Date): Promise<number> {
+      const rows = await db
+        .select({ id: outreachSends.id })
+        .from(outreachSends)
+        .innerJoin(scheduledSends, eq(outreachSends.scheduledSendId, scheduledSends.id))
+        .where(
+          and(
+            eq(outreachSends.accountId, accountId),
+            eq(outreachSends.channel, "linkedin"),
+            eq(scheduledSends.linkedinStage, kind),
+            gte(outreachSends.sentAt, dayStart)
+          )
+        );
+      return rows.length;
+    },
+
+    async markScheduled(sendId: string, scheduledFor: Date) {
+      await db.update(scheduledSends).set({ status: "scheduled", scheduledFor }).where(eq(scheduledSends.id, sendId));
+    },
+
+    async cancelSend(sendId: string, error: string) {
+      await db.update(scheduledSends).set({ status: "canceled", error }).where(eq(scheduledSends.id, sendId));
+    },
+
+    // ── OutreachSendStore ────────────────────────────────────────────────────
+
+    async getSendContext(sendId: string): Promise<SendContext | null> {
+      const [r] = await db
+        .select({
+          id: scheduledSends.id,
+          accountId: scheduledSends.accountId,
+          campaignId: scheduledSends.campaignId,
+          leadId: scheduledSends.leadId,
+          channel: scheduledSends.channel,
+          linkedinStage: scheduledSends.linkedinStage,
+          status: scheduledSends.status,
+          subject: scheduledSends.subject,
+          body: scheduledSends.body,
+          campaignStatus: campaigns.status,
+          accountPaused: accounts.outreachPaused,
+          senderAddress: accounts.senderAddress,
+          leadEmail: leads.email,
+          leadLinkedinUrl: leads.linkedinUrl,
+        })
+        .from(scheduledSends)
+        .innerJoin(accounts, eq(scheduledSends.accountId, accounts.id))
+        .innerJoin(campaigns, eq(scheduledSends.campaignId, campaigns.id))
+        .innerJoin(leads, eq(scheduledSends.leadId, leads.id))
+        .where(eq(scheduledSends.id, sendId));
+      if (!r) return null;
+      return {
+        id: r.id,
+        accountId: r.accountId,
+        campaignId: r.campaignId,
+        leadId: r.leadId,
+        channel: r.channel as "email" | "linkedin",
+        linkedinStage: r.linkedinStage as "invite" | "message" | null,
+        status: r.status,
+        subject: r.subject,
+        body: r.body,
+        campaignStatus: r.campaignStatus,
+        accountPaused: r.accountPaused,
+        senderAddress: parseSenderAddress(r.senderAddress),
+        lead: { email: r.leadEmail, linkedinUrl: r.leadLinkedinUrl },
+      };
+    },
+
+    async claimSending(sendId: string): Promise<boolean> {
+      const rows = await db
+        .update(scheduledSends)
+        .set({ status: "sending" })
+        .where(and(eq(scheduledSends.id, sendId), eq(scheduledSends.status, "scheduled")))
+        .returning({ id: scheduledSends.id });
+      return rows.length > 0;
+    },
+
+    async revertToApproved(sendId: string) {
+      await db.update(scheduledSends).set({ status: "approved", scheduledFor: null }).where(eq(scheduledSends.id, sendId));
+    },
+
+    async markSent(sendId: string) {
+      await db.update(scheduledSends).set({ status: "sent" }).where(eq(scheduledSends.id, sendId));
+    },
+
+    async markFailed(sendId: string, error: string) {
+      await db.update(scheduledSends).set({ status: "failed", error }).where(eq(scheduledSends.id, sendId));
+    },
+
+    async markSuppressed(sendId: string) {
+      await db.update(scheduledSends).set({ status: "suppressed" }).where(eq(scheduledSends.id, sendId));
+    },
+
+    async pickActiveMailbox(accountId: string) {
+      const boxes = await db
+        .select({ id: mailboxes.id, providerRef: mailboxes.providerRef, status: mailboxes.status })
+        .from(mailboxes)
+        .where(and(eq(mailboxes.accountId, accountId), eq(mailboxes.status, "active")));
+      if (boxes.length === 0) return null;
+      // LRU rotation by last outbound send; 50 recent sends is plenty to order a handful of mailboxes
+      const lastSends = await db
+        .select({ mailboxId: outreachSends.mailboxId, sentAt: outreachSends.sentAt })
+        .from(outreachSends)
+        .where(and(eq(outreachSends.accountId, accountId), eq(outreachSends.channel, "email")))
+        .orderBy(desc(outreachSends.sentAt))
+        .limit(50);
+      const lastByBox = new Map<string, number>();
+      for (const s of lastSends) {
+        if (s.mailboxId && !lastByBox.has(s.mailboxId)) lastByBox.set(s.mailboxId, s.sentAt.getTime());
+      }
+      boxes.sort((a, b) => (lastByBox.get(a.id) ?? 0) - (lastByBox.get(b.id) ?? 0));
+      return boxes[0] ?? null;
+    },
+
+    async getActiveLinkedInIdentity(accountId: string) {
+      const [acct] = await db
+        .select({ id: linkedinAccounts.id, providerRef: linkedinAccounts.providerRef, status: linkedinAccounts.status })
+        .from(linkedinAccounts)
+        .where(and(eq(linkedinAccounts.accountId, accountId), eq(linkedinAccounts.status, "active")))
+        .limit(1);
+      return acct ?? null;
+    },
+
+    async createUnsubscribeToken(accountId: string, leadId: string, email: string) {
+      const [row] = await db
+        .insert(unsubscribeTokens)
+        .values({ accountId, leadId, email })
+        .returning({ token: unsubscribeTokens.token });
+      if (!row) throw new Error("failed to create unsubscribe token");
+      return row.token;
+    },
+
+    async recordOutreachSend(rec: {
+      accountId: string;
+      campaignId: string;
+      leadId: string;
+      scheduledSendId: string;
+      channel: "email" | "linkedin";
+      mailboxId?: string;
+      linkedinAccountId?: string;
+      messageRef: string | null;
+    }) {
+      await db.insert(outreachSends).values({
+        accountId: rec.accountId,
+        campaignId: rec.campaignId,
+        leadId: rec.leadId,
+        scheduledSendId: rec.scheduledSendId,
+        channel: rec.channel,
+        mailboxId: rec.mailboxId,
+        linkedinAccountId: rec.linkedinAccountId,
+        messageRef: rec.messageRef,
+      });
+    },
+
+    async setLeadInvited(leadId: string, at: Date) {
+      await db.update(leads).set({ linkedinInvitedAt: at }).where(eq(leads.id, leadId));
+    },
+
+    // ── InboundStore ─────────────────────────────────────────────────────────
+
+    async findMailboxByProviderRef(ref: string) {
+      const [m] = await db
+        .select({ id: mailboxes.id, accountId: mailboxes.accountId })
+        .from(mailboxes)
+        .where(eq(mailboxes.providerRef, ref));
+      return m ?? null;
+    },
+
+    async findLinkedInAccountByProviderRef(ref: string) {
+      const [a] = await db
+        .select({ id: linkedinAccounts.id, accountId: linkedinAccounts.accountId })
+        .from(linkedinAccounts)
+        .where(eq(linkedinAccounts.providerRef, ref));
+      return a ?? null;
+    },
+
+    async upsertLinkedInAccountStatus(e: {
+      vanteraAccountId: string;
+      providerRef: string;
+      status: "active" | "disconnected";
+      profileUrl: string | null;
+      displayName: string | null;
+    }) {
+      await db
+        .insert(linkedinAccounts)
+        .values({
+          accountId: e.vanteraAccountId,
+          providerRef: e.providerRef,
+          status: e.status,
+          profileUrl: e.profileUrl,
+          displayName: e.displayName,
+          connectedAt: e.status === "active" ? new Date() : null,
+        })
+        .onConflictDoUpdate({
+          target: [linkedinAccounts.accountId, linkedinAccounts.providerRef],
+          set: { status: e.status, profileUrl: e.profileUrl, displayName: e.displayName },
+        });
+    },
+
+    async findLeadByEmail(accountId: string, email: string) {
+      // callers pass lowercased addresses; stored emails may be mixed-case
+      const [lead] = await db
+        .select({ id: leads.id })
+        .from(leads)
+        .where(and(eq(leads.accountId, accountId), sql`lower(${leads.email}) = ${email}`));
+      if (!lead) return null;
+      const [cl] = await db
+        .select({ campaignId: campaignLeads.campaignId })
+        .from(campaignLeads)
+        .where(eq(campaignLeads.leadId, lead.id))
+        .limit(1);
+      return { id: lead.id, campaignId: cl?.campaignId ?? null };
+    },
+
+    async findLeadByLinkedInUrl(accountId: string, normalizedUrl: string) {
+      // linkedin_url is stored as captured; normalize in JS over the account's leads.
+      // revisit: normalized linkedin_url column if accounts exceed ~10k leads
+      const rows = await db
+        .select({ id: leads.id, linkedinUrl: leads.linkedinUrl })
+        .from(leads)
+        .where(eq(leads.accountId, accountId));
+      const hit = rows.find((r) => r.linkedinUrl && normalizeLinkedInUrl(r.linkedinUrl) === normalizedUrl);
+      if (!hit) return null;
+      const [cl] = await db
+        .select({ campaignId: campaignLeads.campaignId })
+        .from(campaignLeads)
+        .where(eq(campaignLeads.leadId, hit.id))
+        .limit(1);
+      return { id: hit.id, campaignId: cl?.campaignId ?? null };
+    },
+
+    async insertReply(r: {
+      accountId: string;
+      leadId: string;
+      campaignId: string | null;
+      channel: "email" | "linkedin";
+      providerMessageRef: string | null;
+      body: string;
+      receivedAt: Date;
+    }) {
+      const [row] = await db.insert(replies).values(r).returning({ id: replies.id });
+      if (!row) throw new Error("failed to insert reply");
+      return row.id;
+    },
+
+    async setReplyClassification(replyId: string, verdict: import("@vantera/agent-brains").ReplyVerdict) {
+      await db
+        .update(replies)
+        .set({
+          classification: verdict.classification as typeof replies.classification._.data,
+          classificationRationale: verdict.rationale,
+          classifiedAt: new Date(),
+        })
+        .where(eq(replies.id, replyId));
+    },
+
+    async addSuppression(
+      accountId: string,
+      kind: "email" | "linkedin",
+      value: string,
+      source: "unsubscribe" | "bounce" | "complaint" | "not_interested",
+      leadId?: string
+    ) {
+      await db
+        .insert(suppressionEntries)
+        .values({ accountId, kind, value, source, leadId })
+        .onConflictDoNothing();
+    },
+
+    async pauseMailbox(mailboxId: string) {
+      await db.update(mailboxes).set({ status: "paused" }).where(eq(mailboxes.id, mailboxId));
+    },
+
+    async updateMailboxWarmup(mailboxId: string, status: "warming" | "active", dailyCap: number) {
+      await db.update(mailboxes).set({ status, dailySendLimit: dailyCap }).where(eq(mailboxes.id, mailboxId));
+    },
+
+    async setLeadConnected(leadId: string, at: Date) {
+      await db.update(leads).set({ linkedinConnectedAt: at }).where(eq(leads.id, leadId));
+    },
+
+    async setLeadReplied(leadId: string, campaignId: string | null) {
+      await db.update(leads).set({ status: "replied" }).where(eq(leads.id, leadId));
+      if (campaignId) {
+        await db
+          .update(campaignLeads)
+          .set({ status: "replied" })
+          .where(and(eq(campaignLeads.campaignId, campaignId), eq(campaignLeads.leadId, leadId)));
+      }
+    },
+
+    async cancelPendingSends(leadId: string) {
+      const rows = await db
+        .update(scheduledSends)
+        .set({ status: "canceled", error: "lead replied or was suppressed" })
+        .where(
+          and(
+            eq(scheduledSends.leadId, leadId),
+            inArray(scheduledSends.status, ["pending_review", "approved", "scheduled"])
+          )
+        )
+        .returning({ id: scheduledSends.id });
       return rows.length;
     },
   };
