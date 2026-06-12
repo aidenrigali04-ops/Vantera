@@ -38,6 +38,11 @@ export type LinkedInEvent =
  * ceiling, pacing) live in the scheduler, NOT here.
  */
 export interface LinkedInInfra {
+  /**
+   * accountId rides through the provider as hosted-auth metadata and comes back
+   * as vanteraAccountId on account_status events — that round-trip is how a
+   * connected identity is attributed to a tenant.
+   */
   createHostedAuthLink(accountId: string): Promise<HostedAuthLink>;
   sendInvite(req: InviteRequest): Promise<SendOutcome>;
   sendMessage(req: MessageRequest): Promise<SendOutcome>;
