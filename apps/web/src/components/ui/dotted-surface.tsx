@@ -83,7 +83,9 @@ export function DottedSurface({ className, ...props }: DottedSurfaceProps) {
 				if (theme === 'dark') {
 					colors.push(200, 200, 200);
 				} else {
-					const [r, g, b] = lerpPalette(ix / (AMOUNTX - 1));
+					const [r, g, b] = lerpPalette(
+						(ix / (AMOUNTX - 1) + iy / (AMOUNTY - 1)) / 2,
+					);
 					colors.push(r, g, b);
 				}
 			}
@@ -95,26 +97,30 @@ export function DottedSurface({ className, ...props }: DottedSurfaceProps) {
 		);
 		geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
 
-		// Round sprite so points render as circles instead of squares
+		// Round sprite with a solid core and soft falloff so points render
+		// as gently glowing circles instead of squares
 		const spriteCanvas = document.createElement('canvas');
 		spriteCanvas.width = 64;
 		spriteCanvas.height = 64;
 		const spriteCtx = spriteCanvas.getContext('2d')!;
-		spriteCtx.beginPath();
-		spriteCtx.arc(32, 32, 30, 0, Math.PI * 2);
-		spriteCtx.fillStyle = '#ffffff';
-		spriteCtx.fill();
+		const glow = spriteCtx.createRadialGradient(32, 32, 0, 32, 32, 30);
+		glow.addColorStop(0, 'rgba(255,255,255,1)');
+		glow.addColorStop(0.45, 'rgba(255,255,255,0.95)');
+		glow.addColorStop(0.7, 'rgba(255,255,255,0.35)');
+		glow.addColorStop(1, 'rgba(255,255,255,0)');
+		spriteCtx.fillStyle = glow;
+		spriteCtx.fillRect(0, 0, 64, 64);
 		const circleTexture = new THREE.CanvasTexture(spriteCanvas);
 
 		// Create material
 		const material = new THREE.PointsMaterial({
-			size: 12,
+			size: 20,
 			vertexColors: true,
 			transparent: true,
 			opacity: 1,
 			sizeAttenuation: true,
 			map: circleTexture,
-			alphaTest: 0.5,
+			depthWrite: false,
 		});
 
 		// Create points object

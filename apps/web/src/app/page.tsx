@@ -8,7 +8,7 @@ const montserrat = Montserrat({ subsets: ["latin"], weight: ["500"] });
 export default function Home() {
   return (
     <main
-      className={`${montserrat.className} flex flex-1 flex-col items-center justify-start gap-4 px-6 pt-[18vh] text-center font-medium`}
+      className={`${montserrat.className} flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center font-medium`}
     >
       <DottedSurface />
       <TextEffect
@@ -19,7 +19,7 @@ export default function Home() {
       >
         Welcome to Your Agentic SDR Sales Intelligence System
       </TextEffect>
-      <div className="mt-2 flex gap-3">
+      <div className="mt-12 flex gap-3">
         <Link
           href="/signup"
           className="rounded-[18px] bg-[#121317] px-6 py-2.5 text-[17.5px] font-medium text-white transition-opacity hover:opacity-90"
