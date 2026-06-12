@@ -1,11 +1,6 @@
-import { ComingSoon } from "@/components/coming-soon";
+import { redirect } from "next/navigation";
 
+// campaigns are an internal execution grouping, never the primary surface (rule 08)
 export default function CampaignsPage() {
-  return (
-    <ComingSoon
-      title="Campaigns"
-      description="Create outreach campaigns and let your SDR agent run them on schedule — email, LinkedIn, or both."
-      unlocks="Unlocks with the campaign wizard."
-    />
-  );
+  redirect("/review");
 }

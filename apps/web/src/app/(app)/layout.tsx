@@ -3,9 +3,9 @@ import { redirect } from "next/navigation";
 import {
   BarChart3,
   Bot,
+  Inbox,
   LayoutDashboard,
   LogOut,
-  Megaphone,
   Settings,
   Users,
 } from "lucide-react";
@@ -19,7 +19,7 @@ const NAV = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/agents", label: "Agents", icon: Bot },
   { href: "/leads", label: "Leads", icon: Users },
-  { href: "/campaigns", label: "Campaigns", icon: Megaphone },
+  { href: "/review", label: "Review", icon: Inbox },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
