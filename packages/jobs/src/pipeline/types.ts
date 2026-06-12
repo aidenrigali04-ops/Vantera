@@ -15,6 +15,9 @@ import type {
   StoredInsights,
   WebsiteScan,
 } from "@vantera/agent-brains";
+import type { SenderAddress } from "./email-footer";
+import type { EmailInfra } from "@vantera/email-infra";
+import type { LinkedInInfra } from "@vantera/linkedin-infra";
 
 export interface ScoutConfig {
   prospectsPerRun: number;
@@ -121,7 +124,7 @@ export interface CopyDraftStore {
   setCampaignLeadStatus(
     campaignId: string,
     leadId: string,
-    status: "queued" | "suppressed" | "skipped"
+    status: "queued" | "suppressed" | "skipped" | "sent"
   ): Promise<void>;
   insertScheduledSend(send: NewScheduledSend): Promise<void>;
   /** Both rows or neither — the dispatch core assumes complete pairs. */
@@ -139,6 +142,101 @@ export interface CopyDraftSummary {
   status: "completed" | "skipped";
   drafted: number;
   suppressed: number;
+  skipped: number;
+}
+
+export interface SendContext {
+  id: string;
+  accountId: string;
+  campaignId: string;
+  leadId: string;
+  channel: "email" | "linkedin";
+  linkedinStage: "invite" | "message" | null;
+  status: string;
+  subject: string | null;
+  body: string | null;
+  campaignStatus: string;
+  accountPaused: boolean;
+  senderAddress: SenderAddress | null;
+  lead: { email: string | null; linkedinUrl: string | null };
+}
+
+export interface OutreachSendStore {
+  getSendContext(sendId: string): Promise<SendContext | null>;
+  isKillSwitchOn(): Promise<boolean>;
+  isSuppressed(accountId: string, kind: "email" | "linkedin", value: string): Promise<boolean>;
+  /** optimistic claim: scheduled → sending; false means another run owns it */
+  claimSending(sendId: string): Promise<boolean>;
+  revertToApproved(sendId: string): Promise<void>;
+  markSent(sendId: string): Promise<void>;
+  markFailed(sendId: string, error: string): Promise<void>;
+  markSuppressed(sendId: string): Promise<void>;
+  pickActiveMailbox(accountId: string): Promise<{ id: string; providerRef: string | null; status: string } | null>;
+  getActiveLinkedInIdentity(accountId: string): Promise<{ id: string; providerRef: string; status: string } | null>;
+  createUnsubscribeToken(accountId: string, leadId: string, email: string): Promise<string>;
+  recordOutreachSend(rec: {
+    accountId: string;
+    campaignId: string;
+    leadId: string;
+    scheduledSendId: string;
+    channel: "email" | "linkedin";
+    mailboxId?: string;
+    linkedinAccountId?: string;
+    messageRef: string | null;
+  }): Promise<void>;
+  setLeadInvited(leadId: string, at: Date): Promise<void>;
+  setCampaignLeadStatus(campaignId: string, leadId: string, status: "queued" | "suppressed" | "skipped" | "sent"): Promise<void>;
+}
+
+export interface OutreachSendDeps {
+  store: OutreachSendStore;
+  emailInfra: EmailInfra;
+  linkedinInfra: LinkedInInfra;
+  appUrl: string;
+  now?: () => Date;
+}
+
+export type OutreachSendOutcome = "sent" | "suppressed" | "parked" | "failed" | "skipped";
+
+export interface DispatchableSend {
+  id: string;
+  accountId: string;
+  campaignId: string;
+  leadId: string;
+  channel: "email" | "linkedin";
+  linkedinStage: "invite" | "message" | null;
+  status: "approved" | "scheduled";
+  accountPaused: boolean;
+  hasSenderAddress: boolean;
+  campaignStatus: string;
+  leadInvitedAt: Date | null;
+  leadConnectedAt: Date | null;
+}
+
+export interface SendDispatchStore {
+  isKillSwitchOn(): Promise<boolean>;
+  /** approved rows + scheduled rows whose scheduled_for is older than staleCutoff (lost-task recovery) */
+  getDispatchableSends(staleCutoff: Date): Promise<DispatchableSend[]>;
+  /** Σ over ACTIVE mailboxes of min(daily_send_limit ?? cap, cap) − sends recorded today */
+  getEmailCapacity(accountId: string, dayStart: Date): Promise<number>;
+  /** null = no active LinkedIn identity */
+  getLinkedInAccountAgeDays(accountId: string, now: Date): Promise<number | null>;
+  countLinkedInSentToday(accountId: string, kind: "invite" | "message", dayStart: Date): Promise<number>;
+  markScheduled(sendId: string, scheduledFor: Date): Promise<void>;
+  cancelSend(sendId: string, error: string): Promise<void>;
+}
+
+export interface SendDispatchDeps {
+  store: SendDispatchStore;
+  /** wrapper triggers the outreach-send task with a delay */
+  enqueue: (sendId: string, runAt: Date) => Promise<void>;
+  now?: () => Date;
+}
+
+export interface SendDispatchSummary {
+  status: "halted" | "completed";
+  scheduled: number;
+  canceled: number;
   skipped: number;
 }
 
