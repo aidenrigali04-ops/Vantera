@@ -21,9 +21,10 @@ Each entry stays short — the detail lives in that phase's spec (`docs/superpow
   Scope shipped: `agents`/`agent_icps`/`agent_assets` schema (RLS, 0007); `packages/prospect-data` (interface + in-memory fake + Explorium adapter); `packages/agent-brains` (rules gate, batched AI rank with `ai_insights`, website scan, email + LinkedIn copy brains, humanizer); Trigger.dev scheduler cron + scout-run + copy-draft tasks; **suppression enforced before every draft, with tests** (rule 11); agent wizards + `/agents` page with Live cards.
   Descoped to later phases: leads table UI (Phase 4), review-queue UI (Phase 4), automatic/manual send modes + preview step + user-drafted copy path (Phase 5), LinkedIn follow-up sequencing (Phase 5).
 
-- [ ] **Phase 4 — Leads & review queue UI**
-  Goal: users see what their agents produced and approve outreach.
-  Scope: leads table UI with score + rationale + tailored insights panel (rule 06 dashboard surface); review-before-send queue UI (approve/edit/decline drafts, humanizer style flags visible); suppression list management UI (manual adds, rule 11); retention purge job for never-qualified leads (90-day window stated in 0002); channel safety-limit scaffolding at the scheduler (rule 04 ceilings, enforced when sends go live).
+- [x] **Phase 4 — Leads & review queue UI**
+  Goal: users see what their agents produced and approve outreach. Shipped 2026-06-11.
+  Scope shipped: leads table UI with status tabs, pagination, and score/rationale/insights slide-over (rule 06 surface); review queue UI at `/review` (approve / edit-with-relint / decline / decline-and-suppress, style flags visible; Campaigns nav slot replaced per rule 08); suppression management UI at `/settings/suppression` (add+view only — entries never expire per 0003; adds flip queued drafts to suppressed); 0008 `scheduled_sends.style_flags`; daily retention purge job (90-day window from 0002); safety-limit scaffolding (`safety-limits.ts`, rule 04 ceilings, wired at the Phase 5 send boundary).
+  Follow-up (pre-existing, flagged by whitelabel audit): rename the `leads.source` enum value `'explorium'` to a neutral value before any surface/DTO/export ever selects `source` — fold into Phase 5 or 6.
   Depends on: Phase 3. Key rules: 04, 06, 08, 11.
 
 - [ ] **Phase 5 — Live channel adapters**
