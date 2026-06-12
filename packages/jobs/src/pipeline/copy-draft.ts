@@ -36,9 +36,24 @@ function toDraftInput(lead: DraftableLead, ctx: CopyContext): DraftInput | null 
 }
 
 /**
+ * Resolve the draft status for a send row.
+ * automatic mode promotes clean drafts to 'approved'; any style violations
+ * always fall back to 'pending_review' regardless of mode (the guardrail:
+ * flagged copy never auto-sends).
+ */
+function draftStatus(
+  sendMode: "review" | "automatic",
+  violations: unknown[]
+): "pending_review" | "approved" {
+  return sendMode === "automatic" && violations.length === 0 ? "approved" : "pending_review";
+}
+
+/**
  * Draft personalized outreach for qualified leads into the review queue.
- * The suppression check runs BEFORE any draft on every channel (rule 11), and
- * nothing here moves past 'pending_review' — live sending is Phase 5.
+ * The suppression check runs BEFORE any draft on every channel (rule 11).
+ * automatic send mode promotes clean drafts to 'approved'; style-flagged
+ * drafts always stay 'pending_review'. LinkedIn leads get an invite+message
+ * pair stored as two rows.
  */
 export async function runCopyDraft(
   payload: CopyDraftPayload,
@@ -80,7 +95,8 @@ export async function runCopyDraft(
           channel: "email",
           subject: draft.subject,
           body: draft.body,
-          status: "pending_review",
+          status: draftStatus(ctx.agent.sendMode, draft.violations),
+          linkedinStage: null,
           styleFlags: draft.violations.length > 0 ? describeViolations(draft.violations) : null,
         });
         leadDrafted += 1;
@@ -93,19 +109,13 @@ export async function runCopyDraft(
       ) {
         leadSuppressed += 1;
       } else {
+        // suppression checked above; one draft call yields both the invite note and follow-up
         const draft = await deps.draftLinkedInFn(input);
-        // first touch only: the connection note. The follow-up is generated again at
-        // Phase 5 when acceptance events exist to hang it off.
-        await deps.store.insertScheduledSend({
-          accountId,
-          campaignId,
-          leadId: lead.id,
-          channel: "linkedin",
-          subject: null,
-          body: draft.connectionNote,
-          status: "pending_review",
-          styleFlags: draft.violations.length > 0 ? describeViolations(draft.violations) : null,
-        });
+        const status = draftStatus(ctx.agent.sendMode, draft.violations);
+        const flags = draft.violations.length > 0 ? describeViolations(draft.violations) : null;
+        const common = { accountId, campaignId, leadId: lead.id, channel: "linkedin" as const, subject: null, status, styleFlags: flags };
+        await deps.store.insertScheduledSend({ ...common, linkedinStage: "invite", body: draft.connectionNote });
+        await deps.store.insertScheduledSend({ ...common, linkedinStage: "message", body: draft.followupMessage });
         leadDrafted += 1;
       }
     }

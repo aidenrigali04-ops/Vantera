@@ -81,7 +81,7 @@ export interface CopyConfig {
 }
 
 export interface CopyContext {
-  agent: { id: string; accountId: string; status: string; campaignId: string | null; config: CopyConfig };
+  agent: { id: string; accountId: string; status: string; campaignId: string | null; config: CopyConfig; sendMode: "review" | "automatic" };
   assets: { kind: string; url: string | null; filename: string | null }[];
   account: { industry: string | null; websiteScan: (WebsiteScan & { url?: string }) | null };
 }
@@ -105,9 +105,10 @@ export interface NewScheduledSend {
   channel: "email" | "linkedin";
   subject: string | null;
   body: string;
-  /** always 'pending_review' — the pipeline stops at the drafted queue until Phase 5 */
-  status: "pending_review";
-  /** unresolved humanizer flags shown in the review queue */
+  /** automatic mode inserts clean drafts as 'approved'; style-flagged drafts always review */
+  status: "pending_review" | "approved";
+  /** invite/message pair for LinkedIn (0009); null for email */
+  linkedinStage: "invite" | "message" | null;
   styleFlags: string | null;
 }
 

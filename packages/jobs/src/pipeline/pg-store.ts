@@ -5,6 +5,7 @@ import {
   agentIcps,
   agents,
   campaignLeads,
+  campaigns,
   enrichmentResults,
   icps,
   leads,
@@ -192,6 +193,9 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         .where(eq(agentAssets.agentId, copyAgentId));
       const [account] = await db.select().from(accounts).where(eq(accounts.id, agent.accountId));
       if (!account) return null;
+      const [campaign] = agent.campaignId
+        ? await db.select({ sendMode: campaigns.sendMode }).from(campaigns).where(eq(campaigns.id, agent.campaignId))
+        : [undefined];
       const config = (agent.config ?? {}) as Partial<CopyConfig>;
       return {
         agent: {
@@ -203,6 +207,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
             cta: config.cta ?? "a quick look",
             channels: { linkedin: config.channels?.linkedin ?? false, email: config.channels?.email ?? false },
           },
+          sendMode: campaign?.sendMode === "automatic" ? "automatic" : "review",
         },
         assets,
         account: {
@@ -269,6 +274,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         status: send.status,
         subject: send.subject,
         body: send.body,
+        linkedinStage: send.linkedinStage,
         styleFlags: send.styleFlags,
       });
     },
