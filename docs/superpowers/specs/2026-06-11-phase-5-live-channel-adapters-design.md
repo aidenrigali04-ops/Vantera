@@ -44,9 +44,13 @@ one spec/one pass; send modes = **review + automatic**; verification = **TDD on 
   (`{line1, line2?, city, region, postal, country}`) for the CAN-SPAM footer.
   Collected on `/settings/channels`; email dispatch refuses to run for an account
   until it is set.
-- `accounts.sending_paused boolean not null default false` — per-account kill
-  switch, toggled from `/settings/channels`. The platform-wide switch stays in
+- Per-account kill switch: the existing `accounts.outreach_paused` (0001) gets its
+  toggle on `/settings/channels` — no new column. The platform-wide switch stays in
   `app_settings.outreach_kill_switch` (service-role only, no UI this phase).
+- `scheduled_sends.linkedin_stage text check in ('invite','message')`, null for
+  email — Phase 3 LinkedIn drafts hold only the connection note, so the follow-up
+  message becomes a second draft row and the stage column tells the dispatcher
+  which is which (see §3).
 - `webhook_events` — inbound webhook idempotency + debugging: `id`, `source`
   (`'email' | 'linkedin'`), `provider_event_id` (unique per source), `payload jsonb`,
   `received_at`. **Service-role only: RLS enabled, no policies.**
@@ -55,7 +59,7 @@ one spec/one pass; send modes = **review + automatic**; verification = **TDD on 
   — connection-state tracking for LinkedIn sequencing.
 - `leads.source` check constraint updated and existing rows migrated:
   `'explorium'` → `'discovery'`.
-- **No new columns on `scheduled_sends`.** The status lifecycle
+- No other `scheduled_sends` changes: the status lifecycle
   (`approved → scheduled → sending → sent | failed | canceled | suppressed`) already
   fits; identity assignment and `message_ref` are recorded on `outreach_sends`.
 
@@ -95,13 +99,15 @@ Pure cores in `pipeline/`, deps injected via `types.ts` interfaces, drizzle impl
 3. **Email composition at send time:** create an `unsubscribe_tokens` row; append the
    footer (unsubscribe link + the account's physical address); set the one-click
    unsubscribe (RFC 8058) header where the provider supports it.
-4. **LinkedIn sequencing:** lead not connected and not invited → send an **invite**
-   (note = opener trimmed to ≤200 chars), set `leads.linkedin_invited_at`, and flip
-   the draft back to `approved` with `scheduled_for` cleared — it parks there until
-   the relationship-accepted webhook sets `linkedin_connected_at`, after which the
-   next dispatch tick schedules the full drafted **message** (dispatch skips
-   LinkedIn drafts for invited-but-unconnected leads). Invites unaccepted after 30
-   days → draft `canceled`.
+4. **LinkedIn sequencing (two draft rows):** the LinkedIn copy brain already
+   returns both a connection note and a follow-up message, and `copy-draft` inserts
+   two `scheduled_sends` rows per lead — `linkedin_stage = 'invite'` (body = note,
+   trimmed to ≤200 chars at send) and `linkedin_stage = 'message'` (body = full
+   follow-up), both reviewed together in the queue. Dispatch sends invite rows
+   normally (the send sets `leads.linkedin_invited_at`); message rows are eligible
+   only once the relationship-accepted webhook has set
+   `leads.linkedin_connected_at`. Message rows for leads invited >30 days ago with
+   no acceptance → `canceled`.
 
 ### Send modes
 
@@ -196,7 +202,7 @@ ramp/ceiling unchanged; add `LINKEDIN_STEADY_DAILY_MESSAGES = 25` and a
 
 - **`/settings/channels`** (new): email provisioning + sender address + mailbox list;
   LinkedIn connect + account list; "Pause all sending" toggle
-  (`accounts.sending_paused`). Settings nav entry added.
+  (`accounts.outreach_paused`). Settings nav entry added.
 - Copy-agent wizard: send-mode toggle (review/automatic) + channel readiness
   indicators with deep links. Agent card exposes the same send-mode setting.
 - Lead slide-over: latest reply + classification badge. Review queue rows show
