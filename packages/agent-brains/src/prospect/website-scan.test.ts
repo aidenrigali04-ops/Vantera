@@ -51,6 +51,33 @@ describe("scanWebsite", () => {
     await expect(scanWebsite("https://acme.com", { model, fetchImpl })).resolves.toEqual(scan);
   });
 
+  it("clamps oversized model output to 5 list items instead of throwing", async () => {
+    // real content-rich sites make the model return many items; the schema must not
+    // reject them (root cause of the onboarding scan silently failing) — clamp instead.
+    const big = {
+      summary: "x".repeat(800),
+      offerings: Array.from({ length: 16 }, (_, i) => `offering ${i}`),
+      value_props: Array.from({ length: 12 }, (_, i) => `value ${i}`),
+      scope_of_industry: "y".repeat(400),
+    };
+    const fetchImpl = (async () =>
+      new Response("<html><p>lots of real content here</p></html>", { status: 200 })) as unknown as typeof fetch;
+    const model = new MockLanguageModelV2({
+      doGenerate: {
+        finishReason: "stop",
+        usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
+        content: [{ type: "text", text: JSON.stringify(big) }],
+        warnings: [],
+      },
+    });
+
+    const result = await scanWebsite("https://acme.com", { model, fetchImpl });
+    expect(result.offerings).toHaveLength(5);
+    expect(result.value_props).toHaveLength(5);
+    expect(result.summary.length).toBeLessThanOrEqual(500);
+    expect(result.scope_of_industry.length).toBeLessThanOrEqual(200);
+  });
+
   it("throws on fetch failure", async () => {
     const fetchImpl = (async () => new Response("nope", { status: 500 })) as unknown as typeof fetch;
     await expect(
