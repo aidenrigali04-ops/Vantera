@@ -20,7 +20,15 @@ const allTables = Object.values(schema)
   .map((t) => getTableName(t as Parameters<typeof getTableName>[0]));
 
 // exceptions to the account_id tenancy rule, each justified in its migration comment
-const tenantExempt = new Set(["accounts", "account_members", "user_profiles", "app_settings", "webhook_events"]);
+const tenantExempt = new Set([
+  "accounts",
+  "account_members",
+  "user_profiles",
+  "app_settings",
+  "webhook_events",
+  // global RAG table — no account_id by design (identical data for every tenant); service-role only
+  "copilot_knowledge_chunks",
+]);
 
 // returns the create-table DDL block for a table from the concatenated migrations
 function tableDdl(table: string): string {
@@ -111,7 +119,7 @@ describe("retention windows (rule 11)", () => {
 });
 
 describe("service-role-only write surfaces (rules 09/11)", () => {
-  it.each(["outreach_sends", "copilot_actions", "enrichment_results", "replies", "unsubscribe_tokens"])(
+  it.each(["outreach_sends", "copilot_actions", "enrichment_results", "replies", "unsubscribe_tokens", "copilot_conversations", "copilot_messages"])(
     "%s has no client write policies",
     (table) => {
     const policyRe = new RegExp(`create policy \\w+ on public\\.${table}\\s+for (insert|update|delete|all)`);
@@ -126,5 +134,14 @@ describe("migration hygiene", () => {
     migrationFiles.forEach((file, i) => {
       expect(file.startsWith(String(i).padStart(4, "0"))).toBe(true);
     });
+  });
+});
+
+describe("copilot v1 (0011)", () => {
+  it("copilot_knowledge_chunks is global: RLS on, no tenant policies (0011)", () => {
+    const sql = readFileSync(join(migrationsDir, "0011_copilot_v1.sql"), "utf8");
+    expect(sql).toMatch(/alter table public\.copilot_knowledge_chunks enable row level security/);
+    // no RLS policy directly on the table (global/service-role-only table; see migration comment)
+    expect(sql).not.toMatch(/create policy\s+\w+\s+on public\.copilot_knowledge_chunks/);
   });
 });

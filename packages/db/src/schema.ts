@@ -1,6 +1,7 @@
 import {
   bigint,
   boolean,
+  customType,
   index,
   integer,
   jsonb,
@@ -12,6 +13,18 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
+
+const vector1024 = customType<{ data: number[]; driverData: string }>({
+  dataType() {
+    return "vector(1024)";
+  },
+  toDriver(value: number[]) {
+    return `[${value.join(",")}]`;
+  },
+  fromDriver(value: string) {
+    return value.slice(1, -1).split(",").map(Number);
+  },
+});
 
 // The SQL migrations in ../migrations are the source of truth. This file mirrors them for
 // type-safe queries. SQL-only details without a first-class Drizzle representation: FKs to
@@ -600,6 +613,10 @@ export const copilotActions = pgTable(
     }).notNull(),
     error: text("error"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    conversationId: uuid("conversation_id"),
+    undoable: boolean("undoable").notNull().default(false),
+    undoExpiresAt: timestamp("undo_expires_at", { withTimezone: true }),
+    undoPayload: jsonb("undo_payload"),
   },
   (t) => [
     index("copilot_actions_account_created_idx").on(t.accountId, t.createdAt),
@@ -620,4 +637,52 @@ export const copilotKnowledgeGaps = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("copilot_knowledge_gaps_account_status_idx").on(t.accountId, t.status)]
+);
+
+// ── 0011 copilot v1 ───────────────────────────────────────────────────────────
+
+export const copilotConversations = pgTable(
+  "copilot_conversations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id").notNull().references(() => accounts.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").notNull(),
+    currentSurface: text("current_surface"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("copilot_conversations_account_idx").on(t.accountId, t.updatedAt.desc())]
+);
+
+export const copilotMessages = pgTable(
+  "copilot_messages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    conversationId: uuid("conversation_id").notNull().references(() => copilotConversations.id, { onDelete: "cascade" }),
+    accountId: uuid("account_id").notNull().references(() => accounts.id, { onDelete: "cascade" }),
+    role: text("role", { enum: ["user", "assistant"] }).notNull(),
+    content: text("content").notNull().default(""),
+    toolCalls: jsonb("tool_calls"),
+    feedback: text("feedback", { enum: ["up", "down"] }),
+    unhelpful: boolean("unhelpful").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("copilot_messages_conversation_idx").on(t.conversationId, t.createdAt)]
+);
+
+// Global reference data — no account_id by design (identical for every tenant).
+// Service-role only (RLS on, no tenant policies); accessed via match_copilot_chunks() SECURITY DEFINER fn.
+// retention: rebuilt at deploy, not purged.
+export const copilotKnowledgeChunks = pgTable(
+  "copilot_knowledge_chunks",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    slug: text("slug").notNull(),
+    heading: text("heading"),
+    content: text("content").notNull(),
+    contentHash: text("content_hash").notNull().unique(),
+    embedding: vector1024("embedding").notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("copilot_knowledge_chunks_slug_idx").on(t.slug)]
 );
