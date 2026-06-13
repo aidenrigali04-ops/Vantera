@@ -1,5 +1,15 @@
 # UI/UX workflow
 
+## Theme default — DARK (updated 2026-06-13, supersedes the prior light default)
+
+The app default theme is **dark** (`defaultTheme="dark"` in `apps/web/src/app/layout.tsx`). The
+**theme toggle lives only on the dashboard** (`(app)/layout.tsx`) — users who want light flip it
+there. The **landing page, auth, and onboarding are always dark** (a forced `.dark` wrapper on each
+shell), independent of that toggle, because they are brand marketing/entry surfaces. The monochrome
+base + warm sunset accent (`#FFCC1A → #FF730D → #EB291C`) and Montserrat + Geist Mono pairing are
+unchanged; only the default lightness flipped. Owner decision while building the Antigravity-style
+landing page.
+
 ## UI Designer Reference sheet
 A development-only artifact (never user-facing) used to build the dashboard UI. Workflow: replicate the reference precisely, then customize. No AI slop — every aspect, feature, and component must be pinpointed precisely against the reference.
 

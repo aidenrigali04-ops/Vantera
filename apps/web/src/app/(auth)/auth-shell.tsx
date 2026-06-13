@@ -9,7 +9,7 @@ const montserrat = Montserrat({ subsets: ["latin"], weight: ["500", "600"] });
 export function AuthShell({ children }: { children: React.ReactNode }) {
   return (
     <main
-      className={`${montserrat.className} flex min-h-screen flex-col items-center justify-center px-6 py-12 font-medium`}
+      className={`dark ${montserrat.className} flex min-h-screen flex-col items-center justify-center bg-background px-6 py-12 font-medium text-foreground`}
     >
       <DottedSurface />
       <GlassFilter />

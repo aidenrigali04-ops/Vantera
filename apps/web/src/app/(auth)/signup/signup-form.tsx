@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { FormError } from "@/components/form-error";
 
 const inputClass =
-  "border-white/60 bg-white/40 backdrop-blur-sm placeholder:text-zinc-500 focus-visible:border-white";
+  "border-white/15 bg-white/5 backdrop-blur-sm placeholder:text-muted-foreground focus-visible:border-white/40";
 
 export function SignupForm() {
   const [state, action, pending] = useActionState<AuthFormState, FormData>(signup, {});
@@ -21,13 +21,13 @@ export function SignupForm() {
         <GlassEffect className="w-full rounded-3xl">
           <div className="flex flex-col gap-4 p-8">
             <h1 className="text-xl font-semibold tracking-tight">Check your email</h1>
-            <p className="text-sm text-zinc-700">
+            <p className="text-sm text-muted-foreground">
               We sent a confirmation link to your inbox. Click it to continue setting up
               your workspace.
             </p>
-            <p className="text-sm text-zinc-700">
+            <p className="text-sm text-muted-foreground">
               Already confirmed?{" "}
-              <Link className="text-zinc-950 hover:underline" href="/login">
+              <Link className="text-foreground hover:underline" href="/login">
                 Sign in
               </Link>
             </p>
@@ -77,19 +77,19 @@ export function SignupForm() {
                 className={inputClass}
                 required
               />
-              <p className="text-xs text-zinc-600">At least 8 characters.</p>
+              <p className="text-xs text-muted-foreground">At least 8 characters.</p>
             </div>
             <FormError message={state.error} />
             <button
               type="submit"
               disabled={pending}
-              className="rounded-[18px] bg-[#121317] px-6 py-2.5 font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+              className="rounded-[18px] bg-foreground px-6 py-2.5 font-medium text-background transition-opacity hover:opacity-90 disabled:opacity-60"
             >
               {pending ? "Creating account…" : "Create account"}
             </button>
-            <p className="text-center text-sm text-zinc-700">
+            <p className="text-center text-sm text-muted-foreground">
               Already have an account?{" "}
-              <Link className="text-zinc-950 hover:underline" href="/login">
+              <Link className="text-foreground hover:underline" href="/login">
                 Sign in
               </Link>
             </p>
