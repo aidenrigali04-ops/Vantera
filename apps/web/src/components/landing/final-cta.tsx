@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
-import { WARM, WARM_GRADIENT } from "./landing-theme";
+import { WARM } from "./landing-theme";
 
 export function FinalCta() {
   return (
@@ -13,7 +13,7 @@ export function FinalCta() {
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, margin: "-80px" }}
         transition={{ duration: 0.7 }}
-        className="relative mx-auto max-w-4xl overflow-hidden rounded-3xl border border-white/10 bg-white/[0.02] px-6 py-16 text-center sm:px-12"
+        className="relative mx-auto max-w-4xl overflow-hidden rounded-3xl border border-white/[0.16] bg-white/[0.06] shadow-lg shadow-black/25 px-6 py-16 text-center sm:px-12"
       >
         <div
           aria-hidden
@@ -35,15 +35,14 @@ export function FinalCta() {
           <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
             <Link
               href="/signup"
-              className="group inline-flex items-center justify-center gap-2 rounded-full px-7 py-3.5 text-sm font-medium text-background shadow-lg shadow-black/30 transition-transform hover:scale-[1.02]"
-              style={{ backgroundImage: WARM_GRADIENT }}
+              className="group inline-flex items-center justify-center gap-2 rounded-full bg-foreground px-7 py-3.5 text-sm font-medium text-background shadow-lg shadow-black/30 transition-opacity hover:opacity-90"
             >
               Get started free
               <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
             </Link>
             <Link
               href="/login"
-              className="inline-flex items-center justify-center rounded-full border border-white/15 px-7 py-3.5 text-sm font-medium text-foreground transition-colors hover:bg-white/[0.04]"
+              className="inline-flex items-center justify-center rounded-full border border-white/15 px-7 py-3.5 text-sm font-medium text-foreground transition-colors hover:bg-white/[0.07]"
             >
               Sign in
             </Link>

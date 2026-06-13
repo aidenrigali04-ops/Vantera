@@ -1,8 +1,6 @@
 "use client";
 
 import { Search, CornerDownLeft } from "lucide-react";
-import { AnimatedPanelBorder } from "@/components/ui/animated-border";
-import { WARM_BEAM, WARM_GRADIENT } from "../landing-theme";
 import { ICP_PRESETS } from "./sim-data";
 
 export function SearchBar({
@@ -23,9 +21,8 @@ export function SearchBar({
           e.preventDefault();
           onSubmit();
         }}
-        className="relative rounded-2xl"
       >
-        <div className="relative flex items-center gap-2 rounded-2xl border border-white/12 bg-white/[0.04] p-2 pl-4 backdrop-blur-md transition-shadow focus-within:ring-2 focus-within:ring-white/25">
+        <div className="flex items-center gap-2 rounded-2xl border border-white/15 bg-white/[0.07] p-2 pl-4 shadow-lg shadow-black/20 backdrop-blur-md transition-shadow focus-within:ring-2 focus-within:ring-white/25">
           <Search className="size-4 shrink-0 text-muted-foreground" />
           <label htmlFor="icp-search" className="sr-only">
             Describe your target audience
@@ -40,14 +37,12 @@ export function SearchBar({
           />
           <button
             type="submit"
-            className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-xl px-4 text-sm font-medium text-background transition-transform hover:scale-[1.02] active:scale-100"
-            style={{ backgroundImage: WARM_GRADIENT }}
+            className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-xl bg-foreground px-4 text-sm font-medium text-background transition-opacity hover:opacity-90"
           >
-            Run pipeline
+            Simulate
             <CornerDownLeft className="size-3.5" />
           </button>
         </div>
-        <AnimatedPanelBorder radius={16} gradient={WARM_BEAM} />
       </form>
 
       <div className="mt-3 flex flex-wrap items-center justify-center gap-1.5">
@@ -57,7 +52,7 @@ export function SearchBar({
             key={p.id}
             type="button"
             onClick={() => onPreset(p.id, p.query)}
-            className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-xs text-foreground/70 transition-colors hover:border-white/25 hover:text-foreground"
+            className="rounded-full border border-white/[0.16] bg-white/[0.06] px-3 py-1 text-xs text-foreground/70 transition-colors hover:border-white/25 hover:text-foreground"
           >
             {p.label}
           </button>

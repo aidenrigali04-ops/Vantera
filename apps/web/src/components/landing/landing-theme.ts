@@ -1,17 +1,20 @@
 /**
- * Marketing-page accent constants. The landing page keeps the locked monochrome
- * base from `globals.css` and layers the brand's warm "particle" sweep
- * (yellow → orange → red) as the single sharp accent — same palette the
- * `DottedSurface` and `AnimatedPanelBorder` use, so the page reads as one system.
+ * Landing accent constants.
+ *
+ * TEMPORARILY NEUTRALIZED (2026-06-13): the warm brand sweep is parked — the
+ * landing page is strict monochrome (white-on-near-black) for now. These names
+ * are kept so consumers compile unchanged; every value resolves to white/grey,
+ * so dots, glows, bars, and gradient-text read as tasteful monochrome. Restore
+ * the warm palette here (#FFCC1A → #FF730D → #EB291C) to bring branding back.
  */
 export const WARM = {
-  c1: "#FFCC1A",
-  c2: "#FF730D",
-  c3: "#EB291C",
+  c1: "#ffffff",
+  c2: "#ffffff",
+  c3: "#ffffff",
 } as const;
 
-/** Solid left-to-right sweep for fills, text clips, and small accents. */
-export const WARM_GRADIENT = `linear-gradient(90deg, ${WARM.c1}, ${WARM.c2}, ${WARM.c3})`;
+/** Subtle monochrome sweep for decorative fills/clipped-text (buttons use solid tokens). */
+export const WARM_GRADIENT = "linear-gradient(135deg, #ffffff, #d4d4d4)";
 
-/** Traveling-beam gradient for `AnimatedPanelBorder` (leads with a transparent head). */
-export const WARM_BEAM = `linear-gradient(90deg,transparent,${WARM.c1},${WARM.c2},${WARM.c3})`;
+/** Retained for API compatibility; the traveling gradient border is no longer used. */
+export const WARM_BEAM = "linear-gradient(90deg,transparent,#ffffff,#d4d4d4)";

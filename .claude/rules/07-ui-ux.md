@@ -1,14 +1,27 @@
 # UI/UX workflow
 
-## Theme default — DARK (updated 2026-06-13, supersedes the prior light default)
+## Theme strategy — per-surface (updated 2026-06-13)
 
-The app default theme is **dark** (`defaultTheme="dark"` in `apps/web/src/app/layout.tsx`). The
-**theme toggle lives only on the dashboard** (`(app)/layout.tsx`) — users who want light flip it
-there. The **landing page, auth, and onboarding are always dark** (a forced `.dark` wrapper on each
-shell), independent of that toggle, because they are brand marketing/entry surfaces. The monochrome
-base + warm sunset accent (`#FFCC1A → #FF730D → #EB291C`) and Montserrat + Geist Mono pairing are
-unchanged; only the default lightness flipped. Owner decision while building the Antigravity-style
-landing page.
+App default is **dark** (`defaultTheme="dark"` in `apps/web/src/app/layout.tsx`); the **theme toggle
+lives only on the dashboard** (`(app)/layout.tsx`). Surfaces are forced per-context, independent of
+the global toggle:
+
+- **Landing** — forced **dark**, strict **monochrome** (brand warm sweep parked; see
+  `components/landing/landing-theme.ts`). White particles via `DottedSurface colorTheme="dark"`.
+  The page wrapper has **no opaque background** so the dark body shows behind the fixed `-z-1`
+  particle canvas (an opaque wrapper bg hides the particles — the bug fixed here).
+- **Auth + onboarding** — forced **dark** (a `.dark` class on each shell) so they stay dark
+  regardless of the dashboard toggle. Each shell has **no opaque background** + a fixed
+  `-z-10 bg-background` dark backdrop behind `DottedSurface colorTheme="dark"` (white particles) so
+  the particles stay visible. Onboarding had no particle background before — added here.
+- **Dashboard** — follows the global theme (dark default; toggle switches it to light).
+
+**Particle-visibility rule:** the `DottedSurface` canvas is `fixed -z-1`; any opaque in-flow
+background on the wrapper paints over it and hides the dots. A forced-theme surface must keep the
+wrapper transparent and put a separate fixed `-z-10` backdrop behind the canvas.
+
+Montserrat + Geist Mono pairing unchanged. Landing panels use ~`bg-white/[0.06]` +
+`border-white/[0.16]` + a soft shadow for contrast on the near-black background.
 
 ## UI Designer Reference sheet
 A development-only artifact (never user-facing) used to build the dashboard UI. Workflow: replicate the reference precisely, then customize. No AI slop — every aspect, feature, and component must be pinpointed precisely against the reference.

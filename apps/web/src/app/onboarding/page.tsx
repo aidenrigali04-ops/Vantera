@@ -8,10 +8,5 @@ export default async function OnboardingPage() {
   } = await supabase.auth.getUser();
   const defaultCompanyName =
     (user?.user_metadata?.company_name as string | undefined)?.trim() ?? "";
-  // Onboarding is always dark (brand surface, no toggle here) — see page.tsx note.
-  return (
-    <div className="dark bg-background text-foreground">
-      <Wizard defaultCompanyName={defaultCompanyName} />
-    </div>
-  );
+  return <Wizard defaultCompanyName={defaultCompanyName} />;
 }

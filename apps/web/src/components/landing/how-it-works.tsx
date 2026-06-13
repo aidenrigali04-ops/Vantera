@@ -61,11 +61,11 @@ export function HowItWorks() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: "-60px" }}
             transition={{ duration: 0.5, delay: (i % 3) * 0.08 }}
-            className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.02] p-5 transition-colors hover:border-white/20"
+            className="group relative overflow-hidden rounded-2xl border border-white/[0.16] bg-white/[0.06] shadow-lg shadow-black/25 p-5 transition-colors hover:border-white/20"
           >
             <div className="flex items-center gap-3">
               <span
-                className="grid size-9 place-items-center rounded-xl border border-white/10 bg-white/[0.04] text-foreground/80"
+                className="grid size-9 place-items-center rounded-xl border border-white/[0.16] bg-white/[0.07] text-foreground/80"
                 style={{ boxShadow: `0 0 24px -10px ${WARM.c2}` }}
               >
                 <step.icon className="size-4" />

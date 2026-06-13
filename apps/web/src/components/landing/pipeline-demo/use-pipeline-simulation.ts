@@ -32,14 +32,15 @@ export const PHASE_ORDER: Phase[] = [
   "done",
 ];
 
+// Paced deliberately slow so a first-time viewer can read each step as it runs.
 const SEQUENCE: { phase: Phase; duration: number }[] = [
-  { phase: "sourcing", duration: 1600 },
-  { phase: "gating", duration: 1300 },
-  { phase: "enriching", duration: 1700 },
-  { phase: "scoring", duration: 1800 },
-  { phase: "drafting", duration: 2000 },
-  { phase: "sending", duration: 1700 },
-  { phase: "crm", duration: 1600 },
+  { phase: "sourcing", duration: 2300 },
+  { phase: "gating", duration: 2100 },
+  { phase: "enriching", duration: 2500 },
+  { phase: "scoring", duration: 2400 },
+  { phase: "drafting", duration: 2800 },
+  { phase: "sending", duration: 2300 },
+  { phase: "crm", duration: 2100 },
   { phase: "done", duration: 0 },
 ];
 

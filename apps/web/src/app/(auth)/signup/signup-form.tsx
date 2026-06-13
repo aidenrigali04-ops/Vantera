@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { FormError } from "@/components/form-error";
 
 const inputClass =
-  "border-white/15 bg-white/5 backdrop-blur-sm placeholder:text-muted-foreground focus-visible:border-white/40";
+  "border-white/15 bg-white/[0.06] backdrop-blur-sm placeholder:text-muted-foreground focus-visible:border-white/40";
 
 export function SignupForm() {
   const [state, action, pending] = useActionState<AuthFormState, FormData>(signup, {});

@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 
 const LINKS = [
   { label: "How it works", href: "#how" },
-  { label: "Pipeline", href: "#demo" },
+  { label: "Pipeline", href: "#simulate" },
   { label: "Agents", href: "#agents" },
   { label: "Outcomes", href: "#outcomes" },
 ];
@@ -27,7 +27,7 @@ export function LandingNav() {
         className={cn(
           "flex w-full max-w-5xl items-center gap-4 rounded-2xl border px-3 py-2 transition-all duration-300 sm:px-4",
           scrolled
-            ? "border-white/10 bg-[#0b0c0f]/80 shadow-lg shadow-black/30 backdrop-blur-xl"
+            ? "border-white/[0.16] bg-[#0b0c0f]/80 shadow-lg shadow-black/30 backdrop-blur-xl"
             : "border-transparent bg-transparent",
         )}
       >

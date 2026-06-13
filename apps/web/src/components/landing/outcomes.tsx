@@ -35,7 +35,7 @@ export function Outcomes() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-60px" }}
           transition={{ duration: 0.6 }}
-          className="rounded-2xl border border-white/10 bg-white/[0.02] p-5"
+          className="rounded-2xl border border-white/[0.16] bg-white/[0.06] shadow-lg shadow-black/25 p-5"
         >
           <div className="mb-1 flex items-baseline justify-between">
             <h3 className="font-heading text-lg font-semibold text-foreground">The quality gate</h3>
@@ -89,7 +89,7 @@ export function Outcomes() {
         >
           <div className="grid grid-cols-2 gap-3">
             {STATS.map((s) => (
-              <div key={s.label} className="rounded-2xl border border-white/10 bg-white/[0.02] p-4">
+              <div key={s.label} className="rounded-2xl border border-white/[0.16] bg-white/[0.06] shadow-lg shadow-black/25 p-4">
                 <div
                   className="font-heading bg-clip-text text-3xl font-semibold text-transparent"
                   style={{ backgroundImage: `linear-gradient(135deg, ${WARM.c1}, ${WARM.c3})` }}
@@ -100,7 +100,7 @@ export function Outcomes() {
               </div>
             ))}
           </div>
-          <div className="flex-1 rounded-2xl border border-white/10 bg-white/[0.02] p-5">
+          <div className="flex-1 rounded-2xl border border-white/[0.16] bg-white/[0.06] shadow-lg shadow-black/25 p-5">
             <h3 className="font-heading text-lg font-semibold text-foreground">
               Every campaign tracks to your number
             </h3>

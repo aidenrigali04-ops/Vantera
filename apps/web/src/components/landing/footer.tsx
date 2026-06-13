@@ -5,7 +5,7 @@ const COLUMNS: { heading: string; links: { label: string; href: string }[] }[] =
     heading: "Product",
     links: [
       { label: "How it works", href: "#how" },
-      { label: "Live pipeline", href: "#demo" },
+      { label: "Live pipeline", href: "#simulate" },
       { label: "Agents", href: "#agents" },
       { label: "Outcomes", href: "#outcomes" },
     ],
@@ -29,7 +29,7 @@ const COLUMNS: { heading: string; links: { label: string; href: string }[] }[] =
 
 export function LandingFooter() {
   return (
-    <footer className="relative border-t border-white/10 px-4 py-12">
+    <footer className="relative border-t border-white/[0.16] px-4 py-12">
       <div className="mx-auto grid max-w-5xl gap-10 sm:grid-cols-[1.5fr_1fr_1fr_1fr]">
         <div>
           <Link href="/" className="font-heading text-lg font-semibold tracking-tight text-foreground">

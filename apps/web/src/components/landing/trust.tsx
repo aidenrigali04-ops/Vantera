@@ -44,7 +44,7 @@ export function Trust() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: "-60px" }}
             transition={{ duration: 0.5, delay: i * 0.08 }}
-            className="rounded-2xl border border-white/10 bg-white/[0.02] p-5"
+            className="rounded-2xl border border-white/[0.16] bg-white/[0.06] shadow-lg shadow-black/25 p-5"
           >
             <item.icon className="size-5 text-foreground/80" />
             <h3 className="font-heading mt-3 text-base font-semibold text-foreground">{item.title}</h3>
