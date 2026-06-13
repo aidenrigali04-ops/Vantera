@@ -42,6 +42,9 @@ export const accounts = pgTable("accounts", {
   onboardingIndustry: text("onboarding_industry"),
   onboardingIcp: text("onboarding_icp"),
   revenueGoalCents: bigint("revenue_goal_cents", { mode: "number" }),
+  // 0012: estimated monthly recurring value per closed client — powers the dashboard
+  // revenue snapshot (closed + expected MRR vs. the goal). Null until set in Settings.
+  avgDealValueCents: bigint("avg_deal_value_cents", { mode: "number" }),
   onboardingCompletedAt: timestamp("onboarding_completed_at", { withTimezone: true }),
   stripeCustomerId: text("stripe_customer_id").unique(),
   stripeSubscriptionId: text("stripe_subscription_id"),

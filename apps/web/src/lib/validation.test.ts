@@ -3,6 +3,7 @@ import {
   confirmAccountName,
   dollarsToCents,
   normalizeWebsiteUrl,
+  optionalDollarsToCents,
   validateOnboarding,
   validateSignup,
   validateWorkspace,
@@ -111,6 +112,22 @@ describe("validateSignup", () => {
   });
 });
 
+describe("optionalDollarsToCents", () => {
+  it("treats blank as null (not an error)", () => {
+    expect(optionalDollarsToCents("")).toEqual({ ok: true, cents: null });
+    expect(optionalDollarsToCents("   ")).toEqual({ ok: true, cents: null });
+  });
+
+  it("parses a positive amount", () => {
+    expect(optionalDollarsToCents("$1,500")).toEqual({ ok: true, cents: 150_000 });
+  });
+
+  it("rejects non-positive or junk", () => {
+    expect(optionalDollarsToCents("0").ok).toBe(false);
+    expect(optionalDollarsToCents("abc").ok).toBe(false);
+  });
+});
+
 describe("validateWorkspace", () => {
   it("requires a name and valid onboarding fields", () => {
     expect(
@@ -121,6 +138,39 @@ describe("validateWorkspace", () => {
     ).toBe(false);
     expect(
       validateWorkspace({ name: "Acme", industry: "SaaS", icp: "CTOs", revenueGoal: "junk" }).ok
+    ).toBe(false);
+  });
+
+  it("defaults avg deal value to null when blank", () => {
+    const result = validateWorkspace({
+      name: "Acme",
+      industry: "SaaS",
+      icp: "CTOs",
+      revenueGoal: "1000",
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.values.avgDealValueCents).toBeNull();
+  });
+
+  it("parses a provided avg deal value and rejects junk", () => {
+    const ok = validateWorkspace({
+      name: "Acme",
+      industry: "SaaS",
+      icp: "CTOs",
+      revenueGoal: "1000",
+      avgDealValue: "1500",
+    });
+    expect(ok.ok).toBe(true);
+    if (ok.ok) expect(ok.values.avgDealValueCents).toBe(150_000);
+
+    expect(
+      validateWorkspace({
+        name: "Acme",
+        industry: "SaaS",
+        icp: "CTOs",
+        revenueGoal: "1000",
+        avgDealValue: "-5",
+      }).ok
     ).toBe(false);
   });
 });

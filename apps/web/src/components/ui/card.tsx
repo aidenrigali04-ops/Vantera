@@ -2,9 +2,43 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
+/**
+ * Frosted-glass layers replicated from the auth card (`GlassEffect` in
+ * `liquid-glass.tsx`): a blurred + distorted backdrop, a translucent white
+ * fill, and an inset highlight. Rendered behind card content via `-z-10`; the
+ * card root sets `isolate` so in-flow content always paints above these.
+ * Requires the `#glass-distortion` SVG filter mounted once per page.
+ */
+function CardGlass() {
+  return (
+    <>
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 -z-10 overflow-hidden rounded-[inherit]"
+        style={{
+          backdropFilter: "var(--glass-blur)",
+          filter: "url(#glass-distortion)",
+          isolation: "isolate",
+        }}
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 -z-10 rounded-[inherit]"
+        style={{ background: "var(--glass-fill)" }}
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 -z-10 rounded-[inherit]"
+        style={{ boxShadow: "var(--glass-rim)" }}
+      />
+    </>
+  )
+}
+
 function Card({
   className,
   size = "default",
+  children,
   ...props
 }: React.ComponentProps<"div"> & { size?: "default" | "sm" }) {
   return (
@@ -12,11 +46,14 @@ function Card({
       data-slot="card"
       data-size={size}
       className={cn(
-        "group/card flex flex-col gap-(--card-spacing) overflow-hidden rounded-xl bg-card py-(--card-spacing) text-sm text-card-foreground ring-1 ring-foreground/10 [--card-spacing:--spacing(4)] has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 data-[size=sm]:[--card-spacing:--spacing(3)] data-[size=sm]:has-data-[slot=card-footer]:pb-0 *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl",
+        "group/card relative isolate flex flex-col gap-(--card-spacing) overflow-hidden rounded-xl py-(--card-spacing) text-sm text-card-foreground shadow-(--glass-shadow) ring-1 ring-foreground/10 [--card-spacing:--spacing(4)] has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 data-[size=sm]:[--card-spacing:--spacing(3)] data-[size=sm]:has-data-[slot=card-footer]:pb-0 *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl",
         className
       )}
       {...props}
-    />
+    >
+      <CardGlass />
+      {children}
+    </div>
   )
 }
 
@@ -94,6 +131,7 @@ function CardFooter({ className, ...props }: React.ComponentProps<"div">) {
 
 export {
   Card,
+  CardGlass,
   CardHeader,
   CardFooter,
   CardTitle,

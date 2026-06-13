@@ -49,6 +49,9 @@ export default async function SettingsPage() {
             revenueGoalDollars={
               account.revenue_goal_cents ? String(account.revenue_goal_cents / 100) : ""
             }
+            avgDealValueDollars={
+              account.avg_deal_value_cents ? String(account.avg_deal_value_cents / 100) : ""
+            }
           />
         </CardContent>
       </Card>
