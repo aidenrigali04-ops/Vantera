@@ -38,7 +38,7 @@ describe("single AI entry point (rule 02, locked)", () => {
     const offenders: string[] = [];
     for (const file of sourceFiles(src)) {
       const content = readFileSync(file, "utf8");
-      if (/from\s+["']@ai-sdk\/|require\(["']@ai-sdk\/|from\s+["']@anthropic-ai\//.test(content)) {
+      if (/from\s+["']@ai-sdk\/|require\(["']@ai-sdk\/|from\s+["']@anthropic-ai\/|voyageai\.com|voyage-ai-provider/.test(content)) {
         offenders.push(relative(repoRoot, file));
       }
     }
