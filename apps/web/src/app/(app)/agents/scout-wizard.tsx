@@ -8,31 +8,42 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FormError } from "@/components/form-error";
 import { WizardShell } from "@/components/wizard/wizard-shell";
-import { deployScoutAgent, type AgentActionState } from "./actions";
+import { deployScoutAgent, updateScoutAgent, type AgentActionState } from "./actions";
 import { MAX_ICPS } from "./validation";
 
 const RUN_TIMES = ["06:00", "07:00", "08:00", "09:00", "10:00", "12:00", "15:00", "18:00"];
 
 const STEPS = ["Name", "ICPs", "Schedule", "Deploy"] as const;
 
+export type ScoutEditValues = {
+  name: string;
+  icps: string[];
+  runAtTime: string;
+  cadence: "daily" | "weekly";
+};
+
 export function ScoutWizard({
   defaultIcp,
   existingIcps,
+  edit,
 }: {
   /** the ICP captured at onboarding — offered as a pre-built chip (rule 08 default) */
   defaultIcp: string | null;
   existingIcps: string[];
+  /** present → edit an existing agent's config instead of deploying a new one */
+  edit?: ScoutEditValues;
 }) {
+  const isEdit = Boolean(edit);
   const [step, setStep] = useState(0);
-  const [name, setName] = useState("");
-  const [icps, setIcps] = useState<string[]>(defaultIcp ? [defaultIcp] : []);
+  const [name, setName] = useState(edit?.name ?? "");
+  const [icps, setIcps] = useState<string[]>(edit?.icps ?? (defaultIcp ? [defaultIcp] : []));
   const [icpInput, setIcpInput] = useState("");
-  const [runAtTime, setRunAtTime] = useState("08:00");
-  const [cadence, setCadence] = useState<"daily" | "weekly">("daily");
+  const [runAtTime, setRunAtTime] = useState(edit?.runAtTime ?? "08:00");
+  const [cadence, setCadence] = useState<"daily" | "weekly">(edit?.cadence ?? "daily");
   // resolved on the client; SSR sees the server zone, so the two nodes rendering it suppress hydration diffs
   const [timezone] = useState(() => Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC");
   const [state, action, pending] = useActionState<AgentActionState, FormData>(
-    deployScoutAgent,
+    isEdit ? updateScoutAgent : deployScoutAgent,
     {}
   );
 
@@ -64,16 +75,21 @@ export function ScoutWizard({
       endowed={1}
       endowedNote={defaultIcp ? "Your onboarding ICP is already loaded ✓" : "Account ready ✓"}
       title={
-        ["Name your agent", "Who should it hunt for?", "When should it run?", `Deploy ${name.trim() || "your agent"}`][
-          step
-        ]!
+        [
+          "Name your agent",
+          "Who should it hunt for?",
+          "When should it run?",
+          isEdit
+            ? `Save changes to ${name.trim() || "your agent"}`
+            : `Deploy ${name.trim() || "your agent"}`,
+        ][step]!
       }
       hint={
         [
           "This is your prospecting teammate — give it a name you'll recognize.",
           `Type your own or pick a suggestion. Up to ${MAX_ICPS}.`,
           "It sources, scores, and enriches leads on this schedule.",
-          "Review everything, then put it to work.",
+          isEdit ? "Review your changes, then save the new config." : "Review everything, then put it to work.",
         ][step]
       }
     >
@@ -214,8 +230,8 @@ export function ScoutWizard({
             <dd>
               Every {cadence === "daily" ? "day" : "week"} at {runAtTime} ({timezone})
             </dd>
-            <dt className="text-muted-foreground">First run</dt>
-            <dd>within 15 minutes of deploy</dd>
+            <dt className="text-muted-foreground">{isEdit ? "Takes effect" : "First run"}</dt>
+            <dd>{isEdit ? "on the next scheduled run" : "within 15 minutes of deploy"}</dd>
           </dl>
         )}
 
@@ -236,7 +252,13 @@ export function ScoutWizard({
             </Button>
           ) : (
             <Button type="submit" disabled={pending}>
-              {pending ? "Deploying…" : `Deploy ${name.trim() || "agent"}`}
+              {isEdit
+                ? pending
+                  ? "Saving…"
+                  : "Save changes"
+                : pending
+                  ? "Deploying…"
+                  : `Deploy ${name.trim() || "agent"}`}
             </Button>
           )}
         </div>

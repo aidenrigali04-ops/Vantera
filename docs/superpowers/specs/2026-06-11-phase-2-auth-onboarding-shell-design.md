@@ -54,6 +54,8 @@ Three steps, one field per step, progress bar starting endowed (account-created 
 
 Single save at the end (server action): updates the `accounts` row and sets `onboarding_completed_at`. These answers seed the campaign-wizard default targeting (rule 08).
 
+**Spacing & visual polish (2026-06-12):** the wizard cards are focused single-task surfaces and follow the locked spacing scale in rule 07 — `[--card-spacing:--spacing(8)]`, `space-y-9` between fields, `space-y-3.5` within a field, `CardContent pb-8` so the footer divider never butts the last hint, `h-11 px-4 text-base` inputs. Each card carries an `AnimatedPanelBorder` overlaid as a sibling (matching the auth panels), beamed in the particle palette (`PARTICLE_BEAM`, `#FFCC1A → #FF730D → #EB291C`). Rule 07 is the source of truth; keep these in sync there, not per-spec.
+
 ### Dashboard home (retention brief: endowed progress)
 
 - **Goal card** — "Targeting {icp} in {industry} — goal ${goal}/mo", real data from the `accounts` row, never placeholders.

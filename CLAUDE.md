@@ -12,7 +12,7 @@ Foundational decisions were locked 2026-06-11. The detailed rules live in `.clau
 - [LinkedIn outreach infrastructure](.claude/rules/04-linkedin-infra.md) — Unipile behind the `linkedin-infra` interface
 - [Prospect data & enrichment](.claude/rules/05-enrichment.md) — Explorium AgentSource + enrichment waterfall
 - [Lead scoring](.claude/rules/06-lead-scoring.md) — rules gate + AI rank, the "only high-quality leads" gate
-- [UI/UX workflow](.claude/rules/07-ui-ux.md) — UI Designer Reference sheet, UX Brain, prompting loop
+- [UI/UX workflow](.claude/rules/07-ui-ux.md) — UI Designer Reference sheet, UX Brain, prompting loop, locked spacing/padding scale + animated-border convention
 - [SDR agents & outreach pipeline](.claude/rules/08-campaign-pipeline.md) — agent setup wizards (the front door) + agent behavior contract
 - [Help copilot](.claude/rules/09-help-copilot.md) — in-app LLM overlay, action tiers, knowledge whitelist, knowledge-sync rule
 - [Deployment & environments](.claude/rules/10-deployment.md) — Vercel hosting, env ladder, migration discipline

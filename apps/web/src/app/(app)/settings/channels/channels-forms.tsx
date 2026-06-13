@@ -36,12 +36,12 @@ export function SenderAddressForm({ defaultValues }: SenderAddressFormProps) {
     <form action={action} className="space-y-3" data-copilot="channels-setup">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="space-y-1 sm:col-span-2">
-          <Label htmlFor="line1">Street address</Label>
+          <Label htmlFor="line1">Street address or PO box</Label>
           <Input
             id="line1"
             name="line1"
             defaultValue={defaultValues.line1}
-            placeholder="100 Main St"
+            placeholder="100 Main St or PO Box 100"
             required
           />
         </div>

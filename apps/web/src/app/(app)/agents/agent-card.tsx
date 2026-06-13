@@ -1,6 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState } from "react";
+import { Settings2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -69,7 +71,12 @@ export function AgentCard({
           <div>
             <p className="text-xs uppercase tracking-wide text-muted-foreground">{roleLabel}</p>
             <CardTitle className="flex items-center gap-2 text-lg">
-              {agent.name}
+              <Link
+                href={`/agents/${agent.kind}`}
+                className="rounded-sm underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                {agent.name}
+              </Link>
               <span
                 className={`inline-flex items-center gap-1.5 text-xs font-medium ${
                   live ? "text-emerald-600" : "text-muted-foreground"
@@ -82,13 +89,20 @@ export function AgentCard({
               </span>
             </CardTitle>
           </div>
-          <form action={action}>
-            <input type="hidden" name="agentId" value={agent.id} />
-            <input type="hidden" name="status" value={live ? "paused" : "live"} />
-            <Button type="submit" variant="ghost" size="sm">
-              {live ? "Pause" : "Resume"}
+          <div className="flex items-center gap-1">
+            <Button asChild variant="ghost" size="sm">
+              <Link href={`/agents/${agent.kind}/edit`}>
+                <Settings2 className="size-4" /> Edit config
+              </Link>
             </Button>
-          </form>
+            <form action={action}>
+              <input type="hidden" name="agentId" value={agent.id} />
+              <input type="hidden" name="status" value={live ? "paused" : "live"} />
+              <Button type="submit" variant="ghost" size="sm">
+                {live ? "Pause" : "Resume"}
+              </Button>
+            </form>
+          </div>
         </div>
         {icpNames.length > 0 && (
           <div className="flex flex-wrap gap-1.5 pt-1">

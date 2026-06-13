@@ -170,7 +170,7 @@ export default async function DashboardPage() {
   const reached = funnel.filter((s) => s.count > 0).length;
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-6">
+    <div className="mx-auto flex max-w-5xl flex-col gap-6 [&_[data-slot=card]]:rounded-2xl [&_[data-slot=card]]:border [&_[data-slot=card]]:border-border [&_[data-slot=card]]:shadow-sm [&_[data-slot=card]]:ring-0 [&_[data-slot=card]]:transition-colors [&_[data-slot=card]:hover]:border-foreground">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Good to see you, {firstName}</h1>

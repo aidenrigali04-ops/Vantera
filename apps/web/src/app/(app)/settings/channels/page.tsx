@@ -97,9 +97,12 @@ export default async function ChannelsPage() {
           {/* Sender address — required for CAN-SPAM (rule 11) */}
           <div className="space-y-3">
             <div>
-              <p className="text-sm font-medium">Physical mailing address</p>
+              <p className="text-sm font-medium">Business mailing address</p>
               <p className="text-sm text-muted-foreground">
-                Required — this address appears in the footer of every cold email.
+                U.S. anti-spam law (CAN-SPAM) requires a real postal address in the footer of
+                every cold email — it&apos;s printed publicly there, never shared or used for
+                anything else. A business address, PO box, or virtual mailbox all work; just
+                don&apos;t use your home.
               </p>
             </div>
             <SenderAddressForm defaultValues={senderAddressDefaults} />

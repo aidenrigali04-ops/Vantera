@@ -3,7 +3,8 @@ import { Inbox, Mail, MessageSquare } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
-import { LeadProfileLink, LEAD_PROFILE_FIELDS, type LeadProfile } from "@/components/lead-profile";
+import { LeadProfileLink, type LeadProfile } from "@/components/lead-profile";
+import { LEAD_PROFILE_FIELDS } from "@/components/lead-profile-fields";
 import { DraftCard, type DraftRow } from "./draft-card";
 
 const CHANNELS = ["all", "email", "linkedin"] as const;

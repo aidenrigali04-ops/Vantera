@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { FormError } from "@/components/form-error";
 import { WizardShell } from "@/components/wizard/wizard-shell";
-import { deployCopyAgent, type AgentActionState } from "./actions";
+import { deployCopyAgent, updateCopyAgent, type AgentActionState } from "./actions";
 
 const STEPS = ["Name", "Targeting", "CTA", "Content", "Channels", "Deploy"] as const;
 
@@ -18,27 +18,39 @@ const CTA_EXAMPLES = [
   "try a free demo",
 ] as const;
 
+export type CopyEditValues = {
+  name: string;
+  cta: string;
+  links: string;
+  channels: { linkedin: boolean; email: boolean };
+  sendMode: "review" | "automatic";
+};
+
 export function CopyWizard({
   scoutName,
   icpNames,
   mailboxCount = 0,
   linkedinCount = 0,
+  edit,
 }: {
   scoutName: string;
   icpNames: string[];
   mailboxCount?: number;
   linkedinCount?: number;
+  /** present → edit an existing agent's config instead of deploying a new one */
+  edit?: CopyEditValues;
 }) {
+  const isEdit = Boolean(edit);
   const [step, setStep] = useState(0);
-  const [name, setName] = useState("");
-  const [cta, setCta] = useState("");
-  const [links, setLinks] = useState("");
+  const [name, setName] = useState(edit?.name ?? "");
+  const [cta, setCta] = useState(edit?.cta ?? "");
+  const [links, setLinks] = useState(edit?.links ?? "");
   const [fileCount, setFileCount] = useState(0);
-  const [linkedin, setLinkedin] = useState(true);
-  const [email, setEmail] = useState(true);
-  const [sendMode, setSendMode] = useState<"review" | "automatic">("review");
+  const [linkedin, setLinkedin] = useState(edit?.channels.linkedin ?? true);
+  const [email, setEmail] = useState(edit?.channels.email ?? true);
+  const [sendMode, setSendMode] = useState<"review" | "automatic">(edit?.sendMode ?? "review");
   const [state, action, pending] = useActionState<AgentActionState, FormData>(
-    deployCopyAgent,
+    isEdit ? updateCopyAgent : deployCopyAgent,
     {}
   );
 
@@ -63,7 +75,9 @@ export function CopyWizard({
           "What's the ask?",
           "Give it material",
           "Where it reaches out",
-          `Deploy ${name.trim() || "your agent"}`,
+          isEdit
+            ? `Save changes to ${name.trim() || "your agent"}`
+            : `Deploy ${name.trim() || "your agent"}`,
         ][step]!
       }
       hint={
@@ -71,9 +85,11 @@ export function CopyWizard({
           "Your outreach teammate — it writes every message, tailored to each lead.",
           "Set by your Prospect Agent — every draft targets these people.",
           "The one thing each message invites the prospect to do.",
-          "Optional — but the more you add, the smarter every message gets.",
+          isEdit
+            ? "Add more material — anything you already uploaded stays."
+            : "Optional — but the more you add, the smarter every message gets.",
           "Enable at least one channel.",
-          "Choose how it sends, then deploy.",
+          isEdit ? "Review your changes, then save the new config." : "Choose how it sends, then deploy.",
         ][step]
       }
     >
@@ -288,7 +304,13 @@ export function CopyWizard({
             </Button>
           ) : (
             <Button type="submit" disabled={pending}>
-              {pending ? "Deploying…" : `Deploy ${name.trim() || "agent"}`}
+              {isEdit
+                ? pending
+                  ? "Saving…"
+                  : "Save changes"
+                : pending
+                  ? "Deploying…"
+                  : `Deploy ${name.trim() || "agent"}`}
             </Button>
           )}
         </div>

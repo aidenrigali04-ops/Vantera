@@ -8,9 +8,9 @@ import { AgentCard, type AgentRow } from "./agent-card";
 export default async function AgentsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ deployed?: string }>;
+  searchParams: Promise<{ deployed?: string; updated?: string }>;
 }) {
-  const { deployed } = await searchParams;
+  const { deployed, updated } = await searchParams;
   const supabase = await createClient();
 
   const { data: agents } = await supabase
@@ -39,6 +39,15 @@ export default async function AgentsPage({
           Your SDR team. Deploy them once — they prospect, score, and write for you.
         </p>
       </div>
+
+      {updated && (
+        <div className="mb-6 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm">
+          <span className="font-medium">
+            {(updated === "scout" ? scout?.name : copy?.name) ?? "Your agent"} updated.
+          </span>{" "}
+          The new configuration is saved and takes effect on its next run.
+        </div>
+      )}
 
       {deployed && (
         <div className="mb-6 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm">

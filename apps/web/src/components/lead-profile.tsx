@@ -39,10 +39,6 @@ export interface LeadProfile {
   linkedin_url: string | null;
 }
 
-// The fields a Supabase `leads(...)` select needs to fully hydrate this panel.
-export const LEAD_PROFILE_FIELDS =
-  "id, first_name, last_name, title, company_name, company_size, industry, location, tech_stack, status, ai_score, ai_rationale, ai_insights, email, email_status, phone, phone_status, linkedin_url";
-
 const STATUS_LABELS: Record<string, string> = {
   sourced: "Sourced",
   rejected: "Filtered out",
