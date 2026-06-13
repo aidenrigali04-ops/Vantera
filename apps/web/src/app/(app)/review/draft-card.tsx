@@ -16,6 +16,7 @@ export interface DraftRow {
   subject: string | null;
   body: string;
   style_flags: string | null;
+  linkedin_stage: "invite" | "message" | null;
   created_at: string;
   leads: {
     first_name: string | null;
@@ -56,10 +57,17 @@ export function DraftCard({ draft }: { draft: DraftRow }) {
           <p className="font-medium">{name}</p>
           {context && <p className="text-sm text-muted-foreground">{context}</p>}
         </div>
-        <Badge variant="outline" className="gap-1">
-          {draft.channel === "email" ? <Mail className="size-3" /> : <MessageSquare className="size-3" />}
-          {draft.channel === "email" ? "Email" : "LinkedIn"}
-        </Badge>
+        <div className="flex items-center gap-1.5">
+          <Badge variant="outline" className="gap-1">
+            {draft.channel === "email" ? <Mail className="size-3" /> : <MessageSquare className="size-3" />}
+            {draft.channel === "email" ? "Email" : "LinkedIn"}
+          </Badge>
+          {draft.linkedin_stage && (
+            <Badge variant="secondary">
+              {draft.linkedin_stage === "invite" ? "Invite" : "Follow-up"}
+            </Badge>
+          )}
+        </div>
       </CardHeader>
       <CardContent className="space-y-3">
         {draft.style_flags && (

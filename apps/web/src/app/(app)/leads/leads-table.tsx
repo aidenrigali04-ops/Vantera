@@ -33,6 +33,30 @@ export interface LeadRow {
   phone_status: string;
   linkedin_url: string | null;
   created_at: string;
+  replies?: ReplyView[] | null;
+}
+
+export interface ReplyView {
+  classification: string | null;
+  classification_rationale: string | null;
+  body: string | null;
+  received_at: string;
+}
+
+const REPLY_LABELS: Record<string, string> = {
+  interested: "Interested",
+  not_interested: "Not interested",
+  neutral: "Neutral",
+  out_of_office: "Out of office",
+  bounce: "Bounced",
+  unsubscribe: "Unsubscribed",
+  other: "Other",
+};
+
+function latestReply(lead: LeadRow): ReplyView | null {
+  const replies = lead.replies ?? [];
+  if (replies.length === 0) return null;
+  return [...replies].sort((a, b) => b.received_at.localeCompare(a.received_at))[0];
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -157,6 +181,34 @@ export function LeadsTable({ leads }: { leads: LeadRow[] }) {
                   <p className="mt-2 text-sm text-muted-foreground">{selected.ai_rationale}</p>
                 )}
               </section>
+
+              {(() => {
+                const reply = latestReply(selected);
+                if (!reply) return null;
+                return (
+                  <section className="space-y-2 rounded-lg border border-border bg-muted/30 p-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-medium uppercase text-muted-foreground">Replied</p>
+                      {reply.classification && (
+                        <Badge
+                          variant={reply.classification === "interested" ? "default" : "secondary"}
+                        >
+                          {REPLY_LABELS[reply.classification] ?? reply.classification}
+                        </Badge>
+                      )}
+                    </div>
+                    {reply.classification_rationale && (
+                      <p className="text-xs text-muted-foreground">{reply.classification_rationale}</p>
+                    )}
+                    {reply.body && (
+                      <p className="text-sm text-muted-foreground">
+                        “{reply.body.slice(0, 200)}
+                        {reply.body.length > 200 ? "…" : ""}”
+                      </p>
+                    )}
+                  </section>
+                );
+              })()}
 
               {selected.ai_insights && (
                 <section className="space-y-3">
