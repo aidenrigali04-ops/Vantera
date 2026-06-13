@@ -10,7 +10,7 @@ const FLOW =
   "linear-gradient(90deg, #FFCC1A 0%, #FF730D 35%, #EB291C 60%, #FF730D 85%, #FFCC1A 100%)";
 
 /**
- * Determinate progress bar with the Claude-chat "working" treatment, in Vantera
+ * Determinate progress bar with a "working" streaming treatment, in Vantera
  * brand colors: the filled portion is a continuously flowing brand gradient with
  * a sheen that sweeps across it. Falls back to a static brand fill when the user
  * prefers reduced motion.

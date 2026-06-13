@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isPurgeable, runRetentionPurge, RETENTION_DAYS, WEBHOOK_RETENTION_DAYS } from "./retention-purge";
+import { isPurgeable, runRetentionPurge, RETENTION_DAYS, WEBHOOK_RETENTION_DAYS, COPILOT_CONVERSATION_RETENTION_DAYS } from "./retention-purge";
 import type { PurgeCandidate, RetentionStore } from "./types";
 
 const base: PurgeCandidate = {
@@ -43,6 +43,9 @@ describe("runRetentionPurge", () => {
       async purgeWebhookEvents() {
         return 0;
       },
+      async purgeOldCopilotConversations() {
+        return 0;
+      },
     };
     return { store, deleted };
   }
@@ -59,6 +62,9 @@ describe("runRetentionPurge", () => {
         return 0;
       },
       async purgeWebhookEvents() {
+        return 0;
+      },
+      async purgeOldCopilotConversations() {
         return 0;
       },
     };
@@ -99,6 +105,9 @@ describe("webhook_events retention (30-day window, rule 11)", () => {
         seenWebhookCutoff = cutoff;
         return eventsToDelete;
       },
+      async purgeOldCopilotConversations() {
+        return 0;
+      },
     };
     return { store, getSeenCutoff: () => seenWebhookCutoff };
   }
@@ -120,5 +129,46 @@ describe("webhook_events retention (30-day window, rule 11)", () => {
     const { store } = fakeStoreWithWebhooks(0);
     const summary = await runRetentionPurge({ store });
     expect(summary.webhookEventsPurged).toBe(0);
+  });
+});
+
+describe("copilot_conversations retention (180-day window, 0011)", () => {
+  function fakeStoreWithCopilot(conversationsToDelete: number) {
+    let seenCopilotCutoff: Date | null = null;
+    const store: RetentionStore = {
+      async getPurgeCandidates() {
+        return [];
+      },
+      async deleteLeads() {
+        return 0;
+      },
+      async purgeWebhookEvents() {
+        return 0;
+      },
+      async purgeOldCopilotConversations(cutoff) {
+        seenCopilotCutoff = cutoff;
+        return conversationsToDelete;
+      },
+    };
+    return { store, getSeenCutoff: () => seenCopilotCutoff };
+  }
+
+  it("calls purgeOldCopilotConversations with now − 180 days", async () => {
+    const now = new Date("2026-06-11T00:00:00Z");
+    const { store, getSeenCutoff } = fakeStoreWithCopilot(0);
+    await runRetentionPurge({ store, now: () => now });
+    expect(getSeenCutoff()!.getTime()).toBe(now.getTime() - COPILOT_CONVERSATION_RETENTION_DAYS * 86_400_000);
+  });
+
+  it("reports copilotConversationsPurged in the summary", async () => {
+    const { store } = fakeStoreWithCopilot(3);
+    const summary = await runRetentionPurge({ store });
+    expect(summary).toMatchObject({ status: "completed", copilotConversationsPurged: 3 });
+  });
+
+  it("reports 0 copilotConversationsPurged when none are old enough", async () => {
+    const { store } = fakeStoreWithCopilot(0);
+    const summary = await runRetentionPurge({ store });
+    expect(summary.copilotConversationsPurged).toBe(0);
   });
 });

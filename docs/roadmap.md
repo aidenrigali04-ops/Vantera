@@ -38,6 +38,8 @@ Each entry stays short — the detail lives in that phase's spec (`docs/superpow
 - [ ] **Phase 6 — Help copilot v1**
   Goal: the approved copilot spec, live on every dashboard page.
   Scope: build `docs/superpowers/specs/2026-06-11-help-copilot-design.md` — `packages/help-agent`, `packages/help-content` index build, `/api/copilot` streaming route, overlay UI, action tiers + confirmation cards, `copilot_actions`/`copilot_knowledge_gaps` tables, red-team CI fixture; backfill help articles for Phases 2–5 surfaces.
+  Built: RAG knowledge index via pgvector + Voyage embeddings; help-agent core with tiered tools (read/navigate/mutate/critical); `/api/copilot` streaming route with persistence + audit + tenant isolation; MorphPanel overlay with confirmation/outcome cards, feedback + escalation; pause/resume mutate with undo; navigate tier with highlights + walkthroughs; red-team fixture; copilot.md article; 0011 migration; 180-day copilot_conversations retention purge (cascades copilot_messages).
+  Remaining before /ship-phase: live smoke test with owner VOYAGE_API_KEY (run `pnpm --filter @vantera/help-content build-index` to populate the index, then exercise the overlay).
   Depends on: Phases 2–5 (things to help with). Key rules: 09. Skill: building-copilot-features.
 
 - [ ] **Phase 7 — Billing & team seats**

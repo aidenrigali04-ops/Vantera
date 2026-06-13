@@ -254,6 +254,8 @@ export interface RetentionStore {
   deleteLeads(ids: string[]): Promise<number>;
   /** webhook_events rows with received_at < cutoff — debugging/idempotency data, purged after 30 days (rule 11) */
   purgeWebhookEvents(cutoff: Date): Promise<number>;
+  /** copilot_conversations rows with updated_at < cutoff — cascades copilot_messages via FK on delete cascade (0011) */
+  purgeOldCopilotConversations(cutoff: Date): Promise<number>;
 }
 
 export interface RetentionDeps {
@@ -266,6 +268,7 @@ export interface RetentionSummary {
   purged: number;
   cutoff: string;
   webhookEventsPurged: number;
+  copilotConversationsPurged: number;
 }
 
 export interface InboundPayload {

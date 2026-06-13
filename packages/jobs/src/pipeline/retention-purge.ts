@@ -6,6 +6,9 @@ export const RETENTION_DAYS = 90;
 /** retention(webhook_events), 0009: debugging/idempotency rows purge after 30 days (rule 11) */
 export const WEBHOOK_RETENTION_DAYS = 30;
 
+/** retention(copilot_conversations), 0011: chat sessions purge after 180 days; copilot_messages cascade via FK */
+export const COPILOT_CONVERSATION_RETENTION_DAYS = 180;
+
 /**
  * Safety predicate — the deciding logic lives HERE, tested, not in SQL.
  * Anything that ever qualified (or is still awaiting scoring after passing
@@ -25,5 +28,7 @@ export async function runRetentionPurge(deps: RetentionDeps): Promise<RetentionS
   const purged = ids.length > 0 ? await deps.store.deleteLeads(ids) : 0;
   const webhookCutoff = new Date(now.getTime() - WEBHOOK_RETENTION_DAYS * 86_400_000);
   const webhookEventsPurged = await deps.store.purgeWebhookEvents(webhookCutoff);
-  return { status: "completed", purged, cutoff: cutoff.toISOString(), webhookEventsPurged };
+  const copilotCutoff = new Date(now.getTime() - COPILOT_CONVERSATION_RETENTION_DAYS * 86_400_000);
+  const copilotConversationsPurged = await deps.store.purgeOldCopilotConversations(copilotCutoff);
+  return { status: "completed", purged, cutoff: cutoff.toISOString(), webhookEventsPurged, copilotConversationsPurged };
 }

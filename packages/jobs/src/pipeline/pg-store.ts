@@ -6,6 +6,7 @@ import {
   agents,
   campaignLeads,
   campaigns,
+  copilotConversations,
   enrichmentResults,
   icps,
   leads,
@@ -357,6 +358,12 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
 
     async purgeWebhookEvents(cutoff: Date): Promise<number> {
       const rows = await db.delete(webhookEvents).where(lt(webhookEvents.receivedAt, cutoff)).returning({ id: webhookEvents.id });
+      return rows.length;
+    },
+
+    async purgeOldCopilotConversations(cutoff: Date): Promise<number> {
+      // copilot_messages cascade-delete via FK on delete cascade (0011)
+      const rows = await db.delete(copilotConversations).where(lt(copilotConversations.updatedAt, cutoff)).returning({ id: copilotConversations.id });
       return rows.length;
     },
 
