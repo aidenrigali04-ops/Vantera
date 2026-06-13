@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createEmailInfraFromEnv } from "@vantera/email-infra";
 import { createLinkedInInfraFromEnv } from "@vantera/linkedin-infra";
-import { validateSenderAddress, validateProvisionCounts } from "./validation";
+import { canProvision, validateSenderAddress, validateProvisionCounts } from "./validation";
 
 export type ChannelActionState = { error?: string; success?: string };
 
@@ -105,11 +105,11 @@ export async function provisionEmailSending(
     .maybeSingle<{ id: string; sender_address: unknown }>();
   if (!account) return { error: "Your session expired. Sign in again." };
 
-  if (!account.sender_address) {
-    return {
-      error: "Add your sender address first — every cold email must carry it.",
-    };
-  }
+  const { count: existingCount } = await supabase
+    .from("mailboxes")
+    .select("id", { count: "exact", head: true });
+  const gate = canProvision(account.sender_address, existingCount ?? 0);
+  if (!gate.ok) return { error: gate.error };
 
   let mailboxes: Awaited<ReturnType<ReturnType<typeof createEmailInfraFromEnv>["provision"]>>;
   try {

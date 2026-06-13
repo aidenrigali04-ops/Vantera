@@ -37,6 +37,25 @@ export function validateSenderAddress(
   };
 }
 
+/**
+ * The provisioning gate: no sender address (rule 11 — every cold email must
+ * carry it) and no re-provisioning once mailboxes exist (each provider call
+ * creates billable domains/mailboxes; the page hides the form, this guards
+ * direct POSTs and stale tabs).
+ */
+export function canProvision(
+  senderAddress: unknown,
+  existingMailboxCount: number
+): Valid<true> | Invalid {
+  if (!senderAddress) {
+    return { ok: false, error: "Add your sender address first — every cold email must carry it." };
+  }
+  if (existingMailboxCount > 0) {
+    return { ok: false, error: "Email sending is already set up for this workspace." };
+  }
+  return { ok: true, values: true };
+}
+
 export function validateProvisionCounts(
   domainsRaw: string,
   mailboxesRaw: string
