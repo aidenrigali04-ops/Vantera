@@ -1,0 +1,45 @@
+#!/bin/sh
+# Secret-leak guard (rule 10: git never contains a real value).
+# Blocks a commit when staged content contains a high-signal secret token.
+# Real values belong only in .env.local (gitignored); .env.example holds blank placeholders.
+#
+# False positive? Re-check it's truly not a secret, then bypass with: git commit --no-verify
+# Zero-dependency: pure git + grep. Enabled via `core.hooksPath .githooks` (root package.json prepare script).
+
+set -e
+
+# Staged added lines only, excluding this hook, lockfiles, and the test fixture.
+added=$(git diff --cached --no-color -U0 \
+  -- . ':(exclude).githooks/*' ':(exclude)*.lock' ':(exclude)pnpm-lock.yaml' \
+  | grep -E '^\+' | grep -vE '^\+\+\+ ' || true)
+
+[ -z "$added" ] && exit 0
+
+# High-signal secret patterns. Each is specific enough to avoid matching placeholders
+# (e.g. postgres password [PASSWORD] is skipped — `[` is excluded after the colon).
+patterns='
+sk-ant-[A-Za-z0-9_-]{20,}
+sb_secret_[A-Za-z0-9_-]{8,}
+re_[A-Za-z0-9]{20,}
+sk_live_[A-Za-z0-9]{10,}
+sk_test_[A-Za-z0-9]{10,}
+whsec_[A-Za-z0-9]{10,}
+eyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}
+postgresql://[^:[:space:]]+:[^@[:space:]\[]+@
+'
+
+hits=""
+for p in $patterns; do
+  m=$(printf '%s\n' "$added" | grep -nE "$p" || true)
+  [ -n "$m" ] && hits="$hits\n[$p]\n$m"
+done
+
+if [ -n "$hits" ]; then
+  printf '\n\033[31m✖ Commit blocked: a secret-shaped value is staged (rule 10 — git never holds a real value).\033[0m\n'
+  printf '%b\n' "$hits"
+  printf '\nMove the value to .env.local (gitignored) and leave .env.example blank.\n'
+  printf 'If this is genuinely not a secret, bypass with: git commit --no-verify\n\n'
+  exit 1
+fi
+
+exit 0
