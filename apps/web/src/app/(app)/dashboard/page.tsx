@@ -15,7 +15,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/server";
 import { getGateData } from "@/lib/auth/context";
 import { AnimatedProgress } from "@/components/ui/animated-progress";
-import { LeadProfileLink, LEAD_PROFILE_FIELDS, type LeadProfile } from "@/components/lead-profile";
+import { LeadProfileLink, type LeadProfile } from "@/components/lead-profile";
+import { LEAD_PROFILE_FIELDS } from "@/components/lead-profile-fields";
 import { ProspectPanel, type Prospect } from "./prospect-panel";
 
 const usd = new Intl.NumberFormat("en-US", {
@@ -519,7 +520,7 @@ function ActivationRamp({ scoutDeployed, goal }: { scoutDeployed: boolean; goal:
 
   return (
     <div className="grid gap-6 md:grid-cols-[1.2fr_1fr]">
-      <Card>
+      <Card data-copilot="dashboard-checklist">
         <CardHeader className="pb-3">
           <CardTitle className="text-base">
             You&apos;re {doneCount}/{steps.length} of the way to your first reply

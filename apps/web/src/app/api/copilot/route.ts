@@ -10,6 +10,7 @@ import { getModel } from "@vantera/ai";
 import { makeRetriever } from "@/server/copilot/retriever";
 import { ensureConversation, saveMessage, auditAction } from "@/server/copilot/persist";
 import { buildAccountTools } from "@/server/copilot/tools";
+import { navigateTools } from "@/server/copilot/navigate-tools";
 
 export const runtime = "nodejs";
 
@@ -53,7 +54,7 @@ export async function POST(req: Request) {
   );
 
   const retrieve = makeRetriever(service);
-  const tools: CopilotTool[] = [searchKnowledgeTool as unknown as CopilotTool, ...buildAccountTools(supabase, accountId)];
+  const tools: CopilotTool[] = [searchKnowledgeTool as unknown as CopilotTool, ...buildAccountTools(supabase, accountId), ...navigateTools];
 
   const stream = new ReadableStream({
     async start(controller) {

@@ -1,9 +1,11 @@
 "use client";
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { ColorOrb } from "./color-orb";
 import { ConfirmationCard, OutcomeCard } from "./cards";
 import { useCopilot } from "./use-copilot";
+import { Walkthrough, type WalkStep } from "./walkthrough";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
@@ -52,8 +54,28 @@ export function MorphPanel({ surface }: MorphPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [walkthrough, setWalkthrough] = useState<WalkStep[] | null>(null);
 
-  const { items, busy, escalate, send, confirm, rate } = useCopilot(surface);
+  const router = useRouter();
+  const { items, busy, escalate, navEvent, send, confirm, rate } = useCopilot(surface);
+
+  // Handle navigate events emitted by the run loop.
+  // setState calls are deferred to avoid synchronous setState-in-effect lint errors.
+  useEffect(() => {
+    if (!navEvent) return;
+    if (navEvent.action === "openPage") {
+      const route = String(navEvent.params.route);
+      router.push(route);
+    } else if (navEvent.action === "highlightElement") {
+      const anchor = String(navEvent.params.anchor);
+      const id = setTimeout(() => setWalkthrough([{ anchor, note: "Here it is." }]), 0);
+      return () => clearTimeout(id);
+    } else if (navEvent.action === "startWalkthrough") {
+      const steps = navEvent.params.steps as WalkStep[];
+      const id = setTimeout(() => setWalkthrough(steps), 0);
+      return () => clearTimeout(id);
+    }
+  }, [navEvent, router]);
 
   // Close on click-outside
   useEffect(() => {
@@ -117,6 +139,10 @@ export function MorphPanel({ surface }: MorphPanelProps) {
   const suggestions = getSuggestions(surface);
 
   return (
+    <>
+      {walkthrough && (
+        <Walkthrough steps={walkthrough} onClose={() => setWalkthrough(null)} />
+      )}
     <div className="fixed bottom-6 right-6 z-50" ref={panelRef}>
       <motion.div
         layout
@@ -286,6 +312,7 @@ export function MorphPanel({ surface }: MorphPanelProps) {
         </AnimatePresence>
       </motion.div>
     </div>
+    </>
   );
 }
 

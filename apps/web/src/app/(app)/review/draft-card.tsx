@@ -109,7 +109,7 @@ export function DraftCard({ draft }: { draft: DraftRow }) {
           <div className="flex flex-wrap items-center gap-2">
             <form action={approve}>
               <input type="hidden" name="sendId" value={draft.id} />
-              <Button type="submit" size="sm" disabled={approving}>
+              <Button type="submit" size="sm" disabled={approving} data-copilot="approve-draft">
                 {approving ? "Approving…" : "Approve"}
               </Button>
             </form>

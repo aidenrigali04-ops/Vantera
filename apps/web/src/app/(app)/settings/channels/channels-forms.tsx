@@ -33,7 +33,7 @@ export function SenderAddressForm({ defaultValues }: SenderAddressFormProps) {
   );
 
   return (
-    <form action={action} className="space-y-3">
+    <form action={action} className="space-y-3" data-copilot="channels-setup">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="space-y-1 sm:col-span-2">
           <Label htmlFor="line1">Street address</Label>

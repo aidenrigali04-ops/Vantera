@@ -100,7 +100,7 @@ export function LeadsTable({ leads }: { leads: LeadRow[] }) {
 
   return (
     <>
-      <div className="overflow-hidden rounded-lg border border-border">
+      <div className="overflow-hidden rounded-lg border border-border" data-copilot="leads-table">
         <table className="w-full text-sm">
           <thead className="bg-muted/40 text-left text-xs uppercase text-muted-foreground">
             <tr>

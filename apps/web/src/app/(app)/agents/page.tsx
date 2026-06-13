@@ -72,7 +72,7 @@ export default async function AgentsPage({
             </p>
           </CardHeader>
           <CardContent className="flex justify-center pb-8">
-            <Button asChild size="lg">
+            <Button asChild size="lg" data-copilot="deploy-scout">
               <Link href="/agents/new/scout">Set up your Prospect Agent</Link>
             </Button>
           </CardContent>
@@ -106,7 +106,7 @@ export default async function AgentsPage({
                 </p>
               </CardHeader>
               <CardContent>
-                <Button asChild variant="outline">
+                <Button asChild variant="outline" data-copilot="deploy-outreach">
                   <Link href="/agents/new/copy">Set up your Outreach Agent</Link>
                 </Button>
               </CardContent>
