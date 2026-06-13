@@ -41,6 +41,9 @@ importers:
       '@vantera/linkedin-infra':
         specifier: workspace:*
         version: link:../../packages/linkedin-infra
+      '@vantera/voice-infra':
+        specifier: workspace:*
+        version: link:../../packages/voice-infra
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
