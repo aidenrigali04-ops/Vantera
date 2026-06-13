@@ -69,7 +69,12 @@ export default async function SettingsPage() {
               </li>
             ))}
           </ul>
-          <p className="mt-3 text-sm text-muted-foreground">Team invites are coming soon.</p>
+          <p className="mt-3 text-sm text-muted-foreground">
+            Invite teammates and manage roles.
+          </p>
+          <Button asChild variant="outline" size="sm" className="mt-3">
+            <Link href="/settings/team">Manage team</Link>
+          </Button>
         </CardContent>
       </Card>
 
