@@ -780,6 +780,29 @@ export interface SchedulerStore {
   advanceSchedule(agentId: string, nextRunAt: Date): Promise<void>;
 }
 
+// ── CallerConfig helper ───────────────────────────────────────────────────────
+
+function parseCallerConfig(raw: Record<string, unknown>): CallerConfig {
+  const rawVoice = (raw["voice"] ?? {}) as Record<string, unknown>;
+  const rawWindow = (raw["calling_window"] ?? {}) as Record<string, unknown>;
+  return {
+    cta: (raw["cta"] as string) ?? "",
+    bookingLink: (raw["booking_link"] as string) ?? "",
+    voice: {
+      voiceId: (rawVoice["voice_id"] as string) ?? "",
+      personaName: (rawVoice["persona_name"] as string) ?? "",
+      language: (rawVoice["language"] as string) ?? "en-US",
+    },
+    recordingConsentMode: ((raw["recording_consent_mode"] as string) ?? "one_party") as "one_party" | "two_party",
+    callingWindow: {
+      days: (rawWindow["days"] as string[]) ?? ["mon", "tue", "wed", "thu", "fri"],
+      startLocal: (rawWindow["start_local"] as string) ?? "09:00",
+      endLocal: (rawWindow["end_local"] as string) ?? "17:00",
+    },
+    maxAttempts: (raw["max_attempts"] as number) ?? 3,
+  };
+}
+
 // ── CallBriefStore ────────────────────────────────────────────────────────────
 
 export function createCallBriefStore(db: Db): CallBriefStore {
@@ -793,25 +816,7 @@ export function createCallBriefStore(db: Db): CallBriefStore {
         .where(eq(agentAssets.agentId, callerAgentId));
       const [account] = await db.select().from(accounts).where(eq(accounts.id, agent.accountId));
       if (!account) return null;
-      const raw = (agent.config ?? {}) as Record<string, unknown>;
-      const rawVoice = (raw["voice"] ?? {}) as Record<string, unknown>;
-      const rawWindow = (raw["calling_window"] ?? {}) as Record<string, unknown>;
-      const config: CallerConfig = {
-        cta: (raw["cta"] as string) ?? "",
-        bookingLink: (raw["booking_link"] as string) ?? "",
-        voice: {
-          voiceId: (rawVoice["voice_id"] as string) ?? "",
-          personaName: (rawVoice["persona_name"] as string) ?? "",
-          language: (rawVoice["language"] as string) ?? "en-US",
-        },
-        recordingConsentMode: ((raw["recording_consent_mode"] as string) ?? "one_party") as "one_party" | "two_party",
-        callingWindow: {
-          days: (rawWindow["days"] as string[]) ?? ["mon", "tue", "wed", "thu", "fri"],
-          startLocal: (rawWindow["start_local"] as string) ?? "09:00",
-          endLocal: (rawWindow["end_local"] as string) ?? "17:00",
-        },
-        maxAttempts: (raw["max_attempts"] as number) ?? 3,
-      };
+      const config = parseCallerConfig((agent.config ?? {}) as Record<string, unknown>);
       return {
         agent: {
           id: agent.id,
@@ -912,7 +917,7 @@ export function createCallDispatchStore(db: Db): CallDispatchStore {
         .innerJoin(leads, eq(scheduledSends.leadId, leads.id))
         .innerJoin(
           agents,
-          and(eq(agents.accountId, scheduledSends.accountId), eq(agents.kind, "caller"))
+          and(eq(agents.accountId, scheduledSends.accountId), eq(agents.kind, "caller"), eq(agents.status, "live"))
         )
         .where(
           and(eq(scheduledSends.channel, "call"), eq(scheduledSends.status, "approved"))
@@ -934,25 +939,7 @@ export function createCallDispatchStore(db: Db): CallDispatchStore {
       const attemptsBySend = new Map(attemptCounts.map((r) => [r.scheduledSendId, Number(r.n)]));
 
       return rows.map((r) => {
-        const raw = (r.agentConfig ?? {}) as Record<string, unknown>;
-        const rawVoice = (raw["voice"] ?? {}) as Record<string, unknown>;
-        const rawWindow = (raw["calling_window"] ?? {}) as Record<string, unknown>;
-        const config: CallerConfig = {
-          cta: (raw["cta"] as string) ?? "",
-          bookingLink: (raw["booking_link"] as string) ?? "",
-          voice: {
-            voiceId: (rawVoice["voice_id"] as string) ?? "",
-            personaName: (rawVoice["persona_name"] as string) ?? "",
-            language: (rawVoice["language"] as string) ?? "en-US",
-          },
-          recordingConsentMode: ((raw["recording_consent_mode"] as string) ?? "one_party") as "one_party" | "two_party",
-          callingWindow: {
-            days: (rawWindow["days"] as string[]) ?? ["mon", "tue", "wed", "thu", "fri"],
-            startLocal: (rawWindow["start_local"] as string) ?? "09:00",
-            endLocal: (rawWindow["end_local"] as string) ?? "17:00",
-          },
-          maxAttempts: (raw["max_attempts"] as number) ?? 3,
-        };
+        const config = parseCallerConfig((r.agentConfig ?? {}) as Record<string, unknown>);
         return {
           id: r.id,
           accountId: r.accountId,
