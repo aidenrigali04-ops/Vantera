@@ -632,7 +632,13 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         })
         .onConflictDoUpdate({
           target: [linkedinAccounts.accountId, linkedinAccounts.providerRef],
-          set: { status: e.status, profileUrl: e.profileUrl, displayName: e.displayName },
+          set: {
+            status: e.status,
+            profileUrl: e.profileUrl,
+            displayName: e.displayName,
+            // reconnects restart the rule-04 ramp clock; disconnects keep the old value
+            connectedAt: e.status === "active" ? new Date() : sql`${linkedinAccounts.connectedAt}`,
+          },
         });
     },
 
@@ -735,6 +741,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         .where(
           and(
             eq(scheduledSends.leadId, leadId),
+            // "sending" is intentionally excluded — that provider call is already in flight
             inArray(scheduledSends.status, ["pending_review", "approved", "scheduled"])
           )
         )

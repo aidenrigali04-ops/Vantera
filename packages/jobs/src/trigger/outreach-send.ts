@@ -15,7 +15,8 @@ export const outreachSend = task({
       store,
       emailInfra: createEmailInfraFromEnv(),
       linkedinInfra: createLinkedInInfraFromEnv(),
-      appUrl: process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
+      // APP_URL is the Trigger.dev-side name; NEXT_PUBLIC_APP_URL covers local dev sharing one .env
+      appUrl: process.env.APP_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
     });
     logger.info("outreach send finished", { sendId: payload.sendId, outcome });
     return { outcome };

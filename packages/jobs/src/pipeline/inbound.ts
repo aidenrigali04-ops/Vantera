@@ -105,7 +105,8 @@ export async function runInbound(payload: InboundPayload, deps: InboundDeps): Pr
     return { handled: true, action: "relationship_accepted" };
   }
 
-  // LinkedIn reply
+  // LinkedIn reply — explicit narrow so a future event variant can't fall into the reply path
+  if (event.type !== "reply") return { handled: false, action: "unhandled event type" };
   const url = normalizeLinkedInUrl(event.fromProfileUrl);
   const lead = await deps.store.findLeadByLinkedInUrl(accountId, url);
   if (!lead) return { handled: false, action: "no matching lead" };
