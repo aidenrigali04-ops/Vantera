@@ -17,7 +17,11 @@ describe("StripeBilling.parseWebhook", () => {
           current_period_end: 1768262400,
           items: {
             data: [
-              { price: { id: PLANS.growth.stripePriceId }, quantity: 1 },
+              {
+                price: { id: PLANS.growth.stripePriceId },
+                quantity: 1,
+                current_period_end: 1768262400,
+              },
               { price: { id: ADDON_PRICES.seat }, quantity: 2 },
               { price: { id: ADDON_PRICES.linkedinAccount }, quantity: 1 },
             ],
@@ -35,6 +39,8 @@ describe("StripeBilling.parseWebhook", () => {
       seatsPurchased: 2,
       linkedinAccountsPurchased: 1,
     });
+    if (parsed.type !== "subscription_updated") throw new Error("expected subscription_updated");
+    expect(parsed.currentPeriodEnd).toBe(new Date(1768262400 * 1000).toISOString());
   });
 
   it("maps customer.subscription.deleted to subscription_canceled", () => {
