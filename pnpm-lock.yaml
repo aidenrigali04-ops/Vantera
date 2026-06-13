@@ -23,9 +23,18 @@ importers:
       '@supabase/supabase-js':
         specifier: ^2.108.1
         version: 2.108.1
+      '@trigger.dev/sdk':
+        specifier: ^4.0.0
+        version: 4.4.6(ai@5.0.199(zod@4.4.3))(zod@4.4.3)
       '@vantera/agent-brains':
         specifier: workspace:*
         version: link:../../packages/agent-brains
+      '@vantera/email-infra':
+        specifier: workspace:*
+        version: link:../../packages/email-infra
+      '@vantera/linkedin-infra':
+        specifier: workspace:*
+        version: link:../../packages/linkedin-infra
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
