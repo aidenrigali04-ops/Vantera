@@ -1,5 +1,5 @@
 ---
-title: Send modes: review vs automatic
+title: "Send modes: review vs automatic"
 surface: agents
 routes: /agents
 ---

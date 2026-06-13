@@ -5,6 +5,17 @@ import type { OutreachSendDeps, OutreachSendOutcome } from "./types";
 export const LINKEDIN_NOTE_MAX = 200;
 
 /**
+ * scheduled_sends.error is one select away from a user surface, and adapter
+ * errors append up to 300 chars of raw provider response after the first
+ * colon — strip that detail (it stays in task logs) and keep the neutral prefix.
+ */
+export function sanitizeSendError(err: unknown): string {
+  const message = err instanceof Error ? err.message : String(err);
+  const detailStart = message.indexOf(": ");
+  return detailStart === -1 ? message : message.slice(0, detailStart);
+}
+
+/**
  * One live send. Re-checks suppression, kill switch, pause and identity health
  * immediately before the provider call (rule 11) — dispatch-time checks are not
  * trusted across the delay.
@@ -100,7 +111,7 @@ export async function runOutreachSend(
       providerResult = { channel: "linkedin", linkedinAccountId: identity.id, messageRef, inviteSent };
     }
   } catch (err) {
-    await deps.store.markFailed(ctx.id, err instanceof Error ? err.message : String(err));
+    await deps.store.markFailed(ctx.id, sanitizeSendError(err));
     return "failed";
   }
 

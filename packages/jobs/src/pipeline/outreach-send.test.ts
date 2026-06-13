@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { InMemoryEmailInfra } from "@vantera/email-infra";
 import { InMemoryLinkedInInfra } from "@vantera/linkedin-infra";
-import { runOutreachSend } from "./outreach-send";
+import { runOutreachSend, sanitizeSendError } from "./outreach-send";
 import type { OutreachSendDeps, OutreachSendStore, SendContext } from "./types";
 import type { SenderAddress } from "./email-footer";
 
@@ -289,6 +289,14 @@ describe("runOutreachSend — failure and skip paths", () => {
     expect(store.failed).toHaveLength(1);
     expect(store.failed[0]?.error).toBeTruthy();
     expect(deps.emailInfra.sentEmails).toHaveLength(0);
+  });
+
+  it("stored failure errors are stripped of provider response detail (white-label)", () => {
+    expect(sanitizeSendError(new Error("email provider error 502 on /send: smartlead.ai said no"))).toBe(
+      "email provider error 502 on /send"
+    );
+    expect(sanitizeSendError(new Error("missing contact info"))).toBe("missing contact info");
+    expect(sanitizeSendError("plain string")).toBe("plain string");
   });
 
   it("claim lost (claimSending false) → 'skipped', no provider call", async () => {
