@@ -25,6 +25,14 @@ Name Your Agent → ICP (read-only, inherited from Scout) → CTA → Add Conten
 - ≥1 channel required. Deploy auto-creates the internal campaign (`copywriting_mode: 'agent'`, `send_mode: 'review'`); the deploy summary states what happens next (drafts as leads qualify, everything waits in review).
 - **Wizard scope rule**: steps collect only *identity, goal, or context*. Strategy and mechanics (tone, sequencing, pacing, send schedules) belong to the brain or the review queue — never wizard inputs.
 
+### Caller Agent (kind `caller`)
+```
+Name Your Agent → Targeting (read-only, inherited from Scout) → Goal & Booking link → Voice & Identity → Add Content → Calling Window → Deploy
+```
+- **Requires a deployed Scout agent**; inherits its ICPs and qualification gate. Only leads scoring ≥ `min_score` with a validated phone are eligible for a call.
+- **Wizard scope rule**: same as Outreach — steps collect only identity, goal, content context, and the calling window. Conversation strategy belongs to the brain; timing and retry mechanics belong to the scheduler.
+- **Behavior contract**: as leads qualify, the brain drafts a per-lead **call brief** (`call_briefs.status = 'pending_review'`). The calling system places no call until the brief is approved in the review queue. Dispatch places calls exclusively within the configured calling window, timed to the prospect's local timezone. Outcomes (`booked`, `callback`, `not_interested`, `no_answer`, `voicemail`, `do_not_call`) are classified by the calling system after each call ends. `not_interested` and `do_not_call` write the number to the suppression list immediately — no manual step required.
+
 ## Agent behavior contract after deploy
 
 1. **Scheduler** (Trigger.dev cron, every 15 min) scans live Scout agents by `agents.next_run_at` — schedule state lives in our DB; pause is a status flip.

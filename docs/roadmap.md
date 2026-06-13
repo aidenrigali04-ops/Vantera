@@ -57,7 +57,7 @@ Each entry stays short — the detail lives in that phase's spec (`docs/superpow
   Scope: Vantera-owned `crm-infra` interface (same swappable pattern); first two connectors (HubSpot, Salesforce); field mapping UI; push-on-close + retry handling; connection health surface.
   Depends on: Phase 8 (close tracking). Key rules: 01.
 
-- [ ] **Phase 10 — AI caller**
+- [x] **Phase 10 — AI caller**
   Goal: voice outreach to phone-validated leads.
   Scope: calling provider selection (spec decides; behind a `voice-infra` interface); call scripts tailored per lead; outcomes into the reply-classification flow; consent/recording rules per jurisdiction (extend rule 11 before build).
   Depends on: Phase 3 (phone validation), Phase 4 (scheduler). Key rules: 01, 05, 11.
