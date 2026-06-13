@@ -6,7 +6,7 @@ export type ChatItem =
   | { kind: "user"; text: string }
   | { kind: "assistant"; text: string; id?: string }
   | { kind: "confirmation"; actionId: string; tool: string; summary: string; params: Record<string, unknown> }
-  | { kind: "outcome"; summary: string; deepLink?: string; undoable: boolean };
+  | { kind: "outcome"; summary: string; deepLink?: string; undoable: boolean; tool: string };
 
 function apply(items: ChatItem[], e: CopilotEvent): ChatItem[] {
   switch (e.type) {
@@ -24,7 +24,7 @@ function apply(items: ChatItem[], e: CopilotEvent): ChatItem[] {
     case "confirmation":
       return [...items, { kind: "confirmation", actionId: e.actionId, tool: e.tool, summary: e.summary, params: e.params }];
     case "outcome":
-      return [...items, { kind: "outcome", summary: e.summary, deepLink: e.deepLink, undoable: e.undoable }];
+      return [...items, { kind: "outcome", summary: e.summary, deepLink: e.deepLink, undoable: e.undoable, tool: e.tool }];
     case "error":
       return [...items, { kind: "assistant", text: e.message }];
     case "tool_status":

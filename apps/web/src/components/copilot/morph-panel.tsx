@@ -144,29 +144,16 @@ export function MorphPanel({ surface }: MorphPanelProps) {
         <Walkthrough steps={walkthrough} onClose={() => setWalkthrough(null)} />
       )}
     <div className="fixed bottom-6 right-6 z-50" ref={panelRef}>
-      <motion.div
-        layout
-        animate={
-          open
-            ? { width: 400, height: 560, borderRadius: 24 }
-            : { width: "auto", height: "auto", borderRadius: 9999 }
-        }
-        transition={{ type: "spring", stiffness: 550, damping: 45, mass: 0.7 }}
-        className={cn(
-          "bg-background shadow-xl border border-border overflow-hidden",
-          open ? "flex flex-col" : "flex items-center"
-        )}
-        style={{ originX: 1, originY: 1 }}
-      >
-        <AnimatePresence mode="wait">
-          {open ? (
+      <AnimatePresence>
+        {open && (
             <motion.div
               key="panel"
-              className="flex flex-col w-full h-full"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.15 }}
+              initial={{ opacity: 0, scale: 0.92, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 8 }}
+              transition={{ type: "spring", stiffness: 460, damping: 36, mass: 0.7 }}
+              style={{ originX: 1, originY: 1 }}
+              className="absolute bottom-0 right-0 flex h-[560px] w-[400px] flex-col overflow-hidden rounded-3xl border border-border bg-background shadow-2xl"
             >
               {/* Header */}
               <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
@@ -254,12 +241,17 @@ export function MorphPanel({ surface }: MorphPanelProps) {
                       );
                     }
                     if (item.kind === "outcome") {
+                      const inverse =
+                        item.tool === "pauseCampaign" ? "resumeCampaign" :
+                        item.tool === "resumeCampaign" ? "pauseCampaign" :
+                        null;
                       return (
                         <OutcomeCard
                           key={i}
                           summary={item.summary}
                           deepLink={item.deepLink}
                           undoable={item.undoable}
+                          onUndo={item.undoable && inverse ? () => void confirm(inverse, {}) : undefined}
                         />
                       );
                     }
@@ -291,26 +283,26 @@ export function MorphPanel({ surface }: MorphPanelProps) {
                 </div>
               </div>
             </motion.div>
-          ) : (
-            <motion.div
-              key="pill"
-              className="flex items-center gap-2 px-3 py-2 cursor-pointer"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.1 }}
-              onClick={() => setOpen(true)}
-            >
-              <ColorOrb
-                dimension="24px"
-                tones={{ base: "oklch(22.64% 0 0)" }}
-                spinDuration={15}
-              />
-              <span className="text-sm font-medium pr-1">Ask AI</span>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {!open && (
+          <motion.button
+            key="pill"
+            type="button"
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.85 }}
+            transition={{ duration: 0.12, ease: "easeOut" }}
+            onClick={() => setOpen(true)}
+            className="flex cursor-pointer items-center gap-2 rounded-full border border-border bg-background px-3 py-2 shadow-lg"
+          >
+            <ColorOrb dimension="24px" tones={{ base: "oklch(22.64% 0 0)" }} spinDuration={15} />
+            <span className="text-sm font-medium pr-1">Ask AI</span>
+          </motion.button>
+        )}
+      </AnimatePresence>
     </div>
     </>
   );

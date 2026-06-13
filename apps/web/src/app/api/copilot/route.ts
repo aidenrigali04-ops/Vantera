@@ -64,12 +64,14 @@ export async function POST(req: Request) {
 
       let assistantText = "";
       try {
-        await saveMessage(service, {
-          conversationId,
-          accountId,
-          role: "user",
-          content: body.message ?? "",
-        });
+        if (typeof body.message === "string" && body.message.trim().length > 0) {
+          await saveMessage(service, {
+            conversationId,
+            accountId,
+            role: "user",
+            content: body.message,
+          });
+        }
 
         await runCopilotTurn({
           model: getModel(),
