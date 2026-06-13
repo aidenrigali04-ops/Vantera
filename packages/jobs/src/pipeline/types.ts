@@ -252,6 +252,8 @@ export interface RetentionStore {
   /** leads with created_at < cutoff and status in ('sourced','rejected') — pre-filter only, isPurgeable decides */
   getPurgeCandidates(cutoff: Date): Promise<PurgeCandidate[]>;
   deleteLeads(ids: string[]): Promise<number>;
+  /** webhook_events rows with received_at < cutoff — debugging/idempotency data, purged after 30 days (rule 11) */
+  purgeWebhookEvents(cutoff: Date): Promise<number>;
 }
 
 export interface RetentionDeps {
@@ -263,6 +265,7 @@ export interface RetentionSummary {
   status: "completed";
   purged: number;
   cutoff: string;
+  webhookEventsPurged: number;
 }
 
 export interface InboundPayload {

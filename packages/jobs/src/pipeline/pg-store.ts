@@ -17,6 +17,7 @@ import {
   suppressionEntries,
   unsubscribeTokens,
   appSettings,
+  webhookEvents,
   type Db,
 } from "@vantera/db";
 import type { EnrichedProspect, IcpCriteria, ProspectCandidate } from "@vantera/prospect-data";
@@ -351,6 +352,11 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
     async deleteLeads(ids: string[]): Promise<number> {
       // enrichment_results cascade with the lead; suppression entries set-null and survive (0003)
       const rows = await db.delete(leads).where(inArray(leads.id, ids)).returning({ id: leads.id });
+      return rows.length;
+    },
+
+    async purgeWebhookEvents(cutoff: Date): Promise<number> {
+      const rows = await db.delete(webhookEvents).where(lt(webhookEvents.receivedAt, cutoff)).returning({ id: webhookEvents.id });
       return rows.length;
     },
 

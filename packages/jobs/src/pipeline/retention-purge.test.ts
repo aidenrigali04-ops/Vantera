@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isPurgeable, runRetentionPurge, RETENTION_DAYS } from "./retention-purge";
+import { isPurgeable, runRetentionPurge, RETENTION_DAYS, WEBHOOK_RETENTION_DAYS } from "./retention-purge";
 import type { PurgeCandidate, RetentionStore } from "./types";
 
 const base: PurgeCandidate = {
@@ -40,6 +40,9 @@ describe("runRetentionPurge", () => {
         deleted.push(ids);
         return ids.length;
       },
+      async purgeWebhookEvents() {
+        return 0;
+      },
     };
     return { store, deleted };
   }
@@ -53,6 +56,9 @@ describe("runRetentionPurge", () => {
         return [];
       },
       async deleteLeads() {
+        return 0;
+      },
+      async purgeWebhookEvents() {
         return 0;
       },
     };
@@ -76,5 +82,43 @@ describe("runRetentionPurge", () => {
     const summary = await runRetentionPurge({ store });
     expect(deleted).toEqual([]);
     expect(summary.purged).toBe(0);
+  });
+});
+
+describe("webhook_events retention (30-day window, rule 11)", () => {
+  function fakeStoreWithWebhooks(eventsToDelete: number) {
+    let seenWebhookCutoff: Date | null = null;
+    const store: RetentionStore = {
+      async getPurgeCandidates() {
+        return [];
+      },
+      async deleteLeads() {
+        return 0;
+      },
+      async purgeWebhookEvents(cutoff) {
+        seenWebhookCutoff = cutoff;
+        return eventsToDelete;
+      },
+    };
+    return { store, getSeenCutoff: () => seenWebhookCutoff };
+  }
+
+  it("calls purgeWebhookEvents with now − 30 days", async () => {
+    const now = new Date("2026-06-11T00:00:00Z");
+    const { store, getSeenCutoff } = fakeStoreWithWebhooks(0);
+    await runRetentionPurge({ store, now: () => now });
+    expect(getSeenCutoff()!.getTime()).toBe(now.getTime() - WEBHOOK_RETENTION_DAYS * 86_400_000);
+  });
+
+  it("reports webhookEventsPurged in the summary", async () => {
+    const { store } = fakeStoreWithWebhooks(5);
+    const summary = await runRetentionPurge({ store });
+    expect(summary).toMatchObject({ status: "completed", webhookEventsPurged: 5 });
+  });
+
+  it("reports 0 webhookEventsPurged when none are old enough", async () => {
+    const { store } = fakeStoreWithWebhooks(0);
+    const summary = await runRetentionPurge({ store });
+    expect(summary.webhookEventsPurged).toBe(0);
   });
 });
