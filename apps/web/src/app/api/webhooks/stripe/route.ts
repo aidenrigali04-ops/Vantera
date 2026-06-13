@@ -20,19 +20,34 @@ export async function POST(req: Request) {
       return true;
     },
     applySnapshot: async (snap) => {
-      const { error } = await supabase
+      const updateCols = {
+        plan: snap.plan,
+        subscription_status: snap.subscriptionStatus,
+        seats_purchased: snap.seatsPurchased,
+        linkedin_accounts_purchased: snap.linkedinAccountsPurchased,
+        current_period_end: snap.currentPeriodEnd,
+        stripe_subscription_id: snap.stripeSubscriptionId,
+        stripe_customer_id: snap.stripeCustomerId,
+        outreach_paused: snap.outreachPaused,
+      };
+      // Primary match: existing customer id.
+      const { data: byCustomer } = await supabase
         .from("accounts")
-        .update({
-          plan: snap.plan,
-          subscription_status: snap.subscriptionStatus,
-          seats_purchased: snap.seatsPurchased,
-          linkedin_accounts_purchased: snap.linkedinAccountsPurchased,
-          current_period_end: snap.currentPeriodEnd,
-          stripe_subscription_id: snap.stripeSubscriptionId,
-          outreach_paused: snap.outreachPaused,
-        })
-        .eq("stripe_customer_id", snap.stripeCustomerId);
-      if (error) throw new Error(`account snapshot update failed: ${error.code}`);
+        .update(updateCols)
+        .eq("stripe_customer_id", snap.stripeCustomerId)
+        .select("id");
+      if ((byCustomer?.length ?? 0) > 0) return;
+      // First subscription: the row has no customer id yet — link by account id from metadata.
+      if (snap.accountId) {
+        const { error } = await supabase
+          .from("accounts")
+          .update(updateCols)
+          .eq("id", snap.accountId);
+        if (error) throw new Error(`account snapshot link failed: ${error.code}`);
+        return;
+      }
+      // Nothing matched and no account id to fall back on — surface for retry.
+      throw new Error("billing webhook: no account matched for snapshot");
     },
   });
 

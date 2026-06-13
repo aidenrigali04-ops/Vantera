@@ -75,6 +75,20 @@ export default async function SettingsPage() {
 
       <Card>
         <CardHeader>
+          <CardTitle>Billing</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            Plan, usage, and payment.
+          </p>
+          <Button asChild variant="outline" size="sm" className="mt-3">
+            <Link href="/settings/billing">Manage billing</Link>
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>Channels</CardTitle>
         </CardHeader>
         <CardContent>
