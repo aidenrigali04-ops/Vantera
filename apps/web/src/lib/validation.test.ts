@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   confirmAccountName,
   dollarsToCents,
+  normalizeWebsiteUrl,
   validateOnboarding,
   validateSignup,
   validateWorkspace,
@@ -22,19 +23,69 @@ describe("dollarsToCents", () => {
   });
 });
 
+describe("normalizeWebsiteUrl", () => {
+  it("treats blank as no website", () => {
+    expect(normalizeWebsiteUrl("")).toEqual({ ok: true, url: null });
+    expect(normalizeWebsiteUrl("   ")).toEqual({ ok: true, url: null });
+  });
+
+  it("prepends https:// when no scheme is given", () => {
+    expect(normalizeWebsiteUrl("acme.com")).toEqual({ ok: true, url: "https://acme.com" });
+    expect(normalizeWebsiteUrl(" www.acme.io/about ")).toEqual({
+      ok: true,
+      url: "https://www.acme.io/about",
+    });
+  });
+
+  it("keeps explicit http(s) URLs as typed", () => {
+    expect(normalizeWebsiteUrl("https://acme.com/pricing")).toEqual({
+      ok: true,
+      url: "https://acme.com/pricing",
+    });
+    expect(normalizeWebsiteUrl("http://acme.com")).toEqual({ ok: true, url: "http://acme.com" });
+  });
+
+  it.each(["not a url", "ftp://acme.com", "localhost", "https://"])(
+    "rejects %j",
+    (input) => {
+      expect(normalizeWebsiteUrl(input).ok).toBe(false);
+    }
+  );
+});
+
 describe("validateOnboarding", () => {
-  const good = { industry: "SaaS", icp: "Mid-market CTOs", revenueGoal: "25000" };
+  const good = {
+    companyName: "Acme",
+    websiteUrl: "acme.com",
+    industry: "SaaS",
+    icp: "Mid-market CTOs",
+    revenueGoal: "25000",
+  };
 
   it("accepts complete answers", () => {
     expect(validateOnboarding(good)).toEqual({
       ok: true,
-      values: { industry: "SaaS", icp: "Mid-market CTOs", revenueGoalCents: 2_500_000 },
+      values: {
+        companyName: "Acme",
+        websiteUrl: "https://acme.com",
+        industry: "SaaS",
+        icp: "Mid-market CTOs",
+        revenueGoalCents: 2_500_000,
+      },
     });
   });
 
+  it("allows the website to be blank", () => {
+    const result = validateOnboarding({ ...good, websiteUrl: "" });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.values.websiteUrl).toBeNull();
+  });
+
   it.each([
+    [{ ...good, companyName: " " }, "company name"],
+    [{ ...good, websiteUrl: "not a url" }, "website"],
     [{ ...good, industry: "  " }, "industry"],
-    [{ ...good, icp: "" }, "ICP"],
+    [{ ...good, icp: "" }, "target audience"],
     [{ ...good, revenueGoal: "0" }, "revenue goal"],
   ])("rejects %j", (input, field) => {
     const result = validateOnboarding(input);
