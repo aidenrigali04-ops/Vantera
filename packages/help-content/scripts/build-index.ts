@@ -1,4 +1,4 @@
-import { sql } from "drizzle-orm";
+import { notInArray } from "drizzle-orm";
 import { createDb, copilotKnowledgeChunks } from "@vantera/db";
 import { createEmbedderFromEnv } from "@vantera/ai";
 import { loadArticles, chunkArticle } from "../src/index";
@@ -20,9 +20,11 @@ async function main() {
     );
   }
 
-  // prune chunks no longer present in the content
+  // prune chunks no longer present in the content (empty content → wipe the table)
   const live = chunks.map((c) => c.contentHash);
-  await db.delete(copilotKnowledgeChunks).where(sql`${copilotKnowledgeChunks.contentHash} <> all(${live})`);
+  await db
+    .delete(copilotKnowledgeChunks)
+    .where(live.length > 0 ? notInArray(copilotKnowledgeChunks.contentHash, live) : undefined);
 
   console.log(`knowledge index: ${chunks.length} chunks, ${fresh.length} newly embedded`);
   process.exit(0);
