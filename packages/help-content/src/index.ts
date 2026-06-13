@@ -49,3 +49,5 @@ export function loadArticles(): HelpArticle[] {
 export function articlesForRoute(route: string): HelpArticle[] {
   return loadArticles().filter((a) => a.routes.includes(route));
 }
+
+export { chunkArticle, type Chunk } from "./chunk";
