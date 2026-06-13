@@ -55,6 +55,18 @@ export const accounts = pgTable("accounts", {
   websiteScannedAt: timestamp("website_scanned_at", { withTimezone: true }),
   // 0009: CAN-SPAM physical mailing address for cold-email footer (rule 11)
   senderAddress: jsonb("sender_address"),
+  // 0013: subscription entitlement snapshot (server-managed; Stripe webhook only)
+  plan: text("plan", { enum: ["none", "starter", "growth", "scale"] })
+    .notNull()
+    .default("none"),
+  subscriptionStatus: text("subscription_status", {
+    enum: ["none", "trialing", "active", "past_due", "canceled"],
+  })
+    .notNull()
+    .default("none"),
+  seatsPurchased: integer("seats_purchased").notNull().default(0),
+  linkedinAccountsPurchased: integer("linkedin_accounts_purchased").notNull().default(0),
+  currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }),
 });
 
 export const accountMembers = pgTable(
@@ -369,7 +381,7 @@ export const webhookEvents = pgTable(
   "webhook_events",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    source: text("source", { enum: ["email", "linkedin"] }).notNull(),
+    source: text("source", { enum: ["email", "linkedin", "stripe"] }).notNull(),
     providerEventId: text("provider_event_id").notNull(),
     payload: jsonb("payload").notNull(),
     receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),
