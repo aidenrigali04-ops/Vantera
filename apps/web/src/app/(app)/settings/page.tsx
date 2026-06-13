@@ -72,6 +72,20 @@ export default async function SettingsPage() {
 
       <Card>
         <CardHeader>
+          <CardTitle>Channels</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            Email sending mailboxes, LinkedIn account, and global pause controls.
+          </p>
+          <Button asChild variant="outline" size="sm" className="mt-3">
+            <Link href="/settings/channels">Manage channels</Link>
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>Suppression list</CardTitle>
         </CardHeader>
         <CardContent>
