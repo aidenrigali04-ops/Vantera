@@ -98,15 +98,11 @@ days via the existing retention-purge job). `copilot_knowledge_gaps` is unchange
     route context already identifies the surface.
 - **Embeddings** go through `@vantera/ai` — extend the single wrapper with an embedding entry
   (`embed()` / `getEmbeddingModel()`) so the single-AI-entry guardrail still holds (only
-  `packages/ai` imports any provider SDK, embeddings included). Provider behind the wrapper;
-  default **Voyage AI** (Anthropic's recommended embeddings partner) or OpenAI
-  `text-embedding-3-small` — see the open decision below. New env key in `.env.example`.
+  `packages/ai` imports any provider SDK, embeddings included). **Provider locked: Voyage AI
+  (`voyage-3` family)** — Anthropic's recommended embeddings partner — behind the wrapper. New env
+  key `VOYAGE_API_KEY` in `.env.example`; the model name/version is a `packages/ai` constant so the
+  `vector(N)` dimension and the chunk index stay in sync with the model.
 - The existing `articles.test.ts` vendor-name guard stays; no chunk or DTO may carry a vendor name.
-
-> **Open decision (RAG forces it):** the embeddings provider. Anthropic has no first-party
-> embeddings model, so RAG introduces one new vendor + API key + per-embedding cost. Recommended
-> default: Voyage AI (`voyage-3` family) routed through `@vantera/ai`. Confirm or substitute
-> before the plan finalizes; the choice is isolated to `packages/ai` + one env var.
 
 ### Overlay — MorphPanel (`apps/web/src/components/copilot/`)
 - **Mount:** the authenticated `(app)/layout.tsx`, so it hovers on every dashboard page and is
