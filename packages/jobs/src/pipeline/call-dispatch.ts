@@ -31,8 +31,8 @@ export interface CallDispatchResult {
 
 /**
  * Dispatch approved call briefs into live dial attempts.
- * Order of guards (rule 11 + TCPA): kill switch → calling window (prospect-local)
- * → attempt cap → claim → suppression re-check → place call → record.
+ * Order of guards (rule 11 + TCPA): kill switch → attempt cap → calling window
+ * (prospect-local) → claim → suppression re-check → place call → record.
  */
 export async function runCallDispatch(deps: CallDispatchDeps): Promise<CallDispatchResult[]> {
   if (await deps.store.isKillSwitchOn()) return [{ sendId: "*", outcome: "halted" }];
