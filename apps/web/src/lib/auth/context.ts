@@ -6,6 +6,7 @@ export type AccountRow = {
   onboarding_industry: string | null;
   onboarding_icp: string | null;
   revenue_goal_cents: number | null;
+  avg_deal_value_cents: number | null;
   onboarding_completed_at: string | null;
 };
 
@@ -24,7 +25,9 @@ export async function getGateData(): Promise<GateData> {
 
   const { data: account } = await supabase
     .from("accounts")
-    .select("id, name, onboarding_industry, onboarding_icp, revenue_goal_cents, onboarding_completed_at")
+    .select(
+      "id, name, onboarding_industry, onboarding_icp, revenue_goal_cents, avg_deal_value_cents, onboarding_completed_at"
+    )
     .limit(1)
     .maybeSingle<AccountRow>();
 

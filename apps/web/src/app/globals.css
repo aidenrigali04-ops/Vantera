@@ -81,6 +81,11 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+  /* Liquid-glass card layers (light): translucent white fill + bright inset rim. */
+  --glass-fill: rgba(255, 255, 255, 0.25);
+  --glass-rim: inset 2px 2px 1px 0 rgba(255, 255, 255, 0.5), inset -1px -1px 1px 1px rgba(255, 255, 255, 0.5);
+  --glass-shadow: 0 6px 6px rgba(0, 0, 0, 0.2), 0 0 20px rgba(0, 0, 0, 0.1);
+  --glass-blur: blur(3px);
 }
 
 .dark {
@@ -109,12 +114,41 @@
   --chart-5: oklch(0.269 0 0);
   --sidebar: oklch(0.205 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
+  /* Monochrome to match the brand (was shadcn's leftover indigo) — mirrors
+     --primary/--primary-foreground in dark. */
+  --sidebar-primary: oklch(0.922 0 0);
+  --sidebar-primary-foreground: oklch(0.205 0 0);
   --sidebar-accent: oklch(0.269 0 0);
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+  /* Liquid-glass card layers (dark theme): translucent dark fill + faint sheen. */
+  --glass-fill: rgba(15, 16, 20, 0.6);
+  --glass-rim: inset 1px 1px 1px 0 rgba(255, 255, 255, 0.14), inset -1px -1px 1px 0 rgba(0, 0, 0, 0.3);
+  --glass-shadow: 0 8px 24px rgba(0, 0, 0, 0.35), 0 2px 6px rgba(0, 0, 0, 0.25);
+  --glass-blur: blur(12px);
+}
+
+/* `(app)` dashboard cards: a refined, genuinely light liquid glass — frosted
+   translucent white with a stronger backdrop blur and a soft lift off the page,
+   dark text on the default light palette. See-through and minimal but defined.
+   Scoped to the dashboard shell; auth, onboarding, and landing keep the default
+   card glass. */
+.glass-cards [data-slot="card"] {
+  --glass-fill: rgba(255, 255, 255, 0.6);
+  --glass-rim: inset 2px 2px 1px 0 rgba(255, 255, 255, 0.6), inset -1px -1px 1px 0 rgba(0, 0, 0, 0.04);
+  --glass-shadow: 0 10px 30px rgba(0, 0, 0, 0.08), 0 2px 8px rgba(0, 0, 0, 0.05);
+  --glass-blur: blur(14px) saturate(140%);
+}
+
+/* Dark dashboard cards: an elevated frosted panel lifted just off the near-black
+   page (oklch 0.145) — a faint cool fill plus a thin top sheen rim so each card
+   reads as its own surface without glowing. Mirrors the light glass-cards block. */
+.dark .glass-cards [data-slot="card"] {
+  --glass-fill: rgba(255, 255, 255, 0.045);
+  --glass-rim: inset 1px 1px 1px 0 rgba(255, 255, 255, 0.08), inset -1px -1px 1px 0 rgba(0, 0, 0, 0.4);
+  --glass-shadow: 0 10px 30px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.35);
+  --glass-blur: blur(14px) saturate(120%);
 }
 
 @layer base {
@@ -126,5 +160,32 @@
   }
   html {
     @apply font-sans;
+  }
+}
+/* Dock-style nav tiles: a soft halo that fades in on hover (the source's
+   `.hover-halo`). Tooltips are pure Tailwind group-hover in the component.
+   Themed — a subtle dark glow in light, a brighter rim in dark. */
+.dock-tile::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  opacity: 0;
+  transition: opacity 0.25s;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.06), 0 12px 30px -10px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+.dark .dock-tile::after {
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18), 0 12px 30px -10px rgba(0, 0, 0, 0.7);
+}
+.dock-tile:hover::after {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dock-tile,
+  .dock-tile *,
+  .dock-tile::after {
+    transition: none !important;
   }
 }

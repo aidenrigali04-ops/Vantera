@@ -26,35 +26,32 @@ export const GlassEffect: React.FC<GlassEffectProps> = ({
   target = "_blank",
 }) => {
   const glassStyle = {
-    boxShadow: "0 6px 6px rgba(0, 0, 0, 0.2), 0 0 20px rgba(0, 0, 0, 0.1)",
+    boxShadow: "var(--glass-shadow)",
     transitionTimingFunction: "cubic-bezier(0.175, 0.885, 0.32, 2.2)",
     ...style,
   };
 
   const content = (
     <div
-      className={`relative flex font-semibold overflow-hidden text-black cursor-pointer transition-all duration-700 ${className}`}
+      className={`relative flex font-semibold overflow-hidden text-foreground cursor-pointer transition-all duration-700 ${className}`}
       style={glassStyle}
     >
-      {/* Glass Layers */}
+      {/* Glass Layers — fill/rim are token-driven so a `.dark` scope flips them. */}
       <div
         className="absolute inset-0 z-0 overflow-hidden rounded-inherit rounded-3xl"
         style={{
-          backdropFilter: "blur(3px)",
+          backdropFilter: "var(--glass-blur)",
           filter: "url(#glass-distortion)",
           isolation: "isolate",
         }}
       />
       <div
         className="absolute inset-0 z-10 rounded-inherit"
-        style={{ background: "rgba(255, 255, 255, 0.25)" }}
+        style={{ background: "var(--glass-fill)" }}
       />
       <div
         className="absolute inset-0 z-20 rounded-inherit rounded-3xl overflow-hidden"
-        style={{
-          boxShadow:
-            "inset 2px 2px 1px 0 rgba(255, 255, 255, 0.5), inset -1px -1px 1px 1px rgba(255, 255, 255, 0.5)",
-        }}
+        style={{ boxShadow: "var(--glass-rim)" }}
       />
 
       {/* Content */}

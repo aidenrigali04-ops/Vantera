@@ -36,6 +36,7 @@ export async function updateWorkspace(
     industry: String(formData.get("industry") ?? ""),
     icp: String(formData.get("icp") ?? ""),
     revenueGoal: String(formData.get("revenueGoal") ?? ""),
+    avgDealValue: String(formData.get("avgDealValue") ?? ""),
   });
   if (!result.ok) return { error: result.error };
 
@@ -50,6 +51,7 @@ export async function updateWorkspace(
       onboarding_industry: result.values.industry,
       onboarding_icp: result.values.icp,
       revenue_goal_cents: result.values.revenueGoalCents,
+      avg_deal_value_cents: result.values.avgDealValueCents,
     })
     .eq("id", account.id); // RLS: admins only
   if (error) return { error: "Could not save. Only workspace admins can change these settings." };

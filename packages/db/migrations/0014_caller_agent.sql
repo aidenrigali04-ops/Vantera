@@ -19,10 +19,10 @@ alter table public.scheduled_sends add constraint scheduled_sends_channel_check
   check (channel in ('email', 'linkedin', 'call'));
 alter table public.scheduled_sends add column brief jsonb;
 
--- voice joins email/linkedin as a webhook source (idempotency parity, 0009)
+-- voice joins email/linkedin/stripe as a webhook source (idempotency parity, 0009/0013)
 alter table public.webhook_events drop constraint if exists webhook_events_source_check;
 alter table public.webhook_events add constraint webhook_events_source_check
-  check (source in ('email', 'linkedin', 'voice'));
+  check (source in ('email', 'linkedin', 'stripe', 'voice'));
 
 -- 'phone' joins the campaign channel set (0003) so the caller's auto-created campaign
 -- (channels = ['phone']) passes the check constraint.

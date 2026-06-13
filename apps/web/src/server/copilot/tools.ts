@@ -6,6 +6,7 @@ import {
   getCampaignStatus,
   getGoalProgress,
   getLeadScoreRationale,
+  getBillingStatus,
 } from "./read-tools";
 import { runCampaignSendState } from "./mutate-tools";
 
@@ -39,6 +40,14 @@ export function buildAccountTools(db: SupabaseClient, accountId: string): Copilo
       description: "Why a lead got its score. Pass the lead's first name.",
       parameters: z.object({ leadName: z.string() }),
       run: async (args: Record<string, unknown>) => getLeadScoreRationale(db, args.leadName as string),
+    },
+    {
+      name: "getBillingStatus",
+      tier: "read",
+      description:
+        "The account's current plan, subscription status, and seat/campaign usage vs. limits.",
+      parameters: z.object({}),
+      run: async () => getBillingStatus(db, accountId),
     },
     {
       name: "pauseCampaign",

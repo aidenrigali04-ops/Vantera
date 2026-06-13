@@ -13,6 +13,7 @@ import { Bot, PenLine, Phone, Mail, MessageSquare, Settings2, ArrowRight } from 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { AnimatedProgress } from "@/components/ui/animated-progress";
+import { CardGlass } from "@/components/ui/card";
 import { FormError } from "@/components/form-error";
 import { setAgentStatus, updateSendMode, type AgentActionState } from "./actions";
 import type { ShowcaseAgent, ShowcaseKind } from "./agent-showcase-data";
@@ -218,8 +219,9 @@ function AgentDetails({ agent, alignRight }: { agent: ShowcaseAgent; alignRight:
       {/* run-summary panel */}
       <motion.div
         variants={item}
-        className="w-full space-y-5 rounded-2xl border border-border bg-card p-6 text-left shadow-sm"
+        className="relative isolate w-full space-y-5 overflow-hidden rounded-2xl border border-border p-6 text-left shadow-sm"
       >
+        <CardGlass />
         <div className="flex gap-8">
           {agent.stats.map((s) => (
             <div key={s.label}>

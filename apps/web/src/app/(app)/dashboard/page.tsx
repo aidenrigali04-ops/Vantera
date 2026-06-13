@@ -8,6 +8,7 @@ import {
   Mail,
   MessageSquare,
   Sparkles,
+  TrendingUp,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/server";
 import { getGateData } from "@/lib/auth/context";
 import { AnimatedProgress } from "@/components/ui/animated-progress";
+import {
+  buildRevenueSeries,
+  computeRevenueSnapshot,
+  type RevenuePoint,
+  type RevenueSnapshot,
+} from "@/lib/revenue";
+import { RevenueChart } from "./revenue-chart";
 import { LeadProfileLink, type LeadProfile } from "@/components/lead-profile";
 import { LEAD_PROFILE_FIELDS } from "@/components/lead-profile-fields";
 import { ProspectPanel, type Prospect } from "./prospect-panel";
@@ -79,6 +87,7 @@ export default async function DashboardPage() {
     qualifiedRes,
     outreachRes,
     repliedRes,
+    repliedOnlyRes,
     convertedRes,
     draftsRes,
     interestedRes,
@@ -88,6 +97,7 @@ export default async function DashboardPage() {
     { data: weekSends },
     repliesWeekRes,
     { data: prospects },
+    { data: convertedDates },
   ] = await Promise.all([
     supabase
       .from("agents")
@@ -97,6 +107,7 @@ export default async function DashboardPage() {
     leadCount(["qualified", "enriched"]),
     leadCount(["in_campaign"]),
     leadCount(["replied", "converted"]),
+    leadCount(["replied"]),
     leadCount(["converted"]),
     supabase
       .from("scheduled_sends")
@@ -129,6 +140,13 @@ export default async function DashboardPage() {
       .order("ai_score", { ascending: false, nullsFirst: false })
       .limit(6)
       .returns<Prospect[]>(),
+    // Closed-revenue history: conversion dates (updated_at) of converted leads.
+    supabase
+      .from("leads")
+      .select("updated_at")
+      .eq("status", "converted")
+      .order("updated_at", { ascending: true })
+      .returns<{ updated_at: string }[]>(),
   ]);
 
   const total = totalRes.count ?? 0;
@@ -138,6 +156,22 @@ export default async function DashboardPage() {
   const converted = convertedRes.count ?? 0;
   const drafts = draftsRes.count ?? 0;
   const interested = interestedRes.count ?? 0;
+  const repliedOnly = repliedOnlyRes.count ?? 0;
+
+  // Revenue snapshot: real counts × the account's value per client (Settings).
+  const pipelineLeads = qualified + inOutreach + repliedOnly;
+  const revenue = computeRevenueSnapshot({
+    convertedClients: converted,
+    pipeline: { qualified, inOutreach, replied: repliedOnly },
+    avgDealValueCents: account.avg_deal_value_cents,
+    goalCents: account.revenue_goal_cents,
+  });
+  const revenueSeries = buildRevenueSeries({
+    conversionDates: (convertedDates ?? []).map((r) => r.updated_at),
+    avgDealValueCents: account.avg_deal_value_cents,
+    expectedPipelineCents: revenue.expectedCents,
+    days: 30,
+  });
 
   const scout = agents?.find((a) => a.kind === "scout") ?? null;
   const liveAgents = (agents ?? []).filter((a) => a.status === "live");
@@ -194,7 +228,8 @@ export default async function DashboardPage() {
         <ActivationRamp scoutDeployed={Boolean(scout)} goal={goal} />
       ) : (
         <>
-          {/* One primary action, state-dependent */}
+          {/* Top row: the one primary action (left, shortened) + revenue dopamine (right) */}
+          <div className="grid gap-6 lg:grid-cols-[1.1fr_1.9fr]">
           {drafts > 0 ? (
             <Card className="border-foreground/15 bg-muted/40">
               <CardContent className="flex flex-wrap items-center justify-between gap-3 py-5">
@@ -240,6 +275,16 @@ export default async function DashboardPage() {
               </CardContent>
             </Card>
           )}
+
+            <RevenueCard
+              revenue={revenue}
+              convertedClients={converted}
+              pipelineLeads={pipelineLeads}
+              goal={goal}
+              goalCents={account.revenue_goal_cents}
+              series={revenueSeries}
+            />
+          </div>
 
           {/* Pipeline funnel — real counts */}
           <Card>
@@ -505,6 +550,106 @@ function ChannelRow({
         />
       </span>
     </div>
+  );
+}
+
+function RevenueCard({
+  revenue,
+  convertedClients,
+  pipelineLeads,
+  goal,
+  goalCents,
+  series,
+}: {
+  revenue: RevenueSnapshot;
+  convertedClients: number;
+  pipelineLeads: number;
+  goal: string | null;
+  goalCents: number | null;
+  series: RevenuePoint[];
+}) {
+  const projectedTotalCents = revenue.closedCents + revenue.expectedCents;
+  return (
+    <Card data-copilot="dashboard-revenue">
+      <CardHeader className="flex-row items-center justify-between pb-3">
+        <CardTitle className="text-base">Revenue</CardTitle>
+        <span className="flex items-center gap-1 text-xs text-muted-foreground">
+          <TrendingUp className="size-3.5" /> {goal ? `goal ${goal}/mo` : "vs goal"}
+        </span>
+      </CardHeader>
+      <CardContent>
+        {revenue.hasValue ? (
+          <>
+            <div className="flex flex-wrap items-end gap-x-10 gap-y-2">
+              <div>
+                <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <span className="size-2 rounded-full bg-[#FF730D]" /> Closed ·{" "}
+                  {convertedClients} {convertedClients === 1 ? "client" : "clients"}
+                </span>
+                <span className="font-mono text-2xl font-semibold tabular-nums">
+                  {usd.format(revenue.closedCents / 100)}
+                </span>
+              </div>
+              <div>
+                <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <span className="size-2 rounded-full bg-[#FFCC1A]" /> Projected ·{" "}
+                  {pipelineLeads} in pipeline
+                </span>
+                <span className="font-mono text-2xl font-semibold tabular-nums text-muted-foreground">
+                  {usd.format(projectedTotalCents / 100)}
+                </span>
+              </div>
+            </div>
+            <div className="mt-3">
+              <RevenueChart data={series} goalCents={goalCents} />
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {revenue.closedPctOfGoal !== null ? (
+                <>
+                  <span className="font-medium text-foreground">
+                    {revenue.closedPctOfGoal}%
+                  </span>{" "}
+                  of your {goal}/mo goal closed
+                  {revenue.projectedPctOfGoal !== null &&
+                    ` — projected ${revenue.projectedPctOfGoal}% as your pipeline closes`}
+                  .
+                </>
+              ) : (
+                "Set a monthly revenue goal in Settings to track progress."
+              )}
+            </p>
+          </>
+        ) : (
+          <div className="flex flex-col gap-3">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <span className="font-mono text-2xl font-semibold tabular-nums">
+                  {convertedClients}
+                </span>
+                <p className="text-xs text-muted-foreground">
+                  Closed {convertedClients === 1 ? "client" : "clients"}
+                </p>
+              </div>
+              <div>
+                <span className="font-mono text-2xl font-semibold tabular-nums text-muted-foreground">
+                  {pipelineLeads}
+                </span>
+                <p className="text-xs text-muted-foreground">In pipeline</p>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Add your average value per client to turn these into closed and projected MRR against
+              your goal.
+            </p>
+            <Button asChild variant="outline" size="sm" className="w-fit">
+              <Link href="/settings">
+                Set deal value <ArrowRight className="size-4" />
+              </Link>
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

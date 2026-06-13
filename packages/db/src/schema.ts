@@ -43,6 +43,9 @@ export const accounts = pgTable("accounts", {
   onboardingIndustry: text("onboarding_industry"),
   onboardingIcp: text("onboarding_icp"),
   revenueGoalCents: bigint("revenue_goal_cents", { mode: "number" }),
+  // 0012: estimated monthly recurring value per closed client — powers the dashboard
+  // revenue snapshot (closed + expected MRR vs. the goal). Null until set in Settings.
+  avgDealValueCents: bigint("avg_deal_value_cents", { mode: "number" }),
   onboardingCompletedAt: timestamp("onboarding_completed_at", { withTimezone: true }),
   stripeCustomerId: text("stripe_customer_id").unique(),
   stripeSubscriptionId: text("stripe_subscription_id"),
@@ -53,6 +56,18 @@ export const accounts = pgTable("accounts", {
   websiteScannedAt: timestamp("website_scanned_at", { withTimezone: true }),
   // 0009: CAN-SPAM physical mailing address for cold-email footer (rule 11)
   senderAddress: jsonb("sender_address"),
+  // 0013: subscription entitlement snapshot (server-managed; Stripe webhook only)
+  plan: text("plan", { enum: ["none", "starter", "growth", "scale"] })
+    .notNull()
+    .default("none"),
+  subscriptionStatus: text("subscription_status", {
+    enum: ["none", "trialing", "active", "past_due", "canceled"],
+  })
+    .notNull()
+    .default("none"),
+  seatsPurchased: integer("seats_purchased").notNull().default(0),
+  linkedinAccountsPurchased: integer("linkedin_accounts_purchased").notNull().default(0),
+  currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }),
 });
 
 export const accountMembers = pgTable(
@@ -369,7 +384,7 @@ export const webhookEvents = pgTable(
   "webhook_events",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    source: text("source", { enum: ["email", "linkedin", "voice"] }).notNull(),
+    source: text("source", { enum: ["email", "linkedin", "stripe", "voice"] }).notNull(),
     providerEventId: text("provider_event_id").notNull(),
     payload: jsonb("payload").notNull(),
     receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),
