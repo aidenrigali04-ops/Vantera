@@ -38,8 +38,8 @@ export async function inviteMember(_prev: TeamActionState, formData: FormData): 
 
   const limits = resolveEntitlements(snapshotFromRow(account as AccountBillingRow));
   const [{ count: members }, { count: pending }] = await Promise.all([
-    supabase.from("account_members").select("user_id", { count: "exact", head: true }),
-    supabase.from("account_invites").select("id", { count: "exact", head: true }).eq("status", "pending"),
+    supabase.from("account_members").select("user_id", { count: "exact", head: true }).eq("account_id", account.id),
+    supabase.from("account_invites").select("id", { count: "exact", head: true }).eq("account_id", account.id).eq("status", "pending"),
   ]);
   if (seatCapReached(members ?? 0, pending ?? 0, limits.maxSeats))
     return { error: "You've used all your seats. Add seats or upgrade your plan in Billing." };
