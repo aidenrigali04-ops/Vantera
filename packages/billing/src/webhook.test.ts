@@ -9,6 +9,7 @@ describe("snapshotFromEvent", () => {
       type: "subscription_updated",
       stripeCustomerId: "cus_1",
       stripeSubscriptionId: "sub_1",
+      accountId: "acc_123",
       status: "active",
       planPriceId: PLANS.growth.stripePriceId,
       seatsPurchased: 2,
@@ -18,6 +19,7 @@ describe("snapshotFromEvent", () => {
     expect(snapshotFromEvent(event)).toEqual({
       stripeCustomerId: "cus_1",
       stripeSubscriptionId: "sub_1",
+      accountId: "acc_123",
       plan: "growth",
       subscriptionStatus: "active",
       seatsPurchased: 2,
@@ -32,7 +34,7 @@ describe("snapshotFromEvent", () => {
       stripeCustomerId: "cus_1",
       stripeSubscriptionId: "sub_1",
     });
-    expect(snap).toMatchObject({ plan: "none", subscriptionStatus: "canceled" });
+    expect(snap).toMatchObject({ plan: "none", subscriptionStatus: "canceled", accountId: null });
   });
 
   it("returns null for ignored events", () => {
@@ -44,6 +46,7 @@ describe("snapshotFromEvent", () => {
       type: "subscription_updated",
       stripeCustomerId: "cus_1",
       stripeSubscriptionId: "sub_1",
+      accountId: null,
       status: "active",
       planPriceId: "price_unknown",
       seatsPurchased: 0,

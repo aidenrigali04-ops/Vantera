@@ -5,6 +5,7 @@ import type { ParsedWebhookEvent } from "./types";
 export interface PersistedSnapshot {
   stripeCustomerId: string;
   stripeSubscriptionId: string;
+  accountId: string | null;
   plan: PlanTier | "none";
   subscriptionStatus: SubscriptionStatus;
   seatsPurchased: number;
@@ -20,6 +21,7 @@ export function snapshotFromEvent(event: ParsedWebhookEvent): PersistedSnapshot 
     return {
       stripeCustomerId: event.stripeCustomerId,
       stripeSubscriptionId: event.stripeSubscriptionId,
+      accountId: null,
       plan: "none",
       subscriptionStatus: "canceled",
       seatsPurchased: 0,
@@ -32,6 +34,7 @@ export function snapshotFromEvent(event: ParsedWebhookEvent): PersistedSnapshot 
   return {
     stripeCustomerId: event.stripeCustomerId,
     stripeSubscriptionId: event.stripeSubscriptionId,
+    accountId: event.accountId,
     plan: tier ?? "none",
     subscriptionStatus: event.status,
     seatsPurchased: event.seatsPurchased,

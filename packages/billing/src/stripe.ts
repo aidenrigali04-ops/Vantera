@@ -89,6 +89,7 @@ export class StripeBilling implements BillingProvider {
         type: "subscription_updated",
         stripeCustomerId: String(sub.customer),
         stripeSubscriptionId: sub.id,
+        accountId: (sub.metadata?.accountId as string | undefined) ?? null,
         status: STATUS_MAP[sub.status] ?? "canceled",
         planPriceId: planItem?.price.id ?? null,
         seatsPurchased: seatItem?.quantity ?? 0,

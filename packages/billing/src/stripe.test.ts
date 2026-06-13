@@ -15,6 +15,7 @@ describe("StripeBilling.parseWebhook", () => {
           id: "sub_1",
           status: "active",
           current_period_end: 1768262400,
+          metadata: { accountId: "acc_123" },
           items: {
             data: [
               {
@@ -38,6 +39,7 @@ describe("StripeBilling.parseWebhook", () => {
       planPriceId: PLANS.growth.stripePriceId,
       seatsPurchased: 2,
       linkedinAccountsPurchased: 1,
+      accountId: "acc_123",
     });
     if (parsed.type !== "subscription_updated") throw new Error("expected subscription_updated");
     expect(parsed.currentPeriodEnd).toBe(new Date(1768262400 * 1000).toISOString());

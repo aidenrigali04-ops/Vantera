@@ -48,6 +48,7 @@ export class InMemoryBilling implements BillingProvider {
         type: "subscription_updated",
         stripeCustomerId: String(e.customer),
         stripeSubscriptionId: String(e.subscription),
+        accountId: (e.accountId as string) ?? null,
         status: e.status as SubscriptionStatus,
         planPriceId: (e.planPriceId as string) ?? null,
         seatsPurchased: Number(e.seats ?? 0),

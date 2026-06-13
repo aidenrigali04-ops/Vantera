@@ -57,4 +57,23 @@ describe("handleStripeWebhook", () => {
     await handleStripeWebhook(body, "whsec_test", deps);
     expect(updates[0]).toMatchObject({ subscriptionStatus: "canceled", outreachPaused: true });
   });
+
+  it("threads accountId through for first-subscription linkage", async () => {
+    const { deps, updates } = makeDeps();
+    const body = JSON.stringify({
+      id: "evt_3",
+      type: "subscription_updated",
+      customer: "cus_new",
+      subscription: "sub_new",
+      status: "active",
+      planPriceId: PLANS.growth.stripePriceId,
+      seats: 0,
+      linkedin: 0,
+      currentPeriodEnd: "2026-07-13T00:00:00.000Z",
+      accountId: "acc_xyz",
+    });
+    const res = await handleStripeWebhook(body, "whsec_test", deps);
+    expect(res.status).toBe(200);
+    expect(updates[0]).toMatchObject({ accountId: "acc_xyz" });
+  });
 });

@@ -30,6 +30,7 @@ export type ParsedWebhookEvent =
       type: "subscription_updated";
       stripeCustomerId: string;
       stripeSubscriptionId: string;
+      accountId: string | null;
       status: SubscriptionStatus;
       /** Base-plan price id (maps to a tier via plans.planForPriceId). */
       planPriceId: string | null;
