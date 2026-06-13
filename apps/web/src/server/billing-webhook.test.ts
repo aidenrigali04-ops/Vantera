@@ -1,19 +1,21 @@
 import { describe, expect, it, vi } from "vitest";
-import { handleStripeWebhook } from "./billing-webhook";
-import { InMemoryBilling, PLANS } from "@vantera/billing";
+import { handleStripeWebhook, type BillingWebhookDeps } from "./billing-webhook";
+import { InMemoryBilling, PLANS, type PersistedSnapshot } from "@vantera/billing";
 
-function makeDeps(overrides: Partial<any> = {}) {
-  const updates: any[] = [];
+type SnapshotPayload = PersistedSnapshot & { outreachPaused: boolean };
+
+function makeDeps(overrides: Partial<BillingWebhookDeps> = {}) {
+  const updates: SnapshotPayload[] = [];
   return {
     updates,
     deps: {
       provider: new InMemoryBilling("whsec_test"),
       recordEvent: vi.fn(async () => true), // true = new, false = duplicate
-      applySnapshot: vi.fn(async (snap: any) => {
+      applySnapshot: vi.fn(async (snap: SnapshotPayload) => {
         updates.push(snap);
       }),
       ...overrides,
-    },
+    } satisfies BillingWebhookDeps,
   };
 }
 
