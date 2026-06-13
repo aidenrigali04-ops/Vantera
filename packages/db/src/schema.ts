@@ -7,6 +7,7 @@ import {
   jsonb,
   pgTable,
   primaryKey,
+  smallint,
   text,
   time,
   timestamp,
@@ -293,7 +294,7 @@ export const scheduledSends = pgTable(
     leadId: uuid("lead_id")
       .notNull()
       .references(() => leads.id, { onDelete: "cascade" }),
-    channel: text("channel", { enum: ["email", "linkedin"] }).notNull(),
+    channel: text("channel", { enum: ["email", "linkedin", "call"] }).notNull(),
     status: text("status", {
       enum: [
         "drafting",
@@ -311,6 +312,8 @@ export const scheduledSends = pgTable(
       .default("drafting"),
     subject: text("subject"),
     body: text("body"),
+    // 0012: structured call brief for the caller agent (rides alongside human-readable body)
+    brief: jsonb("brief"),
     // unresolved humanizer violations, shown as review-queue badges (0008)
     styleFlags: text("style_flags"),
     // 0009: LinkedIn invite/message pair sequencing (null for email)
@@ -336,7 +339,7 @@ export const suppressionEntries = pgTable(
     accountId: uuid("account_id")
       .notNull()
       .references(() => accounts.id, { onDelete: "cascade" }),
-    kind: text("kind", { enum: ["email", "linkedin"] }).notNull(),
+    kind: text("kind", { enum: ["email", "linkedin", "phone"] }).notNull(),
     value: text("value").notNull(),
     source: text("source", {
       enum: ["unsubscribe", "bounce", "complaint", "manual", "not_interested", "gdpr"],
@@ -366,7 +369,7 @@ export const webhookEvents = pgTable(
   "webhook_events",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    source: text("source", { enum: ["email", "linkedin"] }).notNull(),
+    source: text("source", { enum: ["email", "linkedin", "voice"] }).notNull(),
     providerEventId: text("provider_event_id").notNull(),
     payload: jsonb("payload").notNull(),
     receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),
@@ -526,7 +529,7 @@ export const agents = pgTable(
     accountId: uuid("account_id")
       .notNull()
       .references(() => accounts.id, { onDelete: "cascade" }),
-    kind: text("kind", { enum: ["scout", "copy"] }).notNull(),
+    kind: text("kind", { enum: ["scout", "copy", "caller"] }).notNull(),
     name: text("name").notNull(),
     status: text("status", { enum: ["draft", "live", "paused"] }).notNull().default("draft"),
     // scout: {prospects_per_run, min_score}; copy: {cta, channels: {linkedin, email}}
@@ -668,6 +671,50 @@ export const copilotMessages = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("copilot_messages_conversation_idx").on(t.conversationId, t.createdAt)]
+);
+
+// ── 0012 AI Caller agent ─────────────────────────────────────────────────────
+
+// retention(calls): one row per dial attempt; cascades with the lead. Terminal rows
+// purged by the 180-day scheduled_sends sweep companion (rule 11).
+// Writes arrive via the service-role pipeline only (no client write policy).
+export const calls = pgTable(
+  "calls",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    leadId: uuid("lead_id").notNull(),
+    agentId: uuid("agent_id").notNull(),
+    campaignId: uuid("campaign_id").notNull(),
+    scheduledSendId: uuid("scheduled_send_id").notNull(),
+    providerCallId: text("provider_call_id"),
+    attemptNo: smallint("attempt_no").notNull().default(1),
+    status: text("status", {
+      enum: ["queued", "dialing", "in_progress", "completed", "no_answer", "voicemail", "failed"],
+    })
+      .notNull()
+      .default("queued"),
+    outcome: text("outcome", {
+      enum: ["booked", "callback", "not_interested", "no_answer", "voicemail", "do_not_call"],
+    }),
+    durationSec: integer("duration_sec"),
+    recordingUrl: text("recording_url"),
+    transcript: text("transcript"),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    endedAt: timestamp("ended_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    // composite same-tenant FKs enforced in SQL; simplified relational hints here
+    // calls_provider_call_idx is a partial unique index in SQL (where provider_call_id is not null)
+    index("calls_provider_call_idx").on(t.providerCallId),
+    index("calls_account_status_idx").on(t.accountId, t.status),
+    index("calls_lead_idx").on(t.leadId),
+    index("calls_send_idx").on(t.scheduledSendId),
+  ]
 );
 
 // Global reference data — no account_id by design (identical for every tenant).
