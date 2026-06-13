@@ -100,11 +100,11 @@ function createShared(): SharedScene {
 function applyThemeColors(geometry: THREE.BufferGeometry, theme?: string) {
 	const colors: number[] = [];
 
-	// Warm-to-cool palette (coral → magenta → indigo), normalized 0–1
+	// Warm sunset palette from the brand gradient (yellow → orange → red), normalized 0–1
 	const PALETTE: [number, number, number][] = [
-		[1.0, 0.45, 0.12],
-		[1.0, 0.2, 0.62],
-		[0.45, 0.38, 1.0],
+		[1.0, 0.8, 0.1],
+		[1.0, 0.45, 0.05],
+		[0.92, 0.16, 0.11],
 	];
 	const lerpPalette = (t: number): [number, number, number] => {
 		const scaled = t * (PALETTE.length - 1);

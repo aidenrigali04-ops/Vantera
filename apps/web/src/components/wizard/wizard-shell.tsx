@@ -31,12 +31,26 @@ export function WizardShell({
     <Card className="mx-auto w-full max-w-xl">
       <CardHeader>
         <div className="mb-2 flex gap-1.5" aria-label={`Step ${done + 1} of ${total}`}>
-          {Array.from({ length: total }, (_, i) => (
-            <div
-              key={i}
-              className={`h-1.5 flex-1 rounded-full ${i < done ? "bg-primary" : i === done ? "bg-primary/40" : "bg-muted"}`}
-            />
-          ))}
+          {Array.from({ length: total }, (_, i) => {
+            const complete = i < done;
+            return (
+              <div
+                key={i}
+                className={`h-1.5 flex-1 rounded-full ${
+                  complete ? "" : i === done ? "bg-primary/40" : "bg-muted"
+                }`}
+                // completed segments carry the brand particle gradient with a faint glow
+                style={
+                  complete
+                    ? {
+                        backgroundImage: "linear-gradient(90deg, #FFCC1A, #FF730D, #EB291C)",
+                        boxShadow: "0 0 6px rgba(255, 115, 13, 0.25)",
+                      }
+                    : undefined
+                }
+              />
+            );
+          })}
         </div>
         {endowedNote ? <p className="text-xs text-muted-foreground">{endowedNote}</p> : null}
         <CardTitle className="text-xl">{title}</CardTitle>

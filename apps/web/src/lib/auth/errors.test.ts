@@ -12,6 +12,15 @@ describe("friendlyAuthError", () => {
     );
   });
 
+  it("maps rate-limit errors by substring", () => {
+    expect(friendlyAuthError("email rate limit exceeded")).toBe(
+      "Too many attempts right now — please wait a few minutes and try again."
+    );
+    expect(friendlyAuthError("Request rate limit reached")).toBe(
+      "Too many attempts right now — please wait a few minutes and try again."
+    );
+  });
+
   it("falls back to a generic message", () => {
     expect(friendlyAuthError("weird internal thing")).toBe(
       "Something went wrong. Please try again."

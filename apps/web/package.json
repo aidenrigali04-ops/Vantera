@@ -13,7 +13,9 @@
   "dependencies": {
     "@supabase/ssr": "^0.12.0",
     "@vantera/agent-brains": "workspace:*",
+    "@vantera/ai": "workspace:*",
     "@vantera/email-infra": "workspace:*",
+    "@vantera/help-agent": "workspace:*",
     "@vantera/linkedin-infra": "workspace:*",
     "@trigger.dev/sdk": "^4.0.0",
     "@supabase/supabase-js": "^2.108.1",

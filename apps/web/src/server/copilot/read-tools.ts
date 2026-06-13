@@ -110,10 +110,11 @@ export async function getLeadScoreRationale(
   db: SupabaseClient,
   leadName: string
 ): Promise<LeadScoreDTO> {
+  const safe = leadName.replace(/[\\%_]/g, (c) => `\\${c}`);
   const { data } = await db
     .from("leads")
     .select("ai_score, ai_rationale")
-    .ilike("first_name", `%${leadName}%`)
+    .ilike("first_name", `%${safe}%`)
     .limit(1)
     .maybeSingle();
   return {

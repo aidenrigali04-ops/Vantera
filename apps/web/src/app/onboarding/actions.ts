@@ -5,7 +5,7 @@ import { scanWebsite, type WebsiteScan } from "@vantera/agent-brains";
 import { createClient } from "@/lib/supabase/server";
 import { validateOnboarding } from "@/lib/validation";
 
-export type OnboardingState = { error?: string; scan?: WebsiteScan };
+export type OnboardingState = { error?: string; done?: boolean; scan?: WebsiteScan };
 
 export async function completeOnboarding(
   _prev: OnboardingState,
@@ -53,8 +53,11 @@ export async function completeOnboarding(
 
   // learn the seller's offerings from their website so the Scout agent targets the
   // right leads; the result is shown to the user and cached on the account (the
-  // pipeline's 30-day staleness check picks it up from here). A broken or missing
-  // website never blocks onboarding — the next Scout run retries the scan.
+  // pipeline's 30-day staleness check picks it up from here). When a website was
+  // given, the summary screen is the onboarding payoff, so we ALWAYS present it:
+  // a successful scan shows what we learned, a failed scan still confirms setup and
+  // hands the retry to the next Scout run. A broken/missing website never blocks
+  // onboarding. A blank website has nothing to summarize → straight to dashboard.
   if (result.values.websiteUrl) {
     try {
       const scan = await scanWebsite(result.values.websiteUrl);
@@ -65,10 +68,15 @@ export async function completeOnboarding(
           website_scanned_at: new Date().toISOString(),
         })
         .eq("id", account.id);
-      if (!scanError) return { scan };
+      // even if caching the scan failed, the user still earned their summary; the
+      // Scout run re-persists it via the staleness check.
+      if (scanError) console.error("onboarding website scan cache write failed", scanError);
+      return { done: true, scan };
     } catch (err) {
-      // fall through to the dashboard redirect; the Scout run retries via staleness
+      // the scan itself failed (unreachable site, model error) — confirm setup
+      // anyway and let the next Scout run retry the scan.
       console.error("onboarding website scan failed", err);
+      return { done: true };
     }
   }
 
