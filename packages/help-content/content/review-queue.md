@@ -6,7 +6,7 @@ routes: /review
 
 # Reviewing drafts before they send
 
-Every message your Copy Agent writes waits in the review queue — nothing sends without your approval.
+Every message your Outreach Agent writes waits in the review queue — nothing sends without your approval.
 
 Each draft shows who it's for, the channel, and the message. If our style check spotted anything that could read as robotic, you'll see a flag on the card; edit the draft and the flag clears once the text passes.
 

@@ -115,7 +115,7 @@ export function AgentCard({
         )}
         {agent.kind === "copy" && (
           <p className="text-xs text-muted-foreground">
-            Drafts wait for your approval — review them under Campaigns.
+            Drafts wait for your approval in the review queue.
           </p>
         )}
         <FormError message={state.error} />

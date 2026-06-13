@@ -49,11 +49,11 @@ export default async function AgentsPage({
               <Link href="/leads" className="underline underline-offset-2">
                 Leads
               </Link>
-              . {!copy && "Next: deploy a Copy Agent so every qualified lead gets a message drafted."}
+              . {!copy && "Next: deploy an Outreach Agent so every qualified lead gets a message drafted."}
             </>
           ) : (
             <>
-              <span className="font-medium">{copy?.name ?? "Your Copy Agent"} is live.</span>{" "}
+              <span className="font-medium">{copy?.name ?? "Your Outreach Agent"} is live.</span>{" "}
               It drafts personalized outreach for every qualified lead — everything waits in your
               review queue, nothing sends without you.
             </>
@@ -92,22 +92,22 @@ export default async function AgentsPage({
           {copy ? (
             <AgentCard
               agent={copy}
-              roleLabel="Copy Agent"
+              roleLabel="Outreach Agent"
               stats={[{ label: "Drafts awaiting review", value: drafts ?? 0 }]}
             />
           ) : (
             <Card className="border-dashed">
               <CardHeader>
                 <PenLine className="size-6 text-muted-foreground" />
-                <CardTitle className="text-base">Add a Copy Agent</CardTitle>
+                <CardTitle className="text-base">Add an Outreach Agent</CardTitle>
                 <p className="text-sm text-muted-foreground">
-                  {scout?.name ?? "Your Prospect Agent"} is finding leads — a Copy Agent writes a
-                  personalized message for each one and queues it for your review.
+                  {scout?.name ?? "Your Prospect Agent"} is finding leads — an Outreach Agent
+                  writes a personalized message for each one and queues it for your review.
                 </p>
               </CardHeader>
               <CardContent>
                 <Button asChild variant="outline">
-                  <Link href="/agents/new/copy">Set up your Copy Agent</Link>
+                  <Link href="/agents/new/copy">Set up your Outreach Agent</Link>
                 </Button>
               </CardContent>
             </Card>

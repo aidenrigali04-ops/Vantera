@@ -33,8 +33,8 @@ export default async function NewCopyAgentPage() {
         <CardHeader>
           <CardTitle>Deploy a Prospect Agent first</CardTitle>
           <p className="text-sm text-muted-foreground">
-            The Copy Agent writes to the leads your Prospect Agent finds — without one, it has no
-            one to write to.
+            The Outreach Agent writes to the leads your Prospect Agent finds — without one, it
+            has no one to write to.
           </p>
         </CardHeader>
         <CardContent>

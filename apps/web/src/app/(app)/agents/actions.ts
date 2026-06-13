@@ -109,7 +109,7 @@ export async function deployCopyAgent(
   const { supabase, user, account } = await sessionAccount();
   if (!user || !account) return { error: "Your session expired. Sign in again." };
 
-  // the Copy agent inherits the Scout's targeting — require a deployed Scout first
+  // the Outreach agent (kind 'copy') inherits the Scout's targeting — require a deployed Scout first
   const { data: scout } = await supabase
     .from("agents")
     .select("id")
@@ -169,7 +169,7 @@ export async function deployCopyAgent(
     .single<{ id: string }>();
   if (agentError || !agent) {
     if (agentError?.code === "23505") {
-      return { error: "You already have a Copy Agent. Pause or edit it from the Agents page." };
+      return { error: "You already have an Outreach Agent. Pause or edit it from the Agents page." };
     }
     return { error: "Could not deploy the agent. Only workspace admins can do this." };
   }

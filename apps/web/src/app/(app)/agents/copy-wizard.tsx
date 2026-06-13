@@ -12,11 +12,18 @@ import { deployCopyAgent, type AgentActionState } from "./actions";
 
 const STEPS = ["Name", "Targeting", "CTA", "Content", "Channels", "Deploy"] as const;
 
+const CTA_EXAMPLES = [
+  "book a 15-minute intro call",
+  "reply to set up a quick chat",
+  "try a free demo",
+] as const;
+
 export function CopyWizard({ scoutName, icpNames }: { scoutName: string; icpNames: string[] }) {
   const [step, setStep] = useState(0);
   const [name, setName] = useState("");
   const [cta, setCta] = useState("");
   const [links, setLinks] = useState("");
+  const [fileCount, setFileCount] = useState(0);
   const [linkedin, setLinkedin] = useState(true);
   const [email, setEmail] = useState(true);
   const [state, action, pending] = useActionState<AgentActionState, FormData>(
@@ -50,10 +57,10 @@ export function CopyWizard({ scoutName, icpNames }: { scoutName: string; icpName
       }
       hint={
         [
-          "This teammate writes every message, tailored to each lead.",
+          "Your outreach teammate — it writes every message, tailored to each lead.",
           "Set by your Prospect Agent — every draft targets these people.",
           "The one thing each message invites the prospect to do.",
-          "Links, case studies, or files it can reference. Optional.",
+          "Optional — but the more you add, the smarter every message gets.",
           "Enable at least one channel.",
           "Every draft lands in your review queue — nothing sends without you.",
         ][step]
@@ -104,6 +111,18 @@ export function CopyWizard({ scoutName, icpNames }: { scoutName: string; icpName
               maxLength={200}
               autoFocus
             />
+            <div className="flex flex-wrap gap-1.5 pt-1">
+              {CTA_EXAMPLES.map((example) => (
+                <button
+                  key={example}
+                  type="button"
+                  onClick={() => setCta(example)}
+                  className="rounded-full border border-border px-3 py-1 text-xs text-muted-foreground transition-colors hover:border-primary hover:text-foreground"
+                >
+                  {example}
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
@@ -120,7 +139,13 @@ export function CopyWizard({ scoutName, icpNames }: { scoutName: string; icpName
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="copy-files">Files or images (up to 5, 5 MB each)</Label>
-            <Input id="copy-files" name="files" type="file" multiple />
+            <Input
+              id="copy-files"
+              name="files"
+              type="file"
+              multiple
+              onChange={(e) => setFileCount(e.target.files?.length ?? 0)}
+            />
           </div>
         </div>
 
@@ -156,18 +181,33 @@ export function CopyWizard({ scoutName, icpNames }: { scoutName: string; icpName
         )}
 
         {step === 5 && (
-          <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
-            <dt className="text-muted-foreground">Agent</dt>
-            <dd className="font-medium">{name}</dd>
-            <dt className="text-muted-foreground">Writes to</dt>
-            <dd>{icpNames.join(" · ")}</dd>
-            <dt className="text-muted-foreground">CTA</dt>
-            <dd>{cta}</dd>
-            <dt className="text-muted-foreground">Channels</dt>
-            <dd>{[linkedin && "LinkedIn", email && "Email"].filter(Boolean).join(" + ")}</dd>
-            <dt className="text-muted-foreground">Review</dt>
-            <dd>every draft waits for your approval</dd>
-          </dl>
+          <div className="flex flex-col gap-4">
+            <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
+              <dt className="text-muted-foreground">Agent</dt>
+              <dd className="font-medium">{name}</dd>
+              <dt className="text-muted-foreground">Reaches out to</dt>
+              <dd>{icpNames.join(" · ")}</dd>
+              <dt className="text-muted-foreground">CTA</dt>
+              <dd>{cta}</dd>
+              <dt className="text-muted-foreground">Content</dt>
+              <dd>
+                {(() => {
+                  const linkCount = links.split("\n").filter((l) => l.trim()).length;
+                  const parts = [
+                    linkCount > 0 && `${linkCount} link${linkCount === 1 ? "" : "s"}`,
+                    fileCount > 0 && `${fileCount} file${fileCount === 1 ? "" : "s"}`,
+                  ].filter(Boolean);
+                  return parts.length > 0 ? parts.join(" · ") : "none — add anytime";
+                })()}
+              </dd>
+              <dt className="text-muted-foreground">Channels</dt>
+              <dd>{[linkedin && "LinkedIn", email && "Email"].filter(Boolean).join(" + ")}</dd>
+            </dl>
+            <p className="rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm">
+              {name.trim() || "Your agent"} starts drafting as soon as qualified leads arrive.
+              Every draft waits in your review queue — nothing sends without you.
+            </p>
+          </div>
         )}
 
         <FormError message={state.error} />

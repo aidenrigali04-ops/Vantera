@@ -55,7 +55,7 @@ export default async function ReviewPage({
             <Inbox className="mx-auto size-8 text-muted-foreground" />
             <CardTitle className="text-base">Queue&apos;s clear</CardTitle>
             <p className="max-w-md text-sm text-muted-foreground">
-              When your Copy Agent drafts outreach for qualified leads, every message lands here
+              When your Outreach Agent drafts messages for qualified leads, every one lands here
               for your sign-off first. Check{" "}
               <Link href="/agents" className="underline underline-offset-2">
                 your agents
