@@ -5,6 +5,9 @@ import type {
   ProspectDataSource,
 } from "@vantera/prospect-data";
 import type {
+  CallBrief,
+  CallBriefRequest,
+  CallOutcome,
   EmailDraft,
   LeadInsights,
   LinkedInDraft,
@@ -16,6 +19,7 @@ import type {
   StoredInsights,
   WebsiteScan,
 } from "@vantera/agent-brains";
+import type { VoiceInfra } from "@vantera/voice-infra";
 import type { SenderAddress } from "./email-footer";
 import type { EmailInfra } from "@vantera/email-infra";
 import type { LinkedInInfra } from "@vantera/linkedin-infra";
@@ -106,7 +110,7 @@ export interface NewScheduledSend {
   accountId: string;
   campaignId: string;
   leadId: string;
-  channel: "email" | "linkedin";
+  channel: "email" | "linkedin" | "call";
   subject: string | null;
   body: string;
   /** automatic mode inserts clean drafts as 'approved'; style-flagged drafts always review */
@@ -114,6 +118,8 @@ export interface NewScheduledSend {
   /** invite/message pair for LinkedIn (0009); null for email */
   linkedinStage: "invite" | "message" | null;
   styleFlags: string | null;
+  /** structured call brief (channel 'call' only); null otherwise */
+  brief?: CallBrief | null;
 }
 
 export interface CopyDraftStore {
@@ -323,6 +329,124 @@ export interface InboundDeps {
 }
 
 export interface InboundSummary {
+  handled: boolean;
+  action: string;
+}
+
+export interface CallerConfig {
+  cta: string;
+  bookingLink: string;
+  voice: { voiceId: string; personaName: string; language: string };
+  recordingConsentMode: "one_party" | "two_party";
+  callingWindow: { days: string[]; startLocal: string; endLocal: string };
+  maxAttempts: number;
+}
+
+export const CALLER_DEFAULTS = {
+  maxAttempts: 3,
+  callingWindow: { days: ["mon", "tue", "wed", "thu", "fri"], startLocal: "09:00", endLocal: "17:00" },
+} as const;
+
+export interface CallerContext {
+  agent: { id: string; accountId: string; status: string; campaignId: string | null; config: CallerConfig };
+  assets: { kind: string; url: string | null; filename: string | null }[];
+  account: { industry: string | null; websiteScan: { summary?: string } | null };
+}
+
+export interface CallableLead {
+  id: string;
+  firstName: string | null;
+  lastName: string | null;
+  title: string | null;
+  companyName: string | null;
+  industry: string | null;
+  phone: string | null;
+  phoneStatus: "unvalidated" | "valid" | "invalid";
+  aiInsights: StoredInsights | null;
+}
+
+export interface CallBriefDraftPayload {
+  callerAgentId: string;
+  accountId: string;
+  leadIds: string[];
+}
+
+export interface CallBriefStore {
+  getCallerContext(callerAgentId: string): Promise<CallerContext | null>;
+  getCallableLeads(accountId: string, leadIds: string[]): Promise<CallableLead[]>;
+  /** rule-11 gate: phone normalized to E.164 lower-case before lookup */
+  isSuppressed(accountId: string, kind: "phone", value: string): Promise<boolean>;
+  ensureCampaignLead(campaignId: string, leadId: string, accountId: string): Promise<void>;
+  setCampaignLeadStatus(campaignId: string, leadId: string, status: "queued" | "suppressed" | "skipped"): Promise<void>;
+  insertScheduledSend(send: NewScheduledSend): Promise<void>;
+  setLeadStatus(leadId: string, status: "in_campaign"): Promise<void>;
+}
+
+export interface CallBriefDeps {
+  store: CallBriefStore;
+  draftBriefFn: (req: CallBriefRequest) => Promise<CallBrief>;
+}
+
+export interface CallBriefSummary {
+  status: "completed" | "skipped";
+  drafted: number;
+  suppressed: number;
+  skipped: number;
+}
+
+// --- dispatch (send boundary) ---
+export interface DispatchableCall {
+  id: string;
+  accountId: string;
+  campaignId: string;
+  agentId: string;
+  leadId: string;
+  brief: CallBrief;
+  phone: string;
+  config: CallerConfig;
+  attemptsSoFar: number;
+  leadTimezone: string | null;
+}
+
+export interface CallDispatchStore {
+  getApprovedCalls(): Promise<DispatchableCall[]>;
+  isKillSwitchOn(): Promise<boolean>;
+  isSuppressed(accountId: string, kind: "phone", value: string): Promise<boolean>;
+  claimSending(sendId: string): Promise<boolean>;
+  revertToApproved(sendId: string): Promise<void>;
+  markSuppressed(sendId: string): Promise<void>;
+  insertCall(c: {
+    accountId: string; leadId: string; agentId: string; campaignId: string;
+    scheduledSendId: string; providerCallId: string; attemptNo: number;
+  }): Promise<void>;
+  markSendSent(sendId: string): Promise<void>;
+}
+
+export interface CallDispatchDeps {
+  store: CallDispatchStore;
+  voiceInfra: VoiceInfra;
+  fromNumber: string;
+  now?: () => Date;
+}
+
+export type CallDispatchOutcome = "dialing" | "suppressed" | "outside_window" | "skipped" | "halted";
+
+export interface VoiceInboundStore {
+  recordWebhookEvent(source: "voice", providerEventId: string, payload: unknown): Promise<boolean>;
+  findCallByProviderId(providerCallId: string): Promise<{ id: string; accountId: string; leadId: string; phone: string | null } | null>;
+  updateCallEnded(callId: string, e: { status: string; outcome: CallOutcome; durationSec: number; recordingUrl: string | null; transcript: string | null }): Promise<void>;
+  updateCallStarted(callId: string): Promise<void>;
+  addSuppression(accountId: string, kind: "phone", value: string, source: "not_interested", leadId?: string): Promise<void>;
+}
+
+export interface VoiceInboundDeps {
+  store: VoiceInboundStore;
+  voiceInfra: Pick<VoiceInfra, "parseEventWebhook">;
+  classifyFn: (transcript: string) => Promise<CallOutcome>;
+  now?: () => Date;
+}
+
+export interface VoiceInboundSummary {
   handled: boolean;
   action: string;
 }

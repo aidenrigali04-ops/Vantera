@@ -17,6 +17,7 @@
     "@vantera/email-infra": "workspace:*",
     "@vantera/linkedin-infra": "workspace:*",
     "@vantera/prospect-data": "workspace:*",
+    "@vantera/voice-infra": "workspace:*",
     "drizzle-orm": "^0.45.0"
   },
   "devDependencies": {
