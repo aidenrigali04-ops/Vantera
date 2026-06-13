@@ -18,7 +18,17 @@ const CTA_EXAMPLES = [
   "try a free demo",
 ] as const;
 
-export function CopyWizard({ scoutName, icpNames }: { scoutName: string; icpNames: string[] }) {
+export function CopyWizard({
+  scoutName,
+  icpNames,
+  mailboxCount = 0,
+  linkedinCount = 0,
+}: {
+  scoutName: string;
+  icpNames: string[];
+  mailboxCount?: number;
+  linkedinCount?: number;
+}) {
   const [step, setStep] = useState(0);
   const [name, setName] = useState("");
   const [cta, setCta] = useState("");
@@ -26,6 +36,7 @@ export function CopyWizard({ scoutName, icpNames }: { scoutName: string; icpName
   const [fileCount, setFileCount] = useState(0);
   const [linkedin, setLinkedin] = useState(true);
   const [email, setEmail] = useState(true);
+  const [sendMode, setSendMode] = useState<"review" | "automatic">("review");
   const [state, action, pending] = useActionState<AgentActionState, FormData>(
     deployCopyAgent,
     {}
@@ -62,7 +73,7 @@ export function CopyWizard({ scoutName, icpNames }: { scoutName: string; icpName
           "The one thing each message invites the prospect to do.",
           "Optional — but the more you add, the smarter every message gets.",
           "Enable at least one channel.",
-          "Every draft lands in your review queue — nothing sends without you.",
+          "Choose how it sends, then deploy.",
         ][step]
       }
     >
@@ -70,6 +81,7 @@ export function CopyWizard({ scoutName, icpNames }: { scoutName: string; icpName
         <input type="hidden" name="name" value={name} />
         <input type="hidden" name="cta" value={cta} />
         <input type="hidden" name="links" value={links} />
+        <input type="hidden" name="sendMode" value={sendMode} />
         {linkedin && <input type="hidden" name="channelLinkedin" value="on" />}
         {email && <input type="hidden" name="channelEmail" value="on" />}
 
@@ -177,6 +189,20 @@ export function CopyWizard({ scoutName, icpNames }: { scoutName: string; icpName
                 </span>
               </button>
             ))}
+            {((email && mailboxCount === 0) || (linkedin && linkedinCount === 0)) && (
+              <p className="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-muted-foreground">
+                {email && mailboxCount === 0 && linkedin && linkedinCount === 0
+                  ? "No sending channel connected yet"
+                  : email && mailboxCount === 0
+                    ? "No email sending set up yet"
+                    : "No LinkedIn account connected yet"}
+                {" — drafting works now; sending starts once you "}
+                <a href="/settings/channels" className="underline underline-offset-2">
+                  set one up in Settings → Channels
+                </a>
+                .
+              </p>
+            )}
           </div>
         )}
 
@@ -203,9 +229,44 @@ export function CopyWizard({ scoutName, icpNames }: { scoutName: string; icpName
               <dt className="text-muted-foreground">Channels</dt>
               <dd>{[linkedin && "LinkedIn", email && "Email"].filter(Boolean).join(" + ")}</dd>
             </dl>
+
+            <fieldset className="flex flex-col gap-2">
+              <legend className="pb-1 text-sm font-medium">How should it send?</legend>
+              {(
+                [
+                  {
+                    value: "review",
+                    title: "Review every draft",
+                    note: "Recommended — nothing sends until you approve it.",
+                  },
+                  {
+                    value: "automatic",
+                    title: "Send automatically",
+                    note: "Clean drafts send on a human-like schedule; anything with a style flag still comes to you.",
+                  },
+                ] as const
+              ).map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={sendMode === opt.value}
+                  onClick={() => setSendMode(opt.value)}
+                  className={`flex flex-col items-start gap-0.5 rounded-lg border px-4 py-3 text-left text-sm transition-colors ${
+                    sendMode === opt.value ? "border-primary bg-primary/5" : "border-border"
+                  }`}
+                >
+                  <span className="font-medium">{opt.title}</span>
+                  <span className="text-xs text-muted-foreground">{opt.note}</span>
+                </button>
+              ))}
+            </fieldset>
+
             <p className="rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm">
-              {name.trim() || "Your agent"} starts drafting as soon as qualified leads arrive.
-              Every draft waits in your review queue — nothing sends without you.
+              {name.trim() || "Your agent"} starts drafting as soon as qualified leads arrive.{" "}
+              {sendMode === "review"
+                ? "Every draft waits in your review queue — nothing sends without you."
+                : "Clean drafts send automatically on a human-like schedule; flagged ones wait in your review queue."}
             </p>
           </div>
         )}

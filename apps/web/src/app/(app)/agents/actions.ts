@@ -104,7 +104,7 @@ export async function deployCopyAgent(
 ): Promise<AgentActionState> {
   const parsed = parseCopyForm(formData);
   if (!parsed.ok) return { error: parsed.error };
-  const { name, cta, links, channels } = parsed.values;
+  const { name, cta, links, channels, sendMode } = parsed.values;
 
   const { supabase, user, account } = await sessionAccount();
   if (!user || !account) return { error: "Your session expired. Sign in again." };
@@ -144,7 +144,7 @@ export async function deployCopyAgent(
       channels: channelList,
       targeting: icpNames.map((value) => ({ type: "icp", value })),
       copywriting_mode: "agent",
-      send_mode: "review",
+      send_mode: sendMode,
       created_by: user.id,
     })
     .select("id")
@@ -211,6 +211,26 @@ export async function deployCopyAgent(
 
   revalidatePath("/agents");
   redirect("/agents?deployed=copy");
+}
+
+/** Flip an Outreach agent's campaign between review and automatic sending (rule 08). */
+export async function updateSendMode(
+  _prev: AgentActionState,
+  formData: FormData
+): Promise<AgentActionState> {
+  const campaignId = String(formData.get("campaignId") ?? "");
+  const sendMode = String(formData.get("sendMode") ?? "");
+  if (!campaignId || (sendMode !== "review" && sendMode !== "automatic")) {
+    return { error: "Invalid request." };
+  }
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("campaigns")
+    .update({ send_mode: sendMode }) // RLS scopes to the admin's account (rule 02)
+    .eq("id", campaignId);
+  if (error) return { error: "Could not update send mode. Only workspace admins can do this." };
+  revalidatePath("/agents");
+  return {};
 }
 
 export async function setAgentStatus(

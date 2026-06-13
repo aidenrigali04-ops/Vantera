@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormError } from "@/components/form-error";
-import { setAgentStatus, type AgentActionState } from "./actions";
+import { setAgentStatus, updateSendMode, type AgentActionState } from "./actions";
 
 export type AgentRow = {
   id: string;
@@ -19,6 +19,8 @@ export type AgentRow = {
   next_run_at: string | null;
   last_run_at: string | null;
   deployed_at: string | null;
+  campaign_id?: string | null;
+  campaigns?: { send_mode: "automatic" | "review" | "manual" | null } | null;
   agent_icps?: { position: number; icps: { name: string } | null }[];
 };
 
@@ -46,7 +48,13 @@ export function AgentCard({
   stats: { label: string; value: number }[];
 }) {
   const [state, action] = useActionState<AgentActionState, FormData>(setAgentStatus, {});
+  const [modeState, switchMode, switchingMode] = useActionState<AgentActionState, FormData>(
+    updateSendMode,
+    {}
+  );
   const live = agent.status === "live";
+  const sendMode = agent.campaigns?.send_mode ?? "review";
+  const automatic = sendMode === "automatic";
   const icpNames = (agent.agent_icps ?? [])
     .sort((a, b) => a.position - b.position)
     .map((l) => l.icps?.name)
@@ -114,11 +122,28 @@ export function AgentCard({
           </p>
         )}
         {agent.kind === "copy" && (
-          <p className="text-xs text-muted-foreground">
-            Drafts wait for your approval in the review queue.
-          </p>
+          <div className="flex flex-col gap-1.5">
+            <p className="text-xs text-muted-foreground">
+              {automatic
+                ? "Sending automatically — flagged drafts still come to your review queue."
+                : "Drafts wait for your approval in the review queue."}
+            </p>
+            {agent.campaign_id && (
+              <form action={switchMode}>
+                <input type="hidden" name="campaignId" value={agent.campaign_id} />
+                <input
+                  type="hidden"
+                  name="sendMode"
+                  value={automatic ? "review" : "automatic"}
+                />
+                <Button type="submit" variant="ghost" size="sm" disabled={switchingMode}>
+                  {automatic ? "Switch to review every draft" : "Switch to automatic sending"}
+                </Button>
+              </form>
+            )}
+          </div>
         )}
-        <FormError message={state.error} />
+        <FormError message={state.error ?? modeState.error} />
       </CardContent>
     </Card>
   );

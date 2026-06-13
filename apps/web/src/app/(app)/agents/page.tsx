@@ -15,7 +15,7 @@ export default async function AgentsPage({
 
   const { data: agents } = await supabase
     .from("agents")
-    .select("id, kind, name, status, config, run_at_time, cadence, timezone, next_run_at, last_run_at, deployed_at, agent_icps(position, icps(name))")
+    .select("id, kind, name, status, config, run_at_time, cadence, timezone, next_run_at, last_run_at, deployed_at, campaign_id, campaigns(send_mode), agent_icps(position, icps(name))")
     .order("kind", { ascending: false }); // scout first
 
   const scout = (agents as AgentRow[] | null)?.find((a) => a.kind === "scout") ?? null;

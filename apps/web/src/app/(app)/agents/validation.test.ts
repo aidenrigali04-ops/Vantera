@@ -71,8 +71,21 @@ describe("parseCopyForm", () => {
         cta: "book a 15-min intro",
         links: ["https://acme.com/case-study"],
         channels: { linkedin: false, email: true },
+        sendMode: "review",
       },
     });
+  });
+
+  it("defaults sendMode to review and accepts automatic", () => {
+    expect(parseCopyForm(copyForm())).toMatchObject({ values: { sendMode: "review" } });
+    expect(parseCopyForm(copyForm({ sendMode: "automatic" }))).toMatchObject({
+      values: { sendMode: "automatic" },
+    });
+  });
+
+  it("rejects an unknown sendMode (manual deferred, rule 08)", () => {
+    expect(parseCopyForm(copyForm({ sendMode: "manual" })).ok).toBe(false);
+    expect(parseCopyForm(copyForm({ sendMode: "blast" })).ok).toBe(false);
   });
 
   it("requires at least one channel", () => {

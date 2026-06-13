@@ -13,6 +13,7 @@ export type CopyFormValues = {
   cta: string;
   links: string[];
   channels: { linkedin: boolean; email: boolean };
+  sendMode: "review" | "automatic";
 };
 
 type Result<T> = { ok: true; values: T } | { ok: false; error: string };
@@ -82,5 +83,13 @@ export function parseCopyForm(form: FormData): Result<CopyFormValues> {
     return { ok: false, error: "Enable at least one channel." };
   }
 
-  return { ok: true, values: { name, cta, links, channels } };
+  // send mode defaults to review; only review/automatic are valid (rule 08 —
+  // manual + user-drafted modes are deferred to a later phase)
+  const rawMode = form.get("sendMode");
+  const sendMode = rawMode == null || rawMode === "" ? "review" : String(rawMode);
+  if (sendMode !== "review" && sendMode !== "automatic") {
+    return { ok: false, error: "Pick how this agent sends." };
+  }
+
+  return { ok: true, values: { name, cta, links, channels, sendMode } };
 }
