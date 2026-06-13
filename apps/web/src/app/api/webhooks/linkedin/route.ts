@@ -15,7 +15,11 @@ export async function POST(req: Request) {
       const { error } = await supabase
         .from("webhook_events")
         .insert({ source, provider_event_id: providerEventId, payload });
-      return !error; // unique violation = duplicate
+      if (error) {
+        if (error.code === "23505") return false; // genuine duplicate
+        throw new Error(`webhook event store failed: ${error.code}`); // → 500, vendor retries
+      }
+      return true;
     },
     enqueue: async (payload) => {
       await tasks.trigger("process-inbound", payload);

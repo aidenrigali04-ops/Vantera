@@ -17,7 +17,10 @@ const SUCCESS_HTML = `<!doctype html>
 </body>
 </html>`;
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 async function run(token: string): Promise<void> {
+  if (!UUID_RE.test(token)) return; // garbage input: skip the DB, still render success (no oracle)
   const supabase = createServiceClient();
   await processUnsubscribe(token, {
     findToken: async (t) => {
@@ -59,7 +62,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ token: 
   await run(token);
   return new Response(SUCCESS_HTML, {
     status: 200,
-    headers: { "Content-Type": "text/html; charset=utf-8" },
+    headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" },
   });
 }
 
