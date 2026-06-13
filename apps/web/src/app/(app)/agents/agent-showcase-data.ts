@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 
-export type ShowcaseKind = "scout" | "copy";
+export type ShowcaseKind = "scout" | "copy" | "caller";
 
 export type ShowcaseStat = { label: string; value: number };
 
@@ -41,6 +41,15 @@ type AgentDbRow = {
   campaigns: { send_mode: "automatic" | "review" | "manual" | null } | null;
   agent_icps: { position: number; icps: { name: string } | null }[];
 };
+
+function callerSummary(status: string, personaName: string | null): string {
+  const caller = personaName ? personaName : "Your Caller Agent";
+  if (status === "live")
+    return `${caller} calls every qualified lead, books them in directly, and leaves no lead untouched — every call waits in your review queue.`;
+  if (status === "paused")
+    return `Paused. Resume and ${caller} goes right back to calling qualified leads on your schedule.`;
+  return `Not deployed yet. Deploy it and every qualified lead gets a personalised call.`;
+}
 
 function icpPhrase(names: string[]): string {
   if (names.length === 0) return "your ideal customers";
@@ -117,6 +126,38 @@ function toShowcaseAgent(
             ? `${qualified} of ${sourced} leads kept`
             : "Waiting for the first run to bring leads in",
       },
+    };
+  }
+
+  if (row.kind === "caller") {
+    const personaName =
+      typeof (config as { voice?: { persona_name?: unknown } }).voice?.persona_name === "string"
+        ? (config as { voice: { persona_name: string } }).voice.persona_name
+        : null;
+    const cta =
+      typeof (config as { cta?: unknown }).cta === "string"
+        ? (config as { cta: string }).cta
+        : null;
+
+    return {
+      id: row.id,
+      kind: "caller",
+      roleLabel: "Caller Agent",
+      name: row.name,
+      status: row.status,
+      summary: callerSummary(row.status, personaName),
+      icpNames,
+      cadence: null,
+      timezone: row.timezone,
+      nextRunAt: null,
+      lastRunAt: row.last_run_at,
+      deployedAt: row.deployed_at,
+      cta,
+      channels: ["phone"],
+      sendMode: "review",
+      campaignId: row.campaign_id,
+      stats: [{ label: "Calls in review", value: counts.drafts }],
+      progress: null,
     };
   }
 

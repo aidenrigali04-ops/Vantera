@@ -119,7 +119,7 @@ describe("retention windows (rule 11)", () => {
 });
 
 describe("service-role-only write surfaces (rules 09/11)", () => {
-  it.each(["outreach_sends", "copilot_actions", "enrichment_results", "replies", "unsubscribe_tokens", "copilot_conversations", "copilot_messages"])(
+  it.each(["outreach_sends", "copilot_actions", "enrichment_results", "replies", "unsubscribe_tokens", "copilot_conversations", "copilot_messages", "calls"])(
     "%s has no client write policies",
     (table) => {
     const policyRe = new RegExp(`create policy \\w+ on public\\.${table}\\s+for (insert|update|delete|all)`);
@@ -143,5 +143,33 @@ describe("copilot v1 (0011)", () => {
     expect(sql).toMatch(/alter table public\.copilot_knowledge_chunks enable row level security/);
     // no RLS policy directly on the table (global/service-role-only table; see migration comment)
     expect(sql).not.toMatch(/create policy\s+\w+\s+on public\.copilot_knowledge_chunks/);
+  });
+});
+
+describe("billing entitlements (0013)", () => {
+  it("0013: billing snapshot columns are not client-writable", () => {
+    const sql = readFileSync(join(migrationsDir, "0013_billing_entitlements.sql"), "utf8");
+    const grantMatch = sql.match(/grant update \(([^)]*)\)\s+on table public\.accounts/i);
+    expect(grantMatch, "expected a column-scoped accounts UPDATE grant").toBeTruthy();
+    const granted = grantMatch![1];
+    for (const col of [
+      "plan",
+      "subscription_status",
+      "seats_purchased",
+      "linkedin_accounts_purchased",
+      "current_period_end",
+    ]) {
+      expect(granted).not.toContain(col);
+    }
+  });
+
+  it("0013: sender_address and outreach_paused ARE client-writable (closes pre-existing gap)", () => {
+    const sql = readFileSync(join(migrationsDir, "0013_billing_entitlements.sql"), "utf8");
+    const grantMatch = sql.match(/grant update \(([^)]*)\)\s+on table public\.accounts/i);
+    expect(grantMatch, "expected a column-scoped accounts UPDATE grant").toBeTruthy();
+    const granted = grantMatch![1];
+    for (const col of ["sender_address", "outreach_paused"]) {
+      expect(granted).toContain(col);
+    }
   });
 });

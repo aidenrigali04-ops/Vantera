@@ -1,9 +1,10 @@
-import { and, desc, eq, gte, inArray, isNull, lt, lte, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, inArray, isNull, lt, lte, or, sql } from "drizzle-orm";
 import {
   accounts,
   agentAssets,
   agentIcps,
   agents,
+  calls,
   campaignLeads,
   campaigns,
   copilotConversations,
@@ -24,9 +25,15 @@ import {
 import type { EnrichedProspect, IcpCriteria, ProspectCandidate } from "@vantera/prospect-data";
 import { toStoredInsights, type LeadInsights, type WebsiteScan } from "@vantera/agent-brains";
 import type {
+  CallBriefStore,
+  CallDispatchStore,
+  CallerConfig,
+  CallerContext,
+  CallableLead,
   CopyConfig,
   CopyContext,
   CopyDraftStore,
+  DispatchableCall,
   DispatchableSend,
   DraftableLead,
   FreshLead,
@@ -40,6 +47,7 @@ import type {
   ScoutStore,
   SendContext,
   SendDispatchStore,
+  VoiceInboundStore,
 } from "./types";
 import { EMAIL_STEADY_DAILY_PER_MAILBOX } from "./safety-limits";
 import { parseSenderAddress } from "./email-footer";
@@ -55,6 +63,7 @@ function toRow(send: NewScheduledSend) {
     status: send.status,
     subject: send.subject,
     body: send.body,
+    brief: send.brief ?? null,
     linkedinStage: send.linkedinStage,
     styleFlags: send.styleFlags,
   };
@@ -210,6 +219,14 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         .select({ id: agents.id })
         .from(agents)
         .where(and(eq(agents.accountId, accountId), eq(agents.kind, "copy"), eq(agents.status, "live")));
+      return agent ?? null;
+    },
+
+    async getLiveCallerAgent(accountId: string) {
+      const [agent] = await db
+        .select({ id: agents.id })
+        .from(agents)
+        .where(and(eq(agents.accountId, accountId), eq(agents.kind, "caller"), eq(agents.status, "live")));
       return agent ?? null;
     },
 
@@ -769,4 +786,319 @@ export interface DueScoutAgent {
 export interface SchedulerStore {
   getDueScoutAgents(now: Date): Promise<DueScoutAgent[]>;
   advanceSchedule(agentId: string, nextRunAt: Date): Promise<void>;
+}
+
+// ── CallerConfig helper ───────────────────────────────────────────────────────
+
+function parseCallerConfig(raw: Record<string, unknown>): CallerConfig {
+  const rawVoice = (raw["voice"] ?? {}) as Record<string, unknown>;
+  const rawWindow = (raw["calling_window"] ?? {}) as Record<string, unknown>;
+  return {
+    cta: (raw["cta"] as string) ?? "",
+    bookingLink: (raw["booking_link"] as string) ?? "",
+    voice: {
+      voiceId: (rawVoice["voice_id"] as string) ?? "",
+      personaName: (rawVoice["persona_name"] as string) ?? "",
+      language: (rawVoice["language"] as string) ?? "en-US",
+    },
+    recordingConsentMode: ((raw["recording_consent_mode"] as string) ?? "one_party") as "one_party" | "two_party",
+    callingWindow: {
+      days: (rawWindow["days"] as string[]) ?? ["mon", "tue", "wed", "thu", "fri"],
+      startLocal: (rawWindow["start_local"] as string) ?? "09:00",
+      endLocal: (rawWindow["end_local"] as string) ?? "17:00",
+    },
+    maxAttempts: (raw["max_attempts"] as number) ?? 3,
+  };
+}
+
+// ── CallBriefStore ────────────────────────────────────────────────────────────
+
+export function createCallBriefStore(db: Db): CallBriefStore {
+  return {
+    async getCallerContext(callerAgentId: string): Promise<CallerContext | null> {
+      const [agent] = await db.select().from(agents).where(eq(agents.id, callerAgentId));
+      if (!agent || agent.kind !== "caller") return null;
+      const assets = await db
+        .select({ kind: agentAssets.kind, url: agentAssets.url, filename: agentAssets.filename })
+        .from(agentAssets)
+        .where(eq(agentAssets.agentId, callerAgentId));
+      const [account] = await db.select().from(accounts).where(eq(accounts.id, agent.accountId));
+      if (!account) return null;
+      const config = parseCallerConfig((agent.config ?? {}) as Record<string, unknown>);
+      return {
+        agent: {
+          id: agent.id,
+          accountId: agent.accountId,
+          status: agent.status,
+          campaignId: agent.campaignId,
+          config,
+        },
+        assets,
+        account: {
+          industry: account.onboardingIndustry,
+          websiteScan: account.websiteScan as CallerContext["account"]["websiteScan"],
+        },
+      };
+    },
+
+    async getCallableLeads(accountId: string, leadIds: string[]): Promise<CallableLead[]> {
+      if (leadIds.length === 0) return [];
+      const rows = await db
+        .select()
+        .from(leads)
+        .where(and(eq(leads.accountId, accountId), inArray(leads.id, leadIds)));
+      return rows.map((r) => ({
+        id: r.id,
+        firstName: r.firstName,
+        lastName: r.lastName,
+        title: r.title,
+        companyName: r.companyName,
+        industry: r.industry,
+        phone: r.phone,
+        phoneStatus: r.phoneStatus as "unvalidated" | "valid" | "invalid",
+        aiInsights: r.aiInsights as CallableLead["aiInsights"],
+      }));
+    },
+
+    async isSuppressed(accountId: string, kind: "phone", value: string): Promise<boolean> {
+      const [hit] = await db
+        .select({ id: suppressionEntries.id })
+        .from(suppressionEntries)
+        .where(
+          and(
+            eq(suppressionEntries.accountId, accountId),
+            eq(suppressionEntries.kind, kind),
+            eq(suppressionEntries.value, value)
+          )
+        )
+        .limit(1);
+      return Boolean(hit);
+    },
+
+    async ensureCampaignLead(campaignId: string, leadId: string, accountId: string): Promise<void> {
+      await db
+        .insert(campaignLeads)
+        .values({ campaignId, leadId, accountId })
+        .onConflictDoNothing();
+    },
+
+    async setCampaignLeadStatus(
+      campaignId: string,
+      leadId: string,
+      status: "queued" | "suppressed" | "skipped"
+    ): Promise<void> {
+      await db
+        .update(campaignLeads)
+        .set({ status })
+        .where(and(eq(campaignLeads.campaignId, campaignId), eq(campaignLeads.leadId, leadId)));
+    },
+
+    async insertScheduledSend(send: NewScheduledSend): Promise<void> {
+      await db.insert(scheduledSends).values(toRow(send));
+    },
+
+    async setLeadStatus(leadId: string, status: "in_campaign"): Promise<void> {
+      await db.update(leads).set({ status }).where(eq(leads.id, leadId));
+    },
+  };
+}
+
+// ── CallDispatchStore ─────────────────────────────────────────────────────────
+
+export function createCallDispatchStore(db: Db): CallDispatchStore {
+  return {
+    async getApprovedCalls(): Promise<DispatchableCall[]> {
+      // Load approved call rows joined to their lead and to the caller agent for the account.
+      // leads has no timezone column; leadTimezone is always null (dispatch core falls back to UTC).
+      const rows = await db
+        .select({
+          id: scheduledSends.id,
+          accountId: scheduledSends.accountId,
+          campaignId: scheduledSends.campaignId,
+          leadId: scheduledSends.leadId,
+          brief: scheduledSends.brief,
+          phone: leads.phone,
+          agentConfig: agents.config,
+          agentId: agents.id,
+        })
+        .from(scheduledSends)
+        .innerJoin(leads, eq(scheduledSends.leadId, leads.id))
+        .innerJoin(
+          agents,
+          and(eq(agents.accountId, scheduledSends.accountId), eq(agents.kind, "caller"), eq(agents.status, "live"))
+        )
+        .where(
+          and(eq(scheduledSends.channel, "call"), eq(scheduledSends.status, "approved"))
+        );
+
+      // Count attempts per scheduled send in a second query to avoid a complex lateral join.
+      const sendIds = rows.map((r) => r.id);
+      const attemptCounts =
+        sendIds.length > 0
+          ? await db
+              .select({
+                scheduledSendId: calls.scheduledSendId,
+                n: count(calls.id),
+              })
+              .from(calls)
+              .where(inArray(calls.scheduledSendId, sendIds))
+              .groupBy(calls.scheduledSendId)
+          : [];
+      const attemptsBySend = new Map(attemptCounts.map((r) => [r.scheduledSendId, Number(r.n)]));
+
+      return rows.map((r) => {
+        const config = parseCallerConfig((r.agentConfig ?? {}) as Record<string, unknown>);
+        return {
+          id: r.id,
+          accountId: r.accountId,
+          campaignId: r.campaignId,
+          agentId: r.agentId,
+          leadId: r.leadId,
+          brief: r.brief as DispatchableCall["brief"],
+          phone: r.phone ?? "",
+          config,
+          attemptsSoFar: attemptsBySend.get(r.id) ?? 0,
+          leadTimezone: null, // leads table has no timezone column; dispatch core falls back to UTC
+        };
+      });
+    },
+
+    async isKillSwitchOn(): Promise<boolean> {
+      const [row] = await db.select().from(appSettings).where(eq(appSettings.key, "outreach_kill_switch"));
+      return row?.value === true;
+    },
+
+    async isSuppressed(accountId: string, kind: "phone", value: string): Promise<boolean> {
+      const [hit] = await db
+        .select({ id: suppressionEntries.id })
+        .from(suppressionEntries)
+        .where(
+          and(
+            eq(suppressionEntries.accountId, accountId),
+            eq(suppressionEntries.kind, kind),
+            eq(suppressionEntries.value, value)
+          )
+        )
+        .limit(1);
+      return Boolean(hit);
+    },
+
+    async claimSending(sendId: string): Promise<boolean> {
+      const rows = await db
+        .update(scheduledSends)
+        .set({ status: "sending" })
+        .where(and(eq(scheduledSends.id, sendId), eq(scheduledSends.status, "approved")))
+        .returning({ id: scheduledSends.id });
+      return rows.length > 0;
+    },
+
+    async revertToApproved(sendId: string): Promise<void> {
+      await db.update(scheduledSends).set({ status: "approved", scheduledFor: null }).where(eq(scheduledSends.id, sendId));
+    },
+
+    async markSuppressed(sendId: string): Promise<void> {
+      await db.update(scheduledSends).set({ status: "suppressed" }).where(eq(scheduledSends.id, sendId));
+    },
+
+    async markSendSent(sendId: string): Promise<void> {
+      await db.update(scheduledSends).set({ status: "sent" }).where(eq(scheduledSends.id, sendId));
+    },
+
+    async insertCall(c: {
+      accountId: string;
+      leadId: string;
+      agentId: string;
+      campaignId: string;
+      scheduledSendId: string;
+      providerCallId: string;
+      attemptNo: number;
+    }): Promise<void> {
+      await db.insert(calls).values({
+        accountId: c.accountId,
+        leadId: c.leadId,
+        agentId: c.agentId,
+        campaignId: c.campaignId,
+        scheduledSendId: c.scheduledSendId,
+        providerCallId: c.providerCallId,
+        attemptNo: c.attemptNo,
+        status: "dialing",
+        startedAt: new Date(),
+      });
+    },
+  };
+}
+
+// ── VoiceInboundStore ─────────────────────────────────────────────────────────
+
+export function createVoiceInboundStore(db: Db): VoiceInboundStore {
+  return {
+    async recordWebhookEvent(source: "voice", providerEventId: string, payload: unknown): Promise<boolean> {
+      const rows = await db
+        .insert(webhookEvents)
+        .values({ source, providerEventId, payload: payload as Record<string, unknown> })
+        .onConflictDoNothing()
+        .returning({ id: webhookEvents.id });
+      return rows.length > 0;
+    },
+
+    async findCallByProviderId(
+      providerCallId: string
+    ): Promise<{ id: string; accountId: string; leadId: string; phone: string | null } | null> {
+      const [row] = await db
+        .select({
+          id: calls.id,
+          accountId: calls.accountId,
+          leadId: calls.leadId,
+          phone: leads.phone,
+        })
+        .from(calls)
+        .innerJoin(leads, eq(calls.leadId, leads.id))
+        .where(eq(calls.providerCallId, providerCallId))
+        .limit(1);
+      return row ?? null;
+    },
+
+    async updateCallStarted(callId: string): Promise<void> {
+      await db
+        .update(calls)
+        .set({ status: "in_progress", startedAt: new Date() })
+        .where(eq(calls.id, callId));
+    },
+
+    async updateCallEnded(
+      callId: string,
+      e: {
+        status: string;
+        outcome: import("@vantera/agent-brains").CallOutcome;
+        durationSec: number;
+        recordingUrl: string | null;
+        transcript: string | null;
+      }
+    ): Promise<void> {
+      await db
+        .update(calls)
+        .set({
+          status: e.status as typeof calls.status._.data,
+          outcome: e.outcome as typeof calls.outcome._.data,
+          durationSec: e.durationSec,
+          recordingUrl: e.recordingUrl,
+          transcript: e.transcript,
+          endedAt: new Date(),
+        })
+        .where(eq(calls.id, callId));
+    },
+
+    async addSuppression(
+      accountId: string,
+      kind: "phone",
+      value: string,
+      source: "not_interested",
+      leadId?: string
+    ): Promise<void> {
+      await db
+        .insert(suppressionEntries)
+        .values({ accountId, kind, value, source, leadId })
+        .onConflictDoNothing();
+    },
+  };
 }

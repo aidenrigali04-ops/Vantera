@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseCopyForm, parseScoutForm } from "./validation";
+import { parseCopyForm, parseScoutForm, validateCallerConfig, clampCallingWindow, TCPA_EARLIEST, TCPA_LATEST } from "./validation";
 
 function scoutForm(overrides: Record<string, string> = {}): FormData {
   const fd = new FormData();
@@ -97,5 +97,31 @@ describe("parseCopyForm", () => {
   it("rejects non-http links and short CTAs", () => {
     expect(parseCopyForm(copyForm({ links: "ftp://nope" })).ok).toBe(false);
     expect(parseCopyForm(copyForm({ cta: "go" })).ok).toBe(false);
+  });
+});
+
+describe("validateCallerConfig", () => {
+  it("accepts a complete config", () => {
+    expect(validateCallerConfig({
+      cta: "book a demo", bookingLink: "https://cal.com/x",
+      voice: { voiceId: "v1", personaName: "Alex", language: "en-US" },
+      recordingConsentMode: "two_party",
+      callingWindow: { days: ["mon"], startLocal: "09:00", endLocal: "17:00" }, maxAttempts: 3,
+    }).ok).toBe(true);
+  });
+
+  it("rejects a non-URL booking link", () => {
+    const r = validateCallerConfig({ cta: "x", bookingLink: "not-a-url", voice: { voiceId: "v", personaName: "A", language: "en-US" }, recordingConsentMode: "one_party", callingWindow: { days: ["mon"], startLocal: "09:00", endLocal: "17:00" }, maxAttempts: 1 });
+    expect(r.ok).toBe(false);
+  });
+
+  it("clamps the calling window into TCPA bounds (08:00-21:00)", () => {
+    expect(clampCallingWindow({ days: ["mon"], startLocal: "06:00", endLocal: "23:00" }))
+      .toEqual({ days: ["mon"], startLocal: TCPA_EARLIEST, endLocal: TCPA_LATEST });
+  });
+
+  it("rejects an empty day list", () => {
+    const r = validateCallerConfig({ cta: "x", bookingLink: "https://cal.com/x", voice: { voiceId: "v", personaName: "A", language: "en-US" }, recordingConsentMode: "one_party", callingWindow: { days: [], startLocal: "09:00", endLocal: "17:00" }, maxAttempts: 1 });
+    expect(r.ok).toBe(false);
   });
 });

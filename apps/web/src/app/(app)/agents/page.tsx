@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Bot, PenLine } from "lucide-react";
+import { Bot, PenLine, Phone } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,6 +20,7 @@ export default async function AgentsPage({
 
   const scout = (agents as AgentRow[] | null)?.find((a) => a.kind === "scout") ?? null;
   const copy = (agents as AgentRow[] | null)?.find((a) => a.kind === "copy") ?? null;
+  const caller = (agents as AgentRow[] | null)?.find((a) => a.kind === "caller") ?? null;
 
   // value proof: real pipeline counts, never placeholders
   const [{ count: qualified }, { count: sourced }, { count: drafts }] = await Promise.all([
@@ -60,6 +61,12 @@ export default async function AgentsPage({
               </Link>
               . {!copy && "Next: deploy an Outreach Agent so every qualified lead gets a message drafted."}
             </>
+          ) : deployed === "caller" ? (
+            <>
+              <span className="font-medium">{caller?.name ?? "Your Caller Agent"} is live.</span>{" "}
+              It briefs calls as qualified leads arrive — every call waits in your review queue,
+              nothing dials without you.
+            </>
           ) : (
             <>
               <span className="font-medium">{copy?.name ?? "Your Outreach Agent"} is live.</span>{" "}
@@ -70,7 +77,7 @@ export default async function AgentsPage({
         </div>
       )}
 
-      {!scout && !copy ? (
+      {!scout && !copy && !caller ? (
         <Card className="border-dashed">
           <CardHeader className="items-center text-center">
             <Bot className="mx-auto size-10 text-muted-foreground" />
@@ -121,6 +128,29 @@ export default async function AgentsPage({
               </CardContent>
             </Card>
           )}
+          {caller ? (
+            <AgentCard
+              agent={caller}
+              roleLabel="Caller Agent"
+              stats={[{ label: "Calls in review", value: drafts ?? 0 }]}
+            />
+          ) : scout ? (
+            <Card className="border-dashed">
+              <CardHeader>
+                <Phone className="size-6 text-muted-foreground" />
+                <CardTitle className="text-base">Add a Caller Agent</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  {scout.name} is qualifying leads — a Caller Agent phones each one, pitches your
+                  value, and books the meeting directly. Every call queues for your review first.
+                </p>
+              </CardHeader>
+              <CardContent>
+                <Button asChild variant="outline" data-copilot="deploy-caller">
+                  <Link href="/agents/new/caller">Set up your Caller Agent</Link>
+                </Button>
+              </CardContent>
+            </Card>
+          ) : null}
         </div>
       )}
     </div>

@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createEmailInfraFromEnv } from "@vantera/email-infra";
 import { createLinkedInInfraFromEnv } from "@vantera/linkedin-infra";
 import { canProvision, validateSenderAddress, validateProvisionCounts } from "./validation";
+import { gate, loadBillingRow } from "@/lib/billing/entitlement";
 
 export type ChannelActionState = { error?: string; success?: string };
 
@@ -108,8 +109,13 @@ export async function provisionEmailSending(
   const { count: existingCount } = await supabase
     .from("mailboxes")
     .select("id", { count: "exact", head: true });
-  const gate = canProvision(account.sender_address, existingCount ?? 0);
-  if (!gate.ok) return { error: gate.error };
+  const provisionGate = canProvision(account.sender_address, existingCount ?? 0);
+  if (!provisionGate.ok) return { error: provisionGate.error };
+
+  const billingRow = await loadBillingRow(supabase);
+  if (!billingRow) return { error: "No active plan. Choose a plan in Billing first." };
+  const planGate = gate(billingRow, "mailbox", existingCount ?? 0);
+  if (!planGate.ok) return { error: planGate.error };
 
   let mailboxes: Awaited<ReturnType<ReturnType<typeof createEmailInfraFromEnv>["provision"]>>;
   try {
@@ -154,6 +160,14 @@ export async function createLinkedInConnectLink(): Promise<{ url?: string; error
     .limit(1)
     .maybeSingle<{ id: string }>();
   if (!account) return { error: "Your session expired. Sign in again." };
+
+  const { count: liCount } = await supabase
+    .from("linkedin_accounts")
+    .select("id", { count: "exact", head: true });
+  const billingRow = await loadBillingRow(supabase);
+  if (!billingRow) return { error: "No active plan. Choose a plan in Billing first." };
+  const planGate = gate(billingRow, "linkedinAccount", liCount ?? 0);
+  if (!planGate.ok) return { error: planGate.error };
 
   try {
     const { url } = await createLinkedInInfraFromEnv().createHostedAuthLink(account.id);

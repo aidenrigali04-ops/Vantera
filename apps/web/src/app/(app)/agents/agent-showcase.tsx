@@ -9,10 +9,11 @@ import {
   useReducedMotion,
   type Variants,
 } from "framer-motion";
-import { Bot, PenLine, Mail, MessageSquare, Settings2, ArrowRight } from "lucide-react";
+import { Bot, PenLine, Phone, Mail, MessageSquare, Settings2, ArrowRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { AnimatedProgress } from "@/components/ui/animated-progress";
+import { CardGlass } from "@/components/ui/card";
 import { FormError } from "@/components/form-error";
 import { setAgentStatus, updateSendMode, type AgentActionState } from "./actions";
 import type { ShowcaseAgent, ShowcaseKind } from "./agent-showcase-data";
@@ -96,7 +97,7 @@ function Backdrop({ side }: { side: "left" | "right" }) {
 function AgentOrb({ agent, fromLeft }: { agent: ShowcaseAgent; fromLeft: boolean }) {
   const reduce = useReducedMotion();
   const live = agent.status === "live";
-  const Icon = agent.kind === "scout" ? Bot : PenLine;
+  const Icon = agent.kind === "scout" ? Bot : agent.kind === "caller" ? Phone : PenLine;
 
   return (
     <motion.div layout="position" className="relative shrink-0">
@@ -169,9 +170,11 @@ function AgentDetails({ agent, alignRight }: { agent: ShowcaseAgent; alignRight:
       ? live
         ? `Next run ${timeUntil(agent.nextRunAt)}${agent.cadence ? ` · every ${agent.cadence === "daily" ? "day" : "week"}` : ""}`
         : `Last ran ${timeAgo(agent.lastRunAt)}`
-      : automatic
-        ? "Sending automatically — flagged drafts still come to your review queue."
-        : "Drafts wait for your approval in the review queue.";
+      : agent.kind === "caller"
+        ? "Every call waits in your review queue before it dials out."
+        : automatic
+          ? "Sending automatically — flagged drafts still come to your review queue."
+          : "Drafts wait for your approval in the review queue.";
 
   return (
     <motion.div
@@ -216,8 +219,9 @@ function AgentDetails({ agent, alignRight }: { agent: ShowcaseAgent; alignRight:
       {/* run-summary panel */}
       <motion.div
         variants={item}
-        className="w-full space-y-5 rounded-2xl border border-border bg-card p-6 text-left shadow-sm"
+        className="relative isolate w-full space-y-5 overflow-hidden rounded-2xl border border-border p-6 text-left shadow-sm"
       >
+        <CardGlass />
         <div className="flex gap-8">
           {agent.stats.map((s) => (
             <div key={s.label}>
@@ -246,6 +250,11 @@ function AgentDetails({ agent, alignRight }: { agent: ShowcaseAgent; alignRight:
               icon={<MessageSquare className="size-3.5" />}
               label="LinkedIn"
             />
+          </div>
+        )}
+        {agent.kind === "caller" && (
+          <div className="flex flex-wrap items-center gap-2">
+            <ChannelChip on={true} icon={<Phone className="size-3.5" />} label="Phone" />
           </div>
         )}
 

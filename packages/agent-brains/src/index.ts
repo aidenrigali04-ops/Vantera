@@ -31,3 +31,6 @@ export {
 } from "./copy/linkedin";
 export { leadBlock, type CopyLead, type CopyContext, type DraftInput } from "./copy/shared";
 export { classifyReply, preClassify, replyVerdictSchema, type ReplyVerdict } from "./reply/classify";
+export { callBriefSchema, callOutcomeSchema, CALL_OUTCOMES, type CallBriefOutput, type CallOutcome } from "./caller/schema";
+export { draftCallBrief, type CallBrief, type CallBriefRequest } from "./caller/brief";
+export { classifyOutcome, mapProviderDisposition } from "./caller/classify";

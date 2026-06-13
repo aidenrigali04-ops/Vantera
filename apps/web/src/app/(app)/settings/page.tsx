@@ -49,6 +49,9 @@ export default async function SettingsPage() {
             revenueGoalDollars={
               account.revenue_goal_cents ? String(account.revenue_goal_cents / 100) : ""
             }
+            avgDealValueDollars={
+              account.avg_deal_value_cents ? String(account.avg_deal_value_cents / 100) : ""
+            }
           />
         </CardContent>
       </Card>
@@ -66,7 +69,26 @@ export default async function SettingsPage() {
               </li>
             ))}
           </ul>
-          <p className="mt-3 text-sm text-muted-foreground">Team invites are coming soon.</p>
+          <p className="mt-3 text-sm text-muted-foreground">
+            Invite teammates and manage roles.
+          </p>
+          <Button asChild variant="outline" size="sm" className="mt-3">
+            <Link href="/settings/team">Manage team</Link>
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Billing</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            Plan, usage, and payment.
+          </p>
+          <Button asChild variant="outline" size="sm" className="mt-3">
+            <Link href="/settings/billing">Manage billing</Link>
+          </Button>
         </CardContent>
       </Card>
 

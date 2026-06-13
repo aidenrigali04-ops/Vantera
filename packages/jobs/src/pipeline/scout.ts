@@ -104,6 +104,14 @@ export async function runScout(agentId: string, deps: ScoutDeps): Promise<ScoutR
     }
   }
 
+  // hand qualified leads to the Caller agent, if one is live (parallel chain)
+  if (qualifiedIds.length > 0) {
+    const callerAgent = await deps.store.getLiveCallerAgent(accountId);
+    if (callerAgent) {
+      await deps.triggerCallBrief({ callerAgentId: callerAgent.id, accountId, leadIds: qualifiedIds });
+    }
+  }
+
   return {
     status: "completed",
     discovered,

@@ -12,11 +12,13 @@ export function WorkspaceForm({
   industry,
   icp,
   revenueGoalDollars,
+  avgDealValueDollars,
 }: {
   name: string;
   industry: string;
   icp: string;
   revenueGoalDollars: string;
+  avgDealValueDollars: string;
 }) {
   const [state, action, pending] = useActionState<SettingsState, FormData>(updateWorkspace, {});
   return (
@@ -44,6 +46,21 @@ export function WorkspaceForm({
         />
         <p className="text-xs text-muted-foreground">
           Industry, ICP, and goal seed your default campaign targeting.
+        </p>
+      </div>
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="avgDealValue">Average value per client (USD/mo)</Label>
+        <Input
+          id="avgDealValue"
+          name="avgDealValue"
+          inputMode="decimal"
+          defaultValue={avgDealValueDollars}
+          placeholder="e.g. 1,500"
+        />
+        <p className="text-xs text-muted-foreground">
+          The recurring monthly revenue a closed client is worth. Powers the revenue snapshot on
+          your dashboard — closed and projected MRR against your goal. Leave blank to track counts
+          only.
         </p>
       </div>
       <FormError message={state.error} />

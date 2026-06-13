@@ -1,4 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { resolveEntitlements } from "@vantera/billing";
+import { snapshotFromRow, type AccountBillingRow } from "@/lib/billing/entitlement";
 
 // ── Draft queue ───────────────────────────────────────────────────────────────
 
@@ -120,5 +122,49 @@ export async function getLeadScoreRationale(
   return {
     score: data?.ai_score ?? null,
     rationale: data?.ai_rationale ?? null,
+  };
+}
+
+// ── Billing status ────────────────────────────────────────────────────────────
+
+export interface BillingStatusDTO {
+  plan: string;
+  status: string;
+  seats: { used: number; max: number };
+  campaigns: { used: number; max: number };
+}
+
+export async function getBillingStatus(
+  db: SupabaseClient,
+  _accountId: string
+): Promise<BillingStatusDTO> {
+  const { data: row } = await db
+    .from("accounts")
+    .select(
+      "plan, subscription_status, seats_purchased, linkedin_accounts_purchased, current_period_end"
+    )
+    .limit(1)
+    .maybeSingle();
+  const snap = snapshotFromRow(
+    (row ?? {
+      plan: "none",
+      subscription_status: "none",
+      seats_purchased: 0,
+      linkedin_accounts_purchased: 0,
+      current_period_end: null,
+    }) as AccountBillingRow
+  );
+  const limits = resolveEntitlements(snap);
+  const { count: seats } = await db
+    .from("account_members")
+    .select("user_id", { count: "exact", head: true });
+  const { count: campaigns } = await db
+    .from("campaigns")
+    .select("id", { count: "exact", head: true });
+  return {
+    plan: snap.plan,
+    status: snap.subscriptionStatus,
+    seats: { used: seats ?? 0, max: limits.maxSeats },
+    campaigns: { used: campaigns ?? 0, max: limits.maxCampaigns },
   };
 }

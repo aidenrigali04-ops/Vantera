@@ -8,6 +8,19 @@ export function dollarsToCents(input: string): number | null {
   return cents > 0 ? cents : null;
 }
 
+/** Optional positive dollar amount: blank → null; otherwise must parse to > 0. */
+export function optionalDollarsToCents(
+  input: string
+): { ok: true; cents: number | null } | Invalid {
+  const trimmed = input.trim();
+  if (!trimmed) return { ok: true, cents: null };
+  const cents = dollarsToCents(trimmed);
+  if (cents === null) {
+    return { ok: false, error: "Enter a value per client greater than zero, or leave it blank." };
+  }
+  return { ok: true, cents };
+}
+
 /** Blank means "no website"; otherwise require an http(s) URL, defaulting the scheme to https. */
 export function normalizeWebsiteUrl(input: string): { ok: true; url: string | null } | Invalid {
   const trimmed = input.trim();
@@ -87,12 +100,23 @@ export function validateWorkspace(input: {
   industry: string;
   icp: string;
   revenueGoal: string;
-}): Valid<{ name: string; industry: string; icp: string; revenueGoalCents: number }> | Invalid {
+  avgDealValue?: string;
+}):
+  | Valid<{
+      name: string;
+      industry: string;
+      icp: string;
+      revenueGoalCents: number;
+      avgDealValueCents: number | null;
+    }>
+  | Invalid {
   const name = input.name.trim();
   if (!name) return { ok: false, error: "Workspace name can't be empty." };
   const targeting = validateTargeting(input);
   if (!targeting.ok) return targeting;
-  return { ok: true, values: { name, ...targeting.values } };
+  const deal = optionalDollarsToCents(input.avgDealValue ?? "");
+  if (!deal.ok) return deal;
+  return { ok: true, values: { name, ...targeting.values, avgDealValueCents: deal.cents } };
 }
 
 export function confirmAccountName(accountName: string, typed: string): boolean {

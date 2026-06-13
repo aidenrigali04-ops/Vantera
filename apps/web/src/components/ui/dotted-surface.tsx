@@ -4,7 +4,10 @@ import { useTheme } from 'next-themes';
 import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 
-type DottedSurfaceProps = Omit<React.ComponentProps<'div'>, 'ref'>;
+type DottedSurfaceProps = Omit<React.ComponentProps<'div'>, 'ref'> & {
+	/** Force the particle colouring regardless of the active app theme. */
+	colorTheme?: 'light' | 'dark';
+};
 
 const SEPARATION = 150;
 const AMOUNTX = 40;
@@ -135,8 +138,9 @@ function applyThemeColors(geometry: THREE.BufferGeometry, theme?: string) {
 	geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
 }
 
-export function DottedSurface({ className, ...props }: DottedSurfaceProps) {
+export function DottedSurface({ className, colorTheme, ...props }: DottedSurfaceProps) {
 	const { theme } = useTheme();
+	const activeTheme = colorTheme ?? theme;
 
 	const containerRef = useRef<HTMLDivElement>(null);
 
@@ -145,7 +149,7 @@ export function DottedSurface({ className, ...props }: DottedSurfaceProps) {
 		if (!shared) shared = createShared();
 		const s = shared;
 
-		applyThemeColors(s.geometry, theme);
+		applyThemeColors(s.geometry, activeTheme);
 
 		// Handle window resize (also restores size if it changed while detached)
 		const handleResize = () => {
@@ -200,7 +204,7 @@ export function DottedSurface({ className, ...props }: DottedSurfaceProps) {
 				s.renderer.domElement.remove();
 			}
 		};
-	}, [theme]);
+	}, [activeTheme]);
 
 	return (
 		<div

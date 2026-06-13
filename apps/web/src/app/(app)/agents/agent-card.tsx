@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useActionState } from "react";
-import { Settings2 } from "lucide-react";
+import { Phone, Settings2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,7 +11,7 @@ import { setAgentStatus, updateSendMode, type AgentActionState } from "./actions
 
 export type AgentRow = {
   id: string;
-  kind: "scout" | "copy";
+  kind: "scout" | "copy" | "caller";
   name: string;
   status: "draft" | "live" | "paused";
   config: Record<string, unknown> | null;
@@ -155,6 +155,12 @@ export function AgentCard({
                 </Button>
               </form>
             )}
+          </div>
+        )}
+        {agent.kind === "caller" && (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Phone className="size-3.5 shrink-0" />
+            Every call waits in your review queue before it dials out.
           </div>
         )}
         <FormError message={state.error ?? modeState.error} />

@@ -8,6 +8,7 @@ routes: /settings
 
 - **Profile** — your display name, visible to your team.
 - **Workspace** — workspace name plus the industry, ICP, and revenue goal that seed your default campaign targeting. Only workspace admins can change these.
+- **Average value per client** — the recurring monthly revenue one closed client is worth. Optional, but setting it powers the Revenue snapshot on your dashboard (closed and projected MRR against your goal). Leave it blank to track client counts only.
 - **Team** — who's in your workspace. Invites are coming soon.
 
 ## Deleting your workspace
