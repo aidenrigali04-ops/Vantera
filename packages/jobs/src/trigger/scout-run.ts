@@ -19,6 +19,9 @@ export const scoutRun = task({
       triggerCopyDraft: async (p) => {
         await tasks.trigger("copy-draft", p);
       },
+      triggerCallBrief: async (p) => {
+        await tasks.trigger("call-brief", p);
+      },
     });
     logger.info("scout run finished", { ...summary, agentId: payload.agentId });
     return summary;

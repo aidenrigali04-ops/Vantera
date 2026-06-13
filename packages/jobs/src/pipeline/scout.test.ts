@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { InMemoryProspectData, makeCandidate } from "@vantera/prospect-data";
 import type { LeadInsights } from "@vantera/agent-brains";
 import { runScout } from "./scout";
-import type { CopyDraftPayload, FreshLead, ScoutContext, ScoutDeps, ScoutStore } from "./types";
+import type { CallBriefDraftPayload, CopyDraftPayload, FreshLead, ScoutContext, ScoutDeps, ScoutStore } from "./types";
 
 function insight(leadId: string, score: number): LeadInsights {
   return {
@@ -28,6 +28,7 @@ class FakeScoutStore implements ScoutStore {
   scores = new Map<string, { score: number; qualified: boolean }>();
   completedAt: Date | null = null;
   copyAgent: { id: string } | null = null;
+  callerAgent: { id: string } | null = null;
   private leadSeq = 0;
   private seenRefs = new Set<string>();
 
@@ -65,6 +66,9 @@ class FakeScoutStore implements ScoutStore {
   async getLiveCopyAgent() {
     return this.copyAgent;
   }
+  async getLiveCallerAgent() {
+    return this.callerAgent;
+  }
 }
 
 function makeContext(overrides: Partial<ScoutContext["account"]> = {}): ScoutContext {
@@ -79,6 +83,7 @@ function makeDeps(store: FakeScoutStore, pool: ReturnType<typeof makeCandidate>[
   const prospectData = new InMemoryProspectData(pool);
   const ranked: string[][] = [];
   const chained: CopyDraftPayload[] = [];
+  const callerChained: CallBriefDraftPayload[] = [];
   const deps: ScoutDeps = {
     store,
     prospectData,
@@ -95,9 +100,12 @@ function makeDeps(store: FakeScoutStore, pool: ReturnType<typeof makeCandidate>[
     triggerCopyDraft: async (p) => {
       chained.push(p);
     },
+    triggerCallBrief: async (p) => {
+      callerChained.push(p);
+    },
     now: () => new Date("2026-06-11T08:00:00Z"),
   };
-  return { deps, prospectData, ranked, chained };
+  return { deps, prospectData, ranked, chained, callerChained };
 }
 
 describe("runScout", () => {
@@ -217,5 +225,30 @@ describe("runScout", () => {
     const { deps } = makeDeps(store, [], {});
 
     expect((await runScout("scout1", deps)).status).toBe("skipped");
+  });
+
+  it("chains the caller agent when one is live and leads qualified", async () => {
+    const pool = [makeCandidate({ externalRef: "good", industry: "saas" })];
+    const store = new FakeScoutStore(makeContext());
+    store.callerAgent = { id: "caller1" };
+    const { deps, callerChained } = makeDeps(store, pool, { good: 90 });
+
+    await runScout("scout1", deps);
+
+    expect(callerChained).toHaveLength(1);
+    expect(callerChained[0]!.callerAgentId).toBe("caller1");
+    expect(callerChained[0]!.accountId).toBe("acc1");
+    expect(callerChained[0]!.leadIds).toHaveLength(1);
+  });
+
+  it("does not chain the caller when no live caller agent exists", async () => {
+    const pool = [makeCandidate({ externalRef: "good", industry: "saas" })];
+    const store = new FakeScoutStore(makeContext());
+    // callerAgent is null by default — no override
+    const { deps, callerChained } = makeDeps(store, pool, { good: 90 });
+
+    await runScout("scout1", deps);
+
+    expect(callerChained).toHaveLength(0);
   });
 });

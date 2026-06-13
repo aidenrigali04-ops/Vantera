@@ -222,6 +222,14 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
       return agent ?? null;
     },
 
+    async getLiveCallerAgent(accountId: string) {
+      const [agent] = await db
+        .select({ id: agents.id })
+        .from(agents)
+        .where(and(eq(agents.accountId, accountId), eq(agents.kind, "caller"), eq(agents.status, "live")));
+      return agent ?? null;
+    },
+
     // ── CopyDraftStore ───────────────────────────────────────────────────────
 
     async getCopyContext(copyAgentId: string): Promise<CopyContext | null> {

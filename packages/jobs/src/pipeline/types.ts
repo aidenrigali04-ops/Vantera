@@ -58,6 +58,7 @@ export interface ScoutStore {
   saveScore(leadId: string, insights: LeadInsights, qualified: boolean): Promise<void>;
   completeRun(agentId: string, lastRunAt: Date): Promise<void>;
   getLiveCopyAgent(accountId: string): Promise<{ id: string } | null>;
+  getLiveCallerAgent(accountId: string): Promise<{ id: string } | null>;
 }
 
 export interface ScoutDeps {
@@ -66,6 +67,7 @@ export interface ScoutDeps {
   scanFn: (url: string) => Promise<WebsiteScan>;
   rankFn: (candidates: RankCandidate[], ctx: RankContext) => Promise<LeadInsights[]>;
   triggerCopyDraft: (payload: CopyDraftPayload) => Promise<void>;
+  triggerCallBrief: (payload: CallBriefDraftPayload) => Promise<void>;
   now?: () => Date;
 }
 
