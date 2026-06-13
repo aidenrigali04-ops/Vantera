@@ -51,7 +51,9 @@ create table public.calls (
   constraint calls_agent_fk foreign key (agent_id, account_id)
     references public.agents (id, account_id) on delete cascade,
   constraint calls_campaign_fk foreign key (campaign_id, account_id)
-    references public.campaigns (id, account_id) on delete cascade
+    references public.campaigns (id, account_id) on delete cascade,
+  constraint calls_send_fk foreign key (scheduled_send_id)
+    references public.scheduled_sends (id) on delete cascade
 );
 
 create unique index calls_provider_call_idx on public.calls (provider_call_id) where provider_call_id is not null;

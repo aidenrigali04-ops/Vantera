@@ -688,7 +688,9 @@ export const calls = pgTable(
     leadId: uuid("lead_id").notNull(),
     agentId: uuid("agent_id").notNull(),
     campaignId: uuid("campaign_id").notNull(),
-    scheduledSendId: uuid("scheduled_send_id").notNull(),
+    scheduledSendId: uuid("scheduled_send_id")
+      .notNull()
+      .references(() => scheduledSends.id, { onDelete: "cascade" }),
     providerCallId: text("provider_call_id"),
     attemptNo: smallint("attempt_no").notNull().default(1),
     status: text("status", {
