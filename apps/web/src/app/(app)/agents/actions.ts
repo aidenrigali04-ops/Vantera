@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { parseCopyForm, parseScoutForm, MAX_ICPS } from "./validation";
+import { gate, loadBillingRow } from "@/lib/billing/entitlement";
 
 export type AgentActionState = { error?: string };
 
@@ -191,6 +192,14 @@ export async function deployCopyAgent(
     ...(channels.email ? ["email"] : []),
     ...(channels.linkedin ? ["linkedin"] : []),
   ];
+
+  const { count: campaignCount } = await supabase
+    .from("campaigns")
+    .select("id", { count: "exact", head: true });
+  const billingRow = await loadBillingRow(supabase);
+  if (!billingRow) return { error: "No active plan. Choose a plan in Billing first." };
+  const planGate = gate(billingRow, "campaign", campaignCount ?? 0);
+  if (!planGate.ok) return { error: planGate.error };
 
   // internal execution campaign — never a user surface (agents are the front door)
   const { data: campaign, error: campaignError } = await supabase
