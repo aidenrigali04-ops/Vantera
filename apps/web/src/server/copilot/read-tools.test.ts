@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { getDraftQueueSummary, getCampaignStatus, getGoalProgress, getLeadScoreRationale } from "./read-tools";
+import { getDraftQueueSummary, getCampaignStatus, getGoalProgress, getLeadScoreRationale, getBillingStatus } from "./read-tools";
 
 // fake supabase: each query resolves to the canned result for its table
 function fakeDb(rows: Record<string, unknown>) {
@@ -125,5 +125,58 @@ describe("getLeadScoreRationale", () => {
     const db = fakeDb({ leads: null });
     const dto = await getLeadScoreRationale(db, "Unknown");
     expect(dto).toEqual({ score: null, rationale: null });
+  });
+});
+
+describe("getBillingStatus", () => {
+  it("returns plan + usage, never raw billing columns", async () => {
+    // accounts -> maybeSingle: growth plan, active, 0 extra seats/linkedin
+    // account_members -> array of 2 (count = 2 via then)
+    // campaigns -> array of 1 (count = 1 via then)
+    const db = fakeDb({
+      accounts: {
+        plan: "growth",
+        subscription_status: "active",
+        seats_purchased: 0,
+        linkedin_accounts_purchased: 0,
+        current_period_end: null,
+      },
+      account_members: [{}, {}],
+      campaigns: [{}],
+    });
+    const dto = await getBillingStatus(db, "acc_1");
+    expect(dto.plan).toBe("growth");
+    expect(dto.status).toBe("active");
+    expect(dto.seats.used).toBe(2);
+    expect(dto.campaigns.used).toBe(1);
+    expect(typeof dto.seats.max).toBe("number");
+    expect(typeof dto.campaigns.max).toBe("number");
+    // Must not expose raw billing columns
+    expect(dto).not.toHaveProperty("stripe_customer_id");
+    expect(dto).not.toHaveProperty("subscription_status");
+    expect(dto).not.toHaveProperty("seats_purchased");
+    // Shape: exactly plan, status, seats, campaigns
+    expect(Object.keys(dto).sort()).toEqual(["campaigns", "plan", "seats", "status"]);
+  });
+
+  it("returns zero seats/campaigns and empty limits when plan is none", async () => {
+    const db = fakeDb({
+      accounts: {
+        plan: "none",
+        subscription_status: "none",
+        seats_purchased: 0,
+        linkedin_accounts_purchased: 0,
+        current_period_end: null,
+      },
+      account_members: [],
+      campaigns: [],
+    });
+    const dto = await getBillingStatus(db, "acc_1");
+    expect(dto.plan).toBe("none");
+    expect(dto.status).toBe("none");
+    expect(dto.seats.used).toBe(0);
+    expect(dto.campaigns.used).toBe(0);
+    expect(dto.seats.max).toBe(0);
+    expect(dto.campaigns.max).toBe(0);
   });
 });
