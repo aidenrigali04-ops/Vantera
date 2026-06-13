@@ -9,7 +9,7 @@ export function isWithinCallingWindow(
 ): boolean {
   const tz = timezone ?? "UTC";
   const fmt = new Intl.DateTimeFormat("en-US", {
-    timeZone: tz, weekday: "short", hour: "2-digit", minute: "2-digit", hour12: false,
+    timeZone: tz, weekday: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
   });
   const parts = fmt.formatToParts(now);
   const wd = parts.find((p) => p.type === "weekday")?.value?.toLowerCase().slice(0, 3) ?? "";
