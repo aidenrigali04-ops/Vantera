@@ -489,3 +489,71 @@ export async function deployCallerAgent(
   revalidatePath("/agents");
   redirect("/agents?deployed=caller");
 }
+
+/**
+ * Edit a deployed Caller agent and save it as the new config. Targeting
+ * stays inherited from the Scout; content uploads are append-only (existing
+ * assets are kept).
+ */
+export async function updateCallerAgent(
+  _prev: AgentActionState,
+  formData: FormData
+): Promise<AgentActionState> {
+  const parsed = parseCallerForm(formData);
+  if (!parsed.ok) return { error: parsed.error };
+  const { name, links, ...callerInput } = parsed.values;
+
+  const clampedWindow = clampCallingWindow(callerInput.callingWindow);
+  const configInput = { ...callerInput, callingWindow: clampedWindow };
+
+  const validation = validateCallerConfig(configInput);
+  if (!validation.ok) return { error: validation.error ?? "Invalid caller configuration." };
+
+  const { supabase, user, account } = await sessionAccount();
+  if (!user || !account) return { error: "Your session expired. Sign in again." };
+
+  const { data: agent } = await supabase
+    .from("agents")
+    .select("id, config, campaign_id")
+    .eq("account_id", account.id)
+    .eq("kind", "caller")
+    .limit(1)
+    .maybeSingle<{ id: string; config: Record<string, unknown> | null; campaign_id: string | null }>();
+  if (!agent) return { error: "No Caller Agent to edit. Deploy one first." };
+
+  const configJsonb = {
+    cta: configInput.cta,
+    booking_link: configInput.bookingLink,
+    voice: {
+      voice_id: configInput.voice.voiceId,
+      persona_name: configInput.voice.personaName,
+      language: configInput.voice.language,
+    },
+    recording_consent_mode: configInput.recordingConsentMode,
+    calling_window: {
+      days: configInput.callingWindow.days,
+      start_local: configInput.callingWindow.startLocal,
+      end_local: configInput.callingWindow.endLocal,
+    },
+    max_attempts: configInput.maxAttempts,
+  };
+
+  const { error: updateError } = await supabase
+    .from("agents")
+    .update({ name, config: configJsonb })
+    .eq("id", agent.id); // RLS scopes to the admin's account (rule 02)
+  if (updateError) return { error: "Could not save changes. Only workspace admins can do this." };
+
+  if (agent.campaign_id) {
+    await supabase
+      .from("campaigns")
+      .update({ name: `${name} (agent)` })
+      .eq("id", agent.campaign_id);
+  }
+
+  const content = await saveAgentContent(supabase, account.id, agent.id, user.id, formData, links);
+  if (content.error) return content;
+
+  revalidatePath("/agents");
+  redirect("/agents?updated=caller");
+}
