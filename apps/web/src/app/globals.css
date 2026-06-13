@@ -162,3 +162,30 @@
     @apply font-sans;
   }
 }
+/* Dock-style nav tiles: a soft halo that fades in on hover (the source's
+   `.hover-halo`). Tooltips are pure Tailwind group-hover in the component.
+   Themed — a subtle dark glow in light, a brighter rim in dark. */
+.dock-tile::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  opacity: 0;
+  transition: opacity 0.25s;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.06), 0 12px 30px -10px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+.dark .dock-tile::after {
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18), 0 12px 30px -10px rgba(0, 0, 0, 0.7);
+}
+.dock-tile:hover::after {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dock-tile,
+  .dock-tile *,
+  .dock-tile::after {
+    transition: none !important;
+  }
+}
