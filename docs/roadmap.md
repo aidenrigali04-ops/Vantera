@@ -27,9 +27,12 @@ Each entry stays short — the detail lives in that phase's spec (`docs/superpow
   Follow-up (pre-existing, flagged by whitelabel audit): rename the `leads.source` enum value `'explorium'` to a neutral value before any surface/DTO/export ever selects `source` — fold into Phase 5 or 6.
   Depends on: Phase 3. Key rules: 04, 06, 08, 11.
 
-- [ ] **Phase 5 — Live channel adapters**
+- [ ] **Phase 5 — Live channel adapters** *(build in progress 2026-06-12 — spec/plan in docs/superpowers)*
   Goal: real sends through real providers, replies flowing back in.
   Scope: Smartlead adapter implementing `EmailInfra` (domain/mailbox provisioning UX, warmup status gating sends, sends, reply webhooks); Unipile adapter implementing `LinkedInInfra` (hosted auth in onboarding, invites, messages, reply webhooks); webhook routes with **signature verification**; shared reply-classification handler ("interested" → next step, "not interested" → suppression); **unsubscribe link + one-click unsubscribe → suppression, physical address in cold emails** (rule 11).
+  Built so far: 0009 migration; both adapters behind env factories; send-dispatch/outreach-send/process-inbound pipeline with kill switch, account pause, safety limits, warmup gating, suppression-at-boundary tests; reply brain; webhook + one-click-unsubscribe routes; `/settings/channels` (provisional UI); 3 help articles. Remaining before `/ship-phase`: send-mode toggle on the Outreach agent wizard + review/leads post-send UI (waiting on the concurrent Outreach-agent rename session), review-queue article update, `.env.example` additions (`SMARTLEAD_WEBHOOK_SECRET`, `UNIPILE_WEBHOOK_SECRET`, `APP_URL`), live smoke test per adapter.
+  Deferred to later phases (not silent drops): manual-draft + user-drafted-copy send modes; deliverability alarm dashboards (minimal automatic reactions shipped: bounce/complaint → suppression + mailbox pause); reply conversation UI.
+  Audit follow-ups: `scheduled_sends` check tying `linkedin_stage` to channel (follow-up migration); confirm the hosted-auth custom domain is configured vendor-side before launch (+ adapter assertion); consider blocking client writes to `leads.linkedin_connected_at`.
   Depends on: Phase 4. Key rules: 03, 04, 11. Note: provision warmup-dependent domains 2–4 weeks before any launch date.
 
 - [ ] **Phase 6 — Help copilot v1**
