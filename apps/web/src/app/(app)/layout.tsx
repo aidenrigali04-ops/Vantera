@@ -6,6 +6,7 @@ import { resolveGate } from "@/lib/auth/gate";
 import { signOut } from "./actions";
 import { Button } from "@/components/ui/button";
 import { SidebarNav } from "@/components/nav-link";
+import CopilotOverlay from "@/components/copilot/copilot-overlay";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const data = await getGateData();
@@ -29,6 +30,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </div>
       </aside>
       <main className="flex-1 px-8 py-6">{children}</main>
+      <CopilotOverlay />
     </div>
   );
 }

@@ -15,6 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/server";
 import { getGateData } from "@/lib/auth/context";
 import { AnimatedProgress } from "@/components/ui/animated-progress";
+import { LeadProfileLink, LEAD_PROFILE_FIELDS, type LeadProfile } from "@/components/lead-profile";
 import { ProspectPanel, type Prospect } from "./prospect-panel";
 
 const usd = new Intl.NumberFormat("en-US", {
@@ -54,7 +55,7 @@ type ReplyRow = {
   body: string | null;
   received_at: string;
   lead_id: string;
-  leads: { first_name: string | null; last_name: string | null; company_name: string | null } | null;
+  leads: LeadProfile | null;
 };
 
 export default async function DashboardPage() {
@@ -106,7 +107,7 @@ export default async function DashboardPage() {
       .eq("classification", "interested"),
     supabase
       .from("replies")
-      .select("id, channel, body, received_at, lead_id, leads(first_name, last_name, company_name)")
+      .select(`id, channel, body, received_at, lead_id, leads(${LEAD_PROFILE_FIELDS})`)
       .eq("classification", "interested")
       .order("received_at", { ascending: false })
       .limit(4)
@@ -360,9 +361,9 @@ export default async function DashboardPage() {
                       const fresh = i === 0;
                       return (
                         <li key={r.id}>
-                          <Link
-                            href={`/leads?lead=${r.lead_id}`}
-                            className={`flex items-start gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-muted ${
+                          <LeadProfileLink
+                            lead={r.leads}
+                            className={`flex w-full items-start gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-muted ${
                               fresh ? "bg-muted/60" : ""
                             }`}
                           >
@@ -396,7 +397,7 @@ export default async function DashboardPage() {
                                 </span>
                               )}
                             </span>
-                          </Link>
+                          </LeadProfileLink>
                         </li>
                       );
                     })}

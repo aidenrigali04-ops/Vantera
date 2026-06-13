@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { LeadProfileLink, type LeadProfile } from "@/components/lead-profile";
 import { approveDraft, declineDraft, declineAndSuppress, saveDraftEdit } from "./actions";
 import type { ReviewActionState } from "./actions";
 
@@ -18,12 +19,7 @@ export interface DraftRow {
   style_flags: string | null;
   linkedin_stage: "invite" | "message" | null;
   created_at: string;
-  leads: {
-    first_name: string | null;
-    last_name: string | null;
-    title: string | null;
-    company_name: string | null;
-  } | null;
+  leads: LeadProfile | null;
 }
 
 export function DraftCard({ draft }: { draft: DraftRow }) {
@@ -54,7 +50,9 @@ export function DraftCard({ draft }: { draft: DraftRow }) {
     <Card>
       <CardHeader className="flex-row items-start justify-between space-y-0">
         <div>
-          <p className="font-medium">{name}</p>
+          <LeadProfileLink lead={lead} className="text-left font-medium hover:underline">
+            {name}
+          </LeadProfileLink>
           {context && <p className="text-sm text-muted-foreground">{context}</p>}
         </div>
         <div className="flex items-center gap-1.5">

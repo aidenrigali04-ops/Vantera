@@ -3,6 +3,7 @@ import { Inbox, Mail, MessageSquare } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
+import { LeadProfileLink, LEAD_PROFILE_FIELDS, type LeadProfile } from "@/components/lead-profile";
 import { DraftCard, type DraftRow } from "./draft-card";
 
 const CHANNELS = ["all", "email", "linkedin"] as const;
@@ -36,7 +37,7 @@ type ProcessedRow = {
   status: string;
   error: string | null;
   linkedin_stage: "invite" | "message" | null;
-  leads: { first_name: string | null; last_name: string | null; company_name: string | null } | null;
+  leads: LeadProfile | null;
 };
 
 export default async function ReviewPage({
@@ -50,8 +51,7 @@ export default async function ReviewPage({
     : "queue";
   const supabase = await createClient();
 
-  const select =
-    "id, channel, subject, body, style_flags, linkedin_stage, status, error, created_at, leads(first_name, last_name, title, company_name)";
+  const select = `id, channel, subject, body, style_flags, linkedin_stage, status, error, created_at, leads(${LEAD_PROFILE_FIELDS})`;
 
   let query = supabase
     .from("scheduled_sends")
@@ -159,10 +159,13 @@ export default async function ReviewPage({
                   <MessageSquare className="mt-0.5 size-4 text-muted-foreground" />
                 )}
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">
+                  <LeadProfileLink
+                    lead={r.leads}
+                    className="block max-w-full truncate text-left text-sm font-medium hover:underline"
+                  >
                     {name}
                     {r.leads?.company_name ? ` · ${r.leads.company_name}` : ""}
-                  </p>
+                  </LeadProfileLink>
                   {r.subject && <p className="truncate text-xs text-muted-foreground">{r.subject}</p>}
                   {failed && r.error && (
                     <p className="mt-1 text-xs text-destructive">{r.error}</p>
