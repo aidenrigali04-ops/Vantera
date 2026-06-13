@@ -3,7 +3,10 @@ import { runVoiceInbound } from "./voice-inbound";
 import { InMemoryVoiceInfra } from "@vantera/voice-infra";
 import type { VoiceInboundDeps } from "./types";
 
-function deps(over: Partial<VoiceInboundDeps["store"]> = {}, classify = vi.fn(async () => "booked" as const)): VoiceInboundDeps {
+function deps(
+  over: Partial<VoiceInboundDeps["store"]> = {},
+  classify: VoiceInboundDeps["classifyFn"] = vi.fn(async () => "booked" as const)
+): VoiceInboundDeps {
   const store = {
     recordWebhookEvent: vi.fn(async () => true),
     findCallByProviderId: vi.fn(async () => ({ id: "c1", accountId: "acc1", leadId: "l1", phone: "+15551112222" })),
