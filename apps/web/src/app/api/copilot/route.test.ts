@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 // ── Service client mock ───────────────────────────────────────────────────────
 // Track inserts so we can assert on what account_id was written.
@@ -23,7 +24,7 @@ function makeServiceChain(table: string) {
     select: (_cols: string) => ({
       eq: (_col: string, _val: string) => Promise.resolve({}),
     }),
-  } as any;
+  } as unknown as ReturnType<SupabaseClient["from"]>;
 }
 
 vi.mock("@/lib/supabase/service", () => ({
@@ -52,7 +53,7 @@ function makeSessionClient(opts: { userId: string | null; accountId: string | nu
         }),
       }),
     }),
-  } as any;
+  } as unknown as SupabaseClient;
 }
 
 // Default: authenticated with a real account
@@ -150,7 +151,7 @@ describe("POST /api/copilot", () => {
     const spy = vi
       .spyOn(serverModule, "createClient")
       .mockResolvedValueOnce(
-        makeSessionClient({ userId: null, accountId: null }) as any
+        makeSessionClient({ userId: null, accountId: null })
       );
 
     const res = await POST(makeRequest({ message: "hello" }));

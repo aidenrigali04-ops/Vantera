@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { runCampaignSendState } from "./mutate-tools";
 
 function fakeDb(campaign: { id: string; status: string } | null) {
@@ -7,7 +8,8 @@ function fakeDb(campaign: { id: string; status: string } | null) {
     updates,
     from(table: string) {
       if (table === "agents") {
-        const b: any = {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- recursive self-referential builder; no practical typed alternative
+        const b: Record<string, any> = {
           select: () => b,
           eq: () => b,
           limit: () => b,
@@ -29,10 +31,10 @@ function fakeDb(campaign: { id: string; status: string } | null) {
           }),
         };
       }
-      return {} as any;
+      return {} as unknown as Record<string, unknown>;
     },
   };
-  return db as any;
+  return db as unknown as SupabaseClient & { updates: typeof updates };
 }
 
 describe("runCampaignSendState", () => {

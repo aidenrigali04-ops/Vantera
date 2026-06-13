@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { ensureConversation } from "./persist";
 
 // ── Fake DB builder ────────────────────────────────────────────────────────────
@@ -45,9 +46,9 @@ function makeFakeDb(updateReturnsRow: boolean) {
         };
       }
       // Fallback for any other table
-      return {} as any;
+      return {} as unknown as Record<string, unknown>;
     },
-  } as any;
+  } as unknown as SupabaseClient & { calls: typeof calls };
 
   return db;
 }

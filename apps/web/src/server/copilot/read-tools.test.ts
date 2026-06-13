@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { getDraftQueueSummary, getCampaignStatus, getGoalProgress, getLeadScoreRationale } from "./read-tools";
 
 // fake supabase: each query resolves to the canned result for its table
@@ -6,7 +7,8 @@ function fakeDb(rows: Record<string, unknown>) {
   return {
     from(table: string) {
       const r = rows[table];
-      const builder: any = {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- recursive self-referential builder; no practical typed alternative
+      const builder: Record<string, any> = {
         select: () => builder,
         eq: () => builder,
         in: () => builder,
@@ -14,12 +16,12 @@ function fakeDb(rows: Record<string, unknown>) {
         order: () => builder,
         ilike: () => builder,
         maybeSingle: async () => ({ data: Array.isArray(r) ? r[0] : r }),
-        then: (resolve: any) =>
+        then: (resolve: (v: unknown) => unknown) =>
           Promise.resolve({ data: r, count: Array.isArray(r) ? r.length : null }).then(resolve),
       };
       return builder;
     },
-  } as any;
+  } as unknown as SupabaseClient;
 }
 
 describe("getDraftQueueSummary", () => {
