@@ -24,6 +24,12 @@ alter table public.webhook_events drop constraint if exists webhook_events_sourc
 alter table public.webhook_events add constraint webhook_events_source_check
   check (source in ('email', 'linkedin', 'voice'));
 
+-- 'phone' joins the campaign channel set (0003) so the caller's auto-created campaign
+-- (channels = ['phone']) passes the check constraint.
+alter table public.campaigns drop constraint if exists campaigns_channels_check;
+alter table public.campaigns add constraint campaigns_channels_check
+  check (channels <@ array['email', 'linkedin', 'phone'] and array_length(channels, 1) >= 1);
+
 -- retention(calls): one row per dial attempt; cascades with the lead. Terminal rows
 -- purged by the 180-day scheduled_sends sweep companion (rule 11).
 create table public.calls (
