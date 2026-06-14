@@ -92,6 +92,7 @@ export default async function DashboardPage() {
     repliesWeekRes,
     { data: prospects },
     { data: convertedDates },
+    crmActiveRes,
   ] = await Promise.all([
     supabase
       .from("agents")
@@ -142,6 +143,11 @@ export default async function DashboardPage() {
       .eq("status", "converted")
       .order("updated_at", { ascending: true })
       .returns<{ updated_at: string }[]>(),
+    // Active CRM connections — drives the just-in-time "connect your CRM" nudge.
+    supabase
+      .from("crm_connections")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "active"),
   ]);
 
   const total = totalRes.count ?? 0;
@@ -215,6 +221,10 @@ export default async function DashboardPage() {
   ];
   const reached = funnel.filter((s) => s.count > 0).length;
 
+  // Just-in-time CRM nudge: a deal has closed but nothing is routing wins out yet.
+  // Peak-end moment — surface it here rather than as pre-aha onboarding friction.
+  const showCrmNudge = converted > 0 && (crmActiveRes.count ?? 0) === 0;
+
   return (
     <DashboardView
       firstName={firstName}
@@ -223,6 +233,7 @@ export default async function DashboardPage() {
       goal={goal}
       goalCents={account.revenue_goal_cents}
       isNew={isNew}
+      showCrmNudge={showCrmNudge}
       scoutDeployed={Boolean(scout)}
       drafts={drafts}
       agents={agentRows}

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useSyncExternalStore } from "react";
 import { motion, MotionConfig } from "framer-motion";
 import {
   Activity,
@@ -12,6 +13,8 @@ import {
   MessageSquare,
   Sparkles,
   TrendingUp,
+  Workflow,
+  X,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -58,6 +61,7 @@ export interface DashboardViewProps {
   goal: string | null;
   goalCents: number | null;
   isNew: boolean;
+  showCrmNudge: boolean;
   scoutDeployed: boolean;
   drafts: number;
   agents: AgentRow[];
@@ -79,7 +83,7 @@ export interface DashboardViewProps {
 }
 
 export function DashboardView(props: DashboardViewProps) {
-  const { firstName, icp, industry, goal, isNew } = props;
+  const { firstName, icp, industry, goal, isNew, showCrmNudge, convertedClients } = props;
 
   return (
     <MotionConfig reducedMotion="user">
@@ -111,6 +115,8 @@ export function DashboardView(props: DashboardViewProps) {
           <Link href="/settings">Edit goal</Link>
         </Button>
       </motion.header>
+
+      {showCrmNudge && <CrmNudge convertedClients={convertedClients} />}
 
       {isNew ? (
         <ActivationRamp scoutDeployed={props.scoutDeployed} goal={goal} />
@@ -552,6 +558,90 @@ function RevenueCard({
         )}
       </div>
     </RevealItem>
+  );
+}
+
+const CRM_NUDGE_KEY = "vantera:crm-nudge-dismissed";
+const CRM_NUDGE_EVENT = "vantera:crm-nudge";
+
+// Persisted, SSR-safe dismissal via useSyncExternalStore: server snapshot is always
+// "shown", the client reads localStorage, and a same-tab custom event re-renders on
+// dismiss. Avoids both the hydration mismatch and setState-in-effect.
+function subscribeNudge(cb: () => void) {
+  window.addEventListener(CRM_NUDGE_EVENT, cb);
+  window.addEventListener("storage", cb);
+  return () => {
+    window.removeEventListener(CRM_NUDGE_EVENT, cb);
+    window.removeEventListener("storage", cb);
+  };
+}
+function nudgeDismissedSnapshot() {
+  try {
+    return localStorage.getItem(CRM_NUDGE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+// Just-in-time CRM connection prompt — fires only when a deal has closed and no
+// destination is connected (peak-end moment). Dismissible so it never nags; the
+// connect path lives in Settings, which this deep-links to.
+function CrmNudge({ convertedClients }: { convertedClients: number }) {
+  const dismissed = useSyncExternalStore(
+    subscribeNudge,
+    nudgeDismissedSnapshot,
+    () => false
+  );
+
+  if (dismissed) return null;
+
+  function dismiss() {
+    try {
+      localStorage.setItem(CRM_NUDGE_KEY, "1");
+    } catch {
+      /* ignore */
+    }
+    window.dispatchEvent(new Event(CRM_NUDGE_EVENT));
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+      className={cn(PANEL_SURFACE, "relative p-5 dark:bg-white/[0.06]")}
+    >
+      <button
+        type="button"
+        onClick={dismiss}
+        aria-label="Dismiss"
+        className="absolute right-3 top-3 grid size-7 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <X className="size-4" />
+      </button>
+      <div className="flex flex-wrap items-center justify-between gap-4 pr-6">
+        <div className="flex items-start gap-3">
+          <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-foreground text-background">
+            <Workflow className="size-4" />
+          </span>
+          <div>
+            <p className="text-sm font-medium">
+              {convertedClients} {convertedClients === 1 ? "deal" : "deals"} closed — send the wins
+              to your CRM
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Closed-won deals are tracked here but aren&apos;t reaching your team&apos;s tools yet.
+              Connect HubSpot, Salesforce, Slack, and more so every win lands automatically.
+            </p>
+          </div>
+        </div>
+        <Button asChild size="sm" className="shrink-0">
+          <Link href="/settings/integrations">
+            Connect a destination <ArrowRight className="size-4" />
+          </Link>
+        </Button>
+      </div>
+    </motion.div>
   );
 }
 
