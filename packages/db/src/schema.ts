@@ -314,7 +314,7 @@ export const scheduledSends = pgTable(
     leadId: uuid("lead_id")
       .notNull()
       .references(() => leads.id, { onDelete: "cascade" }),
-    channel: text("channel", { enum: ["email", "linkedin", "call"] }).notNull(),
+    channel: text("channel", { enum: ["email", "linkedin", "call", "imessage"] }).notNull(),
     status: text("status", {
       enum: [
         "drafting",
