@@ -266,6 +266,8 @@ export const campaigns = pgTable(
     timezone: text("timezone").notNull().default("UTC"),
     createdBy: uuid("created_by"),
     launchedAt: timestamp("launched_at", { withTimezone: true }),
+    // 0017: per-campaign sequence config; null falls back to SEQUENCE_DEFAULTS in code
+    sequenceConfig: jsonb("sequence_config"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -819,3 +821,69 @@ export const crmPushEvents = pgTable(
     index("crm_push_events_retry_idx").on(t.nextRetryAt),
   ]
 );
+
+// ── 0017 sequence orchestrator ────────────────────────────────────────────────
+
+// retention(sequence_runs): one active run per lead per campaign; cascades with lead/campaign.
+// Terminal runs (converted/exhausted/stopped) are kept for audit and swept with the lead.
+// Writes arrive via the service-role orchestrator only (no client write policy).
+export const sequenceRuns = pgTable(
+  "sequence_runs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    campaignId: uuid("campaign_id").notNull(),
+    leadId: uuid("lead_id").notNull(),
+    status: text("status", {
+      enum: ["active", "paused_reply", "converted", "exhausted", "stopped"],
+    })
+      .notNull()
+      .default("active"),
+    currentStage: text("current_stage", {
+      enum: ["linkedin", "email", "imessage", "call", "done"],
+    })
+      .notNull()
+      .default("linkedin"),
+    touchesDone: smallint("touches_done").notNull().default(0),
+    callAttempts: smallint("call_attempts").notNull().default(0),
+    nextActionAt: timestamp("next_action_at", { withTimezone: true }).notNull().defaultNow(),
+    enteredStageAt: timestamp("entered_stage_at", { withTimezone: true }).notNull().defaultNow(),
+    lastTouchAt: timestamp("last_touch_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    // composite same-tenant FKs (campaign_id/lead_id pair with account_id) enforced in SQL only
+    // partial unique index in SQL (where status = 'active'); simplified here
+    index("sequence_runs_due_idx").on(t.nextActionAt),
+    index("sequence_runs_account_idx").on(t.accountId),
+    index("sequence_runs_lead_idx").on(t.leadId),
+    uniqueIndex("sequence_runs_campaign_lead_unique").on(t.campaignId, t.leadId),
+  ]
+);
+
+// retention(lead_notifications): in-app alerts (e.g. a lead replied). Read by members;
+// written by the pipeline. Swept with the lead.
+export const leadNotifications = pgTable(
+  "lead_notifications",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    leadId: uuid("lead_id").notNull(),
+    kind: text("kind", { enum: ["reply", "converted", "exhausted"] }).notNull(),
+    body: text("body").notNull(),
+    // no updated_at: read_at is the only mutable field
+    readAt: timestamp("read_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    // partial index in SQL (where read_at is null); simplified here
+    index("lead_notifications_account_unread_idx").on(t.accountId, t.createdAt),
+    index("lead_notifications_lead_idx").on(t.leadId),
+  ]
+);
+
