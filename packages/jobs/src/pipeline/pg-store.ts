@@ -18,6 +18,7 @@ import {
   outreachSends,
   replies,
   scheduledSends,
+  sendingDomains,
   suppressionEntries,
   unsubscribeTokens,
   appSettings,
@@ -44,6 +45,7 @@ import type {
   InboundStore,
   NewScheduledSend,
   OutreachSendStore,
+  ProvisionEmailStore,
   PurgeCandidate,
   RetentionStore,
   ScoutConfig,
@@ -74,7 +76,7 @@ function toRow(send: NewScheduledSend) {
 }
 
 /** Drizzle-backed store used by the Trigger.dev tasks (service-role DATABASE_URL). */
-export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerStore & RetentionStore & SendDispatchStore & OutreachSendStore & InboundStore {
+export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerStore & RetentionStore & SendDispatchStore & OutreachSendStore & InboundStore & ProvisionEmailStore {
   return {
     async getScoutContext(agentId: string): Promise<ScoutContext | null> {
       const [agent] = await db.select().from(agents).where(eq(agents.id, agentId));
@@ -775,6 +777,29 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         )
         .returning({ id: scheduledSends.id });
       return rows.length;
+    },
+
+    // ── ProvisionEmailStore ──────────────────────────────────────────────────
+
+    async upsertSendingDomain(accountId: string, domain: string): Promise<string> {
+      const [row] = await db
+        .insert(sendingDomains)
+        .values({ accountId, domain, status: "verifying" })
+        .onConflictDoUpdate({ target: [sendingDomains.accountId, sendingDomains.domain], set: { updatedAt: new Date() } })
+        .returning({ id: sendingDomains.id });
+      if (!row) throw new Error("upsert sending_domains returned no row");
+      return row.id;
+    },
+
+    async markDomainActive(domainId: string, at: Date): Promise<void> {
+      await db.update(sendingDomains).set({ status: "active", verifiedAt: at }).where(eq(sendingDomains.id, domainId));
+    },
+
+    async insertMailbox(m: { accountId: string; domainId: string; emailAddress: string; providerRef: string }): Promise<void> {
+      await db
+        .insert(mailboxes)
+        .values({ accountId: m.accountId, domainId: m.domainId, emailAddress: m.emailAddress, providerRef: m.providerRef, status: "warming", warmupStartedAt: new Date() })
+        .onConflictDoNothing({ target: [mailboxes.accountId, mailboxes.emailAddress] });
     },
   };
 }

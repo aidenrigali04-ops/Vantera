@@ -452,3 +452,23 @@ export interface VoiceInboundSummary {
   handled: boolean;
   action: string;
 }
+
+export interface ProvisionEmailStore {
+  /** upsert a sending_domains row, return its id */
+  upsertSendingDomain(accountId: string, domain: string): Promise<string>;
+  markDomainActive(domainId: string, at: Date): Promise<void>;
+  /** insert a mailbox row in 'warming' (skip if (accountId,email) already exists) */
+  insertMailbox(m: { accountId: string; domainId: string; emailAddress: string; providerRef: string }): Promise<void>;
+}
+
+export interface ProvisionEmailDeps {
+  store: ProvisionEmailStore;
+  emailInfra: Pick<EmailInfra, "provision">;
+  now?: () => Date;
+}
+
+export interface ProvisionEmailSummary {
+  status: "completed";
+  domains: number;
+  mailboxes: number;
+}
