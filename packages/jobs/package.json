@@ -3,6 +3,10 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "exports": {
+    "./pipeline/conversion": "./src/pipeline/conversion.ts",
+    "./pipeline/types": "./src/pipeline/types.ts"
+  },
   "scripts": {
     "type-check": "tsc --noEmit",
     "dev": "trigger dev",

@@ -7,11 +7,13 @@ import {
   calls,
   campaignLeads,
   campaigns,
+  conversionTokens,
   copilotConversations,
   crmConnections,
   crmPushEvents,
   enrichmentResults,
   icps,
+  leadNotifications,
   leads,
   linkedinAccounts,
   mailboxes,
@@ -35,6 +37,7 @@ import type {
   CallerConfig,
   CallerContext,
   CallableLead,
+  ConversionStore,
   CopyConfig,
   CopyContext,
   CopyDraftStore,
@@ -103,7 +106,7 @@ function toRow(send: NewScheduledSend) {
 }
 
 /** Drizzle-backed store used by the Trigger.dev tasks (service-role DATABASE_URL). */
-export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerStore & RetentionStore & SendDispatchStore & OutreachSendStore & InboundStore & SequenceStore & SequenceTouchStore {
+export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerStore & RetentionStore & SendDispatchStore & OutreachSendStore & InboundStore & SequenceStore & SequenceTouchStore & ConversionStore {
   return {
     async getScoutContext(agentId: string): Promise<ScoutContext | null> {
       const [agent] = await db.select().from(agents).where(eq(agents.id, agentId));
@@ -972,6 +975,42 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         .onConflictDoNothing({ target: [sequenceRuns.campaignId, sequenceRuns.leadId] })
         .returning({ id: sequenceRuns.id });
       return rows.length;
+    },
+
+    // ── ConversionStore ──────────────────────────────────────────────────────
+
+    async resolveConversionToken(token: string) {
+      const [row] = await db
+        .select({
+          accountId: conversionTokens.accountId,
+          leadId: conversionTokens.leadId,
+          campaignId: conversionTokens.campaignId,
+          targetUrl: conversionTokens.targetUrl,
+        })
+        .from(conversionTokens)
+        .where(eq(conversionTokens.token, token))
+        .limit(1);
+      return row ?? null;
+    },
+
+    async setLeadConverted(leadId: string) {
+      await db.update(leads).set({ status: "converted" }).where(eq(leads.id, leadId));
+    },
+
+    async closeSequenceRun(campaignId: string, leadId: string) {
+      await db
+        .update(sequenceRuns)
+        .set({ status: "converted" })
+        .where(and(eq(sequenceRuns.campaignId, campaignId), eq(sequenceRuns.leadId, leadId)));
+    },
+
+    async insertLeadNotification(n: { accountId: string; leadId: string; kind: "converted"; body: string }) {
+      await db.insert(leadNotifications).values({
+        accountId: n.accountId,
+        leadId: n.leadId,
+        kind: n.kind,
+        body: n.body,
+      });
     },
   };
 }

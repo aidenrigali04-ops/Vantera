@@ -887,3 +887,27 @@ export const leadNotifications = pgTable(
   ]
 );
 
+// ── 0018 conversion tokens ────────────────────────────────────────────────────
+
+// retention(conversion_tokens): one-shot tracked-CTA tokens; swept with the lead/campaign.
+// Service-role write surface (issued + marked used by the redirect route); members may read.
+export const conversionTokens = pgTable(
+  "conversion_tokens",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    campaignId: uuid("campaign_id").notNull(),
+    leadId: uuid("lead_id").notNull(),
+    targetUrl: text("target_url").notNull(),
+    token: uuid("token").notNull().unique().defaultRandom(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    usedAt: timestamp("used_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("conversion_tokens_lead_idx").on(t.leadId),
+    index("conversion_tokens_account_idx").on(t.accountId),
+  ]
+);
+

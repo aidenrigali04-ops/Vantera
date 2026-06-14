@@ -565,3 +565,24 @@ export interface SequenceTouchDeps {
 }
 
 export type SequenceTouchOutcome = "drafted" | "suppressed" | "skipped";
+
+// ── Conversion gate (tracked-CTA redirect) ────────────────────────────────────
+
+export interface ConversionStore {
+  /** resolve a tracked CTA token to its lead/campaign/account; null if unknown/expired */
+  resolveConversionToken(token: string): Promise<{ accountId: string; leadId: string; campaignId: string; targetUrl: string } | null>;
+  setLeadConverted(leadId: string): Promise<void>;
+  closeSequenceRun(campaignId: string, leadId: string): Promise<void>;
+  cancelPendingSends(leadId: string): Promise<number>;
+  setCampaignLeadStatus(campaignId: string, leadId: string, status: "completed"): Promise<void>;
+  insertLeadNotification(n: { accountId: string; leadId: string; kind: "converted"; body: string }): Promise<void>;
+}
+
+export interface ConversionDeps {
+  store: ConversionStore;
+}
+
+export interface ConversionResult {
+  converted: boolean;
+  redirectUrl: string | null;
+}
