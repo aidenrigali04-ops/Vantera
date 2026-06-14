@@ -29,41 +29,24 @@ const usd = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 0,
 });
 
-function timeUntil(iso: string | null): string {
-  if (!iso) return "within ~15 min";
-  const ms = new Date(iso).getTime() - Date.now();
-  if (ms <= 0) return "any moment now";
-  const mins = Math.round(ms / 60_000);
-  if (mins < 60) return `in ~${mins} min`;
-  const hrs = Math.round(mins / 60);
-  if (hrs < 24) return `in ~${hrs}h`;
-  return `in ~${Math.round(hrs / 24)}d`;
-}
-
-function timeAgo(iso: string | null): string {
-  if (!iso) return "no runs yet";
-  const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60_000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.round(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.round(hrs / 24)}d ago`;
-}
+// Relative-time strings are formatted on the SERVER (page.tsx) and passed in as
+// ready labels — never recomputed here. This is a client component, so calling
+// Date.now() during render would diverge between SSR and hydration and trip a
+// hydration mismatch (it did, before this split).
 
 export type AgentRow = {
   id: string;
   kind: string;
   name: string;
   status: string;
-  last_run_at: string | null;
-  next_run_at: string | null;
+  nextRunLabel: string;
 };
 
 export type ReplyRow = {
   id: string;
   channel: "email" | "linkedin";
   body: string | null;
-  received_at: string;
+  receivedLabel: string;
   lead_id: string;
   leads: LeadProfile | null;
 };
@@ -79,8 +62,8 @@ export interface DashboardViewProps {
   drafts: number;
   agents: AgentRow[];
   liveAgentsCount: number;
-  scoutNextRun: string | null;
-  scoutLastRun: string | null;
+  scoutNextRunLabel: string;
+  scoutLastRunLabel: string;
   scoutLive: boolean;
   revenue: RevenueSnapshot;
   convertedClients: number;
@@ -143,7 +126,7 @@ function WorkingDashboard(props: DashboardViewProps) {
   const {
     drafts,
     liveAgentsCount,
-    scoutNextRun,
+    scoutNextRunLabel,
     revenue,
     convertedClients,
     pipelineLeads,
@@ -159,7 +142,7 @@ function WorkingDashboard(props: DashboardViewProps) {
     channels,
     week,
     scoutLive,
-    scoutLastRun,
+    scoutLastRunLabel,
   } = props;
 
   return (
@@ -196,7 +179,7 @@ function WorkingDashboard(props: DashboardViewProps) {
                   <p className="text-sm font-medium">You&apos;re all caught up</p>
                   <p className="text-sm text-muted-foreground">
                     {liveAgentsCount > 0
-                      ? `Your agent runs ${timeUntil(scoutNextRun)} — new drafts land here as leads qualify.`
+                      ? `Your agent runs ${scoutNextRunLabel} — new drafts land here as leads qualify.`
                       : "Deploy an Outreach Agent to start drafting personalized outreach."}
                   </p>
                 </div>
@@ -288,7 +271,7 @@ function WorkingDashboard(props: DashboardViewProps) {
                 </div>
                 <span className="text-xs text-muted-foreground">
                   {a.status === "live"
-                    ? `next run ${timeUntil(a.next_run_at)}`
+                    ? `next run ${a.nextRunLabel}`
                     : a.status === "paused"
                       ? "paused"
                       : "draft"}
@@ -298,7 +281,7 @@ function WorkingDashboard(props: DashboardViewProps) {
           )}
           {scoutLive && (
             <p className="border-t border-border/60 pt-3 text-xs text-muted-foreground">
-              Last sourced {timeAgo(scoutLastRun)}. Quiet stretches are normal — your agent only
+              Last sourced {scoutLastRunLabel}. Quiet stretches are normal — your agent only
               keeps high-quality leads.
             </p>
           )}
@@ -360,7 +343,7 @@ function WorkingDashboard(props: DashboardViewProps) {
                               </span>
                             )}
                             <span className="ml-auto shrink-0 text-xs text-muted-foreground">
-                              {timeAgo(r.received_at)}
+                              {r.receivedLabel}
                             </span>
                           </span>
                           {r.body && (

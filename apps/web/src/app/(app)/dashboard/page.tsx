@@ -5,6 +5,7 @@ import {
   computeRevenueSnapshot,
 } from "@/lib/revenue";
 import { LEAD_PROFILE_FIELDS } from "@/components/lead-profile-fields";
+import type { LeadProfile } from "@/components/lead-profile";
 import { DashboardView, type AgentRow, type ReplyRow } from "./dashboard-view";
 import type { Prospect } from "./prospect-panel";
 
@@ -17,6 +18,48 @@ const usd = new Intl.NumberFormat("en-US", {
 function isoDaysAgo(days: number): string {
   return new Date(Date.now() - days * 86_400_000).toISOString();
 }
+
+// Relative-time labels are formatted here on the server and passed to the client
+// view as static strings — keeps Date.now() out of the client render (no hydration
+// mismatch).
+function timeUntil(iso: string | null): string {
+  if (!iso) return "within ~15 min";
+  const ms = new Date(iso).getTime() - Date.now();
+  if (ms <= 0) return "any moment now";
+  const mins = Math.round(ms / 60_000);
+  if (mins < 60) return `in ~${mins} min`;
+  const hrs = Math.round(mins / 60);
+  if (hrs < 24) return `in ~${hrs}h`;
+  return `in ~${Math.round(hrs / 24)}d`;
+}
+
+function timeAgo(iso: string | null): string {
+  if (!iso) return "no runs yet";
+  const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60_000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.round(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.round(hrs / 24)}d ago`;
+}
+
+type AgentRowRaw = {
+  id: string;
+  kind: string;
+  name: string;
+  status: string;
+  last_run_at: string | null;
+  next_run_at: string | null;
+};
+
+type ReplyRowRaw = {
+  id: string;
+  channel: "email" | "linkedin";
+  body: string | null;
+  received_at: string;
+  lead_id: string;
+  leads: LeadProfile | null;
+};
 
 export default async function DashboardPage() {
   const { user, account } = await getGateData();
@@ -54,7 +97,7 @@ export default async function DashboardPage() {
       .from("agents")
       .select("id, kind, name, status, last_run_at, next_run_at")
       .order("created_at", { ascending: true })
-      .returns<AgentRow[]>(),
+      .returns<AgentRowRaw[]>(),
     leadCount(),
     leadCount(["qualified", "enriched"]),
     leadCount(["in_campaign"]),
@@ -75,7 +118,7 @@ export default async function DashboardPage() {
       .eq("classification", "interested")
       .order("received_at", { ascending: false })
       .limit(4)
-      .returns<ReplyRow[]>(),
+      .returns<ReplyRowRaw[]>(),
     supabase.from("mailboxes").select("status"),
     supabase.from("linkedin_accounts").select("status"),
     supabase.from("outreach_sends").select("channel").gte("sent_at", weekAgo),
@@ -125,9 +168,25 @@ export default async function DashboardPage() {
     days: 30,
   });
 
-  const agentRows = agents ?? [];
-  const scout = agentRows.find((a) => a.kind === "scout") ?? null;
-  const liveAgents = agentRows.filter((a) => a.status === "live");
+  const agentRowsRaw = agents ?? [];
+  const scout = agentRowsRaw.find((a) => a.kind === "scout") ?? null;
+  const liveAgents = agentRowsRaw.filter((a) => a.status === "live");
+  // Map to the view's shape with server-formatted labels (no client Date.now()).
+  const agentRows: AgentRow[] = agentRowsRaw.map((a) => ({
+    id: a.id,
+    kind: a.kind,
+    name: a.name,
+    status: a.status,
+    nextRunLabel: timeUntil(a.next_run_at),
+  }));
+  const replyRows: ReplyRow[] = (recentReplies ?? []).map((r) => ({
+    id: r.id,
+    channel: r.channel,
+    body: r.body,
+    receivedLabel: timeAgo(r.received_at),
+    lead_id: r.lead_id,
+    leads: r.leads,
+  }));
   const goal = account.revenue_goal_cents ? usd.format(account.revenue_goal_cents / 100) : null;
   const firstName = user?.email?.split("@")[0] ?? "there";
 
@@ -168,8 +227,8 @@ export default async function DashboardPage() {
       drafts={drafts}
       agents={agentRows}
       liveAgentsCount={liveAgents.length}
-      scoutNextRun={scout?.next_run_at ?? null}
-      scoutLastRun={scout?.last_run_at ?? null}
+      scoutNextRunLabel={timeUntil(scout?.next_run_at ?? null)}
+      scoutLastRunLabel={timeAgo(scout?.last_run_at ?? null)}
       scoutLive={scout?.status === "live"}
       revenue={revenue}
       convertedClients={converted}
@@ -178,7 +237,7 @@ export default async function DashboardPage() {
       funnel={funnel}
       reached={reached}
       prospects={prospects ?? []}
-      recentReplies={recentReplies ?? []}
+      recentReplies={replyRows}
       interested={interested}
       channels={{ mbActive, mbWarming, mbTotal, liStatus }}
       week={{ sends: sendsWeek, email: emailWeek, li: liWeek, replies: repliesWeek }}
