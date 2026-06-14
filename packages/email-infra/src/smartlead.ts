@@ -173,10 +173,3 @@ export class SmartleadEmailInfra implements EmailInfra {
   }
 }
 
-/** The only construction point product code may use (white-label, rule 03). */
-export function createEmailInfraFromEnv(): EmailInfra {
-  const apiKey = process.env.SMARTLEAD_API_KEY;
-  const webhookSecret = process.env.SMARTLEAD_WEBHOOK_SECRET;
-  if (!apiKey || !webhookSecret) throw new Error("email infra env vars missing");
-  return new SmartleadEmailInfra({ apiKey, webhookSecret });
-}
