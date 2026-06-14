@@ -750,3 +750,36 @@ export const copilotKnowledgeChunks = pgTable(
   },
   (t) => [index("copilot_knowledge_chunks_slug_idx").on(t.slug)]
 );
+
+// CRM push connections (Phase 9, migration 0015). One row per destination per account.
+// Tokens are written service-role-side only and never selected client-side (see migration).
+// config: { autoPush, target: {...}, mapping: {...} }.
+export const crmConnections = pgTable(
+  "crm_connections",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    provider: text("provider", {
+      enum: ["hubspot", "salesforce", "gohighlevel", "slack", "monday"],
+    }).notNull(),
+    kind: text("kind", { enum: ["crm", "notify"] }).notNull(),
+    status: text("status", { enum: ["connecting", "active", "error", "disconnected"] })
+      .notNull()
+      .default("connecting"),
+    accessTokenEnc: text("access_token_enc"),
+    refreshTokenEnc: text("refresh_token_enc"),
+    tokenExpiresAt: timestamp("token_expires_at", { withTimezone: true }),
+    externalAccountRef: text("external_account_ref"),
+    config: jsonb("config").notNull().default({}),
+    lastError: text("last_error"),
+    lastSyncAt: timestamp("last_sync_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("crm_connections_account_provider_idx").on(t.accountId, t.provider),
+    index("crm_connections_account_status_idx").on(t.accountId, t.status),
+  ]
+);

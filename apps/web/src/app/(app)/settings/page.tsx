@@ -108,6 +108,20 @@ export default async function SettingsPage() {
 
       <Card>
         <CardHeader>
+          <CardTitle>CRM &amp; integrations</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            Push closed-won deals into HubSpot, Salesforce, GoHighLevel, Slack, or Monday.
+          </p>
+          <Button asChild variant="outline" size="sm" className="mt-3">
+            <Link href="/settings/integrations">Manage integrations</Link>
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>Suppression list</CardTitle>
         </CardHeader>
         <CardContent>

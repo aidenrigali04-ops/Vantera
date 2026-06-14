@@ -16,6 +16,7 @@
     "@trigger.dev/sdk": "^4.0.0",
     "@vantera/agent-brains": "workspace:*",
     "@vantera/billing": "workspace:*",
+    "@vantera/crm-infra": "workspace:*",
     "@vantera/transactional-email": "workspace:*",
     "@vantera/ai": "workspace:*",
     "@vantera/email-infra": "workspace:*",
