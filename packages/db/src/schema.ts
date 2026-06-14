@@ -397,6 +397,28 @@ export const webhookEvents = pgTable(
 
 // ── 0004 channel identities, outreach audit ──────────────────────────────────
 
+// ── 0017 owned email infra (sending_domains declared before mailboxes so the lazy FK reference compiles) ──
+export const sendingDomains = pgTable(
+  "sending_domains",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    domain: text("domain").notNull(),
+    status: text("status", { enum: ["verifying", "active", "error"] })
+      .notNull()
+      .default("verifying"),
+    verifiedAt: timestamp("verified_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("sending_domains_account_domain_idx").on(t.accountId, t.domain),
+    index("sending_domains_account_status_idx").on(t.accountId, t.status),
+  ]
+);
+
 export const mailboxes = pgTable(
   "mailboxes",
   {
@@ -413,12 +435,15 @@ export const mailboxes = pgTable(
     warmupStartedAt: timestamp("warmup_started_at", { withTimezone: true }),
     health: jsonb("health"),
     dailySendLimit: integer("daily_send_limit"),
+    // 0017: link mailbox to its owned sending domain
+    domainId: uuid("domain_id").references(() => sendingDomains.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
     uniqueIndex("mailboxes_account_email_idx").on(t.accountId, t.emailAddress),
     index("mailboxes_account_status_idx").on(t.accountId, t.status),
+    index("mailboxes_domain_idx").on(t.domainId),
   ]
 );
 
@@ -819,3 +844,14 @@ export const crmPushEvents = pgTable(
     index("crm_push_events_retry_idx").on(t.nextRetryAt),
   ]
 );
+
+// ── 0017 (continued) owned email infra ───────────────────────────────────────
+// Vantera-owned Google Workspace tenant pool. Internal infra config, NOT customer data:
+// RLS on with no authenticated policy — service role (jobs) only.
+export const infraWorkspaceTenants = pgTable("infra_workspace_tenants", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  label: text("label").notNull(),
+  customerDomainCount: integer("customer_domain_count").notNull().default(0),
+  domainCap: integer("domain_cap").notNull().default(20),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});

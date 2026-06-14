@@ -28,6 +28,8 @@ const tenantExempt = new Set([
   "webhook_events",
   // global RAG table — no account_id by design (identical data for every tenant); service-role only
   "copilot_knowledge_chunks",
+  // Vantera-owned Google Workspace pool — internal infra config, not customer data; service-role only (migration 0017)
+  "infra_workspace_tenants",
 ]);
 
 // returns the create-table DDL block for a table from the concatenated migrations
@@ -134,6 +136,21 @@ describe("migration hygiene", () => {
     migrationFiles.forEach((file, i) => {
       expect(file.startsWith(String(i).padStart(4, "0"))).toBe(true);
     });
+  });
+});
+
+describe("owned email infra (0017)", () => {
+  it("sending_domains has RLS with member select + admin manage", () => {
+    const sql = readFileSync(join(migrationsDir, "0017_owned_email_infra.sql"), "utf8");
+    expect(sql).toMatch(/alter table public\.sending_domains enable row level security/);
+    expect(sql).toMatch(/create policy sending_domains_select[\s\S]*is_account_member\(account_id\)/);
+    expect(sql).toMatch(/create policy sending_domains_manage[\s\S]*is_account_admin\(account_id\)/);
+  });
+
+  it("infra_workspace_tenants has RLS enabled with no authenticated policy (service-role only)", () => {
+    const sql = readFileSync(join(migrationsDir, "0017_owned_email_infra.sql"), "utf8");
+    expect(sql).toMatch(/alter table public\.infra_workspace_tenants enable row level security/);
+    expect(sql).not.toMatch(/create policy infra_workspace_tenants_\w+ on public\.infra_workspace_tenants[\s\S]*to authenticated/);
   });
 });
 
