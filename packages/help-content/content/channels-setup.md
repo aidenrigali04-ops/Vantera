@@ -14,7 +14,7 @@ Every cold email must include a physical mailing address in the footer. This is 
 
 ## Email sending
 
-When you set up email sending, dedicated sending domains and mailboxes are provisioned for your workspace — you don't need to configure anything externally. After provisioning, each new mailbox goes through a **warm-up period of 2–4 weeks** while it builds sender reputation on the network.
+When you set up email sending, you choose **how many sending domains** to add and **how many mailboxes per domain**. Vantera then registers those dedicated domains and creates the mailboxes for your workspace automatically — you don't need to configure anything externally. The number you can provision is governed by your plan. After provisioning, each new mailbox goes through a **warm-up period of 2–4 weeks** while it builds sender reputation on the network.
 
 During warm-up, a mailbox shows the status **"Warming up — building sender reputation"**. Warming mailboxes never carry campaign email — they are kept separate until they're ready. Once a mailbox reaches **Ready**, it joins the sending rotation automatically.
 

@@ -35,6 +35,13 @@ Each entry stays short — the detail lives in that phase's spec (`docs/superpow
   Audit follow-ups: `scheduled_sends` check tying `linkedin_stage` to channel (follow-up migration); confirm the hosted-auth custom domain is configured vendor-side before launch (+ adapter assertion); consider blocking client writes to `leads.linkedin_connected_at`.
   Depends on: Phase 4. Key rules: 03, 04, 11. Note: provision warmup-dependent domains 2–4 weeks before any launch date.
 
+- [ ] **Owned Email Infrastructure (Path B — self-built provider)** *(build complete 2026-06-14 — spec/plan in docs/superpowers; pending /ship-phase)*
+  Scope: a second `EmailInfra` provider that Vantera owns end-to-end — buys domains (registrar API), writes DNS (SPF/DKIM/DMARC/MX), provisions mailboxes on a hosted-workspace API, and outsources only warmup to a specialist warmup network. Switchable from the managed provider via `EMAIL_PROVIDER=owned|smartlead` behind the existing interface, so no product code changes. Driver: control / data ownership.
+  Built: `[x]` migration 0017 (`sending_domains` + `infra_workspace_tenants` + `mailboxes.domain_id`, RLS + guardrail tests); `[x]` owned sub-layer interfaces + in-memory fakes (registrar / dns / mailbox / warmup / gmail-send); `[x]` `OwnedEmailInfra` orchestration; `[x]` real adapters; `[x]` `EMAIL_PROVIDER` env-factory switch; `[x]` durable provisioning Trigger task + `sending_domains`/mailbox persistence; `[x]` plan-gated Channels provisioning UI + warmup-status surface; `[x]` help article; white-label clean; full per-package gates green.
+  Tenancy: lightweight multi-domain under owned workspace tenants now; reseller-grade per-customer tenants later (same interface, swap the mailbox adapter).
+  Remaining before /ship-phase: `[ ]` live smoke test with real registrar / workspace / warmup credentials (not runnable in CI); `[ ]` reply/bounce ingestion (push-subscription → normalized webhook) as the recommended fast-follow — until it ships the owned provider sends + provisions but does not yet feed replies/bounces back; `[ ]` hosted-workspace reseller application as a parallel follow-up.
+  Depends on: Phase 5 (the `EmailInfra` interface + send pipeline). Key rules: 02, 03, 11.
+
 - [ ] **Phase 6 — Help copilot v1**
   Goal: the approved copilot spec, live on every dashboard page.
   Scope: build `docs/superpowers/specs/2026-06-11-help-copilot-design.md` — `packages/help-agent`, `packages/help-content` index build, `/api/copilot` streaming route, overlay UI, action tiers + confirmation cards, `copilot_actions`/`copilot_knowledge_gaps` tables, red-team CI fixture; backfill help articles for Phases 2–5 surfaces.
