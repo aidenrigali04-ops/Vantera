@@ -56,6 +56,7 @@ import type {
   SendDispatchStore,
   SequenceRunPatch,
   SequenceStore,
+  SequenceTouchStore,
   VoiceInboundStore,
 } from "./types";
 import { EMAIL_STEADY_DAILY_PER_MAILBOX } from "./safety-limits";
@@ -91,7 +92,8 @@ function toRow(send: NewScheduledSend) {
     accountId: send.accountId,
     campaignId: send.campaignId,
     leadId: send.leadId,
-    channel: send.channel,
+    // 0017 permits 'imessage' at the DB level; cast to satisfy the Drizzle enum mirror.
+    channel: send.channel as "email" | "linkedin" | "call",
     status: send.status,
     subject: send.subject,
     body: send.body,
@@ -102,7 +104,7 @@ function toRow(send: NewScheduledSend) {
 }
 
 /** Drizzle-backed store used by the Trigger.dev tasks (service-role DATABASE_URL). */
-export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerStore & RetentionStore & SendDispatchStore & OutreachSendStore & InboundStore & SequenceStore {
+export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerStore & RetentionStore & SendDispatchStore & OutreachSendStore & InboundStore & SequenceStore & SequenceTouchStore {
   return {
     async getScoutContext(agentId: string): Promise<ScoutContext | null> {
       const [agent] = await db.select().from(agents).where(eq(agents.id, agentId));
@@ -312,8 +314,41 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         industry: r.industry,
         email: r.email,
         linkedinUrl: r.linkedinUrl,
+        phone: r.phone,
         aiInsights: r.aiInsights as DraftableLead["aiInsights"],
       }));
+    },
+
+    async getDraftableLead(accountId: string, leadId: string): Promise<DraftableLead | null> {
+      const [r] = await db
+        .select()
+        .from(leads)
+        .where(and(eq(leads.accountId, accountId), eq(leads.id, leadId)))
+        .limit(1);
+      if (!r) return null;
+      return {
+        id: r.id,
+        firstName: r.firstName,
+        lastName: r.lastName,
+        title: r.title,
+        companyName: r.companyName,
+        industry: r.industry,
+        email: r.email,
+        linkedinUrl: r.linkedinUrl,
+        phone: r.phone,
+        aiInsights: r.aiInsights as DraftableLead["aiInsights"],
+      };
+    },
+
+    async getCampaignCta(campaignId: string): Promise<string> {
+      // CTA lives on the agent that owns this campaign (agents.config.cta).
+      const [agent] = await db
+        .select({ config: agents.config })
+        .from(agents)
+        .where(eq(agents.campaignId, campaignId))
+        .limit(1);
+      const config = (agent?.config ?? {}) as { cta?: string };
+      return config.cta ?? "a quick look";
     },
 
     async isSuppressed(accountId, kind, value) {

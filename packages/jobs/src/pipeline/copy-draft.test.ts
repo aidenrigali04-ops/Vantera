@@ -18,6 +18,7 @@ function lead(id: string, overrides: Partial<DraftableLead> = {}): DraftableLead
     industry: "saas",
     email: `${id}@acme.com`,
     linkedinUrl: `https://linkedin.com/in/${id}`,
+    phone: null,
     aiInsights: {
       pain_points: ["pipeline"],
       triggers: ["hiring"],

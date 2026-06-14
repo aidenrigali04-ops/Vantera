@@ -105,6 +105,7 @@ export interface DraftableLead {
   industry: string | null;
   email: string | null;
   linkedinUrl: string | null;
+  phone: string | null;
   aiInsights: StoredInsights | null;
 }
 
@@ -112,7 +113,7 @@ export interface NewScheduledSend {
   accountId: string;
   campaignId: string;
   leadId: string;
-  channel: "email" | "linkedin" | "call";
+  channel: "email" | "linkedin" | "call" | "imessage";
   subject: string | null;
   body: string;
   /** automatic mode inserts clean drafts as 'approved'; style-flagged drafts always review */
@@ -549,3 +550,18 @@ export interface SequenceStore {
   /** enrol qualified in_campaign leads lacking an active run; returns count created */
   enrollPendingLeads(now: Date): Promise<number>;
 }
+
+export interface SequenceTouchStore {
+  getDraftableLead(accountId: string, leadId: string): Promise<DraftableLead | null>;
+  getCampaignCta(campaignId: string): Promise<string>;
+  isSuppressed(accountId: string, kind: "email" | "linkedin" | "phone", value: string): Promise<boolean>;
+  insertScheduledSend(send: NewScheduledSend): Promise<void>;
+}
+
+export interface SequenceTouchDeps {
+  store: SequenceTouchStore;
+  draftEmailFn: (input: DraftInput) => Promise<EmailDraft>;
+  draftLinkedInFn: (input: DraftInput) => Promise<LinkedInDraft>;
+}
+
+export type SequenceTouchOutcome = "drafted" | "suppressed" | "skipped";
