@@ -1,4 +1,3 @@
-import { DottedSurface } from "@/components/ui/dotted-surface";
 import { LandingNav } from "@/components/landing/nav";
 import { Hero } from "@/components/landing/hero";
 import { SimulateSection } from "@/components/landing/simulate-section";
@@ -11,10 +10,9 @@ import { LandingFooter } from "@/components/landing/footer";
 
 export default function Home() {
   return (
-    // Landing is always dark. No opaque background here — the dark body shows
-    // through so the fixed particle canvas (-z-1) stays visible behind content.
-    <div className="dark relative min-h-screen w-full overflow-x-clip text-foreground">
-      <DottedSurface colorTheme="dark" />
+    // Landing is always dark. The particle field is scoped to the hero section
+    // (see Hero) — no page-level background here.
+    <div className="dark relative min-h-screen w-full overflow-x-clip bg-background text-foreground">
       <LandingNav />
       <main>
         <Hero />

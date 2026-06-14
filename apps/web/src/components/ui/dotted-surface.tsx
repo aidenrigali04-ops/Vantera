@@ -7,6 +7,9 @@ import * as THREE from 'three';
 type DottedSurfaceProps = Omit<React.ComponentProps<'div'>, 'ref'> & {
 	/** Force the particle colouring regardless of the active app theme. */
 	colorTheme?: 'light' | 'dark';
+	/** Contain to the nearest positioned ancestor (absolute) instead of the
+	 *  viewport (fixed) — used to scope the field to a single section. */
+	contained?: boolean;
 };
 
 const SEPARATION = 150;
@@ -138,7 +141,7 @@ function applyThemeColors(geometry: THREE.BufferGeometry, theme?: string) {
 	geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
 }
 
-export function DottedSurface({ className, colorTheme, ...props }: DottedSurfaceProps) {
+export function DottedSurface({ className, colorTheme, contained = false, ...props }: DottedSurfaceProps) {
 	const { theme } = useTheme();
 	const activeTheme = colorTheme ?? theme;
 
@@ -209,7 +212,12 @@ export function DottedSurface({ className, colorTheme, ...props }: DottedSurface
 	return (
 		<div
 			ref={containerRef}
-			className={cn('pointer-events-none fixed inset-0 -z-1', className)}
+			className={cn(
+				contained
+					? 'pointer-events-none absolute inset-0'
+					: 'pointer-events-none fixed inset-0 -z-1',
+				className,
+			)}
 			{...props}
 		/>
 	);
