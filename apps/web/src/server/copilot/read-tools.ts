@@ -168,3 +168,39 @@ export async function getBillingStatus(
     campaigns: { used: campaigns ?? 0, max: limits.maxCampaigns },
   };
 }
+
+// ── CRM connections + push status ─────────────────────────────────────────────
+
+export interface CrmStatusDTO {
+  connections: Array<{ destination: string; status: string }>;
+  recentPushes: { success: number; pending: number; failed: number };
+}
+
+const CRM_LABELS: Record<string, string> = {
+  hubspot: "HubSpot",
+  salesforce: "Salesforce",
+  gohighlevel: "GoHighLevel",
+  slack: "Slack",
+  monday: "Monday",
+};
+
+export async function getCrmStatus(
+  db: SupabaseClient,
+  _accountId: string
+): Promise<CrmStatusDTO> {
+  const { data: conns } = await db.from("crm_connections").select("provider, status");
+  const { data: events } = await db.from("crm_push_events").select("status");
+  const connRows: { provider: string; status: string }[] = conns ?? [];
+  const eventRows: { status: string }[] = events ?? [];
+  return {
+    connections: connRows.map((c) => ({
+      destination: CRM_LABELS[c.provider] ?? c.provider,
+      status: c.status,
+    })),
+    recentPushes: {
+      success: eventRows.filter((r) => r.status === "success").length,
+      pending: eventRows.filter((r) => r.status === "pending").length,
+      failed: eventRows.filter((r) => r.status === "failed").length,
+    },
+  };
+}

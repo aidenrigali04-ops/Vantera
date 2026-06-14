@@ -49,6 +49,10 @@ export interface ConnectorMeta {
   oauthScopes: string[];
   /** provider authorize endpoint (the OAuth dialog the user is sent to) */
   authorizeEndpoint: string;
+  /** OAuth token endpoint (code→token exchange + refresh) */
+  tokenEndpoint: string;
+  /** API base for push calls (Salesforce overrides this per-connection with instance_url) */
+  apiBase: string;
   /** smart defaults pre-filled in the mapping editor */
   defaultMapping: FieldMapping;
   /** fields the user may remap */
@@ -82,6 +86,19 @@ export interface TokenSet {
   accessToken: string;
   refreshToken?: string;
   expiresAt?: string; // ISO
+  // provider-specific account handle returned at exchange (Salesforce instance_url,
+  // Slack team id, etc.) — persisted as crm_connections.external_account_ref
+  externalAccountRef?: string;
+}
+
+// Per-provider push/health logic. OAuth (authorize/exchange/refresh) is generic across
+// providers and lives in the factory; only these differ per destination.
+export interface ProviderAdapter {
+  pushClosedDeal(
+    ctx: ConnectorCtx,
+    deal: ClosedDeal
+  ): Promise<ConnectorResult<{ externalRef?: string }>>;
+  testConnection(ctx: ConnectorCtx): Promise<ConnectorResult<{ detail?: string }>>;
 }
 
 export interface ConnectorCtx {

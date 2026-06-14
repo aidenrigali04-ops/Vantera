@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ExternalLink, Mail, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { LeadCrmControls } from "@/components/lead-crm-controls";
 
 // Shared "lead profiler" — the full prospect-enrichment slide-over used
 // everywhere a lead surfaces (Leads, Dashboard prospects, Warm replies, Review).
@@ -178,6 +179,8 @@ export function LeadProfileSheet({ lead, onClose }: { lead: LeadProfile; onClose
               </a>
             )}
           </section>
+
+          {lead.id && <LeadCrmControls leadId={lead.id} status={lead.status} />}
         </div>
       </aside>
     </>

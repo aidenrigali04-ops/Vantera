@@ -31,6 +31,18 @@ Each connection has a **Push automatically on close** toggle. Leave it on and ev
 
 Each connected destination shows its status and when it was last checked. If a connection needs attention (for example, access was revoked on the provider's side), it's flagged here — reconnect to restore the push.
 
+## Marking a deal closed-won
+
+Open a lead and use **Mark closed-won** (with the deal value) under *Deal & CRM*. This sets the lead to converted and — if a destination has **auto-push** on — sends it to your CRM right away. The deal value also feeds the Revenue snapshot on your dashboard.
+
+## Pushing on demand
+
+For a deal that's already closed-won, **Push to CRM** sends (or re-sends) it to every connected destination. Use it if a push failed, if you connected a CRM after the deal closed, or to re-sync. Each push is retried automatically with backoff if the destination is briefly unavailable.
+
+## When a push fails
+
+If a destination rejects a push or its access was revoked, the connection is flagged **Needs attention** on the integrations page with the reason. Reconnect to restore pushing — queued deals retry automatically once the connection is healthy.
+
 ## Disconnecting
 
 **Disconnect** removes the connection and stops all pushes to that destination. Your closed deals stay in Vantera; you can reconnect any time.

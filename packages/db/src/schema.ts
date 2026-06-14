@@ -193,6 +193,9 @@ export const leads = pgTable(
     // 0007: structured prospect-brain output (pain_points, triggers, motivations, value_angle, aha_moment, summary)
     aiInsights: jsonb("ai_insights"),
     scoredAt: timestamp("scored_at", { withTimezone: true }),
+    // 0016: close stage (status='converted' is closed-won); value + close date for CRM push
+    dealValueCents: bigint("deal_value_cents", { mode: "number" }),
+    closedAt: timestamp("closed_at", { withTimezone: true }),
     status: text("status", {
       enum: [
         "sourced",
@@ -781,5 +784,38 @@ export const crmConnections = pgTable(
   (t) => [
     uniqueIndex("crm_connections_account_provider_idx").on(t.accountId, t.provider),
     index("crm_connections_account_status_idx").on(t.accountId, t.status),
+  ]
+);
+
+// CRM push audit + retry queue (Phase 9, migration 0016). One row per push attempt of a
+// closed-won lead to a connection; also the per-lead push-status + connection-health surface.
+export const crmPushEvents = pgTable(
+  "crm_push_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    connectionId: uuid("connection_id").references(() => crmConnections.id, {
+      onDelete: "cascade",
+    }),
+    leadId: uuid("lead_id").references(() => leads.id, { onDelete: "set null" }),
+    status: text("status", { enum: ["pending", "success", "failed"] })
+      .notNull()
+      .default("pending"),
+    attempts: integer("attempts").notNull().default(0),
+    lastAttemptAt: timestamp("last_attempt_at", { withTimezone: true }),
+    nextRetryAt: timestamp("next_retry_at", { withTimezone: true }),
+    payload: jsonb("payload"),
+    externalRef: text("external_ref"),
+    error: text("error"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("crm_push_events_account_status_idx").on(t.accountId, t.status),
+    index("crm_push_events_lead_idx").on(t.leadId),
+    index("crm_push_events_connection_idx").on(t.connectionId),
+    index("crm_push_events_retry_idx").on(t.nextRetryAt),
   ]
 );

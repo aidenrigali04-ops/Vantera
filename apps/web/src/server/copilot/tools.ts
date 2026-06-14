@@ -7,6 +7,7 @@ import {
   getGoalProgress,
   getLeadScoreRationale,
   getBillingStatus,
+  getCrmStatus,
 } from "./read-tools";
 import { runCampaignSendState } from "./mutate-tools";
 
@@ -48,6 +49,14 @@ export function buildAccountTools(db: SupabaseClient, accountId: string): Copilo
         "The account's current plan, subscription status, and seat/campaign usage vs. limits.",
       parameters: z.object({}),
       run: async () => getBillingStatus(db, accountId),
+    },
+    {
+      name: "getCrmStatus",
+      tier: "read",
+      description:
+        "Connected CRM / notification destinations and recent closed-deal push results (success/pending/failed).",
+      parameters: z.object({}),
+      run: async () => getCrmStatus(db, accountId),
     },
     {
       name: "pauseCampaign",

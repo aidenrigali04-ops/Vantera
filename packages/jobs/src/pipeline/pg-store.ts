@@ -8,6 +8,8 @@ import {
   campaignLeads,
   campaigns,
   copilotConversations,
+  crmConnections,
+  crmPushEvents,
   enrichmentResults,
   icps,
   leads,
@@ -24,6 +26,8 @@ import {
 } from "@vantera/db";
 import type { EnrichedProspect, IcpCriteria, ProspectCandidate } from "@vantera/prospect-data";
 import { toStoredInsights, type LeadInsights, type WebsiteScan } from "@vantera/agent-brains";
+import type { ClosedDeal, CrmProvider } from "@vantera/crm-infra";
+import type { CrmPushStore } from "./crm-push";
 import type {
   CallBriefStore,
   CallDispatchStore,
@@ -1099,6 +1103,102 @@ export function createVoiceInboundStore(db: Db): VoiceInboundStore {
         .insert(suppressionEntries)
         .values({ accountId, kind, value, source, leadId })
         .onConflictDoNothing();
+    },
+  };
+}
+
+// CRM push (Phase 9). Drizzle impl of the pure-core's injected store interface.
+export function createCrmPushStore(db: Db): CrmPushStore {
+  return {
+    async loadEvent(id) {
+      const [e] = await db.select().from(crmPushEvents).where(eq(crmPushEvents.id, id)).limit(1);
+      if (!e) return null;
+      return {
+        id: e.id,
+        accountId: e.accountId,
+        connectionId: e.connectionId,
+        leadId: e.leadId,
+        status: e.status as "pending" | "success" | "failed",
+        attempts: e.attempts,
+        payload: (e.payload ?? null) as ClosedDeal | null,
+      };
+    },
+
+    async loadConnection(id) {
+      const [c] = await db.select().from(crmConnections).where(eq(crmConnections.id, id)).limit(1);
+      if (!c) return null;
+      return {
+        id: c.id,
+        provider: c.provider as CrmProvider,
+        status: c.status,
+        accessTokenEnc: c.accessTokenEnc,
+        refreshTokenEnc: c.refreshTokenEnc,
+        tokenExpiresAt: c.tokenExpiresAt ? c.tokenExpiresAt.toISOString() : null,
+        externalAccountRef: c.externalAccountRef,
+        config: (c.config ?? {}) as {
+          target?: Record<string, string>;
+          mapping?: Record<string, string>;
+        },
+      };
+    },
+
+    async saveRefreshedTokens(connectionId, t) {
+      await db
+        .update(crmConnections)
+        .set({
+          accessTokenEnc: t.accessTokenEnc,
+          refreshTokenEnc: t.refreshTokenEnc,
+          tokenExpiresAt: t.tokenExpiresAt ? new Date(t.tokenExpiresAt) : null,
+        })
+        .where(eq(crmConnections.id, connectionId));
+    },
+
+    async markSuccess(eventId, externalRef, connectionId, at) {
+      await db
+        .update(crmPushEvents)
+        .set({
+          status: "success",
+          externalRef: externalRef ?? null,
+          error: null,
+          nextRetryAt: null,
+          lastAttemptAt: new Date(at),
+          attempts: sql`${crmPushEvents.attempts} + 1`,
+        })
+        .where(eq(crmPushEvents.id, eventId));
+      if (connectionId) {
+        await db
+          .update(crmConnections)
+          .set({ status: "active", lastError: null, lastSyncAt: new Date(at) })
+          .where(eq(crmConnections.id, connectionId));
+      }
+    },
+
+    async markFailure(a) {
+      await db
+        .update(crmPushEvents)
+        .set({
+          status: a.nextRetryAt ? "pending" : "failed",
+          error: a.error,
+          attempts: a.attempts,
+          nextRetryAt: a.nextRetryAt ? new Date(a.nextRetryAt) : null,
+          lastAttemptAt: new Date(),
+        })
+        .where(eq(crmPushEvents.id, a.eventId));
+      if (a.connectionError && a.connectionId) {
+        await db
+          .update(crmConnections)
+          .set({ status: "error", lastError: a.connectionError })
+          .where(eq(crmConnections.id, a.connectionId));
+      }
+    },
+
+    async dueEventIds(now, limit) {
+      const rows = await db
+        .select({ id: crmPushEvents.id })
+        .from(crmPushEvents)
+        .where(and(eq(crmPushEvents.status, "pending"), lte(crmPushEvents.nextRetryAt, now)))
+        .limit(limit);
+      return rows.map((r) => r.id);
     },
   };
 }
