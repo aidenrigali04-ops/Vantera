@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   SenderAddressForm,
-  ProvisionEmailForm,
+  StartEmailProvisioningForm,
   PauseSendingForm,
   LinkedInConnectButton,
 } from "./channels-forms";
@@ -17,6 +17,23 @@ interface SenderAddress {
   postal: string;
   country: string;
 }
+
+type DomainStatus = "verifying" | "active" | "error";
+
+const DOMAIN_STATUS_LABELS: Record<DomainStatus, string> = {
+  verifying: "Verifying",
+  active: "Ready",
+  error: "Issue",
+};
+
+const DOMAIN_STATUS_VARIANTS: Record<
+  DomainStatus,
+  "default" | "secondary" | "outline" | "destructive"
+> = {
+  verifying: "secondary",
+  active: "default",
+  error: "destructive",
+};
 
 type MailboxStatus = "provisioning" | "warming" | "active" | "paused" | "error";
 
@@ -44,6 +61,7 @@ export default async function ChannelsPage() {
 
   const [
     { data: accountRow },
+    { data: domainRows },
     { data: mailboxRows },
     { data: linkedinRows },
   ] = await Promise.all([
@@ -52,6 +70,10 @@ export default async function ChannelsPage() {
       .select("sender_address, outreach_paused")
       .limit(1)
       .maybeSingle<{ sender_address: SenderAddress | null; outreach_paused: boolean }>(),
+    supabase
+      .from("sending_domains")
+      .select("id, domain, status")
+      .order("created_at", { ascending: true }),
     supabase
       .from("mailboxes")
       .select("id, email_address, domain, status, daily_send_limit")
@@ -64,6 +86,7 @@ export default async function ChannelsPage() {
 
   const senderAddress = accountRow?.sender_address ?? null;
   const outreachPaused = accountRow?.outreach_paused ?? false;
+  const sendingDomains = domainRows ?? [];
   const mailboxes = mailboxRows ?? [];
   const linkedinAccounts = linkedinRows ?? [];
 
@@ -108,47 +131,82 @@ export default async function ChannelsPage() {
             <SenderAddressForm defaultValues={senderAddressDefaults} />
           </div>
 
-          {/* Mailboxes: provision form or list */}
+          {/* Sending domains + mailboxes: provision form or list */}
           <div className="space-y-3">
-            <div>
-              <p className="text-sm font-medium">Sending mailboxes</p>
-              {mailboxes.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  No mailboxes set up yet. Add your sender address above, then provision
-                  mailboxes below.
-                </p>
-              ) : null}
-            </div>
-            {mailboxes.length === 0 ? (
-              <ProvisionEmailForm />
+            {mailboxes.length === 0 && sendingDomains.length === 0 ? (
+              <>
+                <div>
+                  <p className="text-sm font-medium">Sending mailboxes</p>
+                  <p className="text-sm text-muted-foreground">
+                    No mailboxes set up yet. Add your sender address above, then provision
+                    mailboxes below.
+                  </p>
+                </div>
+                <StartEmailProvisioningForm />
+              </>
             ) : (
-              <table className="w-full text-sm">
-                <thead className="text-left text-xs uppercase text-muted-foreground">
-                  <tr>
-                    <th className="pb-2 font-medium">Address</th>
-                    <th className="pb-2 font-medium">Status</th>
-                    <th className="pb-2 font-medium">Daily cap</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {mailboxes.map((m) => {
-                    const status = (m.status ?? "provisioning") as MailboxStatus;
-                    return (
-                      <tr key={m.id} className="border-t border-border">
-                        <td className="py-2 font-medium">{m.email_address}</td>
-                        <td className="py-2">
-                          <Badge variant={MAILBOX_STATUS_VARIANTS[status]}>
-                            {MAILBOX_STATUS_LABELS[status] ?? m.status}
-                          </Badge>
-                        </td>
-                        <td className="py-2 text-muted-foreground">
-                          {m.daily_send_limit ?? "—"}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+              <>
+                {sendingDomains.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">Sending domains</p>
+                    <table className="w-full text-sm">
+                      <thead className="text-left text-xs uppercase text-muted-foreground">
+                        <tr>
+                          <th className="pb-2 font-medium">Domain</th>
+                          <th className="pb-2 font-medium">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sendingDomains.map((d) => {
+                          const status = (d.status ?? "verifying") as DomainStatus;
+                          return (
+                            <tr key={d.id} className="border-t border-border">
+                              <td className="py-2 font-medium">{d.domain}</td>
+                              <td className="py-2">
+                                <Badge variant={DOMAIN_STATUS_VARIANTS[status]}>
+                                  {DOMAIN_STATUS_LABELS[status] ?? d.status}
+                                </Badge>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                {mailboxes.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">Sending mailboxes</p>
+                    <table className="w-full text-sm">
+                      <thead className="text-left text-xs uppercase text-muted-foreground">
+                        <tr>
+                          <th className="pb-2 font-medium">Address</th>
+                          <th className="pb-2 font-medium">Status</th>
+                          <th className="pb-2 font-medium">Daily cap</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {mailboxes.map((m) => {
+                          const status = (m.status ?? "provisioning") as MailboxStatus;
+                          return (
+                            <tr key={m.id} className="border-t border-border">
+                              <td className="py-2 font-medium">{m.email_address}</td>
+                              <td className="py-2">
+                                <Badge variant={MAILBOX_STATUS_VARIANTS[status]}>
+                                  {MAILBOX_STATUS_LABELS[status] ?? m.status}
+                                </Badge>
+                              </td>
+                              <td className="py-2 text-muted-foreground">
+                                {m.daily_send_limit ?? "—"}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </CardContent>

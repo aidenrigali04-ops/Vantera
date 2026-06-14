@@ -2,9 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { tasks } from "@trigger.dev/sdk";
 import { createEmailInfraFromEnv } from "@vantera/email-infra";
 import { createLinkedInInfraFromEnv } from "@vantera/linkedin-infra";
-import { canProvision, validateSenderAddress, validateProvisionCounts } from "./validation";
+import { canProvision, validateSenderAddress, validateProvisionCounts, validateProvisionInput } from "./validation";
 import { gate, loadBillingRow } from "@/lib/billing/entitlement";
 
 export type ChannelActionState = { error?: string; success?: string };
@@ -143,6 +144,63 @@ export async function provisionEmailSending(
 
   revalidatePath("/settings/channels");
   return { success: `Email sending set up — ${rows.length} mailbox${rows.length !== 1 ? "es" : ""} are now warming up.` };
+}
+
+// ── Email provisioning (Trigger.dev path) ─────────────────────────────────────
+
+/**
+ * Plan-gated provisioning action that enqueues the `provision-email` Trigger.dev
+ * task instead of calling the email-infra adapter inline. The task handles the
+ * long-running work (domain registration, DNS, mailbox creation, warmup start)
+ * with no risk of Vercel function timeouts.
+ */
+export async function startEmailProvisioning(input: {
+  domainCount: number;
+  mailboxesPerDomain: number;
+}): Promise<ChannelActionState> {
+  const v = validateProvisionInput(input);
+  if (!v.ok) return { error: v.error };
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Your session expired. Sign in again." };
+
+  const { data: account } = await supabase
+    .from("accounts")
+    .select("id, sender_address")
+    .limit(1)
+    .maybeSingle<{ id: string; sender_address: unknown }>();
+  if (!account) return { error: "Your session expired. Sign in again." };
+
+  // Rule 11: sender address must be on file before any provisioning can start.
+  const { count: existingCount } = await supabase
+    .from("mailboxes")
+    .select("id", { count: "exact", head: true });
+  const provisionGate = canProvision(account.sender_address, existingCount ?? 0);
+  if (!provisionGate.ok) return { error: provisionGate.error };
+
+  // Phase 6 plan gate: check mailbox capacity against the account's current plan.
+  const billingRow = await loadBillingRow(supabase);
+  if (!billingRow) return { error: "No active plan. Choose a plan in Billing first." };
+  const planGate = gate(
+    billingRow,
+    "mailbox",
+    (existingCount ?? 0) + input.domainCount * input.mailboxesPerDomain - 1
+  );
+  if (!planGate.ok) return { error: planGate.error };
+
+  await tasks.trigger("provision-email", {
+    accountId: account.id,
+    domainCount: input.domainCount,
+    mailboxesPerDomain: input.mailboxesPerDomain,
+  });
+
+  revalidatePath("/settings/channels");
+  return {
+    success: `Email setup started — ${input.domainCount * input.mailboxesPerDomain} mailbox${input.domainCount * input.mailboxesPerDomain !== 1 ? "es" : ""} are being provisioned and will appear here once ready.`,
+  };
 }
 
 // ── LinkedIn connect link ─────────────────────────────────────────────────────

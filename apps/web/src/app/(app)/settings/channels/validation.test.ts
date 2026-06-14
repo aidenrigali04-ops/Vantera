@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { canProvision, validateSenderAddress, validateProvisionCounts } from "./validation";
+import { canProvision, validateSenderAddress, validateProvisionCounts, validateProvisionInput } from "./validation";
 
 describe("validateSenderAddress", () => {
   it("requires line1, city, postal, country", () => {
@@ -29,6 +29,16 @@ describe("canProvision (the rule-11 + re-provisioning gate)", () => {
   });
   it("allows first provisioning with an address on file", () => {
     expect(canProvision({ line1: "100 Main St" }, 0).ok).toBe(true);
+  });
+});
+
+describe("validateProvisionInput", () => {
+  it("accepts in-range counts", () => {
+    expect(validateProvisionInput({ domainCount: 2, mailboxesPerDomain: 2 })).toEqual({ ok: true });
+  });
+  it("rejects zero or excessive counts", () => {
+    expect(validateProvisionInput({ domainCount: 0, mailboxesPerDomain: 2 }).ok).toBe(false);
+    expect(validateProvisionInput({ domainCount: 1, mailboxesPerDomain: 99 }).ok).toBe(false);
   });
 });
 

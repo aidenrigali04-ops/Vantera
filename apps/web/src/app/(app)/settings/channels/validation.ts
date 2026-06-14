@@ -1,3 +1,4 @@
+import { z } from "zod";
 import type { Valid, Invalid } from "@/lib/validation";
 
 export interface SenderAddressValues {
@@ -54,6 +55,20 @@ export function canProvision(
     return { ok: false, error: "Email sending is already set up for this workspace." };
   }
   return { ok: true, values: true };
+}
+
+// ── Zod-backed provision input validator (used by startEmailProvisioning) ────
+
+const provisionSchema = z.object({
+  domainCount: z.number().int().min(1).max(10),
+  mailboxesPerDomain: z.number().int().min(1).max(5),
+});
+
+export function validateProvisionInput(input: { domainCount: number; mailboxesPerDomain: number }):
+  | { ok: true }
+  | { ok: false; error: string } {
+  const r = provisionSchema.safeParse(input);
+  return r.success ? { ok: true } : { ok: false, error: r.error.issues[0]?.message ?? "invalid" };
 }
 
 export function validateProvisionCounts(

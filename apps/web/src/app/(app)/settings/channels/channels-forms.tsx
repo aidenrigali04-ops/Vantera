@@ -9,6 +9,7 @@ import {
   saveSenderAddress,
   toggleSendingPause,
   provisionEmailSending,
+  startEmailProvisioning,
   createLinkedInConnectLink,
   type ChannelActionState,
 } from "./actions";
@@ -150,6 +151,68 @@ export function ProvisionEmailForm() {
       <div className="flex items-center gap-3">
         <Button type="submit" disabled={pending}>
           {pending ? "Setting up…" : "Set up email sending"}
+        </Button>
+        {state.success && (
+          <p className="text-sm text-muted-foreground">{state.success}</p>
+        )}
+      </div>
+      <FormError message={state.error} />
+    </form>
+  );
+}
+
+// ── Email provisioning form (Trigger.dev path — plan-gated) ──────────────────
+
+export function StartEmailProvisioningForm() {
+  const [state, setState] = useState<ChannelActionState>({});
+  const [isPending, startTransition] = useTransition();
+  const [domainCount, setDomainCount] = useState(1);
+  const [mailboxesPerDomain, setMailboxesPerDomain] = useState(1);
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    startTransition(async () => {
+      setState({});
+      const result = await startEmailProvisioning({ domainCount, mailboxesPerDomain });
+      setState(result);
+    });
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-3">
+      <p className="text-sm text-muted-foreground">
+        We&apos;ll provision dedicated sending domains and mailboxes for your workspace. New mailboxes
+        spend a few weeks warming up before they&apos;re ready to send.
+      </p>
+      <div className="flex flex-wrap gap-4">
+        <div className="space-y-1">
+          <Label htmlFor="start-domainCount">Sending domains (1–10)</Label>
+          <Input
+            id="start-domainCount"
+            type="number"
+            min={1}
+            max={10}
+            value={domainCount}
+            onChange={(e) => setDomainCount(Math.max(1, Math.min(10, parseInt(e.target.value, 10) || 1)))}
+            className="w-24"
+          />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="start-mailboxesPerDomain">Mailboxes per domain (1–5)</Label>
+          <Input
+            id="start-mailboxesPerDomain"
+            type="number"
+            min={1}
+            max={5}
+            value={mailboxesPerDomain}
+            onChange={(e) => setMailboxesPerDomain(Math.max(1, Math.min(5, parseInt(e.target.value, 10) || 1)))}
+            className="w-24"
+          />
+        </div>
+      </div>
+      <div className="flex items-center gap-3">
+        <Button type="submit" disabled={isPending}>
+          {isPending ? "Setting up…" : "Set up email sending"}
         </Button>
         {state.success && (
           <p className="text-sm text-muted-foreground">{state.success}</p>
