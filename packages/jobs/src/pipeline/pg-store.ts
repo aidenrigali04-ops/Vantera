@@ -18,6 +18,7 @@ import {
   outreachSends,
   replies,
   scheduledSends,
+  sequenceRuns,
   suppressionEntries,
   unsubscribeTokens,
   appSettings,
@@ -40,8 +41,10 @@ import type {
   DispatchableCall,
   DispatchableSend,
   DraftableLead,
+  DueSequenceRun,
   FreshLead,
   InboundStore,
+  LeadChannels,
   NewScheduledSend,
   OutreachSendStore,
   PurgeCandidate,
@@ -51,11 +54,36 @@ import type {
   ScoutStore,
   SendContext,
   SendDispatchStore,
+  SequenceRunPatch,
+  SequenceStore,
   VoiceInboundStore,
 } from "./types";
 import { EMAIL_STEADY_DAILY_PER_MAILBOX } from "./safety-limits";
 import { parseSenderAddress } from "./email-footer";
 import { normalizeLinkedInUrl } from "./copy-draft";
+import { normalizePhone } from "./call-brief";
+import { resolveSequenceConfig } from "./sequence-config";
+
+/** Suppression lookup that accepts any kind (email/linkedin/phone) — used by the sequence store. */
+async function isSuppressedAnyKind(
+  db: Db,
+  accountId: string,
+  kind: "email" | "linkedin" | "phone",
+  value: string
+): Promise<boolean> {
+  const [hit] = await db
+    .select({ id: suppressionEntries.id })
+    .from(suppressionEntries)
+    .where(
+      and(
+        eq(suppressionEntries.accountId, accountId),
+        eq(suppressionEntries.kind, kind),
+        eq(suppressionEntries.value, value)
+      )
+    )
+    .limit(1);
+  return Boolean(hit);
+}
 
 /** Maps a NewScheduledSend to the drizzle insert values shape. */
 function toRow(send: NewScheduledSend) {
@@ -74,7 +102,7 @@ function toRow(send: NewScheduledSend) {
 }
 
 /** Drizzle-backed store used by the Trigger.dev tasks (service-role DATABASE_URL). */
-export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerStore & RetentionStore & SendDispatchStore & OutreachSendStore & InboundStore {
+export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerStore & RetentionStore & SendDispatchStore & OutreachSendStore & InboundStore & SequenceStore {
   return {
     async getScoutContext(agentId: string): Promise<ScoutContext | null> {
       const [agent] = await db.select().from(agents).where(eq(agents.id, agentId));
@@ -774,6 +802,141 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           )
         )
         .returning({ id: scheduledSends.id });
+      return rows.length;
+    },
+
+    // ── SequenceStore ──────────────────────────────────────────────────────────
+
+    async getDueSequenceRuns(now: Date, limit: number): Promise<DueSequenceRun[]> {
+      const rows = await db
+        .select({
+          id: sequenceRuns.id,
+          accountId: sequenceRuns.accountId,
+          campaignId: sequenceRuns.campaignId,
+          leadId: sequenceRuns.leadId,
+          status: sequenceRuns.status,
+          currentStage: sequenceRuns.currentStage,
+          touchesDone: sequenceRuns.touchesDone,
+          callAttempts: sequenceRuns.callAttempts,
+          nextActionAt: sequenceRuns.nextActionAt,
+          enteredStageAt: sequenceRuns.enteredStageAt,
+          linkedinUrl: leads.linkedinUrl,
+          email: leads.email,
+          emailStatus: leads.emailStatus,
+          phone: leads.phone,
+          phoneStatus: leads.phoneStatus,
+          sequenceConfig: campaigns.sequenceConfig,
+          accountPaused: accounts.outreachPaused,
+        })
+        .from(sequenceRuns)
+        .innerJoin(
+          leads,
+          and(eq(leads.id, sequenceRuns.leadId), eq(leads.accountId, sequenceRuns.accountId))
+        )
+        .innerJoin(
+          campaigns,
+          and(eq(campaigns.id, sequenceRuns.campaignId), eq(campaigns.accountId, sequenceRuns.accountId))
+        )
+        .innerJoin(accounts, eq(accounts.id, sequenceRuns.accountId))
+        .where(and(eq(sequenceRuns.status, "active"), lte(sequenceRuns.nextActionAt, now)))
+        .orderBy(sequenceRuns.nextActionAt)
+        .limit(limit);
+      return rows.map((r) => ({
+        run: {
+          id: r.id,
+          accountId: r.accountId,
+          campaignId: r.campaignId,
+          leadId: r.leadId,
+          status: r.status,
+          currentStage: r.currentStage,
+          touchesDone: r.touchesDone,
+          callAttempts: r.callAttempts,
+          nextActionAt: r.nextActionAt,
+          enteredStageAt: r.enteredStageAt,
+        },
+        channels: {
+          linkedinUrl: r.linkedinUrl,
+          email: r.email,
+          emailStatus: r.emailStatus,
+          phone: r.phone,
+          phoneStatus: r.phoneStatus,
+        },
+        config: resolveSequenceConfig(
+          (r.sequenceConfig ?? null) as Parameters<typeof resolveSequenceConfig>[0]
+        ),
+        accountPaused: r.accountPaused,
+      }));
+    },
+
+    async suppressionFlags(accountId: string, ch: LeadChannels) {
+      return {
+        linkedin: ch.linkedinUrl
+          ? await isSuppressedAnyKind(db, accountId, "linkedin", normalizeLinkedInUrl(ch.linkedinUrl))
+          : false,
+        email: ch.email
+          ? await isSuppressedAnyKind(db, accountId, "email", ch.email.toLowerCase())
+          : false,
+        phone: ch.phone
+          ? await isSuppressedAnyKind(db, accountId, "phone", normalizePhone(ch.phone))
+          : false,
+      };
+    },
+
+    async applyRunPatch(runId: string, expectNextActionAt: Date, patch: SequenceRunPatch): Promise<boolean> {
+      const set: Partial<typeof sequenceRuns.$inferInsert> = { updatedAt: new Date() };
+      if (patch.status !== undefined) set.status = patch.status;
+      if (patch.currentStage !== undefined) set.currentStage = patch.currentStage;
+      if (patch.touchesDone !== undefined) set.touchesDone = patch.touchesDone;
+      if (patch.callAttempts !== undefined) set.callAttempts = patch.callAttempts;
+      if (patch.nextActionAt !== undefined) set.nextActionAt = patch.nextActionAt;
+      if (patch.enteredStageAt !== undefined) set.enteredStageAt = patch.enteredStageAt;
+      if (patch.lastTouchAt !== undefined) set.lastTouchAt = patch.lastTouchAt;
+      const rows = await db
+        .update(sequenceRuns)
+        .set(set)
+        // optimistic claim: lose the row if another tick already moved it
+        .where(
+          and(
+            eq(sequenceRuns.id, runId),
+            eq(sequenceRuns.status, "active"),
+            eq(sequenceRuns.nextActionAt, expectNextActionAt)
+          )
+        )
+        .returning({ id: sequenceRuns.id });
+      return rows.length > 0;
+    },
+
+    async archiveLead(leadId: string, campaignId: string): Promise<void> {
+      await db.update(leads).set({ status: "archived" }).where(eq(leads.id, leadId));
+      await db
+        .update(campaignLeads)
+        .set({ status: "completed" })
+        .where(and(eq(campaignLeads.campaignId, campaignId), eq(campaignLeads.leadId, leadId)));
+    },
+
+    async enrollPendingLeads(now: Date): Promise<number> {
+      // Enrol in_campaign leads that lack any sequence_runs row for their campaign.
+      // The unique (campaign_id, lead_id) constraint + ON CONFLICT DO NOTHING keeps this idempotent.
+      const selectQuery = db
+        .select({
+          accountId: campaignLeads.accountId,
+          campaignId: campaignLeads.campaignId,
+          leadId: campaignLeads.leadId,
+          nextActionAt: sql<Date>`${now}`.as("next_action_at"),
+        })
+        .from(campaignLeads)
+        .innerJoin(leads, eq(leads.id, campaignLeads.leadId))
+        .where(
+          and(
+            eq(leads.status, "in_campaign"),
+            sql`not exists (select 1 from ${sequenceRuns} sr where sr.campaign_id = ${campaignLeads.campaignId} and sr.lead_id = ${campaignLeads.leadId})`
+          )
+        );
+      const rows = await db
+        .insert(sequenceRuns)
+        .select(selectQuery)
+        .onConflictDoNothing({ target: [sequenceRuns.campaignId, sequenceRuns.leadId] })
+        .returning({ id: sequenceRuns.id });
       return rows.length;
     },
   };

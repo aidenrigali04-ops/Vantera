@@ -517,3 +517,35 @@ export type SequenceDecision =
   | { kind: "dispatch"; stage: SequenceStage; touchNo: number; patch: SequenceRunPatch }
   | { kind: "advance"; patch: SequenceRunPatch }
   | { kind: "exhaust"; patch: SequenceRunPatch };
+
+export interface SequenceTouchDispatch {
+  runId: string;
+  accountId: string;
+  campaignId: string;
+  leadId: string;
+  stage: SequenceStage;
+  touchNo: number;
+}
+
+export interface DueSequenceRun {
+  run: SequenceRun;
+  channels: LeadChannels;
+  config: SequenceConfig;
+  accountPaused: boolean;
+}
+
+export interface SequenceStore {
+  /** active runs with next_action_at <= now, joined to lead channels + campaign config */
+  getDueSequenceRuns(now: Date, limit: number): Promise<DueSequenceRun[]>;
+  isKillSwitchOn(): Promise<boolean>;
+  suppressionFlags(
+    accountId: string,
+    ch: LeadChannels
+  ): Promise<{ linkedin: boolean; email: boolean; phone: boolean }>;
+  /** optimistic claim: only updates if status still 'active' AND next_action_at unchanged */
+  applyRunPatch(runId: string, expectNextActionAt: Date, patch: SequenceRunPatch): Promise<boolean>;
+  /** terminal archive used by the exhaust decision */
+  archiveLead(leadId: string, campaignId: string): Promise<void>;
+  /** enrol qualified in_campaign leads lacking an active run; returns count created */
+  enrollPendingLeads(now: Date): Promise<number>;
+}
