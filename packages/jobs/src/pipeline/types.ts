@@ -452,3 +452,68 @@ export interface VoiceInboundSummary {
   handled: boolean;
   action: string;
 }
+
+// --- sequence orchestrator ---
+export type SequenceStage = "linkedin" | "email" | "imessage" | "call";
+export type SequenceCursor = SequenceStage | "done";
+export type SequenceStatus = "active" | "paused_reply" | "converted" | "exhausted" | "stopped";
+
+export interface StageConfig {
+  enabled: boolean;
+  touches: number;       // touches before the wait window (ignored for 'call')
+  touchGapDays: number;  // spacing between touches within the stage
+  waitDays: number;      // conversion window held after the last touch
+  maxAttempts?: number;  // 'call' only: dial attempts before exhaustion
+}
+
+export interface SequenceConfig {
+  order: SequenceStage[];
+  stages: Record<SequenceStage, StageConfig>;
+}
+
+export interface SequenceRun {
+  id: string;
+  accountId: string;
+  campaignId: string;
+  leadId: string;
+  status: SequenceStatus;
+  currentStage: SequenceCursor;
+  touchesDone: number;
+  callAttempts: number;
+  nextActionAt: Date;
+  enteredStageAt: Date;
+}
+
+export interface LeadChannels {
+  linkedinUrl: string | null;
+  email: string | null;
+  emailStatus: string; // 'valid' | 'unverified' | 'invalid' | 'risky'
+  phone: string | null;
+  phoneStatus: string; // 'valid' | 'unvalidated' | 'invalid'
+}
+
+export interface SequenceTickContext {
+  run: SequenceRun;
+  config: SequenceConfig;
+  channels: LeadChannels;
+  suppressed: { linkedin: boolean; email: boolean; phone: boolean };
+  accountPaused: boolean;
+  killSwitch: boolean;
+  now: Date;
+}
+
+export interface SequenceRunPatch {
+  status?: SequenceStatus;
+  currentStage?: SequenceCursor;
+  touchesDone?: number;
+  callAttempts?: number;
+  nextActionAt?: Date;
+  enteredStageAt?: Date;
+  lastTouchAt?: Date;
+}
+
+export type SequenceDecision =
+  | { kind: "hold" }
+  | { kind: "dispatch"; stage: SequenceStage; touchNo: number; patch: SequenceRunPatch }
+  | { kind: "advance"; patch: SequenceRunPatch }
+  | { kind: "exhaust"; patch: SequenceRunPatch };
