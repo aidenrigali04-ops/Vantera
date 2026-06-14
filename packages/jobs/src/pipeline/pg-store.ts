@@ -92,8 +92,7 @@ function toRow(send: NewScheduledSend) {
     accountId: send.accountId,
     campaignId: send.campaignId,
     leadId: send.leadId,
-    // 0017 permits 'imessage' at the DB level; cast to satisfy the Drizzle enum mirror.
-    channel: send.channel as "email" | "linkedin" | "call",
+    channel: send.channel,
     status: send.status,
     subject: send.subject,
     body: send.body,
