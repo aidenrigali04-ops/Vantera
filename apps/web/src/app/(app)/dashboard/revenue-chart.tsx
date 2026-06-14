@@ -11,9 +11,11 @@ import {
 } from "recharts";
 import type { RevenuePoint } from "@/lib/revenue";
 
-// Vantera brand sunset — same stops as the particle palette / beam.
-const BRAND = "#FF730D"; // closed (solid)
-const BRAND_ACCENT = "#FFCC1A"; // projected (dashed)
+// Strict monochrome to match the landing (DESIGN.md). Theme-aware via tokens so it
+// reads on both the near-black dark panel and the light surface. Restore the warm
+// sunset here (and in landing-theme.ts) to bring brand color back.
+const BRAND = "var(--foreground)"; // closed (solid)
+const BRAND_ACCENT = "var(--muted-foreground)"; // projected (dashed)
 
 const usdCompact = new Intl.NumberFormat("en-US", {
   style: "currency",

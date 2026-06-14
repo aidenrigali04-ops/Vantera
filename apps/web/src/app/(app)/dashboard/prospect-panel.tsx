@@ -27,9 +27,9 @@ export function ProspectPanel({ prospects }: { prospects: Prospect[] }) {
 
   return (
     <>
-      <div className="overflow-hidden rounded-xl border">
+      <div className="overflow-hidden rounded-xl border border-black/[0.06] dark:border-white/[0.08]">
         <table className="w-full text-sm">
-          <thead className="bg-muted/40 text-left text-xs uppercase text-muted-foreground">
+          <thead className="bg-foreground/[0.03] text-left font-mono text-[11px] uppercase tracking-wide text-muted-foreground dark:bg-white/[0.04]">
             <tr>
               <th className="px-4 py-2 font-medium">Prospect</th>
               <th className="hidden px-4 py-2 font-medium sm:table-cell">Company</th>
@@ -43,7 +43,7 @@ export function ProspectPanel({ prospects }: { prospects: Prospect[] }) {
               <tr
                 key={p.id}
                 onClick={() => setSelected(p)}
-                className="cursor-pointer border-t transition-colors hover:bg-muted/40"
+                className="cursor-pointer border-t border-black/[0.05] transition-colors hover:bg-foreground/[0.04] dark:border-white/[0.06]"
               >
                 <td className="px-4 py-3">
                   <p className="font-medium">{name(p)}</p>
