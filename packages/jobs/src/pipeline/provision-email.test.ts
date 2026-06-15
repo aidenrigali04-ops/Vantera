@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { runProvisionEmail } from "./provision-email";
+import { runProvisionEmail, MAX_DOMAINS_PER_ACCOUNT_PER_DAY } from "./provision-email";
 import type { ProvisionEmailStore } from "./types";
 
-function fakeStore() {
+function fakeStore(domainsToday = 0) {
   const domains = new Map<string, string>();
   const mailboxes: Array<{ emailAddress: string; domainId: string }> = [];
   const activated: string[] = [];
@@ -13,6 +13,7 @@ function fakeStore() {
     },
     async markDomainActive(id) { activated.push(id); },
     async insertMailbox(m) { mailboxes.push({ emailAddress: m.emailAddress, domainId: m.domainId }); },
+    async countDomainsCreatedSince() { return domainsToday; },
   };
   return { store, domains, mailboxes, activated };
 }
@@ -34,5 +35,16 @@ describe("runProvisionEmail", () => {
     expect(summary).toEqual({ status: "completed", domains: 2, mailboxes: 3 });
     expect(mailboxes).toHaveLength(3);
     expect(activated).toHaveLength(2);
+  });
+
+  it("throws (before buying anything) when the rolling-24h domain cap would be exceeded", async () => {
+    const { store, mailboxes } = fakeStore(MAX_DOMAINS_PER_ACCOUNT_PER_DAY); // already at the cap
+    let provisionCalled = false;
+    const emailInfra = { provision: async () => { provisionCalled = true; return []; } };
+    await expect(
+      runProvisionEmail({ store, emailInfra }, { accountId: "acct1", domainCount: 1, mailboxesPerDomain: 1 }),
+    ).rejects.toThrow(/daily domain cap/);
+    expect(provisionCalled).toBe(false); // never reached the registrar — no spend
+    expect(mailboxes).toHaveLength(0);
   });
 });

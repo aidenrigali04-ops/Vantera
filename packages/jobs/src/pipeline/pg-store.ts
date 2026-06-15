@@ -801,6 +801,14 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         .values({ accountId: m.accountId, domainId: m.domainId, emailAddress: m.emailAddress, providerRef: m.providerRef, status: "warming", warmupStartedAt: new Date() })
         .onConflictDoNothing({ target: [mailboxes.accountId, mailboxes.emailAddress] });
     },
+
+    async countDomainsCreatedSince(accountId: string, since: Date): Promise<number> {
+      const [row] = await db
+        .select({ c: count() })
+        .from(sendingDomains)
+        .where(and(eq(sendingDomains.accountId, accountId), gte(sendingDomains.createdAt, since)));
+      return row?.c ?? 0;
+    },
   };
 }
 

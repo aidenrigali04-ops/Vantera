@@ -459,6 +459,8 @@ export interface ProvisionEmailStore {
   markDomainActive(domainId: string, at: Date): Promise<void>;
   /** insert a mailbox row in 'warming' (skip if (accountId,email) already exists) */
   insertMailbox(m: { accountId: string; domainId: string; emailAddress: string; providerRef: string }): Promise<void>;
+  /** count of sending_domains rows created for this account since `since` (registrar spend-cap window) */
+  countDomainsCreatedSince(accountId: string, since: Date): Promise<number>;
 }
 
 export interface ProvisionEmailDeps {
