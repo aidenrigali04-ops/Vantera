@@ -18,6 +18,7 @@ const LINKEDIN_RAMP: { maxAgeDays: number; daily: number }[] = [
 ];
 
 export const EMAIL_STEADY_DAILY_PER_MAILBOX = 30; // warmup-safe; revisited with Phase 5 warmup gating
+export const IMESSAGE_STEADY_DAILY = 40; // conservative; non-configurable (rule 04 spirit)
 
 export type SafetyChannel = "linkedin" | "email";
 export type LinkedInSendKind = "invite" | "message";

@@ -563,7 +563,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         accountId: r.accountId,
         campaignId: r.campaignId,
         leadId: r.leadId,
-        channel: r.channel as "email" | "linkedin",
+        channel: r.channel as "email" | "linkedin" | "imessage",
         linkedinStage: r.linkedinStage as "invite" | "message" | null,
         status: r.status as "approved" | "scheduled",
         accountPaused: r.accountPaused,

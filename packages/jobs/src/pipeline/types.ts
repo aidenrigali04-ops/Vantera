@@ -259,7 +259,7 @@ export interface DispatchableSend {
   accountId: string;
   campaignId: string;
   leadId: string;
-  channel: "email" | "linkedin";
+  channel: "email" | "linkedin" | "imessage";
   linkedinStage: "invite" | "message" | null;
   status: "approved" | "scheduled";
   accountPaused: boolean;

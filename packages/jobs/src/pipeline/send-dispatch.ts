@@ -1,4 +1,4 @@
-import { dailyAllowance, paceWithJitter } from "./safety-limits";
+import { dailyAllowance, IMESSAGE_STEADY_DAILY, paceWithJitter } from "./safety-limits";
 import { TRIAL_SEND_CAP, type DispatchableSend, type SendDispatchDeps, type SendDispatchSummary } from "./types";
 
 export const INVITE_EXPIRY_DAYS = 30;
@@ -88,6 +88,20 @@ export async function runSendDispatch(deps: SendDispatchDeps): Promise<SendDispa
           await schedule(row);
           capacity -= 1;
         }
+      }
+    }
+
+    // imessage
+    const ims = active.filter((r) => r.channel === "imessage");
+    if (ims.length > 0) {
+      let budget = IMESSAGE_STEADY_DAILY - (await deps.store.countImessageSentToday(accountId, dayStart));
+      for (const row of ims) {
+        if (budget <= 0) {
+          skipped += 1;
+          continue;
+        }
+        await schedule(row);
+        budget -= 1;
       }
     }
 

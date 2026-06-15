@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { INVITE_EXPIRY_DAYS, STALE_TASK_MINUTES, runSendDispatch } from "./send-dispatch";
+import { IMESSAGE_STEADY_DAILY } from "./safety-limits";
 import { TRIAL_SEND_CAP } from "./types";
 import type { DispatchableSend, SendDispatchDeps, SendDispatchStore } from "./types";
 
@@ -31,6 +32,7 @@ class FakeDispatchStore implements SendDispatchStore {
   linkedInAgeDays: number | null = 30;
   inviteSentToday = 0;
   messageSentToday = 0;
+  imessageSentToday = 0;
   accountSendsCount = 0; // what countAccountSends reports (trial-cap input)
   scheduled: { sendId: string; scheduledFor: Date }[] = [];
   canceled: { sendId: string; error: string }[] = [];
@@ -54,6 +56,9 @@ class FakeDispatchStore implements SendDispatchStore {
   }
   async countLinkedInSentToday(_accountId: string, kind: "invite" | "message", _dayStart: Date) {
     return kind === "invite" ? this.inviteSentToday : this.messageSentToday;
+  }
+  async countImessageSentToday(_accountId: string, _dayStart: Date) {
+    return this.imessageSentToday;
   }
   async markScheduled(sendId: string, scheduledFor: Date) {
     this.scheduled.push({ sendId, scheduledFor });
@@ -404,5 +409,70 @@ describe("runSendDispatch — scheduling and timing", () => {
 
     expect(result.scheduled).toBe(1);
     expect(enqueued[0]?.sendId).toBe("stale1");
+  });
+});
+
+describe("runSendDispatch — imessage channel", () => {
+  it("imessage rows dispatched up to IMESSAGE_STEADY_DAILY budget (2 rows, budget 1 → 1 scheduled, 1 skipped)", async () => {
+    const store = new FakeDispatchStore();
+    store.imessageSentToday = IMESSAGE_STEADY_DAILY - 1; // budget = 1 remaining
+    store.sends = [
+      makeSend({ id: "im1", channel: "imessage", linkedinStage: null }),
+      makeSend({ id: "im2", channel: "imessage", linkedinStage: null }),
+    ];
+    const enqueued: { sendId: string; runAt: Date }[] = [];
+    const deps = makeDeps(store, enqueued);
+
+    const result = await runSendDispatch(deps);
+
+    expect(result.scheduled).toBe(1);
+    expect(result.skipped).toBe(1);
+    expect(enqueued).toHaveLength(1);
+    expect(enqueued[0]?.sendId).toBe("im1");
+  });
+
+  it("imessage rows paced with jitter (scheduled times increasing and > now)", async () => {
+    const store = new FakeDispatchStore();
+    store.imessageSentToday = 0; // full budget
+    store.sends = [
+      makeSend({ id: "im1", channel: "imessage", linkedinStage: null }),
+      makeSend({ id: "im2", channel: "imessage", linkedinStage: null }),
+      makeSend({ id: "im3", channel: "imessage", linkedinStage: null }),
+    ];
+    const enqueued: { sendId: string; runAt: Date }[] = [];
+    const now = new Date("2026-06-12T10:00:00Z");
+    const deps: SendDispatchDeps = {
+      store,
+      enqueue: async (sendId, runAt) => { enqueued.push({ sendId, runAt }); },
+      now: () => now,
+    };
+
+    await runSendDispatch(deps);
+
+    expect(enqueued).toHaveLength(3);
+    for (const e of enqueued) {
+      expect(e.runAt.getTime()).toBeGreaterThan(now.getTime());
+    }
+    const times = enqueued.map((e) => e.runAt.getTime());
+    for (let i = 1; i < times.length; i++) {
+      expect(times[i]!).toBeGreaterThan(times[i - 1]!);
+    }
+  });
+
+  it("imessage daily cap already exhausted → all rows skipped", async () => {
+    const store = new FakeDispatchStore();
+    store.imessageSentToday = IMESSAGE_STEADY_DAILY; // budget = 0
+    store.sends = [
+      makeSend({ id: "im1", channel: "imessage", linkedinStage: null }),
+      makeSend({ id: "im2", channel: "imessage", linkedinStage: null }),
+    ];
+    const enqueued: { sendId: string; runAt: Date }[] = [];
+    const deps = makeDeps(store, enqueued);
+
+    const result = await runSendDispatch(deps);
+
+    expect(result.scheduled).toBe(0);
+    expect(result.skipped).toBe(2);
+    expect(enqueued).toHaveLength(0);
   });
 });
