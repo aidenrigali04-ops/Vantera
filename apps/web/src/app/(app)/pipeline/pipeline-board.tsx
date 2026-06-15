@@ -10,6 +10,7 @@ import {
   MessageSquare,
   Phone,
   Rocket,
+  Settings2,
   type LucideIcon,
 } from "lucide-react";
 import { motion } from "framer-motion";
@@ -48,11 +49,19 @@ export function PipelineBoard({
 
   return (
     <div className="mx-auto max-w-5xl">
-      <div className="mb-8">
-        <h1 className="font-heading text-3xl font-semibold tracking-tight">Pipeline</h1>
-        <p className="mt-1.5 text-sm text-muted-foreground">
-          Every validated lead, moving through the sequence — and stopping the instant they convert.
-        </p>
+      <div className="mb-8 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="font-heading text-3xl font-semibold tracking-tight">Pipeline</h1>
+          <p className="mt-1.5 text-sm text-muted-foreground">
+            Every validated lead, moving through the sequence — and stopping the instant they convert.
+          </p>
+        </div>
+        <Link
+          href="/sequence"
+          className="mt-1 inline-flex shrink-0 items-center gap-1.5 rounded-full border border-white/[0.16] bg-white/[0.04] px-4 py-2 text-sm transition-colors hover:border-white/25"
+        >
+          <Settings2 className="size-4" aria-hidden /> Configure sequence
+        </Link>
       </div>
 
       {empty ? (
