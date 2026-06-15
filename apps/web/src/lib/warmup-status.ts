@@ -3,6 +3,10 @@
 // runtime deps. getWarmupStatus is the RLS-scoped async loader for server components
 // and server actions — accountId always comes from the validated session, never a
 // caller-supplied value (rule 02).
+//
+// The caller passes in the RLS-scoped Supabase server client (never the service-role
+// client); accountId is an extra filter for explicitness, but RLS already scopes the
+// rows to the session's account.
 
 /** Standard warmup window used ONLY for the user-facing "~N days" estimate. */
 const WARMUP_TARGET_DAYS = 21;
@@ -63,21 +67,22 @@ export function shapeWarmupStatus(i: ShapeInput): WarmupStatus {
 /**
  * RLS-scoped WarmupStatus loader for server components and server actions.
  * accountId MUST come from the validated session — never a client-supplied value.
+ * The caller passes in the RLS-scoped Supabase server client; using the service-role
+ * client here would bypass RLS and violate rule 02.
  */
-export async function getWarmupStatus(accountId: string): Promise<WarmupStatus> {
-  // Dynamic import keeps the Supabase service client out of the test bundle while
-  // still making getWarmupStatus importable in server-only contexts.
-  const { createServiceClient } = await import("@/lib/supabase/service");
-  const supabase = createServiceClient();
-
+export async function getWarmupStatus(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: { from: (table: string) => any },
+  accountId: string
+): Promise<WarmupStatus> {
   const { data: mbxRows } = await supabase
     .from("mailboxes")
     .select("status, warmup_started_at")
     .eq("account_id", accountId)
     .in("status", ["warming", "active"]);
 
-  const mailboxes = (mbxRows ?? []).map((m) => ({
-    status: m.status as string,
+  const mailboxes = ((mbxRows ?? []) as Array<{ status: string; warmup_started_at: string | null }>).map((m) => ({
+    status: m.status,
     warmupStartedAt: m.warmup_started_at ? new Date(m.warmup_started_at) : null,
   }));
 

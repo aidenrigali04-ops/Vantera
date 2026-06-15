@@ -31,6 +31,7 @@ import { ProspectPanel, type Prospect } from "./prospect-panel";
 import { LeadProfileLink, type LeadProfile } from "@/components/lead-profile";
 import type { RevenuePoint, RevenueSnapshot } from "@/lib/revenue";
 import type { PipelineViewModel, SequenceStage } from "../pipeline/queries";
+import type { WarmupStatus } from "@/lib/warmup-status";
 
 const STAGE_ICON: Record<SequenceStage, LucideIcon> = {
   linkedin: UserPlus,
@@ -96,6 +97,7 @@ export interface DashboardViewProps {
   interested: number;
   channels: { mbActive: number; mbWarming: number; mbTotal: number; liStatus: string | null };
   week: { sends: number; email: number; li: number; replies: number };
+  warmup: WarmupStatus;
 }
 
 export function DashboardView(props: DashboardViewProps) {
@@ -144,6 +146,7 @@ export function DashboardView(props: DashboardViewProps) {
           scoutDeployed={props.scoutDeployed}
           goal={goal}
           channels={props.channels}
+          warmup={props.warmup}
         />
       ) : (
         <WorkingDashboard {...props} />
@@ -860,10 +863,12 @@ function ActivationRamp({
   scoutDeployed,
   goal,
   channels,
+  warmup,
 }: {
   scoutDeployed: boolean;
   goal: string | null;
   channels: DashboardViewProps["channels"];
+  warmup: WarmupStatus;
 }) {
   const steps = [
     { label: "Create your account", done: true },
@@ -875,50 +880,79 @@ function ActivationRamp({
   const doneCount = steps.filter((s) => s.done).length;
 
   return (
-    <Reveal className="grid gap-6 md:grid-cols-[1.2fr_1fr]">
-      <RevealItem className={cn(PANEL_SURFACE, "p-5")} data-copilot="dashboard-checklist">
-        <Eyebrow>Get to your first reply</Eyebrow>
-        <h2 className="font-heading mt-3 text-xl font-semibold tracking-tight">
-          You&apos;re {doneCount}/{steps.length} of the way there
-        </h2>
-        <div className="mt-4 flex flex-col gap-4">
-          <AnimatedProgress value={(doneCount / steps.length) * 100} />
-          <ul className="flex flex-col gap-3">
-            {steps.map((s) => (
-              <li key={s.label} className="flex items-center gap-2 text-sm">
-                {s.done ? (
-                  <CheckCircle2 className="size-4 text-foreground" />
-                ) : (
-                  <Circle
-                    className={`size-4 ${s.current ? "text-foreground" : "text-muted-foreground/50"}`}
-                  />
-                )}
-                <span className={s.done ? "" : s.current ? "font-medium" : "text-muted-foreground"}>
-                  {s.label}
-                </span>
-              </li>
-            ))}
-          </ul>
-          <Button asChild className="mt-1 w-fit">
-            <Link href="/agents/new/scout">
-              Deploy your Prospect Agent <ArrowRight className="size-4" />
-            </Link>
-          </Button>
-          <p className="border-t border-border/60 pt-3 text-xs text-muted-foreground">
-            Its first run starts within ~15 minutes. Nothing ever sends until you approve it
-            {goal && (
-              <>
-                {" "}
-                — and every reply is measured against your{" "}
-                <span className="font-medium text-foreground">{goal}/mo</span> goal
-              </>
-            )}
-            .
-          </p>
-        </div>
-      </RevealItem>
+    <Reveal className="flex flex-col gap-6">
+      <div className="grid gap-6 md:grid-cols-[1.2fr_1fr]">
+        <RevealItem className={cn(PANEL_SURFACE, "p-5")} data-copilot="dashboard-checklist">
+          <Eyebrow>Get to your first reply</Eyebrow>
+          <h2 className="font-heading mt-3 text-xl font-semibold tracking-tight">
+            You&apos;re {doneCount}/{steps.length} of the way there
+          </h2>
+          <div className="mt-4 flex flex-col gap-4">
+            <AnimatedProgress value={(doneCount / steps.length) * 100} />
+            <ul className="flex flex-col gap-3">
+              {steps.map((s) => (
+                <li key={s.label} className="flex items-center gap-2 text-sm">
+                  {s.done ? (
+                    <CheckCircle2 className="size-4 text-foreground" />
+                  ) : (
+                    <Circle
+                      className={`size-4 ${s.current ? "text-foreground" : "text-muted-foreground/50"}`}
+                    />
+                  )}
+                  <span className={s.done ? "" : s.current ? "font-medium" : "text-muted-foreground"}>
+                    {s.label}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <Button asChild className="mt-1 w-fit">
+              <Link href="/agents/new/scout">
+                Deploy your Prospect Agent <ArrowRight className="size-4" />
+              </Link>
+            </Button>
+            <p className="border-t border-border/60 pt-3 text-xs text-muted-foreground">
+              Its first run starts within ~15 minutes. Nothing ever sends until you approve it
+              {goal && (
+                <>
+                  {" "}
+                  — and every reply is measured against your{" "}
+                  <span className="font-medium text-foreground">{goal}/mo</span> goal
+                </>
+              )}
+              .
+            </p>
+          </div>
+        </RevealItem>
 
-      <ChannelSetupPanel channels={channels} scoutDeployed={scoutDeployed} />
+        <ChannelSetupPanel channels={channels} scoutDeployed={scoutDeployed} />
+      </div>
+
+      {warmup.emailPhase === "warming" && warmup.mailboxesTotal > 0 && (
+        <RevealItem>
+          <div className="rounded-lg border border-border p-4 text-sm">
+            <p className="font-medium">
+              Inboxes warming — email outreach begins in{" "}
+              {warmup.estReadyInDays !== null
+                ? `~${warmup.estReadyInDays} days`
+                : "a couple of weeks"}
+              .
+            </p>
+            <p className="mt-1 text-muted-foreground">
+              {warmup.mailboxesTotal > 0 && (
+                <>{warmup.mailboxesReady}/{warmup.mailboxesTotal} inboxes ready.{" "}</>
+              )}
+              {warmup.linkedinConnected
+                ? "Your agent is reaching out on LinkedIn in the meantime and building your pipeline."
+                : null}
+            </p>
+            {!warmup.linkedinConnected && (
+              <a href="/settings/channels" className="mt-2 inline-block underline">
+                Connect LinkedIn to start reaching out today
+              </a>
+            )}
+          </div>
+        </RevealItem>
+      )}
     </Reveal>
   );
 }

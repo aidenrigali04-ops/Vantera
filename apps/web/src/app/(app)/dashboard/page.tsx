@@ -10,6 +10,7 @@ import { LEAD_PROFILE_FIELDS } from "@/components/lead-profile-fields";
 import type { LeadProfile } from "@/components/lead-profile";
 import { DashboardView, type AgentRow, type ReplyRow } from "./dashboard-view";
 import type { Prospect } from "./prospect-panel";
+import { getWarmupStatus } from "@/lib/warmup-status";
 
 const usd = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -224,6 +225,10 @@ export default async function DashboardPage() {
   // yet; the working dashboard once either condition is met.
   const isNew = liveAgents.length === 0 && total === 0;
 
+  // Warmup status — uses the same RLS-scoped client (rule 02: never the service client
+  // here; accountId reinforces the filter but RLS is the primary gate).
+  const warmup = await getWarmupStatus(supabase, account.id);
+
   // Pipeline pulse — leads moving through the outreach sequence (sequence_runs),
   // a compact mirror of the full /pipeline board.
   const { data: seqRuns } = await supabase
@@ -329,6 +334,7 @@ export default async function DashboardPage() {
       interested={interested}
       channels={{ mbActive, mbWarming, mbTotal, liStatus }}
       week={{ sends: sendsWeek, email: emailWeek, li: liWeek, replies: repliesWeek }}
+      warmup={warmup}
     />
   );
 }
