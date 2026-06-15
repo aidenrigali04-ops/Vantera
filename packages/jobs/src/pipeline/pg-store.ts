@@ -123,6 +123,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           id: agent.id,
           accountId: agent.accountId,
           status: agent.status,
+          cadence: agent.cadence as "daily" | "weekly" | null,
           config: (agent.config ?? {}) as Partial<ScoutConfig>,
         },
         icps: icpRows
@@ -248,6 +249,55 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
 
     async completeRun(agentId: string, lastRunAt: Date) {
       await db.update(agents).set({ lastRunAt }).where(eq(agents.id, agentId));
+    },
+
+    async getOutreachCapacity(accountId: string) {
+      const mbx = await db
+        .select({ status: mailboxes.status, dailyCap: mailboxes.dailySendLimit })
+        .from(mailboxes)
+        .where(and(eq(mailboxes.accountId, accountId), inArray(mailboxes.status, ["warming", "active"])));
+
+      const [li] = await db
+        .select({ connectedAt: linkedinAccounts.connectedAt })
+        .from(linkedinAccounts)
+        .where(and(eq(linkedinAccounts.accountId, accountId), eq(linkedinAccounts.status, "active")))
+        .orderBy(linkedinAccounts.connectedAt)
+        .limit(1);
+
+      const [copy] = await db
+        .select({ config: agents.config })
+        .from(agents)
+        .where(and(eq(agents.accountId, accountId), eq(agents.kind, "copy"), eq(agents.status, "live")))
+        .limit(1);
+      const channels = (copy?.config as { channels?: { email?: boolean; linkedin?: boolean } } | null)
+        ?.channels;
+
+      const now = Date.now();
+      return {
+        linkedinConnected: Boolean(li),
+        linkedinAccountAgeDays: li?.connectedAt
+          ? Math.floor((now - li.connectedAt.getTime()) / 86_400_000)
+          : null,
+        linkedinEnabled: channels?.linkedin ?? Boolean(li),
+        emailEnabled: channels?.email ?? mbx.length > 0,
+        mailboxes: mbx.map((m) => ({
+          phase: m.status === "active" ? ("ready" as const) : ("warming" as const),
+          dailyCap: m.dailyCap ?? 0,
+        })),
+      };
+    },
+
+    async countUncontactedLeads(accountId: string) {
+      const rows = await db
+        .selectDistinct({ leadId: scheduledSends.leadId })
+        .from(scheduledSends)
+        .where(
+          and(
+            eq(scheduledSends.accountId, accountId),
+            inArray(scheduledSends.status, ["drafting", "pending_review", "approved", "scheduled"]),
+          ),
+        );
+      return rows.length;
     },
 
     async getLiveCopyAgent(accountId: string) {
