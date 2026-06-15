@@ -45,6 +45,16 @@ function timeAgo(iso: string | null): string {
   return `${Math.round(hrs / 24)}d ago`;
 }
 
+// Forward-projected month label (e.g. "March 2026") for a goal ETA. Kept at module
+// scope — like timeUntil/timeAgo — so the impure Date.now() isn't called inline in
+// the component's render body (React purity lint).
+function etaMonthLabel(etaDays: number): string {
+  return new Date(Date.now() + etaDays * 86_400_000).toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+  });
+}
+
 type AgentRowRaw = {
   id: string;
   kind: string;
@@ -263,10 +273,7 @@ export default async function DashboardPage() {
   if (pace?.reached) {
     revenuePace = "You've cleared your monthly goal — time to raise it.";
   } else if (pace && pace.etaDays != null) {
-    const when = new Date(Date.now() + pace.etaDays * 86_400_000).toLocaleDateString("en-US", {
-      month: "long",
-      year: "numeric",
-    });
+    const when = etaMonthLabel(pace.etaDays);
     revenuePace = `On pace to hit your ${goal}/mo goal around ${when}.`;
   }
 
