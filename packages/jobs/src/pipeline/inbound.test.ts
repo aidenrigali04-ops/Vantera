@@ -19,6 +19,8 @@ function makeStore(overrides: Partial<InboundStore> = {}): InboundStore & {
   repliedLeads: { leadId: string; campaignId: string | null }[];
   canceledSends: string[];
   upsertedLinkedInStatuses: Parameters<InboundStore["upsertLinkedInAccountStatus"]>[0][];
+  pausedSequences: { leadId: string; stop: boolean }[];
+  notifications: Parameters<InboundStore["insertLeadNotification"]>[0][];
 } {
   let replyCounter = 0;
   const replies: Parameters<InboundStore["insertReply"]>[0][] = [];
@@ -30,6 +32,8 @@ function makeStore(overrides: Partial<InboundStore> = {}): InboundStore & {
   const repliedLeads: { leadId: string; campaignId: string | null }[] = [];
   const canceledSends: string[] = [];
   const upsertedLinkedInStatuses: Parameters<InboundStore["upsertLinkedInAccountStatus"]>[0][] = [];
+  const pausedSequences: { leadId: string; stop: boolean }[] = [];
+  const notifications: Parameters<InboundStore["insertLeadNotification"]>[0][] = [];
 
   const base: InboundStore = {
     findMailboxByProviderRef: async () => null,
@@ -52,6 +56,8 @@ function makeStore(overrides: Partial<InboundStore> = {}): InboundStore & {
     setLeadConnected: async (leadId, at) => { connectedLeads.push({ leadId, at }); },
     setLeadReplied: async (leadId, campaignId) => { repliedLeads.push({ leadId, campaignId }); },
     cancelPendingSends: async (leadId) => { canceledSends.push(leadId); return 0; },
+    pauseSequenceForReply: async (leadId, stop) => { pausedSequences.push({ leadId, stop }); },
+    insertLeadNotification: async (n) => { notifications.push(n); },
     ...overrides,
   };
 
@@ -65,6 +71,8 @@ function makeStore(overrides: Partial<InboundStore> = {}): InboundStore & {
     repliedLeads,
     canceledSends,
     upsertedLinkedInStatuses,
+    pausedSequences,
+    notifications,
   });
 }
 
@@ -461,6 +469,59 @@ describe("runInbound — account_status", () => {
 
     expect(result).toEqual({ handled: false, action: "account event without tenant" });
     expect(store.upsertedLinkedInStatuses).toHaveLength(0);
+  });
+});
+
+describe("runInbound — reply-pause gate", () => {
+  it("pauses the sequence and notifies on a genuine (interested) reply", async () => {
+    const store = makeStore({
+      findMailboxByProviderRef: async () => ({ id: "mbx_id_1", accountId: "acc1" }),
+      findLeadByEmail: async () => ({ id: "lead-id", campaignId: "camp1" }),
+    });
+
+    await runInbound(
+      { source: "email", payload: EMAIL_REPLY_FIXTURE },
+      deps(store, { classifyFn: classify("interested") })
+    );
+
+    expect(store.pausedSequences).toContainEqual({ leadId: "lead-id", stop: false });
+    expect(store.notifications).toHaveLength(1);
+    expect(store.notifications[0]).toEqual(
+      expect.objectContaining({ accountId: "acc1", leadId: "lead-id", kind: "reply" })
+    );
+  });
+
+  it("stops the sequence on a not_interested reply", async () => {
+    const store = makeStore({
+      findMailboxByProviderRef: async () => ({ id: "mbx_id_1", accountId: "acc1" }),
+      findLeadByEmail: async () => ({ id: "lead-id", campaignId: "camp1" }),
+    });
+
+    await runInbound(
+      { source: "email", payload: EMAIL_REPLY_FIXTURE },
+      deps(store, { classifyFn: classify("not_interested") })
+    );
+
+    expect(store.pausedSequences).toContainEqual({ leadId: "lead-id", stop: true });
+    expect(store.notifications).toHaveLength(1);
+    expect(store.notifications[0]).toEqual(
+      expect.objectContaining({ kind: "reply" })
+    );
+  });
+
+  it("does NOT pause or notify on an out_of_office reply", async () => {
+    const store = makeStore({
+      findMailboxByProviderRef: async () => ({ id: "mbx_id_1", accountId: "acc1" }),
+      findLeadByEmail: async () => ({ id: "lead-id", campaignId: "camp1" }),
+    });
+
+    await runInbound(
+      { source: "email", payload: EMAIL_REPLY_FIXTURE },
+      deps(store, { classifyFn: classify("out_of_office") })
+    );
+
+    expect(store.pausedSequences).toHaveLength(0);
+    expect(store.notifications).toHaveLength(0);
   });
 });
 

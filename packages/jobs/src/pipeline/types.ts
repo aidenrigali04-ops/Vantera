@@ -321,6 +321,9 @@ export interface InboundStore {
   setLeadReplied(leadId: string, campaignId: string | null): Promise<void>;
   /** pending_review/approved/scheduled drafts for the lead → canceled; returns count */
   cancelPendingSends(leadId: string): Promise<number>;
+  /** pause the lead's active sequence run on a genuine reply; stop=true → 'stopped', else 'paused_reply' */
+  pauseSequenceForReply(leadId: string, stop: boolean): Promise<void>;
+  insertLeadNotification(n: { accountId: string; leadId: string; kind: "reply"; body: string }): Promise<void>;
 }
 
 export interface InboundDeps {

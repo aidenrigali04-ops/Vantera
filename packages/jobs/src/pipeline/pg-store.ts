@@ -1004,13 +1004,29 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         .where(and(eq(sequenceRuns.campaignId, campaignId), eq(sequenceRuns.leadId, leadId)));
     },
 
-    async insertLeadNotification(n: { accountId: string; leadId: string; kind: "converted"; body: string }) {
+    // Widened union satisfies both ConversionStore ("converted") and InboundStore ("reply");
+    // lead_notifications.kind check (migration 0017) permits reply | converted | exhausted.
+    async insertLeadNotification(n: {
+      accountId: string;
+      leadId: string;
+      kind: "reply" | "converted" | "exhausted";
+      body: string;
+    }) {
       await db.insert(leadNotifications).values({
         accountId: n.accountId,
         leadId: n.leadId,
         kind: n.kind,
         body: n.body,
       });
+    },
+
+    // ── InboundStore (reply-pause gate) ──────────────────────────────────────
+
+    async pauseSequenceForReply(leadId: string, stop: boolean) {
+      await db
+        .update(sequenceRuns)
+        .set({ status: stop ? "stopped" : "paused_reply", updatedAt: new Date() })
+        .where(and(eq(sequenceRuns.leadId, leadId), eq(sequenceRuns.status, "active")));
     },
   };
 }
