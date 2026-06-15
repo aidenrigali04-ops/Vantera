@@ -189,3 +189,17 @@ describe("mailbox SMTP secret columns (0021)", () => {
     expect(sql).toMatch(/REVOKE ALL \(smtp_secret, smtp_host, smtp_port, smtp_username\) ON mailboxes FROM authenticated/);
   });
 });
+
+describe("linkedin_connected_at server-managed (0022)", () => {
+  it("0022 revokes client UPDATE on linkedin_connected_at", () => {
+    const sql = readFileSync(join(migrationsDir, "0022_linkedin_connected_at_grant.sql"), "utf8");
+    expect(sql).toMatch(/revoke update \(linkedin_connected_at\) on leads from authenticated/i);
+  });
+});
+
+describe("scheduled_sends stage/channel integrity (0023)", () => {
+  it("0023 constrains linkedin_stage to the linkedin channel", () => {
+    const sql = readFileSync(join(migrationsDir, "0023_scheduled_sends_stage_check.sql"), "utf8");
+    expect(sql).toMatch(/check \(linkedin_stage is null or channel = 'linkedin'\)/i);
+  });
+});

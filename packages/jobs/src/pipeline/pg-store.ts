@@ -637,6 +637,23 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
       return rows.length;
     },
 
+    async countLinkedInInvitesLast7Days(accountId: string, now: Date): Promise<number> {
+      const since = new Date(now.getTime() - 7 * 86_400_000);
+      const rows = await db
+        .select({ id: outreachSends.id })
+        .from(outreachSends)
+        .innerJoin(scheduledSends, eq(outreachSends.scheduledSendId, scheduledSends.id))
+        .where(
+          and(
+            eq(outreachSends.accountId, accountId),
+            eq(outreachSends.channel, "linkedin"),
+            eq(scheduledSends.linkedinStage, "invite"),
+            gte(outreachSends.sentAt, since)
+          )
+        );
+      return rows.length;
+    },
+
     async markScheduled(sendId: string, scheduledFor: Date) {
       await db.update(scheduledSends).set({ status: "scheduled", scheduledFor }).where(eq(scheduledSends.id, sendId));
     },
@@ -801,7 +818,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
     async upsertLinkedInAccountStatus(e: {
       vanteraAccountId: string;
       providerRef: string;
-      status: "active" | "disconnected";
+      status: "active" | "restricted" | "disconnected";
       profileUrl: string | null;
       displayName: string | null;
     }) {

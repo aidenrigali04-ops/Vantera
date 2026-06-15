@@ -279,6 +279,8 @@ export interface SendDispatchStore {
   /** null = no active LinkedIn identity */
   getLinkedInAccountAgeDays(accountId: string, now: Date): Promise<number | null>;
   countLinkedInSentToday(accountId: string, kind: "invite" | "message", dayStart: Date): Promise<number>;
+  /** Rolling 7-day (168h) count of LinkedIn invites actually sent for the account. */
+  countLinkedInInvitesLast7Days(accountId: string, now: Date): Promise<number>;
   markScheduled(sendId: string, scheduledFor: Date): Promise<void>;
   cancelSend(sendId: string, error: string): Promise<void>;
 }
@@ -356,11 +358,15 @@ export interface InboundPayload {
 export interface InboundStore {
   findMailboxByProviderRef(ref: string): Promise<{ id: string; accountId: string } | null>;
   findLinkedInAccountByProviderRef(ref: string): Promise<{ id: string; accountId: string } | null>;
-  /** insert-or-update by (accountId, providerRef); sets connected_at when turning active */
+  /**
+   * insert-or-update by (accountId, providerRef); sets connected_at when turning active.
+   * 'restricted' is written as-is to linkedin_accounts.status (enum already includes the value);
+   * connectedAt is preserved on restrict — only reset on reconnect (active).
+   */
   upsertLinkedInAccountStatus(e: {
     vanteraAccountId: string;
     providerRef: string;
-    status: "active" | "disconnected";
+    status: "active" | "restricted" | "disconnected";
     profileUrl: string | null;
     displayName: string | null;
   }): Promise<void>;

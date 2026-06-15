@@ -1,4 +1,4 @@
-import { dailyAllowance, paceWithJitter } from "./safety-limits";
+import { LINKEDIN_WEEKLY_INVITE_CEILING, dailyAllowance, paceWithJitter } from "./safety-limits";
 import { TRIAL_SEND_CAP, type DispatchableSend, type SendDispatchDeps, type SendDispatchSummary } from "./types";
 
 export const INVITE_EXPIRY_DAYS = 30;
@@ -99,9 +99,15 @@ export async function runSendDispatch(deps: SendDispatchDeps): Promise<SendDispa
         skipped += lis.length; // no connected identity
         continue;
       }
-      let inviteBudget =
-        dailyAllowance("linkedin", ageDays) -
-        (await deps.store.countLinkedInSentToday(accountId, "invite", dayStart));
+      const weeklyRemaining =
+        LINKEDIN_WEEKLY_INVITE_CEILING - (await deps.store.countLinkedInInvitesLast7Days(accountId, now));
+      let inviteBudget = Math.max(
+        0,
+        Math.min(
+          dailyAllowance("linkedin", ageDays) - (await deps.store.countLinkedInSentToday(accountId, "invite", dayStart)),
+          weeklyRemaining
+        )
+      );
       let messageBudget =
         dailyAllowance("linkedin", ageDays, { kind: "message" }) -
         (await deps.store.countLinkedInSentToday(accountId, "message", dayStart));
