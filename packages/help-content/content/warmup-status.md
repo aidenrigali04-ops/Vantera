@@ -8,9 +8,9 @@ routes: /dashboard
 
 ## New sending inboxes need time to build reputation
 
-When you sign up, dedicated sending inboxes are provisioned for your workspace. Before those inboxes can carry your outreach, they go through a **warm-up period of roughly 2–3 weeks**. During warm-up, the inboxes gradually build sender reputation by sending low volumes of traffic on the mail network. Sending real outreach from a brand-new, cold inbox would hurt your deliverability — emails would land in spam instead of the prospect's inbox.
+When you sign up, dedicated sending inboxes are provisioned for your workspace. Before those inboxes can carry your outreach, they go through a **warm-up period of roughly 2–4 weeks**. During warm-up, each inbox ramps up gradually — starting at around **15 emails per day** and increasing as reputation builds — so that receiving servers recognise it as a legitimate sender. Sending real outreach from a brand-new, cold inbox would hurt your deliverability — emails would land in spam instead of the prospect's inbox.
 
-This is standard practice for serious outreach, and the process runs automatically. You don't need to do anything to advance it.
+This is standard practice for serious outreach, and the entire process runs automatically. You don't need to do anything to advance it.
 
 ## LinkedIn outreach starts immediately
 
