@@ -358,7 +358,11 @@ export interface InboundPayload {
 export interface InboundStore {
   findMailboxByProviderRef(ref: string): Promise<{ id: string; accountId: string } | null>;
   findLinkedInAccountByProviderRef(ref: string): Promise<{ id: string; accountId: string } | null>;
-  /** insert-or-update by (accountId, providerRef); sets connected_at when turning active */
+  /**
+   * insert-or-update by (accountId, providerRef); sets connected_at when turning active.
+   * 'restricted' is written as-is to linkedin_accounts.status (enum already includes the value);
+   * connectedAt is preserved on restrict — only reset on reconnect (active).
+   */
   upsertLinkedInAccountStatus(e: {
     vanteraAccountId: string;
     providerRef: string;
