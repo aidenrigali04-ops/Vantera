@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { getGateData } from "@/lib/auth/context";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { LeadsTable, type LeadRow } from "./leads-table";
@@ -35,7 +36,8 @@ export default async function LeadsPage({
     .order("created_at", { ascending: false })
     .range(from, from + PAGE_SIZE - 1);
   if (tab.statuses) query = query.in("status", tab.statuses);
-  const { data: leads, count } = await query;
+  // Account carries the revenue numbers that turn each lead into "≈ $X to your goal".
+  const [{ data: leads, count }, { account }] = await Promise.all([query, getGateData()]);
 
   const totalPages = Math.max(1, Math.ceil((count ?? 0) / PAGE_SIZE));
 
@@ -83,7 +85,11 @@ export default async function LeadsPage({
         </Card>
       ) : (
         <>
-          <LeadsTable leads={leads as unknown as LeadRow[]} />
+          <LeadsTable
+            leads={leads as unknown as LeadRow[]}
+            avgDealValueCents={account?.avg_deal_value_cents ?? null}
+            goalCents={account?.revenue_goal_cents ?? null}
+          />
           {totalPages > 1 && (
             <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
               <span>
