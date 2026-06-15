@@ -36,6 +36,7 @@ export interface CallDispatchResult {
  */
 export async function runCallDispatch(deps: CallDispatchDeps): Promise<CallDispatchResult[]> {
   if (await deps.store.isKillSwitchOn()) return [{ sendId: "*", outcome: "halted" }];
+  if (!deps.fromNumber.trim()) return [{ sendId: "*", outcome: "no_caller_number" }];
   const now = deps.now?.() ?? new Date();
   const calls = await deps.store.getApprovedCalls();
   const results: CallDispatchResult[] = [];
@@ -57,21 +58,26 @@ async function dispatchOne(call: DispatchableCall, deps: CallDispatchDeps, now: 
     return "suppressed";
   }
 
-  const handle = await deps.voiceInfra.placeCall({
-    fromNumber: deps.fromNumber,
-    toNumber: call.phone,
-    voiceId: call.config.voice.voiceId,
-    language: call.config.voice.language,
-    personaName: call.config.voice.personaName,
-    brief: call.brief,
-    announceRecording: call.config.recordingConsentMode === "two_party",
-    callRef: call.id,
-  });
-  await deps.store.insertCall({
-    accountId: call.accountId, leadId: call.leadId, agentId: call.agentId,
-    campaignId: call.campaignId, scheduledSendId: call.id,
-    providerCallId: handle.providerCallId, attemptNo: call.attemptsSoFar + 1,
-  });
-  await deps.store.markSendSent(call.id);
-  return "dialing";
+  try {
+    const handle = await deps.voiceInfra.placeCall({
+      fromNumber: deps.fromNumber,
+      toNumber: call.phone,
+      voiceId: call.config.voice.voiceId,
+      language: call.config.voice.language,
+      personaName: call.config.voice.personaName,
+      brief: call.brief,
+      announceRecording: call.config.recordingConsentMode === "two_party",
+      callRef: call.id,
+    });
+    await deps.store.insertCall({
+      accountId: call.accountId, leadId: call.leadId, agentId: call.agentId,
+      campaignId: call.campaignId, scheduledSendId: call.id,
+      providerCallId: handle.providerCallId, attemptNo: call.attemptsSoFar + 1,
+    });
+    await deps.store.markSendSent(call.id);
+    return "dialing";
+  } catch {
+    await deps.store.revertToApproved(call.id);
+    return "failed";
+  }
 }

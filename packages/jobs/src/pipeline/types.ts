@@ -503,7 +503,7 @@ export interface CallDispatchDeps {
   now?: () => Date;
 }
 
-export type CallDispatchOutcome = "dialing" | "suppressed" | "outside_window" | "skipped" | "halted";
+export type CallDispatchOutcome = "dialing" | "suppressed" | "outside_window" | "skipped" | "halted" | "no_caller_number" | "failed";
 
 export interface VoiceInboundStore {
   recordWebhookEvent(source: "voice", providerEventId: string, payload: unknown): Promise<boolean>;

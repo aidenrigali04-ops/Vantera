@@ -15,6 +15,9 @@ export const callDispatch = schedules.task({
       voiceInfra: createVoiceInfraFromEnv(),
       fromNumber: process.env.VOICE_FROM_NUMBER ?? "",
     });
+    if (results.length === 1 && results[0]?.outcome === "no_caller_number") {
+      logger.error("call-dispatch: VOICE_FROM_NUMBER is not set — no calls placed", {});
+    }
     logger.info("call dispatch tick", { total: results.length });
     return results;
   },

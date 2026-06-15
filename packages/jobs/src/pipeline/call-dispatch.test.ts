@@ -78,4 +78,26 @@ describe("runCallDispatch", () => {
     const res = await runCallDispatch(d);
     expect(res).toEqual([{ sendId: "*", outcome: "halted" }]);
   });
+
+  it("returns no_caller_number and claims nothing when fromNumber is blank", async () => {
+    const infra = new InMemoryVoiceInfra();
+    const d = deps(infra);
+    d.fromNumber = "   ";
+    const claim = vi.spyOn(d.store, "claimSending");
+    const res = await runCallDispatch(d);
+    expect(res).toEqual([{ sendId: "*", outcome: "no_caller_number" }]);
+    expect(claim).not.toHaveBeenCalled();
+  });
+
+  it("reverts the send and returns failed when placeCall throws", async () => {
+    const infra = new InMemoryVoiceInfra();
+    const d = deps(infra);
+    // ensure we're inside the calling window (Mon 10am EDT = 14:00 UTC — already the default now)
+    d.now = () => new Date("2026-06-15T14:00:00Z");
+    const revert = vi.spyOn(d.store, "revertToApproved");
+    vi.spyOn(infra, "placeCall").mockRejectedValue(new Error("provider 500"));
+    const res = await runCallDispatch(d);
+    expect(res[0]!.outcome).toBe("failed");
+    expect(revert).toHaveBeenCalledWith("s1");
+  });
 });
