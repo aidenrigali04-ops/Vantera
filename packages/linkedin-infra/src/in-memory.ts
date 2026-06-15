@@ -52,7 +52,7 @@ export class InMemoryLinkedInInfra implements LinkedInInfra {
         if (typeof p.profile_url !== "string") return null;
         return { type: "relationship_accepted", ...base, profileUrl: p.profile_url };
       case "account_status":
-        if ((p.status !== "active" && p.status !== "disconnected")) return null;
+        if ((p.status !== "active" && p.status !== "restricted" && p.status !== "disconnected")) return null;
         return {
           type: "account_status", ...base, status: p.status,
           profileUrl: typeof p.profile_url === "string" ? p.profile_url : null,

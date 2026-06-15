@@ -30,7 +30,7 @@ export interface SendOutcome {
 export type LinkedInEvent =
   | { type: "reply"; providerEventId: string; connectedAccountRef: string; fromProfileUrl: string; body: string; receivedAt: string }
   | { type: "relationship_accepted"; providerEventId: string; connectedAccountRef: string; profileUrl: string }
-  | { type: "account_status"; providerEventId: string; connectedAccountRef: string; status: "active" | "disconnected"; profileUrl: string | null; displayName: string | null; vanteraAccountId: string | null };
+  | { type: "account_status"; providerEventId: string; connectedAccountRef: string; status: "active" | "restricted" | "disconnected"; profileUrl: string | null; displayName: string | null; vanteraAccountId: string | null };
 
 /**
  * Provider-agnostic LinkedIn outreach interface (rule 04). Unipile is an

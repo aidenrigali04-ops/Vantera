@@ -277,6 +277,20 @@ describe("UnipileLinkedInInfra", () => {
       expect(adapter.parseEventWebhook("junk")).toBeNull();
       expect(adapter.parseEventWebhook({})).toBeNull();
     });
+
+    it("maps checkpoint/credential states to restricted", () => {
+      const infra = new UnipileLinkedInInfra({ apiKey: "k", dsn: "d", webhookSecret: "s" });
+      for (const status of ["CREDENTIALS", "CHECKPOINT", "PERMISSIONS", "ERROR", "STOPPED", "SYNC_ERROR"]) {
+        const ev = infra.parseEventWebhook({ event: "account_status", event_id: "e1", account_id: "a1", status, name: "acc_1" });
+        expect(ev).toMatchObject({ type: "account_status", status: "restricted" });
+      }
+    });
+
+    it("still maps OK->active and DISCONNECTED->disconnected", () => {
+      const infra = new UnipileLinkedInInfra({ apiKey: "k", dsn: "d", webhookSecret: "s" });
+      expect(infra.parseEventWebhook({ event: "account_status", event_id: "e", account_id: "a", status: "OK", name: "x" })).toMatchObject({ status: "active" });
+      expect(infra.parseEventWebhook({ event: "account_status", event_id: "e", account_id: "a", status: "DISCONNECTED", name: "x" })).toMatchObject({ status: "disconnected" });
+    });
   });
 
   describe("error handling — Fix 2", () => {

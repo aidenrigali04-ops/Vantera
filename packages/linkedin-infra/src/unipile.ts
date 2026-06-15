@@ -152,11 +152,13 @@ export class UnipileLinkedInInfra implements LinkedInInfra {
       }
       case "account_status": {
         const rawStatus = p.status;
-        let status: "active" | "disconnected";
+        let status: "active" | "restricted" | "disconnected";
         if (rawStatus === "OK" || rawStatus === "CREATION_SUCCESS") {
           status = "active";
         } else if (rawStatus === "DISCONNECTED") {
           status = "disconnected";
+        } else if (rawStatus === "CREDENTIALS" || rawStatus === "CHECKPOINT" || rawStatus === "PERMISSIONS" || rawStatus === "ERROR" || rawStatus === "STOPPED" || rawStatus === "SYNC_ERROR") {
+          status = "restricted";
         } else {
           return null;
         }
