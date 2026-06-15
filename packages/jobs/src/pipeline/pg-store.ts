@@ -31,42 +31,44 @@ import type { EnrichedProspect, IcpCriteria, ProspectCandidate } from "@vantera/
 import { toStoredInsights, type LeadInsights, type WebsiteScan } from "@vantera/agent-brains";
 import type { ClosedDeal, CrmProvider } from "@vantera/crm-infra";
 import type { CrmPushStore } from "./crm-push";
-import type {
-  CallBriefStore,
-  CallDispatchStore,
-  CallerConfig,
-  CallerContext,
-  CallableLead,
-  ConversionStore,
-  CopyConfig,
-  CopyContext,
-  CopyDraftStore,
-  DispatchableCall,
-  DispatchableSend,
-  DraftableLead,
-  DueSequenceRun,
-  FreshLead,
-  InboundStore,
-  LeadChannels,
-  NewScheduledSend,
-  OutreachSendStore,
-  PurgeCandidate,
-  RetentionStore,
-  ScoutConfig,
-  ScoutContext,
-  ScoutStore,
-  SendContext,
-  SendDispatchStore,
-  SequenceRunPatch,
-  SequenceStore,
-  SequenceTouchStore,
-  VoiceInboundStore,
+import {
+  SCOUT_DEFAULTS,
+  type CallBriefStore,
+  type CallDispatchStore,
+  type CallerConfig,
+  type CallerContext,
+  type CallableLead,
+  type ConversionStore,
+  type CopyConfig,
+  type CopyContext,
+  type CopyDraftStore,
+  type DispatchableCall,
+  type DispatchableSend,
+  type DraftableLead,
+  type DueSequenceRun,
+  type FreshLead,
+  type InboundStore,
+  type LeadChannels,
+  type NewScheduledSend,
+  type OutreachSendStore,
+  type PurgeCandidate,
+  type RetentionStore,
+  type ScoutConfig,
+  type ScoutContext,
+  type ScoutStore,
+  type SendContext,
+  type SendDispatchStore,
+  type SequenceRunPatch,
+  type SequenceStore,
+  type SequenceTouchStore,
+  type VoiceInboundStore,
 } from "./types";
 import { EMAIL_STEADY_DAILY_PER_MAILBOX } from "./safety-limits";
 import { parseSenderAddress } from "./email-footer";
 import { normalizeLinkedInUrl } from "./copy-draft";
 import { normalizePhone } from "./call-brief";
 import { resolveSequenceConfig } from "./sequence-config";
+import type { RefreshLeadLoad, RefreshLeadStore } from "./refresh-lead";
 
 /** Suppression lookup that accepts any kind (email/linkedin/phone) — used by the sequence store. */
 async function isSuppressedAnyKind(
@@ -106,7 +108,7 @@ function toRow(send: NewScheduledSend) {
 }
 
 /** Drizzle-backed store used by the Trigger.dev tasks (service-role DATABASE_URL). */
-export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerStore & RetentionStore & SendDispatchStore & OutreachSendStore & InboundStore & SequenceStore & SequenceTouchStore & ConversionStore {
+export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerStore & RetentionStore & SendDispatchStore & OutreachSendStore & InboundStore & SequenceStore & SequenceTouchStore & ConversionStore & RefreshLeadStore {
   return {
     async getScoutContext(agentId: string): Promise<ScoutContext | null> {
       const [agent] = await db.select().from(agents).where(eq(agents.id, agentId));
@@ -368,6 +370,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         linkedinUrl: r.linkedinUrl,
         phone: r.phone,
         aiInsights: r.aiInsights as DraftableLead["aiInsights"],
+        scoredAt: r.scoredAt,
       }));
     },
 
@@ -389,6 +392,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         linkedinUrl: r.linkedinUrl,
         phone: r.phone,
         aiInsights: r.aiInsights as DraftableLead["aiInsights"],
+        scoredAt: r.scoredAt,
       };
     },
 
@@ -1077,6 +1081,55 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         .update(sequenceRuns)
         .set({ status: stop ? "stopped" : "paused_reply", updatedAt: new Date() })
         .where(and(eq(sequenceRuns.leadId, leadId), eq(sequenceRuns.status, "active")));
+    },
+
+    // ── RefreshLeadStore ──────────────────────────────────────────────────────
+
+    async loadLeadForRefresh(accountId: string, leadId: string): Promise<RefreshLeadLoad | null> {
+      // Join lead → its ICP → the account, so we can build icpDescription + candidate fields.
+      const [row] = await db
+        .select({
+          externalRef: leads.externalRef,
+          companyName: leads.companyName,
+          companySize: leads.companySize,
+          industry: leads.industry,
+          location: leads.location,
+          title: leads.title,
+          icpName: icps.name,
+          icpCriteria: icps.criteria,
+          accountIndustry: accounts.onboardingIndustry,
+        })
+        .from(leads)
+        .leftJoin(icps, eq(leads.icpId, icps.id))
+        .innerJoin(accounts, eq(leads.accountId, accounts.id))
+        .where(and(eq(leads.id, leadId), eq(leads.accountId, accountId)))
+        .limit(1);
+      if (!row) return null;
+
+      // Resolve min_score from the live scout agent's config; fall back to SCOUT_DEFAULTS.minScore.
+      const [scoutAgent] = await db
+        .select({ config: agents.config })
+        .from(agents)
+        .where(and(eq(agents.accountId, accountId), eq(agents.kind, "scout"), eq(agents.status, "live")))
+        .limit(1);
+      const scoutConfig = (scoutAgent?.config ?? {}) as { min_score?: number; minScore?: number };
+      const minScore = scoutConfig.min_score ?? scoutConfig.minScore ?? SCOUT_DEFAULTS.minScore;
+
+      return {
+        externalRef: row.externalRef ?? "",
+        minScore,
+        accountIndustry: row.accountIndustry,
+        icpDescription: row.icpName
+          ? `${row.icpName}: ${JSON.stringify(row.icpCriteria ?? {})}`
+          : "",
+        candidate: {
+          companyName: row.companyName,
+          companySize: row.companySize,
+          industry: row.industry,
+          location: row.location,
+          title: row.title,
+        },
+      };
     },
   };
 }
