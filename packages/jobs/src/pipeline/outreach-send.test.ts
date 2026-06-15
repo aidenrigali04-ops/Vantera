@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { CONNECTION_NOTE_MAX_CHARS } from "@vantera/agent-brains";
 import { InMemoryEmailInfra } from "@vantera/email-infra";
 import { InMemoryLinkedInInfra } from "@vantera/linkedin-infra";
-import { runOutreachSend, sanitizeSendError } from "./outreach-send";
+import { LINKEDIN_NOTE_MAX, runOutreachSend, sanitizeSendError } from "./outreach-send";
 import type { OutreachSendDeps, OutreachSendStore, SendContext } from "./types";
 import type { SenderAddress } from "./email-footer";
 
@@ -29,6 +30,7 @@ function makeCtx(overrides: Partial<SendContext> = {}): SendContext {
     campaignStatus: "active",
     accountPaused: false,
     senderAddress: TEST_ADDRESS,
+    senderName: "Jordan Lee",
     lead: { email: "prospect@example.com", linkedinUrl: null },
     ...overrides,
   };
@@ -203,6 +205,31 @@ describe("runOutreachSend — mailbox status gating", () => {
     expect(outcome).toBe("parked");
     expect(deps.emailInfra.sentEmails).toHaveLength(0);
     expect(store.reverted).toContain("send1");
+  });
+});
+
+describe("send caps — single source of truth", () => {
+  it("the LinkedIn note send cap equals the copy-brain generation cap so an approved note is never truncated mid-word", () => {
+    expect(LINKEDIN_NOTE_MAX).toBe(CONNECTION_NOTE_MAX_CHARS);
+  });
+});
+
+describe("runOutreachSend — email personalization", () => {
+  it("substitutes the {{sender_name}} sign-off placeholder before sending — the prospect never sees the raw token", async () => {
+    const store = new FakeOutreachStore();
+    store.ctx = makeCtx({
+      body: "Saw your launch. Worth a look?\n\nThanks,\n{{sender_name}}",
+      senderName: "Jordan Lee",
+    });
+    store.mailbox = { id: "mbx1", providerRef: "mbx_1", status: "active" };
+    const deps = makeDeps(store);
+
+    const outcome = await runOutreachSend({ sendId: "send1" }, deps);
+
+    expect(outcome).toBe("sent");
+    const sent = deps.emailInfra.sentEmails[0]!;
+    expect(sent.body).toContain("Jordan Lee");
+    expect(sent.body).not.toContain("{{sender_name}}");
   });
 });
 

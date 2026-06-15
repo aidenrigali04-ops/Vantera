@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { appendComplianceFooter, formatSenderAddress, parseSenderAddress } from "./email-footer";
+import { applySenderName, appendComplianceFooter, formatSenderAddress, parseSenderAddress } from "./email-footer";
 
 const address = { line1: "100 Main St", line2: "Suite 4", city: "Austin", region: "TX", postal: "78701", country: "USA" };
 
@@ -24,5 +24,19 @@ describe("compliance footer (rule 11: unsubscribe + physical address)", () => {
     expect(parseSenderAddress({ line1: "x", city: "y", postal: "1", country: "US" })).not.toBeNull();
     expect(parseSenderAddress({ city: "y" })).toBeNull();
     expect(parseSenderAddress(null)).toBeNull();
+  });
+});
+
+describe("applySenderName (the {{sender_name}} sign-off placeholder)", () => {
+  it("substitutes the placeholder with the real sender name", () => {
+    expect(applySenderName("Worth a look?\n\nThanks,\n{{sender_name}}", "Jordan Lee")).toBe(
+      "Worth a look?\n\nThanks,\nJordan Lee"
+    );
+  });
+  it("replaces every occurrence, not just the first", () => {
+    expect(applySenderName("{{sender_name}} here. — {{sender_name}}", "Sam")).toBe("Sam here. — Sam");
+  });
+  it("leaves a body without the placeholder unchanged", () => {
+    expect(applySenderName("No placeholder here.", "Jordan Lee")).toBe("No placeholder here.");
   });
 });

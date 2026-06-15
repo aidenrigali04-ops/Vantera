@@ -39,3 +39,12 @@ const UNSUBSCRIBE_LABEL = "Don't want these emails? Unsubscribe:";
 export function appendComplianceFooter(body: string, unsubscribeUrl: string, address: SenderAddress): string {
   return `${body}\n\n--\n${formatSenderAddress(address)}\n${UNSUBSCRIBE_LABEL} ${unsubscribeUrl}`;
 }
+
+/**
+ * Resolve the {{sender_name}} sign-off placeholder the email copy brain emits
+ * (it can't know the per-account sender). Substituted at the send boundary so
+ * the prospect never receives the raw token.
+ */
+export function applySenderName(body: string, senderName: string): string {
+  return body.replace(/\{\{sender_name\}\}/g, senderName);
+}

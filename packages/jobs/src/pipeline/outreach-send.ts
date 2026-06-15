@@ -1,8 +1,15 @@
-import { appendComplianceFooter } from "./email-footer";
+import { CONNECTION_NOTE_MAX_CHARS } from "@vantera/agent-brains";
+import { appendComplianceFooter, applySenderName } from "./email-footer";
 import { normalizeLinkedInUrl } from "./copy-draft";
 import type { OutreachSendDeps, OutreachSendOutcome } from "./types";
 
-export const LINKEDIN_NOTE_MAX = 200;
+/**
+ * Send-time safety cap for a LinkedIn connection note. Derived from the copy
+ * brain's generation cap so the two never drift: a reviewed note is already
+ * ≤ this length, making the slice below a pure belt-and-braces guard against
+ * malformed data — it can no longer chop approved copy mid-word.
+ */
+export const LINKEDIN_NOTE_MAX = CONNECTION_NOTE_MAX_CHARS;
 
 /**
  * scheduled_sends.error is one select away from a user surface, and adapter
@@ -73,7 +80,8 @@ export async function runOutreachSend(
       }
       const token = await deps.store.createUnsubscribeToken(ctx.accountId, ctx.leadId, target);
       const unsubscribeUrl = `${deps.appUrl}/api/unsubscribe/${token}`;
-      const body = appendComplianceFooter(ctx.body ?? "", unsubscribeUrl, ctx.senderAddress);
+      const personalized = applySenderName(ctx.body ?? "", ctx.senderName);
+      const body = appendComplianceFooter(personalized, unsubscribeUrl, ctx.senderAddress);
       const result = await deps.emailInfra.send({
         mailboxId: mailbox.providerRef,
         to: target,

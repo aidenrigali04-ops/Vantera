@@ -189,6 +189,8 @@ export interface SendContext {
   campaignStatus: string;
   accountPaused: boolean;
   senderAddress: SenderAddress | null;
+  /** resolved human sender name for the {{sender_name}} email sign-off placeholder */
+  senderName: string;
   lead: { email: string | null; linkedinUrl: string | null };
 }
 

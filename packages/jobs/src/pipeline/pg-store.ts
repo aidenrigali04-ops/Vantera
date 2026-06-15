@@ -633,6 +633,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           campaignStatus: campaigns.status,
           accountPaused: accounts.outreachPaused,
           senderAddress: accounts.senderAddress,
+          senderName: accounts.senderName,
           leadEmail: leads.email,
           leadLinkedinUrl: leads.linkedinUrl,
         })
@@ -655,6 +656,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         campaignStatus: r.campaignStatus,
         accountPaused: r.accountPaused,
         senderAddress: parseSenderAddress(r.senderAddress),
+        senderName: r.senderName ?? "", // null → empty so the send path strips {{sender_name}} cleanly
         lead: { email: r.leadEmail, linkedinUrl: r.leadLinkedinUrl },
       };
     },

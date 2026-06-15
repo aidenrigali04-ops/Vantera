@@ -38,6 +38,10 @@ function sequence(...responses: ReturnType<typeof textResponse>[]) {
 }
 
 describe("validateLinkedInDraft", () => {
+  it("generates connection notes to the 200-char free-tier cap (locked) so a reviewed note is sent verbatim, never truncated", () => {
+    expect(CONNECTION_NOTE_MAX_CHARS).toBe(200);
+  });
+
   it("accepts a clean draft", () => {
     expect(validateLinkedInDraft(CLEAN)).toEqual([]);
   });

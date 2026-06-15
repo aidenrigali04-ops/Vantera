@@ -4,8 +4,13 @@ import { getModel } from "@vantera/ai";
 import { validateHumanity, type Violation } from "./humanizer";
 import { generateHumanized, leadBlock, type DraftInput } from "./shared";
 
-/** LinkedIn caps a connection note at 300 chars; we stop at 280 for headroom. */
-export const CONNECTION_NOTE_MAX_CHARS = 280;
+/**
+ * LinkedIn's hard cap on a connection-request note is 300 chars, but free-tier
+ * accounts are limited to 200. We generate AND validate to 200 so a reviewed,
+ * approved note is sent verbatim — never truncated mid-word at the send boundary
+ * (the send path enforces the same cap; see LINKEDIN_NOTE_MAX in jobs).
+ */
+export const CONNECTION_NOTE_MAX_CHARS = 200;
 export const FOLLOWUP_MAX_CHARS = 500;
 
 export const linkedinDraftSchema = z.object({
