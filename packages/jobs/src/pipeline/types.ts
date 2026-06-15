@@ -31,6 +31,14 @@ export interface ScoutConfig {
 
 export const SCOUT_DEFAULTS: ScoutConfig = { prospectsPerRun: 25, minScore: 70 };
 
+/**
+ * Trial COGS cap: a trialing account sources at most this many leads total, so
+ * enrichment spend (rule 05, on rules-gate survivors) is bounded until it converts.
+ * Pairs with the free-trial policy in @vantera/billing (TRIAL_TIER/TRIAL_DAYS); this
+ * is the prospecting-budget half and lives with the scout pipeline that enforces it.
+ */
+export const TRIAL_LEAD_CAP = 100;
+
 export interface ScoutContext {
   agent: { id: string; accountId: string; status: string; config: Partial<ScoutConfig> };
   icps: { id: string; name: string; criteria: IcpCriteria }[];
@@ -39,6 +47,8 @@ export interface ScoutContext {
     websiteUrl: string | null;
     websiteScan: (WebsiteScan & { url?: string }) | null;
     websiteScannedAt: Date | null;
+    /** Drives the trial lead cap; 'trialing' accounts are bounded by TRIAL_LEAD_CAP. */
+    subscriptionStatus: string;
   };
 }
 
@@ -50,6 +60,8 @@ export interface FreshLead {
 
 export interface ScoutStore {
   getScoutContext(agentId: string): Promise<ScoutContext | null>;
+  /** Total leads already sourced for the account — used to enforce TRIAL_LEAD_CAP. */
+  countAccountLeads(accountId: string): Promise<number>;
   saveWebsiteScan(accountId: string, url: string, scan: WebsiteScan): Promise<void>;
   /** insert unseen candidates, return new-or-unscored leads only (dedupe by external_ref per account) */
   upsertLeads(accountId: string, icpId: string, candidates: ProspectCandidate[]): Promise<FreshLead[]>;

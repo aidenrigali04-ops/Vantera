@@ -134,8 +134,17 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           websiteUrl: account.websiteUrl,
           websiteScan: account.websiteScan as ScoutContext["account"]["websiteScan"],
           websiteScannedAt: account.websiteScannedAt,
+          subscriptionStatus: account.subscriptionStatus,
         },
       };
+    },
+
+    async countAccountLeads(accountId: string): Promise<number> {
+      const [row] = await db
+        .select({ n: count() })
+        .from(leads)
+        .where(eq(leads.accountId, accountId));
+      return row?.n ?? 0;
     },
 
     async saveWebsiteScan(accountId: string, url: string, scan: WebsiteScan): Promise<void> {

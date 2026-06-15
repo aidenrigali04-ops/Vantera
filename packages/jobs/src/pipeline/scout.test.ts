@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { InMemoryProspectData, makeCandidate } from "@vantera/prospect-data";
 import type { LeadInsights } from "@vantera/agent-brains";
 import { runScout } from "./scout";
+import { TRIAL_LEAD_CAP } from "./types";
 import type { CallBriefDraftPayload, CopyDraftPayload, FreshLead, ScoutContext, ScoutDeps, ScoutStore } from "./types";
 
 function insight(leadId: string, score: number): LeadInsights {
@@ -29,6 +30,7 @@ class FakeScoutStore implements ScoutStore {
   completedAt: Date | null = null;
   copyAgent: { id: string } | null = null;
   callerAgent: { id: string } | null = null;
+  leadCount = 0; // what countAccountLeads reports (trial-cap input)
   private leadSeq = 0;
   private seenRefs = new Set<string>();
 
@@ -37,6 +39,9 @@ class FakeScoutStore implements ScoutStore {
   }
   async getScoutContext() {
     return this.context;
+  }
+  async countAccountLeads() {
+    return this.leadCount;
   }
   async saveWebsiteScan(accountId: string, url: string) {
     this.scans.push({ accountId, url });
@@ -75,7 +80,14 @@ function makeContext(overrides: Partial<ScoutContext["account"]> = {}): ScoutCon
   return {
     agent: { id: "scout1", accountId: "acc1", status: "live", config: { prospectsPerRun: 10, minScore: 70 } },
     icps: [{ id: "icp1", name: "SaaS CTOs", criteria: { industries: ["saas"] } }],
-    account: { industry: "devtools", websiteUrl: null, websiteScan: null, websiteScannedAt: null, ...overrides },
+    account: {
+      industry: "devtools",
+      websiteUrl: null,
+      websiteScan: null,
+      websiteScannedAt: null,
+      subscriptionStatus: "active",
+      ...overrides,
+    },
   };
 }
 
@@ -250,5 +262,42 @@ describe("runScout", () => {
     await runScout("scout1", deps);
 
     expect(callerChained).toHaveLength(0);
+  });
+
+  it("trial cap: a trialing account at the lead ceiling skips before any enrichment", async () => {
+    const pool = [makeCandidate({ externalRef: "good", industry: "saas" })];
+    const store = new FakeScoutStore(makeContext({ subscriptionStatus: "trialing" }));
+    store.leadCount = TRIAL_LEAD_CAP; // already at the ceiling
+    const { deps, prospectData } = makeDeps(store, pool, { good: 90 });
+
+    const summary = await runScout("scout1", deps);
+
+    expect(summary.status).toBe("skipped");
+    expect(store.enriched).toEqual([]);
+    expect(prospectData.enrichCalls).toEqual([]);
+  });
+
+  it("trial cap: a trialing account under the ceiling still prospects", async () => {
+    const pool = [makeCandidate({ externalRef: "good", industry: "saas" })];
+    const store = new FakeScoutStore(makeContext({ subscriptionStatus: "trialing" }));
+    store.leadCount = 0;
+    const { deps } = makeDeps(store, pool, { good: 90 });
+
+    const summary = await runScout("scout1", deps);
+
+    expect(summary.status).toBe("completed");
+    expect(store.enriched).toEqual(["good"]);
+  });
+
+  it("trial cap does not apply to a paid account past the ceiling", async () => {
+    const pool = [makeCandidate({ externalRef: "good", industry: "saas" })];
+    const store = new FakeScoutStore(makeContext({ subscriptionStatus: "active" }));
+    store.leadCount = TRIAL_LEAD_CAP * 10; // way over — but not on trial
+    const { deps } = makeDeps(store, pool, { good: 90 });
+
+    const summary = await runScout("scout1", deps);
+
+    expect(summary.status).toBe("completed");
+    expect(store.enriched).toEqual(["good"]);
   });
 });

@@ -3,6 +3,7 @@ import type { RankCandidate } from "@vantera/agent-brains";
 import { icpCriteriaToFilters } from "@vantera/prospect-data";
 import {
   SCOUT_DEFAULTS,
+  TRIAL_LEAD_CAP,
   type FreshLead,
   type ScoutDeps,
   type ScoutRunSummary,
@@ -33,8 +34,19 @@ export async function runScout(agentId: string, deps: ScoutDeps): Promise<ScoutR
     }
   }
 
+  // Trial COGS guard: a trialing account sources at most TRIAL_LEAD_CAP leads total.
+  // Once the ceiling is hit the run no-ops before any discovery/enrichment spend.
+  let prospectsPerRun = config.prospectsPerRun;
+  if (ctx.account.subscriptionStatus === "trialing") {
+    const alreadySourced = await deps.store.countAccountLeads(accountId);
+    prospectsPerRun = Math.min(prospectsPerRun, Math.max(0, TRIAL_LEAD_CAP - alreadySourced));
+    if (prospectsPerRun === 0) {
+      return { status: "skipped", discovered: 0, gatePassed: 0, qualified: 0, chained: false };
+    }
+  }
+
   // discover per ICP and keep only new-or-unscored leads (store dedupes by external_ref)
-  const perIcp = Math.max(1, Math.floor(config.prospectsPerRun / ctx.icps.length));
+  const perIcp = Math.max(1, Math.floor(prospectsPerRun / ctx.icps.length));
   const fresh: FreshLead[] = [];
   let discovered = 0;
   for (const icp of ctx.icps) {
