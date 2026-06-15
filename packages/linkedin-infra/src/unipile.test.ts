@@ -165,6 +165,10 @@ describe("UnipileLinkedInInfra", () => {
     });
   });
 
+  // TODO(Part B): these payloads use the old assumed shapes (event/event_id/status).
+  // Real Unipile webhooks carry none of those — to be replaced with captured fixtures
+  // when parseEventWebhook is reconciled (plan 2026-06-15, Part B). Until then the
+  // parser silently returns null for real payloads.
   describe("parseEventWebhook", () => {
     const adapter = infra({});
 

@@ -16,6 +16,6 @@ describe("buildConnectRedirects", () => {
   });
 
   it("throws when the base url is empty", () => {
-    expect(() => buildConnectRedirects("")).toThrow();
+    expect(() => buildConnectRedirects("")).toThrow("APP_URL is not set");
   });
 });
