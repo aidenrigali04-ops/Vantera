@@ -39,7 +39,12 @@ const MAILBOX_STATUS_VARIANTS: Record<
   error: "destructive",
 };
 
-export default async function ChannelsPage() {
+export default async function ChannelsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ connected?: string }>;
+}) {
+  const { connected } = await searchParams;
   const supabase = await createClient();
 
   const [
@@ -87,6 +92,17 @@ export default async function ChannelsPage() {
           </Link>
         </p>
       </div>
+
+      {connected === "1" && (
+        <div className="rounded-md border border-border bg-muted/40 px-4 py-3 text-sm">
+          LinkedIn connection submitted — your account will appear here in a moment.
+        </div>
+      )}
+      {connected === "failed" && (
+        <div className="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          That LinkedIn connection didn&apos;t complete. You can try connecting again below.
+        </div>
+      )}
 
       {/* Email sending card */}
       <Card>
@@ -163,9 +179,10 @@ export default async function ChannelsPage() {
           {linkedinAccounts.length === 0 ? (
             <div className="space-y-3">
               <p className="text-sm text-muted-foreground">
-                No LinkedIn account connected. Connect one to enable LinkedIn outreach.
+                Connect your own LinkedIn account to enable LinkedIn outreach. You&apos;ll sign in
+                on LinkedIn&apos;s own page — we never see your password.
               </p>
-              <LinkedInConnectButton />
+              <LinkedInConnectButton variant="default" />
             </div>
           ) : (
             <div className="space-y-4">
@@ -204,14 +221,14 @@ export default async function ChannelsPage() {
                       </td>
                       <td className="py-2">
                         {la.status === "disconnected" && (
-                          <LinkedInConnectButton label="Reconnect" />
+                          <LinkedInConnectButton label="Reconnect" variant="outline" />
                         )}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-              <LinkedInConnectButton label="Connect another account" />
+              <LinkedInConnectButton label="Connect another account" variant="ghost" />
             </div>
           )}
         </CardContent>

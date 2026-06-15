@@ -203,7 +203,13 @@ export function PauseSendingForm({ outreachPaused }: PauseSendingFormProps) {
 
 // ── LinkedIn connect button ───────────────────────────────────────────────────
 
-export function LinkedInConnectButton({ label = "Connect LinkedIn account" }: { label?: string }) {
+export function LinkedInConnectButton({
+  label = "Connect your LinkedIn account",
+  variant = "default",
+}: {
+  label?: string;
+  variant?: "default" | "outline" | "ghost";
+}) {
   const [isPending, startTransition] = useTransition();
   const [connectError, setConnectError] = useState<string | null>(null);
 
@@ -214,14 +220,16 @@ export function LinkedInConnectButton({ label = "Connect LinkedIn account" }: { 
       if (result.error) {
         setConnectError(result.error);
       } else if (result.url) {
-        window.open(result.url, "_blank", "noopener,noreferrer");
+        // Same-tab redirect: the user signs in on LinkedIn's hosted page and is
+        // returned to /settings/channels?connected=… (no stale second tab).
+        window.location.assign(result.url);
       }
     });
   }
 
   return (
     <div className="space-y-2">
-      <Button onClick={handleConnect} disabled={isPending} variant="outline">
+      <Button onClick={handleConnect} disabled={isPending} variant={variant}>
         {isPending ? "Preparing…" : label}
       </Button>
       {connectError && <p className="text-sm text-destructive">{connectError}</p>}
