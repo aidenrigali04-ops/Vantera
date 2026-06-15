@@ -9,6 +9,16 @@ describe("InMemoryLinkedInInfra", () => {
     expect(Date.parse(link.expiresAt)).toBeGreaterThan(Date.now());
   });
 
+  it("createHostedAuthLink accepts optional redirects and returns a url", async () => {
+    const infra = new InMemoryLinkedInInfra();
+    const link = await infra.createHostedAuthLink("acct-1", {
+      success: "https://app.test/s?connected=1",
+      failure: "https://app.test/s?connected=failed",
+    });
+    expect(link.url).toContain("acct-1");
+    expect(typeof link.expiresAt).toBe("string");
+  });
+
   it("records invites and messages", async () => {
     const infra = new InMemoryLinkedInInfra();
     await infra.sendInvite({

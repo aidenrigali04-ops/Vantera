@@ -1,5 +1,6 @@
 import type {
   HostedAuthLink,
+  HostedAuthRedirects,
   InviteRequest,
   LinkedInEvent,
   LinkedInInfra,
@@ -15,10 +16,10 @@ export class InMemoryLinkedInInfra implements LinkedInInfra {
 
   constructor(private readonly webhookSecret = "in-memory-secret") {}
 
-  async createHostedAuthLink(accountId: string): Promise<HostedAuthLink> {
+  async createHostedAuthLink(accountId: string, _redirects?: HostedAuthRedirects): Promise<HostedAuthLink> {
     return {
       url: `https://auth.example.com/connect/${accountId}`,
-      expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+      expiresAt: new Date(Date.now() + 3_600_000).toISOString(),
     };
   }
 

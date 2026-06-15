@@ -35,7 +35,6 @@ describe("UnipileLinkedInInfra", () => {
       const fetchFn = fetchMock({
         "/api/v1/hosted/accounts/link": {
           url: "https://auth.unipile.example.com/link/abc",
-          expires_at: "2026-06-11T13:00:00Z",
         },
       });
       const adapter = new UnipileLinkedInInfra({
@@ -45,12 +44,57 @@ describe("UnipileLinkedInInfra", () => {
         fetchFn,
       });
       const link = await adapter.createHostedAuthLink("acct-1");
-      expect(link).toEqual({ url: "https://auth.unipile.example.com/link/abc", expiresAt: "2026-06-11T13:00:00Z" });
+      expect(link.url).toBe("https://auth.unipile.example.com/link/abc");
+      expect(typeof link.expiresAt).toBe("string");
+      expect(Date.parse(link.expiresAt)).toBeGreaterThan(Date.now());
 
       const [, init] = (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0] as [string, RequestInit];
       const body = JSON.parse(init.body as string);
       expect(body.providers).toContain("LINKEDIN");
       expect(body.name).toBe("acct-1");
+    });
+  });
+
+  describe("createHostedAuthLink — required fields and redirects", () => {
+    function makeInfra(captured: { body?: unknown } = {}) {
+      const fetchFn = (async (_url: string, init?: RequestInit) => {
+        captured.body = JSON.parse(String(init?.body));
+        return new Response(JSON.stringify({ object: "HostedAuthUrl", url: "https://auth.example/x" }), { status: 200 });
+      }) as unknown as typeof fetch;
+      return new UnipileLinkedInInfra({ apiKey: "k", dsn: "api48.unipile.com:17854", webhookSecret: "s", fetchFn });
+    }
+
+    it("sends all provider-required fields", async () => {
+      const captured: { body?: any } = {};
+      const infra = makeInfra(captured);
+      const link = await infra.createHostedAuthLink("acct-123");
+      expect(link.url).toBe("https://auth.example/x");
+      expect(captured.body.type).toBe("create");
+      expect(captured.body.providers).toEqual(["LINKEDIN"]);
+      expect(captured.body.api_url).toBe("https://api48.unipile.com:17854");
+      expect(captured.body.name).toBe("acct-123");
+      expect(captured.body.expiresOn).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+      expect(link.expiresAt).toBe(captured.body.expiresOn);
+    });
+
+    it("includes redirect urls and bypass flag when redirects are given", async () => {
+      const captured: { body?: any } = {};
+      const infra = makeInfra(captured);
+      await infra.createHostedAuthLink("acct-123", {
+        success: "https://app.test/settings/channels?connected=1",
+        failure: "https://app.test/settings/channels?connected=failed",
+      });
+      expect(captured.body.success_redirect_url).toBe("https://app.test/settings/channels?connected=1");
+      expect(captured.body.failure_redirect_url).toBe("https://app.test/settings/channels?connected=failed");
+      expect(captured.body.bypass_success_screen).toBe(true);
+    });
+
+    it("omits redirect fields when none are given", async () => {
+      const captured: { body?: any } = {};
+      const infra = makeInfra(captured);
+      await infra.createHostedAuthLink("acct-123");
+      expect(captured.body.success_redirect_url).toBeUndefined();
+      expect(captured.body.bypass_success_screen).toBeUndefined();
     });
   });
 

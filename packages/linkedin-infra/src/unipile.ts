@@ -1,8 +1,9 @@
 import { createHash, timingSafeEqual } from "node:crypto";
-import type { HostedAuthLink, InviteRequest, LinkedInEvent, LinkedInInfra, MessageRequest, SendOutcome } from "./types";
+import type { HostedAuthLink, HostedAuthRedirects, InviteRequest, LinkedInEvent, LinkedInInfra, MessageRequest, SendOutcome } from "./types";
 
 // ── endpoint constants ──────────────────────────────────────────────────────
 const PATH_HOSTED_AUTH = "/api/v1/hosted/accounts/link";
+const HOSTED_AUTH_TTL_MS = 60 * 60_000;
 const PATH_INVITE = "/api/v1/users/invite";
 const PATH_CHATS = "/api/v1/chats";
 
@@ -52,15 +53,25 @@ export class UnipileLinkedInInfra implements LinkedInInfra {
   }
 
   // ── LinkedInInfra implementation ─────────────────────────────────────────
-  async createHostedAuthLink(accountId: string): Promise<HostedAuthLink> {
-    const data = await this.call<{ url?: unknown; expires_at?: unknown }>(PATH_HOSTED_AUTH, {
+  async createHostedAuthLink(accountId: string, redirects?: HostedAuthRedirects): Promise<HostedAuthLink> {
+    const expiresOn = new Date(Date.now() + HOSTED_AUTH_TTL_MS).toISOString();
+    const body: Record<string, unknown> = {
+      type: "create",
+      providers: ["LINKEDIN"],
+      api_url: `https://${this.dsn}`,
+      expiresOn,
+      name: accountId,
+    };
+    if (redirects) {
+      body.success_redirect_url = redirects.success;
+      body.failure_redirect_url = redirects.failure;
+      body.bypass_success_screen = true;
+    }
+    const data = await this.call<{ url?: unknown }>(PATH_HOSTED_AUTH, {
       method: "POST",
-      body: JSON.stringify({
-        providers: ["LINKEDIN"],
-        name: accountId,
-      }),
+      body: JSON.stringify(body),
     });
-    return { url: requireString(data.url, "url"), expiresAt: requireString(data.expires_at, "expires_at") };
+    return { url: requireString(data.url, "url"), expiresAt: expiresOn };
   }
 
   async sendInvite(req: InviteRequest): Promise<SendOutcome> {

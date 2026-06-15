@@ -3,6 +3,13 @@ export interface HostedAuthLink {
   expiresAt: string;
 }
 
+export interface HostedAuthRedirects {
+  /** Absolute URL the browser returns to on success. */
+  success: string;
+  /** Absolute URL the browser returns to on failure/cancel. */
+  failure: string;
+}
+
 export interface InviteRequest {
   connectedAccountId: string;
   profileUrl: string;
@@ -36,7 +43,7 @@ export interface LinkedInInfra {
    * as vanteraAccountId on account_status events — that round-trip is how a
    * connected identity is attributed to a tenant.
    */
-  createHostedAuthLink(accountId: string): Promise<HostedAuthLink>;
+  createHostedAuthLink(accountId: string, redirects?: HostedAuthRedirects): Promise<HostedAuthLink>;
   sendInvite(req: InviteRequest): Promise<SendOutcome>;
   sendMessage(req: MessageRequest): Promise<SendOutcome>;
   /**
