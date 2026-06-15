@@ -22,13 +22,16 @@ function deps(
   over: Partial<SequenceTouchDeps["store"]> = {},
   refreshResult: "ok" | "dropped" = "ok",
   refreshedLeadIds: string[] = []
-): SequenceTouchDeps {
+): SequenceTouchDeps & { stoppedRunIds: string[] } {
+  const stoppedRunIds: string[] = [];
   return {
+    stoppedRunIds,
     store: {
       getDraftableLead: async () => lead,
       getCampaignCta: async () => "Book a 15-min call",
       isSuppressed: async () => false,
       insertScheduledSend: vi.fn(async () => {}),
+      stopSequenceRun: vi.fn(async (runId: string) => { stoppedRunIds.push(runId); }),
       ...over,
     },
     draftEmailFn: async () => ({ subject: "Hi", body: "hello", styleFlags: null } as never),
@@ -90,7 +93,7 @@ describe("runSequenceTouch — refresh-on-release (email-only)", () => {
     stage: "linkedin",
   };
 
-  it("calls refreshLead for an aged email lead and drafts when refresh returns ok", async () => {
+  it("calls refreshLead for an aged email lead and drafts when refresh returns ok — does not stop the run", async () => {
     const insert = vi.fn(async () => {});
     const refreshedLeadIds: string[] = [];
     const d = deps(
@@ -104,9 +107,10 @@ describe("runSequenceTouch — refresh-on-release (email-only)", () => {
     const out = await runSequenceTouch(emailDispatch, d);
     expect(refreshedLeadIds).toContain("l1");
     expect(out).toBe("drafted");
+    expect(d.stoppedRunIds).toHaveLength(0);
   });
 
-  it("returns 'dropped' for an aged email lead when refresh returns dropped — no draft, no suppression write", async () => {
+  it("returns 'dropped' for an aged email lead when refresh returns dropped — stops the run, no draft, no suppression write", async () => {
     const insert = vi.fn(async () => {});
     const suppressionStore = vi.fn(async () => false);
     const refreshedLeadIds: string[] = [];
@@ -124,8 +128,7 @@ describe("runSequenceTouch — refresh-on-release (email-only)", () => {
     expect(insert).not.toHaveBeenCalled();
     // suppression was checked (the check runs before refresh), but the suppression STORE is
     // never written — isSuppressed only reads; no write path exists in SequenceTouchStore
-    // Confirm no draft was inserted
-    expect(insert).not.toHaveBeenCalled();
+    expect(d.stoppedRunIds).toContain(emailDispatch.runId);
   });
 
   it("does NOT call refreshLead for a fresh email lead", async () => {

@@ -440,6 +440,13 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
       await db.insert(scheduledSends).values(toRow(send));
     },
 
+    async stopSequenceRun(runId: string) {
+      await db
+        .update(sequenceRuns)
+        .set({ status: "stopped", updatedAt: new Date() })
+        .where(eq(sequenceRuns.id, runId));
+    },
+
     async insertLinkedInSendPair(invite: NewScheduledSend, message: NewScheduledSend) {
       await db.transaction(async (tx) => {
         await tx.insert(scheduledSends).values(toRow(invite));

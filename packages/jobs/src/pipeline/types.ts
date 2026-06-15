@@ -580,6 +580,8 @@ export interface SequenceTouchStore {
   getCampaignCta(campaignId: string): Promise<string>;
   isSuppressed(accountId: string, kind: "email" | "linkedin" | "phone", value: string): Promise<boolean>;
   insertScheduledSend(send: NewScheduledSend): Promise<void>;
+  /** stop a sequence run (lead exits the sequence — e.g. dropped below min_score on refresh) */
+  stopSequenceRun(runId: string): Promise<void>;
 }
 
 export interface SequenceTouchDeps {

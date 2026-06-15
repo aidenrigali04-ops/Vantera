@@ -52,7 +52,10 @@ export async function runSequenceTouch(
 
   if (d.stage === "email" && needsRefresh(lead.scoredAt, deps.now(), FRESHNESS_WINDOW_DAYS)) {
     const refresh = await deps.refreshLead(d.accountId, d.leadId);
-    if (refresh === "dropped") return "dropped"; // lead exits the sequence; no send, not suppressed
+    if (refresh === "dropped") {
+      await deps.store.stopSequenceRun(d.runId); // lead exits the sequence — no further touches
+      return "dropped";
+    }
   }
 
   const cta = await deps.store.getCampaignCta(d.campaignId);
