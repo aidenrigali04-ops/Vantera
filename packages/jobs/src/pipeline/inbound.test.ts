@@ -42,7 +42,7 @@ function makeStore(overrides: Partial<InboundStore> = {}): InboundStore & {
     upsertLinkedInAccountStatus: async (e) => { upsertedLinkedInStatuses.push(e); },
     findLeadByEmail: async () => null,
     findLeadByLinkedInUrl: async () => null,
-    findLeadByPhone: async () => null,
+    findLeadByPhone: async () => null as { id: string; accountId: string; campaignId: string | null } | null,
     insertReply: async (r) => {
       replies.push(r);
       return `reply_${++replyCounter}`;
@@ -579,15 +579,18 @@ const IMESSAGE_DELIVERY_FIXTURE = {
 };
 
 describe("runInbound — imessage reply: not_interested writes phone suppression", () => {
-  it("matched lead via findLeadByPhone, suppression kind 'phone' on not_interested", async () => {
+  it("matched lead via findLeadByPhone (global, no accountId), suppression kind 'phone' on not_interested", async () => {
     const normalizedPhone = "+15557778888";
     const store = makeStore({
-      findLeadByPhone: async (_accountId, phone) =>
-        phone === normalizedPhone ? { id: "lead_im_1", campaignId: "camp_im_1" } : null,
+      findLeadByPhone: async (phone) =>
+        phone === normalizedPhone
+          ? { id: "lead_im_1", accountId: "acc_im_1", campaignId: "camp_im_1" }
+          : null,
     });
 
+    // No accountId in the payload — the webhook carries none for iMessage
     const result = await runInbound(
-      { source: "imessage", payload: IMESSAGE_REPLY_FIXTURE, accountId: "acc_im_1" },
+      { source: "imessage", payload: IMESSAGE_REPLY_FIXTURE },
       deps(store, { classifyFn: classify("not_interested") })
     );
 
@@ -595,6 +598,8 @@ describe("runInbound — imessage reply: not_interested writes phone suppression
     expect(store.replies).toHaveLength(1);
     expect(store.replies[0]!.channel).toBe("imessage");
     expect(store.replies[0]!.leadId).toBe("lead_im_1");
+    // accountId resolved from the lead, not the payload
+    expect(store.replies[0]!.accountId).toBe("acc_im_1");
     expect(store.suppressions).toHaveLength(1);
     const [accId, kind, value, source, leadId] = store.suppressions[0]!;
     expect(accId).toBe("acc_im_1");
@@ -609,17 +614,17 @@ describe("runInbound — imessage reply: not_interested writes phone suppression
 
 describe("runInbound — imessage reply: unsubscribe", () => {
   it("suppression kind 'phone' with source 'unsubscribe'", async () => {
-    const normalizedPhone = "+15557778888";
     const store = makeStore({
-      findLeadByPhone: async () => ({ id: "lead_im_2", campaignId: null }),
+      findLeadByPhone: async () => ({ id: "lead_im_2", accountId: "acc_im_1", campaignId: null }),
     });
 
     await runInbound(
-      { source: "imessage", payload: IMESSAGE_REPLY_FIXTURE, accountId: "acc_im_1" },
+      { source: "imessage", payload: IMESSAGE_REPLY_FIXTURE },
       deps(store, { classifyFn: classify("unsubscribe") })
     );
 
     expect(store.suppressions).toHaveLength(1);
+    expect(store.suppressions[0]![0]).toBe("acc_im_1");
     expect(store.suppressions[0]![1]).toBe("phone");
     expect(store.suppressions[0]![3]).toBe("unsubscribe");
   });
@@ -629,8 +634,9 @@ describe("runInbound — imessage delivery: no-op handled:true", () => {
   it("delivery event returns handled:true, action:'delivery', no store writes", async () => {
     const store = makeStore();
 
+    // delivery events don't need an accountId — no phone lookup occurs
     const result = await runInbound(
-      { source: "imessage", payload: IMESSAGE_DELIVERY_FIXTURE, accountId: "acc_im_1" },
+      { source: "imessage", payload: IMESSAGE_DELIVERY_FIXTURE },
       deps(store)
     );
 
@@ -640,28 +646,34 @@ describe("runInbound — imessage delivery: no-op handled:true", () => {
   });
 });
 
-describe("runInbound — imessage: missing accountId", () => {
-  it("returns handled:false when accountId not provided", async () => {
-    const store = makeStore();
+describe("runInbound — imessage: no matching lead (global phone lookup returns null)", () => {
+  it("returns handled:false when findLeadByPhone finds no iMessage history for the phone", async () => {
+    const store = makeStore({
+      findLeadByPhone: async () => null,
+    });
 
+    // No accountId in the payload — tenant resolution is purely via findLeadByPhone
     const result = await runInbound(
       { source: "imessage", payload: IMESSAGE_REPLY_FIXTURE },
       deps(store)
     );
 
-    expect(result).toEqual({ handled: false, action: "missing accountId" });
+    expect(result).toEqual({ handled: false, action: "no matching lead" });
     expect(store.replies).toHaveLength(0);
+    expect(store.suppressions).toHaveLength(0);
   });
 });
 
-describe("runInbound — imessage: no matching lead", () => {
-  it("returns handled:false when phone doesn't match any lead", async () => {
+describe("runInbound — imessage: no matching lead (phone has outbound history but different number)", () => {
+  it("returns handled:false when phone doesn't match any lead with iMessage history", async () => {
     const store = makeStore({
-      findLeadByPhone: async () => null,
+      findLeadByPhone: async (phone) =>
+        // only matches a different number
+        phone === "+10000000000" ? { id: "other_lead", accountId: "other_acc", campaignId: null } : null,
     });
 
     const result = await runInbound(
-      { source: "imessage", payload: IMESSAGE_REPLY_FIXTURE, accountId: "acc_im_1" },
+      { source: "imessage", payload: IMESSAGE_REPLY_FIXTURE },
       deps(store)
     );
 

@@ -355,7 +355,7 @@ export interface TrialExpirySummary {
 export interface InboundPayload {
   source: "email" | "linkedin" | "imessage";
   payload: unknown;
-  /** resolved by the webhook route; required for imessage (provider doesn't carry a Vantera accountId) */
+  /** optional — not used by imessage (tenant resolved globally via outreach history) */
   accountId?: string;
 }
 
@@ -372,7 +372,8 @@ export interface InboundStore {
   }): Promise<void>;
   findLeadByEmail(accountId: string, email: string): Promise<{ id: string; campaignId: string | null } | null>;
   findLeadByLinkedInUrl(accountId: string, normalizedUrl: string): Promise<{ id: string; campaignId: string | null } | null>;
-  findLeadByPhone(accountId: string, normalizedPhone: string): Promise<{ id: string; campaignId: string | null } | null>;
+  /** Global lookup by phone across all accounts — resolves tenant by most-recent iMessage outreach send to that phone. */
+  findLeadByPhone(normalizedPhone: string): Promise<{ id: string; accountId: string; campaignId: string | null } | null>;
   insertReply(r: {
     accountId: string;
     leadId: string;

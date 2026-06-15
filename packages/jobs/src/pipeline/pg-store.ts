@@ -865,12 +865,30 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
       return { id: hit.id, campaignId: cl?.campaignId ?? null };
     },
 
-    async findLeadByPhone(accountId: string, normalizedPhone: string) {
-      // Phone stored as-is; normalize both sides to match (E.164, lowercased, no spaces).
+    async findLeadByPhone(normalizedPhone: string) {
+      // Global lookup — resolves the tenant by finding which account most recently sent an
+      // iMessage to this phone number. The LoopMessage sender is a single global Vantera
+      // number, so the webhook carries no accountId; we disambiguate cross-tenant by recency
+      // of the outbound send (the account that last iMessaged this prospect owns the reply).
+      // Phone is stored as-is; we normalize in JS to match E.164 lower-case w/o spaces.
       const rows = await db
-        .select({ id: leads.id, phone: leads.phone })
+        .select({
+          id: leads.id,
+          accountId: leads.accountId,
+          phone: leads.phone,
+          sentAt: outreachSends.sentAt,
+        })
         .from(leads)
-        .where(eq(leads.accountId, accountId));
+        .innerJoin(
+          outreachSends,
+          and(
+            eq(outreachSends.leadId, leads.id),
+            eq(outreachSends.accountId, leads.accountId),
+            eq(outreachSends.channel, "imessage")
+          )
+        )
+        .orderBy(desc(outreachSends.sentAt));
+
       const hit = rows.find((r) => r.phone && normalizePhone(r.phone) === normalizedPhone);
       if (!hit) return null;
       const [cl] = await db
@@ -878,7 +896,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         .from(campaignLeads)
         .where(eq(campaignLeads.leadId, hit.id))
         .limit(1);
-      return { id: hit.id, campaignId: cl?.campaignId ?? null };
+      return { id: hit.id, accountId: hit.accountId, campaignId: cl?.campaignId ?? null };
     },
 
     async insertReply(r: {

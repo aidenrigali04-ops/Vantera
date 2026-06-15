@@ -83,7 +83,7 @@ export async function runInbound(payload: InboundPayload, deps: InboundDeps): Pr
     }
   }
 
-  // iMessage branch — accountId resolved by the webhook route (provider doesn't carry it)
+  // iMessage branch — tenant resolved globally by outbound history (provider carries no accountId)
   if (payload.source === "imessage") {
     const event = deps.messageInfra.parseEventWebhook(payload.payload);
     if (!event) return { handled: false, action: "unparseable" };
@@ -92,12 +92,12 @@ export async function runInbound(payload: InboundPayload, deps: InboundDeps): Pr
       return { handled: true, action: "delivery" };
     }
 
-    // reply
-    const accountId = payload.accountId;
-    if (!accountId) return { handled: false, action: "missing accountId" };
+    // reply — look up lead+account globally by phone; the account that most recently
+    // iMessaged this number owns the reply (disambiguates multi-tenant on a shared sender)
     const normalizedPhone = normalizePhone(event.fromPhone);
-    const lead = await deps.store.findLeadByPhone(accountId, normalizedPhone);
+    const lead = await deps.store.findLeadByPhone(normalizedPhone);
     if (!lead) return { handled: false, action: "no matching lead" };
+    const accountId = lead.accountId;
     const replyId = await deps.store.insertReply({
       accountId,
       leadId: lead.id,
