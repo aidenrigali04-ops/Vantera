@@ -7,8 +7,30 @@ import { createClient } from "@/lib/supabase/server";
 import { signOut } from "./actions";
 import { DockNav, DockTooltip } from "@/components/dock-nav";
 import { AnimatedThemeToggle } from "@/components/ui/animated-theme-toggle";
+import { NotificationsBell, type AppNotification } from "@/components/notifications/notifications-bell";
 import CopilotOverlay from "@/components/copilot/copilot-overlay";
 import { GlassFilter } from "@/components/ui/liquid-glass";
+
+const NOTE_VERB: Record<AppNotification["kind"], string> = {
+  reply: "replied — the sequence paused for you",
+  converted: "booked a meeting",
+  exhausted: "went cold after the full sequence",
+};
+const NOTE_HREF: Record<AppNotification["kind"], string> = {
+  reply: "/leads?tab=replied",
+  converted: "/pipeline",
+  exhausted: "/leads?tab=rejected",
+};
+
+// Relative time on the server → passed as a static string (no client Date.now()).
+function noteTimeAgo(iso: string): string {
+  const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60_000);
+  if (mins < 1) return "now";
+  if (mins < 60) return `${mins}m`;
+  const hrs = Math.round(mins / 60);
+  if (hrs < 24) return `${hrs}h`;
+  return `${Math.round(hrs / 24)}d`;
+}
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const data = await getGateData();
@@ -23,6 +45,34 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     .select("id", { count: "exact", head: true })
     .eq("status", "pending_review");
   const badges = count && count > 0 ? { review: count } : undefined;
+
+  // Unread lead events for the dock bell (reply paused / converted / exhausted).
+  const { data: notes } = await supabase
+    .from("lead_notifications")
+    .select("id, kind, lead_id, created_at")
+    .is("read_at", null)
+    .order("created_at", { ascending: false })
+    .limit(8)
+    .returns<{ id: string; kind: AppNotification["kind"]; lead_id: string; created_at: string }[]>();
+  const noteLeadIds = [...new Set((notes ?? []).map((n) => n.lead_id))];
+  const { data: noteLeads } = noteLeadIds.length
+    ? await supabase
+        .from("leads")
+        .select("id, first_name, company_name")
+        .in("id", noteLeadIds)
+        .returns<{ id: string; first_name: string | null; company_name: string | null }[]>()
+    : { data: [] as { id: string; first_name: string | null; company_name: string | null }[] };
+  const noteName = new Map(
+    (noteLeads ?? []).map((l) => [l.id, l.company_name || l.first_name || "A lead"])
+  );
+  const notifications: AppNotification[] = (notes ?? []).map((n) => ({
+    id: n.id,
+    kind: n.kind,
+    who: noteName.get(n.lead_id) ?? "A lead",
+    verb: NOTE_VERB[n.kind],
+    at: noteTimeAgo(n.created_at),
+    href: NOTE_HREF[n.kind],
+  }));
 
   const email = data.user?.email ?? "";
   const initial = email.charAt(0).toUpperCase() || "?";
@@ -41,6 +91,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </Link>
 
         <AnimatedThemeToggle className="size-12 rounded-xl" />
+
+        <NotificationsBell notifications={notifications} />
 
         <DockNav badges={badges} />
 
