@@ -1,4 +1,5 @@
 import { applyRulesGate, isScanStale } from "@vantera/agent-brains";
+import { computeRunTarget } from "./capacity";
 import type { RankCandidate } from "@vantera/agent-brains";
 import { icpCriteriaToFilters } from "@vantera/prospect-data";
 import {
@@ -34,7 +35,19 @@ export async function runScout(agentId: string, deps: ScoutDeps): Promise<ScoutR
   }
 
   // discover per ICP and keep only new-or-unscored leads (store dedupes by external_ref)
-  const perIcp = Math.max(1, Math.floor(config.prospectsPerRun / ctx.icps.length));
+  const capacity = await deps.store.getOutreachCapacity(accountId);
+  const runTarget = computeRunTarget(capacity, {
+    cadenceDays: ctx.agent.cadence === "weekly" ? 7 : 1,
+    currentBacklog: await deps.store.countUncontactedLeads(accountId),
+    bufferFactor: config.bufferFactor,
+    floor: config.floor,
+    ceiling: config.prospectsPerRun,
+  });
+  if (runTarget === 0) {
+    await deps.store.completeRun(agentId, now());
+    return { status: "completed", discovered: 0, gatePassed: 0, qualified: 0, chained: false };
+  }
+  const perIcp = Math.max(1, Math.floor(runTarget / ctx.icps.length));
   const fresh: FreshLead[] = [];
   let discovered = 0;
   for (const icp of ctx.icps) {
