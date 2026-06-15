@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createEmailInfraFromEnv } from "@vantera/email-infra";
 import { createLinkedInInfraFromEnv } from "@vantera/linkedin-infra";
 import { canProvision, validateSenderAddress, validateProvisionCounts } from "./validation";
+import { buildConnectRedirects } from "./redirects";
 import { gate, loadBillingRow } from "@/lib/billing/entitlement";
 
 export type ChannelActionState = { error?: string; success?: string };
@@ -170,7 +171,8 @@ export async function createLinkedInConnectLink(): Promise<{ url?: string; error
   if (!planGate.ok) return { error: planGate.error };
 
   try {
-    const { url } = await createLinkedInInfraFromEnv().createHostedAuthLink(account.id);
+    const redirects = buildConnectRedirects(process.env.APP_URL ?? "http://localhost:3000");
+    const { url } = await createLinkedInInfraFromEnv().createHostedAuthLink(account.id, redirects);
     return { url };
   } catch {
     return { error: "Could not generate a connection link. Try again shortly." };
