@@ -17,8 +17,8 @@ describe("createEmailInfraFromEnv", () => {
   it("returns OwnedEmailInfra when EMAIL_PROVIDER is owned", () => {
     vi.stubEnv("EMAIL_PROVIDER", "owned");
     vi.stubEnv("OWNED_EMAIL_WEBHOOK_SECRET", "s");
-    vi.stubEnv("CLOUDFLARE_API_TOKEN", "t");
-    vi.stubEnv("CLOUDFLARE_ACCOUNT_ID", "a");
+    vi.stubEnv("NAMECOM_USERNAME", "u");
+    vi.stubEnv("NAMECOM_API_TOKEN", "t");
     vi.stubEnv("WARMUP_API_KEY", "w");
     vi.stubEnv("GOOGLE_WORKSPACE_TENANT_LABEL", "t1");
     expect(createEmailInfraFromEnv()).toBeInstanceOf(OwnedEmailInfra);

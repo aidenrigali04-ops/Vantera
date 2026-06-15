@@ -6,8 +6,8 @@ export { OwnedEmailInfra } from "./owned/index";
 import type { EmailInfra } from "./types";
 import { SmartleadEmailInfra } from "./smartlead";
 import { OwnedEmailInfra } from "./owned/index";
-import { CloudflareRegistrar } from "./owned/registrar";
-import { CloudflareDns } from "./owned/dns";
+import { NameComRegistrar } from "./owned/registrar";
+import { NameComDns } from "./owned/dns";
 import { GoogleMailboxProvisioner } from "./owned/mailbox";
 import { ApiWarmup } from "./owned/warmup";
 import { GoogleGmailSender } from "./owned/gmail-send";
@@ -28,9 +28,11 @@ export function createEmailInfraFromEnv(): EmailInfra {
   const provider = process.env.EMAIL_PROVIDER ?? "smartlead";
   if (provider === "owned") {
     const getAccessToken = () => googleAccessToken(requireEnv("GOOGLE_SERVICE_ACCOUNT_JSON"));
+    const namecomUsername = requireEnv("NAMECOM_USERNAME");
+    const namecomToken = requireEnv("NAMECOM_API_TOKEN");
     return new OwnedEmailInfra({
-      registrar: new CloudflareRegistrar({ apiToken: requireEnv("CLOUDFLARE_API_TOKEN"), accountId: requireEnv("CLOUDFLARE_ACCOUNT_ID") }),
-      dns: new CloudflareDns({ apiToken: requireEnv("CLOUDFLARE_API_TOKEN") }),
+      registrar: new NameComRegistrar({ username: namecomUsername, token: namecomToken }),
+      dns: new NameComDns({ username: namecomUsername, token: namecomToken }),
       mailbox: new GoogleMailboxProvisioner({ tenantLabel: requireEnv("GOOGLE_WORKSPACE_TENANT_LABEL"), getAccessToken }),
       warmup: new ApiWarmup({ apiKey: requireEnv("WARMUP_API_KEY") }),
       sender: new GoogleGmailSender({ getAccessToken }),

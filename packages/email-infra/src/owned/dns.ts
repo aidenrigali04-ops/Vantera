@@ -27,35 +27,41 @@ export class InMemoryDns implements DnsManager {
   }
 }
 
-export interface CloudflareDnsConfig { apiToken: string; fetchFn?: typeof fetch; baseUrl?: string }
+export interface NameComDnsConfig { username: string; token: string; fetchFn?: typeof fetch; baseUrl?: string }
 
-export class CloudflareDns implements DnsManager {
+/** Convert an FQDN record name to a Name.com host (relative to the domain apex; "" = apex). */
+export function toHost(name: string, domain: string): string {
+  if (name === domain) return "";
+  return name.endsWith(`.${domain}`) ? name.slice(0, -(domain.length + 1)) : name;
+}
+
+/**
+ * Name.com Core API v4 DNS. Same provider as the registrar, so domains register and get
+ * their email auth records written in one account — no cross-provider nameserver dance.
+ * Records POST to /v4/domains/{domain}/records with a host relative to the apex.
+ */
+export class NameComDns implements DnsManager {
   private readonly fetchFn: typeof fetch;
   private readonly base: string;
-  constructor(private readonly cfg: CloudflareDnsConfig) {
+  constructor(private readonly cfg: NameComDnsConfig) {
     this.fetchFn = cfg.fetchFn ?? fetch;
-    this.base = cfg.baseUrl ?? "https://api.cloudflare.com/client/v4";
+    this.base = cfg.baseUrl ?? "https://api.name.com";
   }
-  private h() { return { Authorization: `Bearer ${this.cfg.apiToken}`, "Content-Type": "application/json" }; }
-  private async zoneId(domain: string): Promise<string> {
-    const res = await this.fetchFn(`${this.base}/zones?name=${domain}`, { headers: this.h() });
-    const data = (await res.json()) as { result?: Array<{ id: string }> | { id: string } };
-    // Defensive: accept both array (real Cloudflare shape) and plain object (test mock shape)
-    let id: string | undefined;
-    if (Array.isArray(data.result)) {
-      id = data.result[0]?.id;
-    } else if (data.result && typeof (data.result as { id?: string }).id === "string") {
-      id = (data.result as { id: string }).id;
-    }
-    if (!id) throw new Error(`no Cloudflare zone for ${domain}`);
-    return id;
+  private h() {
+    const basic = Buffer.from(`${this.cfg.username}:${this.cfg.token}`).toString("base64");
+    return { Authorization: `Basic ${basic}`, "Content-Type": "application/json" };
   }
   async writeEmailRecords(domain: string, dkim: DkimRecord): Promise<void> {
-    const zone = await this.zoneId(domain);
     for (const r of buildEmailRecords(domain, dkim)) {
-      const res = await this.fetchFn(`${this.base}/zones/${zone}/dns_records`, {
+      const res = await this.fetchFn(`${this.base}/v4/domains/${domain}/records`, {
         method: "POST", headers: this.h(),
-        body: JSON.stringify({ type: r.type, name: r.name, content: r.value, priority: r.priority }),
+        body: JSON.stringify({
+          host: toHost(r.name, domain),
+          type: r.type,
+          answer: r.value,
+          ttl: 300,
+          ...(r.priority != null ? { priority: r.priority } : {}),
+        }),
       });
       if (!res.ok) throw new Error(`dns write failed (${r.type} ${r.name}): ${res.status}`);
     }

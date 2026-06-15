@@ -12,18 +12,40 @@ describe("InMemoryRegistrar", () => {
   });
 });
 
-import { CloudflareRegistrar } from "./registrar";
+import { NameComRegistrar } from "./registrar";
 
-const cfFetch = (body: unknown, ok = true) =>
+const ncFetch = (body: unknown, ok = true) =>
   vi.fn(async () => ({ ok, status: ok ? 200 : 400, json: async () => body, text: async () => "" })) as unknown as typeof fetch;
 
-describe("CloudflareRegistrar", () => {
-  it("isAvailable true when the registrar reports available", async () => {
-    const r = new CloudflareRegistrar({ apiToken: "t", accountId: "a", fetchFn: cfFetch({ result: { available: true } }) });
+describe("NameComRegistrar", () => {
+  it("isAvailable true when the registrar reports the name purchasable", async () => {
+    const r = new NameComRegistrar({
+      username: "u", token: "t",
+      fetchFn: ncFetch({ results: [{ domainName: "free.com", purchasable: true, purchasePrice: 12.99 }] }),
+    });
     expect(await r.isAvailable("free.com")).toBe(true);
   });
-  it("buy throws on a non-ok response", async () => {
-    const r = new CloudflareRegistrar({ apiToken: "t", accountId: "a", fetchFn: cfFetch({ success: false, errors: [{ message: "nope" }] }, false) });
-    await expect(r.buy("x.com")).rejects.toThrow(/registrar/i);
+
+  it("buy checks availability then registers via POST /v4/domains with the quoted price", async () => {
+    const calls: Array<[string, RequestInit | undefined]> = [];
+    const fetchFn = vi.fn(async (url: string, init?: RequestInit) => {
+      calls.push([url, init]);
+      return { ok: true, status: 200, json: async () => ({ results: [{ domainName: "buy.com", purchasable: true, purchasePrice: 11.5 }] }), text: async () => "" };
+    }) as unknown as typeof fetch;
+    const r = new NameComRegistrar({ username: "u", token: "t", fetchFn });
+    await r.buy("buy.com");
+
+    expect(calls.some(([u]) => u.includes("/v4/domains:checkAvailability"))).toBe(true);
+    const register = calls.find(([u, init]) => init?.method === "POST" && u.endsWith("/v4/domains"));
+    expect(register).toBeDefined();
+    expect(JSON.parse(register![1]!.body as string)).toMatchObject({ domain: { domainName: "buy.com" }, purchasePrice: 11.5 });
+  });
+
+  it("buy throws when the name is not purchasable", async () => {
+    const r = new NameComRegistrar({
+      username: "u", token: "t",
+      fetchFn: ncFetch({ results: [{ domainName: "taken.com", purchasable: false }] }),
+    });
+    await expect(r.buy("taken.com")).rejects.toThrow(/unavailable/);
   });
 });
