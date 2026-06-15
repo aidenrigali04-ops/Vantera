@@ -5,14 +5,14 @@ import { motion } from "framer-motion";
 /**
  * Traveling border beam, overlaid on a rounded container
  * (parent must be `relative` with the same border radius).
- * Gradient runs the landing-page particle palette.
+ * A clean white glow sweeping the border (monochrome system).
  */
 export function AnimatedPanelBorder({
   radius = 24,
-  gradient = "linear-gradient(90deg,transparent,#ff731f,#ff339e,#7361ff)",
+  gradient = "linear-gradient(90deg,transparent,#ffffff,transparent)",
 }: {
   radius?: number;
-  /** Beam gradient; defaults to the landing-page particle palette. */
+  /** Beam gradient; defaults to a clean white glow. */
   gradient?: string;
 }) {
   return (
@@ -31,6 +31,7 @@ export function AnimatedPanelBorder({
           width: 80,
           offsetPath: `rect(0 auto auto 0 round ${radius}px)`,
           backgroundImage: gradient,
+          boxShadow: "0 0 12px 3px rgba(255,255,255,0.55)",
         }}
         transition={{
           repeat: Number.POSITIVE_INFINITY,

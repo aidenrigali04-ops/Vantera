@@ -39,12 +39,12 @@ export function WizardShell({
                 className={`h-1.5 flex-1 rounded-full ${
                   complete ? "" : i === done ? "bg-primary/40" : "bg-muted"
                 }`}
-                // completed segments carry the brand particle gradient with a faint glow
+                // completed segments carry a clean white glow
                 style={
                   complete
                     ? {
-                        backgroundImage: "linear-gradient(90deg, #FFCC1A, #FF730D, #EB291C)",
-                        boxShadow: "0 0 6px rgba(255, 115, 13, 0.25)",
+                        backgroundImage: "linear-gradient(90deg, #ffffff, #d4d4d4)",
+                        boxShadow: "0 0 6px rgba(255, 255, 255, 0.45)",
                       }
                     : undefined
                 }
