@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getGateData } from "@/lib/auth/context";
+import { shapePipeline } from "../pipeline/queries";
 import {
   buildRevenueSeries,
   computeRevenueSnapshot,
@@ -212,14 +213,18 @@ export default async function DashboardPage() {
   // yet; the working dashboard once either condition is met.
   const isNew = liveAgents.length === 0 && total === 0;
 
-  const funnel = [
-    { label: "Sourced", count: total, href: "/leads" },
-    { label: "Qualified", count: qualified, href: "/leads?tab=qualified" },
-    { label: "In outreach", count: inOutreach, href: "/leads?tab=in_campaign" },
-    { label: "Replied", count: replied, href: "/leads?tab=replied" },
-    { label: "Converted", count: converted, href: "/leads?tab=replied" },
-  ];
-  const reached = funnel.filter((s) => s.count > 0).length;
+  // Pipeline pulse — leads moving through the outreach sequence (sequence_runs),
+  // a compact mirror of the full /pipeline board.
+  const { data: seqRuns } = await supabase
+    .from("sequence_runs")
+    .select("current_stage, status")
+    .returns<{ current_stage: string; status: string }[]>();
+  const pipeline = shapePipeline({
+    runs: seqRuns ?? [],
+    convertedClients: converted,
+    avgDealValueCents: account.avg_deal_value_cents,
+    revenueGoalCents: account.revenue_goal_cents,
+  });
 
   // Just-in-time CRM nudge: a deal has closed but nothing is routing wins out yet.
   // Peak-end moment — surface it here rather than as pre-aha onboarding friction.
@@ -245,8 +250,7 @@ export default async function DashboardPage() {
       convertedClients={converted}
       pipelineLeads={pipelineLeads}
       series={revenueSeries}
-      funnel={funnel}
-      reached={reached}
+      pipeline={pipeline}
       prospects={prospects ?? []}
       recentReplies={replyRows}
       interested={interested}

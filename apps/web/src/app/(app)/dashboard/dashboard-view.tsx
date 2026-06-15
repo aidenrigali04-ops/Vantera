@@ -11,10 +11,13 @@ import {
   Inbox,
   Mail,
   MessageSquare,
+  Phone,
   Sparkles,
   TrendingUp,
+  UserPlus,
   Workflow,
   X,
+  type LucideIcon,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,6 +28,14 @@ import { RevenueChart } from "./revenue-chart";
 import { ProspectPanel, type Prospect } from "./prospect-panel";
 import { LeadProfileLink, type LeadProfile } from "@/components/lead-profile";
 import type { RevenuePoint, RevenueSnapshot } from "@/lib/revenue";
+import type { PipelineViewModel, SequenceStage } from "../pipeline/queries";
+
+const STAGE_ICON: Record<SequenceStage, LucideIcon> = {
+  linkedin: UserPlus,
+  email: Mail,
+  imessage: MessageSquare,
+  call: Phone,
+};
 
 const usd = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -73,8 +84,7 @@ export interface DashboardViewProps {
   convertedClients: number;
   pipelineLeads: number;
   series: RevenuePoint[];
-  funnel: { label: string; count: number; href: string }[];
-  reached: number;
+  pipeline: PipelineViewModel;
   prospects: Prospect[];
   recentReplies: ReplyRow[];
   interested: number;
@@ -139,8 +149,7 @@ function WorkingDashboard(props: DashboardViewProps) {
     goal,
     goalCents,
     series,
-    funnel,
-    reached,
+    pipeline,
     prospects,
     agents,
     recentReplies,
@@ -209,28 +218,52 @@ function WorkingDashboard(props: DashboardViewProps) {
         />
       </div>
 
-      {/* Pipeline funnel — real counts */}
+      {/* Pipeline pulse — leads moving through the outreach sequence (sequence_runs) */}
       <RevealItem className={cn(PANEL_SURFACE, "p-5")}>
-        <Eyebrow>Pipeline</Eyebrow>
-        <div className="mt-4 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-black/[0.06] bg-black/[0.04] dark:border-white/[0.08] dark:bg-white/[0.06] sm:grid-cols-5">
-          {funnel.map((stage) => (
-            <Link
-              key={stage.label}
-              href={stage.href}
-              className="group flex flex-col gap-1 bg-background/40 px-4 py-4 transition-colors hover:bg-foreground/[0.04] focus-visible:bg-foreground/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring dark:bg-background/20"
-            >
-              <span className="font-mono text-2xl font-semibold tabular-nums">{stage.count}</span>
-              <span className="text-xs text-muted-foreground group-hover:text-foreground">
-                {stage.label}
-              </span>
-            </Link>
-          ))}
+        <div className="flex items-center justify-between gap-3">
+          <Eyebrow>Pipeline</Eyebrow>
+          <Link
+            href="/pipeline"
+            className="inline-flex items-center gap-1 font-mono text-[11px] uppercase tracking-[0.18em] text-foreground/80 underline-offset-4 transition-colors hover:text-foreground hover:underline"
+          >
+            View all <ArrowRight className="size-3" aria-hidden />
+          </Link>
         </div>
-        <AnimatedProgress value={(reached / funnel.length) * 100} className="mt-4" />
+        <div className="mt-4 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-black/[0.06] bg-black/[0.04] dark:border-white/[0.08] dark:bg-white/[0.06] sm:grid-cols-5">
+          {pipeline.stages.map((stage) => {
+            const Icon = STAGE_ICON[stage.stage];
+            return (
+              <Link
+                key={stage.stage}
+                href="/pipeline"
+                className="group flex flex-col gap-1 bg-background/40 px-4 py-4 transition-colors hover:bg-foreground/[0.04] focus-visible:bg-foreground/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring dark:bg-background/20"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-2xl font-semibold tabular-nums">{stage.count}</span>
+                  <Icon className="size-3.5 text-muted-foreground" aria-hidden />
+                </div>
+                <span className="text-xs text-muted-foreground group-hover:text-foreground">
+                  {stage.label}
+                </span>
+              </Link>
+            );
+          })}
+          <Link
+            href="/pipeline"
+            className="group flex flex-col gap-1 bg-white/[0.06] px-4 py-4 transition-colors hover:bg-white/[0.1] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+          >
+            <div className="flex items-center justify-between">
+              <span className="font-mono text-2xl font-semibold tabular-nums">{convertedClients}</span>
+              <CheckCircle2 className="size-3.5 text-foreground" aria-hidden />
+            </div>
+            <span className="text-xs text-muted-foreground group-hover:text-foreground">Won</span>
+          </Link>
+        </div>
+        <AnimatedProgress value={pipeline.goalProgressPct ?? 0} className="mt-4" />
         <p className="mt-2 text-xs text-muted-foreground">
           {convertedClients > 0
             ? `${convertedClients} ${convertedClients === 1 ? "lead" : "leads"} converted toward your ${goal ?? "revenue"} goal.`
-            : "Leads flow left to right as your agents work. Revenue tracking arrives with Analytics."}
+            : "Leads move LinkedIn → Email → iMessage → Caller, and stop the instant someone converts."}
         </p>
       </RevealItem>
 
