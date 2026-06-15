@@ -1,4 +1,5 @@
 import { and, count, desc, eq, gte, inArray, isNull, lt, lte, or, sql } from "drizzle-orm";
+import { encryptSecret, decryptSecret } from "@vantera/email-infra";
 import {
   accounts,
   agentAssets,
@@ -49,6 +50,7 @@ import {
   type FreshLead,
   type InboundStore,
   type LeadChannels,
+  type MailboxSmtpStore,
   type NewScheduledSend,
   type OutreachSendStore,
   type PurgeCandidate,
@@ -108,8 +110,15 @@ function toRow(send: NewScheduledSend) {
   };
 }
 
+/** Throws if OWNED_EMAIL_SECRET_KEY is not set in the environment. */
+function secretKey(): string {
+  const k = process.env.OWNED_EMAIL_SECRET_KEY;
+  if (!k) throw new Error("OWNED_EMAIL_SECRET_KEY is required for mailbox SMTP secrets");
+  return k;
+}
+
 /** Drizzle-backed store used by the Trigger.dev tasks (service-role DATABASE_URL). */
-export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerStore & RetentionStore & TrialStore & SendDispatchStore & OutreachSendStore & InboundStore & SequenceStore & SequenceTouchStore & ConversionStore & RefreshLeadStore {
+export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerStore & RetentionStore & TrialStore & SendDispatchStore & OutreachSendStore & InboundStore & SequenceStore & SequenceTouchStore & ConversionStore & RefreshLeadStore & MailboxSmtpStore {
   return {
     async getScoutContext(agentId: string): Promise<ScoutContext | null> {
       const [agent] = await db.select().from(agents).where(eq(agents.id, agentId));
@@ -1183,6 +1192,51 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         .where(inArray(accounts.id, ids))
         .returning({ id: accounts.id });
       return rows.length;
+    },
+
+    // ── MailboxSmtpStore ───────────────────────────────────────────────────────
+
+    async saveProvisionedMailboxes(accountId, mbxList) {
+      for (const m of mbxList) {
+        await db.insert(mailboxes).values({
+          accountId,
+          emailAddress: m.address,
+          domain: m.domain,
+          providerRef: m.id,
+          status: "warming",
+          smtpSecret: m.smtp ? encryptSecret(m.smtp.password, secretKey()) : null,
+          smtpHost: m.smtp?.host ?? null,
+          smtpPort: m.smtp?.port ?? null,
+          smtpUsername: m.smtp?.username ?? null,
+        });
+      }
+    },
+
+    async getMailboxSmtpCreds(mailboxId) {
+      const [row] = await db
+        .select()
+        .from(mailboxes)
+        .where(eq(mailboxes.id, mailboxId))
+        .limit(1);
+      if (!row?.smtpSecret || !row.smtpHost || !row.smtpPort || !row.smtpUsername) {
+        throw new Error(`mailbox ${mailboxId} has no SMTP credentials`);
+      }
+      return {
+        host: row.smtpHost,
+        port: row.smtpPort,
+        username: row.smtpUsername,
+        password: decryptSecret(row.smtpSecret, secretKey()),
+      };
+    },
+
+    async collectMailboxProviderRefs(accountId) {
+      const rows = await db
+        .select({ providerRef: mailboxes.providerRef, domain: mailboxes.domain })
+        .from(mailboxes)
+        .where(eq(mailboxes.accountId, accountId));
+      return rows
+        .filter((r) => r.providerRef)
+        .map((r) => ({ providerRef: r.providerRef!, domain: r.domain ?? "" }));
     },
   };
 }

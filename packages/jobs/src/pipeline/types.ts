@@ -22,7 +22,7 @@ import type {
 import type { VoiceInfra } from "@vantera/voice-infra";
 import type { SenderAddress } from "./email-footer";
 import type { OutreachCapacity } from "./capacity";
-import type { EmailInfra } from "@vantera/email-infra";
+import type { EmailInfra, ProvisionedMailbox, SmtpCredentials } from "@vantera/email-infra";
 import type { LinkedInInfra } from "@vantera/linkedin-infra";
 
 export interface ScoutConfig {
@@ -666,4 +666,15 @@ export interface ConversionDeps {
 export interface ConversionResult {
   converted: boolean;
   redirectUrl: string | null;
+}
+
+// ── Mailbox SMTP secret store methods ──────────────────────────────────────────
+
+export interface MailboxSmtpStore {
+  /** Persist provisioned mailboxes with their SMTP secret encrypted at rest. */
+  saveProvisionedMailboxes(accountId: string, mailboxes: ProvisionedMailbox[]): Promise<void>;
+  /** Decrypt and return a mailbox's SMTP creds for the send path. */
+  getMailboxSmtpCreds(mailboxId: string): Promise<SmtpCredentials>;
+  /** Collect provider refs + domains for an account's mailboxes (deprovision). */
+  collectMailboxProviderRefs(accountId: string): Promise<{ providerRef: string; domain: string }[]>;
 }
