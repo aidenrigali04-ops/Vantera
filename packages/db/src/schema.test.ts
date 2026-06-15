@@ -182,3 +182,10 @@ describe("account sender name (0019)", () => {
     expect(grantMatch![1]).toContain("sender_name");
   });
 });
+
+describe("mailbox SMTP secret columns (0021)", () => {
+  it("0021 revokes mailbox SMTP secret columns from clients", () => {
+    const sql = readFileSync(join(migrationsDir, "0021_mailbox_smtp_secret.sql"), "utf8");
+    expect(sql).toMatch(/REVOKE ALL \(smtp_secret, smtp_host, smtp_port, smtp_username\) ON mailboxes FROM authenticated/);
+  });
+});

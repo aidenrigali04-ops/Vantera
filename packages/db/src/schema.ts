@@ -421,6 +421,11 @@ export const mailboxes = pgTable(
     warmupStartedAt: timestamp("warmup_started_at", { withTimezone: true }),
     health: jsonb("health"),
     dailySendLimit: integer("daily_send_limit"),
+    // 0021: Maildoso per-mailbox SMTP credentials (server-managed; clients never read/write these)
+    smtpSecret: text("smtp_secret"),
+    smtpHost: text("smtp_host"),
+    smtpPort: integer("smtp_port"),
+    smtpUsername: text("smtp_username"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
