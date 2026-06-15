@@ -4,6 +4,21 @@ Enterprise-grade operations, staged by when each item must exist: **before the f
 
 ---
 
+## Status — 2026-06-15 (functional-readiness pass)
+
+A "make the channels functional" pass shipped email (Maildoso), LinkedIn, caller, iMessage, plus the ops **code** items below. What remains is overwhelmingly **dashboard/secrets/legal**, not code.
+
+**Done (code, this pass):** security headers + `poweredByHeader:false`; `pnpm audit` + Dependabot in CI; `/api/health` liveness endpoint. Already in place from channel work: **sending kill switch**, **suppression enforced at the boundary (tested)**, **timing-safe webhook signature verification on every inbound route**, **email unsubscribe**, **warmup gating**, **LinkedIn safety limits** (now incl. rolling 7-day invite ceiling).
+
+**Still required — mostly manual / needs the prod environment:**
+- Provision the Supabase **prod** project + per-env keys; Trigger.dev prod env; Vercel prod link + branch protection on `main`.
+- **Migration-apply + drift-check CI job** (needs prod DB creds as CI secrets) — workflow not added because it would be inert/broken without the secrets.
+- **Error tracking**: Vercel Observability covers basics with zero code; wiring `@sentry/nextjs` needs a Sentry DSN — say the word and I'll wire it.
+- **Rate limiting**: Supabase Auth rate-limits auth endpoints already; add Vercel WAF rate rules for app routes (dashboard).
+- Supabase Auth hardening (email confirmations, password policy, leaked-password protection), PITR/backups + restore drill, external uptime monitor, subprocessor DPAs — all dashboard/legal.
+
+---
+
 ## Before the first real user (gate for deploying Phase 2)
 
 **Environments & CI/CD**
@@ -15,14 +30,14 @@ Enterprise-grade operations, staged by when each item must exist: **before the f
 
 **Security**
 - [ ] RLS verified against the prod project (run the `rls-auditor` checklist on the applied schema, not just the files).
-- [ ] Security headers + sensible defaults on the Next.js app (CSP groundwork, no `x-powered-by`).
-- [ ] Rate limiting on auth-adjacent routes (login, signup, password reset).
+- [x] Security headers + sensible defaults on the Next.js app (CSP groundwork, no `x-powered-by`). — `next.config.ts` (full CSP still deferred).
+- [ ] Rate limiting on auth-adjacent routes (login, signup, password reset). — Supabase Auth covers these by default; add Vercel WAF for app routes.
 - [ ] Supabase Auth hardening: email confirmations on, sane password policy, leaked-password protection.
-- [ ] `pnpm audit` + Dependabot (or Renovate) in CI.
+- [x] `pnpm audit` + Dependabot (or Renovate) in CI. — `.github/dependabot.yml` + report-only audit job.
 
 **Observability**
-- [ ] Error tracking (Sentry or Vercel observability) wired in `apps/web` with source maps; alert channel configured.
-- [ ] `/api/health` endpoint + external uptime monitor.
+- [ ] Error tracking (Sentry or Vercel observability) wired in `apps/web` with source maps; alert channel configured. — Vercel Observability on by default; Sentry needs a DSN.
+- [x] `/api/health` endpoint — `apps/web/src/app/api/health`; external uptime monitor still to be pointed at it.
 - [ ] Structured server logs carrying `accountId` (and later `campaignId`) for correlation.
 
 **Data**

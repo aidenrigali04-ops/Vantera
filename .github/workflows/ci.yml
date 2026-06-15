@@ -19,3 +19,18 @@ jobs:
       - run: pnpm type-check
       - run: pnpm test
       - run: pnpm build
+
+  # Dependency vulnerability scan (production-readiness, rule 10). Report-only so a freshly
+  # disclosed advisory never blocks an unrelated deploy; the signal surfaces in the run and
+  # the Dependabot PR queue handles remediation.
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm audit --audit-level=high || true
