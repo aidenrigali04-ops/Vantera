@@ -182,3 +182,10 @@ describe("account sender name (0019)", () => {
     expect(grantMatch![1]).toContain("sender_name");
   });
 });
+
+describe("imessage webhook source (0021)", () => {
+  it("0021 adds imessage to the webhook source set", () => {
+    const sql = readFileSync(join(migrationsDir, "0021_imessage_webhook_source.sql"), "utf8");
+    expect(sql).toMatch(/source in \('email', 'linkedin', 'stripe', 'voice', 'imessage'\)/i);
+  });
+});
