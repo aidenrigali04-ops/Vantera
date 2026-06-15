@@ -80,12 +80,14 @@ export class UnipileLinkedInInfra implements LinkedInInfra {
       method: "POST",
       body: JSON.stringify(body),
     });
-    const url = requireString(data.url, "url");
+    let url = requireString(data.url, "url");
     if (this.hostedAuthDomain) {
-      const host = new URL(url).host;
-      if (host !== this.hostedAuthDomain) {
-        throw new Error(`hosted-auth URL host ${host} is not the configured custom domain ${this.hostedAuthDomain}`);
-      }
+      // The provider returns the URL on its own domain; swap in the white-label custom
+      // domain (configured vendor-side via CNAME) before any user sees it (rule 04).
+      // Path + query are preserved; only the host is replaced.
+      const u = new URL(url);
+      u.host = this.hostedAuthDomain;
+      url = u.toString();
     } else {
       console.warn("HOSTED_AUTH_DOMAIN unset — hosted-auth URL may expose the provider domain (white-label, rule 04)");
     }

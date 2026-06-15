@@ -293,23 +293,25 @@ describe("UnipileLinkedInInfra", () => {
     });
   });
 
-  describe("createHostedAuthLink — hosted-auth domain assertion", () => {
-    it("throws if hostedAuthDomain set and returned url is off-domain", async () => {
-      const fetchFn = (async () => new Response(JSON.stringify({ url: "https://accounts.unipile.com/abc" }), { status: 200 })) as unknown as typeof fetch;
+  describe("createHostedAuthLink — hosted-auth white-label domain", () => {
+    it("rewrites the provider host to the configured custom domain, preserving path + query", async () => {
+      const fetchFn = (async () => new Response(JSON.stringify({ url: "https://accounts.unipile.com/abc?token=xyz" }), { status: 200 })) as unknown as typeof fetch;
       const infra = new UnipileLinkedInInfra({ apiKey: "k", dsn: "d", webhookSecret: "s", fetchFn, hostedAuthDomain: "connect.vanterasystem.com" });
-      await expect(infra.createHostedAuthLink("acc_1")).rejects.toThrow(/custom domain/i);
+      const link = await infra.createHostedAuthLink("acc_1");
+      expect(new URL(link.url).host).toBe("connect.vanterasystem.com");
+      expect(link.url).toBe("https://connect.vanterasystem.com/abc?token=xyz");
     });
 
-    it("passes when hostedAuthDomain matches the returned url host", async () => {
+    it("leaves an already-on-domain url unchanged", async () => {
       const fetchFn = (async () => new Response(JSON.stringify({ url: "https://connect.vanterasystem.com/abc" }), { status: 200 })) as unknown as typeof fetch;
       const infra = new UnipileLinkedInInfra({ apiKey: "k", dsn: "d", webhookSecret: "s", fetchFn, hostedAuthDomain: "connect.vanterasystem.com" });
-      await expect(infra.createHostedAuthLink("acc_1")).resolves.toMatchObject({ url: expect.stringContaining("connect.vanterasystem.com") });
+      await expect(infra.createHostedAuthLink("acc_1")).resolves.toMatchObject({ url: "https://connect.vanterasystem.com/abc" });
     });
 
-    it("warns but proceeds when hostedAuthDomain is unset", async () => {
+    it("warns but proceeds (no rewrite) when hostedAuthDomain is unset", async () => {
       const fetchFn = (async () => new Response(JSON.stringify({ url: "https://accounts.unipile.com/abc" }), { status: 200 })) as unknown as typeof fetch;
       const infra = new UnipileLinkedInInfra({ apiKey: "k", dsn: "d", webhookSecret: "s", fetchFn });
-      await expect(infra.createHostedAuthLink("acc_1")).resolves.toMatchObject({ url: expect.any(String) });
+      await expect(infra.createHostedAuthLink("acc_1")).resolves.toMatchObject({ url: "https://accounts.unipile.com/abc" });
     });
   });
 
