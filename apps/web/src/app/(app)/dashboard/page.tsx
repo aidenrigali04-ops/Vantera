@@ -226,6 +226,27 @@ export default async function DashboardPage() {
     revenueGoalCents: account.revenue_goal_cents,
   });
 
+  // Loss-aversion + variable-reward metrics for the retention panels.
+  const dayAgo = isoDaysAgo(1);
+  const coldCutoff = isoDaysAgo(3);
+  const [coldRes, sent24Res, replies24Res, sourced24Res] = await Promise.all([
+    // warm leads cooling: replied (not converted) and untouched 3+ days
+    supabase
+      .from("leads")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "replied")
+      .lt("updated_at", coldCutoff),
+    supabase.from("outreach_sends").select("id", { count: "exact", head: true }).gte("sent_at", dayAgo),
+    supabase.from("replies").select("id", { count: "exact", head: true }).gte("received_at", dayAgo),
+    supabase.from("leads").select("id", { count: "exact", head: true }).gte("created_at", dayAgo),
+  ]);
+  const cold = coldRes.count ?? 0;
+  const today = {
+    sourced: sourced24Res.count ?? 0,
+    sent: sent24Res.count ?? 0,
+    replied: replies24Res.count ?? 0,
+  };
+
   // Just-in-time CRM nudge: a deal has closed but nothing is routing wins out yet.
   // Peak-end moment — surface it here rather than as pre-aha onboarding friction.
   const showCrmNudge = converted > 0 && (crmActiveRes.count ?? 0) === 0;
@@ -251,6 +272,8 @@ export default async function DashboardPage() {
       pipelineLeads={pipelineLeads}
       series={revenueSeries}
       pipeline={pipeline}
+      cold={cold}
+      today={today}
       prospects={prospects ?? []}
       recentReplies={replyRows}
       interested={interested}

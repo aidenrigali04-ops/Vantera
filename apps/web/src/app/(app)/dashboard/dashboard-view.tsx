@@ -85,6 +85,8 @@ export interface DashboardViewProps {
   pipelineLeads: number;
   series: RevenuePoint[];
   pipeline: PipelineViewModel;
+  cold: number;
+  today: { sourced: number; sent: number; replied: number };
   prospects: Prospect[];
   recentReplies: ReplyRow[];
   interested: number;
@@ -150,6 +152,8 @@ function WorkingDashboard(props: DashboardViewProps) {
     goalCents,
     series,
     pipeline,
+    cold,
+    today,
     prospects,
     agents,
     recentReplies,
@@ -269,6 +273,12 @@ function WorkingDashboard(props: DashboardViewProps) {
         </RevealItem>
 
         <WarmReplies recentReplies={recentReplies} interested={interested} />
+      </div>
+
+      {/* Momentum (variable reward) + risk (loss aversion) — the return-and-act drivers */}
+      <div className="grid gap-6 md:grid-cols-2">
+        <AtRiskPanel cold={cold} />
+        <TodayPanel today={today} />
       </div>
 
       {/* Recent prospects */}
@@ -478,6 +488,74 @@ function WarmReplies({
           </ul>
         )}
       </div>
+    </RevealItem>
+  );
+}
+
+/** Going cold — loss aversion. Warm leads that replied but are cooling off. */
+function AtRiskPanel({ cold }: { cold: number }) {
+  return (
+    <RevealItem className={cn(PANEL_SURFACE, "flex flex-col p-5", cold > 0 && "dark:bg-white/[0.06]")}>
+      <div className="flex items-center justify-between gap-2">
+        <Eyebrow>Going cold</Eyebrow>
+        {cold > 0 && <Badge variant="secondary">{cold}</Badge>}
+      </div>
+      {cold > 0 ? (
+        <>
+          <div className="mt-4 flex items-end gap-2">
+            <span className="font-mono text-2xl font-semibold tabular-nums">{cold}</span>
+            <span className="pb-1 text-sm text-muted-foreground">
+              warm {cold === 1 ? "lead" : "leads"} cooling off
+            </span>
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Replied 3+ days ago and still open — a quick nudge keeps them warm.
+          </p>
+          <Button asChild size="sm" variant="outline" className="mt-3 w-fit">
+            <Link href="/leads?tab=replied">
+              Re-engage <ArrowRight className="size-4" />
+            </Link>
+          </Button>
+        </>
+      ) : (
+        <p className="mt-4 text-sm text-muted-foreground">
+          Nothing slipping — every warm lead is fresh or already moving.
+        </p>
+      )}
+    </RevealItem>
+  );
+}
+
+/** Since yesterday — variable reward. Fresh activity that makes returning rewarding. */
+function TodayPanel({ today }: { today: { sourced: number; sent: number; replied: number } }) {
+  const quiet = today.sourced + today.sent + today.replied === 0;
+  return (
+    <RevealItem className={cn(PANEL_SURFACE, "p-5")}>
+      <div className="flex items-center justify-between gap-2">
+        <Eyebrow>Since yesterday</Eyebrow>
+        <span className="flex items-center gap-1 font-mono text-[11px] uppercase tracking-wide text-muted-foreground">
+          <Activity className="size-3.5" /> last 24h
+        </span>
+      </div>
+      <div className="mt-4 grid grid-cols-3 gap-4">
+        <div>
+          <span className="font-mono text-2xl font-semibold tabular-nums">{today.sourced}</span>
+          <p className="text-xs text-muted-foreground">Sourced</p>
+        </div>
+        <div>
+          <span className="font-mono text-2xl font-semibold tabular-nums">{today.sent}</span>
+          <p className="text-xs text-muted-foreground">Sent</p>
+        </div>
+        <div>
+          <span className="font-mono text-2xl font-semibold tabular-nums">{today.replied}</span>
+          <p className="text-xs text-muted-foreground">Replied</p>
+        </div>
+      </div>
+      <p className="mt-3 border-t border-border/60 pt-3 text-xs text-muted-foreground">
+        {quiet
+          ? "Quiet so far — your agents work on their own schedule."
+          : "Your agents kept working while you were away."}
+      </p>
     </RevealItem>
   );
 }
