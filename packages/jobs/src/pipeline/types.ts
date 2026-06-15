@@ -126,6 +126,8 @@ export interface DraftableLead {
   linkedinUrl: string | null;
   phone: string | null;
   aiInsights: StoredInsights | null;
+  /** when the lead was last AI-ranked; drives refresh-on-release before a delayed email touch */
+  scoredAt: Date | null;
 }
 
 export interface NewScheduledSend {
@@ -584,9 +586,17 @@ export interface SequenceTouchDeps {
   store: SequenceTouchStore;
   draftEmailFn: (input: DraftInput) => Promise<EmailDraft>;
   draftLinkedInFn: (input: DraftInput) => Promise<LinkedInDraft>;
+  /** current time (injectable for tests); used by the freshness check before an email touch */
+  now: () => Date;
+  /**
+   * Re-enrich + re-rank one aged lead before an email touch. Returns "ok" (still
+   * qualified — draft with current insights) or "dropped" (fell below min_score →
+   * the caller exits the sequence; NOT suppression).
+   */
+  refreshLead: (accountId: string, leadId: string) => Promise<"ok" | "dropped">;
 }
 
-export type SequenceTouchOutcome = "drafted" | "suppressed" | "skipped";
+export type SequenceTouchOutcome = "drafted" | "suppressed" | "skipped" | "dropped";
 
 // ── Conversion gate (tracked-CTA redirect) ────────────────────────────────────
 
