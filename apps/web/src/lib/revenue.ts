@@ -93,6 +93,39 @@ export function buildRevenueSeries(input: {
   return points;
 }
 
+/**
+ * Forward goal pace, from the cumulative-closed-MRR model. `reached` once closed
+ * MRR is at/over goal; otherwise `etaDays` projects when closed MRR reaches the
+ * goal at the trailing-30-day conversion rate. Null when there's no goal/value or
+ * no run-rate yet (no conversions in the window) — callers fall back to the
+ * existing % copy. Pure + deterministic (`now` injectable) so it's unit-tested.
+ */
+export function computeGoalPace(input: {
+  conversionDates: string[];
+  avgDealValueCents: number | null;
+  goalCents: number | null;
+  convertedClients: number;
+  now?: Date;
+}): { reached: boolean; etaDays: number | null } | null {
+  const { conversionDates, avgDealValueCents, goalCents, convertedClients, now = new Date() } = input;
+  if (!goalCents || goalCents <= 0 || !avgDealValueCents || avgDealValueCents <= 0) return null;
+
+  const closedCents = convertedClients * avgDealValueCents;
+  if (closedCents >= goalCents) return { reached: true, etaDays: null };
+
+  const dayMs = 86_400_000;
+  const windowStart = now.getTime() - 30 * dayMs;
+  const recent = conversionDates.filter((d) => {
+    const t = new Date(d).getTime();
+    return Number.isFinite(t) && t >= windowStart;
+  }).length;
+  if (recent === 0) return null; // no run-rate to project from yet
+
+  const cents30 = recent * avgDealValueCents;
+  const etaDays = Math.ceil(((goalCents - closedCents) / cents30) * 30);
+  return { reached: false, etaDays };
+}
+
 export function computeRevenueSnapshot(input: {
   convertedClients: number;
   pipeline: PipelineStageCounts;

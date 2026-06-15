@@ -3,6 +3,7 @@ import { getGateData } from "@/lib/auth/context";
 import { shapePipeline } from "../pipeline/queries";
 import {
   buildRevenueSeries,
+  computeGoalPace,
   computeRevenueSnapshot,
 } from "@/lib/revenue";
 import { LEAD_PROFILE_FIELDS } from "@/components/lead-profile-fields";
@@ -251,6 +252,24 @@ export default async function DashboardPage() {
   // Peak-end moment — surface it here rather than as pre-aha onboarding friction.
   const showCrmNudge = converted > 0 && (crmActiveRes.count ?? 0) === 0;
 
+  // Explicit goal pace (forward projection) — formatted on the server, no client Date.now().
+  const pace = computeGoalPace({
+    conversionDates: (convertedDates ?? []).map((r) => r.updated_at),
+    avgDealValueCents: account.avg_deal_value_cents,
+    goalCents: account.revenue_goal_cents,
+    convertedClients: converted,
+  });
+  let revenuePace: string | null = null;
+  if (pace?.reached) {
+    revenuePace = "You've cleared your monthly goal — time to raise it.";
+  } else if (pace && pace.etaDays != null) {
+    const when = new Date(Date.now() + pace.etaDays * 86_400_000).toLocaleDateString("en-US", {
+      month: "long",
+      year: "numeric",
+    });
+    revenuePace = `On pace to hit your ${goal}/mo goal around ${when}.`;
+  }
+
   return (
     <DashboardView
       firstName={firstName}
@@ -274,6 +293,7 @@ export default async function DashboardPage() {
       pipeline={pipeline}
       cold={cold}
       today={today}
+      revenuePace={revenuePace}
       prospects={prospects ?? []}
       recentReplies={replyRows}
       interested={interested}

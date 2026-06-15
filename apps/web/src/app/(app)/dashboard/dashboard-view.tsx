@@ -87,6 +87,7 @@ export interface DashboardViewProps {
   pipeline: PipelineViewModel;
   cold: number;
   today: { sourced: number; sent: number; replied: number };
+  revenuePace: string | null;
   prospects: Prospect[];
   recentReplies: ReplyRow[];
   interested: number;
@@ -154,6 +155,7 @@ function WorkingDashboard(props: DashboardViewProps) {
     pipeline,
     cold,
     today,
+    revenuePace,
     prospects,
     agents,
     recentReplies,
@@ -219,6 +221,7 @@ function WorkingDashboard(props: DashboardViewProps) {
           goal={goal}
           goalCents={goalCents}
           series={series}
+          paceLabel={revenuePace}
         />
       </div>
 
@@ -595,6 +598,7 @@ function RevenueCard({
   goal,
   goalCents,
   series,
+  paceLabel,
 }: {
   revenue: RevenueSnapshot;
   convertedClients: number;
@@ -602,6 +606,7 @@ function RevenueCard({
   goal: string | null;
   goalCents: number | null;
   series: RevenuePoint[];
+  paceLabel: string | null;
 }) {
   const projectedTotalCents = revenue.closedCents + revenue.expectedCents;
   return (
@@ -651,6 +656,12 @@ function RevenueCard({
                 "Set a monthly revenue goal in Settings to track progress."
               )}
             </p>
+            {paceLabel && (
+              <p className="mt-1.5 flex items-center gap-1.5 text-xs font-medium text-foreground">
+                <TrendingUp className="size-3.5 text-muted-foreground" aria-hidden />
+                {paceLabel}
+              </p>
+            )}
           </>
         ) : (
           <div className="flex flex-col gap-3">

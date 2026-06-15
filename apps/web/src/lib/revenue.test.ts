@@ -1,7 +1,40 @@
 import { describe, expect, it } from "vitest";
-import { buildRevenueSeries, computeRevenueSnapshot } from "./revenue";
+import { buildRevenueSeries, computeGoalPace, computeRevenueSnapshot } from "./revenue";
 
 const pipeline = { qualified: 10, inOutreach: 8, replied: 4 };
+
+describe("computeGoalPace", () => {
+  const NOW = new Date("2026-06-14T00:00:00Z");
+  const daysAgo = (n: number) => new Date(NOW.getTime() - n * 86_400_000).toISOString();
+
+  it("returns null without a goal or deal value", () => {
+    expect(computeGoalPace({ conversionDates: [daysAgo(1)], avgDealValueCents: null, goalCents: 2_000_000, convertedClients: 1, now: NOW })).toBeNull();
+    expect(computeGoalPace({ conversionDates: [daysAgo(1)], avgDealValueCents: 500_000, goalCents: null, convertedClients: 1, now: NOW })).toBeNull();
+  });
+
+  it("reports reached once closed MRR is at/over the goal", () => {
+    const r = computeGoalPace({ conversionDates: [daysAgo(1)], avgDealValueCents: 500_000, goalCents: 2_000_000, convertedClients: 4, now: NOW });
+    expect(r).toEqual({ reached: true, etaDays: null });
+  });
+
+  it("projects an ETA from the trailing-30-day rate", () => {
+    // $5k value, goal $20k, 2 closed = $10k closed, remaining $10k.
+    // 2 conversions in the last 30 days → $10k/30d → ~30 days to the remaining $10k.
+    const r = computeGoalPace({
+      conversionDates: [daysAgo(5), daysAgo(20)],
+      avgDealValueCents: 500_000,
+      goalCents: 2_000_000,
+      convertedClients: 2,
+      now: NOW,
+    });
+    expect(r).toEqual({ reached: false, etaDays: 30 });
+  });
+
+  it("returns null when there's no run-rate in the window", () => {
+    const r = computeGoalPace({ conversionDates: [daysAgo(90)], avgDealValueCents: 500_000, goalCents: 2_000_000, convertedClients: 1, now: NOW });
+    expect(r).toBeNull();
+  });
+});
 
 describe("computeRevenueSnapshot", () => {
   it("turns counts into dollars when a value is set", () => {
