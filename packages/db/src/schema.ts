@@ -59,17 +59,21 @@ export const accounts = pgTable("accounts", {
   // 0019: human sender name for the email sign-off ({{sender_name}}); client-settable in Settings
   senderName: text("sender_name"),
   // 0013: subscription entitlement snapshot (server-managed; Stripe webhook only)
+  // No-card free trial (0020): new accounts default to a Starter trial. Defaults
+  // are applied by the DB on create_account insert; the trial_ends_at default
+  // expression (now() + 14 days) lives in the SQL migration (source of truth).
   plan: text("plan", { enum: ["none", "starter", "growth", "scale"] })
     .notNull()
-    .default("none"),
+    .default("starter"),
   subscriptionStatus: text("subscription_status", {
     enum: ["none", "trialing", "active", "past_due", "canceled"],
   })
     .notNull()
-    .default("none"),
+    .default("trialing"),
   seatsPurchased: integer("seats_purchased").notNull().default(0),
   linkedinAccountsPurchased: integer("linkedin_accounts_purchased").notNull().default(0),
   currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }),
+  trialEndsAt: timestamp("trial_ends_at", { withTimezone: true }),
 });
 
 export const accountMembers = pgTable(

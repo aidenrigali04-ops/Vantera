@@ -1,4 +1,4 @@
-import type { PlanTier } from "./plans";
+import type { PlanTier, BillingInterval } from "./plans";
 import type { SubscriptionStatus } from "./entitlements";
 
 export interface CheckoutRequest {
@@ -7,6 +7,8 @@ export interface CheckoutRequest {
   stripeCustomerId: string | null;
   customerEmail: string;
   tier: PlanTier;
+  /** Billing cadence; defaults to monthly when omitted. */
+  interval?: BillingInterval;
   /** Extra seats beyond the tier base (quantity line). */
   seatAddons: number;
   /** LinkedIn-account quantity line. */

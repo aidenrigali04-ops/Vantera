@@ -4,6 +4,7 @@ import type { RankCandidate } from "@vantera/agent-brains";
 import { icpCriteriaToFilters } from "@vantera/prospect-data";
 import {
   SCOUT_DEFAULTS,
+  TRIAL_LEAD_CAP,
   type FreshLead,
   type ScoutDeps,
   type ScoutRunSummary,
@@ -34,14 +35,27 @@ export async function runScout(agentId: string, deps: ScoutDeps): Promise<ScoutR
     }
   }
 
+  // Trial COGS guard: a trialing account sources at most TRIAL_LEAD_CAP leads total.
+  // Once the ceiling is hit the run no-ops before any discovery/enrichment spend.
+  let prospectsPerRun = config.prospectsPerRun;
+  if (ctx.account.subscriptionStatus === "trialing") {
+    const alreadySourced = await deps.store.countAccountLeads(accountId);
+    prospectsPerRun = Math.min(prospectsPerRun, Math.max(0, TRIAL_LEAD_CAP - alreadySourced));
+    if (prospectsPerRun === 0) {
+      return { status: "skipped", discovered: 0, gatePassed: 0, qualified: 0, chained: false };
+    }
+  }
+
   // discover per ICP and keep only new-or-unscored leads (store dedupes by external_ref)
+  // Compose both gates: the capacity throttle's ceiling is the trial-capped
+  // prospectsPerRun, so the effective pull = min(trial cap, outreach capacity).
   const capacity = await deps.store.getOutreachCapacity(accountId);
   const runTarget = computeRunTarget(capacity, {
     cadenceDays: ctx.agent.cadence === "weekly" ? 7 : 1,
     currentBacklog: await deps.store.countUncontactedLeads(accountId),
     bufferFactor: config.bufferFactor,
     floor: config.floor,
-    ceiling: config.prospectsPerRun,
+    ceiling: prospectsPerRun,
   });
   if (runTarget === 0) {
     await deps.store.completeRun(agentId, now());

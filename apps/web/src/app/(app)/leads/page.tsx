@@ -30,7 +30,7 @@ export default async function LeadsPage({
   let query = supabase
     .from("leads")
     .select(
-      "id, first_name, last_name, title, company_name, industry, location, status, ai_score, ai_rationale, ai_insights, rules_gate_reasons, email, email_status, phone, phone_status, linkedin_url, created_at, replies(classification, classification_rationale, body, received_at)",
+      "id, first_name, last_name, title, company_name, industry, location, status, ai_score, ai_rationale, ai_insights, rules_gate_reasons, email, email_status, phone, phone_status, linkedin_url, created_at, replies(channel, classification, classification_rationale, body, received_at)",
       { count: "exact" }
     )
     .order("created_at", { ascending: false })

@@ -40,6 +40,22 @@ export const SCOUT_DEFAULTS: ScoutConfig = {
   floor: 5,
 };
 
+/**
+ * Trial COGS cap: a trialing account sources at most this many leads total, so
+ * enrichment spend (rule 05, on rules-gate survivors) is bounded until it converts.
+ * Pairs with the free-trial policy in @vantera/billing (TRIAL_TIER/TRIAL_DAYS); this
+ * is the prospecting-budget half and lives with the scout pipeline that enforces it.
+ */
+export const TRIAL_LEAD_CAP = 100;
+
+/**
+ * Trial send cap: a trialing account dispatches at most this many outbound sends
+ * total (across email + LinkedIn). Bounds deliverability exposure on our provisioned
+ * mailboxes and per-send COGS until the account converts. Enforced per-account at the
+ * send-dispatch boundary, alongside the channel safety limits.
+ */
+export const TRIAL_SEND_CAP = 50;
+
 export interface ScoutContext {
   agent: {
     id: string;
@@ -54,6 +70,8 @@ export interface ScoutContext {
     websiteUrl: string | null;
     websiteScan: (WebsiteScan & { url?: string }) | null;
     websiteScannedAt: Date | null;
+    /** Drives the trial lead cap; 'trialing' accounts are bounded by TRIAL_LEAD_CAP. */
+    subscriptionStatus: string;
   };
 }
 
@@ -65,6 +83,8 @@ export interface FreshLead {
 
 export interface ScoutStore {
   getScoutContext(agentId: string): Promise<ScoutContext | null>;
+  /** Total leads already sourced for the account — used to enforce TRIAL_LEAD_CAP. */
+  countAccountLeads(accountId: string): Promise<number>;
   saveWebsiteScan(accountId: string, url: string, scan: WebsiteScan): Promise<void>;
   /** insert unseen candidates, return new-or-unscored leads only (dedupe by external_ref per account) */
   upsertLeads(accountId: string, icpId: string, candidates: ProspectCandidate[]): Promise<FreshLead[]>;
@@ -244,12 +264,16 @@ export interface DispatchableSend {
   campaignStatus: string;
   leadInvitedAt: Date | null;
   leadConnectedAt: Date | null;
+  /** Drives the trial send cap; 'trialing' accounts are bounded by TRIAL_SEND_CAP. */
+  subscriptionStatus: string;
 }
 
 export interface SendDispatchStore {
   isKillSwitchOn(): Promise<boolean>;
   /** approved rows + scheduled rows whose scheduled_for is older than staleCutoff (lost-task recovery) */
   getDispatchableSends(staleCutoff: Date): Promise<DispatchableSend[]>;
+  /** Total sends recorded for the account (outreach_sends) — enforces TRIAL_SEND_CAP. */
+  countAccountSends(accountId: string): Promise<number>;
   /** Σ over ACTIVE mailboxes of min(daily_send_limit ?? cap, cap) − sends recorded today */
   getEmailCapacity(accountId: string, dayStart: Date): Promise<number>;
   /** null = no active LinkedIn identity */
@@ -301,6 +325,27 @@ export interface RetentionSummary {
   cutoff: string;
   webhookEventsPurged: number;
   copilotConversationsPurged: number;
+}
+
+export interface ExpiredTrialAccount {
+  id: string;
+}
+
+export interface TrialStore {
+  /** accounts still on a no-card trial (status='trialing', no Stripe sub) past trial_ends_at */
+  getExpiredTrialAccounts(now: Date): Promise<ExpiredTrialAccount[]>;
+  /** flip lapsed trials to plan='none', status='none', outreach paused — returns rows changed */
+  expireTrials(ids: string[]): Promise<number>;
+}
+
+export interface TrialExpiryDeps {
+  store: TrialStore;
+  now?: () => Date;
+}
+
+export interface TrialExpirySummary {
+  status: "completed";
+  expired: number;
 }
 
 export interface InboundPayload {

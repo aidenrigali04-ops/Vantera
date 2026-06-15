@@ -6,7 +6,27 @@ routes: /settings/billing
 
 # Plans and billing
 
-Vantera offers three plans — **Starter**, **Growth**, and **Scale** — each with a set of included seats and usage limits. Your plan determines how many teammates can log in and how much outreach capacity you get by default.
+Vantera offers three plans — **Starter**, **Growth**, and **Scale** — each with a set of included seats and usage limits. Your plan determines how many teammates can log in and how much outreach capacity you get by default. Every plan runs the same prospecting, enrichment, and lead scoring; moving up a plan adds channels, seats, and volume.
+
+## What each plan includes
+
+- **Starter** — Email and LinkedIn SDR agents working your ICP. The smallest seat, mailbox, and campaign limits.
+- **Growth** — Everything in Starter, plus Meta Ads generation and lead nurturing, with more seats, mailboxes, and active campaigns.
+- **Scale** — Everything in Growth, plus the AI Cold Caller (voice outreach), the highest limits, and priority enrichment and support.
+
+For custom volume, SSO, or dedicated support, contact us about an Enterprise plan.
+
+## Your free trial
+
+Every new workspace starts on a **14-day free trial** of the Starter plan — no card required. The trial lets you deploy your agents and reach your first replies before you pay. The Billing page shows how many days are left. To deploy an agent during the trial, confirm your email first.
+
+To keep things fair, a trial sources a capped number of leads — plenty to prove the motion and reach your first replies. Choosing a plan lifts the cap and prospecting continues at your plan's full volume.
+
+When the trial ends, your agents pause and you'll be asked to choose a plan. Your leads, campaigns, and history are kept exactly as they were — picking a plan resumes everything.
+
+## Deploying agents needs an active plan
+
+Your SDR agents go live the moment a plan is active — so deploying your first agent requires either a paid plan or an active trial. Since every workspace starts on a trial, your first deploy just works; you're only asked to choose a plan once the trial ends. Nothing else in onboarding is blocked before that point.
 
 ## Add-ons
 

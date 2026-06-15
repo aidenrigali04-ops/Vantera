@@ -22,6 +22,7 @@ function isoDaysAgo(days: number): string {
   return new Date(Date.now() - days * 86_400_000).toISOString();
 }
 
+// Month-label for the goal-pace ETA — keeps Date.now() in a module helper, not render.
 // Relative-time labels are formatted here on the server and passed to the client
 // view as static strings — keeps Date.now() out of the client render (no hydration
 // mismatch).
@@ -300,8 +301,7 @@ export default async function DashboardPage() {
   if (pace?.reached) {
     revenuePace = "You've cleared your monthly goal — time to raise it.";
   } else if (pace && pace.etaDays != null) {
-    const when = etaMonthLabel(pace.etaDays);
-    revenuePace = `On pace to hit your ${goal}/mo goal around ${when}.`;
+    revenuePace = `On pace to hit your ${goal}/mo goal around ${etaMonthLabel(pace.etaDays)}.`;
   }
 
   return (

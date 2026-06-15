@@ -1,10 +1,15 @@
 /** Internal tier identifiers. Display names + prices are Stripe-side. */
 export type PlanTier = "starter" | "growth" | "scale";
 
+/** Billing cadence — Stripe has a distinct recurring price per cadence. */
+export type BillingInterval = "month" | "year";
+
 export interface PlanConfig {
   tier: PlanTier;
-  /** Stripe recurring price id for the base subscription (from env). */
+  /** Stripe recurring price id for the monthly base subscription (from env). */
   stripePriceId: string;
+  /** Stripe recurring price id for the annual base subscription (from env). */
+  stripePriceIdAnnual: string;
   /** Seats included before the per-seat add-on is billed. */
   includedSeats: number;
   maxMailboxes: number;
@@ -19,6 +24,7 @@ export const PLANS: Record<PlanTier, PlanConfig> = {
   starter: {
     tier: "starter",
     stripePriceId: env("STRIPE_PRICE_STARTER"),
+    stripePriceIdAnnual: env("STRIPE_PRICE_STARTER_ANNUAL"),
     includedSeats: 1,
     maxMailboxes: 3,
     maxCampaigns: 1,
@@ -27,6 +33,7 @@ export const PLANS: Record<PlanTier, PlanConfig> = {
   growth: {
     tier: "growth",
     stripePriceId: env("STRIPE_PRICE_GROWTH"),
+    stripePriceIdAnnual: env("STRIPE_PRICE_GROWTH_ANNUAL"),
     includedSeats: 3,
     maxMailboxes: 9,
     maxCampaigns: 5,
@@ -35,6 +42,7 @@ export const PLANS: Record<PlanTier, PlanConfig> = {
   scale: {
     tier: "scale",
     stripePriceId: env("STRIPE_PRICE_SCALE"),
+    stripePriceIdAnnual: env("STRIPE_PRICE_SCALE_ANNUAL"),
     includedSeats: 10,
     maxMailboxes: 30,
     maxCampaigns: 25,
@@ -42,15 +50,29 @@ export const PLANS: Record<PlanTier, PlanConfig> = {
   },
 };
 
+/** The Stripe price id for a tier at a given cadence. */
+export function priceIdFor(tier: PlanTier, interval: BillingInterval): string {
+  return interval === "year" ? PLANS[tier].stripePriceIdAnnual : PLANS[tier].stripePriceId;
+}
+
 /** Per-unit add-on price ids (Stripe quantity lines). */
 export const ADDON_PRICES = {
   seat: env("STRIPE_PRICE_ADDON_SEAT"),
   linkedinAccount: env("STRIPE_PRICE_ADDON_LINKEDIN"),
 } as const;
 
+/** Resolve a tier from either its monthly or its annual Stripe price id. */
 export function planForPriceId(priceId: string): PlanTier | null {
   const match = (Object.keys(PLANS) as PlanTier[]).find(
-    (t) => PLANS[t].stripePriceId === priceId
+    (t) => PLANS[t].stripePriceId === priceId || PLANS[t].stripePriceIdAnnual === priceId
   );
   return match ?? null;
 }
+
+/** Every base-plan price id (both cadences) — used to spot the plan line in a subscription. */
+export const PLAN_PRICE_IDS: ReadonlySet<string> = new Set(
+  (Object.keys(PLANS) as PlanTier[]).flatMap((t) => [
+    PLANS[t].stripePriceId,
+    PLANS[t].stripePriceIdAnnual,
+  ])
+);

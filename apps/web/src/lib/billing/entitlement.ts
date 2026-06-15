@@ -1,6 +1,7 @@
 import {
   resolveEntitlements,
   checkLimit,
+  isActive,
   type EntitlementSnapshot,
   type GatedResource,
 } from "@vantera/billing";
@@ -23,6 +24,18 @@ export function snapshotFromRow(row: AccountBillingRow): EntitlementSnapshot {
     linkedinAccountsPurchased: row.linkedin_accounts_purchased,
     currentPeriodEnd: row.current_period_end,
   };
+}
+
+/**
+ * True when the account can deploy/run agents — a paid plan OR an active trial.
+ * The first-deploy gate uses this so trial users still reach the aha moment, while
+ * no-plan and lapsed accounts are routed to choose a plan. Null row (no account
+ * billing data yet) counts as no plan.
+ */
+export function hasActivePlan(row: AccountBillingRow | null): boolean {
+  if (!row) return false;
+  const snap = snapshotFromRow(row);
+  return snap.plan !== "none" && isActive(snap.subscriptionStatus);
 }
 
 /** Pure gate: returns the validation-style result the actions already use. */

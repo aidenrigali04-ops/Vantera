@@ -14,6 +14,7 @@ import {
   scoreVerdict,
   type ScoreTier,
 } from "./lead-value";
+import { ReplyHandoff } from "./reply-panel";
 
 export interface LeadInsightsView {
   pain_points?: string[];
@@ -47,6 +48,7 @@ export interface LeadRow {
 }
 
 export interface ReplyView {
+  channel: "email" | "linkedin";
   classification: string | null;
   classification_rationale: string | null;
   body: string | null;
@@ -388,6 +390,11 @@ export function LeadsTable({
                         “{reply.body.slice(0, 200)}
                         {reply.body.length > 200 ? "…" : ""}”
                       </p>
+                    )}
+                    {selected.status === "replied" && (
+                      <div className="border-t border-border pt-3">
+                        <ReplyHandoff leadId={selected.id} channel={reply.channel} />
+                      </div>
                     )}
                   </section>
                 );

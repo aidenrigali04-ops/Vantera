@@ -53,6 +53,7 @@ import {
   type OutreachSendStore,
   type PurgeCandidate,
   type RetentionStore,
+  type TrialStore,
   type ScoutConfig,
   type ScoutContext,
   type ScoutStore,
@@ -108,7 +109,7 @@ function toRow(send: NewScheduledSend) {
 }
 
 /** Drizzle-backed store used by the Trigger.dev tasks (service-role DATABASE_URL). */
-export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerStore & RetentionStore & SendDispatchStore & OutreachSendStore & InboundStore & SequenceStore & SequenceTouchStore & ConversionStore & RefreshLeadStore {
+export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerStore & RetentionStore & TrialStore & SendDispatchStore & OutreachSendStore & InboundStore & SequenceStore & SequenceTouchStore & ConversionStore & RefreshLeadStore {
   return {
     async getScoutContext(agentId: string): Promise<ScoutContext | null> {
       const [agent] = await db.select().from(agents).where(eq(agents.id, agentId));
@@ -136,8 +137,17 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           websiteUrl: account.websiteUrl,
           websiteScan: account.websiteScan as ScoutContext["account"]["websiteScan"],
           websiteScannedAt: account.websiteScannedAt,
+          subscriptionStatus: account.subscriptionStatus,
         },
       };
+    },
+
+    async countAccountLeads(accountId: string): Promise<number> {
+      const [row] = await db
+        .select({ n: count() })
+        .from(leads)
+        .where(eq(leads.accountId, accountId));
+      return row?.n ?? 0;
     },
 
     async saveWebsiteScan(accountId: string, url: string, scan: WebsiteScan): Promise<void> {
@@ -533,6 +543,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           status: scheduledSends.status,
           accountPaused: accounts.outreachPaused,
           senderAddress: accounts.senderAddress,
+          subscriptionStatus: accounts.subscriptionStatus,
           campaignStatus: campaigns.status,
           leadInvitedAt: leads.linkedinInvitedAt,
           leadConnectedAt: leads.linkedinConnectedAt,
@@ -560,7 +571,16 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         campaignStatus: r.campaignStatus,
         leadInvitedAt: r.leadInvitedAt,
         leadConnectedAt: r.leadConnectedAt,
+        subscriptionStatus: r.subscriptionStatus,
       }));
+    },
+
+    async countAccountSends(accountId: string): Promise<number> {
+      const [row] = await db
+        .select({ n: count() })
+        .from(outreachSends)
+        .where(eq(outreachSends.accountId, accountId));
+      return row?.n ?? 0;
     },
 
     async getEmailCapacity(accountId: string, dayStart: Date): Promise<number> {
@@ -1139,6 +1159,30 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           title: row.title,
         },
       };
+    },
+
+    // ── TrialStore ───────────────────────────────────────────────────────────
+    async getExpiredTrialAccounts(now: Date) {
+      return db
+        .select({ id: accounts.id })
+        .from(accounts)
+        .where(
+          and(
+            eq(accounts.subscriptionStatus, "trialing"),
+            isNull(accounts.stripeSubscriptionId),
+            lt(accounts.trialEndsAt, now)
+          )
+        );
+    },
+
+    async expireTrials(ids: string[]) {
+      if (ids.length === 0) return 0;
+      const rows = await db
+        .update(accounts)
+        .set({ plan: "none", subscriptionStatus: "none", outreachPaused: true })
+        .where(inArray(accounts.id, ids))
+        .returning({ id: accounts.id });
+      return rows.length;
     },
   };
 }

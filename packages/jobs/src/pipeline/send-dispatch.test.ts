@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { INVITE_EXPIRY_DAYS, STALE_TASK_MINUTES, runSendDispatch } from "./send-dispatch";
+import { TRIAL_SEND_CAP } from "./types";
 import type { DispatchableSend, SendDispatchDeps, SendDispatchStore } from "./types";
 
 // ─── helper ──────────────────────────────────────────────────────────────────
@@ -18,6 +19,7 @@ function makeSend(overrides: Partial<DispatchableSend> = {}): DispatchableSend {
     campaignStatus: "active",
     leadInvitedAt: null,
     leadConnectedAt: null,
+    subscriptionStatus: "active",
     ...overrides,
   };
 }
@@ -29,12 +31,16 @@ class FakeDispatchStore implements SendDispatchStore {
   linkedInAgeDays: number | null = 30;
   inviteSentToday = 0;
   messageSentToday = 0;
+  accountSendsCount = 0; // what countAccountSends reports (trial-cap input)
   scheduled: { sendId: string; scheduledFor: Date }[] = [];
   canceled: { sendId: string; error: string }[] = [];
   getDispatchableSendsCallCount = 0;
 
   async isKillSwitchOn() {
     return this.killSwitch;
+  }
+  async countAccountSends(_accountId: string) {
+    return this.accountSendsCount;
   }
   async getDispatchableSends(_staleCutoff: Date) {
     this.getDispatchableSendsCallCount += 1;
@@ -295,6 +301,62 @@ describe("runSendDispatch — linkedin channel", () => {
 
     expect(result.skipped).toBe(1);
     expect(result.scheduled).toBe(0);
+  });
+});
+
+describe("runSendDispatch — trial send cap", () => {
+  it("trialing account at the send ceiling: all rows skipped, nothing enqueued", async () => {
+    const store = new FakeDispatchStore();
+    store.emailCapacity = 10;
+    store.accountSendsCount = TRIAL_SEND_CAP; // already at the lifetime trial ceiling
+    store.sends = [
+      makeSend({ id: "s1", subscriptionStatus: "trialing" }),
+      makeSend({ id: "s2", subscriptionStatus: "trialing" }),
+    ];
+    const enqueued: { sendId: string; runAt: Date }[] = [];
+    const deps = makeDeps(store, enqueued);
+
+    const result = await runSendDispatch(deps);
+
+    expect(result.scheduled).toBe(0);
+    expect(result.skipped).toBe(2);
+    expect(enqueued).toHaveLength(0);
+  });
+
+  it("trialing account with 1 send of headroom schedules exactly one, skips the rest", async () => {
+    const store = new FakeDispatchStore();
+    store.emailCapacity = 10; // channel capacity is not the limiter here
+    store.accountSendsCount = TRIAL_SEND_CAP - 1; // one send of trial budget left
+    store.sends = [
+      makeSend({ id: "s1", subscriptionStatus: "trialing" }),
+      makeSend({ id: "s2", subscriptionStatus: "trialing" }),
+      makeSend({ id: "s3", subscriptionStatus: "trialing" }),
+    ];
+    const enqueued: { sendId: string; runAt: Date }[] = [];
+    const deps = makeDeps(store, enqueued);
+
+    const result = await runSendDispatch(deps);
+
+    expect(result.scheduled).toBe(1);
+    expect(result.skipped).toBe(2);
+    expect(enqueued).toHaveLength(1);
+  });
+
+  it("paid account is never bounded by the trial send cap", async () => {
+    const store = new FakeDispatchStore();
+    store.emailCapacity = 10;
+    store.accountSendsCount = TRIAL_SEND_CAP * 100; // far over — but not on trial
+    store.sends = [
+      makeSend({ id: "s1", subscriptionStatus: "active" }),
+      makeSend({ id: "s2", subscriptionStatus: "active" }),
+    ];
+    const enqueued: { sendId: string; runAt: Date }[] = [];
+    const deps = makeDeps(store, enqueued);
+
+    const result = await runSendDispatch(deps);
+
+    expect(result.scheduled).toBe(2);
+    expect(result.skipped).toBe(0);
   });
 });
 
