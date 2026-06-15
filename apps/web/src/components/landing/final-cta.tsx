@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
-import { WARM } from "./landing-theme";
 
 export function FinalCta() {
   return (
@@ -18,7 +17,7 @@ export function FinalCta() {
         <div
           aria-hidden
           className="pointer-events-none absolute -top-40 left-1/2 size-[36rem] -translate-x-1/2 rounded-full blur-[120px]"
-          style={{ background: `radial-gradient(circle, ${WARM.c2}22, transparent 65%)` }}
+          style={{ background: "radial-gradient(circle, color-mix(in srgb, var(--brand) 12%, transparent), transparent 65%)" }}
         />
         <div className="relative">
           <span className="font-mono text-[11px] tracking-[0.18em] text-muted-foreground uppercase">
@@ -35,7 +34,7 @@ export function FinalCta() {
           <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
             <Link
               href="/signup"
-              className="group inline-flex items-center justify-center gap-2 rounded-full bg-foreground px-7 py-3.5 text-sm font-medium text-background shadow-lg shadow-black/30 transition-opacity hover:opacity-90"
+              className="group inline-flex items-center justify-center gap-2 rounded-full bg-brand px-7 py-3.5 text-sm font-medium text-brand-foreground shadow-lg shadow-brand/25 transition-opacity hover:opacity-90"
             >
               Get started free
               <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />

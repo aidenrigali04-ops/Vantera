@@ -58,7 +58,7 @@ export function LandingNav() {
           </Link>
           <Link
             href="/signup"
-            className="rounded-xl bg-foreground px-4 py-1.5 text-sm font-medium text-background transition-opacity hover:opacity-90"
+            className="rounded-xl bg-brand px-4 py-1.5 text-sm font-medium text-brand-foreground transition-opacity hover:opacity-90"
           >
             Get started
           </Link>
