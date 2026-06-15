@@ -173,3 +173,12 @@ describe("billing entitlements (0013)", () => {
     }
   });
 });
+
+describe("account sender name (0019)", () => {
+  it("0019: sender_name is client-writable (column-scoped accounts UPDATE grant)", () => {
+    const sql = readFileSync(join(migrationsDir, "0019_account_sender_name.sql"), "utf8");
+    const grantMatch = sql.match(/grant update \(([^)]*)\)\s+on (?:table )?public\.accounts/i);
+    expect(grantMatch, "expected a column-scoped accounts UPDATE grant").toBeTruthy();
+    expect(grantMatch![1]).toContain("sender_name");
+  });
+});

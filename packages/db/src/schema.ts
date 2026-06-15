@@ -56,6 +56,8 @@ export const accounts = pgTable("accounts", {
   websiteScannedAt: timestamp("website_scanned_at", { withTimezone: true }),
   // 0009: CAN-SPAM physical mailing address for cold-email footer (rule 11)
   senderAddress: jsonb("sender_address"),
+  // 0019: human sender name for the email sign-off ({{sender_name}}); client-settable in Settings
+  senderName: text("sender_name"),
   // 0013: subscription entitlement snapshot (server-managed; Stripe webhook only)
   plan: text("plan", { enum: ["none", "starter", "growth", "scale"] })
     .notNull()
