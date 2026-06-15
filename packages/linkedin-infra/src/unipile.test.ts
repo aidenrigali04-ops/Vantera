@@ -293,6 +293,26 @@ describe("UnipileLinkedInInfra", () => {
     });
   });
 
+  describe("createHostedAuthLink — hosted-auth domain assertion", () => {
+    it("throws if hostedAuthDomain set and returned url is off-domain", async () => {
+      const fetchFn = (async () => new Response(JSON.stringify({ url: "https://accounts.unipile.com/abc" }), { status: 200 })) as unknown as typeof fetch;
+      const infra = new UnipileLinkedInInfra({ apiKey: "k", dsn: "d", webhookSecret: "s", fetchFn, hostedAuthDomain: "connect.vanterasystem.com" });
+      await expect(infra.createHostedAuthLink("acc_1")).rejects.toThrow(/custom domain/i);
+    });
+
+    it("passes when hostedAuthDomain matches the returned url host", async () => {
+      const fetchFn = (async () => new Response(JSON.stringify({ url: "https://connect.vanterasystem.com/abc" }), { status: 200 })) as unknown as typeof fetch;
+      const infra = new UnipileLinkedInInfra({ apiKey: "k", dsn: "d", webhookSecret: "s", fetchFn, hostedAuthDomain: "connect.vanterasystem.com" });
+      await expect(infra.createHostedAuthLink("acc_1")).resolves.toMatchObject({ url: expect.stringContaining("connect.vanterasystem.com") });
+    });
+
+    it("warns but proceeds when hostedAuthDomain is unset", async () => {
+      const fetchFn = (async () => new Response(JSON.stringify({ url: "https://accounts.unipile.com/abc" }), { status: 200 })) as unknown as typeof fetch;
+      const infra = new UnipileLinkedInInfra({ apiKey: "k", dsn: "d", webhookSecret: "s", fetchFn });
+      await expect(infra.createHostedAuthLink("acc_1")).resolves.toMatchObject({ url: expect.any(String) });
+    });
+  });
+
   describe("error handling — Fix 2", () => {
     it("throws with status and body detail on non-ok response", async () => {
       const adapter = new UnipileLinkedInInfra({

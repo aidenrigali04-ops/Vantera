@@ -18,6 +18,13 @@ export interface UnipileConfig {
   dsn: string;
   webhookSecret: string;
   fetchFn?: typeof fetch;
+  /**
+   * Expected hostname (no protocol) of the white-labeled hosted-auth page,
+   * e.g. "connect.vanterasystem.com". When set, the adapter asserts the
+   * returned URL is on this domain; when unset, a warning is logged instead
+   * (rule 04 — white-label).
+   */
+  hostedAuthDomain?: string;
 }
 
 export class UnipileLinkedInInfra implements LinkedInInfra {
@@ -25,12 +32,14 @@ export class UnipileLinkedInInfra implements LinkedInInfra {
   private readonly dsn: string;
   private readonly webhookSecret: string;
   private readonly fetchFn: typeof fetch;
+  private readonly hostedAuthDomain: string | undefined;
 
   constructor(config: UnipileConfig) {
     this.apiKey = config.apiKey;
     this.dsn = config.dsn;
     this.webhookSecret = config.webhookSecret;
     this.fetchFn = config.fetchFn ?? fetch;
+    this.hostedAuthDomain = config.hostedAuthDomain;
   }
 
   // ── private helper ──────────────────────────────────────────────────────
@@ -71,7 +80,16 @@ export class UnipileLinkedInInfra implements LinkedInInfra {
       method: "POST",
       body: JSON.stringify(body),
     });
-    return { url: requireString(data.url, "url"), expiresAt: expiresOn };
+    const url = requireString(data.url, "url");
+    if (this.hostedAuthDomain) {
+      const host = new URL(url).host;
+      if (host !== this.hostedAuthDomain) {
+        throw new Error(`hosted-auth URL host ${host} is not the configured custom domain ${this.hostedAuthDomain}`);
+      }
+    } else {
+      console.warn("HOSTED_AUTH_DOMAIN unset — hosted-auth URL may expose the provider domain (white-label, rule 04)");
+    }
+    return { url, expiresAt: expiresOn };
   }
 
   async sendInvite(req: InviteRequest): Promise<SendOutcome> {
@@ -179,9 +197,9 @@ export class UnipileLinkedInInfra implements LinkedInInfra {
 
 /** The only construction point product code may use (white-label, rule 04). */
 export function createLinkedInInfraFromEnv(): LinkedInInfra {
-  const { UNIPILE_API_KEY, UNIPILE_DSN, UNIPILE_WEBHOOK_SECRET } = process.env;
+  const { UNIPILE_API_KEY, UNIPILE_DSN, UNIPILE_WEBHOOK_SECRET, HOSTED_AUTH_DOMAIN } = process.env;
   if (!UNIPILE_API_KEY || !UNIPILE_DSN || !UNIPILE_WEBHOOK_SECRET) {
     throw new Error("linkedin infra env vars missing");
   }
-  return new UnipileLinkedInInfra({ apiKey: UNIPILE_API_KEY, dsn: UNIPILE_DSN, webhookSecret: UNIPILE_WEBHOOK_SECRET });
+  return new UnipileLinkedInInfra({ apiKey: UNIPILE_API_KEY, dsn: UNIPILE_DSN, webhookSecret: UNIPILE_WEBHOOK_SECRET, hostedAuthDomain: HOSTED_AUTH_DOMAIN });
 }
