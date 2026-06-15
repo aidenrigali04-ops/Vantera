@@ -21,18 +21,33 @@ import type {
 } from "@vantera/agent-brains";
 import type { VoiceInfra } from "@vantera/voice-infra";
 import type { SenderAddress } from "./email-footer";
+import type { OutreachCapacity } from "./capacity";
 import type { EmailInfra } from "@vantera/email-infra";
 import type { LinkedInInfra } from "@vantera/linkedin-infra";
 
 export interface ScoutConfig {
   prospectsPerRun: number;
   minScore: number;
+  /** capacity-throttle tunables (per-agent override via agents.config jsonb) */
+  bufferFactor: number;
+  floor: number;
 }
 
-export const SCOUT_DEFAULTS: ScoutConfig = { prospectsPerRun: 25, minScore: 70 };
+export const SCOUT_DEFAULTS: ScoutConfig = {
+  prospectsPerRun: 25,
+  minScore: 70,
+  bufferFactor: 1.3,
+  floor: 5,
+};
 
 export interface ScoutContext {
-  agent: { id: string; accountId: string; status: string; config: Partial<ScoutConfig> };
+  agent: {
+    id: string;
+    accountId: string;
+    status: string;
+    cadence: "daily" | "weekly" | null;
+    config: Partial<ScoutConfig>;
+  };
   icps: { id: string; name: string; criteria: IcpCriteria }[];
   account: {
     industry: string | null;
@@ -57,6 +72,10 @@ export interface ScoutStore {
   saveEnrichment(leadId: string, accountId: string, enriched: EnrichedProspect): Promise<void>;
   saveScore(leadId: string, insights: LeadInsights, qualified: boolean): Promise<void>;
   completeRun(agentId: string, lastRunAt: Date): Promise<void>;
+  /** live outreach capacity for the account (warmup state + LinkedIn connection + channel toggles) */
+  getOutreachCapacity(accountId: string): Promise<OutreachCapacity>;
+  /** in-flight leads not yet contacted (pending_review/approved/scheduled sends, no send recorded) */
+  countUncontactedLeads(accountId: string): Promise<number>;
   getLiveCopyAgent(accountId: string): Promise<{ id: string } | null>;
   getLiveCallerAgent(accountId: string): Promise<{ id: string } | null>;
 }
