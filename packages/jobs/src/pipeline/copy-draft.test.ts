@@ -27,6 +27,7 @@ function lead(id: string, overrides: Partial<DraftableLead> = {}): DraftableLead
       aha_moment: "meetings week one",
       summary: "fit",
     },
+    scoredAt: null,
     ...overrides,
   };
 }

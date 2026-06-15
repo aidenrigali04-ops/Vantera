@@ -2,6 +2,7 @@ import { describeViolations } from "@vantera/agent-brains";
 import type { DraftInput, Violation } from "@vantera/agent-brains";
 import { normalizeLinkedInUrl } from "./copy-draft";
 import { normalizePhone } from "./call-brief";
+import { needsRefresh, FRESHNESS_WINDOW_DAYS } from "./freshness";
 import type {
   NewScheduledSend,
   SequenceTouchDeps,
@@ -47,6 +48,11 @@ export async function runSequenceTouch(
         : normalizePhone(value);
   if (await deps.store.isSuppressed(d.accountId, SUPPRESSION_KIND[d.stage], normalized)) {
     return "suppressed";
+  }
+
+  if (d.stage === "email" && needsRefresh(lead.scoredAt, deps.now(), FRESHNESS_WINDOW_DAYS)) {
+    const refresh = await deps.refreshLead(d.accountId, d.leadId);
+    if (refresh === "dropped") return "dropped"; // lead exits the sequence; no send, not suppressed
   }
 
   const cta = await deps.store.getCampaignCta(d.campaignId);
