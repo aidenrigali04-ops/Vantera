@@ -44,6 +44,9 @@ importers:
       '@vantera/help-agent':
         specifier: workspace:*
         version: link:../../packages/help-agent
+      '@vantera/imessage-infra':
+        specifier: workspace:*
+        version: link:../../packages/imessage-infra
       '@vantera/jobs':
         specifier: workspace:*
         version: link:../../packages/jobs
@@ -301,6 +304,9 @@ importers:
       '@vantera/email-infra':
         specifier: workspace:*
         version: link:../email-infra
+      '@vantera/imessage-infra':
+        specifier: workspace:*
+        version: link:../imessage-infra
       '@vantera/linkedin-infra':
         specifier: workspace:*
         version: link:../linkedin-infra

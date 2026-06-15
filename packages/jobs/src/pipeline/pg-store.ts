@@ -572,7 +572,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         accountId: r.accountId,
         campaignId: r.campaignId,
         leadId: r.leadId,
-        channel: r.channel as "email" | "linkedin",
+        channel: r.channel as "email" | "linkedin" | "imessage",
         linkedinStage: r.linkedinStage as "invite" | "message" | null,
         status: r.status as "approved" | "scheduled",
         accountPaused: r.accountPaused,
@@ -654,6 +654,20 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
       return rows.length;
     },
 
+    async countImessageSentToday(accountId: string, dayStart: Date): Promise<number> {
+      const rows = await db
+        .select({ id: outreachSends.id })
+        .from(outreachSends)
+        .where(
+          and(
+            eq(outreachSends.accountId, accountId),
+            eq(outreachSends.channel, "imessage"),
+            gte(outreachSends.sentAt, dayStart)
+          )
+        );
+      return rows.length;
+    },
+
     async markScheduled(sendId: string, scheduledFor: Date) {
       await db.update(scheduledSends).set({ status: "scheduled", scheduledFor }).where(eq(scheduledSends.id, sendId));
     },
@@ -682,6 +696,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           senderName: accounts.senderName,
           leadEmail: leads.email,
           leadLinkedinUrl: leads.linkedinUrl,
+          leadPhone: leads.phone,
         })
         .from(scheduledSends)
         .innerJoin(accounts, eq(scheduledSends.accountId, accounts.id))
@@ -694,7 +709,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         accountId: r.accountId,
         campaignId: r.campaignId,
         leadId: r.leadId,
-        channel: r.channel as "email" | "linkedin",
+        channel: r.channel as "email" | "linkedin" | "imessage",
         linkedinStage: r.linkedinStage as "invite" | "message" | null,
         status: r.status,
         subject: r.subject,
@@ -703,7 +718,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         accountPaused: r.accountPaused,
         senderAddress: parseSenderAddress(r.senderAddress),
         senderName: r.senderName ?? "", // null → empty so the send path strips {{sender_name}} cleanly
-        lead: { email: r.leadEmail, linkedinUrl: r.leadLinkedinUrl },
+        lead: { email: r.leadEmail, linkedinUrl: r.leadLinkedinUrl, phone: r.leadPhone },
       };
     },
 
@@ -776,7 +791,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
       campaignId: string;
       leadId: string;
       scheduledSendId: string;
-      channel: "email" | "linkedin";
+      channel: "email" | "linkedin" | "imessage";
       mailboxId?: string;
       linkedinAccountId?: string;
       messageRef: string | null;
@@ -876,11 +891,45 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
       return { id: hit.id, campaignId: cl?.campaignId ?? null };
     },
 
+    async findLeadByPhone(normalizedPhone: string) {
+      // Global lookup — resolves the tenant by finding which account most recently sent an
+      // iMessage to this phone number. The LoopMessage sender is a single global Vantera
+      // number, so the webhook carries no accountId; we disambiguate cross-tenant by recency
+      // of the outbound send (the account that last iMessaged this prospect owns the reply).
+      // Phone is stored as-is; we normalize in JS to match E.164 lower-case w/o spaces.
+      const rows = await db
+        .select({
+          id: leads.id,
+          accountId: leads.accountId,
+          phone: leads.phone,
+          sentAt: outreachSends.sentAt,
+        })
+        .from(leads)
+        .innerJoin(
+          outreachSends,
+          and(
+            eq(outreachSends.leadId, leads.id),
+            eq(outreachSends.accountId, leads.accountId),
+            eq(outreachSends.channel, "imessage")
+          )
+        )
+        .orderBy(desc(outreachSends.sentAt));
+
+      const hit = rows.find((r) => r.phone && normalizePhone(r.phone) === normalizedPhone);
+      if (!hit) return null;
+      const [cl] = await db
+        .select({ campaignId: campaignLeads.campaignId })
+        .from(campaignLeads)
+        .where(eq(campaignLeads.leadId, hit.id))
+        .limit(1);
+      return { id: hit.id, accountId: hit.accountId, campaignId: cl?.campaignId ?? null };
+    },
+
     async insertReply(r: {
       accountId: string;
       leadId: string;
       campaignId: string | null;
-      channel: "email" | "linkedin";
+      channel: "email" | "linkedin" | "imessage";
       providerMessageRef: string | null;
       body: string;
       receivedAt: Date;
@@ -903,7 +952,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
 
     async addSuppression(
       accountId: string,
-      kind: "email" | "linkedin",
+      kind: "email" | "linkedin" | "phone",
       value: string,
       source: "unsubscribe" | "bounce" | "complaint" | "not_interested",
       leadId?: string

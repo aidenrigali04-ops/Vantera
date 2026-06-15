@@ -21,6 +21,7 @@
     "@vantera/ai": "workspace:*",
     "@vantera/email-infra": "workspace:*",
     "@vantera/help-agent": "workspace:*",
+    "@vantera/imessage-infra": "workspace:*",
     "@vantera/jobs": "workspace:*",
     "@vantera/linkedin-infra": "workspace:*",
     "@vantera/voice-infra": "workspace:*",

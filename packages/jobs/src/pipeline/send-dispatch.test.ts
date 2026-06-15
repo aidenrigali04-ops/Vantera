@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { INVITE_EXPIRY_DAYS, STALE_TASK_MINUTES, runSendDispatch } from "./send-dispatch";
+import { IMESSAGE_STEADY_DAILY } from "./safety-limits";
 import { TRIAL_SEND_CAP } from "./types";
 import type { DispatchableSend, SendDispatchDeps, SendDispatchStore } from "./types";
 
@@ -32,6 +33,7 @@ class FakeDispatchStore implements SendDispatchStore {
   inviteSentToday = 0;
   messageSentToday = 0;
   invitesLast7Days = 0; // what countLinkedInInvitesLast7Days reports (weekly-ceiling input)
+  imessageSentToday = 0;
   accountSendsCount = 0; // what countAccountSends reports (trial-cap input)
   scheduled: { sendId: string; scheduledFor: Date }[] = [];
   canceled: { sendId: string; error: string }[] = [];
@@ -58,6 +60,9 @@ class FakeDispatchStore implements SendDispatchStore {
   }
   async countLinkedInInvitesLast7Days(_accountId: string, _now: Date) {
     return this.invitesLast7Days;
+  }
+  async countImessageSentToday(_accountId: string, _dayStart: Date) {
+    return this.imessageSentToday;
   }
   async markScheduled(sendId: string, scheduledFor: Date) {
     this.scheduled.push({ sendId, scheduledFor });
@@ -414,22 +419,15 @@ describe("runSendDispatch — scheduling and timing", () => {
 describe("runSendDispatch — rolling weekly invite ceiling", () => {
   it("clamps invites to the rolling weekly ceiling (97 sent in 7 days → at most 3 dispatched)", async () => {
     const store = new FakeDispatchStore();
-    // ageDays 60 → steady-state daily allowance = LINKEDIN_STEADY_DAILY_INVITES (20)
-    // but 97 of the 100 weekly slots are consumed → only 3 remain
     store.linkedInAgeDays = 60;
-    store.inviteSentToday = 0;       // daily counter is not the binding constraint
-    store.invitesLast7Days = 97;     // weekly counter: 100 - 97 = 3 remaining
-
-    // 10 queued invite rows; assert at most 3 dispatched
+    store.inviteSentToday = 0;
+    store.invitesLast7Days = 97;
     store.sends = Array.from({ length: 10 }, (_, i) =>
       makeSend({ id: `inv${i + 1}`, channel: "linkedin", linkedinStage: "invite" })
     );
     const enqueued: { sendId: string; runAt: Date }[] = [];
     const deps = makeDeps(store, enqueued);
-
     const result = await runSendDispatch(deps);
-
-    // Weekly ceiling wins: exactly 3 invites dispatched, 7 skipped
     expect(result.scheduled).toBe(3);
     expect(result.skipped).toBe(7);
     expect(enqueued).toHaveLength(3);
@@ -439,17 +437,14 @@ describe("runSendDispatch — rolling weekly invite ceiling", () => {
     const store = new FakeDispatchStore();
     store.linkedInAgeDays = 60;
     store.inviteSentToday = 0;
-    store.invitesLast7Days = 100; // at the ceiling
-
+    store.invitesLast7Days = 100;
     store.sends = [
       makeSend({ id: "inv1", channel: "linkedin", linkedinStage: "invite" }),
       makeSend({ id: "inv2", channel: "linkedin", linkedinStage: "invite" }),
     ];
     const enqueued: { sendId: string; runAt: Date }[] = [];
     const deps = makeDeps(store, enqueued);
-
     const result = await runSendDispatch(deps);
-
     expect(result.scheduled).toBe(0);
     expect(result.skipped).toBe(2);
     expect(enqueued).toHaveLength(0);
@@ -458,9 +453,8 @@ describe("runSendDispatch — rolling weekly invite ceiling", () => {
   it("weekly ceiling does NOT restrict messages — only invites", async () => {
     const store = new FakeDispatchStore();
     store.linkedInAgeDays = 60;
-    store.invitesLast7Days = 100; // invite ceiling fully consumed
-    store.messageSentToday = 0;   // messages have room
-
+    store.invitesLast7Days = 100;
+    store.messageSentToday = 0;
     store.sends = [
       makeSend({ id: "inv1", channel: "linkedin", linkedinStage: "invite" }),
       makeSend({
@@ -472,12 +466,68 @@ describe("runSendDispatch — rolling weekly invite ceiling", () => {
     ];
     const enqueued: { sendId: string; runAt: Date }[] = [];
     const deps = makeDeps(store, enqueued);
-
     const result = await runSendDispatch(deps);
-
-    // invite blocked (weekly ceiling), message goes through
     expect(result.scheduled).toBe(1);
     expect(enqueued[0]?.sendId).toBe("msg1");
     expect(result.skipped).toBe(1);
+  });
+});
+
+describe("runSendDispatch — imessage channel", () => {
+  it("imessage rows dispatched up to IMESSAGE_STEADY_DAILY budget (2 rows, budget 1 → 1 scheduled, 1 skipped)", async () => {
+    const store = new FakeDispatchStore();
+    store.imessageSentToday = IMESSAGE_STEADY_DAILY - 1;
+    store.sends = [
+      makeSend({ id: "im1", channel: "imessage", linkedinStage: null }),
+      makeSend({ id: "im2", channel: "imessage", linkedinStage: null }),
+    ];
+    const enqueued: { sendId: string; runAt: Date }[] = [];
+    const deps = makeDeps(store, enqueued);
+    const result = await runSendDispatch(deps);
+    expect(result.scheduled).toBe(1);
+    expect(result.skipped).toBe(1);
+    expect(enqueued).toHaveLength(1);
+    expect(enqueued[0]?.sendId).toBe("im1");
+  });
+
+  it("imessage rows paced with jitter (scheduled times increasing and > now)", async () => {
+    const store = new FakeDispatchStore();
+    store.imessageSentToday = 0;
+    store.sends = [
+      makeSend({ id: "im1", channel: "imessage", linkedinStage: null }),
+      makeSend({ id: "im2", channel: "imessage", linkedinStage: null }),
+      makeSend({ id: "im3", channel: "imessage", linkedinStage: null }),
+    ];
+    const enqueued: { sendId: string; runAt: Date }[] = [];
+    const now = new Date("2026-06-12T10:00:00Z");
+    const deps: SendDispatchDeps = {
+      store,
+      enqueue: async (sendId, runAt) => { enqueued.push({ sendId, runAt }); },
+      now: () => now,
+    };
+    await runSendDispatch(deps);
+    expect(enqueued).toHaveLength(3);
+    for (const e of enqueued) {
+      expect(e.runAt.getTime()).toBeGreaterThan(now.getTime());
+    }
+    const times = enqueued.map((e) => e.runAt.getTime());
+    for (let i = 1; i < times.length; i++) {
+      expect(times[i]!).toBeGreaterThan(times[i - 1]!);
+    }
+  });
+
+  it("imessage daily cap already exhausted → all rows skipped", async () => {
+    const store = new FakeDispatchStore();
+    store.imessageSentToday = IMESSAGE_STEADY_DAILY;
+    store.sends = [
+      makeSend({ id: "im1", channel: "imessage", linkedinStage: null }),
+      makeSend({ id: "im2", channel: "imessage", linkedinStage: null }),
+    ];
+    const enqueued: { sendId: string; runAt: Date }[] = [];
+    const deps = makeDeps(store, enqueued);
+    const result = await runSendDispatch(deps);
+    expect(result.scheduled).toBe(0);
+    expect(result.skipped).toBe(2);
+    expect(enqueued).toHaveLength(0);
   });
 });

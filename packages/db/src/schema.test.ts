@@ -203,3 +203,10 @@ describe("scheduled_sends stage/channel integrity (0023)", () => {
     expect(sql).toMatch(/check \(linkedin_stage is null or channel = 'linkedin'\)/i);
   });
 });
+
+describe("imessage webhook source (0024)", () => {
+  it("0024 adds imessage to the webhook source set", () => {
+    const sql = readFileSync(join(migrationsDir, "0024_imessage_webhook_source.sql"), "utf8");
+    expect(sql).toMatch(/source in \('email', 'linkedin', 'stripe', 'voice', 'imessage'\)/i);
+  });
+});

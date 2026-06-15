@@ -1,4 +1,5 @@
 import { normalizeLinkedInUrl } from "./copy-draft";
+import { normalizePhone } from "./call-brief";
 import type { InboundDeps, InboundPayload, InboundSummary } from "./types";
 
 /**
@@ -80,6 +81,51 @@ export async function runInbound(payload: InboundPayload, deps: InboundDeps): Pr
         return { handled: true, action: "warmup_update" };
       }
     }
+  }
+
+  // iMessage branch — tenant resolved globally by outbound history (provider carries no accountId)
+  if (payload.source === "imessage") {
+    const event = deps.messageInfra.parseEventWebhook(payload.payload);
+    if (!event) return { handled: false, action: "unparseable" };
+
+    if (event.type === "delivery") {
+      return { handled: true, action: "delivery" };
+    }
+
+    // reply — look up lead+account globally by phone; the account that most recently
+    // iMessaged this number owns the reply (disambiguates multi-tenant on a shared sender)
+    const normalizedPhone = normalizePhone(event.fromPhone);
+    const lead = await deps.store.findLeadByPhone(normalizedPhone);
+    if (!lead) return { handled: false, action: "no matching lead" };
+    const accountId = lead.accountId;
+    const replyId = await deps.store.insertReply({
+      accountId,
+      leadId: lead.id,
+      campaignId: lead.campaignId,
+      channel: "imessage",
+      providerMessageRef: event.providerMessageId,
+      body: event.body,
+      receivedAt: new Date(event.receivedAt),
+    });
+    const verdict = await deps.classifyFn(event.body);
+    await deps.store.setReplyClassification(replyId, verdict);
+    if (verdict.classification !== "out_of_office") {
+      await deps.store.cancelPendingSends(lead.id);
+      await deps.store.setLeadReplied(lead.id, lead.campaignId);
+      await deps.store.pauseSequenceForReply(lead.id, verdict.classification === "not_interested");
+      await deps.store.insertLeadNotification({
+        accountId,
+        leadId: lead.id,
+        kind: "reply",
+        body: `${lead.id} replied${verdict.classification === "not_interested" ? " (not interested)" : ""}.`,
+      });
+    }
+    if (verdict.classification === "not_interested") {
+      await deps.store.addSuppression(accountId, "phone", normalizedPhone, "not_interested", lead.id);
+    } else if (verdict.classification === "unsubscribe") {
+      await deps.store.addSuppression(accountId, "phone", normalizedPhone, "unsubscribe", lead.id);
+    }
+    return { handled: true, action: `reply:${verdict.classification}` };
   }
 
   // LinkedIn branch

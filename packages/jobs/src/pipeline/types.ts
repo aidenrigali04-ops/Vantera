@@ -24,6 +24,7 @@ import type { SenderAddress } from "./email-footer";
 import type { OutreachCapacity } from "./capacity";
 import type { EmailInfra, ProvisionedMailbox, SmtpCredentials } from "@vantera/email-infra";
 import type { LinkedInInfra } from "@vantera/linkedin-infra";
+import type { MessageInfra } from "@vantera/imessage-infra";
 
 export interface ScoutConfig {
   prospectsPerRun: number;
@@ -201,7 +202,7 @@ export interface SendContext {
   accountId: string;
   campaignId: string;
   leadId: string;
-  channel: "email" | "linkedin";
+  channel: "email" | "linkedin" | "imessage";
   linkedinStage: "invite" | "message" | null;
   status: string;
   subject: string | null;
@@ -211,13 +212,13 @@ export interface SendContext {
   senderAddress: SenderAddress | null;
   /** resolved human sender name for the {{sender_name}} email sign-off placeholder */
   senderName: string;
-  lead: { email: string | null; linkedinUrl: string | null };
+  lead: { email: string | null; linkedinUrl: string | null; phone: string | null };
 }
 
 export interface OutreachSendStore {
   getSendContext(sendId: string): Promise<SendContext | null>;
   isKillSwitchOn(): Promise<boolean>;
-  isSuppressed(accountId: string, kind: "email" | "linkedin", value: string): Promise<boolean>;
+  isSuppressed(accountId: string, kind: "email" | "linkedin" | "phone", value: string): Promise<boolean>;
   /** optimistic claim: scheduled → sending; false means another run owns it */
   claimSending(sendId: string): Promise<boolean>;
   revertToApproved(sendId: string): Promise<void>;
@@ -232,7 +233,7 @@ export interface OutreachSendStore {
     campaignId: string;
     leadId: string;
     scheduledSendId: string;
-    channel: "email" | "linkedin";
+    channel: "email" | "linkedin" | "imessage";
     mailboxId?: string;
     linkedinAccountId?: string;
     messageRef: string | null;
@@ -245,6 +246,8 @@ export interface OutreachSendDeps {
   store: OutreachSendStore;
   emailInfra: EmailInfra;
   linkedinInfra: LinkedInInfra;
+  messageInfra: MessageInfra;
+  imessageSender: string;
   appUrl: string;
   now?: () => Date;
 }
@@ -256,7 +259,7 @@ export interface DispatchableSend {
   accountId: string;
   campaignId: string;
   leadId: string;
-  channel: "email" | "linkedin";
+  channel: "email" | "linkedin" | "imessage";
   linkedinStage: "invite" | "message" | null;
   status: "approved" | "scheduled";
   accountPaused: boolean;
@@ -281,6 +284,7 @@ export interface SendDispatchStore {
   countLinkedInSentToday(accountId: string, kind: "invite" | "message", dayStart: Date): Promise<number>;
   /** Rolling 7-day (168h) count of LinkedIn invites actually sent for the account. */
   countLinkedInInvitesLast7Days(accountId: string, now: Date): Promise<number>;
+  countImessageSentToday(accountId: string, dayStart: Date): Promise<number>;
   markScheduled(sendId: string, scheduledFor: Date): Promise<void>;
   cancelSend(sendId: string, error: string): Promise<void>;
 }
@@ -351,8 +355,10 @@ export interface TrialExpirySummary {
 }
 
 export interface InboundPayload {
-  source: "email" | "linkedin";
+  source: "email" | "linkedin" | "imessage";
   payload: unknown;
+  /** optional — not used by imessage (tenant resolved globally via outreach history) */
+  accountId?: string;
 }
 
 export interface InboundStore {
@@ -372,11 +378,13 @@ export interface InboundStore {
   }): Promise<void>;
   findLeadByEmail(accountId: string, email: string): Promise<{ id: string; campaignId: string | null } | null>;
   findLeadByLinkedInUrl(accountId: string, normalizedUrl: string): Promise<{ id: string; campaignId: string | null } | null>;
+  /** Global lookup by phone across all accounts — resolves tenant by most-recent iMessage outreach send to that phone. */
+  findLeadByPhone(normalizedPhone: string): Promise<{ id: string; accountId: string; campaignId: string | null } | null>;
   insertReply(r: {
     accountId: string;
     leadId: string;
     campaignId: string | null;
-    channel: "email" | "linkedin";
+    channel: "email" | "linkedin" | "imessage";
     providerMessageRef: string | null;
     body: string;
     receivedAt: Date;
@@ -384,7 +392,7 @@ export interface InboundStore {
   setReplyClassification(replyId: string, verdict: ReplyVerdict): Promise<void>;
   addSuppression(
     accountId: string,
-    kind: "email" | "linkedin",
+    kind: "email" | "linkedin" | "phone",
     value: string,
     source: "unsubscribe" | "bounce" | "complaint" | "not_interested",
     leadId?: string
@@ -404,6 +412,7 @@ export interface InboundDeps {
   store: InboundStore;
   emailInfra: Pick<EmailInfra, "parseEventWebhook">;
   linkedinInfra: Pick<LinkedInInfra, "parseEventWebhook">;
+  messageInfra: Pick<MessageInfra, "parseEventWebhook">;
   classifyFn: (body: string) => Promise<ReplyVerdict>;
   now?: () => Date;
 }
