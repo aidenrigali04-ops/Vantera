@@ -3,6 +3,7 @@ import { InMemoryProspectData, makeCandidate } from "@vantera/prospect-data";
 import type { LeadInsights } from "@vantera/agent-brains";
 import { runScout } from "./scout";
 import type { CallBriefDraftPayload, CopyDraftPayload, FreshLead, ScoutContext, ScoutDeps, ScoutStore } from "./types";
+import type { OutreachCapacity } from "./capacity";
 
 function insight(leadId: string, score: number): LeadInsights {
   return {
@@ -29,6 +30,14 @@ class FakeScoutStore implements ScoutStore {
   completedAt: Date | null = null;
   copyAgent: { id: string } | null = null;
   callerAgent: { id: string } | null = null;
+  capacity: OutreachCapacity = {
+    linkedinConnected: false,
+    linkedinAccountAgeDays: null,
+    linkedinEnabled: false,
+    emailEnabled: true,
+    mailboxes: [{ phase: "ready", dailyCap: 0 }, { phase: "ready", dailyCap: 0 }], // ample by default
+  };
+  backlog = 0;
   private leadSeq = 0;
   private seenRefs = new Set<string>();
 
@@ -63,6 +72,12 @@ class FakeScoutStore implements ScoutStore {
   async completeRun(_agentId: string, lastRunAt: Date) {
     this.completedAt = lastRunAt;
   }
+  async getOutreachCapacity() {
+    return this.capacity;
+  }
+  async countUncontactedLeads() {
+    return this.backlog;
+  }
   async getLiveCopyAgent() {
     return this.copyAgent;
   }
@@ -73,7 +88,7 @@ class FakeScoutStore implements ScoutStore {
 
 function makeContext(overrides: Partial<ScoutContext["account"]> = {}): ScoutContext {
   return {
-    agent: { id: "scout1", accountId: "acc1", status: "live", config: { prospectsPerRun: 10, minScore: 70 } },
+    agent: { id: "scout1", accountId: "acc1", status: "live", cadence: "daily", config: { prospectsPerRun: 10, minScore: 70 } },
     icps: [{ id: "icp1", name: "SaaS CTOs", criteria: { industries: ["saas"] } }],
     account: { industry: "devtools", websiteUrl: null, websiteScan: null, websiteScannedAt: null, ...overrides },
   };
@@ -250,5 +265,57 @@ describe("runScout", () => {
     await runScout("scout1", deps);
 
     expect(callerChained).toHaveLength(0);
+  });
+});
+
+describe("runScout — capacity throttle", () => {
+  it("pulls a small trickle during warmup and bounds enrichment spend", async () => {
+    // 25 saas candidates — more than the 7-lead warmup cap so the cap is what limits discovery
+    const pool = Array.from({ length: 25 }, (_, i) =>
+      makeCandidate({ externalRef: `c${i}`, industry: "saas" })
+    );
+    const store = new FakeScoutStore({
+      agent: { id: "scout1", accountId: "acc1", status: "live", cadence: "daily", config: { prospectsPerRun: 25, minScore: 70 } },
+      icps: [{ id: "icp1", name: "SaaS CTOs", criteria: { industries: ["saas"] } }],
+      account: { industry: "devtools", websiteUrl: null, websiteScan: null, websiteScannedAt: null },
+    });
+    store.capacity = {
+      linkedinConnected: true,
+      linkedinEnabled: true,
+      linkedinAccountAgeDays: 3, // ramp: 5/day → projected round(5*1*1.3)=7
+      emailEnabled: true,
+      mailboxes: [{ phase: "warming", dailyCap: 0 }], // email adds nothing yet
+    };
+    // scores are high enough that everyone who passes the gate qualifies
+    const scores: Record<string, number> = {};
+    for (let i = 0; i < 25; i++) scores[`c${i}`] = 90;
+    const { deps } = makeDeps(store, pool, scores);
+
+    const summary = await runScout("scout1", deps);
+
+    expect(summary.discovered).toBeLessThanOrEqual(7);
+    expect(store.enriched.length).toBeLessThanOrEqual(7); // spend bounded by the pull
+  });
+
+  it("skips discovery entirely in a dead-zone", async () => {
+    const pool = [makeCandidate({ externalRef: "good", industry: "saas" })];
+    const store = new FakeScoutStore({
+      agent: { id: "scout1", accountId: "acc1", status: "live", cadence: "daily", config: { prospectsPerRun: 25, minScore: 70 } },
+      icps: [{ id: "icp1", name: "SaaS CTOs", criteria: { industries: ["saas"] } }],
+      account: { industry: "devtools", websiteUrl: null, websiteScan: null, websiteScannedAt: null },
+    });
+    store.capacity = {
+      linkedinConnected: false,
+      linkedinEnabled: false,
+      linkedinAccountAgeDays: null,
+      emailEnabled: true,
+      mailboxes: [{ phase: "warming", dailyCap: 0 }],
+    };
+    const { deps } = makeDeps(store, pool, { good: 90 });
+
+    const summary = await runScout("scout1", deps);
+
+    expect(summary).toMatchObject({ status: "completed", discovered: 0 });
+    expect(store.enriched.length).toBe(0);
   });
 });
