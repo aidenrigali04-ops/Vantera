@@ -1,5 +1,7 @@
 import { getGateData } from "@/lib/auth/context";
 import { createClient } from "@/lib/supabase/server";
+import { cn } from "@/lib/utils";
+import { PANEL_SURFACE } from "@/components/ui/panel";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -14,7 +16,12 @@ import { snapshotFromRow, type AccountBillingRow } from "@/lib/billing/entitleme
 import { ManageBillingButton } from "./billing-actions";
 import { PricingPlans, type PlanCard } from "./pricing-plans";
 
-export default async function BillingPage() {
+export default async function BillingPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ reason?: string }>;
+}) {
+  const { reason } = await searchParams;
   const { account } = await getGateData();
   if (!account) return null;
 
@@ -55,6 +62,15 @@ export default async function BillingPage() {
 
   return (
     <div className="flex max-w-6xl flex-col gap-10">
+      {reason === "deploy" && !hasActivePlan && (
+        <div className={cn(PANEL_SURFACE, "p-5 text-sm")}>
+          <span className="font-heading font-semibold">Choose a plan to deploy your agent.</span>{" "}
+          <span className="text-muted-foreground">
+            Your agents go live the moment a plan is active — pick the one that fits the channels you want to run.
+          </span>
+        </div>
+      )}
+
       {lapsed && (
         <Card className="border-destructive">
           <CardContent className="pt-6 text-sm">

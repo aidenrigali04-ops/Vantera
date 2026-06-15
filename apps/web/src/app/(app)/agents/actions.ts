@@ -11,7 +11,7 @@ import {
   clampCallingWindow,
   MAX_ICPS,
 } from "./validation";
-import { gate, loadBillingRow } from "@/lib/billing/entitlement";
+import { gate, loadBillingRow, hasActivePlan } from "@/lib/billing/entitlement";
 
 export type AgentActionState = { error?: string };
 
@@ -120,6 +120,11 @@ export async function deployScoutAgent(
 
   const { supabase, user, account } = await sessionAccount();
   if (!user || !account) return { error: "Your session expired. Sign in again." };
+
+  // First-deploy gate: a plan (or active trial) is required to put an agent live.
+  // This is the activation-commitment moment — not a wall during onboarding.
+  const billingRow = await loadBillingRow(supabase);
+  if (!hasActivePlan(billingRow)) redirect("/settings/billing?reason=deploy");
 
   const resolved = await resolveIcpIds(supabase, account.id, icps);
   if (!resolved.ok) return { error: "Could not save your ICPs. Please try again." };
