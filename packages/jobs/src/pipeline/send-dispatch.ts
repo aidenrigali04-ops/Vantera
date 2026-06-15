@@ -1,5 +1,5 @@
 import { dailyAllowance, paceWithJitter } from "./safety-limits";
-import type { DispatchableSend, SendDispatchDeps, SendDispatchSummary } from "./types";
+import { TRIAL_SEND_CAP, type DispatchableSend, type SendDispatchDeps, type SendDispatchSummary } from "./types";
 
 export const INVITE_EXPIRY_DAYS = 30;
 export const STALE_TASK_MINUTES = 30;
@@ -46,14 +46,31 @@ export async function runSendDispatch(deps: SendDispatchDeps): Promise<SendDispa
     }
     const active = rows.filter((r) => r.campaignStatus === "active");
     skipped += rows.length - active.length;
+
+    // Trial send cap: a trialing account dispatches at most TRIAL_SEND_CAP sends
+    // total (rule 04/11 channel ceilings still apply on top). Bounds deliverability
+    // and per-send COGS until conversion; paid accounts are unbounded here.
+    let trialRemaining = Number.POSITIVE_INFINITY;
+    if (rows[0]?.subscriptionStatus === "trialing") {
+      trialRemaining = Math.max(0, TRIAL_SEND_CAP - (await deps.store.countAccountSends(accountId)));
+      if (trialRemaining <= 0) {
+        skipped += active.length;
+        continue;
+      }
+    }
     let offsetMs = 0;
 
     const schedule = async (row: DispatchableSend) => {
+      if (trialRemaining <= 0) {
+        skipped += 1; // trial ceiling reached mid-run
+        return;
+      }
       offsetMs += paceWithJitter(BASE_GAP_MS, seedFrom(row.id));
       const runAt = new Date(now.getTime() + offsetMs);
       await deps.store.markScheduled(row.id, runAt);
       await deps.enqueue(row.id, runAt);
       scheduled += 1;
+      trialRemaining -= 1;
     };
 
     // email

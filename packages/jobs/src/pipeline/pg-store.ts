@@ -482,6 +482,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           status: scheduledSends.status,
           accountPaused: accounts.outreachPaused,
           senderAddress: accounts.senderAddress,
+          subscriptionStatus: accounts.subscriptionStatus,
           campaignStatus: campaigns.status,
           leadInvitedAt: leads.linkedinInvitedAt,
           leadConnectedAt: leads.linkedinConnectedAt,
@@ -509,7 +510,16 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         campaignStatus: r.campaignStatus,
         leadInvitedAt: r.leadInvitedAt,
         leadConnectedAt: r.leadConnectedAt,
+        subscriptionStatus: r.subscriptionStatus,
       }));
+    },
+
+    async countAccountSends(accountId: string): Promise<number> {
+      const [row] = await db
+        .select({ n: count() })
+        .from(outreachSends)
+        .where(eq(outreachSends.accountId, accountId));
+      return row?.n ?? 0;
     },
 
     async getEmailCapacity(accountId: string, dayStart: Date): Promise<number> {

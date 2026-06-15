@@ -39,6 +39,14 @@ export const SCOUT_DEFAULTS: ScoutConfig = { prospectsPerRun: 25, minScore: 70 }
  */
 export const TRIAL_LEAD_CAP = 100;
 
+/**
+ * Trial send cap: a trialing account dispatches at most this many outbound sends
+ * total (across email + LinkedIn). Bounds deliverability exposure on our provisioned
+ * mailboxes and per-send COGS until the account converts. Enforced per-account at the
+ * send-dispatch boundary, alongside the channel safety limits.
+ */
+export const TRIAL_SEND_CAP = 50;
+
 export interface ScoutContext {
   agent: { id: string; accountId: string; status: string; config: Partial<ScoutConfig> };
   icps: { id: string; name: string; criteria: IcpCriteria }[];
@@ -233,12 +241,16 @@ export interface DispatchableSend {
   campaignStatus: string;
   leadInvitedAt: Date | null;
   leadConnectedAt: Date | null;
+  /** Drives the trial send cap; 'trialing' accounts are bounded by TRIAL_SEND_CAP. */
+  subscriptionStatus: string;
 }
 
 export interface SendDispatchStore {
   isKillSwitchOn(): Promise<boolean>;
   /** approved rows + scheduled rows whose scheduled_for is older than staleCutoff (lost-task recovery) */
   getDispatchableSends(staleCutoff: Date): Promise<DispatchableSend[]>;
+  /** Total sends recorded for the account (outreach_sends) — enforces TRIAL_SEND_CAP. */
+  countAccountSends(accountId: string): Promise<number>;
   /** Σ over ACTIVE mailboxes of min(daily_send_limit ?? cap, cap) − sends recorded today */
   getEmailCapacity(accountId: string, dayStart: Date): Promise<number>;
   /** null = no active LinkedIn identity */
