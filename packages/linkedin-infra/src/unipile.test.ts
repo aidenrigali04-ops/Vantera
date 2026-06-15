@@ -61,7 +61,7 @@ describe("UnipileLinkedInInfra", () => {
         captured.body = JSON.parse(String(init?.body));
         return new Response(JSON.stringify({ object: "HostedAuthUrl", url: "https://auth.example/x" }), { status: 200 });
       }) as unknown as typeof fetch;
-      return new UnipileLinkedInInfra({ apiKey: "k", dsn: "api48.unipile.com:17854", webhookSecret: "s", fetchFn });
+      return new UnipileLinkedInInfra({ apiKey: "k", dsn: "api.unipile.example.com:13000", webhookSecret: "s", fetchFn });
     }
 
     it("sends all provider-required fields", async () => {
@@ -71,7 +71,7 @@ describe("UnipileLinkedInInfra", () => {
       expect(link.url).toBe("https://auth.example/x");
       expect(captured.body.type).toBe("create");
       expect(captured.body.providers).toEqual(["LINKEDIN"]);
-      expect(captured.body.api_url).toBe("https://api48.unipile.com:17854");
+      expect(captured.body.api_url).toBe("https://api.unipile.example.com:13000");
       expect(captured.body.name).toBe("acct-123");
       expect(captured.body.expiresOn).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
       expect(link.expiresAt).toBe(captured.body.expiresOn);
@@ -94,6 +94,7 @@ describe("UnipileLinkedInInfra", () => {
       const infra = makeInfra(captured);
       await infra.createHostedAuthLink("acct-123");
       expect(captured.body.success_redirect_url).toBeUndefined();
+      expect(captured.body.failure_redirect_url).toBeUndefined();
       expect(captured.body.bypass_success_screen).toBeUndefined();
     });
   });
