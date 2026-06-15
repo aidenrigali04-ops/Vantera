@@ -118,13 +118,16 @@ describe("driveSequenceRun", () => {
     expect(e.dispatch.dispatchCallBrief).not.toHaveBeenCalled();
   });
 
-  it("call stage dispatches call-brief with the live caller agent id", async () => {
+  it("call stage claims (applyRunPatch) then dispatches call-brief with the live caller agent id", async () => {
     const e = env({ getLiveCallerAgent: vi.fn(async () => ({ id: "caller-xyz" })) });
     const item = dueItem({ run: run({ currentStage: "call", touchesDone: 0, callAttempts: 0 }) });
 
     const out = await driveSequenceRun(item, e);
 
     expect(out).toEqual({ dispatched: 1, archived: 0 });
+    // the attempt/clock IS claimed when a caller agent is present
+    expect(e.store.applyRunPatch).toHaveBeenCalledTimes(1);
+    expect(e.store.applyRunPatch).toHaveBeenCalledWith("r1", NOW, expect.any(Object));
     expect(e.dispatch.dispatchCallBrief).toHaveBeenCalledTimes(1);
     expect(e.dispatch.dispatchCallBrief).toHaveBeenCalledWith({
       callerAgentId: "caller-xyz",
@@ -134,14 +137,19 @@ describe("driveSequenceRun", () => {
     expect(e.dispatch.dispatchTouch).not.toHaveBeenCalled();
   });
 
-  it("call stage with no live caller agent stops gracefully (no crash, no call-brief)", async () => {
+  it("call stage with no live caller agent holds WITHOUT burning the attempt (no claim, no dispatch)", async () => {
     const e = env({ getLiveCallerAgent: vi.fn(async () => null) });
     const item = dueItem({ run: run({ currentStage: "call", touchesDone: 0, callAttempts: 0 }) });
 
     const out = await driveSequenceRun(item, e);
 
     expect(out).toEqual({ dispatched: 0, archived: 0 });
+    // the claim must NOT happen: the attempt is not incremented and the clock is not advanced,
+    // so the run stays due and retries on a later tick (same "nothing happened" shape as a hold)
+    expect(e.store.applyRunPatch).not.toHaveBeenCalled();
+    expect(e.store.archiveLead).not.toHaveBeenCalled();
     expect(e.dispatch.dispatchCallBrief).not.toHaveBeenCalled();
+    expect(e.dispatch.dispatchTouch).not.toHaveBeenCalled();
   });
 
   it("exhaust decision archives the lead", async () => {
