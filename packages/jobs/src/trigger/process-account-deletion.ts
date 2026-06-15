@@ -1,6 +1,10 @@
 import { logger, schedules } from "@trigger.dev/sdk";
 import { createClient } from "@supabase/supabase-js";
+import { createDb } from "@vantera/db";
+import { MaildosoApiClient } from "@vantera/email-infra";
 import { isEligibleForDeletion } from "../lib/deletion";
+import { createPgStore } from "../pipeline/pg-store";
+import { runDeprovisionAccount } from "../pipeline/deprovision";
 
 function serviceClient() {
   const url = process.env.SUPABASE_URL;
@@ -32,8 +36,30 @@ export const processAccountDeletion = schedules.task({
         .update({ status: "vendor_cleanup" })
         .eq("id", request.id);
 
-      // Vendor deletion calls land here as each vendor integration ships (Phase 5+).
-      logger.info("vendor cleanup (no vendors connected yet)", { accountId: request.account_id });
+      // Deprovision email mailboxes + release domains BEFORE the hard delete — the FK cascade
+      // wipes the mailbox rows, so the provider-side deletion must read them first (rule 11
+      // vendor deletion + COGS). Awaited inline, not fire-and-forget. On failure, revert the
+      // request to pending so the next cron retries rather than orphaning provider mailboxes.
+      try {
+        await runDeprovisionAccount(
+          { accountId: request.account_id },
+          {
+            api: new MaildosoApiClient({ apiKey: process.env.MAILDOSO_API_KEY ?? "" }),
+            store: createPgStore(createDb()),
+          }
+        );
+      } catch (err) {
+        logger.error("email deprovision failed; reverting to pending for retry", {
+          accountId: request.account_id,
+          error: err instanceof Error ? err.message : String(err),
+        });
+        await supabase
+          .from("account_deletion_requests")
+          .update({ status: "pending" })
+          .eq("id", request.id);
+        continue;
+      }
+      logger.info("email deprovisioned", { accountId: request.account_id });
 
       const { error: deleteError } = await supabase
         .from("accounts")

@@ -13,7 +13,7 @@ export const outreachSend = task({
     const store = createPgStore(createDb());
     const outcome = await runOutreachSend(payload, {
       store,
-      emailInfra: createEmailInfraFromEnv(),
+      emailInfra: createEmailInfraFromEnv({ getSmtpCreds: (mailboxId) => store.getMailboxSmtpCreds(mailboxId) }),
       linkedinInfra: createLinkedInInfraFromEnv(),
       // APP_URL is the Trigger.dev-side name; NEXT_PUBLIC_APP_URL covers local dev sharing one .env
       appUrl: process.env.APP_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",

@@ -3,6 +3,7 @@ import type {
   EmailInfra,
   Mailbox,
   OutboundEmail,
+  ProvisionedMailbox,
   ProvisionRequest,
   SendResult,
   WarmupStatus,
@@ -16,13 +17,16 @@ export class InMemoryEmailInfra implements EmailInfra {
 
   constructor(private readonly webhookSecret = "in-memory-secret") {}
 
-  async provision(req: ProvisionRequest): Promise<Mailbox[]> {
-    const created: Mailbox[] = [];
+  async provision(req: ProvisionRequest): Promise<ProvisionedMailbox[]> {
+    const created: ProvisionedMailbox[] = [];
     for (let d = 0; d < req.domainCount; d++) {
       const domain = `outbound-${req.accountId}-${d}.example.com`;
       for (let m = 0; m < req.mailboxesPerDomain; m++) {
         const id = `mbx_${++this.counter}`;
-        const mailbox: Mailbox = { id, address: `sdr${m}@${domain}`, domain };
+        const mailbox: ProvisionedMailbox = {
+          id, address: `sdr${m}@${domain}`, domain,
+          smtp: { host: "smtp.in-memory.test", port: 587, username: `sdr${m}@${domain}`, password: `pw_${id}` },
+        };
         this.mailboxes.set(id, mailbox);
         created.push(mailbox);
       }
