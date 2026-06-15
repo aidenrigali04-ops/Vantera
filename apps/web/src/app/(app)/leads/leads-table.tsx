@@ -86,21 +86,67 @@ const STATUS_LABELS: Record<string, string> = {
   archived: "Archived",
 };
 
-function StatusBadge({ status }: { status: string }) {
-  const positive = ["qualified", "enriched", "in_campaign", "replied", "converted"].includes(status);
+// Color grade (rule 07 kept emerald as the positive accent; dopamine layer added
+// here per request): emerald = a win, neutral foreground = in motion, muted = dead.
+// A won deal glows; everything else steps down. Two hues only — never a rainbow.
+const STATUS_CLASS: Record<string, string> = {
+  converted: "bg-emerald-500 text-white shadow-[0_0_12px_rgba(16,185,129,0.4)]",
+  replied:
+    "bg-emerald-500/12 text-emerald-700 ring-1 ring-inset ring-emerald-500/30 dark:text-emerald-300",
+  in_campaign: "bg-foreground/10 text-foreground ring-1 ring-inset ring-border",
+  qualified: "bg-foreground/10 text-foreground ring-1 ring-inset ring-border",
+  enriched: "bg-foreground/10 text-foreground ring-1 ring-inset ring-border",
+  sourced: "text-muted-foreground ring-1 ring-inset ring-border",
+  rejected: "text-muted-foreground ring-1 ring-inset ring-border",
+  archived: "text-muted-foreground ring-1 ring-inset ring-border",
+};
+
+function StatusPill({ status }: { status: string }) {
   return (
-    <Badge variant={positive ? "default" : "secondary"}>{STATUS_LABELS[status] ?? status}</Badge>
+    <span
+      className={cn(
+        "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
+        STATUS_CLASS[status] ?? "text-muted-foreground ring-1 ring-inset ring-border"
+      )}
+    >
+      {STATUS_LABELS[status] ?? status}
+    </span>
   );
 }
 
-// Monochrome, white-glow tiers (rule 07): a hot lead glows, weaker ones step down
-// to a quiet ring — intensity, not hue, carries the verdict.
+// Score is the dopamine metric — grade it on the same emerald→amber ramp. Hot leads
+// glow so the best prospects pull your eye straight out of the list.
 const VERDICT_CLASS: Record<ScoreTier, string> = {
-  hot: "bg-foreground text-background shadow-[0_0_16px_rgba(255,255,255,0.45)]",
-  strong: "bg-foreground/10 text-foreground ring-1 ring-inset ring-white/20",
-  look: "text-muted-foreground ring-1 ring-inset ring-border",
-  unscored: "text-muted-foreground/60 ring-1 ring-inset ring-border",
+  hot: "bg-emerald-500 text-white shadow-[0_0_16px_rgba(16,185,129,0.5)]",
+  strong:
+    "bg-emerald-500/12 text-emerald-700 ring-1 ring-inset ring-emerald-500/30 dark:text-emerald-300",
+  look: "bg-amber-500/12 text-amber-700 ring-1 ring-inset ring-amber-500/30 dark:text-amber-300",
+  unscored: "text-muted-foreground ring-1 ring-inset ring-border",
 };
+
+const SCORE_BADGE_CLASS: Record<ScoreTier, string> = {
+  hot: "bg-emerald-500/15 text-emerald-700 ring-1 ring-inset ring-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.35)] dark:text-emerald-300",
+  strong:
+    "bg-emerald-500/10 text-emerald-700 ring-1 ring-inset ring-emerald-500/20 dark:text-emerald-300/90",
+  look: "bg-amber-500/10 text-amber-700 ring-1 ring-inset ring-amber-500/25 dark:text-amber-300",
+  unscored: "text-muted-foreground/60",
+};
+
+function ScoreBadge({ score }: { score: number | null }) {
+  if (score == null)
+    return <span className="font-mono text-muted-foreground/50">—</span>;
+  const { tier } = scoreVerdict(score);
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center rounded-md px-2 py-0.5 font-mono text-xs font-semibold tabular-nums",
+        SCORE_BADGE_CLASS[tier]
+      )}
+    >
+      {score}
+    </span>
+  );
+}
 
 function VerdictChip({ score }: { score: number | null }) {
   const v = scoreVerdict(score);
@@ -112,7 +158,7 @@ function VerdictChip({ score }: { score: number | null }) {
       )}
     >
       {v.label}
-      {score != null && <span className="font-mono tabular-nums opacity-70">{score}</span>}
+      {score != null && <span className="font-mono tabular-nums opacity-80">{score}</span>}
     </span>
   );
 }
@@ -131,9 +177,14 @@ function RevenuePill({
   const proj = projectedRevenue(avgDealValueCents, goalCents);
   if (!proj) return null;
   return (
-    <div className={cn(PANEL_SURFACE, "mt-5 p-4")}>
+    <div
+      className={cn(
+        PANEL_SURFACE,
+        "mt-5 p-4 ring-1 ring-inset ring-emerald-500/20 dark:bg-emerald-500/[0.06]"
+      )}
+    >
       <Eyebrow>Worth to you</Eyebrow>
-      <p className="mt-1.5 font-mono text-3xl font-semibold tabular-nums">
+      <p className="mt-1.5 font-mono text-3xl font-semibold tabular-nums text-emerald-600 dark:text-emerald-300">
         ≈ {usd.format(proj.valueCents / 100)}
       </p>
       <p className="mt-1 text-xs text-muted-foreground">
@@ -148,9 +199,9 @@ function RevenuePill({
 function OpeningCard({ insights }: { insights: LeadInsightsView }) {
   if (!insights.value_angle && !insights.aha_moment) return null;
   return (
-    <section className={cn(PANEL_SURFACE, "p-4 ring-1 ring-inset ring-white/10")}>
+    <section className={cn(PANEL_SURFACE, "p-4 ring-1 ring-inset ring-emerald-500/15")}>
       <div className="flex items-center gap-1.5">
-        <Sparkles className="size-3.5 text-foreground" aria-hidden />
+        <Sparkles className="size-3.5 text-emerald-600 dark:text-emerald-300" aria-hidden />
         <Eyebrow>Your opening</Eyebrow>
       </div>
       {insights.value_angle && <p className="mt-2 text-sm font-medium">{insights.value_angle}</p>}
@@ -188,7 +239,7 @@ function StatusTag({ verified, label }: { verified: boolean; label: string }) {
       className={cn(
         "ml-auto inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px]",
         verified
-          ? "text-foreground ring-1 ring-inset ring-white/20"
+          ? "bg-emerald-500/10 text-emerald-700 ring-1 ring-inset ring-emerald-500/30 dark:text-emerald-300"
           : "text-muted-foreground ring-1 ring-inset ring-border"
       )}
     >
@@ -211,15 +262,18 @@ export function LeadsTable({
 
   return (
     <>
-      <div className="overflow-hidden rounded-lg border border-border" data-copilot="leads-table">
+      <div
+        className="overflow-hidden rounded-xl border border-black/[0.06] dark:border-white/[0.08]"
+        data-copilot="leads-table"
+      >
         <table className="w-full text-sm">
-          <thead className="bg-muted/40 text-left text-xs uppercase text-muted-foreground">
+          <thead className="bg-foreground/[0.03] text-left font-mono text-[11px] uppercase tracking-wide text-muted-foreground dark:bg-white/[0.04]">
             <tr>
-              <th className="px-4 py-2 font-medium">Prospect</th>
-              <th className="px-4 py-2 font-medium">Company</th>
-              <th className="px-4 py-2 font-medium">Status</th>
-              <th className="px-4 py-2 font-medium">Score</th>
-              <th className="px-4 py-2 font-medium">Channels</th>
+              <th className="px-4 py-2.5 font-medium">Prospect</th>
+              <th className="hidden px-4 py-2.5 font-medium sm:table-cell">Company</th>
+              <th className="px-4 py-2.5 font-medium">Status</th>
+              <th className="px-4 py-2.5 font-medium">Score</th>
+              <th className="px-4 py-2.5 text-right font-medium">Channels</th>
             </tr>
           </thead>
           <tbody>
@@ -227,24 +281,26 @@ export function LeadsTable({
               <tr
                 key={lead.id}
                 onClick={() => setSelected(lead)}
-                className="cursor-pointer border-t border-border hover:bg-muted/30"
+                className="cursor-pointer border-t border-black/[0.05] transition-colors hover:bg-foreground/[0.04] dark:border-white/[0.06]"
               >
                 <td className="px-4 py-3">
                   <p className="font-medium">{leadName(lead)}</p>
                   {lead.title && <p className="text-xs text-muted-foreground">{lead.title}</p>}
                 </td>
-                <td className="px-4 py-3">
+                <td className="hidden px-4 py-3 sm:table-cell">
                   <p>{lead.company_name ?? "—"}</p>
                   {lead.industry && (
                     <p className="text-xs text-muted-foreground">{lead.industry}</p>
                   )}
                 </td>
                 <td className="px-4 py-3">
-                  <StatusBadge status={lead.status} />
+                  <StatusPill status={lead.status} />
                 </td>
-                <td className="px-4 py-3 font-medium tabular-nums">{lead.ai_score ?? "—"}</td>
                 <td className="px-4 py-3">
-                  <span className="flex gap-1.5">
+                  <ScoreBadge score={lead.ai_score} />
+                </td>
+                <td className="px-4 py-3">
+                  <span className="flex justify-end gap-1.5">
                     <Mail
                       className={cn(
                         "size-4",
@@ -279,7 +335,7 @@ export function LeadsTable({
             aria-hidden
           />
           <aside className="fixed inset-y-0 right-0 z-50 w-full max-w-md overflow-y-auto border-l border-border bg-background p-6 shadow-xl">
-            {/* Hero: who they are + the verdict you feel + ai's reasoning */}
+            {/* Hero: who they are + the verdict you feel + the AI's reasoning */}
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-lg font-semibold">{leadName(selected)}</h2>
@@ -288,7 +344,7 @@ export function LeadsTable({
                 </p>
                 <div className="mt-2.5 flex flex-wrap items-center gap-2">
                   <VerdictChip score={selected.ai_score} />
-                  <StatusBadge status={selected.status} />
+                  <StatusPill status={selected.status} />
                 </div>
               </div>
               <Button variant="ghost" size="sm" onClick={() => setSelected(null)} aria-label="Close">
@@ -300,7 +356,7 @@ export function LeadsTable({
               <p className="mt-3 text-sm text-muted-foreground">{selected.ai_rationale}</p>
             )}
 
-            {/* The money on the table — goal-gradient */}
+            {/* The money on the table — goal-gradient, graded green because it's a reward */}
             <RevenuePill avgDealValueCents={avgDealValueCents} goalCents={goalCents} />
 
             <div className="mt-6 space-y-5">
