@@ -210,3 +210,23 @@ describe("imessage webhook source (0024)", () => {
     expect(sql).toMatch(/source in \('email', 'linkedin', 'stripe', 'voice', 'imessage'\)/i);
   });
 });
+
+describe("column-grant lockdown (0025)", () => {
+  const sql = readFileSync(join(migrationsDir, "0025_column_grant_lockdown.sql"), "utf8");
+
+  it("0025 removes client writes on mailboxes and hides smtp_* from SELECT", () => {
+    expect(sql).toMatch(/REVOKE INSERT, UPDATE, DELETE ON public\.mailboxes FROM authenticated, anon/i);
+    expect(sql).toMatch(/REVOKE SELECT ON public\.mailboxes FROM authenticated, anon/i);
+    // the re-granted SELECT column list must NOT include any smtp_* column
+    const grant = sql.match(/GRANT SELECT \(([\s\S]*?)\) ON public\.mailboxes/i);
+    expect(grant, "expected a column-scoped mailboxes SELECT grant").toBeTruthy();
+    expect(grant![1]).not.toMatch(/smtp_/);
+  });
+
+  it("0025 keeps client UPDATE on leads but excludes linkedin_connected_at", () => {
+    expect(sql).toMatch(/REVOKE UPDATE ON public\.leads FROM authenticated/i);
+    const grant = sql.match(/GRANT UPDATE \(([\s\S]*?)\) ON public\.leads/i);
+    expect(grant, "expected a column-scoped leads UPDATE grant").toBeTruthy();
+    expect(grant![1]).not.toMatch(/linkedin_connected_at/);
+  });
+});
