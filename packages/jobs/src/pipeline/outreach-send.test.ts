@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { CONNECTION_NOTE_MAX_CHARS } from "@vantera/agent-brains";
 import { InMemoryEmailInfra } from "@vantera/email-infra";
 import { InMemoryLinkedInInfra } from "@vantera/linkedin-infra";
+import { InMemoryMessageInfra } from "@vantera/imessage-infra";
 import { LINKEDIN_NOTE_MAX, runOutreachSend, sanitizeSendError } from "./outreach-send";
 import type { OutreachSendDeps, OutreachSendStore, SendContext } from "./types";
 import type { SenderAddress } from "./email-footer";
@@ -31,7 +32,7 @@ function makeCtx(overrides: Partial<SendContext> = {}): SendContext {
     accountPaused: false,
     senderAddress: TEST_ADDRESS,
     senderName: "Jordan Lee",
-    lead: { email: "prospect@example.com", linkedinUrl: null },
+    lead: { email: "prospect@example.com", linkedinUrl: null, phone: null },
     ...overrides,
   };
 }
@@ -39,7 +40,7 @@ function makeCtx(overrides: Partial<SendContext> = {}): SendContext {
 class FakeOutreachStore implements OutreachSendStore {
   ctx: SendContext | null = null;
   killSwitch = false;
-  suppressedSet = new Set<string>(); // "email:value" or "linkedin:value"
+  suppressedSet = new Set<string>(); // "email:value" or "linkedin:value" or "phone:value"
   claimed = true; // claimSending returns this
   reverted: string[] = [];
   sent: string[] = [];
@@ -61,7 +62,7 @@ class FakeOutreachStore implements OutreachSendStore {
     campaignId: string;
     leadId: string;
     scheduledSendId: string;
-    channel: "email" | "linkedin";
+    channel: "email" | "linkedin" | "imessage";
     mailboxId?: string;
     linkedinAccountId?: string;
     messageRef: string | null;
@@ -75,7 +76,7 @@ class FakeOutreachStore implements OutreachSendStore {
   async isKillSwitchOn() {
     return this.killSwitch;
   }
-  async isSuppressed(_accountId: string, kind: "email" | "linkedin", value: string) {
+  async isSuppressed(_accountId: string, kind: "email" | "linkedin" | "phone", value: string) {
     return this.suppressedSet.has(`${kind}:${value}`);
   }
   async claimSending(_sendId: string) {
@@ -107,7 +108,7 @@ class FakeOutreachStore implements OutreachSendStore {
     campaignId: string;
     leadId: string;
     scheduledSendId: string;
-    channel: "email" | "linkedin";
+    channel: "email" | "linkedin" | "imessage";
     mailboxId?: string;
     linkedinAccountId?: string;
     messageRef: string | null;
@@ -122,9 +123,10 @@ class FakeOutreachStore implements OutreachSendStore {
   }
 }
 
-function makeDeps(store: FakeOutreachStore): OutreachSendDeps & {
+function makeDeps(store: FakeOutreachStore, overrides: { imessageSender?: string } = {}): OutreachSendDeps & {
   emailInfra: InMemoryEmailInfra;
   linkedinInfra: InMemoryLinkedInInfra;
+  messageInfra: InMemoryMessageInfra;
 } {
   const emailInfra = new InMemoryEmailInfra();
   // Provision the mailbox so the fake doesn't throw on unknown mailbox id
@@ -134,7 +136,12 @@ function makeDeps(store: FakeOutreachStore): OutreachSendDeps & {
   // Override the store's mailbox to use the id the fake assigned.
   // Actually we'll rely on the fake's first provisioned mailbox.
   const linkedinInfra = new InMemoryLinkedInInfra();
-  return { store, emailInfra, linkedinInfra, appUrl: "https://app.vantera.io" };
+  const messageInfra = new InMemoryMessageInfra();
+  return {
+    store, emailInfra, linkedinInfra, messageInfra,
+    imessageSender: overrides.imessageSender ?? "+15550001234",
+    appUrl: "https://app.vantera.io",
+  };
 }
 
 // ─── tests ───────────────────────────────────────────────────────────────────
@@ -142,7 +149,7 @@ function makeDeps(store: FakeOutreachStore): OutreachSendDeps & {
 describe("runOutreachSend — rule 11: suppression gate", () => {
   it("NEVER sends to a suppressed lead — rule 11", async () => {
     const store = new FakeOutreachStore();
-    store.ctx = makeCtx({ lead: { email: "prospect@example.com", linkedinUrl: null } });
+    store.ctx = makeCtx({ lead: { email: "prospect@example.com", linkedinUrl: null, phone: null } });
     store.suppressedSet.add("email:prospect@example.com");
     const deps = makeDeps(store);
 
@@ -267,7 +274,7 @@ describe("runOutreachSend — linkedin stages", () => {
       channel: "linkedin",
       linkedinStage: "invite",
       body: longBody,
-      lead: { email: null, linkedinUrl: "https://linkedin.com/in/prospect" },
+      lead: { email: null, linkedinUrl: "https://linkedin.com/in/prospect", phone: null },
     });
     const deps = makeDeps(store);
 
@@ -289,7 +296,7 @@ describe("runOutreachSend — linkedin stages", () => {
       channel: "linkedin",
       linkedinStage: "message",
       body: "Following up on my invite.",
-      lead: { email: null, linkedinUrl: "https://linkedin.com/in/prospect" },
+      lead: { email: null, linkedinUrl: "https://linkedin.com/in/prospect", phone: null },
     });
     const deps = makeDeps(store);
 
@@ -341,7 +348,7 @@ describe("runOutreachSend — failure and skip paths", () => {
 
   it("missing contact info → 'failed'", async () => {
     const store = new FakeOutreachStore();
-    store.ctx = makeCtx({ lead: { email: null, linkedinUrl: null } });
+    store.ctx = makeCtx({ lead: { email: null, linkedinUrl: null, phone: null } });
     const deps = makeDeps(store);
 
     const outcome = await runOutreachSend({ sendId: "send1" }, deps);
@@ -421,5 +428,85 @@ describe("runOutreachSend — state integrity: bookkeeping isolation", () => {
     expect(auditIdx).toBeGreaterThanOrEqual(0);
     expect(sentIdx).toBeGreaterThanOrEqual(0);
     expect(auditIdx).toBeLessThan(sentIdx);
+  });
+});
+
+describe("runOutreachSend — imessage send", () => {
+  it("imessage success: calls messageInfra.sendMessage with correct toPhone + fromIdentity; records channel:imessage + markSent", async () => {
+    const store = new FakeOutreachStore();
+    store.ctx = makeCtx({
+      channel: "imessage",
+      linkedinStage: null,
+      body: "Hi, wanted to reach out about your SaaS.",
+      lead: { email: null, linkedinUrl: null, phone: "+1 555 000 9999" },
+    });
+    const deps = makeDeps(store);
+
+    const outcome = await runOutreachSend({ sendId: "send1" }, deps);
+
+    expect(outcome).toBe("sent");
+    expect(deps.messageInfra.sentMessages).toHaveLength(1);
+    const msg = deps.messageInfra.sentMessages[0]!;
+    expect(msg.toPhone).toBe("+15550009999"); // normalizePhone strips spaces
+    expect(msg.fromIdentity).toBe("+15550001234"); // from imessageSender
+    expect(msg.body).toBe("Hi, wanted to reach out about your SaaS.");
+    expect(store.sent).toContain("send1");
+    expect(store.outreachRecords).toHaveLength(1);
+    expect(store.outreachRecords[0]!.channel).toBe("imessage");
+    expect(store.outreachRecords[0]!.messageRef).toBeTruthy();
+    expect(store.campaignLeadStatuses.get("camp1:lead1")).toBe("sent");
+    // email/linkedin infras must NOT have been called
+    expect(deps.emailInfra.sentEmails).toHaveLength(0);
+    expect(deps.linkedinInfra.sentInvites).toHaveLength(0);
+  });
+
+  it("imessage missing phone → 'failed' (markFailed, no send)", async () => {
+    const store = new FakeOutreachStore();
+    store.ctx = makeCtx({
+      channel: "imessage",
+      lead: { email: null, linkedinUrl: null, phone: null },
+    });
+    const deps = makeDeps(store);
+
+    const outcome = await runOutreachSend({ sendId: "send1" }, deps);
+
+    expect(outcome).toBe("failed");
+    expect(deps.messageInfra.sentMessages).toHaveLength(0);
+    expect(store.failed[0]?.error).toContain("missing contact info");
+  });
+
+  it("imessage blank imessageSender → 'parked', no send (graceful missing-sender guard)", async () => {
+    const store = new FakeOutreachStore();
+    store.ctx = makeCtx({
+      channel: "imessage",
+      lead: { email: null, linkedinUrl: null, phone: "+15550001111" },
+    });
+    const deps = makeDeps(store, { imessageSender: "   " });
+
+    const outcome = await runOutreachSend({ sendId: "send1" }, deps);
+
+    expect(outcome).toBe("parked");
+    expect(deps.messageInfra.sentMessages).toHaveLength(0);
+    expect(store.reverted).toContain("send1");
+  });
+
+  it("NEVER sends to a suppressed phone — imessage suppression-at-boundary (rule 11)", async () => {
+    const store = new FakeOutreachStore();
+    const phone = "+1 555 000 8888";
+    const normalizedPhone = "+15550008888"; // normalizePhone strips spaces
+    store.ctx = makeCtx({
+      channel: "imessage",
+      lead: { email: null, linkedinUrl: null, phone },
+    });
+    // Suppression is stored under kind 'phone' (sequence-touch SUPPRESSION_KIND map: imessage→phone)
+    store.suppressedSet.add(`phone:${normalizedPhone}`);
+    const deps = makeDeps(store);
+
+    const outcome = await runOutreachSend({ sendId: "send1" }, deps);
+
+    expect(outcome).toBe("suppressed");
+    expect(deps.messageInfra.sentMessages).toHaveLength(0); // NEVER sent to suppressed phone
+    expect(store.suppressed).toContain("send1");
+    expect(store.campaignLeadStatuses.get("camp1:lead1")).toBe("suppressed");
   });
 });

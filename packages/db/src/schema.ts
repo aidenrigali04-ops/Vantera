@@ -466,7 +466,7 @@ export const outreachSends = pgTable(
     scheduledSendId: uuid("scheduled_send_id").references(() => scheduledSends.id, {
       onDelete: "set null",
     }),
-    channel: text("channel", { enum: ["email", "linkedin"] }).notNull(),
+    channel: text("channel", { enum: ["email", "linkedin", "imessage"] }).notNull(),
     mailboxId: uuid("mailbox_id").references(() => mailboxes.id, { onDelete: "set null" }),
     linkedinAccountId: uuid("linkedin_account_id").references(() => linkedinAccounts.id, {
       onDelete: "set null",
@@ -498,7 +498,7 @@ export const replies = pgTable(
     outreachSendId: uuid("outreach_send_id").references(() => outreachSends.id, {
       onDelete: "set null",
     }),
-    channel: text("channel", { enum: ["email", "linkedin"] }).notNull(),
+    channel: text("channel", { enum: ["email", "linkedin", "imessage"] }).notNull(),
     providerMessageRef: text("provider_message_ref"),
     body: text("body"),
     receivedAt: timestamp("received_at", { withTimezone: true }).notNull(),

@@ -1,7 +1,14 @@
 import { CONNECTION_NOTE_MAX_CHARS } from "@vantera/agent-brains";
 import { appendComplianceFooter, applySenderName } from "./email-footer";
 import { normalizeLinkedInUrl } from "./copy-draft";
+import { normalizePhone } from "./call-brief";
 import type { OutreachSendDeps, OutreachSendOutcome } from "./types";
+
+/** Map channel to the suppression kind stored in suppression_entries (rule 11). */
+function suppressionKindFor(channel: "email" | "linkedin" | "imessage"): "email" | "linkedin" | "phone" {
+  if (channel === "imessage") return "phone";
+  return channel;
+}
 
 /**
  * Send-time safety cap for a LinkedIn connection note. Derived from the copy
@@ -43,12 +50,14 @@ export async function runOutreachSend(
   const target =
     ctx.channel === "email"
       ? ctx.lead.email?.toLowerCase() ?? null
-      : ctx.lead.linkedinUrl ? normalizeLinkedInUrl(ctx.lead.linkedinUrl) : null;
+      : ctx.channel === "linkedin"
+      ? ctx.lead.linkedinUrl ? normalizeLinkedInUrl(ctx.lead.linkedinUrl) : null
+      : ctx.lead.phone ? normalizePhone(ctx.lead.phone) : null;
   if (!target) {
     await deps.store.markFailed(ctx.id, "missing contact info");
     return "failed";
   }
-  if (await deps.store.isSuppressed(ctx.accountId, ctx.channel, target)) {
+  if (await deps.store.isSuppressed(ctx.accountId, suppressionKindFor(ctx.channel), target)) {
     await deps.store.markSuppressed(ctx.id);
     await deps.store.setCampaignLeadStatus(ctx.campaignId, ctx.leadId, "suppressed");
     return "suppressed";
@@ -68,6 +77,7 @@ export async function runOutreachSend(
   let providerResult:
     | { channel: "email"; mailboxId: string; messageId: string }
     | { channel: "linkedin"; linkedinAccountId: string; messageRef: string | null; inviteSent: boolean }
+    | { channel: "imessage"; messageRef: string }
     | { parked: true };
 
   try {
@@ -92,7 +102,7 @@ export async function runOutreachSend(
         unsubscribeUrl,
       });
       providerResult = { channel: "email", mailboxId: mailbox.id, messageId: result.messageId };
-    } else {
+    } else if (ctx.channel === "linkedin") {
       const identity = await deps.store.getActiveLinkedInIdentity(ctx.accountId);
       if (!identity || identity.status !== "active") {
         await deps.store.revertToApproved(ctx.id);
@@ -117,6 +127,19 @@ export async function runOutreachSend(
         inviteSent = true;
       }
       providerResult = { channel: "linkedin", linkedinAccountId: identity.id, messageRef, inviteSent };
+    } else {
+      // imessage
+      if (!deps.imessageSender.trim()) {
+        await deps.store.revertToApproved(ctx.id);
+        return "parked";
+      }
+      const r = await deps.messageInfra.sendMessage({
+        fromIdentity: deps.imessageSender,
+        toPhone: target,
+        body: ctx.body ?? "",
+        sendRef: ctx.id,
+      });
+      providerResult = { channel: "imessage", messageRef: r.providerMessageId };
     }
   } catch (err) {
     await deps.store.markFailed(ctx.id, sanitizeSendError(err));
@@ -136,7 +159,7 @@ export async function runOutreachSend(
       mailboxId: providerResult.mailboxId, messageRef: providerResult.messageId,
     });
     await deps.store.markSent(ctx.id);
-  } else {
+  } else if (providerResult.channel === "linkedin") {
     if (providerResult.inviteSent) {
       await deps.store.setLeadInvited(ctx.leadId, now);
     }
@@ -144,6 +167,13 @@ export async function runOutreachSend(
       accountId: ctx.accountId, campaignId: ctx.campaignId, leadId: ctx.leadId,
       scheduledSendId: ctx.id, channel: "linkedin",
       linkedinAccountId: providerResult.linkedinAccountId, messageRef: providerResult.messageRef,
+    });
+    await deps.store.markSent(ctx.id);
+  } else {
+    await deps.store.recordOutreachSend({
+      accountId: ctx.accountId, campaignId: ctx.campaignId, leadId: ctx.leadId,
+      scheduledSendId: ctx.id, channel: "imessage",
+      messageRef: providerResult.messageRef,
     });
     await deps.store.markSent(ctx.id);
   }
