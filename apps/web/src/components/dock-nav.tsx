@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   Settings,
   Users,
+  Workflow,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -22,6 +23,7 @@ const MAIN: NavItem[] = [
   { key: "dashboard", href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { key: "agents", href: "/agents", label: "Agents", icon: Bot },
   { key: "leads", href: "/leads", label: "Leads", icon: Users },
+  { key: "pipeline", href: "/pipeline", label: "Pipeline", icon: Workflow },
   { key: "review", href: "/review", label: "Review", icon: Inbox },
   { key: "analytics", href: "/analytics", label: "Analytics", icon: BarChart3 },
 ];

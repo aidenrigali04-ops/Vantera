@@ -1,7 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { getGateData } from "@/lib/auth/context";
+import { shapePipeline } from "../pipeline/queries";
 import {
   buildRevenueSeries,
+  computeGoalPace,
   computeRevenueSnapshot,
 } from "@/lib/revenue";
 import { LEAD_PROFILE_FIELDS } from "@/components/lead-profile-fields";
@@ -41,6 +43,16 @@ function timeAgo(iso: string | null): string {
   const hrs = Math.round(mins / 60);
   if (hrs < 24) return `${hrs}h ago`;
   return `${Math.round(hrs / 24)}d ago`;
+}
+
+// Forward-projected month label (e.g. "March 2026") for a goal ETA. Kept at module
+// scope — like timeUntil/timeAgo — so the impure Date.now() isn't called inline in
+// the component's render body (React purity lint).
+function etaMonthLabel(etaDays: number): string {
+  return new Date(Date.now() + etaDays * 86_400_000).toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+  });
 }
 
 type AgentRowRaw = {
@@ -212,18 +224,58 @@ export default async function DashboardPage() {
   // yet; the working dashboard once either condition is met.
   const isNew = liveAgents.length === 0 && total === 0;
 
-  const funnel = [
-    { label: "Sourced", count: total, href: "/leads" },
-    { label: "Qualified", count: qualified, href: "/leads?tab=qualified" },
-    { label: "In outreach", count: inOutreach, href: "/leads?tab=in_campaign" },
-    { label: "Replied", count: replied, href: "/leads?tab=replied" },
-    { label: "Converted", count: converted, href: "/leads?tab=replied" },
-  ];
-  const reached = funnel.filter((s) => s.count > 0).length;
+  // Pipeline pulse — leads moving through the outreach sequence (sequence_runs),
+  // a compact mirror of the full /pipeline board.
+  const { data: seqRuns } = await supabase
+    .from("sequence_runs")
+    .select("current_stage, status")
+    .returns<{ current_stage: string; status: string }[]>();
+  const pipeline = shapePipeline({
+    runs: seqRuns ?? [],
+    convertedClients: converted,
+    avgDealValueCents: account.avg_deal_value_cents,
+    revenueGoalCents: account.revenue_goal_cents,
+  });
+
+  // Loss-aversion + variable-reward metrics for the retention panels.
+  const dayAgo = isoDaysAgo(1);
+  const coldCutoff = isoDaysAgo(3);
+  const [coldRes, sent24Res, replies24Res, sourced24Res] = await Promise.all([
+    // warm leads cooling: replied (not converted) and untouched 3+ days
+    supabase
+      .from("leads")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "replied")
+      .lt("updated_at", coldCutoff),
+    supabase.from("outreach_sends").select("id", { count: "exact", head: true }).gte("sent_at", dayAgo),
+    supabase.from("replies").select("id", { count: "exact", head: true }).gte("received_at", dayAgo),
+    supabase.from("leads").select("id", { count: "exact", head: true }).gte("created_at", dayAgo),
+  ]);
+  const cold = coldRes.count ?? 0;
+  const today = {
+    sourced: sourced24Res.count ?? 0,
+    sent: sent24Res.count ?? 0,
+    replied: replies24Res.count ?? 0,
+  };
 
   // Just-in-time CRM nudge: a deal has closed but nothing is routing wins out yet.
   // Peak-end moment — surface it here rather than as pre-aha onboarding friction.
   const showCrmNudge = converted > 0 && (crmActiveRes.count ?? 0) === 0;
+
+  // Explicit goal pace (forward projection) — formatted on the server, no client Date.now().
+  const pace = computeGoalPace({
+    conversionDates: (convertedDates ?? []).map((r) => r.updated_at),
+    avgDealValueCents: account.avg_deal_value_cents,
+    goalCents: account.revenue_goal_cents,
+    convertedClients: converted,
+  });
+  let revenuePace: string | null = null;
+  if (pace?.reached) {
+    revenuePace = "You've cleared your monthly goal — time to raise it.";
+  } else if (pace && pace.etaDays != null) {
+    const when = etaMonthLabel(pace.etaDays);
+    revenuePace = `On pace to hit your ${goal}/mo goal around ${when}.`;
+  }
 
   return (
     <DashboardView
@@ -245,8 +297,10 @@ export default async function DashboardPage() {
       convertedClients={converted}
       pipelineLeads={pipelineLeads}
       series={revenueSeries}
-      funnel={funnel}
-      reached={reached}
+      pipeline={pipeline}
+      cold={cold}
+      today={today}
+      revenuePace={revenuePace}
       prospects={prospects ?? []}
       recentReplies={replyRows}
       interested={interested}

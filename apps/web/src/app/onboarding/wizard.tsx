@@ -99,13 +99,13 @@ const STEPS: { label: string; title: string; description: string; fields: Field[
 const ALL_FIELDS = STEPS.flatMap((s) => s.fields);
 const TOTAL_SEGMENTS = STEPS.length + 1; // 1 endowed segment (account created) + wizard steps
 
-// Same warm sunset sweep as the background particles (yellow → orange → red)
+// Clean monochrome sweep (white → soft grey) — matches the white-glow system
 const BRAND_GRADIENT =
-  "linear-gradient(90deg, #FFCC1A 0%, #FF730D 55%, #EB291C 100%)";
+  "linear-gradient(90deg, #ffffff 0%, #d4d4d4 100%)";
 
-// Traveling-beam version of the particle palette (leading transparent = comet tail)
+// Traveling white-glow beam (leading transparent = comet tail)
 const PARTICLE_BEAM =
-  "linear-gradient(90deg,transparent,#FFCC1A,#FF730D,#EB291C)";
+  "linear-gradient(90deg,transparent,#ffffff,transparent)";
 
 const fadeInUp = {
   hidden: { opacity: 0, y: 20 },
@@ -236,7 +236,7 @@ export function Wizard({ defaultCompanyName = "" }: { defaultCompanyName?: strin
               <motion.div
                 className={cn(
                   "w-4 h-4 rounded-full cursor-pointer transition-colors duration-300",
-                  index === step && "ring-4 ring-[#FF730D]/25",
+                  index === step && "ring-4 ring-white/25",
                   index > step && "bg-muted"
                 )}
                 style={

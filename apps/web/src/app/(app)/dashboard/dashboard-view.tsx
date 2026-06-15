@@ -11,10 +11,13 @@ import {
   Inbox,
   Mail,
   MessageSquare,
+  Phone,
   Sparkles,
   TrendingUp,
+  UserPlus,
   Workflow,
   X,
+  type LucideIcon,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,6 +28,14 @@ import { RevenueChart } from "./revenue-chart";
 import { ProspectPanel, type Prospect } from "./prospect-panel";
 import { LeadProfileLink, type LeadProfile } from "@/components/lead-profile";
 import type { RevenuePoint, RevenueSnapshot } from "@/lib/revenue";
+import type { PipelineViewModel, SequenceStage } from "../pipeline/queries";
+
+const STAGE_ICON: Record<SequenceStage, LucideIcon> = {
+  linkedin: UserPlus,
+  email: Mail,
+  imessage: MessageSquare,
+  call: Phone,
+};
 
 const usd = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -73,8 +84,10 @@ export interface DashboardViewProps {
   convertedClients: number;
   pipelineLeads: number;
   series: RevenuePoint[];
-  funnel: { label: string; count: number; href: string }[];
-  reached: number;
+  pipeline: PipelineViewModel;
+  cold: number;
+  today: { sourced: number; sent: number; replied: number };
+  revenuePace: string | null;
   prospects: Prospect[];
   recentReplies: ReplyRow[];
   interested: number;
@@ -119,7 +132,11 @@ export function DashboardView(props: DashboardViewProps) {
       {showCrmNudge && <CrmNudge convertedClients={convertedClients} />}
 
       {isNew ? (
-        <ActivationRamp scoutDeployed={props.scoutDeployed} goal={goal} />
+        <ActivationRamp
+          scoutDeployed={props.scoutDeployed}
+          goal={goal}
+          channels={props.channels}
+        />
       ) : (
         <WorkingDashboard {...props} />
       )}
@@ -139,8 +156,10 @@ function WorkingDashboard(props: DashboardViewProps) {
     goal,
     goalCents,
     series,
-    funnel,
-    reached,
+    pipeline,
+    cold,
+    today,
+    revenuePace,
     prospects,
     agents,
     recentReplies,
@@ -206,33 +225,68 @@ function WorkingDashboard(props: DashboardViewProps) {
           goal={goal}
           goalCents={goalCents}
           series={series}
+          paceLabel={revenuePace}
         />
       </div>
 
-      {/* Pipeline funnel — real counts */}
-      <RevealItem className={cn(PANEL_SURFACE, "p-5")}>
-        <Eyebrow>Pipeline</Eyebrow>
-        <div className="mt-4 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-black/[0.06] bg-black/[0.04] dark:border-white/[0.08] dark:bg-white/[0.06] sm:grid-cols-5">
-          {funnel.map((stage) => (
-            <Link
-              key={stage.label}
-              href={stage.href}
-              className="group flex flex-col gap-1 bg-background/40 px-4 py-4 transition-colors hover:bg-foreground/[0.04] focus-visible:bg-foreground/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring dark:bg-background/20"
-            >
-              <span className="font-mono text-2xl font-semibold tabular-nums">{stage.count}</span>
-              <span className="text-xs text-muted-foreground group-hover:text-foreground">
-                {stage.label}
-              </span>
-            </Link>
-          ))}
+      {/* Pipeline motion (left) + warm replies, the variable reward (right) — kept high to anchor the daily habit loop */}
+      <div className="grid gap-6 lg:grid-cols-[1.9fr_1.1fr]">
+        <RevealItem className={cn(PANEL_SURFACE, "p-5")}>
+        <div className="flex items-center justify-between gap-3">
+          <Eyebrow>Pipeline</Eyebrow>
+          <Link
+            href="/pipeline"
+            className="inline-flex items-center gap-1 font-mono text-[11px] uppercase tracking-[0.18em] text-foreground/80 underline-offset-4 transition-colors hover:text-foreground hover:underline"
+          >
+            View all <ArrowRight className="size-3" aria-hidden />
+          </Link>
         </div>
-        <AnimatedProgress value={(reached / funnel.length) * 100} className="mt-4" />
+        <div className="mt-4 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-black/[0.06] bg-black/[0.04] dark:border-white/[0.08] dark:bg-white/[0.06] sm:grid-cols-5">
+          {pipeline.stages.map((stage) => {
+            const Icon = STAGE_ICON[stage.stage];
+            return (
+              <Link
+                key={stage.stage}
+                href="/pipeline"
+                className="group flex flex-col gap-1 bg-background/40 px-4 py-4 transition-colors hover:bg-foreground/[0.04] focus-visible:bg-foreground/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring dark:bg-background/20"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-2xl font-semibold tabular-nums">{stage.count}</span>
+                  <Icon className="size-3.5 text-muted-foreground" aria-hidden />
+                </div>
+                <span className="text-xs text-muted-foreground group-hover:text-foreground">
+                  {stage.label}
+                </span>
+              </Link>
+            );
+          })}
+          <Link
+            href="/pipeline"
+            className="group flex flex-col gap-1 bg-white/[0.06] px-4 py-4 transition-colors hover:bg-white/[0.1] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+          >
+            <div className="flex items-center justify-between">
+              <span className="font-mono text-2xl font-semibold tabular-nums">{convertedClients}</span>
+              <CheckCircle2 className="size-3.5 text-foreground" aria-hidden />
+            </div>
+            <span className="text-xs text-muted-foreground group-hover:text-foreground">Won</span>
+          </Link>
+        </div>
+        <AnimatedProgress value={pipeline.goalProgressPct ?? 0} className="mt-4" />
         <p className="mt-2 text-xs text-muted-foreground">
           {convertedClients > 0
             ? `${convertedClients} ${convertedClients === 1 ? "lead" : "leads"} converted toward your ${goal ?? "revenue"} goal.`
-            : "Leads flow left to right as your agents work. Revenue tracking arrives with Analytics."}
+            : "Leads move LinkedIn → Email → iMessage → Caller, and stop the instant someone converts."}
         </p>
-      </RevealItem>
+        </RevealItem>
+
+        <WarmReplies recentReplies={recentReplies} interested={interested} />
+      </div>
+
+      {/* Momentum (variable reward) + risk (loss aversion) — the return-and-act drivers */}
+      <div className="grid gap-6 md:grid-cols-2">
+        <AtRiskPanel cold={cold} />
+        <TodayPanel today={today} />
+      </div>
 
       {/* Recent prospects */}
       <RevealItem className={cn(PANEL_SURFACE, "p-5")}>
@@ -254,7 +308,8 @@ function WorkingDashboard(props: DashboardViewProps) {
         </div>
       </RevealItem>
 
-      <div className="grid gap-6 md:grid-cols-2">
+      {/* Status & reassurance — secondary, kept low */}
+      <div className="grid gap-6 md:grid-cols-3">
         {/* Agent heartbeat */}
         <RevealItem className={cn(PANEL_SURFACE, "flex flex-col gap-3 p-5")}>
           <Eyebrow>Your agents</Eyebrow>
@@ -296,75 +351,6 @@ function WorkingDashboard(props: DashboardViewProps) {
               Manage agents <ArrowRight className="size-4" />
             </Link>
           </Button>
-        </RevealItem>
-
-        {/* Warm replies */}
-        <RevealItem className={cn(PANEL_SURFACE, "p-5")}>
-          <div className="flex items-center justify-between gap-2">
-            <Eyebrow>Warm replies</Eyebrow>
-            {interested > 0 && <Badge variant="secondary">{interested}</Badge>}
-          </div>
-          <div className="mt-4">
-            {!recentReplies || recentReplies.length === 0 ? (
-              <div className="flex flex-col items-center gap-2 py-6 text-center">
-                <Sparkles className="size-6 text-muted-foreground" />
-                <p className="max-w-xs text-sm text-muted-foreground">
-                  Interested replies show up here the moment they land. This is the number that
-                  matters most.
-                </p>
-              </div>
-            ) : (
-              <ul className="flex flex-col gap-0.5">
-                {recentReplies.map((r, i) => {
-                  const name =
-                    [r.leads?.first_name, r.leads?.last_name].filter(Boolean).join(" ") ||
-                    "A prospect";
-                  const fresh = i === 0;
-                  return (
-                    <li key={r.id}>
-                      <LeadProfileLink
-                        lead={r.leads}
-                        className={`flex w-full items-start gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-foreground/[0.04] ${
-                          fresh ? "bg-foreground/[0.04]" : ""
-                        }`}
-                      >
-                        <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-foreground/10 text-muted-foreground">
-                          {r.channel === "email" ? (
-                            <Mail className="size-3.5" />
-                          ) : (
-                            <MessageSquare className="size-3.5" />
-                          )}
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span className="flex items-center gap-2">
-                            <span className="truncate text-sm font-medium">{name}</span>
-                            {fresh && (
-                              <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">
-                                New
-                              </Badge>
-                            )}
-                            {r.leads?.company_name && (
-                              <span className="truncate text-xs text-muted-foreground">
-                                {r.leads.company_name}
-                              </span>
-                            )}
-                            <span className="ml-auto shrink-0 text-xs text-muted-foreground">
-                              {r.receivedLabel}
-                            </span>
-                          </span>
-                          {r.body && (
-                            <span className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
-                              {r.body}
-                            </span>
-                          )}
-                        </span>
-                      </LeadProfileLink>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </div>
         </RevealItem>
 
         {/* Channels readiness */}
@@ -435,6 +421,152 @@ function WorkingDashboard(props: DashboardViewProps) {
   );
 }
 
+/** Warm replies — the variable reward that anchors the daily habit loop. */
+function WarmReplies({
+  recentReplies,
+  interested,
+}: {
+  recentReplies: ReplyRow[];
+  interested: number;
+}) {
+  return (
+    <RevealItem className={cn(PANEL_SURFACE, "p-5")}>
+      <div className="flex items-center justify-between gap-2">
+        <Eyebrow>Warm replies</Eyebrow>
+        {interested > 0 && <Badge variant="secondary">{interested}</Badge>}
+      </div>
+      <div className="mt-4">
+        {!recentReplies || recentReplies.length === 0 ? (
+          <div className="flex flex-col items-center gap-2 py-6 text-center">
+            <Sparkles className="size-6 text-muted-foreground" />
+            <p className="max-w-xs text-sm text-muted-foreground">
+              Interested replies show up here the moment they land. This is the number that matters
+              most.
+            </p>
+          </div>
+        ) : (
+          <ul className="flex flex-col gap-0.5">
+            {recentReplies.map((r, i) => {
+              const name =
+                [r.leads?.first_name, r.leads?.last_name].filter(Boolean).join(" ") || "A prospect";
+              const fresh = i === 0;
+              return (
+                <li key={r.id}>
+                  <LeadProfileLink
+                    lead={r.leads}
+                    className={`flex w-full items-start gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-foreground/[0.04] ${
+                      fresh ? "bg-foreground/[0.04]" : ""
+                    }`}
+                  >
+                    <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-foreground/10 text-muted-foreground">
+                      {r.channel === "email" ? (
+                        <Mail className="size-3.5" />
+                      ) : (
+                        <MessageSquare className="size-3.5" />
+                      )}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-center gap-2">
+                        <span className="truncate text-sm font-medium">{name}</span>
+                        {fresh && (
+                          <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">
+                            New
+                          </Badge>
+                        )}
+                        {r.leads?.company_name && (
+                          <span className="truncate text-xs text-muted-foreground">
+                            {r.leads.company_name}
+                          </span>
+                        )}
+                        <span className="ml-auto shrink-0 text-xs text-muted-foreground">
+                          {r.receivedLabel}
+                        </span>
+                      </span>
+                      {r.body && (
+                        <span className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
+                          {r.body}
+                        </span>
+                      )}
+                    </span>
+                  </LeadProfileLink>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+    </RevealItem>
+  );
+}
+
+/** Going cold — loss aversion. Warm leads that replied but are cooling off. */
+function AtRiskPanel({ cold }: { cold: number }) {
+  return (
+    <RevealItem className={cn(PANEL_SURFACE, "flex flex-col p-5", cold > 0 && "dark:bg-white/[0.06]")}>
+      <div className="flex items-center justify-between gap-2">
+        <Eyebrow>Going cold</Eyebrow>
+        {cold > 0 && <Badge variant="secondary">{cold}</Badge>}
+      </div>
+      {cold > 0 ? (
+        <>
+          <div className="mt-4 flex items-end gap-2">
+            <span className="font-mono text-2xl font-semibold tabular-nums">{cold}</span>
+            <span className="pb-1 text-sm text-muted-foreground">
+              warm {cold === 1 ? "lead" : "leads"} cooling off
+            </span>
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Replied 3+ days ago and still open — a quick nudge keeps them warm.
+          </p>
+          <Button asChild size="sm" variant="outline" className="mt-3 w-fit">
+            <Link href="/leads?tab=replied">
+              Re-engage <ArrowRight className="size-4" />
+            </Link>
+          </Button>
+        </>
+      ) : (
+        <p className="mt-4 text-sm text-muted-foreground">
+          Nothing slipping — every warm lead is fresh or already moving.
+        </p>
+      )}
+    </RevealItem>
+  );
+}
+
+/** Since yesterday — variable reward. Fresh activity that makes returning rewarding. */
+function TodayPanel({ today }: { today: { sourced: number; sent: number; replied: number } }) {
+  const quiet = today.sourced + today.sent + today.replied === 0;
+  return (
+    <RevealItem className={cn(PANEL_SURFACE, "p-5")}>
+      <div className="flex items-center justify-between gap-2">
+        <Eyebrow>Since yesterday</Eyebrow>
+        <span className="flex items-center gap-1 font-mono text-[11px] uppercase tracking-wide text-muted-foreground">
+          <Activity className="size-3.5" /> last 24h
+        </span>
+      </div>
+      <div className="mt-4 grid grid-cols-3 gap-4">
+        <div>
+          <span className="font-mono text-2xl font-semibold tabular-nums">{today.sourced}</span>
+          <p className="text-xs text-muted-foreground">Sourced</p>
+        </div>
+        <div>
+          <span className="font-mono text-2xl font-semibold tabular-nums">{today.sent}</span>
+          <p className="text-xs text-muted-foreground">Sent</p>
+        </div>
+        <div>
+          <span className="font-mono text-2xl font-semibold tabular-nums">{today.replied}</span>
+          <p className="text-xs text-muted-foreground">Replied</p>
+        </div>
+      </div>
+      <p className="mt-3 border-t border-border/60 pt-3 text-xs text-muted-foreground">
+        {quiet
+          ? "Quiet so far — your agents work on their own schedule."
+          : "Your agents kept working while you were away."}
+      </p>
+    </RevealItem>
+  );
+}
+
 function ChannelRow({
   icon,
   label,
@@ -470,6 +602,7 @@ function RevenueCard({
   goal,
   goalCents,
   series,
+  paceLabel,
 }: {
   revenue: RevenueSnapshot;
   convertedClients: number;
@@ -477,6 +610,7 @@ function RevenueCard({
   goal: string | null;
   goalCents: number | null;
   series: RevenuePoint[];
+  paceLabel: string | null;
 }) {
   const projectedTotalCents = revenue.closedCents + revenue.expectedCents;
   return (
@@ -526,6 +660,12 @@ function RevenueCard({
                 "Set a monthly revenue goal in Settings to track progress."
               )}
             </p>
+            {paceLabel && (
+              <p className="mt-1.5 flex items-center gap-1.5 text-xs font-medium text-foreground">
+                <TrendingUp className="size-3.5 text-muted-foreground" aria-hidden />
+                {paceLabel}
+              </p>
+            )}
           </>
         ) : (
           <div className="flex flex-col gap-3">
@@ -645,11 +785,25 @@ function CrmNudge({ convertedClients }: { convertedClients: number }) {
   );
 }
 
-function ActivationRamp({ scoutDeployed, goal }: { scoutDeployed: boolean; goal: string | null }) {
+// New-user activation hub. Two non-blocking surfaces side by side: the path to
+// first reply (agent-centric — agents are the front door, rule 08) and a parallel
+// channel-connect panel. No channel gates deploying an agent; the panel just lets
+// fast wins (LinkedIn one-click) and the time-gated one (email warmup, ~2 weeks)
+// start early. Shown only while isNew — it disappears the moment the Scout goes live.
+function ActivationRamp({
+  scoutDeployed,
+  goal,
+  channels,
+}: {
+  scoutDeployed: boolean;
+  goal: string | null;
+  channels: DashboardViewProps["channels"];
+}) {
   const steps = [
     { label: "Create your account", done: true },
     { label: "Set your industry, ICP, and revenue goal", done: true },
     { label: "Deploy your Prospect Agent", done: scoutDeployed, current: !scoutDeployed },
+    { label: "Add an Outreach Agent to draft your first messages", done: false },
     { label: "Get your first reply", done: false },
   ];
   const doneCount = steps.filter((s) => s.done).length;
@@ -684,28 +838,159 @@ function ActivationRamp({ scoutDeployed, goal }: { scoutDeployed: boolean; goal:
               Deploy your Prospect Agent <ArrowRight className="size-4" />
             </Link>
           </Button>
+          <p className="border-t border-border/60 pt-3 text-xs text-muted-foreground">
+            Its first run starts within ~15 minutes. Nothing ever sends until you approve it
+            {goal && (
+              <>
+                {" "}
+                — and every reply is measured against your{" "}
+                <span className="font-medium text-foreground">{goal}/mo</span> goal
+              </>
+            )}
+            .
+          </p>
         </div>
       </RevealItem>
 
-      <RevealItem className={cn(PANEL_SURFACE, "p-5")}>
-        <Eyebrow>What happens next</Eyebrow>
-        <div className="mt-4 flex flex-col gap-3 text-sm text-muted-foreground">
-          <p>
-            Once live, your Prospect Agent sources companies that fit your ICP, scores them, and
-            keeps only the high-quality ones — its first run starts within ~15 minutes.
-          </p>
-          <p>
-            Add an Outreach Agent and qualified leads turn into personalized drafts, waiting in your
-            review queue. Nothing sends until you approve it.
-          </p>
-          {goal && (
-            <p className="border-t border-border/60 pt-3 text-foreground">
-              Every reply and meeting is measured against your{" "}
-              <span className="font-medium">{goal}/mo</span> goal.
-            </p>
-          )}
-        </div>
-      </RevealItem>
+      <ChannelSetupPanel channels={channels} scoutDeployed={scoutDeployed} />
     </Reveal>
+  );
+}
+
+// Parallel, non-blocking channel setup. Ordered by time-to-value: LinkedIn is a
+// one-click connect (the fast first win), email warmup is time-gated (~2 weeks, so
+// nudge starting it early — loss aversion against a future bottleneck), the caller
+// unlocks once leads exist, and SMS is still on the roadmap (no setup surface yet —
+// shown honestly rather than as a dead link).
+function ChannelSetupPanel({
+  channels,
+  scoutDeployed,
+}: {
+  channels: DashboardViewProps["channels"];
+  scoutDeployed: boolean;
+}) {
+  const liConnected = channels.liStatus === "active";
+  const liConnecting = Boolean(channels.liStatus) && !liConnected && channels.liStatus !== "restricted";
+  const emailReady = channels.mbActive > 0;
+  const emailWarming = channels.mbWarming > 0;
+
+  return (
+    <RevealItem className={cn(PANEL_SURFACE, "flex flex-col p-5")}>
+      <Eyebrow>Connect your channels</Eyebrow>
+      <p className="mt-2 text-xs text-muted-foreground">
+        Connect as you go — none of these block you from deploying an agent. Start the quick one now;
+        kick off email early so it&apos;s warmed up when you need it.
+      </p>
+      <div className="mt-4 flex flex-col divide-y divide-border/60">
+        <ChannelSetupRow
+          icon={<UserPlus className="size-4" />}
+          label="LinkedIn"
+          done={liConnected}
+          detail={
+            liConnected
+              ? "Connected — ready to send"
+              : liConnecting
+                ? "Finishing connection…"
+                : channels.liStatus === "restricted"
+                  ? "Account restricted — reconnect"
+                  : "One click — the fastest way to start"
+          }
+          action={
+            liConnected ? undefined : (
+              <Button asChild size="sm" variant={liConnecting ? "ghost" : "default"}>
+                <Link href="/settings/channels">{liConnecting ? "Resume" : "Connect"}</Link>
+              </Button>
+            )
+          }
+        />
+        <ChannelSetupRow
+          icon={<Mail className="size-4" />}
+          label="Email"
+          done={emailReady}
+          detail={
+            emailReady
+              ? `${channels.mbActive} ${channels.mbActive === 1 ? "mailbox" : "mailboxes"} ready${emailWarming ? ` · ${channels.mbWarming} warming` : ""}`
+              : emailWarming
+                ? `${channels.mbWarming} warming up — building sender reputation`
+                : "Warmup takes ~2 weeks. Start now so it's ready when you are."
+          }
+          action={
+            emailReady || emailWarming ? undefined : (
+              <Button asChild size="sm" variant="outline">
+                <Link href="/settings/channels">Set up</Link>
+              </Button>
+            )
+          }
+        />
+        <ChannelSetupRow
+          icon={<Phone className="size-4" />}
+          label="AI Caller"
+          done={false}
+          muted={!scoutDeployed}
+          detail={
+            scoutDeployed
+              ? "Books meetings by phone with your best leads"
+              : "Unlocks once your Prospect Agent is live"
+          }
+          action={
+            scoutDeployed ? (
+              <Button asChild size="sm" variant="outline">
+                <Link href="/agents/new/caller">Set up</Link>
+              </Button>
+            ) : undefined
+          }
+        />
+        <ChannelSetupRow
+          icon={<MessageSquare className="size-4" />}
+          label="SMS"
+          done={false}
+          muted
+          detail="Text outreach to opted-in leads"
+          action={<Badge variant="secondary">Soon</Badge>}
+        />
+      </div>
+    </RevealItem>
+  );
+}
+
+function ChannelSetupRow({
+  icon,
+  label,
+  detail,
+  done,
+  muted = false,
+  action,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  detail: string;
+  done: boolean;
+  muted?: boolean;
+  action?: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
+      <div className="flex min-w-0 items-start gap-3">
+        <span
+          className={cn(
+            "mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg",
+            done
+              ? "bg-foreground text-background"
+              : muted
+                ? "bg-foreground/5 text-muted-foreground/60"
+                : "bg-foreground/10 text-muted-foreground"
+          )}
+        >
+          {done ? <CheckCircle2 className="size-4" /> : icon}
+        </span>
+        <div className="min-w-0">
+          <p className={cn("text-sm font-medium", muted && !done && "text-muted-foreground")}>
+            {label}
+          </p>
+          <p className="text-xs text-muted-foreground">{detail}</p>
+        </div>
+      </div>
+      {action && <div className="shrink-0">{action}</div>}
+    </div>
   );
 }

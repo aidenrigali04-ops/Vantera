@@ -1,9 +1,9 @@
 import { cn } from "@/lib/utils";
 
 /**
- * Minimal determinate progress bar: a very thin track with a neutral dark-grey
- * fill — no brand color, gradient, or shimmer. The width eases to its value for
- * a sleek, understated look. (Step dots/steppers are styled separately.)
+ * Minimal determinate progress bar: a very thin track with a clean white-glow
+ * fill — no brand color or shimmer, just a soft white bloom. The width eases to
+ * its value for a sleek, understated look. (Step dots/steppers are styled separately.)
  */
 export function AnimatedProgress({
   value,
@@ -24,10 +24,10 @@ export function AnimatedProgress({
       aria-valuemin={0}
       aria-valuemax={100}
       aria-label={label}
-      className={cn("relative h-0.5 w-full overflow-hidden rounded-full bg-muted", className)}
+      className={cn("relative h-0.5 w-full rounded-full bg-muted", className)}
     >
       <div
-        className="absolute inset-y-0 left-0 rounded-full bg-foreground/70 transition-[width] duration-500 ease-out"
+        className="absolute inset-y-0 left-0 rounded-full bg-foreground transition-[width] duration-500 ease-out shadow-[0_0_8px_rgba(255,255,255,0.55)]"
         style={{ width: `${pct}%` }}
       />
     </div>

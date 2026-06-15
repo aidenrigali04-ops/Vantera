@@ -108,12 +108,12 @@ function AgentOrb({ agent, fromLeft }: { agent: ShowcaseAgent; fromLeft: boolean
         transition={{ duration: 26, repeat: Infinity, ease: "linear" }}
         className="absolute inset-[-14%] rounded-full border border-dashed border-foreground/15"
       />
-      {/* soft brand glow */}
+      {/* soft white glow */}
       <motion.div
         aria-hidden
         animate={!reduce && live ? { scale: [1, 1.06, 1], opacity: [0.5, 0.7, 0.5] } : undefined}
         transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
-        className="absolute inset-[8%] rounded-full bg-[radial-gradient(circle,#FFCC1A_0%,#FF730D_55%,transparent_72%)] opacity-40 blur-2xl"
+        className="absolute inset-[8%] rounded-full bg-[radial-gradient(circle,#ffffff_0%,#d4d4d4_55%,transparent_72%)] opacity-30 blur-2xl"
       />
 
       <div className="relative flex size-64 items-center justify-center overflow-hidden rounded-full border border-border bg-card shadow-sm md:size-80">
