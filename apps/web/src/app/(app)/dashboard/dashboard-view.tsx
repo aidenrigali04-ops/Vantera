@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { motion, MotionConfig } from "framer-motion";
 import {
   Activity,
@@ -11,6 +11,7 @@ import {
   Inbox,
   Mail,
   MessageSquare,
+  PartyPopper,
   Phone,
   Sparkles,
   TrendingUp,
@@ -19,6 +20,7 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
+import { markNotificationsRead } from "@/components/notifications/actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { AnimatedProgress } from "@/components/ui/animated-progress";
@@ -88,6 +90,7 @@ export interface DashboardViewProps {
   cold: number;
   today: { sourced: number; sent: number; replied: number };
   revenuePace: string | null;
+  conversionWin: { id: string; leadName: string } | null;
   prospects: Prospect[];
   recentReplies: ReplyRow[];
   interested: number;
@@ -96,7 +99,8 @@ export interface DashboardViewProps {
 }
 
 export function DashboardView(props: DashboardViewProps) {
-  const { firstName, icp, industry, goal, isNew, showCrmNudge, convertedClients } = props;
+  const { firstName, icp, industry, goal, isNew, showCrmNudge, convertedClients, conversionWin } =
+    props;
 
   return (
     <MotionConfig reducedMotion="user">
@@ -128,6 +132,10 @@ export function DashboardView(props: DashboardViewProps) {
           <Link href="/settings">Edit goal</Link>
         </Button>
       </motion.header>
+
+      {conversionWin && (
+        <ConversionCelebration win={conversionWin} convertedClients={convertedClients} goal={goal} />
+      )}
 
       {showCrmNudge && <CrmNudge convertedClients={convertedClients} />}
 
@@ -721,6 +729,64 @@ function nudgeDismissedSnapshot() {
   } catch {
     return false;
   }
+}
+
+/**
+ * Peak-end: a booked meeting is a celebration, never a silent row update. Fires
+ * once per conversion (dismiss marks the underlying lead_notification read), ties
+ * the win to the MRR goal, and ends on a forward nudge to keep the pipeline full.
+ */
+function ConversionCelebration({
+  win,
+  convertedClients,
+  goal,
+}: {
+  win: { id: string; leadName: string };
+  convertedClients: number;
+  goal: string | null;
+}) {
+  const [dismissed, setDismissed] = useState(false);
+  if (dismissed) return null;
+
+  function dismiss() {
+    setDismissed(true);
+    void markNotificationsRead([win.id]);
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 16, scale: 0.99 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+      className={cn(PANEL_SURFACE, "relative p-5 dark:bg-white/[0.07]")}
+    >
+      <button
+        type="button"
+        onClick={dismiss}
+        aria-label="Dismiss"
+        className="absolute right-3 top-3 grid size-7 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <X className="size-4" />
+      </button>
+      <div className="flex flex-wrap items-center gap-4 pr-8">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-foreground text-background shadow-[0_0_20px_rgba(255,255,255,0.55)]">
+          <PartyPopper className="size-5" />
+        </span>
+        <div className="min-w-0">
+          <p className="text-sm font-medium">{win.leadName} just booked a meeting</p>
+          <p className="text-sm text-muted-foreground">
+            {convertedClients} {convertedClients === 1 ? "win" : "wins"}
+            {goal && ` toward your ${goal}/mo goal`} — keep the pipeline full to stack the next one.
+          </p>
+        </div>
+        <Button asChild size="sm" variant="outline" className="ml-auto shrink-0">
+          <Link href="/pipeline">
+            View pipeline <ArrowRight className="size-4" />
+          </Link>
+        </Button>
+      </div>
+    </motion.div>
+  );
 }
 
 // Just-in-time CRM connection prompt — fires only when a deal has closed and no

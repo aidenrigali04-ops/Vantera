@@ -262,6 +262,28 @@ export default async function DashboardPage() {
   // Peak-end moment — surface it here rather than as pre-aha onboarding friction.
   const showCrmNudge = converted > 0 && (crmActiveRes.count ?? 0) === 0;
 
+  // Peak-end: the most recent unread conversion drives a one-time celebration.
+  const { data: winNote } = await supabase
+    .from("lead_notifications")
+    .select("id, lead_id")
+    .eq("kind", "converted")
+    .is("read_at", null)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  let conversionWin: { id: string; leadName: string } | null = null;
+  if (winNote) {
+    const { data: winLead } = await supabase
+      .from("leads")
+      .select("first_name, company_name")
+      .eq("id", winNote.lead_id)
+      .maybeSingle();
+    conversionWin = {
+      id: winNote.id,
+      leadName: winLead?.company_name || winLead?.first_name || "A lead",
+    };
+  }
+
   // Explicit goal pace (forward projection) — formatted on the server, no client Date.now().
   const pace = computeGoalPace({
     conversionDates: (convertedDates ?? []).map((r) => r.updated_at),
@@ -301,6 +323,7 @@ export default async function DashboardPage() {
       cold={cold}
       today={today}
       revenuePace={revenuePace}
+      conversionWin={conversionWin}
       prospects={prospects ?? []}
       recentReplies={replyRows}
       interested={interested}
