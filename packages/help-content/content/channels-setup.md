@@ -8,6 +8,10 @@ routes: /settings/channels, /settings
 
 The Channels page is where you configure everything that touches outbound messaging: your physical sender address, email sending infrastructure, and LinkedIn account. Set these up before you deploy an Outreach Agent — outreach won't start until the required pieces are in place.
 
+## Sender name
+
+Go to **Settings → Channels → Email sending** and enter your **Sender name** — this is the name your cold emails are signed with (for example, your first name). It personalises the sign-off in outgoing emails. Leave the field blank to omit the name from the sign-off.
+
 ## Sender address (required for email)
 
 Every cold email must include a physical mailing address in the footer. This is a legal requirement, not optional. Go to **Settings → Channels** and enter your workspace's sender address. Until it's saved, email outreach will not send.

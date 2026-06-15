@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   SenderAddressForm,
+  SenderNameForm,
   ProvisionEmailForm,
   PauseSendingForm,
   LinkedInConnectButton,
@@ -54,9 +55,9 @@ export default async function ChannelsPage({
   ] = await Promise.all([
     supabase
       .from("accounts")
-      .select("sender_address, outreach_paused")
+      .select("sender_address, sender_name, outreach_paused")
       .limit(1)
-      .maybeSingle<{ sender_address: SenderAddress | null; outreach_paused: boolean }>(),
+      .maybeSingle<{ sender_address: SenderAddress | null; sender_name: string | null; outreach_paused: boolean }>(),
     supabase
       .from("mailboxes")
       .select("id, email_address, domain, status, daily_send_limit")
@@ -68,6 +69,7 @@ export default async function ChannelsPage({
   ]);
 
   const senderAddress = accountRow?.sender_address ?? null;
+  const senderName = accountRow?.sender_name ?? "";
   const outreachPaused = accountRow?.outreach_paused ?? false;
   const mailboxes = mailboxRows ?? [];
   const linkedinAccounts = linkedinRows ?? [];
@@ -110,6 +112,14 @@ export default async function ChannelsPage({
           <CardTitle>Email sending</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
+          {/* Sender name — personalises the email sign-off */}
+          <div className="space-y-3">
+            <div>
+              <p className="text-sm font-medium">Sender name</p>
+            </div>
+            <SenderNameForm defaultValue={senderName} />
+          </div>
+
           {/* Sender address — required for CAN-SPAM (rule 11) */}
           <div className="space-y-3">
             <div>

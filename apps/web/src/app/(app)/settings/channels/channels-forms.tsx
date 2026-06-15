@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { FormError } from "@/components/form-error";
 import {
   saveSenderAddress,
+  saveSenderName,
   toggleSendingPause,
   provisionEmailSending,
   createLinkedInConnectLink,
@@ -97,6 +98,45 @@ export function SenderAddressForm({ defaultValues }: SenderAddressFormProps) {
       <div className="flex items-center gap-3">
         <Button type="submit" disabled={pending}>
           {pending ? "Saving…" : "Save address"}
+        </Button>
+        {state.success && (
+          <p className="text-sm text-muted-foreground">{state.success}</p>
+        )}
+      </div>
+      <FormError message={state.error} />
+    </form>
+  );
+}
+
+// ── Sender name form ──────────────────────────────────────────────────────────
+
+interface SenderNameFormProps {
+  defaultValue: string;
+}
+
+export function SenderNameForm({ defaultValue }: SenderNameFormProps) {
+  const [state, action, pending] = useActionState<ChannelActionState, FormData>(
+    saveSenderName,
+    {}
+  );
+
+  return (
+    <form action={action} className="space-y-3">
+      <div className="space-y-1">
+        <Label htmlFor="sender_name">Sender name</Label>
+        <p className="text-sm text-muted-foreground">
+          The name your cold emails are signed with (e.g. your first name). Leave blank to omit the sign-off name.
+        </p>
+        <Input
+          id="sender_name"
+          name="sender_name"
+          defaultValue={defaultValue}
+          placeholder="Alex"
+        />
+      </div>
+      <div className="flex items-center gap-3">
+        <Button type="submit" disabled={pending}>
+          {pending ? "Saving…" : "Save"}
         </Button>
         {state.success && (
           <p className="text-sm text-muted-foreground">{state.success}</p>

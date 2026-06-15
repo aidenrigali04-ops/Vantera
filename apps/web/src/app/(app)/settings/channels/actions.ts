@@ -52,6 +52,40 @@ export async function saveSenderAddress(
   return { success: "Sender address saved." };
 }
 
+// ── Sender name ───────────────────────────────────────────────────────────────
+
+export async function saveSenderName(
+  _prev: ChannelActionState,
+  formData: FormData
+): Promise<ChannelActionState> {
+  const raw = String(formData.get("sender_name") ?? "").trim();
+  // Empty string → store null (clears the name; the email template strips the token).
+  const value = raw.length > 0 ? raw : null;
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Your session expired. Sign in again." };
+
+  // account always resolved from RLS-scoped select — never from the form (rule 02)
+  const { data: account } = await supabase
+    .from("accounts")
+    .select("id")
+    .limit(1)
+    .maybeSingle<{ id: string }>();
+  if (!account) return { error: "Your session expired. Sign in again." };
+
+  const { error } = await supabase
+    .from("accounts")
+    .update({ sender_name: value })
+    .eq("id", account.id);
+  if (error) return { error: "Could not save sender name. Try again shortly." };
+
+  revalidatePath("/settings/channels");
+  return { success: "Sender name saved." };
+}
+
 // ── Pause toggle ──────────────────────────────────────────────────────────────
 
 export async function toggleSendingPause(
