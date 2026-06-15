@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { resolveEntitlements } from "@vantera/billing";
 import { snapshotFromRow, type AccountBillingRow } from "@/lib/billing/entitlement";
+import { getWarmupStatus, type WarmupStatus } from "@/lib/warmup-status";
 
 // ── Draft queue ───────────────────────────────────────────────────────────────
 
@@ -203,4 +204,21 @@ export async function getCrmStatus(
       failed: eventRows.filter((r) => r.status === "failed").length,
     },
   };
+}
+
+// ── Warmup status ─────────────────────────────────────────────────────────────
+
+// Re-export WarmupStatus so callers can reference the type without a separate import.
+export type { WarmupStatus };
+
+/**
+ * Returns the current sending-channel warmup status for the account.
+ * Answers "when does my email start?" / "why aren't emails going out yet?".
+ * accountId MUST come from the validated session (rule 02).
+ */
+export async function getWarmupStatusForAccount(
+  db: SupabaseClient,
+  accountId: string
+): Promise<WarmupStatus> {
+  return getWarmupStatus(db, accountId);
 }

@@ -8,6 +8,7 @@ import {
   getLeadScoreRationale,
   getBillingStatus,
   getCrmStatus,
+  getWarmupStatusForAccount,
 } from "./read-tools";
 import { runCampaignSendState } from "./mutate-tools";
 
@@ -57,6 +58,14 @@ export function buildAccountTools(db: SupabaseClient, accountId: string): Copilo
         "Connected CRM / notification destinations and recent closed-deal push results (success/pending/failed).",
       parameters: z.object({}),
       run: async () => getCrmStatus(db, accountId),
+    },
+    {
+      name: "getWarmupStatus",
+      tier: "read",
+      description:
+        "Current email warm-up phase (warming vs. ready), estimated days until email outreach can start, and which channels are live now. Use to answer questions like 'when does my email start?' or 'why aren't emails going out yet?'.",
+      parameters: z.object({}),
+      run: async () => getWarmupStatusForAccount(db, accountId),
     },
     {
       name: "pauseCampaign",
