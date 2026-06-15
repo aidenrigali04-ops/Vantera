@@ -121,6 +121,15 @@ export async function deployScoutAgent(
   const { supabase, user, account } = await sessionAccount();
   if (!user || !account) return { error: "Your session expired. Sign in again." };
 
+  // Trial-abuse guard: deploying triggers prospecting + enrichment spend, so the
+  // free trial only unlocks after the email is verified. Server-side and
+  // independent of the Supabase "confirm email" project setting — defense in depth.
+  if (!user.email_confirmed_at) {
+    return {
+      error: "Confirm your email to deploy your agent — check your inbox for the verification link.",
+    };
+  }
+
   // First-deploy gate: a plan (or active trial) is required to put an agent live.
   // This is the activation-commitment moment — not a wall during onboarding.
   const billingRow = await loadBillingRow(supabase);
