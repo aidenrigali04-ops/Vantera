@@ -94,12 +94,12 @@ export default async function ChannelsPage({
       </div>
 
       {connected === "1" && (
-        <div className="rounded-md border border-border bg-muted/40 px-4 py-3 text-sm">
+        <div role="status" className="rounded-md border border-border bg-muted/40 px-4 py-3 text-sm">
           LinkedIn connection submitted — your account will appear here in a moment.
         </div>
       )}
       {connected === "failed" && (
-        <div className="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+        <div role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           That LinkedIn connection didn&apos;t complete. You can try connecting again below.
         </div>
       )}
