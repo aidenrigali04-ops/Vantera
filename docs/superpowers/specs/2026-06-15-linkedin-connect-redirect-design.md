@@ -1,15 +1,25 @@
-# LinkedIn connect: existing-first + return redirect (2026-06-15)
+# LinkedIn connect + inbound webhook reconciliation (2026-06-15)
 
 ## Goal
 
-Make connecting LinkedIn in the dashboard a clean, single-flow experience: the user
-leaves to the hosted-auth page, signs in on LinkedIn, and is **redirected back into
-the app**. Frame **connecting an existing account** as the primary action, with
-**connecting additional existing accounts** as a clearly secondary one. No onboarding
-step and no managed/provisioned-account capability — both explicitly out of scope.
+Two coupled pieces of Phase 5 LinkedIn finishing work:
 
-This closes the Phase 5 LinkedIn connect-UX gap (no return path; new-tab flow) flagged
-in the roadmap.
+1. **Connect UX (dashboard).** Make connecting LinkedIn a clean, single-flow
+   experience: the user leaves to the hosted-auth page, signs in on LinkedIn, and is
+   **redirected back into the app**. Frame **connecting an existing account** as the
+   primary action, with **connecting additional existing accounts** as a clearly
+   secondary one. No onboarding step and no managed/provisioned-account capability —
+   both explicitly out of scope.
+
+2. **Inbound webhook parser reconciliation.** Wiring the three live Unipile webhooks
+   (done 2026-06-15) surfaced that our `parseEventWebhook` assumes a payload shape the
+   provider does **not** send. Reconcile the adapter to the real payloads so inbound
+   replies, invite-accepts, and account-status events actually parse — without which
+   the LinkedIn loop silently no-ops (accounts never flip to connected; replies never
+   classify/suppress).
+
+Together these close the Phase 5 LinkedIn connect-UX gap and the inbound-parse gap
+flagged on the roadmap.
 
 ## What already exists (reused, not rebuilt)
 
@@ -97,6 +107,77 @@ returned to the app; the account shows as *Connecting* until confirmed, then *Ac
 No vendor names. No new copilot tool needed (no new user action type — same connect
 action, restyled).
 
+## Inbound webhook parser reconciliation
+
+### Live webhooks (created 2026-06-15, account DSN `api48`)
+
+Three webhooks, all → `https://vanterasystem.dev/api/webhooks/linkedin`, JSON, no
+`account_ids` (all current + future accounts), each carrying header
+`x-unipile-secret = <UNIPILE_WEBHOOK_SECRET>`:
+
+| source | events | id |
+|---|---|---|
+| `messaging` | `message_received` | `tTl2lqBZQO2gWoGf1VC_PQ` |
+| `users` | `new_relation` | `NEutnsGiQzKzXqfZXVw70Q` |
+| `account_status` | `creation_success, reconnected, credentials, permissions, error, deleted` | `zNxTETeuSs-viLLQ8yzq8A` |
+
+(The provider dashboard can't attach custom headers; these were created via the API so
+the secret header is present. Auth note: the API key's trailing `=` is significant.)
+
+### The mismatch (confirmed from the provider field reference)
+
+`parseEventWebhook` (`packages/linkedin-infra/src/unipile.ts`)
+assumes every payload has top-level `event` (the discriminator), `event_id` (idempotency
+key), and — for status — `status ∈ {OK, CREATION_SUCCESS, DISCONNECTED}`. The real
+provider payloads carry **none of those names**:
+
+- **`messaging` / message_received**: fields include `account_id`, `sender` (object),
+  `message`, `timestamp`, `message_id`, `provider_message_id`, `is_sender`,
+  `webhook_name`, … — **no `event`, no `event_id`**.
+- **`users` / new_relation**: `account_id`, `user_profile_url`, `user_provider_id`,
+  `user_full_name`, `timestamp`, `webhook_name`, … — **no `event`, no `event_id`**.
+- **`account_status`**: default fields render as **`AccountStatus`** and **`Product`**
+  (capitalized), plus account identity — **no `status`, no `event`, no `event_id`**.
+
+So as shipped, authenticated events arrive and **silently fail to parse**: accounts
+never flip to connected, invite-accepts never advance the sequence, replies never
+classify or suppress.
+
+### Reconciliation work
+
+1. **Capture-first (verification gate, before finalizing code).** Instrument the webhook
+   route in a preview/dev env to log the raw body, then trigger one of each event
+   (connect an account → `account_status`; send + accept an invite → `new_relation`;
+   receive a DM → `message_received`). The captured JSON is the source of truth for
+   exact nesting, the event discriminator, and the `AccountStatus` value set. No final
+   parser code lands against guessed shapes.
+
+2. **Discriminator.** Each webhook is single-event, but the route hands the parser an
+   undifferentiated body. Resolve the type by field presence (e.g. `message` →
+   reply; `user_profile_url` && no `message` → relationship_accepted; `AccountStatus`
+   present → account_status), confirmed against captured payloads. (`webhook_name`
+   carries our `name` and is a fallback signal, not the primary key.)
+
+3. **Idempotency key.** With no `event_id`, `recordEvent` needs a per-source synthetic
+   `providerEventId`: messaging → `provider_message_id` (fallback `message_id`);
+   account_status → `account_id` + `AccountStatus` + `timestamp`; users → `account_id` +
+   `user_provider_id` + `timestamp`. Keep it stable so retries dedupe in `webhook_events`.
+
+4. **Status mapping.** Map `AccountStatus` values → our `"active" | "disconnected"`:
+   success-class (`CREATION_SUCCESS`, `OK`, `RECONNECTED`, `SYNC_SUCCESS`) → active;
+   fault-class (`CREDENTIALS`, `PERMISSIONS`, `ERROR`, `DELETED`, `STOPPED`) →
+   disconnected; ignore transient (`CONNECTING`). Exact enum confirmed by capture.
+
+5. **`is_sender` guard.** Drop messaging events where `is_sender === true` so our own
+   outbound messages don't echo back as fake inbound replies.
+
+6. **Update the contract everywhere it's mirrored.** `LinkedInEvent` types,
+   `in-memory.ts` fake, and `unipile.test.ts` move to the real shapes (tests first,
+   fed by the captured fixtures). The fake's payloads become realistic, not idealized.
+
+This stays inside the `linkedin-infra` package (interface + adapter + fake + tests) plus
+the route's `extractEventId`; no schema change, no new table.
+
 ## Explicitly out of scope (separate Phase 5 follow-ups)
 
 - Hosted-auth **custom-domain assertion** (audit follow-up 2b) — keeps the hosted page
@@ -106,16 +187,25 @@ action, restyled).
 
 ## Testing
 
+Connect UX:
 - `buildConnectRedirects` unit tests — TDD (trailing slash, param shape, missing env).
 - `linkedin-infra` adapter test: `createHostedAuthLink` includes the redirect URLs in
   the request body when provided, omits them when not; fake-interface test updated.
-- No send path touched → no new suppression test required; no new table → no migration,
-  no RLS change.
 - whitelabel-auditor on the changed channels surface + help article.
 - Manual: at localhost, click Connect → land on hosted auth → complete/cancel → verify
-  redirect back to `/settings/channels?connected=1|failed` and the banner. Full
-  end-to-end account-row creation rides the existing Phase 5 live webhook smoke test
-  (real Unipile credentials).
+  redirect back to `/settings/channels?connected=1|failed` and the banner.
+
+Webhook reconciliation:
+- `parseEventWebhook` tests driven by the **captured real payload fixtures** (one per
+  source) — reply, relationship_accepted, account_status(active), account_status
+  (disconnected); plus the `is_sender === true` echo case → null.
+- Idempotency-key derivation tests per source (stable synthetic `providerEventId`).
+- The existing `inbound.test.ts` / suppression test still passes against the new event
+  shapes (a suppressed reply is never sent to — rule 11 guard stays green).
+- No send path changed → no new suppression test required; no new table → no migration,
+  no RLS change.
+- Full end-to-end account-row creation + reply flow rides the Phase 5 live webhook smoke
+  test (the capture step above doubles as it), real Unipile credentials.
 
 ## Definition of done
 
