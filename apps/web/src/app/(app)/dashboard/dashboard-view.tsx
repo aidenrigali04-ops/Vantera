@@ -218,8 +218,9 @@ function WorkingDashboard(props: DashboardViewProps) {
         />
       </div>
 
-      {/* Pipeline pulse — leads moving through the outreach sequence (sequence_runs) */}
-      <RevealItem className={cn(PANEL_SURFACE, "p-5")}>
+      {/* Pipeline motion (left) + warm replies, the variable reward (right) — kept high to anchor the daily habit loop */}
+      <div className="grid gap-6 lg:grid-cols-[1.9fr_1.1fr]">
+        <RevealItem className={cn(PANEL_SURFACE, "p-5")}>
         <div className="flex items-center justify-between gap-3">
           <Eyebrow>Pipeline</Eyebrow>
           <Link
@@ -265,7 +266,10 @@ function WorkingDashboard(props: DashboardViewProps) {
             ? `${convertedClients} ${convertedClients === 1 ? "lead" : "leads"} converted toward your ${goal ?? "revenue"} goal.`
             : "Leads move LinkedIn → Email → iMessage → Caller, and stop the instant someone converts."}
         </p>
-      </RevealItem>
+        </RevealItem>
+
+        <WarmReplies recentReplies={recentReplies} interested={interested} />
+      </div>
 
       {/* Recent prospects */}
       <RevealItem className={cn(PANEL_SURFACE, "p-5")}>
@@ -287,7 +291,8 @@ function WorkingDashboard(props: DashboardViewProps) {
         </div>
       </RevealItem>
 
-      <div className="grid gap-6 md:grid-cols-2">
+      {/* Status & reassurance — secondary, kept low */}
+      <div className="grid gap-6 md:grid-cols-3">
         {/* Agent heartbeat */}
         <RevealItem className={cn(PANEL_SURFACE, "flex flex-col gap-3 p-5")}>
           <Eyebrow>Your agents</Eyebrow>
@@ -329,75 +334,6 @@ function WorkingDashboard(props: DashboardViewProps) {
               Manage agents <ArrowRight className="size-4" />
             </Link>
           </Button>
-        </RevealItem>
-
-        {/* Warm replies */}
-        <RevealItem className={cn(PANEL_SURFACE, "p-5")}>
-          <div className="flex items-center justify-between gap-2">
-            <Eyebrow>Warm replies</Eyebrow>
-            {interested > 0 && <Badge variant="secondary">{interested}</Badge>}
-          </div>
-          <div className="mt-4">
-            {!recentReplies || recentReplies.length === 0 ? (
-              <div className="flex flex-col items-center gap-2 py-6 text-center">
-                <Sparkles className="size-6 text-muted-foreground" />
-                <p className="max-w-xs text-sm text-muted-foreground">
-                  Interested replies show up here the moment they land. This is the number that
-                  matters most.
-                </p>
-              </div>
-            ) : (
-              <ul className="flex flex-col gap-0.5">
-                {recentReplies.map((r, i) => {
-                  const name =
-                    [r.leads?.first_name, r.leads?.last_name].filter(Boolean).join(" ") ||
-                    "A prospect";
-                  const fresh = i === 0;
-                  return (
-                    <li key={r.id}>
-                      <LeadProfileLink
-                        lead={r.leads}
-                        className={`flex w-full items-start gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-foreground/[0.04] ${
-                          fresh ? "bg-foreground/[0.04]" : ""
-                        }`}
-                      >
-                        <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-foreground/10 text-muted-foreground">
-                          {r.channel === "email" ? (
-                            <Mail className="size-3.5" />
-                          ) : (
-                            <MessageSquare className="size-3.5" />
-                          )}
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span className="flex items-center gap-2">
-                            <span className="truncate text-sm font-medium">{name}</span>
-                            {fresh && (
-                              <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">
-                                New
-                              </Badge>
-                            )}
-                            {r.leads?.company_name && (
-                              <span className="truncate text-xs text-muted-foreground">
-                                {r.leads.company_name}
-                              </span>
-                            )}
-                            <span className="ml-auto shrink-0 text-xs text-muted-foreground">
-                              {r.receivedLabel}
-                            </span>
-                          </span>
-                          {r.body && (
-                            <span className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
-                              {r.body}
-                            </span>
-                          )}
-                        </span>
-                      </LeadProfileLink>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </div>
         </RevealItem>
 
         {/* Channels readiness */}
@@ -465,6 +401,84 @@ function WorkingDashboard(props: DashboardViewProps) {
         </RevealItem>
       </div>
     </Reveal>
+  );
+}
+
+/** Warm replies — the variable reward that anchors the daily habit loop. */
+function WarmReplies({
+  recentReplies,
+  interested,
+}: {
+  recentReplies: ReplyRow[];
+  interested: number;
+}) {
+  return (
+    <RevealItem className={cn(PANEL_SURFACE, "p-5")}>
+      <div className="flex items-center justify-between gap-2">
+        <Eyebrow>Warm replies</Eyebrow>
+        {interested > 0 && <Badge variant="secondary">{interested}</Badge>}
+      </div>
+      <div className="mt-4">
+        {!recentReplies || recentReplies.length === 0 ? (
+          <div className="flex flex-col items-center gap-2 py-6 text-center">
+            <Sparkles className="size-6 text-muted-foreground" />
+            <p className="max-w-xs text-sm text-muted-foreground">
+              Interested replies show up here the moment they land. This is the number that matters
+              most.
+            </p>
+          </div>
+        ) : (
+          <ul className="flex flex-col gap-0.5">
+            {recentReplies.map((r, i) => {
+              const name =
+                [r.leads?.first_name, r.leads?.last_name].filter(Boolean).join(" ") || "A prospect";
+              const fresh = i === 0;
+              return (
+                <li key={r.id}>
+                  <LeadProfileLink
+                    lead={r.leads}
+                    className={`flex w-full items-start gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-foreground/[0.04] ${
+                      fresh ? "bg-foreground/[0.04]" : ""
+                    }`}
+                  >
+                    <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-foreground/10 text-muted-foreground">
+                      {r.channel === "email" ? (
+                        <Mail className="size-3.5" />
+                      ) : (
+                        <MessageSquare className="size-3.5" />
+                      )}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-center gap-2">
+                        <span className="truncate text-sm font-medium">{name}</span>
+                        {fresh && (
+                          <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">
+                            New
+                          </Badge>
+                        )}
+                        {r.leads?.company_name && (
+                          <span className="truncate text-xs text-muted-foreground">
+                            {r.leads.company_name}
+                          </span>
+                        )}
+                        <span className="ml-auto shrink-0 text-xs text-muted-foreground">
+                          {r.receivedLabel}
+                        </span>
+                      </span>
+                      {r.body && (
+                        <span className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
+                          {r.body}
+                        </span>
+                      )}
+                    </span>
+                  </LeadProfileLink>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+    </RevealItem>
   );
 }
 
