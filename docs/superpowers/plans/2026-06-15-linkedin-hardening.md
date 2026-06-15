@@ -10,6 +10,8 @@
 
 **Spec:** `docs/superpowers/specs/2026-06-15-linkedin-hardening-design.md`. **Branch:** `phase-linkedin-harden` (off `main`).
 
+> **Migration numbering note:** the spec proposed `0022`/`0023` to reserve `0021` for the unmerged Maildoso branch, but `schema.test.ts` enforces gapless numbering, so on this branch the migrations are **`0021_linkedin_connected_at_grant.sql`** and **`0022_scheduled_sends_stage_check.sql`**. Both this branch and `phase-maildoso-email` add a `0021`; whichever merges second must renumber its migration(s) + guardrail test reference.
+
 ---
 
 ## File Structure

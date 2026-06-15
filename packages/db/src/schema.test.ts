@@ -182,3 +182,17 @@ describe("account sender name (0019)", () => {
     expect(grantMatch![1]).toContain("sender_name");
   });
 });
+
+describe("linkedin_connected_at server-managed (0021)", () => {
+  it("0021 revokes client UPDATE on linkedin_connected_at", () => {
+    const sql = readFileSync(join(migrationsDir, "0021_linkedin_connected_at_grant.sql"), "utf8");
+    expect(sql).toMatch(/revoke update \(linkedin_connected_at\) on leads from authenticated/i);
+  });
+});
+
+describe("scheduled_sends stage/channel integrity (0022)", () => {
+  it("0022 constrains linkedin_stage to the linkedin channel", () => {
+    const sql = readFileSync(join(migrationsDir, "0022_scheduled_sends_stage_check.sql"), "utf8");
+    expect(sql).toMatch(/check \(linkedin_stage is null or channel = 'linkedin'\)/i);
+  });
+});
