@@ -33,6 +33,13 @@ describe("InMemoryEmailInfra", () => {
     expect(infra.sentEmails).toHaveLength(1);
   });
 
+  it("provision returns per-mailbox smtp creds", async () => {
+    const infra = new InMemoryEmailInfra();
+    const [mbx] = await infra.provision({ accountId: "acc_1", domainCount: 1, mailboxesPerDomain: 1 });
+    expect(mbx!.smtp).toMatchObject({ username: mbx!.address, port: 587 });
+    expect(mbx!.smtp!.password).toBeTruthy();
+  });
+
   it("rejects sends from unknown mailboxes", async () => {
     await expect(
       new InMemoryEmailInfra().send({
