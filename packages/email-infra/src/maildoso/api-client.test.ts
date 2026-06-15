@@ -10,8 +10,8 @@ describe("MaildosoApiClient", () => {
     const fetchMock = vi.fn(async () => okJson({ domain: "d.com" }));
     const client = new MaildosoApiClient({ apiKey: "k_test", fetchImpl: fetchMock });
     await client.ensureDomain("d.com");
-    const [, init] = fetchMock.mock.calls[0]!;
-    expect((init as RequestInit).headers).toMatchObject({ Authorization: "Bearer k_test" });
+    const call = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(call[1].headers).toMatchObject({ Authorization: "Bearer k_test" });
   });
 
   it("createMailbox returns address + smtp creds", async () => {
