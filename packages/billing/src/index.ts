@@ -1,4 +1,5 @@
 export * from "./plans";
+export * from "./display";
 export * from "./entitlements";
 export * from "./types";
 export { snapshotFromEvent, type PersistedSnapshot } from "./webhook";
