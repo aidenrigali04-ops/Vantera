@@ -82,7 +82,7 @@ export default async function AgentsPage({
           <CardHeader className="items-center text-center">
             <Bot className="mx-auto size-10 text-muted-foreground" />
             <CardTitle>Deploy your first agent</CardTitle>
-            <p className="max-w-md text-sm text-muted-foreground">
+            <p className="mx-auto max-w-md text-pretty text-sm text-muted-foreground">
               The Prospect Agent hunts your ideal customers on a schedule, scores them, and keeps
               only the high-quality ones. Two minutes to set up.
             </p>

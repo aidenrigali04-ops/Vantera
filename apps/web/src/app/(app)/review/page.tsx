@@ -123,7 +123,7 @@ export default async function ReviewPage({
             <CardTitle className="text-base">
               {view === "queue" ? "Queue's clear" : "Nothing processed yet"}
             </CardTitle>
-            <p className="max-w-md text-sm text-muted-foreground">
+            <p className="mx-auto max-w-md text-pretty text-sm text-muted-foreground">
               {view === "queue" ? (
                 <>
                   When your Outreach Agent drafts messages for qualified leads, every one lands here

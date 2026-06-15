@@ -49,7 +49,7 @@ export default async function SuppressionPage() {
           <CardHeader className="items-center text-center">
             <ShieldBan className="mx-auto size-8 text-muted-foreground" />
             <CardTitle className="text-base">Nothing suppressed yet</CardTitle>
-            <p className="text-sm text-muted-foreground">
+            <p className="mx-auto max-w-md text-pretty text-sm text-muted-foreground">
               Unsubscribes, bounces, and &quot;not interested&quot; replies land here automatically
               once sending goes live. You can add contacts manually any time.
             </p>

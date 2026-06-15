@@ -71,7 +71,7 @@ export default async function LeadsPage({
             <CardTitle className="text-base">
               {tab.key === "all" ? "No leads yet" : "Nothing here yet"}
             </CardTitle>
-            <p className="max-w-md text-sm text-muted-foreground">
+            <p className="mx-auto max-w-md text-pretty text-sm text-muted-foreground">
               {tab.key === "all"
                 ? "Your Prospect Agent fills this page on its schedule — sourcing, scoring, and keeping only high-quality leads."
                 : "Leads move here as your agents work the pipeline."}
