@@ -132,7 +132,11 @@ export function DashboardView(props: DashboardViewProps) {
       {showCrmNudge && <CrmNudge convertedClients={convertedClients} />}
 
       {isNew ? (
-        <ActivationRamp scoutDeployed={props.scoutDeployed} goal={goal} />
+        <ActivationRamp
+          scoutDeployed={props.scoutDeployed}
+          goal={goal}
+          channels={props.channels}
+        />
       ) : (
         <WorkingDashboard {...props} />
       )}
@@ -781,11 +785,25 @@ function CrmNudge({ convertedClients }: { convertedClients: number }) {
   );
 }
 
-function ActivationRamp({ scoutDeployed, goal }: { scoutDeployed: boolean; goal: string | null }) {
+// New-user activation hub. Two non-blocking surfaces side by side: the path to
+// first reply (agent-centric — agents are the front door, rule 08) and a parallel
+// channel-connect panel. No channel gates deploying an agent; the panel just lets
+// fast wins (LinkedIn one-click) and the time-gated one (email warmup, ~2 weeks)
+// start early. Shown only while isNew — it disappears the moment the Scout goes live.
+function ActivationRamp({
+  scoutDeployed,
+  goal,
+  channels,
+}: {
+  scoutDeployed: boolean;
+  goal: string | null;
+  channels: DashboardViewProps["channels"];
+}) {
   const steps = [
     { label: "Create your account", done: true },
     { label: "Set your industry, ICP, and revenue goal", done: true },
     { label: "Deploy your Prospect Agent", done: scoutDeployed, current: !scoutDeployed },
+    { label: "Add an Outreach Agent to draft your first messages", done: false },
     { label: "Get your first reply", done: false },
   ];
   const doneCount = steps.filter((s) => s.done).length;
@@ -820,28 +838,159 @@ function ActivationRamp({ scoutDeployed, goal }: { scoutDeployed: boolean; goal:
               Deploy your Prospect Agent <ArrowRight className="size-4" />
             </Link>
           </Button>
+          <p className="border-t border-border/60 pt-3 text-xs text-muted-foreground">
+            Its first run starts within ~15 minutes. Nothing ever sends until you approve it
+            {goal && (
+              <>
+                {" "}
+                — and every reply is measured against your{" "}
+                <span className="font-medium text-foreground">{goal}/mo</span> goal
+              </>
+            )}
+            .
+          </p>
         </div>
       </RevealItem>
 
-      <RevealItem className={cn(PANEL_SURFACE, "p-5")}>
-        <Eyebrow>What happens next</Eyebrow>
-        <div className="mt-4 flex flex-col gap-3 text-sm text-muted-foreground">
-          <p>
-            Once live, your Prospect Agent sources companies that fit your ICP, scores them, and
-            keeps only the high-quality ones — its first run starts within ~15 minutes.
-          </p>
-          <p>
-            Add an Outreach Agent and qualified leads turn into personalized drafts, waiting in your
-            review queue. Nothing sends until you approve it.
-          </p>
-          {goal && (
-            <p className="border-t border-border/60 pt-3 text-foreground">
-              Every reply and meeting is measured against your{" "}
-              <span className="font-medium">{goal}/mo</span> goal.
-            </p>
-          )}
-        </div>
-      </RevealItem>
+      <ChannelSetupPanel channels={channels} scoutDeployed={scoutDeployed} />
     </Reveal>
+  );
+}
+
+// Parallel, non-blocking channel setup. Ordered by time-to-value: LinkedIn is a
+// one-click connect (the fast first win), email warmup is time-gated (~2 weeks, so
+// nudge starting it early — loss aversion against a future bottleneck), the caller
+// unlocks once leads exist, and SMS is still on the roadmap (no setup surface yet —
+// shown honestly rather than as a dead link).
+function ChannelSetupPanel({
+  channels,
+  scoutDeployed,
+}: {
+  channels: DashboardViewProps["channels"];
+  scoutDeployed: boolean;
+}) {
+  const liConnected = channels.liStatus === "active";
+  const liConnecting = Boolean(channels.liStatus) && !liConnected && channels.liStatus !== "restricted";
+  const emailReady = channels.mbActive > 0;
+  const emailWarming = channels.mbWarming > 0;
+
+  return (
+    <RevealItem className={cn(PANEL_SURFACE, "flex flex-col p-5")}>
+      <Eyebrow>Connect your channels</Eyebrow>
+      <p className="mt-2 text-xs text-muted-foreground">
+        Connect as you go — none of these block you from deploying an agent. Start the quick one now;
+        kick off email early so it&apos;s warmed up when you need it.
+      </p>
+      <div className="mt-4 flex flex-col divide-y divide-border/60">
+        <ChannelSetupRow
+          icon={<UserPlus className="size-4" />}
+          label="LinkedIn"
+          done={liConnected}
+          detail={
+            liConnected
+              ? "Connected — ready to send"
+              : liConnecting
+                ? "Finishing connection…"
+                : channels.liStatus === "restricted"
+                  ? "Account restricted — reconnect"
+                  : "One click — the fastest way to start"
+          }
+          action={
+            liConnected ? undefined : (
+              <Button asChild size="sm" variant={liConnecting ? "ghost" : "default"}>
+                <Link href="/settings/channels">{liConnecting ? "Resume" : "Connect"}</Link>
+              </Button>
+            )
+          }
+        />
+        <ChannelSetupRow
+          icon={<Mail className="size-4" />}
+          label="Email"
+          done={emailReady}
+          detail={
+            emailReady
+              ? `${channels.mbActive} ${channels.mbActive === 1 ? "mailbox" : "mailboxes"} ready${emailWarming ? ` · ${channels.mbWarming} warming` : ""}`
+              : emailWarming
+                ? `${channels.mbWarming} warming up — building sender reputation`
+                : "Warmup takes ~2 weeks. Start now so it's ready when you are."
+          }
+          action={
+            emailReady || emailWarming ? undefined : (
+              <Button asChild size="sm" variant="outline">
+                <Link href="/settings/channels">Set up</Link>
+              </Button>
+            )
+          }
+        />
+        <ChannelSetupRow
+          icon={<Phone className="size-4" />}
+          label="AI Caller"
+          done={false}
+          muted={!scoutDeployed}
+          detail={
+            scoutDeployed
+              ? "Books meetings by phone with your best leads"
+              : "Unlocks once your Prospect Agent is live"
+          }
+          action={
+            scoutDeployed ? (
+              <Button asChild size="sm" variant="outline">
+                <Link href="/agents/new/caller">Set up</Link>
+              </Button>
+            ) : undefined
+          }
+        />
+        <ChannelSetupRow
+          icon={<MessageSquare className="size-4" />}
+          label="SMS"
+          done={false}
+          muted
+          detail="Text outreach to opted-in leads"
+          action={<Badge variant="secondary">Soon</Badge>}
+        />
+      </div>
+    </RevealItem>
+  );
+}
+
+function ChannelSetupRow({
+  icon,
+  label,
+  detail,
+  done,
+  muted = false,
+  action,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  detail: string;
+  done: boolean;
+  muted?: boolean;
+  action?: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
+      <div className="flex min-w-0 items-start gap-3">
+        <span
+          className={cn(
+            "mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg",
+            done
+              ? "bg-foreground text-background"
+              : muted
+                ? "bg-foreground/5 text-muted-foreground/60"
+                : "bg-foreground/10 text-muted-foreground"
+          )}
+        >
+          {done ? <CheckCircle2 className="size-4" /> : icon}
+        </span>
+        <div className="min-w-0">
+          <p className={cn("text-sm font-medium", muted && !done && "text-muted-foreground")}>
+            {label}
+          </p>
+          <p className="text-xs text-muted-foreground">{detail}</p>
+        </div>
+      </div>
+      {action && <div className="shrink-0">{action}</div>}
+    </div>
   );
 }
