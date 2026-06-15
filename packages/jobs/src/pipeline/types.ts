@@ -355,6 +355,8 @@ export interface TrialExpirySummary {
 export interface InboundPayload {
   source: "email" | "linkedin" | "imessage";
   payload: unknown;
+  /** resolved by the webhook route; required for imessage (provider doesn't carry a Vantera accountId) */
+  accountId?: string;
 }
 
 export interface InboundStore {
