@@ -35,6 +35,13 @@ export async function runInbound(payload: InboundPayload, deps: InboundDeps): Pr
         if (verdict.classification !== "out_of_office") {
           await deps.store.cancelPendingSends(lead.id);
           await deps.store.setLeadReplied(lead.id, lead.campaignId);
+          await deps.store.pauseSequenceForReply(lead.id, verdict.classification === "not_interested");
+          await deps.store.insertLeadNotification({
+            accountId,
+            leadId: lead.id,
+            kind: "reply",
+            body: `${lead.id} replied${verdict.classification === "not_interested" ? " (not interested)" : ""}.`,
+          });
         }
         if (verdict.classification === "not_interested") {
           await deps.store.addSuppression(accountId, "email", from, "not_interested", lead.id);
@@ -124,6 +131,13 @@ export async function runInbound(payload: InboundPayload, deps: InboundDeps): Pr
   if (verdict.classification !== "out_of_office") {
     await deps.store.cancelPendingSends(lead.id);
     await deps.store.setLeadReplied(lead.id, lead.campaignId);
+    await deps.store.pauseSequenceForReply(lead.id, verdict.classification === "not_interested");
+    await deps.store.insertLeadNotification({
+      accountId,
+      leadId: lead.id,
+      kind: "reply",
+      body: `${lead.id} replied${verdict.classification === "not_interested" ? " (not interested)" : ""}.`,
+    });
   }
   if (verdict.classification === "not_interested") {
     await deps.store.addSuppression(accountId, "linkedin", url, "not_interested", lead.id);

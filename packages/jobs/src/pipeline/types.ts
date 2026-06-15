@@ -105,6 +105,7 @@ export interface DraftableLead {
   industry: string | null;
   email: string | null;
   linkedinUrl: string | null;
+  phone: string | null;
   aiInsights: StoredInsights | null;
 }
 
@@ -112,7 +113,7 @@ export interface NewScheduledSend {
   accountId: string;
   campaignId: string;
   leadId: string;
-  channel: "email" | "linkedin" | "call";
+  channel: "email" | "linkedin" | "call" | "imessage";
   subject: string | null;
   body: string;
   /** automatic mode inserts clean drafts as 'approved'; style-flagged drafts always review */
@@ -320,6 +321,9 @@ export interface InboundStore {
   setLeadReplied(leadId: string, campaignId: string | null): Promise<void>;
   /** pending_review/approved/scheduled drafts for the lead → canceled; returns count */
   cancelPendingSends(leadId: string): Promise<number>;
+  /** pause the lead's active sequence run on a genuine reply; stop=true → 'stopped', else 'paused_reply' */
+  pauseSequenceForReply(leadId: string, stop: boolean): Promise<void>;
+  insertLeadNotification(n: { accountId: string; leadId: string; kind: "reply"; body: string }): Promise<void>;
 }
 
 export interface InboundDeps {
@@ -451,4 +455,137 @@ export interface VoiceInboundDeps {
 export interface VoiceInboundSummary {
   handled: boolean;
   action: string;
+}
+
+// --- sequence orchestrator ---
+export type SequenceStage = "linkedin" | "email" | "imessage" | "call";
+export type SequenceCursor = SequenceStage | "done";
+export type SequenceStatus = "active" | "paused_reply" | "converted" | "exhausted" | "stopped";
+
+export interface StageConfig {
+  enabled: boolean;
+  touches: number;       // touches before the wait window (ignored for 'call')
+  touchGapDays: number;  // spacing between touches within the stage
+  waitDays: number;      // conversion window held after the last touch
+  maxAttempts?: number;  // 'call' only: dial attempts before exhaustion
+}
+
+export interface SequenceConfig {
+  order: SequenceStage[];
+  stages: Record<SequenceStage, StageConfig>;
+}
+
+export interface SequenceRun {
+  id: string;
+  accountId: string;
+  campaignId: string;
+  leadId: string;
+  status: SequenceStatus;
+  currentStage: SequenceCursor;
+  touchesDone: number;
+  callAttempts: number;
+  nextActionAt: Date;
+  enteredStageAt: Date;
+}
+
+export interface LeadChannels {
+  linkedinUrl: string | null;
+  email: string | null;
+  emailStatus: string; // 'valid' | 'unverified' | 'invalid' | 'risky'
+  phone: string | null;
+  phoneStatus: string; // 'valid' | 'unvalidated' | 'invalid'
+}
+
+export interface SequenceTickContext {
+  run: SequenceRun;
+  config: SequenceConfig;
+  channels: LeadChannels;
+  suppressed: { linkedin: boolean; email: boolean; phone: boolean };
+  accountPaused: boolean;
+  killSwitch: boolean;
+  now: Date;
+}
+
+export interface SequenceRunPatch {
+  status?: SequenceStatus;
+  currentStage?: SequenceCursor;
+  touchesDone?: number;
+  callAttempts?: number;
+  nextActionAt?: Date;
+  enteredStageAt?: Date;
+  lastTouchAt?: Date;
+}
+
+export type SequenceDecision =
+  | { kind: "hold" }
+  | { kind: "dispatch"; stage: SequenceStage; touchNo: number; patch: SequenceRunPatch }
+  | { kind: "advance"; patch: SequenceRunPatch }
+  | { kind: "exhaust"; patch: SequenceRunPatch };
+
+export interface SequenceTouchDispatch {
+  runId: string;
+  accountId: string;
+  campaignId: string;
+  leadId: string;
+  stage: SequenceStage;
+  touchNo: number;
+}
+
+export interface DueSequenceRun {
+  run: SequenceRun;
+  channels: LeadChannels;
+  config: SequenceConfig;
+  accountPaused: boolean;
+}
+
+export interface SequenceStore {
+  /** active runs with next_action_at <= now, joined to lead channels + campaign config */
+  getDueSequenceRuns(now: Date, limit: number): Promise<DueSequenceRun[]>;
+  isKillSwitchOn(): Promise<boolean>;
+  suppressionFlags(
+    accountId: string,
+    ch: LeadChannels
+  ): Promise<{ linkedin: boolean; email: boolean; phone: boolean }>;
+  /** optimistic claim: only updates if status still 'active' AND next_action_at unchanged */
+  applyRunPatch(runId: string, expectNextActionAt: Date, patch: SequenceRunPatch): Promise<boolean>;
+  /** terminal archive used by the exhaust decision */
+  archiveLead(leadId: string, campaignId: string): Promise<void>;
+  /** enrol qualified in_campaign leads lacking an active run; returns count created */
+  enrollPendingLeads(now: Date): Promise<number>;
+}
+
+export interface SequenceTouchStore {
+  getDraftableLead(accountId: string, leadId: string): Promise<DraftableLead | null>;
+  getCampaignCta(campaignId: string): Promise<string>;
+  isSuppressed(accountId: string, kind: "email" | "linkedin" | "phone", value: string): Promise<boolean>;
+  insertScheduledSend(send: NewScheduledSend): Promise<void>;
+}
+
+export interface SequenceTouchDeps {
+  store: SequenceTouchStore;
+  draftEmailFn: (input: DraftInput) => Promise<EmailDraft>;
+  draftLinkedInFn: (input: DraftInput) => Promise<LinkedInDraft>;
+}
+
+export type SequenceTouchOutcome = "drafted" | "suppressed" | "skipped";
+
+// ── Conversion gate (tracked-CTA redirect) ────────────────────────────────────
+
+export interface ConversionStore {
+  /** resolve a tracked CTA token to its lead/campaign/account; null if unknown/expired */
+  resolveConversionToken(token: string): Promise<{ accountId: string; leadId: string; campaignId: string; targetUrl: string } | null>;
+  setLeadConverted(leadId: string): Promise<void>;
+  closeSequenceRun(campaignId: string, leadId: string): Promise<void>;
+  cancelPendingSends(leadId: string): Promise<number>;
+  setCampaignLeadStatus(campaignId: string, leadId: string, status: "completed"): Promise<void>;
+  insertLeadNotification(n: { accountId: string; leadId: string; kind: "converted"; body: string }): Promise<void>;
+}
+
+export interface ConversionDeps {
+  store: ConversionStore;
+}
+
+export interface ConversionResult {
+  converted: boolean;
+  redirectUrl: string | null;
 }
