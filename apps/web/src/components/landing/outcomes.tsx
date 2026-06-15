@@ -15,7 +15,7 @@ const DISTRIBUTION = [
 const STATS = [
   { value: "150M+", label: "companies in reach" },
   { value: "70+", label: "score floor to send" },
-  { value: "3", label: "channels, one config" },
+  { value: "4", label: "channels, one sequence" },
   { value: "100%", label: "sends compliance-checked" },
 ];
 

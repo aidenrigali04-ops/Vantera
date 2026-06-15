@@ -48,7 +48,7 @@ export function FinalCta() {
             </Link>
           </div>
           <p className="mt-4 font-mono text-[11px] tracking-wide text-muted-foreground/70">
-            No credit card to start · Cancel anytime
+            Free for 14 days · No credit card · Cancel anytime
           </p>
         </div>
       </motion.div>

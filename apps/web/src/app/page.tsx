@@ -1,8 +1,8 @@
 import { LandingNav } from "@/components/landing/nav";
 import { Hero } from "@/components/landing/hero";
-import { SimulateSection } from "@/components/landing/simulate-section";
 import { HowItWorks } from "@/components/landing/how-it-works";
 import { AgentsSection } from "@/components/landing/agents-section";
+import { SequenceSection } from "@/components/landing/sequence-section";
 import { Outcomes } from "@/components/landing/outcomes";
 import { Trust } from "@/components/landing/trust";
 import { FinalCta } from "@/components/landing/final-cta";
@@ -16,9 +16,9 @@ export default function Home() {
       <LandingNav />
       <main>
         <Hero />
-        <SimulateSection />
         <HowItWorks />
         <AgentsSection />
+        <SequenceSection />
         <Outcomes />
         <Trust />
         <FinalCta />

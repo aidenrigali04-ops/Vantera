@@ -27,7 +27,7 @@ const STEPS = [
   {
     icon: Send,
     title: "Outreach",
-    body: "Personalized email, LinkedIn, and AI calls draft from each prospect's pain points and triggers — humanized, never spammy.",
+    body: "Personalized email, LinkedIn, iMessage, and AI calls draft from each prospect's pain points and triggers — humanized, never spammy.",
     aha: "Outreach that sounds like your best rep wrote it, at machine scale.",
   },
   {
