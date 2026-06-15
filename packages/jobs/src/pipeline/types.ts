@@ -677,4 +677,6 @@ export interface MailboxSmtpStore {
   getMailboxSmtpCreds(mailboxId: string): Promise<SmtpCredentials>;
   /** Collect provider refs + domains for an account's mailboxes (deprovision). */
   collectMailboxProviderRefs(accountId: string): Promise<{ providerRef: string; domain: string }[]>;
+  /** Delete all mailbox rows for the account (and their encrypted SMTP secrets). */
+  purgeMailboxes(accountId: string): Promise<void>;
 }

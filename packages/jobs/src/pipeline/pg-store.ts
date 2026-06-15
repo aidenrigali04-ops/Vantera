@@ -1238,6 +1238,10 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         .filter((r) => r.providerRef)
         .map((r) => ({ providerRef: r.providerRef!, domain: r.domain ?? "" }));
     },
+
+    async purgeMailboxes(accountId) {
+      await db.delete(mailboxes).where(eq(mailboxes.accountId, accountId));
+    },
   };
 }
 

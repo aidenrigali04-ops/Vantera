@@ -1,4 +1,4 @@
-import { logger, schedules } from "@trigger.dev/sdk";
+import { logger, schedules, tasks } from "@trigger.dev/sdk";
 import { createClient } from "@supabase/supabase-js";
 import { isEligibleForDeletion } from "../lib/deletion";
 
@@ -32,8 +32,9 @@ export const processAccountDeletion = schedules.task({
         .update({ status: "vendor_cleanup" })
         .eq("id", request.id);
 
-      // Vendor deletion calls land here as each vendor integration ships (Phase 5+).
-      logger.info("vendor cleanup (no vendors connected yet)", { accountId: request.account_id });
+      // Deprovision email mailboxes + release domains before the hard delete.
+      await tasks.trigger("deprovision-account", { accountId: request.account_id });
+      logger.info("deprovision-account triggered", { accountId: request.account_id });
 
       const { error: deleteError } = await supabase
         .from("accounts")
