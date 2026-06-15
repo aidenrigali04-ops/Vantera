@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { createEmailInfraFromEnv } from "@vantera/email-infra";
+import { tasks } from "@trigger.dev/sdk";
 import { createLinkedInInfraFromEnv } from "@vantera/linkedin-infra";
 import { canProvision, validateSenderAddress, validateProvisionCounts } from "./validation";
 import { buildConnectRedirects } from "./redirects";
@@ -152,9 +152,8 @@ export async function provisionEmailSending(
   const planGate = gate(billingRow, "mailbox", existingCount ?? 0);
   if (!planGate.ok) return { error: planGate.error };
 
-  let mailboxes: Awaited<ReturnType<ReturnType<typeof createEmailInfraFromEnv>["provision"]>>;
   try {
-    mailboxes = await createEmailInfraFromEnv().provision({
+    await tasks.trigger("provision-email", {
       accountId: account.id,
       domainCount,
       mailboxesPerDomain,
@@ -163,21 +162,8 @@ export async function provisionEmailSending(
     return { error: "Could not start email setup. Try again shortly." };
   }
 
-  const now = new Date().toISOString();
-  const rows = mailboxes.map((m) => ({
-    account_id: account.id,
-    email_address: m.address,
-    domain: m.domain,
-    provider_ref: m.id,
-    status: "warming" as const,
-    warmup_started_at: now,
-  }));
-
-  const { error: insertError } = await supabase.from("mailboxes").insert(rows);
-  if (insertError) return { error: "Could not start email setup. Try again shortly." };
-
   revalidatePath("/settings/channels");
-  return { success: `Email sending set up — ${rows.length} mailbox${rows.length !== 1 ? "es" : ""} are now warming up.` };
+  return { success: "Email setup started — your mailboxes will appear here as they finish provisioning and begin warming up." };
 }
 
 // ── LinkedIn connect link ─────────────────────────────────────────────────────
