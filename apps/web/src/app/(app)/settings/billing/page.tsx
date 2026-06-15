@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   resolveEntitlements,
   isActive,
+  trialDaysLeft,
   PLAN_DISPLAY,
   PLAN_DISPLAY_ORDER,
   ADDON_DISPLAY,
@@ -30,15 +31,23 @@ export default async function BillingPage({
   const supabase = await createClient();
   const { data: row } = await supabase
     .from("accounts")
-    .select("plan, subscription_status, seats_purchased, linkedin_accounts_purchased, current_period_end")
+    .select("plan, subscription_status, seats_purchased, linkedin_accounts_purchased, current_period_end, trial_ends_at")
     .limit(1)
-    .maybeSingle<AccountBillingRow>();
+    .maybeSingle<AccountBillingRow & { trial_ends_at: string | null }>();
 
   const snap = row ? snapshotFromRow(row) : null;
   const limits = snap ? resolveEntitlements(snap) : null;
-  const hasActivePlan =
-    !!snap && snap.plan !== "none" && isActive(snap.subscriptionStatus);
-  const currentTier: PlanTier | "none" = snap && snap.plan !== "none" ? snap.plan : "none";
+
+  // Entitlement (trial or paid) = the gate passes. Paid subscription = there's a
+  // Stripe sub to manage/switch via the portal; a trial has neither, so trial users
+  // see checkout CTAs on every tier.
+  const hasEntitlement = !!snap && snap.plan !== "none" && isActive(snap.subscriptionStatus);
+  const isTrialing = snap?.subscriptionStatus === "trialing";
+  const hasPaidSubscription =
+    !!snap && ["active", "past_due"].includes(snap.subscriptionStatus);
+  const daysLeft = isTrialing ? trialDaysLeft(row?.trial_ends_at ?? null) : null;
+  const currentTier: PlanTier | "none" =
+    hasPaidSubscription && snap ? snap.plan : "none";
 
   const [{ count: seatCount }, { count: mailboxCount }, { count: campaignCount }, { count: liCount }] =
     await Promise.all([
@@ -66,12 +75,37 @@ export default async function BillingPage({
 
   return (
     <div className="flex max-w-6xl flex-col gap-10">
-      {reason === "deploy" && !hasActivePlan && (
+      {reason === "deploy" && !hasEntitlement && (
         <div className={cn(PANEL_SURFACE, "p-5 text-sm")}>
           <span className="font-heading font-semibold">Choose a plan to deploy your agent.</span>{" "}
           <span className="text-muted-foreground">
             Your agents go live the moment a plan is active — pick the one that fits the channels you want to run.
           </span>
+        </div>
+      )}
+
+      {isTrialing && limits && (
+        <div className={cn(PANEL_SURFACE, "flex flex-col gap-4 p-5")}>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm">
+              <span className="font-heading font-semibold">
+                {daysLeft === 0
+                  ? "Your free trial ends today."
+                  : `Your free trial ends in ${daysLeft} day${daysLeft === 1 ? "" : "s"}.`}
+              </span>{" "}
+              <span className="text-muted-foreground">
+                Choose a plan below to keep your agents running — your leads, campaigns, and history stay exactly as they are.
+              </span>
+            </p>
+            <Badge variant="secondary" className="font-mono uppercase tracking-[0.14em]">
+              Trial · {daysLeft}d left
+            </Badge>
+          </div>
+          <ul className="text-sm text-muted-foreground">
+            <li>Seats: {seatCount ?? 0} / {limits.maxSeats}</li>
+            <li>Mailboxes: {mailboxCount ?? 0} / {limits.maxMailboxes}</li>
+            <li>Campaigns: {campaignCount ?? 0} / {limits.maxCampaigns}</li>
+          </ul>
         </div>
       )}
 
@@ -83,7 +117,7 @@ export default async function BillingPage({
         </Card>
       )}
 
-      {hasActivePlan && limits && (
+      {hasPaidSubscription && limits && (
         <Card className="max-w-2xl">
           <CardHeader>
             <CardTitle>Current plan</CardTitle>
@@ -109,7 +143,7 @@ export default async function BillingPage({
         plans={plans}
         addons={ADDON_DISPLAY.map((a) => ({ key: a.key, label: a.label, blurb: a.blurb }))}
         currentTier={currentTier}
-        hasActivePlan={hasActivePlan}
+        hasActivePlan={hasPaidSubscription}
       />
     </div>
   );

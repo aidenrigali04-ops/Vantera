@@ -52,6 +52,7 @@ import type {
   OutreachSendStore,
   PurgeCandidate,
   RetentionStore,
+  TrialStore,
   ScoutConfig,
   ScoutContext,
   ScoutStore,
@@ -106,7 +107,7 @@ function toRow(send: NewScheduledSend) {
 }
 
 /** Drizzle-backed store used by the Trigger.dev tasks (service-role DATABASE_URL). */
-export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerStore & RetentionStore & SendDispatchStore & OutreachSendStore & InboundStore & SequenceStore & SequenceTouchStore & ConversionStore {
+export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerStore & RetentionStore & TrialStore & SendDispatchStore & OutreachSendStore & InboundStore & SequenceStore & SequenceTouchStore & ConversionStore {
   return {
     async getScoutContext(agentId: string): Promise<ScoutContext | null> {
       const [agent] = await db.select().from(agents).where(eq(agents.id, agentId));
@@ -1027,6 +1028,30 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         .update(sequenceRuns)
         .set({ status: stop ? "stopped" : "paused_reply", updatedAt: new Date() })
         .where(and(eq(sequenceRuns.leadId, leadId), eq(sequenceRuns.status, "active")));
+    },
+
+    // ── TrialStore ───────────────────────────────────────────────────────────
+    async getExpiredTrialAccounts(now: Date) {
+      return db
+        .select({ id: accounts.id })
+        .from(accounts)
+        .where(
+          and(
+            eq(accounts.subscriptionStatus, "trialing"),
+            isNull(accounts.stripeSubscriptionId),
+            lt(accounts.trialEndsAt, now)
+          )
+        );
+    },
+
+    async expireTrials(ids: string[]) {
+      if (ids.length === 0) return 0;
+      const rows = await db
+        .update(accounts)
+        .set({ plan: "none", subscriptionStatus: "none", outreachPaused: true })
+        .where(inArray(accounts.id, ids))
+        .returning({ id: accounts.id });
+      return rows.length;
     },
   };
 }

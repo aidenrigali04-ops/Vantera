@@ -280,6 +280,27 @@ export interface RetentionSummary {
   copilotConversationsPurged: number;
 }
 
+export interface ExpiredTrialAccount {
+  id: string;
+}
+
+export interface TrialStore {
+  /** accounts still on a no-card trial (status='trialing', no Stripe sub) past trial_ends_at */
+  getExpiredTrialAccounts(now: Date): Promise<ExpiredTrialAccount[]>;
+  /** flip lapsed trials to plan='none', status='none', outreach paused — returns rows changed */
+  expireTrials(ids: string[]): Promise<number>;
+}
+
+export interface TrialExpiryDeps {
+  store: TrialStore;
+  now?: () => Date;
+}
+
+export interface TrialExpirySummary {
+  status: "completed";
+  expired: number;
+}
+
 export interface InboundPayload {
   source: "email" | "linkedin";
   payload: unknown;
