@@ -22,7 +22,7 @@ Plan accordingly: set up email sending at least 2–4 weeks before you intend to
 
 ## LinkedIn account
 
-Connect your LinkedIn account by clicking **Connect LinkedIn** and completing the secure hosted login — including any two-factor or checkpoint steps LinkedIn requires. The connection is handled through an embedded flow; your credentials are passed directly to LinkedIn and are never stored by Vantera.
+Connect your own existing LinkedIn account to turn on LinkedIn outreach. Click **Connect your LinkedIn account** — you'll sign in on LinkedIn's own secure page (we never see your password), then you're brought straight back to **Settings → Channels**. Your account first shows as **Connecting** and flips to **Active** within a moment once it's confirmed. Need more than one? Use **Connect another account** on the same card.
 
 If your connection drops (LinkedIn sessions expire periodically), return to this page and reconnect. A disconnected account pauses LinkedIn outreach for your workspace; reconnecting resumes it.
 
