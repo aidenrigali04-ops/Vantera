@@ -76,6 +76,19 @@ export const PLAN_DISPLAY: Record<PlanTier, PlanDisplay> = {
 /** Render order, left → right. */
 export const PLAN_DISPLAY_ORDER: PlanTier[] = ["starter", "growth", "scale"];
 
+/** Annual billing gives two months free. Charged yearly; shown as an effective /mo. */
+export const MONTHS_FREE_ANNUAL = 2;
+
+/** Total charged once per year when billed annually (display only). */
+export function annualYearlyUsd(monthlyUsd: number): number {
+  return monthlyUsd * (12 - MONTHS_FREE_ANNUAL);
+}
+
+/** Effective monthly price when billed annually — the big number on the annual toggle. */
+export function annualMonthlyUsd(monthlyUsd: number): number {
+  return Math.round(annualYearlyUsd(monthlyUsd) / 12);
+}
+
 /** Quantity add-ons available on every plan (priced Stripe-side, billed per unit). */
 export const ADDON_DISPLAY = [
   {

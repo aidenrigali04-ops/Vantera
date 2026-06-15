@@ -1,5 +1,5 @@
 import Stripe from "stripe";
-import { ADDON_PRICES, PLANS } from "./plans";
+import { ADDON_PRICES, PLAN_PRICE_IDS, priceIdFor } from "./plans";
 import type { SubscriptionStatus } from "./entitlements";
 import type {
   BillingProvider,
@@ -26,7 +26,7 @@ export class StripeBilling implements BillingProvider {
 
   async createCheckoutSession(req: CheckoutRequest): Promise<SessionResult> {
     const line_items: Stripe.Checkout.SessionCreateParams.LineItem[] = [
-      { price: PLANS[req.tier].stripePriceId, quantity: 1 },
+      { price: priceIdFor(req.tier, req.interval ?? "month"), quantity: 1 },
     ];
     if (req.seatAddons > 0) line_items.push({ price: ADDON_PRICES.seat, quantity: req.seatAddons });
     if (req.linkedinAddons > 0)
@@ -79,7 +79,7 @@ export class StripeBilling implements BillingProvider {
     ) {
       const sub = event.data.object as Stripe.Subscription;
       const items = sub.items.data;
-      const planItem = items.find((i) => PLANS_PRICE_IDS.has(i.price.id));
+      const planItem = items.find((i) => PLAN_PRICE_IDS.has(i.price.id));
       const seatItem = items.find((i) => i.price.id === ADDON_PRICES.seat);
       const liItem = items.find((i) => i.price.id === ADDON_PRICES.linkedinAccount);
       // In Stripe API 18.x, current_period_end lives on SubscriptionItem, not Subscription.
@@ -102,8 +102,6 @@ export class StripeBilling implements BillingProvider {
     return { type: "ignored" };
   }
 }
-
-const PLANS_PRICE_IDS = new Set(Object.values(PLANS).map((p) => p.stripePriceId));
 
 export function createBillingFromEnv(): BillingProvider {
   const key = process.env.STRIPE_SECRET_KEY;

@@ -10,6 +10,7 @@ function appUrl(path: string): string {
 
 export async function startCheckout(formData: FormData): Promise<void> {
   const tier = String(formData.get("tier") ?? "") as PlanTier;
+  const interval = String(formData.get("interval") ?? "month") === "year" ? "year" : "month";
   const seatAddons = Math.max(0, parseInt(String(formData.get("seatAddons") ?? "0"), 10) || 0);
   const linkedinAddons = Math.max(0, parseInt(String(formData.get("linkedinAddons") ?? "0"), 10) || 0);
   if (!["starter", "growth", "scale"].includes(tier)) return;
@@ -30,6 +31,7 @@ export async function startCheckout(formData: FormData): Promise<void> {
     stripeCustomerId: account.stripe_customer_id,
     customerEmail: user.email ?? "",
     tier,
+    interval,
     seatAddons,
     linkedinAddons,
     successUrl: appUrl("/settings/billing?checkout=success"),

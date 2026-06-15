@@ -10,6 +10,8 @@ import {
   PLAN_DISPLAY,
   PLAN_DISPLAY_ORDER,
   ADDON_DISPLAY,
+  annualMonthlyUsd,
+  annualYearlyUsd,
   type PlanTier,
 } from "@vantera/billing";
 import { snapshotFromRow, type AccountBillingRow } from "@/lib/billing/entitlement";
@@ -55,6 +57,8 @@ export default async function BillingPage({
       name: d.name,
       tagline: d.tagline,
       monthlyUsd: d.monthlyUsd,
+      annualMonthlyUsd: annualMonthlyUsd(d.monthlyUsd),
+      annualYearlyUsd: annualYearlyUsd(d.monthlyUsd),
       highlight: d.highlight,
       features: d.features,
     };
