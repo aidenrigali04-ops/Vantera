@@ -51,12 +51,12 @@ export function Hero() {
       <DottedSurface colorTheme="dark" contained />
 
       {/* First screen: the promise + the interactive demo, vertically centered. */}
-      <div className="relative z-10 mx-auto flex min-h-screen max-w-3xl flex-col items-center justify-center pt-24 pb-12 text-center">
+      <div className="relative z-10 mx-auto flex min-h-screen max-w-4xl flex-col items-center justify-center pt-24 pb-12 text-center">
         <TextEffect
           as="h1"
           per="word"
           preset="blur"
-          className="font-heading max-w-3xl text-4xl font-medium tracking-tight text-foreground sm:text-5xl md:text-6xl"
+          className="font-heading max-w-4xl text-balance text-4xl font-medium tracking-tight text-foreground sm:text-5xl md:text-6xl"
         >
           Your next customers, found and contacted on autopilot.
         </TextEffect>
@@ -68,10 +68,9 @@ export function Hero() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.5, ease: [0.22, 1, 0.36, 1] }}
         >
-          <p className="mx-auto mt-6 max-w-2xl text-base text-muted-foreground sm:text-lg">
-            Vantera&apos;s SDR agents prospect, enrich, score, and reach out across email, LinkedIn,
-            and calls — handing you only high-fit leads, booked into your CRM. Describe your buyer to
-            watch the pipeline run.
+          <p className="mx-auto mt-6 max-w-3xl text-pretty text-base text-muted-foreground sm:text-lg">
+            AI SDR agents prospect, score, and reach out across email, LinkedIn, and calls — handing
+            you only high-fit leads, booked into your CRM.
           </p>
 
           <div id="simulate" className="mt-10 w-full scroll-mt-28">

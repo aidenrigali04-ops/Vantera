@@ -71,7 +71,7 @@ export function GatedPayoff({
             href="/signup"
             className="group inline-flex items-center justify-center gap-2 rounded-full bg-foreground px-6 py-3 text-sm font-medium text-background transition-opacity hover:opacity-90"
           >
-            Get started — launch this campaign
+            Get started free
             <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
           </Link>
           <span className="font-mono text-[11px] text-muted-foreground">
