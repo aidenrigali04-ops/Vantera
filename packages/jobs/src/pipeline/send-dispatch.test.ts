@@ -31,6 +31,7 @@ class FakeDispatchStore implements SendDispatchStore {
   linkedInAgeDays: number | null = 30;
   inviteSentToday = 0;
   messageSentToday = 0;
+  invitesLast7Days = 0; // what countLinkedInInvitesLast7Days reports (weekly-ceiling input)
   accountSendsCount = 0; // what countAccountSends reports (trial-cap input)
   scheduled: { sendId: string; scheduledFor: Date }[] = [];
   canceled: { sendId: string; error: string }[] = [];
@@ -54,6 +55,9 @@ class FakeDispatchStore implements SendDispatchStore {
   }
   async countLinkedInSentToday(_accountId: string, kind: "invite" | "message", _dayStart: Date) {
     return kind === "invite" ? this.inviteSentToday : this.messageSentToday;
+  }
+  async countLinkedInInvitesLast7Days(_accountId: string, _now: Date) {
+    return this.invitesLast7Days;
   }
   async markScheduled(sendId: string, scheduledFor: Date) {
     this.scheduled.push({ sendId, scheduledFor });
@@ -404,5 +408,76 @@ describe("runSendDispatch — scheduling and timing", () => {
 
     expect(result.scheduled).toBe(1);
     expect(enqueued[0]?.sendId).toBe("stale1");
+  });
+});
+
+describe("runSendDispatch — rolling weekly invite ceiling", () => {
+  it("clamps invites to the rolling weekly ceiling (97 sent in 7 days → at most 3 dispatched)", async () => {
+    const store = new FakeDispatchStore();
+    // ageDays 60 → steady-state daily allowance = LINKEDIN_STEADY_DAILY_INVITES (20)
+    // but 97 of the 100 weekly slots are consumed → only 3 remain
+    store.linkedInAgeDays = 60;
+    store.inviteSentToday = 0;       // daily counter is not the binding constraint
+    store.invitesLast7Days = 97;     // weekly counter: 100 - 97 = 3 remaining
+
+    // 10 queued invite rows; assert at most 3 dispatched
+    store.sends = Array.from({ length: 10 }, (_, i) =>
+      makeSend({ id: `inv${i + 1}`, channel: "linkedin", linkedinStage: "invite" })
+    );
+    const enqueued: { sendId: string; runAt: Date }[] = [];
+    const deps = makeDeps(store, enqueued);
+
+    const result = await runSendDispatch(deps);
+
+    // Weekly ceiling wins: exactly 3 invites dispatched, 7 skipped
+    expect(result.scheduled).toBe(3);
+    expect(result.skipped).toBe(7);
+    expect(enqueued).toHaveLength(3);
+  });
+
+  it("weekly ceiling fully consumed → zero invites dispatched", async () => {
+    const store = new FakeDispatchStore();
+    store.linkedInAgeDays = 60;
+    store.inviteSentToday = 0;
+    store.invitesLast7Days = 100; // at the ceiling
+
+    store.sends = [
+      makeSend({ id: "inv1", channel: "linkedin", linkedinStage: "invite" }),
+      makeSend({ id: "inv2", channel: "linkedin", linkedinStage: "invite" }),
+    ];
+    const enqueued: { sendId: string; runAt: Date }[] = [];
+    const deps = makeDeps(store, enqueued);
+
+    const result = await runSendDispatch(deps);
+
+    expect(result.scheduled).toBe(0);
+    expect(result.skipped).toBe(2);
+    expect(enqueued).toHaveLength(0);
+  });
+
+  it("weekly ceiling does NOT restrict messages — only invites", async () => {
+    const store = new FakeDispatchStore();
+    store.linkedInAgeDays = 60;
+    store.invitesLast7Days = 100; // invite ceiling fully consumed
+    store.messageSentToday = 0;   // messages have room
+
+    store.sends = [
+      makeSend({ id: "inv1", channel: "linkedin", linkedinStage: "invite" }),
+      makeSend({
+        id: "msg1",
+        channel: "linkedin",
+        linkedinStage: "message",
+        leadConnectedAt: new Date("2026-06-01T00:00:00Z"),
+      }),
+    ];
+    const enqueued: { sendId: string; runAt: Date }[] = [];
+    const deps = makeDeps(store, enqueued);
+
+    const result = await runSendDispatch(deps);
+
+    // invite blocked (weekly ceiling), message goes through
+    expect(result.scheduled).toBe(1);
+    expect(enqueued[0]?.sendId).toBe("msg1");
+    expect(result.skipped).toBe(1);
   });
 });
