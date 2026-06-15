@@ -23,7 +23,9 @@ describe("MaildosoEmailInfra", () => {
     const out = await infra.provision({ accountId: "acc_1", domainCount: 1, mailboxesPerDomain: 2 });
     expect(out).toHaveLength(2);
     expect(out[0]!.smtp).toEqual(creds);
-    expect(out[0]!.id).toBe(out[0]!.address); // id == providerRef-derived address ref (see impl)
+    // id is the Maildoso provider ref (persisted as mailboxes.provider_ref), NOT the address
+    expect(out[0]!.id).toBe("mbx_sdr0");
+    expect(out[0]!.id).not.toBe(out[0]!.address);
   });
 
   it("send resolves creds via getSmtpCreds and sets List-Unsubscribe", async () => {

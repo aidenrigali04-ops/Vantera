@@ -34,7 +34,9 @@ export class MaildosoEmailInfra implements EmailInfra {
       await this.api.ensureDomain(domain);
       for (let m = 0; m < req.mailboxesPerDomain; m++) {
         const created = await this.api.createMailbox(domain, `sdr${m}`);
-        out.push({ id: created.address, address: created.address, domain: created.domain, smtp: created.smtp });
+        // id is the provider's internal mailbox ref — the jobs layer persists it as
+        // mailboxes.provider_ref, and deprovision/warmup call Maildoso by that ref (not the address).
+        out.push({ id: created.providerRef, address: created.address, domain: created.domain, smtp: created.smtp });
       }
     }
     return out;
