@@ -1,10 +1,13 @@
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { checkLimit, rateLimitResponse } from "@/lib/rate-limit";
 export const runtime = "nodejs";
 export async function POST(req: Request) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return new Response("unauthorized", { status: 401 });
+  const limited = rateLimitResponse(await checkLimit("copilotFeedback", user.id));
+  if (limited) return limited;
   const { data: account } = await supabase.from("accounts").select("id").limit(1).maybeSingle();
   if (!account) return new Response("no account", { status: 403 });
   const { messageId, feedback } = await req.json();

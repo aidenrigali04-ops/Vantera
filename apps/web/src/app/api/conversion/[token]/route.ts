@@ -1,6 +1,7 @@
 import { createServiceClient } from "@/lib/supabase/service";
 import { markConverted } from "@vantera/jobs/pipeline/conversion";
 import type { ConversionStore } from "@vantera/jobs/pipeline/types";
+import { checkLimit, clientIp, rateLimitResponse } from "@/lib/rate-limit";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -62,6 +63,9 @@ function conversionStore(): ConversionStore {
 export async function GET(req: Request, { params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
   const fallback = new URL("/", req.url).toString();
+  // Per-IP rate limit (depth — tokens are UUIDs). Blunts a scanner hammering the endpoint.
+  const limited = rateLimitResponse(await checkLimit("publicToken", clientIp(req)));
+  if (limited) return limited;
   // garbage input: skip the DB, just send them home (never an error page for a prospect)
   if (!UUID_RE.test(token)) return Response.redirect(fallback, 302);
   const { redirectUrl } = await markConverted(token, { store: conversionStore() });

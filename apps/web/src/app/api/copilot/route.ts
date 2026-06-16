@@ -11,6 +11,7 @@ import { makeRetriever } from "@/server/copilot/retriever";
 import { ensureConversation, saveMessage, auditAction } from "@/server/copilot/persist";
 import { buildAccountTools } from "@/server/copilot/tools";
 import { navigateTools } from "@/server/copilot/navigate-tools";
+import { checkLimit, rateLimitResponse } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -21,6 +22,10 @@ export async function POST(req: Request) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return new Response("unauthorized", { status: 401 });
+
+  // Rate limit per user before any LLM work (token-burn / DoS protection).
+  const limited = rateLimitResponse(await checkLimit("copilot", user.id));
+  if (limited) return limited;
 
   const { data: account } = await supabase
     .from("accounts")
