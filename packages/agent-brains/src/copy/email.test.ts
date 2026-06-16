@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { MockLanguageModelV2 } from "ai/test";
 import { draftEmail, validateEmailDraft } from "./email";
-import type { DraftInput } from "./shared";
+import { leadBlock, type DraftInput } from "./shared";
 
 const INPUT: DraftInput = {
   lead: { firstName: "Dana", title: "VP Sales", companyName: "Acme", industry: "saas" },
@@ -55,6 +55,29 @@ describe("validateEmailDraft", () => {
     expect(rules).toContain("subject-length");
     expect(rules).toContain("no-links");
   });
+
+  it("flags a metric claim not grounded in the lead facts", () => {
+    const violations = validateEmailDraft(
+      {
+        subject: "growth",
+        body: "Saw Acme grew pipeline 40% last quarter. Worth a look?\n\n{{sender_name}}",
+      },
+      leadBlock(INPUT),
+    );
+    expect(violations.map((v) => v.rule)).toContain("ungrounded-claim");
+  });
+
+  it("does not flag a metric that the lead facts support", () => {
+    const grounding = leadBlock({
+      ...INPUT,
+      insights: { ...INPUT.insights, triggers: ["reported 40% YoY growth"] },
+    });
+    const violations = validateEmailDraft(
+      { subject: "that 40% year", body: "Your 40% growth is usually when this breaks. Worth a look?\n\n{{sender_name}}" },
+      grounding,
+    );
+    expect(violations.map((v) => v.rule)).not.toContain("ungrounded-claim");
+  });
 });
 
 describe("draftEmail", () => {
@@ -89,6 +112,20 @@ describe("draftEmail", () => {
 
     expect(model.doGenerateCalls).toHaveLength(2);
     expect(draft.violations.length).toBeGreaterThan(0);
+  });
+
+  it("flags a fabricated metric in the generated draft so it routes to review", async () => {
+    const fabricated = {
+      subject: "growth",
+      body: "Saw Acme grew 40% last quarter. Worth a look?\n\n{{sender_name}}",
+    };
+    const model = new MockLanguageModelV2({
+      doGenerate: sequence(textResponse(fabricated), textResponse(fabricated)),
+    });
+
+    const draft = await draftEmail(INPUT, model);
+
+    expect(draft.violations.map((v) => v.rule)).toContain("ungrounded-claim");
   });
 
   it("sends the lead context (pain points, CTA, aha moment) to the model", async () => {
