@@ -1,5 +1,5 @@
 import { and, count, desc, eq, gte, inArray, isNull, lt, lte, or, sql } from "drizzle-orm";
-import { encryptSecret, decryptSecret } from "@vantera/email-infra";
+import { encryptSecretWithKeyring, decryptSecretWithKeyring } from "@vantera/email-infra";
 import {
   accounts,
   agentAssets,
@@ -108,13 +108,6 @@ function toRow(send: NewScheduledSend) {
     linkedinStage: send.linkedinStage,
     styleFlags: send.styleFlags,
   };
-}
-
-/** Throws if OWNED_EMAIL_SECRET_KEY is not set in the environment. */
-function secretKey(): string {
-  const k = process.env.OWNED_EMAIL_SECRET_KEY;
-  if (!k) throw new Error("OWNED_EMAIL_SECRET_KEY is required for mailbox SMTP secrets");
-  return k;
 }
 
 /** Drizzle-backed store used by the Trigger.dev tasks (service-role DATABASE_URL). */
@@ -1270,7 +1263,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           domain: m.domain,
           providerRef: m.id,
           status: "warming",
-          smtpSecret: m.smtp ? encryptSecret(m.smtp.password, secretKey()) : null,
+          smtpSecret: m.smtp ? encryptSecretWithKeyring(m.smtp.password) : null,
           smtpHost: m.smtp?.host ?? null,
           smtpPort: m.smtp?.port ?? null,
           smtpUsername: m.smtp?.username ?? null,
@@ -1291,7 +1284,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         host: row.smtpHost,
         port: row.smtpPort,
         username: row.smtpUsername,
-        password: decryptSecret(row.smtpSecret, secretKey()),
+        password: decryptSecretWithKeyring(row.smtpSecret),
       };
     },
 

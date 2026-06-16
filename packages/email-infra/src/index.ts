@@ -2,7 +2,12 @@ export * from "./types";
 export { InMemoryEmailInfra } from "./in-memory";
 export { MaildosoEmailInfra } from "./maildoso/index";
 export { MaildosoApiClient } from "./maildoso/api-client";
-export { encryptSecret, decryptSecret } from "./maildoso/secret-crypto";
+export {
+  encryptSecret,
+  decryptSecret,
+  encryptSecretWithKeyring,
+  decryptSecretWithKeyring,
+} from "./maildoso/secret-crypto";
 
 import type { EmailInfra, GetSmtpCreds } from "./types";
 import { MaildosoEmailInfra } from "./maildoso/index";
