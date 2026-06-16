@@ -25,11 +25,11 @@ export function FinalCta() {
             Deploy in minutes
           </span>
           <h2 className="font-heading mx-auto mt-4 max-w-2xl text-3xl font-semibold tracking-tight text-foreground sm:text-5xl">
-            Give your pipeline an SDR team that never clocks out.
+            The AI SDR you won&apos;t have to apologize for.
           </h2>
           <p className="mx-auto mt-5 max-w-xl text-base text-muted-foreground sm:text-lg">
-            Connect your channels, define your ICP, and let the agents prospect, enrich, score, and
-            reach out — while you focus on closing.
+            Define your ICP and connect your channels. The agents prospect, score, and draft — you
+            approve every send, and you&apos;re never locked in.
           </p>
 
           <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">

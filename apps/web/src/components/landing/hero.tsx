@@ -58,7 +58,7 @@ export function Hero() {
           preset="blur"
           className="font-heading max-w-4xl text-balance text-4xl font-medium tracking-tight text-foreground sm:text-5xl md:text-6xl"
         >
-          Your next customers, found and contacted on autopilot.
+          {"Most of your leads aren't worth a call."}
         </TextEffect>
 
         {/* The promise resolves first (headline blur), then the demo + CTA rise as one block. */}
@@ -69,8 +69,7 @@ export function Hero() {
           transition={{ duration: 0.6, delay: 0.5, ease: [0.22, 1, 0.36, 1] }}
         >
           <p className="mx-auto mt-6 max-w-3xl text-pretty text-base text-muted-foreground sm:text-lg">
-            AI SDR agents prospect, score, and reach out across email, LinkedIn, and calls — handing
-            you only high-fit leads, booked into your CRM.
+            {"We score every prospect, cut the ones that don't fit, and work only the handful worth a rep's time — across email, LinkedIn, and a real call. Nothing sends without your sign-off."}
           </p>
 
           <div id="simulate" className="mt-10 w-full scroll-mt-28">

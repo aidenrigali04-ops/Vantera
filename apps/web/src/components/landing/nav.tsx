@@ -5,11 +5,11 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 
 const LINKS = [
+  { label: "Why Vantera", href: "#difference" },
   { label: "How it works", href: "#how" },
-  { label: "Pipeline", href: "#simulate" },
   { label: "Agents", href: "#agents" },
-  { label: "Sequence", href: "#sequence" },
   { label: "Outcomes", href: "#outcomes" },
+  { label: "Pricing", href: "/pricing" },
 ];
 
 export function LandingNav() {

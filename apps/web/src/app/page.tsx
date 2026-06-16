@@ -1,5 +1,6 @@
 import { LandingNav } from "@/components/landing/nav";
 import { Hero } from "@/components/landing/hero";
+import { Contrast } from "@/components/landing/contrast";
 import { HowItWorks } from "@/components/landing/how-it-works";
 import { AgentsSection } from "@/components/landing/agents-section";
 import { SequenceSection } from "@/components/landing/sequence-section";
@@ -16,6 +17,7 @@ export default function Home() {
       <LandingNav />
       <main>
         <Hero />
+        <Contrast />
         <HowItWorks />
         <AgentsSection />
         <SequenceSection />
