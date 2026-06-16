@@ -54,6 +54,6 @@
     "eslint-plugin-security": "^3.0.1",
     "tailwindcss": "^4",
     "typescript": "^5",
-    "vitest": "^4.0.0"
+    "vitest": "^4.1.9"
   }
 }
