@@ -230,3 +230,15 @@ describe("column-grant lockdown (0025)", () => {
     expect(grant![1]).not.toMatch(/linkedin_connected_at/);
   });
 });
+
+describe("column-grant lockdown (0026 — crm_connections tokens)", () => {
+  const sql = readFileSync(join(migrationsDir, "0026_crm_token_column_lockdown.sql"), "utf8");
+
+  it("0026 revokes SELECT and re-grants without the encrypted token columns", () => {
+    expect(sql).toMatch(/REVOKE SELECT ON public\.crm_connections FROM authenticated, anon/i);
+    const grant = sql.match(/GRANT SELECT \(([\s\S]*?)\) ON public\.crm_connections/i);
+    expect(grant, "expected a column-scoped crm_connections SELECT grant").toBeTruthy();
+    expect(grant![1]).not.toMatch(/access_token_enc/);
+    expect(grant![1]).not.toMatch(/refresh_token_enc/);
+  });
+});
