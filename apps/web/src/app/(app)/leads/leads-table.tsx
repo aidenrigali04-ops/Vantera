@@ -15,6 +15,7 @@ import {
   type ScoreTier,
 } from "./lead-value";
 import { ReplyHandoff } from "./reply-panel";
+import { EraseLead } from "./erase-lead";
 
 export interface LeadInsightsView {
   pain_points?: string[];
@@ -468,6 +469,11 @@ export function LeadsTable({
                   <p className="mt-1.5 text-sm">{selected.location}</p>
                 </section>
               )}
+
+              {/* GDPR erasure (rule 11). Admin-only, enforced server-side. */}
+              <section className="border-t border-border pt-4">
+                <EraseLead leadId={selected.id} onErased={() => setSelected(null)} />
+              </section>
             </div>
           </aside>
         </>
