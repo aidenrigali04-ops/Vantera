@@ -58,12 +58,22 @@ export async function POST(req: Request) {
         return;
       }
       // First subscription: the row has no customer id yet — link by account id from metadata.
+      // Defense-in-depth: constrain to stripe_customer_id IS NULL so a crafted metadata.accountId
+      // can never overwrite an account that already has an established customer (account takeover
+      // of billing). Established accounts always match via the primary stripe_customer_id path above.
       if (snap.accountId) {
-        const { error } = await supabase
+        const { data: linked, error } = await supabase
           .from("accounts")
           .update(updateCols)
-          .eq("id", snap.accountId);
+          .eq("id", snap.accountId)
+          .is("stripe_customer_id", null)
+          .select("id");
         if (error) throw new Error(`account snapshot link failed: ${error.code}`);
+        if ((linked?.length ?? 0) === 0) {
+          // Already linked to a customer (or not found): refuse silently rather than clobber.
+          console.warn("billing webhook: first-subscription link skipped (account already has a customer)");
+          return;
+        }
         if (zeroMailboxEntitlement) {
           await tasks.trigger("deprovision-account", { accountId: snap.accountId });
         }
