@@ -2,7 +2,8 @@ import { timingSafeEqual } from "node:crypto";
 import type { MessageEvent, MessageHandle, MessageInfra, SendMessageRequest } from "./types";
 import { InMemoryMessageInfra } from "./in-memory";
 
-const SEND_URL = "https://server.loopmessage.com/api/v1/message/send/"; // CONFIRM ON ACTIVATION
+// LoopMessage Send Message API endpoint (host confirmed against the owner's dashboard).
+const SEND_URL = "https://a.loopmessage.com/api/v1/message/send/";
 
 export interface LoopMessageConfig {
   authKey: string;
@@ -23,15 +24,18 @@ export class LoopMessageInfra implements MessageInfra {
     const res = await this.fetchImpl(SEND_URL, {
       method: "POST",
       headers: {
-        Authorization: this.cfg.authKey,          // CONFIRM ON ACTIVATION
-        "Loop-Secret-Key": this.cfg.secretKey,    // CONFIRM ON ACTIVATION
+        // API key goes in Authorization with no Bearer/Basic prefix (per docs).
+        Authorization: this.cfg.authKey,
+        // Account-dependent: the current Conversation API docs show only Authorization,
+        // but plans that issue a separate Secret Key expect it here. Harmless if ignored.
+        "Loop-Secret-Key": this.cfg.secretKey,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        recipient: req.toPhone,                   // CONFIRM ON ACTIVATION
-        text: req.body,                           // CONFIRM ON ACTIVATION
-        sender_name: req.fromIdentity,            // CONFIRM ON ACTIVATION
-        passthrough: req.sendRef,                 // CONFIRM ON ACTIVATION
+        contact: req.toPhone,         // E.164 phone or lowercase email
+        text: req.body,
+        sender: req.fromIdentity,     // dedicated sender ID/handle — never a phone number
+        passthrough: req.sendRef,     // echoed back on every webhook for this message
       }),
     });
 
@@ -47,7 +51,8 @@ export class LoopMessageInfra implements MessageInfra {
   }
 
   verifyWebhook(headers: Record<string, string>, _rawBody: string): boolean {
-    // CONFIRM ON ACTIVATION: which header LoopMessage echoes on callbacks
+    // LoopMessage lets you set the webhook authorization header in the dashboard;
+    // it arrives as `Authorization`. `x-loop-secret` kept as a defensive alias.
     const presented = headers["authorization"] ?? headers["x-loop-secret"];
     if (!presented) return false;
     try {
@@ -63,35 +68,40 @@ export class LoopMessageInfra implements MessageInfra {
     if (typeof payload !== "object" || payload === null) return null;
     const p = payload as Record<string, unknown>;
 
-    // CONFIRM ON ACTIVATION: LoopMessage uses alert_type (e.g. message_inbound / message_sent)
-    const t = p.alert_type ?? p.event_type;
+    // LoopMessage names the event type in `event`. Inbound from the contact arrives
+    // as `message_inbound`; `opt-in` is that contact's FIRST inbound — same
+    // {contact, text} shape, so we treat it as a reply too.
+    const event = p.event;
 
-    if (t === "message_inbound" || t === "reply") {
-      // Need at least one phone field and one text field
-      if (typeof p.text !== "string" && typeof p.body !== "string") return null;
-      if (typeof p.recipient !== "string" && typeof p.from !== "string") return null;
+    if (event === "message_inbound" || event === "opt-in") {
+      // `contact` is the sender (E.164 phone or lowercase email); `text` the body.
+      if (typeof p.contact !== "string") return null;
+      if (typeof p.text !== "string") return null;
 
       return {
         type: "reply",
         providerMessageId: typeof p.message_id === "string" ? p.message_id : null,
-        fromPhone: String(p.recipient ?? p.from),        // CONFIRM ON ACTIVATION
-        body: String(p.text ?? p.body),                  // CONFIRM ON ACTIVATION
-        receivedAt:
-          typeof p.received_at === "string" ? p.received_at : new Date().toISOString(),
+        fromPhone: p.contact,
+        body: p.text,
+        // Inbound webhooks carry no timestamp — stamp it on receipt.
+        receivedAt: new Date().toISOString(),
       };
     }
 
-    if (t === "message_sent" || t === "delivery") {
+    // Terminal delivery status: the event NAME is the outcome. `passthrough` is the
+    // metadata we sent on the outbound, used to attribute the event back to the send row.
+    if (event === "message_delivered" || event === "message_failed") {
       if (typeof p.message_id !== "string") return null;
 
       return {
         type: "delivery",
         providerMessageId: p.message_id,
-        sendRef: typeof p.passthrough === "string" ? p.passthrough : null, // CONFIRM ON ACTIVATION
-        delivered: p.success === true || p.delivered === true,             // CONFIRM ON ACTIVATION
+        sendRef: typeof p.passthrough === "string" ? p.passthrough : null,
+        delivered: event === "message_delivered",
       };
     }
 
+    // Non-terminal/unhandled (message_scheduled, message_reaction, inbound_call, unknown).
     return null;
   }
 }

@@ -42,18 +42,19 @@ describe("LoopMessageInfra.sendMessage", () => {
     // URL
     expect(url).toContain("loopmessage.com"); // CONFIRM ON ACTIVATION
 
-    // Auth headers
+    // Auth headers — Authorization is the API key (no Bearer/Basic prefix, per docs).
+    // Loop-Secret-Key is account-dependent; kept and asserted since we still send it.
     const headers = init.headers as Record<string, string>;
-    expect(headers["Authorization"]).toBe("auth-key-123"); // CONFIRM ON ACTIVATION
-    expect(headers["Loop-Secret-Key"]).toBe("secret-key-456"); // CONFIRM ON ACTIVATION
+    expect(headers["Authorization"]).toBe("auth-key-123");
+    expect(headers["Loop-Secret-Key"]).toBe("secret-key-456");
     expect(headers["Content-Type"]).toBe("application/json");
 
-    // Body fields
+    // Body fields — LoopMessage real schema: contact / text / sender / passthrough.
     const sentBody = JSON.parse(init.body as string) as Record<string, unknown>;
-    expect(sentBody["recipient"]).toBe("+15555550100"); // CONFIRM ON ACTIVATION
-    expect(sentBody["text"]).toBe("Hi there!"); // CONFIRM ON ACTIVATION
-    expect(sentBody["sender_name"]).toBe("VanteraBot"); // CONFIRM ON ACTIVATION
-    expect(sentBody["passthrough"]).toBe("send-row-001"); // CONFIRM ON ACTIVATION
+    expect(sentBody["contact"]).toBe("+15555550100");
+    expect(sentBody["text"]).toBe("Hi there!");
+    expect(sentBody["sender"]).toBe("VanteraBot");
+    expect(sentBody["passthrough"]).toBe("send-row-001");
 
     // Return shape
     expect(handle.providerMessageId).toBe("lm_abc123");
@@ -112,13 +113,13 @@ describe("LoopMessageInfra.verifyWebhook", () => {
 describe("LoopMessageInfra.parseEventWebhook", () => {
   const infra = new LoopMessageInfra(defaultCfg);
 
-  it("maps a LoopMessage inbound payload (alert_type=message_inbound) → {type:'reply',...}", () => {
+  it("maps a LoopMessage inbound payload (event=message_inbound) → {type:'reply',...}", () => {
     const event = infra.parseEventWebhook({
-      alert_type: "message_inbound", // CONFIRM ON ACTIVATION
+      event: "message_inbound",
       message_id: "lm_reply_1",
-      recipient: "+15555550100", // CONFIRM ON ACTIVATION
-      text: "I'm interested!", // CONFIRM ON ACTIVATION
-      received_at: "2026-06-15T12:00:00.000Z",
+      contact: "+15555550100",
+      text: "I'm interested!",
+      message_type: "text",
     });
     expect(event).not.toBeNull();
     expect(event?.type).toBe("reply");
@@ -126,29 +127,28 @@ describe("LoopMessageInfra.parseEventWebhook", () => {
       expect(event.fromPhone).toBe("+15555550100");
       expect(event.body).toBe("I'm interested!");
       expect(event.providerMessageId).toBe("lm_reply_1");
-      expect(event.receivedAt).toBe("2026-06-15T12:00:00.000Z");
     }
   });
 
-  it("also maps event_type=reply (alternate field name)", () => {
+  it("treats opt-in (the contact's first inbound) as a reply", () => {
     const event = infra.parseEventWebhook({
-      event_type: "reply",
-      from: "+15555550200",
-      body: "Yes please",
+      event: "opt-in",
+      contact: "jane@example.com",
+      text: "yes",
+      message_id: "lm_optin_1",
     });
     expect(event?.type).toBe("reply");
     if (event?.type === "reply") {
-      expect(event.fromPhone).toBe("+15555550200");
-      expect(event.body).toBe("Yes please");
+      expect(event.fromPhone).toBe("jane@example.com");
+      expect(event.body).toBe("yes");
     }
   });
 
-  it("maps a LoopMessage status payload (alert_type=message_sent) → {type:'delivery',...}", () => {
+  it("maps message_delivered → {type:'delivery', delivered:true} with passthrough as sendRef", () => {
     const event = infra.parseEventWebhook({
-      alert_type: "message_sent", // CONFIRM ON ACTIVATION
+      event: "message_delivered",
       message_id: "lm_sent_1",
       passthrough: "send-row-001",
-      success: true, // CONFIRM ON ACTIVATION
     });
     expect(event).not.toBeNull();
     expect(event?.type).toBe("delivery");
@@ -159,11 +159,11 @@ describe("LoopMessageInfra.parseEventWebhook", () => {
     }
   });
 
-  it("maps success=false as delivered=false", () => {
+  it("maps message_failed → delivered=false", () => {
     const event = infra.parseEventWebhook({
-      alert_type: "message_sent",
+      event: "message_failed",
       message_id: "lm_failed_1",
-      success: false,
+      error_code: 200,
     });
     expect(event?.type).toBe("delivery");
     if (event?.type === "delivery") {
@@ -171,8 +171,11 @@ describe("LoopMessageInfra.parseEventWebhook", () => {
     }
   });
 
-  it("returns null for unknown event types", () => {
-    expect(infra.parseEventWebhook({ alert_type: "unknown_event" })).toBeNull();
+  it("returns null for non-terminal / unhandled events (message_scheduled, message_reaction, inbound_call, unknown)", () => {
+    expect(infra.parseEventWebhook({ event: "message_scheduled", message_id: "lm_1" })).toBeNull();
+    expect(infra.parseEventWebhook({ event: "message_reaction", contact: "+1", text: "👍" })).toBeNull();
+    expect(infra.parseEventWebhook({ event: "inbound_call", contact: "+1" })).toBeNull();
+    expect(infra.parseEventWebhook({ event: "unknown" })).toBeNull();
   });
 
   it("returns null for null / non-object payloads", () => {
@@ -181,26 +184,27 @@ describe("LoopMessageInfra.parseEventWebhook", () => {
     expect(infra.parseEventWebhook(42)).toBeNull();
   });
 
-  it("returns null for a reply payload missing both phone fields", () => {
-    expect(
-      infra.parseEventWebhook({ alert_type: "message_inbound", text: "hi" })
-    ).toBeNull();
+  it("returns null for an inbound payload missing the contact field", () => {
+    expect(infra.parseEventWebhook({ event: "message_inbound", text: "hi" })).toBeNull();
+  });
+
+  it("returns null for an inbound payload missing the text field", () => {
+    expect(infra.parseEventWebhook({ event: "message_inbound", contact: "+1" })).toBeNull();
   });
 
   it("returns null for a delivery payload missing message_id", () => {
-    expect(
-      infra.parseEventWebhook({ alert_type: "message_sent", success: true })
-    ).toBeNull();
+    expect(infra.parseEventWebhook({ event: "message_delivered" })).toBeNull();
   });
 
-  it("falls back to new Date() for receivedAt when absent", () => {
+  it("stamps receivedAt on receipt (LoopMessage inbound carries no timestamp)", () => {
     const before = Date.now();
     const event = infra.parseEventWebhook({
-      alert_type: "message_inbound",
-      recipient: "+1",
+      event: "message_inbound",
+      contact: "+1",
       text: "hi",
     });
     const after = Date.now();
+    expect(event?.type).toBe("reply");
     if (event?.type === "reply") {
       const ts = new Date(event.receivedAt).getTime();
       expect(ts).toBeGreaterThanOrEqual(before);
