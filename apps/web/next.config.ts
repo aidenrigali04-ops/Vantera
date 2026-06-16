@@ -1,10 +1,9 @@
 import type { NextConfig } from "next";
 
-// Security headers applied to every response (production-readiness, rule 10). These are the
-// "sensible defaults" groundwork: HSTS, clickjacking + MIME-sniffing protection, a tight
-// referrer policy, and a locked-down permissions policy. A full Content-Security-Policy is
-// deliberately deferred (it needs per-surface nonce work to not break Next's inline runtime)
-// — tracked in docs/production-readiness.md.
+// Security headers applied to every response (production-readiness, rule 10): HSTS, clickjacking
+// + MIME-sniffing protection, a tight referrer policy, and a locked-down permissions policy.
+// The Content-Security-Policy is set in proxy.ts (it needs a per-request nonce) and currently
+// ships in Report-Only mode — flip it to enforcing after reviewing /api/csp-report output.
 const securityHeaders = [
   { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
   { key: "X-Frame-Options", value: "DENY" },
