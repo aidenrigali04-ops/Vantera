@@ -20,7 +20,7 @@ function makeStore(overrides: Partial<InboundStore> = {}): InboundStore & {
   repliedLeads: { leadId: string; campaignId: string | null }[];
   canceledSends: string[];
   upsertedLinkedInStatuses: Parameters<InboundStore["upsertLinkedInAccountStatus"]>[0][];
-  pausedSequences: { leadId: string; stop: boolean }[];
+  stoppedSequences: string[];
   notifications: Parameters<InboundStore["insertLeadNotification"]>[0][];
 } {
   let replyCounter = 0;
@@ -33,7 +33,7 @@ function makeStore(overrides: Partial<InboundStore> = {}): InboundStore & {
   const repliedLeads: { leadId: string; campaignId: string | null }[] = [];
   const canceledSends: string[] = [];
   const upsertedLinkedInStatuses: Parameters<InboundStore["upsertLinkedInAccountStatus"]>[0][] = [];
-  const pausedSequences: { leadId: string; stop: boolean }[] = [];
+  const stoppedSequences: string[] = [];
   const notifications: Parameters<InboundStore["insertLeadNotification"]>[0][] = [];
 
   const base: InboundStore = {
@@ -58,7 +58,7 @@ function makeStore(overrides: Partial<InboundStore> = {}): InboundStore & {
     setLeadConnected: async (leadId, at) => { connectedLeads.push({ leadId, at }); },
     setLeadReplied: async (leadId, campaignId) => { repliedLeads.push({ leadId, campaignId }); },
     cancelPendingSends: async (leadId) => { canceledSends.push(leadId); return 0; },
-    pauseSequenceForReply: async (leadId, stop) => { pausedSequences.push({ leadId, stop }); },
+    stopSequenceForReply: async (leadId) => { stoppedSequences.push(leadId); },
     insertLeadNotification: async (n) => { notifications.push(n); },
     ...overrides,
   };
@@ -73,7 +73,7 @@ function makeStore(overrides: Partial<InboundStore> = {}): InboundStore & {
     repliedLeads,
     canceledSends,
     upsertedLinkedInStatuses,
-    pausedSequences,
+    stoppedSequences,
     notifications,
   });
 }
@@ -177,7 +177,7 @@ function deps(store: InboundStore, extra?: Partial<InboundDeps>): InboundDeps {
 // ---------------------------------------------------------------------------
 
 describe("runInbound — email reply: interested", () => {
-  it("insertReply is called with lowercased from, classification written, cancelPendingSends + setLeadReplied called, NO suppression", async () => {
+  it("logs + marks replied + notifies, but does NOT cancel sends or stop the sequence (nurtures until closed)", async () => {
     const store = makeStore({
       findMailboxByProviderRef: async () => ({ id: "mbx_id_1", accountId: "acc1" }),
       findLeadByEmail: async (_accountId, email) =>
@@ -198,8 +198,12 @@ describe("runInbound — email reply: interested", () => {
     expect(reply.body).toBe(EMAIL_REPLY_FIXTURE.body);
     expect(store.classifications).toHaveLength(1);
     expect(store.classifications[0]!.verdict.classification).toBe("interested");
-    expect(store.canceledSends).toContain("lead1");
+    // a genuine reply no longer halts outbound — the sequence keeps nurturing until close
+    expect(store.canceledSends).toHaveLength(0);
+    expect(store.stoppedSequences).toHaveLength(0);
+    // still recorded as replied + surfaced to the user
     expect(store.repliedLeads.map((r) => r.leadId)).toContain("lead1");
+    expect(store.notifications).toHaveLength(1);
     expect(store.suppressions).toHaveLength(0);
   });
 });
@@ -476,55 +480,63 @@ describe("runInbound — account_status", () => {
   });
 });
 
-describe("runInbound — reply-pause gate", () => {
-  it("pauses the sequence and notifies on a genuine (interested) reply", async () => {
-    const store = makeStore({
+describe("runInbound — sequence stop gate (stop on close, not on reply)", () => {
+  function storeForLead() {
+    return makeStore({
       findMailboxByProviderRef: async () => ({ id: "mbx_id_1", accountId: "acc1" }),
       findLeadByEmail: async () => ({ id: "lead-id", campaignId: "camp1" }),
     });
+  }
 
-    await runInbound(
-      { source: "email", payload: EMAIL_REPLY_FIXTURE },
-      deps(store, { classifyFn: classify("interested") })
-    );
+  // A reply that is NOT a hard-negative keeps the sequence nurturing toward close:
+  // no stop, no cancel — only logged + marked replied + notified.
+  for (const classification of ["interested", "neutral", "other"] as const) {
+    it(`keeps the sequence running on a ${classification} reply (notifies, does not stop or cancel)`, async () => {
+      const store = storeForLead();
 
-    expect(store.pausedSequences).toContainEqual({ leadId: "lead-id", stop: false });
-    expect(store.notifications).toHaveLength(1);
-    expect(store.notifications[0]).toEqual(
-      expect.objectContaining({ accountId: "acc1", leadId: "lead-id", kind: "reply" })
-    );
-  });
+      await runInbound(
+        { source: "email", payload: EMAIL_REPLY_FIXTURE },
+        deps(store, { classifyFn: classify(classification) })
+      );
 
-  it("stops the sequence on a not_interested reply", async () => {
-    const store = makeStore({
-      findMailboxByProviderRef: async () => ({ id: "mbx_id_1", accountId: "acc1" }),
-      findLeadByEmail: async () => ({ id: "lead-id", campaignId: "camp1" }),
+      expect(store.stoppedSequences).toHaveLength(0);
+      expect(store.canceledSends).toHaveLength(0);
+      expect(store.repliedLeads.map((r) => r.leadId)).toContain("lead-id");
+      expect(store.notifications).toHaveLength(1);
+      expect(store.notifications[0]).toEqual(
+        expect.objectContaining({ accountId: "acc1", leadId: "lead-id", kind: "reply" })
+      );
     });
+  }
 
-    await runInbound(
-      { source: "email", payload: EMAIL_REPLY_FIXTURE },
-      deps(store, { classifyFn: classify("not_interested") })
-    );
+  // Hard-negatives terminate outbound: stop the run + cancel queued sends + suppress.
+  for (const classification of ["not_interested", "unsubscribe"] as const) {
+    it(`stops the sequence + cancels queued sends on a ${classification} reply`, async () => {
+      const store = storeForLead();
 
-    expect(store.pausedSequences).toContainEqual({ leadId: "lead-id", stop: true });
-    expect(store.notifications).toHaveLength(1);
-    expect(store.notifications[0]).toEqual(
-      expect.objectContaining({ kind: "reply" })
-    );
-  });
+      await runInbound(
+        { source: "email", payload: EMAIL_REPLY_FIXTURE },
+        deps(store, { classifyFn: classify(classification) })
+      );
 
-  it("does NOT pause or notify on an out_of_office reply", async () => {
-    const store = makeStore({
-      findMailboxByProviderRef: async () => ({ id: "mbx_id_1", accountId: "acc1" }),
-      findLeadByEmail: async () => ({ id: "lead-id", campaignId: "camp1" }),
+      expect(store.stoppedSequences).toContain("lead-id");
+      expect(store.canceledSends).toContain("lead-id");
+      expect(store.suppressions).toHaveLength(1);
+      expect(store.suppressions[0]![3]).toBe(classification);
+      expect(store.notifications).toHaveLength(1);
     });
+  }
+
+  it("does NOT stop, cancel, or notify on an out_of_office reply", async () => {
+    const store = storeForLead();
 
     await runInbound(
       { source: "email", payload: EMAIL_REPLY_FIXTURE },
       deps(store, { classifyFn: classify("out_of_office") })
     );
 
-    expect(store.pausedSequences).toHaveLength(0);
+    expect(store.stoppedSequences).toHaveLength(0);
+    expect(store.canceledSends).toHaveLength(0);
     expect(store.notifications).toHaveLength(0);
   });
 });
@@ -608,7 +620,7 @@ describe("runInbound — imessage reply: not_interested writes phone suppression
     expect(source).toBe("not_interested");
     expect(leadId).toBe("lead_im_1");
     expect(store.canceledSends).toContain("lead_im_1");
-    expect(store.pausedSequences).toContainEqual({ leadId: "lead_im_1", stop: true });
+    expect(store.stoppedSequences).toContain("lead_im_1");
   });
 });
 

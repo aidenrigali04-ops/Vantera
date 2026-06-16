@@ -1,6 +1,39 @@
+import type { ReplyVerdict } from "@vantera/agent-brains";
 import { normalizeLinkedInUrl } from "./copy-draft";
 import { normalizePhone } from "./call-brief";
-import type { InboundDeps, InboundPayload, InboundSummary } from "./types";
+import type { InboundDeps, InboundPayload, InboundStore, InboundSummary } from "./types";
+
+/**
+ * Hard-negative classifications terminate outbound. Both also write suppression (rule 11), so
+ * the lead can never be contacted again on that channel. Every OTHER genuine reply (interested /
+ * neutral / other) keeps the sequence nurturing toward close — a reply alone is not a stop signal.
+ */
+const STOPS_SEQUENCE = new Set<ReplyVerdict["classification"]>(["not_interested", "unsubscribe"]);
+
+/**
+ * Effects of a genuine (non-OOO) reply, shared across email / iMessage / LinkedIn. The lead is
+ * always marked replied and the user is notified. The sequence is stopped — and its queued sends
+ * canceled — ONLY on a hard-negative; otherwise outbound keeps running until the lead converts
+ * (conversion gate) or is exhausted, because Vantera has no inbox for a human to take over.
+ */
+async function applyGenuineReply(
+  store: InboundStore,
+  accountId: string,
+  lead: { id: string; campaignId: string | null },
+  verdict: ReplyVerdict
+): Promise<void> {
+  await store.setLeadReplied(lead.id, lead.campaignId);
+  if (STOPS_SEQUENCE.has(verdict.classification)) {
+    await store.cancelPendingSends(lead.id);
+    await store.stopSequenceForReply(lead.id);
+  }
+  await store.insertLeadNotification({
+    accountId,
+    leadId: lead.id,
+    kind: "reply",
+    body: `${lead.id} replied${verdict.classification === "not_interested" ? " (not interested)" : ""}.`,
+  });
+}
 
 /**
  * Routes one verified, deduped webhook event (rules 03/04/11). Replies are
@@ -34,15 +67,7 @@ export async function runInbound(payload: InboundPayload, deps: InboundDeps): Pr
         const verdict = await deps.classifyFn(event.body);
         await deps.store.setReplyClassification(replyId, verdict);
         if (verdict.classification !== "out_of_office") {
-          await deps.store.cancelPendingSends(lead.id);
-          await deps.store.setLeadReplied(lead.id, lead.campaignId);
-          await deps.store.pauseSequenceForReply(lead.id, verdict.classification === "not_interested");
-          await deps.store.insertLeadNotification({
-            accountId,
-            leadId: lead.id,
-            kind: "reply",
-            body: `${lead.id} replied${verdict.classification === "not_interested" ? " (not interested)" : ""}.`,
-          });
+          await applyGenuineReply(deps.store, accountId, lead, verdict);
         }
         if (verdict.classification === "not_interested") {
           await deps.store.addSuppression(accountId, "email", from, "not_interested", lead.id);
@@ -110,15 +135,7 @@ export async function runInbound(payload: InboundPayload, deps: InboundDeps): Pr
     const verdict = await deps.classifyFn(event.body);
     await deps.store.setReplyClassification(replyId, verdict);
     if (verdict.classification !== "out_of_office") {
-      await deps.store.cancelPendingSends(lead.id);
-      await deps.store.setLeadReplied(lead.id, lead.campaignId);
-      await deps.store.pauseSequenceForReply(lead.id, verdict.classification === "not_interested");
-      await deps.store.insertLeadNotification({
-        accountId,
-        leadId: lead.id,
-        kind: "reply",
-        body: `${lead.id} replied${verdict.classification === "not_interested" ? " (not interested)" : ""}.`,
-      });
+      await applyGenuineReply(deps.store, accountId, lead, verdict);
     }
     if (verdict.classification === "not_interested") {
       await deps.store.addSuppression(accountId, "phone", normalizedPhone, "not_interested", lead.id);
@@ -175,15 +192,7 @@ export async function runInbound(payload: InboundPayload, deps: InboundDeps): Pr
   const verdict = await deps.classifyFn(event.body);
   await deps.store.setReplyClassification(replyId, verdict);
   if (verdict.classification !== "out_of_office") {
-    await deps.store.cancelPendingSends(lead.id);
-    await deps.store.setLeadReplied(lead.id, lead.campaignId);
-    await deps.store.pauseSequenceForReply(lead.id, verdict.classification === "not_interested");
-    await deps.store.insertLeadNotification({
-      accountId,
-      leadId: lead.id,
-      kind: "reply",
-      body: `${lead.id} replied${verdict.classification === "not_interested" ? " (not interested)" : ""}.`,
-    });
+    await applyGenuineReply(deps.store, accountId, lead, verdict);
   }
   if (verdict.classification === "not_interested") {
     await deps.store.addSuppression(accountId, "linkedin", url, "not_interested", lead.id);

@@ -14,9 +14,15 @@ export interface CopyContext {
   cta: string;
   /** filenames/links from Add Content — referenced, never attached in first touch */
   contentLinks?: string[];
+  /** the seller's company name — so the caller can honestly say "this is {rep} from {company}" */
+  accountName?: string | null;
   accountIndustry?: string | null;
   /** what the seller offers (website-scan summary) */
   valueProp?: string | null;
+  /** how the agent should sound — tone/personality/brand voice (style only, never overrides compliance) */
+  brandVoice?: string | null;
+  /** things the agent must never say or do — topics, claims, or words to avoid */
+  guardrails?: string | null;
 }
 
 export interface DraftInput {
@@ -29,9 +35,12 @@ export interface DraftInput {
 export function leadBlock({ lead, insights, context }: DraftInput): string {
   const name = [lead.firstName, lead.lastName].filter(Boolean).join(" ") || "unknown";
   return [
+    context.accountName ? `Seller company: ${context.accountName}` : null,
     `Seller industry: ${context.accountIndustry ?? "unknown"}`,
     `Seller offer: ${context.valueProp ?? "unknown"}`,
     `CTA goal: ${context.cta}`,
+    context.brandVoice ? `Brand voice (match this tone): ${context.brandVoice}` : null,
+    context.guardrails ? `Guardrails (never violate): ${context.guardrails}` : null,
     context.contentLinks?.length ? `Supporting content: ${context.contentLinks.join(", ")}` : null,
     ``,
     `Prospect: ${name}, ${lead.title ?? "unknown role"} at ${lead.companyName ?? "unknown"} (${lead.industry ?? "unknown industry"})`,

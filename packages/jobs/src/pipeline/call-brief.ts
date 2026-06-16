@@ -14,8 +14,11 @@ function toRequest(lead: CallableLead, ctx: CallerContext): CallBriefRequest | n
     context: {
       cta: ctx.agent.config.cta,
       contentLinks: ctx.assets.map((a) => a.url ?? a.filename).filter((v): v is string => Boolean(v)),
+      accountName: ctx.account.name,
       accountIndustry: ctx.account.industry,
       valueProp: ctx.account.websiteScan?.summary ?? null,
+      brandVoice: ctx.agent.config.brandVoice ?? null,
+      guardrails: ctx.agent.config.guardrails ?? null,
     },
   };
   return {

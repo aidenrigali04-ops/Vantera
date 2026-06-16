@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseCopyForm, parseScoutForm, validateCallerConfig, clampCallingWindow, TCPA_EARLIEST, TCPA_LATEST } from "./validation";
+import { parseCopyForm, parseScoutForm, parseCallerForm, validateCallerConfig, clampCallingWindow, BRAND_FIELD_MAX, TCPA_EARLIEST, TCPA_LATEST } from "./validation";
 
 function scoutForm(overrides: Record<string, string> = {}): FormData {
   const fd = new FormData();
@@ -97,6 +97,40 @@ describe("parseCopyForm", () => {
   it("rejects non-http links and short CTAs", () => {
     expect(parseCopyForm(copyForm({ links: "ftp://nope" })).ok).toBe(false);
     expect(parseCopyForm(copyForm({ cta: "go" })).ok).toBe(false);
+  });
+});
+
+function callerForm(overrides: Record<string, string> = {}): FormData {
+  const fd = new FormData();
+  fd.set("name", "Aria");
+  fd.set("cta", "book a 15-min intro");
+  fd.set("bookingLink", "https://cal.com/x/intro");
+  fd.set("voiceId", "voice-natural-en-1");
+  fd.set("personaName", "Alex");
+  fd.set("language", "en-US");
+  fd.set("callingWindowDays", JSON.stringify(["Mon", "Tue"]));
+  fd.set("startLocal", "09:00");
+  fd.set("endLocal", "17:00");
+  fd.set("maxAttempts", "3");
+  for (const [k, v] of Object.entries(overrides)) fd.set(k, v);
+  return fd;
+}
+
+describe("parseCallerForm — brand voice & guardrails", () => {
+  it("captures brand voice and guardrails when provided", () => {
+    const r = parseCallerForm(callerForm({ brandVoice: "warm, consultative", guardrails: "never name competitors" }));
+    expect(r).toMatchObject({ ok: true, values: { brandVoice: "warm, consultative", guardrails: "never name competitors" } });
+  });
+
+  it("leaves them undefined when blank (so the brief omits them)", () => {
+    const r = parseCallerForm(callerForm());
+    expect(r.ok && r.values.brandVoice).toBeUndefined();
+    expect(r.ok && r.values.guardrails).toBeUndefined();
+  });
+
+  it("caps each field length to keep the call prompt lean", () => {
+    const r = parseCallerForm(callerForm({ brandVoice: "x".repeat(BRAND_FIELD_MAX + 50) }));
+    expect(r.ok && r.values.brandVoice?.length).toBe(BRAND_FIELD_MAX);
   });
 });
 
