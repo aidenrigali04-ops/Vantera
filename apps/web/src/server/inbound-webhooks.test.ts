@@ -22,6 +22,14 @@ describe("handleInboundWebhook", () => {
     expect(res.status).toBe(401);
     expect(enqueued).toHaveLength(0);
   });
+  it("invokes onUnverified for security auditing when the signature fails", async () => {
+    let audited = 0;
+    const { deps, enqueued } = makeDeps({ verify: () => false, onUnverified: async () => void audited++ });
+    const res = await handleInboundWebhook("email", {}, "{}", deps);
+    expect(res.status).toBe(401);
+    expect(audited).toBe(1);
+    expect(enqueued).toHaveLength(0);
+  });
   it("400s on unparseable JSON", async () => {
     const { deps } = makeDeps();
     expect((await handleInboundWebhook("email", {}, "not-json", deps)).status).toBe(400);

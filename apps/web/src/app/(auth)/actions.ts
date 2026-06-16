@@ -1,10 +1,12 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { friendlyAuthError } from "@/lib/auth/errors";
 import { validateSignup } from "@/lib/validation";
 import { siteUrl } from "@/lib/site-url";
+import { recordSecurityEvent } from "@/lib/security/audit";
 
 export type AuthFormState = { error?: string; sent?: boolean };
 
@@ -15,7 +17,19 @@ export async function login(_prev: AuthFormState, formData: FormData): Promise<A
 
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) return { error: friendlyAuthError(error.message) };
+  if (error) {
+    // Security audit: failed logins are a credential-stuffing / brute-force signal. This is a
+    // system event (no account_id resolved on failure), readable only by service role.
+    const h = await headers();
+    await recordSecurityEvent({
+      eventType: "auth.login_failed",
+      severity: "warn",
+      ip: (h.get("x-forwarded-for")?.split(",")[0] ?? h.get("x-real-ip") ?? "unknown").trim(),
+      userAgent: h.get("user-agent") ?? "unknown",
+      metadata: { email },
+    });
+    return { error: friendlyAuthError(error.message) };
+  }
   redirect("/dashboard"); // app gate forwards to /onboarding if incomplete
 }
 

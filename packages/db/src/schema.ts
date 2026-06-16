@@ -922,3 +922,30 @@ export const conversionTokens = pgTable(
   ]
 );
 
+// ── 0027 security audit log ───────────────────────────────────────────────────
+
+// Append-only audit of security-relevant activity (failed logins, webhook signature
+// failures, rate-limit hits, sensitive mutations). Service-role writes only; account admins
+// read their own. account_id is nullable by design — system/global events (e.g. a webhook
+// with no resolvable account, a failed login before account resolution) have none and are
+// hidden from all client roles (tenant-exempt in schema.test.ts).
+// retention(security_events): 180 days, trimmed by a scheduled purge (rule 11 audit trail).
+export const securityEvents = pgTable(
+  "security_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id").references(() => accounts.id, { onDelete: "cascade" }),
+    actorUserId: uuid("actor_user_id"),
+    eventType: text("event_type").notNull(),
+    severity: text("severity", { enum: ["info", "warn", "critical"] }).notNull().default("info"),
+    ip: text("ip"),
+    userAgent: text("user_agent"),
+    metadata: jsonb("metadata").notNull().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("security_events_account_created_idx").on(t.accountId, t.createdAt),
+    index("security_events_type_created_idx").on(t.eventType, t.createdAt),
+  ]
+);
+

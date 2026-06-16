@@ -28,6 +28,9 @@ const tenantExempt = new Set([
   "webhook_events",
   // global RAG table — no account_id by design (identical data for every tenant); service-role only
   "copilot_knowledge_chunks",
+  // security audit log — account_id is nullable so system/global events (no resolvable account)
+  // can be recorded; account-scoped rows still cascade (0027).
+  "security_events",
 ]);
 
 // returns the create-table DDL block for a table from the concatenated migrations
@@ -119,7 +122,7 @@ describe("retention windows (rule 11)", () => {
 });
 
 describe("service-role-only write surfaces (rules 09/11)", () => {
-  it.each(["outreach_sends", "copilot_actions", "enrichment_results", "replies", "unsubscribe_tokens", "conversion_tokens", "copilot_conversations", "copilot_messages", "calls"])(
+  it.each(["outreach_sends", "copilot_actions", "enrichment_results", "replies", "unsubscribe_tokens", "conversion_tokens", "copilot_conversations", "copilot_messages", "calls", "security_events"])(
     "%s has no client write policies",
     (table) => {
     const policyRe = new RegExp(`create policy \\w+ on public\\.${table}\\s+for (insert|update|delete|all)`);

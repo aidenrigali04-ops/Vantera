@@ -5,6 +5,8 @@ export interface WebhookHandlerDeps {
   /** insert into webhook_events; false = duplicate provider_event_id */
   recordEvent: (source: "email" | "linkedin" | "imessage", providerEventId: string, payload: unknown) => Promise<boolean>;
   enqueue: (payload: { source: "email" | "linkedin" | "imessage"; payload: unknown }) => Promise<void>;
+  /** Optional: invoked when signature verification fails (security auditing). Best-effort. */
+  onUnverified?: () => Promise<void> | void;
 }
 
 export async function handleInboundWebhook(
@@ -13,7 +15,10 @@ export async function handleInboundWebhook(
   rawBody: string,
   deps: WebhookHandlerDeps
 ): Promise<{ status: number; body: string }> {
-  if (!deps.verify(headers, rawBody)) return { status: 401, body: "invalid signature" };
+  if (!deps.verify(headers, rawBody)) {
+    if (deps.onUnverified) await deps.onUnverified();
+    return { status: 401, body: "invalid signature" };
+  }
   let payload: unknown;
   try {
     payload = JSON.parse(rawBody);
