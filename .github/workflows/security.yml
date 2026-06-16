@@ -1,0 +1,24 @@
+name: Security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  # Secret scanning — blocks a commit/PR that introduces a credential. Defense-in-depth
+  # alongside GitHub's native secret scanning + push protection (enable those in repo settings).
+  gitleaks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history so PR scans cover every new commit
+      - name: gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Free for personal accounts and public repos. If this repo lives under a GitHub
+          # ORGANIZATION, gitleaks-action requires a (free) GITLEAKS_LICENSE secret — see
+          # https://github.com/gitleaks/gitleaks-action#-license.
+          GITLEAKS_CONFIG: .gitleaks.toml

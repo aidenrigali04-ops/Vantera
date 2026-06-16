@@ -3,6 +3,7 @@ export type Invalid = { ok: false; error: string };
 
 export function dollarsToCents(input: string): number | null {
   const cleaned = input.replace(/[$,\s]/g, "");
+  // eslint-disable-next-line security/detect-unsafe-regex -- safe: bounded, no nested quantifier (no ReDoS)
   if (!/^\d+(\.\d{1,2})?$/.test(cleaned)) return null;
   const cents = Math.round(parseFloat(cleaned) * 100);
   return cents > 0 ? cents : null;

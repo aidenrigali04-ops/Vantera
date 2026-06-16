@@ -1,0 +1,15 @@
+# gitleaks config — start from the maintained default ruleset, then allowlist known
+# non-secrets so the scan stays signal-rich.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Placeholders and intentional fake values that are not real secrets"
+paths = [
+  # The env manifest ships only empty keys (KEY=) — no real values (rule 10).
+  '''\.env\.example$''',
+  # Lockfile integrity hashes look high-entropy but are not credentials.
+  '''pnpm-lock\.yaml$''',
+  # Test fixtures use deliberately fake keys/secrets (e.g. AES key round-trip tests).
+  '''.*\.test\.ts$''',
+]

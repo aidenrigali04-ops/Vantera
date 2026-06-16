@@ -20,9 +20,9 @@ jobs:
       - run: pnpm test
       - run: pnpm build
 
-  # Dependency vulnerability scan (production-readiness, rule 10). Report-only so a freshly
-  # disclosed advisory never blocks an unrelated deploy; the signal surfaces in the run and
-  # the Dependabot PR queue handles remediation.
+  # Dependency vulnerability scan (production-readiness, rule 10). CRITICAL advisories fail the
+  # build; HIGH is report-only so a freshly disclosed high never blocks an unrelated deploy
+  # (Dependabot's PR queue handles remediation).
   audit:
     runs-on: ubuntu-latest
     steps:
@@ -33,4 +33,7 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm audit --audit-level=high || true
+      - name: Fail on critical advisories
+        run: pnpm audit --audit-level=critical
+      - name: Report high advisories (non-blocking)
+        run: pnpm audit --audit-level=high || true
