@@ -3,6 +3,8 @@ import { MockLanguageModelV2 } from "ai/test";
 import { htmlToText, isScanStale, scanWebsite } from "./website-scan";
 
 const NOW = new Date("2026-06-11T00:00:00Z");
+// Skip the network-resolving SSRF guard in unit tests that inject a mock fetch.
+const noValidate = async () => {};
 
 describe("isScanStale", () => {
   it("is stale when never scanned", () => {
@@ -48,7 +50,7 @@ describe("scanWebsite", () => {
       },
     });
 
-    await expect(scanWebsite("https://acme.com", { model, fetchImpl })).resolves.toEqual(scan);
+    await expect(scanWebsite("https://acme.com", { model, fetchImpl, validate: noValidate })).resolves.toEqual(scan);
   });
 
   it("clamps oversized model output to 5 list items instead of throwing", async () => {
@@ -71,7 +73,7 @@ describe("scanWebsite", () => {
       },
     });
 
-    const result = await scanWebsite("https://acme.com", { model, fetchImpl });
+    const result = await scanWebsite("https://acme.com", { model, fetchImpl, validate: noValidate });
     expect(result.offerings).toHaveLength(5);
     expect(result.value_props).toHaveLength(5);
     expect(result.summary.length).toBeLessThanOrEqual(500);
@@ -81,7 +83,22 @@ describe("scanWebsite", () => {
   it("throws on fetch failure", async () => {
     const fetchImpl = (async () => new Response("nope", { status: 500 })) as unknown as typeof fetch;
     await expect(
-      scanWebsite("https://acme.com", { model: new MockLanguageModelV2(), fetchImpl })
+      scanWebsite("https://acme.com", { model: new MockLanguageModelV2(), fetchImpl, validate: noValidate })
     ).rejects.toThrow(/website fetch failed \(500\)/);
+  });
+
+  it("refuses an SSRF-blocked URL before fetching (guard is wired in)", async () => {
+    let fetched = false;
+    const fetchImpl = (async () => {
+      fetched = true;
+      return new Response("<html></html>", { status: 200 });
+    }) as unknown as typeof fetch;
+    const validate = async () => {
+      throw new Error("URL resolves to a private address");
+    };
+    await expect(
+      scanWebsite("http://169.254.169.254/", { model: new MockLanguageModelV2(), fetchImpl, validate })
+    ).rejects.toThrow(/private address/);
+    expect(fetched).toBe(false);
   });
 });

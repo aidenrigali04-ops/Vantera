@@ -1,6 +1,7 @@
 import { generateObject, type LanguageModel } from "ai";
 import { z } from "zod";
 import { getModel } from "@vantera/ai";
+import { assertPublicHttpUrl, createGuardedFetch } from "./url-guard";
 
 // Shape only — NO hard length/count caps here. Anthropic structured output treats
 // JSON-schema maxItems/maxLength as soft hints, so a content-rich homepage routinely
@@ -21,6 +22,28 @@ const MAX_PAGE_CHARS = 8000;
 const MAX_LIST_ITEMS = 5;
 const MAX_SUMMARY_CHARS = 500;
 const MAX_SCOPE_CHARS = 200;
+const FETCH_TIMEOUT_MS = 10_000;
+const MAX_FETCH_BYTES = 5_000_000; // hard cap on the response body we'll read into memory
+
+/** Read a response body up to maxBytes, truncating (not erroring) past the cap. */
+async function readCapped(res: Response, maxBytes: number): Promise<string> {
+  const reader = res.body?.getReader();
+  if (!reader) return (await res.text()).slice(0, maxBytes);
+  const decoder = new TextDecoder();
+  let out = "";
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    out += decoder.decode(value, { stream: true });
+    if (total > maxBytes) {
+      await reader.cancel();
+      break;
+    }
+  }
+  return out;
+}
 
 /** Refresh when never scanned, the URL changed, or the scan is older than 30 days. */
 export function isScanStale(
@@ -50,14 +73,32 @@ const SCAN_SYSTEM = `You analyze a company's homepage text and extract what they
 /** Scan the customer's website so the Scout brain knows what the seller offers (config: "scope of industry"). */
 export async function scanWebsite(
   url: string,
-  options: { model?: LanguageModel; fetchImpl?: typeof fetch } = {}
+  options: {
+    model?: LanguageModel;
+    fetchImpl?: typeof fetch;
+    /** SSRF pre-validation; defaults to the real DNS-resolving guard. Injectable for tests. */
+    validate?: (url: string) => Promise<unknown>;
+  } = {}
 ): Promise<WebsiteScan> {
-  const fetchImpl = options.fetchImpl ?? fetch;
-  const res = await fetchImpl(url, { headers: { accept: "text/html" } });
+  // SSRF guard (rule: never fetch a user-supplied URL unguarded). Pre-validate the target,
+  // then fetch through a transport that re-checks the connecting IP at socket time so
+  // redirects / DNS-rebinding to internal hosts are also blocked.
+  const validate = options.validate ?? assertPublicHttpUrl;
+  const fetchImpl = options.fetchImpl ?? createGuardedFetch();
+  await validate(url);
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  let res: Response;
+  try {
+    res = await fetchImpl(url, { headers: { accept: "text/html" }, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
   if (!res.ok) {
     throw new Error(`website fetch failed (${res.status})`);
   }
-  const text = htmlToText(await res.text()).slice(0, MAX_PAGE_CHARS);
+  const text = htmlToText(await readCapped(res, MAX_FETCH_BYTES)).slice(0, MAX_PAGE_CHARS);
   if (!text) {
     throw new Error("website returned no readable text");
   }
