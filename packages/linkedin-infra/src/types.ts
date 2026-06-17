@@ -27,6 +27,15 @@ export interface SendOutcome {
   sentAt: string;
 }
 
+/** A LinkedIn account currently connected in the provider workspace. */
+export interface ConnectedAccount {
+  /** Provider account id — persisted as linkedin_accounts.provider_ref. */
+  providerRef: string;
+  displayName: string | null;
+  profileUrl: string | null;
+  status: "active" | "restricted" | "disconnected";
+}
+
 export type LinkedInEvent =
   | { type: "reply"; providerEventId: string; connectedAccountRef: string; fromProfileUrl: string; body: string; receivedAt: string }
   | { type: "relationship_accepted"; providerEventId: string; connectedAccountRef: string; profileUrl: string }
@@ -44,6 +53,13 @@ export interface LinkedInInfra {
    * connected identity is attributed to a tenant.
    */
   createHostedAuthLink(accountId: string, redirects?: HostedAuthRedirects): Promise<HostedAuthLink>;
+  /**
+   * The LinkedIn accounts connected in the provider workspace. Used to reconcile
+   * connected identities into our store when a hosted-auth status webhook is
+   * missed (e.g. on return from the connect flow) — never the primary attribution
+   * path (that is the account_status webhook), but a reliable fallback.
+   */
+  listAccounts(): Promise<ConnectedAccount[]>;
   sendInvite(req: InviteRequest): Promise<SendOutcome>;
   sendMessage(req: MessageRequest): Promise<SendOutcome>;
   /**

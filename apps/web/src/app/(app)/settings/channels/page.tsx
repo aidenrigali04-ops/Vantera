@@ -8,9 +8,11 @@ import {
   ProvisionEmailForm,
   PauseSendingForm,
   LinkedInConnectButton,
+  RefreshLinkedInButton,
 } from "./channels-forms";
 import { ChannelReadiness } from "./channels-readiness";
 import { shapeWarmupStatus, estimateReadyInDays } from "@/lib/warmup-status";
+import { reconcileLinkedInAccounts } from "@/lib/linkedin/sync";
 
 interface SenderAddress {
   line1: string;
@@ -50,16 +52,23 @@ export default async function ChannelsPage({
   const { connected } = await searchParams;
   const supabase = await createClient();
 
-  const [
-    { data: accountRow },
-    { data: mailboxRows },
-    { data: linkedinRows },
-  ] = await Promise.all([
-    supabase
-      .from("accounts")
-      .select("sender_address, sender_name, outreach_paused")
-      .limit(1)
-      .maybeSingle<{ sender_address: SenderAddress | null; sender_name: string | null; outreach_paused: boolean }>(),
+  const { data: accountRow } = await supabase
+    .from("accounts")
+    .select("id, sender_address, sender_name, outreach_paused")
+    .limit(1)
+    .maybeSingle<{ id: string; sender_address: SenderAddress | null; sender_name: string | null; outreach_paused: boolean }>();
+
+  // On return from the connect flow, reconcile against the provider so the account
+  // shows immediately even if the hosted-auth status webhook was missed (best-effort).
+  if (connected === "1" && accountRow?.id) {
+    try {
+      await reconcileLinkedInAccounts(accountRow.id);
+    } catch (err) {
+      console.error("channels reconcile on connect failed:", err);
+    }
+  }
+
+  const [{ data: mailboxRows }, { data: linkedinRows }] = await Promise.all([
     supabase
       .from("mailboxes")
       .select("id, email_address, domain, status, daily_send_limit, warmup_started_at")
@@ -227,6 +236,10 @@ export default async function ChannelsPage({
                 on LinkedIn&apos;s own page — we never see your password.
               </p>
               <LinkedInConnectButton variant="default" />
+              <p className="text-xs text-muted-foreground">
+                Just finished connecting and don&apos;t see it yet?{" "}
+                <RefreshLinkedInButton inline />
+              </p>
             </div>
           ) : (
             <div className="space-y-4">
@@ -280,7 +293,10 @@ export default async function ChannelsPage({
                   sessions expire periodically.
                 </p>
               )}
-              <LinkedInConnectButton label="Connect another account" variant="ghost" />
+              <div className="flex items-center gap-2">
+                <LinkedInConnectButton label="Connect another account" variant="ghost" />
+                <RefreshLinkedInButton />
+              </div>
             </div>
           )}
         </CardContent>

@@ -1,15 +1,33 @@
 import { createHash, timingSafeEqual } from "node:crypto";
-import type { HostedAuthLink, HostedAuthRedirects, InviteRequest, LinkedInEvent, LinkedInInfra, MessageRequest, SendOutcome } from "./types";
+import type { ConnectedAccount, HostedAuthLink, HostedAuthRedirects, InviteRequest, LinkedInEvent, LinkedInInfra, MessageRequest, SendOutcome } from "./types";
 
 // ── endpoint constants ──────────────────────────────────────────────────────
 const PATH_HOSTED_AUTH = "/api/v1/hosted/accounts/link";
 const HOSTED_AUTH_TTL_MS = 60 * 60_000;
 const PATH_INVITE = "/api/v1/users/invite";
 const PATH_CHATS = "/api/v1/chats";
+const PATH_ACCOUNTS = "/api/v1/accounts";
 
 function requireString(value: unknown, label: string): string {
   if (typeof value !== "string" || value === "") throw new Error(`provider response missing ${label}`);
   return value;
+}
+
+/** Map a provider account-source status to our coarse account status (mirrors parseEventWebhook). */
+function sourceStatus(raw: unknown): "active" | "restricted" | "disconnected" {
+  const s = raw && typeof raw === "object" ? (raw as Record<string, unknown>).status : raw;
+  if (s === "OK" || s === "CREATION_SUCCESS") return "active";
+  if (s === "DISCONNECTED") return "disconnected";
+  return "restricted"; // CREDENTIALS / CHECKPOINT / PERMISSIONS / ERROR / STOPPED / SYNC_ERROR / unknown
+}
+
+/** Reduce all of an account's sources to one status: active only if every source is. */
+function accountStatusFromSources(sources: unknown): "active" | "restricted" | "disconnected" {
+  if (!Array.isArray(sources) || sources.length === 0) return "disconnected";
+  const mapped = sources.map(sourceStatus);
+  if (mapped.every((s) => s === "active")) return "active";
+  if (mapped.some((s) => s === "disconnected")) return "disconnected";
+  return "restricted";
 }
 
 export interface UnipileConfig {
@@ -92,6 +110,26 @@ export class UnipileLinkedInInfra implements LinkedInInfra {
       console.warn("HOSTED_AUTH_DOMAIN unset — hosted-auth URL may expose the provider domain (white-label, rule 04)");
     }
     return { url, expiresAt: expiresOn };
+  }
+
+  async listAccounts(): Promise<ConnectedAccount[]> {
+    const data = await this.call<{ items?: unknown }>(PATH_ACCOUNTS, { method: "GET" });
+    const items = Array.isArray(data.items) ? data.items : [];
+    const out: ConnectedAccount[] = [];
+    for (const raw of items) {
+      if (typeof raw !== "object" || raw === null) continue;
+      const a = raw as Record<string, unknown>;
+      if (a.type !== "LINKEDIN" || typeof a.id !== "string") continue; // ignore non-LinkedIn / malformed
+      const im = (a.connection_params as Record<string, unknown> | undefined)?.im as Record<string, unknown> | undefined;
+      const publicId = typeof im?.publicIdentifier === "string" ? im.publicIdentifier : null;
+      out.push({
+        providerRef: a.id,
+        displayName: typeof a.name === "string" ? a.name : null,
+        profileUrl: publicId ? `https://www.linkedin.com/in/${publicId}` : null,
+        status: accountStatusFromSources(a.sources),
+      });
+    }
+    return out;
   }
 
   async sendInvite(req: InviteRequest): Promise<SendOutcome> {

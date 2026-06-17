@@ -99,6 +99,49 @@ describe("UnipileLinkedInInfra", () => {
     });
   });
 
+  describe("listAccounts", () => {
+    it("maps connected LinkedIn accounts (id→providerRef, name→displayName, publicIdentifier→profileUrl, sources→status) and filters non-LinkedIn", async () => {
+      const adapter = infra({
+        "/api/v1/accounts": {
+          object: "AccountList",
+          items: [
+            {
+              object: "Account", id: "acc_1", type: "LINKEDIN", name: "Jane Doe",
+              connection_params: { im: { publicIdentifier: "jane-doe-123" } },
+              sources: [{ id: "acc_1_MESSAGING", status: "OK" }],
+            },
+            {
+              object: "Account", id: "acc_2", type: "LINKEDIN", name: "Bob",
+              connection_params: { im: { publicIdentifier: "bob-9" } },
+              sources: [{ id: "x", status: "CREDENTIALS" }],
+            },
+            { object: "Account", id: "mail_1", type: "GOOGLE", name: "Mailbox" },
+          ],
+        },
+      });
+      await expect(adapter.listAccounts()).resolves.toEqual([
+        { providerRef: "acc_1", displayName: "Jane Doe", profileUrl: "https://www.linkedin.com/in/jane-doe-123", status: "active" },
+        { providerRef: "acc_2", displayName: "Bob", profileUrl: "https://www.linkedin.com/in/bob-9", status: "restricted" },
+      ]);
+    });
+
+    it("returns [] when the workspace has no accounts", async () => {
+      const adapter = infra({ "/api/v1/accounts": { object: "AccountList", items: [] } });
+      await expect(adapter.listAccounts()).resolves.toEqual([]);
+    });
+
+    it("marks a DISCONNECTED source as disconnected and a missing publicIdentifier as null profileUrl", async () => {
+      const adapter = infra({
+        "/api/v1/accounts": {
+          items: [{ id: "acc_3", type: "LINKEDIN", name: "Zoe", connection_params: { im: {} }, sources: [{ status: "DISCONNECTED" }] }],
+        },
+      });
+      await expect(adapter.listAccounts()).resolves.toEqual([
+        { providerRef: "acc_3", displayName: "Zoe", profileUrl: null, status: "disconnected" },
+      ]);
+    });
+  });
+
   describe("sendInvite", () => {
     it("posts to the invite endpoint and returns SendOutcome", async () => {
       const fetchFn = fetchMock({

@@ -7,6 +7,7 @@ import { createLinkedInInfraFromEnv } from "@vantera/linkedin-infra";
 import { canProvision, validateSenderAddress, validateProvisionCounts } from "./validation";
 import { buildConnectRedirects } from "./redirects";
 import { gate, loadBillingRow } from "@/lib/billing/entitlement";
+import { reconcileLinkedInAccounts } from "@/lib/linkedin/sync";
 
 export type ChannelActionState = { error?: string; success?: string };
 
@@ -203,5 +204,34 @@ export async function createLinkedInConnectLink(): Promise<{ url?: string; error
     // failures undiagnosable (no log line reached Vercel).
     console.error("createLinkedInConnectLink failed:", err);
     return { error: "Could not generate a connection link. Try again shortly." };
+  }
+}
+
+/**
+ * Reconcile connected LinkedIn accounts from the provider into linkedin_accounts
+ * for the session's account. Backstops a missed hosted-auth status webhook so a
+ * just-connected account shows as connected (rule 04). Account resolved via RLS.
+ */
+export async function refreshLinkedInAccounts(): Promise<{ error?: string; synced?: number }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Your session expired. Sign in again." };
+
+  const { data: account } = await supabase
+    .from("accounts")
+    .select("id")
+    .limit(1)
+    .maybeSingle<{ id: string }>();
+  if (!account) return { error: "Your session expired. Sign in again." };
+
+  try {
+    const { synced } = await reconcileLinkedInAccounts(account.id);
+    revalidatePath("/settings/channels");
+    return { synced };
+  } catch (err) {
+    console.error("refreshLinkedInAccounts failed:", err);
+    return { error: "Could not refresh LinkedIn status. Try again shortly." };
   }
 }

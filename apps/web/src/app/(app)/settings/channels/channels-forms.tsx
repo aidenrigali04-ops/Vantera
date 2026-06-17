@@ -11,6 +11,7 @@ import {
   toggleSendingPause,
   provisionEmailSending,
   createLinkedInConnectLink,
+  refreshLinkedInAccounts,
   type ChannelActionState,
 } from "./actions";
 
@@ -273,6 +274,56 @@ export function LinkedInConnectButton({
         {isPending ? "Preparing…" : label}
       </Button>
       {connectError && <p className="text-sm text-destructive">{connectError}</p>}
+    </div>
+  );
+}
+
+// ── LinkedIn refresh / sync status ────────────────────────────────────────────
+
+/**
+ * Re-syncs connected LinkedIn accounts from the provider into the workspace.
+ * A backstop for a missed connection webhook — reloads the page on success so a
+ * newly-recorded account renders. `inline` renders a link-style button for use
+ * inside a sentence; otherwise a ghost button to sit beside the connect action.
+ */
+export function RefreshLinkedInButton({ inline = false }: { inline?: boolean }) {
+  const [isPending, startTransition] = useTransition();
+  const [message, setMessage] = useState<string | null>(null);
+
+  function handleRefresh() {
+    startTransition(async () => {
+      setMessage(null);
+      const result = await refreshLinkedInAccounts();
+      if (result.error) {
+        setMessage(result.error);
+      } else if (result.synced && result.synced > 0) {
+        window.location.reload();
+      } else {
+        setMessage("No connected account found yet — finish signing in on LinkedIn, then refresh.");
+      }
+    });
+  }
+
+  if (inline) {
+    return (
+      <button
+        type="button"
+        onClick={handleRefresh}
+        disabled={isPending}
+        className="underline underline-offset-2 disabled:opacity-60"
+      >
+        {isPending ? "Refreshing…" : "Refresh status"}
+        {message && <span className="ml-2 not-italic text-destructive">{message}</span>}
+      </button>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <Button onClick={handleRefresh} disabled={isPending} variant="ghost">
+        {isPending ? "Refreshing…" : "Refresh status"}
+      </Button>
+      {message && <p className="text-sm text-muted-foreground">{message}</p>}
     </div>
   );
 }

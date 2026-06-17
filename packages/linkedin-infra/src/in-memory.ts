@@ -1,4 +1,5 @@
 import type {
+  ConnectedAccount,
   HostedAuthLink,
   HostedAuthRedirects,
   InviteRequest,
@@ -12,6 +13,8 @@ import type {
 export class InMemoryLinkedInInfra implements LinkedInInfra {
   readonly sentInvites: InviteRequest[] = [];
   readonly sentMessages: MessageRequest[] = [];
+  /** Accounts returned by listAccounts() — push to simulate a connected workspace. */
+  readonly accounts: ConnectedAccount[] = [];
   private counter = 0;
 
   constructor(private readonly webhookSecret = "in-memory-secret") {}
@@ -21,6 +24,10 @@ export class InMemoryLinkedInInfra implements LinkedInInfra {
       url: `https://auth.example.com/connect/${accountId}`,
       expiresAt: new Date(Date.now() + 3_600_000).toISOString(),
     };
+  }
+
+  async listAccounts(): Promise<ConnectedAccount[]> {
+    return [...this.accounts];
   }
 
   async sendInvite(req: InviteRequest): Promise<SendOutcome> {

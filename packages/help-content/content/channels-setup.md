@@ -30,7 +30,9 @@ Plan accordingly: set up email sending at least 2–4 weeks before you intend to
 
 ## LinkedIn account
 
-Connect your own existing LinkedIn account to turn on LinkedIn outreach. Click **Connect your LinkedIn account** — you'll sign in on LinkedIn's own secure page (we never see your password), then you're brought straight back to **Settings → Channels**. Your account first shows as **Connecting** and flips to **Active** within a moment once it's confirmed. Need more than one? Use **Connect another account** on the same card.
+Connect your own existing LinkedIn account to turn on LinkedIn outreach. Click **Connect your LinkedIn account** — you'll sign in on LinkedIn's own secure page (we never see your password), then you're brought straight back to **Settings → Channels**, where your account appears as **Active**. Need more than one? Use **Connect another account** on the same card.
+
+If you finish signing in but don't see your account listed yet, use **Refresh status** on the LinkedIn card to sync it immediately — no need to reconnect.
 
 If your connection drops (LinkedIn sessions expire periodically), return to this page and reconnect. A disconnected account pauses LinkedIn outreach for your workspace; reconnecting resumes it.
 
