@@ -17,6 +17,7 @@
     "@upstash/ratelimit": "^2.0.5",
     "@upstash/redis": "^1.34.3",
     "@vantera/agent-brains": "workspace:*",
+    "@vantera/ads-infra": "workspace:*",
     "@vantera/billing": "workspace:*",
     "@vantera/crm-infra": "workspace:*",
     "@vantera/transactional-email": "workspace:*",

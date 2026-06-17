@@ -517,6 +517,46 @@ export interface InboundRespondJobSummary {
   leadId?: string;
 }
 
+// ── ad lead ingestion (Phase 11 — Meta Ads + nurturing) ───────────────────────
+export interface AdInboundEvent {
+  providerLeadId: string;
+  /** attribution ref carried through the ad → resolves to the ad campaign + its nurture campaign */
+  campaignRef: string | null;
+  email: string | null;
+  firstName: string | null;
+  companyName: string | null;
+}
+
+export interface AdInboundStore {
+  /** resolve the ad campaign + its internal nurture campaign by the attribution ref */
+  getAdCampaignByRef(
+    campaignRef: string
+  ): Promise<{ adCampaignId: string; accountId: string; campaignId: string | null } | null>;
+  isSuppressed(accountId: string, kind: "email", value: string): Promise<boolean>;
+  /** create-or-match a leads row (source 'ad') for the ad lead; returns the lead id */
+  upsertAdLead(e: {
+    accountId: string;
+    email: string;
+    firstName: string | null;
+    companyName: string | null;
+  }): Promise<string>;
+  ensureCampaignLead(campaignId: string, leadId: string, accountId: string): Promise<void>;
+  /** mark the opted-in ad lead in_campaign so the sequence orchestrator nurtures it */
+  setLeadInCampaign(leadId: string): Promise<void>;
+}
+
+export interface AdInboundDeps {
+  store: AdInboundStore;
+  now?: () => Date;
+}
+
+export type AdInboundOutcome = "enrolled" | "suppressed" | "skipped";
+
+export interface AdInboundSummary {
+  outcome: AdInboundOutcome;
+  leadId?: string;
+}
+
 export interface CallerConfig {
   cta: string;
   bookingLink: string;
