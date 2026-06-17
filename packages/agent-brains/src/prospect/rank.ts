@@ -1,7 +1,7 @@
 import { generateObject, type LanguageModel } from "ai";
 import { getModel } from "@vantera/ai";
 import type { ProspectSignal } from "@vantera/prospect-data";
-import { rankBatchSchema, type LeadInsights } from "./schema";
+import { normalizeInsights, rankBatchSchema, type LeadInsights } from "./schema";
 
 /** Leads per model call: enough to amortize the context, small enough for output-token headroom. */
 export const RANK_BATCH_SIZE = 12;
@@ -124,9 +124,10 @@ async function rankBatch(
     leads = (await run()).object.leads;
   }
 
-  // only keep rows that map back to a real lead in this batch
+  // only keep rows that map back to a real lead in this batch, then enforce the field caps
+  // the (now permissive) schema no longer hard-validates
   const known = new Set(batch.map((c) => c.leadId));
-  return leads.filter((l) => known.has(l.lead_id));
+  return leads.filter((l) => known.has(l.lead_id)).map(normalizeInsights);
 }
 
 /** Stage 2 of the scoring gate (rule 06): batched AI rank over rules-gate survivors. */

@@ -142,15 +142,25 @@ describe("rankLeads", () => {
     expect(out[0]!.score).toBe(82);
   });
 
-  it("rejects out-of-range scores via the schema", async () => {
+  it("clamps an out-of-range score into 0-100 instead of failing the batch", async () => {
     const model = new MockLanguageModelV3({
-      doGenerate: sequence(
-        textResponse({ leads: [insight("l1", { score: 140 })] }),
-        textResponse({ leads: [insight("l1", { score: 140 })] })
-      ),
+      doGenerate: sequence(textResponse({ leads: [insight("l1", { score: 140 })] })),
     });
 
-    await expect(rankLeads([candidate("l1")], {}, model)).rejects.toThrow();
+    const out = await rankLeads([candidate("l1")], {}, model);
+    expect(model.doGenerateCalls).toHaveLength(1); // no retry — schema now accepts it
+    expect(out[0]!.score).toBe(100);
+  });
+
+  it("truncates over-long free-text fields instead of failing the batch (the NoObjectGenerated fix)", async () => {
+    const longSummary = "x".repeat(900);
+    const model = new MockLanguageModelV3({
+      doGenerate: sequence(textResponse({ leads: [insight("l1", { summary: longSummary })] })),
+    });
+
+    const out = await rankLeads([candidate("l1")], {}, model);
+    expect(model.doGenerateCalls).toHaveLength(1);
+    expect(out[0]!.summary.length).toBe(400);
   });
 
   it("sends seller context ahead of lead lines for prompt-cache-friendly ordering", async () => {

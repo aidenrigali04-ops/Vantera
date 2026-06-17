@@ -4,20 +4,26 @@ import { z } from "zod";
  * Per-lead structured output of the AI rank (rule 06 stage 2). `reasoning` comes
  * FIRST: a short forced deliberation before the score — most of the quality of
  * extended thinking at a fraction of the output tokens.
+ *
+ * The schema is intentionally PERMISSIVE (no length/range caps): the model can't
+ * reliably honor exact char limits, and a single over-long field used to fail the
+ * WHOLE batch (AI_NoObjectGeneratedError). Length/range discipline lives in the
+ * system prompt for guidance and in `normalizeInsights` for enforcement — validate
+ * loosely, normalize strictly.
  */
 export const leadInsightsSchema = z.object({
   lead_id: z.string(),
-  reasoning: z.string().max(300),
-  score: z.number().min(0).max(100),
+  reasoning: z.string(),
+  score: z.number(),
   /** dashboard one-liner (leads.ai_rationale) */
-  rationale: z.string().max(280),
-  pain_points: z.array(z.string()).max(3),
-  triggers: z.array(z.string()).max(3),
-  motivations: z.array(z.string()).max(3),
-  value_angle: z.string().max(200),
-  aha_moment: z.string().max(200),
+  rationale: z.string(),
+  pain_points: z.array(z.string()),
+  triggers: z.array(z.string()),
+  motivations: z.array(z.string()),
+  value_angle: z.string(),
+  aha_moment: z.string(),
   /** user-facing tailored enrichment summary (leads.ai_insights.summary) */
-  summary: z.string().max(400),
+  summary: z.string(),
 });
 
 export const rankBatchSchema = z.object({
@@ -25,6 +31,28 @@ export const rankBatchSchema = z.object({
 });
 
 export type LeadInsights = z.infer<typeof leadInsightsSchema>;
+
+const clamp = (s: string, max: number): string => (s.length > max ? s.slice(0, max).trimEnd() : s);
+
+/**
+ * Enforce the field caps the schema no longer hard-validates: clamp the score to 0-100,
+ * cap each list at 3 items, and truncate each free-text field to its documented length.
+ * Applied to every ranked lead before scores/insights are persisted.
+ */
+export function normalizeInsights(i: LeadInsights): LeadInsights {
+  return {
+    lead_id: i.lead_id,
+    reasoning: clamp(i.reasoning, 300),
+    score: Math.max(0, Math.min(100, Math.round(i.score))),
+    rationale: clamp(i.rationale, 280),
+    pain_points: i.pain_points.slice(0, 3),
+    triggers: i.triggers.slice(0, 3),
+    motivations: i.motivations.slice(0, 3),
+    value_angle: clamp(i.value_angle, 200),
+    aha_moment: clamp(i.aha_moment, 200),
+    summary: clamp(i.summary, 400),
+  };
+}
 
 /** Shape persisted to leads.ai_insights (everything except score/rationale, which get columns). */
 export function toStoredInsights(insights: LeadInsights) {
