@@ -24,11 +24,13 @@ export interface ExploriumOptions {
 type FilterValues = { values: string[] };
 
 // AgentSource /v1/prospects is a strict (Pydantic) schema: unknown filter keys and bad enum
-// values both 422. Keys + enums below are verified against the live API. Three direct-use
-// filters are supported for our ICP shape; industries/techStack/signals are intentionally NOT
-// sent — there is no free-text industry filter (linkedin_category needs a strict taxonomy that
-// raw ICP strings would 422 on; google_category silently returns 0). Industry/tech are filtered
-// by the deterministic rules gate (rule 06) on returned candidates; signals ride enrichment.
+// values both 422. Keys + enums below are verified against the live API. We send four direct-use
+// filters: job_level, company_size, company_country_code, and linkedin_category. The industry
+// filter is the big quality lever — without it discovery matches on title alone and returns
+// off-ICP public figures (CEOs of media/finance/wellness cos). linkedin_category needs EXACT
+// LinkedIn-taxonomy values (free-text 422s), so ICP industries are mapped to a verified-valid set
+// below; unmapped industries are simply dropped (never sent raw). techStack/signals still ride
+// enrichment + the rules gate (rule 06), not discovery.
 
 const SIZE_BUCKETS = ["1-10", "11-50", "51-200", "201-500", "501-1000", "1001-5000", "5001-10000", "10001+"] as const;
 
@@ -81,6 +83,49 @@ function mapJobLevels(titles: string[], seniorities: string[]): string[] {
   return [...levels];
 }
 
+// Free-text ICP industry keyword → EXACT LinkedIn-taxonomy categories (all verified valid against
+// the live /prospects schema; sending an unknown value 422s the whole call). Matching is substring,
+// case-insensitive; an ICP industry that matches no keyword contributes nothing (so a partially-
+// mappable ICP still filters on what it can, and a fully-unmappable one falls back to no industry
+// filter rather than erroring).
+const LINKEDIN_CATEGORY_MAP: { match: string[]; categories: string[] }[] = [
+  { match: ["saas", "software"], categories: ["software development"] },
+  { match: [" ai ", "artificial intelligence", "machine learning", " ml "], categories: ["software development", "technology, information and internet"] },
+  { match: [" tech ", "technology", "internet", "information technology"], categories: ["technology, information and internet"] },
+  { match: ["it services", "it consulting", "managed services"], categories: ["it services and it consulting"] },
+  { match: ["security", "cyber"], categories: ["computer and network security"] },
+  { match: ["analytics", "data infrastructure"], categories: ["data infrastructure and analytics"] },
+  { match: ["advertising", "ad agency", " ads "], categories: ["advertising services"] },
+  { match: ["marketing", "demand gen", "growth"], categories: ["marketing services"] },
+  { match: ["agency", "agencies"], categories: ["advertising services", "marketing services"] },
+  { match: ["fintech", "finance", "financial", "banking", "payments"], categories: ["financial services"] },
+  { match: ["consult"], categories: ["business consulting and services"] },
+  { match: ["health", "medical", "hospital", "clinic", "biotech", "pharma"], categories: ["hospitals and health care"] },
+  { match: ["ecommerce", "e-commerce", "retail", "commerce", "dtc", "consumer goods"], categories: ["retail"] },
+  { match: ["real estate", "property", "proptech"], categories: ["real estate"] },
+  { match: ["staffing", "recruit", "talent acquisition"], categories: ["staffing and recruiting"] },
+  { match: ["telecom"], categories: ["telecommunications"] },
+  { match: ["manufactur", "industrial"], categories: ["manufacturing"] },
+  { match: ["insurance", "insurtech"], categories: ["insurance"] },
+  { match: ["education", "edtech", "e-learning", "elearning", "learning", "training"], categories: ["e-learning providers"] },
+  { match: ["human resources", " hr ", "people ops", "hrtech"], categories: ["human resources services"] },
+  { match: ["accounting", "bookkeeping"], categories: ["accounting"] },
+  { match: ["legal", "law firm", "legaltech"], categories: ["legal services"] },
+  { match: ["media", "publishing", "content", "news"], categories: ["internet publishing"] },
+];
+
+/** Map ICP industry strings onto the verified LinkedIn-category taxonomy (deduped, case-insensitive). */
+function mapLinkedinCategories(industries: string[]): string[] {
+  const out = new Set<string>();
+  for (const raw of industries) {
+    const v = ` ${raw.toLowerCase()} `;
+    for (const { match, categories } of LINKEDIN_CATEGORY_MAP) {
+      if (match.some((m) => v.includes(m))) categories.forEach((c) => out.add(c));
+    }
+  }
+  return [...out];
+}
+
 function buildFilters(filters: ProspectFilters): Record<string, FilterValues> {
   const out: Record<string, FilterValues> = {};
 
@@ -100,6 +145,11 @@ function buildFilters(filters: ProspectFilters): Record<string, FilterValues> {
 
   const countries = [...new Set((filters.geos ?? []).map(mapCountry).filter((c): c is string => Boolean(c)))];
   out.company_country_code = { values: countries.length > 0 ? countries : ["US"] };
+
+  // Industry filter — the quality lever. Only verified-valid taxonomy values are emitted;
+  // an ICP whose industries don't map sends no linkedin_category (broad, but never 422s).
+  const categories = mapLinkedinCategories(filters.industries ?? []);
+  if (categories.length > 0) out.linkedin_category = { values: categories };
 
   return out;
 }

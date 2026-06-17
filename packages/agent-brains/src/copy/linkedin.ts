@@ -39,7 +39,7 @@ Follow-up message — under ${FOLLOWUP_MAX_CHARS} characters:
 - Thank them briefly (3-6 words, not gushing), then one observation tying their pain/trigger to the aha moment as a concrete outcome.
 - End with ONE soft, interest-based ask aligned to the CTA goal. No meeting demands, no calendar links.
 
-Both: conversational chat register, no "Dear", no "Best regards", no signature. Plain human voice: no "I hope this finds you well", no buzzwords ("game-changer", "cutting-edge", "seamless"), no generic flattery ("big fan of", "love what you're doing"), no "As a …" openers, at most one em-dash, at most one exclamation mark, minimal hedging.`;
+Both: conversational chat register, no "Dear", no "Best regards", no signature. Plain human voice: no "I hope this finds you well", no buzzwords ("game-changer", "cutting-edge", "seamless"), no generic flattery ("big fan of", "love what you're doing"), no "As a …" openers, at most one em-dash, at most one exclamation mark, minimal hedging. Name the seller ONLY by the "Seller company" value from the block — ignore any other brand name that appears in the offer description.`;
 
 // `grounding` is the per-lead facts (leadBlock). When provided, both messages are checked for
 // fabricated metric claims (rule 11 / anti-hallucination); unresolved ones surface in review.

@@ -73,7 +73,7 @@ describe("ExploriumProspectData", () => {
         seniorities: ["director"],
         companySizes: ["11-50", "200"],
         geos: ["united states", "canada"],
-        industries: ["fintech"], // dropped
+        industries: ["fintech"], // → linkedin_category (mapped to the LinkedIn taxonomy)
         techStack: ["salesforce"], // dropped
         signals: ["funding"], // dropped
       },
@@ -85,10 +85,31 @@ describe("ExploriumProspectData", () => {
     expect(body.filters.job_level.values).toEqual(expect.arrayContaining(["vice president", "director"]));
     expect(body.filters.company_size.values).toEqual(["11-50", "51-200"]); // "200" bins to 51-200
     expect(body.filters.company_country_code.values).toEqual(["US", "CA"]);
+    // industry maps onto the verified LinkedIn taxonomy (raw free-text would 422)
+    expect(body.filters.linkedin_category.values).toEqual(["financial services"]);
     // unsupported keys never leave the adapter — each would 422 or silently return 0
-    for (const k of ["company_industry", "linkedin_category", "company_technologies", "events"]) {
+    for (const k of ["company_industry", "company_technologies", "events"]) {
       expect(body.filters[k]).toBeUndefined();
     }
+  });
+
+  it("maps ICP industries onto verified LinkedIn categories, and drops unmappable ones (no 422)", async () => {
+    const { impl, calls } = fetchStub({ "/prospects": { data: [] } });
+    const source = new ExploriumProspectData({ apiKey: "k", fetchImpl: impl });
+
+    await source.discoverProspects({ industries: ["software", "AI", "marketing agency"] }, 5);
+    const body = JSON.parse(String(calls[0]!.init.body));
+    expect(body.filters.linkedin_category.values).toEqual(
+      expect.arrayContaining(["software development", "technology, information and internet", "marketing services", "advertising services"])
+    );
+
+    // a fully-unmappable ICP sends no industry filter at all (falls back to broad, never errors)
+    const { impl: impl2, calls: calls2 } = fetchStub({ "/prospects": { data: [] } });
+    await new ExploriumProspectData({ apiKey: "k", fetchImpl: impl2 }).discoverProspects(
+      { industries: ["underwater basket weaving"] },
+      5
+    );
+    expect(JSON.parse(String(calls2[0]!.init.body)).filters.linkedin_category).toBeUndefined();
   });
 
   it("defaults job_level to the full decision-maker spread (incl. VP + director) for a title-less ICP", async () => {

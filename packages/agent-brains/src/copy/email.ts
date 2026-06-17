@@ -35,7 +35,8 @@ Hard rules:
 - Subject: 1-${SUBJECT_MAX_WORDS} words, specific to the observation, written like an internal note (lowercase except proper nouns). Never clickbait, never deceptive — it must honestly reflect the body.
 - No links, no images, no attachments in a first touch.
 - Plain human voice: no "I hope this finds you well", no "I wanted to reach out", no "game-changer"/"cutting-edge"/"seamless", no generic flattery, no "As a …" openers, at most one em-dash, at most one exclamation mark, minimal hedging.
-- Use the prospect's first name at most once. Sign-off is just the sender's first name placeholder "{{sender_name}}".`;
+- Use the prospect's first name at most once. Sign-off is just the sender's first name placeholder "{{sender_name}}".
+- Name the seller ONLY by the "Seller company" value from the block. If the offer description mentions a different brand name, ignore it — never use or invent any other company name.`;
 
 // `grounding` is the per-lead facts (leadBlock). When provided, the body is checked for
 // fabricated metric claims (rule 11 / anti-hallucination); unresolved ones surface in the
