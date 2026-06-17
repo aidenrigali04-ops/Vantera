@@ -28,6 +28,7 @@ import { AnimatedProgress } from "@/components/ui/animated-progress";
 import { Reveal, RevealItem, Eyebrow, PANEL_SURFACE } from "@/components/ui/panel";
 import { cn } from "@/lib/utils";
 import { RevenueChart } from "./revenue-chart";
+import { LivePipeline, type LivePipelineData } from "./live-pipeline";
 import { ProspectPanel, type Prospect } from "./prospect-panel";
 import { LeadProfileLink, type LeadProfile } from "@/components/lead-profile";
 import type { RevenuePoint, RevenueSnapshot } from "@/lib/revenue";
@@ -77,6 +78,7 @@ export interface DashboardViewProps {
   goalCents: number | null;
   isNew: boolean;
   showCrmNudge: boolean;
+  livePipeline: LivePipelineData;
   scoutDeployed: boolean;
   drafts: number;
   agents: AgentRow[];
@@ -193,6 +195,9 @@ function WorkingDashboard(props: DashboardViewProps) {
 
   return (
     <Reveal className="flex flex-col gap-6">
+      {/* Live pipeline — full-width transparency of the autonomous process, top of the page */}
+      <LivePipeline {...props.livePipeline} />
+
       {/* Top row: the one primary action (left) + revenue dopamine (right) */}
       <div className="grid gap-6 lg:grid-cols-[1.1fr_1.9fr]">
         <RevealItem className={cn(PANEL_SURFACE, "p-5", drafts > 0 && "dark:bg-white/[0.06]")}>
