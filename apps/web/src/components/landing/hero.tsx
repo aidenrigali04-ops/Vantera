@@ -52,13 +52,22 @@ export function Hero() {
 
       {/* First screen: the promise + the interactive demo, vertically centered. */}
       <div className="relative z-10 mx-auto flex min-h-screen max-w-4xl flex-col items-center justify-center pt-24 pb-12 text-center">
+        <motion.span
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5 }}
+          className="mb-5 font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground/80 sm:text-xs"
+        >
+          Prospect · Qualify · Review · Send
+        </motion.span>
+
         <TextEffect
           as="h1"
           per="word"
           preset="blur"
           className="font-heading max-w-4xl text-balance text-4xl font-medium tracking-tight text-foreground sm:text-5xl md:text-6xl"
         >
-          {"Most of your leads aren't worth a call."}
+          {"AI SDRs spray. This one qualifies."}
         </TextEffect>
 
         {/* The promise resolves first (headline blur), then the demo + CTA rise as one block. */}
@@ -69,7 +78,7 @@ export function Hero() {
           transition={{ duration: 0.6, delay: 0.5, ease: [0.22, 1, 0.36, 1] }}
         >
           <p className="mx-auto mt-6 max-w-3xl text-pretty text-base text-muted-foreground sm:text-lg">
-            {"We score every prospect, cut the ones that don't fit, and work only the handful worth a rep's time — across email, LinkedIn, and a real call. Nothing sends without your sign-off."}
+            {"It finds real buyers in your ICP, qualifies every one, and drafts the outreach — across email, LinkedIn, and a real call. Nothing sends until you approve."}
           </p>
 
           <div id="simulate" className="mt-10 w-full scroll-mt-28">
