@@ -45,6 +45,46 @@ describe("draftCallBrief", () => {
     }
   });
 
+  it("flags a fabricated metric in the brief against the lead facts (grounding guardrail)", async () => {
+    const generate = vi.fn(async () => ({
+      object: {
+        opening_line: "Hi Sam, this is Alex from Acme.",
+        talking_points: [],
+        value_angle: "teams like yours cut routing time 47% in a quarter",
+        consequence_hook: "what happens if it stays manual?",
+        aha_moment: "a 15-minute look",
+        objection_handling: [],
+        goal_statement: "book a 15-min intro",
+      },
+    }));
+    const brief = await draftCallBrief(
+      { input, bookingLink: "https://cal.com/x", recordingConsentMode: "one_party", personaName: "Alex" },
+      fakeModel(null),
+      generate as never
+    );
+    expect(brief.violations.map((v) => v.rule)).toContain("ungrounded-claim");
+  });
+
+  it("returns no grounding violations for a clean brief", async () => {
+    const generate = vi.fn(async () => ({
+      object: {
+        opening_line: "Hi Sam, this is Alex from Acme.",
+        talking_points: ["manual routing is costing you"],
+        value_angle: "a clearer way to cut routing time",
+        consequence_hook: "what happens if it stays manual?",
+        aha_moment: "a 15-minute look",
+        objection_handling: [],
+        goal_statement: "book a 15-min intro",
+      },
+    }));
+    const brief = await draftCallBrief(
+      { input, bookingLink: "https://cal.com/x", recordingConsentMode: "one_party", personaName: "Alex" },
+      fakeModel(null),
+      generate as never
+    );
+    expect(brief.violations).toEqual([]);
+  });
+
   it("prepends a recorded-line disclosure for two-party consent", async () => {
     const generate = vi.fn(async () => ({
       object: {

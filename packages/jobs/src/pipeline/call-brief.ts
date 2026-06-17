@@ -1,3 +1,4 @@
+import { describeViolations } from "@vantera/agent-brains";
 import type { CallBriefRequest, DraftInput } from "@vantera/agent-brains";
 import type { CallableLead, CallBriefDeps, CallBriefDraftPayload, CallBriefSummary, CallerContext } from "./types";
 
@@ -64,7 +65,9 @@ export async function runCallBrief(payload: CallBriefDraftPayload, deps: CallBri
     await deps.store.insertScheduledSend({
       accountId, campaignId, leadId: lead.id, channel: "call",
       subject: null, body: brief.openingLine, status: "pending_review",
-      linkedinStage: null, styleFlags: null, brief,
+      linkedinStage: null,
+      styleFlags: brief.violations.length > 0 ? describeViolations(brief.violations) : null,
+      brief,
     });
     await deps.store.setCampaignLeadStatus(campaignId, lead.id, "queued");
     await deps.store.setLeadStatus(lead.id, "in_campaign");

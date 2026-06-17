@@ -1,6 +1,7 @@
 import { generateObject, type LanguageModel } from "ai";
 import { getModel } from "@vantera/ai";
 import { leadBlock, type DraftInput } from "../copy/shared";
+import { findUngroundedClaims, type Violation } from "../copy/humanizer";
 import { callBriefSchema } from "./schema";
 
 export interface CallBrief {
@@ -15,6 +16,9 @@ export interface CallBrief {
   objectionHandling: string[];
   goalStatement: string;
   bookingLink: string;
+  /** Fabricated-metric claims absent from the lead facts — the 11x-class guardrail (WS-F). The
+   *  prompt already forbids invention; this catches a regression and surfaces it in review. */
+  violations: Violation[];
 }
 
 export interface CallBriefRequest {
@@ -55,6 +59,19 @@ export async function draftCallBrief(
     req.recordingConsentMode === "two_party"
       ? `${RECORDING_DISCLOSURE}${object.opening_line}`
       : object.opening_line;
+  // Grounding check over every spoken field vs the lead facts (same guardrail as the copy brains).
+  const spoken = [
+    object.opening_line,
+    ...object.talking_points,
+    object.value_angle,
+    object.consequence_hook,
+    object.aha_moment,
+    ...object.objection_handling,
+    object.goal_statement,
+  ]
+    .filter(Boolean)
+    .join("\n");
+  const violations = findUngroundedClaims(spoken, leadBlock(req.input));
   return {
     openingLine,
     talkingPoints: object.talking_points,
@@ -64,5 +81,6 @@ export async function draftCallBrief(
     objectionHandling: object.objection_handling,
     goalStatement: object.goal_statement,
     bookingLink: req.bookingLink,
+    violations,
   };
 }
