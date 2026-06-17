@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Panel, Eyebrow } from "@/components/ui/panel";
 import { cn } from "@/lib/utils";
-import type { FunnelStage, Roi } from "@/lib/revenue";
+import { benchmarkForStage, type FunnelStage, type Roi } from "@/lib/revenue";
 
 const usd = (cents: number) =>
   new Intl.NumberFormat("en-US", {
@@ -187,17 +187,27 @@ function FunnelCard({ funnel, meetingsTracked }: { funnel: FunnelStage[]; meetin
   return (
     <Panel index={1}>
       <Eyebrow>Conversion funnel</Eyebrow>
+      <p className="mt-2 text-sm text-muted-foreground">
+        Quality outreach trades volume for fit — so the rate that matters, not the raw count. Here&apos;s
+        how each stage compares to what&apos;s typical for gated, reviewed sending.
+      </p>
       <div className="mt-5 space-y-4">
         {funnel.map((stage) => {
           const widthPct = top > 0 && stage.count > 0 ? Math.max(3, Math.round((stage.count / top) * 100)) : 0;
           const isUntrackedMeetings = stage.key === "meetings" && !meetingsTracked;
+          const bench = isUntrackedMeetings ? null : benchmarkForStage(stage.key, stage.conversionPct);
           return (
             <div key={stage.key}>
               <div className="flex items-baseline justify-between text-sm">
                 <span className="text-foreground">{stage.label}</span>
                 <span className="flex items-baseline gap-3">
                   {stage.conversionPct != null && !isUntrackedMeetings && (
-                    <span className="font-mono text-[11px] text-muted-foreground">
+                    <span
+                      className={cn(
+                        "font-mono text-[11px]",
+                        bench?.status === "below" ? "text-muted-foreground" : "text-foreground/80",
+                      )}
+                    >
                       {stage.conversionPct}%
                     </span>
                   )}
@@ -210,6 +220,17 @@ function FunnelCard({ funnel, meetingsTracked }: { funnel: FunnelStage[]; meetin
                   style={{ width: `${widthPct}%` }}
                 />
               </div>
+              {bench && (
+                <p className="mt-1 font-mono text-[11px] text-muted-foreground/70">
+                  typical {bench.low}–{bench.high}%
+                  {" · "}
+                  {bench.status === "healthy"
+                    ? "on track"
+                    : bench.status === "above"
+                      ? "ahead of typical"
+                      : "room to improve"}
+                </p>
+              )}
               {isUntrackedMeetings && (
                 <p className="mt-1 text-xs text-muted-foreground/70">
                   Tracked once your AI caller books a meeting.
