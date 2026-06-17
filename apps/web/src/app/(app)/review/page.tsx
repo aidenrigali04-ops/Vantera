@@ -5,7 +5,25 @@ import { Badge } from "@/components/ui/badge";
 import { Panel, Eyebrow } from "@/components/ui/panel";
 import { LeadProfileLink, type LeadProfile } from "@/components/lead-profile";
 import { LEAD_PROFILE_FIELDS } from "@/components/lead-profile-fields";
-import { DraftCard, type DraftRow } from "./draft-card";
+import { type DraftRow } from "./draft-card";
+import { ProspectReviewCard, type ProspectGroup } from "./prospect-review-card";
+
+/** Group queue drafts by prospect, preserving the rows' (created_at) order. */
+function groupByProspect(rows: DraftRow[]): ProspectGroup[] {
+  const groups: ProspectGroup[] = [];
+  const index = new Map<string, number>();
+  for (const d of rows) {
+    const key = d.leads?.id ?? `none-${d.id}`;
+    const at = index.get(key);
+    if (at === undefined) {
+      index.set(key, groups.length);
+      groups.push({ lead: d.leads, drafts: [d] });
+    } else {
+      groups[at]!.drafts.push(d);
+    }
+  }
+  return groups;
+}
 
 const CHANNELS = ["all", "email", "linkedin"] as const;
 const VIEWS = ["queue", "processed"] as const;
@@ -66,6 +84,8 @@ export default async function ReviewPage({
   if (channel === "email" || channel === "linkedin") query = query.eq("channel", channel);
   const { data: rows, count } = await query;
 
+  const groups = view === "queue" ? groupByProspect((rows ?? []) as unknown as DraftRow[]) : [];
+
   const withChannel = (params: Record<string, string>) => {
     const sp = new URLSearchParams(params);
     return `/review?${sp.toString()}`;
@@ -78,7 +98,9 @@ export default async function ReviewPage({
         <h1 className="font-heading mt-3 text-3xl font-semibold tracking-tight">Review queue</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           {view === "queue"
-            ? `${count ?? 0} draft${count === 1 ? "" : "s"} waiting. Nothing sends without your approval.`
+            ? `${count ?? 0} draft${count === 1 ? "" : "s"} across ${groups.length} prospect${
+                groups.length === 1 ? "" : "s"
+              } waiting. Nothing sends without your approval.`
             : `${count ?? 0} message${count === 1 ? "" : "s"} past review — approved, scheduled, sent, or stopped.`}
         </p>
       </div>
@@ -139,9 +161,13 @@ export default async function ReviewPage({
           </p>
         </Panel>
       ) : view === "queue" ? (
-        <div className="space-y-4">
-          {(rows as unknown as DraftRow[]).map((d) => (
-            <DraftCard key={d.id} draft={d} />
+        <div className="space-y-3">
+          {groups.map((g) => (
+            <ProspectReviewCard
+              key={g.lead?.id ?? g.drafts[0]!.id}
+              group={g}
+              defaultOpen={groups.length === 1}
+            />
           ))}
         </div>
       ) : (

@@ -22,7 +22,14 @@ export interface DraftRow {
   leads: LeadProfile | null;
 }
 
-export function DraftCard({ draft }: { draft: DraftRow }) {
+/**
+ * A single draft's review controls. Two modes:
+ * - default: standalone card (Panel) with the lead header + channel badge.
+ * - compact: rendered inside a ProspectReviewCard's channel group, so it drops the
+ *   repeated lead identity + channel badge (the prospect card + section header carry
+ *   those) and shows only the LinkedIn stage label. Keeps body + edit + actions.
+ */
+export function DraftCard({ draft, compact = false }: { draft: DraftRow; compact?: boolean }) {
   const [editing, setEditing] = useState(false);
   const [approveState, approve, approving] = useActionState<ReviewActionState, FormData>(
     approveDraft,
@@ -45,6 +52,97 @@ export function DraftCard({ draft }: { draft: DraftRow }) {
   const name = [lead?.first_name, lead?.last_name].filter(Boolean).join(" ") || "Unknown prospect";
   const context = [lead?.title, lead?.company_name].filter(Boolean).join(" · ");
   const error = approveState.error ?? declineState.error ?? suppressState.error ?? editState.error;
+  const stageLabel = draft.linkedin_stage === "invite" ? "Invite" : draft.linkedin_stage === "message" ? "Follow-up" : null;
+
+  // Shared body + actions — identical in both modes.
+  const content = (
+    <div className="space-y-3">
+      {draft.style_flags && (
+        <p className="flex items-start gap-1.5 rounded-md bg-amber-500/10 px-2.5 py-1.5 text-xs text-amber-700 dark:text-amber-400">
+          <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
+          Style check: {draft.style_flags}
+        </p>
+      )}
+
+      {editing ? (
+        <form
+          action={(fd) => {
+            saveEdit(fd);
+            setEditing(false);
+          }}
+          className="space-y-2"
+        >
+          <input type="hidden" name="sendId" value={draft.id} />
+          <input type="hidden" name="channel" value={draft.channel} />
+          {draft.channel === "email" && (
+            <Input name="subject" defaultValue={draft.subject ?? ""} placeholder="Subject" />
+          )}
+          <Textarea name="body" defaultValue={draft.body} rows={6} />
+          <div className="flex gap-2">
+            <Button type="submit" size="sm" disabled={saving}>
+              {saving ? "Saving…" : "Save"}
+            </Button>
+            <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(false)}>
+              Cancel
+            </Button>
+          </div>
+        </form>
+      ) : (
+        <div className="rounded-md border border-border bg-muted/30 p-3 text-sm">
+          {draft.subject && <p className="mb-1 font-medium">{draft.subject}</p>}
+          <p className="whitespace-pre-wrap">{draft.body}</p>
+        </div>
+      )}
+
+      {!editing && (
+        <div className="flex flex-wrap items-center gap-2">
+          <form action={approve}>
+            <input type="hidden" name="sendId" value={draft.id} />
+            <Button type="submit" size="sm" disabled={approving} data-copilot="approve-draft">
+              {approving ? "Approving…" : "Approve"}
+            </Button>
+          </form>
+          <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
+            Edit
+          </Button>
+          <form action={decline}>
+            <input type="hidden" name="sendId" value={draft.id} />
+            <Button type="submit" size="sm" variant="ghost" disabled={declining}>
+              Decline
+            </Button>
+          </form>
+          <form action={suppress}>
+            <input type="hidden" name="sendId" value={draft.id} />
+            <Button
+              type="submit"
+              size="sm"
+              variant="ghost"
+              className="text-destructive"
+              disabled={suppressing}
+            >
+              Decline &amp; never contact
+            </Button>
+          </form>
+        </div>
+      )}
+
+      {error && <p className="text-sm text-destructive">{error}</p>}
+    </div>
+  );
+
+  // Compact: inside a prospect card's channel group — no Panel, no lead header.
+  if (compact) {
+    return (
+      <div className="rounded-lg border border-border bg-muted/20 p-3.5">
+        {stageLabel && (
+          <Badge variant="secondary" className="mb-2.5">
+            {stageLabel}
+          </Badge>
+        )}
+        {content}
+      </div>
+    );
+  }
 
   return (
     <Panel className="flex flex-col gap-4">
@@ -60,85 +158,10 @@ export function DraftCard({ draft }: { draft: DraftRow }) {
             {draft.channel === "email" ? <Mail className="size-3" /> : <MessageSquare className="size-3" />}
             {draft.channel === "email" ? "Email" : "LinkedIn"}
           </Badge>
-          {draft.linkedin_stage && (
-            <Badge variant="secondary">
-              {draft.linkedin_stage === "invite" ? "Invite" : "Follow-up"}
-            </Badge>
-          )}
+          {stageLabel && <Badge variant="secondary">{stageLabel}</Badge>}
         </div>
       </div>
-      <div className="space-y-3">
-        {draft.style_flags && (
-          <p className="flex items-start gap-1.5 rounded-md bg-amber-500/10 px-2.5 py-1.5 text-xs text-amber-700 dark:text-amber-400">
-            <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
-            Style check: {draft.style_flags}
-          </p>
-        )}
-
-        {editing ? (
-          <form
-            action={(fd) => {
-              saveEdit(fd);
-              setEditing(false);
-            }}
-            className="space-y-2"
-          >
-            <input type="hidden" name="sendId" value={draft.id} />
-            <input type="hidden" name="channel" value={draft.channel} />
-            {draft.channel === "email" && (
-              <Input name="subject" defaultValue={draft.subject ?? ""} placeholder="Subject" />
-            )}
-            <Textarea name="body" defaultValue={draft.body} rows={6} />
-            <div className="flex gap-2">
-              <Button type="submit" size="sm" disabled={saving}>
-                {saving ? "Saving…" : "Save"}
-              </Button>
-              <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(false)}>
-                Cancel
-              </Button>
-            </div>
-          </form>
-        ) : (
-          <div className="rounded-md border border-border bg-muted/30 p-3 text-sm">
-            {draft.subject && <p className="mb-1 font-medium">{draft.subject}</p>}
-            <p className="whitespace-pre-wrap">{draft.body}</p>
-          </div>
-        )}
-
-        {!editing && (
-          <div className="flex flex-wrap items-center gap-2">
-            <form action={approve}>
-              <input type="hidden" name="sendId" value={draft.id} />
-              <Button type="submit" size="sm" disabled={approving} data-copilot="approve-draft">
-                {approving ? "Approving…" : "Approve"}
-              </Button>
-            </form>
-            <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
-              Edit
-            </Button>
-            <form action={decline}>
-              <input type="hidden" name="sendId" value={draft.id} />
-              <Button type="submit" size="sm" variant="ghost" disabled={declining}>
-                Decline
-              </Button>
-            </form>
-            <form action={suppress}>
-              <input type="hidden" name="sendId" value={draft.id} />
-              <Button
-                type="submit"
-                size="sm"
-                variant="ghost"
-                className="text-destructive"
-                disabled={suppressing}
-              >
-                Decline &amp; never contact
-              </Button>
-            </form>
-          </div>
-        )}
-
-        {error && <p className="text-sm text-destructive">{error}</p>}
-      </div>
+      {content}
     </Panel>
   );
 }
