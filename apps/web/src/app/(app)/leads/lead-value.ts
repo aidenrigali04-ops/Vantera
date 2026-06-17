@@ -24,26 +24,62 @@ export function scoreVerdict(score: number | null): ScoreVerdict {
   return { tier: "look", label: "Worth a look" };
 }
 
+/** The qualification bar (rule 06 default min_score). Value is shown only at/above it. */
+export const QUALIFIED_MIN_SCORE = 70;
+
 export interface ProjectedRevenue {
-  /** full deal value in cents — what closing this prospect is worth */
+  /** deal value in cents — what a client of this fit is worth to the goal */
   valueCents: number;
   /** how many deals of this size reach the MRR goal, or null if no goal set */
   dealsToGoal: number | null;
 }
 
 /**
- * "Worth ≈ $X to your goal." Full deal value (the honest, hardest-hitting number),
- * with a deals-to-goal count for the goal-gradient line. Null when the account has
- * no deal value set — the pill is hidden rather than showing $0.
+ * "What a client like this is worth to your goal." Shown ONLY for a lead that has cleared the
+ * qualification bar — never dangled on a weak or unscored lead (the SDR market report's #2
+ * response-below-promise + #4 false-qualification traps: an inflated, identical dollar figure on
+ * every lead reads as a false promise). Value is the account's real avg deal value; null when
+ * there's no deal value set or the lead hasn't earned the framing.
  */
 export function projectedRevenue(
   avgDealValueCents: number | null,
-  goalCents: number | null
+  goalCents: number | null,
+  score: number | null
 ): ProjectedRevenue | null {
   if (!avgDealValueCents || avgDealValueCents <= 0) return null;
+  if (score == null || score < QUALIFIED_MIN_SCORE) return null;
   const dealsToGoal =
     goalCents && goalCents > 0 ? Math.max(1, Math.ceil(goalCents / avgDealValueCents)) : null;
   return { valueCents: avgDealValueCents, dealsToGoal };
+}
+
+/** A lead whose research is older than this reads as aging — surfaced, not hidden (report #9). */
+export const FRESHNESS_STALE_DAYS = 30;
+
+export interface DataFreshness {
+  /** human label of when the lead was last scored/enriched, e.g. "today", "3d ago", "6w ago" */
+  label: string;
+  /** older than the freshness window — its intel may be stale (the "2022 phonebook" risk) */
+  stale: boolean;
+}
+
+/**
+ * How fresh a lead's research is, from its last AI-score timestamp. Stale data is a top churn
+ * driver in the report (#9) — outreach off a months-old signal or an unre-verified contact erodes
+ * trust. Surfacing recency lets the user trust (or re-check) the intel. Null = never scored.
+ */
+export function dataFreshness(scoredAtIso: string | null, now: Date = new Date()): DataFreshness | null {
+  if (!scoredAtIso) return null;
+  const t = new Date(scoredAtIso).getTime();
+  if (!Number.isFinite(t)) return null;
+  const days = Math.floor((now.getTime() - t) / 86_400_000);
+  if (days < 0) return { label: "just now", stale: false };
+  let label: string;
+  if (days === 0) label = "today";
+  else if (days < 14) label = `${days}d ago`;
+  else if (days < 60) label = `${Math.round(days / 7)}w ago`;
+  else label = `${Math.round(days / 30)}mo ago`;
+  return { label, stale: days > FRESHNESS_STALE_DAYS };
 }
 
 const EMAIL_STATUS: Record<string, string> = {

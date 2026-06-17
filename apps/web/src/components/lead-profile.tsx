@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ExternalLink, Mail, X } from "lucide-react";
+import { Clock, ExternalLink, Mail, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { LeadCrmControls } from "@/components/lead-crm-controls";
@@ -33,6 +33,7 @@ export interface LeadProfile {
   ai_score: number | null;
   ai_rationale: string | null;
   ai_insights: LeadProfileInsights | null;
+  scored_at?: string | null;
   email: string | null;
   email_status: string | null;
   phone: string | null;
@@ -55,10 +56,25 @@ function leadName(lead: LeadProfile): string {
   return [lead.first_name, lead.last_name].filter(Boolean).join(" ") || "Unknown";
 }
 
+// Data recency from the last AI-score (report #9: stale data is a top churn driver — outreach off
+// months-old intel erodes trust). 30-day window flags aging research; self-contained so the shared
+// profiler carries no page-level dependency.
+const FRESHNESS_STALE_DAYS = 30;
+function freshness(scoredAt: string | null | undefined): { label: string; stale: boolean } | null {
+  if (!scoredAt) return null;
+  const t = new Date(scoredAt).getTime();
+  if (!Number.isFinite(t)) return null;
+  const days = Math.floor((Date.now() - t) / 86_400_000);
+  if (days < 0) return { label: "just now", stale: false };
+  const label =
+    days === 0 ? "today" : days < 14 ? `${days}d ago` : days < 60 ? `${Math.round(days / 7)}w ago` : `${Math.round(days / 30)}mo ago`;
+  return { label, stale: days > FRESHNESS_STALE_DAYS };
+}
+
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <p className="text-xs font-medium uppercase text-muted-foreground">{label}</p>
+      <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{label}</p>
       <div className="mt-1 text-sm">{children}</div>
     </div>
   );
@@ -68,7 +84,7 @@ function InsightList({ label, items }: { label: string; items?: string[] }) {
   if (!items || items.length === 0) return null;
   return (
     <div>
-      <p className="text-xs font-medium uppercase text-muted-foreground">{label}</p>
+      <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{label}</p>
       <ul className="mt-1 list-disc space-y-1 pl-4 text-sm">
         {items.map((item, i) => (
           <li key={i}>{item}</li>
@@ -91,8 +107,24 @@ export function LeadProfileSheet({ lead, onClose }: { lead: LeadProfile; onClose
             <p className="text-sm text-muted-foreground">
               {[lead.title, lead.company_name].filter(Boolean).join(" · ")}
             </p>
-            <div className="mt-2">
+            <div className="mt-2 flex flex-wrap items-center gap-2">
               <Badge>{STATUS_LABELS[lead.status] ?? lead.status}</Badge>
+              {(() => {
+                const f = freshness(lead.scored_at);
+                if (!f) return null;
+                return (
+                  <span
+                    className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] ${
+                      f.stale
+                        ? "bg-amber-500/12 text-amber-700 ring-1 ring-inset ring-amber-500/30 dark:text-amber-300"
+                        : "text-muted-foreground ring-1 ring-inset ring-border"
+                    }`}
+                  >
+                    <Clock className="size-3" aria-hidden />
+                    {f.stale ? `Researched ${f.label} · may be stale` : `Researched ${f.label}`}
+                  </span>
+                );
+              })()}
             </div>
           </div>
           <Button variant="ghost" size="sm" onClick={onClose} aria-label="Close">
@@ -103,7 +135,7 @@ export function LeadProfileSheet({ lead, onClose }: { lead: LeadProfile; onClose
         <div className="mt-6 space-y-6">
           <section>
             <div className="flex items-baseline justify-between">
-              <p className="text-xs font-medium uppercase text-muted-foreground">Fit score</p>
+              <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Fit score</p>
               <p className="font-mono text-3xl font-semibold tabular-nums">{lead.ai_score ?? "—"}</p>
             </div>
             {lead.ai_rationale && (
@@ -113,7 +145,7 @@ export function LeadProfileSheet({ lead, onClose }: { lead: LeadProfile; onClose
 
           {insights && (
             <section className="space-y-3 rounded-xl border bg-muted/30 p-4">
-              <p className="text-xs font-medium uppercase text-muted-foreground">Why this prospect</p>
+              <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Why this prospect</p>
               {insights.summary && <p className="text-sm">{insights.summary}</p>}
               <InsightList label="Pain points" items={insights.pain_points} />
               <InsightList label="Buying triggers" items={insights.triggers} />
@@ -132,7 +164,7 @@ export function LeadProfileSheet({ lead, onClose }: { lead: LeadProfile; onClose
 
           {lead.tech_stack && lead.tech_stack.length > 0 && (
             <section>
-              <p className="text-xs font-medium uppercase text-muted-foreground">Tech stack</p>
+              <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Tech stack</p>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {lead.tech_stack.map((t) => (
                   <Badge key={t} variant="secondary">
@@ -144,7 +176,7 @@ export function LeadProfileSheet({ lead, onClose }: { lead: LeadProfile; onClose
           )}
 
           <section className="space-y-2">
-            <p className="text-xs font-medium uppercase text-muted-foreground">Verified contact</p>
+            <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Verified contact</p>
             {lead.email ? (
               <p className="flex items-center gap-2 text-sm">
                 <Mail className="size-4 text-muted-foreground" />

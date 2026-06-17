@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Check, ExternalLink, Mail, Phone, Sparkles, UserPlus, X } from "lucide-react";
+import { Check, Clock, ExternalLink, Mail, Phone, Sparkles, UserPlus, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PANEL_SURFACE, Eyebrow } from "@/components/ui/panel";
 import { cn } from "@/lib/utils";
 import {
+  dataFreshness,
   humanizeEmailStatus,
   humanizePhoneStatus,
   isVerified,
@@ -39,6 +40,7 @@ export interface LeadRow {
   ai_rationale: string | null;
   ai_insights: LeadInsightsView | null;
   rules_gate_reasons: string[] | null;
+  scored_at?: string | null;
   email: string | null;
   email_status: string;
   phone: string | null;
@@ -173,11 +175,15 @@ function leadName(lead: LeadRow): string {
 function RevenuePill({
   avgDealValueCents,
   goalCents,
+  score,
 }: {
   avgDealValueCents: number | null;
   goalCents: number | null;
+  score: number | null;
 }) {
-  const proj = projectedRevenue(avgDealValueCents, goalCents);
+  // Shown only for a lead that cleared the qualification bar — value is never dangled on a weak
+  // or unscored lead (report #2/#4). The figure is the account's real avg deal value.
+  const proj = projectedRevenue(avgDealValueCents, goalCents, score);
   if (!proj) return null;
   return (
     <div
@@ -186,16 +192,35 @@ function RevenuePill({
         "mt-5 p-4 ring-1 ring-inset ring-emerald-500/20 dark:bg-emerald-500/[0.06]"
       )}
     >
-      <Eyebrow>Worth to you</Eyebrow>
+      <Eyebrow>Worth pursuing</Eyebrow>
       <p className="mt-1.5 font-mono text-3xl font-semibold tabular-nums text-emerald-600 dark:text-emerald-300">
         ≈ {usd.format(proj.valueCents / 100)}
       </p>
       <p className="mt-1 text-xs text-muted-foreground">
         {proj.dealsToGoal != null
-          ? `One of ~${proj.dealsToGoal} closes to your ${usd.format((goalCents as number) / 100)} goal`
-          : "what closing this prospect is worth"}
+          ? `What a client like this is worth — one of ~${proj.dealsToGoal} closes to your ${usd.format((goalCents as number) / 100)} goal`
+          : "what a client like this is worth to you"}
       </p>
     </div>
+  );
+}
+
+/** Data recency — surfaces how fresh the research is so stale intel is trusted or re-checked (#9). */
+function FreshnessChip({ scoredAt }: { scoredAt: string | null | undefined }) {
+  const f = dataFreshness(scoredAt ?? null);
+  if (!f) return null;
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px]",
+        f.stale
+          ? "bg-amber-500/12 text-amber-700 ring-1 ring-inset ring-amber-500/30 dark:text-amber-300"
+          : "text-muted-foreground ring-1 ring-inset ring-border"
+      )}
+    >
+      <Clock className="size-3" aria-hidden />
+      {f.stale ? `Researched ${f.label} · may be stale` : `Researched ${f.label}`}
+    </span>
   );
 }
 
@@ -348,6 +373,7 @@ export function LeadsTable({
                 <div className="mt-2.5 flex flex-wrap items-center gap-2">
                   <VerdictChip score={selected.ai_score} />
                   <StatusPill status={selected.status} />
+                  <FreshnessChip scoredAt={selected.scored_at} />
                 </div>
               </div>
               <Button variant="ghost" size="sm" onClick={() => setSelected(null)} aria-label="Close">
@@ -359,8 +385,12 @@ export function LeadsTable({
               <p className="mt-3 text-sm text-muted-foreground">{selected.ai_rationale}</p>
             )}
 
-            {/* The money on the table — goal-gradient, graded green because it's a reward */}
-            <RevenuePill avgDealValueCents={avgDealValueCents} goalCents={goalCents} />
+            {/* The money on the table — shown only for a qualified lead (report #4), goal-gradient */}
+            <RevenuePill
+              avgDealValueCents={avgDealValueCents}
+              goalCents={goalCents}
+              score={selected.ai_score}
+            />
 
             <div className="mt-6 space-y-5">
               {/* Peak moment: the AI's ready-made way in */}
