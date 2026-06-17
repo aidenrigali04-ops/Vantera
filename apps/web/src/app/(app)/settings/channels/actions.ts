@@ -136,9 +136,9 @@ export async function provisionEmailSending(
 
   const { data: account } = await supabase
     .from("accounts")
-    .select("id, sender_address")
+    .select("id, sender_address, name, website_url")
     .limit(1)
-    .maybeSingle<{ id: string; sender_address: unknown }>();
+    .maybeSingle<{ id: string; sender_address: unknown; name: string | null; website_url: string | null }>();
   if (!account) return { error: "Your session expired. Sign in again." };
 
   const { count: existingCount } = await supabase
@@ -157,6 +157,9 @@ export async function provisionEmailSending(
       accountId: account.id,
       domainCount,
       mailboxesPerDomain,
+      // brand source → branded look-alike sending domains (never the primary)
+      companyName: account.name,
+      websiteUrl: account.website_url,
     });
   } catch {
     return { error: "Could not start email setup. Try again shortly." };

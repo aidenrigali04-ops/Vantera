@@ -2,6 +2,11 @@ export interface ProvisionRequest {
   accountId: string;
   domainCount: number;
   mailboxesPerDomain: number;
+  /** Brand source for branded sending domains (company name + website). When present, mailboxes
+   *  are provisioned on recognizable look-alike domains (never the primary); absent → a neutral
+   *  provider-owned subdomain. */
+  companyName?: string | null;
+  websiteUrl?: string | null;
 }
 
 export interface Mailbox {

@@ -4,6 +4,7 @@ import type {
 } from "../types";
 import { MaildosoApiClient } from "./api-client";
 import { SmtpSender, type SmtpTransport } from "./smtp-sender";
+import { brandedSendingDomains } from "../branded-domains";
 
 export interface MaildosoEmailInfraConfig {
   api: MaildosoApiClient;
@@ -28,10 +29,9 @@ export class MaildosoEmailInfra implements EmailInfra {
   }
 
   async provision(req: ProvisionRequest): Promise<ProvisionedMailbox[]> {
+    const domains = await this.acquireDomains(req);
     const out: ProvisionedMailbox[] = [];
-    for (let d = 0; d < req.domainCount; d++) {
-      const domain = `outbound-${req.accountId.slice(0, 8)}-${d}.maildoso.app`; // CONFIRM domain-naming (open-Q#2)
-      await this.api.ensureDomain(domain);
+    for (const domain of domains) {
       for (let m = 0; m < req.mailboxesPerDomain; m++) {
         const created = await this.api.createMailbox(domain, `sdr${m}`);
         // id is the provider's internal mailbox ref — the jobs layer persists it as
@@ -40,6 +40,33 @@ export class MaildosoEmailInfra implements EmailInfra {
       }
     }
     return out;
+  }
+
+  /**
+   * Register `domainCount` sending domains. Branded look-alikes derived from the account's brand
+   * come first (recognizable as the customer, but NEVER their primary domain — cold mail off the
+   * real domain would torch its reputation); Maildoso buys the first available one and auto-sets
+   * SPF/DKIM/DMARC. If a branded candidate is taken (or no brand is known), we top up with a
+   * neutral provider-owned subdomain so provisioning never hard-fails.
+   */
+  private async acquireDomains(req: ProvisionRequest): Promise<string[]> {
+    const registered: string[] = [];
+    for (const domain of brandedSendingDomains(req.companyName, req.websiteUrl, req.domainCount)) {
+      if (registered.length >= req.domainCount) break;
+      try {
+        await this.api.ensureDomain(domain);
+        registered.push(domain);
+      } catch {
+        // branded candidate unavailable/taken — try the next one
+      }
+    }
+    for (let d = 0; registered.length < req.domainCount; d++) {
+      const fallback = `outbound-${req.accountId.slice(0, 8)}-${d}.maildoso.app`;
+      if (registered.includes(fallback)) continue;
+      await this.api.ensureDomain(fallback);
+      registered.push(fallback);
+    }
+    return registered;
   }
 
   async send(email: OutboundEmail): Promise<SendResult> {

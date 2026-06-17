@@ -28,6 +28,45 @@ describe("MaildosoEmailInfra", () => {
     expect(out[0]!.id).not.toBe(out[0]!.address);
   });
 
+  it("provisions on branded look-alike domains from the account brand, never the primary", async () => {
+    const api = fakeApi();
+    const infra = new MaildosoEmailInfra({ api, webhookSecret: "whsec" });
+    const out = await infra.provision({
+      accountId: "acc_1",
+      domainCount: 1,
+      mailboxesPerDomain: 1,
+      companyName: "Acme Inc",
+      websiteUrl: "https://www.acme.com",
+    });
+    const domain = out[0]!.domain;
+    expect(domain).toContain("acme"); // recognizable as the customer
+    expect(domain).not.toBe("acme.com"); // never their real corporate domain
+    expect(domain).not.toContain("maildoso.app"); // branded, not the neutral fallback
+  });
+
+  it("skips a taken branded candidate and registers the next available one", async () => {
+    const api = fakeApi();
+    // first branded candidate is taken (ensureDomain throws once), then succeeds
+    let calls = 0;
+    (api.ensureDomain as any).mockImplementation(async () => {
+      calls += 1;
+      if (calls === 1) throw new Error("domain taken");
+    });
+    const infra = new MaildosoEmailInfra({ api, webhookSecret: "whsec" });
+    const out = await infra.provision({
+      accountId: "acc_1", domainCount: 1, mailboxesPerDomain: 1,
+      companyName: "Acme", websiteUrl: "https://acme.com",
+    });
+    expect(calls).toBeGreaterThanOrEqual(2); // tried again after the taken one
+    expect(out[0]!.domain).toContain("acme");
+  });
+
+  it("falls back to a neutral provider subdomain when no brand is known", async () => {
+    const infra = new MaildosoEmailInfra({ api: fakeApi(), webhookSecret: "whsec" });
+    const out = await infra.provision({ accountId: "acc_1", domainCount: 1, mailboxesPerDomain: 1 });
+    expect(out[0]!.domain).toContain("maildoso.app");
+  });
+
   it("send resolves creds via getSmtpCreds and sets List-Unsubscribe", async () => {
     const transport: SmtpTransport = { sendMail: vi.fn(async () => ({ messageId: "smtp_1" })) };
     const infra = new MaildosoEmailInfra({
