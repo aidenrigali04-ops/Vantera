@@ -225,6 +225,8 @@ export interface OutreachSendStore {
   markSent(sendId: string): Promise<void>;
   markFailed(sendId: string, error: string): Promise<void>;
   markSuppressed(sendId: string): Promise<void>;
+  /** Roll a mailbox's deliverability counter; pauses it if the rate burns (WS-C / report #5). */
+  recordMailboxHealthEvent(mailboxId: string, kind: "sent" | "bounce" | "complaint"): Promise<void>;
   pickActiveMailbox(accountId: string): Promise<{ id: string; providerRef: string | null; status: string } | null>;
   getActiveLinkedInIdentity(accountId: string): Promise<{ id: string; providerRef: string; status: string } | null>;
   createUnsubscribeToken(accountId: string, leadId: string, email: string): Promise<string>;
@@ -410,6 +412,8 @@ export interface InboundStore {
    */
   stopSequenceForReply(leadId: string): Promise<void>;
   insertLeadNotification(n: { accountId: string; leadId: string; kind: "reply"; body: string }): Promise<void>;
+  /** Roll a mailbox's deliverability counter; pauses it if the rate burns (WS-C / report #5). */
+  recordMailboxHealthEvent(mailboxId: string, kind: "sent" | "bounce" | "complaint"): Promise<void>;
 }
 
 export interface InboundDeps {

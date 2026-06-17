@@ -85,6 +85,8 @@ export async function runInbound(payload: InboundPayload, deps: InboundDeps): Pr
           recipient,
           event.type === "bounce" ? "bounce" : "unsubscribe"
         );
+        // A bounce degrades the sending mailbox's health; the store pauses it if the rate burns.
+        if (event.type === "bounce") await deps.store.recordMailboxHealthEvent(mailbox.id, "bounce");
         const lead = await deps.store.findLeadByEmail(accountId, recipient);
         if (lead) await deps.store.cancelPendingSends(lead.id);
         return { handled: true, action: event.type };
@@ -92,7 +94,8 @@ export async function runInbound(payload: InboundPayload, deps: InboundDeps): Pr
       case "complaint": {
         const recipient = event.recipient.toLowerCase();
         await deps.store.addSuppression(accountId, "email", recipient, "complaint");
-        await deps.store.pauseMailbox(mailbox.id);
+        await deps.store.recordMailboxHealthEvent(mailbox.id, "complaint");
+        await deps.store.pauseMailbox(mailbox.id); // a complaint is severe enough to pause regardless of sample
         const lead = await deps.store.findLeadByEmail(accountId, recipient);
         if (lead) await deps.store.cancelPendingSends(lead.id);
         return { handled: true, action: "complaint" };

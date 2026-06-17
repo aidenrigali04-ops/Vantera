@@ -57,6 +57,7 @@ class FakeOutreachStore implements OutreachSendStore {
     status: "active",
   };
   unsubscribeToken = "tok_abc";
+  healthEvents: { mailboxId: string; kind: "sent" | "bounce" | "complaint" }[] = [];
   outreachRecords: {
     accountId: string;
     campaignId: string;
@@ -87,6 +88,9 @@ class FakeOutreachStore implements OutreachSendStore {
   }
   async markSent(sendId: string) {
     this.sent.push(sendId);
+  }
+  async recordMailboxHealthEvent(mailboxId: string, kind: "sent" | "bounce" | "complaint") {
+    this.healthEvents.push({ mailboxId, kind });
   }
   async markFailed(sendId: string, error: string) {
     this.failed.push({ id: sendId, error });
@@ -263,6 +267,8 @@ describe("runOutreachSend — email happy path", () => {
     expect(rec.messageRef).toBeTruthy();
     expect(rec.channel).toBe("email");
     expect(store.campaignLeadStatuses.get("camp1:lead1")).toBe("sent");
+    // WS-C: a successful email send rolls the mailbox's sent counter (health denominator)
+    expect(store.healthEvents).toContainEqual({ mailboxId: "mbx1", kind: "sent" });
   });
 });
 
