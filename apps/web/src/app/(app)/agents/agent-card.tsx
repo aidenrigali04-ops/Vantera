@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useActionState } from "react";
-import { Phone, Settings2 } from "lucide-react";
+import { Phone, Settings2, Zap } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,7 +11,7 @@ import { setAgentStatus, updateSendMode, type AgentActionState } from "./actions
 
 export type AgentRow = {
   id: string;
-  kind: "scout" | "copy" | "caller";
+  kind: "scout" | "copy" | "caller" | "responder";
   name: string;
   status: "draft" | "live" | "paused";
   config: Record<string, unknown> | null;
@@ -90,11 +90,13 @@ export function AgentCard({
             </CardTitle>
           </div>
           <div className="flex items-center gap-1">
-            <Button asChild variant="ghost" size="sm">
-              <Link href={`/agents/${agent.kind}/edit`}>
-                <Settings2 className="size-4" /> Edit config
-              </Link>
-            </Button>
+            {agent.kind !== "responder" && (
+              <Button asChild variant="ghost" size="sm">
+                <Link href={`/agents/${agent.kind}/edit`}>
+                  <Settings2 className="size-4" /> Edit config
+                </Link>
+              </Button>
+            )}
             <form action={action}>
               <input type="hidden" name="agentId" value={agent.id} />
               <input type="hidden" name="status" value={live ? "paused" : "live"} />
@@ -161,6 +163,15 @@ export function AgentCard({
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Phone className="size-3.5 shrink-0" />
             Every call waits in your review queue before it dials out.
+          </div>
+        )}
+        {agent.kind === "responder" && (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Zap className="size-3.5 shrink-0" />
+            Answers qualified inbound leads in minutes —{" "}
+            {(agent.config as { sendMode?: string } | null)?.sendMode === "auto"
+              ? "clean replies send automatically; flagged ones wait for you."
+              : "every reply waits in your review queue."}
           </div>
         )}
         <FormError message={state.error ?? modeState.error} />

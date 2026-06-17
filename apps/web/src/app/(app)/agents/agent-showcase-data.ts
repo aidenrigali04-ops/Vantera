@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 
-export type ShowcaseKind = "scout" | "copy" | "caller";
+export type ShowcaseKind = "scout" | "copy" | "caller" | "responder";
 
 export type ShowcaseStat = { label: string; value: number };
 
@@ -49,6 +49,16 @@ function callerSummary(status: string, personaName: string | null): string {
   if (status === "paused")
     return `Paused. Resume and ${caller} goes right back to calling qualified leads on your schedule.`;
   return `Not deployed yet. Deploy it and every qualified lead gets a personalised call.`;
+}
+
+function responderSummary(status: string, sendMode: "auto" | "review"): string {
+  if (status === "live")
+    return sendMode === "auto"
+      ? "Answering qualified inbound leads in minutes — clean replies send automatically, anything flagged waits in your review queue."
+      : "Answering qualified inbound leads in minutes — every reply waits in your review queue until you approve it.";
+  if (status === "paused")
+    return "Paused. Resume and inbound leads get qualified and answered the moment they arrive again.";
+  return "Not deployed yet. Deploy it and every inbound lead gets qualified and answered fast.";
 }
 
 function icpPhrase(names: string[]): string {
@@ -157,6 +167,31 @@ function toShowcaseAgent(
       sendMode: "review",
       campaignId: row.campaign_id,
       stats: [{ label: "Calls in review", value: counts.drafts }],
+      progress: null,
+    };
+  }
+
+  if (row.kind === "responder") {
+    const sendMode = (config as { sendMode?: unknown }).sendMode === "auto" ? "auto" : "review";
+    const cta = typeof (config as { cta?: unknown }).cta === "string" ? (config as { cta: string }).cta : null;
+    return {
+      id: row.id,
+      kind: "responder",
+      roleLabel: "Responder Agent",
+      name: row.name,
+      status: row.status,
+      summary: responderSummary(row.status, sendMode),
+      icpNames,
+      cadence: null,
+      timezone: row.timezone,
+      nextRunAt: null,
+      lastRunAt: row.last_run_at,
+      deployedAt: row.deployed_at,
+      cta,
+      channels: ["email"],
+      sendMode: sendMode === "auto" ? "automatic" : "review",
+      campaignId: row.campaign_id,
+      stats: [{ label: "Inbound handled", value: counts.drafts }],
       progress: null,
     };
   }

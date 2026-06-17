@@ -196,3 +196,49 @@ export function parseCallerForm(form: FormData): Result<CallerFormValues> {
   };
   return { ok: true, values };
 }
+
+// ─── Responder agent validation (Phase 12 — fast inbound response) ────────────
+
+/** SLA ceiling: a responder must answer fast or it's not a responder. Cap keeps the promise honest. */
+export const RESPONDER_SLA_MAX = 1440; // 24h
+
+export type ResponderFormValues = {
+  name: string;
+  cta: string;
+  sendMode: "auto" | "review";
+  slaMinutes: number;
+  sources: { formFill: boolean; websiteVisitor: boolean; signal: boolean };
+};
+
+export function parseResponderForm(form: FormData): Result<ResponderFormValues> {
+  const name = cleanName(form.get("name"));
+  if (!name) return { ok: false, error: "Give your agent a name (up to 60 characters)." };
+
+  const cta = String(form.get("cta") ?? "").trim();
+  if (cta.length < 3 || cta.length > 200) {
+    return { ok: false, error: "Describe what a reply should lead to (3–200 characters)." };
+  }
+
+  const rawMode = form.get("sendMode");
+  const sendMode = rawMode == null || rawMode === "" ? "review" : String(rawMode);
+  if (sendMode !== "auto" && sendMode !== "review") {
+    return { ok: false, error: "Pick how this agent responds." };
+  }
+
+  const rawSla = form.get("slaMinutes");
+  const slaMinutes = rawSla != null && String(rawSla) !== "" ? parseInt(String(rawSla), 10) : 5;
+  if (isNaN(slaMinutes) || slaMinutes < 1 || slaMinutes > RESPONDER_SLA_MAX) {
+    return { ok: false, error: `Response time must be 1–${RESPONDER_SLA_MAX} minutes.` };
+  }
+
+  const sources = {
+    formFill: form.get("sourceFormFill") === "on",
+    websiteVisitor: form.get("sourceWebsiteVisitor") === "on",
+    signal: form.get("sourceSignal") === "on",
+  };
+  if (!sources.formFill && !sources.websiteVisitor && !sources.signal) {
+    return { ok: false, error: "Enable at least one inbound source." };
+  }
+
+  return { ok: true, values: { name, cta, sendMode, slaMinutes, sources } };
+}

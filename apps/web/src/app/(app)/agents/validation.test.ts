@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseCopyForm, parseScoutForm, parseCallerForm, validateCallerConfig, clampCallingWindow, BRAND_FIELD_MAX, TCPA_EARLIEST, TCPA_LATEST } from "./validation";
+import { parseCopyForm, parseScoutForm, parseCallerForm, parseResponderForm, validateCallerConfig, clampCallingWindow, BRAND_FIELD_MAX, TCPA_EARLIEST, TCPA_LATEST, RESPONDER_SLA_MAX } from "./validation";
 
 function scoutForm(overrides: Record<string, string> = {}): FormData {
   const fd = new FormData();
@@ -157,5 +157,50 @@ describe("validateCallerConfig", () => {
   it("rejects an empty day list", () => {
     const r = validateCallerConfig({ cta: "x", bookingLink: "https://cal.com/x", voice: { voiceId: "v", personaName: "A", language: "en-US" }, recordingConsentMode: "one_party", callingWindow: { days: [], startLocal: "09:00", endLocal: "17:00" }, maxAttempts: 1 });
     expect(r.ok).toBe(false);
+  });
+});
+
+function responderForm(overrides: Record<string, string> = {}): FormData {
+  const fd = new FormData();
+  fd.set("name", "Rey");
+  fd.set("cta", "book a 15-min intro");
+  fd.set("sendMode", "review");
+  fd.set("slaMinutes", "5");
+  fd.set("sourceFormFill", "on");
+  for (const [k, v] of Object.entries(overrides)) fd.set(k, v);
+  return fd;
+}
+
+describe("parseResponderForm", () => {
+  it("parses a valid responder form", () => {
+    expect(parseResponderForm(responderForm())).toEqual({
+      ok: true,
+      values: {
+        name: "Rey",
+        cta: "book a 15-min intro",
+        sendMode: "review",
+        slaMinutes: 5,
+        sources: { formFill: true, websiteVisitor: false, signal: false },
+      },
+    });
+  });
+
+  it("defaults send mode to review and rejects unknown modes", () => {
+    const fd = responderForm();
+    fd.delete("sendMode");
+    expect(parseResponderForm(fd)).toMatchObject({ values: { sendMode: "review" } });
+    expect(parseResponderForm(responderForm({ sendMode: "blast" })).ok).toBe(false);
+  });
+
+  it("requires at least one inbound source", () => {
+    const fd = responderForm();
+    fd.delete("sourceFormFill");
+    expect(parseResponderForm(fd).ok).toBe(false);
+  });
+
+  it("requires a CTA and a sane SLA", () => {
+    expect(parseResponderForm(responderForm({ cta: "go" })).ok).toBe(false);
+    expect(parseResponderForm(responderForm({ slaMinutes: "0" })).ok).toBe(false);
+    expect(parseResponderForm(responderForm({ slaMinutes: String(RESPONDER_SLA_MAX + 1) })).ok).toBe(false);
   });
 });
