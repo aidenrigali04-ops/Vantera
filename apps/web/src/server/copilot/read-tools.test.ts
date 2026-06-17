@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { getDraftQueueSummary, getCampaignStatus, getGoalProgress, getLeadScoreRationale, getBillingStatus, getReturnOnSpend } from "./read-tools";
+import { getDraftQueueSummary, getCampaignStatus, getGoalProgress, getLeadScoreRationale, getBillingStatus, getReturnOnSpend, getResponderStatus } from "./read-tools";
 
 // fake supabase: each query resolves to the canned result for its table
 function fakeDb(rows: Record<string, unknown>) {
@@ -218,5 +218,41 @@ describe("getReturnOnSpend", () => {
     expect(dto.annualSpend).toBeNull();
     expect(dto.pipelineToSpend).toBeNull();
     expect(dto.clearsRenewalBar).toBeNull();
+  });
+});
+
+describe("getResponderStatus", () => {
+  it("returns only the responder summary DTO — no raw rows", async () => {
+    const db = fakeDb({
+      agents: { name: "Echo", status: "live", config: { sendMode: "auto", slaMinutes: 5 } },
+      inbound_leads: [
+        { status: "responded" },
+        { status: "responded" },
+        { status: "review" },
+        { status: "rejected" },
+      ],
+    });
+    const dto = await getResponderStatus(db, "acc1");
+    expect(dto).toEqual({
+      deployed: true,
+      agentName: "Echo",
+      live: true,
+      sendMode: "auto",
+      slaMinutes: 5,
+      inbound: { responded: 2, inReview: 1, rejected: 1, total: 4 },
+    });
+  });
+
+  it("reports not-deployed when there's no responder agent", async () => {
+    const db = fakeDb({ agents: null });
+    const dto = await getResponderStatus(db, "acc1");
+    expect(dto).toEqual({
+      deployed: false,
+      agentName: null,
+      live: false,
+      sendMode: null,
+      slaMinutes: null,
+      inbound: { responded: 0, inReview: 0, rejected: 0, total: 0 },
+    });
   });
 });

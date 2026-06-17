@@ -10,6 +10,7 @@ import {
   getCrmStatus,
   getWarmupStatusForAccount,
   getReturnOnSpend,
+  getResponderStatus,
 } from "./read-tools";
 import { runCampaignSendState } from "./mutate-tools";
 
@@ -75,6 +76,14 @@ export function buildAccountTools(db: SupabaseClient, accountId: string): Copilo
         "Return on spend: the pipeline-to-spend ratio vs the 2x renewal bar, cost per meeting, cost per close, and annual spend. Use for 'is this worth it / what's my ROI / what does a meeting cost me?'.",
       parameters: z.object({}),
       run: async () => getReturnOnSpend(db),
+    },
+    {
+      name: "getResponderStatus",
+      tier: "read",
+      description:
+        "The Inbound Responder agent: whether it's deployed and live, how it responds (auto vs review), its response-time goal, and how many inbound leads it has handled / has in review / rejected. Use for 'is my responder working?' or 'how many inbound leads have we answered?'.",
+      parameters: z.object({}),
+      run: async () => getResponderStatus(db, accountId),
     },
     {
       name: "pauseCampaign",
