@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   CAPACITY_DEFAULTS,
+  NO_CHANNEL_PREVIEW_CAP,
   computeRunTarget,
   dailyOutreachCapacity,
   type OutreachCapacity,
@@ -85,8 +86,20 @@ describe("computeRunTarget", () => {
     expect(computeRunTarget(cap, { ...opts, currentBacklog: 10 })).toBe(0);
   });
 
-  it("dead-zone (no channel can act) → 0", () => {
-    expect(computeRunTarget(base, opts)).toBe(0);
+  it("no channel yet → still sources a bounded preview batch so prospects land", () => {
+    // Q3: prospects pull even before outreach is set up; the dashboard nudges to
+    // connect a channel. Bounded so a no-channel account can't accumulate forever.
+    expect(computeRunTarget(base, opts)).toBe(opts.floor);
+  });
+
+  it("no channel + preview backlog already full → 0 (stops accumulating)", () => {
+    expect(computeRunTarget(base, { ...opts, currentBacklog: NO_CHANNEL_PREVIEW_CAP })).toBe(0);
+  });
+
+  it("no channel, near the preview cap → only tops up to the cap", () => {
+    expect(
+      computeRunTarget(base, { ...opts, currentBacklog: NO_CHANNEL_PREVIEW_CAP - 2 })
+    ).toBe(2);
   });
 
   it("tiny capacity still pulls the floor batch", () => {

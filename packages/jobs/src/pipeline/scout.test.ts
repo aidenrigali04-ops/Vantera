@@ -346,7 +346,10 @@ describe("runScout — capacity throttle", () => {
     expect(store.enriched.length).toBeLessThanOrEqual(7); // spend bounded by the pull
   });
 
-  it("skips discovery entirely in a dead-zone", async () => {
+  it("still sources a bounded preview when no channel is connected, so prospects land", async () => {
+    // No active mailbox/LinkedIn → dead-zone. The Scout no longer no-ops; it sources a
+    // small preview so prospects appear on the dashboard/pipeline while the user connects
+    // a channel (outreach still waits). See capacity.ts NO_CHANNEL_PREVIEW_CAP.
     const pool = [makeCandidate({ externalRef: "good", industry: "saas" })];
     const store = new FakeScoutStore({
       agent: { id: "scout1", accountId: "acc1", status: "live", cadence: "daily", config: { prospectsPerRun: 25, minScore: 70 } },
@@ -364,7 +367,8 @@ describe("runScout — capacity throttle", () => {
 
     const summary = await runScout("scout1", deps);
 
-    expect(summary).toMatchObject({ status: "completed", discovered: 0 });
-    expect(store.enriched.length).toBe(0);
+    expect(summary.status).toBe("completed");
+    expect(summary.discovered).toBe(1); // the one pooled candidate was sourced despite no channel
+    expect(store.enriched.length).toBe(1);
   });
 });
