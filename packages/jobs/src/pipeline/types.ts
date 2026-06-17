@@ -430,6 +430,93 @@ export interface InboundSummary {
   action: string;
 }
 
+// ── inbound responder (Phase 12 — fast inbound response) ──────────────────────
+export interface ResponderConfig {
+  /** auto: send a clean draft immediately (within SLA); review: always queue for approval */
+  sendMode: "auto" | "review";
+  /** response SLA in minutes — speed is the product (the report's defensible inbound edge) */
+  slaMinutes: number;
+  /** which inbound sources this responder accepts */
+  sources: { formFill: boolean; websiteVisitor: boolean; signal: boolean };
+}
+
+export const RESPONDER_DEFAULTS: ResponderConfig = {
+  sendMode: "review",
+  slaMinutes: 5,
+  sources: { formFill: true, websiteVisitor: false, signal: false },
+};
+
+export interface ResponderContext {
+  agent: {
+    id: string;
+    accountId: string;
+    status: string;
+    campaignId: string | null;
+    config: ResponderConfig;
+  };
+  /** drafting context fed to the copy brain (reused from the Outreach agent) */
+  cta: string;
+  accountName: string | null;
+  accountIndustry: string | null;
+  valueProp: string | null;
+}
+
+export interface InboundLeadEvent {
+  accountId: string;
+  agentId: string;
+  source: "form_fill" | "website_visitor" | "signal";
+  email: string | null;
+  firstName: string | null;
+  companyName: string | null;
+  raw?: unknown;
+}
+
+export type InboundFinalStatus = "rejected" | "suppressed" | "responded" | "review" | "error";
+
+export interface InboundRespondJobStore {
+  getResponderContext(agentId: string): Promise<ResponderContext | null>;
+  /** insert the intake/SLA row (status 'received'); returns its id */
+  recordInbound(e: {
+    accountId: string;
+    agentId: string;
+    source: "form_fill" | "website_visitor" | "signal";
+    email: string | null;
+    firstName: string | null;
+    companyName: string | null;
+    payload: unknown;
+  }): Promise<string>;
+  /** rule-11 gate: account + lowercased email lookup against suppression_entries */
+  isSuppressed(accountId: string, kind: "email", value: string): Promise<boolean>;
+  /** create-or-match a leads row (source 'inbound') for the inbound contact; returns the lead id */
+  upsertInboundLeadRow(e: {
+    accountId: string;
+    email: string;
+    firstName: string | null;
+    companyName: string | null;
+  }): Promise<string>;
+  saveScore(leadId: string, insights: LeadInsights, qualified: boolean): Promise<void>;
+  ensureCampaignLead(campaignId: string, leadId: string, accountId: string): Promise<void>;
+  insertScheduledSend(send: NewScheduledSend): Promise<void>;
+  finalizeInbound(
+    inboundId: string,
+    e: { status: InboundFinalStatus; leadId?: string; respondedAt?: Date }
+  ): Promise<void>;
+}
+
+export interface InboundRespondJobDeps {
+  store: InboundRespondJobStore;
+  /** enrich + rules-gate + AI-rank one inbound contact (wrapper composes; tests mock) */
+  qualify: (lead: InboundLeadEvent) => Promise<{ passed: boolean; insights: LeadInsights }>;
+  draftEmailFn: (input: DraftInput) => Promise<EmailDraft>;
+  now?: () => Date;
+}
+
+export interface InboundRespondJobSummary {
+  action: "skipped" | "suppressed" | "rejected" | "review" | "responded";
+  inboundLeadId: string | null;
+  leadId?: string;
+}
+
 export interface CallerConfig {
   cta: string;
   bookingLink: string;

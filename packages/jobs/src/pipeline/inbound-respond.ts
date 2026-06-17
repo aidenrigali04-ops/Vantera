@@ -1,4 +1,11 @@
-import type { Violation } from "@vantera/agent-brains";
+import type { LeadInsights, Violation } from "@vantera/agent-brains";
+import { toStoredInsights } from "@vantera/agent-brains";
+import type {
+  InboundRespondJobDeps,
+  InboundRespondJobSummary,
+  InboundLeadEvent,
+  NewScheduledSend,
+} from "./types";
 
 /**
  * Phase 12 — Inbound Responder core. The report's most defensible use case is fast inbound
@@ -62,4 +69,113 @@ export async function runInboundRespond(
   const action: InboundRespondAction =
     deps.sendMode === "auto" && draft.violations.length === 0 ? "send" : "review";
   return { action, draft };
+}
+
+/**
+ * The persistence orchestrator around the decision core. Loads the responder's context, records
+ * the intake row (SLA tracking), runs runInboundRespond with the real qualify + copy brains, then
+ * persists the outcome: a qualified lead becomes a leads row (source 'inbound') + a scheduled_send
+ * (auto-mode clean draft → 'approved', everything else → 'pending_review'), and the inbound_leads
+ * row is finalized with its responded_at. Pure: all I/O is injected via the store (rule 13).
+ */
+export async function processInboundLead(
+  event: InboundLeadEvent,
+  deps: InboundRespondJobDeps
+): Promise<InboundRespondJobSummary> {
+  const { store } = deps;
+  const now = deps.now ?? (() => new Date());
+
+  const ctx = await store.getResponderContext(event.agentId);
+  if (!ctx || ctx.agent.status !== "live") {
+    return { action: "skipped", inboundLeadId: null };
+  }
+
+  const inboundLeadId = await store.recordInbound({
+    accountId: event.accountId,
+    agentId: event.agentId,
+    source: event.source,
+    email: event.email,
+    firstName: event.firstName,
+    companyName: event.companyName,
+    payload: event.raw ?? {},
+  });
+
+  const email = event.email?.trim().toLowerCase();
+  if (!email) {
+    await store.finalizeInbound(inboundLeadId, { status: "error" });
+    return { action: "skipped", inboundLeadId };
+  }
+
+  // Capture the rank insights from the qualify step so we can persist the score + ground the draft.
+  let insights: LeadInsights | null = null;
+  const decision = await runInboundRespond(
+    {
+      accountId: event.accountId,
+      source: event.source,
+      email,
+      firstName: event.firstName,
+      companyName: event.companyName,
+    },
+    {
+      sendMode: ctx.agent.config.sendMode,
+      isSuppressed: (accountId, kind, value) => store.isSuppressed(accountId, kind, value),
+      qualify: async () => {
+        const q = await deps.qualify(event);
+        insights = q.insights;
+        return { passed: q.passed, score: q.insights.score };
+      },
+      draft: async () => {
+        const d = await deps.draftEmailFn({
+          lead: { firstName: event.firstName, companyName: event.companyName },
+          insights: toStoredInsights(insights!),
+          context: {
+            cta: ctx.cta,
+            accountName: ctx.accountName,
+            accountIndustry: ctx.accountIndustry,
+            valueProp: ctx.valueProp,
+          },
+        });
+        return { subject: d.subject, body: d.body, violations: d.violations };
+      },
+    }
+  );
+
+  if (decision.action === "suppressed") {
+    await store.finalizeInbound(inboundLeadId, { status: "suppressed" });
+    return { action: "suppressed", inboundLeadId };
+  }
+  if (decision.action === "rejected") {
+    await store.finalizeInbound(inboundLeadId, { status: "rejected" });
+    return { action: "rejected", inboundLeadId };
+  }
+
+  // review or send: qualified → persist the lead, score, and the drafted reply.
+  const leadId = await store.upsertInboundLeadRow({
+    accountId: event.accountId,
+    email,
+    firstName: event.firstName,
+    companyName: event.companyName,
+  });
+  if (insights) await store.saveScore(leadId, insights, true);
+  if (ctx.agent.campaignId) {
+    await store.ensureCampaignLead(ctx.agent.campaignId, leadId, event.accountId);
+  }
+
+  const draft = decision.draft!;
+  const send: NewScheduledSend = {
+    accountId: event.accountId,
+    campaignId: ctx.agent.campaignId ?? "",
+    leadId,
+    channel: "email",
+    subject: draft.subject ?? null,
+    body: draft.body,
+    status: decision.action === "send" ? "approved" : "pending_review",
+    linkedinStage: null,
+    styleFlags: draft.violations.length ? JSON.stringify(draft.violations) : null,
+  };
+  await store.insertScheduledSend(send);
+
+  const status = decision.action === "send" ? "responded" : "review";
+  await store.finalizeInbound(inboundLeadId, { status, leadId, respondedAt: now() });
+  return { action: status, inboundLeadId, leadId };
 }
