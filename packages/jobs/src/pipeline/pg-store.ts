@@ -2,6 +2,7 @@ import { and, count, desc, eq, gte, inArray, isNull, lt, lte, or, sql } from "dr
 import { encryptSecretWithKeyring, decryptSecretWithKeyring } from "@vantera/email-infra";
 import {
   accounts,
+  adCampaigns,
   agentAssets,
   agentIcps,
   agents,
@@ -54,6 +55,7 @@ import {
   type ResponderConfig,
   type ResponderContext,
   RESPONDER_DEFAULTS,
+  type AdInboundStore,
   type LeadChannels,
   type MailboxSmtpStore,
   type NewScheduledSend,
@@ -1907,6 +1909,68 @@ export function createInboundRespondStore(db: Db): InboundRespondJobStore {
           ...(e.respondedAt ? { respondedAt: e.respondedAt } : {}),
         })
         .where(eq(inboundLeads.id, inboundId));
+    },
+  };
+}
+
+// ── AdInboundStore (Phase 11 — ad-lead ingestion → nurture) ──────────────────────
+
+export function createAdInboundStore(db: Db): AdInboundStore {
+  return {
+    async getAdCampaignByRef(campaignRef: string) {
+      const [row] = await db
+        .select({ id: adCampaigns.id, accountId: adCampaigns.accountId, campaignId: adCampaigns.campaignId })
+        .from(adCampaigns)
+        .where(eq(adCampaigns.campaignRef, campaignRef))
+        .limit(1);
+      if (!row) return null;
+      return { adCampaignId: row.id, accountId: row.accountId, campaignId: row.campaignId };
+    },
+
+    async isSuppressed(accountId: string, kind: "email", value: string): Promise<boolean> {
+      const [hit] = await db
+        .select({ id: suppressionEntries.id })
+        .from(suppressionEntries)
+        .where(
+          and(
+            eq(suppressionEntries.accountId, accountId),
+            eq(suppressionEntries.kind, kind),
+            eq(suppressionEntries.value, value)
+          )
+        )
+        .limit(1);
+      return Boolean(hit);
+    },
+
+    async upsertAdLead(e): Promise<string> {
+      const [existing] = await db
+        .select({ id: leads.id })
+        .from(leads)
+        .where(and(eq(leads.accountId, e.accountId), eq(leads.email, e.email)))
+        .limit(1);
+      if (existing) return existing.id;
+      const [row] = await db
+        .insert(leads)
+        .values({
+          accountId: e.accountId,
+          source: "ad",
+          email: e.email,
+          firstName: e.firstName,
+          companyName: e.companyName,
+          // opted-in ad leads enter qualified; setLeadInCampaign flips them to in_campaign for nurture
+          status: "qualified",
+        })
+        .returning({ id: leads.id });
+      if (!row) throw new Error("ad lead insert returned no row");
+      return row.id;
+    },
+
+    async ensureCampaignLead(campaignId: string, leadId: string, accountId: string): Promise<void> {
+      await db.insert(campaignLeads).values({ campaignId, leadId, accountId }).onConflictDoNothing();
+    },
+
+    async setLeadInCampaign(leadId: string): Promise<void> {
+      await db.update(leads).set({ status: "in_campaign" }).where(eq(leads.id, leadId));
     },
   };
 }

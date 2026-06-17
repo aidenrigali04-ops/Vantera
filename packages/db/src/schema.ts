@@ -167,7 +167,7 @@ export const leads = pgTable(
       .notNull()
       .references(() => accounts.id, { onDelete: "cascade" }),
     icpId: uuid("icp_id").references(() => icps.id, { onDelete: "set null" }),
-    source: text("source", { enum: ["discovery", "manual", "import", "inbound"] })
+    source: text("source", { enum: ["discovery", "manual", "import", "inbound", "ad"] })
       .notNull()
       .default("discovery"),
     externalRef: text("external_ref"),
@@ -683,6 +683,58 @@ export const inboundIntakeSecrets = pgTable(
   (t) => [
     uniqueIndex("inbound_intake_secrets_agent_unique").on(t.agentId),
     uniqueIndex("inbound_intake_secrets_intake_idx").on(t.intakeId),
+  ]
+);
+
+// ── 0030 meta ads + nurturing ────────────────────────────────────────────────
+
+export const adCampaigns = pgTable(
+  "ad_campaigns",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    offer: text("offer").notNull(),
+    targetIcp: text("target_icp").notNull(),
+    cta: text("cta").notNull(),
+    status: text("status", { enum: ["draft", "published", "paused", "archived"] })
+      .notNull()
+      .default("draft"),
+    dailyBudgetCents: bigint("daily_budget_cents", { mode: "number" }),
+    leadFormId: text("lead_form_id"),
+    providerCampaignId: text("provider_campaign_id"),
+    campaignRef: uuid("campaign_ref").notNull().defaultRandom(),
+    campaignId: uuid("campaign_id").references(() => campaigns.id, { onDelete: "set null" }),
+    createdBy: uuid("created_by"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("ad_campaigns_account_idx").on(t.accountId), uniqueIndex("ad_campaigns_ref_idx").on(t.campaignRef)]
+);
+
+export const adCreatives = pgTable(
+  "ad_creatives",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    adCampaignId: uuid("ad_campaign_id").notNull(),
+    headline: text("headline").notNull(),
+    primaryText: text("primary_text").notNull(),
+    description: text("description"),
+    cta: text("cta").notNull(),
+    creativePrompt: text("creative_prompt").notNull(),
+    creativeUrl: text("creative_url"),
+    styleFlags: text("style_flags"),
+    status: text("status", { enum: ["draft", "selected", "published"] }).notNull().default("draft"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("ad_creatives_campaign_idx").on(t.adCampaignId),
+    index("ad_creatives_account_idx").on(t.accountId),
   ]
 );
 

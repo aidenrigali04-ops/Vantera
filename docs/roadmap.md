@@ -67,10 +67,10 @@ Each entry stays short — the detail lives in that phase's spec (`docs/superpow
   Status (2026-06-16): **hardened + brief-brain upgrade merged** (`9d6ab30`) — graceful `no_caller_number` skip when `VOICE_FROM_NUMBER` unset, `placeCall` failure → `revertToApproved` (no stuck sends); brief gained `value_angle`/`consequence_hook`/`aha_moment` with a Hormozi/NEPQ method + baked-in anti-invention; `booked` outcome now stamps `meeting_booked_at` (WS-A); brief grounding guardrail flags fabricated metrics (WS-F). Operational gaps remain (Retell creds + webhook + `trigger deploy`).
   Depends on: Phase 3 (phone validation), Phase 4 (scheduler). Key rules: 01, 05, 11.
 
-- [ ] **Phase 11 — Meta Ads + nurturing**
+- [x] **Phase 11 — Meta Ads + nurturing** *(built 2026-06-16)*
   Goal: users generate Meta ads on-platform feeding the nurture channel (rule 01 key initiative).
-  Scope: ad generation via Claude (copy) + Higgsfield (creative); campaign nurturing flows for ad-sourced leads; Meta account connection.
-  Depends on: Phase 8 (analytics to measure it). Key rules: 01, 02.
+  Shipped: the ad-concept brain (`agent-brains/src/ads` — grounded copy + creative-prompt variants via Claude, same anti-hallucination guardrail as the copy/caller brains); the white-labeled `@vantera/ads-infra` package (Meta behind the interface: in-memory fake + adapter with timing-safe webhook verify + leadgen parsing); migration `0030` (`ad_campaigns` + `ad_creatives` + `leads.source 'ad'` + `webhook_events 'ads'`, RLS + guardrails); the `runAdInbound` ingestion pipeline (resolve campaign by ref → suppression → record source 'ad' → **enroll into the existing nurture/sequence engine**) + signed `/api/webhooks/ads` route + `ads-inbound` trigger; the `/ads` surface (generate concepts via a server action → persist grounded creatives with style flags; list + per-campaign view) + Megaphone nav; `ads.md` help article + `getAdsStatus` copilot tool. Full gate green; white-label scan clean.
+  Operational remainder (owner): connect the ad account (`ADS_ACCESS_TOKEN`/`ADS_AD_ACCOUNT_ID`/`ADS_APP_SECRET`/`ADS_VERIFY_TOKEN`); **publish-to-Meta** flow (campaign→ad set→creative→ad) in the adapter; **creative generation** (Higgsfield) behind a `creative-infra` interface to fill `creative_url` from the stored creative prompt; apply `0030` to the DB. Key rules: 01, 02, 13.
 
 - [x] **Phase 12 — Inbound Responder agent** *(built 2026-06-16 from the AI-SDR market-report plan, WS-H; the report's most defensible "what works" use case)*
   Goal: sub-5-minute inbound lead response, reusing the existing qualify + copy + send engine rather than net-new infra. Puts Vantera on the one part of the category that's genuinely winning.

@@ -252,6 +252,23 @@ describe("inbound responder (0029)", () => {
   });
 });
 
+describe("meta ads (0030)", () => {
+  const sql = readFileSync(join(migrationsDir, "0030_meta_ads.sql"), "utf8");
+
+  it("0030 adds 'ad' to the leads source set and 'ads' to the webhook source set", () => {
+    expect(sql).toMatch(/source in \('discovery', 'manual', 'import', 'inbound', 'ad'\)/i);
+    expect(sql).toMatch(/source in \('email', 'linkedin', 'stripe', 'voice', 'imessage', 'inbound', 'ads'\)/i);
+  });
+
+  it("0030 protects ad tables with member-select + admin-manage policies (rule 02)", () => {
+    for (const table of ["ad_campaigns", "ad_creatives"]) {
+      expect(sql).toMatch(new RegExp(`alter table public\\.${table} enable row level security`, "i"));
+      expect(sql).toMatch(new RegExp(`create policy ${table}_select on public\\.${table}\\s+for select`, "i"));
+      expect(sql).toMatch(new RegExp(`create policy ${table}_manage on public\\.${table}\\s+for all`, "i"));
+    }
+  });
+});
+
 describe("column-grant lockdown (0026 — crm_connections tokens)", () => {
   const sql = readFileSync(join(migrationsDir, "0026_crm_token_column_lockdown.sql"), "utf8");
 
