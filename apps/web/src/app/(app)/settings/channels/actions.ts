@@ -197,7 +197,11 @@ export async function createLinkedInConnectLink(): Promise<{ url?: string; error
     const redirects = buildConnectRedirects(process.env.APP_URL ?? "http://localhost:3000");
     const { url } = await createLinkedInInfraFromEnv().createHostedAuthLink(account.id, redirects);
     return { url };
-  } catch {
+  } catch (err) {
+    // Surface the underlying provider error to runtime logs — the user-facing
+    // message stays generic, but a bare catch here previously made connect
+    // failures undiagnosable (no log line reached Vercel).
+    console.error("createLinkedInConnectLink failed:", err);
     return { error: "Could not generate a connection link. Try again shortly." };
   }
 }
