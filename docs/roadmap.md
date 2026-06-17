@@ -69,6 +69,11 @@ Each entry stays short — the detail lives in that phase's spec (`docs/superpow
   Scope: ad generation via Claude (copy) + Higgsfield (creative); campaign nurturing flows for ad-sourced leads; Meta account connection.
   Depends on: Phase 8 (analytics to measure it). Key rules: 01, 02.
 
+- [ ] **Phase 12 — Inbound Responder agent** *(queued 2026-06-16 from the AI-SDR market-report plan, WS-H; recommended ahead of Phase 11)*
+  Goal: the report's most defensible "what works" use case — sub-5-minute inbound lead response, reusing the existing qualify + copy + send engine rather than net-new infra. Puts Vantera on the one part of the category that's genuinely winning.
+  Scope (new agent kind `responder`, six-piece skeleton, rule 13): migration extending `agents.kind` + a new `inbound_leads` table with **RLS + guardrail test in the same migration** (rule 02); **signature-verified** inbound webhook route(s) for form-fills / site-visitors / inbound signals routed through a shared inbound-lead handler (distinct from the reply handler); `inbound-respond` pipeline core (rules-gate + AI rank qualify → copy-brain draft → auto-send within an SLA *or* drop to review; **suppression checked at the boundary + test**, rule 11); responder setup wizard + `/agents` card + actions/validation; help article + copilot tool; `whitelabel-auditor` + `rls-auditor`. Speed is the product — minimize intake→first-touch latency.
+  Depends on: Phase 3 (qualification), Phase 5 (live send). Key rules: 02, 06, 08, 11, 13. Build via `/next-phase` (brainstorm → spec → plan → TDD).
+
 ---
 
 ## Continuous tracks (no single phase)
