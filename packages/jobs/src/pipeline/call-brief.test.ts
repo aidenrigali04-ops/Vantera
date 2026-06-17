@@ -40,7 +40,7 @@ function deps(over: Partial<CallBriefDeps["store"]> = {}): CallBriefDeps {
     store,
     draftBriefFn: vi.fn(async () => ({
       openingLine: "Hi Sam", talkingPoints: [], objectionHandling: [],
-      goalStatement: "book", bookingLink: "https://cal.com/x",
+      goalStatement: "book", bookingLink: "https://cal.com/x", violations: [],
     })),
   };
 }
