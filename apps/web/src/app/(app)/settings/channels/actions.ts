@@ -198,15 +198,10 @@ export async function createLinkedInConnectLink(): Promise<{ url?: string; error
     const { url } = await createLinkedInInfraFromEnv().createHostedAuthLink(account.id, redirects);
     return { url };
   } catch (err) {
-    const detail = err instanceof Error ? err.message : String(err);
-    const status = detail.match(/provider error (\d+)/)?.[1] ?? "NONE";
-    // Short, truncation-proof tokens so the status + env fingerprint survive the log table.
-    console.error(`LICONNECT_STATUS_${status}`, detail.slice(0, 240));
-    console.error(
-      "LICONNECT_ENV",
-      `dsn=${process.env.UNIPILE_DSN} keylen=${(process.env.UNIPILE_API_KEY ?? "").length} keypfx=${(process.env.UNIPILE_API_KEY ?? "").slice(0, 8)} appUrl=${process.env.APP_URL} hosted=${process.env.HOSTED_AUTH_DOMAIN}`
-    );
-    // TEMP diagnostic during launch debugging — revert to the generic message once root cause is found.
-    return { error: `Could not generate a connection link. [diag: ${detail}]` };
+    // Surface the underlying provider error to runtime logs — the user-facing
+    // message stays generic, but a bare catch here previously made connect
+    // failures undiagnosable (no log line reached Vercel).
+    console.error("createLinkedInConnectLink failed:", err);
+    return { error: "Could not generate a connection link. Try again shortly." };
   }
 }
