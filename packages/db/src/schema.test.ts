@@ -113,7 +113,7 @@ describe("suppression list (rule 11 — the master gate)", () => {
 });
 
 describe("retention windows (rule 11)", () => {
-  it.each(["leads", "enrichment_results", "scheduled_sends", "replies"])(
+  it.each(["leads", "enrichment_results", "scheduled_sends", "replies", "inbound_leads"])(
     "%s states its retention window",
     (table) => {
       expect(allMigrations).toContain(`retention(${table})`);
@@ -122,7 +122,7 @@ describe("retention windows (rule 11)", () => {
 });
 
 describe("service-role-only write surfaces (rules 09/11)", () => {
-  it.each(["outreach_sends", "copilot_actions", "enrichment_results", "replies", "unsubscribe_tokens", "conversion_tokens", "copilot_conversations", "copilot_messages", "calls", "security_events"])(
+  it.each(["outreach_sends", "copilot_actions", "enrichment_results", "replies", "unsubscribe_tokens", "conversion_tokens", "copilot_conversations", "copilot_messages", "calls", "security_events", "inbound_leads"])(
     "%s has no client write policies",
     (table) => {
     const policyRe = new RegExp(`create policy \\w+ on public\\.${table}\\s+for (insert|update|delete|all)`);
@@ -231,6 +231,24 @@ describe("column-grant lockdown (0025)", () => {
     const grant = sql.match(/GRANT UPDATE \(([\s\S]*?)\) ON public\.leads/i);
     expect(grant, "expected a column-scoped leads UPDATE grant").toBeTruthy();
     expect(grant![1]).not.toMatch(/linkedin_connected_at/);
+  });
+});
+
+describe("inbound responder (0029)", () => {
+  const sql = readFileSync(join(migrationsDir, "0029_inbound_responder.sql"), "utf8");
+
+  it("0029 adds 'responder' to the agent kind set", () => {
+    expect(sql).toMatch(/kind in \('scout', 'copy', 'caller', 'responder'\)/i);
+  });
+
+  it("0029 adds 'inbound' to the webhook source and leads source sets", () => {
+    expect(sql).toMatch(/source in \('email', 'linkedin', 'stripe', 'voice', 'imessage', 'inbound'\)/i);
+    expect(sql).toMatch(/source in \('discovery', 'manual', 'import', 'inbound'\)/i);
+  });
+
+  it("0029 keeps the intake secret store service-role only (RLS on, no policies)", () => {
+    expect(sql).toMatch(/alter table public\.inbound_intake_secrets enable row level security/i);
+    expect(sql).not.toMatch(/create policy\s+\w+\s+on public\.inbound_intake_secrets/i);
   });
 });
 

@@ -167,7 +167,7 @@ export const leads = pgTable(
       .notNull()
       .references(() => accounts.id, { onDelete: "cascade" }),
     icpId: uuid("icp_id").references(() => icps.id, { onDelete: "set null" }),
-    source: text("source", { enum: ["discovery", "manual", "import"] })
+    source: text("source", { enum: ["discovery", "manual", "import", "inbound"] })
       .notNull()
       .default("discovery"),
     externalRef: text("external_ref"),
@@ -562,7 +562,7 @@ export const agents = pgTable(
     accountId: uuid("account_id")
       .notNull()
       .references(() => accounts.id, { onDelete: "cascade" }),
-    kind: text("kind", { enum: ["scout", "copy", "caller"] }).notNull(),
+    kind: text("kind", { enum: ["scout", "copy", "caller", "responder"] }).notNull(),
     name: text("name").notNull(),
     status: text("status", { enum: ["draft", "live", "paused"] }).notNull().default("draft"),
     // scout: {prospects_per_run, min_score}; copy: {cta, channels: {linkedin, email}}
@@ -629,6 +629,61 @@ export const agentAssets = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("agent_assets_agent_idx").on(t.agentId), index("agent_assets_account_idx").on(t.accountId)]
+);
+
+// ── 0029 inbound responder ───────────────────────────────────────────────────
+
+// Intake log + SLA tracker for the Responder agent: one row per inbound lead event.
+// Writes via the service-role intake pipeline only (no client write policy).
+export const inboundLeads = pgTable(
+  "inbound_leads",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    agentId: uuid("agent_id").notNull(),
+    leadId: uuid("lead_id"),
+    source: text("source", { enum: ["form_fill", "website_visitor", "signal"] }).notNull(),
+    email: text("email"),
+    firstName: text("first_name"),
+    companyName: text("company_name"),
+    payload: jsonb("payload").notNull().default({}),
+    status: text("status", {
+      enum: ["received", "qualified", "rejected", "suppressed", "responded", "review", "error"],
+    })
+      .notNull()
+      .default("received"),
+    // SLA measurement (speed is the product): received_at → responded_at
+    receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),
+    respondedAt: timestamp("responded_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("inbound_leads_account_status_idx").on(t.accountId, t.status),
+    index("inbound_leads_agent_idx").on(t.agentId),
+    index("inbound_leads_lead_idx").on(t.leadId),
+  ]
+);
+
+// Signing secret for the inbound intake webhook. Service-role only — RLS on, NO policies
+// (FKs to auth not modeled here; secret_enc is encrypted at rest, never client-readable).
+export const inboundIntakeSecrets = pgTable(
+  "inbound_intake_secrets",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    agentId: uuid("agent_id").notNull(),
+    intakeId: uuid("intake_id").notNull(),
+    secretEnc: text("secret_enc").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("inbound_intake_secrets_agent_unique").on(t.agentId),
+    uniqueIndex("inbound_intake_secrets_intake_idx").on(t.intakeId),
+  ]
 );
 
 // ── 0005 copilot ─────────────────────────────────────────────────────────────
