@@ -9,6 +9,7 @@ import {
   getBillingStatus,
   getCrmStatus,
   getWarmupStatusForAccount,
+  getReturnOnSpend,
 } from "./read-tools";
 import { runCampaignSendState } from "./mutate-tools";
 
@@ -66,6 +67,14 @@ export function buildAccountTools(db: SupabaseClient, accountId: string): Copilo
         "Current email warm-up phase (warming vs. ready), estimated days until email outreach can start, and which channels are live now. Use to answer questions like 'when does my email start?' or 'why aren't emails going out yet?'.",
       parameters: z.object({}),
       run: async () => getWarmupStatusForAccount(db, accountId),
+    },
+    {
+      name: "getReturnOnSpend",
+      tier: "read",
+      description:
+        "Return on spend: the pipeline-to-spend ratio vs the 2x renewal bar, cost per meeting, cost per close, and annual spend. Use for 'is this worth it / what's my ROI / what does a meeting cost me?'.",
+      parameters: z.object({}),
+      run: async () => getReturnOnSpend(db),
     },
     {
       name: "pauseCampaign",

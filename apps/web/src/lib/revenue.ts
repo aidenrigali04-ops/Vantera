@@ -155,3 +155,98 @@ export function computeRevenueSnapshot(input: {
     projectedPctOfGoal: pct(closedCents + expectedCents),
   };
 }
+
+// ── Funnel & ROI (WS-A) ──────────────────────────────────────────────────────
+// The category's #1 churn driver is a CFO killing the budget when attributable
+// pipeline comes in under ~2× spend. These pure functions turn lead-lifecycle
+// counts + the account's plan price into the funnel and the spend ratio a CFO
+// would ask for. Spend is the plan price (what the customer pays Vantera), passed
+// in by the caller — never COGS.
+
+/** Lead-lifecycle counts that form the revenue funnel, in stage order. */
+export type FunnelCounts = {
+  /** passed the quality gate */
+  qualified: number;
+  /** entered outreach (in_campaign or beyond) */
+  contacted: number;
+  /** replied (replied or beyond) */
+  replied: number;
+  /** a meeting was booked (leads.meeting_booked_at) */
+  meetings: number;
+  /** closed-won (status='converted') */
+  closed: number;
+};
+
+export type FunnelStage = {
+  key: keyof FunnelCounts;
+  label: string;
+  count: number;
+  /** % of the previous stage that reached this one; null for the first stage or an empty predecessor */
+  conversionPct: number | null;
+};
+
+const FUNNEL_ORDER: readonly { key: keyof FunnelCounts; label: string }[] = [
+  { key: "qualified", label: "Qualified" },
+  { key: "contacted", label: "Contacted" },
+  { key: "replied", label: "Replied" },
+  { key: "meetings", label: "Meetings" },
+  { key: "closed", label: "Closed" },
+];
+
+/** Ordered funnel with stage-to-stage conversion. Pure; never divides by zero. */
+export function computeFunnel(counts: FunnelCounts): FunnelStage[] {
+  return FUNNEL_ORDER.map((stage, i) => {
+    const count = counts[stage.key];
+    const prev = i === 0 ? null : counts[FUNNEL_ORDER[i - 1]!.key];
+    const conversionPct = prev && prev > 0 ? Math.round((count / prev) * 100) : null;
+    return { key: stage.key, label: stage.label, count, conversionPct };
+  });
+}
+
+export type RoiInput = {
+  /** closed-won revenue (converted clients × value) */
+  closedCents: number;
+  /** stage-weighted expected pipeline (computeRevenueSnapshot.expectedCents) */
+  pipelineCents: number;
+  /** the account's plan price per month; null when not on a paid plan */
+  planMonthlyCents: number | null;
+  meetings: number;
+  closes: number;
+};
+
+export type Roi = {
+  hasSpend: boolean;
+  monthlySpendCents: number;
+  annualSpendCents: number;
+  /** (closed + expected pipeline) ÷ annual spend, to 1 dp; null without spend */
+  pipelineToSpend: number | null;
+  /** the report's renewal bar: pipeline should clear 2× annual spend */
+  meetsThreshold: boolean | null;
+  /** monthly spend per booked meeting; null without spend or meetings */
+  costPerMeetingCents: number | null;
+  /** monthly spend per closed deal; null without spend or closes */
+  costPerCloseCents: number | null;
+};
+
+/** The CFO view: annual pipeline-to-spend ratio (vs the 2× bar) and cost per meeting/close. */
+export function computeRoi(input: RoiInput): Roi {
+  const { closedCents, pipelineCents, planMonthlyCents, meetings, closes } = input;
+  const hasSpend = planMonthlyCents != null && planMonthlyCents > 0;
+  const monthlySpendCents = hasSpend ? planMonthlyCents! : 0;
+  const annualSpendCents = monthlySpendCents * 12;
+
+  const pipelineToSpend =
+    annualSpendCents > 0
+      ? Math.round(((closedCents + pipelineCents) / annualSpendCents) * 10) / 10
+      : null;
+
+  return {
+    hasSpend,
+    monthlySpendCents,
+    annualSpendCents,
+    pipelineToSpend,
+    meetsThreshold: pipelineToSpend == null ? null : pipelineToSpend >= 2,
+    costPerMeetingCents: hasSpend && meetings > 0 ? Math.round(monthlySpendCents / meetings) : null,
+    costPerCloseCents: hasSpend && closes > 0 ? Math.round(monthlySpendCents / closes) : null,
+  };
+}

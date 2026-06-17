@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { getDraftQueueSummary, getCampaignStatus, getGoalProgress, getLeadScoreRationale, getBillingStatus } from "./read-tools";
+import { getDraftQueueSummary, getCampaignStatus, getGoalProgress, getLeadScoreRationale, getBillingStatus, getReturnOnSpend } from "./read-tools";
 
 // fake supabase: each query resolves to the canned result for its table
 function fakeDb(rows: Record<string, unknown>) {
@@ -12,6 +12,7 @@ function fakeDb(rows: Record<string, unknown>) {
         select: () => builder,
         eq: () => builder,
         in: () => builder,
+        not: () => builder,
         limit: () => builder,
         order: () => builder,
         ilike: () => builder,
@@ -178,5 +179,44 @@ describe("getBillingStatus", () => {
     expect(dto.campaigns.used).toBe(0);
     expect(dto.seats.max).toBe(0);
     expect(dto.campaigns.max).toBe(0);
+  });
+});
+
+describe("getReturnOnSpend", () => {
+  it("returns only the ROI DTO keys — no raw rows", async () => {
+    // deal value set + a paid plan; no leads → all counts 0
+    const db = fakeDb({
+      accounts: { avg_deal_value_cents: 500_000, revenue_goal_cents: 2_000_000, plan: "growth" },
+      leads: [],
+    });
+    const dto = await getReturnOnSpend(db);
+    expect(Object.keys(dto).sort()).toEqual([
+      "annualSpend",
+      "clearsRenewalBar",
+      "costPerClose",
+      "costPerMeeting",
+      "hasValue",
+      "onPaidPlan",
+      "pipelineToSpend",
+    ]);
+    // dollars, not cents (rule 09: the copilot speaks real numbers); Growth = $349/mo → $4,188/yr
+    expect(dto.annualSpend).toBe(4188);
+    expect(dto.onPaidPlan).toBe(true);
+    expect(dto.hasValue).toBe(true);
+    // no meetings/closes yet → cost-per-* null, not a fabricated 0
+    expect(dto.costPerMeeting).toBeNull();
+    expect(dto.costPerClose).toBeNull();
+  });
+
+  it("nulls spend figures when not on a paid plan", async () => {
+    const db = fakeDb({
+      accounts: { avg_deal_value_cents: 500_000, revenue_goal_cents: null, plan: "none" },
+      leads: [],
+    });
+    const dto = await getReturnOnSpend(db);
+    expect(dto.onPaidPlan).toBe(false);
+    expect(dto.annualSpend).toBeNull();
+    expect(dto.pipelineToSpend).toBeNull();
+    expect(dto.clearsRenewalBar).toBeNull();
   });
 });
