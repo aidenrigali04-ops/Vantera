@@ -17,14 +17,17 @@ interface Props {
   addons: AddonCard[];
   currentTier: PlanTier | "none";
   hasActivePlan: boolean;
+  /** Account's average deal value (USD) → honest per-card payback line; null when unset. */
+  dealValueUsd?: number | null;
 }
 
-export function PricingPlans({ plans, addons, currentTier, hasActivePlan }: Props) {
+export function PricingPlans({ plans, addons, currentTier, hasActivePlan, dealValueUsd }: Props) {
   return (
     <PricingGrid
       plans={plans}
       addons={addons}
       currentTier={currentTier}
+      dealValueUsd={dealValueUsd}
       title="Choose the plan that matches your goal"
       subtitle="Every plan runs the same SDR agents on your ICP. Move up as you add channels, seats, and volume — your enrichment and scoring never change."
       enterpriseCta={

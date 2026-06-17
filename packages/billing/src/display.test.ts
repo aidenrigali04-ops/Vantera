@@ -1,6 +1,22 @@
 import { describe, expect, it } from "vitest";
 import { PLANS } from "./plans";
-import { PLAN_DISPLAY, PLAN_DISPLAY_ORDER } from "./display";
+import { PLAN_DISPLAY, PLAN_DISPLAY_ORDER, breakEvenCloses } from "./display";
+
+describe("breakEvenCloses", () => {
+  it("returns closed deals needed to cover a year at monthly billing", () => {
+    expect(breakEvenCloses(349, 5000, "month")).toBe(1); // $4,188/yr ÷ $5k → 1
+    expect(breakEvenCloses(349, 1000, "month")).toBe(5); // $4,188/yr ÷ $1k → 5
+  });
+
+  it("needs fewer closes on annual billing (two months free)", () => {
+    expect(breakEvenCloses(349, 1000, "year")).toBe(4); // $3,490/yr ÷ $1k → 4
+  });
+
+  it("returns null without a positive deal value (no fabricated payback)", () => {
+    expect(breakEvenCloses(349, 0, "month")).toBeNull();
+    expect(breakEvenCloses(349, -100, "month")).toBeNull();
+  });
+});
 
 describe("plan display", () => {
   it("exposes exactly one center-stage plan", () => {

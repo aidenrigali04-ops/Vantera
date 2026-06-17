@@ -144,6 +144,7 @@ export default async function BillingPage({
         addons={ADDON_DISPLAY.map((a) => ({ key: a.key, label: a.label, blurb: a.blurb }))}
         currentTier={currentTier}
         hasActivePlan={hasPaidSubscription}
+        dealValueUsd={account.avg_deal_value_cents ? account.avg_deal_value_cents / 100 : null}
       />
     </div>
   );
