@@ -47,12 +47,24 @@ rounded-2xl border shadow-lg
 
 ## Accent
 
-**Strict monochrome right now.** Decorative fills/dots/bars use white → `#d4d4d4`
-(`WARM`/`WARM_GRADIENT` in `components/landing/landing-theme.ts`, currently all
-white). The warm sunset (`#FFCC1A → #FF730D → #EB291C`) is parked; restore it in
-that one file to bring brand color back across landing + dashboard at once. Charts
-use `rgba(255,255,255,0.08)` for muted series and the white gradient for the
-highlighted series.
+**One reserved gold, monochrome everything else (2026-06-15).** The brand accent is
+a single gold-leaning amber, `--brand: #f5c518` (`--brand-foreground` near-black for
+text on it), defined in `globals.css` and exposed as Tailwind `bg-brand` /
+`text-brand-foreground` / `shadow-brand`. It is **reserved for the signup/commit
+action only** — the `Get started`/`Get started free` CTAs in nav, hero, the gated
+payoff, and the final CTA — plus a faint gold pool behind the closing CTA
+(`color-mix(var(--brand) 12%)`). This is the isolation/von-Restorff lever: gold is
+the *only* hue on the page, so the eye goes straight to the conversion action.
+Rationale: chosen over switching the landing to a light theme — dark stays (it sells
+the interactive demo + matches the AI-tooling category); the conversion lever is a
+reserved accent, not the theme.
+
+**Everything decorative stays monochrome.** Dots/bars/glows still use white → `#d4d4d4`
+(`WARM`/`WARM_GRADIENT` in `components/landing/landing-theme.ts`, still all white) —
+deliberately *not* goldened, to keep gold exclusive to the commit action. The full
+warm sunset (`#FFCC1A → #FF730D → #EB291C`) remains parked in that file. Charts use
+`rgba(255,255,255,0.08)` for muted series and the white gradient for the highlighted
+series.
 
 ## Motion
 

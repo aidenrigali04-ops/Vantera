@@ -84,7 +84,7 @@ export function Hero() {
           <div className="mt-7 flex flex-col items-center gap-2">
             <Link
               href="/signup"
-              className="rounded-[18px] bg-foreground px-6 py-2.5 text-[17.5px] font-medium text-background transition-opacity hover:opacity-90"
+              className="rounded-[18px] bg-brand px-6 py-2.5 text-[17.5px] font-medium text-brand-foreground shadow-lg shadow-brand/20 transition-opacity hover:opacity-90"
             >
               Get started free
             </Link>
