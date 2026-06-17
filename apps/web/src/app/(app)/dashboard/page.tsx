@@ -190,6 +190,7 @@ export default async function DashboardPage() {
 
   const agentRowsRaw = agents ?? [];
   const scout = agentRowsRaw.find((a) => a.kind === "scout") ?? null;
+  const responder = agentRowsRaw.find((a) => a.kind === "responder") ?? null;
   const liveAgents = agentRowsRaw.filter((a) => a.status === "live");
   // Map to the view's shape with server-formatted labels (no client Date.now()).
   const agentRows: AgentRow[] = agentRowsRaw.map((a) => ({
@@ -264,6 +265,32 @@ export default async function DashboardPage() {
     replied: replies24Res.count ?? 0,
   };
 
+  // Fast inbound response — the market's defensible "what works" use case. Real inbound_leads
+  // counts + the median intake→response latency (the SLA the Responder is keeping). Loss-aversion
+  // nudge when a Scout is live but no Responder answers inbound yet.
+  const { data: inboundRows } = await supabase
+    .from("inbound_leads")
+    .select("status, received_at, responded_at")
+    .returns<{ status: string; received_at: string | null; responded_at: string | null }[]>();
+  const inbound = inboundRows ?? [];
+  const respondedLatencies = inbound
+    .filter((r) => r.responded_at && r.received_at)
+    .map((r) => (new Date(r.responded_at!).getTime() - new Date(r.received_at!).getTime()) / 60_000)
+    .filter((m) => m >= 0)
+    .sort((a, b) => a - b);
+  const medianInboundMins =
+    respondedLatencies.length > 0
+      ? Math.round(respondedLatencies[Math.floor((respondedLatencies.length - 1) / 2)]!)
+      : null;
+  const fastInbound = {
+    deployed: Boolean(responder),
+    live: responder?.status === "live",
+    handled: inbound.filter((r) => r.status === "responded" || r.status === "review").length,
+    responded: inbound.filter((r) => r.status === "responded").length,
+    medianMins: medianInboundMins,
+    scoutLive: scout?.status === "live",
+  };
+
   // Just-in-time CRM nudge: a deal has closed but nothing is routing wins out yet.
   // Peak-end moment — surface it here rather than as pre-aha onboarding friction.
   const showCrmNudge = converted > 0 && (crmActiveRes.count ?? 0) === 0;
@@ -327,6 +354,7 @@ export default async function DashboardPage() {
       pipeline={pipeline}
       cold={cold}
       today={today}
+      fastInbound={fastInbound}
       revenuePace={revenuePace}
       conversionWin={conversionWin}
       prospects={prospects ?? []}

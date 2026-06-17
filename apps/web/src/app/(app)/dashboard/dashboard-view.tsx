@@ -18,6 +18,7 @@ import {
   UserPlus,
   Workflow,
   X,
+  Zap,
   type LucideIcon,
 } from "lucide-react";
 import { markNotificationsRead } from "@/components/notifications/actions";
@@ -90,6 +91,14 @@ export interface DashboardViewProps {
   pipeline: PipelineViewModel;
   cold: number;
   today: { sourced: number; sent: number; replied: number };
+  fastInbound: {
+    deployed: boolean;
+    live: boolean;
+    handled: number;
+    responded: number;
+    medianMins: number | null;
+    scoutLive: boolean;
+  };
   revenuePace: string | null;
   conversionWin: { id: string; leadName: string } | null;
   prospects: Prospect[];
@@ -170,6 +179,7 @@ function WorkingDashboard(props: DashboardViewProps) {
     pipeline,
     cold,
     today,
+    fastInbound,
     revenuePace,
     prospects,
     agents,
@@ -299,6 +309,10 @@ function WorkingDashboard(props: DashboardViewProps) {
         <TodayPanel today={today} />
       </div>
 
+      {/* Fast inbound response — the category's defensible "what works" use case (market report).
+          Value-proof when a Responder is live; a loss-aversion nudge when inbound is unanswered. */}
+      {(fastInbound.deployed || fastInbound.scoutLive) && <FastInboundPanel fast={fastInbound} />}
+
       {/* Recent prospects */}
       <RevealItem className={cn(PANEL_SURFACE, "p-5")}>
         <div className="flex items-center justify-between gap-3">
@@ -338,7 +352,13 @@ function WorkingDashboard(props: DashboardViewProps) {
                   />
                   <span className="text-sm font-medium">{a.name}</span>
                   <Badge variant="secondary" className="capitalize">
-                    {a.kind === "scout" ? "Prospect" : a.kind === "caller" ? "Caller" : "Outreach"}
+                    {a.kind === "scout"
+                      ? "Prospect"
+                      : a.kind === "caller"
+                        ? "Caller"
+                        : a.kind === "responder"
+                          ? "Responder"
+                          : "Outreach"}
                   </Badge>
                 </div>
                 <span className="text-xs text-muted-foreground">
@@ -506,6 +526,88 @@ function WarmReplies({
           </ul>
         )}
       </div>
+    </RevealItem>
+  );
+}
+
+/**
+ * Fast inbound response — the market report's most defensible "what works" use case. When a
+ * Responder is live, this is value-proof (leads answered + the median response time it's keeping).
+ * When a Scout is live but nothing answers inbound, it's a loss-aversion nudge: inbound interest
+ * decays within the hour, so an unanswered form is pipeline walking out the door.
+ */
+function FastInboundPanel({ fast }: { fast: DashboardViewProps["fastInbound"] }) {
+  const speedLabel =
+    fast.medianMins == null
+      ? null
+      : fast.medianMins < 1
+        ? "under a minute"
+        : `~${fast.medianMins} min`;
+
+  if (!fast.deployed) {
+    return (
+      <RevealItem className={cn(PANEL_SURFACE, "p-5 dark:bg-white/[0.06]")}>
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-foreground text-background">
+              <Zap className="size-4" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-sm font-medium">Answer inbound leads in minutes, not days</p>
+              <p className="text-sm text-muted-foreground">
+                Inbound interest goes cold within the hour. A Responder qualifies and replies the
+                instant a lead fills your form — using the same bar your Prospect Agent sets, so
+                fast never means spray.
+              </p>
+            </div>
+          </div>
+          <Button asChild size="sm" className="shrink-0">
+            <Link href="/agents/new/responder">
+              Turn on fast response <ArrowRight className="size-4" />
+            </Link>
+          </Button>
+        </div>
+      </RevealItem>
+    );
+  }
+
+  return (
+    <RevealItem className={cn(PANEL_SURFACE, "p-5")}>
+      <div className="flex items-center justify-between gap-2">
+        <Eyebrow>Fast inbound response</Eyebrow>
+        <span className="flex items-center gap-1 font-mono text-[11px] uppercase tracking-wide text-muted-foreground">
+          <Zap className="size-3.5" /> {fast.live ? "live" : "paused"}
+        </span>
+      </div>
+      {fast.handled > 0 ? (
+        <>
+          <div className="mt-4 grid grid-cols-2 gap-4">
+            <div>
+              <span className="font-mono text-2xl font-semibold tabular-nums">{fast.handled}</span>
+              <p className="text-xs text-muted-foreground">Inbound handled</p>
+            </div>
+            <div>
+              <span className="font-mono text-2xl font-semibold tabular-nums">
+                {speedLabel ?? "—"}
+              </span>
+              <p className="text-xs text-muted-foreground">Median response</p>
+            </div>
+          </div>
+          <p className="mt-3 border-t border-border/60 pt-3 text-xs text-muted-foreground">
+            {fast.responded} answered automatically within your SLA — the speed edge that turns
+            inbound interest into booked meetings.
+          </p>
+        </>
+      ) : (
+        <p className="mt-4 text-sm text-muted-foreground">
+          Live and watching. The moment a lead fills your form, it&apos;s qualified and answered in
+          minutes — point your form at the webhook on the{" "}
+          <Link href="/agents/responder" className="underline underline-offset-2">
+            Responder&apos;s page
+          </Link>
+          .
+        </p>
+      )}
     </RevealItem>
   );
 }

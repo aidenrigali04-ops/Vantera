@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Panel } from "@/components/ui/panel";
 import { ResponderWizard } from "../../responder-wizard";
 
 export default async function NewResponderAgentPage() {
@@ -29,20 +29,18 @@ export default async function NewResponderAgentPage() {
 
   if (!scout) {
     return (
-      <Card className="mx-auto max-w-xl border-dashed">
-        <CardHeader>
-          <CardTitle>Deploy a Prospect Agent first</CardTitle>
+      <Panel className="mx-auto flex max-w-xl flex-col gap-4 border-dashed">
+        <div className="flex flex-col gap-2">
+          <h2 className="font-heading text-lg font-semibold">Deploy a Prospect Agent first</h2>
           <p className="text-sm text-muted-foreground">
             The Responder qualifies inbound leads against the bar your Prospect Agent sets — without
             one, it has nothing to qualify against.
           </p>
-        </CardHeader>
-        <CardContent>
-          <Button asChild>
-            <Link href="/agents/new/scout">Set up your Prospect Agent</Link>
-          </Button>
-        </CardContent>
-      </Card>
+        </div>
+        <Button asChild className="w-fit">
+          <Link href="/agents/new/scout">Set up your Prospect Agent</Link>
+        </Button>
+      </Panel>
     );
   }
 

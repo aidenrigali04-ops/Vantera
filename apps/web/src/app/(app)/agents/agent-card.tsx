@@ -5,7 +5,7 @@ import { useActionState } from "react";
 import { Phone, Settings2, Zap } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Panel, Eyebrow } from "@/components/ui/panel";
 import { FormError } from "@/components/form-error";
 import { setAgentStatus, updateSendMode, type AgentActionState } from "./actions";
 
@@ -44,10 +44,12 @@ export function AgentCard({
   agent,
   roleLabel,
   stats,
+  index = 0,
 }: {
   agent: AgentRow;
   roleLabel: string;
   stats: { label: string; value: number }[];
+  index?: number;
 }) {
   const [state, action] = useActionState<AgentActionState, FormData>(setAgentStatus, {});
   const [modeState, switchMode, switchingMode] = useActionState<AgentActionState, FormData>(
@@ -65,62 +67,62 @@ export function AgentCard({
   const lastRun = formatRun(agent.last_run_at, agent.timezone);
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-start justify-between gap-2">
-          <div>
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">{roleLabel}</p>
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <Link
-                href={`/agents/${agent.kind}`}
-                className="rounded-sm underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                {agent.name}
-              </Link>
+    <Panel index={index} interactive className="flex flex-col gap-4">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex flex-col gap-1.5">
+          <Eyebrow>{roleLabel}</Eyebrow>
+          <h3 className="font-heading flex items-center gap-2 text-lg font-semibold tracking-tight">
+            <Link
+              href={`/agents/${agent.kind}`}
+              className="rounded-sm underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {agent.name}
+            </Link>
+            <span
+              className={`inline-flex items-center gap-1.5 text-xs font-medium ${
+                live ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"
+              }`}
+            >
               <span
-                className={`inline-flex items-center gap-1.5 text-xs font-medium ${
-                  live ? "text-emerald-600" : "text-muted-foreground"
-                }`}
-              >
-                <span
-                  className={`size-2 rounded-full ${live ? "animate-pulse bg-emerald-500" : "bg-muted-foreground/40"}`}
-                />
-                {live ? "Live" : agent.status === "paused" ? "Paused" : "Draft"}
-              </span>
-            </CardTitle>
-          </div>
-          <div className="flex items-center gap-1">
-            {agent.kind !== "responder" && (
-              <Button asChild variant="ghost" size="sm">
-                <Link href={`/agents/${agent.kind}/edit`}>
-                  <Settings2 className="size-4" /> Edit config
-                </Link>
-              </Button>
-            )}
-            <form action={action}>
-              <input type="hidden" name="agentId" value={agent.id} />
-              <input type="hidden" name="status" value={live ? "paused" : "live"} />
-              <Button type="submit" variant="ghost" size="sm">
-                {live ? "Pause" : "Resume"}
-              </Button>
-            </form>
-          </div>
+                className={`size-2 rounded-full ${live ? "animate-pulse bg-emerald-500" : "bg-muted-foreground/40"}`}
+              />
+              {live ? "Live" : agent.status === "paused" ? "Paused" : "Draft"}
+            </span>
+          </h3>
         </div>
-        {icpNames.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 pt-1">
-            {icpNames.map((name) => (
-              <Badge key={name} variant="secondary" className="font-normal">
-                {name}
-              </Badge>
-            ))}
-          </div>
-        )}
-      </CardHeader>
-      <CardContent className="flex flex-col gap-3">
+        <div className="flex items-center gap-1">
+          {agent.kind !== "responder" && (
+            <Button asChild variant="ghost" size="sm">
+              <Link href={`/agents/${agent.kind}/edit`}>
+                <Settings2 className="size-4" /> Edit config
+              </Link>
+            </Button>
+          )}
+          <form action={action}>
+            <input type="hidden" name="agentId" value={agent.id} />
+            <input type="hidden" name="status" value={live ? "paused" : "live"} />
+            <Button type="submit" variant="ghost" size="sm">
+              {live ? "Pause" : "Resume"}
+            </Button>
+          </form>
+        </div>
+      </div>
+
+      {icpNames.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {icpNames.map((name) => (
+            <Badge key={name} variant="secondary" className="font-normal">
+              {name}
+            </Badge>
+          ))}
+        </div>
+      )}
+
+      <div className="flex flex-col gap-3">
         <div className="flex gap-6">
           {stats.map((s) => (
             <div key={s.label}>
-              <p className="text-2xl font-semibold tabular-nums">{s.value}</p>
+              <p className="font-mono text-2xl font-semibold tabular-nums">{s.value}</p>
               <p className="text-xs text-muted-foreground">{s.label}</p>
             </div>
           ))}
@@ -147,12 +149,8 @@ export function AgentCard({
             {agent.campaign_id && (
               <form action={switchMode}>
                 <input type="hidden" name="campaignId" value={agent.campaign_id} />
-                <input
-                  type="hidden"
-                  name="sendMode"
-                  value={automatic ? "review" : "automatic"}
-                />
-                <Button type="submit" variant="ghost" size="sm" disabled={switchingMode}>
+                <input type="hidden" name="sendMode" value={automatic ? "review" : "automatic"} />
+                <Button type="submit" variant="ghost" size="sm" disabled={switchingMode} className="-mx-2">
                   {automatic ? "Switch to review every draft" : "Switch to automatic sending"}
                 </Button>
               </form>
@@ -175,7 +173,7 @@ export function AgentCard({
           </div>
         )}
         <FormError message={state.error ?? modeState.error} />
-      </CardContent>
-    </Card>
+      </div>
+    </Panel>
   );
 }
