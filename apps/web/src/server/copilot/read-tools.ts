@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { resolveEntitlements } from "@vantera/billing";
 import { snapshotFromRow, type AccountBillingRow } from "@/lib/billing/entitlement";
 import { getWarmupStatus, type WarmupStatus } from "@/lib/warmup-status";
+import { loadAnalytics } from "@/lib/analytics";
 
 // ── Draft queue ───────────────────────────────────────────────────────────────
 
@@ -221,4 +222,40 @@ export async function getWarmupStatusForAccount(
   accountId: string
 ): Promise<WarmupStatus> {
   return getWarmupStatus(db, accountId);
+}
+
+// ── Return on spend (WS-A) ────────────────────────────────────────────────────
+
+export interface ReturnOnSpendDTO {
+  /** (closed + expected pipeline) ÷ annual plan spend, to 1 dp; null without a paid plan */
+  pipelineToSpend: number | null;
+  /** clears the 2× pipeline-to-spend bar that keeps a budget funded; null without spend */
+  clearsRenewalBar: boolean | null;
+  /** dollars per booked meeting; null until meetings are tracked / no plan */
+  costPerMeeting: number | null;
+  /** dollars per closed deal; null until a deal closes / no plan */
+  costPerClose: number | null;
+  /** annual plan spend in dollars; null without a paid plan */
+  annualSpend: number | null;
+  /** the account has set an average deal value (dollar figures depend on it) */
+  hasValue: boolean;
+  onPaidPlan: boolean;
+}
+
+/**
+ * Return on spend for the copilot — the same numbers /analytics shows (shared loadAnalytics),
+ * in dollars. Answers "is this worth it / what's my ROI / cost per meeting?". RLS scopes the
+ * read to the caller's account (rule 02).
+ */
+export async function getReturnOnSpend(db: SupabaseClient): Promise<ReturnOnSpendDTO> {
+  const { roi, hasValue } = await loadAnalytics(db);
+  return {
+    pipelineToSpend: roi.pipelineToSpend,
+    clearsRenewalBar: roi.meetsThreshold,
+    costPerMeeting: roi.costPerMeetingCents != null ? Math.round(roi.costPerMeetingCents / 100) : null,
+    costPerClose: roi.costPerCloseCents != null ? Math.round(roi.costPerCloseCents / 100) : null,
+    annualSpend: roi.hasSpend ? Math.round(roi.annualSpendCents / 100) : null,
+    hasValue,
+    onPaidPlan: roi.hasSpend,
+  };
 }
