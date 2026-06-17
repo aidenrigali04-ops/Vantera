@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@vantera/ai": "workspace:*",
-    "ai": "^5.0.0",
+    "ai": "^6.0.207",
     "zod": "^4.0.0"
   },
   "devDependencies": {
