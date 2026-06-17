@@ -34,3 +34,5 @@ export { classifyReply, preClassify, replyVerdictSchema, type ReplyVerdict } fro
 export { callBriefSchema, callOutcomeSchema, CALL_OUTCOMES, type CallBriefOutput, type CallOutcome } from "./caller/schema";
 export { draftCallBrief, type CallBrief, type CallBriefRequest } from "./caller/brief";
 export { classifyOutcome, mapProviderDisposition } from "./caller/classify";
+export { adConceptSchema, adConceptBatchSchema, AD_CTAS, type AdConcept } from "./ads/schema";
+export { generateAdConcepts, adContextBlock, type AdConceptInput, type AdConceptResult } from "./ads/generate";
