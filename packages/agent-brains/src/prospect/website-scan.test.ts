@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MockLanguageModelV2 } from "ai/test";
+import { MockLanguageModelV3 } from "ai/test";
 import { htmlToText, isScanStale, scanWebsite } from "./website-scan";
 
 const NOW = new Date("2026-06-11T00:00:00Z");
@@ -41,10 +41,10 @@ describe("scanWebsite", () => {
   it("fetches the page and extracts a structured scan", async () => {
     const fetchImpl = (async () =>
       new Response("<html><p>Acme sells revenue tools.</p></html>", { status: 200 })) as unknown as typeof fetch;
-    const model = new MockLanguageModelV2({
+    const model = new MockLanguageModelV3({
       doGenerate: {
-        finishReason: "stop",
-        usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
+        finishReason: { unified: "stop" as const, raw: "stop" },
+        usage: { inputTokens: { total: 1, noCache: 1, cacheRead: 0, cacheWrite: 0 }, outputTokens: { total: 1, text: 1, reasoning: 0 } },
         content: [{ type: "text", text: JSON.stringify(scan) }],
         warnings: [],
       },
@@ -64,10 +64,10 @@ describe("scanWebsite", () => {
     };
     const fetchImpl = (async () =>
       new Response("<html><p>lots of real content here</p></html>", { status: 200 })) as unknown as typeof fetch;
-    const model = new MockLanguageModelV2({
+    const model = new MockLanguageModelV3({
       doGenerate: {
-        finishReason: "stop",
-        usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
+        finishReason: { unified: "stop" as const, raw: "stop" },
+        usage: { inputTokens: { total: 1, noCache: 1, cacheRead: 0, cacheWrite: 0 }, outputTokens: { total: 1, text: 1, reasoning: 0 } },
         content: [{ type: "text", text: JSON.stringify(big) }],
         warnings: [],
       },
@@ -83,7 +83,7 @@ describe("scanWebsite", () => {
   it("throws on fetch failure", async () => {
     const fetchImpl = (async () => new Response("nope", { status: 500 })) as unknown as typeof fetch;
     await expect(
-      scanWebsite("https://acme.com", { model: new MockLanguageModelV2(), fetchImpl, validate: noValidate })
+      scanWebsite("https://acme.com", { model: new MockLanguageModelV3(), fetchImpl, validate: noValidate })
     ).rejects.toThrow(/website fetch failed \(500\)/);
   });
 
@@ -97,7 +97,7 @@ describe("scanWebsite", () => {
       throw new Error("URL resolves to a private address");
     };
     await expect(
-      scanWebsite("http://169.254.169.254/", { model: new MockLanguageModelV2(), fetchImpl, validate })
+      scanWebsite("http://169.254.169.254/", { model: new MockLanguageModelV3(), fetchImpl, validate })
     ).rejects.toThrow(/private address/);
     expect(fetched).toBe(false);
   });

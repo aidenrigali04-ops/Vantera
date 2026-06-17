@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { MockLanguageModelV2 } from "ai/test";
+import { MockLanguageModelV3 } from "ai/test";
 import { classifyReply, preClassify } from "./classify";
 
 function textResponse(json: unknown) {
   return {
-    finishReason: "stop" as const,
-    usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
+    finishReason: { unified: "stop" as const, raw: "stop" },
+    usage: { inputTokens: { total: 1, noCache: 1, cacheRead: 0, cacheWrite: 0 }, outputTokens: { total: 1, text: 1, reasoning: 0 } },
     content: [{ type: "text" as const, text: JSON.stringify(json) }],
     warnings: [],
   };
@@ -35,7 +35,7 @@ describe("preClassify (deterministic, no model call)", () => {
 describe("classifyReply", () => {
   it("returns the pre-classification without calling the model", async () => {
     // model double that throws if invoked
-    const model = new MockLanguageModelV2({
+    const model = new MockLanguageModelV3({
       doGenerate: async () => {
         throw new Error("model should not be called for unsubscribe pre-classification");
       },
@@ -47,7 +47,7 @@ describe("classifyReply", () => {
   });
 
   it("uses the model for nuanced replies", async () => {
-    const model = new MockLanguageModelV2({
+    const model = new MockLanguageModelV3({
       doGenerate: async () =>
         textResponse({ classification: "interested", rationale: "asks to learn more" }),
     });

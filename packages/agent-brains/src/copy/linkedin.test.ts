@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MockLanguageModelV2 } from "ai/test";
+import { MockLanguageModelV3 } from "ai/test";
 import { draftLinkedIn, validateLinkedInDraft, CONNECTION_NOTE_MAX_CHARS } from "./linkedin";
 import { leadBlock, type DraftInput } from "./shared";
 
@@ -25,8 +25,8 @@ const CLEAN = {
 
 function textResponse(json: unknown) {
   return {
-    finishReason: "stop" as const,
-    usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
+    finishReason: { unified: "stop" as const, raw: "stop" },
+    usage: { inputTokens: { total: 1, noCache: 1, cacheRead: 0, cacheWrite: 0 }, outputTokens: { total: 1, text: 1, reasoning: 0 } },
     content: [{ type: "text" as const, text: JSON.stringify(json) }],
     warnings: [],
   };
@@ -76,7 +76,7 @@ describe("validateLinkedInDraft", () => {
 
 describe("draftLinkedIn", () => {
   it("returns both messages with no violations for clean output", async () => {
-    const model = new MockLanguageModelV2({ doGenerate: textResponse(CLEAN) });
+    const model = new MockLanguageModelV3({ doGenerate: textResponse(CLEAN) });
 
     const draft = await draftLinkedIn(INPUT, model);
 
@@ -90,7 +90,7 @@ describe("draftLinkedIn", () => {
       connection_note: "I hope this finds you well! Big fan of Acme!",
       followup_message: CLEAN.followup_message,
     };
-    const model = new MockLanguageModelV2({
+    const model = new MockLanguageModelV3({
       doGenerate: sequence(textResponse(sloppy), textResponse(CLEAN)),
     });
 
