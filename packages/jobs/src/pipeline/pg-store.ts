@@ -71,6 +71,7 @@ import { parseSenderAddress } from "./email-footer";
 import { normalizeLinkedInUrl } from "./copy-draft";
 import { normalizePhone } from "./call-brief";
 import { resolveSequenceConfig } from "./sequence-config";
+import { assessMailboxHealth } from "./deliverability";
 import type { RefreshLeadLoad, RefreshLeadStore } from "./refresh-lead";
 
 /** Suppression lookup that accepts any kind (email/linkedin/phone) — used by the sequence store. */
@@ -958,6 +959,38 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
 
     async pauseMailbox(mailboxId: string) {
       await db.update(mailboxes).set({ status: "paused" }).where(eq(mailboxes.id, mailboxId));
+    },
+
+    async recordMailboxHealthEvent(mailboxId: string, kind: "sent" | "bounce" | "complaint") {
+      // Lifetime rolling counters in mailboxes.health (jsonb). assessMailboxHealth turns them into
+      // a status; a burned mailbox is paused so pickActiveMailbox stops selecting it (WS-C, rule 04).
+      const [mb] = await db
+        .select({ health: mailboxes.health })
+        .from(mailboxes)
+        .where(eq(mailboxes.id, mailboxId))
+        .limit(1);
+      const cur = (mb?.health ?? {}) as { sent?: number; bounces?: number; complaints?: number };
+      const counts = {
+        sent: (cur.sent ?? 0) + (kind === "sent" ? 1 : 0),
+        bounces: (cur.bounces ?? 0) + (kind === "bounce" ? 1 : 0),
+        complaints: (cur.complaints ?? 0) + (kind === "complaint" ? 1 : 0),
+      };
+      const h = assessMailboxHealth(counts);
+      await db
+        .update(mailboxes)
+        .set({
+          health: {
+            ...counts,
+            status: h.status,
+            bounceRate: h.bounceRate,
+            complaintRate: h.complaintRate,
+            updatedAt: new Date().toISOString(),
+          },
+        })
+        .where(eq(mailboxes.id, mailboxId));
+      if (h.status === "burned") {
+        await db.update(mailboxes).set({ status: "paused" }).where(eq(mailboxes.id, mailboxId));
+      }
     },
 
     async updateMailboxWarmup(mailboxId: string, status: "warming" | "active", dailyCap: number) {

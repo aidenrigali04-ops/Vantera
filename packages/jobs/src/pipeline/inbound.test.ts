@@ -22,6 +22,7 @@ function makeStore(overrides: Partial<InboundStore> = {}): InboundStore & {
   upsertedLinkedInStatuses: Parameters<InboundStore["upsertLinkedInAccountStatus"]>[0][];
   stoppedSequences: string[];
   notifications: Parameters<InboundStore["insertLeadNotification"]>[0][];
+  healthEvents: { mailboxId: string; kind: "sent" | "bounce" | "complaint" }[];
 } {
   let replyCounter = 0;
   const replies: Parameters<InboundStore["insertReply"]>[0][] = [];
@@ -35,6 +36,7 @@ function makeStore(overrides: Partial<InboundStore> = {}): InboundStore & {
   const upsertedLinkedInStatuses: Parameters<InboundStore["upsertLinkedInAccountStatus"]>[0][] = [];
   const stoppedSequences: string[] = [];
   const notifications: Parameters<InboundStore["insertLeadNotification"]>[0][] = [];
+  const healthEvents: { mailboxId: string; kind: "sent" | "bounce" | "complaint" }[] = [];
 
   const base: InboundStore = {
     findMailboxByProviderRef: async () => null,
@@ -60,6 +62,7 @@ function makeStore(overrides: Partial<InboundStore> = {}): InboundStore & {
     cancelPendingSends: async (leadId) => { canceledSends.push(leadId); return 0; },
     stopSequenceForReply: async (leadId) => { stoppedSequences.push(leadId); },
     insertLeadNotification: async (n) => { notifications.push(n); },
+    recordMailboxHealthEvent: async (mailboxId, kind) => { healthEvents.push({ mailboxId, kind }); },
     ...overrides,
   };
 
@@ -75,6 +78,7 @@ function makeStore(overrides: Partial<InboundStore> = {}): InboundStore & {
     upsertedLinkedInStatuses,
     stoppedSequences,
     notifications,
+    healthEvents,
   });
 }
 
@@ -285,6 +289,7 @@ describe("runInbound — bounce", () => {
     expect(store.suppressions[0]![3]).toBe("bounce");
     expect(store.suppressions[0]![2]).toBe("bounced@example.com"); // lowercased
     expect(store.canceledSends).toContain("lead5");
+    expect(store.healthEvents).toContainEqual({ mailboxId: "mbx_id_1", kind: "bounce" });
   });
 
   it("still writes suppression when no matching lead found", async () => {
@@ -321,6 +326,7 @@ describe("runInbound — complaint", () => {
     expect(store.suppressions[0]![3]).toBe("complaint");
     expect(store.pausedMailboxes).toContain("mbx_id_1");
     expect(store.canceledSends).toContain("lead6");
+    expect(store.healthEvents).toContainEqual({ mailboxId: "mbx_id_1", kind: "complaint" });
   });
 });
 

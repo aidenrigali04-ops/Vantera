@@ -159,6 +159,8 @@ export async function runOutreachSend(
       mailboxId: providerResult.mailboxId, messageRef: providerResult.messageId,
     });
     await deps.store.markSent(ctx.id);
+    // Roll the mailbox's sent counter — the denominator for its bounce/complaint health (WS-C).
+    await deps.store.recordMailboxHealthEvent(providerResult.mailboxId, "sent");
   } else if (providerResult.channel === "linkedin") {
     if (providerResult.inviteSent) {
       await deps.store.setLeadInvited(ctx.leadId, now);
