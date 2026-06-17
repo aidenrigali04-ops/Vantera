@@ -52,8 +52,53 @@ describe("ExploriumProspectData", () => {
     ]);
     expect(calls[0]!.init.headers).toMatchObject({ api_key: "k" });
     const body = JSON.parse(String(calls[0]!.init.body));
+    expect(body.mode).toBe("full");
     expect(body.size).toBe(5);
-    expect(body.filters.job_title.values).toEqual(["vp sales"]);
+    expect(body.page_size).toBe(5); // required by /v1/prospects — its omission was the 422
+    // titles collapse onto the verified job_level enum; "vp sales" → "vice president"
+    expect(body.filters.job_level.values).toEqual(["vice president"]);
+    expect(body.filters.company_country_code.values).toEqual(["US"]); // default
+    // industries are NOT sent — no supported free-text industry filter key
+    expect(body.filters.company_industry).toBeUndefined();
+    expect(body.filters.job_title).toBeUndefined();
+  });
+
+  it("maps ICP filters onto the live-verified discovery contract (keys + enums)", async () => {
+    const { impl, calls } = fetchStub({ "/prospects": { data: [] } });
+    const source = new ExploriumProspectData({ apiKey: "k", fetchImpl: impl });
+
+    await source.discoverProspects(
+      {
+        titles: ["VP of Sales"],
+        seniorities: ["director"],
+        companySizes: ["11-50", "200"],
+        geos: ["united states", "canada"],
+        industries: ["fintech"], // dropped
+        techStack: ["salesforce"], // dropped
+        signals: ["funding"], // dropped
+      },
+      50
+    );
+
+    const body = JSON.parse(String(calls[0]!.init.body));
+    expect(body.page_size).toBe(50);
+    expect(body.filters.job_level.values).toEqual(expect.arrayContaining(["vice president", "director"]));
+    expect(body.filters.company_size.values).toEqual(["11-50", "51-200"]); // "200" bins to 51-200
+    expect(body.filters.company_country_code.values).toEqual(["US", "CA"]);
+    // unsupported keys never leave the adapter — each would 422 or silently return 0
+    for (const k of ["company_industry", "linkedin_category", "company_technologies", "events"]) {
+      expect(body.filters[k]).toBeUndefined();
+    }
+  });
+
+  it("enriches via the contacts_information bulk_enrich path", async () => {
+    const { impl, calls } = fetchStub({ "/prospects": { data: [] } });
+    const source = new ExploriumProspectData({ apiKey: "k", fetchImpl: impl });
+
+    await source.enrichProspects(["ref_1"]);
+
+    expect(calls[0]!.url).toContain("/prospects/contacts_information/bulk_enrich");
+    expect(JSON.parse(String(calls[0]!.init.body))).toEqual({ prospect_ids: ["ref_1"] });
   });
 
   it("maps enrichment responses onto enriched prospects", async () => {

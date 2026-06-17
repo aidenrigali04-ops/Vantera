@@ -1,4 +1,5 @@
 export * from "./types";
+export { brandedSendingDomains, brandToken, primaryHost } from "./branded-domains";
 export { InMemoryEmailInfra } from "./in-memory";
 export { MaildosoEmailInfra } from "./maildoso/index";
 export { MaildosoApiClient } from "./maildoso/api-client";

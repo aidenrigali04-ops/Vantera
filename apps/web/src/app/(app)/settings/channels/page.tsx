@@ -9,6 +9,8 @@ import {
   PauseSendingForm,
   LinkedInConnectButton,
 } from "./channels-forms";
+import { ChannelReadiness } from "./channels-readiness";
+import { shapeWarmupStatus, estimateReadyInDays } from "@/lib/warmup-status";
 
 interface SenderAddress {
   line1: string;
@@ -60,7 +62,7 @@ export default async function ChannelsPage({
       .maybeSingle<{ sender_address: SenderAddress | null; sender_name: string | null; outreach_paused: boolean }>(),
     supabase
       .from("mailboxes")
-      .select("id, email_address, domain, status, daily_send_limit")
+      .select("id, email_address, domain, status, daily_send_limit, warmup_started_at")
       .order("created_at", { ascending: true }),
     supabase
       .from("linkedin_accounts")
@@ -73,6 +75,21 @@ export default async function ChannelsPage({
   const outreachPaused = accountRow?.outreach_paused ?? false;
   const mailboxes = mailboxRows ?? [];
   const linkedinAccounts = linkedinRows ?? [];
+
+  // Channel readiness for the header — derived from the same rows the cards render,
+  // via the tested pure helper (no extra round-trip). Only warming/active mailboxes
+  // count toward warmup, matching getWarmupStatus semantics.
+  const now = new Date();
+  const warmup = shapeWarmupStatus({
+    mailboxes: mailboxes
+      .filter((m) => m.status === "warming" || m.status === "active")
+      .map((m) => ({
+        status: m.status,
+        warmupStartedAt: m.warmup_started_at ? new Date(m.warmup_started_at) : null,
+      })),
+    linkedinConnected: linkedinAccounts.some((la) => la.status === "active"),
+    now,
+  });
 
   const senderAddressDefaults = {
     line1: senderAddress?.line1 ?? "",
@@ -105,6 +122,9 @@ export default async function ChannelsPage({
           That LinkedIn connection didn&apos;t complete. You can try connecting again below.
         </div>
       )}
+
+      {/* Readiness header — value proof + endowed progress toward "channels live" */}
+      <ChannelReadiness warmup={warmup} />
 
       {/* Email sending card */}
       <Card>
@@ -159,13 +179,27 @@ export default async function ChannelsPage({
                 <tbody>
                   {mailboxes.map((m) => {
                     const status = (m.status ?? "provisioning") as MailboxStatus;
+                    const eta =
+                      status === "warming"
+                        ? estimateReadyInDays(
+                            m.warmup_started_at ? new Date(m.warmup_started_at) : null,
+                            now
+                          )
+                        : null;
                     return (
                       <tr key={m.id} className="border-t border-border">
                         <td className="py-2 font-medium">{m.email_address}</td>
                         <td className="py-2">
-                          <Badge variant={MAILBOX_STATUS_VARIANTS[status]}>
-                            {MAILBOX_STATUS_LABELS[status] ?? m.status}
-                          </Badge>
+                          <div className="flex flex-col items-start gap-0.5">
+                            <Badge variant={MAILBOX_STATUS_VARIANTS[status]}>
+                              {MAILBOX_STATUS_LABELS[status] ?? m.status}
+                            </Badge>
+                            {eta !== null && (
+                              <span className="text-xs text-muted-foreground">
+                                ~{eta}d to ready
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="py-2 text-muted-foreground">
                           {m.daily_send_limit ?? "—"}
@@ -230,7 +264,7 @@ export default async function ChannelsPage({
                         </Badge>
                       </td>
                       <td className="py-2">
-                        {la.status === "disconnected" && (
+                        {(la.status === "disconnected" || la.status === "restricted") && (
                           <LinkedInConnectButton label="Reconnect" variant="outline" />
                         )}
                       </td>
@@ -238,6 +272,14 @@ export default async function ChannelsPage({
                   ))}
                 </tbody>
               </table>
+              {linkedinAccounts.some(
+                (la) => la.status === "disconnected" || la.status === "restricted"
+              ) && (
+                <p className="text-xs text-muted-foreground">
+                  Reconnect any flagged or disconnected account to resume LinkedIn outreach —
+                  sessions expire periodically.
+                </p>
+              )}
               <LinkedInConnectButton label="Connect another account" variant="ghost" />
             </div>
           )}

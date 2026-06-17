@@ -223,17 +223,20 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
     },
 
     async saveEnrichment(leadId: string, accountId: string, enriched: EnrichedProspect) {
-      await db
-        .update(leads)
-        .set({
-          email: enriched.email ?? undefined,
-          emailStatus: enriched.emailStatus ?? undefined,
-          phone: enriched.phone ?? undefined,
-          phoneStatus: enriched.phoneStatus ?? undefined,
-          linkedinUrl: enriched.linkedinUrl ?? undefined,
-          techStack: enriched.technographics ?? undefined,
-        })
-        .where(eq(leads.id, leadId));
+      // Only persist fields the provider actually returned. Drizzle throws "No values to set" on
+      // an all-undefined .set(), which happens whenever bulk_enrich finds no email/phone/tech for
+      // a prospect (common) — so guard the UPDATE and skip it when there is nothing to write.
+      const patch = {
+        ...(enriched.email !== undefined ? { email: enriched.email } : {}),
+        ...(enriched.emailStatus !== undefined ? { emailStatus: enriched.emailStatus } : {}),
+        ...(enriched.phone !== undefined ? { phone: enriched.phone } : {}),
+        ...(enriched.phoneStatus !== undefined ? { phoneStatus: enriched.phoneStatus } : {}),
+        ...(enriched.linkedinUrl !== undefined ? { linkedinUrl: enriched.linkedinUrl } : {}),
+        ...(enriched.technographics !== undefined ? { techStack: enriched.technographics } : {}),
+      };
+      if (Object.keys(patch).length > 0) {
+        await db.update(leads).set(patch).where(eq(leads.id, leadId));
+      }
       if (enriched.email) {
         await db.insert(enrichmentResults).values({
           accountId,
@@ -1145,12 +1148,16 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
     async enrollPendingLeads(now: Date): Promise<number> {
       // Enrol in_campaign leads that lack any sequence_runs row for their campaign.
       // The unique (campaign_id, lead_id) constraint + ON CONFLICT DO NOTHING keeps this idempotent.
-      const selectQuery = db
+      //
+      // Two-step (select candidates, then insert .values) rather than INSERT…SELECT: Drizzle's
+      // insert().select() requires the projection to enumerate EVERY table column in declaration
+      // order (haveSameKeys), so a 4-of-13-column projection throws at build time. .values()
+      // respects the column defaults (id/status/stage/timestamps), matching every other insert here.
+      const candidates = await db
         .select({
           accountId: campaignLeads.accountId,
           campaignId: campaignLeads.campaignId,
           leadId: campaignLeads.leadId,
-          nextActionAt: sql<Date>`${now}`.as("next_action_at"),
         })
         .from(campaignLeads)
         .innerJoin(leads, eq(leads.id, campaignLeads.leadId))
@@ -1160,9 +1167,10 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
             sql`not exists (select 1 from ${sequenceRuns} sr where sr.campaign_id = ${campaignLeads.campaignId} and sr.lead_id = ${campaignLeads.leadId})`
           )
         );
+      if (candidates.length === 0) return 0;
       const rows = await db
         .insert(sequenceRuns)
-        .select(selectQuery)
+        .values(candidates.map((c) => ({ ...c, nextActionAt: now })))
         .onConflictDoNothing({ target: [sequenceRuns.campaignId, sequenceRuns.leadId] })
         .returning({ id: sequenceRuns.id });
       return rows.length;
