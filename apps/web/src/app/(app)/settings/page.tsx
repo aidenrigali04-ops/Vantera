@@ -1,12 +1,24 @@
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Panel, Eyebrow } from "@/components/ui/panel";
 import { createClient } from "@/lib/supabase/server";
 import { getGateData } from "@/lib/auth/context";
 import { ProfileForm } from "./profile-form";
 import { WorkspaceForm } from "./workspace-form";
 import { DangerZone } from "./danger-zone";
+
+function SettingsLink({ title, body, href, cta }: { title: string; body: string; href: string; cta: string }) {
+  return (
+    <Panel interactive className="flex flex-col gap-3">
+      <h2 className="font-heading text-base font-semibold">{title}</h2>
+      <p className="text-sm text-muted-foreground">{body}</p>
+      <Button asChild variant="outline" size="sm" className="w-fit">
+        <Link href={href}>{cta}</Link>
+      </Button>
+    </Panel>
+  );
+}
 
 export default async function SettingsPage() {
   const { user, account } = await getGateData();
@@ -25,114 +37,72 @@ export default async function SettingsPage() {
   ]);
 
   return (
-    <div className="flex max-w-2xl flex-col gap-6">
-      <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
+    <div className="mx-auto flex max-w-2xl flex-col gap-6">
+      <div>
+        <Eyebrow>Workspace</Eyebrow>
+        <h1 className="font-heading mt-3 text-3xl font-semibold tracking-tight">Settings</h1>
+      </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Profile</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ProfileForm displayName={profile?.display_name ?? ""} email={user.email ?? ""} />
-        </CardContent>
-      </Card>
+      <Panel className="flex flex-col gap-4">
+        <h2 className="font-heading text-base font-semibold">Profile</h2>
+        <ProfileForm displayName={profile?.display_name ?? ""} email={user.email ?? ""} />
+      </Panel>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Workspace</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <WorkspaceForm
-            name={account.name}
-            industry={account.onboarding_industry ?? ""}
-            icp={account.onboarding_icp ?? ""}
-            revenueGoalDollars={
-              account.revenue_goal_cents ? String(account.revenue_goal_cents / 100) : ""
-            }
-            avgDealValueDollars={
-              account.avg_deal_value_cents ? String(account.avg_deal_value_cents / 100) : ""
-            }
-          />
-        </CardContent>
-      </Card>
+      <Panel className="flex flex-col gap-4">
+        <h2 className="font-heading text-base font-semibold">Workspace</h2>
+        <WorkspaceForm
+          name={account.name}
+          industry={account.onboarding_industry ?? ""}
+          icp={account.onboarding_icp ?? ""}
+          revenueGoalDollars={
+            account.revenue_goal_cents ? String(account.revenue_goal_cents / 100) : ""
+          }
+          avgDealValueDollars={
+            account.avg_deal_value_cents ? String(account.avg_deal_value_cents / 100) : ""
+          }
+        />
+      </Panel>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Team</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ul className="flex flex-col gap-2">
-            {(members ?? []).map((m) => (
-              <li key={m.user_id} className="flex items-center justify-between text-sm">
-                <span>{m.user_id === user.id ? (user.email ?? "You") : "Team member"}</span>
-                <Badge variant="secondary">{m.role}</Badge>
-              </li>
-            ))}
-          </ul>
-          <p className="mt-3 text-sm text-muted-foreground">
-            Invite teammates and manage roles.
-          </p>
-          <Button asChild variant="outline" size="sm" className="mt-3">
-            <Link href="/settings/team">Manage team</Link>
-          </Button>
-        </CardContent>
-      </Card>
+      <Panel className="flex flex-col gap-3">
+        <h2 className="font-heading text-base font-semibold">Team</h2>
+        <ul className="flex flex-col gap-2">
+          {(members ?? []).map((m) => (
+            <li key={m.user_id} className="flex items-center justify-between text-sm">
+              <span>{m.user_id === user.id ? (user.email ?? "You") : "Team member"}</span>
+              <Badge variant="secondary">{m.role}</Badge>
+            </li>
+          ))}
+        </ul>
+        <p className="text-sm text-muted-foreground">Invite teammates and manage roles.</p>
+        <Button asChild variant="outline" size="sm" className="w-fit">
+          <Link href="/settings/team">Manage team</Link>
+        </Button>
+      </Panel>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Billing</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">
-            Plan, usage, and payment.
-          </p>
-          <Button asChild variant="outline" size="sm" className="mt-3">
-            <Link href="/settings/billing">Manage billing</Link>
-          </Button>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Channels</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">
-            Email sending mailboxes, LinkedIn account, and global pause controls.
-          </p>
-          <Button asChild variant="outline" size="sm" className="mt-3">
-            <Link href="/settings/channels">Manage channels</Link>
-          </Button>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>CRM &amp; integrations</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">
-            Push closed-won deals into HubSpot, Salesforce, GoHighLevel, Slack, or Monday.
-          </p>
-          <Button asChild variant="outline" size="sm" className="mt-3">
-            <Link href="/settings/integrations">Manage integrations</Link>
-          </Button>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Suppression list</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">
-            Contacts your agents must never message — unsubscribes, bounces, and manual adds.
-          </p>
-          <Button asChild variant="outline" size="sm" className="mt-3">
-            <Link href="/settings/suppression">Manage suppression</Link>
-          </Button>
-        </CardContent>
-      </Card>
+      <SettingsLink
+        title="Billing"
+        body="Plan, usage, and payment."
+        href="/settings/billing"
+        cta="Manage billing"
+      />
+      <SettingsLink
+        title="Channels"
+        body="Email sending mailboxes, LinkedIn account, and global pause controls."
+        href="/settings/channels"
+        cta="Manage channels"
+      />
+      <SettingsLink
+        title="CRM & integrations"
+        body="Push closed-won deals into your CRM and notification tools."
+        href="/settings/integrations"
+        cta="Manage integrations"
+      />
+      <SettingsLink
+        title="Suppression list"
+        body="Contacts your agents must never message — unsubscribes, bounces, and manual adds."
+        href="/settings/suppression"
+        cta="Manage suppression"
+      />
 
       <DangerZone
         accountName={account.name}
