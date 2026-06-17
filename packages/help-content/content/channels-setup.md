@@ -8,6 +8,10 @@ routes: /settings/channels, /settings
 
 The Channels page is where you configure everything that touches outbound messaging: your physical sender address, email sending infrastructure, and LinkedIn account. Set these up before you deploy an Outreach Agent — outreach won't start until the required pieces are in place.
 
+## Channel readiness at a glance
+
+At the top of the page, a readiness summary shows how many of your two channels (LinkedIn and email) are live right now, with a progress bar toward "ready to send". Each channel shows its own state — LinkedIn as **Active** or **Not connected**, and email as **Ready**, **Warming** (with an estimate of how many days until it can send), or **Not set up**. You only need one channel live for your agents to start reaching out, so this is the fastest way to confirm outreach can begin.
+
 ## Sender name
 
 Go to **Settings → Channels → Email sending** and enter your **Sender name** — this is the name your cold emails are signed with (for example, your first name). It personalises the sign-off in outgoing emails. Leave the field blank to omit the name from the sign-off.

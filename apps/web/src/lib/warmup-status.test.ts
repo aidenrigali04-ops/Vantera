@@ -1,5 +1,22 @@
 import { describe, expect, it } from "vitest";
-import { estimateReadyInDays, shapeWarmupStatus } from "./warmup-status";
+import {
+  estimateReadyInDays,
+  shapeWarmupStatus,
+  summarizeChannelReadiness,
+  type WarmupStatus,
+} from "./warmup-status";
+
+function warmup(overrides: Partial<WarmupStatus> = {}): WarmupStatus {
+  return {
+    emailPhase: "warming",
+    estReadyInDays: null,
+    mailboxesReady: 0,
+    mailboxesTotal: 0,
+    linkedinConnected: false,
+    channelsLiveNow: [],
+    ...overrides,
+  };
+}
 
 describe("estimateReadyInDays", () => {
   const now = new Date("2026-06-15T00:00:00Z");
@@ -39,5 +56,52 @@ describe("shapeWarmupStatus", () => {
     expect(dto.emailPhase).toBe("ready");
     expect(dto.estReadyInDays).toBe(0);
     expect(dto.channelsLiveNow).toContain("email");
+  });
+});
+
+describe("summarizeChannelReadiness", () => {
+  it("nothing set up → no channel live, not ready to send", () => {
+    const s = summarizeChannelReadiness(warmup());
+    expect(s.channelsLive).toBe(0);
+    expect(s.channelsTotal).toBe(2);
+    expect(s.readyToSend).toBe(false);
+    expect(s.linkedin).toBe("off");
+    expect(s.email).toBe("off");
+    expect(s.emailEtaDays).toBeNull();
+  });
+
+  it("LinkedIn active + email warming → one channel live, carries email ETA", () => {
+    const s = summarizeChannelReadiness(
+      warmup({ linkedinConnected: true, mailboxesTotal: 2, estReadyInDays: 12, channelsLiveNow: ["linkedin"] })
+    );
+    expect(s.channelsLive).toBe(1);
+    expect(s.readyToSend).toBe(true);
+    expect(s.linkedin).toBe("active");
+    expect(s.email).toBe("warming");
+    expect(s.emailEtaDays).toBe(12);
+  });
+
+  it("email ready but LinkedIn off → one channel live via email", () => {
+    const s = summarizeChannelReadiness(
+      warmup({ mailboxesReady: 1, mailboxesTotal: 1, emailPhase: "ready", estReadyInDays: 0, channelsLiveNow: ["email"] })
+    );
+    expect(s.channelsLive).toBe(1);
+    expect(s.email).toBe("ready");
+    expect(s.linkedin).toBe("off");
+    expect(s.emailEtaDays).toBeNull();
+  });
+
+  it("both channels live → fully ready", () => {
+    const s = summarizeChannelReadiness(
+      warmup({
+        linkedinConnected: true,
+        mailboxesReady: 2,
+        mailboxesTotal: 2,
+        emailPhase: "ready",
+        channelsLiveNow: ["linkedin", "email"],
+      })
+    );
+    expect(s.channelsLive).toBe(2);
+    expect(s.readyToSend).toBe(true);
   });
 });

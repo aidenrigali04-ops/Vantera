@@ -65,6 +65,39 @@ export function shapeWarmupStatus(i: ShapeInput): WarmupStatus {
 }
 
 /**
+ * Presentational readiness summary for the Channels page header. Pure transform of
+ * WarmupStatus into the two-channel (LinkedIn + email) "is outreach live yet?" view —
+ * the endowed-progress / value-proof surface. Keeps the header component dumb.
+ */
+export interface ChannelReadinessSummary {
+  /** Channels live right now (0–2). */
+  channelsLive: number;
+  /** Total channels this page configures (LinkedIn + email). */
+  channelsTotal: number;
+  /** True once at least one channel can send — outreach can go live. */
+  readyToSend: boolean;
+  linkedin: "active" | "off";
+  email: "ready" | "warming" | "off";
+  /** Days until the first warming mailbox is expected ready; only set while warming. */
+  emailEtaDays: number | null;
+}
+
+export function summarizeChannelReadiness(w: WarmupStatus): ChannelReadinessSummary {
+  const linkedin: ChannelReadinessSummary["linkedin"] = w.linkedinConnected ? "active" : "off";
+  const email: ChannelReadinessSummary["email"] =
+    w.mailboxesReady > 0 ? "ready" : w.mailboxesTotal > 0 ? "warming" : "off";
+  const channelsLive = (linkedin === "active" ? 1 : 0) + (email === "ready" ? 1 : 0);
+  return {
+    channelsLive,
+    channelsTotal: 2,
+    readyToSend: channelsLive > 0,
+    linkedin,
+    email,
+    emailEtaDays: email === "warming" ? w.estReadyInDays : null,
+  };
+}
+
+/**
  * RLS-scoped WarmupStatus loader for server components and server actions.
  * accountId MUST come from the validated session — never a client-supplied value.
  * The caller passes in the RLS-scoped Supabase server client; using the service-role
