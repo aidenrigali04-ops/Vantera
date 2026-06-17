@@ -1,4 +1,4 @@
-import { PLANS, type PlanTier } from "./plans";
+import { PLANS, type PlanTier, type BillingInterval } from "./plans";
 
 /**
  * Presentation source of truth for the pricing surface — display names, positioning,
@@ -87,6 +87,21 @@ export function annualYearlyUsd(monthlyUsd: number): number {
 /** Effective monthly price when billed annually — the big number on the annual toggle. */
 export function annualMonthlyUsd(monthlyUsd: number): number {
   return Math.round(annualYearlyUsd(monthlyUsd) / 12);
+}
+
+/**
+ * Closed deals (at `dealValueUsd` each) needed to cover a year of this plan at the chosen
+ * cadence — the honest payback line. Annual billing needs fewer (two months free). Returns
+ * null without a positive deal value, so the UI never shows a fabricated payback number.
+ */
+export function breakEvenCloses(
+  monthlyUsd: number,
+  dealValueUsd: number,
+  interval: BillingInterval
+): number | null {
+  if (dealValueUsd <= 0) return null;
+  const annualCost = interval === "year" ? annualYearlyUsd(monthlyUsd) : monthlyUsd * 12;
+  return Math.ceil(annualCost / dealValueUsd);
 }
 
 /** Quantity add-ons available on every plan (priced Stripe-side, billed per unit). */

@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useState } from "react";
 import { Check } from "lucide-react";
-import type { PlanTier } from "@vantera/billing";
+import { breakEvenCloses, type PlanTier } from "@vantera/billing";
 import { cn } from "@/lib/utils";
 import { Reveal, RevealItem, Eyebrow, PANEL_SURFACE } from "@/components/ui/panel";
 import { AnimatedPanelBorder } from "@/components/ui/animated-border";
@@ -37,6 +37,9 @@ interface Props {
   title: string;
   subtitle: string;
   enterpriseCta: React.ReactNode;
+  /** The account's average deal value (USD). When set, each card shows an honest payback line.
+   *  Omit on the public page (no deal value pre-login) so no payback is shown. */
+  dealValueUsd?: number | null;
   /** Renders a plan's CTA; receives the selected cadence so it can bill correctly. */
   renderCta: (args: { plan: PlanCard; interval: Interval; isCurrent: boolean }) => React.ReactNode;
 }
@@ -48,6 +51,7 @@ export function PricingGrid({
   title,
   subtitle,
   enterpriseCta,
+  dealValueUsd,
   renderCta,
 }: Props) {
   const [interval, setInterval] = useState<Interval>("month");
@@ -65,6 +69,10 @@ export function PricingGrid({
         {plans.map((plan) => {
           const isCurrent = plan.tier === currentTier;
           const price = interval === "year" ? plan.annualMonthlyUsd : plan.monthlyUsd;
+          const payback =
+            dealValueUsd && dealValueUsd > 0
+              ? breakEvenCloses(plan.monthlyUsd, dealValueUsd, interval)
+              : null;
           return (
             <RevealItem key={plan.tier} className="h-full">
               <div className="relative h-full rounded-2xl">
@@ -101,6 +109,13 @@ export function PricingGrid({
                         ? `Billed $${plan.annualYearlyUsd.toLocaleString()}/yr`
                         : "Billed monthly"}
                     </span>
+                    {payback != null && (
+                      <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-foreground/70">
+                        {payback === 1
+                          ? "One closed client covers the year"
+                          : `${payback} closed clients cover the year`}
+                      </span>
+                    )}
                   </div>
 
                   <ul className="flex flex-col gap-3">
