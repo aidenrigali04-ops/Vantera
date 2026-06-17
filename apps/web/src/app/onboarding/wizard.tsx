@@ -197,6 +197,11 @@ export function Wizard({ defaultCompanyName = "" }: { defaultCompanyName?: strin
                 </p>
               </>
             )}
+            <p className="text-xs text-muted-foreground">
+              One thing to expect: your agent works quality over volume — fewer, better-fit
+              messages, not a blast. A handful of strong replies beats a flood of ignored ones, and
+              Analytics shows your rates against what&apos;s healthy.
+            </p>
             <Button asChild className="rounded-2xl">
               <a href="/dashboard">Go to dashboard</a>
             </Button>
