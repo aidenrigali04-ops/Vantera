@@ -67,7 +67,7 @@ export function Hero() {
           preset="blur"
           className="font-heading max-w-4xl text-balance text-4xl font-medium tracking-tight text-foreground sm:text-5xl md:text-6xl"
         >
-          {"AI SDRs spray. This one qualifies."}
+          {"Real Value, Real Revenue, Real Simple"}
         </TextEffect>
 
         {/* The promise resolves first (headline blur), then the demo + CTA rise as one block. */}
@@ -93,7 +93,7 @@ export function Hero() {
           <div className="mt-7 flex flex-col items-center gap-2">
             <Link
               href="/signup"
-              className="rounded-[18px] bg-brand px-6 py-2.5 text-[17.5px] font-medium text-brand-foreground shadow-lg shadow-brand/20 transition-opacity hover:opacity-90"
+              className="rounded-[18px] border border-brand px-6 py-2.5 text-[17.5px] font-medium text-brand shadow-lg shadow-brand/20 transition-colors hover:bg-brand/10"
             >
               Get started free
             </Link>
