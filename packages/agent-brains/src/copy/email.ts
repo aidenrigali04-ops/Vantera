@@ -1,7 +1,7 @@
 import { generateObject, type LanguageModel } from "ai";
 import { z } from "zod";
 import { getModel } from "@vantera/ai";
-import { validateHumanity, type Violation } from "./humanizer";
+import { validateHumanity, findUngroundedClaims, type Violation } from "./humanizer";
 import { generateHumanized, leadBlock, type DraftInput } from "./shared";
 
 export const EMAIL_MAX_WORDS = 90;
@@ -37,7 +37,13 @@ Hard rules:
 - Plain human voice: no "I hope this finds you well", no "I wanted to reach out", no "game-changer"/"cutting-edge"/"seamless", no generic flattery, no "As a …" openers, at most one em-dash, at most one exclamation mark, minimal hedging.
 - Use the prospect's first name at most once. Sign-off is just the sender's first name placeholder "{{sender_name}}".`;
 
-export function validateEmailDraft(draft: { subject: string; body: string }): Violation[] {
+// `grounding` is the per-lead facts (leadBlock). When provided, the body is checked for
+// fabricated metric claims (rule 11 / anti-hallucination); unresolved ones surface in the
+// review queue rather than reaching a prospect.
+export function validateEmailDraft(
+  draft: { subject: string; body: string },
+  grounding?: string,
+): Violation[] {
   const violations = validateHumanity(draft.body, { maxWords: EMAIL_MAX_WORDS });
   const subjectWords = draft.subject.trim().split(/\s+/).filter(Boolean).length;
   if (subjectWords > SUBJECT_MAX_WORDS) {
@@ -48,6 +54,9 @@ export function validateEmailDraft(draft: { subject: string; body: string }): Vi
   }
   if (/https?:\/\//i.test(draft.body)) {
     violations.push({ rule: "no-links", detail: "no links in a first-touch email" });
+  }
+  if (grounding) {
+    violations.push(...findUngroundedClaims(`${draft.subject}\n${draft.body}`, grounding));
   }
   return violations;
 }
@@ -69,7 +78,7 @@ export async function draftEmail(
           maxOutputTokens: 700,
         })
       ).object,
-    validateEmailDraft
+    (draft) => validateEmailDraft(draft, block)
   );
   return { ...output, violations };
 }

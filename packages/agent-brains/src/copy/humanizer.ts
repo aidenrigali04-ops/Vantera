@@ -93,3 +93,41 @@ export function validateHumanity(text: string, limits: HumanityLimits = {}): Vio
 export function describeViolations(violations: Violation[]): string {
   return violations.map((v) => `${v.rule}: ${v.detail}`).join("; ");
 }
+
+// Specific metric claims a draft can fabricate: percentages, currency, multipliers. Bare
+// integers (meeting durations, years, list counts) are intentionally NOT checked — low signal,
+// high false-positive. A metric the copy states that doesn't appear in the grounding facts is
+// the 11x-class hallucination (a confident, verifiable, fabricated number) — flag it for review.
+const METRIC_PATTERNS: readonly RegExp[] = [
+  /\d+(?:\.\d+)?\s?%/g, // 40%, 40 %
+  /\$\s?\d[\d,]*(?:\.\d+)?\s?(?:k|m|b|bn|mm)?\b/gi, // $2M, $1,200, $1.2m
+  /\b\d+(?:\.\d+)?x\b/gi, // 3x, 2.5x
+];
+
+const normalizeClaim = (s: string): string => s.replace(/\s+/g, "").toLowerCase();
+
+/**
+ * Grounding check: flags specific metric claims (%, $, Nx) in `text` that don't appear in
+ * `grounding` — the per-lead facts the copy is allowed to assert (the `leadBlock`). Each
+ * distinct ungrounded metric is reported once. Matching is case- and spacing-insensitive.
+ */
+export function findUngroundedClaims(text: string, grounding: string): Violation[] {
+  const groundNorm = normalizeClaim(grounding);
+  const seen = new Set<string>();
+  const violations: Violation[] = [];
+  for (const pattern of METRIC_PATTERNS) {
+    for (const match of text.match(pattern) ?? []) {
+      const token = match.trim();
+      const key = normalizeClaim(token);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      if (!groundNorm.includes(key)) {
+        violations.push({
+          rule: "ungrounded-claim",
+          detail: `"${token}" is not supported by the prospect's data`,
+        });
+      }
+    }
+  }
+  return violations;
+}

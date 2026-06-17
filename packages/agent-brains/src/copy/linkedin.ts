@@ -1,7 +1,7 @@
 import { generateObject, type LanguageModel } from "ai";
 import { z } from "zod";
 import { getModel } from "@vantera/ai";
-import { validateHumanity, type Violation } from "./humanizer";
+import { validateHumanity, findUngroundedClaims, type Violation } from "./humanizer";
 import { generateHumanized, leadBlock, type DraftInput } from "./shared";
 
 /**
@@ -41,16 +41,26 @@ Follow-up message — under ${FOLLOWUP_MAX_CHARS} characters:
 
 Both: conversational chat register, no "Dear", no "Best regards", no signature. Plain human voice: no "I hope this finds you well", no buzzwords ("game-changer", "cutting-edge", "seamless"), no generic flattery ("big fan of", "love what you're doing"), no "As a …" openers, at most one em-dash, at most one exclamation mark, minimal hedging.`;
 
-export function validateLinkedInDraft(draft: {
-  connection_note: string;
-  followup_message: string;
-}): Violation[] {
+// `grounding` is the per-lead facts (leadBlock). When provided, both messages are checked for
+// fabricated metric claims (rule 11 / anti-hallucination); unresolved ones surface in review.
+export function validateLinkedInDraft(
+  draft: {
+    connection_note: string;
+    followup_message: string;
+  },
+  grounding?: string,
+): Violation[] {
   const violations = [
     ...validateHumanity(draft.connection_note, { maxChars: CONNECTION_NOTE_MAX_CHARS }),
     ...validateHumanity(draft.followup_message, { maxChars: FOLLOWUP_MAX_CHARS }),
   ];
   if (/https?:\/\//i.test(draft.connection_note)) {
     violations.push({ rule: "no-links", detail: "no links in a connection note" });
+  }
+  if (grounding) {
+    violations.push(
+      ...findUngroundedClaims(`${draft.connection_note}\n${draft.followup_message}`, grounding),
+    );
   }
   return violations;
 }
@@ -72,7 +82,7 @@ export async function draftLinkedIn(
           maxOutputTokens: 600,
         })
       ).object,
-    validateLinkedInDraft
+    (draft) => validateLinkedInDraft(draft, block)
   );
   return {
     connectionNote: output.connection_note,

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { MockLanguageModelV2 } from "ai/test";
 import { draftLinkedIn, validateLinkedInDraft, CONNECTION_NOTE_MAX_CHARS } from "./linkedin";
-import type { DraftInput } from "./shared";
+import { leadBlock, type DraftInput } from "./shared";
 
 const INPUT: DraftInput = {
   lead: { firstName: "Dana", title: "VP Sales", companyName: "Acme", industry: "saas" },
@@ -60,6 +60,17 @@ describe("validateLinkedInDraft", () => {
       followup_message: "fine",
     });
     expect(violations.some((v) => v.rule === "no-links")).toBe(true);
+  });
+
+  it("flags a metric claim not grounded in the lead facts", () => {
+    const violations = validateLinkedInDraft(
+      {
+        connection_note: "Dana — saw Acme grew 40% last quarter, impressive.",
+        followup_message: "Thanks for connecting. Worth a quick look?",
+      },
+      leadBlock(INPUT),
+    );
+    expect(violations.map((v) => v.rule)).toContain("ungrounded-claim");
   });
 });
 
