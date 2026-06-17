@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { MockLanguageModelV2 } from "ai/test";
-import { compactLead, rankLeads, RANK_BATCH_SIZE, type RankCandidate } from "./rank";
+import { compactLead, freshSignals, rankLeads, RANK_BATCH_SIZE, type RankCandidate } from "./rank";
 import type { LeadInsights } from "./schema";
 
 function insight(leadId: string, overrides: Partial<LeadInsights> = {}): LeadInsights {
@@ -58,6 +58,44 @@ describe("compactLead", () => {
     expect(parts[1]).toHaveLength(60);
     expect(parts[1]!.endsWith("…")).toBe(true);
     expect(parts.slice(2)).toEqual(["-", "-", "-", "-", "-", "-"]);
+  });
+
+  it("drops stale timing signals so the model doesn't treat a 2022 event as 'active'", () => {
+    const now = new Date("2026-06-16T00:00:00Z");
+    const day = 86_400_000;
+    const line = compactLead(
+      {
+        leadId: "l1",
+        signals: [
+          { kind: "hiring", detail: "fresh", observedAt: new Date(now.getTime() - 10 * day).toISOString() },
+          { kind: "funding", detail: "old", observedAt: new Date(now.getTime() - 300 * day).toISOString() },
+        ],
+      },
+      now
+    );
+    expect(line).toContain("hiring:fresh");
+    expect(line).not.toContain("funding:old");
+  });
+});
+
+describe("freshSignals", () => {
+  const now = new Date("2026-06-16T00:00:00Z");
+  const daysAgo = (n: number) => new Date(now.getTime() - n * 86_400_000).toISOString();
+
+  it("drops a timing signal older than the freshness window", () => {
+    expect(freshSignals([{ kind: "hiring", detail: "x", observedAt: daysAgo(200) }], now)).toEqual([]);
+  });
+
+  it("keeps recent + unknown-age signals, newest first", () => {
+    const out = freshSignals(
+      [
+        { kind: "old", detail: "a", observedAt: daysAgo(100) },
+        { kind: "new", detail: "b", observedAt: daysAgo(5) },
+        { kind: "unknown", detail: "c" },
+      ],
+      now
+    );
+    expect(out.map((s) => s.kind)).toEqual(["new", "old", "unknown"]);
   });
 });
 

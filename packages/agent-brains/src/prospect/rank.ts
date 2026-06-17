@@ -31,12 +31,41 @@ export interface RankContext {
 const trunc = (s: string | undefined, max = FIELD_MAX) =>
   s ? (s.length > max ? `${s.slice(0, max - 1)}…` : s) : "-";
 
+/** A timing signal older than ~6 months is stale — no longer an "active" trigger (report #9). */
+export const SIGNAL_FRESH_DAYS = 180;
+
+const signalAt = (s: ProspectSignal): number => (s.observedAt ? new Date(s.observedAt).getTime() : 0);
+
+/**
+ * Decay: drop timing signals past the freshness window and sort newest-first, so the rank brain
+ * weighs a recent trigger over a stale one and never treats a 2022 event as happening "now".
+ * Unknown-age signals are kept (can't decay what we can't date) and sort last.
+ */
+export function freshSignals(signals: ProspectSignal[], now: Date = new Date()): ProspectSignal[] {
+  return signals
+    .filter((s) => {
+      if (!s.observedAt) return true;
+      const ageDays = (now.getTime() - signalAt(s)) / 86_400_000;
+      return !Number.isFinite(ageDays) || ageDays <= SIGNAL_FRESH_DAYS;
+    })
+    .sort((a, b) => signalAt(b) - signalAt(a));
+}
+
+function signalAgeLabel(observedAt: string, now: Date): string | null {
+  const days = Math.floor((now.getTime() - new Date(observedAt).getTime()) / 86_400_000);
+  if (!Number.isFinite(days) || days < 0) return null;
+  return days < 60 ? `${days}d ago` : `${Math.round(days / 30)}mo ago`;
+}
+
 /** One pipe-delimited line per lead — compact, stable field order, lossy by design. */
-export function compactLead(c: RankCandidate): string {
+export function compactLead(c: RankCandidate, now: Date = new Date()): string {
   const tech = (c.technographics ?? []).slice(0, 3).join(",");
-  const signals = (c.signals ?? [])
+  const signals = freshSignals(c.signals ?? [], now)
     .slice(0, 3)
-    .map((s) => `${s.kind}:${trunc(s.detail, 40)}`)
+    .map((s) => {
+      const age = s.observedAt ? signalAgeLabel(s.observedAt, now) : null;
+      return `${s.kind}:${trunc(s.detail, 40)}${age ? ` (${age})` : ""}`;
+    })
     .join(",");
   return [
     c.leadId,
@@ -77,7 +106,7 @@ async function rankBatch(
   ctx: RankContext,
   model: LanguageModel
 ): Promise<LeadInsights[]> {
-  const prompt = `${contextBlock(ctx)}\n\nLeads:\n${batch.map(compactLead).join("\n")}`;
+  const prompt = `${contextBlock(ctx)}\n\nLeads:\n${batch.map((c) => compactLead(c)).join("\n")}`;
   const run = () =>
     generateObject({
       model,
