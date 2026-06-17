@@ -4,6 +4,7 @@ import type {
   ConnectorCtx,
   ConnectorResult,
   CrmConnector,
+  CrmContactLookup,
   CrmProvider,
   TokenSet,
 } from "./types";
@@ -16,6 +17,8 @@ export class InMemoryConnector implements CrmConnector {
   readonly kind: CrmConnector["kind"];
   readonly meta: CrmConnector["meta"];
   readonly pushed: ClosedDeal[] = [];
+  /** Seed by email/domain (lowercased) for findContact in dedup tests. */
+  contacts: Record<string, CrmContactLookup> = {};
   failNext = false;
 
   constructor(provider: CrmProvider = "hubspot") {
@@ -61,5 +64,17 @@ export class InMemoryConnector implements CrmConnector {
     }
     this.pushed.push(deal);
     return { ok: true, data: { externalRef: `fake-ref-${this.pushed.length}` } };
+  }
+
+  async findContact(
+    _ctx: ConnectorCtx,
+    query: { email?: string; domain?: string }
+  ): Promise<ConnectorResult<CrmContactLookup>> {
+    if (this.failNext) {
+      this.failNext = false;
+      return { ok: false, error: "Lookup failed", retryable: true };
+    }
+    const key = (query.email ?? query.domain ?? "").toLowerCase();
+    return { ok: true, data: this.contacts[key] ?? { exists: false } };
   }
 }
