@@ -202,6 +202,8 @@ export const leads = pgTable(
     // 0016: close stage (status='converted' is closed-won); value + close date for CRM push
     dealValueCents: bigint("deal_value_cents", { mode: "number" }),
     closedAt: timestamp("closed_at", { withTimezone: true }),
+    // 0028: meeting-booked stage for the attribution funnel; server-set only (not client-writable)
+    meetingBookedAt: timestamp("meeting_booked_at", { withTimezone: true }),
     status: text("status", {
       enum: [
         "sourced",

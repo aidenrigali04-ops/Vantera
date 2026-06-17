@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { buildRevenueSeries, computeGoalPace, computeRevenueSnapshot } from "./revenue";
+import {
+  buildRevenueSeries,
+  computeFunnel,
+  computeGoalPace,
+  computeRevenueSnapshot,
+  computeRoi,
+} from "./revenue";
 
 const pipeline = { qualified: 10, inOutreach: 8, replied: 4 };
 
@@ -86,6 +92,75 @@ describe("computeRevenueSnapshot", () => {
     });
     expect(s.closedPctOfGoal).toBeNull();
     expect(s.projectedPctOfGoal).toBeNull();
+  });
+});
+
+describe("computeFunnel", () => {
+  it("orders the revenue stages and computes stage-to-stage conversion", () => {
+    const f = computeFunnel({ qualified: 100, contacted: 80, replied: 20, meetings: 10, closed: 4 });
+    expect(f.map((s) => s.key)).toEqual([
+      "qualified",
+      "contacted",
+      "replied",
+      "meetings",
+      "closed",
+    ]);
+    expect(f.map((s) => s.count)).toEqual([100, 80, 20, 10, 4]);
+    expect(f[0]!.conversionPct).toBeNull(); // first stage has no predecessor
+    expect(f[1]!.conversionPct).toBe(80); // 80/100
+    expect(f[2]!.conversionPct).toBe(25); // 20/80
+    expect(f[3]!.conversionPct).toBe(50); // 10/20
+    expect(f[4]!.conversionPct).toBe(40); // 4/10
+  });
+
+  it("returns null conversion (never divides by zero) when a stage is empty", () => {
+    const f = computeFunnel({ qualified: 0, contacted: 0, replied: 0, meetings: 0, closed: 0 });
+    expect(f.every((s) => s.conversionPct === null)).toBe(true);
+  });
+});
+
+describe("computeRoi", () => {
+  it("computes annual pipeline-to-spend, the 2x threshold, and cost per meeting/close", () => {
+    // Growth plan $349/mo → $4,188/yr; pipeline $10,476 → ratio 2.5 (clears 2x).
+    const r = computeRoi({
+      closedCents: 1_000_000,
+      pipelineCents: 47_600,
+      planMonthlyCents: 34_900,
+      meetings: 5,
+      closes: 2,
+    });
+    expect(r.hasSpend).toBe(true);
+    expect(r.annualSpendCents).toBe(418_800);
+    expect(r.pipelineToSpend).toBe(2.5);
+    expect(r.meetsThreshold).toBe(true);
+    expect(r.costPerMeetingCents).toBe(6_980); // 34,900 / 5
+    expect(r.costPerCloseCents).toBe(17_450); // 34,900 / 2
+  });
+
+  it("flags when pipeline is under 2x spend, and nulls cost-per-close with no closes", () => {
+    const r = computeRoi({
+      closedCents: 0,
+      pipelineCents: 100_000,
+      planMonthlyCents: 89_900,
+      meetings: 1,
+      closes: 0,
+    });
+    expect(r.meetsThreshold).toBe(false);
+    expect(r.costPerCloseCents).toBeNull();
+  });
+
+  it("returns null ratio and costs when there is no plan price", () => {
+    const r = computeRoi({
+      closedCents: 500_000,
+      pipelineCents: 0,
+      planMonthlyCents: null,
+      meetings: 3,
+      closes: 1,
+    });
+    expect(r.hasSpend).toBe(false);
+    expect(r.pipelineToSpend).toBeNull();
+    expect(r.meetsThreshold).toBeNull();
+    expect(r.costPerMeetingCents).toBeNull();
   });
 });
 
