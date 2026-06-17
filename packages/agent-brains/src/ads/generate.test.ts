@@ -48,7 +48,7 @@ describe("generateAdConcepts", () => {
   it("requests the asked-for number of variants", async () => {
     const generate = fakeGenerate([]);
     await generateAdConcepts({ ...input, variants: 4 }, stubModel, generate);
-    const prompt = (generate as unknown as { mock: { calls: { 0: { prompt: string } }[] } }).mock.calls[0][0].prompt;
-    expect(prompt).toContain("4");
+    const calls = (generate as unknown as { mock: { calls: [{ prompt: string }][] } }).mock.calls;
+    expect(calls[0]?.[0]?.prompt).toContain("4");
   });
 });

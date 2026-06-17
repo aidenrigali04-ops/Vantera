@@ -11,6 +11,7 @@ import {
   getWarmupStatusForAccount,
   getReturnOnSpend,
   getResponderStatus,
+  getAdsStatus,
 } from "./read-tools";
 import { runCampaignSendState } from "./mutate-tools";
 
@@ -84,6 +85,14 @@ export function buildAccountTools(db: SupabaseClient, accountId: string): Copilo
         "The Inbound Responder agent: whether it's deployed and live, how it responds (auto vs review), its response-time goal, and how many inbound leads it has handled / has in review / rejected. Use for 'is my responder working?' or 'how many inbound leads have we answered?'.",
       parameters: z.object({}),
       run: async () => getResponderStatus(db, accountId),
+    },
+    {
+      name: "getAdsStatus",
+      tier: "read",
+      description:
+        "Ads activity: how many ad campaigns exist, how many concepts have been generated, and how many leads came in from ads. Use for 'how are my ads doing?' or 'how many leads did ads bring in?'.",
+      parameters: z.object({}),
+      run: async () => getAdsStatus(db, accountId),
     },
     {
       name: "pauseCampaign",
