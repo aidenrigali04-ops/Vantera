@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MockLanguageModelV2 } from "ai/test";
+import { MockLanguageModelV3 } from "ai/test";
 import { compactLead, freshSignals, rankLeads, RANK_BATCH_SIZE, type RankCandidate } from "./rank";
 import type { LeadInsights } from "./schema";
 
@@ -21,8 +21,8 @@ function insight(leadId: string, overrides: Partial<LeadInsights> = {}): LeadIns
 
 function textResponse(json: unknown) {
   return {
-    finishReason: "stop" as const,
-    usage: { inputTokens: 10, outputTokens: 20, totalTokens: 30 },
+    finishReason: { unified: "stop" as const, raw: "stop" },
+    usage: { inputTokens: { total: 10, noCache: 10, cacheRead: 0, cacheWrite: 0 }, outputTokens: { total: 20, text: 20, reasoning: 0 } },
     content: [{ type: "text" as const, text: JSON.stringify(json) }],
     warnings: [],
   };
@@ -101,7 +101,7 @@ describe("freshSignals", () => {
 
 describe("rankLeads", () => {
   it("parses structured output and maps lead ids back", async () => {
-    const model = new MockLanguageModelV2({
+    const model = new MockLanguageModelV3({
       doGenerate: textResponse({ leads: [insight("l1"), insight("ghost")] }),
     });
 
@@ -114,7 +114,7 @@ describe("rankLeads", () => {
 
   it("splits candidates into batches of RANK_BATCH_SIZE", async () => {
     const candidates = Array.from({ length: RANK_BATCH_SIZE + 1 }, (_, i) => candidate(`l${i}`));
-    const model = new MockLanguageModelV2({
+    const model = new MockLanguageModelV3({
       doGenerate: async (opts) => {
         const prompt = JSON.stringify(opts.prompt);
         const ids = candidates.filter((c) => prompt.includes(`${c.leadId}|`)).map((c) => c.leadId);
@@ -129,7 +129,7 @@ describe("rankLeads", () => {
   });
 
   it("retries once when the model returns schema-invalid output", async () => {
-    const model = new MockLanguageModelV2({
+    const model = new MockLanguageModelV3({
       doGenerate: sequence(
         textResponse({ leads: [{ lead_id: "l1", score: "not a number" }] }),
         textResponse({ leads: [insight("l1")] })
@@ -143,7 +143,7 @@ describe("rankLeads", () => {
   });
 
   it("rejects out-of-range scores via the schema", async () => {
-    const model = new MockLanguageModelV2({
+    const model = new MockLanguageModelV3({
       doGenerate: sequence(
         textResponse({ leads: [insight("l1", { score: 140 })] }),
         textResponse({ leads: [insight("l1", { score: 140 })] })
@@ -154,7 +154,7 @@ describe("rankLeads", () => {
   });
 
   it("sends seller context ahead of lead lines for prompt-cache-friendly ordering", async () => {
-    const model = new MockLanguageModelV2({
+    const model = new MockLanguageModelV3({
       doGenerate: textResponse({ leads: [insight("l1")] }),
     });
 

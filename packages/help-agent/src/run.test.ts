@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { MockLanguageModelV2, simulateReadableStream } from "ai/test";
+import { MockLanguageModelV3, simulateReadableStream } from "ai/test";
 import { z } from "zod";
 import { runCopilotTurn } from "./run";
 import { searchKnowledgeTool } from "./knowledge";
@@ -43,8 +43,8 @@ function twoStepStream(toolName: string, input: Record<string, unknown>, textAns
             },
             {
               type: "finish" as const,
-              finishReason: "tool-calls" as const,
-              usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
+              finishReason: { unified: "tool-calls" as const, raw: "tool-calls" },
+              usage: { inputTokens: { total: 10, noCache: 10, cacheRead: 0, cacheWrite: 0 }, outputTokens: { total: 5, text: 5, reasoning: 0 } },
             },
           ],
         }),
@@ -72,8 +72,8 @@ function twoStepStream(toolName: string, input: Record<string, unknown>, textAns
           },
           {
             type: "finish" as const,
-            finishReason: "stop" as const,
-            usage: { inputTokens: 20, outputTokens: 10, totalTokens: 30 },
+            finishReason: { unified: "stop" as const, raw: "stop" },
+            usage: { inputTokens: { total: 20, noCache: 20, cacheRead: 0, cacheWrite: 0 }, outputTokens: { total: 10, text: 10, reasoning: 0 } },
           },
         ],
       }),
@@ -105,8 +105,8 @@ function mutateToolCallStream(toolName: string, input: Record<string, unknown>) 
             },
             {
               type: "finish" as const,
-              finishReason: "tool-calls" as const,
-              usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
+              finishReason: { unified: "tool-calls" as const, raw: "tool-calls" },
+              usage: { inputTokens: { total: 10, noCache: 10, cacheRead: 0, cacheWrite: 0 }, outputTokens: { total: 5, text: 5, reasoning: 0 } },
             },
           ],
         }),
@@ -124,8 +124,8 @@ function mutateToolCallStream(toolName: string, input: Record<string, unknown>) 
           { type: "text-end" as const, id: "t1" },
           {
             type: "finish" as const,
-            finishReason: "stop" as const,
-            usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
+            finishReason: { unified: "stop" as const, raw: "stop" },
+            usage: { inputTokens: { total: 10, noCache: 10, cacheRead: 0, cacheWrite: 0 }, outputTokens: { total: 5, text: 5, reasoning: 0 } },
           },
         ],
       }),
@@ -143,7 +143,7 @@ describe("runCopilotTurn", () => {
       { slug: "send-modes", heading: null, content: "Automatic sends clean drafts.", similarity: 0.8 },
     ]);
 
-    const model = new MockLanguageModelV2({
+    const model = new MockLanguageModelV3({
       doStream: twoStepStream("searchKnowledge", { query: "send modes" }, "Automatic sends clean drafts."),
     });
 
@@ -184,7 +184,7 @@ describe("runCopilotTurn", () => {
       run: mutateFn,
     };
 
-    const model = new MockLanguageModelV2({
+    const model = new MockLanguageModelV3({
       doStream: mutateToolCallStream("deleteAllLeads", { confirm: true }),
     });
 
@@ -223,7 +223,7 @@ describe("runCopilotTurn", () => {
       run: runFn,
     };
 
-    const model = new MockLanguageModelV2({
+    const model = new MockLanguageModelV3({
       doStream: mutateToolCallStream("openPage", { route: "/review" }),
     });
 
@@ -264,7 +264,7 @@ describe("runCopilotTurn", () => {
     };
 
     // The model only needs to stream a final text response (summarize after mutate ran)
-    const model = new MockLanguageModelV2({
+    const model = new MockLanguageModelV3({
       doStream: async () => ({
         stream: simulateReadableStream({
           initialDelayInMs: null,
@@ -276,8 +276,8 @@ describe("runCopilotTurn", () => {
             { type: "text-end" as const, id: "t1" },
             {
               type: "finish" as const,
-              finishReason: "stop" as const,
-              usage: { inputTokens: 5, outputTokens: 5, totalTokens: 10 },
+              finishReason: { unified: "stop" as const, raw: "stop" },
+              usage: { inputTokens: { total: 5, noCache: 5, cacheRead: 0, cacheWrite: 0 }, outputTokens: { total: 5, text: 5, reasoning: 0 } },
             },
           ],
         }),
