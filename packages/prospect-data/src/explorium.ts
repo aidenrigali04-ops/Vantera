@@ -3,7 +3,7 @@ import type {
   ProspectCandidate,
   ProspectDataSource,
   ProspectFilters,
-  ProspectSignal,
+  ProspectRef,
 } from "./types";
 
 // Endpoint paths and filter keys live here only; verify against the AgentSource API
@@ -11,6 +11,9 @@ import type {
 const BASE_URL = "https://api.explorium.ai/v1";
 const DISCOVER_PATH = "/prospects";
 const ENRICH_PATH = "/prospects/contacts_information/bulk_enrich";
+// Firmographics (industry / employee count / revenue) live on the BUSINESS, keyed by business_id —
+// they are not on the /prospects row, so they must be fetched separately and joined per prospect.
+const FIRMOGRAPHICS_PATH = "/businesses/firmographics/bulk_enrich";
 
 export interface ExploriumOptions {
   apiKey?: string;
@@ -111,8 +114,11 @@ function str(row: ProviderRow, key: string): string | undefined {
 function toCandidate(row: ProviderRow): ProspectCandidate {
   return {
     externalRef: str(row, "prospect_id") ?? "",
+    businessId: str(row, "business_id"),
     companyName: str(row, "company_name") ?? "",
     companyDomain: str(row, "company_website"),
+    // company_size / company_industry are NOT on the /prospects row — they come from the
+    // firmographics enrichment (by business_id). Discovery leaves them undefined.
     companySize: str(row, "company_size"),
     industry: str(row, "company_industry"),
     location: str(row, "country_name"),
@@ -123,31 +129,46 @@ function toCandidate(row: ProviderRow): ProspectCandidate {
   };
 }
 
-function toEnriched(row: ProviderRow): EnrichedProspect {
-  const emails = Array.isArray(row.emails) ? (row.emails as ProviderRow[]) : [];
-  const phones = Array.isArray(row.phone_numbers) ? (row.phone_numbers as ProviderRow[]) : [];
-  const events = Array.isArray(row.events) ? (row.events as ProviderRow[]) : [];
-  const email = emails[0];
-  const phone = phones[0];
-  const signals: ProspectSignal[] = events.map((e) => ({
-    kind: str(e, "event_name") ?? "event",
-    detail: str(e, "event_description") ?? "",
-    observedAt: str(e, "event_time"),
-  }));
+function mapEmailStatus(s: string | undefined): EnrichedProspect["emailStatus"] {
+  if (s === "valid") return "valid";
+  if (s === "invalid") return "invalid";
+  return s ? "risky" : undefined;
+}
+
+/**
+ * Build an EnrichedProspect from the contacts-enrich payload (nested under `data`) joined with
+ * the business firmographics payload. The contacts response shape is:
+ *   { prospect_id, data: { emails:[{address,type}], professions_email, professional_email_status,
+ *                          phone_numbers:[{phone_number}], mobile_phone } }
+ * and firmographics: { data: { linkedin_industry_category, number_of_employees_range, name, ... } }.
+ */
+function buildEnriched(externalRef: string, contact: ProviderRow, firmo: ProviderRow): EnrichedProspect {
+  const emails = Array.isArray(contact.emails) ? (contact.emails as ProviderRow[]) : [];
+  const professional = emails.find((e) => str(e, "type") === "current_professional");
+  const email = str(contact, "professions_email") ?? (professional ? str(professional, "address") : undefined) ?? (emails[0] ? str(emails[0], "address") : undefined);
+
+  const phones = Array.isArray(contact.phone_numbers) ? (contact.phone_numbers as ProviderRow[]) : [];
+  const phone = str(contact, "mobile_phone") ?? (phones[0] ? str(phones[0], "phone_number") : undefined);
+
+  const technographics = Array.isArray(firmo.technologies)
+    ? (firmo.technologies as unknown[]).filter((t): t is string => typeof t === "string")
+    : undefined;
+
   return {
-    ...toCandidate(row),
-    email: email ? str(email, "email") : undefined,
-    emailStatus: email ? (str(email, "status") as EnrichedProspect["emailStatus"]) : undefined,
-    phone: phone ? str(phone, "phone_number") : undefined,
-    phoneStatus: phone ? (str(phone, "status") as EnrichedProspect["phoneStatus"]) : undefined,
-    firmographics:
-      typeof row.firmographics === "object" && row.firmographics !== null
-        ? (row.firmographics as Record<string, unknown>)
-        : undefined,
-    technographics: Array.isArray(row.technologies)
-      ? (row.technologies as unknown[]).filter((t): t is string => typeof t === "string")
-      : undefined,
-    signals: signals.length > 0 ? signals : undefined,
+    externalRef,
+    companyName: str(firmo, "name") ?? "",
+    companyDomain: str(firmo, "website"),
+    // Firmographics → the fields the rules gate / AI rank actually need (rule 06).
+    industry: str(firmo, "linkedin_industry_category") ?? str(firmo, "naics_description"),
+    companySize: str(firmo, "number_of_employees_range"),
+    location: str(firmo, "country_name"),
+    email,
+    emailStatus: mapEmailStatus(str(contact, "professional_email_status")),
+    phone,
+    phoneStatus: phone ? "valid" : undefined,
+    firmographics: Object.keys(firmo).length > 0 ? firmo : undefined,
+    technographics: technographics && technographics.length > 0 ? technographics : undefined,
+    signals: undefined,
   };
 }
 
@@ -191,9 +212,38 @@ export class ExploriumProspectData implements ProspectDataSource {
     return rows.map(toCandidate).filter((c) => c.externalRef && c.companyName);
   }
 
-  async enrichProspects(externalRefs: string[]): Promise<EnrichedProspect[]> {
-    if (externalRefs.length === 0) return [];
-    const rows = await this.post(ENRICH_PATH, { prospect_ids: externalRefs });
-    return rows.map(toEnriched).filter((c) => c.externalRef);
+  async enrichProspects(refs: ProspectRef[]): Promise<EnrichedProspect[]> {
+    if (refs.length === 0) return [];
+    const prospectIds = refs.map((r) => r.externalRef);
+
+    // contacts (emails / phones), keyed by prospect_id; response rows nest payload under `data`
+    const contactRows = await this.post(ENRICH_PATH, { prospect_ids: prospectIds });
+    const contactByRef = new Map<string, ProviderRow>();
+    for (const row of contactRows) {
+      const pid = str(row, "prospect_id");
+      const data = typeof row.data === "object" && row.data !== null ? (row.data as ProviderRow) : {};
+      if (pid) contactByRef.set(pid, data);
+    }
+
+    // firmographics (industry / employee count), keyed by business_id — one call for the
+    // unique businesses among the refs; refs without a businessId simply get no firmographics.
+    const businessIds = [...new Set(refs.map((r) => r.businessId).filter((b): b is string => Boolean(b)))];
+    const firmoByBusiness = new Map<string, ProviderRow>();
+    if (businessIds.length > 0) {
+      const firmoRows = await this.post(FIRMOGRAPHICS_PATH, { business_ids: businessIds });
+      for (const row of firmoRows) {
+        const bid = str(row, "business_id");
+        const data = typeof row.data === "object" && row.data !== null ? (row.data as ProviderRow) : {};
+        if (bid) firmoByBusiness.set(bid, data);
+      }
+    }
+
+    return refs.map((ref) =>
+      buildEnriched(
+        ref.externalRef,
+        contactByRef.get(ref.externalRef) ?? {},
+        (ref.businessId ? firmoByBusiness.get(ref.businessId) : undefined) ?? {}
+      )
+    );
   }
 }

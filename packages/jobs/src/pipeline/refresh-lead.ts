@@ -49,7 +49,9 @@ export async function runRefreshLead(
   const lead = await deps.store.loadLeadForRefresh(accountId, leadId);
   if (!lead) return "ok"; // nothing to refresh — let the normal draft proceed
 
-  const [enriched] = await deps.prospectData.enrichProspects([lead.externalRef]);
+  // businessId isn't persisted on the lead, so a refresh re-enriches contacts only (no
+  // firmographics call); the initial scout run is where firmographics are captured.
+  const [enriched] = await deps.prospectData.enrichProspects([{ externalRef: lead.externalRef }]);
   if (enriched) await deps.store.saveEnrichment(leadId, accountId, enriched);
 
   const [insight] = await deps.rankFn(

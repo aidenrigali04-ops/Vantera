@@ -103,43 +103,69 @@ describe("ExploriumProspectData", () => {
     );
   });
 
-  it("enriches via the contacts_information bulk_enrich path", async () => {
-    const { impl, calls } = fetchStub({ "/prospects": { data: [] } });
+  it("enriches via the contacts_information bulk_enrich path (contacts only when no businessId)", async () => {
+    const { impl, calls } = fetchStub({ "/prospects/contacts_information/bulk_enrich": { data: [] } });
     const source = new ExploriumProspectData({ apiKey: "k", fetchImpl: impl });
 
-    await source.enrichProspects(["ref_1"]);
+    await source.enrichProspects([{ externalRef: "ref_1" }]);
 
+    expect(calls).toHaveLength(1); // no businessId → firmographics endpoint not called
     expect(calls[0]!.url).toContain("/prospects/contacts_information/bulk_enrich");
     expect(JSON.parse(String(calls[0]!.init.body))).toEqual({ prospect_ids: ["ref_1"] });
   });
 
-  it("maps enrichment responses onto enriched prospects", async () => {
-    const { impl } = fetchStub({
-      "/prospects": {
+  it("joins the nested contacts payload with firmographics (by business_id) onto enriched prospects", async () => {
+    const { impl, calls } = fetchStub({
+      "/prospects/contacts_information/bulk_enrich": {
         data: [
           {
             prospect_id: "ref_1",
-            company_name: "Acme",
-            emails: [{ email: "dana@acme.com", status: "valid" }],
-            phone_numbers: [{ phone_number: "+15555550100", status: "valid" }],
-            technologies: ["salesforce"],
-            events: [{ event_name: "new_funding_round", event_description: "Series B", event_time: "2026-05-01" }],
+            data: {
+              emails: [
+                { address: "dana.personal@gmail.com", type: "personal" },
+                { address: "dana@acme.com", type: "current_professional" },
+              ],
+              professions_email: "dana@acme.com",
+              professional_email_status: "valid",
+              phone_numbers: [{ phone_number: "+15555550100" }],
+              mobile_phone: "+15555550100",
+            },
+          },
+        ],
+      },
+      "/businesses/firmographics/bulk_enrich": {
+        data: [
+          {
+            business_id: "biz_1",
+            data: {
+              name: "Acme",
+              website: "https://acme.com",
+              linkedin_industry_category: "software development",
+              number_of_employees_range: "11-50",
+              country_name: "united states",
+            },
           },
         ],
       },
     });
     const source = new ExploriumProspectData({ apiKey: "k", fetchImpl: impl });
 
-    const enriched = await source.enrichProspects(["ref_1"]);
+    const enriched = await source.enrichProspects([{ externalRef: "ref_1", businessId: "biz_1" }]);
+
+    // both endpoints are hit; firmographics is keyed by the unique business_ids
+    const firmoCall = calls.find((c) => c.url.includes("/businesses/firmographics/bulk_enrich"));
+    expect(firmoCall).toBeDefined();
+    expect(JSON.parse(String(firmoCall!.init.body))).toEqual({ business_ids: ["biz_1"] });
 
     expect(enriched[0]).toMatchObject({
       externalRef: "ref_1",
+      companyName: "Acme",
       email: "dana@acme.com",
       emailStatus: "valid",
       phone: "+15555550100",
       phoneStatus: "valid",
-      technographics: ["salesforce"],
-      signals: [{ kind: "new_funding_round", detail: "Series B", observedAt: "2026-05-01" }],
+      industry: "software development",
+      companySize: "11-50",
     });
   });
 

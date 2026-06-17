@@ -22,6 +22,8 @@ export interface ProspectFilters {
 /** Discovery output — cheap fields only; enrichment is spent on gate survivors (rule 05). */
 export interface ProspectCandidate {
   externalRef: string;
+  /** Provider company id — needed to fetch firmographics (industry/size) at enrichment time. */
+  businessId?: string;
   companyName: string;
   companyDomain?: string;
   companySize?: string;
@@ -31,6 +33,12 @@ export interface ProspectCandidate {
   lastName?: string;
   title?: string;
   linkedinUrl?: string;
+}
+
+/** A prospect to enrich. businessId (from discovery) unlocks firmographics; refs without it get contacts only. */
+export interface ProspectRef {
+  externalRef: string;
+  businessId?: string;
 }
 
 export interface ProspectSignal {
@@ -52,5 +60,5 @@ export interface EnrichedProspect extends ProspectCandidate {
 /** Provider-agnostic prospect discovery + enrichment interface (rule 05). Explorium is an implementation detail behind it. */
 export interface ProspectDataSource {
   discoverProspects(filters: ProspectFilters, limit: number): Promise<ProspectCandidate[]>;
-  enrichProspects(externalRefs: string[]): Promise<EnrichedProspect[]>;
+  enrichProspects(refs: ProspectRef[]): Promise<EnrichedProspect[]>;
 }

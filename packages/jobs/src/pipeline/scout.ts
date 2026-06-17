@@ -84,9 +84,11 @@ export async function runScout(agentId: string, deps: ScoutDeps): Promise<ScoutR
 
   // enrichment is spent on survivors only (rule 05)
   const enrichedByRef = new Map(
-    (await deps.prospectData.enrichProspects(survivors.map((s) => s.candidate.externalRef))).map(
-      (e) => [e.externalRef, e]
-    )
+    (
+      await deps.prospectData.enrichProspects(
+        survivors.map((s) => ({ externalRef: s.candidate.externalRef, businessId: s.candidate.businessId }))
+      )
+    ).map((e) => [e.externalRef, e])
   );
   const rankCandidates: RankCandidate[] = [];
   for (const lead of survivors) {
@@ -95,9 +97,11 @@ export async function runScout(agentId: string, deps: ScoutDeps): Promise<ScoutR
     rankCandidates.push({
       leadId: lead.leadId,
       companyName: lead.candidate.companyName,
-      companySize: lead.candidate.companySize,
-      industry: lead.candidate.industry,
-      location: lead.candidate.location,
+      // firmographics arrive at enrichment (by business_id), not discovery — prefer the
+      // enriched industry/size so the AI rank can actually judge fit (rule 06).
+      companySize: enriched?.companySize ?? lead.candidate.companySize,
+      industry: enriched?.industry ?? lead.candidate.industry,
+      location: enriched?.location ?? lead.candidate.location,
       title: lead.candidate.title,
       technographics: enriched?.technographics,
       signals: enriched?.signals,

@@ -32,12 +32,12 @@ describe("InMemoryProspectData", () => {
   it("enriches only known refs with deterministic contact data", async () => {
     const source = new InMemoryProspectData([makeCandidate({ externalRef: "p1" })]);
 
-    const enriched = await source.enrichProspects(["p1", "unknown"]);
+    const enriched = await source.enrichProspects([{ externalRef: "p1" }, { externalRef: "unknown" }]);
 
     expect(enriched).toHaveLength(1);
     expect(enriched[0]!.email).toBe("p1@enriched.example.com");
     expect(enriched[0]!.emailStatus).toBe("valid");
     expect(enriched[0]!.signals?.length).toBeGreaterThan(0);
-    expect(source.enrichCalls).toEqual([["p1", "unknown"]]);
+    expect(source.enrichCalls).toEqual([[{ externalRef: "p1" }, { externalRef: "unknown" }]]);
   });
 });

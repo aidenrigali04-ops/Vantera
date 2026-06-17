@@ -149,7 +149,7 @@ describe("runScout", () => {
     // the fake source only returns saas matches for the saas filter, so discovery
     // already excludes "bad"; assert the gate result and enrichment spend
     expect(summary.gatePassed).toBe(1);
-    expect(prospectData.enrichCalls).toEqual([["good"]]);
+    expect(prospectData.enrichCalls).toEqual([[{ externalRef: "good" }]]);
     expect(ranked.flat().join()).toContain("good");
     expect(store.enriched).toEqual(["good"]);
   });
@@ -172,7 +172,7 @@ describe("runScout", () => {
     const summary = await runScout("scout1", deps);
 
     expect(summary.gatePassed).toBe(1);
-    expect(prospectData.enrichCalls).toEqual([["fit"]]);
+    expect(prospectData.enrichCalls).toEqual([[{ externalRef: "fit" }]]);
     expect([...store.gates.values()].sort()).toEqual([false, true]);
   });
 

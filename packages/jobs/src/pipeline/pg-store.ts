@@ -233,6 +233,10 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         ...(enriched.phoneStatus !== undefined ? { phoneStatus: enriched.phoneStatus } : {}),
         ...(enriched.linkedinUrl !== undefined ? { linkedinUrl: enriched.linkedinUrl } : {}),
         ...(enriched.technographics !== undefined ? { techStack: enriched.technographics } : {}),
+        // firmographics from the business enrichment — without these the AI rank can't confirm
+        // ICP fit and caps the score (rule 06).
+        ...(enriched.industry !== undefined ? { industry: enriched.industry } : {}),
+        ...(enriched.companySize !== undefined ? { companySize: enriched.companySize } : {}),
       };
       if (Object.keys(patch).length > 0) {
         await db.update(leads).set(patch).where(eq(leads.id, leadId));

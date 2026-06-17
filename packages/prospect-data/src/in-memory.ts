@@ -3,6 +3,7 @@ import type {
   ProspectCandidate,
   ProspectDataSource,
   ProspectFilters,
+  ProspectRef,
 } from "./types";
 
 let seq = 0;
@@ -35,7 +36,7 @@ function matches(value: string | undefined, wanted: string[] | undefined): boole
 /** Test/dev double. Also the reference behavior for real adapters. */
 export class InMemoryProspectData implements ProspectDataSource {
   readonly discoverCalls: { filters: ProspectFilters; limit: number }[] = [];
-  readonly enrichCalls: string[][] = [];
+  readonly enrichCalls: ProspectRef[][] = [];
 
   constructor(private readonly pool: ProspectCandidate[] = []) {}
 
@@ -52,10 +53,11 @@ export class InMemoryProspectData implements ProspectDataSource {
       .slice(0, limit);
   }
 
-  async enrichProspects(externalRefs: string[]): Promise<EnrichedProspect[]> {
-    this.enrichCalls.push(externalRefs);
+  async enrichProspects(refs: ProspectRef[]): Promise<EnrichedProspect[]> {
+    this.enrichCalls.push(refs);
+    const wanted = new Set(refs.map((r) => r.externalRef));
     return this.pool
-      .filter((c) => externalRefs.includes(c.externalRef))
+      .filter((c) => wanted.has(c.externalRef))
       .map((c) => ({
         ...c,
         email: `${c.externalRef}@enriched.example.com`,
