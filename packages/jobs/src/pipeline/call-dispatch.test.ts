@@ -5,7 +5,7 @@ import type { CallDispatchDeps, DispatchableCall } from "./types";
 
 const baseCall: DispatchableCall = {
   id: "s1", accountId: "acc1", campaignId: "camp1", agentId: "a1", leadId: "l1",
-  brief: { openingLine: "hi", talkingPoints: [], objectionHandling: [], goalStatement: "book", bookingLink: "https://cal.com/x" },
+  brief: { openingLine: "hi", talkingPoints: [], objectionHandling: [], goalStatement: "book", bookingLink: "https://cal.com/x", violations: [] },
   phone: "+15551112222",
   config: {
     cta: "book", bookingLink: "https://cal.com/x",

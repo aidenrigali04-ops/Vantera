@@ -14,7 +14,7 @@ const ctx: CallerContext = {
     },
   },
   assets: [],
-  account: { industry: "SaaS", websiteScan: { summary: "routing software" } },
+  account: { name: "Northwind", industry: "SaaS", websiteScan: { summary: "routing software" } },
 };
 
 const lead: CallableLead = {
@@ -40,7 +40,7 @@ function deps(over: Partial<CallBriefDeps["store"]> = {}): CallBriefDeps {
     store,
     draftBriefFn: vi.fn(async () => ({
       openingLine: "Hi Sam", talkingPoints: [], objectionHandling: [],
-      goalStatement: "book", bookingLink: "https://cal.com/x",
+      goalStatement: "book", bookingLink: "https://cal.com/x", violations: [],
     })),
   };
 }

@@ -104,10 +104,15 @@ export interface CallerConfigInput {
   cta: string;
   bookingLink: string;
   voice: { voiceId: string; personaName: string; language: string };
+  brandVoice?: string;
+  guardrails?: string;
   recordingConsentMode: "one_party" | "two_party";
   callingWindow: { days: string[]; startLocal: string; endLocal: string };
   maxAttempts: number;
 }
+
+/** brand voice / guardrails are free text — cap length so a stray paste can't bloat the call prompt */
+export const BRAND_FIELD_MAX = 600;
 
 export function clampCallingWindow(w: { days: string[]; startLocal: string; endLocal: string }) {
   const start = w.startLocal < TCPA_EARLIEST ? TCPA_EARLIEST : w.startLocal;
@@ -145,6 +150,9 @@ export function parseCallerForm(form: FormData): Result<CallerFormValues> {
   const personaName = String(form.get("personaName") ?? "").trim();
   const language = String(form.get("language") ?? "en-US").trim() || "en-US";
 
+  const brandVoice = String(form.get("brandVoice") ?? "").trim().slice(0, BRAND_FIELD_MAX) || undefined;
+  const guardrails = String(form.get("guardrails") ?? "").trim().slice(0, BRAND_FIELD_MAX) || undefined;
+
   const rawConsent = form.get("recordingConsentMode");
   const recordingConsentMode =
     rawConsent === "two_party" ? "two_party" : ("one_party" as const);
@@ -179,6 +187,8 @@ export function parseCallerForm(form: FormData): Result<CallerFormValues> {
     cta,
     bookingLink,
     voice: { voiceId, personaName, language },
+    brandVoice,
+    guardrails,
     recordingConsentMode,
     callingWindow: { days: callingWindowDays, startLocal, endLocal },
     maxAttempts: isNaN(maxAttempts) ? 3 : maxAttempts,

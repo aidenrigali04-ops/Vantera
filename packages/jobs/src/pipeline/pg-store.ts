@@ -1171,12 +1171,12 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
       });
     },
 
-    // ── InboundStore (reply-pause gate) ──────────────────────────────────────
+    // ── InboundStore (sequence stop gate) ────────────────────────────────────
 
-    async pauseSequenceForReply(leadId: string, stop: boolean) {
+    async stopSequenceForReply(leadId: string) {
       await db
         .update(sequenceRuns)
-        .set({ status: stop ? "stopped" : "paused_reply", updatedAt: new Date() })
+        .set({ status: "stopped", updatedAt: new Date() })
         .where(and(eq(sequenceRuns.leadId, leadId), eq(sequenceRuns.status, "active")));
     },
 
@@ -1330,6 +1330,8 @@ function parseCallerConfig(raw: Record<string, unknown>): CallerConfig {
       personaName: (rawVoice["persona_name"] as string) ?? "",
       language: (rawVoice["language"] as string) ?? "en-US",
     },
+    brandVoice: (raw["brand_voice"] as string) || undefined,
+    guardrails: (raw["guardrails"] as string) || undefined,
     recordingConsentMode: ((raw["recording_consent_mode"] as string) ?? "one_party") as "one_party" | "two_party",
     callingWindow: {
       days: (rawWindow["days"] as string[]) ?? ["mon", "tue", "wed", "thu", "fri"],
@@ -1364,6 +1366,7 @@ export function createCallBriefStore(db: Db): CallBriefStore {
         },
         assets,
         account: {
+          name: account.name,
           industry: account.onboardingIndustry,
           websiteScan: account.websiteScan as CallerContext["account"]["websiteScan"],
         },
@@ -1628,6 +1631,15 @@ export function createVoiceInboundStore(db: Db): VoiceInboundStore {
         .insert(suppressionEntries)
         .values({ accountId, kind, value, source, leadId })
         .onConflictDoNothing();
+    },
+
+    async setMeetingBooked(leadId: string): Promise<void> {
+      // First booked call wins — keep the earliest meeting time (isNull guard). Server-only
+      // column (0028); RLS-scoped service writes, never client (the funnel can't be forged).
+      await db
+        .update(leads)
+        .set({ meetingBookedAt: new Date() })
+        .where(and(eq(leads.id, leadId), isNull(leads.meetingBookedAt)));
     },
   };
 }

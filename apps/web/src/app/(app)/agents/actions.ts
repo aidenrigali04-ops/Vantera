@@ -475,6 +475,8 @@ export async function deployCallerAgent(
       persona_name: configInput.voice.personaName,
       language: configInput.voice.language,
     },
+    brand_voice: configInput.brandVoice ?? null,
+    guardrails: configInput.guardrails ?? null,
     recording_consent_mode: configInput.recordingConsentMode,
     calling_window: {
       days: configInput.callingWindow.days,
@@ -552,6 +554,8 @@ export async function updateCallerAgent(
       persona_name: configInput.voice.personaName,
       language: configInput.voice.language,
     },
+    brand_voice: configInput.brandVoice ?? null,
+    guardrails: configInput.guardrails ?? null,
     recording_consent_mode: configInput.recordingConsentMode,
     calling_window: {
       days: configInput.callingWindow.days,

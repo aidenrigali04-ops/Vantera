@@ -6,6 +6,9 @@ describe("caller schemas", () => {
     const r = callBriefSchema.safeParse({
       opening_line: "Hi, this is Alex from Acme.",
       talking_points: ["churn is high"],
+      value_angle: "a clearer way to keep customers, the way other teams do once retention is automated",
+      consequence_hook: "And if churn keeps climbing another quarter, what does that mean for you?",
+      aha_moment: "a 15-minute look at one churn driver — nothing to prep, easy to cancel",
       objection_handling: ["if busy, offer a callback"],
       goal_statement: "book a 15-min intro",
     });

@@ -17,6 +17,8 @@ export default async function EditCallerAgentPage() {
         cta?: string;
         booking_link?: string;
         voice?: { voice_id?: string; persona_name?: string; language?: string };
+        brand_voice?: string | null;
+        guardrails?: string | null;
         recording_consent_mode?: "one_party" | "two_party";
         calling_window?: { days?: string[]; start_local?: string; end_local?: string };
         max_attempts?: number;
@@ -65,6 +67,8 @@ export default async function EditCallerAgentPage() {
         voiceId: cfg.voice?.voice_id ?? "",
         personaName: cfg.voice?.persona_name ?? "",
         language: cfg.voice?.language ?? "en-US",
+        brandVoice: cfg.brand_voice ?? "",
+        guardrails: cfg.guardrails ?? "",
         recordingConsentMode: cfg.recording_consent_mode ?? "one_party",
         callingWindowDays: cfg.calling_window?.days ?? ["Mon", "Tue", "Wed", "Thu", "Fri"],
         startLocal: cfg.calling_window?.start_local ?? "09:00",

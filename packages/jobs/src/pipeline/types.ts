@@ -403,8 +403,12 @@ export interface InboundStore {
   setLeadReplied(leadId: string, campaignId: string | null): Promise<void>;
   /** pending_review/approved/scheduled drafts for the lead → canceled; returns count */
   cancelPendingSends(leadId: string): Promise<number>;
-  /** pause the lead's active sequence run on a genuine reply; stop=true → 'stopped', else 'paused_reply' */
-  pauseSequenceForReply(leadId: string, stop: boolean): Promise<void>;
+  /**
+   * Stop the lead's active sequence run → 'stopped'. Called ONLY for hard-negative replies
+   * (not_interested / unsubscribe). A plain reply no longer stops outbound: the sequence keeps
+   * nurturing until the lead converts (conversion gate) or is exhausted.
+   */
+  stopSequenceForReply(leadId: string): Promise<void>;
   insertLeadNotification(n: { accountId: string; leadId: string; kind: "reply"; body: string }): Promise<void>;
 }
 
@@ -426,6 +430,10 @@ export interface CallerConfig {
   cta: string;
   bookingLink: string;
   voice: { voiceId: string; personaName: string; language: string };
+  /** how the agent should sound — tone/personality/brand voice (style only, never overrides compliance) */
+  brandVoice?: string;
+  /** things the agent must never say or do — topics, claims, or words to avoid */
+  guardrails?: string;
   recordingConsentMode: "one_party" | "two_party";
   callingWindow: { days: string[]; startLocal: string; endLocal: string };
   maxAttempts: number;
@@ -439,7 +447,7 @@ export const CALLER_DEFAULTS = {
 export interface CallerContext {
   agent: { id: string; accountId: string; status: string; campaignId: string | null; config: CallerConfig };
   assets: { kind: string; url: string | null; filename: string | null }[];
-  account: { industry: string | null; websiteScan: { summary?: string } | null };
+  account: { name: string | null; industry: string | null; websiteScan: { summary?: string } | null };
 }
 
 export interface CallableLead {
@@ -526,6 +534,8 @@ export interface VoiceInboundStore {
   updateCallEnded(callId: string, e: { status: string; outcome: CallOutcome; durationSec: number; recordingUrl: string | null; transcript: string | null }): Promise<void>;
   updateCallStarted(callId: string): Promise<void>;
   addSuppression(accountId: string, kind: "phone", value: string, source: "not_interested", leadId?: string): Promise<void>;
+  /** Stamp the lead's meeting-booked stage (WS-A attribution funnel) — first booked call only. */
+  setMeetingBooked(leadId: string): Promise<void>;
 }
 
 export interface VoiceInboundDeps {

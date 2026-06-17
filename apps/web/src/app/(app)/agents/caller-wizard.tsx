@@ -51,6 +51,8 @@ export type CallerEditValues = {
   voiceId: string;
   personaName: string;
   language: string;
+  brandVoice: string;
+  guardrails: string;
   recordingConsentMode: "one_party" | "two_party";
   callingWindowDays: string[];
   startLocal: string;
@@ -82,6 +84,8 @@ export function CallerWizard({
   const [voiceId, setVoiceId] = useState(edit?.voiceId ?? VOICE_OPTIONS[0]!.voiceId);
   const [personaName, setPersonaName] = useState(edit?.personaName ?? "");
   const [language, setLanguage] = useState(edit?.language ?? "en-US");
+  const [brandVoice, setBrandVoice] = useState(edit?.brandVoice ?? "");
+  const [guardrails, setGuardrails] = useState(edit?.guardrails ?? "");
 
   // Step 4: Content (links)
   const [links, setLinks] = useState(edit?.links ?? "");
@@ -159,6 +163,8 @@ export function CallerWizard({
         <input type="hidden" name="voiceId" value={voiceId} />
         <input type="hidden" name="personaName" value={personaName} />
         <input type="hidden" name="language" value={language} />
+        <input type="hidden" name="brandVoice" value={brandVoice} />
+        <input type="hidden" name="guardrails" value={guardrails} />
         <input type="hidden" name="recordingConsentMode" value={recordingConsentMode} />
         <input type="hidden" name="callingWindowDays" value={JSON.stringify(callingDays)} />
         <input type="hidden" name="startLocal" value={startLocal} />
@@ -279,6 +285,32 @@ export function CallerWizard({
                   </option>
                 ))}
               </select>
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="caller-brand-voice">Brand voice <span className="text-muted-foreground font-normal">(optional)</span></Label>
+              <Textarea
+                id="caller-brand-voice"
+                value={brandVoice}
+                onChange={(e) => setBrandVoice(e.target.value)}
+                placeholder="e.g. Warm and consultative, like a senior peer — never pushy or salesy. Plain language, a little understated."
+                maxLength={600}
+              />
+              <p className="text-xs text-muted-foreground">
+                How your agent should sound. Shapes tone only — it never overrides honesty or compliance.
+              </p>
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="caller-guardrails">Guardrails <span className="text-muted-foreground font-normal">(optional)</span></Label>
+              <Textarea
+                id="caller-guardrails"
+                value={guardrails}
+                onChange={(e) => setGuardrails(e.target.value)}
+                placeholder="e.g. Never name competitors. Don't discuss pricing on the call. Avoid jargon and hype."
+                maxLength={600}
+              />
+              <p className="text-xs text-muted-foreground">
+                Topics, claims, or words your agent must always avoid.
+              </p>
             </div>
           </div>
         )}
@@ -455,6 +487,18 @@ export function CallerWizard({
               </dd>
               <dt className="text-muted-foreground">Language</dt>
               <dd>{LANGUAGE_OPTIONS.find((l) => l.code === language)?.label ?? language}</dd>
+              {brandVoice.trim() && (
+                <>
+                  <dt className="text-muted-foreground">Brand voice</dt>
+                  <dd className="line-clamp-2">{brandVoice.trim()}</dd>
+                </>
+              )}
+              {guardrails.trim() && (
+                <>
+                  <dt className="text-muted-foreground">Guardrails</dt>
+                  <dd className="line-clamp-2">{guardrails.trim()}</dd>
+                </>
+              )}
               <dt className="text-muted-foreground">Calling days</dt>
               <dd>{callingDays.length > 0 ? callingDays.join(" · ") : "—"}</dd>
               <dt className="text-muted-foreground">Window</dt>

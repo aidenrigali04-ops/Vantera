@@ -2,6 +2,12 @@
 export interface CallBriefPayload {
   openingLine: string;
   talkingPoints: string[];
+  /** meeting-as-offer: dream outcome + one honest reason it works (Hormozi value equation) */
+  valueAngle?: string;
+  /** a neutral consequence QUESTION inviting the prospect to voice the cost of inaction (NEPQ) */
+  consequenceHook?: string;
+  /** the de-risked, low-effort, fast next step framed as the offer */
+  ahaMoment?: string;
   objectionHandling: string[];
   goalStatement: string;
   bookingLink: string;
