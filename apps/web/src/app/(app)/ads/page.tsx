@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Panel, Eyebrow } from "@/components/ui/panel";
 import { AdsGenerator } from "./ads-generator";
 
 type AdCampaignRow = {
@@ -39,8 +39,9 @@ export default async function AdsPage() {
   return (
     <div className="mx-auto max-w-3xl">
       <div className="mb-8">
-        <h1 className="text-2xl font-semibold tracking-tight">Ads</h1>
-        <p className="text-sm text-muted-foreground">
+        <Eyebrow>Demand generation</Eyebrow>
+        <h1 className="font-heading mt-3 text-3xl font-semibold tracking-tight">Ads</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
           Generate ad concepts on-brand, then turn the leads they bring in into nurtured pipeline.
         </p>
       </div>
@@ -52,27 +53,23 @@ export default async function AdsPage() {
       {rows.length > 0 && (
         <div className="flex flex-col gap-3">
           <h2 className="text-sm font-medium text-muted-foreground">Your campaigns</h2>
-          {rows.map((c) => (
-            <Card key={c.id}>
-              <CardHeader>
-                <div className="flex items-start justify-between gap-2">
-                  <CardTitle className="text-base">
-                    <Link href={`/ads/${c.id}`} className="underline-offset-4 hover:underline">
-                      {c.name}
-                    </Link>
-                  </CardTitle>
-                  <Badge variant="secondary" className="font-normal capitalize">
-                    {c.status}
-                  </Badge>
-                </div>
-                <p className="text-sm text-muted-foreground">{c.offer}</p>
-              </CardHeader>
-              <CardContent>
-                <p className="text-xs text-muted-foreground">
-                  {c.ad_creatives.length} concept{c.ad_creatives.length === 1 ? "" : "s"}
-                </p>
-              </CardContent>
-            </Card>
+          {rows.map((c, i) => (
+            <Panel key={c.id} index={i} interactive className="flex flex-col gap-3">
+              <div className="flex items-start justify-between gap-2">
+                <h3 className="font-heading text-base font-semibold">
+                  <Link href={`/ads/${c.id}`} className="underline-offset-4 hover:underline">
+                    {c.name}
+                  </Link>
+                </h3>
+                <Badge variant="secondary" className="font-normal capitalize">
+                  {c.status}
+                </Badge>
+              </div>
+              <p className="text-sm text-muted-foreground">{c.offer}</p>
+              <p className="font-mono text-xs text-muted-foreground">
+                {c.ad_creatives.length} concept{c.ad_creatives.length === 1 ? "" : "s"}
+              </p>
+            </Panel>
           ))}
         </div>
       )}

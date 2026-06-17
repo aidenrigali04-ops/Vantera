@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Panel, Eyebrow } from "@/components/ui/panel";
 
 type ResponderConfig = {
   cta?: string;
@@ -75,8 +75,8 @@ export default async function ResponderAgentPage() {
     <div className="mx-auto max-w-3xl">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">Responder Agent</p>
-          <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
+          <Eyebrow>Responder Agent</Eyebrow>
+          <h1 className="font-heading mt-3 flex items-center gap-2 text-3xl font-semibold tracking-tight">
             {agent.name}
             <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${live ? "text-emerald-600" : "text-muted-foreground"}`}>
               <span className={`size-2 rounded-full ${live ? "animate-pulse bg-emerald-500" : "bg-muted-foreground/40"}`} />
@@ -89,84 +89,76 @@ export default async function ResponderAgentPage() {
         </Button>
       </div>
 
-      <Card className="mb-4">
-        <CardHeader>
-          <CardTitle className="text-base">Connect your inbound source</CardTitle>
+      <Panel className="mb-4 flex flex-col gap-3">
+        <div className="flex flex-col gap-1.5">
+          <h2 className="font-heading text-base font-semibold">Connect your inbound source</h2>
           <p className="text-sm text-muted-foreground">
             POST a lead here the moment it arrives — speed is the edge. Sign the raw request body
             with HMAC-SHA256 using your signing secret and send it as the{" "}
             <code className="text-[11px]">X-Vantera-Signature: sha256=…</code> header.
           </p>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-3">
-          {webhookUrl ? (
-            <code className="break-all rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs">
-              {webhookUrl}
-            </code>
-          ) : (
-            <p className="text-sm text-muted-foreground">Webhook endpoint unavailable — redeploy to regenerate it.</p>
-          )}
-          <p className="text-xs text-muted-foreground">
-            Your signing secret was shown once when you deployed this agent. If you didn&apos;t save
-            it, redeploy to roll a new one.
-          </p>
-        </CardContent>
-      </Card>
+        </div>
+        {webhookUrl ? (
+          <code className="break-all rounded-xl border border-black/[0.06] bg-black/[0.03] px-3 py-2 text-xs dark:border-white/[0.08] dark:bg-white/[0.04]">
+            {webhookUrl}
+          </code>
+        ) : (
+          <p className="text-sm text-muted-foreground">Webhook endpoint unavailable — redeploy to regenerate it.</p>
+        )}
+        <p className="text-xs text-muted-foreground">
+          Your signing secret was shown once when you deployed this agent. If you didn&apos;t save
+          it, redeploy to roll a new one.
+        </p>
+      </Panel>
 
-      <Card className="mb-4">
-        <CardHeader>
-          <CardTitle className="text-base">Configuration</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
-            <dt className="text-muted-foreground">Reply goal</dt>
-            <dd>{config.cta ?? "—"}</dd>
-            <dt className="text-muted-foreground">Responds within</dt>
-            <dd>{config.slaMinutes ?? 5} min</dd>
-            <dt className="text-muted-foreground">Mode</dt>
-            <dd>{config.sendMode === "auto" ? "Automatic (clean replies send within SLA)" : "Review every reply"}</dd>
-            <dt className="text-muted-foreground">Sources</dt>
-            <dd className="flex flex-wrap gap-1.5">
-              {activeSources.length
-                ? activeSources.map((s) => (
-                    <Badge key={s} variant="secondary" className="font-normal">
-                      {s}
-                    </Badge>
-                  ))
-                : "—"}
-            </dd>
-          </dl>
-        </CardContent>
-      </Card>
+      <Panel className="mb-4 flex flex-col gap-4">
+        <h2 className="font-heading text-base font-semibold">Configuration</h2>
+        <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
+          <dt className="text-muted-foreground">Reply goal</dt>
+          <dd>{config.cta ?? "—"}</dd>
+          <dt className="text-muted-foreground">Responds within</dt>
+          <dd>{config.slaMinutes ?? 5} min</dd>
+          <dt className="text-muted-foreground">Mode</dt>
+          <dd>{config.sendMode === "auto" ? "Automatic (clean replies send within SLA)" : "Review every reply"}</dd>
+          <dt className="text-muted-foreground">Sources</dt>
+          <dd className="flex flex-wrap gap-1.5">
+            {activeSources.length
+              ? activeSources.map((s) => (
+                  <Badge key={s} variant="secondary" className="font-normal">
+                    {s}
+                  </Badge>
+                ))
+              : "—"}
+          </dd>
+        </dl>
+      </Panel>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Recent inbound</CardTitle>
+      <Panel className="flex flex-col gap-4">
+        <div className="flex flex-col gap-1.5">
+          <h2 className="font-heading text-base font-semibold">Recent inbound</h2>
           <p className="text-sm text-muted-foreground">
             Every inbound lead, qualified against your Prospect Agent&apos;s bar.
           </p>
-        </CardHeader>
-        <CardContent>
-          {rows.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No inbound leads yet. Once your form starts posting here, they&apos;ll appear in real time.
-            </p>
-          ) : (
-            <ul className="flex flex-col divide-y divide-border text-sm">
-              {rows.map((r) => (
-                <li key={r.id} className="flex items-center justify-between gap-3 py-2">
-                  <span className="truncate">{r.email ?? "(no email)"}</span>
-                  <span className="flex items-center gap-3 text-xs text-muted-foreground">
-                    <span>{SOURCE_LABELS[r.source] ?? r.source}</span>
-                    <span className={STATUS_TONE[r.status] ?? "text-muted-foreground"}>{r.status}</span>
-                    <span>{new Date(r.received_at).toLocaleDateString()}</span>
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
+        </div>
+        {rows.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            No inbound leads yet. Once your form starts posting here, they&apos;ll appear in real time.
+          </p>
+        ) : (
+          <ul className="flex flex-col divide-y divide-border text-sm">
+            {rows.map((r) => (
+              <li key={r.id} className="flex items-center justify-between gap-3 py-2">
+                <span className="truncate">{r.email ?? "(no email)"}</span>
+                <span className="flex items-center gap-3 text-xs text-muted-foreground">
+                  <span>{SOURCE_LABELS[r.source] ?? r.source}</span>
+                  <span className={STATUS_TONE[r.status] ?? "text-muted-foreground"}>{r.status}</span>
+                  <span>{new Date(r.received_at).toLocaleDateString()}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Panel>
     </div>
   );
 }

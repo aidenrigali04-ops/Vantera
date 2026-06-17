@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Panel } from "@/components/ui/panel";
 import { FormError } from "@/components/form-error";
 import { generateAdCampaign, type AdActionState } from "./actions";
 
@@ -14,16 +14,15 @@ export function AdsGenerator({ defaultTargetIcp }: { defaultTargetIcp?: string }
   const [variants, setVariants] = useState(3);
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">Generate ad concepts</CardTitle>
+    <Panel className="flex flex-col gap-4">
+      <div className="flex flex-col gap-1.5">
+        <h2 className="font-heading text-base font-semibold">Generate ad concepts</h2>
         <p className="text-sm text-muted-foreground">
           Describe the offer and who it&apos;s for. We&apos;ll write a few on-brand concepts —
           copy plus a creative brief — grounded in what you actually do. Leads who fill the form
           flow into your nurture sequence automatically.
         </p>
-      </CardHeader>
-      <CardContent>
+      </div>
         <form action={action} className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
             <Label htmlFor="ad-name">Campaign name</Label>
@@ -78,7 +77,6 @@ export function AdsGenerator({ defaultTargetIcp }: { defaultTargetIcp?: string }
             {pending ? "Generating…" : "Generate concepts"}
           </Button>
         </form>
-      </CardContent>
-    </Card>
+    </Panel>
   );
 }

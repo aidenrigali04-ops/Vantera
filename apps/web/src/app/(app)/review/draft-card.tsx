@@ -4,7 +4,7 @@ import { useActionState, useState } from "react";
 import { AlertTriangle, Mail, MessageSquare } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Panel } from "@/components/ui/panel";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { LeadProfileLink, type LeadProfile } from "@/components/lead-profile";
@@ -47,8 +47,8 @@ export function DraftCard({ draft }: { draft: DraftRow }) {
   const error = approveState.error ?? declineState.error ?? suppressState.error ?? editState.error;
 
   return (
-    <Card>
-      <CardHeader className="flex-row items-start justify-between space-y-0">
+    <Panel className="flex flex-col gap-4">
+      <div className="flex flex-row items-start justify-between gap-2">
         <div>
           <LeadProfileLink lead={lead} className="text-left font-medium hover:underline">
             {name}
@@ -66,8 +66,8 @@ export function DraftCard({ draft }: { draft: DraftRow }) {
             </Badge>
           )}
         </div>
-      </CardHeader>
-      <CardContent className="space-y-3">
+      </div>
+      <div className="space-y-3">
         {draft.style_flags && (
           <p className="flex items-start gap-1.5 rounded-md bg-amber-500/10 px-2.5 py-1.5 text-xs text-amber-700 dark:text-amber-400">
             <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
@@ -138,7 +138,7 @@ export function DraftCard({ draft }: { draft: DraftRow }) {
         )}
 
         {error && <p className="text-sm text-destructive">{error}</p>}
-      </CardContent>
-    </Card>
+      </div>
+    </Panel>
   );
 }
