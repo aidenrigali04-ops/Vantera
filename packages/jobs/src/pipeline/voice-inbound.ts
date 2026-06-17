@@ -38,5 +38,9 @@ export async function runVoiceInbound(payload: unknown, deps: VoiceInboundDeps):
   if ((outcome === "not_interested" || outcome === "do_not_call") && call.phone) {
     await deps.store.addSuppression(call.accountId, "phone", call.phone, "not_interested", call.leadId);
   }
+  // A booked call is the mid-funnel "meeting" stage the analytics funnel counts (WS-A).
+  if (outcome === "booked") {
+    await deps.store.setMeetingBooked(call.leadId);
+  }
   return { handled: true, action: `ended:${outcome}` };
 }
