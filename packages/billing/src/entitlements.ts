@@ -46,7 +46,7 @@ export function resolveEntitlements(snapshot: EntitlementSnapshot): Limits {
     maxSeats: plan.includedSeats + Math.max(0, snapshot.seatsPurchased),
     maxMailboxes: plan.maxMailboxes,
     maxCampaigns: plan.maxCampaigns,
-    maxLinkedinAccounts: Math.max(0, snapshot.linkedinAccountsPurchased),
+    maxLinkedinAccounts: plan.includedLinkedinAccounts + Math.max(0, snapshot.linkedinAccountsPurchased),
     features: plan.features,
   };
 }

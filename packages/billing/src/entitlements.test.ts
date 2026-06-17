@@ -18,8 +18,19 @@ describe("resolveEntitlements", () => {
   it("adds purchased seats on top of the tier base", () => {
     const limits = resolveEntitlements(base);
     expect(limits.maxSeats).toBe(3 + 2); // growth base 3 + 2 add-on
-    expect(limits.maxLinkedinAccounts).toBe(1);
+    expect(limits.maxLinkedinAccounts).toBe(3 + 1); // growth base 3 + 1 add-on
     expect(limits.maxCampaigns).toBe(5);
+  });
+
+  it("includes a LinkedIn account on an active plan with no add-on — the first connect is allowed (regression: 0-included blocked everyone)", () => {
+    const starter = resolveEntitlements({
+      ...base,
+      plan: "starter",
+      seatsPurchased: 0,
+      linkedinAccountsPurchased: 0,
+    });
+    expect(starter.maxLinkedinAccounts).toBe(1); // starter includes 1
+    expect(checkLimit("linkedinAccount", 0, starter).allowed).toBe(true);
   });
 
   it("grants nothing when there is no active plan", () => {

@@ -12,6 +12,8 @@ export interface PlanConfig {
   stripePriceIdAnnual: string;
   /** Seats included before the per-seat add-on is billed. */
   includedSeats: number;
+  /** LinkedIn sender accounts included before the per-account add-on is billed. */
+  includedLinkedinAccounts: number;
   maxMailboxes: number;
   maxCampaigns: number;
   /** Capability flags gated by tier. */
@@ -26,6 +28,7 @@ export const PLANS: Record<PlanTier, PlanConfig> = {
     stripePriceId: env("STRIPE_PRICE_STARTER"),
     stripePriceIdAnnual: env("STRIPE_PRICE_STARTER_ANNUAL"),
     includedSeats: 1,
+    includedLinkedinAccounts: 1,
     maxMailboxes: 3,
     maxCampaigns: 1,
     features: { aiCaller: false, metaAds: false },
@@ -35,6 +38,7 @@ export const PLANS: Record<PlanTier, PlanConfig> = {
     stripePriceId: env("STRIPE_PRICE_GROWTH"),
     stripePriceIdAnnual: env("STRIPE_PRICE_GROWTH_ANNUAL"),
     includedSeats: 3,
+    includedLinkedinAccounts: 3,
     maxMailboxes: 9,
     maxCampaigns: 5,
     features: { aiCaller: false, metaAds: true },
@@ -44,6 +48,7 @@ export const PLANS: Record<PlanTier, PlanConfig> = {
     stripePriceId: env("STRIPE_PRICE_SCALE"),
     stripePriceIdAnnual: env("STRIPE_PRICE_SCALE_ANNUAL"),
     includedSeats: 10,
+    includedLinkedinAccounts: 10,
     maxMailboxes: 30,
     maxCampaigns: 25,
     features: { aiCaller: true, metaAds: true },
