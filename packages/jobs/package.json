@@ -16,7 +16,7 @@
   },
   "dependencies": {
     "@trigger.dev/sdk": "^4.0.0",
-    "@supabase/supabase-js": "^2.108.1",
+    "@supabase/supabase-js": "^2.108.2",
     "@vantera/agent-brains": "workspace:*",
     "@vantera/crm-infra": "workspace:*",
     "@vantera/db": "workspace:*",
@@ -30,6 +30,6 @@
   "devDependencies": {
     "trigger.dev": "^4.0.0",
     "typescript": "^5.8.0",
-    "vitest": "^4.0.0"
+    "vitest": "^4.1.9"
   }
 }
