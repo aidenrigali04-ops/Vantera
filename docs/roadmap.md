@@ -52,16 +52,19 @@ Each entry stays short — the detail lives in that phase's spec (`docs/superpow
 - [ ] **Phase 8 — Analytics & revenue goal**
   Goal: users see progress toward the revenue goal they set in onboarding.
   Scope: campaign funnel analytics (sent → opened/accepted → replied → meeting → closed); revenue-goal progress tracking; deliverability health surface (white-labeled warmup/bounce data); Recharts dashboards; copilot tools for every number shown.
+  Status (2026-06-16, AI-SDR-report build): **largely built** — `/analytics` surface shipped with the conversion funnel + ROI card (annual pipeline-to-spend vs the 2× renewal bar, cost-per-meeting/close) and per-stage quality benchmarks (WS-A/B); `meeting_booked_at` stage (0028) populated by the caller's `booked` outcome; `getReturnOnSpend` copilot tool + `analytics.md`. Remaining before checkbox/ship: white-labeled **deliverability sender-health panel** (WS-C backend — health tracking/burn-pause — is live, panel is the visual surface) + campaign/ICP attribution breakdown.
   Depends on: Phases 5, 7. Key rules: 01, 07, 09.
 
 - [ ] **Phase 9 — CRM push**
   Goal: closed leads land in the customer's CRM (Vantera is not a CRM, rule 01).
   Scope: Vantera-owned `crm-infra` interface (same swappable pattern); first two connectors (HubSpot, Salesforce); field mapping UI; push-on-close + retry handling; connection health surface.
+  Status (2026-06-16): connection UI + push pipeline + retry built previously; this session added the **dedup foundation** (WS-E) — a `findContact` read path on `CrmConnector` (+ fake) and a pure `shouldSkipForCrm` gate so cold outreach skips existing customers / open deals (report #10). Remaining: wire the dedup gate into `copy-draft` (lookup per lead) + the real HubSpot `findContact` adapter + reverse-sync; then ship.
   Depends on: Phase 8 (close tracking). Key rules: 01.
 
 - [x] **Phase 10 — AI caller**
   Goal: voice outreach to phone-validated leads.
   Scope: calling provider selection (spec decides; behind a `voice-infra` interface); call scripts tailored per lead; outcomes into the reply-classification flow; consent/recording rules per jurisdiction (extend rule 11 before build).
+  Status (2026-06-16): **hardened + brief-brain upgrade merged** (`9d6ab30`) — graceful `no_caller_number` skip when `VOICE_FROM_NUMBER` unset, `placeCall` failure → `revertToApproved` (no stuck sends); brief gained `value_angle`/`consequence_hook`/`aha_moment` with a Hormozi/NEPQ method + baked-in anti-invention; `booked` outcome now stamps `meeting_booked_at` (WS-A); brief grounding guardrail flags fabricated metrics (WS-F). Operational gaps remain (Retell creds + webhook + `trigger deploy`).
   Depends on: Phase 3 (phone validation), Phase 4 (scheduler). Key rules: 01, 05, 11.
 
 - [ ] **Phase 11 — Meta Ads + nurturing**
@@ -78,6 +81,7 @@ Each entry stays short — the detail lives in that phase's spec (`docs/superpow
 
 ## Continuous tracks (no single phase)
 
+- **AI-SDR market-report build (2026-06-16)** — cross-cutting work from the competitive-intelligence report (pain points, 50–70% churn drivers, user-feedback quotes), all merged to `main` and gate-green: landing repositioned against the category trust-crisis (WS-I); anti-hallucination grounding guardrail across email/LinkedIn + caller briefs (WS-F); deliverability burn-gate that pauses a burning mailbox (WS-C, report #5); AI-rank signal decay so stale triggers don't read as active (WS-D, report #9); CRM dedup foundation (WS-E, report #10); pricing payback line (WS-G). The analytics/ROI work landed under Phase 8; the caller items under Phase 10; the inbound responder is queued as Phase 12. Deferred sub-parts are noted on their phases.
 - **UI Designer Reference workflow** (rule 07): when a reference sheet exists for a surface, the replicate-precisely loop applies to that surface's phase.
 - **Knowledge-sync** (rule 09): every user-facing change ships its help article from Phase 2 onward.
 - **Production readiness** (`docs/production-readiness.md`): the "before first real user" items must be complete before Phase 5 sends anything real.
