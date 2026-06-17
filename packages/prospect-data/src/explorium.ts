@@ -82,8 +82,15 @@ function buildFilters(filters: ProspectFilters): Record<string, FilterValues> {
   const out: Record<string, FilterValues> = {};
 
   const jobLevels = mapJobLevels(filters.titles ?? [], filters.seniorities ?? []);
-  // default to decision-makers so a sparse ICP still yields a valid, scoped request
-  out.job_level = { values: jobLevels.length > 0 ? jobLevels : ["owner", "c-suite", "founder"] };
+  // default to the full decision-maker spread so a title-only ICP (e.g. "VP of Operations",
+  // "Director of Sales") still surfaces the right people. The earlier owner/c-suite/founder
+  // default silently excluded VPs and directors, so role-titled ICPs matched almost nothing.
+  out.job_level = {
+    values:
+      jobLevels.length > 0
+        ? jobLevels
+        : ["owner", "founder", "c-suite", "partner", "vice president", "director"],
+  };
 
   const sizes = [...new Set((filters.companySizes ?? []).map(mapCompanySize).filter((s): s is string => Boolean(s)))];
   if (sizes.length > 0) out.company_size = { values: sizes };

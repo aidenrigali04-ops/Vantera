@@ -91,6 +91,18 @@ describe("ExploriumProspectData", () => {
     }
   });
 
+  it("defaults job_level to the full decision-maker spread (incl. VP + director) for a title-less ICP", async () => {
+    const { impl, calls } = fetchStub({ "/prospects": { data: [] } });
+    const source = new ExploriumProspectData({ apiKey: "k", fetchImpl: impl });
+
+    await source.discoverProspects({ companySizes: ["51-200"] }, 5);
+
+    const body = JSON.parse(String(calls[0]!.init.body));
+    expect(body.filters.job_level.values).toEqual(
+      expect.arrayContaining(["owner", "founder", "c-suite", "vice president", "director"])
+    );
+  });
+
   it("enriches via the contacts_information bulk_enrich path", async () => {
     const { impl, calls } = fetchStub({ "/prospects": { data: [] } });
     const source = new ExploriumProspectData({ apiKey: "k", fetchImpl: impl });
