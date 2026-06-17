@@ -1632,6 +1632,15 @@ export function createVoiceInboundStore(db: Db): VoiceInboundStore {
         .values({ accountId, kind, value, source, leadId })
         .onConflictDoNothing();
     },
+
+    async setMeetingBooked(leadId: string): Promise<void> {
+      // First booked call wins — keep the earliest meeting time (isNull guard). Server-only
+      // column (0028); RLS-scoped service writes, never client (the funnel can't be forged).
+      await db
+        .update(leads)
+        .set({ meetingBookedAt: new Date() })
+        .where(and(eq(leads.id, leadId), isNull(leads.meetingBookedAt)));
+    },
   };
 }
 

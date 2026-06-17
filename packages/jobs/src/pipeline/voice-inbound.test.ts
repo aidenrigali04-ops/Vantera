@@ -13,6 +13,7 @@ function deps(
     updateCallEnded: vi.fn(async () => {}),
     updateCallStarted: vi.fn(async () => {}),
     addSuppression: vi.fn(async () => {}),
+    setMeetingBooked: vi.fn(async () => {}),
     ...over,
   } as unknown as VoiceInboundDeps["store"];
   return { store, voiceInfra: new InMemoryVoiceInfra(), classifyFn: classify };
@@ -30,6 +31,18 @@ describe("runVoiceInbound", () => {
     expect(d.classifyFn).toHaveBeenCalledWith("yes book it");
     expect(d.store.updateCallEnded).toHaveBeenCalledWith("c1", expect.objectContaining({ outcome: "booked", durationSec: 88 }));
     expect(res.handled).toBe(true);
+  });
+
+  it("records the meeting on a booked outcome (lights up the analytics funnel)", async () => {
+    const d = deps(); // classify defaults to "booked"
+    await runVoiceInbound({ event_id: "e5", ...endedPayload }, d);
+    expect(d.store.setMeetingBooked).toHaveBeenCalledWith("l1");
+  });
+
+  it("does not record a meeting on a non-booked outcome", async () => {
+    const d = deps({}, vi.fn(async () => "callback" as const));
+    await runVoiceInbound({ event_id: "e6", ...endedPayload }, d);
+    expect(d.store.setMeetingBooked).not.toHaveBeenCalled();
   });
 
   it("writes phone suppression on a not_interested outcome", async () => {

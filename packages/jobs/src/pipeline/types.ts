@@ -534,6 +534,8 @@ export interface VoiceInboundStore {
   updateCallEnded(callId: string, e: { status: string; outcome: CallOutcome; durationSec: number; recordingUrl: string | null; transcript: string | null }): Promise<void>;
   updateCallStarted(callId: string): Promise<void>;
   addSuppression(accountId: string, kind: "phone", value: string, source: "not_interested", leadId?: string): Promise<void>;
+  /** Stamp the lead's meeting-booked stage (WS-A attribution funnel) — first booked call only. */
+  setMeetingBooked(leadId: string): Promise<void>;
 }
 
 export interface VoiceInboundDeps {
