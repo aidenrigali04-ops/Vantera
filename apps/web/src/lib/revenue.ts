@@ -250,3 +250,33 @@ export function computeRoi(input: RoiInput): Roi {
     costPerCloseCents: hasSpend && closes > 0 ? Math.round(monthlySpendCents / closes) : null,
   };
 }
+
+// ── Stage benchmarks (WS-B) ───────────────────────────────────────────────────
+// Quality-gated outreach sends FEWER, better-targeted touches, so absolute volume reads low. A
+// user expecting blast-volume reply counts can misread that as failure and churn. These typical
+// ranges — conservative, for *quality* outreach, not blast — let the funnel show that a user's
+// conversion rates are healthy, reframing "fewer" as the intended trade. They're reference bands,
+// never promises. Throughput stages (qualified→contacted) carry no quality band.
+
+export type StageBenchmark = { low: number; high: number; status: "below" | "healthy" | "above" };
+
+const STAGE_BANDS: Partial<Record<keyof FunnelCounts, { low: number; high: number }>> = {
+  replied: { low: 8, high: 20 }, // contacted → replied
+  meetings: { low: 30, high: 50 }, // replied → meeting
+  closed: { low: 20, high: 40 }, // meeting → close
+};
+
+/**
+ * Typical-range assessment for a funnel stage's incoming conversion %. Null for throughput
+ * stages (qualified→contacted) or when the rate isn't known yet.
+ */
+export function benchmarkForStage(
+  key: keyof FunnelCounts,
+  conversionPct: number | null
+): StageBenchmark | null {
+  const band = STAGE_BANDS[key];
+  if (!band || conversionPct == null) return null;
+  const status =
+    conversionPct < band.low ? "below" : conversionPct > band.high ? "above" : "healthy";
+  return { low: band.low, high: band.high, status };
+}

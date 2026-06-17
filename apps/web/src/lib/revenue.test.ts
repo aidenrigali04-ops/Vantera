@@ -1,11 +1,34 @@
 import { describe, expect, it } from "vitest";
 import {
+  benchmarkForStage,
   buildRevenueSeries,
   computeFunnel,
   computeGoalPace,
   computeRevenueSnapshot,
   computeRoi,
 } from "./revenue";
+
+describe("benchmarkForStage", () => {
+  it("marks a reply rate inside the typical quality-outreach band as healthy", () => {
+    expect(benchmarkForStage("replied", 12)).toEqual({ low: 8, high: 20, status: "healthy" });
+  });
+
+  it("flags below and above the band", () => {
+    expect(benchmarkForStage("replied", 5)?.status).toBe("below");
+    expect(benchmarkForStage("replied", 25)?.status).toBe("above");
+  });
+
+  it("benchmarks the meeting and close transitions too", () => {
+    expect(benchmarkForStage("meetings", 40)?.status).toBe("healthy");
+    expect(benchmarkForStage("closed", 30)?.status).toBe("healthy");
+  });
+
+  it("has no benchmark for throughput stages or missing data", () => {
+    expect(benchmarkForStage("contacted", 80)).toBeNull(); // qualified→contacted is throughput, not quality
+    expect(benchmarkForStage("qualified", null)).toBeNull();
+    expect(benchmarkForStage("replied", null)).toBeNull();
+  });
+});
 
 const pipeline = { qualified: 10, inOutreach: 8, replied: 4 };
 
