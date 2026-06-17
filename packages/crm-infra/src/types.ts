@@ -111,6 +111,17 @@ export type ConnectorResult<T> =
   | { ok: true; data: T }
   | { ok: false; error: string; retryable: boolean };
 
+// Read-back of a contact already in the customer's CRM — powers the dedup gate (report #10:
+// don't cold-outreach someone who's already a customer or in an open deal — the "janitor effect").
+export interface CrmContactLookup {
+  exists: boolean;
+  /** the CRM's lifecycle stage, normalized lowercase where possible (e.g. "customer", "lead") */
+  lifecycleStage?: string | null;
+  /** an open/active deal or opportunity is associated with this contact */
+  openDeal?: boolean;
+  lastActivityAt?: string | null;
+}
+
 // The one push interface. CRM adapters create a contact + deal; notify adapters post a
 // message / item — two implementations, never two interfaces.
 export interface CrmConnector {
@@ -130,4 +141,9 @@ export interface CrmConnector {
   ): Promise<ConnectorResult<{ externalRef?: string }>>;
   // optional: live target fields for the mapping UI
   describeFields?(ctx: ConnectorCtx): Promise<FieldDescriptor[]>;
+  // optional read-back for the dedup gate: does this contact already exist in the CRM, and how?
+  findContact?(
+    ctx: ConnectorCtx,
+    query: { email?: string; domain?: string }
+  ): Promise<ConnectorResult<CrmContactLookup>>;
 }
