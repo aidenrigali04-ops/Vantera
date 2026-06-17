@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Bot, PenLine, Phone } from "lucide-react";
+import { Bot, PenLine, Phone, Zap } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,16 +21,22 @@ export default async function AgentsPage({
   const scout = (agents as AgentRow[] | null)?.find((a) => a.kind === "scout") ?? null;
   const copy = (agents as AgentRow[] | null)?.find((a) => a.kind === "copy") ?? null;
   const caller = (agents as AgentRow[] | null)?.find((a) => a.kind === "caller") ?? null;
+  const responder = (agents as AgentRow[] | null)?.find((a) => a.kind === "responder") ?? null;
 
   // value proof: real pipeline counts, never placeholders
-  const [{ count: qualified }, { count: sourced }, { count: drafts }] = await Promise.all([
-    supabase.from("leads").select("id", { count: "exact", head: true }).eq("status", "qualified"),
-    supabase.from("leads").select("id", { count: "exact", head: true }),
-    supabase
-      .from("scheduled_sends")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "pending_review"),
-  ]);
+  const [{ count: qualified }, { count: sourced }, { count: drafts }, { count: inboundResponded }] =
+    await Promise.all([
+      supabase.from("leads").select("id", { count: "exact", head: true }).eq("status", "qualified"),
+      supabase.from("leads").select("id", { count: "exact", head: true }),
+      supabase
+        .from("scheduled_sends")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "pending_review"),
+      supabase
+        .from("inbound_leads")
+        .select("id", { count: "exact", head: true })
+        .in("status", ["responded", "review"]),
+    ]);
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -67,6 +73,16 @@ export default async function AgentsPage({
               It briefs calls as qualified leads arrive — every call waits in your review queue,
               nothing dials without you.
             </>
+          ) : deployed === "responder" ? (
+            <>
+              <span className="font-medium">{responder?.name ?? "Your Responder Agent"} is live.</span>{" "}
+              It qualifies and answers inbound leads the moment they arrive — point your form at its
+              webhook (shown on its{" "}
+              <Link href="/agents/responder" className="underline underline-offset-2">
+                agent page
+              </Link>
+              ).
+            </>
           ) : (
             <>
               <span className="font-medium">{copy?.name ?? "Your Outreach Agent"} is live.</span>{" "}
@@ -77,7 +93,7 @@ export default async function AgentsPage({
         </div>
       )}
 
-      {!scout && !copy && !caller ? (
+      {!scout && !copy && !caller && !responder ? (
         <Card className="border-dashed">
           <CardHeader className="items-center text-center">
             <Bot className="mx-auto size-10 text-muted-foreground" />
@@ -147,6 +163,29 @@ export default async function AgentsPage({
               <CardContent>
                 <Button asChild variant="outline" data-copilot="deploy-caller">
                   <Link href="/agents/new/caller">Set up your Caller Agent</Link>
+                </Button>
+              </CardContent>
+            </Card>
+          ) : null}
+          {responder ? (
+            <AgentCard
+              agent={responder}
+              roleLabel="Responder Agent"
+              stats={[{ label: "Inbound handled", value: inboundResponded ?? 0 }]}
+            />
+          ) : scout ? (
+            <Card className="border-dashed">
+              <CardHeader>
+                <Zap className="size-6 text-muted-foreground" />
+                <CardTitle className="text-base">Add a Responder Agent</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  When a lead fills your form, speed wins. A Responder Agent qualifies and replies
+                  within minutes — using the same bar {scout.name} sets, so fast never means spray.
+                </p>
+              </CardHeader>
+              <CardContent>
+                <Button asChild variant="outline" data-copilot="deploy-responder">
+                  <Link href="/agents/new/responder">Set up your Responder Agent</Link>
                 </Button>
               </CardContent>
             </Card>

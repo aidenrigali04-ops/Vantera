@@ -14,6 +14,7 @@ import {
   crmPushEvents,
   enrichmentResults,
   icps,
+  inboundLeads,
   leadNotifications,
   leads,
   linkedinAccounts,
@@ -49,6 +50,10 @@ import {
   type DueSequenceRun,
   type FreshLead,
   type InboundStore,
+  type InboundRespondJobStore,
+  type ResponderConfig,
+  type ResponderContext,
+  RESPONDER_DEFAULTS,
   type LeadChannels,
   type MailboxSmtpStore,
   type NewScheduledSend,
@@ -1769,6 +1774,139 @@ export function createCrmPushStore(db: Db): CrmPushStore {
         .where(and(eq(crmPushEvents.status, "pending"), lte(crmPushEvents.nextRetryAt, now)))
         .limit(limit);
       return rows.map((r) => r.id);
+    },
+  };
+}
+
+// ── InboundRespondJobStore (Phase 12) ───────────────────────────────────────────
+
+function parseResponderConfig(raw: Record<string, unknown>): ResponderConfig & { cta: string } {
+  const sources = (raw.sources ?? {}) as Record<string, unknown>;
+  return {
+    sendMode: raw.sendMode === "auto" ? "auto" : "review",
+    slaMinutes:
+      typeof raw.slaMinutes === "number" && raw.slaMinutes > 0
+        ? raw.slaMinutes
+        : RESPONDER_DEFAULTS.slaMinutes,
+    sources: {
+      formFill: sources.formFill !== false,
+      websiteVisitor: sources.websiteVisitor === true,
+      signal: sources.signal === true,
+    },
+    cta: typeof raw.cta === "string" && raw.cta.trim() ? raw.cta : "a quick look",
+  };
+}
+
+export function createInboundRespondStore(db: Db): InboundRespondJobStore {
+  return {
+    async getResponderContext(agentId: string): Promise<ResponderContext | null> {
+      const [agent] = await db.select().from(agents).where(eq(agents.id, agentId));
+      if (!agent || agent.kind !== "responder") return null;
+      const [account] = await db.select().from(accounts).where(eq(accounts.id, agent.accountId));
+      if (!account) return null;
+      const config = parseResponderConfig((agent.config ?? {}) as Record<string, unknown>);
+      const scan = account.websiteScan as { summary?: string } | null;
+      return {
+        agent: {
+          id: agent.id,
+          accountId: agent.accountId,
+          status: agent.status,
+          campaignId: agent.campaignId,
+          config: { sendMode: config.sendMode, slaMinutes: config.slaMinutes, sources: config.sources },
+        },
+        cta: config.cta,
+        accountName: account.name,
+        accountIndustry: account.onboardingIndustry,
+        valueProp: scan?.summary ?? null,
+      };
+    },
+
+    async recordInbound(e): Promise<string> {
+      const [row] = await db
+        .insert(inboundLeads)
+        .values({
+          accountId: e.accountId,
+          agentId: e.agentId,
+          source: e.source,
+          email: e.email,
+          firstName: e.firstName,
+          companyName: e.companyName,
+          payload: (e.payload ?? {}) as object,
+          status: "received",
+        })
+        .returning({ id: inboundLeads.id });
+      if (!row) throw new Error("inbound_leads insert returned no row");
+      return row.id;
+    },
+
+    async isSuppressed(accountId: string, kind: "email", value: string): Promise<boolean> {
+      const [hit] = await db
+        .select({ id: suppressionEntries.id })
+        .from(suppressionEntries)
+        .where(
+          and(
+            eq(suppressionEntries.accountId, accountId),
+            eq(suppressionEntries.kind, kind),
+            eq(suppressionEntries.value, value)
+          )
+        )
+        .limit(1);
+      return Boolean(hit);
+    },
+
+    async upsertInboundLeadRow(e): Promise<string> {
+      // Match an existing lead by email within the account before creating one.
+      const [existing] = await db
+        .select({ id: leads.id })
+        .from(leads)
+        .where(and(eq(leads.accountId, e.accountId), eq(leads.email, e.email)))
+        .limit(1);
+      if (existing) return existing.id;
+      const [row] = await db
+        .insert(leads)
+        .values({
+          accountId: e.accountId,
+          source: "inbound",
+          email: e.email,
+          firstName: e.firstName,
+          companyName: e.companyName,
+          status: "sourced",
+        })
+        .returning({ id: leads.id });
+      if (!row) throw new Error("inbound lead insert returned no row");
+      return row.id;
+    },
+
+    async saveScore(leadId: string, insights: LeadInsights, qualified: boolean): Promise<void> {
+      await db
+        .update(leads)
+        .set({
+          aiScore: Math.round(insights.score),
+          aiRationale: insights.rationale,
+          aiInsights: toStoredInsights(insights),
+          scoredAt: new Date(),
+          status: qualified ? "qualified" : "rejected",
+        })
+        .where(eq(leads.id, leadId));
+    },
+
+    async ensureCampaignLead(campaignId: string, leadId: string, accountId: string): Promise<void> {
+      await db.insert(campaignLeads).values({ campaignId, leadId, accountId }).onConflictDoNothing();
+    },
+
+    async insertScheduledSend(send: NewScheduledSend): Promise<void> {
+      await db.insert(scheduledSends).values(toRow(send));
+    },
+
+    async finalizeInbound(inboundId, e): Promise<void> {
+      await db
+        .update(inboundLeads)
+        .set({
+          status: e.status,
+          ...(e.leadId ? { leadId: e.leadId } : {}),
+          ...(e.respondedAt ? { respondedAt: e.respondedAt } : {}),
+        })
+        .where(eq(inboundLeads.id, inboundId));
     },
   };
 }

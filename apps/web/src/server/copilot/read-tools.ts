@@ -259,3 +259,57 @@ export async function getReturnOnSpend(db: SupabaseClient): Promise<ReturnOnSpen
     onPaidPlan: roi.hasSpend,
   };
 }
+
+export interface ResponderStatusDTO {
+  deployed: boolean;
+  agentName: string | null;
+  live: boolean;
+  sendMode: "auto" | "review" | null;
+  slaMinutes: number | null;
+  inbound: { responded: number; inReview: number; rejected: number; total: number };
+}
+
+/**
+ * Inbound Responder status for the copilot: whether one is deployed, how it responds, and the
+ * inbound funnel (handled / in review / rejected). Answers "is my responder working?" / "how many
+ * inbound leads have we answered?". RLS scopes the read to the caller's account (rule 02).
+ */
+export async function getResponderStatus(
+  db: SupabaseClient,
+  _accountId: string
+): Promise<ResponderStatusDTO> {
+  const { data: agent } = await db
+    .from("agents")
+    .select("name, status, config")
+    .eq("kind", "responder")
+    .limit(1)
+    .maybeSingle();
+  const a = agent as
+    | { name?: string; status?: string; config?: { sendMode?: string; slaMinutes?: number } }
+    | null;
+  if (!a) {
+    return {
+      deployed: false,
+      agentName: null,
+      live: false,
+      sendMode: null,
+      slaMinutes: null,
+      inbound: { responded: 0, inReview: 0, rejected: 0, total: 0 },
+    };
+  }
+  const { data: inbound } = await db.from("inbound_leads").select("status");
+  const rows: { status: string }[] = (inbound as { status: string }[] | null) ?? [];
+  return {
+    deployed: true,
+    agentName: a.name ?? null,
+    live: a.status === "live",
+    sendMode: a.config?.sendMode === "auto" ? "auto" : "review",
+    slaMinutes: typeof a.config?.slaMinutes === "number" ? a.config.slaMinutes : null,
+    inbound: {
+      responded: rows.filter((r) => r.status === "responded").length,
+      inReview: rows.filter((r) => r.status === "review").length,
+      rejected: rows.filter((r) => r.status === "rejected").length,
+      total: rows.length,
+    },
+  };
+}

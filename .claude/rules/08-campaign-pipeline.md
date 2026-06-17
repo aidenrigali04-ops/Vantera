@@ -33,6 +33,15 @@ Name Your Agent → Targeting (read-only, inherited from Scout) → Goal & Booki
 - **Wizard scope rule**: same as Outreach — steps collect only identity, goal, content context, and the calling window. Conversation strategy belongs to the brain; timing and retry mechanics belong to the scheduler.
 - **Behavior contract**: as leads qualify, the brain drafts a per-lead **call brief** into the shared review queue (`scheduled_sends` with `channel = 'call'`, `status = 'pending_review'`; the structured brief rides in the `brief` jsonb). The calling system places no call until the brief is approved in the review queue. Dispatch places calls exclusively within the configured calling window, timed to the prospect's local timezone, and records each attempt in the `calls` table. Outcomes (`booked`, `callback`, `not_interested`, `no_answer`, `voicemail`, `do_not_call`) are classified by the calling system after each call ends. `not_interested` and `do_not_call` write the number to the suppression list immediately — no manual step required.
 
+### Responder Agent (kind `responder`)
+```
+Name Your Agent → Targeting (read-only, inherited from Scout) → Goal (CTA) → Inbound sources → Deploy
+```
+- **Requires a deployed Scout agent**; inherits its ICPs and qualification gate. Inbound leads are scored against the **same bar** (rule 06) — fast inbound response is the report's defensible edge, but the gate keeps "fast" from meaning "spray."
+- **Wizard scope rule**: same as Outreach/Caller — steps collect only identity, goal, inbound source selection, response SLA, and send mode. Qualification + drafting strategy belong to the brains.
+- **Front door**: deploying the agent mints a public `intake_id` (the `/api/webhooks/inbound/[intakeId]` URL the customer points their form/site/signal source at) plus a **signing secret** shown **once** at deploy (stored encrypted, service-role only in `inbound_intake_secrets`). The customer signs each request body with HMAC-SHA256 (`X-Vantera-Signature: sha256=…`); unsigned/invalid requests are rejected and audited.
+- **Behavior contract**: on a verified inbound event the pipeline checks suppression (rule 11), qualifies via the AI rank gate, and drafts a reply with the copy brain. In **review** mode every reply waits in the queue; in **auto** mode a clean draft sends within the SLA while any humanizer-flagged draft routes to review (never silent-sends an ungrounded claim, rule 06/11). Every inbound event is logged in `inbound_leads` with its outcome (received/qualified/rejected/suppressed/review/responded) and an intake→response latency for SLA tracking. Speed is the product.
+
 ## Agent behavior contract after deploy
 
 1. **Scheduler** (Trigger.dev cron, every 15 min) scans live Scout agents by `agents.next_run_at` — schedule state lives in our DB; pause is a status flip.

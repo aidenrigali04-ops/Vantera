@@ -1,19 +1,27 @@
 "use server";
 
+import { randomUUID, randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { encryptSecretWithKeyring } from "@vantera/email-infra";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 import {
   parseCopyForm,
   parseScoutForm,
   parseCallerForm,
+  parseResponderForm,
   validateCallerConfig,
   clampCallingWindow,
   MAX_ICPS,
 } from "./validation";
 import { gate, loadBillingRow, hasActivePlan } from "@/lib/billing/entitlement";
 
-export type AgentActionState = { error?: string };
+export type AgentActionState = {
+  error?: string;
+  /** one-time reveal after a Responder deploy: the intake URL path + signing secret */
+  responderDeployed?: { intakePath: string; signingSecret: string };
+};
 
 const MAX_FILES = 5;
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
@@ -513,6 +521,109 @@ export async function deployCallerAgent(
 
   revalidatePath("/agents");
   redirect("/agents?deployed=caller");
+}
+
+/**
+ * Deploy an Inbound Responder agent (kind 'responder', Phase 12). It inherits the Scout's
+ * targeting for the qualification gate (fast inbound response is the report's defensible edge,
+ * but the gate keeps fast from meaning spray). Mints a public intake id + a signing secret
+ * (stored encrypted, service-role only) and returns the secret ONCE so the user can wire their
+ * form provider — it's never shown again.
+ */
+export async function deployResponderAgent(
+  _prev: AgentActionState,
+  formData: FormData
+): Promise<AgentActionState> {
+  const parsed = parseResponderForm(formData);
+  if (!parsed.ok) return { error: parsed.error };
+  const { name, cta, sendMode, slaMinutes, sources } = parsed.values;
+
+  const { supabase, user, account } = await sessionAccount();
+  if (!user || !account) return { error: "Your session expired. Sign in again." };
+
+  // inherits the Scout's targeting — require a deployed Scout first
+  const { data: scout } = await supabase
+    .from("agents")
+    .select("id")
+    .eq("account_id", account.id)
+    .eq("kind", "scout")
+    .limit(1)
+    .maybeSingle<{ id: string }>();
+  if (!scout) return { error: "Deploy a Prospect Agent first — it feeds this agent its leads." };
+
+  const { data: scoutIcps } = await supabase
+    .from("agent_icps")
+    .select("icps(name)")
+    .eq("agent_id", scout.id)
+    .order("position");
+  const icpNames = (scoutIcps ?? [])
+    .map((r) => (r.icps as unknown as { name: string } | null)?.name)
+    .filter((n): n is string => Boolean(n))
+    .slice(0, MAX_ICPS);
+
+  // internal execution campaign — never a user surface (agents are the front door)
+  const { data: campaign, error: campaignError } = await supabase
+    .from("campaigns")
+    .insert({
+      account_id: account.id,
+      name: `${name} (agent)`,
+      status: "active",
+      channels: ["email"],
+      targeting: icpNames.map((value) => ({ type: "icp", value })),
+      copywriting_mode: "agent",
+      send_mode: sendMode === "auto" ? "automatic" : "review",
+      created_by: user.id,
+    })
+    .select("id")
+    .single<{ id: string }>();
+  if (campaignError || !campaign) {
+    return { error: "Could not deploy the agent. Only workspace admins can do this." };
+  }
+
+  // public webhook identifier (safe to expose) — the signing secret stays server-only.
+  const intakeId = randomUUID();
+  const config = { cta, sendMode, slaMinutes, sources, intakeId };
+
+  const { data: agent, error: agentError } = await supabase
+    .from("agents")
+    .insert({
+      account_id: account.id,
+      kind: "responder",
+      name,
+      status: "live",
+      config,
+      campaign_id: campaign.id,
+      deployed_at: new Date().toISOString(),
+      created_by: user.id,
+    })
+    .select("id")
+    .single<{ id: string }>();
+  if (agentError || !agent) {
+    await supabase.from("campaigns").delete().eq("id", campaign.id);
+    if (agentError?.code === "23505") {
+      return { error: "You already have a Responder Agent. Pause or edit it from the Agents page." };
+    }
+    return { error: "Could not deploy the agent. Only workspace admins can do this." };
+  }
+
+  // mint + persist the signing secret (encrypted, service-role only — RLS blocks client writes)
+  const signingSecret = `whsec_${randomBytes(24).toString("base64url")}`;
+  const service = createServiceClient();
+  const { error: secretError } = await service.from("inbound_intake_secrets").insert({
+    account_id: account.id,
+    agent_id: agent.id,
+    intake_id: intakeId,
+    secret_enc: encryptSecretWithKeyring(signingSecret),
+  });
+  if (secretError) {
+    // roll back so the responder isn't left without a verifiable webhook
+    await supabase.from("agents").delete().eq("id", agent.id);
+    await supabase.from("campaigns").delete().eq("id", campaign.id);
+    return { error: "Could not finish setup. Try deploying again." };
+  }
+
+  revalidatePath("/agents");
+  return { responderDeployed: { intakePath: `/api/webhooks/inbound/${intakeId}`, signingSecret } };
 }
 
 /**
