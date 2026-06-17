@@ -9,7 +9,16 @@ const req: PlaceCallRequest = {
   voiceId: "v1",
   language: "en-US",
   personaName: "Alex",
-  brief: { openingLine: "hi", talkingPoints: ["a"], objectionHandling: [], goalStatement: "book", bookingLink: "https://cal.com/x" },
+  brief: {
+    openingLine: "hi",
+    talkingPoints: ["a"],
+    valueAngle: "a clearer way to cut routing time",
+    consequenceHook: "what does that mean for you?",
+    ahaMoment: "a 15-minute look, easy to cancel",
+    objectionHandling: [],
+    goalStatement: "book",
+    bookingLink: "https://cal.com/x",
+  },
   announceRecording: true,
   callRef: "call_1",
 };
@@ -34,6 +43,17 @@ describe("RetellVoiceInfra.placeCall", () => {
     const body = JSON.parse(init.body as string);
     expect(body.to_number).toBe("+15551112222");
     expect(body.metadata.call_ref).toBe("call_1");
+  });
+
+  it("speaks the value angle, consequence question, and de-risked ask in the prompt", async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ call_id: "pc_1" }), { status: 201 }));
+    const infra = new RetellVoiceInfra({ apiKey: "k", fetchImpl: fetchMock });
+    await infra.placeCall(req);
+    const [, init] = (fetchMock as ReturnType<typeof vi.fn>).mock.calls[0] as [string, RequestInit];
+    const prompt = JSON.parse(init.body as string).retell_llm_dynamic_variables.prompt as string;
+    expect(prompt).toContain("a clearer way to cut routing time");
+    expect(prompt).toContain("what does that mean for you?");
+    expect(prompt).toContain("a 15-minute look, easy to cancel");
   });
 
   it("includes override_agent_id when an agentId is configured", async () => {

@@ -14,7 +14,7 @@ const ctx: CallerContext = {
     },
   },
   assets: [],
-  account: { industry: "SaaS", websiteScan: { summary: "routing software" } },
+  account: { name: "Northwind", industry: "SaaS", websiteScan: { summary: "routing software" } },
 };
 
 const lead: CallableLead = {

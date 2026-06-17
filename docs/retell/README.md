@@ -19,7 +19,8 @@ The `knowledge-base/` files are the clean, upload-ready copies (no internal refe
 The adapter is `packages/voice-infra/src/retell.ts`. On `placeCall` it sends, in
 `retell_llm_dynamic_variables`:
 - **`prompt`** — `briefToPrompt(req)`: the per-lead Call Brief (persona name, opening line,
-  talking points, objection cues, goal + booking link) built by
+  talking points, a consequence question, the meeting's value angle, the de-risked next step,
+  objection cues, goal + booking link) built by
   `packages/agent-brains/src/caller/brief.ts`.
 - **`voice_id`**, **`language`**.
 
@@ -62,4 +63,8 @@ written to make those endings explicit so classification is clean.
   so the methodology layer stays reusable.
 - Methods are sourced from established B2B sales practice: Josh Braun (permission openers),
   Chris Voss / *Never Split the Difference* (tactical empathy), Rackham *SPIN Selling*,
-  Keenan *Gap Selling*, Dixon & Adamson *The Challenger Sale*, Cialdini *Influence*.
+  Keenan *Gap Selling*, Dixon & Adamson *The Challenger Sale*, Cialdini *Influence*,
+  Jeremy Miner *NEPQ / The New Model of Selling* (tonality, detached frame, consequence
+  questions, Clarify–Discuss–Diffuse), Alex Hormozi *$100M Offers* (value equation:
+  the meeting framed as the offer, risk reversal). Adopt the value-communication and
+  diagnosis logic, not the urgency/scarcity tactics — honest speed framing only.

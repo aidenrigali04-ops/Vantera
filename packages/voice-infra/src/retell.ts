@@ -17,13 +17,17 @@ export interface RetellConfig {
 
 /** Composes the agent prompt the provider speaks from the structured brief. */
 function briefToPrompt(req: PlaceCallRequest): string {
+  const b = req.brief;
   const lines = [
-    `You are ${req.personaName}, a friendly B2B sales rep. Speak naturally, never robotic.`,
+    `You are ${req.personaName}, a human-sounding B2B rep on a cold call. Speak naturally, never robotic. Stay calm and a little detached — you're finding out whether you can help, not pushing for the booking.`,
     req.announceRecording ? `First, briefly say the call may be recorded.` : null,
-    `Open with: "${req.brief.openingLine}"`,
-    req.brief.talkingPoints.length ? `Talking points: ${req.brief.talkingPoints.join("; ")}` : null,
-    req.brief.objectionHandling.length ? `If objections: ${req.brief.objectionHandling.join("; ")}` : null,
-    `Goal: ${req.brief.goalStatement}. To book, offer this link: ${req.brief.bookingLink}.`,
+    `Open with: "${b.openingLine}"`,
+    b.talkingPoints.length ? `Diagnose, don't pitch — work through (one idea per turn, then stop): ${b.talkingPoints.join("; ")}` : null,
+    b.consequenceHook ? `Once they name a problem, ask this in a concerned-but-calm tone and let them answer fully: "${b.consequenceHook}"` : null,
+    b.valueAngle ? `When you make the ask, frame the meeting itself as the offer: ${b.valueAngle}` : null,
+    b.ahaMoment ? `Keep the ask small and low-risk: ${b.ahaMoment}` : null,
+    b.objectionHandling.length ? `If objections (clarify → discuss like a friend → diffuse; shrink the ask, reverse the risk): ${b.objectionHandling.join("; ")}` : null,
+    `Goal: ${b.goalStatement}. To book, offer this link: ${b.bookingLink}.`,
   ];
   return lines.filter((l): l is string => l !== null).join("\n");
 }

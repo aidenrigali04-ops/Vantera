@@ -5,7 +5,7 @@ import type { DraftInput } from "../copy/shared";
 const input: DraftInput = {
   lead: { firstName: "Sam", lastName: "Lee", title: "VP Ops", companyName: "Acme", industry: "Logistics" },
   insights: { pain_points: ["manual routing"], triggers: ["new funding"], motivations: ["scale"], value_angle: "cut routing time", aha_moment: "auto-routing", summary: "ops leader" },
-  context: { cta: "book a 15-min intro", valueProp: "routing software", accountIndustry: "SaaS" },
+  context: { cta: "book a 15-min intro", valueProp: "routing software", accountName: "Northwind", accountIndustry: "SaaS", brandVoice: "warm and consultative", guardrails: "never name competitors" },
 };
 
 function fakeModel(obj: unknown) {
@@ -18,6 +18,9 @@ describe("draftCallBrief", () => {
       object: {
         opening_line: "Hi Sam, this is Alex from Acme.",
         talking_points: ["manual routing is costing you"],
+        value_angle: "a clearer way to cut routing time, the way other ops teams do once it's automated",
+        consequence_hook: "And if routing stays manual another quarter, what does that mean for you?",
+        aha_moment: "a 15-minute look at one route — easy to cancel, nothing to prep",
         objection_handling: ["if busy, offer a callback"],
         goal_statement: "book a 15-min intro",
       },
@@ -31,6 +34,15 @@ describe("draftCallBrief", () => {
     expect(brief.openingLine).toContain("Alex");
     expect(brief.openingLine).not.toMatch(/recorded/i);
     expect(brief.talkingPoints).toEqual(["manual routing is costing you"]);
+    expect(brief.valueAngle).toContain("cut routing time");
+    expect(brief.consequenceHook).toMatch(/\?$/);
+    expect(brief.ahaMoment).toContain("15-minute");
+    // brand voice + guardrails + seller company reach the generator's prompt
+    for (const fragment of ["warm and consultative", "never name competitors", "Northwind"]) {
+      expect(generate).toHaveBeenCalledWith(
+        expect.objectContaining({ prompt: expect.stringContaining(fragment) })
+      );
+    }
   });
 
   it("prepends a recorded-line disclosure for two-party consent", async () => {
