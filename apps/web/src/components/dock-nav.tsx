@@ -3,14 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  BarChart3,
   Bot,
   Inbox,
   LayoutDashboard,
   Megaphone,
   Settings,
   Users,
-  Workflow,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -20,14 +18,15 @@ import { cn } from "@/lib/utils";
 // passes them in by key.
 type NavItem = { key: string; href: string; label: string; icon: LucideIcon };
 
+// Results (Surface B) consolidates the former Dashboard + Pipeline + Analytics into one
+// destination with in-page tabs; Leads (Surface A) is the daily opportunity feed. Pipeline and
+// Analytics tiles were removed — their routes redirect into Results' tabs.
 const MAIN: NavItem[] = [
-  { key: "dashboard", href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { key: "dashboard", href: "/dashboard", label: "Results", icon: LayoutDashboard },
   { key: "agents", href: "/agents", label: "Agents", icon: Bot },
   { key: "leads", href: "/leads", label: "Leads", icon: Users },
   { key: "ads", href: "/ads", label: "Ads", icon: Megaphone },
-  { key: "pipeline", href: "/pipeline", label: "Pipeline", icon: Workflow },
   { key: "review", href: "/review", label: "Review", icon: Inbox },
-  { key: "analytics", href: "/analytics", label: "Analytics", icon: BarChart3 },
 ];
 
 const SECONDARY: NavItem[] = [

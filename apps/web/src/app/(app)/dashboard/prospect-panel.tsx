@@ -3,15 +3,12 @@
 import { useState } from "react";
 import { Mail, MessageSquare } from "lucide-react";
 import { LeadProfileSheet, type LeadProfile } from "@/components/lead-profile";
+import { whyNowSignal } from "../leads/lead-value";
 
 export type Prospect = LeadProfile;
 
 function name(p: Prospect): string {
   return [p.first_name, p.last_name].filter(Boolean).join(" ") || "Unknown";
-}
-
-function topSignal(p: Prospect): string | null {
-  return p.ai_insights?.triggers?.[0] ?? p.ai_insights?.pain_points?.[0] ?? null;
 }
 
 export function ProspectPanel({ prospects }: { prospects: Prospect[] }) {
@@ -56,7 +53,9 @@ export function ProspectPanel({ prospects }: { prospects: Prospect[] }) {
                   </p>
                 </td>
                 <td className="hidden max-w-[16rem] px-4 py-3 md:table-cell">
-                  <p className="truncate text-xs text-muted-foreground">{topSignal(p) ?? "—"}</p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {whyNowSignal(p.ai_insights) ?? "—"}
+                  </p>
                 </td>
                 <td className="px-4 py-3 font-mono font-medium tabular-nums">{p.ai_score ?? "—"}</td>
                 <td className="px-4 py-3">

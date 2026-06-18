@@ -42,8 +42,14 @@ export interface ProspectRef {
 }
 
 export interface ProspectSignal {
+  /** normalized category: funding, exec_hire, m_and_a, office_opening, product_launch, partnership,
+   *  award, hiring, workforce, cost_cutting, legal, security, intent, or other */
   kind: string;
+  /** the human one-line "why now" shown in the UI; falls back to `detail` when absent */
+  label?: string;
   detail: string;
+  /** intent signals only: in_depth | active | early */
+  level?: string;
   observedAt?: string;
 }
 

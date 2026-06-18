@@ -86,3 +86,58 @@ export async function loadAnalytics(db: SupabaseClient): Promise<AnalyticsViewMo
     goalCents: snapshot.goalCents,
   };
 }
+
+// ── Signal → revenue attribution (0031) ──────────────────────────────────────
+// The dependency mechanism: trace closed wins back to the buying signal that opened the door, so the
+// user sees the real signals on Leads (Surface A) literally producing the revenue on Results
+// (Surface B). Closed-won leads only — a win is real money, never a projection.
+
+const SIGNAL_KIND_LABELS: Record<string, string> = {
+  funding: "Funding rounds",
+  exec_hire: "Exec hires",
+  m_and_a: "M&A",
+  office_opening: "Office openings",
+  office_closing: "Office closings",
+  product_launch: "Product launches",
+  partnership: "Partnerships",
+  award: "Awards",
+  hiring: "Hiring",
+  workforce: "Workforce shifts",
+  cost_cutting: "Cost-cutting",
+  legal: "Legal proceedings",
+  security: "Security incidents",
+  intent: "Buying intent",
+  other: "Other signals",
+};
+
+export function signalKindLabel(kind: string): string {
+  return SIGNAL_KIND_LABELS[kind] ?? kind;
+}
+
+export type SignalAttribution = { kind: string; label: string; wins: number };
+
+/**
+ * Count closed wins by the signal kinds that preceded them. A win counts once per DISTINCT kind it
+ * carried (a lead with two funding signals isn't two funding wins). Pure + deterministic so it's
+ * unit-tested without a DB. Sorted by wins desc, then kind for stability.
+ */
+export function aggregateSignalAttribution(
+  wins: { lead_signals?: { kind: string }[] | null }[]
+): SignalAttribution[] {
+  const counts = new Map<string, number>();
+  for (const w of wins) {
+    const kinds = new Set((w.lead_signals ?? []).map((s) => s.kind));
+    for (const k of kinds) counts.set(k, (counts.get(k) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .map(([kind, n]) => ({ kind, label: signalKindLabel(kind), wins: n }))
+    .sort((a, b) => b.wins - a.wins || a.kind.localeCompare(b.kind));
+}
+
+/** Closed-won leads joined to their captured signals → wins-by-signal-kind. RLS-scoped (rule 02). */
+export async function loadSignalAttribution(db: SupabaseClient): Promise<SignalAttribution[]> {
+  const { data } = await db.from("leads").select("id, lead_signals(kind)").eq("status", "converted");
+  return aggregateSignalAttribution(
+    (data ?? []) as { lead_signals?: { kind: string }[] | null }[]
+  );
+}

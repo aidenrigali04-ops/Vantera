@@ -1,7 +1,36 @@
 import { describe, expect, it } from "vitest";
 import { sql } from "drizzle-orm";
 import { type Db, createDb, sequenceRuns, campaignLeads } from "@vantera/db";
-import { createPgStore } from "./pg-store";
+import { createPgStore, toLeadSignalRow } from "./pg-store";
+
+describe("toLeadSignalRow", () => {
+  it("maps a provider signal to a lead_signals row with an ISO→Date observed_at", () => {
+    expect(
+      toLeadSignalRow("acc", "lead", {
+        kind: "funding",
+        label: "Raised new funding",
+        detail: "Series B, $40M",
+        observedAt: "2026-06-01",
+      })
+    ).toEqual({
+      accountId: "acc",
+      leadId: "lead",
+      kind: "funding",
+      label: "Raised new funding",
+      detail: "Series B, $40M",
+      level: undefined,
+      observedAt: new Date("2026-06-01"),
+      source: "prospect-data",
+    });
+  });
+
+  it("falls back to detail for the label and null for a missing observed_at", () => {
+    const row = toLeadSignalRow("acc", "lead", { kind: "intent", detail: "Sales Automation", level: "in_depth" });
+    expect(row.label).toBe("Sales Automation");
+    expect(row.observedAt).toBeNull();
+    expect(row.level).toBe("in_depth");
+  });
+});
 
 // pg-store has no DB integration harness in this repo (siblings are pure-function
 // unit tests). createPgStore only wires closures over `db` — it touches no rows at

@@ -17,6 +17,7 @@ import {
   icps,
   inboundLeads,
   leadNotifications,
+  leadSignals,
   leads,
   linkedinAccounts,
   mailboxes,
@@ -30,7 +31,12 @@ import {
   webhookEvents,
   type Db,
 } from "@vantera/db";
-import type { EnrichedProspect, IcpCriteria, ProspectCandidate } from "@vantera/prospect-data";
+import type {
+  EnrichedProspect,
+  IcpCriteria,
+  ProspectCandidate,
+  ProspectSignal,
+} from "@vantera/prospect-data";
 import { toStoredInsights, type LeadInsights, type WebsiteScan } from "@vantera/agent-brains";
 import type { ClosedDeal, CrmProvider } from "@vantera/crm-infra";
 import type { CrmPushStore } from "./crm-push";
@@ -80,6 +86,23 @@ import { normalizePhone } from "./call-brief";
 import { resolveSequenceConfig } from "./sequence-config";
 import { assessMailboxHealth } from "./deliverability";
 import type { RefreshLeadLoad, RefreshLeadStore } from "./refresh-lead";
+
+/**
+ * Map a provider signal to a lead_signals row (0031). label falls back to detail, and the provider's
+ * ISO observed_at becomes a Date (or null). Pure so the mapping is unit-tested without a DB.
+ */
+export function toLeadSignalRow(accountId: string, leadId: string, s: ProspectSignal) {
+  return {
+    accountId,
+    leadId,
+    kind: s.kind,
+    label: s.label ?? s.detail,
+    detail: s.detail,
+    level: s.level,
+    observedAt: s.observedAt ? new Date(s.observedAt) : null,
+    source: "prospect-data" as const,
+  };
+}
 
 /** Suppression lookup that accepts any kind (email/linkedin/phone) — used by the sequence store. */
 async function isSuppressedAnyKind(
@@ -260,6 +283,15 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           status: "success",
           payload: { phone: enriched.phone, status: enriched.phoneStatus },
         });
+      }
+      // Real buying signals (events + intent) → lead_signals, the "why now" feed + attribution
+      // source (0031). label falls back to detail; re-observing the same signal is idempotent
+      // (unique lead_id,kind,label → onConflictDoNothing). Skipped silently when none were found.
+      if (enriched.signals && enriched.signals.length > 0) {
+        await db
+          .insert(leadSignals)
+          .values(enriched.signals.map((s) => toLeadSignalRow(accountId, leadId, s)))
+          .onConflictDoNothing();
       }
     },
 

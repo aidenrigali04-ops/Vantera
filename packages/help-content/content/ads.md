@@ -28,4 +28,4 @@ Connecting your ad account and generating the visuals are set up for your worksp
 
 ## What happens to ad leads
 
-A lead who submits your ad form is added as a lead from ads and enrolled into your nurture sequence — the same engine that nurtures the rest of your pipeline. As always, anyone on your suppression list is never contacted, even if they fill out a form. You'll see ad-sourced leads alongside the rest under Leads, and their progress under Pipeline and Analytics.
+A lead who submits your ad form is added as a lead from ads and enrolled into your nurture sequence — the same engine that nurtures the rest of your pipeline. As always, anyone on your suppression list is never contacted, even if they fill out a form. You'll see ad-sourced leads alongside the rest under Leads, and their progress on the Pipeline and Analytics tabs of your Results dashboard.

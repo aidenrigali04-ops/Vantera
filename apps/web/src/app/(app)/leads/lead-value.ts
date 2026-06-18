@@ -12,6 +12,9 @@ export interface ScoreVerdict {
   label: string;
 }
 
+/** A standout fit — the bar for the "Hot right now" spotlight and the "Hot lead" verdict. */
+export const HOT_MIN_SCORE = 85;
+
 /**
  * Turn the 0–100 AI fit score into a verdict the user *feels*. Thresholds align
  * with the qualification gate (default min_score 70): ≥85 is a standout, 70–84
@@ -19,8 +22,8 @@ export interface ScoreVerdict {
  */
 export function scoreVerdict(score: number | null): ScoreVerdict {
   if (score == null) return { tier: "unscored", label: "Not scored yet" };
-  if (score >= 85) return { tier: "hot", label: "Hot lead" };
-  if (score >= 70) return { tier: "strong", label: "Strong fit" };
+  if (score >= HOT_MIN_SCORE) return { tier: "hot", label: "Hot lead" };
+  if (score >= QUALIFIED_MIN_SCORE) return { tier: "strong", label: "Strong fit" };
   return { tier: "look", label: "Worth a look" };
 }
 
@@ -80,6 +83,76 @@ export function dataFreshness(scoredAtIso: string | null, now: Date = new Date()
   else if (days < 60) label = `${Math.round(days / 7)}w ago`;
   else label = `${Math.round(days / 30)}mo ago`;
   return { label, stale: days > FRESHNESS_STALE_DAYS };
+}
+
+/**
+ * The single "why now" line from the lead's AI-derived insights — prefers a timing trigger (what
+ * changed that makes now the moment), falling back to the top pain point. Returns null when there's
+ * nothing to say — never a filler line.
+ */
+export function whyNowSignal(
+  insights: { triggers?: string[]; pain_points?: string[] } | null | undefined
+): string | null {
+  if (!insights) return null;
+  return insights.triggers?.[0] ?? insights.pain_points?.[0] ?? null;
+}
+
+/** A real captured buying signal (lead_signals, 0031) — events + intent from enrichment. */
+export interface LeadSignalView {
+  kind: string;
+  label: string | null;
+  detail?: string | null;
+  observed_at?: string | null;
+}
+
+/** Freshest real signal first (by observed_at desc; undated sort last). Pure; safe on empty/null. */
+export function topLeadSignal(signals: LeadSignalView[] | null | undefined): LeadSignalView | null {
+  if (!signals || signals.length === 0) return null;
+  const at = (s: LeadSignalView) => (s.observed_at ? new Date(s.observed_at).getTime() : -Infinity);
+  return [...signals].sort((a, b) => at(b) - at(a))[0]!;
+}
+
+/**
+ * The lead's "why now" line, REAL signal first. A captured event/intent signal (funding, exec hire,
+ * intent, …) is insider intel and beats an AI-inferred trigger, so it wins; otherwise we fall back to
+ * the AI insight (`whyNowSignal`). This is the anticipation hit (retention: variable reward).
+ */
+export function leadSignalLine(
+  signals: LeadSignalView[] | null | undefined,
+  insights: { triggers?: string[]; pain_points?: string[] } | null | undefined
+): string | null {
+  const top = topLeadSignal(signals);
+  if (top) return top.label ?? top.detail ?? null;
+  return whyNowSignal(insights);
+}
+
+/** A warm lead that's gone quiet this long reads as cooling — surfaced, not hidden (loss aversion). */
+export const COOLING_DAYS = 3;
+
+export interface CoolingState {
+  /** days since the last reply landed */
+  daysWaiting: number;
+  /** loss-aversion label, e.g. "Reply waiting 4d" */
+  label: string;
+}
+
+/**
+ * Loss-aversion marker for a replied-but-unworked lead: a warm reply left sitting is the warm
+ * pipeline going cold (the dashboard's cold-leads monitor, mirrored onto the row). Only fires for
+ * `replied` status (a converted lead isn't cooling; an un-replied one has nothing waiting). Null
+ * until the reply has waited COOLING_DAYS — so the marker means "act now", never decoration.
+ */
+export function coolingState(
+  status: string,
+  latestReplyIso: string | null | undefined,
+  now: Date = new Date()
+): CoolingState | null {
+  if (status !== "replied" || !latestReplyIso) return null;
+  const t = new Date(latestReplyIso).getTime();
+  if (!Number.isFinite(t)) return null;
+  const days = Math.floor((now.getTime() - t) / 86_400_000);
+  if (days < COOLING_DAYS) return null;
+  return { daysWaiting: days, label: `Reply waiting ${days}d` };
 }
 
 const EMAIL_STATUS: Record<string, string> = {

@@ -5,8 +5,17 @@ import { getGateData } from "@/lib/auth/context";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { LeadsTable, type LeadRow } from "./leads-table";
+import { HOT_MIN_SCORE } from "./lead-value";
 
 const PAGE_SIZE = 25;
+
+// Shared column set so the paginated table and the "Hot right now" spotlight return the same shape.
+// lead_signals (0031) are the REAL "why now" — events + intent captured at enrichment.
+const LEAD_SELECT =
+  "id, first_name, last_name, title, company_name, industry, location, status, ai_score, ai_rationale, ai_insights, rules_gate_reasons, scored_at, email, email_status, phone, phone_status, linkedin_url, created_at, replies(channel, classification, classification_rationale, body, received_at), lead_signals(kind, label, detail, observed_at)";
+
+// Tabs where the spotlight makes sense — never above the "Filtered out" list.
+const HOT_STRIP_TABS = new Set(["all", "qualified", "in_campaign", "replied"]);
 
 const TABS: { key: string; label: string; statuses: string[] | null }[] = [
   { key: "all", label: "All", statuses: null },
@@ -29,15 +38,28 @@ export default async function LeadsPage({
   const supabase = await createClient();
   let query = supabase
     .from("leads")
-    .select(
-      "id, first_name, last_name, title, company_name, industry, location, status, ai_score, ai_rationale, ai_insights, rules_gate_reasons, scored_at, email, email_status, phone, phone_status, linkedin_url, created_at, replies(channel, classification, classification_rationale, body, received_at)",
-      { count: "exact" }
-    )
+    .select(LEAD_SELECT, { count: "exact" })
     .order("created_at", { ascending: false })
     .range(from, from + PAGE_SIZE - 1);
   if (tab.statuses) query = query.in("status", tab.statuses);
+
+  // "Hot right now" spotlight — account-wide top-fit leads ready to work, independent of the
+  // current tab/page. RLS scopes it to this account (rule 02); no account id is passed.
+  const hotQuery = supabase
+    .from("leads")
+    .select(LEAD_SELECT)
+    .gte("ai_score", HOT_MIN_SCORE)
+    .in("status", ["qualified", "enriched", "in_campaign"])
+    .order("ai_score", { ascending: false })
+    .order("scored_at", { ascending: false, nullsFirst: false })
+    .limit(3);
+
   // Account carries the revenue numbers that turn each lead into "≈ $X to your goal".
-  const [{ data: leads, count }, { account }] = await Promise.all([query, getGateData()]);
+  const [{ data: leads, count }, { data: hotLeads }, { account }] = await Promise.all([
+    query,
+    hotQuery,
+    getGateData(),
+  ]);
 
   const totalPages = Math.max(1, Math.ceil((count ?? 0) / PAGE_SIZE));
 
@@ -87,6 +109,9 @@ export default async function LeadsPage({
         <>
           <LeadsTable
             leads={leads as unknown as LeadRow[]}
+            hotLeads={
+              (HOT_STRIP_TABS.has(tab.key) ? (hotLeads ?? []) : []) as unknown as LeadRow[]
+            }
             avgDealValueCents={account?.avg_deal_value_cents ?? null}
             goalCents={account?.revenue_goal_cents ?? null}
           />

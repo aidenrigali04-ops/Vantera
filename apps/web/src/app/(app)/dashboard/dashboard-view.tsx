@@ -261,7 +261,7 @@ function WorkingDashboard(props: DashboardViewProps) {
         <div className="flex items-center justify-between gap-3">
           <Eyebrow>Pipeline</Eyebrow>
           <Link
-            href="/pipeline"
+            href="/dashboard?view=pipeline"
             className="inline-flex items-center gap-1 font-mono text-[11px] uppercase tracking-[0.18em] text-foreground/80 underline-offset-4 transition-colors hover:text-foreground hover:underline"
           >
             View all <ArrowRight className="size-3" aria-hidden />
@@ -273,7 +273,7 @@ function WorkingDashboard(props: DashboardViewProps) {
             return (
               <Link
                 key={stage.stage}
-                href="/pipeline"
+                href="/dashboard?view=pipeline"
                 className="group flex flex-col gap-1 bg-background/40 px-4 py-4 transition-colors hover:bg-foreground/[0.04] focus-visible:bg-foreground/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring dark:bg-background/20"
               >
                 <div className="flex items-center justify-between">
@@ -287,7 +287,7 @@ function WorkingDashboard(props: DashboardViewProps) {
             );
           })}
           <Link
-            href="/pipeline"
+            href="/dashboard?view=pipeline"
             className="group flex flex-col gap-1 bg-white/[0.06] px-4 py-4 transition-colors hover:bg-white/[0.1] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
           >
             <div className="flex items-center justify-between">
@@ -890,7 +890,7 @@ function ConversionCelebration({
           </p>
         </div>
         <Button asChild size="sm" variant="outline" className="ml-auto shrink-0">
-          <Link href="/pipeline">
+          <Link href="/dashboard?view=pipeline">
             View pipeline <ArrowRight className="size-4" />
           </Link>
         </Button>

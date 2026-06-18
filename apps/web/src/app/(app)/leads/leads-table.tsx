@@ -1,18 +1,33 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Clock, ExternalLink, Mail, Phone, Sparkles, UserPlus, X } from "lucide-react";
+import {
+  Check,
+  Clock,
+  ExternalLink,
+  Flame,
+  Mail,
+  Phone,
+  Snowflake,
+  Sparkles,
+  UserPlus,
+  X,
+  Zap,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PANEL_SURFACE, Eyebrow } from "@/components/ui/panel";
 import { cn } from "@/lib/utils";
 import {
+  coolingState,
   dataFreshness,
   humanizeEmailStatus,
   humanizePhoneStatus,
   isVerified,
+  leadSignalLine,
   projectedRevenue,
   scoreVerdict,
+  type LeadSignalView,
   type ScoreTier,
 } from "./lead-value";
 import { ReplyHandoff } from "./reply-panel";
@@ -48,6 +63,7 @@ export interface LeadRow {
   linkedin_url: string | null;
   created_at: string;
   replies?: ReplyView[] | null;
+  lead_signals?: LeadSignalView[] | null;
 }
 
 export interface ReplyView {
@@ -277,12 +293,101 @@ function StatusTag({ verified, label }: { verified: boolean; label: string }) {
   );
 }
 
+/** The one-line "why now" — anticipation hit. Real captured signal first, AI trigger as fallback. */
+function WhyNowLine({ lead }: { lead: LeadRow }) {
+  const signal = leadSignalLine(lead.lead_signals, lead.ai_insights);
+  if (!signal) return null;
+  return (
+    <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+      <Zap className="size-3 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden />
+      <span className="truncate">{signal}</span>
+    </p>
+  );
+}
+
+/** Loss-aversion marker: a warm reply left waiting (the warm pipeline going cold). */
+function CoolingChip({ lead }: { lead: LeadRow }) {
+  const cooling = coolingState(lead.status, latestReply(lead)?.received_at ?? null);
+  if (!cooling) return null;
+  return (
+    <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-500/12 px-2 py-0.5 text-[11px] font-medium text-amber-700 ring-1 ring-inset ring-amber-500/30 dark:text-amber-300">
+      <Snowflake className="size-3" aria-hidden />
+      {cooling.label}
+    </span>
+  );
+}
+
+/**
+ * "Hot right now" — the freshest, highest-fit leads pulled to the top as a scannable opportunity
+ * feed (retention: variable reward — the reason to open Leads daily). Cards open the same profiler
+ * as the table, so the strip is a shortcut, never a second code path. Hidden when there's nothing hot.
+ */
+function HotNowStrip({
+  hotLeads,
+  onSelect,
+}: {
+  hotLeads: LeadRow[];
+  onSelect: (lead: LeadRow) => void;
+}) {
+  if (hotLeads.length === 0) return null;
+  return (
+    <section className="mb-5" data-copilot="hot-leads">
+      <div className="mb-2.5 flex items-center gap-1.5">
+        <Flame className="size-4 text-emerald-600 dark:text-emerald-400" aria-hidden />
+        <Eyebrow>Hot right now</Eyebrow>
+        <span className="text-xs text-muted-foreground">— your strongest-fit leads to work today</span>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {hotLeads.map((lead) => (
+          <button
+            key={lead.id}
+            type="button"
+            onClick={() => onSelect(lead)}
+            className={cn(
+              PANEL_SURFACE,
+              "group flex flex-col gap-2 p-4 text-left ring-1 ring-inset ring-emerald-500/20 transition-colors hover:ring-emerald-500/40 dark:bg-emerald-500/[0.05]"
+            )}
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="truncate font-medium">{leadName(lead)}</p>
+                <p className="truncate text-xs text-muted-foreground">
+                  {[lead.title, lead.company_name].filter(Boolean).join(" · ") || "—"}
+                </p>
+              </div>
+              <ScoreBadge score={lead.ai_score} />
+            </div>
+            {(() => {
+              const signal = leadSignalLine(lead.lead_signals, lead.ai_insights);
+              return signal ? (
+                <p className="flex items-center gap-1 text-xs text-emerald-700 dark:text-emerald-300">
+                  <Zap className="size-3 shrink-0" aria-hidden />
+                  <span className="truncate">{signal}</span>
+                </p>
+              ) : null;
+            })()}
+            <span className="mt-auto flex gap-1.5 pt-1 text-muted-foreground">
+              <Mail className={cn("size-4", lead.email ? "text-foreground" : "text-muted-foreground/30")} />
+              <UserPlus
+                className={cn("size-4", lead.linkedin_url ? "text-foreground" : "text-muted-foreground/30")}
+              />
+              <Phone className={cn("size-4", lead.phone ? "text-foreground" : "text-muted-foreground/30")} />
+            </span>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export function LeadsTable({
   leads,
+  hotLeads = [],
   avgDealValueCents,
   goalCents,
 }: {
   leads: LeadRow[];
+  hotLeads?: LeadRow[];
   avgDealValueCents: number | null;
   goalCents: number | null;
 }) {
@@ -290,6 +395,7 @@ export function LeadsTable({
 
   return (
     <>
+      <HotNowStrip hotLeads={hotLeads} onSelect={setSelected} />
       <div
         className="overflow-hidden rounded-xl border border-black/[0.06] dark:border-white/[0.08]"
         data-copilot="leads-table"
@@ -314,6 +420,8 @@ export function LeadsTable({
                 <td className="px-4 py-3">
                   <p className="font-medium">{leadName(lead)}</p>
                   {lead.title && <p className="text-xs text-muted-foreground">{lead.title}</p>}
+                  <WhyNowLine lead={lead} />
+                  <CoolingChip lead={lead} />
                 </td>
                 <td className="hidden px-4 py-3 sm:table-cell">
                   <p>{lead.company_name ?? "—"}</p>

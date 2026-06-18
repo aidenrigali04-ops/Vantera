@@ -18,7 +18,7 @@ const NOTE_VERB: Record<AppNotification["kind"], string> = {
 };
 const NOTE_HREF: Record<AppNotification["kind"], string> = {
   reply: "/leads?tab=replied",
-  converted: "/pipeline",
+  converted: "/dashboard?view=pipeline",
   exhausted: "/leads?tab=rejected",
 };
 

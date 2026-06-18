@@ -190,6 +190,100 @@ describe("ExploriumProspectData", () => {
     });
   });
 
+  it("rolls company events + intent into normalized per-business signals", async () => {
+    const { impl } = fetchStub({
+      "/prospects/contacts_information/bulk_enrich": { data: [{ prospect_id: "ref_1", data: {} }] },
+      "/businesses/firmographics/bulk_enrich": { data: [{ business_id: "biz_1", data: { name: "Acme" } }] },
+      "/businesses/events": {
+        data: [
+          {
+            business_id: "biz_1",
+            data: {
+              events: [
+                { type: "New Funding Round", description: "Series B, $40M", event_time: "2026-06-01" },
+                { type: "New Executive Level Hires", description: "Hired a new CRO", event_time: "2026-05-20" },
+              ],
+            },
+          },
+        ],
+      },
+      "/businesses/intent/bulk_enrich": {
+        data: [
+          {
+            business_id: "biz_1",
+            data: { intent_level: "In-Depth", intent_topics: [{ topic: "Sales Automation", score: 82 }] },
+          },
+        ],
+      },
+    });
+    const source = new ExploriumProspectData({ apiKey: "k", fetchImpl: impl });
+
+    const [enriched] = await source.enrichProspects([{ externalRef: "ref_1", businessId: "biz_1" }]);
+
+    expect(enriched!.signals).toEqual([
+      { kind: "funding", label: "Raised new funding", detail: "Series B, $40M", observedAt: "2026-06-01" },
+      { kind: "exec_hire", label: "New executive hire", detail: "Hired a new CRO", observedAt: "2026-05-20" },
+      { kind: "intent", label: "Researching Sales Automation", level: "in_depth", detail: "Sales Automation" },
+    ]);
+  });
+
+  it("maps the canonical AgentSource event-type tokens (underscored) to the right kinds", async () => {
+    const { impl } = fetchStub({
+      "/prospects/contacts_information/bulk_enrich": { data: [{ prospect_id: "ref_1", data: {} }] },
+      "/businesses/firmographics/bulk_enrich": { data: [{ business_id: "biz_1", data: { name: "Acme" } }] },
+      "/businesses/events": {
+        data: [
+          {
+            business_id: "biz_1",
+            data: {
+              events: [
+                { type: "new_funding_round", event_time: "2026-06-01" },
+                { type: "new_product", event_time: "2026-06-02" },
+                { type: "closing_office", event_time: "2026-06-03" },
+                { type: "merger_and_acquisitions", event_time: "2026-06-04" },
+                { type: "cost_cutting", event_time: "2026-06-05" },
+                { type: "hiring_in_sales_department", event_time: "2026-06-06" },
+                { type: "increase_in_all_departments", event_time: "2026-06-07" },
+                { type: "outages_and_security_breaches", event_time: "2026-06-08" },
+                { type: "lawsuits_and_legal_issues", event_time: "2026-06-09" },
+              ],
+            },
+          },
+        ],
+      },
+    });
+    const source = new ExploriumProspectData({ apiKey: "k", fetchImpl: impl });
+
+    const [enriched] = await source.enrichProspects([{ externalRef: "ref_1", businessId: "biz_1" }]);
+    expect(enriched!.signals?.map((s) => s.kind)).toEqual([
+      "funding",
+      "product_launch",
+      "office_closing",
+      "m_and_a",
+      "cost_cutting",
+      "hiring",
+      "workforce",
+      "security",
+      "legal",
+    ]);
+  });
+
+  it("degrades gracefully when the signals endpoints fail (no signals, core enrichment intact)", async () => {
+    // events/intent are NOT stubbed → 404 → postSafe swallows; contacts/firmographics still resolve.
+    const { impl } = fetchStub({
+      "/prospects/contacts_information/bulk_enrich": {
+        data: [{ prospect_id: "ref_1", data: { professions_email: "dana@acme.com", professional_email_status: "valid" } }],
+      },
+      "/businesses/firmographics/bulk_enrich": { data: [{ business_id: "biz_1", data: { name: "Acme" } }] },
+    });
+    const source = new ExploriumProspectData({ apiKey: "k", fetchImpl: impl });
+
+    const [enriched] = await source.enrichProspects([{ externalRef: "ref_1", businessId: "biz_1" }]);
+
+    expect(enriched!.email).toBe("dana@acme.com");
+    expect(enriched!.signals).toBeUndefined();
+  });
+
   it("throws a useful error on non-2xx responses without leaking the api key", async () => {
     const impl = (async () => new Response("denied", { status: 401 })) as unknown as typeof fetch;
     const source = new ExploriumProspectData({ apiKey: "secret-key", fetchImpl: impl });

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Panel, Eyebrow } from "@/components/ui/panel";
 import { cn } from "@/lib/utils";
 import { benchmarkForStage, type FunnelStage, type Roi } from "@/lib/revenue";
+import type { SignalAttribution } from "@/lib/analytics";
 
 const usd = (cents: number) =>
   new Intl.NumberFormat("en-US", {
@@ -21,6 +22,7 @@ type Props = {
   closedCents: number;
   pipelineCents: number;
   goalCents: number | null;
+  attribution: SignalAttribution[];
 };
 
 export function AnalyticsView({
@@ -31,6 +33,7 @@ export function AnalyticsView({
   hasValue,
   closedCents,
   pipelineCents,
+  attribution,
 }: Props) {
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -57,6 +60,7 @@ export function AnalyticsView({
       ) : (
         <div className="space-y-6">
           <RoiCard roi={roi} hasValue={hasValue} closedCents={closedCents} pipelineCents={pipelineCents} />
+          {attribution.length > 0 && <AttributionCard attribution={attribution} />}
           <FunnelCard funnel={funnel} meetingsTracked={meetingsTracked} />
         </div>
       )}
@@ -167,6 +171,42 @@ function RoiCard({
           value={roi.costPerCloseCents != null ? usd(roi.costPerCloseCents) : "—"}
           hint={roi.costPerCloseCents == null ? "once a deal closes" : undefined}
         />
+      </div>
+    </Panel>
+  );
+}
+
+// The dependency mechanism: closed wins traced back to the signal that opened the door, so the real
+// signals on Leads visibly produce the revenue here. Rendered only when wins carry signals.
+function AttributionCard({ attribution }: { attribution: SignalAttribution[] }) {
+  const top = attribution[0]?.wins ?? 0;
+  return (
+    <Panel index={1}>
+      <Eyebrow>Where your wins come from</Eyebrow>
+      <p className="mt-2 text-sm text-muted-foreground">
+        Closed deals traced back to the buying signal that opened the door — the moments worth working
+        the moment they appear on Leads.
+      </p>
+      <div className="mt-5 space-y-4">
+        {attribution.map((row) => {
+          const widthPct = top > 0 ? Math.max(6, Math.round((row.wins / top) * 100)) : 0;
+          return (
+            <div key={row.kind}>
+              <div className="flex items-baseline justify-between text-sm">
+                <span className="text-foreground">{row.label}</span>
+                <span className="font-mono font-semibold tabular-nums">
+                  {row.wins} {row.wins === 1 ? "win" : "wins"}
+                </span>
+              </div>
+              <div className="mt-1.5 h-2.5 w-full overflow-hidden rounded-full bg-white/[0.05]">
+                <div
+                  className="h-full rounded-full bg-emerald-500/70 transition-[width] duration-500"
+                  style={{ width: `${widthPct}%` }}
+                />
+              </div>
+            </div>
+          );
+        })}
       </div>
     </Panel>
   );

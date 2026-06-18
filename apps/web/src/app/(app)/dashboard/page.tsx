@@ -11,6 +11,33 @@ import type { LeadProfile } from "@/components/lead-profile";
 import { DashboardView, type AgentRow, type ReplyRow } from "./dashboard-view";
 import type { Prospect } from "./prospect-panel";
 import { getWarmupStatus } from "@/lib/warmup-status";
+import { ResultsTabsBar, resolveView } from "./results-tabs";
+import { AnalyticsSection } from "../analytics/analytics-section";
+import { PipelineSection } from "../pipeline/pipeline-section";
+
+// The Results surface (Surface B). One destination, three views (Overview / Analytics / Pipeline)
+// selected by ?view= so each is server-rendered and deep-linkable. Only the active view loads its
+// data. Overview is the command-center home (OverviewTab below); the other two reuse the sections
+// extracted from the former /analytics and /pipeline pages.
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ view?: string }>;
+}) {
+  const view = resolveView((await searchParams).view);
+  return (
+    <>
+      <ResultsTabsBar active={view} />
+      {view === "analytics" ? (
+        <AnalyticsSection />
+      ) : view === "pipeline" ? (
+        <PipelineSection />
+      ) : (
+        <OverviewTab />
+      )}
+    </>
+  );
+}
 
 const usd = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -75,7 +102,7 @@ type ReplyRowRaw = {
   leads: LeadProfile | null;
 };
 
-export default async function DashboardPage() {
+async function OverviewTab() {
   const { user, account } = await getGateData();
   if (!account) return null; // layout gate guarantees this; satisfies TS
 

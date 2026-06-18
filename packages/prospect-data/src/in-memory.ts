@@ -66,7 +66,9 @@ export class InMemoryProspectData implements ProspectDataSource {
         phoneStatus: "valid" as const,
         firmographics: { employees: 42 },
         technographics: ["salesforce", "hubspot"],
-        signals: [{ kind: "hiring", detail: "3 open SDR roles", observedAt: "2026-06-01" }],
+        signals: [
+          { kind: "hiring", label: "Actively hiring", detail: "3 open SDR roles", observedAt: "2026-06-01" },
+        ],
       }));
   }
 }

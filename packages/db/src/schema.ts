@@ -250,6 +250,33 @@ export const enrichmentResults = pgTable(
   ]
 );
 
+// 0031: real buying signals (events + intent) per lead — the "why now" feed + signal→revenue
+// attribution. kind is free text (provider taxonomy evolves); writes are service-role only.
+export const leadSignals = pgTable(
+  "lead_signals",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    leadId: uuid("lead_id")
+      .notNull()
+      .references(() => leads.id, { onDelete: "cascade" }),
+    kind: text("kind").notNull(),
+    label: text("label").notNull(),
+    detail: text("detail"),
+    level: text("level"),
+    observedAt: timestamp("observed_at", { withTimezone: true }),
+    source: text("source"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("lead_signals_lead_idx").on(t.leadId, t.observedAt),
+    index("lead_signals_account_kind_idx").on(t.accountId, t.kind),
+    uniqueIndex("lead_signals_unique").on(t.leadId, t.kind, t.label),
+  ]
+);
+
 // ── 0003 campaigns, scheduler, suppression ───────────────────────────────────
 
 export const campaigns = pgTable(
