@@ -39,6 +39,8 @@ export interface LeadProfile {
   phone: string | null;
   phone_status: string | null;
   linkedin_url: string | null;
+  /** real captured buying signals (lead_signals, 0031) — the "why now" line, when present */
+  lead_signals?: { kind: string; label: string | null; detail?: string | null; observed_at?: string | null }[] | null;
 }
 
 const STATUS_LABELS: Record<string, string> = {

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Mail, MessageSquare } from "lucide-react";
 import { LeadProfileSheet, type LeadProfile } from "@/components/lead-profile";
-import { whyNowSignal } from "../leads/lead-value";
+import { leadSignalLine } from "../leads/lead-value";
 
 export type Prospect = LeadProfile;
 
@@ -30,7 +30,7 @@ export function ProspectPanel({ prospects }: { prospects: Prospect[] }) {
             <tr>
               <th className="px-4 py-2 font-medium">Prospect</th>
               <th className="hidden px-4 py-2 font-medium sm:table-cell">Company</th>
-              <th className="hidden px-4 py-2 font-medium md:table-cell">Top signal</th>
+              <th className="hidden px-4 py-2 font-medium md:table-cell">Why now</th>
               <th className="px-4 py-2 font-medium">Score</th>
               <th className="px-4 py-2 text-right font-medium">Data</th>
             </tr>
@@ -54,7 +54,7 @@ export function ProspectPanel({ prospects }: { prospects: Prospect[] }) {
                 </td>
                 <td className="hidden max-w-[16rem] px-4 py-3 md:table-cell">
                   <p className="truncate text-xs text-muted-foreground">
-                    {whyNowSignal(p.ai_insights) ?? "—"}
+                    {leadSignalLine(p.lead_signals, p.ai_insights) ?? "—"}
                   </p>
                 </td>
                 <td className="px-4 py-3 font-mono font-medium tabular-nums">{p.ai_score ?? "—"}</td>

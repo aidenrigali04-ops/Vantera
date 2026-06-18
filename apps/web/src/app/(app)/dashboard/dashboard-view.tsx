@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useState, useSyncExternalStore } from "react";
 import { motion, MotionConfig } from "framer-motion";
 import {
-  Activity,
   ArrowRight,
   CheckCircle2,
   Circle,
@@ -181,7 +180,6 @@ function WorkingDashboard(props: DashboardViewProps) {
     series,
     pipeline,
     cold,
-    today,
     fastInbound,
     revenuePace,
     prospects,
@@ -189,7 +187,6 @@ function WorkingDashboard(props: DashboardViewProps) {
     recentReplies,
     interested,
     channels,
-    week,
     scoutLive,
     scoutLastRunLabel,
     attribution,
@@ -210,7 +207,7 @@ function WorkingDashboard(props: DashboardViewProps) {
         scoutNextRunLabel={scoutNextRunLabel}
       />
 
-      {/* 2 — Revenue vs goal: the value proof, front and center. */}
+      {/* 2 — Revenue vs goal (the value proof) with the wins→signal attribution folded into it. */}
       <RevenueCard
         revenue={revenue}
         convertedClients={convertedClients}
@@ -219,26 +216,23 @@ function WorkingDashboard(props: DashboardViewProps) {
         goalCents={goalCents}
         series={series}
         paceLabel={revenuePace}
+        attribution={attribution}
       />
 
-      {/* Dependency proof: the signals that actually closed deals, on the first screen. */}
-      {attribution.length > 0 && <WinsAttributionLine attribution={attribution} />}
-
-      {/* 3 — The daily loop: warm replies (the reward) + a compact pipeline pulse. */}
-      <div className="grid gap-6 lg:grid-cols-[1.1fr_1.9fr]">
+      {/* 3 — The anticipation loop: hot leads (real why-now signals) + warm replies (the reward). */}
+      <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
+        <HotLeads prospects={prospects} />
         <WarmReplies recentReplies={recentReplies} interested={interested} />
-        <PipelinePulse pipeline={pipeline} convertedClients={convertedClients} goal={goal} />
       </div>
 
-      {/* 4 — Hot leads: the anticipation surface. */}
-      <RecentProspects prospects={prospects} />
+      {/* 4 — Pipeline pulse: real-time stage counts at a glance; full funnel on the Pipeline tab. */}
+      <PipelinePulse pipeline={pipeline} convertedClients={convertedClients} goal={goal} />
 
       {/* Conditional: fast-inbound value-proof / nudge (the report's defensible edge). */}
       {(fastInbound.deployed || fastInbound.scoutLive) && <FastInboundPanel fast={fastInbound} />}
 
-      {/* Secondary, kept low — momentum + agent heartbeat, plus channels only when they need you. */}
-      <div className={cn("grid gap-6", channelsNeedAttention ? "lg:grid-cols-3" : "md:grid-cols-2")}>
-        <MomentumPanel today={today} week={week} />
+      {/* Slim footer — agent heartbeat (trust), plus channels only when they need you. */}
+      <div className={cn("grid gap-6", channelsNeedAttention && "md:grid-cols-2")}>
         <AgentsPanel agents={agents} scoutLive={scoutLive} scoutLastRunLabel={scoutLastRunLabel} />
         {channelsNeedAttention && <ChannelsPanel channels={channels} />}
       </div>
@@ -256,7 +250,7 @@ function WinsAttributionLine({ attribution }: { attribution: SignalAttribution[]
   return (
     <Link
       href="/dashboard?view=analytics"
-      className="group -mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 px-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
+      className="group flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
     >
       <span className="flex items-center gap-1.5 font-mono uppercase tracking-[0.14em] text-foreground/70">
         <Zap className="size-3.5" aria-hidden /> Wins from
@@ -438,15 +432,16 @@ function PipelinePulse({
   );
 }
 
-/** Recent prospects — the anticipation surface; click a row for the full profile + why-now signal. */
-function RecentProspects({ prospects }: { prospects: Prospect[] }) {
+/** Hot leads — the anticipation surface; each row leads with its real "why now" buying signal. */
+function HotLeads({ prospects }: { prospects: Prospect[] }) {
   return (
     <RevealItem className={cn(PANEL_SURFACE, "p-5")}>
       <div className="flex items-center justify-between gap-3">
         <div>
-          <Eyebrow>Recent prospects</Eyebrow>
+          <Eyebrow>Hot leads</Eyebrow>
           <p className="mt-2 text-xs text-muted-foreground">
-            Sourced, scored, and enriched by your Prospect Agent — click any row for the full profile.
+            Your highest-fit prospects, each with the signal that makes now the moment — click a row
+            for the full profile.
           </p>
         </div>
         <Button asChild variant="ghost" size="sm" className="shrink-0">
@@ -566,47 +561,6 @@ function ChannelsPanel({ channels }: { channels: DashboardViewProps["channels"] 
   );
 }
 
-/**
- * Momentum — what your agents did lately, in one panel (merges the old "Since yesterday" + "This
- * week" cards). The 24h counts are the headline variable reward; the 7-day line is the context.
- */
-function MomentumPanel({
-  today,
-  week,
-}: {
-  today: { sourced: number; sent: number; replied: number };
-  week: { sends: number; email: number; li: number; replies: number };
-}) {
-  return (
-    <RevealItem className={cn(PANEL_SURFACE, "p-5")}>
-      <div className="flex items-center justify-between gap-2">
-        <Eyebrow>Momentum</Eyebrow>
-        <span className="flex items-center gap-1 font-mono text-[11px] uppercase tracking-wide text-muted-foreground">
-          <Activity className="size-3.5" /> last 24h
-        </span>
-      </div>
-      <div className="mt-4 grid grid-cols-3 gap-4">
-        <div>
-          <span className="font-mono text-2xl font-semibold tabular-nums">{today.sourced}</span>
-          <p className="text-xs text-muted-foreground">Sourced</p>
-        </div>
-        <div>
-          <span className="font-mono text-2xl font-semibold tabular-nums">{today.sent}</span>
-          <p className="text-xs text-muted-foreground">Sent</p>
-        </div>
-        <div>
-          <span className="font-mono text-2xl font-semibold tabular-nums">{today.replied}</span>
-          <p className="text-xs text-muted-foreground">Replied</p>
-        </div>
-      </div>
-      <p className="mt-3 border-t border-border/60 pt-3 text-xs text-muted-foreground">
-        {week.sends > 0
-          ? `This week: ${week.sends} sent (${week.email} email · ${week.li} LinkedIn) · ${week.replies} ${week.replies === 1 ? "reply" : "replies"} in.`
-          : "Quiet so far — your agents work on their own schedule, and what they do shows up here."}
-      </p>
-    </RevealItem>
-  );
-}
 
 /** Warm replies — the variable reward that anchors the daily habit loop. */
 function WarmReplies({
@@ -804,6 +758,7 @@ function RevenueCard({
   goalCents,
   series,
   paceLabel,
+  attribution,
 }: {
   revenue: RevenueSnapshot;
   convertedClients: number;
@@ -812,6 +767,7 @@ function RevenueCard({
   goalCents: number | null;
   series: RevenuePoint[];
   paceLabel: string | null;
+  attribution: SignalAttribution[];
 }) {
   const projectedTotalCents = revenue.closedCents + revenue.expectedCents;
   return (
@@ -898,6 +854,12 @@ function RevenueCard({
           </div>
         )}
       </div>
+      {/* Dependency proof, folded in: the signals that actually closed these deals. */}
+      {attribution.length > 0 && (
+        <div className="mt-3 border-t border-border/60 pt-3">
+          <WinsAttributionLine attribution={attribution} />
+        </div>
+      )}
     </RevealItem>
   );
 }

@@ -172,7 +172,7 @@ async function OverviewTab() {
     supabase
       .from("leads")
       .select(
-        "id, first_name, last_name, title, company_name, company_domain, company_size, industry, location, tech_stack, status, ai_score, ai_rationale, ai_insights, scored_at, email, email_status, phone, phone_status, linkedin_url"
+        "id, first_name, last_name, title, company_name, company_domain, company_size, industry, location, tech_stack, status, ai_score, ai_rationale, ai_insights, scored_at, email, email_status, phone, phone_status, linkedin_url, lead_signals(kind, label, detail, observed_at)"
       )
       .in("status", ["qualified", "enriched", "in_campaign", "replied", "converted"])
       .order("ai_score", { ascending: false, nullsFirst: false })
