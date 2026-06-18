@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { InMemoryProspectData, makeCandidate } from "@vantera/prospect-data";
 import type { LeadInsights } from "@vantera/agent-brains";
-import { runScout } from "./scout";
+import { runScout, pickHotSignal } from "./scout";
 import { TRIAL_LEAD_CAP } from "./types";
 import type { CallBriefDraftPayload, CopyDraftPayload, FreshLead, ScoutContext, ScoutDeps, ScoutStore } from "./types";
 import type { OutreachCapacity } from "./capacity";
@@ -73,6 +73,10 @@ class FakeScoutStore implements ScoutStore {
   }
   async saveScore(leadId: string, ins: LeadInsights, qualified: boolean) {
     this.scores.set(leadId, { score: ins.score, qualified });
+  }
+  hotSignals: { leadId: string; label: string }[] = [];
+  async notifyHotSignals(_accountId: string, items: { leadId: string; label: string }[]) {
+    this.hotSignals.push(...items);
   }
   async completeRun(_agentId: string, lastRunAt: Date) {
     this.completedAt = lastRunAt;
@@ -370,5 +374,26 @@ describe("runScout — capacity throttle", () => {
     expect(summary.status).toBe("completed");
     expect(summary.discovered).toBe(1); // the one pooled candidate was sourced despite no channel
     expect(store.enriched.length).toBe(1);
+  });
+});
+
+describe("pickHotSignal", () => {
+  it("returns the label of a high-value 'strike now' signal", () => {
+    expect(
+      pickHotSignal([
+        { kind: "hiring", detail: "3 open roles" },
+        { kind: "funding", label: "Raised a Series B", detail: "Series B, $40M" },
+      ])
+    ).toBe("Raised a Series B");
+    expect(pickHotSignal([{ kind: "intent", detail: "Researching Sales Automation" }])).toBe(
+      "Researching Sales Automation"
+    );
+  });
+
+  it("ignores low-value signals and empty input (no notification noise)", () => {
+    expect(pickHotSignal([{ kind: "hiring", detail: "3 open roles" }])).toBeNull();
+    expect(pickHotSignal([{ kind: "award", detail: "Won an award" }])).toBeNull();
+    expect(pickHotSignal(undefined)).toBeNull();
+    expect(pickHotSignal([])).toBeNull();
   });
 });

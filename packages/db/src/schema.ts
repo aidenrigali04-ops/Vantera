@@ -1021,7 +1021,7 @@ export const leadNotifications = pgTable(
       .notNull()
       .references(() => accounts.id, { onDelete: "cascade" }),
     leadId: uuid("lead_id").notNull(),
-    kind: text("kind", { enum: ["reply", "converted", "exhausted"] }).notNull(),
+    kind: text("kind", { enum: ["reply", "converted", "exhausted", "hot_signal"] }).notNull(),
     body: text("body").notNull(),
     // no updated_at: read_at is the only mutable field
     readAt: timestamp("read_at", { withTimezone: true }),

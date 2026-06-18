@@ -14,4 +14,6 @@ Each lead carries a fit verdict at a glance — Hot lead, Strong fit, or Worth a
 
 Click any lead to open its profile. At the top you'll see what closing that prospect is worth to you (based on your average deal value) and how many deals of that size it takes to reach your revenue goal. Below that, "Your opening" gives you the angle most likely to land and the "aha moment" your outreach can build on, followed by why they're a fit — pain points, buying triggers, and motivations — and verified contact details. Leads that didn't fit are under "Filtered out", each with the reasons.
 
+When a newly qualified lead carries a fresh, high-value signal — a funding round, an executive hire, an acquisition, or active buying intent — you'll get a **hot-signal notification** in the bell, so you can pounce while the timing is right.
+
 Only high-quality leads (score 70+ by default) move on to outreach drafting. Prospects that never qualify are automatically removed after 90 days.

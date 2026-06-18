@@ -308,6 +308,18 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         .where(eq(leads.id, leadId));
     },
 
+    async notifyHotSignals(accountId: string, items: { leadId: string; label: string }[]) {
+      if (items.length === 0) return;
+      await db.insert(leadNotifications).values(
+        items.map((it) => ({
+          accountId,
+          leadId: it.leadId,
+          kind: "hot_signal" as const,
+          body: it.label,
+        }))
+      );
+    },
+
     async completeRun(agentId: string, lastRunAt: Date) {
       await db.update(agents).set({ lastRunAt }).where(eq(agents.id, agentId));
     },

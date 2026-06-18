@@ -2,13 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Bell, CheckCircle2, MessageSquare, Snowflake, type LucideIcon } from "lucide-react";
+import { Bell, CheckCircle2, Flame, MessageSquare, Snowflake, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { markNotificationsRead } from "./actions";
 
 export type AppNotification = {
   id: string;
-  kind: "reply" | "converted" | "exhausted";
+  kind: "reply" | "converted" | "exhausted" | "hot_signal";
   who: string;
   verb: string;
   at: string;
@@ -19,6 +19,7 @@ const KIND_ICON: Record<AppNotification["kind"], LucideIcon> = {
   reply: MessageSquare,
   converted: CheckCircle2,
   exhausted: Snowflake,
+  hot_signal: Flame,
 };
 
 /**

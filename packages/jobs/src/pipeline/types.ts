@@ -92,6 +92,9 @@ export interface ScoutStore {
   markRulesGate(leadId: string, result: RulesGateResult): Promise<void>;
   saveEnrichment(leadId: string, accountId: string, enriched: EnrichedProspect): Promise<void>;
   saveScore(leadId: string, insights: LeadInsights, qualified: boolean): Promise<void>;
+  /** Anticipation hook: drop a "hot signal" notification for qualified leads carrying a fresh,
+   *  high-value buying signal (funding/intent/exec-hire/M&A). Best-effort; never blocks the run. */
+  notifyHotSignals(accountId: string, items: { leadId: string; label: string }[]): Promise<void>;
   completeRun(agentId: string, lastRunAt: Date): Promise<void>;
   /** live outreach capacity for the account (warmup state + LinkedIn connection + channel toggles) */
   getOutreachCapacity(accountId: string): Promise<OutreachCapacity>;

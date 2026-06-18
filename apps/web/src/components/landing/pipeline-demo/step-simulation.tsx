@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Check, Loader2, Mail, Phone } from "lucide-react";
+import { Check, Loader2, Mail, Phone, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LinkedinGlyph } from "./brand-icons";
 import { CountUp } from "./count-up";
@@ -102,14 +102,23 @@ function StepResult({
       );
     case "scoring":
       return (
-        <div className="flex items-center gap-2">
-          <span className="rounded-md bg-white/10 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-foreground">
-            <CountUp to={specimen.score} active duration={1000} format={(n) => String(Math.round(n))} />
-            /100
-          </span>
-          <span className="truncate font-mono text-[11px] text-muted-foreground">
-            {specimen.firstName} {specimen.lastName} — {specimen.ahaMoment}
-          </span>
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-2">
+            <span className="rounded-md bg-white/10 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-foreground">
+              <CountUp to={specimen.score} active duration={1000} format={(n) => String(Math.round(n))} />
+              /100
+            </span>
+            <span className="truncate font-mono text-[11px] text-muted-foreground">
+              {specimen.firstName} {specimen.lastName} — {specimen.ahaMoment}
+            </span>
+          </div>
+          {/* The timing edge — why this lead is worth reaching NOW, not just who they are. */}
+          <div className="flex items-center gap-1.5">
+            <Zap className="size-3 shrink-0 text-foreground/80" aria-hidden />
+            <span className="truncate font-mono text-[11px] text-foreground/85">
+              why now — {specimen.signal}
+            </span>
+          </div>
         </div>
       );
     case "drafting":

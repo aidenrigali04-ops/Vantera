@@ -6,6 +6,7 @@ import {
   computeGoalPace,
   computeRevenueSnapshot,
 } from "@/lib/revenue";
+import { loadSignalAttribution } from "@/lib/analytics";
 import { LEAD_PROFILE_FIELDS } from "@/components/lead-profile-fields";
 import type { LeadProfile } from "@/components/lead-profile";
 import { DashboardView, type AgentRow, type ReplyRow } from "./dashboard-view";
@@ -361,6 +362,10 @@ async function OverviewTab() {
     revenuePace = `On pace to hit your ${goal}/mo goal around ${etaMonthLabel(pace.etaDays)}.`;
   }
 
+  // Signal→revenue attribution: which captured signals actually closed deals (the dependency
+  // proof). Surfaced as a one-liner on Overview when there's at least one attributed win.
+  const signalAttribution = await loadSignalAttribution(supabase);
+
   return (
     <DashboardView
       firstName={firstName}
@@ -393,6 +398,7 @@ async function OverviewTab() {
       channels={{ mbActive, mbWarming, mbTotal, liStatus }}
       week={{ sends: sendsWeek, email: emailWeek, li: liWeek, replies: repliesWeek }}
       warmup={warmup}
+      attribution={signalAttribution}
     />
   );
 }

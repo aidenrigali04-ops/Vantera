@@ -32,6 +32,7 @@ import { RevenueChart } from "./revenue-chart";
 import { ProspectPanel, type Prospect } from "./prospect-panel";
 import { LeadProfileLink, type LeadProfile } from "@/components/lead-profile";
 import type { RevenuePoint, RevenueSnapshot } from "@/lib/revenue";
+import type { SignalAttribution } from "@/lib/analytics";
 import type { PipelineViewModel, SequenceStage } from "../pipeline/queries";
 import type { WarmupStatus } from "@/lib/warmup-status";
 
@@ -108,6 +109,7 @@ export interface DashboardViewProps {
   channels: { mbActive: number; mbWarming: number; mbTotal: number; liStatus: string | null };
   week: { sends: number; email: number; li: number; replies: number };
   warmup: WarmupStatus;
+  attribution: SignalAttribution[];
 }
 
 export function DashboardView(props: DashboardViewProps) {
@@ -190,6 +192,7 @@ function WorkingDashboard(props: DashboardViewProps) {
     week,
     scoutLive,
     scoutLastRunLabel,
+    attribution,
   } = props;
 
   // Channels/warmup are health surfaces — they earn space only when something needs doing,
@@ -218,6 +221,9 @@ function WorkingDashboard(props: DashboardViewProps) {
         paceLabel={revenuePace}
       />
 
+      {/* Dependency proof: the signals that actually closed deals, on the first screen. */}
+      {attribution.length > 0 && <WinsAttributionLine attribution={attribution} />}
+
       {/* 3 — The daily loop: warm replies (the reward) + a compact pipeline pulse. */}
       <div className="grid gap-6 lg:grid-cols-[1.1fr_1.9fr]">
         <WarmReplies recentReplies={recentReplies} interested={interested} />
@@ -237,6 +243,33 @@ function WorkingDashboard(props: DashboardViewProps) {
         {channelsNeedAttention && <ChannelsPanel channels={channels} />}
       </div>
     </Reveal>
+  );
+}
+
+/**
+ * Signal→revenue attribution, one line — the dependency proof on the first screen: the captured
+ * signals that actually closed deals, so the user sees the signals on Leads literally make the
+ * money. Links to the full breakdown on the Analytics tab. Rendered only when wins carry signals.
+ */
+function WinsAttributionLine({ attribution }: { attribution: SignalAttribution[] }) {
+  const top = attribution.slice(0, 3);
+  return (
+    <Link
+      href="/dashboard?view=analytics"
+      className="group -mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 px-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
+    >
+      <span className="flex items-center gap-1.5 font-mono uppercase tracking-[0.14em] text-foreground/70">
+        <Zap className="size-3.5" aria-hidden /> Wins from
+      </span>
+      {top.map((row, i) => (
+        <span key={row.kind}>
+          <span className="text-foreground">{row.label}</span>{" "}
+          <span className="tabular-nums">({row.wins})</span>
+          {i < top.length - 1 && <span className="text-muted-foreground/50"> ·</span>}
+        </span>
+      ))}
+      <ArrowRight className="size-3 opacity-0 transition-opacity group-hover:opacity-100" aria-hidden />
+    </Link>
   );
 }
 

@@ -1,7 +1,7 @@
 import { applyRulesGate, isScanStale } from "@vantera/agent-brains";
 import { computeRunTarget } from "./capacity";
 import type { RankCandidate } from "@vantera/agent-brains";
-import { icpCriteriaToFilters } from "@vantera/prospect-data";
+import { icpCriteriaToFilters, type ProspectSignal } from "@vantera/prospect-data";
 import {
   SCOUT_DEFAULTS,
   TRIAL_LEAD_CAP,
@@ -9,6 +9,15 @@ import {
   type ScoutDeps,
   type ScoutRunSummary,
 } from "./types";
+
+/** "Strike now" signal kinds worth a notification — the high-value timing events (rule 05). */
+const HOT_SIGNAL_KINDS = new Set(["funding", "intent", "exec_hire", "m_and_a"]);
+
+/** A qualified lead's top high-value signal label, or null — drives the hot-signal notification. */
+export function pickHotSignal(signals: ProspectSignal[] | undefined): string | null {
+  const s = signals?.find((x) => HOT_SIGNAL_KINDS.has(x.kind));
+  return s ? (s.label ?? s.detail) : null;
+}
 
 /**
  * One Scout (Prospect) Agent run: discover → rules gate → enrich survivors only →
@@ -121,6 +130,19 @@ export async function runScout(agentId: string, deps: ScoutDeps): Promise<ScoutR
       await deps.store.saveScore(insight.lead_id, insight, qualified);
       if (qualified) qualifiedIds.push(insight.lead_id);
     }
+  }
+
+  // Anticipation hook (Surface A): a qualified lead carrying a fresh, high-value buying signal
+  // earns a notification — an unpredictable, high-value reason to come back and work it now.
+  if (qualifiedIds.length > 0) {
+    const refByLeadId = new Map(survivors.map((s) => [s.leadId, s.candidate.externalRef]));
+    const hotItems = qualifiedIds
+      .map((leadId) => {
+        const label = pickHotSignal(enrichedByRef.get(refByLeadId.get(leadId) ?? "")?.signals);
+        return label ? { leadId, label } : null;
+      })
+      .filter((x): x is { leadId: string; label: string } => x !== null);
+    if (hotItems.length > 0) await deps.store.notifyHotSignals(accountId, hotItems);
   }
 
   await deps.store.completeRun(agentId, now());
