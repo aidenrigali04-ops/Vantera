@@ -5,6 +5,7 @@ import { icpCriteriaToFilters, type ProspectSignal } from "@vantera/prospect-dat
 import {
   SCOUT_DEFAULTS,
   TRIAL_LEAD_CAP,
+  WORST_CASE_CREDITS_PER_PROSPECT,
   type FreshLead,
   type ScoutDeps,
   type ScoutRunSummary,
@@ -76,6 +77,20 @@ export async function runScout(agentId: string, deps: ScoutDeps): Promise<ScoutR
     await deps.store.completeRun(agentId, now());
     return { status: "completed", discovered: 0, gatePassed: 0, qualified: 0, chained: false };
   }
+
+  // Platform COGS guard: the prospect-data credit pool is shared across every tenant. Before
+  // spending on discovery + enrichment, confirm the pool can cover this run's worst case (every
+  // discovered prospect surviving the gate → full waterfall). A null/failed balance read fails
+  // OPEN — this improves safety, it is not a correctness gate, and the provider's own insufficient-
+  // credit error stays the backstop. Skipping here (before any spend) turns a messy mid-run hard-
+  // stop into a clean, observable skip an operator can act on (top up the pool). We intentionally
+  // do NOT completeRun: the scheduler already advanced next_run_at at trigger time, so the agent
+  // simply retries on its normal cadence — no tight 15-min loop.
+  const balance = await deps.prospectData.getCreditBalance();
+  if (balance && balance.remaining < runTarget * WORST_CASE_CREDITS_PER_PROSPECT) {
+    return { status: "skipped", reason: "low_credits", discovered: 0, gatePassed: 0, qualified: 0, chained: false };
+  }
+
   const perIcp = Math.max(1, Math.floor(runTarget / ctx.icps.length));
   const fresh: FreshLead[] = [];
   let discovered = 0;

@@ -23,7 +23,17 @@ export const scoutRun = task({
         await tasks.trigger("call-brief", p);
       },
     });
-    logger.info("scout run finished", { ...summary, agentId: payload.agentId });
+    if (summary.reason === "low_credits") {
+      // Ops alert: the shared prospect-data credit pool can't cover this run. The run skipped
+      // before spending (no partial/mid-run hard-stop) — top up the pool to resume prospecting.
+      logger.error("scout run skipped: prospect-data credit pool below this run's cost — top up to resume", {
+        ...summary,
+        agentId: payload.agentId,
+        accountId: payload.accountId,
+      });
+    } else {
+      logger.info("scout run finished", { ...summary, agentId: payload.agentId });
+    }
     return summary;
   },
 });

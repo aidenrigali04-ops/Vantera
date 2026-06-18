@@ -1,4 +1,5 @@
 import type {
+  CreditBalance,
   EnrichedProspect,
   ProspectCandidate,
   ProspectDataSource,
@@ -37,8 +38,14 @@ function matches(value: string | undefined, wanted: string[] | undefined): boole
 export class InMemoryProspectData implements ProspectDataSource {
   readonly discoverCalls: { filters: ProspectFilters; limit: number }[] = [];
   readonly enrichCalls: ProspectRef[][] = [];
+  /** Settable for tests; null mirrors a real adapter that can't read the balance (fail-open). */
+  creditBalance: CreditBalance | null = null;
 
   constructor(private readonly pool: ProspectCandidate[] = []) {}
+
+  async getCreditBalance(): Promise<CreditBalance | null> {
+    return this.creditBalance;
+  }
 
   async discoverProspects(filters: ProspectFilters, limit: number): Promise<ProspectCandidate[]> {
     this.discoverCalls.push({ filters, limit });

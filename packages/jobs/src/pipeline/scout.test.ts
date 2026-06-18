@@ -402,6 +402,51 @@ describe("cadence-scaled run ceiling", () => {
   });
 });
 
+describe("runScout — credit guard", () => {
+  // The prospect-data credit pool is platform-wide (shared across tenants). The Scout confirms the
+  // pool can cover a run's worst case BEFORE spending; a null/unknown balance fails open.
+  it("skips before any spend when the shared pool can't cover the run", async () => {
+    const pool = [makeCandidate({ externalRef: "good", industry: "saas" })];
+    const store = new FakeScoutStore(makeContext());
+    const { deps, prospectData } = makeDeps(store, pool, { good: 90 });
+    prospectData.creditBalance = { remaining: 10, allocated: 2600 }; // < runTarget * 9 for any runTarget >= floor
+
+    const summary = await runScout("scout1", deps);
+
+    expect(summary.status).toBe("skipped");
+    expect(summary.reason).toBe("low_credits");
+    expect(prospectData.discoverCalls).toEqual([]); // discovery never ran
+    expect(prospectData.enrichCalls).toEqual([]); // enrichment never ran
+    expect(store.upserted).toEqual([]);
+    expect(store.enriched).toEqual([]);
+  });
+
+  it("proceeds normally when the pool comfortably covers the run", async () => {
+    const pool = [makeCandidate({ externalRef: "good", industry: "saas" })];
+    const store = new FakeScoutStore(makeContext());
+    const { deps, prospectData } = makeDeps(store, pool, { good: 90 });
+    prospectData.creditBalance = { remaining: 100_000, allocated: 200_000 };
+
+    const summary = await runScout("scout1", deps);
+
+    expect(summary.status).toBe("completed");
+    expect(summary.reason).toBeUndefined();
+    expect(store.enriched).toEqual(["good"]);
+  });
+
+  it("fails open when the balance is unknown (null) — prospecting continues", async () => {
+    const pool = [makeCandidate({ externalRef: "good", industry: "saas" })];
+    const store = new FakeScoutStore(makeContext());
+    const { deps, prospectData } = makeDeps(store, pool, { good: 90 });
+    expect(prospectData.creditBalance).toBeNull(); // default
+
+    const summary = await runScout("scout1", deps);
+
+    expect(summary.status).toBe("completed");
+    expect(store.enriched).toEqual(["good"]);
+  });
+});
+
 describe("pickHotSignal", () => {
   it("returns the label of a high-value 'strike now' signal", () => {
     expect(

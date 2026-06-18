@@ -50,6 +50,17 @@ export const SCOUT_DEFAULTS: ScoutConfig = {
 export const TRIAL_LEAD_CAP = 100;
 
 /**
+ * Worst-case prospect-data credits one discovered prospect can cost across the full waterfall:
+ * 1 (discovery) + 5 (contacts: email+phone) + 1 (firmographics) + 2 (events) = 9. MEASURED live
+ * 2026-06-18 (see project-explorium-enrichment). The credit pool is platform-wide (one provider
+ * account serves every tenant), so the Scout multiplies this by a run's target to confirm the pool
+ * can fully cover the run BEFORE spending — turning a mid-run insufficient-credit hard-stop into a
+ * clean, observable skip. Worst case assumes every discovered prospect survives the gate; real runs
+ * cost less, so this is a deliberately conservative floor.
+ */
+export const WORST_CASE_CREDITS_PER_PROSPECT = 9;
+
+/**
  * Trial send cap: a trialing account dispatches at most this many outbound sends
  * total (across email + LinkedIn). Bounds deliverability exposure on our provisioned
  * mailboxes and per-send COGS until the account converts. Enforced per-account at the
@@ -116,6 +127,8 @@ export interface ScoutDeps {
 
 export interface ScoutRunSummary {
   status: "completed" | "skipped";
+  /** present only on a "skipped" run when the shared credit pool can't cover this run's worst case */
+  reason?: "low_credits";
   discovered: number;
   gatePassed: number;
   qualified: number;

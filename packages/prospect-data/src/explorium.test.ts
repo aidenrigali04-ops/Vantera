@@ -297,4 +297,30 @@ describe("ExploriumProspectData", () => {
     await expect(source.discoverProspects({}, 1)).rejects.toThrow(/prospect data request failed \(401\)/);
     await expect(source.discoverProspects({}, 1)).rejects.not.toThrow(/secret-key/);
   });
+
+  it("reads the credit balance via GET /credits with the api key header", async () => {
+    const { impl, calls } = fetchStub({
+      "/credits": { allocated_credits: 2600, remaining_credits: 2031, account_type: "paid" },
+    });
+    const source = new ExploriumProspectData({ apiKey: "k", fetchImpl: impl });
+
+    const balance = await source.getCreditBalance();
+
+    expect(balance).toEqual({ remaining: 2031, allocated: 2600 });
+    const creditsCall = calls.find((c) => c.url.includes("/credits"));
+    expect(creditsCall!.init.method).toBe("GET");
+    expect(creditsCall!.init.headers).toMatchObject({ api_key: "k" });
+  });
+
+  it("returns null (fail-open, never throws) when the credits endpoint errors", async () => {
+    const impl = (async () => new Response("nope", { status: 500 })) as unknown as typeof fetch;
+    const source = new ExploriumProspectData({ apiKey: "k", fetchImpl: impl });
+    await expect(source.getCreditBalance()).resolves.toBeNull();
+  });
+
+  it("returns null when the credits payload is missing remaining_credits", async () => {
+    const { impl } = fetchStub({ "/credits": { account_type: "paid" } });
+    const source = new ExploriumProspectData({ apiKey: "k", fetchImpl: impl });
+    await expect(source.getCreditBalance()).resolves.toBeNull();
+  });
 });

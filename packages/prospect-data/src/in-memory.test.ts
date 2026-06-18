@@ -40,4 +40,12 @@ describe("InMemoryProspectData", () => {
     expect(enriched[0]!.signals?.length).toBeGreaterThan(0);
     expect(source.enrichCalls).toEqual([[{ externalRef: "p1" }, { externalRef: "unknown" }]]);
   });
+
+  it("reports the credit balance: null until set, then the set value", async () => {
+    const source = new InMemoryProspectData();
+
+    expect(await source.getCreditBalance()).toBeNull();
+    source.creditBalance = { remaining: 500, allocated: 2600 };
+    expect(await source.getCreditBalance()).toEqual({ remaining: 500, allocated: 2600 });
+  });
 });

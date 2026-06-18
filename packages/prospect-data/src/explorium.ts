@@ -1,4 +1,5 @@
 import type {
+  CreditBalance,
   EnrichedProspect,
   ProspectCandidate,
   ProspectDataSource,
@@ -24,6 +25,9 @@ const FIRMOGRAPHICS_PATH = "/businesses/firmographics/bulk_enrich";
 // INTENT is intentionally NOT fetched: no /v1 intent endpoint exists (every candidate 404s and the
 // enrich interface has no intent enrichment). The `intent` kind stays defined for a future source.
 const EVENTS_PATH = "/businesses/events";
+// Remaining credit balance for the (platform-wide, tenant-shared) account. GET, no body, no spend.
+// VERIFIED live 2026-06-18: GET /v1/credits (api_key header) → { allocated_credits, remaining_credits, account_type }.
+const CREDITS_PATH = "/credits";
 
 // Window for "fresh" events — aligned with the rank's signal-decay window so we don't pull stale ones.
 const EVENT_WINDOW_DAYS = 180;
@@ -391,6 +395,25 @@ export class ExploriumProspectData implements ProspectDataSource {
       if (bid && sig) byBusiness.set(bid, [...(byBusiness.get(bid) ?? []), sig]);
     }
     return byBusiness;
+  }
+
+  // Read the shared pool's remaining credits (free GET, spends nothing). Best-effort: any
+  // failure returns null so the caller fails open (a flaky balance read never halts prospecting).
+  async getCreditBalance(): Promise<CreditBalance | null> {
+    try {
+      const res = await this.fetchImpl(`${this.baseUrl}${CREDITS_PATH}`, {
+        method: "GET",
+        headers: { api_key: this.apiKey },
+      });
+      if (!res.ok) return null;
+      const json = (await res.json()) as { remaining_credits?: unknown; allocated_credits?: unknown };
+      const remaining = Number(json.remaining_credits);
+      if (!Number.isFinite(remaining)) return null;
+      const allocated = Number(json.allocated_credits);
+      return { remaining, allocated: Number.isFinite(allocated) ? allocated : 0 };
+    } catch {
+      return null;
+    }
   }
 
   async discoverProspects(filters: ProspectFilters, limit: number): Promise<ProspectCandidate[]> {

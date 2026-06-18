@@ -63,8 +63,23 @@ export interface EnrichedProspect extends ProspectCandidate {
   signals?: ProspectSignal[];
 }
 
+/** Remaining balance on the (platform-wide, tenant-shared) prospect-data credit pool. */
+export interface CreditBalance {
+  /** credits still available to spend on discovery + enrichment */
+  remaining: number;
+  /** total credits allocated to the account (the denominator), for context */
+  allocated: number;
+}
+
 /** Provider-agnostic prospect discovery + enrichment interface (rule 05). Explorium is an implementation detail behind it. */
 export interface ProspectDataSource {
   discoverProspects(filters: ProspectFilters, limit: number): Promise<ProspectCandidate[]>;
   enrichProspects(refs: ProspectRef[]): Promise<EnrichedProspect[]>;
+  /**
+   * Remaining balance on the shared provider credit pool, or null if it can't be read.
+   * The pool is platform-wide (one provider account serves every tenant), so this is a
+   * COGS-safety signal, not a per-account quota. Callers MUST treat null as "unknown" and
+   * fail open — a flaky balance read should never halt all prospecting.
+   */
+  getCreditBalance(): Promise<CreditBalance | null>;
 }
