@@ -292,40 +292,8 @@ async function OverviewTab() {
     replied: replies24Res.count ?? 0,
   };
 
-  // Live pipeline funnel — the full autonomous process, stage by stage (real counts).
-  const [disqRes, draftingRes, sendingRes, sentRes, outreachCampaign] = await Promise.all([
-    leadCount(["rejected"]),
-    supabase.from("scheduled_sends").select("id", { count: "exact", head: true }).eq("status", "drafting"),
-    supabase
-      .from("scheduled_sends")
-      .select("id", { count: "exact", head: true })
-      .in("status", ["approved", "scheduled", "sending"]),
-    supabase.from("scheduled_sends").select("id", { count: "exact", head: true }).eq("status", "sent"),
-    supabase
-      .from("campaigns")
-      .select("send_mode")
-      .eq("copywriting_mode", "agent")
-      .limit(1)
-      .maybeSingle<{ send_mode: string }>(),
-  ]);
-  const livePipeline = {
-    scoutDeployed: Boolean(scout),
-    scoutLive: scout?.status === "live",
-    scoutNextRunLabel: timeUntil(scout?.next_run_at ?? null),
-    scoutLastRunLabel: timeAgo(scout?.last_run_at ?? null),
-    pulled: total,
-    disqualified: disqRes.count ?? 0,
-    drafting: draftingRes.count ?? 0,
-    inReview: drafts,
-    sending: sendingRes.count ?? 0,
-    sent: sentRes.count ?? 0,
-    active: inOutreach + repliedOnly + converted,
-    replied: repliedOnly,
-    won: converted,
-    sendMode: (outreachCampaign.data?.send_mode === "automatic" ? "automatic" : "review") as
-      | "review"
-      | "automatic",
-  };
+  // The full live-pipeline funnel moved to the Pipeline tab (its dedicated home); the Overview
+  // keeps only the compact pipeline pulse (built from `pipeline` above).
 
   // Fast inbound response — the market's defensible "what works" use case. Real inbound_leads
   // counts + the median intake→response latency (the SLA the Responder is keeping). Loss-aversion
@@ -402,7 +370,6 @@ async function OverviewTab() {
       goalCents={account.revenue_goal_cents}
       isNew={isNew}
       showCrmNudge={showCrmNudge}
-      livePipeline={livePipeline}
       scoutDeployed={Boolean(scout)}
       drafts={drafts}
       agents={agentRows}

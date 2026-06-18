@@ -13,6 +13,7 @@ import {
   MessageSquare,
   PartyPopper,
   Phone,
+  Snowflake,
   Sparkles,
   TrendingUp,
   UserPlus,
@@ -28,7 +29,6 @@ import { AnimatedProgress } from "@/components/ui/animated-progress";
 import { Reveal, RevealItem, Eyebrow, PANEL_SURFACE } from "@/components/ui/panel";
 import { cn } from "@/lib/utils";
 import { RevenueChart } from "./revenue-chart";
-import { LivePipeline, type LivePipelineData } from "./live-pipeline";
 import { ProspectPanel, type Prospect } from "./prospect-panel";
 import { LeadProfileLink, type LeadProfile } from "@/components/lead-profile";
 import type { RevenuePoint, RevenueSnapshot } from "@/lib/revenue";
@@ -78,7 +78,6 @@ export interface DashboardViewProps {
   goalCents: number | null;
   isNew: boolean;
   showCrmNudge: boolean;
-  livePipeline: LivePipelineData;
   scoutDeployed: boolean;
   drafts: number;
   agents: AgentRow[];
@@ -193,267 +192,386 @@ function WorkingDashboard(props: DashboardViewProps) {
     scoutLastRunLabel,
   } = props;
 
+  // Channels/warmup are health surfaces — they earn space only when something needs doing,
+  // otherwise they're permanent noise. Hidden once email is active and LinkedIn is connected.
+  const channelsNeedAttention =
+    channels.mbActive === 0 || channels.mbWarming > 0 || channels.liStatus !== "active";
+
   return (
     <Reveal className="flex flex-col gap-6">
-      {/* Live pipeline — full-width transparency of the autonomous process, top of the page */}
-      <LivePipeline {...props.livePipeline} />
+      {/* 1 — Needs you: the single action surface (drafts to review + warm leads cooling). */}
+      <NeedsYou
+        drafts={drafts}
+        cold={cold}
+        liveAgentsCount={liveAgentsCount}
+        scoutNextRunLabel={scoutNextRunLabel}
+      />
 
-      {/* Top row: the one primary action (left) + revenue dopamine (right) */}
+      {/* 2 — Revenue vs goal: the value proof, front and center. */}
+      <RevenueCard
+        revenue={revenue}
+        convertedClients={convertedClients}
+        pipelineLeads={pipelineLeads}
+        goal={goal}
+        goalCents={goalCents}
+        series={series}
+        paceLabel={revenuePace}
+      />
+
+      {/* 3 — The daily loop: warm replies (the reward) + a compact pipeline pulse. */}
       <div className="grid gap-6 lg:grid-cols-[1.1fr_1.9fr]">
-        <RevealItem className={cn(PANEL_SURFACE, "p-5", drafts > 0 && "dark:bg-white/[0.06]")}>
-          {drafts > 0 ? (
-            <div className="flex h-full flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <span className="flex size-9 items-center justify-center rounded-lg bg-foreground text-background">
-                  <Inbox className="size-4" />
-                </span>
-                <div>
-                  <p className="text-sm font-medium">
-                    {drafts} {drafts === 1 ? "draft is" : "drafts are"} waiting for your review
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    Nothing sends until you approve it. A few minutes keeps the pipeline moving.
-                  </p>
-                </div>
-              </div>
-              <Button asChild size="sm">
-                <Link href="/review">
-                  Review now <ArrowRight className="size-4" />
-                </Link>
-              </Button>
-            </div>
-          ) : (
-            <div className="flex h-full flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <CheckCircle2 className="size-5 text-muted-foreground" />
-                <div>
-                  <p className="text-sm font-medium">You&apos;re all caught up</p>
-                  <p className="text-sm text-muted-foreground">
-                    {liveAgentsCount > 0
-                      ? `Your agent runs ${scoutNextRunLabel} — new drafts land here as leads qualify.`
-                      : "Deploy an Outreach Agent to start drafting personalized outreach."}
-                  </p>
-                </div>
-              </div>
-              {liveAgentsCount === 0 && (
-                <Button asChild size="sm" variant="outline">
-                  <Link href="/agents">View agents</Link>
-                </Button>
-              )}
-            </div>
-          )}
-        </RevealItem>
-
-        <RevenueCard
-          revenue={revenue}
-          convertedClients={convertedClients}
-          pipelineLeads={pipelineLeads}
-          goal={goal}
-          goalCents={goalCents}
-          series={series}
-          paceLabel={revenuePace}
-        />
-      </div>
-
-      {/* Pipeline motion (left) + warm replies, the variable reward (right) — kept high to anchor the daily habit loop */}
-      <div className="grid gap-6 lg:grid-cols-[1.9fr_1.1fr]">
-        <RevealItem className={cn(PANEL_SURFACE, "p-5")}>
-        <div className="flex items-center justify-between gap-3">
-          <Eyebrow>Pipeline</Eyebrow>
-          <Link
-            href="/dashboard?view=pipeline"
-            className="inline-flex items-center gap-1 font-mono text-[11px] uppercase tracking-[0.18em] text-foreground/80 underline-offset-4 transition-colors hover:text-foreground hover:underline"
-          >
-            View all <ArrowRight className="size-3" aria-hidden />
-          </Link>
-        </div>
-        <div className="mt-4 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-black/[0.06] bg-black/[0.04] dark:border-white/[0.08] dark:bg-white/[0.06] sm:grid-cols-5">
-          {pipeline.stages.map((stage) => {
-            const Icon = STAGE_ICON[stage.stage];
-            return (
-              <Link
-                key={stage.stage}
-                href="/dashboard?view=pipeline"
-                className="group flex flex-col gap-1 bg-background/40 px-4 py-4 transition-colors hover:bg-foreground/[0.04] focus-visible:bg-foreground/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring dark:bg-background/20"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-mono text-2xl font-semibold tabular-nums">{stage.count}</span>
-                  <Icon className="size-3.5 text-muted-foreground" aria-hidden />
-                </div>
-                <span className="text-xs text-muted-foreground group-hover:text-foreground">
-                  {stage.label}
-                </span>
-              </Link>
-            );
-          })}
-          <Link
-            href="/dashboard?view=pipeline"
-            className="group flex flex-col gap-1 bg-white/[0.06] px-4 py-4 transition-colors hover:bg-white/[0.1] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-          >
-            <div className="flex items-center justify-between">
-              <span className="font-mono text-2xl font-semibold tabular-nums">{convertedClients}</span>
-              <CheckCircle2 className="size-3.5 text-foreground" aria-hidden />
-            </div>
-            <span className="text-xs text-muted-foreground group-hover:text-foreground">Won</span>
-          </Link>
-        </div>
-        <AnimatedProgress value={pipeline.goalProgressPct ?? 0} className="mt-4" />
-        <p className="mt-2 text-xs text-muted-foreground">
-          {convertedClients > 0
-            ? `${convertedClients} ${convertedClients === 1 ? "lead" : "leads"} converted toward your ${goal ?? "revenue"} goal.`
-            : "Leads move LinkedIn → Email → iMessage → Caller, and stop the instant someone converts."}
-        </p>
-        </RevealItem>
-
         <WarmReplies recentReplies={recentReplies} interested={interested} />
+        <PipelinePulse pipeline={pipeline} convertedClients={convertedClients} goal={goal} />
       </div>
 
-      {/* Momentum (variable reward) + risk (loss aversion) — the return-and-act drivers */}
-      <div className="grid gap-6 md:grid-cols-2">
-        <AtRiskPanel cold={cold} />
-        <TodayPanel today={today} />
-      </div>
+      {/* 4 — Hot leads: the anticipation surface. */}
+      <RecentProspects prospects={prospects} />
 
-      {/* Fast inbound response — the category's defensible "what works" use case (market report).
-          Value-proof when a Responder is live; a loss-aversion nudge when inbound is unanswered. */}
+      {/* Conditional: fast-inbound value-proof / nudge (the report's defensible edge). */}
       {(fastInbound.deployed || fastInbound.scoutLive) && <FastInboundPanel fast={fastInbound} />}
 
-      {/* Recent prospects */}
-      <RevealItem className={cn(PANEL_SURFACE, "p-5")}>
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <Eyebrow>Recent prospects</Eyebrow>
-            <p className="mt-2 text-xs text-muted-foreground">
-              Sourced, scored, and enriched by your Prospect Agent — click any row for the full profile.
-            </p>
-          </div>
-          <Button asChild variant="ghost" size="sm" className="shrink-0">
-            <Link href="/leads">
-              View all <ArrowRight className="size-4" />
-            </Link>
-          </Button>
-        </div>
-        <div className="mt-4">
-          <ProspectPanel prospects={prospects} />
-        </div>
-      </RevealItem>
-
-      {/* Status & reassurance — secondary, kept low */}
-      <div className="grid gap-6 md:grid-cols-3">
-        {/* Agent heartbeat */}
-        <RevealItem className={cn(PANEL_SURFACE, "flex flex-col gap-3 p-5")}>
-          <Eyebrow>Your agents</Eyebrow>
-          {agents.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No agents deployed yet.</p>
-          ) : (
-            agents.map((a) => (
-              <div key={a.id} className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <span
-                    className={`size-2 rounded-full ${
-                      a.status === "live" ? "animate-pulse bg-emerald-400" : "bg-muted-foreground/40"
-                    }`}
-                    aria-hidden
-                  />
-                  <span className="text-sm font-medium">{a.name}</span>
-                  <Badge variant="secondary" className="capitalize">
-                    {a.kind === "scout"
-                      ? "Prospect"
-                      : a.kind === "caller"
-                        ? "Caller"
-                        : a.kind === "responder"
-                          ? "Responder"
-                          : "Outreach"}
-                  </Badge>
-                </div>
-                <span className="text-xs text-muted-foreground">
-                  {a.status === "live"
-                    ? `next run ${a.nextRunLabel}`
-                    : a.status === "paused"
-                      ? "paused"
-                      : "draft"}
-                </span>
-              </div>
-            ))
-          )}
-          {scoutLive && (
-            <p className="border-t border-border/60 pt-3 text-xs text-muted-foreground">
-              Last sourced {scoutLastRunLabel}. Quiet stretches are normal — your agent only
-              keeps high-quality leads.
-            </p>
-          )}
-          <Button asChild variant="ghost" size="sm" className="-mx-2 mt-1 justify-start">
-            <Link href="/agents">
-              Manage agents <ArrowRight className="size-4" />
-            </Link>
-          </Button>
-        </RevealItem>
-
-        {/* Channels readiness */}
-        <RevealItem className={cn(PANEL_SURFACE, "flex flex-col gap-3 p-5")}>
-          <Eyebrow>Channels</Eyebrow>
-          <ChannelRow
-            icon={<Mail className="size-4" />}
-            label="Email"
-            ready={channels.mbActive > 0}
-            detail={
-              channels.mbTotal === 0
-                ? "Not set up"
-                : [
-                    channels.mbActive ? `${channels.mbActive} active` : null,
-                    channels.mbWarming ? `${channels.mbWarming} warming` : null,
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")
-            }
-          />
-          <ChannelRow
-            icon={<MessageSquare className="size-4" />}
-            label="LinkedIn"
-            ready={channels.liStatus === "active"}
-            detail={
-              channels.liStatus === "active"
-                ? "Connected"
-                : channels.liStatus === "restricted"
-                  ? "Restricted"
-                  : channels.liStatus
-                    ? "Connecting"
-                    : "Not connected"
-            }
-          />
-          <Button asChild variant="ghost" size="sm" className="-mx-2 mt-1 justify-start">
-            <Link href="/settings/channels">
-              Manage channels <ArrowRight className="size-4" />
-            </Link>
-          </Button>
-        </RevealItem>
-
-        {/* This week */}
-        <RevealItem className={cn(PANEL_SURFACE, "p-5")}>
-          <div className="flex items-center justify-between gap-2">
-            <Eyebrow>This week</Eyebrow>
-            <span className="flex items-center gap-1 font-mono text-[11px] uppercase tracking-wide text-muted-foreground">
-              <Activity className="size-3.5" /> last 7 days
-            </span>
-          </div>
-          <div className="mt-4 grid grid-cols-2 gap-4">
-            <div>
-              <span className="font-mono text-2xl font-semibold tabular-nums">{week.sends}</span>
-              <p className="text-xs text-muted-foreground">Messages sent</p>
-            </div>
-            <div>
-              <span className="font-mono text-2xl font-semibold tabular-nums">{week.replies}</span>
-              <p className="text-xs text-muted-foreground">Replies in</p>
-            </div>
-          </div>
-          <p className="mt-3 border-t border-border/60 pt-3 text-xs text-muted-foreground">
-            {week.sends > 0
-              ? `${week.email} email · ${week.li} LinkedIn`
-              : "No sends yet this week — drafts you approve are sent here."}
-          </p>
-        </RevealItem>
+      {/* Secondary, kept low — momentum + agent heartbeat, plus channels only when they need you. */}
+      <div className={cn("grid gap-6", channelsNeedAttention ? "lg:grid-cols-3" : "md:grid-cols-2")}>
+        <MomentumPanel today={today} week={week} />
+        <AgentsPanel agents={agents} scoutLive={scoutLive} scoutLastRunLabel={scoutLastRunLabel} />
+        {channelsNeedAttention && <ChannelsPanel channels={channels} />}
       </div>
     </Reveal>
+  );
+}
+
+/** One actionable row inside "Needs you" — icon + what + why + a single CTA. */
+function ActionRow({
+  icon,
+  title,
+  detail,
+  href,
+  label,
+  primary,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  detail: string;
+  href: string;
+  label: string;
+  primary?: boolean;
+}) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex items-center gap-3">
+        <span
+          className={cn(
+            "flex size-9 shrink-0 items-center justify-center rounded-lg",
+            primary ? "bg-foreground text-background" : "bg-foreground/10 text-muted-foreground"
+          )}
+        >
+          {icon}
+        </span>
+        <div>
+          <p className="text-sm font-medium">{title}</p>
+          <p className="text-sm text-muted-foreground">{detail}</p>
+        </div>
+      </div>
+      <Button asChild size="sm" variant={primary ? "default" : "outline"}>
+        <Link href={href}>
+          {label} <ArrowRight className="size-4" />
+        </Link>
+      </Button>
+    </div>
+  );
+}
+
+/**
+ * "Needs you" — the single action surface at the top of the page (merges the old review-drafts and
+ * going-cold cards). It answers "what needs me?" in one glance: drafts to approve (the gate that
+ * keeps sending in your control) and warm leads cooling off (loss aversion). All-clear reads calm.
+ */
+function NeedsYou({
+  drafts,
+  cold,
+  liveAgentsCount,
+  scoutNextRunLabel,
+}: {
+  drafts: number;
+  cold: number;
+  liveAgentsCount: number;
+  scoutNextRunLabel: string;
+}) {
+  const hasWork = drafts > 0 || cold > 0;
+  return (
+    <RevealItem className={cn(PANEL_SURFACE, "p-5", hasWork && "dark:bg-white/[0.06]")}>
+      <Eyebrow>Needs you</Eyebrow>
+      {hasWork ? (
+        <div className="mt-4 flex flex-col gap-4">
+          {drafts > 0 && (
+            <ActionRow
+              primary
+              icon={<Inbox className="size-4" />}
+              title={`${drafts} ${drafts === 1 ? "draft is" : "drafts are"} waiting for your review`}
+              detail="Nothing sends until you approve it — a few minutes keeps the pipeline moving."
+              href="/review"
+              label="Review"
+            />
+          )}
+          {cold > 0 && (
+            <ActionRow
+              icon={<Snowflake className="size-4" />}
+              title={`${cold} warm ${cold === 1 ? "lead is" : "leads are"} cooling off`}
+              detail="Replied 3+ days ago and still open — a quick nudge keeps them warm."
+              href="/leads?tab=replied"
+              label="Re-engage"
+            />
+          )}
+        </div>
+      ) : (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <CheckCircle2 className="size-5 text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">
+              {liveAgentsCount > 0
+                ? `You're all caught up — your agent runs ${scoutNextRunLabel}, and anything that needs you lands here.`
+                : "Deploy an Outreach Agent to start drafting personalized outreach."}
+            </p>
+          </div>
+          {liveAgentsCount === 0 && (
+            <Button asChild size="sm" variant="outline">
+              <Link href="/agents">View agents</Link>
+            </Button>
+          )}
+        </div>
+      )}
+    </RevealItem>
+  );
+}
+
+/** Compact pipeline pulse — stage counts + goal progress, linking to the full funnel on the Pipeline tab. */
+function PipelinePulse({
+  pipeline,
+  convertedClients,
+  goal,
+}: {
+  pipeline: PipelineViewModel;
+  convertedClients: number;
+  goal: string | null;
+}) {
+  return (
+    <RevealItem className={cn(PANEL_SURFACE, "p-5")}>
+      <div className="flex items-center justify-between gap-3">
+        <Eyebrow>Pipeline</Eyebrow>
+        <Link
+          href="/dashboard?view=pipeline"
+          className="inline-flex items-center gap-1 font-mono text-[11px] uppercase tracking-[0.18em] text-foreground/80 underline-offset-4 transition-colors hover:text-foreground hover:underline"
+        >
+          View all <ArrowRight className="size-3" aria-hidden />
+        </Link>
+      </div>
+      <div className="mt-4 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-black/[0.06] bg-black/[0.04] dark:border-white/[0.08] dark:bg-white/[0.06] sm:grid-cols-5">
+        {pipeline.stages.map((stage) => {
+          const Icon = STAGE_ICON[stage.stage];
+          return (
+            <Link
+              key={stage.stage}
+              href="/dashboard?view=pipeline"
+              className="group flex flex-col gap-1 bg-background/40 px-4 py-4 transition-colors hover:bg-foreground/[0.04] focus-visible:bg-foreground/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring dark:bg-background/20"
+            >
+              <div className="flex items-center justify-between">
+                <span className="font-mono text-2xl font-semibold tabular-nums">{stage.count}</span>
+                <Icon className="size-3.5 text-muted-foreground" aria-hidden />
+              </div>
+              <span className="text-xs text-muted-foreground group-hover:text-foreground">
+                {stage.label}
+              </span>
+            </Link>
+          );
+        })}
+        <Link
+          href="/dashboard?view=pipeline"
+          className="group flex flex-col gap-1 bg-white/[0.06] px-4 py-4 transition-colors hover:bg-white/[0.1] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+        >
+          <div className="flex items-center justify-between">
+            <span className="font-mono text-2xl font-semibold tabular-nums">{convertedClients}</span>
+            <CheckCircle2 className="size-3.5 text-foreground" aria-hidden />
+          </div>
+          <span className="text-xs text-muted-foreground group-hover:text-foreground">Won</span>
+        </Link>
+      </div>
+      <AnimatedProgress value={pipeline.goalProgressPct ?? 0} className="mt-4" />
+      <p className="mt-2 text-xs text-muted-foreground">
+        {convertedClients > 0
+          ? `${convertedClients} ${convertedClients === 1 ? "lead" : "leads"} converted toward your ${goal ?? "revenue"} goal.`
+          : "Leads move LinkedIn → Email → iMessage → Caller, and stop the instant someone converts."}
+      </p>
+    </RevealItem>
+  );
+}
+
+/** Recent prospects — the anticipation surface; click a row for the full profile + why-now signal. */
+function RecentProspects({ prospects }: { prospects: Prospect[] }) {
+  return (
+    <RevealItem className={cn(PANEL_SURFACE, "p-5")}>
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <Eyebrow>Recent prospects</Eyebrow>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Sourced, scored, and enriched by your Prospect Agent — click any row for the full profile.
+          </p>
+        </div>
+        <Button asChild variant="ghost" size="sm" className="shrink-0">
+          <Link href="/leads">
+            View all <ArrowRight className="size-4" />
+          </Link>
+        </Button>
+      </div>
+      <div className="mt-4">
+        <ProspectPanel prospects={prospects} />
+      </div>
+    </RevealItem>
+  );
+}
+
+/** Agent heartbeat — secondary reassurance that the autonomous process is alive. */
+function AgentsPanel({
+  agents,
+  scoutLive,
+  scoutLastRunLabel,
+}: {
+  agents: AgentRow[];
+  scoutLive: boolean;
+  scoutLastRunLabel: string;
+}) {
+  return (
+    <RevealItem className={cn(PANEL_SURFACE, "flex flex-col gap-3 p-5")}>
+      <Eyebrow>Your agents</Eyebrow>
+      {agents.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No agents deployed yet.</p>
+      ) : (
+        agents.map((a) => (
+          <div key={a.id} className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span
+                className={`size-2 rounded-full ${
+                  a.status === "live" ? "animate-pulse bg-emerald-400" : "bg-muted-foreground/40"
+                }`}
+                aria-hidden
+              />
+              <span className="text-sm font-medium">{a.name}</span>
+              <Badge variant="secondary" className="capitalize">
+                {a.kind === "scout"
+                  ? "Prospect"
+                  : a.kind === "caller"
+                    ? "Caller"
+                    : a.kind === "responder"
+                      ? "Responder"
+                      : "Outreach"}
+              </Badge>
+            </div>
+            <span className="text-xs text-muted-foreground">
+              {a.status === "live"
+                ? `next run ${a.nextRunLabel}`
+                : a.status === "paused"
+                  ? "paused"
+                  : "draft"}
+            </span>
+          </div>
+        ))
+      )}
+      {scoutLive && (
+        <p className="border-t border-border/60 pt-3 text-xs text-muted-foreground">
+          Last sourced {scoutLastRunLabel}. Quiet stretches are normal — your agent only keeps
+          high-quality leads.
+        </p>
+      )}
+      <Button asChild variant="ghost" size="sm" className="-mx-2 mt-1 justify-start">
+        <Link href="/agents">
+          Manage agents <ArrowRight className="size-4" />
+        </Link>
+      </Button>
+    </RevealItem>
+  );
+}
+
+/** Channels readiness — rendered only when a channel needs attention (else it's hidden noise). */
+function ChannelsPanel({ channels }: { channels: DashboardViewProps["channels"] }) {
+  return (
+    <RevealItem className={cn(PANEL_SURFACE, "flex flex-col gap-3 p-5")}>
+      <Eyebrow>Channels need attention</Eyebrow>
+      <ChannelRow
+        icon={<Mail className="size-4" />}
+        label="Email"
+        ready={channels.mbActive > 0}
+        detail={
+          channels.mbTotal === 0
+            ? "Not set up"
+            : [
+                channels.mbActive ? `${channels.mbActive} active` : null,
+                channels.mbWarming ? `${channels.mbWarming} warming` : null,
+              ]
+                .filter(Boolean)
+                .join(" · ")
+        }
+      />
+      <ChannelRow
+        icon={<MessageSquare className="size-4" />}
+        label="LinkedIn"
+        ready={channels.liStatus === "active"}
+        detail={
+          channels.liStatus === "active"
+            ? "Connected"
+            : channels.liStatus === "restricted"
+              ? "Restricted"
+              : channels.liStatus
+                ? "Connecting"
+                : "Not connected"
+        }
+      />
+      <Button asChild variant="ghost" size="sm" className="-mx-2 mt-1 justify-start">
+        <Link href="/settings/channels">
+          Manage channels <ArrowRight className="size-4" />
+        </Link>
+      </Button>
+    </RevealItem>
+  );
+}
+
+/**
+ * Momentum — what your agents did lately, in one panel (merges the old "Since yesterday" + "This
+ * week" cards). The 24h counts are the headline variable reward; the 7-day line is the context.
+ */
+function MomentumPanel({
+  today,
+  week,
+}: {
+  today: { sourced: number; sent: number; replied: number };
+  week: { sends: number; email: number; li: number; replies: number };
+}) {
+  return (
+    <RevealItem className={cn(PANEL_SURFACE, "p-5")}>
+      <div className="flex items-center justify-between gap-2">
+        <Eyebrow>Momentum</Eyebrow>
+        <span className="flex items-center gap-1 font-mono text-[11px] uppercase tracking-wide text-muted-foreground">
+          <Activity className="size-3.5" /> last 24h
+        </span>
+      </div>
+      <div className="mt-4 grid grid-cols-3 gap-4">
+        <div>
+          <span className="font-mono text-2xl font-semibold tabular-nums">{today.sourced}</span>
+          <p className="text-xs text-muted-foreground">Sourced</p>
+        </div>
+        <div>
+          <span className="font-mono text-2xl font-semibold tabular-nums">{today.sent}</span>
+          <p className="text-xs text-muted-foreground">Sent</p>
+        </div>
+        <div>
+          <span className="font-mono text-2xl font-semibold tabular-nums">{today.replied}</span>
+          <p className="text-xs text-muted-foreground">Replied</p>
+        </div>
+      </div>
+      <p className="mt-3 border-t border-border/60 pt-3 text-xs text-muted-foreground">
+        {week.sends > 0
+          ? `This week: ${week.sends} sent (${week.email} email · ${week.li} LinkedIn) · ${week.replies} ${week.replies === 1 ? "reply" : "replies"} in.`
+          : "Quiet so far — your agents work on their own schedule, and what they do shows up here."}
+      </p>
+    </RevealItem>
   );
 }
 
@@ -613,74 +731,6 @@ function FastInboundPanel({ fast }: { fast: DashboardViewProps["fastInbound"] })
           .
         </p>
       )}
-    </RevealItem>
-  );
-}
-
-/** Going cold — loss aversion. Warm leads that replied but are cooling off. */
-function AtRiskPanel({ cold }: { cold: number }) {
-  return (
-    <RevealItem className={cn(PANEL_SURFACE, "flex flex-col p-5", cold > 0 && "dark:bg-white/[0.06]")}>
-      <div className="flex items-center justify-between gap-2">
-        <Eyebrow>Going cold</Eyebrow>
-        {cold > 0 && <Badge variant="secondary">{cold}</Badge>}
-      </div>
-      {cold > 0 ? (
-        <>
-          <div className="mt-4 flex items-end gap-2">
-            <span className="font-mono text-2xl font-semibold tabular-nums">{cold}</span>
-            <span className="pb-1 text-sm text-muted-foreground">
-              warm {cold === 1 ? "lead" : "leads"} cooling off
-            </span>
-          </div>
-          <p className="mt-2 text-xs text-muted-foreground">
-            Replied 3+ days ago and still open — a quick nudge keeps them warm.
-          </p>
-          <Button asChild size="sm" variant="outline" className="mt-3 w-fit">
-            <Link href="/leads?tab=replied">
-              Re-engage <ArrowRight className="size-4" />
-            </Link>
-          </Button>
-        </>
-      ) : (
-        <p className="mt-4 text-sm text-muted-foreground">
-          Nothing slipping — every warm lead is fresh or already moving.
-        </p>
-      )}
-    </RevealItem>
-  );
-}
-
-/** Since yesterday — variable reward. Fresh activity that makes returning rewarding. */
-function TodayPanel({ today }: { today: { sourced: number; sent: number; replied: number } }) {
-  const quiet = today.sourced + today.sent + today.replied === 0;
-  return (
-    <RevealItem className={cn(PANEL_SURFACE, "p-5")}>
-      <div className="flex items-center justify-between gap-2">
-        <Eyebrow>Since yesterday</Eyebrow>
-        <span className="flex items-center gap-1 font-mono text-[11px] uppercase tracking-wide text-muted-foreground">
-          <Activity className="size-3.5" /> last 24h
-        </span>
-      </div>
-      <div className="mt-4 grid grid-cols-3 gap-4">
-        <div>
-          <span className="font-mono text-2xl font-semibold tabular-nums">{today.sourced}</span>
-          <p className="text-xs text-muted-foreground">Sourced</p>
-        </div>
-        <div>
-          <span className="font-mono text-2xl font-semibold tabular-nums">{today.sent}</span>
-          <p className="text-xs text-muted-foreground">Sent</p>
-        </div>
-        <div>
-          <span className="font-mono text-2xl font-semibold tabular-nums">{today.replied}</span>
-          <p className="text-xs text-muted-foreground">Replied</p>
-        </div>
-      </div>
-      <p className="mt-3 border-t border-border/60 pt-3 text-xs text-muted-foreground">
-        {quiet
-          ? "Quiet so far — your agents work on their own schedule."
-          : "Your agents kept working while you were away."}
-      </p>
     </RevealItem>
   );
 }
