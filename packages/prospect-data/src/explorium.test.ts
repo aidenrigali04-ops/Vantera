@@ -190,28 +190,23 @@ describe("ExploriumProspectData", () => {
     });
   });
 
-  it("rolls company events + intent into normalized per-business signals", async () => {
+  it("rolls company events (output_events shape) into per-business signals, real title preferred", async () => {
     const { impl } = fetchStub({
       "/prospects/contacts_information/bulk_enrich": { data: [{ prospect_id: "ref_1", data: {} }] },
       "/businesses/firmographics/bulk_enrich": { data: [{ business_id: "biz_1", data: { name: "Acme" } }] },
       "/businesses/events": {
-        data: [
+        output_events: [
           {
             business_id: "biz_1",
-            data: {
-              events: [
-                { type: "New Funding Round", description: "Series B, $40M", event_time: "2026-06-01" },
-                { type: "New Executive Level Hires", description: "Hired a new CRO", event_time: "2026-05-20" },
-              ],
-            },
+            event_name: "new_funding_round",
+            event_time: "2026-06-01",
+            data: { title: "Acme raises $40M Series B", snippet: "Series B led by Acme Capital" },
           },
-        ],
-      },
-      "/businesses/intent/bulk_enrich": {
-        data: [
           {
             business_id: "biz_1",
-            data: { intent_level: "In-Depth", intent_topics: [{ topic: "Sales Automation", score: 82 }] },
+            event_name: "new_product",
+            event_time: "2026-05-20",
+            data: { title: "Acme launches Copilot" },
           },
         ],
       },
@@ -221,34 +216,28 @@ describe("ExploriumProspectData", () => {
     const [enriched] = await source.enrichProspects([{ externalRef: "ref_1", businessId: "biz_1" }]);
 
     expect(enriched!.signals).toEqual([
-      { kind: "funding", label: "Raised new funding", detail: "Series B, $40M", observedAt: "2026-06-01" },
-      { kind: "exec_hire", label: "New executive hire", detail: "Hired a new CRO", observedAt: "2026-05-20" },
-      { kind: "intent", label: "Researching Sales Automation", level: "in_depth", detail: "Sales Automation" },
+      // label prefers the event's real title; detail falls back to title when no snippet
+      { kind: "funding", label: "Acme raises $40M Series B", detail: "Series B led by Acme Capital", observedAt: "2026-06-01" },
+      { kind: "product_launch", label: "Acme launches Copilot", detail: "Acme launches Copilot", observedAt: "2026-05-20" },
     ]);
   });
 
-  it("maps the canonical AgentSource event-type tokens (underscored) to the right kinds", async () => {
+  it("maps the canonical AgentSource event_name tokens to the right kinds", async () => {
+    const evt = (event_name: string) => ({ business_id: "biz_1", event_name, event_time: "2026-06-01" });
     const { impl } = fetchStub({
       "/prospects/contacts_information/bulk_enrich": { data: [{ prospect_id: "ref_1", data: {} }] },
       "/businesses/firmographics/bulk_enrich": { data: [{ business_id: "biz_1", data: { name: "Acme" } }] },
       "/businesses/events": {
-        data: [
-          {
-            business_id: "biz_1",
-            data: {
-              events: [
-                { type: "new_funding_round", event_time: "2026-06-01" },
-                { type: "new_product", event_time: "2026-06-02" },
-                { type: "closing_office", event_time: "2026-06-03" },
-                { type: "merger_and_acquisitions", event_time: "2026-06-04" },
-                { type: "cost_cutting", event_time: "2026-06-05" },
-                { type: "hiring_in_sales_department", event_time: "2026-06-06" },
-                { type: "increase_in_all_departments", event_time: "2026-06-07" },
-                { type: "outages_and_security_breaches", event_time: "2026-06-08" },
-                { type: "lawsuits_and_legal_issues", event_time: "2026-06-09" },
-              ],
-            },
-          },
+        output_events: [
+          evt("new_funding_round"),
+          evt("new_product"),
+          evt("closing_office"),
+          evt("merger_and_acquisitions"),
+          evt("cost_cutting"),
+          evt("hiring_in_sales_department"),
+          evt("increase_in_all_departments"),
+          evt("outages_and_security_breaches"),
+          evt("lawsuits_and_legal_issues"),
         ],
       },
     });
@@ -268,8 +257,25 @@ describe("ExploriumProspectData", () => {
     ]);
   });
 
-  it("degrades gracefully when the signals endpoints fail (no signals, core enrichment intact)", async () => {
-    // events/intent are NOT stubbed → 404 → postSafe swallows; contacts/firmographics still resolve.
+  it("sends the required event_types in the events request body", async () => {
+    const { impl, calls } = fetchStub({
+      "/prospects/contacts_information/bulk_enrich": { data: [{ prospect_id: "ref_1", data: {} }] },
+      "/businesses/firmographics/bulk_enrich": { data: [{ business_id: "biz_1", data: { name: "Acme" } }] },
+      "/businesses/events": { output_events: [] },
+    });
+    await new ExploriumProspectData({ apiKey: "k", fetchImpl: impl }).enrichProspects([
+      { externalRef: "ref_1", businessId: "biz_1" },
+    ]);
+    const eventsCall = calls.find((c) => c.url.includes("/businesses/events"));
+    expect(eventsCall).toBeDefined();
+    const body = JSON.parse(String(eventsCall!.init.body));
+    expect(body.business_ids).toEqual(["biz_1"]);
+    expect(Array.isArray(body.event_types) && body.event_types.length).toBeTruthy();
+    expect(body.event_types).toContain("new_funding_round");
+  });
+
+  it("degrades gracefully when the events endpoint fails (no signals, core enrichment intact)", async () => {
+    // events is NOT stubbed → 404 → postSafeJson returns null; contacts/firmographics still resolve.
     const { impl } = fetchStub({
       "/prospects/contacts_information/bulk_enrich": {
         data: [{ prospect_id: "ref_1", data: { professions_email: "dana@acme.com", professional_email_status: "valid" } }],

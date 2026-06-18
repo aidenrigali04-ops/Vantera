@@ -15,18 +15,45 @@ const ENRICH_PATH = "/prospects/contacts_information/bulk_enrich";
 // Firmographics (industry / employee count / revenue) live on the BUSINESS, keyed by business_id —
 // they are not on the /prospects row, so they must be fetched separately and joined per prospect.
 const FIRMOGRAPHICS_PATH = "/businesses/firmographics/bulk_enrich";
-// Buying signals, keyed by business_id (rule 05 waterfall, survivors only). Company EVENTS (funding,
-// office moves, product launches, M&A, hiring/workforce, …) and INTENT (level + topics). Both are
-// best-effort: a failure or disabled endpoint degrades to no signals — it never breaks the core
-// email/firmographics enrichment.
-//   EVENTS — the type taxonomy is VERIFIED against the live AgentSource enum (canonical underscore
-//     tokens like new_funding_round / new_product / cost_cutting / hiring_in_sales_department);
-//     normalizeEvent() maps those tokens. The bulk REST path below is assumed — verify at live-wire.
-//   INTENT — NOT exposed in the current AgentSource enrich interface we verified; the path/shape are
-//     assumed. If unavailable it simply 404s (postSafe) and no intent signal is produced.
-// The mapping contract is covered by stub tests.
+// Company EVENT signals, keyed by business_id (rule 05 waterfall, survivors only). Best-effort: a
+// failure or empty result degrades to no signals — it never breaks core email/firmographics enrichment.
+// VERIFIED live 2026-06-18 against api.explorium.ai/v1:
+//   POST /businesses/events  body { business_ids, event_types (REQUIRED), timestamp_from? }
+//   → { output_events: [{ business_id, event_name, event_time, data:{ title, snippet, … } }] }
+//   (note: results are under `output_events`, NOT `data`; event_types is mandatory or it 422s).
+// INTENT is intentionally NOT fetched: no /v1 intent endpoint exists (every candidate 404s and the
+// enrich interface has no intent enrichment). The `intent` kind stays defined for a future source.
 const EVENTS_PATH = "/businesses/events";
-const INTENT_PATH = "/businesses/intent/bulk_enrich";
+
+// Window for "fresh" events — aligned with the rank's signal-decay window so we don't pull stale ones.
+const EVENT_WINDOW_DAYS = 180;
+
+// The event types we capture (verified canonical tokens). Curated to the signals we surface — capital,
+// product/partnership, expansion, workforce, leadership, and risk — not the full 40-type enum.
+const EVENT_TYPES = [
+  "new_funding_round",
+  "ipo_announcement",
+  "new_investment",
+  "new_product",
+  "new_partnership",
+  "company_award",
+  "merger_and_acquisitions",
+  "new_office",
+  "closing_office",
+  "increase_in_all_departments",
+  "decrease_in_all_departments",
+  "hiring_in_sales_department",
+  "hiring_in_engineering_department",
+  "hiring_in_marketing_department",
+  "employee_joined_company",
+  "cost_cutting",
+  "outages_and_security_breaches",
+  "lawsuits_and_legal_issues",
+];
+
+function isoDaysAgo(days: number): string {
+  return new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
+}
 
 export interface ExploriumOptions {
   apiKey?: string;
@@ -246,50 +273,19 @@ function normalizeEvent(typeRaw: string): { kind: string; label: string } {
   return { kind, label: KIND_LABEL[kind] ?? typeRaw };
 }
 
-// Assumed events shape (verify at live-wire): data:[{ business_id, data:{ events:[{ type, description,
-// event_time }] } }]. Tolerant: accepts events under data.events or a bare data array; skips rows
-// without a type. Caller keys by business_id.
-function signalsFromEvents(eventsData: unknown): ProspectSignal[] {
-  const list = Array.isArray(eventsData)
-    ? eventsData
-    : Array.isArray((eventsData as ProviderRow | undefined)?.events)
-      ? ((eventsData as ProviderRow).events as unknown[])
-      : [];
-  const out: ProspectSignal[] = [];
-  for (const e of list) {
-    if (typeof e !== "object" || e === null) continue;
-    const row = e as ProviderRow;
-    const type = str(row, "type") ?? str(row, "event_type") ?? str(row, "category");
-    if (!type) continue;
-    const { kind, label } = normalizeEvent(type);
-    out.push({
-      kind,
-      label,
-      detail: str(row, "description") ?? str(row, "summary") ?? type,
-      observedAt: str(row, "event_time") ?? str(row, "date") ?? str(row, "timestamp"),
-    });
-  }
-  return out;
-}
-
-// Assumed intent shape (verify at live-wire): data:{ intent_level, intent_topics:[{ topic, score }] }.
-// Emits a single rolled-up intent signal; null when there's no meaningful level.
-function signalFromIntent(intentData: unknown): ProspectSignal | null {
-  if (typeof intentData !== "object" || intentData === null) return null;
-  const row = intentData as ProviderRow;
-  const levelRaw = (str(row, "intent_level") ?? str(row, "level") ?? "").toLowerCase();
-  if (!levelRaw || levelRaw === "none") return null;
-  const level = levelRaw.replace(/[\s-]+/g, "_"); // "in depth" / "in-depth" → "in_depth"
-  const topicsRaw = Array.isArray(row.intent_topics) ? (row.intent_topics as ProviderRow[]) : [];
-  const topics = topicsRaw
-    .map((t) => str(t, "topic") ?? str(t, "name"))
-    .filter((t): t is string => Boolean(t));
-  const label = topics.length > 0 ? `Researching ${topics.slice(0, 2).join(", ")}` : "Showing buying intent";
+// Map one event from the live `output_events` array → a ProspectSignal. event_name is the canonical
+// token (normalizeEvent handles it); the human label prefers the event's real title, with a default
+// per-kind fallback. Returns null when there's no usable type.
+function signalFromEvent(e: ProviderRow): ProspectSignal | null {
+  const type = str(e, "event_name");
+  if (!type) return null;
+  const { kind, label } = normalizeEvent(type);
+  const data = typeof e.data === "object" && e.data !== null ? (e.data as ProviderRow) : {};
   return {
-    kind: "intent",
-    label,
-    level,
-    detail: topics.length > 0 ? topics.join(", ") : "Active buying intent detected",
+    kind,
+    label: str(data, "title") ?? label,
+    detail: str(data, "snippet") ?? str(data, "title") ?? type,
+    observedAt: str(e, "event_time"),
   };
 }
 
@@ -360,42 +356,39 @@ export class ExploriumProspectData implements ProspectDataSource {
     return Array.isArray(json.data) ? (json.data as ProviderRow[]) : [];
   }
 
-  // Best-effort POST for additive enrichment (signals): swallows any failure and returns [] so a
-  // disabled/erroring signals endpoint degrades gracefully instead of breaking core enrichment.
-  private async postSafe(path: string, body: unknown): Promise<ProviderRow[]> {
+  // Best-effort POST returning the full JSON object (or null): a disabled/erroring signals endpoint
+  // degrades to no signals instead of breaking core enrichment. (Distinct from `post`, which unwraps
+  // `data` — the events endpoint returns its rows under `output_events`.)
+  private async postSafeJson(path: string, body: unknown): Promise<Record<string, unknown> | null> {
     try {
-      return await this.post(path, body);
+      const res = await this.fetchImpl(`${this.baseUrl}${path}`, {
+        method: "POST",
+        headers: { "content-type": "application/json", api_key: this.apiKey },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) return null;
+      return (await res.json()) as Record<string, unknown>;
     } catch {
-      return [];
+      return null;
     }
   }
 
-  // Fetch company events + intent for the given businesses and roll them into per-business signals.
-  // Best-effort throughout (postSafe); company-level signals attach to every prospect at that business.
+  // Fetch recent company events for the given businesses and roll them into per-business signals.
+  // Best-effort; company-level signals attach to every prospect at that business.
   private async fetchSignals(businessIds: string[]): Promise<Map<string, ProspectSignal[]>> {
     const byBusiness = new Map<string, ProspectSignal[]>();
     if (businessIds.length === 0) return byBusiness;
 
-    const add = (bid: string, signals: ProspectSignal[]) => {
-      if (signals.length === 0) return;
-      byBusiness.set(bid, [...(byBusiness.get(bid) ?? []), ...signals]);
-    };
-    const payloadOf = (row: ProviderRow): unknown =>
-      typeof row.data === "object" && row.data !== null ? row.data : row;
-
-    const [eventRows, intentRows] = await Promise.all([
-      this.postSafe(EVENTS_PATH, { business_ids: businessIds }),
-      this.postSafe(INTENT_PATH, { business_ids: businessIds }),
-    ]);
-
-    for (const row of eventRows) {
-      const bid = str(row, "business_id");
-      if (bid) add(bid, signalsFromEvents(payloadOf(row)));
-    }
-    for (const row of intentRows) {
-      const bid = str(row, "business_id");
-      const intent = bid ? signalFromIntent(payloadOf(row)) : null;
-      if (bid && intent) add(bid, [intent]);
+    const json = await this.postSafeJson(EVENTS_PATH, {
+      business_ids: businessIds,
+      event_types: EVENT_TYPES,
+      timestamp_from: isoDaysAgo(EVENT_WINDOW_DAYS),
+    });
+    const events = Array.isArray(json?.output_events) ? (json!.output_events as ProviderRow[]) : [];
+    for (const e of events) {
+      const bid = str(e, "business_id");
+      const sig = bid ? signalFromEvent(e) : null;
+      if (bid && sig) byBusiness.set(bid, [...(byBusiness.get(bid) ?? []), sig]);
     }
     return byBusiness;
   }
