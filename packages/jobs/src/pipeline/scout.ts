@@ -44,27 +44,33 @@ export async function runScout(agentId: string, deps: ScoutDeps): Promise<ScoutR
     }
   }
 
-  // Trial COGS guard: a trialing account sources at most TRIAL_LEAD_CAP leads total.
-  // Once the ceiling is hit the run no-ops before any discovery/enrichment spend.
-  let prospectsPerRun = config.prospectsPerRun;
+  const cadenceDays = ctx.agent.cadence === "weekly" ? 7 : 1;
+
+  // The per-run ceiling scales with cadence: config.prospectsPerRun is a PER-DAY budget, so a weekly
+  // run sources up to a full week of it in one batch (~7x) — weekly users get real outreach volume
+  // without the per-run cost of daily runs. computeRunTarget still clamps to actual send capacity
+  // below this, so we never source more than the account can contact (no wasted credits, rule 05).
+  let ceiling = config.prospectsPerRun * cadenceDays;
+
+  // Trial COGS guard: a trialing account sources at most TRIAL_LEAD_CAP leads total. Clamp the run
+  // ceiling to the remaining trial budget; the run no-ops once the cap is hit (before any spend).
   if (ctx.account.subscriptionStatus === "trialing") {
     const alreadySourced = await deps.store.countAccountLeads(accountId);
-    prospectsPerRun = Math.min(prospectsPerRun, Math.max(0, TRIAL_LEAD_CAP - alreadySourced));
-    if (prospectsPerRun === 0) {
+    ceiling = Math.min(ceiling, Math.max(0, TRIAL_LEAD_CAP - alreadySourced));
+    if (ceiling === 0) {
       return { status: "skipped", discovered: 0, gatePassed: 0, qualified: 0, chained: false };
     }
   }
 
-  // discover per ICP and keep only new-or-unscored leads (store dedupes by external_ref)
-  // Compose both gates: the capacity throttle's ceiling is the trial-capped
-  // prospectsPerRun, so the effective pull = min(trial cap, outreach capacity).
+  // discover per ICP and keep only new-or-unscored leads (store dedupes by external_ref).
+  // The effective pull = min(cadence-scaled ceiling, outreach capacity, trial budget).
   const capacity = await deps.store.getOutreachCapacity(accountId);
   const runTarget = computeRunTarget(capacity, {
-    cadenceDays: ctx.agent.cadence === "weekly" ? 7 : 1,
+    cadenceDays,
     currentBacklog: await deps.store.countUncontactedLeads(accountId),
     bufferFactor: config.bufferFactor,
     floor: config.floor,
-    ceiling: prospectsPerRun,
+    ceiling,
   });
   if (runTarget === 0) {
     await deps.store.completeRun(agentId, now());

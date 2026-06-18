@@ -377,6 +377,31 @@ describe("runScout — capacity throttle", () => {
   });
 });
 
+describe("cadence-scaled run ceiling", () => {
+  // config.prospectsPerRun (10 in makeContext) is a per-day budget: daily caps a run at ~10, weekly
+  // at ~70 — so a weekly run sources a full week's volume in one batch (capacity permitting).
+  const pool = Array.from({ length: 90 }, (_, i) =>
+    makeCandidate({ externalRef: `p${i}`, industry: "saas" })
+  );
+
+  it("daily run stays at the per-day ceiling", async () => {
+    const store = new FakeScoutStore(makeContext()); // cadence defaults to "daily"
+    const { deps } = makeDeps(store, pool, {});
+    const summary = await runScout("scout1", deps);
+    expect(summary.discovered).toBeLessThanOrEqual(10);
+  });
+
+  it("weekly run sources a full week's worth — well above the daily ceiling", async () => {
+    const ctx = makeContext();
+    ctx.agent.cadence = "weekly";
+    const store = new FakeScoutStore(ctx);
+    const { deps } = makeDeps(store, pool, {});
+    const summary = await runScout("scout1", deps);
+    // breaks the old hard clamp at prospectsPerRun (10) — weekly now scales ~7x, capacity permitting
+    expect(summary.discovered).toBeGreaterThan(10);
+  });
+});
+
 describe("pickHotSignal", () => {
   it("returns the label of a high-value 'strike now' signal", () => {
     expect(
