@@ -8,9 +8,8 @@ import {
   getLeadScoreRationale,
   getBillingStatus,
   getCrmStatus,
-  getWarmupStatusForAccount,
+  getChannelStatusForAccount,
   getReturnOnSpend,
-  getResponderStatus,
   getAdsStatus,
 } from "./read-tools";
 import { runCampaignSendState } from "./mutate-tools";
@@ -20,7 +19,7 @@ export function buildAccountTools(db: SupabaseClient, accountId: string): Copilo
     {
       name: "getDraftQueueSummary",
       tier: "read",
-      description: "How many drafts are waiting in the review queue, by channel.",
+      description: "How many drafts are waiting in the review queue.",
       parameters: z.object({}),
       run: async () => getDraftQueueSummary(db, accountId),
     },
@@ -63,12 +62,12 @@ export function buildAccountTools(db: SupabaseClient, accountId: string): Copilo
       run: async () => getCrmStatus(db, accountId),
     },
     {
-      name: "getWarmupStatus",
+      name: "getChannelStatus",
       tier: "read",
       description:
-        "Current email warm-up phase (warming vs. ready), estimated days until email outreach can start, and which channels are live now. Use to answer questions like 'when does my email start?' or 'why aren't emails going out yet?'.",
+        "LinkedIn connection status: whether a LinkedIn account is connected and active, the primary account's state, and how many accounts are connected. Connecting LinkedIn is the activation gate. Use to answer 'is my LinkedIn connected?' or 'why isn't my outreach going out yet?'.",
       parameters: z.object({}),
-      run: async () => getWarmupStatusForAccount(db, accountId),
+      run: async () => getChannelStatusForAccount(db, accountId),
     },
     {
       name: "getReturnOnSpend",
@@ -77,14 +76,6 @@ export function buildAccountTools(db: SupabaseClient, accountId: string): Copilo
         "Return on spend: the pipeline-to-spend ratio vs the 2x renewal bar, cost per meeting, cost per close, and annual spend. Use for 'is this worth it / what's my ROI / what does a meeting cost me?'.",
       parameters: z.object({}),
       run: async () => getReturnOnSpend(db),
-    },
-    {
-      name: "getResponderStatus",
-      tier: "read",
-      description:
-        "The Inbound Responder agent: whether it's deployed and live, how it responds (auto vs review), its response-time goal, and how many inbound leads it has handled / has in review / rejected. Use for 'is my responder working?' or 'how many inbound leads have we answered?'.",
-      parameters: z.object({}),
-      run: async () => getResponderStatus(db, accountId),
     },
     {
       name: "getAdsStatus",

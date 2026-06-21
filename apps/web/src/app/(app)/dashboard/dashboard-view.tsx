@@ -8,10 +8,7 @@ import {
   CheckCircle2,
   Circle,
   Inbox,
-  Mail,
-  MessageSquare,
   PartyPopper,
-  Phone,
   Snowflake,
   Sparkles,
   TrendingUp,
@@ -33,13 +30,9 @@ import { LeadProfileLink, type LeadProfile } from "@/components/lead-profile";
 import type { RevenuePoint, RevenueSnapshot } from "@/lib/revenue";
 import type { SignalAttribution } from "@/lib/analytics";
 import type { PipelineViewModel, SequenceStage } from "../pipeline/queries";
-import type { WarmupStatus } from "@/lib/warmup-status";
 
 const STAGE_ICON: Record<SequenceStage, LucideIcon> = {
   linkedin: UserPlus,
-  email: Mail,
-  imessage: MessageSquare,
-  call: Phone,
 };
 
 const usd = new Intl.NumberFormat("en-US", {
@@ -63,7 +56,7 @@ export type AgentRow = {
 
 export type ReplyRow = {
   id: string;
-  channel: "email" | "linkedin";
+  channel: "linkedin";
   body: string | null;
   receivedLabel: string;
   lead_id: string;
@@ -92,22 +85,13 @@ export interface DashboardViewProps {
   pipeline: PipelineViewModel;
   cold: number;
   today: { sourced: number; sent: number; replied: number };
-  fastInbound: {
-    deployed: boolean;
-    live: boolean;
-    handled: number;
-    responded: number;
-    medianMins: number | null;
-    scoutLive: boolean;
-  };
   revenuePace: string | null;
   conversionWin: { id: string; leadName: string } | null;
   prospects: Prospect[];
   recentReplies: ReplyRow[];
   interested: number;
-  channels: { mbActive: number; mbWarming: number; mbTotal: number; liStatus: string | null };
-  week: { sends: number; email: number; li: number; replies: number };
-  warmup: WarmupStatus;
+  channels: { liStatus: string | null };
+  week: { sends: number; li: number; replies: number };
   attribution: SignalAttribution[];
 }
 
@@ -157,7 +141,6 @@ export function DashboardView(props: DashboardViewProps) {
           scoutDeployed={props.scoutDeployed}
           goal={goal}
           channels={props.channels}
-          warmup={props.warmup}
         />
       ) : (
         <WorkingDashboard {...props} />
@@ -180,7 +163,6 @@ function WorkingDashboard(props: DashboardViewProps) {
     series,
     pipeline,
     cold,
-    fastInbound,
     revenuePace,
     prospects,
     agents,
@@ -192,10 +174,9 @@ function WorkingDashboard(props: DashboardViewProps) {
     attribution,
   } = props;
 
-  // Channels/warmup are health surfaces — they earn space only when something needs doing,
-  // otherwise they're permanent noise. Hidden once email is active and LinkedIn is connected.
-  const channelsNeedAttention =
-    channels.mbActive === 0 || channels.mbWarming > 0 || channels.liStatus !== "active";
+  // The channel panel is a health surface — it earns space only when LinkedIn isn't
+  // connected yet (the single activation gate). Hidden once LinkedIn is active.
+  const channelsNeedAttention = channels.liStatus !== "active";
 
   return (
     <Reveal className="flex flex-col gap-6">
@@ -228,10 +209,7 @@ function WorkingDashboard(props: DashboardViewProps) {
       {/* 4 — Pipeline pulse: real-time stage counts at a glance; full funnel on the Pipeline tab. */}
       <PipelinePulse pipeline={pipeline} convertedClients={convertedClients} goal={goal} />
 
-      {/* Conditional: fast-inbound value-proof / nudge (the report's defensible edge). */}
-      {(fastInbound.deployed || fastInbound.scoutLive) && <FastInboundPanel fast={fastInbound} />}
-
-      {/* Slim footer — agent heartbeat (trust), plus channels only when they need you. */}
+      {/* Slim footer — agent heartbeat (trust), plus the LinkedIn connect nudge until it's live. */}
       <div className={cn("grid gap-6", channelsNeedAttention && "md:grid-cols-2")}>
         <AgentsPanel agents={agents} scoutLive={scoutLive} scoutLastRunLabel={scoutLastRunLabel} />
         {channelsNeedAttention && <ChannelsPanel channels={channels} />}
@@ -426,7 +404,7 @@ function PipelinePulse({
       <p className="mt-2 text-xs text-muted-foreground">
         {convertedClients > 0
           ? `${convertedClients} ${convertedClients === 1 ? "lead" : "leads"} converted toward your ${goal ?? "revenue"} goal.`
-          : "Leads move LinkedIn → Email → iMessage → Caller, and stop the instant someone converts."}
+          : "Leads move through your LinkedIn sequence, and stop the instant someone converts."}
       </p>
     </RevealItem>
   );
@@ -484,13 +462,7 @@ function AgentsPanel({
               />
               <span className="text-sm font-medium">{a.name}</span>
               <Badge variant="secondary" className="capitalize">
-                {a.kind === "scout"
-                  ? "Prospect"
-                  : a.kind === "caller"
-                    ? "Caller"
-                    : a.kind === "responder"
-                      ? "Responder"
-                      : "Outreach"}
+                {a.kind === "scout" ? "Prospect" : "Outreach"}
               </Badge>
             </div>
             <span className="text-xs text-muted-foreground">
@@ -518,35 +490,20 @@ function AgentsPanel({
   );
 }
 
-/** Channels readiness — rendered only when a channel needs attention (else it's hidden noise). */
+/** LinkedIn connect nudge — rendered only while LinkedIn isn't connected (the activation gate). */
 function ChannelsPanel({ channels }: { channels: DashboardViewProps["channels"] }) {
   return (
     <RevealItem className={cn(PANEL_SURFACE, "flex flex-col gap-3 p-5")}>
-      <Eyebrow>Channels need attention</Eyebrow>
+      <Eyebrow>Finish setup</Eyebrow>
       <ChannelRow
-        icon={<Mail className="size-4" />}
-        label="Email"
-        ready={channels.mbActive > 0}
-        detail={
-          channels.mbTotal === 0
-            ? "Not set up"
-            : [
-                channels.mbActive ? `${channels.mbActive} active` : null,
-                channels.mbWarming ? `${channels.mbWarming} warming` : null,
-              ]
-                .filter(Boolean)
-                .join(" · ")
-        }
-      />
-      <ChannelRow
-        icon={<MessageSquare className="size-4" />}
+        icon={<UserPlus className="size-4" />}
         label="LinkedIn"
         ready={channels.liStatus === "active"}
         detail={
           channels.liStatus === "active"
             ? "Connected"
             : channels.liStatus === "restricted"
-              ? "Restricted"
+              ? "Restricted — reconnect"
               : channels.liStatus
                 ? "Connecting"
                 : "Not connected"
@@ -554,7 +511,7 @@ function ChannelsPanel({ channels }: { channels: DashboardViewProps["channels"] 
       />
       <Button asChild variant="ghost" size="sm" className="-mx-2 mt-1 justify-start">
         <Link href="/settings/channels">
-          Manage channels <ArrowRight className="size-4" />
+          Connect LinkedIn <ArrowRight className="size-4" />
         </Link>
       </Button>
     </RevealItem>
@@ -600,11 +557,7 @@ function WarmReplies({
                     }`}
                   >
                     <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-foreground/10 text-muted-foreground">
-                      {r.channel === "email" ? (
-                        <Mail className="size-3.5" />
-                      ) : (
-                        <MessageSquare className="size-3.5" />
-                      )}
+                      <UserPlus className="size-3.5" />
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="flex items-center gap-2">
@@ -636,88 +589,6 @@ function WarmReplies({
           </ul>
         )}
       </div>
-    </RevealItem>
-  );
-}
-
-/**
- * Fast inbound response — the market report's most defensible "what works" use case. When a
- * Responder is live, this is value-proof (leads answered + the median response time it's keeping).
- * When a Scout is live but nothing answers inbound, it's a loss-aversion nudge: inbound interest
- * decays within the hour, so an unanswered form is pipeline walking out the door.
- */
-function FastInboundPanel({ fast }: { fast: DashboardViewProps["fastInbound"] }) {
-  const speedLabel =
-    fast.medianMins == null
-      ? null
-      : fast.medianMins < 1
-        ? "under a minute"
-        : `~${fast.medianMins} min`;
-
-  if (!fast.deployed) {
-    return (
-      <RevealItem className={cn(PANEL_SURFACE, "p-5 dark:bg-white/[0.06]")}>
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-foreground text-background">
-              <Zap className="size-4" />
-            </span>
-            <div className="min-w-0">
-              <p className="text-sm font-medium">Answer inbound leads in minutes, not days</p>
-              <p className="text-sm text-muted-foreground">
-                Inbound interest goes cold within the hour. A Responder qualifies and replies the
-                instant a lead fills your form — using the same bar your Prospect Agent sets, so
-                fast never means spray.
-              </p>
-            </div>
-          </div>
-          <Button asChild size="sm" className="shrink-0">
-            <Link href="/agents/new/responder">
-              Turn on fast response <ArrowRight className="size-4" />
-            </Link>
-          </Button>
-        </div>
-      </RevealItem>
-    );
-  }
-
-  return (
-    <RevealItem className={cn(PANEL_SURFACE, "p-5")}>
-      <div className="flex items-center justify-between gap-2">
-        <Eyebrow>Fast inbound response</Eyebrow>
-        <span className="flex items-center gap-1 font-mono text-[11px] uppercase tracking-wide text-muted-foreground">
-          <Zap className="size-3.5" /> {fast.live ? "live" : "paused"}
-        </span>
-      </div>
-      {fast.handled > 0 ? (
-        <>
-          <div className="mt-4 grid grid-cols-2 gap-4">
-            <div>
-              <span className="font-mono text-2xl font-semibold tabular-nums">{fast.handled}</span>
-              <p className="text-xs text-muted-foreground">Inbound handled</p>
-            </div>
-            <div>
-              <span className="font-mono text-2xl font-semibold tabular-nums">
-                {speedLabel ?? "—"}
-              </span>
-              <p className="text-xs text-muted-foreground">Median response</p>
-            </div>
-          </div>
-          <p className="mt-3 border-t border-border/60 pt-3 text-xs text-muted-foreground">
-            {fast.responded} answered automatically within your SLA — the speed edge that turns
-            inbound interest into booked meetings.
-          </p>
-        </>
-      ) : (
-        <p className="mt-4 text-sm text-muted-foreground">
-          Live and watching. The moment a lead fills your form, it&apos;s qualified and answered in
-          minutes — point your form at the webhook on the{" "}
-          <Link href="/agents/responder" className="underline underline-offset-2">
-            Responder&apos;s page
-          </Link>
-          .
-        </p>
-      )}
     </RevealItem>
   );
 }
@@ -1008,19 +879,17 @@ function CrmNudge({ convertedClients }: { convertedClients: number }) {
 
 // New-user activation hub. Two non-blocking surfaces side by side: the path to
 // first reply (agent-centric — agents are the front door, rule 08) and a parallel
-// channel-connect panel. No channel gates deploying an agent; the panel just lets
-// fast wins (LinkedIn one-click) and the time-gated one (email warmup, ~2 weeks)
-// start early. Shown only while isNew — it disappears the moment the Scout goes live.
+// LinkedIn-connect panel. Connecting LinkedIn doesn't gate deploying an agent; the
+// panel just lets the user connect early (the one activation gate). Shown only while
+// isNew — it disappears the moment the Scout goes live.
 function ActivationRamp({
   scoutDeployed,
   goal,
   channels,
-  warmup,
 }: {
   scoutDeployed: boolean;
   goal: string | null;
   channels: DashboardViewProps["channels"];
-  warmup: WarmupStatus;
 }) {
   const steps = [
     { label: "Create your account", done: true },
@@ -1076,62 +945,26 @@ function ActivationRamp({
           </div>
         </RevealItem>
 
-        <ChannelSetupPanel channels={channels} scoutDeployed={scoutDeployed} />
+        <ChannelSetupPanel channels={channels} />
       </div>
-
-      {warmup.emailPhase === "warming" && warmup.mailboxesTotal > 0 && (
-        <RevealItem>
-          <div className="rounded-lg border border-border p-4 text-sm">
-            <p className="font-medium">
-              Inboxes warming — email outreach begins in{" "}
-              {warmup.estReadyInDays !== null
-                ? `~${warmup.estReadyInDays} days`
-                : "a couple of weeks"}
-              .
-            </p>
-            <p className="mt-1 text-muted-foreground">
-              {warmup.mailboxesTotal > 0 && (
-                <>{warmup.mailboxesReady}/{warmup.mailboxesTotal} inboxes ready.{" "}</>
-              )}
-              {warmup.linkedinConnected
-                ? "Your agent is reaching out on LinkedIn in the meantime and building your pipeline."
-                : null}
-            </p>
-            {!warmup.linkedinConnected && (
-              <a href="/settings/channels" className="mt-2 inline-block underline">
-                Connect LinkedIn to start reaching out today
-              </a>
-            )}
-          </div>
-        </RevealItem>
-      )}
     </Reveal>
   );
 }
 
-// Parallel, non-blocking channel setup. Ordered by time-to-value: LinkedIn is a
-// one-click connect (the fast first win), email warmup is time-gated (~2 weeks, so
-// nudge starting it early — loss aversion against a future bottleneck), the caller
-// unlocks once leads exist, and SMS is still on the roadmap (no setup surface yet —
-// shown honestly rather than as a dead link).
-function ChannelSetupPanel({
-  channels,
-  scoutDeployed,
-}: {
-  channels: DashboardViewProps["channels"];
-  scoutDeployed: boolean;
-}) {
+// LinkedIn connect — the single activation gate. One-click hosted auth; connecting
+// doesn't block deploying an agent, but nothing sends until LinkedIn is connected.
+// Shown only while isNew (the new-user activation hub).
+function ChannelSetupPanel({ channels }: { channels: DashboardViewProps["channels"] }) {
   const liConnected = channels.liStatus === "active";
-  const liConnecting = Boolean(channels.liStatus) && !liConnected && channels.liStatus !== "restricted";
-  const emailReady = channels.mbActive > 0;
-  const emailWarming = channels.mbWarming > 0;
+  const liConnecting =
+    Boolean(channels.liStatus) && !liConnected && channels.liStatus !== "restricted";
 
   return (
     <RevealItem className={cn(PANEL_SURFACE, "flex flex-col p-5")}>
-      <Eyebrow>Connect your channels</Eyebrow>
+      <Eyebrow>Connect LinkedIn</Eyebrow>
       <p className="mt-2 text-xs text-muted-foreground">
-        Connect as you go — none of these block you from deploying an agent. Start the quick one now;
-        kick off email early so it&apos;s warmed up when you need it.
+        One click — sign in on LinkedIn&apos;s own page and your agents can start reaching out. It
+        doesn&apos;t block deploying an agent, but nothing sends until it&apos;s connected.
       </p>
       <div className="mt-4 flex flex-col divide-y divide-border/60">
         <ChannelSetupRow
@@ -1145,7 +978,7 @@ function ChannelSetupPanel({
                 ? "Finishing connection…"
                 : channels.liStatus === "restricted"
                   ? "Account restricted — reconnect"
-                  : "One click — the fastest way to start"
+                  : "The one step before your agents can reach out"
           }
           action={
             liConnected ? undefined : (
@@ -1154,51 +987,6 @@ function ChannelSetupPanel({
               </Button>
             )
           }
-        />
-        <ChannelSetupRow
-          icon={<Mail className="size-4" />}
-          label="Email"
-          done={emailReady}
-          detail={
-            emailReady
-              ? `${channels.mbActive} ${channels.mbActive === 1 ? "mailbox" : "mailboxes"} ready${emailWarming ? ` · ${channels.mbWarming} warming` : ""}`
-              : emailWarming
-                ? `${channels.mbWarming} warming up — building sender reputation`
-                : "Warmup takes ~2 weeks. Start now so it's ready when you are."
-          }
-          action={
-            emailReady || emailWarming ? undefined : (
-              <Button asChild size="sm" variant="outline">
-                <Link href="/settings/channels">Set up</Link>
-              </Button>
-            )
-          }
-        />
-        <ChannelSetupRow
-          icon={<Phone className="size-4" />}
-          label="AI Caller"
-          done={false}
-          muted={!scoutDeployed}
-          detail={
-            scoutDeployed
-              ? "Books meetings by phone with your best leads"
-              : "Unlocks once your Prospect Agent is live"
-          }
-          action={
-            scoutDeployed ? (
-              <Button asChild size="sm" variant="outline">
-                <Link href="/agents/new/caller">Set up</Link>
-              </Button>
-            ) : undefined
-          }
-        />
-        <ChannelSetupRow
-          icon={<MessageSquare className="size-4" />}
-          label="SMS"
-          done={false}
-          muted
-          detail="Text outreach to opted-in leads"
-          action={<Badge variant="secondary">Soon</Badge>}
         />
       </div>
     </RevealItem>

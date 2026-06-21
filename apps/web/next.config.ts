@@ -18,7 +18,6 @@ const nextConfig: NextConfig = {
   transpilePackages: [
     "@vantera/db",
     "@vantera/ai",
-    "@vantera/email-infra",
     "@vantera/linkedin-infra",
   ],
   async headers() {

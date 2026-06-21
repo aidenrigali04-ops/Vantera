@@ -3,7 +3,7 @@ import { InMemoryProspectData, makeCandidate } from "@vantera/prospect-data";
 import type { LeadInsights } from "@vantera/agent-brains";
 import { runScout, pickHotSignal } from "./scout";
 import { TRIAL_LEAD_CAP } from "./types";
-import type { CallBriefDraftPayload, CopyDraftPayload, FreshLead, ScoutContext, ScoutDeps, ScoutStore } from "./types";
+import type { CopyDraftPayload, FreshLead, ScoutContext, ScoutDeps, ScoutStore } from "./types";
 import type { OutreachCapacity } from "./capacity";
 
 function insight(leadId: string, score: number): LeadInsights {
@@ -30,13 +30,10 @@ class FakeScoutStore implements ScoutStore {
   scores = new Map<string, { score: number; qualified: boolean }>();
   completedAt: Date | null = null;
   copyAgent: { id: string } | null = null;
-  callerAgent: { id: string } | null = null;
   capacity: OutreachCapacity = {
-    linkedinConnected: false,
-    linkedinAccountAgeDays: null,
-    linkedinEnabled: false,
-    emailEnabled: true,
-    mailboxes: [{ phase: "ready", dailyCap: 0 }, { phase: "ready", dailyCap: 0 }], // ample by default
+    linkedinConnected: true,
+    linkedinAccountAgeDays: 100, // steady state → ample capacity by default
+    linkedinEnabled: true,
   };
   backlog = 0;
   leadCount = 0; // what countAccountLeads reports (trial-cap input)
@@ -90,9 +87,6 @@ class FakeScoutStore implements ScoutStore {
   async getLiveCopyAgent() {
     return this.copyAgent;
   }
-  async getLiveCallerAgent() {
-    return this.callerAgent;
-  }
 }
 
 function makeContext(overrides: Partial<ScoutContext["account"]> = {}): ScoutContext {
@@ -114,7 +108,6 @@ function makeDeps(store: FakeScoutStore, pool: ReturnType<typeof makeCandidate>[
   const prospectData = new InMemoryProspectData(pool);
   const ranked: string[][] = [];
   const chained: CopyDraftPayload[] = [];
-  const callerChained: CallBriefDraftPayload[] = [];
   const deps: ScoutDeps = {
     store,
     prospectData,
@@ -131,12 +124,9 @@ function makeDeps(store: FakeScoutStore, pool: ReturnType<typeof makeCandidate>[
     triggerCopyDraft: async (p) => {
       chained.push(p);
     },
-    triggerCallBrief: async (p) => {
-      callerChained.push(p);
-    },
     now: () => new Date("2026-06-11T08:00:00Z"),
   };
-  return { deps, prospectData, ranked, chained, callerChained };
+  return { deps, prospectData, ranked, chained };
 }
 
 describe("runScout", () => {
@@ -258,31 +248,6 @@ describe("runScout", () => {
     expect((await runScout("scout1", deps)).status).toBe("skipped");
   });
 
-  it("chains the caller agent when one is live and leads qualified", async () => {
-    const pool = [makeCandidate({ externalRef: "good", industry: "saas" })];
-    const store = new FakeScoutStore(makeContext());
-    store.callerAgent = { id: "caller1" };
-    const { deps, callerChained } = makeDeps(store, pool, { good: 90 });
-
-    await runScout("scout1", deps);
-
-    expect(callerChained).toHaveLength(1);
-    expect(callerChained[0]!.callerAgentId).toBe("caller1");
-    expect(callerChained[0]!.accountId).toBe("acc1");
-    expect(callerChained[0]!.leadIds).toHaveLength(1);
-  });
-
-  it("does not chain the caller when no live caller agent exists", async () => {
-    const pool = [makeCandidate({ externalRef: "good", industry: "saas" })];
-    const store = new FakeScoutStore(makeContext());
-    // callerAgent is null by default — no override
-    const { deps, callerChained } = makeDeps(store, pool, { good: 90 });
-
-    await runScout("scout1", deps);
-
-    expect(callerChained).toHaveLength(0);
-  });
-
   it("trial cap: a trialing account at the lead ceiling skips before any enrichment", async () => {
     const pool = [makeCandidate({ externalRef: "good", industry: "saas" })];
     const store = new FakeScoutStore(makeContext({ subscriptionStatus: "trialing" }));
@@ -336,8 +301,6 @@ describe("runScout — capacity throttle", () => {
       linkedinConnected: true,
       linkedinEnabled: true,
       linkedinAccountAgeDays: 3, // ramp: 5/day → projected round(5*1*1.3)=7
-      emailEnabled: true,
-      mailboxes: [{ phase: "warming", dailyCap: 0 }], // email adds nothing yet
     };
     // scores are high enough that everyone who passes the gate qualifies
     const scores: Record<string, number> = {};
@@ -364,8 +327,6 @@ describe("runScout — capacity throttle", () => {
       linkedinConnected: false,
       linkedinEnabled: false,
       linkedinAccountAgeDays: null,
-      emailEnabled: true,
-      mailboxes: [{ phase: "warming", dailyCap: 0 }],
     };
     const { deps } = makeDeps(store, pool, { good: 90 });
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Radar, PenLine, PhoneCall } from "lucide-react";
+import { Radar, PenLine } from "lucide-react";
 import { SectionHeading } from "./section-heading";
 import { WARM, WARM_GRADIENT } from "./landing-theme";
 
@@ -21,22 +21,11 @@ const AGENTS = [
     icon: PenLine,
     name: "Outreach Agent",
     role: "copy + send",
-    tagline: "Writes outreach worthy of a reply.",
+    tagline: "Writes LinkedIn outreach worthy of a reply.",
     points: [
-      "Email + LinkedIn, personalized per prospect",
+      "Personalized per prospect — never templated",
       "Humanizer linter kills the spammy tells",
       "Everything waits in your review queue",
-    ],
-  },
-  {
-    icon: PhoneCall,
-    name: "Caller Agent",
-    role: "voice",
-    tagline: "Books the meeting over a real call.",
-    points: [
-      "Drafts a call brief from each lead's signals",
-      "Dials inside a compliant, timezone-aware window",
-      "Logs outcomes — booked, callback, do-not-call",
     ],
   },
 ];
@@ -50,7 +39,7 @@ export function AgentsSection() {
         subtitle="Deploy named agents the way you'd hire reps — except they run 24/7, never miss a follow-up, and stay perfectly on-brand."
       />
 
-      <div className="mx-auto mt-14 grid max-w-5xl gap-4 md:grid-cols-3">
+      <div className="mx-auto mt-14 grid max-w-3xl gap-4 md:grid-cols-2">
         {AGENTS.map((agent, i) => (
           <motion.div
             key={agent.name}

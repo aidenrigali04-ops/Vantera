@@ -13,7 +13,7 @@ export default async function EditCopyAgentPage() {
     .maybeSingle<{
       id: string;
       name: string;
-      config: { cta?: string; channels?: { linkedin?: boolean; email?: boolean } } | null;
+      config: { cta?: string; channels?: { linkedin?: boolean } } | null;
       campaigns: { send_mode: string | null } | null;
     }>();
   if (!agent) redirect("/agents");
@@ -29,12 +29,10 @@ export default async function EditCopyAgentPage() {
     }>();
   if (!scout) redirect("/agents");
 
-  const [{ data: linkAssets }, { count: mailboxCount }, { count: linkedinCount }] =
-    await Promise.all([
-      supabase.from("agent_assets").select("url").eq("agent_id", agent.id).eq("kind", "link"),
-      supabase.from("mailboxes").select("id", { count: "exact", head: true }),
-      supabase.from("linkedin_accounts").select("id", { count: "exact", head: true }),
-    ]);
+  const [{ data: linkAssets }, { count: linkedinCount }] = await Promise.all([
+    supabase.from("agent_assets").select("url").eq("agent_id", agent.id).eq("kind", "link"),
+    supabase.from("linkedin_accounts").select("id", { count: "exact", head: true }),
+  ]);
 
   const icpNames = (scout.agent_icps ?? [])
     .sort((a, b) => a.position - b.position)
@@ -50,7 +48,6 @@ export default async function EditCopyAgentPage() {
     <CopyWizard
       scoutName={scout.name}
       icpNames={icpNames}
-      mailboxCount={mailboxCount ?? 0}
       linkedinCount={linkedinCount ?? 0}
       edit={{
         name: agent.name,
@@ -58,7 +55,6 @@ export default async function EditCopyAgentPage() {
         links,
         channels: {
           linkedin: agent.config?.channels?.linkedin ?? true,
-          email: agent.config?.channels?.email ?? true,
         },
         sendMode: agent.campaigns?.send_mode === "automatic" ? "automatic" : "review",
       }}

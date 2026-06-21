@@ -44,7 +44,7 @@ class FakeCopyStore implements CopyDraftStore {
   /** tracks which store method was used per LinkedIn draft: 'pair' or 'single' */
   linkedInCallKinds: ("pair" | "single")[] = [];
 
-  constructor(channels = { linkedin: true, email: true }, sendMode: "review" | "automatic" = "review") {
+  constructor(channels = { linkedin: true }, sendMode: "review" | "automatic" = "review") {
     this.context = {
       agent: {
         id: "copy1",
@@ -64,7 +64,7 @@ class FakeCopyStore implements CopyDraftStore {
   async getDraftableLeads() {
     return this.leads;
   }
-  async isSuppressed(_accountId: string, kind: "email" | "linkedin", value: string) {
+  async isSuppressed(_accountId: string, kind: "linkedin", value: string) {
     this.suppressionLookups.push(`${kind}:${value}`);
     return this.suppressedValues.has(`${kind}:${value}`);
   }
@@ -90,7 +90,6 @@ class FakeCopyStore implements CopyDraftStore {
 function makeDeps(store: FakeCopyStore): CopyDraftDeps {
   return {
     store,
-    draftEmailFn: async () => ({ subject: "subj", body: "email body", violations: [] }),
     draftLinkedInFn: async () => ({
       connectionNote: "note",
       followupMessage: "follow",
@@ -102,11 +101,10 @@ function makeDeps(store: FakeCopyStore): CopyDraftDeps {
 const PAYLOAD = { copyAgentId: "copy1", accountId: "acc1", leadIds: ["l1"] };
 
 describe("runCopyDraft — suppression gate (rule 11)", () => {
-  it("a suppressed email lead gets ZERO scheduled_sends rows and is marked suppressed", async () => {
-    const store = new FakeCopyStore({ linkedin: false, email: true });
-    store.leads = [lead("l1", { email: "Dana@ACME.com" })];
-    // suppression entries store lowercased values; the check must match case-insensitively
-    store.suppressedValues.add("email:dana@acme.com");
+  it("a suppressed linkedin profile is matched on the normalized URL and gets ZERO rows", async () => {
+    const store = new FakeCopyStore();
+    store.leads = [lead("l1", { linkedinUrl: "https://LinkedIn.com/in/Dana-Reed/" })];
+    store.suppressedValues.add("linkedin:https://linkedin.com/in/dana-reed");
 
     const summary = await runCopyDraft(PAYLOAD, makeDeps(store));
 
@@ -116,76 +114,52 @@ describe("runCopyDraft — suppression gate (rule 11)", () => {
     expect(summary).toMatchObject({ drafted: 0, suppressed: 1 });
   });
 
-  it("a suppressed linkedin profile is matched on the normalized URL", async () => {
-    const store = new FakeCopyStore({ linkedin: true, email: false });
-    store.leads = [lead("l1", { linkedinUrl: "https://LinkedIn.com/in/Dana-Reed/" })];
-    store.suppressedValues.add("linkedin:https://linkedin.com/in/dana-reed");
-
-    const summary = await runCopyDraft(PAYLOAD, makeDeps(store));
-
-    expect(store.sends).toHaveLength(0);
-    expect(summary.suppressed).toBe(1);
-  });
-
   it("checks suppression BEFORE drafting: the copy brain is never called for a suppressed lead", async () => {
-    const store = new FakeCopyStore({ linkedin: false, email: true });
+    const store = new FakeCopyStore();
     store.leads = [lead("l1")];
-    store.suppressedValues.add("email:l1@acme.com");
+    store.suppressedValues.add("linkedin:https://linkedin.com/in/l1");
     const deps = makeDeps(store);
     let brainCalled = false;
-    deps.draftEmailFn = async () => {
+    deps.draftLinkedInFn = async () => {
       brainCalled = true;
-      return { subject: "s", body: "b", violations: [] };
+      return { connectionNote: "n", followupMessage: "f", violations: [] };
     };
 
     await runCopyDraft(PAYLOAD, deps);
 
     expect(brainCalled).toBe(false);
-    expect(store.suppressionLookups).toContain("email:l1@acme.com");
-  });
-
-  it("suppression on one channel still drafts the other", async () => {
-    const store = new FakeCopyStore({ linkedin: true, email: true });
-    store.leads = [lead("l1")];
-    store.suppressedValues.add("email:l1@acme.com");
-
-    const summary = await runCopyDraft(PAYLOAD, makeDeps(store));
-
-    // email suppressed → only the two linkedin rows (invite + message)
-    expect(store.sends.every((s) => s.channel === "linkedin")).toBe(true);
-    expect(store.sends).toHaveLength(2);
-    expect(summary).toMatchObject({ drafted: 1, suppressed: 1 });
+    expect(store.suppressionLookups).toContain("linkedin:https://linkedin.com/in/l1");
   });
 });
 
 describe("runCopyDraft — drafted queue", () => {
-  it("drafts per enabled channel into pending_review (default review mode)", async () => {
+  it("drafts the LinkedIn invite+message pair into pending_review (default review mode)", async () => {
     const store = new FakeCopyStore();
     store.leads = [lead("l1")];
 
     const summary = await runCopyDraft(PAYLOAD, makeDeps(store));
 
-    // email(1) + linkedin invite(1) + linkedin message(1) = 3 rows
-    expect(summary.drafted).toBe(2);
-    expect(store.sends).toHaveLength(3);
+    expect(summary.drafted).toBe(1);
+    expect(store.sends).toHaveLength(2);
     for (const send of store.sends) {
       expect(send.status).toBe("pending_review");
       expect(send.campaignId).toBe("camp1");
+      expect(send.channel).toBe("linkedin");
     }
-    expect(store.sends.find((s) => s.channel === "email")?.subject).toBe("subj");
     expect(store.sends.find((s) => s.linkedinStage === "invite")?.body).toBe("note");
     expect(store.sends.find((s) => s.linkedinStage === "message")?.body).toBe("follow");
     expect(store.campaignLeads.get("l1")).toBe("queued");
     expect(store.leadStatuses.get("l1")).toBe("in_campaign");
   });
 
-  it("respects channel toggles", async () => {
-    const store = new FakeCopyStore({ linkedin: false, email: true });
-    store.leads = [lead("l1")];
+  it("skips a lead with no LinkedIn URL", async () => {
+    const store = new FakeCopyStore();
+    store.leads = [lead("l1", { linkedinUrl: null })];
 
-    await runCopyDraft(PAYLOAD, makeDeps(store));
+    const summary = await runCopyDraft(PAYLOAD, makeDeps(store));
 
-    expect(store.sends.map((s) => s.channel)).toEqual(["email"]);
+    expect(store.sends).toHaveLength(0);
+    expect(summary.skipped).toBe(1);
   });
 
   it("skips unscored leads (no ai_insights) without drafting", async () => {
@@ -198,13 +172,13 @@ describe("runCopyDraft — drafted queue", () => {
     expect(summary.skipped).toBe(1);
   });
 
-  it("flags unresolved humanizer violations on the draft row", async () => {
-    const store = new FakeCopyStore({ linkedin: false, email: true });
+  it("flags unresolved humanizer violations on the draft rows", async () => {
+    const store = new FakeCopyStore();
     store.leads = [lead("l1")];
     const deps = makeDeps(store);
-    deps.draftEmailFn = async () => ({
-      subject: "s",
-      body: "b",
+    deps.draftLinkedInFn = async () => ({
+      connectionNote: "note",
+      followupMessage: "follow",
       violations: [{ rule: "banned-phrase", detail: 'remove "game-changer"' }],
     });
 
@@ -230,7 +204,7 @@ describe("normalizeLinkedInUrl", () => {
 
 describe("runCopyDraft — LinkedIn invite+message pair", () => {
   it("uses insertLinkedInSendPair (not two single inserts) for the LinkedIn pair", async () => {
-    const store = new FakeCopyStore({ linkedin: true, email: false });
+    const store = new FakeCopyStore();
     store.leads = [lead("l1")];
 
     await runCopyDraft(PAYLOAD, makeDeps(store));
@@ -240,7 +214,7 @@ describe("runCopyDraft — LinkedIn invite+message pair", () => {
   });
 
   it("inserts an invite AND a message row per LinkedIn lead", async () => {
-    const store = new FakeCopyStore({ linkedin: true, email: false });
+    const store = new FakeCopyStore();
     store.leads = [lead("l1")];
     const deps = makeDeps(store);
     deps.draftLinkedInFn = async () => ({
@@ -262,11 +236,9 @@ describe("runCopyDraft — LinkedIn invite+message pair", () => {
   });
 
   it("automatic mode inserts clean drafts as approved", async () => {
-    const store = new FakeCopyStore({ linkedin: true, email: true }, "automatic");
+    const store = new FakeCopyStore({ linkedin: true }, "automatic");
     store.leads = [lead("l1")];
     const deps = makeDeps(store);
-    // both drafters return no violations
-    deps.draftEmailFn = async () => ({ subject: "s", body: "b", violations: [] });
     deps.draftLinkedInFn = async () => ({
       connectionNote: "note",
       followupMessage: "follow-up",
@@ -282,7 +254,7 @@ describe("runCopyDraft — LinkedIn invite+message pair", () => {
   });
 
   it("automatic mode still routes style-flagged drafts to review", async () => {
-    const store = new FakeCopyStore({ linkedin: true, email: false }, "automatic");
+    const store = new FakeCopyStore({ linkedin: true }, "automatic");
     store.leads = [lead("l1")];
     const deps = makeDeps(store);
     deps.draftLinkedInFn = async () => ({

@@ -4,33 +4,32 @@ import { motion } from "framer-motion";
 import {
   CalendarCheck,
   ChevronRight,
-  Mail,
   MessageSquare,
-  Phone,
+  Send,
   UserPlus,
   type LucideIcon,
 } from "lucide-react";
 import { SectionHeading } from "./section-heading";
 
 /**
- * The multi-channel sequence — the orchestration layer. Each qualified lead runs
- * LinkedIn → Email → iMessage → Caller automatically, and the run halts the
- * instant they convert. This is the differentiator the single-channel tools miss.
+ * The autonomous LinkedIn sequence — the orchestration layer. Each qualified lead
+ * gets a personal connection request, a tailored message, and well-timed follow-ups,
+ * all on LinkedIn, and the run halts the instant they reply or book. Qualify-first,
+ * personalized, hands-off — the part the spray-and-pray tools miss.
  */
 const STAGES: { icon: LucideIcon; label: string; note: string }[] = [
-  { icon: UserPlus, label: "LinkedIn", note: "Connect + a personal DM" },
-  { icon: Mail, label: "Email", note: "Personalized, from a warmed inbox" },
-  { icon: MessageSquare, label: "iMessage", note: "A well-timed text nudge" },
-  { icon: Phone, label: "Caller", note: "An AI call that books the meeting" },
+  { icon: UserPlus, label: "Connect", note: "A personal connection request" },
+  { icon: MessageSquare, label: "Personalized DM", note: "A tailored message once they accept" },
+  { icon: Send, label: "Smart follow-ups", note: "Well-timed nudges until they reply" },
 ];
 
 export function SequenceSection() {
   return (
     <section id="sequence" className="relative px-4 py-24">
       <SectionHeading
-        eyebrow="Multi-channel sequence"
-        title="One sequence. Every channel. It stops the moment they say yes."
-        subtitle="Each qualified lead flows through LinkedIn, email, iMessage, and a real call — automatically. The instant they reply or book, the run halts and the lead is marked closed. No double-touching, no wasted reach."
+        eyebrow="Autonomous LinkedIn sequence"
+        title="One LinkedIn sequence, every touch personalized. It stops the moment they say yes."
+        subtitle="Each qualified lead gets a personal connection request, a tailored message, and well-timed follow-ups — automatically, all from your own LinkedIn. The instant they reply or book, the run halts and the lead is marked closed. No spray, no double-touching."
       />
 
       <div className="mx-auto mt-14 max-w-5xl">
@@ -75,8 +74,8 @@ export function SequenceSection() {
         >
           <CalendarCheck className="size-4 shrink-0 text-foreground" aria-hidden />
           <p className="text-sm text-muted-foreground">
-            <span className="text-foreground">Conversion at any stage closes the lead</span> and
-            skips the rest — your agents never waste a touch on someone who already said yes.
+            <span className="text-foreground">A reply or booking closes the lead</span> and skips the
+            rest — your agent never wastes a touch on someone who already said yes.
           </p>
         </motion.div>
       </div>

@@ -4,11 +4,8 @@ export type { SequenceStage };
 
 const STAGE_LABELS: Record<SequenceStage, string> = {
   linkedin: "LinkedIn",
-  email: "Email",
-  imessage: "iMessage",
-  call: "Caller",
 };
-const STAGE_ORDER: SequenceStage[] = ["linkedin", "email", "imessage", "call"];
+const STAGE_ORDER: SequenceStage[] = ["linkedin"];
 
 export interface PipelineInput {
   /** rows from sequence_runs (only current_stage + status are needed) */

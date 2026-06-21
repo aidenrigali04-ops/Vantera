@@ -20,7 +20,6 @@ describe("dailyAllowance", () => {
 
   it("clamps user-requested volumes to the safety ceiling (non-configurable above)", () => {
     expect(dailyAllowance("linkedin", 60, { requested: 500 })).toBe(LINKEDIN_STEADY_DAILY_INVITES);
-    expect(dailyAllowance("email", 60, { requested: 10_000 })).toBe(dailyAllowance("email", 60));
   });
 
   it("lets users request LESS than the ceiling", () => {
@@ -29,7 +28,7 @@ describe("dailyAllowance", () => {
 
   it("never returns a negative allowance", () => {
     expect(dailyAllowance("linkedin", -5)).toBeGreaterThanOrEqual(0);
-    expect(dailyAllowance("email", 60, { requested: -10 })).toBe(0);
+    expect(dailyAllowance("linkedin", 60, { requested: -10 })).toBe(0);
   });
 });
 

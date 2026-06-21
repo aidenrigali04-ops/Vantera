@@ -1,7 +1,7 @@
 import { SEQUENCE_DEFAULTS } from "@vantera/jobs/pipeline/sequence-config";
 import type { SequenceConfig, SequenceStage } from "@vantera/jobs/pipeline/types";
 
-const STAGES: SequenceStage[] = ["linkedin", "email", "imessage", "call"];
+const STAGES: SequenceStage[] = ["linkedin"];
 
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
 const num = (fd: FormData, k: string, dflt: number) => {
@@ -21,7 +21,6 @@ export function parseSequenceForm(fd: FormData): SequenceConfig {
       touches: clamp(num(fd, `${s}.touches`, d.touches), 0, 5),
       touchGapDays: clamp(num(fd, `${s}.touchGapDays`, d.touchGapDays), 0, 14),
       waitDays: clamp(num(fd, `${s}.waitDays`, d.waitDays), 0, 14),
-      ...(s === "call" ? { maxAttempts: clamp(num(fd, "call.maxAttempts", 2), 1, 3) } : {}),
     };
   }
   return { order: SEQUENCE_DEFAULTS.order, stages };

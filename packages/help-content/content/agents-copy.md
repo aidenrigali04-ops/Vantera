@@ -6,7 +6,7 @@ routes: /agents, /agents/new/copy
 
 # Your Outreach Agent
 
-The Outreach Agent owns everything after a lead qualifies. For every qualified lead your Prospect Agent finds, it drafts a personalized message — grounded in that lead's pain points, triggers, and what your offer means for them specifically — and queues it for your review.
+The Outreach Agent owns everything after a lead qualifies. For every qualified lead your Prospect Agent finds, it drafts a personalized LinkedIn message — grounded in that lead's pain points, triggers, and what your offer means for them specifically — and queues it for your review.
 
 ## Setting it up
 
@@ -14,12 +14,11 @@ The Outreach Agent owns everything after a lead qualifies. For every qualified l
 2. **Targeting** — inherited from your Prospect Agent, shown read-only. Change targeting there and both stay in sync.
 3. **CTA** — the one thing each message invites the prospect to do (e.g. "book a 15-minute intro"). Example chips get you started; tailor the ask to your offer.
 4. **Add content** — optional links, case studies, images, or files the agent can reference. The more you add, the smarter every message gets.
-5. **Channels** — enable LinkedIn, Email, or both.
-6. **Deploy** — it starts drafting as soon as qualified leads arrive.
+5. **Deploy** — choose review or automatic sending, then it starts drafting as soon as qualified leads arrive.
 
 ## How it writes
 
-- Email and LinkedIn each get their own writing system tuned to what works on that channel: short, specific emails with one soft ask; LinkedIn connection notes that never pitch on the first touch.
+- It writes for LinkedIn specifically: a personal connection note that never pitches on the first touch, then tailored follow-up messages once they accept.
 - Every draft is personalized from the lead's insights — never a template with a name swapped in.
 - A style guard strips robotic phrasing. If a draft still trips a style rule, it's flagged for you in the review queue.
 

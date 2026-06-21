@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Inbox, Mail, MessageSquare } from "lucide-react";
+import { Inbox, MessageSquare } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { Badge } from "@/components/ui/badge";
 import { Panel, Eyebrow } from "@/components/ui/panel";
@@ -25,7 +25,6 @@ function groupByProspect(rows: DraftRow[]): ProspectGroup[] {
   return groups;
 }
 
-const CHANNELS = ["all", "email", "linkedin"] as const;
 const VIEWS = ["queue", "processed"] as const;
 
 // post-approve lifecycle statuses (rule 08): everything past the review gate
@@ -51,7 +50,7 @@ const STATUS_LABELS: Record<string, string> = {
 
 type ProcessedRow = {
   id: string;
-  channel: "email" | "linkedin";
+  channel: "linkedin";
   subject: string | null;
   status: string;
   error: string | null;
@@ -62,9 +61,9 @@ type ProcessedRow = {
 export default async function ReviewPage({
   searchParams,
 }: {
-  searchParams: Promise<{ channel?: string; view?: string }>;
+  searchParams: Promise<{ view?: string }>;
 }) {
-  const { channel, view: rawView } = await searchParams;
+  const { view: rawView } = await searchParams;
   const view = VIEWS.includes(rawView as (typeof VIEWS)[number])
     ? (rawView as (typeof VIEWS)[number])
     : "queue";
@@ -81,7 +80,6 @@ export default async function ReviewPage({
     view === "queue"
       ? query.eq("status", "pending_review")
       : query.in("status", PROCESSED_STATUSES as unknown as string[]);
-  if (channel === "email" || channel === "linkedin") query = query.eq("channel", channel);
   const { data: rows, count } = await query;
 
   const groups = view === "queue" ? groupByProspect((rows ?? []) as unknown as DraftRow[]) : [];
@@ -117,26 +115,6 @@ export default async function ReviewPage({
             {v === "queue" ? "Queue" : "Processed"}
           </Link>
         ))}
-      </div>
-
-      <div className="mb-4 flex gap-2 text-sm">
-        {CHANNELS.map((c) => {
-          const active = (channel ?? "all") === c;
-          const params: Record<string, string> = {};
-          if (view !== "queue") params.view = view;
-          if (c !== "all") params.channel = c;
-          return (
-            <Link
-              key={c}
-              href={withChannel(params)}
-              className={`rounded-full border px-3 py-1 capitalize ${
-                active ? "border-primary bg-primary/10 font-medium" : "border-border"
-              }`}
-            >
-              {c === "linkedin" ? "LinkedIn" : c}
-            </Link>
-          );
-        })}
       </div>
 
       {!rows || rows.length === 0 ? (
@@ -179,11 +157,7 @@ export default async function ReviewPage({
             const failed = r.status === "failed";
             return (
               <div key={r.id} className="flex items-start gap-3 border-b border-border px-4 py-3 last:border-b-0">
-                {r.channel === "email" ? (
-                  <Mail className="mt-0.5 size-4 text-muted-foreground" />
-                ) : (
-                  <MessageSquare className="mt-0.5 size-4 text-muted-foreground" />
-                )}
+                <MessageSquare className="mt-0.5 size-4 text-muted-foreground" />
                 <div className="min-w-0 flex-1">
                   <LeadProfileLink
                     lead={r.leads}

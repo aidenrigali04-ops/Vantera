@@ -11,8 +11,6 @@ const base: OutreachCapacity = {
   linkedinConnected: false,
   linkedinAccountAgeDays: null,
   linkedinEnabled: false,
-  emailEnabled: false,
-  mailboxes: [],
 };
 
 const opts = {
@@ -24,36 +22,39 @@ const opts = {
 };
 
 describe("dailyOutreachCapacity", () => {
-  it("sums LinkedIn ramp + per-mailbox caps when channels enabled", () => {
+  it("uses the LinkedIn ramp when connected + enabled", () => {
     const cap: OutreachCapacity = {
       ...base,
       linkedinConnected: true,
       linkedinEnabled: true,
       linkedinAccountAgeDays: 3, // ramp step → 5/day
-      emailEnabled: true,
-      mailboxes: [
-        { phase: "warming", dailyCap: 8 },
-        { phase: "ready", dailyCap: 0 }, // ready ignores cap → 30
-      ],
     };
-    expect(dailyOutreachCapacity(cap)).toBe(5 + 8 + 30);
+    expect(dailyOutreachCapacity(cap)).toBe(5);
   });
 
-  it("ignores a channel that is disabled even if infra exists", () => {
+  it("ignores LinkedIn when disabled even if connected", () => {
     const cap: OutreachCapacity = {
       ...base,
       linkedinConnected: true,
       linkedinEnabled: false, // disabled → contributes 0
       linkedinAccountAgeDays: 100,
-      emailEnabled: false,
-      mailboxes: [{ phase: "ready", dailyCap: 0 }],
+    };
+    expect(dailyOutreachCapacity(cap)).toBe(0);
+  });
+
+  it("treats a null account age as blocked until the age is known", () => {
+    const cap: OutreachCapacity = {
+      ...base,
+      linkedinConnected: true,
+      linkedinEnabled: true,
+      linkedinAccountAgeDays: null,
     };
     expect(dailyOutreachCapacity(cap)).toBe(0);
   });
 });
 
 describe("computeRunTarget", () => {
-  it("LinkedIn-only during warmup → small fresh trickle", () => {
+  it("LinkedIn warmup → small fresh trickle", () => {
     const cap: OutreachCapacity = {
       ...base,
       linkedinConnected: true,
@@ -64,14 +65,12 @@ describe("computeRunTarget", () => {
     expect(computeRunTarget(cap, opts)).toBe(7);
   });
 
-  it("all ready → clamps to the ceiling", () => {
+  it("steady LinkedIn → clamps to the ceiling", () => {
     const cap: OutreachCapacity = {
       ...base,
       linkedinConnected: true,
       linkedinEnabled: true,
-      linkedinAccountAgeDays: 100, // steady 20
-      emailEnabled: true,
-      mailboxes: [{ phase: "ready", dailyCap: 0 }, { phase: "ready", dailyCap: 0 }], // 60
+      linkedinAccountAgeDays: 100, // steady 20 → round(20*1.3)=26, clamped to ceiling 25
     };
     expect(computeRunTarget(cap, opts)).toBe(25);
   });
@@ -87,8 +86,8 @@ describe("computeRunTarget", () => {
   });
 
   it("no channel yet → still sources a bounded preview batch so prospects land", () => {
-    // Q3: prospects pull even before outreach is set up; the dashboard nudges to
-    // connect a channel. Bounded so a no-channel account can't accumulate forever.
+    // Q3: prospects pull even before LinkedIn is connected; the dashboard nudges to
+    // connect. Bounded so a no-channel account can't accumulate forever.
     expect(computeRunTarget(base, opts)).toBe(opts.floor);
   });
 
@@ -100,14 +99,5 @@ describe("computeRunTarget", () => {
     expect(
       computeRunTarget(base, { ...opts, currentBacklog: NO_CHANNEL_PREVIEW_CAP - 2 })
     ).toBe(2);
-  });
-
-  it("tiny capacity still pulls the floor batch", () => {
-    const cap: OutreachCapacity = {
-      ...base,
-      emailEnabled: true,
-      mailboxes: [{ phase: "warming", dailyCap: 2 }], // projected round(2.6)=3
-    };
-    expect(computeRunTarget(cap, opts)).toBe(5); // raised to floor
   });
 });

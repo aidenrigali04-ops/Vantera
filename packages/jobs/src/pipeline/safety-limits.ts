@@ -1,9 +1,8 @@
 /**
- * Channel safety limits (rule 04). These ceilings protect the USER'S OWN accounts
- * from provider restriction — treat them as compliance, not preference. They live
- * here in the scheduler, never in the provider, and callers cannot configure
- * outreach volume above them (requests are clamped). Enforced for real at the
- * Phase 5 send boundary; every send path must call dailyAllowance() first.
+ * LinkedIn safety limits (rule 04). These ceilings protect the USER'S OWN LinkedIn account
+ * from restriction — treat them as compliance, not preference. They live here in the
+ * scheduler, never in the provider, and callers cannot configure outreach volume above them
+ * (requests are clamped). Every send path must call dailyAllowance() first.
  */
 
 export const LINKEDIN_WEEKLY_INVITE_CEILING = 100;
@@ -17,14 +16,10 @@ const LINKEDIN_RAMP: { maxAgeDays: number; daily: number }[] = [
   { maxAgeDays: 28, daily: 15 },
 ];
 
-export const EMAIL_STEADY_DAILY_PER_MAILBOX = 30; // warmup-safe; revisited with Phase 5 warmup gating
-export const IMESSAGE_STEADY_DAILY = 40; // conservative; non-configurable (rule 04 spirit)
-
-export type SafetyChannel = "linkedin" | "email";
+export type SafetyChannel = "linkedin";
 export type LinkedInSendKind = "invite" | "message";
 
-function channelCeiling(channel: SafetyChannel, accountAgeDays: number, kind: LinkedInSendKind): number {
-  if (channel === "email") return EMAIL_STEADY_DAILY_PER_MAILBOX;
+function channelCeiling(_channel: SafetyChannel, accountAgeDays: number, kind: LinkedInSendKind): number {
   if (kind === "message") return LINKEDIN_STEADY_DAILY_MESSAGES;
   const step = LINKEDIN_RAMP.find((s) => accountAgeDays < s.maxAgeDays);
   return step ? step.daily : LINKEDIN_STEADY_DAILY_INVITES;

@@ -5,19 +5,12 @@ import type {
 
 const DAY = 86_400_000;
 
-function hasIdentifier(stage: SequenceStage, ch: LeadChannels): boolean {
-  switch (stage) {
-    case "linkedin": return !!ch.linkedinUrl;
-    case "email": return !!ch.email && ch.emailStatus === "valid";
-    case "imessage":
-    case "call": return !!ch.phone && ch.phoneStatus !== "invalid";
-  }
+function hasIdentifier(_stage: SequenceStage, ch: LeadChannels): boolean {
+  return !!ch.linkedinUrl;
 }
 
-function isSuppressed(stage: SequenceStage, s: SequenceTickContext["suppressed"]): boolean {
-  if (stage === "linkedin") return s.linkedin;
-  if (stage === "email") return s.email;
-  return s.phone; // imessage + call
+function isSuppressed(_stage: SequenceStage, s: SequenceTickContext["suppressed"]): boolean {
+  return s.linkedin;
 }
 
 function stageUsable(stage: SequenceStage, ctx: SequenceTickContext): boolean {
@@ -25,8 +18,7 @@ function stageUsable(stage: SequenceStage, ctx: SequenceTickContext): boolean {
 }
 
 function stageTarget(stage: SequenceStage, config: SequenceConfig): number {
-  const cfg = config.stages[stage];
-  return stage === "call" ? (cfg.maxAttempts ?? 2) : cfg.touches;
+  return config.stages[stage].touches;
 }
 
 /** First usable stage strictly after `current` in the configured order, or null. */
@@ -47,7 +39,7 @@ function advanceOrExhaust(ctx: SequenceTickContext): SequenceDecision {
   }
   return {
     kind: "advance",
-    patch: { currentStage: next, touchesDone: 0, callAttempts: ctx.run.callAttempts, enteredStageAt: ctx.now, nextActionAt: ctx.now },
+    patch: { currentStage: next, touchesDone: 0, enteredStageAt: ctx.now, nextActionAt: ctx.now },
   };
 }
 
@@ -78,7 +70,6 @@ export function advanceSequence(ctx: SequenceTickContext): SequenceDecision {
       touchNo,
       patch: {
         touchesDone: touchNo,
-        callAttempts: stage === "call" ? ctx.run.callAttempts + 1 : ctx.run.callAttempts,
         lastTouchAt: ctx.now,
         nextActionAt: new Date(ctx.now.getTime() + delayDays * DAY),
       },

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseCopyForm, parseScoutForm, parseCallerForm, parseResponderForm, validateCallerConfig, clampCallingWindow, BRAND_FIELD_MAX, TCPA_EARLIEST, TCPA_LATEST, RESPONDER_SLA_MAX } from "./validation";
+import { parseCopyForm, parseScoutForm } from "./validation";
 
 function scoutForm(overrides: Record<string, string> = {}): FormData {
   const fd = new FormData();
@@ -57,20 +57,19 @@ function copyForm(overrides: Record<string, string> = {}): FormData {
   fd.set("name", "Penn");
   fd.set("cta", "book a 15-min intro");
   fd.set("links", "https://acme.com/case-study");
-  fd.set("channelEmail", "on");
   for (const [k, v] of Object.entries(overrides)) fd.set(k, v);
   return fd;
 }
 
 describe("parseCopyForm", () => {
-  it("accepts a complete form", () => {
+  it("accepts a complete form — LinkedIn is the only channel, always enabled", () => {
     expect(parseCopyForm(copyForm())).toEqual({
       ok: true,
       values: {
         name: "Penn",
         cta: "book a 15-min intro",
         links: ["https://acme.com/case-study"],
-        channels: { linkedin: false, email: true },
+        channels: { linkedin: true },
         sendMode: "review",
       },
     });
@@ -88,119 +87,8 @@ describe("parseCopyForm", () => {
     expect(parseCopyForm(copyForm({ sendMode: "blast" })).ok).toBe(false);
   });
 
-  it("requires at least one channel", () => {
-    const fd = copyForm();
-    fd.delete("channelEmail");
-    expect(parseCopyForm(fd).ok).toBe(false);
-  });
-
   it("rejects non-http links and short CTAs", () => {
     expect(parseCopyForm(copyForm({ links: "ftp://nope" })).ok).toBe(false);
     expect(parseCopyForm(copyForm({ cta: "go" })).ok).toBe(false);
-  });
-});
-
-function callerForm(overrides: Record<string, string> = {}): FormData {
-  const fd = new FormData();
-  fd.set("name", "Aria");
-  fd.set("cta", "book a 15-min intro");
-  fd.set("bookingLink", "https://cal.com/x/intro");
-  fd.set("voiceId", "voice-natural-en-1");
-  fd.set("personaName", "Alex");
-  fd.set("language", "en-US");
-  fd.set("callingWindowDays", JSON.stringify(["Mon", "Tue"]));
-  fd.set("startLocal", "09:00");
-  fd.set("endLocal", "17:00");
-  fd.set("maxAttempts", "3");
-  for (const [k, v] of Object.entries(overrides)) fd.set(k, v);
-  return fd;
-}
-
-describe("parseCallerForm — brand voice & guardrails", () => {
-  it("captures brand voice and guardrails when provided", () => {
-    const r = parseCallerForm(callerForm({ brandVoice: "warm, consultative", guardrails: "never name competitors" }));
-    expect(r).toMatchObject({ ok: true, values: { brandVoice: "warm, consultative", guardrails: "never name competitors" } });
-  });
-
-  it("leaves them undefined when blank (so the brief omits them)", () => {
-    const r = parseCallerForm(callerForm());
-    expect(r.ok && r.values.brandVoice).toBeUndefined();
-    expect(r.ok && r.values.guardrails).toBeUndefined();
-  });
-
-  it("caps each field length to keep the call prompt lean", () => {
-    const r = parseCallerForm(callerForm({ brandVoice: "x".repeat(BRAND_FIELD_MAX + 50) }));
-    expect(r.ok && r.values.brandVoice?.length).toBe(BRAND_FIELD_MAX);
-  });
-});
-
-describe("validateCallerConfig", () => {
-  it("accepts a complete config", () => {
-    expect(validateCallerConfig({
-      cta: "book a demo", bookingLink: "https://cal.com/x",
-      voice: { voiceId: "v1", personaName: "Alex", language: "en-US" },
-      recordingConsentMode: "two_party",
-      callingWindow: { days: ["mon"], startLocal: "09:00", endLocal: "17:00" }, maxAttempts: 3,
-    }).ok).toBe(true);
-  });
-
-  it("rejects a non-URL booking link", () => {
-    const r = validateCallerConfig({ cta: "x", bookingLink: "not-a-url", voice: { voiceId: "v", personaName: "A", language: "en-US" }, recordingConsentMode: "one_party", callingWindow: { days: ["mon"], startLocal: "09:00", endLocal: "17:00" }, maxAttempts: 1 });
-    expect(r.ok).toBe(false);
-  });
-
-  it("clamps the calling window into TCPA bounds (08:00-21:00)", () => {
-    expect(clampCallingWindow({ days: ["mon"], startLocal: "06:00", endLocal: "23:00" }))
-      .toEqual({ days: ["mon"], startLocal: TCPA_EARLIEST, endLocal: TCPA_LATEST });
-  });
-
-  it("rejects an empty day list", () => {
-    const r = validateCallerConfig({ cta: "x", bookingLink: "https://cal.com/x", voice: { voiceId: "v", personaName: "A", language: "en-US" }, recordingConsentMode: "one_party", callingWindow: { days: [], startLocal: "09:00", endLocal: "17:00" }, maxAttempts: 1 });
-    expect(r.ok).toBe(false);
-  });
-});
-
-function responderForm(overrides: Record<string, string> = {}): FormData {
-  const fd = new FormData();
-  fd.set("name", "Rey");
-  fd.set("cta", "book a 15-min intro");
-  fd.set("sendMode", "review");
-  fd.set("slaMinutes", "5");
-  fd.set("sourceFormFill", "on");
-  for (const [k, v] of Object.entries(overrides)) fd.set(k, v);
-  return fd;
-}
-
-describe("parseResponderForm", () => {
-  it("parses a valid responder form", () => {
-    expect(parseResponderForm(responderForm())).toEqual({
-      ok: true,
-      values: {
-        name: "Rey",
-        cta: "book a 15-min intro",
-        sendMode: "review",
-        slaMinutes: 5,
-        sources: { formFill: true, websiteVisitor: false, signal: false },
-      },
-    });
-  });
-
-  it("defaults send mode to review and rejects unknown modes", () => {
-    const fd = responderForm();
-    fd.delete("sendMode");
-    expect(parseResponderForm(fd)).toMatchObject({ values: { sendMode: "review" } });
-    expect(parseResponderForm(responderForm({ sendMode: "blast" })).ok).toBe(false);
-  });
-
-  it("requires at least one inbound source", () => {
-    const fd = responderForm();
-    fd.delete("sourceFormFill");
-    expect(parseResponderForm(fd).ok).toBe(false);
-  });
-
-  it("requires a CTA and a sane SLA", () => {
-    expect(parseResponderForm(responderForm({ cta: "go" })).ok).toBe(false);
-    expect(parseResponderForm(responderForm({ slaMinutes: "0" })).ok).toBe(false);
-    expect(parseResponderForm(responderForm({ slaMinutes: String(RESPONDER_SLA_MAX + 1) })).ok).toBe(false);
   });
 });

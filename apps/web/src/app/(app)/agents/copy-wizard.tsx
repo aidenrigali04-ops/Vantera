@@ -10,7 +10,7 @@ import { FormError } from "@/components/form-error";
 import { WizardShell } from "@/components/wizard/wizard-shell";
 import { deployCopyAgent, updateCopyAgent, type AgentActionState } from "./actions";
 
-const STEPS = ["Name", "Targeting", "CTA", "Content", "Channels", "Deploy"] as const;
+const STEPS = ["Name", "Targeting", "CTA", "Content", "Deploy"] as const;
 
 const CTA_EXAMPLES = [
   "book a 15-minute intro call",
@@ -22,20 +22,18 @@ export type CopyEditValues = {
   name: string;
   cta: string;
   links: string;
-  channels: { linkedin: boolean; email: boolean };
+  channels: { linkedin: boolean };
   sendMode: "review" | "automatic";
 };
 
 export function CopyWizard({
   scoutName,
   icpNames,
-  mailboxCount = 0,
   linkedinCount = 0,
   edit,
 }: {
   scoutName: string;
   icpNames: string[];
-  mailboxCount?: number;
   linkedinCount?: number;
   /** present → edit an existing agent's config instead of deploying a new one */
   edit?: CopyEditValues;
@@ -46,8 +44,6 @@ export function CopyWizard({
   const [cta, setCta] = useState(edit?.cta ?? "");
   const [links, setLinks] = useState(edit?.links ?? "");
   const [fileCount, setFileCount] = useState(0);
-  const [linkedin, setLinkedin] = useState(edit?.channels.linkedin ?? true);
-  const [email, setEmail] = useState(edit?.channels.email ?? true);
   const [sendMode, setSendMode] = useState<"review" | "automatic">(edit?.sendMode ?? "review");
   const [state, action, pending] = useActionState<AgentActionState, FormData>(
     isEdit ? updateCopyAgent : deployCopyAgent,
@@ -59,8 +55,7 @@ export function CopyWizard({
     step === 1 ||
     (step === 2 && cta.trim().length >= 3) ||
     step === 3 ||
-    (step === 4 && (linkedin || email)) ||
-    step === 5;
+    step === 4;
 
   return (
     <WizardShell
@@ -74,7 +69,6 @@ export function CopyWizard({
           "Who it writes to",
           "What's the ask?",
           "Give it material",
-          "Where it reaches out",
           isEdit
             ? `Save changes to ${name.trim() || "your agent"}`
             : `Deploy ${name.trim() || "your agent"}`,
@@ -82,13 +76,12 @@ export function CopyWizard({
       }
       hint={
         [
-          "Your outreach teammate — it writes every message, tailored to each lead.",
+          "Your outreach teammate — it writes every LinkedIn message, tailored to each lead.",
           "Set by your Prospect Agent — every draft targets these people.",
           "The one thing each message invites the prospect to do.",
           isEdit
             ? "Add more material — anything you already uploaded stays."
             : "Optional — but the more you add, the smarter every message gets.",
-          "Enable at least one channel.",
           isEdit ? "Review your changes, then save the new config." : "Choose how it sends, then deploy.",
         ][step]
       }
@@ -98,8 +91,6 @@ export function CopyWizard({
         <input type="hidden" name="cta" value={cta} />
         <input type="hidden" name="links" value={links} />
         <input type="hidden" name="sendMode" value={sendMode} />
-        {linkedin && <input type="hidden" name="channelLinkedin" value="on" />}
-        {email && <input type="hidden" name="channelEmail" value="on" />}
 
         {step === 0 && (
           <div className="flex flex-col gap-2">
@@ -178,51 +169,6 @@ export function CopyWizard({
         </div>
 
         {step === 4 && (
-          <div className="flex flex-col gap-3">
-            {(
-              [
-                { key: "linkedin", label: "LinkedIn", on: linkedin, set: setLinkedin },
-                { key: "email", label: "Email", on: email, set: setEmail },
-              ] as const
-            ).map(({ key, label, on, set }) => (
-              <button
-                key={key}
-                type="button"
-                role="switch"
-                aria-checked={on}
-                onClick={() => set(!on)}
-                className={`flex items-center justify-between rounded-lg border px-4 py-3 text-left text-sm transition-colors ${
-                  on ? "border-primary bg-primary/5" : "border-border text-muted-foreground"
-                }`}
-              >
-                <span className="font-medium">{label}</span>
-                <span
-                  className={`relative h-5 w-9 rounded-full transition-colors ${on ? "bg-primary" : "bg-muted"}`}
-                >
-                  <span
-                    className={`absolute top-0.5 size-4 rounded-full bg-background shadow transition-[left] ${on ? "left-4.5" : "left-0.5"}`}
-                  />
-                </span>
-              </button>
-            ))}
-            {((email && mailboxCount === 0) || (linkedin && linkedinCount === 0)) && (
-              <p className="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-muted-foreground">
-                {email && mailboxCount === 0 && linkedin && linkedinCount === 0
-                  ? "No sending channel connected yet"
-                  : email && mailboxCount === 0
-                    ? "No email sending set up yet"
-                    : "No LinkedIn account connected yet"}
-                {" — drafting works now; sending starts once you "}
-                <a href="/settings/channels" className="underline underline-offset-2">
-                  set one up in Settings → Channels
-                </a>
-                .
-              </p>
-            )}
-          </div>
-        )}
-
-        {step === 5 && (
           <div className="flex flex-col gap-4">
             <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
               <dt className="text-muted-foreground">Agent</dt>
@@ -242,8 +188,8 @@ export function CopyWizard({
                   return parts.length > 0 ? parts.join(" · ") : "none — add anytime";
                 })()}
               </dd>
-              <dt className="text-muted-foreground">Channels</dt>
-              <dd>{[linkedin && "LinkedIn", email && "Email"].filter(Boolean).join(" + ")}</dd>
+              <dt className="text-muted-foreground">Channel</dt>
+              <dd>LinkedIn</dd>
             </dl>
 
             <fieldset className="flex flex-col gap-2">
@@ -277,6 +223,16 @@ export function CopyWizard({
                 </button>
               ))}
             </fieldset>
+
+            {linkedinCount === 0 && (
+              <p className="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-muted-foreground">
+                No LinkedIn account connected yet — drafting works now; sending starts once you{" "}
+                <a href="/settings/channels" className="underline underline-offset-2">
+                  connect LinkedIn in Settings → Channels
+                </a>
+                .
+              </p>
+            )}
 
             <p className="rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm">
               {name.trim() || "Your agent"} starts drafting as soon as qualified leads arrive.{" "}

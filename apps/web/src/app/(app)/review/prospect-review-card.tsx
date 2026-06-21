@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronRight, Mail, MessageSquare } from "lucide-react";
+import { ChevronRight, MessageSquare } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Panel } from "@/components/ui/panel";
 import { LeadProfileLink, type LeadProfile } from "@/components/lead-profile";
@@ -18,10 +18,10 @@ const byStage = (a: DraftRow, b: DraftRow) =>
   (STAGE_ORDER[a.linkedin_stage ?? "message"] ?? 1) - (STAGE_ORDER[b.linkedin_stage ?? "message"] ?? 1);
 
 /**
- * One collapsible row per PROSPECT. Collapsed: identity + fit score + a per-channel
- * draft count — the whole queue reads as a short, clearable list (B=MAP). Expanded:
- * the prospect's drafts, grouped by channel (LinkedIn, then Email), each with its
- * own approve / edit / decline controls.
+ * One collapsible row per PROSPECT. Collapsed: identity + fit score + a draft
+ * count — the whole queue reads as a short, clearable list (B=MAP). Expanded:
+ * the prospect's LinkedIn drafts (invite then follow-ups), each with its own
+ * approve / edit / decline controls.
  */
 export function ProspectReviewCard({
   group,
@@ -37,8 +37,7 @@ export function ProspectReviewCard({
   const context = [lead?.title, lead?.company_name].filter(Boolean).join(" · ");
   const score = typeof lead?.ai_score === "number" ? lead.ai_score : null;
 
-  const linkedin = drafts.filter((d) => d.channel === "linkedin").sort(byStage);
-  const email = drafts.filter((d) => d.channel === "email");
+  const linkedin = [...drafts].sort(byStage);
 
   return (
     <Panel className="overflow-hidden p-0">
@@ -69,12 +68,6 @@ export function ProspectReviewCard({
               {linkedin.length}
             </span>
           )}
-          {email.length > 0 && (
-            <span className="inline-flex items-center gap-1" title="Email drafts">
-              <Mail className="size-3.5" />
-              {email.length}
-            </span>
-          )}
           <span className="rounded-full bg-muted px-2 py-0.5 font-medium text-foreground/70">
             {drafts.length} draft{drafts.length === 1 ? "" : "s"}
           </span>
@@ -98,17 +91,6 @@ export function ProspectReviewCard({
                 <MessageSquare className="size-3.5" /> LinkedIn
               </h3>
               {linkedin.map((d) => (
-                <DraftCard key={d.id} draft={d} compact />
-              ))}
-            </section>
-          )}
-
-          {email.length > 0 && (
-            <section className="space-y-3">
-              <h3 className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                <Mail className="size-3.5" /> Email
-              </h3>
-              {email.map((d) => (
                 <DraftCard key={d.id} draft={d} compact />
               ))}
             </section>

@@ -6,7 +6,7 @@ import { runSequenceTick } from "../pipeline/sequence-orchestrate";
 /**
  * Per-lead sequence state machine, every 15 min (mirrors agent-scheduler). The orchestration
  * logic lives in the pipeline core (sequence-orchestrate); this wrapper injects the real store
- * and the Trigger task dispatchers. The core owns the x2 caller cadence via run.callAttempts.
+ * and the Trigger task dispatcher.
  */
 export const sequenceOrchestrator = schedules.task({
   id: "sequence-orchestrator",
@@ -19,9 +19,6 @@ export const sequenceOrchestrator = schedules.task({
       dispatch: {
         dispatchTouch: async (payload) => {
           await tasks.trigger("sequence-touch", payload);
-        },
-        dispatchCallBrief: async (payload) => {
-          await tasks.trigger("call-brief", payload);
         },
       },
     });

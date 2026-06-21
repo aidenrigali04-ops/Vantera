@@ -49,17 +49,15 @@ export default async function NewCopyAgentPage() {
     .map((l) => l.icps?.name)
     .filter((n): n is string => Boolean(n));
 
-  // channel readiness — non-blocking hint in the wizard (sending parks until these exist)
-  const [{ count: mailboxCount }, { count: linkedinCount }] = await Promise.all([
-    supabase.from("mailboxes").select("id", { count: "exact", head: true }),
-    supabase.from("linkedin_accounts").select("id", { count: "exact", head: true }),
-  ]);
+  // channel readiness — non-blocking hint in the wizard (sending parks until LinkedIn connects)
+  const { count: linkedinCount } = await supabase
+    .from("linkedin_accounts")
+    .select("id", { count: "exact", head: true });
 
   return (
     <CopyWizard
       scoutName={scout.name}
       icpNames={icpNames}
-      mailboxCount={mailboxCount ?? 0}
       linkedinCount={linkedinCount ?? 0}
     />
   );

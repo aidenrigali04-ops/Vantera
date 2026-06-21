@@ -8,14 +8,11 @@ import type {
 } from "./types";
 
 /** Subset of the store the orchestration loop needs (createPgStore satisfies it). */
-export interface OrchestrateStore extends SequenceStore {
-  getLiveCallerAgent(accountId: string): Promise<{ id: string } | null>;
-}
+export type OrchestrateStore = SequenceStore;
 
 /** Side-effecting task dispatch, injected so the core stays runtime-agnostic (no Trigger import). */
 export interface OrchestrateDispatch {
   dispatchTouch(payload: SequenceTouchDispatch): Promise<void>;
-  dispatchCallBrief(payload: { callerAgentId: string; accountId: string; leadIds: string[] }): Promise<void>;
 }
 
 export interface OrchestrateEnv {
@@ -53,28 +50,11 @@ export async function driveSequenceRun(
     const decision = advanceSequence(ctx);
     if (decision.kind === "hold") return { dispatched: 0, archived: 0 };
 
-    // Call stage is only dispatchable with a live caller agent. Check BEFORE the claim so a
-    // missing agent leaves the run untouched (like a hold) instead of burning the attempt and
-    // advancing the clock — the run stays due and retries on a later tick.
-    let callerAgent: { id: string } | null = null;
-    if (decision.kind === "dispatch" && decision.stage === "call") {
-      callerAgent = await env.store.getLiveCallerAgent(run.accountId);
-      if (!callerAgent) return { dispatched: 0, archived: 0 };
-    }
-
     // optimistic claim; if another tick already moved this run, stop
     const claimed = await env.store.applyRunPatch(run.id, run.nextActionAt, decision.patch);
     if (!claimed) return { dispatched: 0, archived: 0 };
 
     if (decision.kind === "dispatch") {
-      if (decision.stage === "call") {
-        await env.dispatch.dispatchCallBrief({
-          callerAgentId: callerAgent!.id,
-          accountId: run.accountId,
-          leadIds: [run.leadId],
-        });
-        return { dispatched: 1, archived: 0 };
-      }
       await env.dispatch.dispatchTouch({
         runId: run.id,
         accountId: run.accountId,

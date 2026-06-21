@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { getDraftQueueSummary, getCampaignStatus, getGoalProgress, getLeadScoreRationale, getBillingStatus, getReturnOnSpend, getResponderStatus, getAdsStatus } from "./read-tools";
+import { getDraftQueueSummary, getCampaignStatus, getGoalProgress, getLeadScoreRationale, getBillingStatus, getReturnOnSpend, getAdsStatus } from "./read-tools";
 
 // fake supabase: each query resolves to the canned result for its table
 function fakeDb(rows: Record<string, unknown>) {
@@ -29,19 +29,19 @@ describe("getDraftQueueSummary", () => {
   it("returns only {pendingReview, byChannel} — no raw rows", async () => {
     const db = fakeDb({
       scheduled_sends: [
-        { channel: "email" },
-        { channel: "email" },
+        { channel: "linkedin" },
+        { channel: "linkedin" },
         { channel: "linkedin" },
       ],
     });
     const dto = await getDraftQueueSummary(db, "acc1");
-    expect(dto).toEqual({ pendingReview: 3, byChannel: { email: 2, linkedin: 1 } });
+    expect(dto).toEqual({ pendingReview: 3, byChannel: { linkedin: 3 } });
   });
 
   it("returns zero counts when no rows", async () => {
     const db = fakeDb({ scheduled_sends: [] });
     const dto = await getDraftQueueSummary(db, "acc1");
-    expect(dto).toEqual({ pendingReview: 0, byChannel: { email: 0, linkedin: 0 } });
+    expect(dto).toEqual({ pendingReview: 0, byChannel: { linkedin: 0 } });
   });
 });
 
@@ -218,42 +218,6 @@ describe("getReturnOnSpend", () => {
     expect(dto.annualSpend).toBeNull();
     expect(dto.pipelineToSpend).toBeNull();
     expect(dto.clearsRenewalBar).toBeNull();
-  });
-});
-
-describe("getResponderStatus", () => {
-  it("returns only the responder summary DTO — no raw rows", async () => {
-    const db = fakeDb({
-      agents: { name: "Echo", status: "live", config: { sendMode: "auto", slaMinutes: 5 } },
-      inbound_leads: [
-        { status: "responded" },
-        { status: "responded" },
-        { status: "review" },
-        { status: "rejected" },
-      ],
-    });
-    const dto = await getResponderStatus(db, "acc1");
-    expect(dto).toEqual({
-      deployed: true,
-      agentName: "Echo",
-      live: true,
-      sendMode: "auto",
-      slaMinutes: 5,
-      inbound: { responded: 2, inReview: 1, rejected: 1, total: 4 },
-    });
-  });
-
-  it("reports not-deployed when there's no responder agent", async () => {
-    const db = fakeDb({ agents: null });
-    const dto = await getResponderStatus(db, "acc1");
-    expect(dto).toEqual({
-      deployed: false,
-      agentName: null,
-      live: false,
-      sendMode: null,
-      slaMinutes: null,
-      inbound: { responded: 0, inReview: 0, rejected: 0, total: 0 },
-    });
   });
 });
 

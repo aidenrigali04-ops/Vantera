@@ -7,17 +7,12 @@ import type {
   LeadChannels,
   SequenceConfig,
   SequenceRun,
-  SequenceRunPatch,
 } from "./types";
 
 const NOW = new Date("2026-06-14T12:00:00Z");
 
 const fullChannels: LeadChannels = {
   linkedinUrl: "https://linkedin.com/in/x",
-  email: "x@acme.com",
-  emailStatus: "valid",
-  phone: "+15555550100",
-  phoneStatus: "valid",
 };
 
 function run(over: Partial<SequenceRun> = {}): SequenceRun {
@@ -29,7 +24,6 @@ function run(over: Partial<SequenceRun> = {}): SequenceRun {
     status: "active",
     currentStage: "linkedin",
     touchesDone: 0,
-    callAttempts: 0,
     nextActionAt: NOW,
     enteredStageAt: NOW,
     ...over,
@@ -46,16 +40,15 @@ function dueItem(over: Partial<DueSequenceRun> = {}): DueSequenceRun {
   };
 }
 
-/** Fake store mirroring the call-dispatch.test.ts style: vi.fn defaults, override per case. */
+/** Fake store: vi.fn defaults, override per case. */
 function store(over: Partial<OrchestrateStore> = {}): OrchestrateStore {
   return {
     getDueSequenceRuns: vi.fn(async () => []),
     isKillSwitchOn: vi.fn(async () => false),
-    suppressionFlags: vi.fn(async () => ({ linkedin: false, email: false, phone: false })),
+    suppressionFlags: vi.fn(async () => ({ linkedin: false })),
     applyRunPatch: vi.fn(async () => true),
     archiveLead: vi.fn(async () => {}),
     enrollPendingLeads: vi.fn(async () => 0),
-    getLiveCallerAgent: vi.fn(async () => ({ id: "caller1" })),
     ...over,
   } as OrchestrateStore;
 }
@@ -63,7 +56,6 @@ function store(over: Partial<OrchestrateStore> = {}): OrchestrateStore {
 function dispatch(over: Partial<OrchestrateDispatch> = {}): OrchestrateDispatch {
   return {
     dispatchTouch: vi.fn(async () => {}),
-    dispatchCallBrief: vi.fn(async () => {}),
     ...over,
   };
 }
@@ -91,7 +83,6 @@ describe("driveSequenceRun", () => {
       stage: "linkedin",
       touchNo: 1,
     });
-    expect(e.dispatch.dispatchCallBrief).not.toHaveBeenCalled();
   });
 
   it("claims (applyRunPatch) BEFORE firing the trigger", async () => {
@@ -115,41 +106,6 @@ describe("driveSequenceRun", () => {
 
     expect(out).toEqual({ dispatched: 0, archived: 0 });
     expect(e.dispatch.dispatchTouch).not.toHaveBeenCalled();
-    expect(e.dispatch.dispatchCallBrief).not.toHaveBeenCalled();
-  });
-
-  it("call stage claims (applyRunPatch) then dispatches call-brief with the live caller agent id", async () => {
-    const e = env({ getLiveCallerAgent: vi.fn(async () => ({ id: "caller-xyz" })) });
-    const item = dueItem({ run: run({ currentStage: "call", touchesDone: 0, callAttempts: 0 }) });
-
-    const out = await driveSequenceRun(item, e);
-
-    expect(out).toEqual({ dispatched: 1, archived: 0 });
-    // the attempt/clock IS claimed when a caller agent is present
-    expect(e.store.applyRunPatch).toHaveBeenCalledTimes(1);
-    expect(e.store.applyRunPatch).toHaveBeenCalledWith("r1", NOW, expect.any(Object));
-    expect(e.dispatch.dispatchCallBrief).toHaveBeenCalledTimes(1);
-    expect(e.dispatch.dispatchCallBrief).toHaveBeenCalledWith({
-      callerAgentId: "caller-xyz",
-      accountId: "a1",
-      leadIds: ["l1"],
-    });
-    expect(e.dispatch.dispatchTouch).not.toHaveBeenCalled();
-  });
-
-  it("call stage with no live caller agent holds WITHOUT burning the attempt (no claim, no dispatch)", async () => {
-    const e = env({ getLiveCallerAgent: vi.fn(async () => null) });
-    const item = dueItem({ run: run({ currentStage: "call", touchesDone: 0, callAttempts: 0 }) });
-
-    const out = await driveSequenceRun(item, e);
-
-    expect(out).toEqual({ dispatched: 0, archived: 0 });
-    // the claim must NOT happen: the attempt is not incremented and the clock is not advanced,
-    // so the run stays due and retries on a later tick (same "nothing happened" shape as a hold)
-    expect(e.store.applyRunPatch).not.toHaveBeenCalled();
-    expect(e.store.archiveLead).not.toHaveBeenCalled();
-    expect(e.dispatch.dispatchCallBrief).not.toHaveBeenCalled();
-    expect(e.dispatch.dispatchTouch).not.toHaveBeenCalled();
   });
 
   it("exhaust decision archives the lead", async () => {
@@ -164,8 +120,7 @@ describe("driveSequenceRun", () => {
     expect(e.dispatch.dispatchTouch).not.toHaveBeenCalled();
   });
 
-  it("advances past an unusable stage and dispatches the next stage in the same tick", async () => {
-    // linkedin disabled => advanceSequence returns 'advance' to email, then dispatch on email.
+  it("archives the lead when the only stage is disabled (nothing usable remains)", async () => {
     const config: SequenceConfig = {
       ...SEQUENCE_DEFAULTS,
       stages: {
@@ -173,22 +128,14 @@ describe("driveSequenceRun", () => {
         linkedin: { ...SEQUENCE_DEFAULTS.stages.linkedin, enabled: false },
       },
     };
-    const patches: SequenceRunPatch[] = [];
-    const e = env({
-      applyRunPatch: vi.fn(async (_id, _at, patch) => (patches.push(patch), true)),
-    });
+    const e = env();
     const item = dueItem({ config, run: run({ currentStage: "linkedin", touchesDone: 0 }) });
 
     const out = await driveSequenceRun(item, e);
 
-    expect(out).toEqual({ dispatched: 1, archived: 0 });
-    // exactly one dispatch this tick, and it is the email stage (linkedin was skipped)
-    expect(e.dispatch.dispatchTouch).toHaveBeenCalledTimes(1);
-    expect(e.dispatch.dispatchTouch).toHaveBeenCalledWith(
-      expect.objectContaining({ stage: "email", touchNo: 1 })
-    );
-    // two claims: the advance, then the dispatch
-    expect(patches.map((p) => p.currentStage)).toEqual(["email", undefined]);
+    expect(out).toEqual({ dispatched: 0, archived: 1 });
+    expect(e.store.archiveLead).toHaveBeenCalledWith("l1", "c1");
+    expect(e.dispatch.dispatchTouch).not.toHaveBeenCalled();
   });
 
   it("holds (dispatches nothing) when the kill switch is on", async () => {

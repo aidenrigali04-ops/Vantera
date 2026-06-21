@@ -19,9 +19,6 @@ export const scoutRun = task({
       triggerCopyDraft: async (p) => {
         await tasks.trigger("copy-draft", p);
       },
-      triggerCallBrief: async (p) => {
-        await tasks.trigger("call-brief", p);
-      },
     });
     if (summary.reason === "low_credits") {
       // Ops alert: the shared prospect-data credit pool can't cover this run. The run skipped

@@ -1,14 +1,14 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { resolveEntitlements } from "@vantera/billing";
 import { snapshotFromRow, type AccountBillingRow } from "@/lib/billing/entitlement";
-import { getWarmupStatus, type WarmupStatus } from "@/lib/warmup-status";
+import { getLinkedInChannelStatus, type LinkedInChannelStatus } from "@/lib/channel-status";
 import { loadAnalytics } from "@/lib/analytics";
 
 // ── Draft queue ───────────────────────────────────────────────────────────────
 
 export interface DraftQueueSummary {
   pendingReview: number;
-  byChannel: { email: number; linkedin: number };
+  byChannel: { linkedin: number };
 }
 
 export async function getDraftQueueSummary(
@@ -23,7 +23,6 @@ export async function getDraftQueueSummary(
   return {
     pendingReview: rows.length,
     byChannel: {
-      email: rows.filter((r) => r.channel === "email").length,
       linkedin: rows.filter((r) => r.channel === "linkedin").length,
     },
   };
@@ -207,21 +206,23 @@ export async function getCrmStatus(
   };
 }
 
-// ── Warmup status ─────────────────────────────────────────────────────────────
+// ── LinkedIn channel status ───────────────────────────────────────────────────
 
-// Re-export WarmupStatus so callers can reference the type without a separate import.
-export type { WarmupStatus };
+// Re-export so callers can reference the type without a separate import.
+export type { LinkedInChannelStatus };
 
 /**
- * Returns the current sending-channel warmup status for the account.
- * Answers "when does my email start?" / "why aren't emails going out yet?".
+ * The account's LinkedIn channel status: whether an account is connected (and active),
+ * the primary account's state, and how many accounts are connected. Connecting LinkedIn
+ * is the single activation gate now that LinkedIn is the only channel. Answers "is my
+ * LinkedIn connected?" / "why isn't my outreach going out yet?".
  * accountId MUST come from the validated session (rule 02).
  */
-export async function getWarmupStatusForAccount(
+export async function getChannelStatusForAccount(
   db: SupabaseClient,
   accountId: string
-): Promise<WarmupStatus> {
-  return getWarmupStatus(db, accountId);
+): Promise<LinkedInChannelStatus> {
+  return getLinkedInChannelStatus(db, accountId);
 }
 
 // ── Return on spend (WS-A) ────────────────────────────────────────────────────
@@ -257,60 +258,6 @@ export async function getReturnOnSpend(db: SupabaseClient): Promise<ReturnOnSpen
     annualSpend: roi.hasSpend ? Math.round(roi.annualSpendCents / 100) : null,
     hasValue,
     onPaidPlan: roi.hasSpend,
-  };
-}
-
-export interface ResponderStatusDTO {
-  deployed: boolean;
-  agentName: string | null;
-  live: boolean;
-  sendMode: "auto" | "review" | null;
-  slaMinutes: number | null;
-  inbound: { responded: number; inReview: number; rejected: number; total: number };
-}
-
-/**
- * Inbound Responder status for the copilot: whether one is deployed, how it responds, and the
- * inbound funnel (handled / in review / rejected). Answers "is my responder working?" / "how many
- * inbound leads have we answered?". RLS scopes the read to the caller's account (rule 02).
- */
-export async function getResponderStatus(
-  db: SupabaseClient,
-  _accountId: string
-): Promise<ResponderStatusDTO> {
-  const { data: agent } = await db
-    .from("agents")
-    .select("name, status, config")
-    .eq("kind", "responder")
-    .limit(1)
-    .maybeSingle();
-  const a = agent as
-    | { name?: string; status?: string; config?: { sendMode?: string; slaMinutes?: number } }
-    | null;
-  if (!a) {
-    return {
-      deployed: false,
-      agentName: null,
-      live: false,
-      sendMode: null,
-      slaMinutes: null,
-      inbound: { responded: 0, inReview: 0, rejected: 0, total: 0 },
-    };
-  }
-  const { data: inbound } = await db.from("inbound_leads").select("status");
-  const rows: { status: string }[] = (inbound as { status: string }[] | null) ?? [];
-  return {
-    deployed: true,
-    agentName: a.name ?? null,
-    live: a.status === "live",
-    sendMode: a.config?.sendMode === "auto" ? "auto" : "review",
-    slaMinutes: typeof a.config?.slaMinutes === "number" ? a.config.slaMinutes : null,
-    inbound: {
-      responded: rows.filter((r) => r.status === "responded").length,
-      inReview: rows.filter((r) => r.status === "review").length,
-      rejected: rows.filter((r) => r.status === "rejected").length,
-      total: rows.length,
-    },
   };
 }
 

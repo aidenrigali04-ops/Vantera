@@ -1,7 +1,6 @@
 import { describeViolations } from "@vantera/agent-brains";
 import type { DraftInput, Violation } from "@vantera/agent-brains";
 import { normalizeLinkedInUrl } from "./copy-draft";
-import { normalizePhone } from "./call-brief";
 import { needsRefresh, FRESHNESS_WINDOW_DAYS } from "./freshness";
 import type {
   NewScheduledSend,
@@ -10,24 +9,16 @@ import type {
   SequenceTouchOutcome,
 } from "./types";
 
-/** suppression kind per stage: imessage + call both ride the lead's phone value (rule 11). */
-const SUPPRESSION_KIND = {
-  email: "email",
-  linkedin: "linkedin",
-  imessage: "phone",
-  call: "phone",
-} as const;
-
 /** Describe unresolved humanizer violations for the review queue (tolerant of an empty list). */
 function flagsFor(violations: Violation[] | undefined): string | null {
   return violations && violations.length > 0 ? describeViolations(violations) : null;
 }
 
 /**
- * Draft and insert ONE channel touch for the orchestrator. v1 routing reuses the existing
- * drafters: email -> draftEmailFn; linkedin AND imessage -> draftLinkedInFn (short DM-tone copy
- * fits a text). The suppression re-check at this boundary is the rule-11 send-path gate: it runs
- * BEFORE any draft or insert, so a suppressed lead is never drafted. 'call' never routes here.
+ * Draft and insert ONE LinkedIn follow-up touch for the orchestrator. The suppression re-check at
+ * this boundary is the rule-11 send-path gate: it runs BEFORE any draft or insert, so a suppressed
+ * lead is never drafted. Aged leads are re-ranked first; one that drops below min_score exits the
+ * sequence (NOT suppression).
  */
 export async function runSequenceTouch(
   d: SequenceTouchDispatch,
@@ -36,21 +27,15 @@ export async function runSequenceTouch(
   const lead = await deps.store.getDraftableLead(d.accountId, d.leadId);
   if (!lead) return "skipped";
 
-  const value =
-    d.stage === "email" ? lead.email : d.stage === "linkedin" ? lead.linkedinUrl : lead.phone;
+  const value = lead.linkedinUrl;
   if (!value) return "skipped";
 
-  const normalized =
-    d.stage === "email"
-      ? value.toLowerCase()
-      : d.stage === "linkedin"
-        ? normalizeLinkedInUrl(value)
-        : normalizePhone(value);
-  if (await deps.store.isSuppressed(d.accountId, SUPPRESSION_KIND[d.stage], normalized)) {
+  const normalized = normalizeLinkedInUrl(value);
+  if (await deps.store.isSuppressed(d.accountId, "linkedin", normalized)) {
     return "suppressed";
   }
 
-  if (d.stage === "email" && needsRefresh(lead.scoredAt, deps.now(), FRESHNESS_WINDOW_DAYS)) {
+  if (needsRefresh(lead.scoredAt, deps.now(), FRESHNESS_WINDOW_DAYS)) {
     const refresh = await deps.refreshLead(d.accountId, d.leadId);
     if (refresh === "dropped") {
       await deps.store.stopSequenceRun(d.runId); // lead exits the sequence — no further touches
@@ -71,30 +56,18 @@ export async function runSequenceTouch(
     context: { cta },
   };
 
-  let body: string;
-  let subject: string | null = null;
-  let styleFlags: string | null = null;
-  if (d.stage === "email") {
-    const draft = await deps.draftEmailFn(input);
-    subject = draft.subject;
-    body = draft.body;
-    styleFlags = flagsFor(draft.violations);
-  } else {
-    // linkedin + imessage both use the short-form drafter (DM-length copy)
-    const draft = await deps.draftLinkedInFn(input);
-    body = draft.connectionNote;
-    styleFlags = flagsFor(draft.violations);
-  }
+  const draft = await deps.draftLinkedInFn(input);
+  const styleFlags = flagsFor(draft.violations);
 
   const send: NewScheduledSend = {
     accountId: d.accountId,
     campaignId: d.campaignId,
     leadId: d.leadId,
-    channel: d.stage === "call" ? "call" : d.stage, // 'call' never routes here
-    subject,
-    body,
+    channel: "linkedin",
+    subject: null,
+    body: draft.connectionNote,
     status: styleFlags ? "pending_review" : "approved",
-    linkedinStage: d.stage === "linkedin" ? "message" : null,
+    linkedinStage: "message",
     styleFlags,
   };
   await deps.store.insertScheduledSend(send);

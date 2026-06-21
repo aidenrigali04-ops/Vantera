@@ -6,9 +6,6 @@ import {
   ArrowRight,
   CheckCircle2,
   ChevronRight,
-  Mail,
-  MessageSquare,
-  Phone,
   UserPlus,
   type LucideIcon,
 } from "lucide-react";
@@ -21,9 +18,6 @@ import type { SequenceConfig, SequenceStage } from "@vantera/jobs/pipeline/types
 
 const STAGE_META: { key: SequenceStage; label: string; icon: LucideIcon }[] = [
   { key: "linkedin", label: "LinkedIn", icon: UserPlus },
-  { key: "email", label: "Email", icon: Mail },
-  { key: "imessage", label: "iMessage", icon: MessageSquare },
-  { key: "call", label: "Caller", icon: Phone },
 ];
 
 export function SequenceBuilder({
@@ -41,9 +35,8 @@ export function SequenceBuilder({
         <Eyebrow>Outreach sequence</Eyebrow>
         <h1 className="font-heading mt-3 text-3xl font-semibold tracking-tight">The flow every lead runs</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          {config.stages.linkedin.touches} LinkedIn touches → {config.stages.email.touches} emails → a
-          text → up to {config.stages.call.maxAttempts ?? 2} calls — and it stops the instant a lead
-          books.
+          {config.stages.linkedin.touches} LinkedIn touches — a connection request, then personalized
+          follow-ups — and it stops the instant a lead books.
         </p>
       </div>
 
@@ -96,7 +89,6 @@ function StageCard({
   stage: SequenceConfig["stages"][SequenceStage];
 }) {
   const Icon = meta.icon;
-  const isCall = meta.key === "call";
   return (
     <Panel className="p-5">
       <div className="flex items-center justify-between gap-3">
@@ -119,11 +111,11 @@ function StageCard({
 
       <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3">
         <Field
-          name={`${meta.key}.${isCall ? "maxAttempts" : "touches"}`}
-          label={isCall ? "Call attempts" : "Touches"}
-          defaultValue={isCall ? stage.maxAttempts ?? 2 : stage.touches}
-          min={isCall ? 1 : 0}
-          max={isCall ? 3 : 5}
+          name={`${meta.key}.touches`}
+          label="Touches"
+          defaultValue={stage.touches}
+          min={0}
+          max={5}
         />
         <Field
           name={`${meta.key}.touchGapDays`}

@@ -1,5 +1,7 @@
 # SDR agents & outreach pipeline (rewritten 2026-06-11; supersedes the campaign-wizard front door)
 
+> **LinkedIn-only rescope (2026-06-20).** The shipped agents are **Scout** (kind `scout`) and **Outreach** (kind `copy`), LinkedIn-only. The **Caller Agent** (kind `caller`) and **Responder Agent** (kind `responder`) sections below are **removed** — their wizards, pipelines, brains, and DB writes are gone; ignore those sections. The Outreach Agent no longer has a channel toggle (LinkedIn is implied). Next agent: the **Intent Agent** (kind `intent`) — same rule-13 skeleton, watches LinkedIn for in-market behavior and enrolls qualified people (see roadmap Phase 13). The shared `reply/classify` brain stays (rule 04).
+
 **Agents are the front door.** Users deploy named SDR agents; deploying a Prospect (Scout) Agent and an Outreach Agent is what drives all outreach. Campaigns still exist as the **internal execution grouping** (an Outreach agent's drafts hang off one auto-created campaign row) but are **never the primary user surface** — the agent card is. Spec: `docs/superpowers/specs/2026-06-11-sdr-agents-design.md`.
 
 > **Naming (2026-06-12):** the agent formerly labeled "Copy Agent" is now the **Outreach Agent** on every user-facing surface. Internals are unchanged: `agents.kind = 'copy'`, `packages/agent-brains/src/copy/`, `copy-draft` pipeline, `agents-copy.md` help slug. It owns everything after the qualification gate (score ≥ min_score): copywriting now, plus sending and reply handling when Phase 5 lands — one agent, never a separate "sending agent".

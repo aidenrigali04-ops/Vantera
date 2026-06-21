@@ -1,17 +1,9 @@
-import { dailyAllowance, EMAIL_STEADY_DAILY_PER_MAILBOX } from "./safety-limits";
-
-export interface MailboxCapacity {
-  /** "warming" carries the provider's current warmup cap; "ready" sends at the steady ceiling */
-  phase: "warming" | "ready";
-  dailyCap: number;
-}
+import { dailyAllowance } from "./safety-limits";
 
 export interface OutreachCapacity {
   linkedinConnected: boolean;
   linkedinAccountAgeDays: number | null;
   linkedinEnabled: boolean;
-  emailEnabled: boolean;
-  mailboxes: MailboxCapacity[];
 }
 
 export interface RunTargetOpts {
@@ -25,36 +17,27 @@ export interface RunTargetOpts {
 export const CAPACITY_DEFAULTS = { bufferFactor: 1.3, floor: 5 } as const;
 
 /**
- * Leads a Scout sources before any outreach channel exists, so prospects still land on
- * the dashboard/pipeline while the user sets up email/LinkedIn. Bounded: a no-channel
- * account tops up toward this cap and then stops, so it can't accumulate forever.
+ * Leads a Scout sources before LinkedIn is connected, so prospects still land on the
+ * dashboard/pipeline while the user connects their account. Bounded: a no-channel account
+ * tops up toward this cap and then stops, so it can't accumulate forever.
  */
 export const NO_CHANNEL_PREVIEW_CAP = 25;
 
-/** Total leads that can actually be reached per day across enabled, ready/warming channels. */
+/** Total leads that can actually be reached per day via the connected LinkedIn account. */
 export function dailyOutreachCapacity(c: OutreachCapacity): number {
   // null age (connected but age unknown) → treat as blocked until age is known.
   // We use the invite ceiling: invites dominate new-account sequences during warmup.
-  const linkedinDaily =
-    c.linkedinEnabled && c.linkedinConnected && c.linkedinAccountAgeDays !== null
-      ? dailyAllowance("linkedin", c.linkedinAccountAgeDays)
-      : 0;
-  const emailDaily = c.emailEnabled
-    ? c.mailboxes.reduce(
-        (sum, m) =>
-          sum + (m.phase === "ready" ? EMAIL_STEADY_DAILY_PER_MAILBOX : Math.max(0, m.dailyCap)),
-        0,
-      )
+  return c.linkedinEnabled && c.linkedinConnected && c.linkedinAccountAgeDays !== null
+    ? dailyAllowance("linkedin", c.linkedinAccountAgeDays)
     : 0;
-  return linkedinDaily + emailDaily;
 }
 
 /** How many fresh leads to pull this run. Never exceeds the ceiling; 0 once the backlog is full. */
 export function computeRunTarget(c: OutreachCapacity, o: RunTargetOpts): number {
   const daily = dailyOutreachCapacity(c);
   if (daily <= 0) {
-    // No channel can send yet — still source a bounded preview so prospects land on the
-    // dashboard/pipeline; outreach waits until a channel connects. Tops up toward the
+    // LinkedIn can't send yet — still source a bounded preview so prospects land on the
+    // dashboard/pipeline; outreach waits until the account connects. Tops up toward the
     // preview cap (never past it) and trickles at most a floor batch per run.
     return Math.max(0, Math.min(o.floor, NO_CHANNEL_PREVIEW_CAP - o.currentBacklog));
   }

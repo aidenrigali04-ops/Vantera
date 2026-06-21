@@ -1,4 +1,4 @@
-import { LINKEDIN_WEEKLY_INVITE_CEILING, IMESSAGE_STEADY_DAILY, dailyAllowance, paceWithJitter } from "./safety-limits";
+import { LINKEDIN_WEEKLY_INVITE_CEILING, dailyAllowance, paceWithJitter } from "./safety-limits";
 import { TRIAL_SEND_CAP, type DispatchableSend, type SendDispatchDeps, type SendDispatchSummary } from "./types";
 
 export const INVITE_EXPIRY_DAYS = 30;
@@ -72,38 +72,6 @@ export async function runSendDispatch(deps: SendDispatchDeps): Promise<SendDispa
       scheduled += 1;
       trialRemaining -= 1;
     };
-
-    // email
-    const emails = active.filter((r) => r.channel === "email");
-    if (emails.length > 0) {
-      if (!emails[0]!.hasSenderAddress) {
-        skipped += emails.length; // rule 11: no physical address, no cold email
-      } else {
-        let capacity = await deps.store.getEmailCapacity(accountId, dayStart);
-        for (const row of emails) {
-          if (capacity <= 0) {
-            skipped += 1;
-            continue;
-          }
-          await schedule(row);
-          capacity -= 1;
-        }
-      }
-    }
-
-    // imessage
-    const ims = active.filter((r) => r.channel === "imessage");
-    if (ims.length > 0) {
-      let budget = IMESSAGE_STEADY_DAILY - (await deps.store.countImessageSentToday(accountId, dayStart));
-      for (const row of ims) {
-        if (budget <= 0) {
-          skipped += 1;
-          continue;
-        }
-        await schedule(row);
-        budget -= 1;
-      }
-    }
 
     // linkedin
     const lis = active.filter((r) => r.channel === "linkedin");

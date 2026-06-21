@@ -21,7 +21,6 @@ export {
   type WebsiteScan,
 } from "./prospect/website-scan";
 export { validateHumanity, describeViolations, type Violation } from "./copy/humanizer";
-export { draftEmail, validateEmailDraft, EMAIL_MAX_WORDS, type EmailDraft } from "./copy/email";
 export {
   draftLinkedIn,
   validateLinkedInDraft,
@@ -31,8 +30,5 @@ export {
 } from "./copy/linkedin";
 export { leadBlock, type CopyLead, type CopyContext, type DraftInput } from "./copy/shared";
 export { classifyReply, preClassify, replyVerdictSchema, type ReplyVerdict } from "./reply/classify";
-export { callBriefSchema, callOutcomeSchema, CALL_OUTCOMES, type CallBriefOutput, type CallOutcome } from "./caller/schema";
-export { draftCallBrief, type CallBrief, type CallBriefRequest } from "./caller/brief";
-export { classifyOutcome, mapProviderDisposition } from "./caller/classify";
 export { adConceptSchema, adConceptBatchSchema, AD_CTAS, type AdConcept } from "./ads/schema";
 export { generateAdConcepts, adContextBlock, type AdConceptInput, type AdConceptResult } from "./ads/generate";

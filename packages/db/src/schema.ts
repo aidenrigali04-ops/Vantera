@@ -349,7 +349,7 @@ export const scheduledSends = pgTable(
     leadId: uuid("lead_id")
       .notNull()
       .references(() => leads.id, { onDelete: "cascade" }),
-    channel: text("channel", { enum: ["email", "linkedin", "call", "imessage"] }).notNull(),
+    channel: text("channel", { enum: ["linkedin"] }).notNull(),
     status: text("status", {
       enum: [
         "drafting",
@@ -500,7 +500,7 @@ export const outreachSends = pgTable(
     scheduledSendId: uuid("scheduled_send_id").references(() => scheduledSends.id, {
       onDelete: "set null",
     }),
-    channel: text("channel", { enum: ["email", "linkedin", "imessage"] }).notNull(),
+    channel: text("channel", { enum: ["linkedin"] }).notNull(),
     mailboxId: uuid("mailbox_id").references(() => mailboxes.id, { onDelete: "set null" }),
     linkedinAccountId: uuid("linkedin_account_id").references(() => linkedinAccounts.id, {
       onDelete: "set null",
@@ -532,7 +532,7 @@ export const replies = pgTable(
     outreachSendId: uuid("outreach_send_id").references(() => outreachSends.id, {
       onDelete: "set null",
     }),
-    channel: text("channel", { enum: ["email", "linkedin", "imessage"] }).notNull(),
+    channel: text("channel", { enum: ["linkedin"] }).notNull(),
     providerMessageRef: text("provider_message_ref"),
     body: text("body"),
     receivedAt: timestamp("received_at", { withTimezone: true }).notNull(),
@@ -589,7 +589,7 @@ export const agents = pgTable(
     accountId: uuid("account_id")
       .notNull()
       .references(() => accounts.id, { onDelete: "cascade" }),
-    kind: text("kind", { enum: ["scout", "copy", "caller", "responder"] }).notNull(),
+    kind: text("kind", { enum: ["scout", "copy"] }).notNull(),
     name: text("name").notNull(),
     status: text("status", { enum: ["draft", "live", "paused"] }).notNull().default("draft"),
     // scout: {prospects_per_run, min_score}; copy: {cta, channels: {linkedin, email}}
@@ -989,7 +989,7 @@ export const sequenceRuns = pgTable(
       .notNull()
       .default("active"),
     currentStage: text("current_stage", {
-      enum: ["linkedin", "email", "imessage", "call", "done"],
+      enum: ["linkedin", "done"],
     })
       .notNull()
       .default("linkedin"),

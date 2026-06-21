@@ -6,9 +6,6 @@ import {
   Check,
   ChevronRight,
   UserPlus,
-  Mail,
-  MessageSquare,
-  Phone,
   Rocket,
   Settings2,
   type LucideIcon,
@@ -29,9 +26,6 @@ export type ActivityItem = {
 
 const STAGE_ICON: Record<SequenceStage, LucideIcon> = {
   linkedin: UserPlus,
-  email: Mail,
-  imessage: MessageSquare,
-  call: Phone,
 };
 
 export function PipelineBoard({
@@ -272,8 +266,8 @@ function EmptyState() {
         </div>
         <h2 className="mt-5 font-heading text-lg font-semibold">Your pipeline is ready to run</h2>
         <p className="mt-2 max-w-sm text-sm text-muted-foreground">
-          Launch a campaign and every qualified lead flows through LinkedIn → Email → iMessage →
-          Caller automatically — pausing the instant someone replies.
+          Launch a campaign and every qualified lead flows through your LinkedIn sequence
+          automatically — pausing the instant someone replies.
         </p>
         <Link
           href="/agents"

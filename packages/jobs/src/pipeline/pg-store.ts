@@ -1,12 +1,10 @@
-import { and, count, desc, eq, gte, inArray, isNull, lt, lte, or, sql } from "drizzle-orm";
-import { encryptSecretWithKeyring, decryptSecretWithKeyring } from "@vantera/email-infra";
+import { and, count, eq, gte, inArray, isNull, lt, lte, or, sql } from "drizzle-orm";
 import {
   accounts,
   adCampaigns,
   agentAssets,
   agentIcps,
   agents,
-  calls,
   campaignLeads,
   campaigns,
   conversionTokens,
@@ -15,18 +13,15 @@ import {
   crmPushEvents,
   enrichmentResults,
   icps,
-  inboundLeads,
   leadNotifications,
   leadSignals,
   leads,
   linkedinAccounts,
-  mailboxes,
   outreachSends,
   replies,
   scheduledSends,
   sequenceRuns,
   suppressionEntries,
-  unsubscribeTokens,
   appSettings,
   webhookEvents,
   type Db,
@@ -42,28 +37,17 @@ import type { ClosedDeal, CrmProvider } from "@vantera/crm-infra";
 import type { CrmPushStore } from "./crm-push";
 import {
   SCOUT_DEFAULTS,
-  type CallBriefStore,
-  type CallDispatchStore,
-  type CallerConfig,
-  type CallerContext,
-  type CallableLead,
   type ConversionStore,
   type CopyConfig,
   type CopyContext,
   type CopyDraftStore,
-  type DispatchableCall,
   type DispatchableSend,
   type DraftableLead,
   type DueSequenceRun,
   type FreshLead,
   type InboundStore,
-  type InboundRespondJobStore,
-  type ResponderConfig,
-  type ResponderContext,
-  RESPONDER_DEFAULTS,
   type AdInboundStore,
   type LeadChannels,
-  type MailboxSmtpStore,
   type NewScheduledSend,
   type OutreachSendStore,
   type PurgeCandidate,
@@ -77,14 +61,9 @@ import {
   type SequenceRunPatch,
   type SequenceStore,
   type SequenceTouchStore,
-  type VoiceInboundStore,
 } from "./types";
-import { EMAIL_STEADY_DAILY_PER_MAILBOX } from "./safety-limits";
-import { parseSenderAddress } from "./email-footer";
 import { normalizeLinkedInUrl } from "./copy-draft";
-import { normalizePhone } from "./call-brief";
 import { resolveSequenceConfig } from "./sequence-config";
-import { assessMailboxHealth } from "./deliverability";
 import type { RefreshLeadLoad, RefreshLeadStore } from "./refresh-lead";
 
 /**
@@ -135,14 +114,13 @@ function toRow(send: NewScheduledSend) {
     status: send.status,
     subject: send.subject,
     body: send.body,
-    brief: send.brief ?? null,
     linkedinStage: send.linkedinStage,
     styleFlags: send.styleFlags,
   };
 }
 
 /** Drizzle-backed store used by the Trigger.dev tasks (service-role DATABASE_URL). */
-export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerStore & RetentionStore & TrialStore & SendDispatchStore & OutreachSendStore & InboundStore & SequenceStore & SequenceTouchStore & ConversionStore & RefreshLeadStore & MailboxSmtpStore {
+export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerStore & RetentionStore & TrialStore & SendDispatchStore & OutreachSendStore & InboundStore & SequenceStore & SequenceTouchStore & ConversionStore & RefreshLeadStore {
   return {
     async getScoutContext(agentId: string): Promise<ScoutContext | null> {
       const [agent] = await db.select().from(agents).where(eq(agents.id, agentId));
@@ -325,11 +303,6 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
     },
 
     async getOutreachCapacity(accountId: string) {
-      const mbx = await db
-        .select({ status: mailboxes.status, dailyCap: mailboxes.dailySendLimit })
-        .from(mailboxes)
-        .where(and(eq(mailboxes.accountId, accountId), inArray(mailboxes.status, ["warming", "active"])));
-
       const [li] = await db
         .select({ connectedAt: linkedinAccounts.connectedAt })
         .from(linkedinAccounts)
@@ -342,7 +315,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         .from(agents)
         .where(and(eq(agents.accountId, accountId), eq(agents.kind, "copy"), eq(agents.status, "live")))
         .limit(1);
-      const channels = (copy?.config as { channels?: { email?: boolean; linkedin?: boolean } } | null)
+      const channels = (copy?.config as { channels?: { linkedin?: boolean } } | null)
         ?.channels;
 
       const now = Date.now();
@@ -352,11 +325,6 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           ? Math.floor((now - li.connectedAt.getTime()) / 86_400_000)
           : null,
         linkedinEnabled: channels?.linkedin ?? Boolean(li),
-        emailEnabled: channels?.email ?? mbx.length > 0,
-        mailboxes: mbx.map((m) => ({
-          phase: m.status === "active" ? ("ready" as const) : ("warming" as const),
-          dailyCap: m.dailyCap ?? 0,
-        })),
       };
     },
 
@@ -378,14 +346,6 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         .select({ id: agents.id })
         .from(agents)
         .where(and(eq(agents.accountId, accountId), eq(agents.kind, "copy"), eq(agents.status, "live")));
-      return agent ?? null;
-    },
-
-    async getLiveCallerAgent(accountId: string) {
-      const [agent] = await db
-        .select({ id: agents.id })
-        .from(agents)
-        .where(and(eq(agents.accountId, accountId), eq(agents.kind, "caller"), eq(agents.status, "live")));
       return agent ?? null;
     },
 
@@ -412,7 +372,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           campaignId: agent.campaignId,
           config: {
             cta: config.cta ?? "a quick look",
-            channels: { linkedin: config.channels?.linkedin ?? false, email: config.channels?.email ?? false },
+            channels: { linkedin: config.channels?.linkedin ?? false },
           },
           sendMode: campaign?.sendMode === "automatic" ? "automatic" : "review",
         },
@@ -624,11 +584,10 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         accountId: r.accountId,
         campaignId: r.campaignId,
         leadId: r.leadId,
-        channel: r.channel as "email" | "linkedin" | "imessage",
+        channel: r.channel as "linkedin",
         linkedinStage: r.linkedinStage as "invite" | "message" | null,
         status: r.status as "approved" | "scheduled",
         accountPaused: r.accountPaused,
-        hasSenderAddress: parseSenderAddress(r.senderAddress) !== null,
         campaignStatus: r.campaignStatus,
         leadInvitedAt: r.leadInvitedAt,
         leadConnectedAt: r.leadConnectedAt,
@@ -642,24 +601,6 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         .from(outreachSends)
         .where(eq(outreachSends.accountId, accountId));
       return row?.n ?? 0;
-    },
-
-    async getEmailCapacity(accountId: string, dayStart: Date): Promise<number> {
-      const boxes = await db
-        .select({ id: mailboxes.id, dailySendLimit: mailboxes.dailySendLimit })
-        .from(mailboxes)
-        .where(and(eq(mailboxes.accountId, accountId), eq(mailboxes.status, "active"))); // warming NEVER counts
-      if (boxes.length === 0) return 0;
-      const sent = await db
-        .select({ mailboxId: outreachSends.mailboxId })
-        .from(outreachSends)
-        .where(and(eq(outreachSends.accountId, accountId), eq(outreachSends.channel, "email"), gte(outreachSends.sentAt, dayStart)));
-      const sentByBox = new Map<string, number>();
-      for (const s of sent) if (s.mailboxId) sentByBox.set(s.mailboxId, (sentByBox.get(s.mailboxId) ?? 0) + 1);
-      return boxes.reduce((sum, b) => {
-        const cap = Math.min(b.dailySendLimit ?? EMAIL_STEADY_DAILY_PER_MAILBOX, EMAIL_STEADY_DAILY_PER_MAILBOX);
-        return sum + Math.max(0, cap - (sentByBox.get(b.id) ?? 0));
-      }, 0);
     },
 
     async getLinkedInAccountAgeDays(accountId: string, now: Date): Promise<number | null> {
@@ -706,20 +647,6 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
       return rows.length;
     },
 
-    async countImessageSentToday(accountId: string, dayStart: Date): Promise<number> {
-      const rows = await db
-        .select({ id: outreachSends.id })
-        .from(outreachSends)
-        .where(
-          and(
-            eq(outreachSends.accountId, accountId),
-            eq(outreachSends.channel, "imessage"),
-            gte(outreachSends.sentAt, dayStart)
-          )
-        );
-      return rows.length;
-    },
-
     async markScheduled(sendId: string, scheduledFor: Date) {
       await db.update(scheduledSends).set({ status: "scheduled", scheduledFor }).where(eq(scheduledSends.id, sendId));
     },
@@ -744,11 +671,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           body: scheduledSends.body,
           campaignStatus: campaigns.status,
           accountPaused: accounts.outreachPaused,
-          senderAddress: accounts.senderAddress,
-          senderName: accounts.senderName,
-          leadEmail: leads.email,
           leadLinkedinUrl: leads.linkedinUrl,
-          leadPhone: leads.phone,
         })
         .from(scheduledSends)
         .innerJoin(accounts, eq(scheduledSends.accountId, accounts.id))
@@ -761,16 +684,14 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         accountId: r.accountId,
         campaignId: r.campaignId,
         leadId: r.leadId,
-        channel: r.channel as "email" | "linkedin" | "imessage",
+        channel: r.channel as "linkedin",
         linkedinStage: r.linkedinStage as "invite" | "message" | null,
         status: r.status,
         subject: r.subject,
         body: r.body,
         campaignStatus: r.campaignStatus,
         accountPaused: r.accountPaused,
-        senderAddress: parseSenderAddress(r.senderAddress),
-        senderName: r.senderName ?? "", // null → empty so the send path strips {{sender_name}} cleanly
-        lead: { email: r.leadEmail, linkedinUrl: r.leadLinkedinUrl, phone: r.leadPhone },
+        lead: { linkedinUrl: r.leadLinkedinUrl },
       };
     },
 
@@ -799,27 +720,6 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
       await db.update(scheduledSends).set({ status: "suppressed" }).where(eq(scheduledSends.id, sendId));
     },
 
-    async pickActiveMailbox(accountId: string) {
-      const boxes = await db
-        .select({ id: mailboxes.id, providerRef: mailboxes.providerRef, status: mailboxes.status })
-        .from(mailboxes)
-        .where(and(eq(mailboxes.accountId, accountId), eq(mailboxes.status, "active")));
-      if (boxes.length === 0) return null;
-      // LRU rotation by last outbound send; 50 recent sends is plenty to order a handful of mailboxes
-      const lastSends = await db
-        .select({ mailboxId: outreachSends.mailboxId, sentAt: outreachSends.sentAt })
-        .from(outreachSends)
-        .where(and(eq(outreachSends.accountId, accountId), eq(outreachSends.channel, "email")))
-        .orderBy(desc(outreachSends.sentAt))
-        .limit(50);
-      const lastByBox = new Map<string, number>();
-      for (const s of lastSends) {
-        if (s.mailboxId && !lastByBox.has(s.mailboxId)) lastByBox.set(s.mailboxId, s.sentAt.getTime());
-      }
-      boxes.sort((a, b) => (lastByBox.get(a.id) ?? 0) - (lastByBox.get(b.id) ?? 0));
-      return boxes[0] ?? null;
-    },
-
     async getActiveLinkedInIdentity(accountId: string) {
       const [acct] = await db
         .select({ id: linkedinAccounts.id, providerRef: linkedinAccounts.providerRef, status: linkedinAccounts.status })
@@ -829,22 +729,12 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
       return acct ?? null;
     },
 
-    async createUnsubscribeToken(accountId: string, leadId: string, email: string) {
-      const [row] = await db
-        .insert(unsubscribeTokens)
-        .values({ accountId, leadId, email })
-        .returning({ token: unsubscribeTokens.token });
-      if (!row) throw new Error("failed to create unsubscribe token");
-      return row.token;
-    },
-
     async recordOutreachSend(rec: {
       accountId: string;
       campaignId: string;
       leadId: string;
       scheduledSendId: string;
-      channel: "email" | "linkedin" | "imessage";
-      mailboxId?: string;
+      channel: "linkedin";
       linkedinAccountId?: string;
       messageRef: string | null;
     }) {
@@ -854,7 +744,6 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         leadId: rec.leadId,
         scheduledSendId: rec.scheduledSendId,
         channel: rec.channel,
-        mailboxId: rec.mailboxId,
         linkedinAccountId: rec.linkedinAccountId,
         messageRef: rec.messageRef,
       });
@@ -865,14 +754,6 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
     },
 
     // ── InboundStore ─────────────────────────────────────────────────────────
-
-    async findMailboxByProviderRef(ref: string) {
-      const [m] = await db
-        .select({ id: mailboxes.id, accountId: mailboxes.accountId })
-        .from(mailboxes)
-        .where(eq(mailboxes.providerRef, ref));
-      return m ?? null;
-    },
 
     async findLinkedInAccountByProviderRef(ref: string) {
       const [a] = await db
@@ -911,21 +792,6 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         });
     },
 
-    async findLeadByEmail(accountId: string, email: string) {
-      // callers pass lowercased addresses; stored emails may be mixed-case
-      const [lead] = await db
-        .select({ id: leads.id })
-        .from(leads)
-        .where(and(eq(leads.accountId, accountId), sql`lower(${leads.email}) = ${email}`));
-      if (!lead) return null;
-      const [cl] = await db
-        .select({ campaignId: campaignLeads.campaignId })
-        .from(campaignLeads)
-        .where(eq(campaignLeads.leadId, lead.id))
-        .limit(1);
-      return { id: lead.id, campaignId: cl?.campaignId ?? null };
-    },
-
     async findLeadByLinkedInUrl(accountId: string, normalizedUrl: string) {
       // linkedin_url is stored as captured; normalize in JS over the account's leads.
       // revisit: normalized linkedin_url column if accounts exceed ~10k leads
@@ -943,45 +809,11 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
       return { id: hit.id, campaignId: cl?.campaignId ?? null };
     },
 
-    async findLeadByPhone(normalizedPhone: string) {
-      // Global lookup — resolves the tenant by finding which account most recently sent an
-      // iMessage to this phone number. The LoopMessage sender is a single global Vantera
-      // number, so the webhook carries no accountId; we disambiguate cross-tenant by recency
-      // of the outbound send (the account that last iMessaged this prospect owns the reply).
-      // Phone is stored as-is; we normalize in JS to match E.164 lower-case w/o spaces.
-      const rows = await db
-        .select({
-          id: leads.id,
-          accountId: leads.accountId,
-          phone: leads.phone,
-          sentAt: outreachSends.sentAt,
-        })
-        .from(leads)
-        .innerJoin(
-          outreachSends,
-          and(
-            eq(outreachSends.leadId, leads.id),
-            eq(outreachSends.accountId, leads.accountId),
-            eq(outreachSends.channel, "imessage")
-          )
-        )
-        .orderBy(desc(outreachSends.sentAt));
-
-      const hit = rows.find((r) => r.phone && normalizePhone(r.phone) === normalizedPhone);
-      if (!hit) return null;
-      const [cl] = await db
-        .select({ campaignId: campaignLeads.campaignId })
-        .from(campaignLeads)
-        .where(eq(campaignLeads.leadId, hit.id))
-        .limit(1);
-      return { id: hit.id, accountId: hit.accountId, campaignId: cl?.campaignId ?? null };
-    },
-
     async insertReply(r: {
       accountId: string;
       leadId: string;
       campaignId: string | null;
-      channel: "email" | "linkedin" | "imessage";
+      channel: "linkedin";
       providerMessageRef: string | null;
       body: string;
       receivedAt: Date;
@@ -1013,46 +845,6 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         .insert(suppressionEntries)
         .values({ accountId, kind, value, source, leadId })
         .onConflictDoNothing();
-    },
-
-    async pauseMailbox(mailboxId: string) {
-      await db.update(mailboxes).set({ status: "paused" }).where(eq(mailboxes.id, mailboxId));
-    },
-
-    async recordMailboxHealthEvent(mailboxId: string, kind: "sent" | "bounce" | "complaint") {
-      // Lifetime rolling counters in mailboxes.health (jsonb). assessMailboxHealth turns them into
-      // a status; a burned mailbox is paused so pickActiveMailbox stops selecting it (WS-C, rule 04).
-      const [mb] = await db
-        .select({ health: mailboxes.health })
-        .from(mailboxes)
-        .where(eq(mailboxes.id, mailboxId))
-        .limit(1);
-      const cur = (mb?.health ?? {}) as { sent?: number; bounces?: number; complaints?: number };
-      const counts = {
-        sent: (cur.sent ?? 0) + (kind === "sent" ? 1 : 0),
-        bounces: (cur.bounces ?? 0) + (kind === "bounce" ? 1 : 0),
-        complaints: (cur.complaints ?? 0) + (kind === "complaint" ? 1 : 0),
-      };
-      const h = assessMailboxHealth(counts);
-      await db
-        .update(mailboxes)
-        .set({
-          health: {
-            ...counts,
-            status: h.status,
-            bounceRate: h.bounceRate,
-            complaintRate: h.complaintRate,
-            updatedAt: new Date().toISOString(),
-          },
-        })
-        .where(eq(mailboxes.id, mailboxId));
-      if (h.status === "burned") {
-        await db.update(mailboxes).set({ status: "paused" }).where(eq(mailboxes.id, mailboxId));
-      }
-    },
-
-    async updateMailboxWarmup(mailboxId: string, status: "warming" | "active", dailyCap: number) {
-      await db.update(mailboxes).set({ status, dailySendLimit: dailyCap }).where(eq(mailboxes.id, mailboxId));
     },
 
     async setLeadConnected(leadId: string, at: Date) {
@@ -1096,14 +888,9 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           status: sequenceRuns.status,
           currentStage: sequenceRuns.currentStage,
           touchesDone: sequenceRuns.touchesDone,
-          callAttempts: sequenceRuns.callAttempts,
           nextActionAt: sequenceRuns.nextActionAt,
           enteredStageAt: sequenceRuns.enteredStageAt,
           linkedinUrl: leads.linkedinUrl,
-          email: leads.email,
-          emailStatus: leads.emailStatus,
-          phone: leads.phone,
-          phoneStatus: leads.phoneStatus,
           sequenceConfig: campaigns.sequenceConfig,
           accountPaused: accounts.outreachPaused,
         })
@@ -1129,16 +916,11 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           status: r.status,
           currentStage: r.currentStage,
           touchesDone: r.touchesDone,
-          callAttempts: r.callAttempts,
           nextActionAt: r.nextActionAt,
           enteredStageAt: r.enteredStageAt,
         },
         channels: {
           linkedinUrl: r.linkedinUrl,
-          email: r.email,
-          emailStatus: r.emailStatus,
-          phone: r.phone,
-          phoneStatus: r.phoneStatus,
         },
         config: resolveSequenceConfig(
           (r.sequenceConfig ?? null) as Parameters<typeof resolveSequenceConfig>[0]
@@ -1152,12 +934,6 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         linkedin: ch.linkedinUrl
           ? await isSuppressedAnyKind(db, accountId, "linkedin", normalizeLinkedInUrl(ch.linkedinUrl))
           : false,
-        email: ch.email
-          ? await isSuppressedAnyKind(db, accountId, "email", ch.email.toLowerCase())
-          : false,
-        phone: ch.phone
-          ? await isSuppressedAnyKind(db, accountId, "phone", normalizePhone(ch.phone))
-          : false,
       };
     },
 
@@ -1166,7 +942,6 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
       if (patch.status !== undefined) set.status = patch.status;
       if (patch.currentStage !== undefined) set.currentStage = patch.currentStage;
       if (patch.touchesDone !== undefined) set.touchesDone = patch.touchesDone;
-      if (patch.callAttempts !== undefined) set.callAttempts = patch.callAttempts;
       if (patch.nextActionAt !== undefined) set.nextActionAt = patch.nextActionAt;
       if (patch.enteredStageAt !== undefined) set.enteredStageAt = patch.enteredStageAt;
       if (patch.lastTouchAt !== undefined) set.lastTouchAt = patch.lastTouchAt;
@@ -1349,54 +1124,6 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
       return rows.length;
     },
 
-    // ── MailboxSmtpStore ───────────────────────────────────────────────────────
-
-    async saveProvisionedMailboxes(accountId, mbxList) {
-      for (const m of mbxList) {
-        await db.insert(mailboxes).values({
-          accountId,
-          emailAddress: m.address,
-          domain: m.domain,
-          providerRef: m.id,
-          status: "warming",
-          smtpSecret: m.smtp ? encryptSecretWithKeyring(m.smtp.password) : null,
-          smtpHost: m.smtp?.host ?? null,
-          smtpPort: m.smtp?.port ?? null,
-          smtpUsername: m.smtp?.username ?? null,
-        });
-      }
-    },
-
-    async getMailboxSmtpCreds(mailboxId) {
-      const [row] = await db
-        .select()
-        .from(mailboxes)
-        .where(eq(mailboxes.id, mailboxId))
-        .limit(1);
-      if (!row?.smtpSecret || !row.smtpHost || !row.smtpPort || !row.smtpUsername) {
-        throw new Error(`mailbox ${mailboxId} has no SMTP credentials`);
-      }
-      return {
-        host: row.smtpHost,
-        port: row.smtpPort,
-        username: row.smtpUsername,
-        password: decryptSecretWithKeyring(row.smtpSecret),
-      };
-    },
-
-    async collectMailboxProviderRefs(accountId) {
-      const rows = await db
-        .select({ providerRef: mailboxes.providerRef, domain: mailboxes.domain })
-        .from(mailboxes)
-        .where(eq(mailboxes.accountId, accountId));
-      return rows
-        .filter((r) => r.providerRef)
-        .map((r) => ({ providerRef: r.providerRef!, domain: r.domain ?? "" }));
-    },
-
-    async purgeMailboxes(accountId) {
-      await db.delete(mailboxes).where(eq(mailboxes.accountId, accountId));
-    },
   };
 }
 
@@ -1411,333 +1138,6 @@ export interface DueScoutAgent {
 export interface SchedulerStore {
   getDueScoutAgents(now: Date): Promise<DueScoutAgent[]>;
   advanceSchedule(agentId: string, nextRunAt: Date): Promise<void>;
-}
-
-// ── CallerConfig helper ───────────────────────────────────────────────────────
-
-function parseCallerConfig(raw: Record<string, unknown>): CallerConfig {
-  const rawVoice = (raw["voice"] ?? {}) as Record<string, unknown>;
-  const rawWindow = (raw["calling_window"] ?? {}) as Record<string, unknown>;
-  return {
-    cta: (raw["cta"] as string) ?? "",
-    bookingLink: (raw["booking_link"] as string) ?? "",
-    voice: {
-      voiceId: (rawVoice["voice_id"] as string) ?? "",
-      personaName: (rawVoice["persona_name"] as string) ?? "",
-      language: (rawVoice["language"] as string) ?? "en-US",
-    },
-    brandVoice: (raw["brand_voice"] as string) || undefined,
-    guardrails: (raw["guardrails"] as string) || undefined,
-    recordingConsentMode: ((raw["recording_consent_mode"] as string) ?? "one_party") as "one_party" | "two_party",
-    callingWindow: {
-      days: (rawWindow["days"] as string[]) ?? ["mon", "tue", "wed", "thu", "fri"],
-      startLocal: (rawWindow["start_local"] as string) ?? "09:00",
-      endLocal: (rawWindow["end_local"] as string) ?? "17:00",
-    },
-    maxAttempts: (raw["max_attempts"] as number) ?? 3,
-  };
-}
-
-// ── CallBriefStore ────────────────────────────────────────────────────────────
-
-export function createCallBriefStore(db: Db): CallBriefStore {
-  return {
-    async getCallerContext(callerAgentId: string): Promise<CallerContext | null> {
-      const [agent] = await db.select().from(agents).where(eq(agents.id, callerAgentId));
-      if (!agent || agent.kind !== "caller") return null;
-      const assets = await db
-        .select({ kind: agentAssets.kind, url: agentAssets.url, filename: agentAssets.filename })
-        .from(agentAssets)
-        .where(eq(agentAssets.agentId, callerAgentId));
-      const [account] = await db.select().from(accounts).where(eq(accounts.id, agent.accountId));
-      if (!account) return null;
-      const config = parseCallerConfig((agent.config ?? {}) as Record<string, unknown>);
-      return {
-        agent: {
-          id: agent.id,
-          accountId: agent.accountId,
-          status: agent.status,
-          campaignId: agent.campaignId,
-          config,
-        },
-        assets,
-        account: {
-          name: account.name,
-          industry: account.onboardingIndustry,
-          websiteScan: account.websiteScan as CallerContext["account"]["websiteScan"],
-        },
-      };
-    },
-
-    async getCallableLeads(accountId: string, leadIds: string[]): Promise<CallableLead[]> {
-      if (leadIds.length === 0) return [];
-      const rows = await db
-        .select()
-        .from(leads)
-        .where(and(eq(leads.accountId, accountId), inArray(leads.id, leadIds)));
-      return rows.map((r) => ({
-        id: r.id,
-        firstName: r.firstName,
-        lastName: r.lastName,
-        title: r.title,
-        companyName: r.companyName,
-        industry: r.industry,
-        phone: r.phone,
-        phoneStatus: r.phoneStatus as "unvalidated" | "valid" | "invalid",
-        aiInsights: r.aiInsights as CallableLead["aiInsights"],
-      }));
-    },
-
-    async isSuppressed(accountId: string, kind: "phone", value: string): Promise<boolean> {
-      const [hit] = await db
-        .select({ id: suppressionEntries.id })
-        .from(suppressionEntries)
-        .where(
-          and(
-            eq(suppressionEntries.accountId, accountId),
-            eq(suppressionEntries.kind, kind),
-            eq(suppressionEntries.value, value)
-          )
-        )
-        .limit(1);
-      return Boolean(hit);
-    },
-
-    async ensureCampaignLead(campaignId: string, leadId: string, accountId: string): Promise<void> {
-      await db
-        .insert(campaignLeads)
-        .values({ campaignId, leadId, accountId })
-        .onConflictDoNothing();
-    },
-
-    async setCampaignLeadStatus(
-      campaignId: string,
-      leadId: string,
-      status: "queued" | "suppressed" | "skipped"
-    ): Promise<void> {
-      await db
-        .update(campaignLeads)
-        .set({ status })
-        .where(and(eq(campaignLeads.campaignId, campaignId), eq(campaignLeads.leadId, leadId)));
-    },
-
-    async insertScheduledSend(send: NewScheduledSend): Promise<void> {
-      await db.insert(scheduledSends).values(toRow(send));
-    },
-
-    async setLeadStatus(leadId: string, status: "in_campaign"): Promise<void> {
-      await db.update(leads).set({ status }).where(eq(leads.id, leadId));
-    },
-  };
-}
-
-// ── CallDispatchStore ─────────────────────────────────────────────────────────
-
-export function createCallDispatchStore(db: Db): CallDispatchStore {
-  return {
-    async getApprovedCalls(): Promise<DispatchableCall[]> {
-      // Load approved call rows joined to their lead and to the caller agent for the account.
-      // leads has no timezone column; leadTimezone is always null (dispatch core falls back to UTC).
-      const rows = await db
-        .select({
-          id: scheduledSends.id,
-          accountId: scheduledSends.accountId,
-          campaignId: scheduledSends.campaignId,
-          leadId: scheduledSends.leadId,
-          brief: scheduledSends.brief,
-          phone: leads.phone,
-          agentConfig: agents.config,
-          agentId: agents.id,
-        })
-        .from(scheduledSends)
-        .innerJoin(leads, eq(scheduledSends.leadId, leads.id))
-        .innerJoin(
-          agents,
-          and(eq(agents.accountId, scheduledSends.accountId), eq(agents.kind, "caller"), eq(agents.status, "live"))
-        )
-        .where(
-          and(eq(scheduledSends.channel, "call"), eq(scheduledSends.status, "approved"))
-        );
-
-      // Count attempts per scheduled send in a second query to avoid a complex lateral join.
-      const sendIds = rows.map((r) => r.id);
-      const attemptCounts =
-        sendIds.length > 0
-          ? await db
-              .select({
-                scheduledSendId: calls.scheduledSendId,
-                n: count(calls.id),
-              })
-              .from(calls)
-              .where(inArray(calls.scheduledSendId, sendIds))
-              .groupBy(calls.scheduledSendId)
-          : [];
-      const attemptsBySend = new Map(attemptCounts.map((r) => [r.scheduledSendId, Number(r.n)]));
-
-      return rows.map((r) => {
-        const config = parseCallerConfig((r.agentConfig ?? {}) as Record<string, unknown>);
-        return {
-          id: r.id,
-          accountId: r.accountId,
-          campaignId: r.campaignId,
-          agentId: r.agentId,
-          leadId: r.leadId,
-          brief: r.brief as DispatchableCall["brief"],
-          phone: r.phone ?? "",
-          config,
-          attemptsSoFar: attemptsBySend.get(r.id) ?? 0,
-          leadTimezone: null, // leads table has no timezone column; dispatch core falls back to UTC
-        };
-      });
-    },
-
-    async isKillSwitchOn(): Promise<boolean> {
-      const [row] = await db.select().from(appSettings).where(eq(appSettings.key, "outreach_kill_switch"));
-      return row?.value === true;
-    },
-
-    async isSuppressed(accountId: string, kind: "phone", value: string): Promise<boolean> {
-      const [hit] = await db
-        .select({ id: suppressionEntries.id })
-        .from(suppressionEntries)
-        .where(
-          and(
-            eq(suppressionEntries.accountId, accountId),
-            eq(suppressionEntries.kind, kind),
-            eq(suppressionEntries.value, value)
-          )
-        )
-        .limit(1);
-      return Boolean(hit);
-    },
-
-    async claimSending(sendId: string): Promise<boolean> {
-      const rows = await db
-        .update(scheduledSends)
-        .set({ status: "sending" })
-        .where(and(eq(scheduledSends.id, sendId), eq(scheduledSends.status, "approved")))
-        .returning({ id: scheduledSends.id });
-      return rows.length > 0;
-    },
-
-    async revertToApproved(sendId: string): Promise<void> {
-      await db.update(scheduledSends).set({ status: "approved", scheduledFor: null }).where(eq(scheduledSends.id, sendId));
-    },
-
-    async markSuppressed(sendId: string): Promise<void> {
-      await db.update(scheduledSends).set({ status: "suppressed" }).where(eq(scheduledSends.id, sendId));
-    },
-
-    async markSendSent(sendId: string): Promise<void> {
-      await db.update(scheduledSends).set({ status: "sent" }).where(eq(scheduledSends.id, sendId));
-    },
-
-    async insertCall(c: {
-      accountId: string;
-      leadId: string;
-      agentId: string;
-      campaignId: string;
-      scheduledSendId: string;
-      providerCallId: string;
-      attemptNo: number;
-    }): Promise<void> {
-      await db.insert(calls).values({
-        accountId: c.accountId,
-        leadId: c.leadId,
-        agentId: c.agentId,
-        campaignId: c.campaignId,
-        scheduledSendId: c.scheduledSendId,
-        providerCallId: c.providerCallId,
-        attemptNo: c.attemptNo,
-        status: "dialing",
-        startedAt: new Date(),
-      });
-    },
-  };
-}
-
-// ── VoiceInboundStore ─────────────────────────────────────────────────────────
-
-export function createVoiceInboundStore(db: Db): VoiceInboundStore {
-  return {
-    async recordWebhookEvent(source: "voice", providerEventId: string, payload: unknown): Promise<boolean> {
-      const rows = await db
-        .insert(webhookEvents)
-        .values({ source, providerEventId, payload: payload as Record<string, unknown> })
-        .onConflictDoNothing()
-        .returning({ id: webhookEvents.id });
-      return rows.length > 0;
-    },
-
-    async findCallByProviderId(
-      providerCallId: string
-    ): Promise<{ id: string; accountId: string; leadId: string; phone: string | null } | null> {
-      const [row] = await db
-        .select({
-          id: calls.id,
-          accountId: calls.accountId,
-          leadId: calls.leadId,
-          phone: leads.phone,
-        })
-        .from(calls)
-        .innerJoin(leads, eq(calls.leadId, leads.id))
-        .where(eq(calls.providerCallId, providerCallId))
-        .limit(1);
-      return row ?? null;
-    },
-
-    async updateCallStarted(callId: string): Promise<void> {
-      await db
-        .update(calls)
-        .set({ status: "in_progress", startedAt: new Date() })
-        .where(eq(calls.id, callId));
-    },
-
-    async updateCallEnded(
-      callId: string,
-      e: {
-        status: string;
-        outcome: import("@vantera/agent-brains").CallOutcome;
-        durationSec: number;
-        recordingUrl: string | null;
-        transcript: string | null;
-      }
-    ): Promise<void> {
-      await db
-        .update(calls)
-        .set({
-          status: e.status as typeof calls.status._.data,
-          outcome: e.outcome as typeof calls.outcome._.data,
-          durationSec: e.durationSec,
-          recordingUrl: e.recordingUrl,
-          transcript: e.transcript,
-          endedAt: new Date(),
-        })
-        .where(eq(calls.id, callId));
-    },
-
-    async addSuppression(
-      accountId: string,
-      kind: "phone",
-      value: string,
-      source: "not_interested",
-      leadId?: string
-    ): Promise<void> {
-      await db
-        .insert(suppressionEntries)
-        .values({ accountId, kind, value, source, leadId })
-        .onConflictDoNothing();
-    },
-
-    async setMeetingBooked(leadId: string): Promise<void> {
-      // First booked call wins — keep the earliest meeting time (isNull guard). Server-only
-      // column (0028); RLS-scoped service writes, never client (the funnel can't be forged).
-      await db
-        .update(leads)
-        .set({ meetingBookedAt: new Date() })
-        .where(and(eq(leads.id, leadId), isNull(leads.meetingBookedAt)));
-    },
-  };
 }
 
 // CRM push (Phase 9). Drizzle impl of the pure-core's injected store interface.
@@ -1832,139 +1232,6 @@ export function createCrmPushStore(db: Db): CrmPushStore {
         .where(and(eq(crmPushEvents.status, "pending"), lte(crmPushEvents.nextRetryAt, now)))
         .limit(limit);
       return rows.map((r) => r.id);
-    },
-  };
-}
-
-// ── InboundRespondJobStore (Phase 12) ───────────────────────────────────────────
-
-function parseResponderConfig(raw: Record<string, unknown>): ResponderConfig & { cta: string } {
-  const sources = (raw.sources ?? {}) as Record<string, unknown>;
-  return {
-    sendMode: raw.sendMode === "auto" ? "auto" : "review",
-    slaMinutes:
-      typeof raw.slaMinutes === "number" && raw.slaMinutes > 0
-        ? raw.slaMinutes
-        : RESPONDER_DEFAULTS.slaMinutes,
-    sources: {
-      formFill: sources.formFill !== false,
-      websiteVisitor: sources.websiteVisitor === true,
-      signal: sources.signal === true,
-    },
-    cta: typeof raw.cta === "string" && raw.cta.trim() ? raw.cta : "a quick look",
-  };
-}
-
-export function createInboundRespondStore(db: Db): InboundRespondJobStore {
-  return {
-    async getResponderContext(agentId: string): Promise<ResponderContext | null> {
-      const [agent] = await db.select().from(agents).where(eq(agents.id, agentId));
-      if (!agent || agent.kind !== "responder") return null;
-      const [account] = await db.select().from(accounts).where(eq(accounts.id, agent.accountId));
-      if (!account) return null;
-      const config = parseResponderConfig((agent.config ?? {}) as Record<string, unknown>);
-      const scan = account.websiteScan as { summary?: string } | null;
-      return {
-        agent: {
-          id: agent.id,
-          accountId: agent.accountId,
-          status: agent.status,
-          campaignId: agent.campaignId,
-          config: { sendMode: config.sendMode, slaMinutes: config.slaMinutes, sources: config.sources },
-        },
-        cta: config.cta,
-        accountName: account.name,
-        accountIndustry: account.onboardingIndustry,
-        valueProp: scan?.summary ?? null,
-      };
-    },
-
-    async recordInbound(e): Promise<string> {
-      const [row] = await db
-        .insert(inboundLeads)
-        .values({
-          accountId: e.accountId,
-          agentId: e.agentId,
-          source: e.source,
-          email: e.email,
-          firstName: e.firstName,
-          companyName: e.companyName,
-          payload: (e.payload ?? {}) as object,
-          status: "received",
-        })
-        .returning({ id: inboundLeads.id });
-      if (!row) throw new Error("inbound_leads insert returned no row");
-      return row.id;
-    },
-
-    async isSuppressed(accountId: string, kind: "email", value: string): Promise<boolean> {
-      const [hit] = await db
-        .select({ id: suppressionEntries.id })
-        .from(suppressionEntries)
-        .where(
-          and(
-            eq(suppressionEntries.accountId, accountId),
-            eq(suppressionEntries.kind, kind),
-            eq(suppressionEntries.value, value)
-          )
-        )
-        .limit(1);
-      return Boolean(hit);
-    },
-
-    async upsertInboundLeadRow(e): Promise<string> {
-      // Match an existing lead by email within the account before creating one.
-      const [existing] = await db
-        .select({ id: leads.id })
-        .from(leads)
-        .where(and(eq(leads.accountId, e.accountId), eq(leads.email, e.email)))
-        .limit(1);
-      if (existing) return existing.id;
-      const [row] = await db
-        .insert(leads)
-        .values({
-          accountId: e.accountId,
-          source: "inbound",
-          email: e.email,
-          firstName: e.firstName,
-          companyName: e.companyName,
-          status: "sourced",
-        })
-        .returning({ id: leads.id });
-      if (!row) throw new Error("inbound lead insert returned no row");
-      return row.id;
-    },
-
-    async saveScore(leadId: string, insights: LeadInsights, qualified: boolean): Promise<void> {
-      await db
-        .update(leads)
-        .set({
-          aiScore: Math.round(insights.score),
-          aiRationale: insights.rationale,
-          aiInsights: toStoredInsights(insights),
-          scoredAt: new Date(),
-          status: qualified ? "qualified" : "rejected",
-        })
-        .where(eq(leads.id, leadId));
-    },
-
-    async ensureCampaignLead(campaignId: string, leadId: string, accountId: string): Promise<void> {
-      await db.insert(campaignLeads).values({ campaignId, leadId, accountId }).onConflictDoNothing();
-    },
-
-    async insertScheduledSend(send: NewScheduledSend): Promise<void> {
-      await db.insert(scheduledSends).values(toRow(send));
-    },
-
-    async finalizeInbound(inboundId, e): Promise<void> {
-      await db
-        .update(inboundLeads)
-        .set({
-          status: e.status,
-          ...(e.leadId ? { leadId: e.leadId } : {}),
-          ...(e.respondedAt ? { respondedAt: e.respondedAt } : {}),
-        })
-        .where(eq(inboundLeads.id, inboundId));
     },
   };
 }

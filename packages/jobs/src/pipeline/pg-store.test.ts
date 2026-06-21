@@ -117,12 +117,3 @@ describe("saveEnrichment with no persistable fields", () => {
   });
 });
 
-describe("createPgStore: mailbox SMTP store surface", () => {
-  const store = createPgStore(undefined as unknown as Db);
-
-  it("exposes the MailboxSmtpStore methods", () => {
-    expect(typeof store.saveProvisionedMailboxes).toBe("function");
-    expect(typeof store.getMailboxSmtpCreds).toBe("function");
-    expect(typeof store.collectMailboxProviderRefs).toBe("function");
-  });
-});

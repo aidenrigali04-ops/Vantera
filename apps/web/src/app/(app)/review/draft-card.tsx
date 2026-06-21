@@ -1,11 +1,10 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { AlertTriangle, Mail, MessageSquare } from "lucide-react";
+import { AlertTriangle, MessageSquare } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { LeadProfileLink, type LeadProfile } from "@/components/lead-profile";
 import { approveDraft, declineDraft, declineAndSuppress, saveDraftEdit } from "./actions";
@@ -74,9 +73,6 @@ export function DraftCard({ draft, compact = false }: { draft: DraftRow; compact
         >
           <input type="hidden" name="sendId" value={draft.id} />
           <input type="hidden" name="channel" value={draft.channel} />
-          {draft.channel === "email" && (
-            <Input name="subject" defaultValue={draft.subject ?? ""} placeholder="Subject" />
-          )}
           <Textarea name="body" defaultValue={draft.body} rows={6} />
           <div className="flex gap-2">
             <Button type="submit" size="sm" disabled={saving}>
@@ -155,8 +151,8 @@ export function DraftCard({ draft, compact = false }: { draft: DraftRow; compact
         </div>
         <div className="flex items-center gap-1.5">
           <Badge variant="outline" className="gap-1">
-            {draft.channel === "email" ? <Mail className="size-3" /> : <MessageSquare className="size-3" />}
-            {draft.channel === "email" ? "Email" : "LinkedIn"}
+            <MessageSquare className="size-3" />
+            LinkedIn
           </Badge>
           {stageLabel && <Badge variant="secondary">{stageLabel}</Badge>}
         </div>

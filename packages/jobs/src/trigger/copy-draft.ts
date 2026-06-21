@@ -1,6 +1,6 @@
 import { logger, task } from "@trigger.dev/sdk";
 import { createDb } from "@vantera/db";
-import { draftEmail, draftLinkedIn } from "@vantera/agent-brains";
+import { draftLinkedIn } from "@vantera/agent-brains";
 import { runCopyDraft } from "../pipeline/copy-draft";
 import { createPgStore } from "../pipeline/pg-store";
 import type { CopyDraftPayload } from "../pipeline/types";
@@ -16,7 +16,6 @@ export const copyDraft = task({
     const store = createPgStore(createDb());
     const summary = await runCopyDraft(payload, {
       store,
-      draftEmailFn: (input) => draftEmail(input),
       draftLinkedInFn: (input) => draftLinkedIn(input),
     });
     logger.info("copy draft finished", { ...summary, copyAgentId: payload.copyAgentId });

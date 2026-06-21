@@ -3,14 +3,14 @@ export interface WebhookHandlerDeps {
   /** providerEventId via the infra adapter's parseEventWebhook; null = not an event we know */
   extractEventId: (payload: unknown) => string | null;
   /** insert into webhook_events; false = duplicate provider_event_id */
-  recordEvent: (source: "email" | "linkedin" | "imessage", providerEventId: string, payload: unknown) => Promise<boolean>;
-  enqueue: (payload: { source: "email" | "linkedin" | "imessage"; payload: unknown }) => Promise<void>;
+  recordEvent: (source: "linkedin", providerEventId: string, payload: unknown) => Promise<boolean>;
+  enqueue: (payload: { source: "linkedin"; payload: unknown }) => Promise<void>;
   /** Optional: invoked when signature verification fails (security auditing). Best-effort. */
   onUnverified?: () => Promise<void> | void;
 }
 
 export async function handleInboundWebhook(
-  source: "email" | "linkedin" | "imessage",
+  source: "linkedin",
   headers: Record<string, string>,
   rawBody: string,
   deps: WebhookHandlerDeps

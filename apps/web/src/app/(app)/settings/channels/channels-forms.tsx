@@ -2,204 +2,13 @@
 
 import { useActionState, useTransition, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { FormError } from "@/components/form-error";
 import {
-  saveSenderAddress,
-  saveSenderName,
   toggleSendingPause,
-  provisionEmailSending,
   createLinkedInConnectLink,
   refreshLinkedInAccounts,
   type ChannelActionState,
 } from "./actions";
-
-// ── Sender address form ───────────────────────────────────────────────────────
-
-interface SenderAddressFormProps {
-  defaultValues: {
-    line1: string;
-    line2: string;
-    city: string;
-    region: string;
-    postal: string;
-    country: string;
-  };
-}
-
-export function SenderAddressForm({ defaultValues }: SenderAddressFormProps) {
-  const [state, action, pending] = useActionState<ChannelActionState, FormData>(
-    saveSenderAddress,
-    {}
-  );
-
-  return (
-    <form action={action} className="space-y-3" data-copilot="channels-setup">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div className="space-y-1 sm:col-span-2">
-          <Label htmlFor="line1">Street address or PO box</Label>
-          <Input
-            id="line1"
-            name="line1"
-            defaultValue={defaultValues.line1}
-            placeholder="100 Main St or PO Box 100"
-            required
-          />
-        </div>
-        <div className="space-y-1 sm:col-span-2">
-          <Label htmlFor="line2">Apartment / suite (optional)</Label>
-          <Input
-            id="line2"
-            name="line2"
-            defaultValue={defaultValues.line2}
-            placeholder="Suite 200"
-          />
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="city">City</Label>
-          <Input
-            id="city"
-            name="city"
-            defaultValue={defaultValues.city}
-            placeholder="Austin"
-            required
-          />
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="region">State / region (optional)</Label>
-          <Input
-            id="region"
-            name="region"
-            defaultValue={defaultValues.region}
-            placeholder="TX"
-          />
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="postal">ZIP / postal code</Label>
-          <Input
-            id="postal"
-            name="postal"
-            defaultValue={defaultValues.postal}
-            placeholder="78701"
-            required
-          />
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="country">Country</Label>
-          <Input
-            id="country"
-            name="country"
-            defaultValue={defaultValues.country}
-            placeholder="USA"
-            required
-          />
-        </div>
-      </div>
-      <div className="flex items-center gap-3">
-        <Button type="submit" disabled={pending}>
-          {pending ? "Saving…" : "Save address"}
-        </Button>
-        {state.success && (
-          <p className="text-sm text-muted-foreground">{state.success}</p>
-        )}
-      </div>
-      <FormError message={state.error} />
-    </form>
-  );
-}
-
-// ── Sender name form ──────────────────────────────────────────────────────────
-
-interface SenderNameFormProps {
-  defaultValue: string;
-}
-
-export function SenderNameForm({ defaultValue }: SenderNameFormProps) {
-  const [state, action, pending] = useActionState<ChannelActionState, FormData>(
-    saveSenderName,
-    {}
-  );
-
-  return (
-    <form action={action} className="space-y-3">
-      <div className="space-y-1">
-        <Label htmlFor="sender_name">Sender name</Label>
-        <p className="text-sm text-muted-foreground">
-          The name your cold emails are signed with (e.g. your first name). Leave blank to omit the sign-off name.
-        </p>
-        <Input
-          id="sender_name"
-          name="sender_name"
-          defaultValue={defaultValue}
-          placeholder="Alex"
-        />
-      </div>
-      <div className="flex items-center gap-3">
-        <Button type="submit" disabled={pending}>
-          {pending ? "Saving…" : "Save"}
-        </Button>
-        {state.success && (
-          <p className="text-sm text-muted-foreground">{state.success}</p>
-        )}
-      </div>
-      <FormError message={state.error} />
-    </form>
-  );
-}
-
-// ── Email provisioning form ───────────────────────────────────────────────────
-
-export function ProvisionEmailForm() {
-  const [state, action, pending] = useActionState<ChannelActionState, FormData>(
-    provisionEmailSending,
-    {}
-  );
-
-  return (
-    <form action={action} className="space-y-3">
-      <p className="text-sm text-muted-foreground">
-        We&apos;ll provision dedicated sending domains and mailboxes for your workspace. New mailboxes
-        spend a few weeks warming up before they&apos;re ready to send.
-      </p>
-      <div className="flex flex-wrap gap-4">
-        <div className="space-y-1">
-          <Label htmlFor="domainCount">Sending domains (1–2)</Label>
-          <Input
-            id="domainCount"
-            name="domainCount"
-            type="number"
-            min={1}
-            max={2}
-            defaultValue={1}
-            className="w-24"
-          />
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="mailboxesPerDomain">Mailboxes per domain (1–3)</Label>
-          <Input
-            id="mailboxesPerDomain"
-            name="mailboxesPerDomain"
-            type="number"
-            min={1}
-            max={3}
-            defaultValue={1}
-            className="w-24"
-          />
-        </div>
-      </div>
-      <div className="flex items-center gap-3">
-        <Button type="submit" disabled={pending}>
-          {pending ? "Setting up…" : "Set up email sending"}
-        </Button>
-        {state.success && (
-          <p className="text-sm text-muted-foreground">{state.success}</p>
-        )}
-      </div>
-      <FormError message={state.error} />
-    </form>
-  );
-}
 
 // ── Pause all sending toggle ──────────────────────────────────────────────────
 
@@ -216,7 +25,7 @@ export function PauseSendingForm({ outreachPaused }: PauseSendingFormProps) {
   return (
     <form action={action} className="space-y-3">
       <p className="text-sm text-muted-foreground">
-        Stops every outbound email and LinkedIn action for this workspace until resumed.
+        Stops every outbound LinkedIn action for this workspace until resumed.
       </p>
       <p className="text-sm">
         Status:{" "}

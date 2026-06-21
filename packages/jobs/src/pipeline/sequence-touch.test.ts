@@ -34,8 +34,8 @@ function deps(
       stopSequenceRun: vi.fn(async (runId: string) => { stoppedRunIds.push(runId); }),
       ...over,
     },
-    draftEmailFn: async () => ({ subject: "Hi", body: "hello", styleFlags: null } as never),
-    draftLinkedInFn: async () => ({ body: "hey there", styleFlags: null } as never),
+    draftLinkedInFn: async () =>
+      ({ connectionNote: "hey there", followupMessage: "f", violations: [] } as never),
     now: () => NOW,
     refreshLead: async (_accountId, leadId) => {
       refreshedLeadIds.push(leadId);
@@ -49,21 +49,21 @@ const dispatch: SequenceTouchDispatch = {
   accountId: "a1",
   campaignId: "c1",
   leadId: "l1",
-  stage: "imessage",
+  stage: "linkedin",
   touchNo: 1,
 };
 
 describe("runSequenceTouch", () => {
-  it("drafts an iMessage touch via the short-form drafter and records channel imessage", async () => {
+  it("drafts a LinkedIn message touch and records channel linkedin", async () => {
     const d = deps();
     const out = await runSequenceTouch(dispatch, d);
     expect(out).toBe("drafted");
     expect(d.store.insertScheduledSend).toHaveBeenCalledWith(
-      expect.objectContaining({ channel: "imessage" })
+      expect.objectContaining({ channel: "linkedin", linkedinStage: "message" })
     );
   });
 
-  it("never drafts when the channel value is suppressed", async () => {
+  it("never drafts when the LinkedIn profile is suppressed", async () => {
     const insert = vi.fn(async () => {});
     const d = deps({ isSuppressed: async () => true, insertScheduledSend: insert });
     const out = await runSequenceTouch(dispatch, d);
@@ -71,85 +71,53 @@ describe("runSequenceTouch", () => {
     expect(insert).not.toHaveBeenCalled();
   });
 
-  it("skips when the lead has no value for the channel", async () => {
-    const d = deps({ getDraftableLead: async () => ({ ...lead, email: null }) });
-    const out = await runSequenceTouch({ ...dispatch, stage: "email" }, d);
+  it("skips when the lead has no LinkedIn URL", async () => {
+    const d = deps({ getDraftableLead: async () => ({ ...lead, linkedinUrl: null }) });
+    const out = await runSequenceTouch(dispatch, d);
     expect(out).toBe("skipped");
   });
 });
 
-describe("runSequenceTouch — refresh-on-release (email-only)", () => {
-  // scoredAt ~45 days before NOW
-  const agedScoredAt = new Date("2026-05-01T00:00:00Z");
-  // scoredAt ~2 days before NOW
-  const freshScoredAt = new Date("2026-06-13T00:00:00Z");
+describe("runSequenceTouch — refresh-on-release", () => {
+  const agedScoredAt = new Date("2026-05-01T00:00:00Z"); // ~45 days before NOW
+  const freshScoredAt = new Date("2026-06-13T00:00:00Z"); // ~2 days before NOW
 
-  const emailDispatch: SequenceTouchDispatch = {
-    ...dispatch,
-    stage: "email",
-  };
-  const linkedinDispatch: SequenceTouchDispatch = {
-    ...dispatch,
-    stage: "linkedin",
-  };
-
-  it("calls refreshLead for an aged email lead and drafts when refresh returns ok — does not stop the run", async () => {
+  it("calls refreshLead for an aged lead and drafts when refresh returns ok — does not stop the run", async () => {
     const insert = vi.fn(async () => {});
     const refreshedLeadIds: string[] = [];
     const d = deps(
-      {
-        getDraftableLead: async () => ({ ...lead, scoredAt: agedScoredAt }),
-        insertScheduledSend: insert,
-      },
+      { getDraftableLead: async () => ({ ...lead, scoredAt: agedScoredAt }), insertScheduledSend: insert },
       "ok",
       refreshedLeadIds
     );
-    const out = await runSequenceTouch(emailDispatch, d);
+    const out = await runSequenceTouch(dispatch, d);
     expect(refreshedLeadIds).toContain("l1");
     expect(out).toBe("drafted");
     expect(d.stoppedRunIds).toHaveLength(0);
   });
 
-  it("returns 'dropped' for an aged email lead when refresh returns dropped — stops the run, no draft, no suppression write", async () => {
+  it("returns 'dropped' for an aged lead when refresh returns dropped — stops the run, no draft", async () => {
     const insert = vi.fn(async () => {});
-    const suppressionStore = vi.fn(async () => false);
     const refreshedLeadIds: string[] = [];
     const d = deps(
-      {
-        getDraftableLead: async () => ({ ...lead, scoredAt: agedScoredAt }),
-        insertScheduledSend: insert,
-        isSuppressed: suppressionStore,
-      },
+      { getDraftableLead: async () => ({ ...lead, scoredAt: agedScoredAt }), insertScheduledSend: insert },
       "dropped",
       refreshedLeadIds
     );
-    const out = await runSequenceTouch(emailDispatch, d);
+    const out = await runSequenceTouch(dispatch, d);
     expect(out).toBe("dropped");
     expect(insert).not.toHaveBeenCalled();
-    // suppression was checked (the check runs before refresh), but the suppression STORE is
-    // never written — isSuppressed only reads; no write path exists in SequenceTouchStore
-    expect(d.stoppedRunIds).toContain(emailDispatch.runId);
+    expect(d.stoppedRunIds).toContain(dispatch.runId);
   });
 
-  it("does NOT call refreshLead for a fresh email lead", async () => {
+  it("does NOT call refreshLead for a fresh lead", async () => {
     const refreshedLeadIds: string[] = [];
     const d = deps(
       { getDraftableLead: async () => ({ ...lead, scoredAt: freshScoredAt }) },
       "ok",
       refreshedLeadIds
     );
-    await runSequenceTouch(emailDispatch, d);
-    expect(refreshedLeadIds).toHaveLength(0);
-  });
-
-  it("does NOT call refreshLead for an aged LinkedIn lead (refresh is email-only)", async () => {
-    const refreshedLeadIds: string[] = [];
-    const d = deps(
-      { getDraftableLead: async () => ({ ...lead, scoredAt: agedScoredAt }) },
-      "ok",
-      refreshedLeadIds
-    );
-    await runSequenceTouch(linkedinDispatch, d);
+    await runSequenceTouch(dispatch, d);
     expect(refreshedLeadIds).toHaveLength(0);
   });
 });

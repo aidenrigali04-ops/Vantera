@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 
-export type ShowcaseKind = "scout" | "copy" | "caller" | "responder";
+export type ShowcaseKind = "scout" | "copy";
 
 export type ShowcaseStat = { label: string; value: number };
 
@@ -42,25 +42,6 @@ type AgentDbRow = {
   agent_icps: { position: number; icps: { name: string } | null }[];
 };
 
-function callerSummary(status: string, personaName: string | null): string {
-  const caller = personaName ? personaName : "Your Caller Agent";
-  if (status === "live")
-    return `${caller} calls every qualified lead, books them in directly, and leaves no lead untouched — every call waits in your review queue.`;
-  if (status === "paused")
-    return `Paused. Resume and ${caller} goes right back to calling qualified leads on your schedule.`;
-  return `Not deployed yet. Deploy it and every qualified lead gets a personalised call.`;
-}
-
-function responderSummary(status: string, sendMode: "auto" | "review"): string {
-  if (status === "live")
-    return sendMode === "auto"
-      ? "Answering qualified inbound leads in minutes — clean replies send automatically, anything flagged waits in your review queue."
-      : "Answering qualified inbound leads in minutes — every reply waits in your review queue until you approve it.";
-  if (status === "paused")
-    return "Paused. Resume and inbound leads get qualified and answered the moment they arrive again.";
-  return "Not deployed yet. Deploy it and every inbound lead gets qualified and answered fast.";
-}
-
 function icpPhrase(names: string[]): string {
   if (names.length === 0) return "your ideal customers";
   if (names.length === 1) return names[0];
@@ -69,10 +50,7 @@ function icpPhrase(names: string[]): string {
 }
 
 function channelPhrase(channels: string[]): string {
-  const pretty = channels.map((c) => (c === "linkedin" ? "LinkedIn" : "email"));
-  if (pretty.length === 0) return "your channels";
-  if (pretty.length === 1) return pretty[0];
-  return `${pretty[0]} and ${pretty[1]}`;
+  return channels.length > 0 ? "LinkedIn" : "your channels";
 }
 
 function scoutSummary(status: string, names: string[], cadence: string | null): string {
@@ -139,63 +117,6 @@ function toShowcaseAgent(
     };
   }
 
-  if (row.kind === "caller") {
-    const personaName =
-      typeof (config as { voice?: { persona_name?: unknown } }).voice?.persona_name === "string"
-        ? (config as { voice: { persona_name: string } }).voice.persona_name
-        : null;
-    const cta =
-      typeof (config as { cta?: unknown }).cta === "string"
-        ? (config as { cta: string }).cta
-        : null;
-
-    return {
-      id: row.id,
-      kind: "caller",
-      roleLabel: "Caller Agent",
-      name: row.name,
-      status: row.status,
-      summary: callerSummary(row.status, personaName),
-      icpNames,
-      cadence: null,
-      timezone: row.timezone,
-      nextRunAt: null,
-      lastRunAt: row.last_run_at,
-      deployedAt: row.deployed_at,
-      cta,
-      channels: ["phone"],
-      sendMode: "review",
-      campaignId: row.campaign_id,
-      stats: [{ label: "Calls in review", value: counts.drafts }],
-      progress: null,
-    };
-  }
-
-  if (row.kind === "responder") {
-    const sendMode = (config as { sendMode?: unknown }).sendMode === "auto" ? "auto" : "review";
-    const cta = typeof (config as { cta?: unknown }).cta === "string" ? (config as { cta: string }).cta : null;
-    return {
-      id: row.id,
-      kind: "responder",
-      roleLabel: "Responder Agent",
-      name: row.name,
-      status: row.status,
-      summary: responderSummary(row.status, sendMode),
-      icpNames,
-      cadence: null,
-      timezone: row.timezone,
-      nextRunAt: null,
-      lastRunAt: row.last_run_at,
-      deployedAt: row.deployed_at,
-      cta,
-      channels: ["email"],
-      sendMode: sendMode === "auto" ? "automatic" : "review",
-      campaignId: row.campaign_id,
-      stats: [{ label: "Inbound handled", value: counts.drafts }],
-      progress: null,
-    };
-  }
-
   const channels = Array.isArray((config as { channels?: unknown }).channels)
     ? ((config as { channels: string[] }).channels)
     : Object.entries((config as { channels?: Record<string, boolean> }).channels ?? {})
@@ -220,10 +141,7 @@ function toShowcaseAgent(
     channels,
     sendMode: row.campaigns?.send_mode ?? "review",
     campaignId: row.campaign_id,
-    stats: [
-      { label: "Drafts in review", value: counts.drafts },
-      { label: "Channels live", value: channels.length },
-    ],
+    stats: [{ label: "Drafts in review", value: counts.drafts }],
     progress: null,
   };
 }

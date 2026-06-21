@@ -19,8 +19,8 @@ export interface TransactionalSendResult {
  * an implementation detail behind this interface and its name never leaks out.
  *
  * Scope: auth + product notifications ONLY (team invites, account alerts).
- * Cold outreach is a different concern and goes through @vantera/email-infra,
- * which carries suppression, warmup, and unsubscribe obligations this does not.
+ * This is never cold outreach — outreach is LinkedIn-only (rule 04) and carries
+ * suppression and compliance obligations this transactional path does not.
  */
 export interface TransactionalEmail {
   send(message: TransactionalMessage): Promise<TransactionalSendResult>;

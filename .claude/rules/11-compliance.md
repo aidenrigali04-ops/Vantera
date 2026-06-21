@@ -1,5 +1,7 @@
 # Outreach compliance & data protection (locked 2026-06-11)
 
+> **LinkedIn-only rescope (2026-06-20).** Outreach is LinkedIn-only, so the **Email (CAN-SPAM/GDPR/PECR)** section below is dormant (no cold email is sent; unsubscribe-link/physical-address obligations no longer apply to live sends). The **suppression list stays the master gate** and stays permissive — it's a write-only compliance ledger that still records email/phone entries from history and from Meta Ads. The **LinkedIn safety limits** (ramp, ~100 invites/week ceiling, randomized pacing, non-configurable below thresholds) now also govern any LinkedIn *read* volume the Intent Agent introduces (rule 04). GDPR deletion + audit-trail requirements are unchanged.
+
 Compliance is built in from day one — suppression, unsubscribe, deletion, and audit are product requirements, not retrofits. Cold outreach has real legal surface (CAN-SPAM, GDPR/PECR, LinkedIn ToS); Vantera sends on customers' behalf, so a violation is a customer-trust violation.
 
 ## Suppression list (the master gate)

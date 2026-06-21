@@ -7,22 +7,15 @@ describe("shapePipeline", () => {
       runs: [
         { current_stage: "linkedin", status: "active" },
         { current_stage: "linkedin", status: "active" },
-        { current_stage: "email", status: "active" },
-        { current_stage: "call", status: "active" },
-        { current_stage: "email", status: "paused_reply" },
+        { current_stage: "linkedin", status: "paused_reply" },
         { current_stage: "done", status: "converted" },
       ],
       convertedClients: 1,
       avgDealValueCents: 500_000, // $5,000
       revenueGoalCents: 2_000_000, // $20,000/mo
     });
-    expect(vm.stages).toEqual([
-      { stage: "linkedin", label: "LinkedIn", count: 2 },
-      { stage: "email", label: "Email", count: 1 },
-      { stage: "imessage", label: "iMessage", count: 0 },
-      { stage: "call", label: "Caller", count: 1 },
-    ]);
-    expect(vm.activeTotal).toBe(4);
+    expect(vm.stages).toEqual([{ stage: "linkedin", label: "LinkedIn", count: 2 }]);
+    expect(vm.activeTotal).toBe(2);
     expect(vm.pausedTotal).toBe(1);
     expect(vm.pipelineValueCents).toBe(500_000);
     expect(vm.goalProgressPct).toBe(25);

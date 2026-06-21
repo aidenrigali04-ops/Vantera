@@ -11,7 +11,6 @@ import { LEAD_PROFILE_FIELDS } from "@/components/lead-profile-fields";
 import type { LeadProfile } from "@/components/lead-profile";
 import { DashboardView, type AgentRow, type ReplyRow } from "./dashboard-view";
 import type { Prospect } from "./prospect-panel";
-import { getWarmupStatus } from "@/lib/warmup-status";
 import { ResultsTabsBar, resolveView } from "./results-tabs";
 import { AnalyticsSection } from "../analytics/analytics-section";
 import { PipelineSection } from "../pipeline/pipeline-section";
@@ -96,7 +95,7 @@ type AgentRowRaw = {
 
 type ReplyRowRaw = {
   id: string;
-  channel: "email" | "linkedin";
+  channel: "linkedin";
   body: string | null;
   received_at: string;
   lead_id: string;
@@ -128,7 +127,6 @@ async function OverviewTab() {
     draftsRes,
     interestedRes,
     { data: recentReplies },
-    { data: mailboxes },
     { data: linkedinAccounts },
     { data: weekSends },
     repliesWeekRes,
@@ -162,7 +160,6 @@ async function OverviewTab() {
       .order("received_at", { ascending: false })
       .limit(4)
       .returns<ReplyRowRaw[]>(),
-    supabase.from("mailboxes").select("status"),
     supabase.from("linkedin_accounts").select("status"),
     supabase.from("outreach_sends").select("channel").gte("sent_at", weekAgo),
     supabase
@@ -218,7 +215,6 @@ async function OverviewTab() {
 
   const agentRowsRaw = agents ?? [];
   const scout = agentRowsRaw.find((a) => a.kind === "scout") ?? null;
-  const responder = agentRowsRaw.find((a) => a.kind === "responder") ?? null;
   const liveAgents = agentRowsRaw.filter((a) => a.status === "live");
   // Map to the view's shape with server-formatted labels (no client Date.now()).
   const agentRows: AgentRow[] = agentRowsRaw.map((a) => ({
@@ -239,25 +235,17 @@ async function OverviewTab() {
   const goal = account.revenue_goal_cents ? usd.format(account.revenue_goal_cents / 100) : null;
   const firstName = user?.email?.split("@")[0] ?? "there";
 
-  // Channel readiness — can the pipeline actually send?
-  const mbActive = (mailboxes ?? []).filter((m) => m.status === "active").length;
-  const mbWarming = (mailboxes ?? []).filter((m) => m.status === "warming").length;
-  const mbTotal = (mailboxes ?? []).length;
+  // Channel readiness — is LinkedIn connected? (the only channel, the activation gate)
   const liStatus = (linkedinAccounts ?? [])[0]?.status ?? null;
 
   // This week's momentum
   const sendsWeek = (weekSends ?? []).length;
-  const emailWeek = (weekSends ?? []).filter((s) => s.channel === "email").length;
   const liWeek = (weekSends ?? []).filter((s) => s.channel === "linkedin").length;
   const repliesWeek = repliesWeekRes.count ?? 0;
 
   // State machine: an activation ramp before the first agent is live with no leads
   // yet; the working dashboard once either condition is met.
   const isNew = liveAgents.length === 0 && total === 0;
-
-  // Warmup status — uses the same RLS-scoped client (rule 02: never the service client
-  // here; accountId reinforces the filter but RLS is the primary gate).
-  const warmup = await getWarmupStatus(supabase, account.id);
 
   // Pipeline pulse — leads moving through the outreach sequence (sequence_runs),
   // a compact mirror of the full /pipeline board.
@@ -295,32 +283,6 @@ async function OverviewTab() {
 
   // The full live-pipeline funnel moved to the Pipeline tab (its dedicated home); the Overview
   // keeps only the compact pipeline pulse (built from `pipeline` above).
-
-  // Fast inbound response — the market's defensible "what works" use case. Real inbound_leads
-  // counts + the median intake→response latency (the SLA the Responder is keeping). Loss-aversion
-  // nudge when a Scout is live but no Responder answers inbound yet.
-  const { data: inboundRows } = await supabase
-    .from("inbound_leads")
-    .select("status, received_at, responded_at")
-    .returns<{ status: string; received_at: string | null; responded_at: string | null }[]>();
-  const inbound = inboundRows ?? [];
-  const respondedLatencies = inbound
-    .filter((r) => r.responded_at && r.received_at)
-    .map((r) => (new Date(r.responded_at!).getTime() - new Date(r.received_at!).getTime()) / 60_000)
-    .filter((m) => m >= 0)
-    .sort((a, b) => a - b);
-  const medianInboundMins =
-    respondedLatencies.length > 0
-      ? Math.round(respondedLatencies[Math.floor((respondedLatencies.length - 1) / 2)]!)
-      : null;
-  const fastInbound = {
-    deployed: Boolean(responder),
-    live: responder?.status === "live",
-    handled: inbound.filter((r) => r.status === "responded" || r.status === "review").length,
-    responded: inbound.filter((r) => r.status === "responded").length,
-    medianMins: medianInboundMins,
-    scoutLive: scout?.status === "live",
-  };
 
   // Just-in-time CRM nudge: a deal has closed but nothing is routing wins out yet.
   // Peak-end moment — surface it here rather than as pre-aha onboarding friction.
@@ -389,15 +351,13 @@ async function OverviewTab() {
       pipeline={pipeline}
       cold={cold}
       today={today}
-      fastInbound={fastInbound}
       revenuePace={revenuePace}
       conversionWin={conversionWin}
       prospects={prospects ?? []}
       recentReplies={replyRows}
       interested={interested}
-      channels={{ mbActive, mbWarming, mbTotal, liStatus }}
-      week={{ sends: sendsWeek, email: emailWeek, li: liWeek, replies: repliesWeek }}
-      warmup={warmup}
+      channels={{ liStatus }}
+      week={{ sends: sendsWeek, li: liWeek, replies: repliesWeek }}
       attribution={signalAttribution}
     />
   );

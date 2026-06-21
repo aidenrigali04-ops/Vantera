@@ -83,26 +83,6 @@ export async function runCopyDraft(
     let leadDrafted = 0;
     let leadSuppressed = 0;
 
-    if (channels.email && lead.email) {
-      if (await deps.store.isSuppressed(accountId, "email", lead.email.toLowerCase())) {
-        leadSuppressed += 1;
-      } else {
-        const draft = await deps.draftEmailFn(input);
-        await deps.store.insertScheduledSend({
-          accountId,
-          campaignId,
-          leadId: lead.id,
-          channel: "email",
-          subject: draft.subject,
-          body: draft.body,
-          status: draftStatus(ctx.agent.sendMode, draft.violations),
-          linkedinStage: null,
-          styleFlags: draft.violations.length > 0 ? describeViolations(draft.violations) : null,
-        });
-        leadDrafted += 1;
-      }
-    }
-
     if (channels.linkedin && lead.linkedinUrl) {
       if (
         await deps.store.isSuppressed(accountId, "linkedin", normalizeLinkedInUrl(lead.linkedinUrl))

@@ -5,10 +5,6 @@ import type {
   ProspectDataSource,
 } from "@vantera/prospect-data";
 import type {
-  CallBrief,
-  CallBriefRequest,
-  CallOutcome,
-  EmailDraft,
   LeadInsights,
   LinkedInDraft,
   DraftInput,
@@ -19,12 +15,8 @@ import type {
   StoredInsights,
   WebsiteScan,
 } from "@vantera/agent-brains";
-import type { VoiceInfra } from "@vantera/voice-infra";
-import type { SenderAddress } from "./email-footer";
 import type { OutreachCapacity } from "./capacity";
-import type { EmailInfra, ProvisionedMailbox, SmtpCredentials } from "@vantera/email-infra";
 import type { LinkedInInfra } from "@vantera/linkedin-infra";
-import type { MessageInfra } from "@vantera/imessage-infra";
 
 export interface ScoutConfig {
   prospectsPerRun: number;
@@ -61,10 +53,10 @@ export const TRIAL_LEAD_CAP = 100;
 export const WORST_CASE_CREDITS_PER_PROSPECT = 9;
 
 /**
- * Trial send cap: a trialing account dispatches at most this many outbound sends
- * total (across email + LinkedIn). Bounds deliverability exposure on our provisioned
- * mailboxes and per-send COGS until the account converts. Enforced per-account at the
- * send-dispatch boundary, alongside the channel safety limits.
+ * Trial send cap: a trialing account dispatches at most this many outbound LinkedIn
+ * sends total. Bounds per-send COGS and LinkedIn-account exposure until the account
+ * converts. Enforced per-account at the send-dispatch boundary, alongside the LinkedIn
+ * safety limits.
  */
 export const TRIAL_SEND_CAP = 50;
 
@@ -107,12 +99,11 @@ export interface ScoutStore {
    *  high-value buying signal (funding/intent/exec-hire/M&A). Best-effort; never blocks the run. */
   notifyHotSignals(accountId: string, items: { leadId: string; label: string }[]): Promise<void>;
   completeRun(agentId: string, lastRunAt: Date): Promise<void>;
-  /** live outreach capacity for the account (warmup state + LinkedIn connection + channel toggles) */
+  /** live outreach capacity for the account (LinkedIn connection state) */
   getOutreachCapacity(accountId: string): Promise<OutreachCapacity>;
   /** in-flight leads not yet contacted (pending_review/approved/scheduled sends, no send recorded) */
   countUncontactedLeads(accountId: string): Promise<number>;
   getLiveCopyAgent(accountId: string): Promise<{ id: string } | null>;
-  getLiveCallerAgent(accountId: string): Promise<{ id: string } | null>;
 }
 
 export interface ScoutDeps {
@@ -121,7 +112,6 @@ export interface ScoutDeps {
   scanFn: (url: string) => Promise<WebsiteScan>;
   rankFn: (candidates: RankCandidate[], ctx: RankContext) => Promise<LeadInsights[]>;
   triggerCopyDraft: (payload: CopyDraftPayload) => Promise<void>;
-  triggerCallBrief: (payload: CallBriefDraftPayload) => Promise<void>;
   now?: () => Date;
 }
 
@@ -143,7 +133,8 @@ export interface CopyDraftPayload {
 
 export interface CopyConfig {
   cta: string;
-  channels: { linkedin: boolean; email: boolean };
+  /** LinkedIn is the only channel; retained as an object for back-compat with stored agent configs. */
+  channels: { linkedin: boolean };
 }
 
 export interface CopyContext {
@@ -171,23 +162,21 @@ export interface NewScheduledSend {
   accountId: string;
   campaignId: string;
   leadId: string;
-  channel: "email" | "linkedin" | "call" | "imessage";
+  channel: "linkedin";
   subject: string | null;
   body: string;
   /** automatic mode inserts clean drafts as 'approved'; style-flagged drafts always review */
   status: "pending_review" | "approved";
-  /** invite/message pair for LinkedIn (0009); null for email */
+  /** invite/message pair for LinkedIn (0009) */
   linkedinStage: "invite" | "message" | null;
   styleFlags: string | null;
-  /** structured call brief (channel 'call' only); null otherwise */
-  brief?: CallBrief | null;
 }
 
 export interface CopyDraftStore {
   getCopyContext(copyAgentId: string): Promise<CopyContext | null>;
   getDraftableLeads(accountId: string, leadIds: string[]): Promise<DraftableLead[]>;
-  /** the rule-11 gate: account + kind + lowercased value lookup against suppression_entries */
-  isSuppressed(accountId: string, kind: "email" | "linkedin", value: string): Promise<boolean>;
+  /** the rule-11 gate: account + lowercased LinkedIn URL lookup against suppression_entries */
+  isSuppressed(accountId: string, kind: "linkedin", value: string): Promise<boolean>;
   ensureCampaignLead(campaignId: string, leadId: string, accountId: string): Promise<void>;
   setCampaignLeadStatus(
     campaignId: string,
@@ -202,7 +191,6 @@ export interface CopyDraftStore {
 
 export interface CopyDraftDeps {
   store: CopyDraftStore;
-  draftEmailFn: (input: DraftInput) => Promise<EmailDraft>;
   draftLinkedInFn: (input: DraftInput) => Promise<LinkedInDraft>;
 }
 
@@ -218,41 +206,33 @@ export interface SendContext {
   accountId: string;
   campaignId: string;
   leadId: string;
-  channel: "email" | "linkedin" | "imessage";
+  channel: "linkedin";
   linkedinStage: "invite" | "message" | null;
   status: string;
   subject: string | null;
   body: string | null;
   campaignStatus: string;
   accountPaused: boolean;
-  senderAddress: SenderAddress | null;
-  /** resolved human sender name for the {{sender_name}} email sign-off placeholder */
-  senderName: string;
-  lead: { email: string | null; linkedinUrl: string | null; phone: string | null };
+  lead: { linkedinUrl: string | null };
 }
 
 export interface OutreachSendStore {
   getSendContext(sendId: string): Promise<SendContext | null>;
   isKillSwitchOn(): Promise<boolean>;
-  isSuppressed(accountId: string, kind: "email" | "linkedin" | "phone", value: string): Promise<boolean>;
+  isSuppressed(accountId: string, kind: "linkedin", value: string): Promise<boolean>;
   /** optimistic claim: scheduled → sending; false means another run owns it */
   claimSending(sendId: string): Promise<boolean>;
   revertToApproved(sendId: string): Promise<void>;
   markSent(sendId: string): Promise<void>;
   markFailed(sendId: string, error: string): Promise<void>;
   markSuppressed(sendId: string): Promise<void>;
-  /** Roll a mailbox's deliverability counter; pauses it if the rate burns (WS-C / report #5). */
-  recordMailboxHealthEvent(mailboxId: string, kind: "sent" | "bounce" | "complaint"): Promise<void>;
-  pickActiveMailbox(accountId: string): Promise<{ id: string; providerRef: string | null; status: string } | null>;
   getActiveLinkedInIdentity(accountId: string): Promise<{ id: string; providerRef: string; status: string } | null>;
-  createUnsubscribeToken(accountId: string, leadId: string, email: string): Promise<string>;
   recordOutreachSend(rec: {
     accountId: string;
     campaignId: string;
     leadId: string;
     scheduledSendId: string;
-    channel: "email" | "linkedin" | "imessage";
-    mailboxId?: string;
+    channel: "linkedin";
     linkedinAccountId?: string;
     messageRef: string | null;
   }): Promise<void>;
@@ -262,11 +242,7 @@ export interface OutreachSendStore {
 
 export interface OutreachSendDeps {
   store: OutreachSendStore;
-  emailInfra: EmailInfra;
   linkedinInfra: LinkedInInfra;
-  messageInfra: MessageInfra;
-  imessageSender: string;
-  appUrl: string;
   now?: () => Date;
 }
 
@@ -277,11 +253,10 @@ export interface DispatchableSend {
   accountId: string;
   campaignId: string;
   leadId: string;
-  channel: "email" | "linkedin" | "imessage";
+  channel: "linkedin";
   linkedinStage: "invite" | "message" | null;
   status: "approved" | "scheduled";
   accountPaused: boolean;
-  hasSenderAddress: boolean;
   campaignStatus: string;
   leadInvitedAt: Date | null;
   leadConnectedAt: Date | null;
@@ -295,14 +270,11 @@ export interface SendDispatchStore {
   getDispatchableSends(staleCutoff: Date): Promise<DispatchableSend[]>;
   /** Total sends recorded for the account (outreach_sends) — enforces TRIAL_SEND_CAP. */
   countAccountSends(accountId: string): Promise<number>;
-  /** Σ over ACTIVE mailboxes of min(daily_send_limit ?? cap, cap) − sends recorded today */
-  getEmailCapacity(accountId: string, dayStart: Date): Promise<number>;
   /** null = no active LinkedIn identity */
   getLinkedInAccountAgeDays(accountId: string, now: Date): Promise<number | null>;
   countLinkedInSentToday(accountId: string, kind: "invite" | "message", dayStart: Date): Promise<number>;
   /** Rolling 7-day (168h) count of LinkedIn invites actually sent for the account. */
   countLinkedInInvitesLast7Days(accountId: string, now: Date): Promise<number>;
-  countImessageSentToday(accountId: string, dayStart: Date): Promise<number>;
   markScheduled(sendId: string, scheduledFor: Date): Promise<void>;
   cancelSend(sendId: string, error: string): Promise<void>;
 }
@@ -373,14 +345,12 @@ export interface TrialExpirySummary {
 }
 
 export interface InboundPayload {
-  source: "email" | "linkedin" | "imessage";
+  source: "linkedin";
   payload: unknown;
-  /** optional — not used by imessage (tenant resolved globally via outreach history) */
   accountId?: string;
 }
 
 export interface InboundStore {
-  findMailboxByProviderRef(ref: string): Promise<{ id: string; accountId: string } | null>;
   findLinkedInAccountByProviderRef(ref: string): Promise<{ id: string; accountId: string } | null>;
   /**
    * insert-or-update by (accountId, providerRef); sets connected_at when turning active.
@@ -394,15 +364,12 @@ export interface InboundStore {
     profileUrl: string | null;
     displayName: string | null;
   }): Promise<void>;
-  findLeadByEmail(accountId: string, email: string): Promise<{ id: string; campaignId: string | null } | null>;
   findLeadByLinkedInUrl(accountId: string, normalizedUrl: string): Promise<{ id: string; campaignId: string | null } | null>;
-  /** Global lookup by phone across all accounts — resolves tenant by most-recent iMessage outreach send to that phone. */
-  findLeadByPhone(normalizedPhone: string): Promise<{ id: string; accountId: string; campaignId: string | null } | null>;
   insertReply(r: {
     accountId: string;
     leadId: string;
     campaignId: string | null;
-    channel: "email" | "linkedin" | "imessage";
+    channel: "linkedin";
     providerMessageRef: string | null;
     body: string;
     receivedAt: Date;
@@ -410,13 +377,11 @@ export interface InboundStore {
   setReplyClassification(replyId: string, verdict: ReplyVerdict): Promise<void>;
   addSuppression(
     accountId: string,
-    kind: "email" | "linkedin" | "phone",
+    kind: "linkedin",
     value: string,
-    source: "unsubscribe" | "bounce" | "complaint" | "not_interested",
+    source: "unsubscribe" | "not_interested",
     leadId?: string
   ): Promise<void>;
-  pauseMailbox(mailboxId: string): Promise<void>;
-  updateMailboxWarmup(mailboxId: string, status: "warming" | "active", dailyCap: number): Promise<void>;
   setLeadConnected(leadId: string, at: Date): Promise<void>;
   setLeadReplied(leadId: string, campaignId: string | null): Promise<void>;
   /** pending_review/approved/scheduled drafts for the lead → canceled; returns count */
@@ -428,15 +393,11 @@ export interface InboundStore {
    */
   stopSequenceForReply(leadId: string): Promise<void>;
   insertLeadNotification(n: { accountId: string; leadId: string; kind: "reply"; body: string }): Promise<void>;
-  /** Roll a mailbox's deliverability counter; pauses it if the rate burns (WS-C / report #5). */
-  recordMailboxHealthEvent(mailboxId: string, kind: "sent" | "bounce" | "complaint"): Promise<void>;
 }
 
 export interface InboundDeps {
   store: InboundStore;
-  emailInfra: Pick<EmailInfra, "parseEventWebhook">;
   linkedinInfra: Pick<LinkedInInfra, "parseEventWebhook">;
-  messageInfra: Pick<MessageInfra, "parseEventWebhook">;
   classifyFn: (body: string) => Promise<ReplyVerdict>;
   now?: () => Date;
 }
@@ -444,93 +405,6 @@ export interface InboundDeps {
 export interface InboundSummary {
   handled: boolean;
   action: string;
-}
-
-// ── inbound responder (Phase 12 — fast inbound response) ──────────────────────
-export interface ResponderConfig {
-  /** auto: send a clean draft immediately (within SLA); review: always queue for approval */
-  sendMode: "auto" | "review";
-  /** response SLA in minutes — speed is the product (the report's defensible inbound edge) */
-  slaMinutes: number;
-  /** which inbound sources this responder accepts */
-  sources: { formFill: boolean; websiteVisitor: boolean; signal: boolean };
-}
-
-export const RESPONDER_DEFAULTS: ResponderConfig = {
-  sendMode: "review",
-  slaMinutes: 5,
-  sources: { formFill: true, websiteVisitor: false, signal: false },
-};
-
-export interface ResponderContext {
-  agent: {
-    id: string;
-    accountId: string;
-    status: string;
-    campaignId: string | null;
-    config: ResponderConfig;
-  };
-  /** drafting context fed to the copy brain (reused from the Outreach agent) */
-  cta: string;
-  accountName: string | null;
-  accountIndustry: string | null;
-  valueProp: string | null;
-}
-
-export interface InboundLeadEvent {
-  accountId: string;
-  agentId: string;
-  source: "form_fill" | "website_visitor" | "signal";
-  email: string | null;
-  firstName: string | null;
-  companyName: string | null;
-  raw?: unknown;
-}
-
-export type InboundFinalStatus = "rejected" | "suppressed" | "responded" | "review" | "error";
-
-export interface InboundRespondJobStore {
-  getResponderContext(agentId: string): Promise<ResponderContext | null>;
-  /** insert the intake/SLA row (status 'received'); returns its id */
-  recordInbound(e: {
-    accountId: string;
-    agentId: string;
-    source: "form_fill" | "website_visitor" | "signal";
-    email: string | null;
-    firstName: string | null;
-    companyName: string | null;
-    payload: unknown;
-  }): Promise<string>;
-  /** rule-11 gate: account + lowercased email lookup against suppression_entries */
-  isSuppressed(accountId: string, kind: "email", value: string): Promise<boolean>;
-  /** create-or-match a leads row (source 'inbound') for the inbound contact; returns the lead id */
-  upsertInboundLeadRow(e: {
-    accountId: string;
-    email: string;
-    firstName: string | null;
-    companyName: string | null;
-  }): Promise<string>;
-  saveScore(leadId: string, insights: LeadInsights, qualified: boolean): Promise<void>;
-  ensureCampaignLead(campaignId: string, leadId: string, accountId: string): Promise<void>;
-  insertScheduledSend(send: NewScheduledSend): Promise<void>;
-  finalizeInbound(
-    inboundId: string,
-    e: { status: InboundFinalStatus; leadId?: string; respondedAt?: Date }
-  ): Promise<void>;
-}
-
-export interface InboundRespondJobDeps {
-  store: InboundRespondJobStore;
-  /** enrich + rules-gate + AI-rank one inbound contact (wrapper composes; tests mock) */
-  qualify: (lead: InboundLeadEvent) => Promise<{ passed: boolean; insights: LeadInsights }>;
-  draftEmailFn: (input: DraftInput) => Promise<EmailDraft>;
-  now?: () => Date;
-}
-
-export interface InboundRespondJobSummary {
-  action: "skipped" | "suppressed" | "rejected" | "review" | "responded";
-  inboundLeadId: string | null;
-  leadId?: string;
 }
 
 // ── ad lead ingestion (Phase 11 — Meta Ads + nurturing) ───────────────────────
@@ -573,141 +447,16 @@ export interface AdInboundSummary {
   leadId?: string;
 }
 
-export interface CallerConfig {
-  cta: string;
-  bookingLink: string;
-  voice: { voiceId: string; personaName: string; language: string };
-  /** how the agent should sound — tone/personality/brand voice (style only, never overrides compliance) */
-  brandVoice?: string;
-  /** things the agent must never say or do — topics, claims, or words to avoid */
-  guardrails?: string;
-  recordingConsentMode: "one_party" | "two_party";
-  callingWindow: { days: string[]; startLocal: string; endLocal: string };
-  maxAttempts: number;
-}
-
-export const CALLER_DEFAULTS = {
-  maxAttempts: 3,
-  callingWindow: { days: ["mon", "tue", "wed", "thu", "fri"], startLocal: "09:00", endLocal: "17:00" },
-} as const;
-
-export interface CallerContext {
-  agent: { id: string; accountId: string; status: string; campaignId: string | null; config: CallerConfig };
-  assets: { kind: string; url: string | null; filename: string | null }[];
-  account: { name: string | null; industry: string | null; websiteScan: { summary?: string } | null };
-}
-
-export interface CallableLead {
-  id: string;
-  firstName: string | null;
-  lastName: string | null;
-  title: string | null;
-  companyName: string | null;
-  industry: string | null;
-  phone: string | null;
-  phoneStatus: "unvalidated" | "valid" | "invalid";
-  aiInsights: StoredInsights | null;
-}
-
-export interface CallBriefDraftPayload {
-  callerAgentId: string;
-  accountId: string;
-  leadIds: string[];
-}
-
-export interface CallBriefStore {
-  getCallerContext(callerAgentId: string): Promise<CallerContext | null>;
-  getCallableLeads(accountId: string, leadIds: string[]): Promise<CallableLead[]>;
-  /** rule-11 gate: phone normalized to E.164 lower-case before lookup */
-  isSuppressed(accountId: string, kind: "phone", value: string): Promise<boolean>;
-  ensureCampaignLead(campaignId: string, leadId: string, accountId: string): Promise<void>;
-  setCampaignLeadStatus(campaignId: string, leadId: string, status: "queued" | "suppressed" | "skipped"): Promise<void>;
-  insertScheduledSend(send: NewScheduledSend): Promise<void>;
-  setLeadStatus(leadId: string, status: "in_campaign"): Promise<void>;
-}
-
-export interface CallBriefDeps {
-  store: CallBriefStore;
-  draftBriefFn: (req: CallBriefRequest) => Promise<CallBrief>;
-}
-
-export interface CallBriefSummary {
-  status: "completed" | "skipped";
-  drafted: number;
-  suppressed: number;
-  skipped: number;
-}
-
-// --- dispatch (send boundary) ---
-export interface DispatchableCall {
-  id: string;
-  accountId: string;
-  campaignId: string;
-  agentId: string;
-  leadId: string;
-  brief: CallBrief;
-  phone: string;
-  config: CallerConfig;
-  attemptsSoFar: number;
-  leadTimezone: string | null;
-}
-
-export interface CallDispatchStore {
-  getApprovedCalls(): Promise<DispatchableCall[]>;
-  isKillSwitchOn(): Promise<boolean>;
-  isSuppressed(accountId: string, kind: "phone", value: string): Promise<boolean>;
-  claimSending(sendId: string): Promise<boolean>;
-  revertToApproved(sendId: string): Promise<void>;
-  markSuppressed(sendId: string): Promise<void>;
-  insertCall(c: {
-    accountId: string; leadId: string; agentId: string; campaignId: string;
-    scheduledSendId: string; providerCallId: string; attemptNo: number;
-  }): Promise<void>;
-  markSendSent(sendId: string): Promise<void>;
-}
-
-export interface CallDispatchDeps {
-  store: CallDispatchStore;
-  voiceInfra: VoiceInfra;
-  fromNumber: string;
-  now?: () => Date;
-}
-
-export type CallDispatchOutcome = "dialing" | "suppressed" | "outside_window" | "skipped" | "halted" | "no_caller_number" | "failed";
-
-export interface VoiceInboundStore {
-  recordWebhookEvent(source: "voice", providerEventId: string, payload: unknown): Promise<boolean>;
-  findCallByProviderId(providerCallId: string): Promise<{ id: string; accountId: string; leadId: string; phone: string | null } | null>;
-  updateCallEnded(callId: string, e: { status: string; outcome: CallOutcome; durationSec: number; recordingUrl: string | null; transcript: string | null }): Promise<void>;
-  updateCallStarted(callId: string): Promise<void>;
-  addSuppression(accountId: string, kind: "phone", value: string, source: "not_interested", leadId?: string): Promise<void>;
-  /** Stamp the lead's meeting-booked stage (WS-A attribution funnel) — first booked call only. */
-  setMeetingBooked(leadId: string): Promise<void>;
-}
-
-export interface VoiceInboundDeps {
-  store: VoiceInboundStore;
-  voiceInfra: Pick<VoiceInfra, "parseEventWebhook">;
-  classifyFn: (transcript: string) => Promise<CallOutcome>;
-  now?: () => Date;
-}
-
-export interface VoiceInboundSummary {
-  handled: boolean;
-  action: string;
-}
-
 // --- sequence orchestrator ---
-export type SequenceStage = "linkedin" | "email" | "imessage" | "call";
+export type SequenceStage = "linkedin";
 export type SequenceCursor = SequenceStage | "done";
 export type SequenceStatus = "active" | "paused_reply" | "converted" | "exhausted" | "stopped";
 
 export interface StageConfig {
   enabled: boolean;
-  touches: number;       // touches before the wait window (ignored for 'call')
+  touches: number;       // touches before the wait window
   touchGapDays: number;  // spacing between touches within the stage
   waitDays: number;      // conversion window held after the last touch
-  maxAttempts?: number;  // 'call' only: dial attempts before exhaustion
 }
 
 export interface SequenceConfig {
@@ -723,24 +472,19 @@ export interface SequenceRun {
   status: SequenceStatus;
   currentStage: SequenceCursor;
   touchesDone: number;
-  callAttempts: number;
   nextActionAt: Date;
   enteredStageAt: Date;
 }
 
 export interface LeadChannels {
   linkedinUrl: string | null;
-  email: string | null;
-  emailStatus: string; // 'valid' | 'unverified' | 'invalid' | 'risky'
-  phone: string | null;
-  phoneStatus: string; // 'valid' | 'unvalidated' | 'invalid'
 }
 
 export interface SequenceTickContext {
   run: SequenceRun;
   config: SequenceConfig;
   channels: LeadChannels;
-  suppressed: { linkedin: boolean; email: boolean; phone: boolean };
+  suppressed: { linkedin: boolean };
   accountPaused: boolean;
   killSwitch: boolean;
   now: Date;
@@ -750,7 +494,6 @@ export interface SequenceRunPatch {
   status?: SequenceStatus;
   currentStage?: SequenceCursor;
   touchesDone?: number;
-  callAttempts?: number;
   nextActionAt?: Date;
   enteredStageAt?: Date;
   lastTouchAt?: Date;
@@ -785,7 +528,7 @@ export interface SequenceStore {
   suppressionFlags(
     accountId: string,
     ch: LeadChannels
-  ): Promise<{ linkedin: boolean; email: boolean; phone: boolean }>;
+  ): Promise<{ linkedin: boolean }>;
   /** optimistic claim: only updates if status still 'active' AND next_action_at unchanged */
   applyRunPatch(runId: string, expectNextActionAt: Date, patch: SequenceRunPatch): Promise<boolean>;
   /** terminal archive used by the exhaust decision */
@@ -797,7 +540,7 @@ export interface SequenceStore {
 export interface SequenceTouchStore {
   getDraftableLead(accountId: string, leadId: string): Promise<DraftableLead | null>;
   getCampaignCta(campaignId: string): Promise<string>;
-  isSuppressed(accountId: string, kind: "email" | "linkedin" | "phone", value: string): Promise<boolean>;
+  isSuppressed(accountId: string, kind: "linkedin", value: string): Promise<boolean>;
   insertScheduledSend(send: NewScheduledSend): Promise<void>;
   /** stop a sequence run (lead exits the sequence — e.g. dropped below min_score on refresh) */
   stopSequenceRun(runId: string): Promise<void>;
@@ -805,12 +548,11 @@ export interface SequenceTouchStore {
 
 export interface SequenceTouchDeps {
   store: SequenceTouchStore;
-  draftEmailFn: (input: DraftInput) => Promise<EmailDraft>;
   draftLinkedInFn: (input: DraftInput) => Promise<LinkedInDraft>;
-  /** current time (injectable for tests); used by the freshness check before an email touch */
+  /** current time (injectable for tests); used by the freshness check before a touch */
   now: () => Date;
   /**
-   * Re-enrich + re-rank one aged lead before an email touch. Returns "ok" (still
+   * Re-enrich + re-rank one aged lead before a touch. Returns "ok" (still
    * qualified — draft with current insights) or "dropped" (fell below min_score →
    * the caller exits the sequence; NOT suppression).
    */
@@ -838,17 +580,4 @@ export interface ConversionDeps {
 export interface ConversionResult {
   converted: boolean;
   redirectUrl: string | null;
-}
-
-// ── Mailbox SMTP secret store methods ──────────────────────────────────────────
-
-export interface MailboxSmtpStore {
-  /** Persist provisioned mailboxes with their SMTP secret encrypted at rest. */
-  saveProvisionedMailboxes(accountId: string, mailboxes: ProvisionedMailbox[]): Promise<void>;
-  /** Decrypt and return a mailbox's SMTP creds for the send path. */
-  getMailboxSmtpCreds(mailboxId: string): Promise<SmtpCredentials>;
-  /** Collect provider refs + domains for an account's mailboxes (deprovision). */
-  collectMailboxProviderRefs(accountId: string): Promise<{ providerRef: string; domain: string }[]>;
-  /** Delete all mailbox rows for the account (and their encrypted SMTP secrets). */
-  purgeMailboxes(accountId: string): Promise<void>;
 }

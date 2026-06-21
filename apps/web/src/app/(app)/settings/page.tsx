@@ -86,10 +86,10 @@ export default async function SettingsPage() {
         cta="Manage billing"
       />
       <SettingsLink
-        title="Channels"
-        body="Email sending mailboxes, LinkedIn account, and global pause controls."
+        title="LinkedIn"
+        body="Connect the LinkedIn account your agents send from, plus global pause controls."
         href="/settings/channels"
-        cta="Manage channels"
+        cta="Manage LinkedIn"
       />
       <SettingsLink
         title="CRM & integrations"

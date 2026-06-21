@@ -1,12 +1,9 @@
 import type { SequenceConfig, SequenceStage, StageConfig } from "./types";
 
 export const SEQUENCE_DEFAULTS: SequenceConfig = {
-  order: ["linkedin", "email", "imessage", "call"],
+  order: ["linkedin"],
   stages: {
     linkedin: { enabled: true, touches: 2, touchGapDays: 2, waitDays: 3 },
-    email: { enabled: true, touches: 2, touchGapDays: 2, waitDays: 3 },
-    imessage: { enabled: true, touches: 1, touchGapDays: 2, waitDays: 2 },
-    call: { enabled: true, touches: 0, touchGapDays: 2, waitDays: 2, maxAttempts: 2 },
   },
 };
 
