@@ -246,6 +246,10 @@ async function OverviewTab() {
   // State machine: an activation ramp before the first agent is live with no leads
   // yet; the working dashboard once either condition is met.
   const isNew = liveAgents.length === 0 && total === 0;
+  // Agents are live but the first run hasn't produced leads yet — the post-deploy waiting
+  // window. Surface a "working now" state instead of a hollow dashboard of zeros so the
+  // silence after launch never reads as "nothing's happening" (retention: show activity).
+  const isWorkingEmpty = !isNew && liveAgents.length > 0 && total === 0;
 
   // Pipeline pulse — leads moving through the outreach sequence (sequence_runs),
   // a compact mirror of the full /pipeline board.
@@ -310,6 +314,42 @@ async function OverviewTab() {
     };
   }
 
+  // Peak-end: the most recent unread INTERESTED reply gets a one-time celebration (variable
+  // reward — replies arrive unpredictably; make the moment rewarding). A not-interested reply
+  // still notifies via the bell but never throws confetti.
+  const { data: replyNote } = await supabase
+    .from("lead_notifications")
+    .select("id, lead_id")
+    .eq("kind", "reply")
+    .is("read_at", null)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  let replyWin: { id: string; leadName: string } | null = null;
+  if (replyNote) {
+    const { data: rLead } = await supabase
+      .from("leads")
+      .select("first_name, company_name, replies(classification, received_at)")
+      .eq("id", replyNote.lead_id)
+      .maybeSingle();
+    const replies = (rLead?.replies ?? []) as {
+      classification: string | null;
+      received_at: string | null;
+    }[];
+    const latest = replies
+      .slice()
+      .sort((a, b) => (b.received_at ?? "").localeCompare(a.received_at ?? ""))[0];
+    if (latest?.classification === "interested") {
+      const name = rLead?.first_name?.trim();
+      replyWin = {
+        id: replyNote.id,
+        leadName: name
+          ? `${name}${rLead?.company_name ? ` at ${rLead.company_name}` : ""}`
+          : rLead?.company_name || "A prospect",
+      };
+    }
+  }
+
   // Explicit goal pace (forward projection) — formatted on the server, no client Date.now().
   const pace = computeGoalPace({
     conversionDates: (convertedDates ?? []).map((r) => r.updated_at),
@@ -336,6 +376,7 @@ async function OverviewTab() {
       goal={goal}
       goalCents={account.revenue_goal_cents}
       isNew={isNew}
+      isWorkingEmpty={isWorkingEmpty}
       showCrmNudge={showCrmNudge}
       scoutDeployed={Boolean(scout)}
       drafts={drafts}
@@ -353,6 +394,7 @@ async function OverviewTab() {
       today={today}
       revenuePace={revenuePace}
       conversionWin={conversionWin}
+      replyWin={replyWin}
       prospects={prospects ?? []}
       recentReplies={replyRows}
       interested={interested}

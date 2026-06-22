@@ -17,6 +17,7 @@ export async function completeOnboarding(
     industry: String(formData.get("industry") ?? ""),
     icp: String(formData.get("icp") ?? ""),
     revenueGoal: String(formData.get("revenueGoal") ?? ""),
+    avgDealValue: String(formData.get("avgDealValue") ?? ""),
   });
   if (!result.ok) return { error: result.error };
 
@@ -46,6 +47,7 @@ export async function completeOnboarding(
       onboarding_industry: result.values.industry,
       onboarding_icp: result.values.icp,
       revenue_goal_cents: result.values.revenueGoalCents,
+      avg_deal_value_cents: result.values.avgDealValueCents,
       onboarding_completed_at: new Date().toISOString(),
     })
     .eq("id", account.id);

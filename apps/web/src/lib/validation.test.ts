@@ -61,6 +61,7 @@ describe("validateOnboarding", () => {
     industry: "SaaS",
     icp: "Mid-market CTOs",
     revenueGoal: "25000",
+    avgDealValue: "5000",
   };
 
   it("accepts complete answers", () => {
@@ -72,6 +73,7 @@ describe("validateOnboarding", () => {
         industry: "SaaS",
         icp: "Mid-market CTOs",
         revenueGoalCents: 2_500_000,
+        avgDealValueCents: 500_000,
       },
     });
   });
@@ -88,6 +90,8 @@ describe("validateOnboarding", () => {
     [{ ...good, industry: "  " }, "industry"],
     [{ ...good, icp: "" }, "target audience"],
     [{ ...good, revenueGoal: "0" }, "revenue goal"],
+    [{ ...good, avgDealValue: "" }, "average deal value"],
+    [{ ...good, avgDealValue: "0" }, "average deal value"],
   ])("rejects %j", (input, field) => {
     const result = validateOnboarding(input);
     expect(result.ok).toBe(false);

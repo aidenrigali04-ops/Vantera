@@ -70,6 +70,7 @@ export interface DashboardViewProps {
   goal: string | null;
   goalCents: number | null;
   isNew: boolean;
+  isWorkingEmpty: boolean;
   showCrmNudge: boolean;
   scoutDeployed: boolean;
   drafts: number;
@@ -87,6 +88,7 @@ export interface DashboardViewProps {
   today: { sourced: number; sent: number; replied: number };
   revenuePace: string | null;
   conversionWin: { id: string; leadName: string } | null;
+  replyWin: { id: string; leadName: string } | null;
   prospects: Prospect[];
   recentReplies: ReplyRow[];
   interested: number;
@@ -96,7 +98,7 @@ export interface DashboardViewProps {
 }
 
 export function DashboardView(props: DashboardViewProps) {
-  const { firstName, icp, industry, goal, isNew, showCrmNudge, convertedClients, conversionWin } =
+  const { firstName, icp, industry, goal, isNew, isWorkingEmpty, showCrmNudge, convertedClients, conversionWin, replyWin } =
     props;
 
   return (
@@ -130,8 +132,10 @@ export function DashboardView(props: DashboardViewProps) {
         </Button>
       </motion.header>
 
-      {conversionWin && (
+      {conversionWin ? (
         <ConversionCelebration win={conversionWin} convertedClients={convertedClients} goal={goal} />
+      ) : (
+        replyWin && <ReplyCelebration win={replyWin} />
       )}
 
       {showCrmNudge && <CrmNudge convertedClients={convertedClients} />}
@@ -139,6 +143,12 @@ export function DashboardView(props: DashboardViewProps) {
       {isNew ? (
         <ActivationRamp
           scoutDeployed={props.scoutDeployed}
+          goal={goal}
+          channels={props.channels}
+        />
+      ) : isWorkingEmpty ? (
+        <FirstRunInProgress
+          scoutNextRunLabel={props.scoutNextRunLabel}
           goal={goal}
           channels={props.channels}
         />
@@ -815,6 +825,53 @@ function ConversionCelebration({
   );
 }
 
+// Peak-end for the earlier, more frequent aha: an interested reply. A slim, dismissible win
+// (distinct from the conversion party-popper) that turns the unpredictable reply into a reward,
+// then points to the thread. Only interested replies reach here (gated in page.tsx).
+function ReplyCelebration({ win }: { win: { id: string; leadName: string } }) {
+  const [dismissed, setDismissed] = useState(false);
+  if (dismissed) return null;
+
+  function dismiss() {
+    setDismissed(true);
+    void markNotificationsRead([win.id]);
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 16, scale: 0.99 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+      className={cn(PANEL_SURFACE, "relative p-5 dark:bg-white/[0.07]")}
+    >
+      <button
+        type="button"
+        onClick={dismiss}
+        aria-label="Dismiss"
+        className="absolute right-3 top-3 grid size-7 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <X className="size-4" />
+      </button>
+      <div className="flex flex-wrap items-center gap-4 pr-8">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-foreground text-background shadow-[0_0_20px_rgba(255,255,255,0.55)]">
+          <Sparkles className="size-5" />
+        </span>
+        <div className="min-w-0">
+          <p className="text-sm font-medium">{win.leadName} is interested</p>
+          <p className="text-sm text-muted-foreground">
+            A reply landed in your favor — keep the thread warm and move it toward a meeting.
+          </p>
+        </div>
+        <Button asChild size="sm" variant="outline" className="ml-auto shrink-0">
+          <Link href="/leads?tab=replied">
+            See the reply <ArrowRight className="size-4" />
+          </Link>
+        </Button>
+      </div>
+    </motion.div>
+  );
+}
+
 // Just-in-time CRM connection prompt — fires only when a deal has closed and no
 // destination is connected (peak-end moment). Dismissible so it never nags; the
 // connect path lives in Settings, which this deep-links to.
@@ -942,6 +999,99 @@ function ActivationRamp({
               )}
               .
             </p>
+          </div>
+        </RevealItem>
+
+        <ChannelSetupPanel channels={channels} />
+      </div>
+    </Reveal>
+  );
+}
+
+// Agents are live but the first run hasn't landed leads yet (the post-deploy wait). Show the
+// work in progress — a live pulse, the next-run countdown, and the next action — so the silence
+// before the first results never reads as a dead, empty dashboard (retention: show activity).
+function FirstRunInProgress({
+  scoutNextRunLabel,
+  goal,
+  channels,
+}: {
+  scoutNextRunLabel: string;
+  goal: string | null;
+  channels: DashboardViewProps["channels"];
+}) {
+  const steps = [
+    { label: "Prospect Agent deployed", done: true, current: false },
+    { label: "Sourcing & scoring your first leads", done: false, current: true },
+    { label: "Your first qualified leads land here", done: false, current: false },
+  ];
+  return (
+    <Reveal className="flex flex-col gap-6">
+      <div className="grid gap-6 md:grid-cols-[1.2fr_1fr]">
+        <RevealItem className={cn(PANEL_SURFACE, "p-5")} data-copilot="dashboard-first-run">
+          <div className="flex items-center justify-between gap-3">
+            <Eyebrow>Your agents are working</Eyebrow>
+            <span className="flex items-center gap-1.5 text-xs font-medium text-foreground">
+              <span className="relative flex size-2" aria-hidden>
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-foreground/60" />
+                <span className="relative inline-flex size-2 rounded-full bg-foreground" />
+              </span>
+              Live
+            </span>
+          </div>
+          <h2 className="font-heading mt-3 text-xl font-semibold tracking-tight">
+            Sourcing your first leads now
+          </h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Your Prospect Agent is scanning your market and scoring fits against your ICP. The
+            first qualified leads land here{" "}
+            {scoutNextRunLabel ? (
+              <>
+                in about <span className="font-medium text-foreground">{scoutNextRunLabel}</span>
+              </>
+            ) : (
+              "within ~15 minutes"
+            )}{" "}
+            — quality over volume, and nothing ever sends until you approve it
+            {goal && (
+              <>
+                {" "}
+                — measured against your{" "}
+                <span className="font-medium text-foreground">{goal}/mo</span> goal
+              </>
+            )}
+            .
+          </p>
+          <div className="mt-4 flex flex-col gap-4">
+            <AnimatedProgress value={40} />
+            <ul className="flex flex-col gap-3">
+              {steps.map((s) => (
+                <li key={s.label} className="flex items-center gap-2 text-sm">
+                  {s.done ? (
+                    <CheckCircle2 className="size-4 text-foreground" />
+                  ) : (
+                    <Circle
+                      className={`size-4 ${s.current ? "text-foreground" : "text-muted-foreground/50"}`}
+                    />
+                  )}
+                  <span
+                    className={s.done ? "" : s.current ? "font-medium" : "text-muted-foreground"}
+                  >
+                    {s.label}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <div className="flex flex-wrap gap-2">
+              <Button asChild variant="outline" size="sm">
+                <Link href="/agents">
+                  Add an Outreach Agent <ArrowRight className="size-4" />
+                </Link>
+              </Button>
+              <Button asChild variant="ghost" size="sm">
+                <Link href="/leads">Watch leads arrive</Link>
+              </Button>
+            </div>
           </div>
         </RevealItem>
 

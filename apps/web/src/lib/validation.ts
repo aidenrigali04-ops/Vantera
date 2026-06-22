@@ -63,6 +63,7 @@ export function validateOnboarding(input: {
   industry: string;
   icp: string;
   revenueGoal: string;
+  avgDealValue: string;
 }):
   | Valid<{
       companyName: string;
@@ -70,6 +71,7 @@ export function validateOnboarding(input: {
       industry: string;
       icp: string;
       revenueGoalCents: number;
+      avgDealValueCents: number;
     }>
   | Invalid {
   const companyName = input.companyName.trim();
@@ -78,7 +80,16 @@ export function validateOnboarding(input: {
   if (!website.ok) return website;
   const targeting = validateTargeting(input);
   if (!targeting.ok) return targeting;
-  return { ok: true, values: { companyName, websiteUrl: website.url, ...targeting.values } };
+  // Required at onboarding (commitment device): it turns every qualified lead into a dollar
+  // figure, so the dashboard's pipeline + revenue proof renders from the first lead, not blanks.
+  const avgDealValueCents = dollarsToCents(input.avgDealValue);
+  if (avgDealValueCents === null) {
+    return { ok: false, error: "Enter your average deal value (what one new client is worth)." };
+  }
+  return {
+    ok: true,
+    values: { companyName, websiteUrl: website.url, ...targeting.values, avgDealValueCents },
+  };
 }
 
 export function validateSignup(input: {

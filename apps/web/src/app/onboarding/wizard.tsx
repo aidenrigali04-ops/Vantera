@@ -20,7 +20,7 @@ import { AnimatedPanelBorder } from "@/components/ui/animated-border";
 import { AnimatedProgress } from "@/components/ui/animated-progress";
 import { cn } from "@/lib/utils";
 
-type FieldKey = "companyName" | "websiteUrl" | "industry" | "icp" | "revenueGoal";
+type FieldKey = "companyName" | "websiteUrl" | "industry" | "icp" | "revenueGoal" | "avgDealValue";
 
 type Field = {
   key: FieldKey;
@@ -81,15 +81,22 @@ const STEPS: { label: string; title: string; description: string; fields: Field[
     ],
   },
   {
-    label: "Goal",
-    title: "What's your monthly revenue goal?",
-    description: "We track every campaign against this goal.",
+    label: "Goals",
+    title: "Set your revenue targets",
+    description: "We turn every lead into progress toward this — in dollars, not just counts.",
     fields: [
       {
         key: "revenueGoal",
         label: "Monthly revenue goal",
         placeholder: "e.g. 25,000",
-        hint: "We track every campaign against this goal.",
+        hint: "Your pipeline and results are tracked against this each month.",
+        required: true,
+      },
+      {
+        key: "avgDealValue",
+        label: "Average deal value",
+        placeholder: "e.g. 5,000",
+        hint: "What one new client is worth — this turns every qualified lead into a dollar figure.",
         required: true,
       },
     ],
@@ -126,6 +133,7 @@ export function Wizard({ defaultCompanyName = "" }: { defaultCompanyName?: strin
     industry: "",
     icp: "",
     revenueGoal: "",
+    avgDealValue: "",
   });
   const [state, action, pending] = useActionState<OnboardingState, FormData>(
     completeOnboarding,
@@ -326,7 +334,7 @@ export function Wizard({ defaultCompanyName = "" }: { defaultCompanyName?: strin
                           setValues({ ...values, [field.key]: e.target.value })
                         }
                         placeholder={field.placeholder}
-                        inputMode={field.key === "revenueGoal" ? "decimal" : "text"}
+                        inputMode={field.key === "revenueGoal" || field.key === "avgDealValue" ? "decimal" : "text"}
                         autoFocus={i === 0}
                         required={field.required}
                         className="h-11 px-4 text-base transition-all duration-300 focus:ring-2 focus:ring-primary/20 focus:border-primary"
