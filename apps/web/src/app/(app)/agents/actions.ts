@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import {
   parseCopyForm,
+  parseIntentForm,
   parseScoutForm,
   MAX_ICPS,
 } from "./validation";
@@ -175,6 +176,69 @@ export async function deployScoutAgent(
 
   revalidatePath("/agents");
   redirect("/agents?deployed=scout");
+}
+
+/**
+ * Deploy an Intent Agent (kind 'intent', Phase 13). Watches LinkedIn for in-market behavior
+ * around the customer's niche and enrolls qualified people into the existing outreach engine.
+ * It inherits the Scout's ICP for qualification (rule 06 — the same bar), so a deployed Scout
+ * is required. The watch-list + signal types live in agents.config; the run schedule reuses the
+ * shared scheduler columns (the agent-scheduler cron dispatches 'intent-scan').
+ */
+export async function deployIntentAgent(
+  _prev: AgentActionState,
+  formData: FormData
+): Promise<AgentActionState> {
+  const parsed = parseIntentForm(formData);
+  if (!parsed.ok) return { error: parsed.error };
+  const { name, watch, signals, runAtTime, cadence, timezone } = parsed.values;
+
+  const { supabase, user, account } = await sessionAccount();
+  if (!user || !account) return { error: "Your session expired. Sign in again." };
+  if (!user.email_confirmed_at) {
+    return { error: "Confirm your email to deploy your agent — check your inbox for the verification link." };
+  }
+
+  const billingRow = await loadBillingRow(supabase);
+  if (!hasActivePlan(billingRow)) redirect("/settings/billing?reason=deploy");
+
+  // inherits the Scout's targeting for qualification — require a deployed Scout first
+  const { data: scout } = await supabase
+    .from("agents")
+    .select("id")
+    .eq("account_id", account.id)
+    .eq("kind", "scout")
+    .limit(1)
+    .maybeSingle<{ id: string }>();
+  if (!scout) return { error: "Deploy a Prospect Agent first — the Intent Agent qualifies against its ICP." };
+
+  const { data: agent, error: agentError } = await supabase
+    .from("agents")
+    .insert({
+      account_id: account.id,
+      kind: "intent",
+      name,
+      status: "live",
+      // snake_case jsonb — the pipeline's getIntentContext reads this shape (rule 13)
+      config: { watch, signals, min_score: 70 },
+      run_at_time: runAtTime,
+      cadence,
+      timezone,
+      // next_run_at null → due now; first run within ~15 min, then on schedule
+      deployed_at: new Date().toISOString(),
+      created_by: user.id,
+    })
+    .select("id")
+    .single<{ id: string }>();
+  if (agentError || !agent) {
+    if (agentError?.code === "23505") {
+      return { error: "You already have an Intent Agent. Pause or edit it from the Agents page." };
+    }
+    return { error: "Could not deploy the agent. Only workspace admins can do this." };
+  }
+
+  revalidatePath("/agents");
+  redirect("/agents?deployed=intent");
 }
 
 export async function deployCopyAgent(

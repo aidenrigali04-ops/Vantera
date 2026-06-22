@@ -1,11 +1,18 @@
 import type {
   ConnectedAccount,
+  GetProfileRequest,
   HostedAuthLink,
   HostedAuthRedirects,
   InviteRequest,
+  LinkedInEngager,
   LinkedInEvent,
   LinkedInInfra,
+  LinkedInPost,
+  LinkedInProfile,
   MessageRequest,
+  PostEngagersRequest,
+  ProfilePostsRequest,
+  SearchPostsRequest,
   SendOutcome,
 } from "./types";
 
@@ -15,6 +22,10 @@ export class InMemoryLinkedInInfra implements LinkedInInfra {
   readonly sentMessages: MessageRequest[] = [];
   /** Accounts returned by listAccounts() — push to simulate a connected workspace. */
   readonly accounts: ConnectedAccount[] = [];
+  /** Seedable read fixtures for the Intent Agent reads. */
+  readonly posts: LinkedInPost[] = [];
+  readonly engagersByPost = new Map<string, LinkedInEngager[]>();
+  readonly profiles = new Map<string, LinkedInProfile>();
   private counter = 0;
 
   constructor(private readonly webhookSecret = "in-memory-secret") {}
@@ -38,6 +49,24 @@ export class InMemoryLinkedInInfra implements LinkedInInfra {
   async sendMessage(req: MessageRequest): Promise<SendOutcome> {
     this.sentMessages.push(req);
     return { id: `msg_${++this.counter}`, sentAt: new Date().toISOString() };
+  }
+
+  // ── Reads (Intent Agent) ──────────────────────────────────────────────────
+  async searchPosts(req: SearchPostsRequest): Promise<LinkedInPost[]> {
+    const q = req.query.toLowerCase();
+    return this.posts.filter((p) => p.text.toLowerCase().includes(q)).slice(0, req.limit);
+  }
+
+  async listProfilePosts(req: ProfilePostsRequest): Promise<LinkedInPost[]> {
+    return this.posts.filter((p) => p.authorProfileUrl === req.profileUrl).slice(0, req.limit);
+  }
+
+  async listPostEngagers(req: PostEngagersRequest): Promise<LinkedInEngager[]> {
+    return (this.engagersByPost.get(req.postRef) ?? []).slice(0, req.limit);
+  }
+
+  async getProfile(req: GetProfileRequest): Promise<LinkedInProfile | null> {
+    return this.profiles.get(req.profileUrl) ?? null;
   }
 
   // fake: plain equality; real adapters use a timing-safe compare (see interface doc)

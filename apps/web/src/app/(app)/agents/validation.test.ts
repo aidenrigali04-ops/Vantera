@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseCopyForm, parseScoutForm } from "./validation";
+import { parseCopyForm, parseIntentForm, parseScoutForm } from "./validation";
 
 function scoutForm(overrides: Record<string, string> = {}): FormData {
   const fd = new FormData();
@@ -90,5 +90,48 @@ describe("parseCopyForm", () => {
   it("rejects non-http links and short CTAs", () => {
     expect(parseCopyForm(copyForm({ links: "ftp://nope" })).ok).toBe(false);
     expect(parseCopyForm(copyForm({ cta: "go" })).ok).toBe(false);
+  });
+});
+
+function intentForm(overrides: Record<string, string> = {}): FormData {
+  const fd = new FormData();
+  fd.set("name", "Sonar");
+  fd.set("creators", JSON.stringify(["https://www.linkedin.com/in/creator"]));
+  fd.set("competitors", "[]");
+  fd.set("keywords", JSON.stringify(["onboarding churn"]));
+  fd.set("hashtags", JSON.stringify(["revops"]));
+  fd.set("signalEngagement", "on");
+  fd.set("signalContent", "on");
+  fd.set("runAtTime", "09:00");
+  fd.set("cadence", "weekly");
+  fd.set("timezone", "America/New_York");
+  for (const [k, v] of Object.entries(overrides)) fd.set(k, v);
+  return fd;
+}
+
+describe("parseIntentForm", () => {
+  it("parses watch-list, signals, and schedule; normalizes hashtags", () => {
+    const r = parseIntentForm(intentForm());
+    expect(r).toMatchObject({
+      ok: true,
+      values: {
+        name: "Sonar",
+        watch: { creators: ["https://www.linkedin.com/in/creator"], competitors: [], keywords: ["onboarding churn"], hashtags: ["#revops"] },
+        signals: { engagement: true, content: true },
+        cadence: "weekly",
+      },
+    });
+  });
+
+  it("requires at least one watch target and one signal", () => {
+    expect(parseIntentForm(intentForm({ creators: "[]", competitors: "[]", keywords: "[]", hashtags: "[]" })).ok).toBe(false);
+    const noSignal = intentForm();
+    noSignal.delete("signalEngagement");
+    noSignal.delete("signalContent");
+    expect(parseIntentForm(noSignal).ok).toBe(false);
+  });
+
+  it("rejects non-LinkedIn creator/competitor URLs", () => {
+    expect(parseIntentForm(intentForm({ creators: JSON.stringify(["https://twitter.com/x"]) })).ok).toBe(false);
   });
 });

@@ -70,3 +70,47 @@ describe("InMemoryLinkedInInfra", () => {
     });
   });
 });
+
+describe("InMemoryLinkedInInfra reads (Intent Agent)", () => {
+  function seeded() {
+    const infra = new InMemoryLinkedInInfra();
+    infra.posts.push(
+      { postRef: "p1", authorProfileUrl: "https://linkedin.com/in/author", authorName: "Ann", authorHeadline: "RevOps lead", text: "We're drowning in onboarding churn", postedAt: null, url: null },
+      { postRef: "p2", authorProfileUrl: "https://linkedin.com/in/other", authorName: "Bo", authorHeadline: null, text: "Loving the weather", postedAt: null, url: null }
+    );
+    infra.engagersByPost.set("p1", [
+      { profileUrl: "https://linkedin.com/in/liker", name: "Lee", headline: "Head of CX", kind: "reaction" },
+      { profileUrl: "https://linkedin.com/in/commenter", name: "Cam", headline: "VP Success", kind: "comment", text: "same here" },
+    ]);
+    infra.profiles.set("https://linkedin.com/in/liker", {
+      profileUrl: "https://linkedin.com/in/liker", firstName: "Lee", lastName: "Park", headline: "Head of CX", companyName: "Acme", location: "Austin",
+    });
+    return infra;
+  }
+
+  it("searchPosts matches on post text, respecting the limit", async () => {
+    const infra = seeded();
+    const hits = await infra.searchPosts({ connectedAccountId: "c1", query: "churn", limit: 10 });
+    expect(hits.map((p) => p.postRef)).toEqual(["p1"]);
+    expect(await infra.searchPosts({ connectedAccountId: "c1", query: "the", limit: 1 })).toHaveLength(1);
+  });
+
+  it("listProfilePosts returns only that author's posts", async () => {
+    const infra = seeded();
+    const posts = await infra.listProfilePosts({ connectedAccountId: "c1", profileUrl: "https://linkedin.com/in/author", limit: 10 });
+    expect(posts.map((p) => p.postRef)).toEqual(["p1"]);
+  });
+
+  it("listPostEngagers returns reactors and commenters for a post", async () => {
+    const infra = seeded();
+    const engagers = await infra.listPostEngagers({ connectedAccountId: "c1", postRef: "p1", limit: 10 });
+    expect(engagers.map((e) => e.kind)).toEqual(["reaction", "comment"]);
+    expect(await infra.listPostEngagers({ connectedAccountId: "c1", postRef: "nope", limit: 10 })).toEqual([]);
+  });
+
+  it("getProfile resolves a seeded profile, else null", async () => {
+    const infra = seeded();
+    expect(await infra.getProfile({ connectedAccountId: "c1", profileUrl: "https://linkedin.com/in/liker" })).toMatchObject({ firstName: "Lee", companyName: "Acme" });
+    expect(await infra.getProfile({ connectedAccountId: "c1", profileUrl: "https://linkedin.com/in/ghost" })).toBeNull();
+  });
+});

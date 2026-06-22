@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 
-export type ShowcaseKind = "scout" | "copy";
+export type ShowcaseKind = "scout" | "copy" | "intent";
 
 export type ShowcaseStat = { label: string; value: number };
 
@@ -41,6 +41,15 @@ type AgentDbRow = {
   campaigns: { send_mode: "automatic" | "review" | "manual" | null } | null;
   agent_icps: { position: number; icps: { name: string } | null }[];
 };
+
+function intentSummary(status: string, watchCount: number): string {
+  const targets = `${watchCount} target${watchCount === 1 ? "" : "s"}`;
+  if (status === "live")
+    return `Watching ${targets} on LinkedIn — surfacing people who show buying intent and qualifying each against your ICP before they enter outreach.`;
+  if (status === "paused")
+    return "Paused. Resume and it goes back to watching LinkedIn for in-market behavior around your niche.";
+  return "Not deployed yet. Deploy it and it watches LinkedIn for buying intent around your niche.";
+}
 
 function icpPhrase(names: string[]): string {
   if (names.length === 0) return "your ideal customers";
@@ -114,6 +123,34 @@ function toShowcaseAgent(
             ? `${qualified} of ${sourced} leads kept`
             : "Waiting for the first run to bring leads in",
       },
+    };
+  }
+
+  if (row.kind === "intent") {
+    const watch = (config as { watch?: Record<string, unknown> }).watch ?? {};
+    const watchCount = (["creators", "competitors", "keywords", "hashtags"] as const).reduce(
+      (n, k) => n + (Array.isArray(watch[k]) ? (watch[k] as unknown[]).length : 0),
+      0
+    );
+    return {
+      id: row.id,
+      kind: "intent",
+      roleLabel: "Intent Agent",
+      name: row.name,
+      status: row.status,
+      summary: intentSummary(row.status, watchCount),
+      icpNames,
+      cadence: row.cadence,
+      timezone: row.timezone,
+      nextRunAt: row.next_run_at,
+      lastRunAt: row.last_run_at,
+      deployedAt: row.deployed_at,
+      cta: null,
+      channels: ["linkedin"],
+      sendMode: null,
+      campaignId: row.campaign_id,
+      stats: [{ label: "Watching", value: watchCount }],
+      progress: null,
     };
   }
 

@@ -282,3 +282,52 @@ export async function getAdsStatus(db: SupabaseClient, _accountId: string): Prom
     adLeads: (adLeads as unknown[] | null)?.length ?? 0,
   };
 }
+
+export interface IntentStatusDTO {
+  deployed: boolean;
+  agentName: string | null;
+  live: boolean;
+  /** total watch targets (creators + competitors + keywords + hashtags) */
+  watching: number;
+  signals: { engagement: boolean; content: boolean };
+  /** leads sourced from LinkedIn intent */
+  intentLeads: number;
+}
+
+/**
+ * Intent Agent status for the copilot: whether one is deployed and live, how many things it
+ * watches, which signal types are on, and how many intent-sourced leads it has produced.
+ * Answers "is my Intent Agent working?" / "how many intent leads have we found?". RLS scopes
+ * the read to the caller's account (rule 02).
+ */
+export async function getIntentStatus(db: SupabaseClient, _accountId: string): Promise<IntentStatusDTO> {
+  const { data: agent } = await db
+    .from("agents")
+    .select("name, status, config")
+    .eq("kind", "intent")
+    .limit(1)
+    .maybeSingle();
+  const a = agent as
+    | { name?: string; status?: string; config?: { watch?: Record<string, unknown>; signals?: { engagement?: boolean; content?: boolean } } }
+    | null;
+  const { count: intentLeads } = await db
+    .from("leads")
+    .select("id", { count: "exact", head: true })
+    .eq("source", "intent");
+  if (!a) {
+    return { deployed: false, agentName: null, live: false, watching: 0, signals: { engagement: false, content: false }, intentLeads: intentLeads ?? 0 };
+  }
+  const watch = a.config?.watch ?? {};
+  const watching = ["creators", "competitors", "keywords", "hashtags"].reduce(
+    (n, k) => n + (Array.isArray(watch[k]) ? (watch[k] as unknown[]).length : 0),
+    0
+  );
+  return {
+    deployed: true,
+    agentName: a.name ?? null,
+    live: a.status === "live",
+    watching,
+    signals: { engagement: Boolean(a.config?.signals?.engagement), content: Boolean(a.config?.signals?.content) },
+    intentLeads: intentLeads ?? 0,
+  };
+}

@@ -167,7 +167,7 @@ export const leads = pgTable(
       .notNull()
       .references(() => accounts.id, { onDelete: "cascade" }),
     icpId: uuid("icp_id").references(() => icps.id, { onDelete: "set null" }),
-    source: text("source", { enum: ["discovery", "manual", "import", "inbound", "ad"] })
+    source: text("source", { enum: ["discovery", "manual", "import", "inbound", "ad", "intent"] })
       .notNull()
       .default("discovery"),
     externalRef: text("external_ref"),
@@ -589,10 +589,11 @@ export const agents = pgTable(
     accountId: uuid("account_id")
       .notNull()
       .references(() => accounts.id, { onDelete: "cascade" }),
-    kind: text("kind", { enum: ["scout", "copy"] }).notNull(),
+    kind: text("kind", { enum: ["scout", "copy", "intent"] }).notNull(),
     name: text("name").notNull(),
     status: text("status", { enum: ["draft", "live", "paused"] }).notNull().default("draft"),
-    // scout: {prospects_per_run, min_score}; copy: {cta, channels: {linkedin, email}}
+    // scout: {prospects_per_run, min_score}; copy: {cta, channels: {linkedin}};
+    // intent: {watch:{creators,competitors,keywords,hashtags}, signals:{engagement,content}}
     config: jsonb("config").notNull().default({}),
     // scheduling block (scout agents only)
     runAtTime: time("run_at_time"),
@@ -1082,6 +1083,42 @@ export const securityEvents = pgTable(
   (t) => [
     index("security_events_account_created_idx").on(t.accountId, t.createdAt),
     index("security_events_type_created_idx").on(t.eventType, t.createdAt),
+  ]
+);
+
+// ── 0033 intent agent ────────────────────────────────────────────────────────
+
+// Observation log for the Intent Agent — one row per (person, post) seen engaging or
+// publishing on LinkedIn. Dedupe ledger + audit trail; service-role writes only (RLS on,
+// member select policy). Retention: 90-day sweep of non-enrolled rows (rule 11).
+export const intentObservations = pgTable(
+  "intent_observations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    agentId: uuid("agent_id").notNull(),
+    leadId: uuid("lead_id"),
+    profileUrl: text("profile_url").notNull(),
+    signalKind: text("signal_kind", { enum: ["engagement", "content"] }).notNull(),
+    watchTarget: text("watch_target"),
+    postRef: text("post_ref").notNull(),
+    headline: text("headline"),
+    detail: text("detail"),
+    outcome: text("outcome", {
+      enum: ["observed", "qualified", "rejected", "suppressed", "enrolled"],
+    })
+      .notNull()
+      .default("observed"),
+    observedAt: timestamp("observed_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("intent_observations_dedupe_idx").on(t.accountId, t.profileUrl, t.postRef),
+    index("intent_observations_account_outcome_idx").on(t.accountId, t.outcome),
+    index("intent_observations_agent_idx").on(t.agentId),
+    index("intent_observations_lead_idx").on(t.leadId),
   ]
 );
 

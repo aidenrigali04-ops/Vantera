@@ -1,5 +1,5 @@
 import { createHash, timingSafeEqual } from "node:crypto";
-import type { ConnectedAccount, HostedAuthLink, HostedAuthRedirects, InviteRequest, LinkedInEvent, LinkedInInfra, MessageRequest, SendOutcome } from "./types";
+import type { ConnectedAccount, GetProfileRequest, HostedAuthLink, HostedAuthRedirects, InviteRequest, LinkedInEngager, LinkedInEvent, LinkedInInfra, LinkedInPost, LinkedInProfile, MessageRequest, PostEngagersRequest, ProfilePostsRequest, SearchPostsRequest, SendOutcome } from "./types";
 
 // ── endpoint constants ──────────────────────────────────────────────────────
 const PATH_HOSTED_AUTH = "/api/v1/hosted/accounts/link";
@@ -28,6 +28,84 @@ function accountStatusFromSources(sources: unknown): "active" | "restricted" | "
   if (mapped.every((s) => s === "active")) return "active";
   if (mapped.some((s) => s === "disconnected")) return "disconnected";
   return "restricted";
+}
+
+// ── read mappers (Intent Agent) ──────────────────────────────────────────────
+// Endpoint paths + response shapes below are best-effort and VERIFIED AT LIVE-WIRE
+// (same convention as the prospect-data adapter): parsing stays defensive so a shape
+// drift degrades to "no results" rather than a throw. The interface + in-memory fake
+// are the contract the pipeline + tests bind to.
+const str = (v: unknown): string | null => (typeof v === "string" && v !== "" ? v : null);
+
+/** Extract the LinkedIn public identifier from a profile URL (…/in/<slug>), else the URL. */
+function profileIdentifier(profileUrl: string): string {
+  const m = profileUrl.match(/\/in\/([^/?#]+)/);
+  return m ? m[1]! : profileUrl;
+}
+
+function mapItems<T>(items: unknown, map: (raw: unknown) => T | null, limit: number): T[] {
+  if (!Array.isArray(items)) return [];
+  const out: T[] = [];
+  for (const raw of items) {
+    const m = map(raw);
+    if (m) out.push(m);
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+
+function mapPost(raw: unknown): LinkedInPost | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const p = raw as Record<string, unknown>;
+  const postRef = str(p.id) ?? str(p.social_id) ?? str(p.share_url);
+  if (!postRef) return null;
+  const author = (p.author ?? p.poster) as Record<string, unknown> | undefined;
+  return {
+    postRef,
+    authorProfileUrl: str(author?.profile_url) ?? str(p.author_profile_url),
+    authorName: str(author?.name) ?? str(p.author_name),
+    authorHeadline: str(author?.headline),
+    text: str(p.text) ?? str(p.commentary) ?? "",
+    postedAt: str(p.date) ?? str(p.posted_at),
+    url: str(p.share_url) ?? str(p.url),
+  };
+}
+
+function mapEngager(raw: unknown, kind: "reaction" | "comment"): LinkedInEngager | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const e = raw as Record<string, unknown>;
+  const author = (e.author ?? e.user ?? e) as Record<string, unknown>;
+  const profileUrl = str(author.profile_url) ?? str(e.profile_url);
+  if (!profileUrl) return null;
+  const engager: LinkedInEngager = {
+    profileUrl,
+    name: str(author.name),
+    headline: str(author.headline),
+    kind,
+  };
+  if (kind === "comment") {
+    const text = str(e.text) ?? str(e.body);
+    if (text) engager.text = text;
+  }
+  return engager;
+}
+
+function mapProfile(raw: unknown): LinkedInProfile | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const u = raw as Record<string, unknown>;
+  const publicId = str(u.public_identifier);
+  const profileUrl =
+    str(u.profile_url) ?? (publicId ? `https://www.linkedin.com/in/${publicId}` : null);
+  if (!profileUrl) return null;
+  const company = u.current_company as Record<string, unknown> | undefined;
+  return {
+    profileUrl,
+    firstName: str(u.first_name),
+    lastName: str(u.last_name),
+    headline: str(u.headline),
+    companyName: str(company?.name) ?? str(u.company_name),
+    location: str(u.location),
+  };
 }
 
 export interface UnipileConfig {
@@ -231,6 +309,58 @@ export class UnipileLinkedInInfra implements LinkedInInfra {
       }
       default:
         return null;
+    }
+  }
+
+  // ── Reads (Intent Agent) — defensive parsing; shapes verified at live-wire ───
+  async searchPosts(req: SearchPostsRequest): Promise<LinkedInPost[]> {
+    const data = await this.call<{ items?: unknown }>(
+      `/api/v1/linkedin/search?account_id=${encodeURIComponent(req.connectedAccountId)}`,
+      { method: "POST", body: JSON.stringify({ api: "classic", category: "posts", keywords: req.query, limit: req.limit }) }
+    );
+    return mapItems(data.items, mapPost, req.limit);
+  }
+
+  async listProfilePosts(req: ProfilePostsRequest): Promise<LinkedInPost[]> {
+    const id = encodeURIComponent(profileIdentifier(req.profileUrl));
+    const acct = encodeURIComponent(req.connectedAccountId);
+    const data = await this.call<{ items?: unknown }>(
+      `/api/v1/users/${id}/posts?account_id=${acct}&limit=${req.limit}`,
+      { method: "GET" }
+    );
+    return mapItems(data.items, mapPost, req.limit);
+  }
+
+  async listPostEngagers(req: PostEngagersRequest): Promise<LinkedInEngager[]> {
+    const acct = encodeURIComponent(req.connectedAccountId);
+    const post = encodeURIComponent(req.postRef);
+    const empty = { items: [] as unknown };
+    const [reactions, comments] = await Promise.all([
+      this.call<{ items?: unknown }>(`/api/v1/posts/${post}/reactions?account_id=${acct}&limit=${req.limit}`, { method: "GET" }).catch(() => empty),
+      this.call<{ items?: unknown }>(`/api/v1/posts/${post}/comments?account_id=${acct}&limit=${req.limit}`, { method: "GET" }).catch(() => empty),
+    ]);
+    // Dedupe by profile, preferring a comment (stronger intent) over a bare reaction.
+    const byProfile = new Map<string, LinkedInEngager>();
+    for (const e of [
+      ...mapItems(reactions.items, (r) => mapEngager(r, "reaction"), req.limit),
+      ...mapItems(comments.items, (c) => mapEngager(c, "comment"), req.limit),
+    ]) {
+      const existing = byProfile.get(e.profileUrl);
+      if (!existing || (existing.kind === "reaction" && e.kind === "comment")) byProfile.set(e.profileUrl, e);
+    }
+    return [...byProfile.values()].slice(0, req.limit);
+  }
+
+  async getProfile(req: GetProfileRequest): Promise<LinkedInProfile | null> {
+    const id = encodeURIComponent(profileIdentifier(req.profileUrl));
+    try {
+      const data = await this.call<unknown>(
+        `/api/v1/users/${id}?account_id=${encodeURIComponent(req.connectedAccountId)}`,
+        { method: "GET" }
+      );
+      return mapProfile(data);
+    } catch {
+      return null;
     }
   }
 }

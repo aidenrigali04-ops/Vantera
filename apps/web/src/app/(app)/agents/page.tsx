@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Bot, PenLine } from "lucide-react";
+import { Bot, PenLine, Radar } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { Panel, Eyebrow } from "@/components/ui/panel";
@@ -20,16 +20,19 @@ export default async function AgentsPage({
 
   const scout = (agents as AgentRow[] | null)?.find((a) => a.kind === "scout") ?? null;
   const copy = (agents as AgentRow[] | null)?.find((a) => a.kind === "copy") ?? null;
+  const intent = (agents as AgentRow[] | null)?.find((a) => a.kind === "intent") ?? null;
 
   // value proof: real pipeline counts, never placeholders
-  const [{ count: qualified }, { count: sourced }, { count: drafts }] = await Promise.all([
-    supabase.from("leads").select("id", { count: "exact", head: true }).eq("status", "qualified"),
-    supabase.from("leads").select("id", { count: "exact", head: true }),
-    supabase
-      .from("scheduled_sends")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "pending_review"),
-  ]);
+  const [{ count: qualified }, { count: sourced }, { count: drafts }, { count: intentLeads }] =
+    await Promise.all([
+      supabase.from("leads").select("id", { count: "exact", head: true }).eq("status", "qualified"),
+      supabase.from("leads").select("id", { count: "exact", head: true }),
+      supabase
+        .from("scheduled_sends")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "pending_review"),
+      supabase.from("leads").select("id", { count: "exact", head: true }).eq("source", "intent"),
+    ]);
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -63,6 +66,16 @@ export default async function AgentsPage({
                   Leads
                 </Link>
                 . {!copy && "Next: deploy an Outreach Agent so every qualified lead gets a message drafted."}
+              </>
+            ) : deployed === "intent" ? (
+              <>
+                <span className="font-medium">{intent?.name ?? "Your Intent Agent"} is live.</span>{" "}
+                It watches LinkedIn for people showing buying intent and qualifies them against your
+                ICP — qualified leads appear under{" "}
+                <Link href="/leads" className="underline underline-offset-2">
+                  Leads
+                </Link>
+                .
               </>
             ) : (
               <>
@@ -119,6 +132,23 @@ export default async function AgentsPage({
               copilot="deploy-outreach"
             />
           )}
+          {intent ? (
+            <AgentCard
+              agent={intent}
+              roleLabel="Intent Agent"
+              index={2}
+              stats={[{ label: "Intent leads", value: intentLeads ?? 0 }]}
+            />
+          ) : scout ? (
+            <AddAgentPanel
+              icon={<Radar className="size-6 text-muted-foreground" />}
+              title="Add an Intent Agent"
+              body={`Beyond ${scout.name}'s ICP search, an Intent Agent watches LinkedIn for people showing they're in-market — engaging with your niche or posting about the problem you solve — and qualifies them against the same bar.`}
+              href="/agents/new/intent"
+              cta="Set up your Intent Agent"
+              copilot="deploy-intent"
+            />
+          ) : null}
         </div>
       )}
     </div>

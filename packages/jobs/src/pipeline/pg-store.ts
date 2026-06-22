@@ -13,6 +13,7 @@ import {
   crmPushEvents,
   enrichmentResults,
   icps,
+  intentObservations,
   leadNotifications,
   leadSignals,
   leads,
@@ -53,6 +54,10 @@ import {
   type PurgeCandidate,
   type RetentionStore,
   type TrialStore,
+  type IntentConfig,
+  type IntentObservationRow,
+  type IntentScanContext,
+  type IntentScanStore,
   type ScoutConfig,
   type ScoutContext,
   type ScoutStore,
@@ -120,7 +125,7 @@ function toRow(send: NewScheduledSend) {
 }
 
 /** Drizzle-backed store used by the Trigger.dev tasks (service-role DATABASE_URL). */
-export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerStore & RetentionStore & TrialStore & SendDispatchStore & OutreachSendStore & InboundStore & SequenceStore & SequenceTouchStore & ConversionStore & RefreshLeadStore {
+export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerStore & RetentionStore & TrialStore & SendDispatchStore & OutreachSendStore & InboundStore & SequenceStore & SequenceTouchStore & ConversionStore & RefreshLeadStore & IntentScanStore {
   return {
     async getScoutContext(agentId: string): Promise<ScoutContext | null> {
       const [agent] = await db.select().from(agents).where(eq(agents.id, agentId));
@@ -151,6 +156,124 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           subscriptionStatus: account.subscriptionStatus,
         },
       };
+    },
+
+    // ── Intent Agent (Phase 13) ────────────────────────────────────────────
+    async getIntentContext(agentId: string): Promise<IntentScanContext | null> {
+      const [agent] = await db.select().from(agents).where(eq(agents.id, agentId));
+      if (!agent || agent.kind !== "intent") return null;
+      const [account] = await db.select().from(accounts).where(eq(accounts.id, agent.accountId));
+      if (!account) return null;
+      // read through the account's active LinkedIn connection (null = can't read this run)
+      const [li] = await db
+        .select({ ref: linkedinAccounts.providerRef })
+        .from(linkedinAccounts)
+        .where(and(eq(linkedinAccounts.accountId, agent.accountId), eq(linkedinAccounts.status, "active")))
+        .limit(1);
+      // qualification ICP is inherited from the account's Scout (rule 06 — the same bar)
+      const [scout] = await db
+        .select({ id: agents.id })
+        .from(agents)
+        .where(and(eq(agents.accountId, agent.accountId), eq(agents.kind, "scout")))
+        .limit(1);
+      const icpRows = scout
+        ? await db
+            .select({ id: icps.id, name: icps.name, criteria: icps.criteria, position: agentIcps.position })
+            .from(agentIcps)
+            .innerJoin(icps, eq(agentIcps.icpId, icps.id))
+            .where(eq(agentIcps.agentId, scout.id))
+        : [];
+      const scan = account.websiteScan as (WebsiteScan & { url?: string }) | null;
+      return {
+        agent: {
+          id: agent.id,
+          accountId: agent.accountId,
+          status: agent.status,
+          config: (agent.config ?? {}) as Partial<IntentConfig>,
+        },
+        connectedAccountId: li?.ref ?? null,
+        icps: icpRows
+          .sort((a, b) => a.position - b.position)
+          .map((r) => ({ id: r.id, name: r.name, criteria: (r.criteria ?? {}) as IcpCriteria })),
+        account: {
+          industry: account.onboardingIndustry,
+          valueProp: scan ? `${scan.summary} Value props: ${scan.value_props.join("; ")}` : null,
+          subscriptionStatus: account.subscriptionStatus,
+        },
+      };
+    },
+
+    async seenObservationKeys(accountId, refs) {
+      if (refs.length === 0) return new Set<string>();
+      const profileUrls = [...new Set(refs.map((r) => r.profileUrl))];
+      const rows = await db
+        .select({ profileUrl: intentObservations.profileUrl, postRef: intentObservations.postRef })
+        .from(intentObservations)
+        .where(and(eq(intentObservations.accountId, accountId), inArray(intentObservations.profileUrl, profileUrls)));
+      return new Set(rows.map((r) => `${r.profileUrl}|${r.postRef}`));
+    },
+
+    async recordObservations(accountId, agentId, rows) {
+      if (rows.length === 0) return;
+      await db
+        .insert(intentObservations)
+        .values(
+          rows.map((r) => ({
+            accountId,
+            agentId,
+            leadId: r.leadId,
+            profileUrl: r.profileUrl,
+            signalKind: r.signalKind,
+            watchTarget: r.watchTarget,
+            postRef: r.postRef,
+            headline: r.headline,
+            detail: r.detail,
+            outcome: r.outcome,
+          }))
+        )
+        .onConflictDoNothing();
+    },
+
+    async upsertIntentLead(accountId, candidate) {
+      const [existing] = await db
+        .select({ id: leads.id })
+        .from(leads)
+        .where(and(eq(leads.accountId, accountId), eq(leads.externalRef, candidate.externalRef)))
+        .limit(1);
+      if (existing) return { leadId: existing.id };
+      const [inserted] = await db
+        .insert(leads)
+        .values({
+          accountId,
+          source: "intent",
+          externalRef: candidate.externalRef,
+          companyName: candidate.companyName,
+          companySize: candidate.companySize,
+          industry: candidate.industry,
+          location: candidate.location,
+          firstName: candidate.firstName,
+          lastName: candidate.lastName,
+          title: candidate.title,
+          linkedinUrl: candidate.linkedinUrl,
+        })
+        .returning({ id: leads.id });
+      return { leadId: inserted!.id };
+    },
+
+    async saveIntentSignal(leadId, accountId, signal) {
+      await db
+        .insert(leadSignals)
+        .values({
+          accountId,
+          leadId,
+          kind: "intent",
+          label: signal.label,
+          detail: signal.detail,
+          level: "active",
+          observedAt: new Date(),
+          source: "prospect-data",
+        })
+        .onConflictDoNothing();
     },
 
     async countAccountLeads(accountId: string): Promise<number> {
@@ -491,11 +614,12 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
 
     // ── SchedulerStore ───────────────────────────────────────────────────────
 
-    async getDueScoutAgents(now: Date) {
+    async getDueAgents(now: Date) {
       return db
         .select({
           id: agents.id,
           accountId: agents.accountId,
+          kind: agents.kind,
           runAtTime: agents.runAtTime,
           cadence: agents.cadence,
           timezone: agents.timezone,
@@ -503,7 +627,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         .from(agents)
         .where(
           and(
-            eq(agents.kind, "scout"),
+            inArray(agents.kind, ["scout", "intent"]),
             eq(agents.status, "live"),
             or(isNull(agents.nextRunAt), lte(agents.nextRunAt, now))
           )
@@ -1127,16 +1251,18 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
   };
 }
 
-export interface DueScoutAgent {
+export interface DueAgent {
   id: string;
   accountId: string;
+  kind: "scout" | "copy" | "intent";
   runAtTime: string | null;
   cadence: "daily" | "weekly" | null;
   timezone: string;
 }
 
 export interface SchedulerStore {
-  getDueScoutAgents(now: Date): Promise<DueScoutAgent[]>;
+  /** Live agents whose schedule is due — the scheduled kinds (scout + intent) only. */
+  getDueAgents(now: Date): Promise<DueAgent[]>;
   advanceSchedule(agentId: string, nextRunAt: Date): Promise<void>;
 }
 

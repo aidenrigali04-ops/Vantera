@@ -41,6 +41,66 @@ export type LinkedInEvent =
   | { type: "relationship_accepted"; providerEventId: string; connectedAccountRef: string; profileUrl: string }
   | { type: "account_status"; providerEventId: string; connectedAccountRef: string; status: "active" | "restricted" | "disconnected"; profileUrl: string | null; displayName: string | null; vanteraAccountId: string | null };
 
+// ── Read surface (Intent Agent, Phase 13) ────────────────────────────────────
+// These reads run through the user's connected account and count against LinkedIn's
+// rate budget — the scheduler paces + ceilings them (rule 04 account-safety), never here.
+
+/** A post surfaced by a search or a profile's activity. */
+export interface LinkedInPost {
+  /** provider post id — the dedupe `post_ref` on intent_observations */
+  postRef: string;
+  authorProfileUrl: string | null;
+  authorName: string | null;
+  authorHeadline: string | null;
+  /** post body — feeds content-intent classification */
+  text: string;
+  postedAt: string | null;
+  url: string | null;
+}
+
+/** A person who engaged with a post (reacted or commented). */
+export interface LinkedInEngager {
+  profileUrl: string;
+  name: string | null;
+  headline: string | null;
+  /** how they engaged — a comment is a stronger intent signal than a reaction */
+  kind: "reaction" | "comment";
+  /** comment text, when kind === "comment" */
+  text?: string;
+}
+
+/** A resolved profile — the contact shape the pipeline enriches into a lead. */
+export interface LinkedInProfile {
+  profileUrl: string;
+  firstName: string | null;
+  lastName: string | null;
+  headline: string | null;
+  companyName: string | null;
+  location: string | null;
+}
+
+export interface SearchPostsRequest {
+  connectedAccountId: string;
+  /** keyword phrase or #hashtag */
+  query: string;
+  limit: number;
+}
+export interface ProfilePostsRequest {
+  connectedAccountId: string;
+  /** the creator/competitor profile whose recent posts we read */
+  profileUrl: string;
+  limit: number;
+}
+export interface PostEngagersRequest {
+  connectedAccountId: string;
+  postRef: string;
+  limit: number;
+}
+export interface GetProfileRequest {
+  connectedAccountId: string;
+  profileUrl: string;
+}
+
 /**
  * Provider-agnostic LinkedIn outreach interface (rule 04). Unipile is an
  * implementation detail behind it. Safety limits (ramp, weekly invite
@@ -69,4 +129,14 @@ export interface LinkedInInfra {
    */
   verifyWebhook(headers: Record<string, string>, rawBody: string): boolean;
   parseEventWebhook(payload: unknown): LinkedInEvent | null;
+
+  // ── Reads (Intent Agent) — paced + ceilinged by the scheduler (rule 04) ──────
+  /** Posts matching a keyword or #hashtag — content-intent + a source of posts to read engagers of. */
+  searchPosts(req: SearchPostsRequest): Promise<LinkedInPost[]>;
+  /** A specific creator/competitor profile's recent posts — the engagement-intent input. */
+  listProfilePosts(req: ProfilePostsRequest): Promise<LinkedInPost[]>;
+  /** People who reacted to or commented on a post — the engagement-intent leads. */
+  listPostEngagers(req: PostEngagersRequest): Promise<LinkedInEngager[]>;
+  /** Resolve a profile URL into a contact candidate; null when the profile can't be read. */
+  getProfile(req: GetProfileRequest): Promise<LinkedInProfile | null>;
 }

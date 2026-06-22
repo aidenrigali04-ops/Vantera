@@ -406,4 +406,52 @@ describe("UnipileLinkedInInfra", () => {
         .rejects.toThrow(/missing message_id/);
     });
   });
+
+  describe("reads (Intent Agent)", () => {
+    it("searchPosts maps provider posts (author + text + ref)", async () => {
+      const adapter = infra({
+        "/linkedin/search": { items: [
+          { id: "p1", author: { profile_url: "https://linkedin.com/in/a", name: "Ann", headline: "RevOps" }, text: "onboarding churn pain", date: "2026-01-01", share_url: "https://li/p1" },
+        ] },
+      });
+      const posts = await adapter.searchPosts({ connectedAccountId: "c1", query: "churn", limit: 10 });
+      expect(posts).toEqual([
+        { postRef: "p1", authorProfileUrl: "https://linkedin.com/in/a", authorName: "Ann", authorHeadline: "RevOps", text: "onboarding churn pain", postedAt: "2026-01-01", url: "https://li/p1" },
+      ]);
+    });
+
+    it("listProfilePosts reads a creator's posts", async () => {
+      const adapter = infra({
+        "/posts?account_id": { items: [{ id: "p9", text: "hiring an SDR", author: { profile_url: "https://linkedin.com/in/creator" } }] },
+      });
+      const posts = await adapter.listProfilePosts({ connectedAccountId: "c1", profileUrl: "https://linkedin.com/in/creator", limit: 5 });
+      expect(posts.map((p) => p.postRef)).toEqual(["p9"]);
+    });
+
+    it("listPostEngagers merges reactions + comments, comment wins the dedup", async () => {
+      const adapter = infra({
+        "/reactions": { items: [{ author: { profile_url: "https://linkedin.com/in/x", name: "Xan", headline: "CX" } }] },
+        "/comments": { items: [{ author: { profile_url: "https://linkedin.com/in/x", name: "Xan", headline: "CX" }, text: "me too" }] },
+      });
+      const engagers = await adapter.listPostEngagers({ connectedAccountId: "c1", postRef: "p1", limit: 10 });
+      expect(engagers).toEqual([
+        { profileUrl: "https://linkedin.com/in/x", name: "Xan", headline: "CX", kind: "comment", text: "me too" },
+      ]);
+    });
+
+    it("getProfile resolves a public_identifier into a profile url + fields", async () => {
+      const adapter = infra({
+        "/users/lee": { public_identifier: "lee", first_name: "Lee", last_name: "Park", headline: "Head of CX", current_company: { name: "Acme" }, location: "Austin" },
+      });
+      const profile = await adapter.getProfile({ connectedAccountId: "c1", profileUrl: "https://www.linkedin.com/in/lee" });
+      expect(profile).toEqual({
+        profileUrl: "https://www.linkedin.com/in/lee", firstName: "Lee", lastName: "Park", headline: "Head of CX", companyName: "Acme", location: "Austin",
+      });
+    });
+
+    it("getProfile returns null when the provider read fails", async () => {
+      const adapter = new UnipileLinkedInInfra({ apiKey: "k", dsn: "api.unipile.example.com:13000", webhookSecret: "w", fetchFn: fetchError(404, "not found") });
+      expect(await adapter.getProfile({ connectedAccountId: "c1", profileUrl: "https://linkedin.com/in/ghost" })).toBeNull();
+    });
+  });
 });

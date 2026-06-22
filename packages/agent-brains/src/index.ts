@@ -30,5 +30,15 @@ export {
 } from "./copy/linkedin";
 export { leadBlock, type CopyLead, type CopyContext, type DraftInput } from "./copy/shared";
 export { classifyReply, preClassify, replyVerdictSchema, type ReplyVerdict } from "./reply/classify";
+export {
+  classifyIntent,
+  normalizeVerdict,
+  intentVerdictSchema,
+  intentBatchSchema,
+  INTENT_BATCH_SIZE,
+  type IntentVerdict,
+  type IntentObservationInput,
+  type IntentContext,
+} from "./intent/classify";
 export { adConceptSchema, adConceptBatchSchema, AD_CTAS, type AdConcept } from "./ads/schema";
 export { generateAdConcepts, adContextBlock, type AdConceptInput, type AdConceptResult } from "./ads/generate";

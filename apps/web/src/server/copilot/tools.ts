@@ -11,6 +11,7 @@ import {
   getChannelStatusForAccount,
   getReturnOnSpend,
   getAdsStatus,
+  getIntentStatus,
 } from "./read-tools";
 import { runCampaignSendState } from "./mutate-tools";
 
@@ -84,6 +85,14 @@ export function buildAccountTools(db: SupabaseClient, accountId: string): Copilo
         "Ads activity: how many ad campaigns exist, how many concepts have been generated, and how many leads came in from ads. Use for 'how are my ads doing?' or 'how many leads did ads bring in?'.",
       parameters: z.object({}),
       run: async () => getAdsStatus(db, accountId),
+    },
+    {
+      name: "getIntentStatus",
+      tier: "read",
+      description:
+        "The Intent Agent: whether it's deployed and live, how many creators/competitors/keywords/hashtags it watches, which signal types are on (engagement/content), and how many leads it has sourced from LinkedIn intent. Use for 'is my Intent Agent working?' or 'how many intent leads have we found?'.",
+      parameters: z.object({}),
+      run: async () => getIntentStatus(db, accountId),
     },
     {
       name: "pauseCampaign",

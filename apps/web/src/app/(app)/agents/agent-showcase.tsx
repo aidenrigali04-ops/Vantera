@@ -9,7 +9,7 @@ import {
   useReducedMotion,
   type Variants,
 } from "framer-motion";
-import { Bot, PenLine, MessageSquare, Settings2, ArrowRight } from "lucide-react";
+import { Bot, PenLine, MessageSquare, Radar, Settings2, ArrowRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { AnimatedProgress } from "@/components/ui/animated-progress";
@@ -97,7 +97,7 @@ function Backdrop({ side }: { side: "left" | "right" }) {
 function AgentOrb({ agent, fromLeft }: { agent: ShowcaseAgent; fromLeft: boolean }) {
   const reduce = useReducedMotion();
   const live = agent.status === "live";
-  const Icon = agent.kind === "scout" ? Bot : PenLine;
+  const Icon = agent.kind === "scout" ? Bot : agent.kind === "intent" ? Radar : PenLine;
 
   return (
     <motion.div layout="position" className="relative shrink-0">
@@ -166,7 +166,7 @@ function AgentDetails({ agent, alignRight }: { agent: ShowcaseAgent; alignRight:
   const automatic = agent.sendMode === "automatic";
 
   const runLine =
-    agent.kind === "scout"
+    agent.kind === "scout" || agent.kind === "intent"
       ? live
         ? `Next run ${timeUntil(agent.nextRunAt)}${agent.cadence ? ` · every ${agent.cadence === "daily" ? "day" : "week"}` : ""}`
         : `Last ran ${timeAgo(agent.lastRunAt)}`
@@ -258,11 +258,13 @@ function AgentDetails({ agent, alignRight }: { agent: ShowcaseAgent; alignRight:
         variants={item}
         className={`mt-5 flex flex-wrap items-center gap-2 ${alignRight ? "justify-end" : "justify-start"}`}
       >
-        <Button asChild variant="outline" size="sm">
-          <Link href={`/agents/${agent.kind}/edit`}>
-            <Settings2 className="size-4" /> Edit config
-          </Link>
-        </Button>
+        {agent.kind !== "intent" && (
+          <Button asChild variant="outline" size="sm">
+            <Link href={`/agents/${agent.kind}/edit`}>
+              <Settings2 className="size-4" /> Edit config
+            </Link>
+          </Button>
+        )}
         <form action={statusAction}>
           <input type="hidden" name="agentId" value={agent.id} />
           <input type="hidden" name="status" value={live ? "paused" : "live"} />

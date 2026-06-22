@@ -88,3 +88,63 @@ export function parseCopyForm(form: FormData): Result<CopyFormValues> {
 
   return { ok: true, values: { name, cta, links, channels, sendMode } };
 }
+
+// ─── Intent agent validation (Phase 13) ───────────────────────────────────────
+
+export const MAX_WATCH_PER_LIST = 10;
+
+export type IntentFormValues = {
+  name: string;
+  watch: { creators: string[]; competitors: string[]; keywords: string[]; hashtags: string[] };
+  signals: { engagement: boolean; content: boolean };
+  runAtTime: string;
+  cadence: "daily" | "weekly";
+  timezone: string;
+};
+
+function parseList(form: FormData, key: string): string[] {
+  try {
+    const parsed: unknown = JSON.parse(String(form.get(key) ?? "[]"));
+    return Array.isArray(parsed)
+      ? [...new Set(parsed.filter((v): v is string => typeof v === "string").map((v) => v.trim()).filter(Boolean))].slice(0, MAX_WATCH_PER_LIST)
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+export function parseIntentForm(form: FormData): Result<IntentFormValues> {
+  const name = cleanName(form.get("name"));
+  if (!name) return { ok: false, error: "Give your agent a name (up to 60 characters)." };
+
+  const watch = {
+    creators: parseList(form, "creators"),
+    competitors: parseList(form, "competitors"),
+    keywords: parseList(form, "keywords"),
+    hashtags: parseList(form, "hashtags").map((h) => (h.startsWith("#") ? h : `#${h}`)),
+  };
+  const total = watch.creators.length + watch.competitors.length + watch.keywords.length + watch.hashtags.length;
+  if (total === 0) {
+    return { ok: false, error: "Add at least one creator, competitor, keyword, or hashtag to watch." };
+  }
+  // creators + competitors are LinkedIn profile URLs
+  if ([...watch.creators, ...watch.competitors].some((u) => !/^https?:\/\/(www\.)?linkedin\.com\/in\//i.test(u))) {
+    return { ok: false, error: "Creators and competitors must be LinkedIn profile URLs (linkedin.com/in/…)." };
+  }
+
+  const signals = {
+    engagement: form.get("signalEngagement") === "on",
+    content: form.get("signalContent") === "on",
+  };
+  if (!signals.engagement && !signals.content) {
+    return { ok: false, error: "Enable at least one intent signal (engagement or content)." };
+  }
+
+  const runAtTime = String(form.get("runAtTime") ?? "");
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(runAtTime)) return { ok: false, error: "Pick a valid run time." };
+  const cadence = String(form.get("cadence") ?? "");
+  if (cadence !== "daily" && cadence !== "weekly") return { ok: false, error: "Pick a cadence." };
+  const timezone = String(form.get("timezone") ?? "").trim() || "UTC";
+
+  return { ok: true, values: { name, watch, signals, runAtTime, cadence, timezone } };
+}

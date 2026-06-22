@@ -5,6 +5,9 @@ import type {
   ProspectDataSource,
 } from "@vantera/prospect-data";
 import type {
+  IntentContext,
+  IntentObservationInput,
+  IntentVerdict,
   LeadInsights,
   LinkedInDraft,
   DraftInput,
@@ -129,6 +132,83 @@ export interface CopyDraftPayload {
   copyAgentId: string;
   accountId: string;
   leadIds: string[];
+}
+
+// ── Intent Agent (Phase 13) ──────────────────────────────────────────────────
+
+/** Per-run read ceilings — account-safety (rule 04). LinkedIn reads run through the user's
+ *  own connected account, so the scheduler caps reads per run; not configurable upward. */
+export const INTENT_POSTS_PER_RUN = 20;
+export const INTENT_ENGAGERS_PER_POST = 25;
+
+export interface IntentConfig {
+  watch: { creators: string[]; competitors: string[]; keywords: string[]; hashtags: string[] };
+  signals: { engagement: boolean; content: boolean };
+  /** qualification threshold (the same bar the Scout uses, rule 06) */
+  minScore: number;
+}
+
+export const INTENT_DEFAULTS: IntentConfig = {
+  watch: { creators: [], competitors: [], keywords: [], hashtags: [] },
+  signals: { engagement: true, content: true },
+  minScore: 70,
+};
+
+export interface IntentScanContext {
+  agent: { id: string; accountId: string; status: string; config: Partial<IntentConfig> };
+  /** the LinkedIn account to read through (the account's active connection); null = can't read */
+  connectedAccountId: string | null;
+  /** qualification ICP — inherited from the account's Scout (intent qualifies against the same bar) */
+  icps: { id: string; name: string; criteria: IcpCriteria }[];
+  account: { industry: string | null; valueProp: string | null; subscriptionStatus: string };
+}
+
+/** A persisted observation row — the dedupe ledger + audit trail. */
+export interface IntentObservationRow {
+  profileUrl: string;
+  postRef: string;
+  signalKind: "engagement" | "content";
+  watchTarget: string | null;
+  headline: string | null;
+  detail: string | null;
+  outcome: "observed" | "qualified" | "rejected" | "suppressed" | "enrolled";
+  leadId: string | null;
+}
+
+export interface IntentScanStore {
+  getIntentContext(agentId: string): Promise<IntentScanContext | null>;
+  /** dedupe: return the `${profileUrl}|${postRef}` keys already recorded for the account */
+  seenObservationKeys(accountId: string, refs: { profileUrl: string; postRef: string }[]): Promise<Set<string>>;
+  /** persist the observation ledger (service-role insert; the unique index is the backstop) */
+  recordObservations(accountId: string, agentId: string, rows: IntentObservationRow[]): Promise<void>;
+  /** upsert an intent-sourced lead (source 'intent'), deduped by profile url; returns its id */
+  upsertIntentLead(accountId: string, candidate: ProspectCandidate): Promise<{ leadId: string }>;
+  markRulesGate(leadId: string, result: RulesGateResult): Promise<void>;
+  saveScore(leadId: string, insights: LeadInsights, qualified: boolean): Promise<void>;
+  /** capture the "why now" intent signal on the lead — feeds Surface A's why-now chip */
+  saveIntentSignal(leadId: string, accountId: string, signal: { label: string; detail: string }): Promise<void>;
+  /** the rule-11 gate: account + lowercased LinkedIn URL lookup against suppression_entries */
+  isSuppressed(accountId: string, kind: "linkedin", value: string): Promise<boolean>;
+  getLiveCopyAgent(accountId: string): Promise<{ id: string } | null>;
+  completeRun(agentId: string, lastRunAt: Date): Promise<void>;
+}
+
+export interface IntentScanDeps {
+  store: IntentScanStore;
+  linkedin: Pick<LinkedInInfra, "searchPosts" | "listProfilePosts" | "listPostEngagers" | "getProfile">;
+  classifyFn: (observations: IntentObservationInput[], ctx: IntentContext) => Promise<IntentVerdict[]>;
+  rankFn: (candidates: RankCandidate[], ctx: RankContext) => Promise<LeadInsights[]>;
+  triggerCopyDraft: (payload: CopyDraftPayload) => Promise<void>;
+  now?: () => Date;
+}
+
+export interface IntentScanSummary {
+  status: "completed" | "skipped";
+  reason?: "no_connection" | "empty_watchlist";
+  observed: number;
+  intent: number;
+  qualified: number;
+  chained: boolean;
 }
 
 export interface CopyConfig {
