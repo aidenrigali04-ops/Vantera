@@ -407,45 +407,51 @@ describe("UnipileLinkedInInfra", () => {
     });
   });
 
-  describe("reads (Intent Agent)", () => {
-    it("searchPosts maps provider posts (author + text + ref)", async () => {
+  describe("reads (Intent Agent) — real Unipile shapes", () => {
+    it("searchPosts maps the Post shape (social_id ref, author public_identifier, parsed_datetime)", async () => {
       const adapter = infra({
-        "/linkedin/search": { items: [
-          { id: "p1", author: { profile_url: "https://linkedin.com/in/a", name: "Ann", headline: "RevOps" }, text: "onboarding churn pain", date: "2026-01-01", share_url: "https://li/p1" },
+        "/linkedin/search": { object: "LinkedinSearch", items: [
+          { type: "POST", social_id: "urn:li:ugcPost:99", id: "88", share_url: "https://li/p1", text: "onboarding churn pain", date: "2d", parsed_datetime: "2026-06-19T23:35:37.248Z", author: { public_identifier: "ann-r", id: "ACoAA_ann", name: "Ann", headline: "RevOps" } },
         ] },
       });
       const posts = await adapter.searchPosts({ connectedAccountId: "c1", query: "churn", limit: 10 });
       expect(posts).toEqual([
-        { postRef: "p1", authorProfileUrl: "https://linkedin.com/in/a", authorName: "Ann", authorHeadline: "RevOps", text: "onboarding churn pain", postedAt: "2026-01-01", url: "https://li/p1" },
+        { postRef: "urn:li:ugcPost:99", authorProfileUrl: "https://www.linkedin.com/in/ann-r", authorName: "Ann", authorHeadline: "RevOps", text: "onboarding churn pain", postedAt: "2026-06-19T23:35:37.248Z", url: "https://li/p1" },
       ]);
     });
 
-    it("listProfilePosts reads a creator's posts", async () => {
+    it("listProfilePosts resolves the slug to provider_id, then reads that user's posts", async () => {
       const adapter = infra({
-        "/posts?account_id": { items: [{ id: "p9", text: "hiring an SDR", author: { profile_url: "https://linkedin.com/in/creator" } }] },
+        "/users/creator?": { object: "UserProfile", public_identifier: "creator", provider_id: "ACoAA_creator" },
+        "/posts?account_id": { object: "PostList", items: [{ social_id: "urn:li:activity:9", text: "hiring an SDR", author: { public_identifier: "creator", id: "ACoAA_creator", name: "Cara" } }] },
       });
-      const posts = await adapter.listProfilePosts({ connectedAccountId: "c1", profileUrl: "https://linkedin.com/in/creator", limit: 5 });
-      expect(posts.map((p) => p.postRef)).toEqual(["p9"]);
+      const posts = await adapter.listProfilePosts({ connectedAccountId: "c1", profileUrl: "https://www.linkedin.com/in/creator", limit: 5 });
+      expect(posts.map((p) => p.postRef)).toEqual(["urn:li:activity:9"]);
+      expect(posts[0]!.authorProfileUrl).toBe("https://www.linkedin.com/in/creator");
     });
 
-    it("listPostEngagers merges reactions + comments, comment wins the dedup", async () => {
+    it("listPostEngagers maps reactions (author) + comments (author_details), comment wins the dedup", async () => {
       const adapter = infra({
-        "/reactions": { items: [{ author: { profile_url: "https://linkedin.com/in/x", name: "Xan", headline: "CX" } }] },
-        "/comments": { items: [{ author: { profile_url: "https://linkedin.com/in/x", name: "Xan", headline: "CX" }, text: "me too" }] },
+        "/reactions": { object: "PostReactionList", items: [
+          { object: "PostReaction", value: "LIKE", author: { id: "ACoAA_x", type: "INDIVIDUAL", name: "Xan", headline: "CX", profile_url: "https://www.linkedin.com/in/ACoAA_x" } },
+        ] },
+        "/comments": { object: "CommentList", items: [
+          { object: "Comment", id: "cmt1", author: "Xan", author_details: { id: "ACoAA_x", headline: "CX", profile_url: "https://www.linkedin.com/in/ACoAA_x" }, text: "me too" },
+        ] },
       });
-      const engagers = await adapter.listPostEngagers({ connectedAccountId: "c1", postRef: "p1", limit: 10 });
+      const engagers = await adapter.listPostEngagers({ connectedAccountId: "c1", postRef: "urn:li:activity:7", limit: 10 });
       expect(engagers).toEqual([
-        { profileUrl: "https://linkedin.com/in/x", name: "Xan", headline: "CX", kind: "comment", text: "me too" },
+        { profileUrl: "https://www.linkedin.com/in/ACoAA_x", name: "Xan", headline: "CX", kind: "comment", text: "me too" },
       ]);
     });
 
-    it("getProfile resolves a public_identifier into a profile url + fields", async () => {
+    it("getProfile maps the UserProfile shape (no profile_url field; builds from public_identifier; no company)", async () => {
       const adapter = infra({
-        "/users/lee": { public_identifier: "lee", first_name: "Lee", last_name: "Park", headline: "Head of CX", current_company: { name: "Acme" }, location: "Austin" },
+        "/users/lee": { object: "UserProfile", public_identifier: "lee", provider_id: "ACoAA_lee", first_name: "Lee", last_name: "Park", headline: "Head of CX", location: "Austin" },
       });
       const profile = await adapter.getProfile({ connectedAccountId: "c1", profileUrl: "https://www.linkedin.com/in/lee" });
       expect(profile).toEqual({
-        profileUrl: "https://www.linkedin.com/in/lee", firstName: "Lee", lastName: "Park", headline: "Head of CX", companyName: "Acme", location: "Austin",
+        profileUrl: "https://www.linkedin.com/in/lee", firstName: "Lee", lastName: "Park", headline: "Head of CX", companyName: null, location: "Austin",
       });
     });
 

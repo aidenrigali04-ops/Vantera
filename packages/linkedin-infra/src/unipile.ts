@@ -54,39 +54,55 @@ function mapItems<T>(items: unknown, map: (raw: unknown) => T | null, limit: num
   return out;
 }
 
+/** Profile URL from a Unipile actor: public_identifier slug preferred, provider id as fallback. */
+function actorProfileUrl(a: Record<string, unknown> | undefined): string | null {
+  const pub = str(a?.public_identifier);
+  if (pub) return `https://www.linkedin.com/in/${pub}`;
+  const id = str(a?.id);
+  return id ? `https://www.linkedin.com/in/${id}` : null;
+}
+
 function mapPost(raw: unknown): LinkedInPost | null {
   if (typeof raw !== "object" || raw === null) return null;
   const p = raw as Record<string, unknown>;
-  const postRef = str(p.id) ?? str(p.social_id) ?? str(p.share_url);
+  // reactions/comments are read by the post URN, so social_id is the canonical ref (not the
+  // numeric id — they can differ, and the engager endpoints reject the numeric id).
+  const postRef = str(p.social_id) ?? str(p.id);
   if (!postRef) return null;
-  const author = (p.author ?? p.poster) as Record<string, unknown> | undefined;
+  const author = p.author as Record<string, unknown> | undefined;
   return {
     postRef,
-    authorProfileUrl: str(author?.profile_url) ?? str(p.author_profile_url),
-    authorName: str(author?.name) ?? str(p.author_name),
+    authorProfileUrl: actorProfileUrl(author),
+    authorName: str(author?.name),
     authorHeadline: str(author?.headline),
-    text: str(p.text) ?? str(p.commentary) ?? "",
-    postedAt: str(p.date) ?? str(p.posted_at),
-    url: str(p.share_url) ?? str(p.url),
+    text: str(p.text) ?? "",
+    postedAt: str(p.parsed_datetime) ?? str(p.date),
+    url: str(p.share_url),
   };
 }
 
-function mapEngager(raw: unknown, kind: "reaction" | "comment"): LinkedInEngager | null {
+/** A reaction row: the reactor is under `author` (with a profile_url). */
+function mapReaction(raw: unknown): LinkedInEngager | null {
   if (typeof raw !== "object" || raw === null) return null;
   const e = raw as Record<string, unknown>;
-  const author = (e.author ?? e.user ?? e) as Record<string, unknown>;
-  const profileUrl = str(author.profile_url) ?? str(e.profile_url);
+  const author = e.author as Record<string, unknown> | undefined;
+  const profileUrl = str(author?.profile_url) ?? actorProfileUrl(author);
   if (!profileUrl) return null;
-  const engager: LinkedInEngager = {
-    profileUrl,
-    name: str(author.name),
-    headline: str(author.headline),
-    kind,
-  };
-  if (kind === "comment") {
-    const text = str(e.text) ?? str(e.body);
-    if (text) engager.text = text;
-  }
+  return { profileUrl, name: str(author?.name), headline: str(author?.headline), kind: "reaction" };
+}
+
+/** A comment row: the commenter is under `author_details`; `author` is the display-name string. */
+function mapComment(raw: unknown): LinkedInEngager | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const e = raw as Record<string, unknown>;
+  const details = e.author_details as Record<string, unknown> | undefined;
+  const profileUrl = str(details?.profile_url) ?? actorProfileUrl(details);
+  if (!profileUrl) return null;
+  const name =
+    typeof e.author === "string" ? e.author : str((e.author as Record<string, unknown> | undefined)?.name);
+  const engager: LinkedInEngager = { profileUrl, name, headline: str(details?.headline), kind: "comment" };
+  const text = str(e.text);
+  if (text) engager.text = text;
   return engager;
 }
 
@@ -322,10 +338,17 @@ export class UnipileLinkedInInfra implements LinkedInInfra {
   }
 
   async listProfilePosts(req: ProfilePostsRequest): Promise<LinkedInPost[]> {
-    const id = encodeURIComponent(profileIdentifier(req.profileUrl));
     const acct = encodeURIComponent(req.connectedAccountId);
+    // the posts endpoint wants the provider id (ACoAA…), not the public slug — resolve it first
+    const slug = encodeURIComponent(profileIdentifier(req.profileUrl));
+    const profile = await this.call<{ provider_id?: unknown }>(
+      `/api/v1/users/${slug}?account_id=${acct}`,
+      { method: "GET" }
+    ).catch(() => null);
+    const providerId = profile ? str(profile.provider_id) : null;
+    if (!providerId) return [];
     const data = await this.call<{ items?: unknown }>(
-      `/api/v1/users/${id}/posts?account_id=${acct}&limit=${req.limit}`,
+      `/api/v1/users/${encodeURIComponent(providerId)}/posts?account_id=${acct}&limit=${req.limit}`,
       { method: "GET" }
     );
     return mapItems(data.items, mapPost, req.limit);
@@ -342,8 +365,8 @@ export class UnipileLinkedInInfra implements LinkedInInfra {
     // Dedupe by profile, preferring a comment (stronger intent) over a bare reaction.
     const byProfile = new Map<string, LinkedInEngager>();
     for (const e of [
-      ...mapItems(reactions.items, (r) => mapEngager(r, "reaction"), req.limit),
-      ...mapItems(comments.items, (c) => mapEngager(c, "comment"), req.limit),
+      ...mapItems(reactions.items, mapReaction, req.limit),
+      ...mapItems(comments.items, mapComment, req.limit),
     ]) {
       const existing = byProfile.get(e.profileUrl);
       if (!existing || (existing.kind === "reaction" && e.kind === "comment")) byProfile.set(e.profileUrl, e);

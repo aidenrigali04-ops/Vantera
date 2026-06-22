@@ -147,13 +147,15 @@ export async function runIntentScan(agentId: string, deps: IntentScanDeps): Prom
   const survivors: { o: FreshObs; v: IntentVerdict; leadId: string; candidate: ProspectCandidate }[] = [];
   const icpCriteria = ctx.icps[0]?.criteria ?? {};
   for (const { o, v } of primary.values()) {
-    if (await deps.store.isSuppressed(accountId, "linkedin", o.profileUrl)) {
-      rows.push(obsRow(o, "suppressed", v.why_now, null));
-      continue;
-    }
     const profile = await deps.linkedin.getProfile({ connectedAccountId: acct, profileUrl: o.profileUrl });
     if (!profile) {
       rows.push(obsRow(o, "observed", v.why_now, null));
+      continue;
+    }
+    // Suppression on the CANONICAL profile url (rule 11): engagement reads can return provider-id
+    // urls while the suppression ledger holds public slugs, so resolve first, then check.
+    if (await deps.store.isSuppressed(accountId, "linkedin", profile.profileUrl)) {
+      rows.push(obsRow(o, "suppressed", v.why_now, null));
       continue;
     }
     const candidate = candidateFromProfile(profile);
