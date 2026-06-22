@@ -20,6 +20,7 @@ describe("preClassify (deterministic, no model call)", () => {
   it("catches unsubscribe requests", () => {
     expect(preClassify("please remove me from your list")?.classification).toBe("unsubscribe");
     expect(preClassify("STOP EMAILING ME")?.classification).toBe("unsubscribe");
+    expect(preClassify("please remove me from your list")?.booked).toBe(false);
   });
 
   it("catches out-of-office auto-replies", () => {
@@ -56,6 +57,29 @@ describe("classifyReply", () => {
 
     expect(result.classification).toBe("interested");
     expect(result.rationale).toBe("asks to learn more");
+    expect(result.booked).toBe(false);
     expect(model.doGenerateCalls).toHaveLength(1);
+  });
+
+  it("flags a booked meeting when the prospect confirms a scheduled time", async () => {
+    const model = new MockLanguageModelV3({
+      doGenerate: async () =>
+        textResponse({ classification: "interested", rationale: "agreed to Tuesday 2pm", booked: true }),
+    });
+
+    const result = await classifyReply("Tuesday at 2pm works — sending an invite now", model);
+
+    expect(result.classification).toBe("interested");
+    expect(result.booked).toBe(true);
+  });
+
+  it("defaults booked to false when the model omits it", async () => {
+    const model = new MockLanguageModelV3({
+      doGenerate: async () => textResponse({ classification: "neutral", rationale: "a question" }),
+    });
+
+    const result = await classifyReply("what does it cost?", model);
+
+    expect(result.booked).toBe(false);
   });
 });

@@ -18,6 +18,7 @@ function makeStore(overrides: Partial<InboundStore> = {}): InboundStore & {
   upsertedLinkedInStatuses: Parameters<InboundStore["upsertLinkedInAccountStatus"]>[0][];
   stoppedSequences: string[];
   notifications: Parameters<InboundStore["insertLeadNotification"]>[0][];
+  bookedMeetings: { leadId: string; at: Date }[];
 } {
   let replyCounter = 0;
   const replies: Parameters<InboundStore["insertReply"]>[0][] = [];
@@ -29,6 +30,7 @@ function makeStore(overrides: Partial<InboundStore> = {}): InboundStore & {
   const upsertedLinkedInStatuses: Parameters<InboundStore["upsertLinkedInAccountStatus"]>[0][] = [];
   const stoppedSequences: string[] = [];
   const notifications: Parameters<InboundStore["insertLeadNotification"]>[0][] = [];
+  const bookedMeetings: { leadId: string; at: Date }[] = [];
 
   const base: InboundStore = {
     findLinkedInAccountByProviderRef: async () => null,
@@ -44,6 +46,7 @@ function makeStore(overrides: Partial<InboundStore> = {}): InboundStore & {
     addSuppression: async (...args) => { suppressions.push(args); },
     setLeadConnected: async (leadId, at) => { connectedLeads.push({ leadId, at }); },
     setLeadReplied: async (leadId, campaignId) => { repliedLeads.push({ leadId, campaignId }); },
+    markMeetingBooked: async (leadId, at) => { bookedMeetings.push({ leadId, at }); },
     cancelPendingSends: async (leadId) => { canceledSends.push(leadId); return 0; },
     stopSequenceForReply: async (leadId) => { stoppedSequences.push(leadId); },
     insertLeadNotification: async (n) => { notifications.push(n); },
@@ -60,6 +63,7 @@ function makeStore(overrides: Partial<InboundStore> = {}): InboundStore & {
     upsertedLinkedInStatuses,
     stoppedSequences,
     notifications,
+    bookedMeetings,
   });
 }
 
@@ -102,8 +106,11 @@ const LINKEDIN_ACCOUNT_STATUS_FIXTURE = {
 
 const linkedinInfra = new InMemoryLinkedInInfra();
 
-function classify(classification: ReplyVerdict["classification"]): InboundDeps["classifyFn"] {
-  return async () => ({ classification, rationale: "test stub" });
+function classify(
+  classification: ReplyVerdict["classification"],
+  booked = false
+): InboundDeps["classifyFn"] {
+  return async () => ({ classification, rationale: "test stub", booked });
 }
 
 function deps(store: InboundStore, extra?: Partial<InboundDeps>): InboundDeps {
@@ -144,6 +151,50 @@ describe("runInbound — LinkedIn reply: interested", () => {
     expect(store.repliedLeads.map((r) => r.leadId)).toContain("lead1");
     expect(store.notifications).toHaveLength(1);
     expect(store.suppressions).toHaveLength(0);
+  });
+});
+
+describe("runInbound — meeting booked (funnel writer)", () => {
+  function storeForLead() {
+    return makeStore({
+      findLinkedInAccountByProviderRef: async () => ({ id: "li_id_1", accountId: "acc1" }),
+      findLeadByLinkedInUrl: async (_accountId, url) =>
+        url === NORMALIZED_URL ? { id: "lead1", campaignId: "camp1" } : null,
+    });
+  }
+
+  it("stamps meeting_booked_at when an interested reply confirms a scheduled meeting", async () => {
+    const fixedNow = new Date("2026-06-12T12:00:00.000Z");
+    const store = storeForLead();
+
+    await runInbound(
+      { source: "linkedin", payload: LINKEDIN_REPLY_FIXTURE },
+      deps(store, { classifyFn: classify("interested", true), now: () => fixedNow })
+    );
+
+    expect(store.bookedMeetings).toEqual([{ leadId: "lead1", at: fixedNow }]);
+  });
+
+  it("does not stamp meeting_booked_at on an ordinary interested reply", async () => {
+    const store = storeForLead();
+
+    await runInbound(
+      { source: "linkedin", payload: LINKEDIN_REPLY_FIXTURE },
+      deps(store, { classifyFn: classify("interested", false) })
+    );
+
+    expect(store.bookedMeetings).toHaveLength(0);
+  });
+
+  it("never stamps a booking on a hard-negative reply, even if booked is set", async () => {
+    const store = storeForLead();
+
+    await runInbound(
+      { source: "linkedin", payload: LINKEDIN_REPLY_FIXTURE },
+      deps(store, { classifyFn: classify("not_interested", true) })
+    );
+
+    expect(store.bookedMeetings).toHaveLength(0);
   });
 });
 

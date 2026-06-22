@@ -15,4 +15,4 @@ Analytics answers one question: is your spend paying off? It lives as the **Anal
 
 **To see dollar figures**, set your **average value per client** in Settings — until then the page shows counts, not dollars. The ratio and cost-per figures also need an active plan, since they measure pipeline against what you pay.
 
-**Meetings tracking** turns on once your AI caller books a meeting; until then that stage reads zero with a note, so nothing on the page is a guess.
+**Meetings tracking** turns on once a prospect confirms a meeting in reply to your outreach; until then that stage reads zero with a note, so nothing on the page is a guess.

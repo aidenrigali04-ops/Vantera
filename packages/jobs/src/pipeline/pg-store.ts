@@ -983,6 +983,14 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
       }
     },
 
+    async markMeetingBooked(leadId: string, at: Date) {
+      // First booking wins — never overwrite an earlier meeting timestamp.
+      await db
+        .update(leads)
+        .set({ meetingBookedAt: at })
+        .where(and(eq(leads.id, leadId), isNull(leads.meetingBookedAt)));
+    },
+
     async cancelPendingSends(leadId: string) {
       const rows = await db
         .update(scheduledSends)

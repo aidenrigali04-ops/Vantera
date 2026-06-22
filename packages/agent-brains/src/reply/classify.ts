@@ -5,6 +5,12 @@ import { getModel } from "@vantera/ai";
 export const replyVerdictSchema = z.object({
   classification: z.enum(["interested", "not_interested", "neutral", "out_of_office", "unsubscribe", "other"]),
   rationale: z.string().max(300),
+  /**
+   * The prospect confirmed a SPECIFIC scheduled meeting or call — a time agreed, an invite
+   * accepted, "see you then". Stamps the lead's meeting_booked_at so the funnel's Meetings stage
+   * is honest. Defaults false: mere interest or "let's find a time" is NOT a booking.
+   */
+  booked: z.boolean().default(false),
 });
 
 export type ReplyVerdict = z.infer<typeof replyVerdictSchema>;
@@ -26,10 +32,10 @@ const OOO_PATTERNS = [
 /** Deterministic first pass: legal-significance phrases never depend on a model. */
 export function preClassify(body: string): ReplyVerdict | null {
   if (UNSUB_PATTERNS.some((p) => p.test(body))) {
-    return { classification: "unsubscribe", rationale: "explicit removal request" };
+    return { classification: "unsubscribe", rationale: "explicit removal request", booked: false };
   }
   if (OOO_PATTERNS.some((p) => p.test(body))) {
-    return { classification: "out_of_office", rationale: "auto-responder phrasing" };
+    return { classification: "out_of_office", rationale: "auto-responder phrasing", booked: false };
   }
   return null;
 }
@@ -38,7 +44,9 @@ const SYSTEM = `You classify a prospect's reply to B2B outreach.
 interested = wants to learn more or accepts the ask. not_interested = a clear no, polite or hard.
 neutral = ambiguous, or a question without commitment. out_of_office = auto-responder.
 unsubscribe = asks to stop contact. other = wrong person, forwarded, anything else.
-Rationale: one short sentence.`;
+Set booked=true ONLY when the prospect confirms a specific meeting or call is scheduled — a time
+agreed, an invite accepted, or "see you then". Mere interest, "let's find a time", or asking for a
+link is NOT booked. Rationale: one short sentence.`;
 
 export async function classifyReply(
   body: string,

@@ -19,12 +19,17 @@ async function applyGenuineReply(
   store: InboundStore,
   accountId: string,
   lead: { id: string; campaignId: string | null },
-  verdict: ReplyVerdict
+  verdict: ReplyVerdict,
+  now: Date
 ): Promise<void> {
   await store.setLeadReplied(lead.id, lead.campaignId);
   if (STOPS_SEQUENCE.has(verdict.classification)) {
     await store.cancelPendingSends(lead.id);
     await store.stopSequenceForReply(lead.id);
+  } else if (verdict.booked) {
+    // A genuine reply confirming a scheduled meeting stamps meeting_booked_at — the
+    // LinkedIn-native writer for the funnel's Meetings stage (the removed caller used to do this).
+    await store.markMeetingBooked(lead.id, now);
   }
   await store.insertLeadNotification({
     accountId,
@@ -88,7 +93,7 @@ export async function runInbound(payload: InboundPayload, deps: InboundDeps): Pr
   const verdict = await deps.classifyFn(event.body);
   await deps.store.setReplyClassification(replyId, verdict);
   if (verdict.classification !== "out_of_office") {
-    await applyGenuineReply(deps.store, accountId, lead, verdict);
+    await applyGenuineReply(deps.store, accountId, lead, verdict, now);
   }
   if (verdict.classification === "not_interested") {
     await deps.store.addSuppression(accountId, "linkedin", url, "not_interested", lead.id);

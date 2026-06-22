@@ -464,6 +464,8 @@ export interface InboundStore {
   ): Promise<void>;
   setLeadConnected(leadId: string, at: Date): Promise<void>;
   setLeadReplied(leadId: string, campaignId: string | null): Promise<void>;
+  /** Stamp meeting_booked_at when a reply confirms a scheduled meeting (first booking wins). */
+  markMeetingBooked(leadId: string, at: Date): Promise<void>;
   /** pending_review/approved/scheduled drafts for the lead → canceled; returns count */
   cancelPendingSends(leadId: string): Promise<number>;
   /**
