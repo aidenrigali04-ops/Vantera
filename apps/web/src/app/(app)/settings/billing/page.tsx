@@ -49,13 +49,11 @@ export default async function BillingPage({
   const currentTier: PlanTier | "none" =
     hasPaidSubscription && snap ? snap.plan : "none";
 
-  const [{ count: seatCount }, { count: mailboxCount }, { count: campaignCount }, { count: liCount }] =
-    await Promise.all([
-      supabase.from("account_members").select("user_id", { count: "exact", head: true }),
-      supabase.from("mailboxes").select("id", { count: "exact", head: true }),
-      supabase.from("campaigns").select("id", { count: "exact", head: true }),
-      supabase.from("linkedin_accounts").select("id", { count: "exact", head: true }),
-    ]);
+  const [{ count: seatCount }, { count: campaignCount }, { count: liCount }] = await Promise.all([
+    supabase.from("account_members").select("user_id", { count: "exact", head: true }),
+    supabase.from("campaigns").select("id", { count: "exact", head: true }),
+    supabase.from("linkedin_accounts").select("id", { count: "exact", head: true }),
+  ]);
 
   const lapsed = snap ? ["past_due", "canceled"].includes(snap.subscriptionStatus) : false;
 
@@ -103,7 +101,7 @@ export default async function BillingPage({
           </div>
           <ul className="text-sm text-muted-foreground">
             <li>Seats: {seatCount ?? 0} / {limits.maxSeats}</li>
-            <li>Mailboxes: {mailboxCount ?? 0} / {limits.maxMailboxes}</li>
+            <li>LinkedIn accounts: {liCount ?? 0} / {limits.maxLinkedinAccounts}</li>
             <li>Campaigns: {campaignCount ?? 0} / {limits.maxCampaigns}</li>
           </ul>
         </div>
@@ -131,7 +129,6 @@ export default async function BillingPage({
             <ul className="text-sm text-muted-foreground">
               <li>Seats: {seatCount ?? 0} / {limits.maxSeats}</li>
               <li>LinkedIn accounts: {liCount ?? 0} / {limits.maxLinkedinAccounts}</li>
-              <li>Mailboxes: {mailboxCount ?? 0} / {limits.maxMailboxes}</li>
               <li>Campaigns: {campaignCount ?? 0} / {limits.maxCampaigns}</li>
             </ul>
             <ManageBillingButton />

@@ -1,5 +1,4 @@
-import { createBillingFromEnv, resolveEntitlements } from "@vantera/billing";
-import { tasks } from "@trigger.dev/sdk";
+import { createBillingFromEnv } from "@vantera/billing";
 import { createServiceClient } from "@/lib/supabase/service";
 import { handleStripeWebhook } from "@/server/billing-webhook";
 
@@ -32,16 +31,8 @@ export async function POST(req: Request) {
         outreach_paused: snap.outreachPaused,
       };
 
-      // If the new plan has zero mailbox entitlement (canceled/lapsed), schedule deprovision
-      // after the account row is updated. Partial downgrades (non-zero cap) are not deprovisioned
-      // in this pass — only full cancel/lapse where mailbox entitlement drops to zero.
-      const zeroMailboxEntitlement = resolveEntitlements({
-        plan: snap.plan,
-        subscriptionStatus: snap.subscriptionStatus,
-        seatsPurchased: snap.seatsPurchased,
-        linkedinAccountsPurchased: snap.linkedinAccountsPurchased,
-        currentPeriodEnd: snap.currentPeriodEnd,
-      }).maxMailboxes === 0;
+      // Lapse/cancel pausing is carried by the outreach_paused snapshot column (set by the
+      // webhook parser); there is no email infra to deprovision in the LinkedIn-only model.
 
       // Primary match: existing customer id.
       const { data: byCustomer } = await supabase
@@ -50,11 +41,6 @@ export async function POST(req: Request) {
         .eq("stripe_customer_id", snap.stripeCustomerId)
         .select("id");
       if ((byCustomer?.length ?? 0) > 0) {
-        if (zeroMailboxEntitlement) {
-          for (const row of byCustomer!) {
-            await tasks.trigger("deprovision-account", { accountId: row.id });
-          }
-        }
         return;
       }
       // First subscription: the row has no customer id yet — link by account id from metadata.
@@ -73,9 +59,6 @@ export async function POST(req: Request) {
           // Already linked to a customer (or not found): refuse silently rather than clobber.
           console.warn("billing webhook: first-subscription link skipped (account already has a customer)");
           return;
-        }
-        if (zeroMailboxEntitlement) {
-          await tasks.trigger("deprovision-account", { accountId: snap.accountId });
         }
         return;
       }

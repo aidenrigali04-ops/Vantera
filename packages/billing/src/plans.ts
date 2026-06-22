@@ -14,10 +14,9 @@ export interface PlanConfig {
   includedSeats: number;
   /** LinkedIn sender accounts included before the per-account add-on is billed. */
   includedLinkedinAccounts: number;
-  maxMailboxes: number;
   maxCampaigns: number;
   /** Capability flags gated by tier. */
-  features: { aiCaller: boolean; metaAds: boolean };
+  features: { intent: boolean; metaAds: boolean };
 }
 
 const env = (k: string): string => process.env[k] ?? `MISSING_${k}`;
@@ -29,9 +28,8 @@ export const PLANS: Record<PlanTier, PlanConfig> = {
     stripePriceIdAnnual: env("STRIPE_PRICE_STARTER_ANNUAL"),
     includedSeats: 1,
     includedLinkedinAccounts: 1,
-    maxMailboxes: 3,
     maxCampaigns: 1,
-    features: { aiCaller: false, metaAds: false },
+    features: { intent: false, metaAds: false },
   },
   growth: {
     tier: "growth",
@@ -39,9 +37,8 @@ export const PLANS: Record<PlanTier, PlanConfig> = {
     stripePriceIdAnnual: env("STRIPE_PRICE_GROWTH_ANNUAL"),
     includedSeats: 3,
     includedLinkedinAccounts: 3,
-    maxMailboxes: 9,
     maxCampaigns: 5,
-    features: { aiCaller: false, metaAds: true },
+    features: { intent: false, metaAds: true },
   },
   scale: {
     tier: "scale",
@@ -49,9 +46,8 @@ export const PLANS: Record<PlanTier, PlanConfig> = {
     stripePriceIdAnnual: env("STRIPE_PRICE_SCALE_ANNUAL"),
     includedSeats: 10,
     includedLinkedinAccounts: 10,
-    maxMailboxes: 30,
     maxCampaigns: 25,
-    features: { aiCaller: true, metaAds: true },
+    features: { intent: true, metaAds: true },
   },
 };
 

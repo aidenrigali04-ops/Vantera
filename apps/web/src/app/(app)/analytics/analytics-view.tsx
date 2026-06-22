@@ -273,7 +273,7 @@ function FunnelCard({ funnel, meetingsTracked }: { funnel: FunnelStage[]; meetin
               )}
               {isUntrackedMeetings && (
                 <p className="mt-1 text-xs text-muted-foreground/70">
-                  Tracked once your AI caller books a meeting.
+                  Tracked once a lead books a meeting from your outreach.
                 </p>
               )}
             </div>

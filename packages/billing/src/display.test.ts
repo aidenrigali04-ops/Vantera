@@ -30,17 +30,19 @@ describe("plan display", () => {
     expect(new Set(prices).size).toBe(prices.length);
   });
 
-  it("only surfaces the AI Cold Caller where the entitlement actually unlocks it", () => {
+  it("only surfaces the Intent Agent where the entitlement actually unlocks it", () => {
     for (const tier of PLAN_DISPLAY_ORDER) {
-      const claimsCaller = PLAN_DISPLAY[tier].features.some((f) => /AI Cold Caller/i.test(f));
-      expect(claimsCaller).toBe(PLANS[tier].features.aiCaller);
+      const claimsIntent = PLAN_DISPLAY[tier].features.some((f) => /Intent Agent/i.test(f));
+      expect(claimsIntent).toBe(PLANS[tier].features.intent);
     }
   });
 
   it("derives capacity bullets from the real entitlement numbers", () => {
     for (const tier of PLAN_DISPLAY_ORDER) {
       const f = PLAN_DISPLAY[tier].features;
-      expect(f.some((b) => b.includes(`${PLANS[tier].maxMailboxes} sending mailboxes`))).toBe(true);
+      expect(
+        f.some((b) => b.includes(`${PLANS[tier].includedLinkedinAccounts} LinkedIn account`))
+      ).toBe(true);
       expect(f.some((b) => b.includes(`${PLANS[tier].maxCampaigns} active campaign`))).toBe(true);
     }
   });

@@ -17,20 +17,18 @@ export interface EntitlementSnapshot {
 
 export interface Limits {
   maxSeats: number;
-  maxMailboxes: number;
   maxCampaigns: number;
   maxLinkedinAccounts: number;
-  features: { aiCaller: boolean; metaAds: boolean };
+  features: { intent: boolean; metaAds: boolean };
 }
 
-export type GatedResource = "seat" | "mailbox" | "campaign" | "linkedinAccount";
+export type GatedResource = "seat" | "campaign" | "linkedinAccount";
 
 const EMPTY: Limits = {
   maxSeats: 0,
-  maxMailboxes: 0,
   maxCampaigns: 0,
   maxLinkedinAccounts: 0,
-  features: { aiCaller: false, metaAds: false },
+  features: { intent: false, metaAds: false },
 };
 
 export function isActive(status: SubscriptionStatus): boolean {
@@ -44,7 +42,6 @@ export function resolveEntitlements(snapshot: EntitlementSnapshot): Limits {
   const plan = PLANS[snapshot.plan];
   return {
     maxSeats: plan.includedSeats + Math.max(0, snapshot.seatsPurchased),
-    maxMailboxes: plan.maxMailboxes,
     maxCampaigns: plan.maxCampaigns,
     maxLinkedinAccounts: plan.includedLinkedinAccounts + Math.max(0, snapshot.linkedinAccountsPurchased),
     features: plan.features,
@@ -53,7 +50,6 @@ export function resolveEntitlements(snapshot: EntitlementSnapshot): Limits {
 
 const LIMIT_FIELD: Record<GatedResource, keyof Limits> = {
   seat: "maxSeats",
-  mailbox: "maxMailboxes",
   campaign: "maxCampaigns",
   linkedinAccount: "maxLinkedinAccounts",
 };

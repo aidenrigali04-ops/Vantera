@@ -28,7 +28,7 @@ function capacity(tier: PlanTier): string[] {
   const p = PLANS[tier];
   return [
     `${p.includedSeats} team seat${p.includedSeats === 1 ? "" : "s"} included`,
-    `${p.maxMailboxes} sending mailboxes`,
+    `${p.includedLinkedinAccounts} LinkedIn account${p.includedLinkedinAccounts === 1 ? "" : "s"} included`,
     `${p.maxCampaigns} active campaign${p.maxCampaigns === 1 ? "" : "s"}`,
   ];
 }
@@ -37,11 +37,11 @@ export const PLAN_DISPLAY: Record<PlanTier, PlanDisplay> = {
   starter: {
     tier: "starter",
     name: "Starter",
-    tagline: "Prove the motion — Email + LinkedIn SDR agents working your ICP.",
+    tagline: "Prove the motion — LinkedIn SDR agents working your ICP.",
     monthlyUsd: 99,
     highlight: false,
     features: [
-      "Prospect & Outreach agents (Email + LinkedIn)",
+      "Prospect & Outreach agents (LinkedIn)",
       "ICP-tailored enrichment & lead scoring",
       ...capacity("starter"),
     ],
@@ -49,7 +49,7 @@ export const PLAN_DISPLAY: Record<PlanTier, PlanDisplay> = {
   growth: {
     tier: "growth",
     name: "Growth",
-    tagline: "Full multi-channel outbound, plus Meta Ads lead generation.",
+    tagline: "More volume across the team, plus Meta Ads lead generation.",
     monthlyUsd: 349,
     highlight: true,
     features: [
@@ -61,12 +61,12 @@ export const PLAN_DISPLAY: Record<PlanTier, PlanDisplay> = {
   scale: {
     tier: "scale",
     name: "Scale",
-    tagline: "Add the AI Cold Caller and scale volume across the team.",
+    tagline: "Add the Intent Agent and scale volume across the team.",
     monthlyUsd: 899,
     highlight: false,
     features: [
       "Everything in Growth",
-      "AI Cold Caller agent (voice outreach)",
+      "Intent Agent — LinkedIn-native buying-intent detection",
       "Priority enrichment & support",
       ...capacity("scale"),
     ],
