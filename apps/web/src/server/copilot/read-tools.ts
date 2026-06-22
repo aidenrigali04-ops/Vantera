@@ -261,28 +261,6 @@ export async function getReturnOnSpend(db: SupabaseClient): Promise<ReturnOnSpen
   };
 }
 
-export interface AdsStatusDTO {
-  campaigns: number;
-  conceptsGenerated: number;
-  adLeads: number;
-}
-
-/**
- * Ads activity for the copilot: how many ad campaigns exist, how many concepts have been
- * generated, and how many leads have come in from ads. Answers "how are my ads doing?" /
- * "how many leads did ads bring in?". RLS scopes the read to the caller's account (rule 02).
- */
-export async function getAdsStatus(db: SupabaseClient, _accountId: string): Promise<AdsStatusDTO> {
-  const { data: campaigns } = await db.from("ad_campaigns").select("id");
-  const { data: creatives } = await db.from("ad_creatives").select("id");
-  const { data: adLeads } = await db.from("leads").select("id").eq("source", "ad");
-  return {
-    campaigns: (campaigns as unknown[] | null)?.length ?? 0,
-    conceptsGenerated: (creatives as unknown[] | null)?.length ?? 0,
-    adLeads: (adLeads as unknown[] | null)?.length ?? 0,
-  };
-}
-
 export interface IntentStatusDTO {
   deployed: boolean;
   agentName: string | null;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { getDraftQueueSummary, getCampaignStatus, getGoalProgress, getLeadScoreRationale, getBillingStatus, getReturnOnSpend, getAdsStatus } from "./read-tools";
+import { getDraftQueueSummary, getCampaignStatus, getGoalProgress, getLeadScoreRationale, getBillingStatus, getReturnOnSpend } from "./read-tools";
 
 // fake supabase: each query resolves to the canned result for its table
 function fakeDb(rows: Record<string, unknown>) {
@@ -218,17 +218,5 @@ describe("getReturnOnSpend", () => {
     expect(dto.annualSpend).toBeNull();
     expect(dto.pipelineToSpend).toBeNull();
     expect(dto.clearsRenewalBar).toBeNull();
-  });
-});
-
-describe("getAdsStatus", () => {
-  it("counts campaigns, concepts, and ad-sourced leads — no raw rows", async () => {
-    const db = fakeDb({
-      ad_campaigns: [{ id: "1" }, { id: "2" }],
-      ad_creatives: [{ id: "a" }, { id: "b" }, { id: "c" }],
-      leads: [{ id: "l1" }],
-    });
-    const dto = await getAdsStatus(db, "acc1");
-    expect(dto).toEqual({ campaigns: 2, conceptsGenerated: 3, adLeads: 1 });
   });
 });

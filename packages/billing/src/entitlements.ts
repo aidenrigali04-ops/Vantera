@@ -19,7 +19,7 @@ export interface Limits {
   maxSeats: number;
   maxCampaigns: number;
   maxLinkedinAccounts: number;
-  features: { intent: boolean; metaAds: boolean };
+  features: { intent: boolean };
 }
 
 export type GatedResource = "seat" | "campaign" | "linkedinAccount";
@@ -28,7 +28,7 @@ const EMPTY: Limits = {
   maxSeats: 0,
   maxCampaigns: 0,
   maxLinkedinAccounts: 0,
-  features: { intent: false, metaAds: false },
+  features: { intent: false },
 };
 
 export function isActive(status: SubscriptionStatus): boolean {

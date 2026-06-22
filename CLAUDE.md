@@ -6,7 +6,7 @@ Vantera is **the LinkedIn automation that replaces Waalaxy and Goji Berry**: SDR
 
 Foundational decisions were locked 2026-06-11. The detailed rules live in `.claude/rules/` (auto-loaded alongside this file):
 
-- [Product & scope](.claude/rules/01-product-scope.md) — what Vantera is, the product loop, in/out of scope, Meta Ads initiative
+- [Product & scope](.claude/rules/01-product-scope.md) — what Vantera is, the product loop, in/out of scope
 - [Stack](.claude/rules/02-stack.md) — locked framework, auth, DB, jobs, AI, billing, email choices
 - ~~[Email outreach infrastructure](.claude/rules/03-email-infra.md)~~ — **RETIRED** (LinkedIn-only rescope; `email-infra` deleted)
 - [LinkedIn outreach infrastructure](.claude/rules/04-linkedin-infra.md) — Unipile behind the `linkedin-infra` interface

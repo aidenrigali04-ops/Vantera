@@ -49,12 +49,12 @@ export const PLAN_DISPLAY: Record<PlanTier, PlanDisplay> = {
   growth: {
     tier: "growth",
     name: "Growth",
-    tagline: "More volume across the team, plus Meta Ads lead generation.",
+    tagline: "Scale the motion across your team — more seats, accounts, and volume.",
     monthlyUsd: 349,
     highlight: true,
     features: [
       "Everything in Starter",
-      "Meta Ads generation & lead nurturing",
+      "Run outreach across your whole team",
       ...capacity("growth"),
     ],
   },

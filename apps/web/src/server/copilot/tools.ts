@@ -10,7 +10,6 @@ import {
   getCrmStatus,
   getChannelStatusForAccount,
   getReturnOnSpend,
-  getAdsStatus,
   getIntentStatus,
 } from "./read-tools";
 import { runCampaignSendState } from "./mutate-tools";
@@ -77,14 +76,6 @@ export function buildAccountTools(db: SupabaseClient, accountId: string): Copilo
         "Return on spend: the pipeline-to-spend ratio vs the 2x renewal bar, cost per meeting, cost per close, and annual spend. Use for 'is this worth it / what's my ROI / what does a meeting cost me?'.",
       parameters: z.object({}),
       run: async () => getReturnOnSpend(db),
-    },
-    {
-      name: "getAdsStatus",
-      tier: "read",
-      description:
-        "Ads activity: how many ad campaigns exist, how many concepts have been generated, and how many leads came in from ads. Use for 'how are my ads doing?' or 'how many leads did ads bring in?'.",
-      parameters: z.object({}),
-      run: async () => getAdsStatus(db, accountId),
     },
     {
       name: "getIntentStatus",

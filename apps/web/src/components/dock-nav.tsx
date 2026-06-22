@@ -6,7 +6,6 @@ import {
   Bot,
   Inbox,
   LayoutDashboard,
-  Megaphone,
   Settings,
   Users,
   type LucideIcon,
@@ -25,7 +24,6 @@ const MAIN: NavItem[] = [
   { key: "dashboard", href: "/dashboard", label: "Results", icon: LayoutDashboard },
   { key: "agents", href: "/agents", label: "Agents", icon: Bot },
   { key: "leads", href: "/leads", label: "Leads", icon: Users },
-  { key: "ads", href: "/ads", label: "Ads", icon: Megaphone },
   { key: "review", href: "/review", label: "Review", icon: Inbox },
 ];
 

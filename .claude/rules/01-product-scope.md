@@ -9,10 +9,7 @@ Identify (ICP + LinkedIn intent) → Qualify → Draft → Outreach (LinkedIn) �
 **Only high-quality leads.** Two ways a person enters the funnel: ICP-fit discovery (the Scout, rules 05/06) and LinkedIn intent (the Intent Agent — people showing in-market behavior on LinkedIn around the customer's niche). Both pass the *same* qualification gate; intent is a second filter, never a bypass.
 
 ## In scope
-SDR agents (Scout, Outreach, and the planned Intent agent), auth, onboarding, dashboard, **LinkedIn outreach (the only send channel)**, LinkedIn intent detection, data enrichment, Meta Ads + lead nurturing (a separate inbound lead-gen initiative), CRM connection funnel (closed leads pushed to the customer's CRM — Vantera is not itself a CRM), revenue goal, progress & analytics tracking, team seats, Stripe billing.
+SDR agents (Scout, Outreach, and the planned Intent agent), auth, onboarding, dashboard, **LinkedIn outreach (the only send channel)**, LinkedIn intent detection, data enrichment, CRM connection funnel (closed leads pushed to the customer's CRM — Vantera is not itself a CRM), revenue goal, progress & analytics tracking, team seats, Stripe billing.
 
 ## Out of scope
-**Email outreach, SMS/iMessage, and AI cold calling** — removed in the 2026-06-20 LinkedIn-only rescope (infra + workflows). Also out: inbox, white-label branding, client portal, and anything unrelated to LinkedIn outreach, lead nurturing, or CRM connection.
-
-## Key initiative: Meta Ads generation
-Users generate Meta ads directly on the platform via Claude and Higgsfield, feeding the lead-nurturing channel. Note: Meta Ads is an inbound lead-gen channel alongside the core LinkedIn-only outreach — retained, but flagged for a separate keep/cut call against the pure-LinkedIn positioning.
+**Email outreach, SMS/iMessage, AI cold calling, and Meta Ads generation** — removed (email/SMS/caller in the 2026-06-20 LinkedIn-only rescope; Meta Ads on 2026-06-21, to keep the product strictly LinkedIn — infra + workflows). Also out: inbox, white-label branding, client portal, and anything unrelated to LinkedIn outreach or CRM connection.

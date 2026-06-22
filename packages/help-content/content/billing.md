@@ -6,13 +6,13 @@ routes: /settings/billing
 
 # Plans and billing
 
-Vantera offers three plans — **Starter**, **Growth**, and **Scale** — each with a set of included seats and usage limits. Your plan determines how many teammates can log in and how much outreach capacity you get by default. Every plan runs the same prospecting, enrichment, and lead scoring; moving up a plan adds channels, seats, and volume.
+Vantera offers three plans — **Starter**, **Growth**, and **Scale** — each with a set of included seats and usage limits. Your plan determines how many teammates can log in and how much LinkedIn outreach capacity you get by default. Every plan runs the same prospecting, enrichment, and lead scoring; moving up a plan adds capacity, seats, and capabilities.
 
 ## What each plan includes
 
-- **Starter** — Email and LinkedIn SDR agents working your ICP. The smallest seat, mailbox, and campaign limits.
-- **Growth** — Everything in Starter, plus Meta Ads generation and lead nurturing, with more seats, mailboxes, and active campaigns.
-- **Scale** — Everything in Growth, plus the AI Cold Caller (voice outreach), the highest limits, and priority enrichment and support.
+- **Starter** — The Prospect and Outreach agents working your ICP on LinkedIn. The smallest seat, LinkedIn-account, and campaign limits.
+- **Growth** — Everything in Starter, with more seats, LinkedIn accounts, and active campaigns to scale outreach across your team.
+- **Scale** — Everything in Growth, plus the **Intent Agent** (LinkedIn-native buying-intent detection), the highest limits, and priority enrichment and support.
 
 For custom volume, SSO, or dedicated support, contact us about an Enterprise plan.
 

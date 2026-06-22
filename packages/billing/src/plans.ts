@@ -16,7 +16,7 @@ export interface PlanConfig {
   includedLinkedinAccounts: number;
   maxCampaigns: number;
   /** Capability flags gated by tier. */
-  features: { intent: boolean; metaAds: boolean };
+  features: { intent: boolean };
 }
 
 const env = (k: string): string => process.env[k] ?? `MISSING_${k}`;
@@ -29,7 +29,7 @@ export const PLANS: Record<PlanTier, PlanConfig> = {
     includedSeats: 1,
     includedLinkedinAccounts: 1,
     maxCampaigns: 1,
-    features: { intent: false, metaAds: false },
+    features: { intent: false },
   },
   growth: {
     tier: "growth",
@@ -38,7 +38,7 @@ export const PLANS: Record<PlanTier, PlanConfig> = {
     includedSeats: 3,
     includedLinkedinAccounts: 3,
     maxCampaigns: 5,
-    features: { intent: false, metaAds: true },
+    features: { intent: false },
   },
   scale: {
     tier: "scale",
@@ -47,7 +47,7 @@ export const PLANS: Record<PlanTier, PlanConfig> = {
     includedSeats: 10,
     includedLinkedinAccounts: 10,
     maxCampaigns: 25,
-    features: { intent: true, metaAds: true },
+    features: { intent: true },
   },
 };
 
