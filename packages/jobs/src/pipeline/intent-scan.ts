@@ -27,14 +27,34 @@ function candidateFromProfile(p: LinkedInProfile): ProspectCandidate {
   };
 }
 
-const toRankCandidate = (leadId: string, c: ProspectCandidate): RankCandidate => ({
-  leadId,
-  companyName: c.companyName,
-  companySize: c.companySize,
-  industry: c.industry,
-  location: c.location,
-  title: c.title,
-});
+/** high/medium buying-intent → the intent-signal strength the rank reads (prospect-data levels). */
+const INTENT_LEVEL: Record<string, string> = { high: "in_depth", medium: "active" };
+
+/**
+ * The buying-intent verdict IS this lead's timing signal — feed it to the rank as a first-class,
+ * just-observed `intent` signal (the strongest "why now"), so the score reflects "they're asking
+ * for this" instead of judging a bare LinkedIn headline (rule 06). A LinkedIn read carries no
+ * firmographics, so size/industry stay undefined — the rank weighs intent + plausible fit.
+ */
+function toRankCandidate(leadId: string, c: ProspectCandidate, v: IntentVerdict, observedAt: Date): RankCandidate {
+  return {
+    leadId,
+    companyName: c.companyName,
+    companySize: c.companySize,
+    industry: c.industry,
+    location: c.location,
+    title: c.title,
+    signals: [
+      {
+        kind: "intent",
+        label: v.why_now,
+        detail: v.why_now,
+        level: INTENT_LEVEL[v.level] ?? "active",
+        observedAt: observedAt.toISOString(),
+      },
+    ],
+  };
+}
 
 /**
  * One Intent Agent run (rule 13 pipeline core, pure + deps-injected). Watches LinkedIn for
@@ -172,8 +192,9 @@ export async function runIntentScan(agentId: string, deps: IntentScanDeps): Prom
   // 5. AI rank the survivors; enroll those clearing the bar
   const qualifiedLeadIds: string[] = [];
   if (survivors.length > 0) {
+    const rankNow = now();
     const insights = await deps.rankFn(
-      survivors.map((s) => toRankCandidate(s.leadId, s.candidate)),
+      survivors.map((s) => toRankCandidate(s.leadId, s.candidate, s.v, rankNow)),
       {
         accountIndustry: ctx.account.industry,
         valueProp: ctx.account.valueProp,

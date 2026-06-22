@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { InMemoryLinkedInInfra } from "@vantera/linkedin-infra";
-import type { IntentVerdict, LeadInsights } from "@vantera/agent-brains";
+import type { IntentVerdict, LeadInsights, RankCandidate } from "@vantera/agent-brains";
 import { runIntentScan } from "./intent-scan";
 import type { IntentObservationRow, IntentScanContext, IntentScanDeps, IntentScanStore } from "./types";
 
@@ -91,6 +91,28 @@ describe("runIntentScan", () => {
     expect(calls.completed).toBe(true);
     // each qualified lead captured its "why now" intent signal
     expect(calls.signals).toEqual([`lead_${CREATOR}`, `lead_${GOOD}`]);
+  });
+
+  it("feeds the buying-intent verdict into the rank as an explicit, recent intent signal", async () => {
+    const { store } = makeStore();
+    const deps = makeDeps(store);
+    const ranked: RankCandidate[] = [];
+    deps.rankFn = async (cands) => {
+      ranked.push(...cands);
+      return cands.map((c) => insight(c.leadId, 80));
+    };
+    await runIntentScan("intent-1", deps);
+
+    // the verdict the strict classifier produced is handed to the scorer as a first-class
+    // `intent` signal — so the rank reflects "they're asking for this" instead of judging a
+    // bare LinkedIn headline. high verdict → in_depth strength, stamped at run time.
+    const good = ranked.find((c) => c.leadId === `lead_${GOOD}`);
+    expect(good?.signals?.[0]).toMatchObject({
+      kind: "intent",
+      detail: "commented asking for a churn tool",
+      level: "in_depth",
+      observedAt: "2026-06-20T00:00:00.000Z",
+    });
   });
 
   it("never enrolls a suppressed profile (rule 11 — the master gate)", async () => {

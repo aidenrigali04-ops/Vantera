@@ -89,6 +89,8 @@ Rubric:
 - 40-69: partial fit or unclear persona; do not flatter these upward.
 - 0-39: weak fit. Be ruthless; most leads are not good leads.
 
+A \`signals\` entry of kind \`intent\` is the strongest "why now": it means THIS person is actively showing they have the problem the seller solves (asking for a tool, describing the pain) — weight it above generic company events. A lead with a recent, explicit intent signal AND a role/company that plausibly fits the ICP belongs at the top of the range, even when size/industry are blank (normal for an intent-sourced lead — do not mark it down only for missing firmographics). Intent never overrides a clear ICP mismatch: a wrong-persona or wrong-space lead is still weak, intent or not.
+
 For each lead emit: lead_id (copy the id exactly), reasoning (one dense sentence weighing fit vs timing — think here before scoring), score, rationale (one plain-English line a sales rep reads on a dashboard), pain_points/triggers/motivations (max 3 each, specific to THIS lead, never generic), value_angle (how the seller's offer maps to this lead), aha_moment (the single concrete outcome that would make this prospect lean in), summary (2-3 sentences a rep reads before writing to this person).
 
 Ground every field in the data given. If signals are absent, say so in reasoning and score accordingly — never invent facts.`;
