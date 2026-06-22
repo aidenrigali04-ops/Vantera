@@ -12,13 +12,16 @@ const PAGE_SIZE = 25;
 // Shared column set so the paginated table and the "Hot right now" spotlight return the same shape.
 // lead_signals (0031) are the REAL "why now" — events + intent captured at enrichment.
 const LEAD_SELECT =
-  "id, first_name, last_name, title, company_name, industry, location, status, ai_score, ai_rationale, ai_insights, rules_gate_reasons, scored_at, email, email_status, phone, phone_status, linkedin_url, created_at, replies(channel, classification, classification_rationale, body, received_at), lead_signals(kind, label, detail, observed_at)";
+  "id, first_name, last_name, title, company_name, industry, location, status, source, ai_score, ai_rationale, ai_insights, rules_gate_reasons, scored_at, email, email_status, phone, phone_status, linkedin_url, created_at, replies(channel, classification, classification_rationale, body, received_at), lead_signals(kind, label, detail, observed_at)";
 
 // Tabs where the spotlight makes sense — never above the "Filtered out" list.
 const HOT_STRIP_TABS = new Set(["all", "qualified", "in_campaign", "replied"]);
 
-const TABS: { key: string; label: string; statuses: string[] | null }[] = [
+// `source` tabs filter by where the lead entered the funnel (In-market = the Intent Agent), so the
+// differentiator gets its own first-class view; `statuses` tabs filter by pipeline stage.
+const TABS: { key: string; label: string; statuses: string[] | null; source?: string }[] = [
   { key: "all", label: "All", statuses: null },
+  { key: "intent", label: "In-market", statuses: null, source: "intent" },
   { key: "qualified", label: "Qualified", statuses: ["qualified", "enriched"] },
   { key: "in_campaign", label: "In outreach", statuses: ["in_campaign"] },
   { key: "replied", label: "Replied", statuses: ["replied", "converted"] },
@@ -42,6 +45,7 @@ export default async function LeadsPage({
     .order("created_at", { ascending: false })
     .range(from, from + PAGE_SIZE - 1);
   if (tab.statuses) query = query.in("status", tab.statuses);
+  if (tab.source) query = query.eq("source", tab.source);
 
   // "Hot right now" spotlight — account-wide top-fit leads ready to work, independent of the
   // current tab/page. RLS scopes it to this account (rule 02); no account id is passed.
@@ -91,16 +95,22 @@ export default async function LeadsPage({
           <CardHeader className="items-center text-center">
             <Users className="mx-auto size-8 text-muted-foreground" />
             <CardTitle className="text-base">
-              {tab.key === "all" ? "No leads yet" : "Nothing here yet"}
+              {tab.key === "all"
+                ? "No leads yet"
+                : tab.key === "intent"
+                  ? "No in-market leads yet"
+                  : "Nothing here yet"}
             </CardTitle>
             <p className="mx-auto max-w-md text-pretty text-sm text-muted-foreground">
               {tab.key === "all"
                 ? "Your Prospect Agent fills this page on its schedule — sourcing, scoring, and keeping only high-quality leads."
-                : "Leads move here as your agents work the pipeline."}
+                : tab.key === "intent"
+                  ? "Your Intent Agent surfaces people here the moment they show buying behavior on LinkedIn — engaging your competitors, posting about your space — qualified against your ICP."
+                  : "Leads move here as your agents work the pipeline."}
             </p>
-            {tab.key === "all" && (
+            {(tab.key === "all" || tab.key === "intent") && (
               <Button asChild variant="outline" size="sm" className="mx-auto mt-2">
-                <Link href="/agents">Check your agents</Link>
+                <Link href="/agents">{tab.key === "intent" ? "Set up your Intent Agent" : "Check your agents"}</Link>
               </Button>
             )}
           </CardHeader>

@@ -8,6 +8,7 @@ import {
   Flame,
   Mail,
   Phone,
+  Radar,
   Snowflake,
   Sparkles,
   UserPlus,
@@ -27,6 +28,7 @@ import {
   leadSignalLine,
   projectedRevenue,
   scoreVerdict,
+  topLeadSignal,
   type LeadSignalView,
   type ScoreTier,
 } from "./lead-value";
@@ -51,6 +53,7 @@ export interface LeadRow {
   industry: string | null;
   location: string | null;
   status: string;
+  source: string;
   ai_score: number | null;
   ai_rationale: string | null;
   ai_insights: LeadInsightsView | null;
@@ -293,14 +296,37 @@ function StatusTag({ verified, label }: { verified: boolean; label: string }) {
   );
 }
 
-/** The one-line "why now" — anticipation hit. Real captured signal first, AI trigger as fallback. */
+/** Marks where a lead entered the funnel. Intent leads get a distinct "In-market" badge — the
+ *  differentiator made visible: these people are showing buying behavior on LinkedIn right now. */
+function SourceBadge({ source }: { source: string }) {
+  if (source !== "intent") return null;
+  return (
+    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-500/12 px-2 py-0.5 text-[11px] font-medium text-emerald-700 ring-1 ring-inset ring-emerald-500/30 dark:text-emerald-300">
+      <Radar className="size-3" aria-hidden />
+      In-market
+    </span>
+  );
+}
+
+/** The one-line "why now" — anticipation hit. An intent observation (in-market behavior) reads
+ *  distinctly from an enrichment signal; real captured signal first, AI trigger as fallback. */
 function WhyNowLine({ lead }: { lead: LeadRow }) {
+  const isIntent = topLeadSignal(lead.lead_signals)?.kind === "intent";
   const signal = leadSignalLine(lead.lead_signals, lead.ai_insights);
   if (!signal) return null;
   return (
-    <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-      <Zap className="size-3 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden />
-      <span className="truncate">{signal}</span>
+    <p
+      className={cn(
+        "mt-1 flex items-center gap-1 text-xs",
+        isIntent ? "text-emerald-700 dark:text-emerald-300" : "text-muted-foreground"
+      )}
+    >
+      {isIntent ? (
+        <Radar className="size-3 shrink-0" aria-hidden />
+      ) : (
+        <Zap className="size-3 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden />
+      )}
+      <span className="truncate">{isIntent ? `In-market: ${signal}` : signal}</span>
     </p>
   );
 }
@@ -350,7 +376,10 @@ function HotNowStrip({
           >
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
-                <p className="truncate font-medium">{leadName(lead)}</p>
+                <div className="flex items-center gap-1.5">
+                  <p className="truncate font-medium">{leadName(lead)}</p>
+                  <SourceBadge source={lead.source} />
+                </div>
                 <p className="truncate text-xs text-muted-foreground">
                   {[lead.title, lead.company_name].filter(Boolean).join(" · ") || "—"}
                 </p>
@@ -418,7 +447,10 @@ export function LeadsTable({
                 className="cursor-pointer border-t border-black/[0.05] transition-colors hover:bg-foreground/[0.04] dark:border-white/[0.06]"
               >
                 <td className="px-4 py-3">
-                  <p className="font-medium">{leadName(lead)}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium">{leadName(lead)}</p>
+                    <SourceBadge source={lead.source} />
+                  </div>
                   {lead.title && <p className="text-xs text-muted-foreground">{lead.title}</p>}
                   <WhyNowLine lead={lead} />
                   <CoolingChip lead={lead} />
@@ -481,6 +513,7 @@ export function LeadsTable({
                 <div className="mt-2.5 flex flex-wrap items-center gap-2">
                   <VerdictChip score={selected.ai_score} />
                   <StatusPill status={selected.status} />
+                  <SourceBadge source={selected.source} />
                   <FreshnessChip scoredAt={selected.scored_at} />
                 </div>
               </div>
