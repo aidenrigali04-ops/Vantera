@@ -37,7 +37,7 @@ export default async function AgentsPage({
   return (
     <div className="mx-auto max-w-4xl">
       <div className="mb-8">
-        <Eyebrow>Your SDR team</Eyebrow>
+        <Eyebrow>Your agents</Eyebrow>
         <h1 className="font-heading mt-3 text-3xl font-semibold tracking-tight">Agents</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           Deploy them once — they prospect, score, write, and reach out on LinkedIn for you.

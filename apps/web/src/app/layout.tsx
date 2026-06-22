@@ -14,9 +14,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Vantera",
+  title: "Vantera — The LinkedIn automation power system",
   description:
-    "Sales intelligence run by SDR agents — prospect, score, and outreach only high-quality leads.",
+    "Vantera runs your LinkedIn outreach end to end — it finds in-market buyers, writes a personal message to each, and surfaces every reply so no deal slips. You approve every send.",
 };
 
 export default function RootLayout({

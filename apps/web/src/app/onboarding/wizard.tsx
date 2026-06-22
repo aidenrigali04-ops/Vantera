@@ -55,13 +55,13 @@ const STEPS: { label: string; title: string; description: string; fields: Field[
   {
     label: "Industry",
     title: "What industry are you in?",
-    description: "Your SDR agent tailors prospecting to your space.",
+    description: "Your agent tailors prospecting to your space.",
     fields: [
       {
         key: "industry",
         label: "Industry",
         placeholder: "e.g. B2B SaaS, logistics, fintech",
-        hint: "Your SDR agent tailors prospecting to your space.",
+        hint: "Your agent tailors prospecting to your space.",
         required: true,
       },
     ],

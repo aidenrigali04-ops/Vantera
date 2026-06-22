@@ -36,8 +36,8 @@ export function LandingFooter() {
             Vantera
           </Link>
           <p className="mt-3 max-w-xs text-sm text-muted-foreground">
-            Sales intelligence run by SDR agents — prospect, score, and reach out to only
-            high-quality leads.
+            The LinkedIn automation power system — find in-market buyers, reach out in your
+            voice, and never let a reply slip.
           </p>
         </div>
         {COLUMNS.map((col) => (

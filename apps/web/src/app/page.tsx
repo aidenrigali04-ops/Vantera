@@ -1,10 +1,13 @@
 import { LandingNav } from "@/components/landing/nav";
 import { Hero } from "@/components/landing/hero";
-import { Contrast } from "@/components/landing/contrast";
+import { Problem } from "@/components/landing/problem";
 import { HowItWorks } from "@/components/landing/how-it-works";
-import { AgentsSection } from "@/components/landing/agents-section";
+import { DeepAnalyst } from "@/components/landing/deep-analyst";
+import { NoVariables } from "@/components/landing/no-variables";
 import { SequenceSection } from "@/components/landing/sequence-section";
+import { AgentsSection } from "@/components/landing/agents-section";
 import { Outcomes } from "@/components/landing/outcomes";
+import { Contrast } from "@/components/landing/contrast";
 import { Trust } from "@/components/landing/trust";
 import { FinalCta } from "@/components/landing/final-cta";
 import { LandingFooter } from "@/components/landing/footer";
@@ -17,11 +20,14 @@ export default function Home() {
       <LandingNav />
       <main>
         <Hero />
-        <Contrast />
+        <Problem />
         <HowItWorks />
-        <AgentsSection />
+        <DeepAnalyst />
+        <NoVariables />
         <SequenceSection />
+        <AgentsSection />
         <Outcomes />
+        <Contrast />
         <Trust />
         <FinalCta />
       </main>

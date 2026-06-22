@@ -21,14 +21,14 @@ export function FinalCta() {
         />
         <div className="relative">
           <span className="font-mono text-[11px] tracking-[0.18em] text-muted-foreground uppercase">
-            Deploy in minutes
+            Start in minutes
           </span>
           <h2 className="font-heading mx-auto mt-4 max-w-2xl text-3xl font-semibold tracking-tight text-foreground sm:text-5xl">
-            The AI SDR you won&apos;t have to apologize for.
+            See who&apos;s ready to buy this week.
           </h2>
           <p className="mx-auto mt-5 max-w-xl text-base text-muted-foreground sm:text-lg">
-            Define your ICP and connect your channels. The agents prospect, score, and draft — you
-            approve every send, and you&apos;re never locked in.
+            Connect LinkedIn, set your ICP, and watch the first qualified leads land. You approve
+            every send. You&apos;re never locked in.
           </p>
 
           <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
@@ -47,7 +47,7 @@ export function FinalCta() {
             </Link>
           </div>
           <p className="mt-4 font-mono text-[11px] tracking-wide text-muted-foreground/70">
-            Free for 14 days · No credit card · Cancel anytime
+            Free to start · No credit card · Cancel anytime
           </p>
         </div>
       </motion.div>

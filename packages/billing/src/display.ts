@@ -37,7 +37,7 @@ export const PLAN_DISPLAY: Record<PlanTier, PlanDisplay> = {
   starter: {
     tier: "starter",
     name: "Starter",
-    tagline: "Prove the motion — LinkedIn SDR agents working your ICP.",
+    tagline: "Prove the motion — your LinkedIn agents working your ICP.",
     monthlyUsd: 99,
     highlight: false,
     features: [
@@ -49,7 +49,7 @@ export const PLAN_DISPLAY: Record<PlanTier, PlanDisplay> = {
   growth: {
     tier: "growth",
     name: "Growth",
-    tagline: "Scale the motion across your team — more seats, accounts, and volume.",
+    tagline: "Run the motion across your whole team — more seats and connected accounts.",
     monthlyUsd: 349,
     highlight: true,
     features: [
@@ -61,7 +61,7 @@ export const PLAN_DISPLAY: Record<PlanTier, PlanDisplay> = {
   scale: {
     tier: "scale",
     name: "Scale",
-    tagline: "Add the Intent Agent and scale volume across the team.",
+    tagline: "Add the Intent Agent — catch in-market buyers before your competitors.",
     monthlyUsd: 899,
     highlight: false,
     features: [

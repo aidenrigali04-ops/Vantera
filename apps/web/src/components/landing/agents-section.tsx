@@ -1,16 +1,16 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Radar, PenLine } from "lucide-react";
+import { Telescope, PenLine, Radar } from "lucide-react";
 import { SectionHeading } from "./section-heading";
 import { WARM, WARM_GRADIENT } from "./landing-theme";
 
 const AGENTS = [
   {
-    icon: Radar,
-    name: "Scout Agent",
+    icon: Telescope,
+    name: "Prospect Agent",
     role: "prospect",
-    tagline: "Finds and qualifies your next 150 buyers.",
+    tagline: "Finds and qualifies the buyers worth your time.",
     points: [
       "Hunts your ICP on a daily or weekly schedule",
       "Deterministic rules gate + AI scoring",
@@ -20,12 +20,23 @@ const AGENTS = [
   {
     icon: PenLine,
     name: "Outreach Agent",
-    role: "copy + send",
-    tagline: "Writes LinkedIn outreach worthy of a reply.",
+    role: "outreach",
+    tagline: "Writes each message and runs the conversation.",
     points: [
       "Personalized per prospect — never templated",
       "Humanizer linter kills the spammy tells",
-      "Everything waits in your review queue",
+      "Every draft waits in your review queue",
+    ],
+  },
+  {
+    icon: Radar,
+    name: "Intent Agent",
+    role: "intent",
+    tagline: "Catches the people going in-market this week.",
+    points: [
+      "Watches LinkedIn for buying behavior in your niche",
+      "Qualifies each against your ICP — never a bypass",
+      "Reaches them while the timing is hot",
     ],
   },
 ];
@@ -34,12 +45,12 @@ export function AgentsSection() {
   return (
     <section id="agents" className="relative px-4 py-24">
       <SectionHeading
-        eyebrow="Your team"
-        title="An SDR team that never sleeps"
-        subtitle="Deploy named agents the way you'd hire reps — except they run 24/7, never miss a follow-up, and stay perfectly on-brand."
+        eyebrow="Your agents"
+        title="Three agents. One outcome."
+        subtitle="Deploy them the way you'd hire reps — except they run around the clock, never forget a follow-up, and only ever work the leads that fit."
       />
 
-      <div className="mx-auto mt-14 grid max-w-3xl gap-4 md:grid-cols-2">
+      <div className="mx-auto mt-14 grid max-w-5xl gap-4 md:grid-cols-3">
         {AGENTS.map((agent, i) => (
           <motion.div
             key={agent.name}

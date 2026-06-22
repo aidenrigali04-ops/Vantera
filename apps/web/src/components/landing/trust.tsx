@@ -1,24 +1,24 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { ShieldCheck, MailX, Gauge, FileCheck } from "lucide-react";
+import { ShieldCheck, UserX, Gauge, FileCheck } from "lucide-react";
 import { SectionHeading } from "./section-heading";
 
 const ITEMS = [
   {
     icon: ShieldCheck,
     title: "Suppression by default",
-    body: "A per-account suppression list is checked before every send on every channel — no path bypasses it.",
+    body: "A per-account suppression list is checked before every send — no path can bypass it.",
   },
   {
-    icon: MailX,
-    title: "One-click unsubscribe",
-    body: "Every email carries unsubscribe + your address; opt-outs are honored instantly across all campaigns.",
+    icon: UserX,
+    title: "Opt-outs honored instantly",
+    body: "One “no” and the prospect is suppressed immediately — never contacted again, across every agent and campaign.",
   },
   {
     icon: Gauge,
     title: "Account-safe pacing",
-    body: "Ramped volumes and human-like timing protect your LinkedIn account and your domain's deliverability.",
+    body: "Ramped volumes and human-like timing protect your LinkedIn account from limits and bans.",
   },
   {
     icon: FileCheck,
@@ -33,7 +33,7 @@ export function Trust() {
       <SectionHeading
         eyebrow="Trust"
         title="Aggressive on pipeline. Conservative on your reputation."
-        subtitle="Cold outreach has real legal and deliverability surface. Vantera treats compliance as a product requirement, not an afterthought."
+        subtitle="Cold outreach has real legal and account-safety surface. Vantera treats compliance as a product requirement, not an afterthought."
       />
 
       <div className="mx-auto mt-14 grid max-w-5xl gap-3 sm:grid-cols-2 lg:grid-cols-4">

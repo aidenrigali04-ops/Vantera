@@ -6,7 +6,7 @@ import { SectionHeading } from "./section-heading";
 
 /**
  * The positioning spine for a buyer who's been burned by the category. Each row pairs a
- * documented AI-SDR failure (left, struck through) with Vantera's real answer (right). Every
+ * documented LinkedIn-automation failure (left, struck through) with Vantera's real answer (right). Every
  * claim maps to shipped behavior — quality gate, review queue, personalization from real
  * signals, ramped pacing, month-to-month billing, pipeline-vs-goal. Strict monochrome: contrast
  * is carried by weight + line-through + the check/✗, never color (DESIGN.md slop guardrails).
@@ -25,8 +25,8 @@ const ROWS = [
     good: "Nothing sends without your sign-off in the review queue",
   },
   {
-    bad: "Burns your domain with high-volume sends",
-    good: "Ramped, human-like pacing protects your sender reputation",
+    bad: "Burns your account with high-volume blasts",
+    good: "Ramped, human-like pacing protects your LinkedIn account",
   },
   {
     bad: "Locks you into an annual contract before it proves a thing",
@@ -43,8 +43,8 @@ export function Contrast() {
     <section id="difference" className="relative px-4 py-24">
       <SectionHeading
         eyebrow="The difference"
-        title="Built against everything wrong with AI SDRs"
-        subtitle="The category earned its reputation — generic spam, junk demos, torched domains, contracts you can't escape. Vantera is the opposite, by design."
+        title="Built against everything wrong with LinkedIn automation"
+        subtitle="The category earned its reputation — generic spam, junk demos, torched accounts, contracts you can't escape. Vantera is the opposite, by design."
       />
 
       <div className="mx-auto mt-14 max-w-4xl space-y-3">

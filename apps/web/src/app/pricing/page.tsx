@@ -15,7 +15,7 @@ import { MarketingPricing } from "./marketing-pricing";
 
 export const metadata: Metadata = {
   title: "Pricing — Vantera",
-  description: "Autonomous SDR agents that prospect, qualify, and reach out across every channel.",
+  description: "Autonomous agents that find in-market buyers, qualify them, and reach out on LinkedIn — you approve every send.",
 };
 
 export default function PricingPage() {

@@ -21,7 +21,7 @@ export function MarketingPricing({
       plans={plans}
       addons={addons}
       title="Pricing built around your revenue goal"
-      subtitle="Autonomous SDR agents that prospect, qualify, and reach out across every channel. Start free — choose a plan when you deploy your first agent."
+      subtitle="Autonomous agents that find in-market buyers, qualify them, and reach out on LinkedIn. Start free — choose a plan when you deploy your first agent."
       enterpriseCta={
         <Button asChild variant="outline" size="sm">
           <a href={`mailto:${SALES_EMAIL}`}>Talk to us</a>

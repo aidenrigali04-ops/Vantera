@@ -77,7 +77,7 @@ export default async function BillingPage({
         <div className={cn(PANEL_SURFACE, "p-5 text-sm")}>
           <span className="font-heading font-semibold">Choose a plan to deploy your agent.</span>{" "}
           <span className="text-muted-foreground">
-            Your agents go live the moment a plan is active — pick the one that fits the channels you want to run.
+            Your agents go live the moment a plan is active — pick the one that fits your team and how much you want to run.
           </span>
         </div>
       )}

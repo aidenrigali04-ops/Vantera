@@ -20,13 +20,13 @@ For custom volume, SSO, or dedicated support, contact us about an Enterprise pla
 
 Every new workspace starts on a **14-day free trial** of the Starter plan — no card required. The trial lets you deploy your agents and reach your first replies before you pay. The Billing page shows how many days are left. To deploy an agent during the trial, confirm your email first.
 
-To keep things fair, a trial sources a capped number of leads — plenty to prove the motion and reach your first replies. Choosing a plan lifts the cap and prospecting continues at your plan's full volume.
+To keep things fair, a trial sources a capped number of leads — plenty to prove the motion and reach your first replies. Choosing a plan lifts the cap and prospecting continues at your plan's full capacity.
 
 When the trial ends, your agents pause and you'll be asked to choose a plan. Your leads, campaigns, and history are kept exactly as they were — picking a plan resumes everything.
 
 ## Deploying agents needs an active plan
 
-Your SDR agents go live the moment a plan is active — so deploying your first agent requires either a paid plan or an active trial. Since every workspace starts on a trial, your first deploy just works; you're only asked to choose a plan once the trial ends. Nothing else in onboarding is blocked before that point.
+Your agents go live the moment a plan is active — so deploying your first agent requires either a paid plan or an active trial. Since every workspace starts on a trial, your first deploy just works; you're only asked to choose a plan once the trial ends. Nothing else in onboarding is blocked before that point.
 
 ## Add-ons
 

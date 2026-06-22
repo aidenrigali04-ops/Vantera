@@ -58,7 +58,7 @@ export function Hero() {
           transition={{ duration: 0.5 }}
           className="mb-5 font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground/80 sm:text-xs"
         >
-          Prospect · Qualify · Review · Send
+          The next-gen LinkedIn automation power system
         </motion.span>
 
         <TextEffect
@@ -67,7 +67,7 @@ export function Hero() {
           preset="blur"
           className="font-heading max-w-4xl text-balance text-4xl font-medium tracking-tight text-foreground sm:text-5xl md:text-6xl"
         >
-          {"Real Value, Real Revenue, Real Simple"}
+          {"No more templates. No more deals lost to a reply you never saw."}
         </TextEffect>
 
         {/* The promise resolves first (headline blur), then the demo + CTA rise as one block. */}
@@ -78,7 +78,7 @@ export function Hero() {
           transition={{ duration: 0.6, delay: 0.5, ease: [0.22, 1, 0.36, 1] }}
         >
           <p className="mx-auto mt-6 max-w-3xl text-pretty text-base text-muted-foreground sm:text-lg">
-            {"It finds real buyers in your ICP, qualifies every one, and drafts the outreach — across email, LinkedIn, and a real call. Nothing sends until you approve."}
+            {"Vantera runs your entire LinkedIn motion — it finds the people moving toward a purchase, writes each one a message that actually sounds like you, and reads every reply the second it lands. You approve the next move; it handles the rest. Nothing generic, nothing forgotten."}
           </p>
 
           <div id="simulate" className="mt-10 w-full scroll-mt-28">

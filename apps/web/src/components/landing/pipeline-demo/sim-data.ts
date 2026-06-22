@@ -181,7 +181,8 @@ function buildDraft(rng: () => number, p: {
   };
 }
 
-const ALL_CHANNELS: Channel[] = ["email", "linkedin", "call"];
+// LinkedIn-only product — the simulated outreach runs on LinkedIn alone.
+const ALL_CHANNELS: Channel[] = ["linkedin"];
 
 function generateProspect(rng: () => number, flavor: Flavor, index: number, fit: boolean): Prospect {
   const firstName = pick(rng, FIRST_NAMES);
@@ -227,7 +228,7 @@ function generateProspect(rng: () => number, flavor: Flavor, index: number, fit:
     ahaMoment: aha,
     fit,
     channels,
-    draft: buildDraft(rng, { firstName, company, trigger: triggers[0], pain: pains[0], channels: channels.length ? channels : ["email"] }),
+    draft: buildDraft(rng, { firstName, company, trigger: triggers[0], pain: pains[0], channels: channels.length ? channels : ["linkedin"] }),
     replied: false,
     booked: false,
   };

@@ -214,7 +214,7 @@ function captionFor(p: LivePipelineData): string {
   if (p.drafting > 0)
     return "Your Outreach Agent is drafting personalized messages for qualified leads right now.";
   if (p.sending > 0)
-    return "Approved outreach is sending at a human-like pace across your channels.";
+    return "Approved outreach is sending at a human-like pace from your LinkedIn.";
   if (p.pulled > 0)
     return `${p.pulled} prospect${p.pulled === 1 ? "" : "s"} pulled, ${p.disqualified} filtered out — your agent keeps only the high-quality fits.`;
   return p.scoutLive

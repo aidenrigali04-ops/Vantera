@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Check, Loader2, Mail, Phone, Zap } from "lucide-react";
+import { Check, Loader2, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LinkedinGlyph } from "./brand-icons";
 import { CountUp } from "./count-up";
@@ -131,14 +131,9 @@ function StepResult({
             )}
           </p>
           <div className="flex items-center gap-1">
-            {[Mail, LinkedinGlyph, Phone].map((Icon, i) => (
-              <span
-                key={i}
-                className="grid size-4.5 place-items-center rounded border border-white/[0.16] bg-white/[0.07] p-0.5 text-foreground/70"
-              >
-                <Icon className="size-3" />
-              </span>
-            ))}
+            <span className="inline-flex items-center gap-1 rounded border border-white/[0.16] bg-white/[0.07] px-1.5 py-0.5 font-mono text-[10px] text-foreground/70">
+              <LinkedinGlyph className="size-3" /> LinkedIn
+            </span>
           </div>
         </div>
       );
