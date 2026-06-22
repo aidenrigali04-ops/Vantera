@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.0",
-    "ai": "^6.0.0"
+    "ai": "^6.0.208"
   },
   "devDependencies": {
     "typescript": "^5.8.0",

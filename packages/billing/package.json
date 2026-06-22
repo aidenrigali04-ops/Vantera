@@ -11,7 +11,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "stripe": "^22.2.1"
+    "stripe": "^22.2.2"
   },
   "devDependencies": {
     "typescript": "^5.8.0",

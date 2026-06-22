@@ -13,7 +13,7 @@
   "dependencies": {
     "@vantera/ai": "workspace:*",
     "@vantera/prospect-data": "workspace:*",
-    "ai": "^6.0.0",
+    "ai": "^6.0.208",
     "undici": "^6.21.0",
     "zod": "^4.0.0"
   },
