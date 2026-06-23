@@ -115,6 +115,29 @@ describe("runIntentScan", () => {
     });
   });
 
+  it("watches a competitor NAME as a search query (no URL needed) — auto-derived watchlists just work", async () => {
+    const { store, calls } = makeStore({
+      getIntentContext: async () => ({
+        agent: {
+          id: "intent-1",
+          accountId: "acc-1",
+          status: "live",
+          config: { watch: { creators: [], competitors: ["churn"], keywords: [], hashtags: [] }, signals: { engagement: true, content: true }, minScore: 70 },
+        },
+        connectedAccountId: "conn-1",
+        icps: [{ id: "icp-1", name: "RevOps leaders", criteria: { titles: ["revops", "cx", "success"] } }],
+        account: { industry: "SaaS", valueProp: "cut onboarding churn", subscriptionStatus: "active" },
+      }),
+    });
+    const summary = await runIntentScan("intent-1", makeDeps(store));
+
+    // "churn" is a NAME, not a URL → searchPosts (finds the seeded post). If it were mis-routed as a
+    // profile, listProfilePosts("churn") returns nothing and we'd observe 0.
+    expect(summary.observed).toBeGreaterThan(0);
+    expect(summary.qualified).toBe(2);
+    expect(calls.observations.some((r) => r.watchTarget === "churn")).toBe(true);
+  });
+
   it("never enrolls a suppressed profile (rule 11 — the master gate)", async () => {
     const { store, calls } = makeStore();
     await runIntentScan("intent-1", makeDeps(store));

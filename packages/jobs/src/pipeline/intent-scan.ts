@@ -82,9 +82,14 @@ export async function runIntentScan(agentId: string, deps: IntentScanDeps): Prom
     signals: { ...INTENT_DEFAULTS.signals, ...cfg.signals },
   };
 
+  // A creator/competitor given as a URL is watched as a profile (its own posts); given as a NAME
+  // it's watched as a search query (posts mentioning it). This lets the auto-derived watchlist
+  // (competitor names, no URLs) work with zero hunting, while pasted URLs still profile-watch.
+  const asTarget = (value: string) =>
+    /^https?:\/\//i.test(value) ? { kind: "profile" as const, value } : { kind: "query" as const, value };
   const targets = [
-    ...config.watch.creators.map((value) => ({ kind: "profile" as const, value })),
-    ...config.watch.competitors.map((value) => ({ kind: "profile" as const, value })),
+    ...config.watch.creators.map(asTarget),
+    ...config.watch.competitors.map(asTarget),
     ...config.watch.keywords.map((value) => ({ kind: "query" as const, value })),
     ...config.watch.hashtags.map((v) => ({ kind: "query" as const, value: v.startsWith("#") ? v : `#${v}` })),
   ];

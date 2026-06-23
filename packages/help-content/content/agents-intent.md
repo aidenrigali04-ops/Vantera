@@ -10,10 +10,11 @@ The Intent Agent watches LinkedIn for people showing they're in-market — engag
 
 ## What it watches
 
-You point it at the places your buyers show intent:
+You don't have to go find anyone. When you open the agent, the watchlist is already filled in — keywords, competitors, and hashtags pulled from your industry, website, and ICP. Edit anything, add your own, and deploy.
 
-- **Creators & competitors** — LinkedIn profiles whose posts your buyers engage with. The agent reads who likes and comments.
-- **Keywords & hashtags** — topics and tags around the problem you solve. The agent finds people posting about them.
+- **Keywords & competitors** — the buying-signal phrases and competitor names around the problem you solve. The agent finds people posting or commenting about them. No URLs to hunt for.
+- **Hashtags** — the LinkedIn tags where your buyers and their problem space live.
+- **Creators (optional)** — paste a specific LinkedIn profile whose posts your buyers engage with, to watch its likes and comments directly.
 
 Then you choose the signal types:
 
@@ -32,7 +33,7 @@ Only people who clear both become leads, each tagged with the "why now" signal t
 ## Setting it up
 
 1. **Name your agent.**
-2. **Watch** — add the creators, competitors, keywords, and hashtags to monitor, and pick your signal types. You need a deployed Prospect Agent first, since the Intent Agent qualifies against its ICP.
+2. **Watch** — the keywords, competitors, and hashtags are already filled in from your business; edit them or add your own, then pick your signal types. You need a deployed Prospect Agent first, since the Intent Agent qualifies against its ICP.
 3. **Schedule** — pick a run time and a daily or weekly cadence.
 4. **Deploy** — its first run starts within about 15 minutes. Qualified intent leads flow straight into your Outreach Agent's review queue — nothing sends without you.
 

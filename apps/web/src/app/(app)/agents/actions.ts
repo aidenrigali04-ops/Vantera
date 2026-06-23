@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { deriveIntentWatchlist } from "@vantera/agent-brains";
 import {
   parseCopyForm,
   parseIntentForm,
@@ -239,6 +240,52 @@ export async function deployIntentAgent(
 
   revalidatePath("/agents");
   redirect("/agents?deployed=intent");
+}
+
+/**
+ * Suggest an Intent Agent watchlist (keywords / hashtags / competitor names) from what we already
+ * know about the seller — industry + website scan + ICP — so setup needs no hunting for profiles or
+ * URLs. RLS-scoped read (rule 02); the brain fails open to empty so the wizard always works manually.
+ */
+export async function suggestIntentWatchlist(): Promise<{
+  keywords: string[];
+  hashtags: string[];
+  competitors: string[];
+}> {
+  const empty = { keywords: [], hashtags: [], competitors: [] };
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return empty;
+
+  const { data: account } = await supabase
+    .from("accounts")
+    .select("onboarding_industry, onboarding_icp, website_scan")
+    .limit(1)
+    .maybeSingle<{
+      onboarding_industry: string | null;
+      onboarding_icp: string | null;
+      website_scan: { summary?: string; offerings?: string[]; value_props?: string[] } | null;
+    }>();
+  if (!account) return empty;
+
+  const scan = account.website_scan;
+  const offering = scan
+    ? [
+        scan.summary,
+        scan.offerings?.length ? `Offerings: ${scan.offerings.join(", ")}` : "",
+        scan.value_props?.length ? `Value props: ${scan.value_props.join("; ")}` : "",
+      ]
+        .filter(Boolean)
+        .join(". ")
+    : "";
+
+  return deriveIntentWatchlist({
+    industry: account.onboarding_industry,
+    offering: offering || account.onboarding_icp,
+    icp: account.onboarding_icp,
+  });
 }
 
 export async function deployCopyAgent(

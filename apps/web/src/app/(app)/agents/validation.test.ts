@@ -131,7 +131,10 @@ describe("parseIntentForm", () => {
     expect(parseIntentForm(noSignal).ok).toBe(false);
   });
 
-  it("rejects non-LinkedIn creator/competitor URLs", () => {
+  it("rejects non-LinkedIn creator URLs, but accepts competitor names (no URL needed)", () => {
     expect(parseIntentForm(intentForm({ creators: JSON.stringify(["https://twitter.com/x"]) })).ok).toBe(false);
+    const r = parseIntentForm(intentForm({ creators: "[]", competitors: JSON.stringify(["Salesforce", "Gainsight"]) }));
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.values.watch.competitors).toEqual(["Salesforce", "Gainsight"]);
   });
 });

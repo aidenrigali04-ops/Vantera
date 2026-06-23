@@ -127,9 +127,14 @@ export function parseIntentForm(form: FormData): Result<IntentFormValues> {
   if (total === 0) {
     return { ok: false, error: "Add at least one creator, competitor, keyword, or hashtag to watch." };
   }
-  // creators + competitors are LinkedIn profile URLs
-  if ([...watch.creators, ...watch.competitors].some((u) => !/^https?:\/\/(www\.)?linkedin\.com\/in\//i.test(u))) {
-    return { ok: false, error: "Creators and competitors must be LinkedIn profile URLs (linkedin.com/in/…)." };
+  // Creators are LinkedIn profile URLs (a specific person's posts). Competitors may be a company
+  // NAME or a LinkedIn URL — a name is watched as a search query, a URL profile-watched (intent-scan),
+  // so the auto-derived watchlist (competitor names, no URLs) deploys with zero hunting.
+  if (watch.creators.some((u) => !/^https?:\/\/(www\.)?linkedin\.com\/in\//i.test(u))) {
+    return { ok: false, error: "Creators must be LinkedIn profile URLs (linkedin.com/in/…)." };
+  }
+  if (watch.competitors.some((c) => c.length > 120)) {
+    return { ok: false, error: "Keep each competitor name under 120 characters." };
   }
 
   const signals = {

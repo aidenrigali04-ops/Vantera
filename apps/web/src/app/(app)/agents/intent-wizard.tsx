@@ -1,14 +1,14 @@
 "use client";
 
-import { useActionState, useState } from "react";
-import { X } from "lucide-react";
+import { useActionState, useEffect, useState } from "react";
+import { Loader2, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FormError } from "@/components/form-error";
 import { WizardShell } from "@/components/wizard/wizard-shell";
-import { deployIntentAgent, type AgentActionState } from "./actions";
+import { deployIntentAgent, suggestIntentWatchlist, type AgentActionState } from "./actions";
 
 const RUN_TIMES = ["06:00", "07:00", "08:00", "09:00", "10:00", "12:00", "15:00", "18:00"];
 const STEPS = ["Name", "Watch", "Schedule", "Deploy"] as const;
@@ -20,12 +20,36 @@ export function IntentWizard({ scoutName }: { scoutName: string }) {
   const [competitors, setCompetitors] = useState<string[]>([]);
   const [keywords, setKeywords] = useState<string[]>([]);
   const [hashtags, setHashtags] = useState<string[]>([]);
+  const [suggesting, setSuggesting] = useState(true);
+  const [suggested, setSuggested] = useState(false);
   const [engagement, setEngagement] = useState(true);
   const [content, setContent] = useState(true);
   const [runAtTime, setRunAtTime] = useState("08:00");
   const [cadence, setCadence] = useState<"daily" | "weekly">("daily");
   const [timezone] = useState(() => Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC");
   const [state, action, pending] = useActionState<AgentActionState, FormData>(deployIntentAgent, {});
+
+  // Auto-fill the watchlist from what we already know (industry + website scan + ICP) so setup needs
+  // no hunting for profiles or URLs. Only fills lists the user hasn't touched; fails silently to the
+  // manual form (B=MAP — kill the ability cost before the deploy moment).
+  useEffect(() => {
+    let active = true;
+    suggestIntentWatchlist()
+      .then((s) => {
+        if (!active) return;
+        setKeywords((cur) => (cur.length ? cur : s.keywords));
+        setCompetitors((cur) => (cur.length ? cur : s.competitors));
+        setHashtags((cur) => (cur.length ? cur : s.hashtags));
+        if (s.keywords.length || s.competitors.length || s.hashtags.length) setSuggested(true);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (active) setSuggesting(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const watchCount = creators.length + competitors.length + keywords.length + hashtags.length;
   const canNext =
@@ -50,7 +74,7 @@ export function IntentWizard({ scoutName }: { scoutName: string }) {
       hint={
         [
           "Your intent scout — it finds people showing they're in-market on LinkedIn.",
-          "Point it at the creators, competitors, keywords, and hashtags your buyers engage with.",
+          "We filled this in from your business — review the topics and competitors we'll watch, and add any of your own.",
           "It reads LinkedIn, qualifies, and drafts on this schedule.",
           "Review everything, then put it to work.",
         ][step]
@@ -84,10 +108,21 @@ export function IntentWizard({ scoutName }: { scoutName: string }) {
 
         {step === 1 && (
           <div className="flex flex-col gap-5">
-            <ChipList label="Creators (LinkedIn profile URLs)" placeholder="https://linkedin.com/in/…" values={creators} onChange={setCreators} />
-            <ChipList label="Competitors (LinkedIn profile URLs)" placeholder="https://linkedin.com/in/…" values={competitors} onChange={setCompetitors} />
+            {suggesting ? (
+              <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2.5 text-sm text-muted-foreground">
+                <Loader2 className="size-4 animate-spin" />
+                Finding what to watch for you…
+              </div>
+            ) : suggested ? (
+              <div className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-2.5 text-sm">
+                We pre-filled what to watch from your business — edit anything, then deploy.
+              </div>
+            ) : null}
+
             <ChipList label="Keywords" placeholder="e.g. onboarding churn" values={keywords} onChange={setKeywords} />
+            <ChipList label="Competitors (name or LinkedIn URL)" placeholder="e.g. Salesforce" values={competitors} onChange={setCompetitors} />
             <ChipList label="Hashtags" placeholder="e.g. revops" values={hashtags} onChange={setHashtags} />
+            <ChipList label="Creators — optional (LinkedIn profile URLs)" placeholder="https://linkedin.com/in/…" values={creators} onChange={setCreators} />
 
             <div className="flex flex-col gap-2">
               <Label>Intent signals</Label>

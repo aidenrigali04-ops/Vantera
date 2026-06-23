@@ -40,3 +40,9 @@ export {
   type IntentObservationInput,
   type IntentContext,
 } from "./intent/classify";
+export {
+  deriveIntentWatchlist,
+  watchlistSchema,
+  type IntentWatchlist,
+  type WatchlistContext,
+} from "./intent/watchlist";
