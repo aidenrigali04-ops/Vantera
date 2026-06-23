@@ -1,6 +1,7 @@
 import { generateObject, type LanguageModel } from "ai";
 import { z } from "zod";
 import { getModel } from "@vantera/ai";
+import { stripLoneSurrogates } from "../text";
 
 // Permissive schema (validate loose, normalize strict — see prospect/rank). The model returns
 // one verdict per observation ref; we keep only known refs and cap field lengths in code.
@@ -87,9 +88,12 @@ async function classifyBatch(
   ctx: IntentContext,
   model: LanguageModel
 ): Promise<IntentVerdict[]> {
-  const prompt = `${contextBlock(ctx)}\n\nObservations (ref | kind | action | headline | watch | text):\n${batch
-    .map(compactObservation)
-    .join("\n")}`;
+  // strip lone surrogates from the scraped post text — they 400 the model API as invalid JSON
+  const prompt = stripLoneSurrogates(
+    `${contextBlock(ctx)}\n\nObservations (ref | kind | action | headline | watch | text):\n${batch
+      .map(compactObservation)
+      .join("\n")}`
+  );
   const run = () =>
     generateObject({ model, schema: intentBatchSchema, system: INTENT_SYSTEM, prompt, maxOutputTokens: MAX_OUTPUT_TOKENS });
 

@@ -2,6 +2,7 @@ import { generateObject, type LanguageModel } from "ai";
 import { getModel } from "@vantera/ai";
 import type { ProspectSignal } from "@vantera/prospect-data";
 import { normalizeInsights, rankBatchSchema, type LeadInsights } from "./schema";
+import { stripLoneSurrogates } from "../text";
 
 /** Leads per model call: enough to amortize the context, small enough for output-token headroom. */
 export const RANK_BATCH_SIZE = 12;
@@ -108,7 +109,8 @@ async function rankBatch(
   ctx: RankContext,
   model: LanguageModel
 ): Promise<LeadInsights[]> {
-  const prompt = `${contextBlock(ctx)}\n\nLeads:\n${batch.map((c) => compactLead(c)).join("\n")}`;
+  // strip lone surrogates from any scraped field — they 400 the model API as invalid JSON
+  const prompt = stripLoneSurrogates(`${contextBlock(ctx)}\n\nLeads:\n${batch.map((c) => compactLead(c)).join("\n")}`);
   const run = () =>
     generateObject({
       model,

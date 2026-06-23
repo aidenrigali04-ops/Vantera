@@ -1,3 +1,4 @@
+export { stripLoneSurrogates } from "./text";
 export { applyRulesGate, type RulesGateResult } from "./prospect/rules-gate";
 export {
   compactLead,
