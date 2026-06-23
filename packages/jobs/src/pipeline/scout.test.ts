@@ -288,7 +288,7 @@ describe("runScout", () => {
 
 describe("runScout — capacity throttle", () => {
   it("pulls a small trickle during warmup and bounds enrichment spend", async () => {
-    // 25 saas candidates — more than the 7-lead warmup cap so the cap is what limits discovery
+    // 25 saas candidates — more than the warmup cap so the cap is what limits discovery
     const pool = Array.from({ length: 25 }, (_, i) =>
       makeCandidate({ externalRef: `c${i}`, industry: "saas" })
     );
@@ -300,7 +300,7 @@ describe("runScout — capacity throttle", () => {
     store.capacity = {
       linkedinConnected: true,
       linkedinEnabled: true,
-      linkedinAccountAgeDays: 3, // ramp: 5/day → projected round(5*1*1.3)=7
+      linkedinAccountAgeDays: 3, // ramp: 5/day → projected round(5*1*2.0)=10
     };
     // scores are high enough that everyone who passes the gate qualifies
     const scores: Record<string, number> = {};
@@ -309,8 +309,8 @@ describe("runScout — capacity throttle", () => {
 
     const summary = await runScout("scout1", deps);
 
-    expect(summary.discovered).toBeLessThanOrEqual(7);
-    expect(store.enriched.length).toBeLessThanOrEqual(7); // spend bounded by the pull
+    expect(summary.discovered).toBeLessThanOrEqual(10);
+    expect(store.enriched.length).toBeLessThanOrEqual(10); // spend bounded by the pull
   });
 
   it("still sources a bounded preview when no channel is connected, so prospects land", async () => {

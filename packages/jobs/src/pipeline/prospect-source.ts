@@ -1,5 +1,5 @@
 import {
-  ExploriumProspectData,
+  ApifyProspectData,
   InMemoryProspectData,
   makeCandidate,
   type ProspectDataSource,
@@ -21,10 +21,12 @@ export function seedPool() {
   );
 }
 
-/** Live adapter when the key is configured, deterministic seeded fake otherwise. */
+/** Live adapter when configured, deterministic seeded fake otherwise. */
 export function createProspectData(): ProspectDataSource {
-  if (process.env.EXPLORIUM_API_KEY) {
-    return new ExploriumProspectData();
+  // LinkedIn-search via Apify is the live discovery source (2026-06-22). Needs both the token and a
+  // configured actor; without them, dev/preview runs on the deterministic seeded pool.
+  if (process.env.APIFY_TOKEN && process.env.APIFY_LINKEDIN_ACTOR) {
+    return new ApifyProspectData();
   }
   return new InMemoryProspectData(seedPool());
 }

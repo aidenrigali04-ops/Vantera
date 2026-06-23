@@ -29,10 +29,15 @@ export interface ScoutConfig {
   floor: number;
 }
 
+// Apify-era volume (2026-06-22): LinkedIn-search discovery is cheap to pull wide, so we source a
+// larger pool ahead of send capacity and let the quality gate select the best — a bigger, fresher
+// top-of-funnel without changing the account-safe send pace. computeRunTarget still clamps to
+// capacity + backlog, so this raises the influx without ever sourcing past what can be worked.
+// (Per-agent overridable via agents.config.)
 export const SCOUT_DEFAULTS: ScoutConfig = {
-  prospectsPerRun: 25,
+  prospectsPerRun: 60,
   minScore: 70,
-  bufferFactor: 1.3,
+  bufferFactor: 2.0,
   floor: 5,
 };
 
