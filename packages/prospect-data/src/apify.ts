@@ -49,31 +49,45 @@ function str(item: Item, ...keys: string[]): string | undefined {
 }
 
 /**
- * Build the actor's search input from the ICP filters: titles/seniorities become an OR'd keyword
- * query, industries append as context, geo rides as a location, and the limit caps results. Key
- * names vary by actor — adjust here (or via APIFY_ACTOR_INPUT) when wiring a specific actor.
+ * Map the ICP filters onto the actor's input. Wired + verified live against harvestapi/
+ * linkedin-profile-search (2026-06-23): structured `currentJobTitles` + `locations` filters, an
+ * `searchQuery` for industry/free-text context, `maxItems` cap, and `profileScraperMode: "Short"`
+ * (cheapest, ~$4/1k — already returns name, title, company, location). Extra static fields for a
+ * different actor ride through APIFY_ACTOR_INPUT.
  */
 export function buildSearchInput(filters: ProspectFilters, limit: number): Record<string, unknown> {
-  const titleTerms = [...(filters.titles ?? []), ...(filters.seniorities ?? [])];
-  const searchQuery = [
-    titleTerms.length > 0 ? `(${titleTerms.join(" OR ")})` : "",
-    (filters.industries ?? []).join(" "),
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .trim();
-  const location = (filters.geos ?? [])[0];
-  return {
-    searchQuery,
-    ...(location ? { location } : {}),
-    maxItems: limit,
-  };
+  const titles = [...(filters.titles ?? []), ...(filters.seniorities ?? [])];
+  const input: Record<string, unknown> = { maxItems: limit, profileScraperMode: "Short" };
+  const industryQuery = (filters.industries ?? []).join(" ").trim();
+  if (industryQuery) input.searchQuery = industryQuery;
+  if (titles.length > 0) input.currentJobTitles = titles;
+  if (filters.geos && filters.geos.length > 0) input.locations = filters.geos;
+  return input;
+}
+
+/** The current (or first) position object — HarvestAPI nests company + title here, not top-level. */
+function firstPosition(item: Item): Item | undefined {
+  const pos = item.currentPositions ?? item.currentPosition ?? item.positions;
+  return Array.isArray(pos) && pos.length > 0 && typeof pos[0] === "object" && pos[0] !== null
+    ? (pos[0] as Item)
+    : undefined;
+}
+
+/** Location is a string on some actors, an object ({ linkedinText }) on HarvestAPI. */
+function locationString(item: Item): string | undefined {
+  const loc = item.location;
+  if (typeof loc === "string" && loc.trim()) return loc.trim();
+  if (loc && typeof loc === "object") {
+    return str(loc as Item, "linkedinText", "text", "name", "default", "full");
+  }
+  return str(item, "locationName", "addressWithCountry", "geoRegion");
 }
 
 /** One scraped LinkedIn-search row → a discovery candidate (thin: no firmographics). */
 export function toCandidate(item: Item): ProspectCandidate | null {
   const profileUrl = str(item, "profileUrl", "linkedinUrl", "url", "publicUrl", "link");
   if (!profileUrl) return null;
+  const pos = firstPosition(item);
   const first = str(item, "firstName", "first_name");
   const last = str(item, "lastName", "last_name");
   const full = str(item, "fullName", "name") ?? ([first, last].filter(Boolean).join(" ") || undefined);
@@ -81,12 +95,16 @@ export function toCandidate(item: Item): ProspectCandidate | null {
   return {
     externalRef: profileUrl,
     companyName:
-      str(item, "companyName", "company", "currentCompany", "organization", "companyName1") ?? "",
+      str(item, "companyName", "company", "currentCompany", "organization") ??
+      (pos ? str(pos, "companyName", "company") : undefined) ??
+      "",
     companyDomain: str(item, "companyWebsite", "companyDomain"),
-    location: str(item, "location", "locationName", "addressWithCountry", "geoRegion"),
+    location: locationString(item),
     firstName: first ?? parts[0],
     lastName: last ?? (parts.length > 1 ? parts.slice(1).join(" ") : undefined),
-    title: str(item, "headline", "title", "occupation", "jobTitle", "position"),
+    title:
+      str(item, "headline", "title", "occupation", "jobTitle", "position") ??
+      (pos ? str(pos, "title", "role") : undefined),
     linkedinUrl: profileUrl,
   };
 }

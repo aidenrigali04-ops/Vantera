@@ -36,13 +36,35 @@ describe("ApifyProspectData", () => {
     expect(out[1]).toMatchObject({ externalRef: "https://li/in/leo", title: "VP Sales", companyName: "Initech" });
   });
 
-  it("builds an OR'd keyword search input from the ICP filters + a result cap", () => {
+  it("maps the ICP filters onto HarvestAPI's input (titles, industry query, locations, cap, mode)", () => {
     const input = buildSearchInput({ titles: ["VP Sales", "Head of Growth"], industries: ["SaaS"], geos: ["United States"] }, 50);
-    expect(input.searchQuery).toContain("VP Sales");
-    expect(input.searchQuery).toContain("Head of Growth");
-    expect(input.searchQuery).toContain("SaaS");
+    expect(input.currentJobTitles).toEqual(["VP Sales", "Head of Growth"]);
+    expect(input.searchQuery).toBe("SaaS");
+    expect(input.locations).toEqual(["United States"]);
     expect(input.maxItems).toBe(50);
-    expect(input.location).toBe("United States");
+    expect(input.profileScraperMode).toBe("Short");
+  });
+
+  it("maps HarvestAPI's real shape — nested currentPositions, location object, no top-level headline", async () => {
+    const items = [
+      {
+        linkedinUrl: "https://www.linkedin.com/in/greg",
+        firstName: "Greg",
+        lastName: "Kimmell",
+        currentPositions: [{ companyName: "TwinBird Consulting", title: "VP Digital Sales", current: true }],
+        location: { linkedinText: "Los Angeles, California, United States" },
+      },
+    ];
+    const out = await new ApifyProspectData(opts(fakeFetch(items))).discoverProspects({ titles: ["vp"] }, 10);
+    expect(out[0]).toMatchObject({
+      externalRef: "https://www.linkedin.com/in/greg",
+      linkedinUrl: "https://www.linkedin.com/in/greg",
+      firstName: "Greg",
+      lastName: "Kimmell",
+      title: "VP Digital Sales", // currentPositions[0].title
+      companyName: "TwinBird Consulting", // currentPositions[0].companyName
+      location: "Los Angeles, California, United States", // location.linkedinText
+    });
   });
 
   it("runs the configured actor (~ form) with bearer auth and merges actor-specific input", async () => {
