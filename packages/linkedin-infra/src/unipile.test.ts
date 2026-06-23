@@ -163,7 +163,8 @@ describe("UnipileLinkedInInfra", () => {
       const [, init] = (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0] as [string, RequestInit];
       const body = JSON.parse(init.body as string);
       expect(body.account_id).toBe("conn-1");
-      expect(body.profile_url).toBe("https://linkedin.com/in/janedoe");
+      expect(body.provider_id).toBe("janedoe"); // invites go by provider_id (the /in/ slug), not a profile_url
+      expect(body.profile_url).toBeUndefined();
       expect(body.message).toBe("Hi Jane");
     });
   });
@@ -189,8 +190,8 @@ describe("UnipileLinkedInInfra", () => {
       const [, init] = (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0] as [string, RequestInit];
       const body = JSON.parse(init.body as string);
       expect(body.account_id).toBe("conn-2");
-      expect(body.profile_url).toBe("https://linkedin.com/in/johndoe");
-      expect(body.message).toBe("Following up!");
+      expect(body.attendees_ids).toEqual(["johndoe"]); // chats take attendees_ids (provider_ids) + text
+      expect(body.text).toBe("Following up!");
     });
   });
 

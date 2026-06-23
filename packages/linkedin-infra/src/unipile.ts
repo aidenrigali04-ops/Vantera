@@ -227,11 +227,15 @@ export class UnipileLinkedInInfra implements LinkedInInfra {
   }
 
   async sendInvite(req: InviteRequest): Promise<SendOutcome> {
+    // Unipile invites by the member's provider_id, NOT a profile_url (a profile_url 400s). LinkedIn
+    // member-id URLs (…/in/ACoAAA…, what the search source returns) carry the provider_id as the
+    // slug, so profileIdentifier yields it directly. (A public vanity slug would need a profile
+    // lookup to resolve first — out of scope while discovery returns member-id URLs.)
     const data = await this.call<{ invitation_id?: unknown; sent_at?: unknown }>(PATH_INVITE, {
       method: "POST",
       body: JSON.stringify({
         account_id: req.connectedAccountId,
-        profile_url: req.profileUrl,
+        provider_id: profileIdentifier(req.profileUrl),
         message: req.note,
       }),
     });
@@ -239,12 +243,13 @@ export class UnipileLinkedInInfra implements LinkedInInfra {
   }
 
   async sendMessage(req: MessageRequest): Promise<SendOutcome> {
+    // Starting a chat takes attendees_ids (provider_ids) + text, not a profile_url + message.
     const data = await this.call<{ message_id?: unknown; sent_at?: unknown }>(PATH_CHATS, {
       method: "POST",
       body: JSON.stringify({
         account_id: req.connectedAccountId,
-        profile_url: req.profileUrl,
-        message: req.body,
+        attendees_ids: [profileIdentifier(req.profileUrl)],
+        text: req.body,
       }),
     });
     return { id: requireString(data.message_id, "message_id"), sentAt: requireString(data.sent_at, "sent_at") };
