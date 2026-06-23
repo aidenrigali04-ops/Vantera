@@ -3,7 +3,7 @@
 import { useActionState, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, ChevronRight, Check, Loader2 } from "lucide-react";
-import { completeOnboarding, type OnboardingState } from "./actions";
+import { completeOnboarding, goLive, type OnboardingState } from "./actions";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -139,6 +139,7 @@ export function Wizard({ defaultCompanyName = "" }: { defaultCompanyName?: strin
     completeOnboarding,
     {}
   );
+  const [goLiveState, goLiveAction, goingLive] = useActionState<OnboardingState, FormData>(goLive, {});
 
   if (state.done) {
     const company = values.companyName.trim();
@@ -210,9 +211,15 @@ export function Wizard({ defaultCompanyName = "" }: { defaultCompanyName?: strin
               messages, not a blast. A handful of strong replies beats a flood of ignored ones, and
               Analytics shows your rates against what&apos;s healthy.
             </p>
-            <Button asChild className="rounded-2xl">
-              <a href="/dashboard">Go to dashboard</a>
-            </Button>
+            <form action={goLiveAction} className="flex flex-col gap-2">
+              <Button type="submit" className="rounded-2xl" disabled={goingLive}>
+                {goingLive ? "Going live…" : "Go live"}
+              </Button>
+              <FormError message={goLiveState.error} />
+              <p className="text-center text-xs text-muted-foreground">
+                We&apos;ll set up your agents and start sourcing — nothing sends until you approve.
+              </p>
+            </form>
           </CardContent>
         </Card>
         <AnimatedPanelBorder gradient={PARTICLE_BEAM} />

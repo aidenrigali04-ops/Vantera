@@ -1,11 +1,15 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { scanWebsite, type WebsiteScan } from "@vantera/agent-brains";
+import { scanWebsite, deriveIntentWatchlist, type WebsiteScan } from "@vantera/agent-brains";
 import { createClient } from "@/lib/supabase/server";
 import { validateOnboarding } from "@/lib/validation";
+import { loadBillingRow, hasActivePlan } from "@/lib/billing/entitlement";
 
 export type OnboardingState = { error?: string; done?: boolean; scan?: WebsiteScan };
+
+/** Default outreach CTA — sensible out of the box, refined later in Settings → Sharpen your results. */
+const DEFAULT_CTA = "a quick intro call to see if it's a fit";
 
 export async function completeOnboarding(
   _prev: OnboardingState,
@@ -80,6 +84,159 @@ export async function completeOnboarding(
       console.error("onboarding website scan failed", err);
       return { done: true };
     }
+  }
+
+  redirect("/dashboard");
+}
+
+/**
+ * Go live: the whole setup collapsed into one action. From the onboarding answers we already hold,
+ * auto-provision the system live — Prospect (Scout) from the ICP, Outreach with a sensible default
+ * CTA, and Intent with an auto-derived watchlist — no wizards, no per-agent deploys. Gated on
+ * email-confirmed + active plan/trial (the consent + trial-abuse moment, rule 08). Idempotent: a
+ * re-run once the system is live just lands on the dashboard. Intent is best-effort — a hiccup
+ * deriving its watchlist never blocks going live.
+ */
+export async function goLive(_prev: OnboardingState, _formData: FormData): Promise<OnboardingState> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+  if (!user.email_confirmed_at) {
+    return { error: "Confirm your email to go live — check your inbox for the verification link." };
+  }
+
+  const { data: account } = await supabase
+    .from("accounts")
+    .select("id, onboarding_icp, onboarding_industry, website_scan")
+    .limit(1)
+    .maybeSingle<{
+      id: string;
+      onboarding_icp: string | null;
+      onboarding_industry: string | null;
+      website_scan: { summary?: string; offerings?: string[]; value_props?: string[] } | null;
+    }>();
+  if (!account) return { error: "Finish onboarding first." };
+
+  // active plan / trial required to spend (rule 08) — fresh workspaces start on a trial
+  const billingRow = await loadBillingRow(supabase);
+  if (!hasActivePlan(billingRow)) redirect("/settings/billing?reason=deploy");
+
+  // idempotent: already live → straight to the dashboard
+  const { data: existingScout } = await supabase
+    .from("agents")
+    .select("id")
+    .eq("account_id", account.id)
+    .eq("kind", "scout")
+    .limit(1)
+    .maybeSingle<{ id: string }>();
+  if (existingScout) redirect("/dashboard");
+
+  const icpName = account.onboarding_icp?.trim();
+  if (!icpName) {
+    return { error: "Add your target audience in Settings, then go live." };
+  }
+
+  // ── Prospect (Scout) — sources + qualifies against the onboarding ICP ──
+  const { data: icp } = await supabase
+    .from("icps")
+    .insert({ account_id: account.id, name: icpName, criteria: {}, source: "onboarding" })
+    .select("id")
+    .single<{ id: string }>();
+  if (!icp) return { error: "Could not set up your system. Only workspace admins can do this." };
+
+  const { data: scout, error: scoutErr } = await supabase
+    .from("agents")
+    .insert({
+      account_id: account.id,
+      kind: "scout",
+      name: "Scout",
+      status: "live",
+      config: { prospects_per_run: 60, min_score: 70 },
+      run_at_time: "08:00",
+      cadence: "daily",
+      timezone: "UTC",
+      deployed_at: new Date().toISOString(),
+      created_by: user.id,
+    })
+    .select("id")
+    .single<{ id: string }>();
+  if (scoutErr || !scout) {
+    return { error: "Could not go live. Only workspace admins can do this." };
+  }
+  await supabase.from("agent_icps").insert({ agent_id: scout.id, icp_id: icp.id, account_id: account.id, position: 0 });
+
+  // ── Outreach (Copy) — drafts on a default CTA into the review queue (refine it in Settings) ──
+  const { data: campaign } = await supabase
+    .from("campaigns")
+    .insert({
+      account_id: account.id,
+      name: "Outreach (agent)",
+      status: "active",
+      channels: ["linkedin"],
+      targeting: [{ type: "icp", value: icpName }],
+      copywriting_mode: "agent",
+      send_mode: "review",
+      created_by: user.id,
+    })
+    .select("id")
+    .single<{ id: string }>();
+  if (campaign) {
+    await supabase.from("agents").insert({
+      account_id: account.id,
+      kind: "copy",
+      name: "Outreach",
+      status: "live",
+      config: { cta: DEFAULT_CTA, channels: { linkedin: true } },
+      campaign_id: campaign.id,
+      deployed_at: new Date().toISOString(),
+      created_by: user.id,
+    });
+  }
+
+  // ── Intent (best-effort) — auto-derived watchlist; no URL hunting, never blocks go-live ──
+  try {
+    const scan = account.website_scan;
+    const offering = scan
+      ? [
+          scan.summary,
+          scan.offerings?.length ? `Offerings: ${scan.offerings.join(", ")}` : "",
+          scan.value_props?.length ? `Value props: ${scan.value_props.join("; ")}` : "",
+        ]
+          .filter(Boolean)
+          .join(". ")
+      : "";
+    const watch = await deriveIntentWatchlist({
+      industry: account.onboarding_industry,
+      offering: offering || icpName,
+      icp: icpName,
+    });
+    if (watch.keywords.length || watch.competitors.length || watch.hashtags.length) {
+      await supabase.from("agents").insert({
+        account_id: account.id,
+        kind: "intent",
+        name: "Intent",
+        status: "live",
+        config: {
+          watch: {
+            creators: [],
+            competitors: watch.competitors,
+            keywords: watch.keywords,
+            hashtags: watch.hashtags.map((h) => (h.startsWith("#") ? h : `#${h}`)),
+          },
+          signals: { engagement: true, content: true },
+          min_score: 70,
+        },
+        run_at_time: "08:00",
+        cadence: "daily",
+        timezone: "UTC",
+        deployed_at: new Date().toISOString(),
+        created_by: user.id,
+      });
+    }
+  } catch (err) {
+    console.error("go-live: intent provisioning failed (non-blocking)", err);
   }
 
   redirect("/dashboard");
