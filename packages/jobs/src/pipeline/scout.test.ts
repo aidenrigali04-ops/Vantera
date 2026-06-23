@@ -4,7 +4,7 @@ import type { LeadInsights } from "@vantera/agent-brains";
 import { runScout, pickHotSignal } from "./scout";
 import { TRIAL_LEAD_CAP } from "./types";
 import type { CopyDraftPayload, FreshLead, ScoutContext, ScoutDeps, ScoutStore } from "./types";
-import type { OutreachCapacity } from "./capacity";
+import { QUALIFIED_POOL_TARGET, type OutreachCapacity } from "./capacity";
 
 function insight(leadId: string, score: number): LeadInsights {
   return {
@@ -86,6 +86,18 @@ class FakeScoutStore implements ScoutStore {
   }
   async getLiveCopyAgent() {
     return this.copyAgent;
+  }
+  qualifiedPoolOverride: number | null = null;
+  async countQualifiedPool() {
+    if (this.qualifiedPoolOverride !== null) return this.qualifiedPoolOverride;
+    return [...this.scores.values()].filter((s) => s.qualified).length;
+  }
+  async getTopQualifiedLeadIds(_accountId: string, limit: number) {
+    return [...this.scores.entries()]
+      .filter(([, s]) => s.qualified)
+      .sort((a, b) => b[1].score - a[1].score)
+      .slice(0, limit)
+      .map(([id]) => id);
   }
 }
 
@@ -248,7 +260,7 @@ describe("runScout", () => {
     expect((await runScout("scout1", deps)).status).toBe("skipped");
   });
 
-  it("trial cap: a trialing account at the lead ceiling skips before any enrichment", async () => {
+  it("trial cap: a trialing account at the lead ceiling sources nothing new (no discovery spend)", async () => {
     const pool = [makeCandidate({ externalRef: "good", industry: "saas" })];
     const store = new FakeScoutStore(makeContext({ subscriptionStatus: "trialing" }));
     store.leadCount = TRIAL_LEAD_CAP; // already at the ceiling
@@ -256,7 +268,10 @@ describe("runScout", () => {
 
     const summary = await runScout("scout1", deps);
 
-    expect(summary.status).toBe("skipped");
+    // discovery is clamped to 0 by the trial cap → no discovery/enrichment spend; the run still
+    // completes (the draft phase may drain any existing qualified pool — none here, no copy agent).
+    expect(summary.status).toBe("completed");
+    expect(summary.discovered).toBe(0);
     expect(store.enriched).toEqual([]);
     expect(prospectData.enrichCalls).toEqual([]);
   });
@@ -287,30 +302,47 @@ describe("runScout", () => {
 });
 
 describe("runScout — capacity throttle", () => {
-  it("pulls a small trickle during warmup and bounds enrichment spend", async () => {
-    // 25 saas candidates — more than the warmup cap so the cap is what limits discovery
+  it("decouples discovery from send capacity; drafting stays send-paced + best-first", async () => {
     const pool = Array.from({ length: 25 }, (_, i) =>
       makeCandidate({ externalRef: `c${i}`, industry: "saas" })
     );
     const store = new FakeScoutStore({
-      agent: { id: "scout1", accountId: "acc1", status: "live", cadence: "daily", config: { prospectsPerRun: 25, minScore: 70 } },
+      agent: { id: "scout1", accountId: "acc1", status: "live", cadence: "daily", config: { prospectsPerRun: 10, minScore: 70 } },
       icps: [{ id: "icp1", name: "SaaS CTOs", criteria: { industries: ["saas"] } }],
       account: { industry: "devtools", websiteUrl: null, websiteScan: null, websiteScannedAt: null, subscriptionStatus: "active" },
     });
+    store.copyAgent = { id: "copy1" };
     store.capacity = {
       linkedinConnected: true,
       linkedinEnabled: true,
-      linkedinAccountAgeDays: 3, // ramp: 5/day → projected round(5*1*2.0)=10
+      linkedinAccountAgeDays: 3, // warmup ~5/day send capacity
     };
-    // scores are high enough that everyone who passes the gate qualifies
     const scores: Record<string, number> = {};
     for (let i = 0; i < 25; i++) scores[`c${i}`] = 90;
-    const { deps } = makeDeps(store, pool, scores);
+    const { deps, chained } = makeDeps(store, pool, scores);
 
     const summary = await runScout("scout1", deps);
 
-    expect(summary.discovered).toBeLessThanOrEqual(10);
-    expect(store.enriched.length).toBeLessThanOrEqual(10); // spend bounded by the pull
+    // overscan: the whole 25-candidate pool is sourced + qualified, regardless of low send capacity
+    expect(summary.discovered).toBe(25);
+    expect(summary.qualified).toBe(25);
+    // but drafting is send-paced + best-first — only a warmup-sized batch is chained (far below 25)
+    expect(chained).toHaveLength(1);
+    expect(chained[0]!.leadIds.length).toBeGreaterThan(0);
+    expect(chained[0]!.leadIds.length).toBeLessThanOrEqual(10);
+  });
+
+  it("idles discovery once the qualified pool is full, but the run still completes", async () => {
+    const pool = Array.from({ length: 20 }, (_, i) => makeCandidate({ externalRef: `c${i}`, industry: "saas" }));
+    const store = new FakeScoutStore(makeContext());
+    store.qualifiedPoolOverride = QUALIFIED_POOL_TARGET; // pool already at target
+    const { deps } = makeDeps(store, pool, {});
+
+    const summary = await runScout("scout1", deps);
+
+    expect(summary.discovered).toBe(0); // no discovery spend while the pool is full
+    expect(store.enriched).toEqual([]);
+    expect(store.completedAt).not.toBeNull();
   });
 
   it("still sources a bounded preview when no channel is connected, so prospects land", async () => {
@@ -338,28 +370,24 @@ describe("runScout — capacity throttle", () => {
   });
 });
 
-describe("cadence-scaled run ceiling", () => {
-  // config.prospectsPerRun (10 in makeContext) is a per-day budget: daily caps a run at ~10, weekly
-  // at ~70 — so a weekly run sources a full week's volume in one batch (capacity permitting).
-  const pool = Array.from({ length: 90 }, (_, i) =>
+describe("cadence-scaled discovery (overscan)", () => {
+  // Discovery overscan scales with cadence (DISCOVERY_PER_RUN_CAP × cadenceDays): a weekly run
+  // sources a full week's pool in one batch. A pool larger than the daily cap shows the difference.
+  const pool = Array.from({ length: 300 }, (_, i) =>
     makeCandidate({ externalRef: `p${i}`, industry: "saas" })
   );
 
-  it("daily run stays at the per-day ceiling", async () => {
-    const store = new FakeScoutStore(makeContext()); // cadence defaults to "daily"
-    const { deps } = makeDeps(store, pool, {});
-    const summary = await runScout("scout1", deps);
-    expect(summary.discovered).toBeLessThanOrEqual(10);
-  });
+  it("weekly overscans more than daily", async () => {
+    const dailyStore = new FakeScoutStore(makeContext()); // cadence defaults to "daily"
+    const daily = await runScout("scout1", makeDeps(dailyStore, pool, {}).deps);
 
-  it("weekly run sources a full week's worth — well above the daily ceiling", async () => {
-    const ctx = makeContext();
-    ctx.agent.cadence = "weekly";
-    const store = new FakeScoutStore(ctx);
-    const { deps } = makeDeps(store, pool, {});
-    const summary = await runScout("scout1", deps);
-    // breaks the old hard clamp at prospectsPerRun (10) — weekly now scales ~7x, capacity permitting
-    expect(summary.discovered).toBeGreaterThan(10);
+    const weeklyCtx = makeContext();
+    weeklyCtx.agent.cadence = "weekly";
+    const weeklyStore = new FakeScoutStore(weeklyCtx);
+    const weekly = await runScout("scout1", makeDeps(weeklyStore, pool, {}).deps);
+
+    expect(daily.discovered).toBeGreaterThan(0);
+    expect(weekly.discovered).toBeGreaterThan(daily.discovered);
   });
 });
 

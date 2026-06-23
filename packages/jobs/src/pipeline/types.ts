@@ -111,6 +111,10 @@ export interface ScoutStore {
   getOutreachCapacity(accountId: string): Promise<OutreachCapacity>;
   /** in-flight leads not yet contacted (pending_review/approved/scheduled sends, no send recorded) */
   countUncontactedLeads(accountId: string): Promise<number>;
+  /** size of the qualified, not-yet-drafted pool (status 'qualified') — gates discovery overscan */
+  countQualifiedPool(accountId: string): Promise<number>;
+  /** top-N qualified, not-yet-drafted lead ids by score — best-first draft draining (overscan) */
+  getTopQualifiedLeadIds(accountId: string, limit: number): Promise<string[]>;
   getLiveCopyAgent(accountId: string): Promise<{ id: string } | null>;
 }
 

@@ -1,4 +1,4 @@
-import { and, count, eq, gte, inArray, isNull, lt, lte, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, inArray, isNull, lt, lte, or, sql } from "drizzle-orm";
 import {
   accounts,
   agentAssets,
@@ -460,6 +460,26 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           ),
         );
       return rows.length;
+    },
+
+    async countQualifiedPool(accountId: string) {
+      const [row] = await db
+        .select({ n: count() })
+        .from(leads)
+        .where(and(eq(leads.accountId, accountId), eq(leads.status, "qualified")));
+      return row?.n ?? 0;
+    },
+
+    async getTopQualifiedLeadIds(accountId: string, limit: number) {
+      if (limit <= 0) return [];
+      // qualified, not-yet-drafted leads (drafting flips status to 'in_campaign'), best score first
+      const rows = await db
+        .select({ id: leads.id })
+        .from(leads)
+        .where(and(eq(leads.accountId, accountId), eq(leads.status, "qualified")))
+        .orderBy(desc(leads.aiScore), desc(leads.scoredAt))
+        .limit(limit);
+      return rows.map((r) => r.id);
     },
 
     async getLiveCopyAgent(accountId: string) {
