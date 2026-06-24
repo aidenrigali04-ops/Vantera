@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { INVITE_EXPIRY_DAYS, runSendDispatch } from "./send-dispatch";
 import { TRIAL_SEND_CAP } from "./types";
-import type { DispatchableSend, SendDispatchDeps, SendDispatchStore } from "./types";
+import type { DispatchSender, DispatchableSend, SendDispatchDeps, SendDispatchStore } from "./types";
 
 // ─── helper ──────────────────────────────────────────────────────────────────
 
@@ -18,21 +18,34 @@ function makeSend(overrides: Partial<DispatchableSend> = {}): DispatchableSend {
     campaignStatus: "active",
     leadInvitedAt: null,
     leadConnectedAt: null,
+    leadAssignedSenderId: null,
     subscriptionStatus: "active",
     ...overrides,
+  };
+}
+
+function makeSender(over: Partial<DispatchSender> = {}): DispatchSender {
+  return {
+    linkedinAccountId: "li1",
+    ageDays: 30,
+    sentToday: 0,
+    last7d: 0,
+    sentTodayMessages: 0,
+    lastAssignedAt: 0,
+    healthy: true,
+    ...over,
   };
 }
 
 class FakeDispatchStore implements SendDispatchStore {
   killSwitch = false;
   sends: DispatchableSend[] = [];
-  linkedInAgeDays: number | null = 30;
-  inviteSentToday = 0;
-  messageSentToday = 0;
-  invitesLast7Days = 0; // what countLinkedInInvitesLast7Days reports (weekly-ceiling input)
+  /** the tenant's connected senders; default = one mature, idle account (single-sender case) */
+  senders: DispatchSender[] = [makeSender()];
   accountSendsCount = 0; // what countAccountSends reports (trial-cap input)
   scheduled: { sendId: string; scheduledFor: Date }[] = [];
   canceled: { sendId: string; error: string }[] = [];
+  assigned: { leadId: string; linkedinAccountId: string }[] = [];
   getDispatchableSendsCallCount = 0;
 
   async isKillSwitchOn() {
@@ -45,14 +58,11 @@ class FakeDispatchStore implements SendDispatchStore {
     this.getDispatchableSendsCallCount += 1;
     return this.sends;
   }
-  async getLinkedInAccountAgeDays(_accountId: string, _now: Date) {
-    return this.linkedInAgeDays;
+  async listSenderCandidates(_accountId: string, _now: Date) {
+    return this.senders;
   }
-  async countLinkedInSentToday(_accountId: string, kind: "invite" | "message", _dayStart: Date) {
-    return kind === "invite" ? this.inviteSentToday : this.messageSentToday;
-  }
-  async countLinkedInInvitesLast7Days(_accountId: string, _now: Date) {
-    return this.invitesLast7Days;
+  async assignLeadSender(leadId: string, linkedinAccountId: string) {
+    this.assigned.push({ leadId, linkedinAccountId });
   }
   async markScheduled(sendId: string, scheduledFor: Date) {
     this.scheduled.push({ sendId, scheduledFor });
@@ -126,7 +136,7 @@ describe("runSendDispatch — account / campaign gating", () => {
 describe("runSendDispatch — linkedin channel", () => {
   it("no active LinkedIn identity → all skipped", async () => {
     const store = new FakeDispatchStore();
-    store.linkedInAgeDays = null;
+    store.senders = [];
     store.sends = [
       makeSend({ id: "s1", channel: "linkedin", linkedinStage: "invite" }),
       makeSend({ id: "s2", channel: "linkedin", linkedinStage: "invite" }),
@@ -144,9 +154,8 @@ describe("runSendDispatch — linkedin channel", () => {
   it("invite ramp budget respected (ageDays 3 → budget 5 minus countSentToday) and message budget independent", async () => {
     const store = new FakeDispatchStore();
     // ageDays 3 → ramp bucket maxAgeDays 7 → daily invite ceiling = 5
-    store.linkedInAgeDays = 3;
-    store.inviteSentToday = 3; // budget = 5 - 3 = 2 remaining
-    store.messageSentToday = 0; // message budget = 25 - 0 = 25
+    // budget = 5 - 3 = 2 invites remaining; message budget = 25 - 0 = 25
+    store.senders = [makeSender({ ageDays: 3, sentToday: 3, sentTodayMessages: 0 })];
 
     store.sends = [
       makeSend({ id: "inv1", channel: "linkedin", linkedinStage: "invite" }),
@@ -169,7 +178,7 @@ describe("runSendDispatch — linkedin channel", () => {
 
   it("message rows parked (skipped) while lead not connected and invite fresh", async () => {
     const store = new FakeDispatchStore();
-    store.linkedInAgeDays = 30;
+    store.senders = [makeSender()];
     const now = new Date("2026-06-12T10:00:00Z");
     // invited 5 days ago — well within expiry window
     const recentInvite = new Date(now.getTime() - 5 * 86_400_000);
@@ -195,7 +204,7 @@ describe("runSendDispatch — linkedin channel", () => {
 
   it("message rows canceled with /expired/ error when invitedAt > 30 days ago and not connected", async () => {
     const store = new FakeDispatchStore();
-    store.linkedInAgeDays = 30;
+    store.senders = [makeSender()];
     const now = new Date("2026-06-12T10:00:00Z");
     // invited 31 days ago — expired
     const oldInvite = new Date(now.getTime() - (INVITE_EXPIRY_DAYS + 1) * 86_400_000);
@@ -221,7 +230,7 @@ describe("runSendDispatch — linkedin channel", () => {
 
   it("invite rows for already-invited leads skipped", async () => {
     const store = new FakeDispatchStore();
-    store.linkedInAgeDays = 30;
+    store.senders = [makeSender()];
 
     store.sends = [
       makeSend({
@@ -342,9 +351,7 @@ describe("runSendDispatch — scheduling and timing", () => {
 describe("runSendDispatch — rolling weekly invite ceiling", () => {
   it("clamps invites to the rolling weekly ceiling (97 sent in 7 days → at most 3 dispatched)", async () => {
     const store = new FakeDispatchStore();
-    store.linkedInAgeDays = 60;
-    store.inviteSentToday = 0;
-    store.invitesLast7Days = 97;
+    store.senders = [makeSender({ ageDays: 60, sentToday: 0, last7d: 97 })];
     store.sends = Array.from({ length: 10 }, (_, i) =>
       makeSend({ id: `inv${i + 1}`, channel: "linkedin", linkedinStage: "invite" })
     );
@@ -358,9 +365,7 @@ describe("runSendDispatch — rolling weekly invite ceiling", () => {
 
   it("weekly ceiling fully consumed → zero invites dispatched", async () => {
     const store = new FakeDispatchStore();
-    store.linkedInAgeDays = 60;
-    store.inviteSentToday = 0;
-    store.invitesLast7Days = 100;
+    store.senders = [makeSender({ ageDays: 60, sentToday: 0, last7d: 100 })];
     store.sends = [
       makeSend({ id: "inv1", channel: "linkedin", linkedinStage: "invite" }),
       makeSend({ id: "inv2", channel: "linkedin", linkedinStage: "invite" }),
@@ -375,9 +380,7 @@ describe("runSendDispatch — rolling weekly invite ceiling", () => {
 
   it("weekly ceiling does NOT restrict messages — only invites", async () => {
     const store = new FakeDispatchStore();
-    store.linkedInAgeDays = 60;
-    store.invitesLast7Days = 100;
-    store.messageSentToday = 0;
+    store.senders = [makeSender({ ageDays: 60, last7d: 100, sentTodayMessages: 0 })];
     store.sends = [
       makeSend({ id: "inv1", channel: "linkedin", linkedinStage: "invite" }),
       makeSend({
@@ -392,6 +395,122 @@ describe("runSendDispatch — rolling weekly invite ceiling", () => {
     const result = await runSendDispatch(deps);
     expect(result.scheduled).toBe(1);
     expect(enqueued[0]?.sendId).toBe("msg1");
+    expect(result.skipped).toBe(1);
+  });
+});
+
+describe("runSendDispatch — multi-sender distribution", () => {
+  function inviteRows(n: number): DispatchableSend[] {
+    return Array.from({ length: n }, (_, i) =>
+      makeSend({ id: `inv${i + 1}`, leadId: `lead${i + 1}`, linkedinStage: "invite" })
+    );
+  }
+
+  it("spreads invites evenly across two healthy senders", async () => {
+    const store = new FakeDispatchStore();
+    store.senders = [
+      makeSender({ linkedinAccountId: "A", ageDays: 60 }),
+      makeSender({ linkedinAccountId: "B", ageDays: 60 }),
+    ];
+    store.sends = inviteRows(10);
+    const deps = makeDeps(store);
+
+    const result = await runSendDispatch(deps);
+
+    expect(result.scheduled).toBe(10);
+    const toA = store.assigned.filter((a) => a.linkedinAccountId === "A").length;
+    const toB = store.assigned.filter((a) => a.linkedinAccountId === "B").length;
+    expect(toA).toBe(5);
+    expect(toB).toBe(5);
+  });
+
+  it("total capacity is the SUM across senders, not a single account's cap", async () => {
+    const store = new FakeDispatchStore();
+    // two mature accounts → 20 + 20 = 40 invite capacity; 30 requested all go out
+    store.senders = [
+      makeSender({ linkedinAccountId: "A", ageDays: 60 }),
+      makeSender({ linkedinAccountId: "B", ageDays: 60 }),
+    ];
+    store.sends = inviteRows(30);
+    const deps = makeDeps(store);
+
+    const result = await runSendDispatch(deps);
+
+    expect(result.scheduled).toBe(30); // > one account's 20/day ceiling
+    expect(store.assigned.filter((a) => a.linkedinAccountId === "A").length).toBe(15);
+    expect(store.assigned.filter((a) => a.linkedinAccountId === "B").length).toBe(15);
+  });
+
+  it("a sender at its daily cap sends nothing; the other absorbs within its own cap", async () => {
+    const store = new FakeDispatchStore();
+    store.senders = [
+      makeSender({ linkedinAccountId: "full", ageDays: 60, sentToday: 20 }), // budget 0
+      makeSender({ linkedinAccountId: "open", ageDays: 60, sentToday: 0 }), // budget 20
+    ];
+    store.sends = inviteRows(5);
+    const deps = makeDeps(store);
+
+    const result = await runSendDispatch(deps);
+
+    expect(result.scheduled).toBe(5);
+    expect(store.assigned.every((a) => a.linkedinAccountId === "open")).toBe(true);
+  });
+
+  it("persists the sticky sender assignment on the lead at first invite", async () => {
+    const store = new FakeDispatchStore();
+    store.senders = [makeSender({ linkedinAccountId: "li1" })];
+    store.sends = [makeSend({ id: "inv1", leadId: "leadX", linkedinStage: "invite" })];
+    const deps = makeDeps(store);
+
+    await runSendDispatch(deps);
+
+    expect(store.assigned).toEqual([{ leadId: "leadX", linkedinAccountId: "li1" }]);
+  });
+
+  it("a connected lead's message draws only from its assigned sender's message budget", async () => {
+    const store = new FakeDispatchStore();
+    store.senders = [
+      makeSender({ linkedinAccountId: "A", sentTodayMessages: 0 }), // budget 25
+      makeSender({ linkedinAccountId: "B", sentTodayMessages: 25 }), // budget 0
+    ];
+    store.sends = [
+      makeSend({
+        id: "msgB",
+        leadId: "leadB",
+        linkedinStage: "message",
+        leadAssignedSenderId: "B", // locked to B, which is out of message budget
+        leadConnectedAt: new Date("2026-06-01T00:00:00Z"),
+      }),
+    ];
+    const deps = makeDeps(store);
+
+    const result = await runSendDispatch(deps);
+
+    // locked to B (budget 0) — does NOT borrow A's budget
+    expect(result.scheduled).toBe(0);
+    expect(result.skipped).toBe(1);
+  });
+
+  it("a message locked to an unhealthy/unavailable sender is skipped, never re-routed", async () => {
+    const store = new FakeDispatchStore();
+    store.senders = [
+      makeSender({ linkedinAccountId: "A", healthy: true }),
+      makeSender({ linkedinAccountId: "B", healthy: false }), // the assigned one went unhealthy
+    ];
+    store.sends = [
+      makeSend({
+        id: "msgB",
+        leadId: "leadB",
+        linkedinStage: "message",
+        leadAssignedSenderId: "B",
+        leadConnectedAt: new Date("2026-06-01T00:00:00Z"),
+      }),
+    ];
+    const deps = makeDeps(store);
+
+    const result = await runSendDispatch(deps);
+
+    expect(result.scheduled).toBe(0);
     expect(result.skipped).toBe(1);
   });
 });

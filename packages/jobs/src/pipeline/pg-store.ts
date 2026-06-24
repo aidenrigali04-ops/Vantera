@@ -41,6 +41,7 @@ import {
   type CopyConfig,
   type CopyContext,
   type CopyDraftStore,
+  type DispatchSender,
   type DispatchableSend,
   type DraftableLead,
   type DueSequenceRun,
@@ -710,6 +711,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           campaignStatus: campaigns.status,
           leadInvitedAt: leads.linkedinInvitedAt,
           leadConnectedAt: leads.linkedinConnectedAt,
+          leadAssignedSenderId: leads.linkedinAccountId,
         })
         .from(scheduledSends)
         .innerJoin(accounts, eq(scheduledSends.accountId, accounts.id))
@@ -733,6 +735,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         campaignStatus: r.campaignStatus,
         leadInvitedAt: r.leadInvitedAt,
         leadConnectedAt: r.leadConnectedAt,
+        leadAssignedSenderId: r.leadAssignedSenderId,
         subscriptionStatus: r.subscriptionStatus,
       }));
     },
@@ -745,48 +748,58 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
       return row?.n ?? 0;
     },
 
-    async getLinkedInAccountAgeDays(accountId: string, now: Date): Promise<number | null> {
-      const [acct] = await db
-        .select({ connectedAt: linkedinAccounts.connectedAt })
+    async listSenderCandidates(accountId: string, now: Date): Promise<DispatchSender[]> {
+      // Every active sender for the tenant (multi-sender, rule 04/13).
+      const accts = await db
+        .select({ id: linkedinAccounts.id, connectedAt: linkedinAccounts.connectedAt })
         .from(linkedinAccounts)
-        .where(and(eq(linkedinAccounts.accountId, accountId), eq(linkedinAccounts.status, "active")))
-        .limit(1);
-      if (!acct) return null;
-      if (!acct.connectedAt) return 0;
-      return Math.floor((now.getTime() - acct.connectedAt.getTime()) / 86_400_000);
-    },
+        .where(and(eq(linkedinAccounts.accountId, accountId), eq(linkedinAccounts.status, "active")));
+      if (accts.length === 0) return [];
 
-    async countLinkedInSentToday(accountId: string, kind: "invite" | "message", dayStart: Date): Promise<number> {
-      const rows = await db
-        .select({ id: outreachSends.id })
+      const dayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+      const since7 = new Date(now.getTime() - 7 * 86_400_000);
+
+      // One scan of this tenant's last-7d LinkedIn sends (bounded: ≤ ~100/wk per account),
+      // aggregated per sender in JS — today/7d invites, today messages, last-used recency.
+      const sends = await db
+        .select({
+          liId: outreachSends.linkedinAccountId,
+          stage: scheduledSends.linkedinStage,
+          sentAt: outreachSends.sentAt,
+        })
         .from(outreachSends)
         .innerJoin(scheduledSends, eq(outreachSends.scheduledSendId, scheduledSends.id))
         .where(
           and(
             eq(outreachSends.accountId, accountId),
             eq(outreachSends.channel, "linkedin"),
-            eq(scheduledSends.linkedinStage, kind),
-            gte(outreachSends.sentAt, dayStart)
+            gte(outreachSends.sentAt, since7)
           )
         );
-      return rows.length;
+
+      return accts.map((a) => {
+        const mine = sends.filter((s) => s.liId === a.id);
+        const sentToday = mine.filter((s) => s.stage === "invite" && s.sentAt >= dayStart).length;
+        const last7d = mine.filter((s) => s.stage === "invite").length;
+        const sentTodayMessages = mine.filter((s) => s.stage === "message" && s.sentAt >= dayStart).length;
+        const lastAssignedAt = mine.reduce((m, s) => Math.max(m, s.sentAt.getTime()), 0);
+        const ageDays = a.connectedAt
+          ? Math.floor((now.getTime() - a.connectedAt.getTime()) / 86_400_000)
+          : 0;
+        return {
+          linkedinAccountId: a.id,
+          ageDays,
+          sentToday,
+          last7d,
+          sentTodayMessages,
+          lastAssignedAt,
+          healthy: true, // only active accounts were selected
+        };
+      });
     },
 
-    async countLinkedInInvitesLast7Days(accountId: string, now: Date): Promise<number> {
-      const since = new Date(now.getTime() - 7 * 86_400_000);
-      const rows = await db
-        .select({ id: outreachSends.id })
-        .from(outreachSends)
-        .innerJoin(scheduledSends, eq(outreachSends.scheduledSendId, scheduledSends.id))
-        .where(
-          and(
-            eq(outreachSends.accountId, accountId),
-            eq(outreachSends.channel, "linkedin"),
-            eq(scheduledSends.linkedinStage, "invite"),
-            gte(outreachSends.sentAt, since)
-          )
-        );
-      return rows.length;
+    async assignLeadSender(leadId: string, linkedinAccountId: string): Promise<void> {
+      await db.update(leads).set({ linkedinAccountId }).where(eq(leads.id, leadId));
     },
 
     async markScheduled(sendId: string, scheduledFor: Date) {
@@ -862,13 +875,18 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
       await db.update(scheduledSends).set({ status: "suppressed" }).where(eq(scheduledSends.id, sendId));
     },
 
-    async getActiveLinkedInIdentity(accountId: string) {
-      const [acct] = await db
-        .select({ id: linkedinAccounts.id, providerRef: linkedinAccounts.providerRef, status: linkedinAccounts.status })
-        .from(linkedinAccounts)
-        .where(and(eq(linkedinAccounts.accountId, accountId), eq(linkedinAccounts.status, "active")))
+    async getLeadAssignedIdentity(leadId: string) {
+      const [row] = await db
+        .select({
+          id: linkedinAccounts.id,
+          providerRef: linkedinAccounts.providerRef,
+          status: linkedinAccounts.status,
+        })
+        .from(leads)
+        .innerJoin(linkedinAccounts, eq(leads.linkedinAccountId, linkedinAccounts.id))
+        .where(eq(leads.id, leadId))
         .limit(1);
-      return acct ?? null;
+      return row ?? null;
     },
 
     async recordOutreachSend(rec: {

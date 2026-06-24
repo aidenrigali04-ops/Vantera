@@ -19,6 +19,7 @@ import type {
   WebsiteScan,
 } from "@vantera/agent-brains";
 import type { OutreachCapacity } from "./capacity";
+import type { SenderCandidate } from "./sender-assignment";
 import type { LinkedInInfra } from "@vantera/linkedin-infra";
 
 export interface ScoutConfig {
@@ -315,7 +316,9 @@ export interface OutreachSendStore {
   markSent(sendId: string): Promise<void>;
   markFailed(sendId: string, error: string): Promise<void>;
   markSuppressed(sendId: string): Promise<void>;
-  getActiveLinkedInIdentity(accountId: string): Promise<{ id: string; providerRef: string; status: string } | null>;
+  /** The sticky sender assigned to this lead (multi-sender, rule 04/13). Null = unassigned
+   *  (the dispatcher assigns at invite time) → the send parks until the next dispatch cycle. */
+  getLeadAssignedIdentity(leadId: string): Promise<{ id: string; providerRef: string; status: string } | null>;
   recordOutreachSend(rec: {
     accountId: string;
     campaignId: string;
@@ -349,8 +352,20 @@ export interface DispatchableSend {
   campaignStatus: string;
   leadInvitedAt: Date | null;
   leadConnectedAt: Date | null;
+  /** Multi-sender: the LinkedIn account already assigned to this lead (rule 04/13).
+   *  Null until first invite — invites without one are assigned here; a connected
+   *  lead's messages are LOCKED to this account (can't message from another). */
+  leadAssignedSenderId: string | null;
   /** Drives the trial send cap; 'trialing' accounts are bounded by TRIAL_SEND_CAP. */
   subscriptionStatus: string;
+}
+
+/** One of a tenant's connected LinkedIn sender accounts, with its current safety state.
+ *  Extends the invite-selector's SenderCandidate with today's message count so the
+ *  dispatcher can budget invites and messages per account independently (rule 04). */
+export interface DispatchSender extends SenderCandidate {
+  /** Messages this account has already sent today (its own message cap is independent). */
+  sentTodayMessages: number;
 }
 
 export interface SendDispatchStore {
@@ -359,11 +374,12 @@ export interface SendDispatchStore {
   getDispatchableSends(staleCutoff: Date): Promise<DispatchableSend[]>;
   /** Total sends recorded for the account (outreach_sends) — enforces TRIAL_SEND_CAP. */
   countAccountSends(accountId: string): Promise<number>;
-  /** null = no active LinkedIn identity */
-  getLinkedInAccountAgeDays(accountId: string, now: Date): Promise<number | null>;
-  countLinkedInSentToday(accountId: string, kind: "invite" | "message", dayStart: Date): Promise<number>;
-  /** Rolling 7-day (168h) count of LinkedIn invites actually sent for the account. */
-  countLinkedInInvitesLast7Days(accountId: string, now: Date): Promise<number>;
+  /** Every active LinkedIn sender for the tenant with its current safety state
+   *  (age, invites today, invites last 7d, messages today, last-assigned, health).
+   *  Empty array = no connected identity. Per-sender caps replace the old per-tenant counts. */
+  listSenderCandidates(accountId: string, now: Date): Promise<DispatchSender[]>;
+  /** Persist the sticky sender choice on the lead (set once at first invite). */
+  assignLeadSender(leadId: string, linkedinAccountId: string): Promise<void>;
   markScheduled(sendId: string, scheduledFor: Date): Promise<void>;
   cancelSend(sendId: string, error: string): Promise<void>;
 }
