@@ -189,6 +189,11 @@ export const leads = pgTable(
       .notNull()
       .default("unvalidated"),
     linkedinUrl: text("linkedin_url"),
+    // 0034: sticky sender — the LinkedIn account assigned to send this lead's whole
+    // sequence (multi-sender distribution, rule 04/13). Null until the first invite.
+    linkedinAccountId: uuid("linkedin_account_id").references(() => linkedinAccounts.id, {
+      onDelete: "set null",
+    }),
     // 0009: LinkedIn invite→accept→message sequencing state (rule 04/08)
     linkedinInvitedAt: timestamp("linkedin_invited_at", { withTimezone: true }),
     linkedinConnectedAt: timestamp("linkedin_connected_at", { withTimezone: true }),
@@ -224,6 +229,7 @@ export const leads = pgTable(
   (t) => [
     index("leads_account_status_idx").on(t.accountId, t.status),
     index("leads_icp_idx").on(t.icpId),
+    index("leads_linkedin_account_idx").on(t.linkedinAccountId),
     // expression/partial indexes (lower(email), ai_score where rules_gate_passed) live in SQL only
   ]
 );
