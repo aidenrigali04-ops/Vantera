@@ -27,8 +27,8 @@ export const PLANS: Record<PlanTier, PlanConfig> = {
     stripePriceId: env("STRIPE_PRICE_STARTER"),
     stripePriceIdAnnual: env("STRIPE_PRICE_STARTER_ANNUAL"),
     includedSeats: 1,
-    includedLinkedinAccounts: 1,
-    maxCampaigns: 1,
+    includedLinkedinAccounts: 1, // 1 sender — solo
+    maxCampaigns: 2,
     features: { intent: false },
   },
   growth: {
@@ -36,17 +36,17 @@ export const PLANS: Record<PlanTier, PlanConfig> = {
     stripePriceId: env("STRIPE_PRICE_GROWTH"),
     stripePriceIdAnnual: env("STRIPE_PRICE_GROWTH_ANNUAL"),
     includedSeats: 3,
-    includedLinkedinAccounts: 3,
-    maxCampaigns: 5,
-    features: { intent: false },
+    includedLinkedinAccounts: 5, // generous middle tier — multi-sender headline
+    maxCampaigns: 10,
+    features: { intent: true }, // Intent Agent available from Growth up (2026-06-24 restructure)
   },
   scale: {
     tier: "scale",
     stripePriceId: env("STRIPE_PRICE_SCALE"),
     stripePriceIdAnnual: env("STRIPE_PRICE_SCALE_ANNUAL"),
     includedSeats: 10,
-    includedLinkedinAccounts: 10,
-    maxCampaigns: 25,
+    includedLinkedinAccounts: 15, // max sender capacity — what justifies Scale
+    maxCampaigns: 999, // "Unlimited" in the UI
     features: { intent: true },
   },
 };

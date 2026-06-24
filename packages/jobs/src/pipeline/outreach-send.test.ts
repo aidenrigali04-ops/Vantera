@@ -74,7 +74,7 @@ class FakeOutreachStore implements OutreachSendStore {
   async markSuppressed(sendId: string) {
     this.suppressed.push(sendId);
   }
-  async getActiveLinkedInIdentity(_accountId: string) {
+  async getLeadAssignedIdentity(_leadId: string) {
     return this.linkedInIdentity;
   }
   async recordOutreachSend(rec: {

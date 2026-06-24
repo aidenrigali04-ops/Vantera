@@ -41,9 +41,11 @@ describe("plan display", () => {
     for (const tier of PLAN_DISPLAY_ORDER) {
       const f = PLAN_DISPLAY[tier].features;
       expect(
-        f.some((b) => b.includes(`${PLANS[tier].includedLinkedinAccounts} LinkedIn account`))
+        f.some((b) => b.includes(`${PLANS[tier].includedLinkedinAccounts} LinkedIn sender`))
       ).toBe(true);
-      expect(f.some((b) => b.includes(`${PLANS[tier].maxCampaigns} active campaign`))).toBe(true);
+      const campaigns = PLANS[tier].maxCampaigns;
+      const expected = campaigns >= 999 ? "Unlimited active campaigns" : `${campaigns} active campaign`;
+      expect(f.some((b) => b.includes(expected))).toBe(true);
     }
   });
 });

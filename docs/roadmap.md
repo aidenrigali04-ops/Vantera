@@ -84,6 +84,10 @@ Each entry stays short — the detail lives in that phase's spec (`docs/superpow
 
 - **The conversation closer (flagged, further phase)** — "handle the conversation until close" = a multi-turn LinkedIn-DM responder that carries a thread to a booking, beyond today's one-shot `reply/classify`. The kept reply brain is its seed. Built after the Intent Agent.
 
+- [x] **Phase 14 — Multi-sender distribution + tier restructure** *(built 2026-06-24)*
+  Goal: send from *all* of a tenant's connected LinkedIn accounts (the billing layer already entitled 1/5/15 senders; the runtime only ever used one), and restructure pricing so sender capacity is the headline differentiator. This is the safe way to scale volume — Goji Berry's "multi-sender distribution," done as account-safety not evasion: each sender keeps its own 20/day · 100/week · ramp, so total capacity is the sum while no account trips LinkedIn's limits.
+  Shipped: migration `0034` (`leads.linkedin_account_id` sticky sender, nullable until first invite, RLS already on `leads`); pure capacity-weighted least-loaded `assignSender` selector; `send-dispatch` rebuilt to budget per *sender account* + assign each lead a sticky sender (invite + follow-ups locked to the same account); `outreach-send` sends from the lead's assigned account; pg-store `listSenderCandidates`/`assignLeadSender`/`getLeadAssignedIdentity`. Tier restructure: senders 1/5/15, Intent from Growth up (was Scale-only), campaigns 2/10/Unlimited, display prices $45/$79/$349; both pricing surfaces + help article synced. Full gate green. Operational remainder (owner): apply `0034` to dev/prod DB; create the three Stripe prices ($45/$79/$349 monthly + annual) and set `STRIPE_PRICE_*`/`_ANNUAL` env; `trigger deploy`. Key rules: 02, 04, 06, 11, 13.
+
 ---
 
 ## Continuous tracks (no single phase)

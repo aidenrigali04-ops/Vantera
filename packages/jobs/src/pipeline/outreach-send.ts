@@ -66,7 +66,9 @@ export async function runOutreachSend(
     | { parked: true };
 
   try {
-    const identity = await deps.store.getActiveLinkedInIdentity(ctx.accountId);
+    // Multi-sender (rule 04/13): send from the account stuck to THIS lead, not "a" tenant
+    // identity. Unassigned/unhealthy → park; the dispatcher assigns on the next cycle.
+    const identity = await deps.store.getLeadAssignedIdentity(ctx.leadId);
     if (!identity || identity.status !== "active") {
       await deps.store.revertToApproved(ctx.id);
       return "parked";
