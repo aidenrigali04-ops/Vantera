@@ -3,7 +3,7 @@ import { createDb } from "@vantera/db";
 import { rankLeads, scanWebsite } from "@vantera/agent-brains";
 import { runScout } from "../pipeline/scout";
 import { createPgStore } from "../pipeline/pg-store";
-import { createProspectData } from "../pipeline/prospect-source";
+import { createCompanySignals, createProspectData } from "../pipeline/prospect-source";
 
 /** One Scout (Prospect) Agent run: discover → gate → enrich → rank → chain copy-draft. */
 export const scoutRun = task({
@@ -14,6 +14,7 @@ export const scoutRun = task({
     const summary = await runScout(payload.agentId, {
       store,
       prospectData: createProspectData(),
+      companySignals: createCompanySignals(),
       scanFn: (url) => scanWebsite(url),
       rankFn: (candidates, ctx) => rankLeads(candidates, ctx),
       triggerCopyDraft: async (p) => {

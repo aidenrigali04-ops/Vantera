@@ -29,10 +29,10 @@ describe("gate", () => {
     current_period_end: null,
   };
   it("allows creating a campaign under the limit", () => {
-    expect(gate(activeRow, "campaign", 0).ok).toBe(true); // starter maxCampaigns = 1
+    expect(gate(activeRow, "campaign", 0).ok).toBe(true); // starter maxCampaigns = 2
   });
   it("blocks at the limit", () => {
-    const res = gate(activeRow, "campaign", 1);
+    const res = gate(activeRow, "campaign", 2); // starter limit is 2
     expect(res.ok).toBe(false);
   });
   it("blocks when lapsed", () => {

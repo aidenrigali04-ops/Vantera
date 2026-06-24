@@ -1,7 +1,9 @@
 import {
+  ApifyCompanySignals,
   ApifyProspectData,
   InMemoryProspectData,
   makeCandidate,
+  type CompanySignalSource,
   type ProspectDataSource,
 } from "@vantera/prospect-data";
 
@@ -29,4 +31,20 @@ export function createProspectData(): ProspectDataSource {
     return new ApifyProspectData();
   }
   return new InMemoryProspectData(seedPool());
+}
+
+/**
+ * Company-event signal source for Intent plans (Phase 15). Returns the live Apify company-news
+ * adapter only when both the token and a company-news actor are configured; otherwise `undefined`,
+ * which the Scout treats as a no-op (no company signals, nothing breaks). The Scout also gates the
+ * fetch on the account's Intent entitlement, so this never runs for Starter.
+ */
+export function createCompanySignals(): CompanySignalSource | undefined {
+  if (process.env.APIFY_TOKEN && process.env.APIFY_COMPANY_NEWS_ACTOR) {
+    return new ApifyCompanySignals({
+      token: process.env.APIFY_TOKEN,
+      actorId: process.env.APIFY_COMPANY_NEWS_ACTOR,
+    });
+  }
+  return undefined;
 }
