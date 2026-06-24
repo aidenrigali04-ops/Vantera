@@ -1,7 +1,7 @@
 import { applyRulesGate, isScanStale } from "@vantera/agent-brains";
 import { computeRunTarget, computeDiscoveryTarget, dailyOutreachCapacity } from "./capacity";
 import type { RankCandidate } from "@vantera/agent-brains";
-import { icpCriteriaToFilters, type ProspectSignal } from "@vantera/prospect-data";
+import { companyKey, icpCriteriaToFilters, type CompanyRef, type ProspectSignal } from "@vantera/prospect-data";
 import {
   SCOUT_DEFAULTS,
   TRIAL_LEAD_CAP,
@@ -107,10 +107,44 @@ export async function runScout(agentId: string, deps: ScoutDeps): Promise<ScoutR
         )
       ).map((e) => [e.externalRef, e])
     );
+    // Company-event signals (Phase 15) — only on Intent-entitled plans (Growth/Scale). Fetched once
+    // per company for this run's survivors, attached to the rank (a fresh event can lift the score,
+    // rule 06) and persisted to lead_signals for the "why now" display. Fail-open: any error → no
+    // signals, the run still completes (rule 04 — prospecting never halts on a signal read).
+    const companySignalsByKey = new Map<string, ProspectSignal[]>();
+    if (ctx.account.intentEnabled && deps.companySignals) {
+      const seen = new Set<string>();
+      const companies: CompanyRef[] = [];
+      for (const s of survivors) {
+        if (!s.candidate.companyName) continue;
+        const key = companyKey({ name: s.candidate.companyName, domain: s.candidate.companyDomain });
+        if (seen.has(key)) continue;
+        seen.add(key);
+        companies.push({ name: s.candidate.companyName, domain: s.candidate.companyDomain });
+      }
+      if (companies.length > 0) {
+        try {
+          const map = await deps.companySignals.getCompanySignals(companies);
+          for (const [k, v] of map) companySignalsByKey.set(k, v);
+        } catch {
+          /* fail open */
+        }
+      }
+    }
+
     const rankCandidates: RankCandidate[] = [];
     for (const lead of survivors) {
       const enriched = enrichedByRef.get(lead.candidate.externalRef);
-      if (enriched) await deps.store.saveEnrichment(lead.leadId, accountId, enriched);
+      const companySignals = lead.candidate.companyName
+        ? companySignalsByKey.get(companyKey({ name: lead.candidate.companyName, domain: lead.candidate.companyDomain }))
+        : undefined;
+      // Company events augment any enrichment signals (Apify-only has none, so they stand alone).
+      const merged = [...(enriched?.signals ?? []), ...(companySignals ?? [])];
+      const signals = merged.length > 0 ? merged : undefined;
+      if (enriched)
+        await deps.store.saveEnrichment(lead.leadId, accountId, companySignals?.length ? { ...enriched, signals: merged } : enriched);
+      else if (companySignals && companySignals.length > 0)
+        await deps.store.saveEnrichment(lead.leadId, accountId, { ...lead.candidate, signals: companySignals });
       rankCandidates.push({
         leadId: lead.leadId,
         companyName: lead.candidate.companyName,
@@ -121,9 +155,9 @@ export async function runScout(agentId: string, deps: ScoutDeps): Promise<ScoutR
         location: enriched?.location ?? lead.candidate.location,
         title: lead.candidate.title,
         technographics: enriched?.technographics,
-        signals: enriched?.signals,
+        signals,
       });
-    }
+    } // end survivors loop
 
     // stage 2: batched AI rank → persist scores (qualified = score >= min_score)
     const qualifiedThisRunIds: string[] = [];

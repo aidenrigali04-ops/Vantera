@@ -199,8 +199,8 @@ describe("getReturnOnSpend", () => {
       "onPaidPlan",
       "pipelineToSpend",
     ]);
-    // dollars, not cents (rule 09: the copilot speaks real numbers); Growth = $349/mo → $4,188/yr
-    expect(dto.annualSpend).toBe(4188);
+    // dollars, not cents (rule 09: the copilot speaks real numbers); Growth = $79/mo → $948/yr
+    expect(dto.annualSpend).toBe(948);
     expect(dto.onPaidPlan).toBe(true);
     expect(dto.hasValue).toBe(true);
     // no meetings/closes yet → cost-per-* null, not a fabricated 0

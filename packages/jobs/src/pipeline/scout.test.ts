@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { InMemoryProspectData, makeCandidate } from "@vantera/prospect-data";
+import { InMemoryProspectData, InMemoryCompanySignals, makeCandidate, type CompanyRef, type ProspectSignal } from "@vantera/prospect-data";
 import type { LeadInsights } from "@vantera/agent-brains";
 import { runScout, pickHotSignal } from "./scout";
 import { TRIAL_LEAD_CAP } from "./types";
@@ -65,8 +65,10 @@ class FakeScoutStore implements ScoutStore {
   async markRulesGate(leadId: string, result: { passed: boolean }) {
     this.gates.set(leadId, result.passed);
   }
-  async saveEnrichment(_leadId: string, _accountId: string, enriched: { externalRef: string }) {
+  enrichmentSaved: { leadId: string; signals?: { kind: string }[] }[] = [];
+  async saveEnrichment(leadId: string, _accountId: string, enriched: { externalRef: string; signals?: { kind: string }[] }) {
     this.enriched.push(enriched.externalRef);
+    this.enrichmentSaved.push({ leadId, signals: enriched.signals });
   }
   async saveScore(leadId: string, ins: LeadInsights, qualified: boolean) {
     this.scores.set(leadId, { score: ins.score, qualified });
@@ -111,18 +113,26 @@ function makeContext(overrides: Partial<ScoutContext["account"]> = {}): ScoutCon
       websiteScan: null,
       websiteScannedAt: null,
       subscriptionStatus: "active",
+      intentEnabled: false,
       ...overrides,
     },
   };
 }
 
-function makeDeps(store: FakeScoutStore, pool: ReturnType<typeof makeCandidate>[], scores: Record<string, number>) {
+function makeDeps(
+  store: FakeScoutStore,
+  pool: ReturnType<typeof makeCandidate>[],
+  scores: Record<string, number>,
+  opts: { companySignals?: ScoutDeps["companySignals"] } = {}
+) {
   const prospectData = new InMemoryProspectData(pool);
   const ranked: string[][] = [];
   const chained: CopyDraftPayload[] = [];
+  const rankCandidatesSeen: { leadId: string; signals?: { kind: string }[] }[] = [];
   const deps: ScoutDeps = {
     store,
     prospectData,
+    companySignals: opts.companySignals,
     scanFn: async () => ({
       summary: "sells SDR agents",
       offerings: ["agents"],
@@ -131,6 +141,7 @@ function makeDeps(store: FakeScoutStore, pool: ReturnType<typeof makeCandidate>[
     }),
     rankFn: async (candidates) => {
       ranked.push(candidates.map((c) => c.leadId));
+      for (const c of candidates) rankCandidatesSeen.push({ leadId: c.leadId, signals: c.signals });
       return candidates.map((c) => insight(c.leadId, scores[c.leadId.split("_").at(-1)!] ?? 50));
     },
     triggerCopyDraft: async (p) => {
@@ -138,7 +149,7 @@ function makeDeps(store: FakeScoutStore, pool: ReturnType<typeof makeCandidate>[
     },
     now: () => new Date("2026-06-11T08:00:00Z"),
   };
-  return { deps, prospectData, ranked, chained };
+  return { deps, prospectData, ranked, chained, rankCandidatesSeen };
 }
 
 describe("runScout", () => {
@@ -309,7 +320,7 @@ describe("runScout — capacity throttle", () => {
     const store = new FakeScoutStore({
       agent: { id: "scout1", accountId: "acc1", status: "live", cadence: "daily", config: { prospectsPerRun: 10, minScore: 70 } },
       icps: [{ id: "icp1", name: "SaaS CTOs", criteria: { industries: ["saas"] } }],
-      account: { industry: "devtools", websiteUrl: null, websiteScan: null, websiteScannedAt: null, subscriptionStatus: "active" },
+      account: { industry: "devtools", websiteUrl: null, websiteScan: null, websiteScannedAt: null, subscriptionStatus: "active", intentEnabled: false },
     });
     store.copyAgent = { id: "copy1" };
     store.capacity = {
@@ -353,7 +364,7 @@ describe("runScout — capacity throttle", () => {
     const store = new FakeScoutStore({
       agent: { id: "scout1", accountId: "acc1", status: "live", cadence: "daily", config: { prospectsPerRun: 25, minScore: 70 } },
       icps: [{ id: "icp1", name: "SaaS CTOs", criteria: { industries: ["saas"] } }],
-      account: { industry: "devtools", websiteUrl: null, websiteScan: null, websiteScannedAt: null, subscriptionStatus: "active" },
+      account: { industry: "devtools", websiteUrl: null, websiteScan: null, websiteScannedAt: null, subscriptionStatus: "active", intentEnabled: false },
     });
     store.capacity = {
       linkedinConnected: false,
@@ -454,5 +465,70 @@ describe("pickHotSignal", () => {
     expect(pickHotSignal([{ kind: "award", detail: "Won an award" }])).toBeNull();
     expect(pickHotSignal(undefined)).toBeNull();
     expect(pickHotSignal([])).toBeNull();
+  });
+});
+
+describe("runScout — company-event signals (Phase 15)", () => {
+  function seedFunding(): Map<string, ProspectSignal[]> {
+    return new Map([["acme.com", [{ kind: "funding", detail: "raised Series B", observedAt: "2026-06-10" }]]]);
+  }
+
+  class SpyCompanySignals {
+    calls: CompanyRef[][] = [];
+    constructor(private readonly inner: InMemoryCompanySignals) {}
+    async getCompanySignals(companies: CompanyRef[]) {
+      this.calls.push(companies);
+      return this.inner.getCompanySignals(companies);
+    }
+  }
+
+  it("attaches company signals to the rank + persists them when intent is enabled", async () => {
+    const pool = [makeCandidate({ externalRef: "a", industry: "saas", companyName: "Acme", companyDomain: "acme.com" })];
+    const store = new FakeScoutStore(makeContext({ intentEnabled: true }));
+    const { deps, rankCandidatesSeen } = makeDeps(store, pool, { a: 90 }, {
+      companySignals: new InMemoryCompanySignals(seedFunding()),
+    });
+
+    await runScout("scout1", deps);
+
+    expect(rankCandidatesSeen.find((c) => c.leadId.endsWith("a"))?.signals?.some((s) => s.kind === "funding")).toBe(true);
+    expect(store.enrichmentSaved.some((e) => e.signals?.some((s) => s.kind === "funding"))).toBe(true);
+  });
+
+  it("does NOT fetch company signals when intent is disabled (Starter)", async () => {
+    const pool = [makeCandidate({ externalRef: "a", industry: "saas", companyName: "Acme", companyDomain: "acme.com" })];
+    const store = new FakeScoutStore(makeContext({ intentEnabled: false }));
+    const spy = new SpyCompanySignals(new InMemoryCompanySignals(seedFunding()));
+    const { deps } = makeDeps(store, pool, { a: 90 }, { companySignals: spy });
+
+    await runScout("scout1", deps);
+
+    expect(spy.calls).toHaveLength(0);
+  });
+
+  it("fetches each company once (dedupe) for survivors at the same company", async () => {
+    const pool = [
+      makeCandidate({ externalRef: "a", industry: "saas", companyName: "Acme", companyDomain: "acme.com" }),
+      makeCandidate({ externalRef: "b", industry: "saas", companyName: "Acme", companyDomain: "acme.com" }),
+    ];
+    const store = new FakeScoutStore(makeContext({ intentEnabled: true }));
+    const spy = new SpyCompanySignals(new InMemoryCompanySignals(seedFunding()));
+    const { deps } = makeDeps(store, pool, { a: 90, b: 90 }, { companySignals: spy });
+
+    await runScout("scout1", deps);
+
+    expect(spy.calls).toHaveLength(1);
+    expect(spy.calls[0]).toHaveLength(1); // one company entry, not two
+  });
+
+  it("fails open: a throwing source still completes the run and scores leads", async () => {
+    const pool = [makeCandidate({ externalRef: "a", industry: "saas", companyName: "Acme", companyDomain: "acme.com" })];
+    const store = new FakeScoutStore(makeContext({ intentEnabled: true }));
+    const throwing = { getCompanySignals: async () => { throw new Error("boom"); } };
+    const { deps } = makeDeps(store, pool, { a: 90 }, { companySignals: throwing });
+
+    const summary = await runScout("scout1", deps);
+
+    expect(summary.qualified).toBe(1);
   });
 });

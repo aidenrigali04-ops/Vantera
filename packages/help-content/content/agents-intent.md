@@ -37,6 +37,10 @@ Only people who clear both become leads, each tagged with the "why now" signal t
 3. **Schedule** — pick a run time and a daily or weekly cadence.
 4. **Deploy** — its first run starts within about 15 minutes. Qualified intent leads flow straight into your Outreach Agent's review queue — nothing sends without you.
 
+## Company events, too (Growth and Scale)
+
+On the Growth and Scale plans, Intent also watches for **company events** — funding rounds, acquisitions, executive hires, product launches, partnerships, and new offices — and treats a fresh one as a buying signal. A qualifying event lifts the lead and shows up as its "why now" on the Leads page, right alongside the LinkedIn-behavior signals. It's automatic — there's nothing to set up. (Starter doesn't include company events.)
+
 ## Staying safe
 
 The agent reads LinkedIn through your connected account, so it paces those reads under the same safety limits that protect your account during outreach. You never have to tune anything — the limits aren't configurable below their safety thresholds, by design.

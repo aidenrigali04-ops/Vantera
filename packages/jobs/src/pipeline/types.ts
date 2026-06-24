@@ -1,4 +1,5 @@
 import type {
+  CompanySignalSource,
   EnrichedProspect,
   IcpCriteria,
   ProspectCandidate,
@@ -85,6 +86,8 @@ export interface ScoutContext {
     websiteScannedAt: Date | null;
     /** Drives the trial lead cap; 'trialing' accounts are bounded by TRIAL_LEAD_CAP. */
     subscriptionStatus: string;
+    /** features.intent (Growth/Scale) — gates the company-event signal fetch (Phase 15). */
+    intentEnabled: boolean;
   };
 }
 
@@ -122,6 +125,8 @@ export interface ScoutStore {
 export interface ScoutDeps {
   store: ScoutStore;
   prospectData: ProspectDataSource;
+  /** Company-event buying signals (Phase 15) — only used on Intent-entitled plans; omitted = no-op. */
+  companySignals?: CompanySignalSource;
   scanFn: (url: string) => Promise<WebsiteScan>;
   rankFn: (candidates: RankCandidate[], ctx: RankContext) => Promise<LeadInsights[]>;
   triggerCopyDraft: (payload: CopyDraftPayload) => Promise<void>;
