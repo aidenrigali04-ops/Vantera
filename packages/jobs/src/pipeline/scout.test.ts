@@ -111,6 +111,7 @@ function makeContext(overrides: Partial<ScoutContext["account"]> = {}): ScoutCon
       websiteScan: null,
       websiteScannedAt: null,
       subscriptionStatus: "active",
+      intentEnabled: false,
       ...overrides,
     },
   };
@@ -309,7 +310,7 @@ describe("runScout — capacity throttle", () => {
     const store = new FakeScoutStore({
       agent: { id: "scout1", accountId: "acc1", status: "live", cadence: "daily", config: { prospectsPerRun: 10, minScore: 70 } },
       icps: [{ id: "icp1", name: "SaaS CTOs", criteria: { industries: ["saas"] } }],
-      account: { industry: "devtools", websiteUrl: null, websiteScan: null, websiteScannedAt: null, subscriptionStatus: "active" },
+      account: { industry: "devtools", websiteUrl: null, websiteScan: null, websiteScannedAt: null, subscriptionStatus: "active", intentEnabled: false },
     });
     store.copyAgent = { id: "copy1" };
     store.capacity = {
@@ -353,7 +354,7 @@ describe("runScout — capacity throttle", () => {
     const store = new FakeScoutStore({
       agent: { id: "scout1", accountId: "acc1", status: "live", cadence: "daily", config: { prospectsPerRun: 25, minScore: 70 } },
       icps: [{ id: "icp1", name: "SaaS CTOs", criteria: { industries: ["saas"] } }],
-      account: { industry: "devtools", websiteUrl: null, websiteScan: null, websiteScannedAt: null, subscriptionStatus: "active" },
+      account: { industry: "devtools", websiteUrl: null, websiteScan: null, websiteScannedAt: null, subscriptionStatus: "active", intentEnabled: false },
     });
     store.capacity = {
       linkedinConnected: false,

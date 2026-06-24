@@ -33,6 +33,7 @@ import type {
   ProspectSignal,
 } from "@vantera/prospect-data";
 import { toStoredInsights, type LeadInsights, type WebsiteScan } from "@vantera/agent-brains";
+import { resolveEntitlements, type EntitlementSnapshot } from "@vantera/billing";
 import type { ClosedDeal, CrmProvider } from "@vantera/crm-infra";
 import type { CrmPushStore } from "./crm-push";
 import {
@@ -153,6 +154,14 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           websiteScan: account.websiteScan as ScoutContext["account"]["websiteScan"],
           websiteScannedAt: account.websiteScannedAt,
           subscriptionStatus: account.subscriptionStatus,
+          // features.intent (Growth/Scale) — billing is the single source of truth (Phase 15)
+          intentEnabled: resolveEntitlements({
+            plan: account.plan as EntitlementSnapshot["plan"],
+            subscriptionStatus: account.subscriptionStatus as EntitlementSnapshot["subscriptionStatus"],
+            seatsPurchased: 0,
+            linkedinAccountsPurchased: 0,
+            currentPeriodEnd: null,
+          }).features.intent,
         },
       };
     },

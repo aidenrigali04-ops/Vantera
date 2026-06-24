@@ -276,6 +276,9 @@ importers:
       '@vantera/agent-brains':
         specifier: workspace:*
         version: link:../agent-brains
+      '@vantera/billing':
+        specifier: workspace:*
+        version: link:../billing
       '@vantera/crm-infra':
         specifier: workspace:*
         version: link:../crm-infra
