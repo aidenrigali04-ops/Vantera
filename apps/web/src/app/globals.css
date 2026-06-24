@@ -53,11 +53,11 @@
 :root {
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
-  /* Brand gold — the ONE accent, reserved for the signup/commit action (and the
-     closing CTA glow). Gold-leaning amber: pops on near-black, reads premium, and
-     takes near-black text at ~9:1 (AAA). Constant across themes; cascades to .dark. */
-  --brand: #ffd60a;
-  --brand-foreground: oklch(0.205 0 0);
+  /* Brand blue — LinkedIn-matched accent (#0A66C2), the ONE accent reserved for the
+     primary/commit action (and the closing CTA glow). Reads as the LinkedIn-automation
+     vibe on near-black; takes white text. Constant across themes; cascades to .dark. */
+  --brand: #0a66c2;
+  --brand-foreground: #ffffff;
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
