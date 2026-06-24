@@ -1,65 +1,49 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
-import { AnimatePresence, motion } from "framer-motion";
+import { motion } from "framer-motion";
 import { TextEffect } from "@/components/ui/text-effect";
 import { DottedSurface } from "@/components/ui/dotted-surface";
-import { SearchBar } from "./pipeline-demo/search-bar";
-import { StepSimulation } from "./pipeline-demo/step-simulation";
-import { usePipelineSimulation } from "./pipeline-demo/use-pipeline-simulation";
-import {
-  DEFAULT_DATASET_ID,
-  datasetForPreset,
-  datasetForQuery,
-} from "./pipeline-demo/sim-data";
+import { LiveWinsFeed } from "./hero-visual/live-wins-feed";
+// Alternative motion, kept as a drop-in swap (see hero-visual/connection-thread):
+// import { ConnectionThread } from "./hero-visual/connection-thread";
 
 /**
- * Interactive hero. The product's aha — describe a buyer, watch the agents run
- * the full pipeline — is the FIRST thing a visitor sees, not a scroll away. The
- * input lives in the hero; pressing Simulate reveals the live run just below and
- * scrolls to it. "Get started free" is the single commit CTA.
+ * Landing hero — the promise + a LIVING proof, not a static dashboard. A "Live Events in
+ * San Francisco" card sits up top, the headline lands, then a streaming wins feed shows the
+ * product's value (in-market buyers worked → meetings booked → pipeline) the moment a visitor
+ * arrives. Particles are kept but pulled behind a soft radial mask so the feed reads cleanly.
  */
 export function Hero() {
-  const sim = usePipelineSimulation();
-  const [query, setQuery] = useState("");
-  const [presetId, setPresetId] = useState<string | null>(null);
-
-  // Typing clears any chosen preset so the run reflects the typed text.
-  const handleChange = (v: string) => {
-    setQuery(v);
-    setPresetId(null);
-  };
-
-  // Chips fill the input only — they do not start the simulation.
-  const handlePreset = (id: string, presetQuery: string) => {
-    setQuery(presetQuery);
-    setPresetId(id);
-  };
-
-  const runSimulation = () => {
-    if (presetId) sim.run(datasetForPreset(presetId));
-    else sim.run(query.trim() ? datasetForQuery(query) : datasetForPreset(DEFAULT_DATASET_ID));
-    // Reveal the run and bring it into view.
-    requestAnimationFrame(() =>
-      document.getElementById("sim-results")?.scrollIntoView({ behavior: "smooth", block: "start" })
-    );
-  };
-
   return (
     <section id="top" className="relative overflow-hidden px-4">
       <DottedSurface colorTheme="dark" contained />
+      {/* Manipulate the particle field to fit: a soft radial vignette calms the center where the
+          content lives, so the dots frame the hero instead of fighting the feed. */}
+      <div
+        className="pointer-events-none absolute inset-0 z-[1]"
+        style={{
+          background:
+            "radial-gradient(60% 50% at 50% 42%, rgba(10,10,12,0.92) 0%, rgba(10,10,12,0.65) 45%, transparent 100%)",
+        }}
+      />
 
-      {/* First screen: the promise + the interactive demo, vertically centered. */}
       <div className="relative z-10 mx-auto flex min-h-screen max-w-4xl flex-col items-center justify-center pt-24 pb-12 text-center">
-        <motion.span
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
+        {/* Live Events in San Francisco — the card on top */}
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="mb-5 font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground/80 sm:text-xs"
+          className="mb-7 inline-flex items-center gap-2.5 rounded-full border border-white/15 bg-white/[0.05] px-4 py-1.5 shadow-lg shadow-black/20 backdrop-blur"
         >
-          The next-gen LinkedIn automation power system
-        </motion.span>
+          <span className="relative flex size-2">
+            <span className="absolute inline-flex size-full animate-ping rounded-full bg-foreground/60" />
+            <span className="relative inline-flex size-2 rounded-full bg-foreground" />
+          </span>
+          <span className="font-mono text-[11px] uppercase tracking-[0.18em] text-foreground/85 sm:text-xs">
+            Live Events in San Francisco
+          </span>
+        </motion.div>
 
         <TextEffect
           as="h1"
@@ -67,61 +51,39 @@ export function Hero() {
           preset="blur"
           className="font-heading max-w-4xl text-balance text-4xl font-medium tracking-tight text-foreground sm:text-5xl md:text-6xl"
         >
-          {"Turn LinkedIn into Your Top Revenue Pipeline"}
+          LinkedIn Automation Reimagined
         </TextEffect>
 
-        {/* The promise resolves first (headline blur), then the demo + CTA rise as one block. */}
-        <motion.div
-          className="w-full"
-          initial={{ opacity: 0, y: 14 }}
+        <motion.p
+          initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.5, ease: [0.22, 1, 0.36, 1] }}
+          transition={{ duration: 0.6, delay: 0.4, ease: [0.22, 1, 0.36, 1] }}
+          className="mx-auto mt-5 max-w-2xl text-pretty text-base text-muted-foreground sm:text-lg"
         >
-          <p className="mx-auto mt-6 max-w-3xl text-pretty text-base text-muted-foreground sm:text-lg">
-            {"Vantera runs your entire LinkedIn motion — it finds the people moving toward a purchase, writes each one a message that actually sounds like you, and reads every reply the second it lands. You approve the next move; it handles the rest. Nothing generic, nothing forgotten."}
-          </p>
+          The #1 LinkedIn Automation System.
+        </motion.p>
 
-          <div id="simulate" className="mt-10 w-full scroll-mt-28">
-            <SearchBar
-              value={query}
-              onChange={handleChange}
-              onSubmit={runSimulation}
-              onPreset={handlePreset}
-            />
-          </div>
+        {/* The living proof — replaces the generic dashboard */}
+        <motion.div
+          className="mt-10 w-full"
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7, delay: 0.55, ease: [0.22, 1, 0.36, 1] }}
+        >
+          <LiveWinsFeed />
 
-          <div className="mt-7 flex flex-col items-center gap-2">
+          <div className="mt-9 flex flex-col items-center gap-2">
             <Link
               href="/signup"
               className="rounded-[18px] border border-brand px-6 py-2.5 text-[17.5px] font-medium text-brand shadow-lg shadow-brand/20 transition-colors hover:bg-brand/10"
             >
-              Get started free
+              Start free
             </Link>
             <span className="font-mono text-[11px] tracking-wide text-muted-foreground/70">
               No credit card to start
             </span>
           </div>
         </motion.div>
-      </div>
-
-      {/* The run reveals here on submit — sample data, the real pipeline stages. */}
-      <div id="sim-results" className="relative z-10 mx-auto max-w-2xl scroll-mt-24 pb-24">
-        <AnimatePresence>
-          {sim.dataset && (
-            <motion.div
-              initial={{ opacity: 0, y: 14 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
-            >
-              <div className="mb-6 text-center">
-                <span className="font-mono text-[11px] tracking-[0.18em] text-muted-foreground uppercase">
-                  Live simulation · sample data
-                </span>
-              </div>
-              <StepSimulation sim={sim} />
-            </motion.div>
-          )}
-        </AnimatePresence>
       </div>
     </section>
   );
