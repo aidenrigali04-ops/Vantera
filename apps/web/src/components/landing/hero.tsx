@@ -67,7 +67,7 @@ export function Hero() {
           preset="blur"
           className="font-heading max-w-4xl text-balance text-4xl font-medium tracking-tight text-foreground sm:text-5xl md:text-6xl"
         >
-          {"No more templates. No more deals lost to a reply you never saw."}
+          {"Turn LinkedIn into Your Top Revenue Pipeline"}
         </TextEffect>
 
         {/* The promise resolves first (headline blur), then the demo + CTA rise as one block. */}
