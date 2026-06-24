@@ -121,7 +121,7 @@ export const ADDON_DISPLAY = [
   },
   {
     key: "linkedinAccount" as const,
-    label: "Extra LinkedIn account",
-    blurb: "Run outreach from another connected LinkedIn profile.",
+    label: "Extra LinkedIn sender",
+    blurb: "Add another connected LinkedIn account — outreach spreads across all your senders.",
   },
 ];

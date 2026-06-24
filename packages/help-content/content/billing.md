@@ -6,13 +6,15 @@ routes: /settings/billing
 
 # Plans and billing
 
-Vantera offers three plans — **Starter**, **Growth**, and **Scale** — each with a set of included seats and usage limits. Your plan determines how many teammates can log in and how much LinkedIn outreach capacity you get by default. Every plan runs the same prospecting, enrichment, and lead scoring; moving up a plan adds capacity, seats, and capabilities.
+Vantera offers three plans — **Starter**, **Growth**, and **Scale** — and the headline difference is how many **LinkedIn senders** each one runs in parallel. A sender is a connected LinkedIn account; running more of them spreads your outreach so no single account ever exceeds its safe daily pace, and your total capacity is the sum across all of them. Every plan runs the same prospecting, enrichment, and lead scoring; moving up a plan adds senders, seats, and capabilities.
 
 ## What each plan includes
 
-- **Starter** — The Prospect and Outreach agents working your ICP on LinkedIn. The smallest seat, LinkedIn-account, and campaign limits.
-- **Growth** — Everything in Starter, with more seats, LinkedIn accounts, and active campaigns to scale outreach across your team.
-- **Scale** — Everything in Growth, plus the **Intent Agent** (LinkedIn-native buying-intent detection), the highest limits, and priority enrichment and support.
+- **Starter** — **1 LinkedIn sender.** The Prospect and Outreach agents working your ICP on LinkedIn, hands-off.
+- **Growth** — **5 LinkedIn senders** with multi-sender distribution, **plus the Intent Agent** (LinkedIn-native buying-intent detection). The full power system for a team.
+- **Scale** — **15 LinkedIn senders** for teams and agencies running at volume, with the highest seat and campaign limits and priority enrichment and support.
+
+Outreach is automatically distributed across all your connected senders, and each sender stays within LinkedIn's safe limits on its own — that's how you scale volume without putting any one account at risk.
 
 For custom volume, SSO, or dedicated support, contact us about an Enterprise plan.
 
@@ -30,7 +32,7 @@ Your agents go live the moment a plan is active — so deploying your first agen
 
 ## Add-ons
 
-LinkedIn accounts and extra seats are available as add-ons, billed per unit on top of your base plan. You can add or remove these at any time from the Billing page; changes take effect immediately and are prorated on your next invoice.
+Extra LinkedIn senders and extra seats are available as add-ons, billed per unit on top of your base plan. Adding a sender raises your total outreach capacity — the work spreads across it automatically. You can add or remove add-ons at any time from the Billing page; changes take effect immediately and are prorated on your next invoice.
 
 ## Choosing a plan and paying
 
