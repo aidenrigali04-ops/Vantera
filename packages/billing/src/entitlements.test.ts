@@ -18,8 +18,8 @@ describe("resolveEntitlements", () => {
   it("adds purchased seats on top of the tier base", () => {
     const limits = resolveEntitlements(base);
     expect(limits.maxSeats).toBe(3 + 2); // growth base 3 + 2 add-on
-    expect(limits.maxLinkedinAccounts).toBe(3 + 1); // growth base 3 + 1 add-on
-    expect(limits.maxCampaigns).toBe(5);
+    expect(limits.maxLinkedinAccounts).toBe(5 + 1); // growth base 5 senders + 1 add-on
+    expect(limits.maxCampaigns).toBe(10);
   });
 
   it("includes a LinkedIn account on an active plan with no add-on — the first connect is allowed (regression: 0-included blocked everyone)", () => {
@@ -54,7 +54,7 @@ describe("checkLimit", () => {
     expect(checkLimit("campaign", 4, resolveEntitlements(base)).allowed).toBe(true);
   });
   it("blocks at the limit with a reason", () => {
-    const res = checkLimit("campaign", 5, resolveEntitlements(base));
+    const res = checkLimit("campaign", 10, resolveEntitlements(base));
     expect(res.allowed).toBe(false);
     expect(res.reason).toMatch(/limit/i);
   });

@@ -23,13 +23,21 @@ export interface PlanDisplay {
   features: string[];
 }
 
-/** Capacity bullets pulled straight from the entitlement config — never hand-typed. */
+/**
+ * Capacity bullets pulled straight from the entitlement config — never hand-typed.
+ * Senders lead: how many LinkedIn accounts run in parallel is the headline differentiator
+ * (multi-sender distribution spreads volume so no one account trips LinkedIn's limits).
+ */
 function capacity(tier: PlanTier): string[] {
   const p = PLANS[tier];
+  const campaigns =
+    p.maxCampaigns >= 999
+      ? "Unlimited active campaigns"
+      : `${p.maxCampaigns} active campaign${p.maxCampaigns === 1 ? "" : "s"}`;
   return [
+    `${p.includedLinkedinAccounts} LinkedIn sender${p.includedLinkedinAccounts === 1 ? "" : "s"} included`,
     `${p.includedSeats} team seat${p.includedSeats === 1 ? "" : "s"} included`,
-    `${p.includedLinkedinAccounts} LinkedIn account${p.includedLinkedinAccounts === 1 ? "" : "s"} included`,
-    `${p.maxCampaigns} active campaign${p.maxCampaigns === 1 ? "" : "s"}`,
+    campaigns,
   ];
 }
 
@@ -37,8 +45,8 @@ export const PLAN_DISPLAY: Record<PlanTier, PlanDisplay> = {
   starter: {
     tier: "starter",
     name: "Starter",
-    tagline: "Prove the motion — your LinkedIn agents working your ICP.",
-    monthlyUsd: 99,
+    tagline: "Prove the motion — one LinkedIn sender working your ICP, hands-off.",
+    monthlyUsd: 45,
     highlight: false,
     features: [
       "Prospect & Outreach agents (LinkedIn)",
@@ -49,24 +57,24 @@ export const PLAN_DISPLAY: Record<PlanTier, PlanDisplay> = {
   growth: {
     tier: "growth",
     name: "Growth",
-    tagline: "Run the motion across your whole team — more seats and connected accounts.",
-    monthlyUsd: 349,
+    tagline: "The whole power system — five senders in parallel, plus the Intent Agent.",
+    monthlyUsd: 79,
     highlight: true,
     features: [
       "Everything in Starter",
-      "Run outreach across your whole team",
+      "Intent Agent — LinkedIn-native buying-intent detection",
+      "Multi-sender distribution across your connected accounts",
       ...capacity("growth"),
     ],
   },
   scale: {
     tier: "scale",
     name: "Scale",
-    tagline: "Add the Intent Agent — catch in-market buyers before your competitors.",
-    monthlyUsd: 899,
+    tagline: "Maximum reach — fifteen senders for teams and agencies running at volume.",
+    monthlyUsd: 349,
     highlight: false,
     features: [
-      "Everything in Growth",
-      "Intent Agent — LinkedIn-native buying-intent detection",
+      "Everything in Growth, including the Intent Agent",
       "Priority enrichment & support",
       ...capacity("scale"),
     ],
