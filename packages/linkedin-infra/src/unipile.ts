@@ -227,16 +227,17 @@ export class UnipileLinkedInInfra implements LinkedInInfra {
   }
 
   async sendInvite(req: InviteRequest): Promise<SendOutcome> {
-    // Unipile invites by the member's provider_id, NOT a profile_url (a profile_url 400s). LinkedIn
-    // member-id URLs (…/in/ACoAAA…, what the search source returns) carry the provider_id as the
-    // slug, so profileIdentifier yields it directly. (A public vanity slug would need a profile
-    // lookup to resolve first — out of scope while discovery returns member-id URLs.)
+    // NOTE-LESS connection request: req.note is intentionally NOT sent. LinkedIn caps personalized
+    // invitation notes hard — a free account gets only ~5/month and 403s the rest. Note-less requests
+    // have far higher limits and better acceptance; the personalized pitch lands in the first message
+    // after they accept (the follow-up the Copy agent already drafts). Invites go by the member's
+    // provider_id, NOT a profile_url (a profile_url 400s); member-id URLs (…/in/ACoAAA…, what the
+    // search source returns) carry the provider_id as the slug, so profileIdentifier yields it.
     const data = await this.call<{ invitation_id?: unknown; sent_at?: unknown }>(PATH_INVITE, {
       method: "POST",
       body: JSON.stringify({
         account_id: req.connectedAccountId,
         provider_id: profileIdentifier(req.profileUrl),
-        message: req.note,
       }),
     });
     return { id: requireString(data.invitation_id, "invitation_id"), sentAt: requireString(data.sent_at, "sent_at") };

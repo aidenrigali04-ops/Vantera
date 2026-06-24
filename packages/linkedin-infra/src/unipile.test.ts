@@ -165,7 +165,7 @@ describe("UnipileLinkedInInfra", () => {
       expect(body.account_id).toBe("conn-1");
       expect(body.provider_id).toBe("janedoe"); // invites go by provider_id (the /in/ slug), not a profile_url
       expect(body.profile_url).toBeUndefined();
-      expect(body.message).toBe("Hi Jane");
+      expect(body.message).toBeUndefined(); // note-LESS request — LinkedIn caps invite notes; pitch goes in the post-accept message
     });
   });
 
