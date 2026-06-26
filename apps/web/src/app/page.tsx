@@ -1,34 +1,57 @@
+import {
+  PLAN_DISPLAY,
+  PLAN_DISPLAY_ORDER,
+  annualMonthlyUsd,
+  annualYearlyUsd,
+} from "@vantera/billing";
 import { LandingNav } from "@/components/landing/nav";
 import { Hero } from "@/components/landing/hero";
-import { Problem } from "@/components/landing/problem";
-import { HowItWorks } from "@/components/landing/how-it-works";
-import { DeepAnalyst } from "@/components/landing/deep-analyst";
-import { NoVariables } from "@/components/landing/no-variables";
-import { SequenceSection } from "@/components/landing/sequence-section";
-import { AgentsSection } from "@/components/landing/agents-section";
-import { Outcomes } from "@/components/landing/outcomes";
-import { Contrast } from "@/components/landing/contrast";
-import { Trust } from "@/components/landing/trust";
+import { TrustStrip } from "@/components/landing/trust-strip";
+import { FeaturesGrid } from "@/components/landing/features-grid";
+import { Showcase } from "@/components/landing/showcase";
+import { Results } from "@/components/landing/results";
+import { Teams } from "@/components/landing/teams";
+import { Pricing, type LandingPlan } from "@/components/landing/pricing";
+import { Testimonials } from "@/components/landing/testimonials";
+import { Capabilities } from "@/components/landing/capabilities";
+import { Integrations } from "@/components/landing/integrations";
+import { Faq } from "@/components/landing/faq";
 import { FinalCta } from "@/components/landing/final-cta";
 import { LandingFooter } from "@/components/landing/footer";
 
 export default function Home() {
+  // Real plan data from the billing source of truth — never hardcoded marketing prices.
+  const plans: LandingPlan[] = PLAN_DISPLAY_ORDER.map((tier) => {
+    const d = PLAN_DISPLAY[tier];
+    return {
+      tier: d.tier,
+      name: d.name,
+      tagline: d.tagline,
+      monthlyUsd: d.monthlyUsd,
+      annualMonthlyUsd: annualMonthlyUsd(d.monthlyUsd),
+      annualYearlyUsd: annualYearlyUsd(d.monthlyUsd),
+      highlight: d.highlight,
+      features: d.features,
+    };
+  });
+
   return (
-    // Landing is always dark. The particle field is scoped to the hero section
-    // (see Hero) — no page-level background here.
-    <div className="dark relative min-h-screen w-full overflow-x-clip bg-background text-foreground">
+    // `.landing` scopes the 2026 premium light system (white + cyan + Poppins + dark
+    // product panels) so the dark dashboard/auth surfaces are untouched (globals.css).
+    <div className="landing relative min-h-screen w-full overflow-x-clip">
       <LandingNav />
       <main>
         <Hero />
-        <Problem />
-        <HowItWorks />
-        <DeepAnalyst />
-        <NoVariables />
-        <SequenceSection />
-        <AgentsSection />
-        <Outcomes />
-        <Contrast />
-        <Trust />
+        <TrustStrip />
+        <FeaturesGrid />
+        <Showcase />
+        <Results />
+        <Teams />
+        <Pricing plans={plans} />
+        <Testimonials />
+        <Capabilities />
+        <Integrations />
+        <Faq />
         <FinalCta />
       </main>
       <LandingFooter />

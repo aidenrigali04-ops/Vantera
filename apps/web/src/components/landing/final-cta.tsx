@@ -6,49 +6,52 @@ import { ArrowRight } from "lucide-react";
 
 export function FinalCta() {
   return (
-    <section className="relative px-4 py-28">
+    <section className="px-6 py-20 lg:px-8 lg:py-28">
       <motion.div
-        initial={{ opacity: 0, y: 28 }}
+        initial={{ opacity: 0, y: 24 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, margin: "-80px" }}
-        transition={{ duration: 0.7 }}
-        className="relative mx-auto max-w-4xl overflow-hidden rounded-3xl border border-white/[0.16] bg-white/[0.06] shadow-lg shadow-black/25 px-6 py-16 text-center sm:px-12"
+        transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+        className="relative mx-auto max-w-6xl overflow-hidden rounded-[28px] border border-white/[0.08] bg-[#0a0c12] px-6 py-16 text-center shadow-[var(--panel-glow)] sm:py-24"
       >
+        {/* subtle cyan ambience + top rim */}
         <div
           aria-hidden
-          className="pointer-events-none absolute -top-40 left-1/2 size-[36rem] -translate-x-1/2 rounded-full blur-[120px]"
-          style={{ background: "radial-gradient(circle, color-mix(in srgb, var(--brand) 12%, transparent), transparent 65%)" }}
+          className="pointer-events-none absolute inset-0"
+          style={{ background: "radial-gradient(60% 70% at 50% -10%, rgba(48,207,255,0.2), transparent 60%)" }}
         />
+        <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/15" />
+
         <div className="relative">
-          <span className="font-mono text-[11px] tracking-[0.18em] text-muted-foreground uppercase">
-            Start in minutes
+          <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[12px] font-medium text-white/70">
+            <span className="size-1.5 rounded-full bg-[var(--cyan)] shadow-[0_0_8px_rgba(48,207,255,0.9)]" />
+            Get started
           </span>
-          <h2 className="font-heading mx-auto mt-4 max-w-2xl text-3xl font-semibold tracking-tight text-foreground sm:text-5xl">
-            See who&apos;s ready to buy this week.
+          <h2 className="mx-auto mt-6 max-w-2xl text-[2.4rem] font-semibold leading-[1.04] tracking-[-0.035em] text-white sm:text-[3.2rem]">
+            Turn intent into <span className="text-[var(--cyan)]">revenue</span> on LinkedIn
           </h2>
-          <p className="mx-auto mt-5 max-w-xl text-base text-muted-foreground sm:text-lg">
-            Connect LinkedIn, set your ICP, and watch the first qualified leads land. You approve
-            every send. You&apos;re never locked in.
+          <p className="mx-auto mt-5 max-w-xl text-[16px] leading-relaxed text-white/55 sm:text-[18px]">
+            Deploy your agents in minutes. They find in-market buyers, qualify them, and draft every
+            message — you approve the sends and watch the meetings land.
           </p>
 
-          <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+          <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
             <Link
               href="/signup"
-              className="group inline-flex items-center justify-center gap-2 rounded-full border border-brand px-7 py-3.5 text-sm font-medium text-brand shadow-lg shadow-brand/25 transition-colors hover:bg-brand/10"
+              className="group inline-flex items-center gap-2 rounded-full bg-white px-7 py-3.5 text-[15px] font-medium text-[#0a0c12] transition-transform hover:-translate-y-0.5"
             >
-              Get started free
+              Start free
               <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
             </Link>
-            <Link
-              href="/login"
-              className="inline-flex items-center justify-center rounded-full border border-white/15 px-7 py-3.5 text-sm font-medium text-foreground transition-colors hover:bg-white/[0.07]"
+            <a
+              href="mailto:sales@vanterasystem.com?subject=Vantera%20demo"
+              className="inline-flex items-center gap-2 rounded-full border border-white/20 px-7 py-3.5 text-[15px] font-medium text-white transition-colors hover:bg-white/[0.06]"
             >
-              Sign in
-            </Link>
+              Book a demo
+            </a>
           </div>
-          <p className="mt-4 font-mono text-[11px] tracking-wide text-muted-foreground/70">
-            Free to start · No credit card · Cancel anytime
-          </p>
+
+          <p className="mt-6 text-[13px] text-white/40">No credit card · You approve every message</p>
         </div>
       </motion.div>
     </section>

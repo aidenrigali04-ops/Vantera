@@ -6,10 +6,10 @@ import { cn } from "@/lib/utils";
 import { VanteraLogo } from "./vantera-logo";
 
 const LINKS = [
-  { label: "Product", href: "#difference" },
-  { label: "How it works", href: "#how" },
-  { label: "Agents", href: "#agents" },
-  { label: "Pricing", href: "/pricing" },
+  { label: "Product", href: "#features" },
+  { label: "How it works", href: "#showcase" },
+  { label: "Pricing", href: "#pricing" },
+  { label: "FAQ", href: "#faq" },
 ];
 
 export function LandingNav() {
@@ -23,25 +23,26 @@ export function LandingNav() {
   }, []);
 
   return (
-    <header
-      className={cn(
-        "fixed inset-x-0 top-0 z-50 border-b transition-colors duration-300",
-        scrolled ? "border-white/[0.08] bg-[#0a0b0d]/80 backdrop-blur-xl" : "border-transparent",
-      )}
-    >
-      <nav className="mx-auto flex h-16 w-full max-w-7xl items-center px-6 lg:px-8">
-        {/* Logo — Vantera mark + wordmark */}
-        <Link href="/" className="flex items-center gap-2.5">
-          <VanteraLogo className="size-7 text-foreground" />
-          <span className="font-heading text-lg font-semibold tracking-tight text-foreground">Vantera</span>
+    <header className="fixed inset-x-0 top-0 z-50 flex justify-center px-4 pt-3.5">
+      <nav
+        className={cn(
+          "flex h-14 w-full max-w-5xl items-center rounded-full pl-5 pr-2 transition-all duration-300",
+          scrolled
+            ? "border border-[var(--hairline)] bg-white/75 shadow-[var(--glass-shadow)] backdrop-blur-xl backdrop-saturate-150"
+            : "border border-transparent",
+        )}
+      >
+        <Link href="/" className="flex items-center gap-2 text-foreground">
+          <VanteraLogo className="size-[22px] text-foreground" />
+          <span className="text-[16.5px] font-semibold tracking-[-0.02em]">Vantera</span>
         </Link>
 
-        <ul className="ml-10 hidden items-center gap-1 md:flex">
+        <ul className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-1 md:flex">
           {LINKS.map((l) => (
             <li key={l.href}>
               <a
                 href={l.href}
-                className="rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
+                className="rounded-full px-3.5 py-2 text-[14px] font-medium text-[var(--ink-3)] transition-colors hover:text-foreground"
               >
                 {l.label}
               </a>
@@ -49,18 +50,18 @@ export function LandingNav() {
           ))}
         </ul>
 
-        <div className="ml-auto flex items-center gap-2.5">
+        <div className="ml-auto flex items-center gap-1.5">
           <Link
             href="/login"
-            className="rounded-xl border border-white/15 px-4 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-white/[0.06]"
+            className="hidden rounded-full px-4 py-2 text-[14px] font-medium text-[var(--ink-2)] transition-colors hover:text-foreground sm:inline-flex"
           >
-            Sign In
+            Sign in
           </Link>
           <Link
             href="/signup"
-            className="rounded-xl bg-brand px-4 py-1.5 text-sm font-medium text-brand-foreground shadow-lg shadow-brand/25 transition-opacity hover:opacity-90"
+            className="inline-flex items-center rounded-full bg-[#0a0c12] px-4 py-2.5 text-[14px] font-medium text-white shadow-[0_1px_2px_rgba(12,16,26,0.2)] transition-all hover:shadow-[0_8px_24px_-8px_rgba(48,207,255,0.55)]"
           >
-            Get Started
+            Get started
           </Link>
         </div>
       </nav>
