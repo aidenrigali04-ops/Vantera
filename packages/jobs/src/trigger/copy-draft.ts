@@ -11,6 +11,9 @@ import type { CopyDraftPayload } from "../pipeline/types";
  */
 export const copyDraft = task({
   id: "copy-draft",
+  // Per-tenant isolation (rule 13 scale): chained with concurrencyKey=accountId, so a tenant's
+  // draft batches serialize (one at a time) while different tenants draft concurrently.
+  queue: { concurrencyLimit: 1 },
   maxDuration: 1800,
   run: async (payload: CopyDraftPayload) => {
     const store = createPgStore(createDb());

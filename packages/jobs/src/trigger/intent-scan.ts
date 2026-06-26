@@ -10,6 +10,9 @@ import { createPgStore } from "../pipeline/pg-store";
  *  for account-safety (rule 04). */
 export const intentScan = task({
   id: "intent-scan",
+  // Per-tenant isolation (rule 13 scale): triggered with concurrencyKey=accountId, partitioning
+  // this queue per account so tenants never block each other.
+  queue: { concurrencyLimit: 1 },
   maxDuration: 1800,
   run: async (payload: { agentId: string; accountId: string }) => {
     const store = createPgStore(createDb());
@@ -19,7 +22,7 @@ export const intentScan = task({
       classifyFn: (obs, ctx) => classifyIntent(obs, ctx),
       rankFn: (candidates, ctx) => rankLeads(candidates, ctx),
       triggerCopyDraft: async (p) => {
-        await tasks.trigger("copy-draft", p);
+        await tasks.trigger("copy-draft", p, { concurrencyKey: p.accountId });
       },
     });
     logger.info("intent scan finished", { ...summary, agentId: payload.agentId });
