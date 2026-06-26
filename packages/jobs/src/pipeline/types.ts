@@ -603,6 +603,8 @@ export interface SequenceStore {
     accountId: string,
     ch: LeadChannels
   ): Promise<{ linkedin: boolean }>;
+  /** batched suppression for a whole orchestrator tick — one indexed query per account, not per run */
+  suppressionFlagsForRuns(runs: DueSequenceRun[]): Promise<Map<string, { linkedin: boolean }>>;
   /** optimistic claim: only updates if status still 'active' AND next_action_at unchanged */
   applyRunPatch(runId: string, expectNextActionAt: Date, patch: SequenceRunPatch): Promise<boolean>;
   /** terminal archive used by the exhaust decision */

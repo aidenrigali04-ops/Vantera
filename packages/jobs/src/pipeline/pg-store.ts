@@ -1123,6 +1123,41 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
       };
     },
 
+    async suppressionFlagsForRuns(runs) {
+      // Group normalized LinkedIn urls by account → one indexed inArray query per account,
+      // replacing the per-run suppressionFlags lookup (the orchestrator N+1).
+      const urlsByAccount = new Map<string, Set<string>>();
+      for (const r of runs) {
+        if (!r.channels.linkedinUrl) continue;
+        const norm = normalizeLinkedInUrl(r.channels.linkedinUrl);
+        let set = urlsByAccount.get(r.run.accountId);
+        if (!set) urlsByAccount.set(r.run.accountId, (set = new Set()));
+        set.add(norm);
+      }
+      const suppressedByAccount = new Map<string, Set<string>>();
+      for (const [accountId, urls] of urlsByAccount) {
+        const rows = await db
+          .select({ value: suppressionEntries.value })
+          .from(suppressionEntries)
+          .where(
+            and(
+              eq(suppressionEntries.accountId, accountId),
+              eq(suppressionEntries.kind, "linkedin"),
+              inArray(suppressionEntries.value, [...urls])
+            )
+          );
+        suppressedByAccount.set(accountId, new Set(rows.map((row) => row.value)));
+      }
+      const out = new Map<string, { linkedin: boolean }>();
+      for (const r of runs) {
+        const norm = r.channels.linkedinUrl ? normalizeLinkedInUrl(r.channels.linkedinUrl) : null;
+        out.set(r.run.id, {
+          linkedin: !!norm && (suppressedByAccount.get(r.run.accountId)?.has(norm) ?? false),
+        });
+      }
+      return out;
+    },
+
     async applyRunPatch(runId: string, expectNextActionAt: Date, patch: SequenceRunPatch): Promise<boolean> {
       const set: Partial<typeof sequenceRuns.$inferInsert> = { updatedAt: new Date() };
       if (patch.status !== undefined) set.status = patch.status;
