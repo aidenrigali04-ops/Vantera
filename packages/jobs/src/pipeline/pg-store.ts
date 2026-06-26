@@ -618,6 +618,15 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         .where(and(eq(campaignLeads.campaignId, campaignId), eq(campaignLeads.leadId, leadId)));
     },
 
+    async leadsWithExistingSends(accountId: string, leadIds: string[]): Promise<Set<string>> {
+      if (leadIds.length === 0) return new Set();
+      const rows = await db
+        .selectDistinct({ leadId: scheduledSends.leadId })
+        .from(scheduledSends)
+        .where(and(eq(scheduledSends.accountId, accountId), inArray(scheduledSends.leadId, leadIds)));
+      return new Set(rows.map((r) => r.leadId));
+    },
+
     async insertScheduledSend(send: NewScheduledSend) {
       await db.insert(scheduledSends).values(toRow(send));
     },
@@ -962,20 +971,29 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
     },
 
     async findLeadByLinkedInUrl(accountId: string, normalizedUrl: string) {
-      // linkedin_url is stored as captured; normalize in JS over the account's leads.
-      // revisit: normalized linkedin_url column if accounts exceed ~10k leads
-      const rows = await db
-        .select({ id: leads.id, linkedinUrl: leads.linkedinUrl })
+      // Fast path: the DB-generated, indexed linkedin_url_normalized column (0036).
+      const [indexed] = await db
+        .select({ id: leads.id })
         .from(leads)
-        .where(eq(leads.accountId, accountId));
-      const hit = rows.find((r) => r.linkedinUrl && normalizeLinkedInUrl(r.linkedinUrl) === normalizedUrl);
-      if (!hit) return null;
+        .where(and(eq(leads.accountId, accountId), eq(leads.linkedinUrlNormalized, normalizedUrl)))
+        .limit(1);
+      let leadId = indexed?.id ?? null;
+      if (!leadId) {
+        // Fallback: a row whose stored (SQL) normalize diverges from the JS normalizeLinkedInUrl
+        // (rare — e.g. exotic whitespace). Scan + JS-normalize so a reply is never mis-attributed.
+        const rows = await db
+          .select({ id: leads.id, linkedinUrl: leads.linkedinUrl })
+          .from(leads)
+          .where(eq(leads.accountId, accountId));
+        leadId = rows.find((r) => r.linkedinUrl && normalizeLinkedInUrl(r.linkedinUrl) === normalizedUrl)?.id ?? null;
+      }
+      if (!leadId) return null;
       const [cl] = await db
         .select({ campaignId: campaignLeads.campaignId })
         .from(campaignLeads)
-        .where(eq(campaignLeads.leadId, hit.id))
+        .where(eq(campaignLeads.leadId, leadId))
         .limit(1);
-      return { id: hit.id, campaignId: cl?.campaignId ?? null };
+      return { id: leadId, campaignId: cl?.campaignId ?? null };
     },
 
     async insertReply(r: {
@@ -1112,6 +1130,41 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           ? await isSuppressedAnyKind(db, accountId, "linkedin", normalizeLinkedInUrl(ch.linkedinUrl))
           : false,
       };
+    },
+
+    async suppressionFlagsForRuns(runs) {
+      // Group normalized LinkedIn urls by account → one indexed inArray query per account,
+      // replacing the per-run suppressionFlags lookup (the orchestrator N+1).
+      const urlsByAccount = new Map<string, Set<string>>();
+      for (const r of runs) {
+        if (!r.channels.linkedinUrl) continue;
+        const norm = normalizeLinkedInUrl(r.channels.linkedinUrl);
+        let set = urlsByAccount.get(r.run.accountId);
+        if (!set) urlsByAccount.set(r.run.accountId, (set = new Set()));
+        set.add(norm);
+      }
+      const suppressedByAccount = new Map<string, Set<string>>();
+      for (const [accountId, urls] of urlsByAccount) {
+        const rows = await db
+          .select({ value: suppressionEntries.value })
+          .from(suppressionEntries)
+          .where(
+            and(
+              eq(suppressionEntries.accountId, accountId),
+              eq(suppressionEntries.kind, "linkedin"),
+              inArray(suppressionEntries.value, [...urls])
+            )
+          );
+        suppressedByAccount.set(accountId, new Set(rows.map((row) => row.value)));
+      }
+      const out = new Map<string, { linkedin: boolean }>();
+      for (const r of runs) {
+        const norm = r.channels.linkedinUrl ? normalizeLinkedInUrl(r.channels.linkedinUrl) : null;
+        out.set(r.run.id, {
+          linkedin: !!norm && (suppressedByAccount.get(r.run.accountId)?.has(norm) ?? false),
+        });
+      }
+      return out;
     },
 
     async applyRunPatch(runId: string, expectNextActionAt: Date, patch: SequenceRunPatch): Promise<boolean> {

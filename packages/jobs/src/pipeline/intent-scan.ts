@@ -9,6 +9,12 @@ import {
   type IntentScanDeps,
   type IntentScanSummary,
 } from "./types";
+import { mapWithConcurrency } from "./concurrency";
+
+/** LinkedIn profile reads run at a LOW bounded concurrency — rule-04 account safety caps read volume. */
+const INTENT_READ_CONCURRENCY = 3;
+/** Score-write concurrency for rank persistence; under the DB pool max of 10. */
+const WRITE_CONCURRENCY = 8;
 
 type FreshObs = IntentObservationInput & { postRef: string; profileUrl: string };
 
@@ -168,30 +174,34 @@ export async function runIntentScan(agentId: string, deps: IntentScanDeps): Prom
     else rows.push(obsRow(o, "observed", v?.why_now ?? null, null));
   }
 
-  // 4. resolve → suppress → ICP rules gate; collect gate survivors for rank
-  const survivors: { o: FreshObs; v: IntentVerdict; leadId: string; candidate: ProspectCandidate }[] = [];
+  // 4. resolve → suppress → ICP rules gate; collect gate survivors for rank.
+  // Each person is independent, so run at a LOW bounded concurrency: the per-survivor profile
+  // fetch is the dominant cost, and rule-04 caps LinkedIn read volume. Order-independent — rows
+  // feed recordObservations and survivors feed the leadId-keyed rank.
   const icpCriteria = ctx.icps[0]?.criteria ?? {};
-  for (const { o, v } of primary.values()) {
-    const profile = await deps.linkedin.getProfile({ connectedAccountId: acct, profileUrl: o.profileUrl });
-    if (!profile) {
-      rows.push(obsRow(o, "observed", v.why_now, null));
-      continue;
+  type Survivor = { o: FreshObs; v: IntentVerdict; leadId: string; candidate: ProspectCandidate };
+  const resolved = await mapWithConcurrency(
+    [...primary.values()],
+    INTENT_READ_CONCURRENCY,
+    async ({ o, v }): Promise<{ row: IntentObservationRow | null; survivor: Survivor | null }> => {
+      const profile = await deps.linkedin.getProfile({ connectedAccountId: acct, profileUrl: o.profileUrl });
+      if (!profile) return { row: obsRow(o, "observed", v.why_now, null), survivor: null };
+      // Suppression on the CANONICAL profile url (rule 11): engagement reads can return provider-id
+      // urls while the suppression ledger holds public slugs, so resolve first, then check.
+      if (await deps.store.isSuppressed(accountId, "linkedin", profile.profileUrl))
+        return { row: obsRow(o, "suppressed", v.why_now, null), survivor: null };
+      const candidate = candidateFromProfile(profile);
+      const { leadId } = await deps.store.upsertIntentLead(accountId, candidate);
+      const gate = applyRulesGate(candidate, icpCriteria);
+      await deps.store.markRulesGate(leadId, gate);
+      if (!gate.passed) return { row: obsRow(o, "rejected", v.why_now, leadId), survivor: null };
+      return { row: null, survivor: { o, v, leadId, candidate } };
     }
-    // Suppression on the CANONICAL profile url (rule 11): engagement reads can return provider-id
-    // urls while the suppression ledger holds public slugs, so resolve first, then check.
-    if (await deps.store.isSuppressed(accountId, "linkedin", profile.profileUrl)) {
-      rows.push(obsRow(o, "suppressed", v.why_now, null));
-      continue;
-    }
-    const candidate = candidateFromProfile(profile);
-    const { leadId } = await deps.store.upsertIntentLead(accountId, candidate);
-    const gate = applyRulesGate(candidate, icpCriteria);
-    await deps.store.markRulesGate(leadId, gate);
-    if (!gate.passed) {
-      rows.push(obsRow(o, "rejected", v.why_now, leadId));
-      continue;
-    }
-    survivors.push({ o, v, leadId, candidate });
+  );
+  const survivors: Survivor[] = [];
+  for (const r of resolved) {
+    if (r.row) rows.push(r.row);
+    if (r.survivor) survivors.push(r.survivor);
   }
 
   // 5. AI rank the survivors; enroll those clearing the bar
@@ -207,10 +217,16 @@ export async function runIntentScan(agentId: string, deps: IntentScanDeps): Prom
       }
     );
     const byLead = new Map(insights.map((i) => [i.lead_id, i]));
-    for (const s of survivors) {
+    const scored = survivors.map((s) => {
       const ins = byLead.get(s.leadId);
-      const qualified = !!ins && ins.score >= config.minScore;
-      if (ins) await deps.store.saveScore(s.leadId, ins, qualified);
+      return { s, ins, qualified: !!ins && ins.score >= config.minScore };
+    });
+    // score writes run concurrently; the qualifying side-effects (intent signal + enroll list +
+    // observation rows) stay in a deterministic sequential pass.
+    await mapWithConcurrency(scored, WRITE_CONCURRENCY, ({ s, ins, qualified }) =>
+      ins ? deps.store.saveScore(s.leadId, ins, qualified) : Promise.resolve()
+    );
+    for (const { s, qualified } of scored) {
       if (qualified) {
         await deps.store.saveIntentSignal(s.leadId, accountId, { label: s.v.why_now, detail: s.v.why_now });
         qualifiedLeadIds.push(s.leadId);

@@ -19,6 +19,8 @@ export interface OrchestrateEnv {
   store: OrchestrateStore;
   dispatch: OrchestrateDispatch;
   killSwitch: boolean;
+  /** pre-fetched once per tick (batched), so driving a run never issues its own suppression query */
+  suppressed: { linkedin: boolean };
   now: Date;
 }
 
@@ -34,7 +36,7 @@ export async function driveSequenceRun(
   env: OrchestrateEnv
 ): Promise<{ dispatched: number; archived: number }> {
   let run: SequenceRun = item.run;
-  const suppressed = await env.store.suppressionFlags(item.run.accountId, item.channels);
+  const suppressed = env.suppressed;
 
   // bounded loop: at most one transition per stage in a single tick
   for (let i = 0; i <= item.config.order.length + 1; i++) {
@@ -91,6 +93,8 @@ export async function runSequenceTick(env: {
   const enrolled = await env.store.enrollPendingLeads(env.now);
   const killSwitch = await env.store.isKillSwitchOn();
   const due = await env.store.getDueSequenceRuns(env.now, BATCH);
+  // Batched suppression: one indexed query per account for the whole tick, not one per run.
+  const suppressedByRun = await env.store.suppressionFlagsForRuns(due);
 
   let dispatched = 0;
   let archived = 0;
@@ -99,6 +103,7 @@ export async function runSequenceTick(env: {
       store: env.store,
       dispatch: env.dispatch,
       killSwitch,
+      suppressed: suppressedByRun.get(item.run.id) ?? { linkedin: false },
       now: env.now,
     });
     dispatched += acted.dispatched;

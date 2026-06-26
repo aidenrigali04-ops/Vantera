@@ -46,6 +46,7 @@ function store(over: Partial<OrchestrateStore> = {}): OrchestrateStore {
     getDueSequenceRuns: vi.fn(async () => []),
     isKillSwitchOn: vi.fn(async () => false),
     suppressionFlags: vi.fn(async () => ({ linkedin: false })),
+    suppressionFlagsForRuns: vi.fn(async () => new Map()),
     applyRunPatch: vi.fn(async () => true),
     archiveLead: vi.fn(async () => {}),
     enrollPendingLeads: vi.fn(async () => 0),
@@ -65,7 +66,7 @@ function env(
   overDispatch: Partial<OrchestrateDispatch> = {},
   killSwitch = false
 ) {
-  return { store: store(overStore), dispatch: dispatch(overDispatch), killSwitch, now: NOW };
+  return { store: store(overStore), dispatch: dispatch(overDispatch), killSwitch, suppressed: { linkedin: false }, now: NOW };
 }
 
 describe("driveSequenceRun", () => {

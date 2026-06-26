@@ -110,20 +110,9 @@ async function OverviewTab() {
   const weekAgo = isoDaysAgo(7);
 
   // RLS scopes every query to this account (rule 02) — no account id is passed.
-  const leadCount = (statuses?: string[]) => {
-    let q = supabase.from("leads").select("id", { count: "exact", head: true });
-    if (statuses) q = q.in("status", statuses);
-    return q;
-  };
-
   const [
     { data: agents },
-    totalRes,
-    qualifiedRes,
-    outreachRes,
-    repliedRes,
-    repliedOnlyRes,
-    convertedRes,
+    { data: leadCountRows },
     draftsRes,
     interestedRes,
     { data: recentReplies },
@@ -139,12 +128,8 @@ async function OverviewTab() {
       .select("id, kind, name, status, last_run_at, next_run_at")
       .order("created_at", { ascending: true })
       .returns<AgentRowRaw[]>(),
-    leadCount(),
-    leadCount(["qualified", "enriched"]),
-    leadCount(["in_campaign"]),
-    leadCount(["replied", "converted"]),
-    leadCount(["replied"]),
-    leadCount(["converted"]),
+    // One RLS-scoped grouped aggregate (account_lead_counts) replaces six count:'exact' scans.
+    supabase.rpc("account_lead_counts"),
     supabase
       .from("scheduled_sends")
       .select("id", { count: "exact", head: true })
@@ -189,14 +174,19 @@ async function OverviewTab() {
       .eq("status", "active"),
   ]);
 
-  const total = totalRes.count ?? 0;
-  const qualified = qualifiedRes.count ?? 0;
-  const inOutreach = outreachRes.count ?? 0;
-  const replied = repliedRes.count ?? 0;
-  const converted = convertedRes.count ?? 0;
+  // status is single-valued per lead, so the multi-status figures are exact sums
+  // of the per-status counts returned by the aggregate (no double counting).
+  const leadCountList = (leadCountRows ?? []) as { status: string; n: number }[];
+  const leadCounts = new Map(leadCountList.map((r): [string, number] => [r.status, Number(r.n)]));
+  const countOf = (...ss: string[]) => ss.reduce((sum, s) => sum + (leadCounts.get(s) ?? 0), 0);
+  const total = [...leadCounts.values()].reduce((a, b) => a + b, 0);
+  const qualified = countOf("qualified", "enriched");
+  const inOutreach = countOf("in_campaign");
+  const replied = countOf("replied", "converted");
+  const repliedOnly = countOf("replied");
+  const converted = countOf("converted");
   const drafts = draftsRes.count ?? 0;
   const interested = interestedRes.count ?? 0;
-  const repliedOnly = repliedOnlyRes.count ?? 0;
 
   // Revenue snapshot: real counts × the account's value per client (Settings).
   const pipelineLeads = qualified + inOutreach + repliedOnly;

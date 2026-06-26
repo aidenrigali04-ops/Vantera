@@ -7,6 +7,10 @@ import type {
   CopyContext,
   DraftableLead,
 } from "./types";
+import { mapWithConcurrency } from "./concurrency";
+
+/** In-flight LLM drafts per copy-draft run — bounds model + DB-pool pressure while parallelizing. */
+const DRAFT_CONCURRENCY = 4;
 
 /** linkedin suppression values are normalized profile URLs (rule 11: value = lower(value)) */
 export function normalizeLinkedInUrl(url: string): string {
@@ -68,16 +72,20 @@ export async function runCopyDraft(
   const channels = ctx.agent.config.channels;
 
   const leads = await deps.store.getDraftableLeads(accountId, payload.leadIds);
-  let drafted = 0;
-  let suppressed = 0;
-  let skipped = 0;
+  // Idempotency: a retried run (Trigger maxAttempts) must never re-draft a lead that already
+  // has rows — that would duplicate the invite/message pair and waste an LLM call.
+  const alreadyDrafted = await deps.store.leadsWithExistingSends(accountId, payload.leadIds);
 
-  for (const lead of leads) {
+  type Outcome = { drafted: number; suppressed: number; skipped: number };
+  const ZERO: Outcome = { drafted: 0, suppressed: 0, skipped: 0 };
+
+  // Bounded concurrency: the per-lead LLM draft + writes used to run one lead at a time, so
+  // wall-clock was N x draft latency. Drafting is the gate between "qualified" and "sendable",
+  // so its throughput is the account's outreach volume. DRAFT_CONCURRENCY caps in-flight drafts.
+  const outcomes = await mapWithConcurrency(leads, DRAFT_CONCURRENCY, async (lead): Promise<Outcome> => {
+    if (alreadyDrafted.has(lead.id)) return ZERO;
     const input = toDraftInput(lead, ctx);
-    if (!input) {
-      skipped += 1;
-      continue;
-    }
+    if (!input) return { drafted: 0, suppressed: 0, skipped: 1 };
     await deps.store.ensureCampaignLead(campaignId, lead.id, accountId);
 
     let leadDrafted = 0;
@@ -113,16 +121,19 @@ export async function runCopyDraft(
     if (leadDrafted > 0) {
       await deps.store.setCampaignLeadStatus(campaignId, lead.id, "queued");
       await deps.store.setLeadStatus(lead.id, "in_campaign");
-      drafted += leadDrafted;
-      suppressed += leadSuppressed;
+      return { drafted: leadDrafted, suppressed: leadSuppressed, skipped: 0 };
     } else if (leadSuppressed > 0) {
       await deps.store.setCampaignLeadStatus(campaignId, lead.id, "suppressed");
-      suppressed += leadSuppressed;
+      return { drafted: 0, suppressed: leadSuppressed, skipped: 0 };
     } else {
       await deps.store.setCampaignLeadStatus(campaignId, lead.id, "skipped");
-      skipped += 1;
+      return { drafted: 0, suppressed: 0, skipped: 1 };
     }
-  }
+  });
+
+  const drafted = outcomes.reduce((s, o) => s + o.drafted, 0);
+  const suppressed = outcomes.reduce((s, o) => s + o.suppressed, 0);
+  const skipped = outcomes.reduce((s, o) => s + o.skipped, 0);
 
   return { status: "completed", drafted, suppressed, skipped };
 }

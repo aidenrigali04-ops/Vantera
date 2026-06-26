@@ -8,6 +8,9 @@ import { createCompanySignals, createProspectData } from "../pipeline/prospect-s
 /** One Scout (Prospect) Agent run: discover → gate → enrich → rank → chain copy-draft. */
 export const scoutRun = task({
   id: "scout-run",
+  // Per-tenant isolation (rule 13 scale): triggered with concurrencyKey=accountId, which partitions
+  // this queue per account — one tenant's run never blocks another's, and a tenant runs one at a time.
+  queue: { concurrencyLimit: 1 },
   maxDuration: 1800,
   run: async (payload: { agentId: string; accountId: string }) => {
     const store = createPgStore(createDb());
@@ -18,7 +21,7 @@ export const scoutRun = task({
       scanFn: (url) => scanWebsite(url),
       rankFn: (candidates, ctx) => rankLeads(candidates, ctx),
       triggerCopyDraft: async (p) => {
-        await tasks.trigger("copy-draft", p);
+        await tasks.trigger("copy-draft", p, { concurrencyKey: p.accountId });
       },
     });
     if (summary.reason === "low_credits") {

@@ -17,7 +17,7 @@ export const agentScheduler = schedules.task({
     const due = await store.getDueAgents(now);
     for (const agent of due) {
       const taskId = agent.kind === "intent" ? "intent-scan" : "scout-run";
-      await tasks.trigger(taskId, { agentId: agent.id, accountId: agent.accountId });
+      await tasks.trigger(taskId, { agentId: agent.id, accountId: agent.accountId }, { concurrencyKey: agent.accountId });
       await store.advanceSchedule(
         agent.id,
         computeNextRunAt(agent.runAtTime ?? "08:00", agent.cadence ?? "daily", agent.timezone, now)
