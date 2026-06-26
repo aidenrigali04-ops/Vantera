@@ -1,7 +1,7 @@
 import { applyRulesGate, isScanStale } from "@vantera/agent-brains";
 import { computeRunTarget, computeDiscoveryTarget, dailyOutreachCapacity } from "./capacity";
 import type { RankCandidate } from "@vantera/agent-brains";
-import { companyKey, icpCriteriaToFilters, type CompanyRef, type ProspectSignal } from "@vantera/prospect-data";
+import { companyKey, icpCriteriaToFilters, type CompanyRef, type EnrichedProspect, type ProspectSignal } from "@vantera/prospect-data";
 import {
   SCOUT_DEFAULTS,
   TRIAL_LEAD_CAP,
@@ -10,6 +10,10 @@ import {
   type ScoutDeps,
   type ScoutRunSummary,
 } from "./types";
+import { mapWithConcurrency } from "./concurrency";
+
+/** In-flight DB writes when persisting a discovery batch (gate / enrichment / score). Pool max is 10. */
+const WRITE_CONCURRENCY = 8;
 
 /** "Strike now" signal kinds worth a notification — the high-value timing events (rule 05). */
 const HOT_SIGNAL_KINDS = new Set(["funding", "intent", "exec_hire", "m_and_a"]);
@@ -91,12 +95,15 @@ export async function runScout(agentId: string, deps: ScoutDeps): Promise<ScoutR
 
     // stage 1: deterministic rules gate — before any enrichment or AI spend
     const criteriaById = new Map(ctx.icps.map((i) => [i.id, i.criteria]));
-    const survivors: FreshLead[] = [];
-    for (const lead of fresh) {
-      const result = applyRulesGate(lead.candidate, criteriaById.get(lead.icpId) ?? {});
-      await deps.store.markRulesGate(lead.leadId, result);
-      if (result.passed) survivors.push(lead);
-    }
+    // pure gate decisions first (deterministic order), then persist them concurrently
+    const gated = fresh.map((lead) => ({
+      lead,
+      result: applyRulesGate(lead.candidate, criteriaById.get(lead.icpId) ?? {}),
+    }));
+    await mapWithConcurrency(gated, WRITE_CONCURRENCY, ({ lead, result }) =>
+      deps.store.markRulesGate(lead.leadId, result)
+    );
+    const survivors = gated.filter((g) => g.result.passed).map((g) => g.lead);
     gatePassed = survivors.length;
 
     // enrichment is spent on survivors only (rule 05; Apify-only is a no-op)
@@ -133,6 +140,7 @@ export async function runScout(agentId: string, deps: ScoutDeps): Promise<ScoutR
     }
 
     const rankCandidates: RankCandidate[] = [];
+    const enrichmentWrites: { leadId: string; enriched: EnrichedProspect }[] = [];
     for (const lead of survivors) {
       const enriched = enrichedByRef.get(lead.candidate.externalRef);
       const companySignals = lead.candidate.companyName
@@ -142,9 +150,9 @@ export async function runScout(agentId: string, deps: ScoutDeps): Promise<ScoutR
       const merged = [...(enriched?.signals ?? []), ...(companySignals ?? [])];
       const signals = merged.length > 0 ? merged : undefined;
       if (enriched)
-        await deps.store.saveEnrichment(lead.leadId, accountId, companySignals?.length ? { ...enriched, signals: merged } : enriched);
+        enrichmentWrites.push({ leadId: lead.leadId, enriched: companySignals?.length ? { ...enriched, signals: merged } : enriched });
       else if (companySignals && companySignals.length > 0)
-        await deps.store.saveEnrichment(lead.leadId, accountId, { ...lead.candidate, signals: companySignals });
+        enrichmentWrites.push({ leadId: lead.leadId, enriched: { ...lead.candidate, signals: companySignals } });
       rankCandidates.push({
         leadId: lead.leadId,
         companyName: lead.candidate.companyName,
@@ -158,6 +166,10 @@ export async function runScout(agentId: string, deps: ScoutDeps): Promise<ScoutR
         signals,
       });
     } // end survivors loop
+    // persist enrichment concurrently (independent per-lead UPDATE + enrichment_results inserts)
+    await mapWithConcurrency(enrichmentWrites, WRITE_CONCURRENCY, (w) =>
+      deps.store.saveEnrichment(w.leadId, accountId, w.enriched)
+    );
 
     // stage 2: batched AI rank → persist scores (qualified = score >= min_score)
     const qualifiedThisRunIds: string[] = [];
@@ -167,11 +179,11 @@ export async function runScout(agentId: string, deps: ScoutDeps): Promise<ScoutR
         valueProp: scan ? `${scan.summary} Value props: ${scan.value_props.join("; ")}` : null,
         icpDescription: ctx.icps.map((i) => `${i.name}: ${JSON.stringify(i.criteria)}`).join(" | "),
       });
-      for (const insight of insights) {
-        const qualified = insight.score >= config.minScore;
-        await deps.store.saveScore(insight.lead_id, insight, qualified);
-        if (qualified) qualifiedThisRunIds.push(insight.lead_id);
-      }
+      const scored = insights.map((insight) => ({ insight, qualified: insight.score >= config.minScore }));
+      await mapWithConcurrency(scored, WRITE_CONCURRENCY, ({ insight, qualified }) =>
+        deps.store.saveScore(insight.lead_id, insight, qualified)
+      );
+      for (const s of scored) if (s.qualified) qualifiedThisRunIds.push(s.insight.lead_id);
     }
     qualifiedThisRun = qualifiedThisRunIds.length;
 
