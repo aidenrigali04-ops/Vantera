@@ -134,15 +134,28 @@ async function rankBatch(
   return leads.filter((l) => known.has(l.lead_id)).map(normalizeInsights);
 }
 
+/** Max rank batches in flight at once. Bounded so a large survivor set doesn't burst the model's
+ *  rate limit; the stable system prompt still lets concurrent calls share Anthropic's prompt cache. */
+const RANK_CONCURRENCY = 3;
+
 /** Stage 2 of the scoring gate (rule 06): batched AI rank over rules-gate survivors. */
 export async function rankLeads(
   candidates: RankCandidate[],
   ctx: RankContext,
   model: LanguageModel = getModel()
 ): Promise<LeadInsights[]> {
-  const results: LeadInsights[] = [];
+  const batches: RankCandidate[][] = [];
   for (let i = 0; i < candidates.length; i += RANK_BATCH_SIZE) {
-    results.push(...(await rankBatch(candidates.slice(i, i + RANK_BATCH_SIZE), ctx, model)));
+    batches.push(candidates.slice(i, i + RANK_BATCH_SIZE));
+  }
+  // Process batches in bounded-concurrency waves; output order is preserved (wave order, then
+  // Promise.all order), so the previous sequential behavior is unchanged apart from latency.
+  const results: LeadInsights[] = [];
+  for (let i = 0; i < batches.length; i += RANK_CONCURRENCY) {
+    const wave = await Promise.all(
+      batches.slice(i, i + RANK_CONCURRENCY).map((b) => rankBatch(b, ctx, model))
+    );
+    for (const r of wave) results.push(...r);
   }
   return results;
 }
