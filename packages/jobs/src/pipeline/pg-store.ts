@@ -971,20 +971,29 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
     },
 
     async findLeadByLinkedInUrl(accountId: string, normalizedUrl: string) {
-      // linkedin_url is stored as captured; normalize in JS over the account's leads.
-      // revisit: normalized linkedin_url column if accounts exceed ~10k leads
-      const rows = await db
-        .select({ id: leads.id, linkedinUrl: leads.linkedinUrl })
+      // Fast path: the DB-generated, indexed linkedin_url_normalized column (0036).
+      const [indexed] = await db
+        .select({ id: leads.id })
         .from(leads)
-        .where(eq(leads.accountId, accountId));
-      const hit = rows.find((r) => r.linkedinUrl && normalizeLinkedInUrl(r.linkedinUrl) === normalizedUrl);
-      if (!hit) return null;
+        .where(and(eq(leads.accountId, accountId), eq(leads.linkedinUrlNormalized, normalizedUrl)))
+        .limit(1);
+      let leadId = indexed?.id ?? null;
+      if (!leadId) {
+        // Fallback: a row whose stored (SQL) normalize diverges from the JS normalizeLinkedInUrl
+        // (rare — e.g. exotic whitespace). Scan + JS-normalize so a reply is never mis-attributed.
+        const rows = await db
+          .select({ id: leads.id, linkedinUrl: leads.linkedinUrl })
+          .from(leads)
+          .where(eq(leads.accountId, accountId));
+        leadId = rows.find((r) => r.linkedinUrl && normalizeLinkedInUrl(r.linkedinUrl) === normalizedUrl)?.id ?? null;
+      }
+      if (!leadId) return null;
       const [cl] = await db
         .select({ campaignId: campaignLeads.campaignId })
         .from(campaignLeads)
-        .where(eq(campaignLeads.leadId, hit.id))
+        .where(eq(campaignLeads.leadId, leadId))
         .limit(1);
-      return { id: hit.id, campaignId: cl?.campaignId ?? null };
+      return { id: leadId, campaignId: cl?.campaignId ?? null };
     },
 
     async insertReply(r: {

@@ -14,6 +14,7 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 const vector1024 = customType<{ data: number[]; driverData: string }>({
   dataType() {
@@ -189,6 +190,12 @@ export const leads = pgTable(
       .notNull()
       .default("unvalidated"),
     linkedinUrl: text("linkedin_url"),
+    // 0036: DB-maintained normalized LinkedIn URL (lower + trim + strip trailing slash) for O(1)
+    // reply attribution. Generated from linkedin_url so it can never drift; the read path falls
+    // back to a scan for any JS-vs-SQL normalize edge (findLeadByLinkedInUrl).
+    linkedinUrlNormalized: text("linkedin_url_normalized").generatedAlwaysAs(
+      sql`regexp_replace(lower(btrim(linkedin_url)), '/+$', '')`
+    ),
     // 0034: sticky sender — the LinkedIn account assigned to send this lead's whole
     // sequence (multi-sender distribution, rule 04/13). Null until the first invite.
     linkedinAccountId: uuid("linkedin_account_id").references(() => linkedinAccounts.id, {
