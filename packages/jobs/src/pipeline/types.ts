@@ -270,6 +270,8 @@ export interface NewScheduledSend {
 export interface CopyDraftStore {
   getCopyContext(copyAgentId: string): Promise<CopyContext | null>;
   getDraftableLeads(accountId: string, leadIds: string[]): Promise<DraftableLead[]>;
+  /** idempotency guard: which of these leadIds already have a scheduled_send, so a retried run never re-drafts */
+  leadsWithExistingSends(accountId: string, leadIds: string[]): Promise<Set<string>>;
   /** the rule-11 gate: account + lowercased LinkedIn URL lookup against suppression_entries */
   isSuppressed(accountId: string, kind: "linkedin", value: string): Promise<boolean>;
   ensureCampaignLead(campaignId: string, leadId: string, accountId: string): Promise<void>;

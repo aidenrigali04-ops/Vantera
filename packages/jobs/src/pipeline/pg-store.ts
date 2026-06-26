@@ -618,6 +618,15 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         .where(and(eq(campaignLeads.campaignId, campaignId), eq(campaignLeads.leadId, leadId)));
     },
 
+    async leadsWithExistingSends(accountId: string, leadIds: string[]): Promise<Set<string>> {
+      if (leadIds.length === 0) return new Set();
+      const rows = await db
+        .selectDistinct({ leadId: scheduledSends.leadId })
+        .from(scheduledSends)
+        .where(and(eq(scheduledSends.accountId, accountId), inArray(scheduledSends.leadId, leadIds)));
+      return new Set(rows.map((r) => r.leadId));
+    },
+
     async insertScheduledSend(send: NewScheduledSend) {
       await db.insert(scheduledSends).values(toRow(send));
     },

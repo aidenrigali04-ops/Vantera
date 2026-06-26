@@ -64,6 +64,9 @@ class FakeCopyStore implements CopyDraftStore {
   async getDraftableLeads() {
     return this.leads;
   }
+  async leadsWithExistingSends() {
+    return new Set<string>();
+  }
   async isSuppressed(_accountId: string, kind: "linkedin", value: string) {
     this.suppressionLookups.push(`${kind}:${value}`);
     return this.suppressedValues.has(`${kind}:${value}`);
