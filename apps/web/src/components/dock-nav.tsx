@@ -22,7 +22,7 @@ type NavItem = { key: string; href: string; label: string; icon: LucideIcon };
 // Analytics tiles were removed — their routes redirect into Results' tabs.
 const MAIN: NavItem[] = [
   { key: "dashboard", href: "/dashboard", label: "Results", icon: LayoutDashboard },
-  { key: "agents", href: "/agents", label: "Agents", icon: Bot },
+  { key: "agents", href: "/agents", label: "System", icon: Bot },
   { key: "leads", href: "/leads", label: "Leads", icon: Users },
   { key: "review", href: "/review", label: "Review", icon: Inbox },
 ];
@@ -41,7 +41,7 @@ export function DockNav({ badges }: { badges?: Record<string, number> }) {
     <nav className="flex flex-col items-center">
       {/* The dock pill — vertical (top-to-bottom) restructure of the source's
           horizontal rail; same rounded, blurred, ringed container. */}
-      <div className="flex flex-col items-center gap-3 rounded-[28px] border border-black/10 bg-neutral-100/70 px-2 py-3 shadow-2xl ring-1 ring-black/5 backdrop-blur-lg dark:border-white/10 dark:bg-neutral-900/80 dark:ring-white/10">
+      <div className="flex flex-col items-center gap-3 rounded-[28px] border border-[var(--hairline)] bg-white/80 px-2 py-3 shadow-[var(--shadow-card)] ring-1 ring-black/5 backdrop-blur-lg">
         {MAIN.map((item) => (
           <DockTile
             key={item.key}
@@ -50,7 +50,7 @@ export function DockNav({ badges }: { badges?: Record<string, number> }) {
             badge={badges?.[item.key]}
           />
         ))}
-        <span className="my-1 h-px w-6 bg-black/10 dark:bg-white/10" aria-hidden="true" />
+        <span className="my-1 h-px w-6 bg-[var(--hairline)]" aria-hidden="true" />
         {SECONDARY.map((item) => (
           <DockTile key={item.key} item={item} active={isActive(item.href)} />
         ))}
@@ -75,10 +75,10 @@ function DockTile({
       aria-label={label}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "dock-tile group relative grid size-12 place-items-center rounded-xl shadow-lg ring-1 backdrop-blur-xl transition-transform duration-200 hover:translate-x-0.5 hover:scale-[1.05] focus-visible:scale-[1.05] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none",
+        "dock-tile group relative grid size-12 place-items-center rounded-xl ring-1 transition-transform duration-200 hover:translate-x-0.5 hover:scale-[1.05] focus-visible:scale-[1.05] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none",
         active
-          ? "bg-foreground text-background ring-foreground/20"
-          : "bg-gradient-to-b from-neutral-200/70 to-neutral-300/40 text-foreground/70 ring-black/10 hover:text-foreground dark:from-neutral-800/60 dark:to-neutral-900/70 dark:text-white/85 dark:ring-white/10 dark:hover:text-white",
+          ? "bg-[var(--cyan)] text-white shadow-[0_8px_22px_-8px_rgba(48,207,255,0.75)] ring-[rgba(48,207,255,0.35)]"
+          : "bg-white text-[var(--cyan-strong)] shadow-sm ring-[var(--hairline)] hover:text-[var(--cyan)]",
       )}
     >
       <Icon

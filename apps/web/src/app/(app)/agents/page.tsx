@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Bot, PenLine, Radar } from "lucide-react";
+import { PenLine, Radar } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { Panel, Eyebrow } from "@/components/ui/panel";
@@ -37,15 +37,16 @@ export default async function AgentsPage({
   return (
     <div className="mx-auto max-w-4xl">
       <div className="mb-8">
-        <Eyebrow>Your agents</Eyebrow>
-        <h1 className="font-heading mt-3 text-3xl font-semibold tracking-tight">Agents</h1>
+        <Eyebrow>Your system</Eyebrow>
+        <h1 className="font-heading mt-3 text-3xl font-semibold tracking-tight">Your system</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Deploy them once — they prospect, score, write, and reach out on LinkedIn for you.
+          Set it up once. Your pipeline finds and qualifies the right people on LinkedIn, then your
+          relationship layer turns every qualified prospect into a conversation.
         </p>
       </div>
 
       {updated && (
-        <Panel className="mb-6 dark:bg-white/[0.06]">
+        <Panel className="mb-6">
           <p className="text-sm">
             <span className="font-medium">
               {(updated === "scout" ? scout?.name : copy?.name) ?? "Your agent"} updated.
@@ -56,20 +57,20 @@ export default async function AgentsPage({
       )}
 
       {deployed && (
-        <Panel className="mb-6 dark:bg-white/[0.06]">
+        <Panel className="mb-6">
           <p className="text-sm">
             {deployed === "scout" ? (
               <>
-                <span className="font-medium">{scout?.name ?? "Your Prospect Agent"} is live.</span>{" "}
+                <span className="font-medium">{scout?.name ?? "Prospect sourcing"} is live.</span>{" "}
                 First run starts within 15 minutes — qualified leads will appear under{" "}
                 <Link href="/leads" className="underline underline-offset-2">
                   Leads
                 </Link>
-                . {!copy && "Next: deploy an Outreach Agent so every qualified lead gets a message drafted."}
+                . {!copy && "Next: set up outreach so every qualified lead gets a message drafted."}
               </>
             ) : deployed === "intent" ? (
               <>
-                <span className="font-medium">{intent?.name ?? "Your Intent Agent"} is live.</span>{" "}
+                <span className="font-medium">{intent?.name ?? "Intent detection"} is live.</span>{" "}
                 It watches LinkedIn for people showing buying intent and qualifies them against your
                 ICP — qualified leads appear under{" "}
                 <Link href="/leads" className="underline underline-offset-2">
@@ -79,7 +80,7 @@ export default async function AgentsPage({
               </>
             ) : (
               <>
-                <span className="font-medium">{copy?.name ?? "Your Outreach Agent"} is live.</span>{" "}
+                <span className="font-medium">{copy?.name ?? "Outreach"} is live.</span>{" "}
                 It drafts personalized outreach for every qualified lead — everything waits in your
                 review queue, nothing sends without you.
               </>
@@ -90,67 +91,96 @@ export default async function AgentsPage({
 
       {!scout && !copy ? (
         <Panel className="flex flex-col items-center gap-4 border-dashed py-10 text-center">
-          <Bot className="size-10 text-muted-foreground" />
+          <Radar className="size-10 text-[var(--cyan-strong)]" />
           <div className="flex flex-col gap-2">
-            <h2 className="font-heading text-lg font-semibold">Deploy your first agent</h2>
+            <h2 className="font-heading text-lg font-semibold">Set up your pipeline</h2>
             <p className="mx-auto max-w-md text-pretty text-sm text-muted-foreground">
-              The Prospect Agent hunts your ideal customers on a schedule, scores them, and keeps
-              only the high-quality ones. Two minutes to set up.
+              Prospect sourcing hunts your ideal customers on a schedule, scores them, and keeps only
+              the high-quality ones. Two minutes to set up.
             </p>
           </div>
           <Button asChild size="lg" data-copilot="deploy-scout">
-            <Link href="/agents/new/scout">Set up your Prospect Agent</Link>
+            <Link href="/agents/new/scout">Set up prospect sourcing</Link>
           </Button>
         </Panel>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2">
-          {scout && (
-            <AgentCard
-              agent={scout}
-              roleLabel="Prospect Agent"
-              index={0}
-              stats={[
-                { label: "Leads sourced", value: sourced ?? 0 },
-                { label: "Qualified", value: qualified ?? 0 },
-              ]}
+        <div className="flex flex-col gap-10">
+          <section>
+            <SectionHead
+              title="Pipeline Setup"
+              sub="Find and qualify the right people on LinkedIn — on a schedule and from live buying intent."
             />
-          )}
-          {copy ? (
-            <AgentCard
-              agent={copy}
-              roleLabel="Outreach Agent"
-              index={1}
-              stats={[{ label: "Drafts awaiting review", value: drafts ?? 0 }]}
+            <div className="grid gap-4 md:grid-cols-2">
+              {scout && (
+                <AgentCard
+                  agent={scout}
+                  roleLabel="Prospect sourcing"
+                  index={0}
+                  stats={[
+                    { label: "Leads sourced", value: sourced ?? 0 },
+                    { label: "Qualified", value: qualified ?? 0 },
+                  ]}
+                />
+              )}
+              {intent ? (
+                <AgentCard
+                  agent={intent}
+                  roleLabel="Intent detection"
+                  index={1}
+                  stats={[{ label: "Intent leads", value: intentLeads ?? 0 }]}
+                />
+              ) : scout ? (
+                <AddAgentPanel
+                  icon={<Radar className="size-6 text-[var(--cyan-strong)]" />}
+                  title="Add intent detection"
+                  body={`Beyond ${scout.name}'s ICP search, intent detection watches LinkedIn for people showing they're in-market — engaging with your niche or posting about the problem you solve — and qualifies them against the same bar.`}
+                  href="/agents/new/intent"
+                  cta="Set up intent detection"
+                  copilot="deploy-intent"
+                />
+              ) : null}
+            </div>
+          </section>
+
+          <section>
+            <SectionHead
+              title="Prospect Relationship Setup"
+              sub="Turn every qualified prospect into a personalized conversation — nothing sends without your approval."
             />
-          ) : (
-            <AddAgentPanel
-              icon={<PenLine className="size-6 text-muted-foreground" />}
-              title="Add an Outreach Agent"
-              body={`${scout?.name ?? "Your Prospect Agent"} is finding leads — an Outreach Agent writes a personalized message for each one and queues it for your review.`}
-              href="/agents/new/copy"
-              cta="Set up your Outreach Agent"
-              copilot="deploy-outreach"
-            />
-          )}
-          {intent ? (
-            <AgentCard
-              agent={intent}
-              roleLabel="Intent Agent"
-              index={2}
-              stats={[{ label: "Intent leads", value: intentLeads ?? 0 }]}
-            />
-          ) : scout ? (
-            <AddAgentPanel
-              icon={<Radar className="size-6 text-muted-foreground" />}
-              title="Add an Intent Agent"
-              body={`Beyond ${scout.name}'s ICP search, an Intent Agent watches LinkedIn for people showing they're in-market — engaging with your niche or posting about the problem you solve — and qualifies them against the same bar.`}
-              href="/agents/new/intent"
-              cta="Set up your Intent Agent"
-              copilot="deploy-intent"
-            />
-          ) : null}
+            <div className="grid gap-4 md:grid-cols-2">
+              {copy ? (
+                <AgentCard
+                  agent={copy}
+                  roleLabel="Outreach & conversations"
+                  index={0}
+                  stats={[{ label: "Drafts awaiting review", value: drafts ?? 0 }]}
+                />
+              ) : (
+                <AddAgentPanel
+                  icon={<PenLine className="size-6 text-[var(--cyan-strong)]" />}
+                  title="Set up outreach"
+                  body={`${scout?.name ?? "Your pipeline"} is finding leads — outreach writes a personalized message for each one and queues it for your review.`}
+                  href="/agents/new/copy"
+                  cta="Set up outreach"
+                  copilot="deploy-outreach"
+                />
+              )}
+            </div>
+          </section>
         </div>
       )}
+    </div>
+  );
+}
+
+function SectionHead({ title, sub }: { title: string; sub: string }) {
+  return (
+    <div className="mb-4">
+      <h2 className="font-heading flex items-center gap-2 text-lg font-semibold tracking-tight">
+        <span className="size-1.5 rounded-full bg-[var(--cyan)] shadow-[0_0_8px_rgba(48,207,255,0.9)]" />
+        {title}
+      </h2>
+      <p className="mt-1 text-sm text-muted-foreground">{sub}</p>
     </div>
   );
 }

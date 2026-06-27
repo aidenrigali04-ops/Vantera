@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import { AnimatedProgress } from "@/components/ui/animated-progress";
 import { CardGlass } from "@/components/ui/card";
 import { FormError } from "@/components/form-error";
-import { setAgentStatus, updateSendMode, type AgentActionState } from "./actions";
+import { setAgentStatus, type AgentActionState } from "./actions";
 import type { ShowcaseAgent, ShowcaseKind } from "./agent-showcase-data";
 
 // ── time helpers (shared convention with the dashboard/agent-card) ───────────
@@ -83,8 +83,8 @@ function Backdrop({ side }: { side: "left" | "right" }) {
         animate={{
           background:
             side === "left"
-              ? "radial-gradient(60% 60% at 18% 42%, rgba(255,204,26,0.10), transparent 70%)"
-              : "radial-gradient(60% 60% at 82% 42%, rgba(255,115,13,0.10), transparent 70%)",
+              ? "radial-gradient(60% 60% at 18% 42%, rgba(48,207,255,0.14), transparent 70%)"
+              : "radial-gradient(60% 60% at 82% 42%, rgba(48,207,255,0.14), transparent 70%)",
         }}
         transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }}
         className="absolute inset-0"
@@ -126,7 +126,7 @@ function AgentOrb({ agent, fromLeft }: { agent: ShowcaseAgent; fromLeft: boolean
             exit="exit"
             className="flex flex-col items-center gap-3"
           >
-            <span className="flex size-20 items-center justify-center rounded-2xl bg-foreground text-background md:size-24">
+            <span className="flex size-20 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--cyan)] to-[var(--cyan-strong)] text-white shadow-[0_18px_40px_-16px_rgba(48,207,255,0.8)] md:size-24">
               <Icon className="size-9 md:size-11" />
             </span>
           </motion.div>
@@ -141,7 +141,7 @@ function AgentOrb({ agent, fromLeft }: { agent: ShowcaseAgent; fromLeft: boolean
         <div className="flex items-center gap-2 rounded-full border border-border bg-card px-4 py-1.5 text-xs font-medium uppercase tracking-widest text-muted-foreground shadow-sm">
           <span
             className={`size-1.5 rounded-full ${
-              live ? "animate-pulse bg-emerald-500" : "bg-muted-foreground/40"
+              live ? "animate-pulse bg-[var(--cyan)] shadow-[0_0_8px_rgba(48,207,255,0.9)]" : "bg-muted-foreground/40"
             }`}
           />
           {statusLabel(agent.status)}
@@ -155,10 +155,6 @@ function AgentOrb({ agent, fromLeft }: { agent: ShowcaseAgent; fromLeft: boolean
 function AgentDetails({ agent, alignRight }: { agent: ShowcaseAgent; alignRight: boolean }) {
   const [statusState, statusAction] = useActionState<AgentActionState, FormData>(
     setAgentStatus,
-    {}
-  );
-  const [modeState, switchMode, switchingMode] = useActionState<AgentActionState, FormData>(
-    updateSendMode,
     {}
   );
 
@@ -272,17 +268,8 @@ function AgentDetails({ agent, alignRight }: { agent: ShowcaseAgent; alignRight:
             {live ? "Pause" : "Resume"}
           </Button>
         </form>
-        {agent.kind === "copy" && agent.campaignId && (
-          <form action={switchMode}>
-            <input type="hidden" name="campaignId" value={agent.campaignId} />
-            <input type="hidden" name="sendMode" value={automatic ? "review" : "automatic"} />
-            <Button type="submit" variant="ghost" size="sm" disabled={switchingMode}>
-              {automatic ? "Switch to review every draft" : "Switch to automatic sending"}
-            </Button>
-          </form>
-        )}
       </motion.div>
-      <FormError message={statusState.error ?? modeState.error} />
+      <FormError message={statusState.error} />
     </motion.div>
   );
 }

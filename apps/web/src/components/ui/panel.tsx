@@ -5,14 +5,12 @@ import { motion, type HTMLMotionProps } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 /**
- * The product's core panel — the landing page's clean translucent card (see
- * DESIGN.md), NOT the liquid-glass distortion Card. Theme-aware so the dashboard
- * toggle keeps working; the dark theme is the designed-for default and matches the
- * landing exactly. Reveals on enter with a staggered delay (`index`).
+ * The product's core panel — a clean white card on the premium-light system: hairline
+ * border + soft premium shadow (matches the landing/auth CARD). Light-only now that the
+ * dark theme is retired. Reveals on enter with a staggered delay (`index`).
  */
 export const PANEL_SURFACE =
-  "rounded-2xl border shadow-lg border-black/[0.07] bg-black/[0.02] shadow-black/5 " +
-  "dark:border-white/[0.12] dark:bg-white/[0.04] dark:shadow-black/30";
+  "rounded-2xl border border-[var(--hairline)] bg-white shadow-[var(--shadow-card)]";
 
 const REVEAL = {
   initial: { opacity: 0, y: 20 },
@@ -34,8 +32,6 @@ export function Panel({
       className={cn(
         PANEL_SURFACE,
         "p-5",
-        interactive &&
-          "transition-colors hover:border-black/15 dark:hover:border-white/20",
         className
       )}
       {...props}
@@ -105,7 +101,7 @@ export function Eyebrow({
         className
       )}
     >
-      <span className="size-1.5 rounded-full bg-foreground/70" />
+      <span className="size-1.5 rounded-full bg-[var(--cyan)] shadow-[0_0_8px_rgba(48,207,255,0.9)]" />
       {children}
     </span>
   );

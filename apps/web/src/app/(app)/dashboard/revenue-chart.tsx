@@ -11,10 +11,9 @@ import {
 } from "recharts";
 import type { RevenuePoint } from "@/lib/revenue";
 
-// Strict monochrome to match the landing (DESIGN.md). Theme-aware via tokens so it
-// reads on both the near-black dark panel and the light surface. Restore the warm
-// sunset here (and in landing-theme.ts) to bring brand color back.
-const BRAND = "var(--foreground)"; // closed (solid)
+// Electric-cyan brand: the closed-revenue line is the signature cyan; the projected
+// line stays a muted dashed so the real number reads as the hero.
+const BRAND = "var(--cyan)"; // closed (solid)
 const BRAND_ACCENT = "var(--muted-foreground)"; // projected (dashed)
 
 const usdCompact = new Intl.NumberFormat("en-US", {

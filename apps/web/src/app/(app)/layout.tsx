@@ -6,7 +6,7 @@ import { resolveGate } from "@/lib/auth/gate";
 import { createClient } from "@/lib/supabase/server";
 import { signOut } from "./actions";
 import { DockNav, DockTooltip } from "@/components/dock-nav";
-import { AnimatedThemeToggle } from "@/components/ui/animated-theme-toggle";
+import { VanteraLogo } from "@/components/landing/vantera-logo";
 import { NotificationsBell, type AppNotification } from "@/components/notifications/notifications-bell";
 import CopilotOverlay from "@/components/copilot/copilot-overlay";
 import { GlassFilter } from "@/components/ui/liquid-glass";
@@ -80,27 +80,25 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const initial = email.charAt(0).toUpperCase() || "?";
 
   return (
-    <div className="flex min-h-screen">
+    <div className="app-surface flex min-h-screen bg-[var(--tint)]">
       <GlassFilter />
       {/* Sticky full-height rail: stays in view while main scrolls. */}
-      <aside className="sticky top-0 flex h-screen w-20 shrink-0 flex-col items-center gap-4 overflow-y-auto border-r border-border px-2 py-4">
+      <aside className="sticky top-0 flex h-screen w-20 shrink-0 flex-col items-center gap-4 overflow-y-auto border-r border-[var(--hairline)] bg-white px-2 py-4">
         <Link
           href="/dashboard"
           aria-label="Vantera home"
-          className="grid size-11 shrink-0 place-items-center rounded-xl bg-foreground font-heading text-lg font-semibold text-background shadow-lg"
+          className="grid size-11 shrink-0 place-items-center text-foreground"
         >
-          V
+          <VanteraLogo className="size-8 text-foreground" />
         </Link>
-
-        <AnimatedThemeToggle className="size-12 rounded-xl" />
 
         <NotificationsBell notifications={notifications} />
 
         <DockNav badges={badges} />
 
         {/* Account + sign out, kept in the dock idiom — pinned to the bottom. */}
-        <div className="mt-auto flex flex-col items-center gap-3 rounded-[28px] border border-black/10 bg-neutral-100/70 px-2 py-3 ring-1 ring-black/5 backdrop-blur-lg dark:border-white/10 dark:bg-neutral-900/80 dark:ring-white/10">
-          <span className="group relative grid size-10 place-items-center rounded-full bg-muted text-xs font-semibold text-foreground ring-1 ring-border">
+        <div className="mt-auto flex flex-col items-center gap-3 rounded-[28px] border border-[var(--hairline)] bg-white/80 px-2 py-3 ring-1 ring-black/5 backdrop-blur-lg">
+          <span className="group relative grid size-10 place-items-center rounded-full bg-[var(--cyan-tint)] text-xs font-semibold text-[var(--cyan-strong)] ring-1 ring-[var(--cyan-line)]">
             {initial}
             <DockTooltip>{email}</DockTooltip>
           </span>
@@ -108,7 +106,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <button
               type="submit"
               aria-label="Sign out"
-              className="dock-tile group relative grid size-12 place-items-center rounded-xl bg-gradient-to-b from-neutral-200/70 to-neutral-300/40 text-foreground/70 shadow-lg ring-1 ring-black/10 backdrop-blur-xl transition-transform duration-200 hover:translate-x-0.5 hover:scale-[1.05] hover:text-foreground focus-visible:scale-[1.05] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none dark:from-neutral-800/60 dark:to-neutral-900/70 dark:text-white/85 dark:ring-white/10 dark:hover:text-white"
+              className="dock-tile group relative grid size-12 place-items-center rounded-xl bg-white text-[var(--ink-3)] shadow-sm ring-1 ring-[var(--hairline)] transition-transform duration-200 hover:translate-x-0.5 hover:scale-[1.05] hover:text-foreground focus-visible:scale-[1.05] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none"
             >
               <LogOut className="size-5 transition-transform duration-200 group-hover:scale-110" strokeWidth={2.1} />
               <DockTooltip>Sign out</DockTooltip>

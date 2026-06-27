@@ -10,8 +10,11 @@
   --color-brand: var(--brand);
   --color-brand-foreground: var(--brand-foreground);
   --font-sans: var(--font-montserrat), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-montserrat), ui-sans-serif, system-ui, sans-serif;
+  /* Poppins is the company type. The old Geist-Mono "machine layer" + Montserrat
+     headings are retired on the in-app surfaces (remapped to Poppins here so the
+     dashboard flips wholesale without touching every `font-mono`/`font-heading`). */
+  --font-mono: var(--font-poppins), ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-poppins), ui-sans-serif, system-ui, sans-serif;
   /* Landing typography — Poppins (2026 marketing landing). */
   --font-display: var(--font-poppins), ui-sans-serif, system-ui, sans-serif;
   /* Landing accent system (Framer scheme) — brand-constant blues + amber pop. */
@@ -154,7 +157,8 @@
    dashboard, auth, and onboarding surfaces are untouched.
 ---------------------------------------------------------------------------- */
 .landing,
-.auth-surface {
+.auth-surface,
+.app-surface {
   --background: #ffffff;
   --foreground: #0a0c12;
   --card: #ffffff;
@@ -210,6 +214,14 @@
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   letter-spacing: -0.014em;
+}
+
+/* Dashboard shell rides the premium-light system above, but keeps shadcn `accent`
+   (hover surfaces, menu items, ghost-button hovers) a subtle neutral so electric-cyan
+   stays an intentional accent (pipeline, dots, nav) rather than a loud hover color. */
+.app-surface {
+  --accent: #eef2f7;
+  --accent-foreground: #0a0c12;
 }
 
 .landing ::selection,

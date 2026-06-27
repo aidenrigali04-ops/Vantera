@@ -97,7 +97,7 @@ function toShowcaseAgent(
     return {
       id: row.id,
       kind: "scout",
-      roleLabel: "Prospect Agent",
+      roleLabel: "Prospect sourcing",
       name: row.name,
       status: row.status,
       summary: scoutSummary(row.status, icpNames, row.cadence),
@@ -135,7 +135,7 @@ function toShowcaseAgent(
     return {
       id: row.id,
       kind: "intent",
-      roleLabel: "Intent Agent",
+      roleLabel: "Intent detection",
       name: row.name,
       status: row.status,
       summary: intentSummary(row.status, watchCount),
@@ -164,7 +164,7 @@ function toShowcaseAgent(
   return {
     id: row.id,
     kind: "copy",
-    roleLabel: "Outreach Agent",
+    roleLabel: "Outreach & conversations",
     name: row.name,
     status: row.status,
     summary: copySummary(row.status, channels),

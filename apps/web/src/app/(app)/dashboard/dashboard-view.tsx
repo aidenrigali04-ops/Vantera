@@ -171,22 +171,11 @@ function WorkingDashboard(props: DashboardViewProps) {
     goal,
     goalCents,
     series,
-    pipeline,
     cold,
     revenuePace,
     prospects,
-    agents,
-    recentReplies,
-    interested,
-    channels,
-    scoutLive,
-    scoutLastRunLabel,
     attribution,
   } = props;
-
-  // The channel panel is a health surface — it earns space only when LinkedIn isn't
-  // connected yet (the single activation gate). Hidden once LinkedIn is active.
-  const channelsNeedAttention = channels.liStatus !== "active";
 
   return (
     <Reveal className="flex flex-col gap-6">
@@ -210,20 +199,8 @@ function WorkingDashboard(props: DashboardViewProps) {
         attribution={attribution}
       />
 
-      {/* 3 — The anticipation loop: hot leads (real why-now signals) + warm replies (the reward). */}
-      <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
-        <HotLeads prospects={prospects} />
-        <WarmReplies recentReplies={recentReplies} interested={interested} />
-      </div>
-
-      {/* 4 — Pipeline pulse: real-time stage counts at a glance; full funnel on the Pipeline tab. */}
-      <PipelinePulse pipeline={pipeline} convertedClients={convertedClients} goal={goal} />
-
-      {/* Slim footer — agent heartbeat (trust), plus the LinkedIn connect nudge until it's live. */}
-      <div className={cn("grid gap-6", channelsNeedAttention && "md:grid-cols-2")}>
-        <AgentsPanel agents={agents} scoutLive={scoutLive} scoutLastRunLabel={scoutLastRunLabel} />
-        {channelsNeedAttention && <ChannelsPanel channels={channels} />}
-      </div>
+      {/* 3 — Hot leads: the anticipation surface, each row led by its real why-now signal. */}
+      <HotLeads prospects={prospects} />
     </Reveal>
   );
 }
@@ -466,7 +443,7 @@ function AgentsPanel({
             <div className="flex items-center gap-2">
               <span
                 className={`size-2 rounded-full ${
-                  a.status === "live" ? "animate-pulse bg-emerald-400" : "bg-muted-foreground/40"
+                  a.status === "live" ? "animate-pulse bg-[var(--cyan)] shadow-[0_0_8px_rgba(48,207,255,0.9)]" : "bg-muted-foreground/40"
                 }`}
                 aria-hidden
               />

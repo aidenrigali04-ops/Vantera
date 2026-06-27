@@ -80,11 +80,11 @@ export function AgentCard({
             </Link>
             <span
               className={`inline-flex items-center gap-1.5 text-xs font-medium ${
-                live ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"
+                live ? "text-[var(--cyan-strong)]" : "text-muted-foreground"
               }`}
             >
               <span
-                className={`size-2 rounded-full ${live ? "animate-pulse bg-emerald-500" : "bg-muted-foreground/40"}`}
+                className={`size-2 rounded-full ${live ? "animate-pulse bg-[var(--cyan)] shadow-[0_0_8px_rgba(48,207,255,0.9)]" : "bg-muted-foreground/40"}`}
               />
               {live ? "Live" : agent.status === "paused" ? "Paused" : "Draft"}
             </span>

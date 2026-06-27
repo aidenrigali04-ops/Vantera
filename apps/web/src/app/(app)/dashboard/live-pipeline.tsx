@@ -118,7 +118,7 @@ export function LivePipeline(p: LivePipelineData) {
           <span
             className={cn(
               "size-2 rounded-full",
-              p.scoutLive ? "animate-pulse bg-emerald-400" : "bg-muted-foreground/40"
+              p.scoutLive ? "animate-pulse bg-[var(--cyan)] shadow-[0_0_8px_rgba(48,207,255,0.9)]" : "bg-muted-foreground/40"
             )}
             aria-hidden
           />
@@ -169,14 +169,14 @@ function StageNode({ stage }: { stage: Stage }) {
       >
         <Icon className="size-4" aria-hidden />
         {stage.live && (
-          <span className="absolute -right-0.5 -top-0.5 size-2 animate-pulse rounded-full bg-emerald-400 ring-2 ring-background" />
+          <span className="absolute -right-0.5 -top-0.5 size-2 animate-pulse rounded-full bg-[var(--cyan)] shadow-[0_0_8px_rgba(48,207,255,0.9)] ring-2 ring-background" />
         )}
       </span>
       {stage.status ? (
         <span
           className={cn(
             "text-sm font-semibold",
-            stage.live ? "text-emerald-500 dark:text-emerald-400" : "text-muted-foreground"
+            stage.live ? "text-[var(--cyan-strong)]" : "text-muted-foreground"
           )}
         >
           {stage.status}
