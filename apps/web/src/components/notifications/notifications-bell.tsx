@@ -22,17 +22,30 @@ const KIND_ICON: Record<AppNotification["kind"], LucideIcon> = {
   hot_signal: Flame,
 };
 
+// Brand badge per event: a win is green (success), cold is muted, replies + hot signals
+// glow cyan. Sits on the corner of each prospect's avatar.
+const KIND_BADGE: Record<AppNotification["kind"], string> = {
+  reply: "bg-[var(--cyan)] text-white",
+  hot_signal: "bg-[var(--cyan)] text-white",
+  converted: "bg-[#13b07a] text-white",
+  exhausted: "bg-[var(--ink-4)] text-white",
+};
+
+function initials(name: string): string {
+  const parts = name.replace(/@.*/, "").split(/[.\s_-]+/).filter(Boolean);
+  return ((parts[0]?.[0] ?? name[0] ?? "?") + (parts[1]?.[0] ?? "")).toUpperCase();
+}
+
 /**
- * Dock-rail notification bell. Surfaces unread lead events (a reply paused the
- * sequence, a lead converted, a lead went cold). Opening marks them read, so the
- * badge is a true "needs your attention" count — not reward-free noise.
+ * Dock-rail notification bell — avatar notifications for unread lead events (a reply
+ * paused the sequence, a lead converted, a lead went cold, a fresh buying signal).
+ * Opening marks them read, so the badge is a true "needs your attention" count.
  */
 export function NotificationsBell({ notifications }: { notifications: AppNotification[] }) {
   const [open, setOpen] = useState(false);
   const [unread, setUnread] = useState(notifications.length);
   const ref = useRef<HTMLDivElement>(null);
 
-  // close on outside click / Escape
   useEffect(() => {
     if (!open) return;
     function onDown(e: MouseEvent) {
@@ -66,27 +79,25 @@ export function NotificationsBell({ notifications }: { notifications: AppNotific
         aria-label="Notifications"
         aria-expanded={open}
         className={cn(
-          "group relative grid size-12 place-items-center rounded-xl text-foreground/70 ring-1 ring-border transition-colors hover:bg-foreground/[0.04] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-          open && "bg-foreground/[0.06] text-foreground"
+          "group relative grid size-12 place-items-center rounded-xl bg-white text-[var(--cyan-strong)] shadow-sm ring-1 ring-[var(--hairline)] transition-colors hover:text-[var(--cyan)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          open && "bg-[var(--cyan-tint)]"
         )}
       >
         <Bell className="size-5" strokeWidth={2.1} />
         {unread > 0 && (
-          <span className="absolute -right-0.5 -top-0.5 grid min-w-[18px] place-items-center rounded-full bg-foreground px-1 font-mono text-[10px] font-semibold leading-[18px] text-background shadow-[0_0_8px_rgba(255,255,255,0.55)]">
+          <span className="absolute -right-0.5 -top-0.5 grid min-w-[18px] place-items-center rounded-full bg-[var(--cyan)] px-1 text-[10px] font-semibold leading-[18px] text-white shadow-[0_0_8px_rgba(48,207,255,0.7)] ring-2 ring-white">
             {unread > 9 ? "9+" : unread}
           </span>
         )}
       </button>
 
       {open && (
-        <div className="absolute left-full top-0 z-50 ml-3 w-72 rounded-2xl border border-white/[0.12] bg-background/95 p-2 shadow-lg shadow-black/30 backdrop-blur-xl dark:bg-neutral-900/95">
-          <p className="px-2 py-1.5 font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+        <div className="absolute left-full top-0 z-50 ml-3 w-80 rounded-2xl border border-[var(--hairline)] bg-white p-2 shadow-[var(--shadow-lift)]">
+          <p className="px-2 py-1.5 text-[11px] uppercase tracking-[0.18em] text-[var(--ink-4)]">
             Notifications
           </p>
           {notifications.length === 0 ? (
-            <p className="px-2 py-6 text-center text-sm text-muted-foreground">
-              You&apos;re all caught up.
-            </p>
+            <p className="px-2 py-6 text-center text-sm text-muted-foreground">You&apos;re all caught up.</p>
           ) : (
             <ul className="max-h-80 overflow-y-auto">
               {notifications.map((n) => {
@@ -96,25 +107,27 @@ export function NotificationsBell({ notifications }: { notifications: AppNotific
                     <Link
                       href={n.href}
                       onClick={() => setOpen(false)}
-                      className="flex items-start gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-foreground/[0.05]"
+                      className="flex items-center gap-3 rounded-xl px-2 py-2 transition-colors hover:bg-[var(--cyan-tint)]/50"
                     >
-                      <span
-                        className={cn(
-                          "mt-0.5 grid size-7 shrink-0 place-items-center rounded-full bg-foreground/10 text-muted-foreground",
-                          n.kind === "converted" &&
-                            "bg-foreground text-background shadow-[0_0_10px_rgba(255,255,255,0.5)]"
-                        )}
-                      >
-                        <Icon className="size-3.5" />
+                      <span className="relative shrink-0">
+                        <span className="grid size-9 place-items-center rounded-full bg-[var(--cyan-tint)] text-[12px] font-semibold text-[var(--cyan-strong)]">
+                          {initials(n.who)}
+                        </span>
+                        <span
+                          className={cn(
+                            "absolute -bottom-0.5 -right-0.5 grid size-4 place-items-center rounded-full ring-2 ring-white",
+                            KIND_BADGE[n.kind]
+                          )}
+                        >
+                          <Icon className="size-2.5" />
+                        </span>
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="flex items-center gap-2">
-                          <span className="truncate text-sm font-medium">{n.who}</span>
-                          <span className="ml-auto shrink-0 font-mono text-[10px] text-muted-foreground/70">
-                            {n.at}
-                          </span>
+                          <span className="truncate text-sm font-medium text-foreground">{n.who}</span>
+                          <span className="ml-auto shrink-0 text-[10px] text-[var(--ink-4)]">{n.at}</span>
                         </span>
-                        <span className="text-xs text-muted-foreground">{n.verb}</span>
+                        <span className="line-clamp-1 text-xs text-muted-foreground">{n.verb}</span>
                       </span>
                     </Link>
                   </li>
