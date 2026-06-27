@@ -13,6 +13,7 @@ export const outreachSend = task({
     const outcome = await runOutreachSend(payload, {
       store,
       linkedinInfra: createLinkedInInfraFromEnv(),
+      onProviderError: (detail) => logger.error("outreach send provider error", { sendId: payload.sendId, detail }),
     });
     logger.info("outreach send finished", { sendId: payload.sendId, outcome });
     return { outcome };

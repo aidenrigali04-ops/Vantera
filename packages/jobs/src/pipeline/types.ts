@@ -343,6 +343,12 @@ export interface OutreachSendDeps {
   store: OutreachSendStore;
   linkedinInfra: LinkedInInfra;
   now?: () => Date;
+  /**
+   * Raw provider error on a failed send — logged server-side (task logs) BEFORE the message is
+   * sanitized for the user-facing scheduled_sends.error column, so the actual provider reason
+   * (e.g. the 400/403 body) is diagnosable. Never written to the DB.
+   */
+  onProviderError?: (detail: string) => void;
 }
 
 export type OutreachSendOutcome = "sent" | "suppressed" | "parked" | "failed" | "skipped";

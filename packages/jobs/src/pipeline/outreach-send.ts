@@ -93,6 +93,10 @@ export async function runOutreachSend(
     }
     providerResult = { linkedinAccountId: identity.id, messageRef, inviteSent };
   } catch (err) {
+    // Capture the full provider error server-side first (the DB column gets only the sanitized
+    // neutral prefix, so the real 400/403 body would otherwise be lost — that's why prior invite
+    // failures couldn't be diagnosed).
+    deps.onProviderError?.(err instanceof Error ? err.message : String(err));
     await deps.store.markFailed(ctx.id, sanitizeSendError(err));
     return "failed";
   }
