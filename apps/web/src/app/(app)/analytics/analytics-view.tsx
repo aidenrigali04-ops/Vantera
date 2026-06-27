@@ -54,7 +54,7 @@ export function AnalyticsView({
             href="/agents"
             className="mt-5 inline-flex rounded-xl bg-foreground px-5 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90"
           >
-            Deploy your agents
+            Set up your pipeline
           </Link>
         </Panel>
       ) : (
@@ -89,7 +89,7 @@ function RoiCard({
         </p>
         <Link
           href="/settings"
-          className="mt-4 inline-flex rounded-xl border border-white/15 px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-white/[0.07]"
+          className="mt-4 inline-flex rounded-xl border border-[var(--hairline)] px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-[var(--cyan-tint)]"
         >
           Set deal value
         </Link>
@@ -110,7 +110,7 @@ function RoiCard({
         </p>
         <Link
           href="/pricing"
-          className="mt-4 inline-flex rounded-xl border border-white/15 px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-white/[0.07]"
+          className="mt-4 inline-flex rounded-xl border border-[var(--hairline)] px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-[var(--cyan-tint)]"
         >
           See plans
         </Link>
@@ -140,13 +140,13 @@ function RoiCard({
 
       {/* Goal-gradient: fill toward the 2x bar that keeps the budget. */}
       <div className="mt-5">
-        <div className="relative h-2 w-full overflow-hidden rounded-full bg-white/[0.08]">
+        <div className="relative h-2 w-full overflow-hidden rounded-full bg-[var(--tint)] ring-1 ring-inset ring-[var(--hairline)]">
           <div
-            className="h-full rounded-full bg-foreground/80"
+            className="h-full rounded-full bg-gradient-to-r from-[var(--cyan)] to-[var(--cyan-strong)]"
             style={{ width: `${towardBar}%` }}
           />
           {/* the 2x threshold marker sits at the end of the track */}
-          <div className="absolute inset-y-0 right-0 w-px bg-foreground/40" aria-hidden />
+          <div className="absolute inset-y-0 right-0 w-px bg-foreground/30" aria-hidden />
         </div>
         <p
           className={cn(
@@ -198,7 +198,7 @@ function AttributionCard({ attribution }: { attribution: SignalAttribution[] }) 
                   {row.wins} {row.wins === 1 ? "win" : "wins"}
                 </span>
               </div>
-              <div className="mt-1.5 h-2.5 w-full overflow-hidden rounded-full bg-white/[0.05]">
+              <div className="mt-1.5 h-2.5 w-full overflow-hidden rounded-full bg-[var(--tint)] ring-1 ring-inset ring-[var(--hairline)]">
                 <div
                   className="h-full rounded-full bg-emerald-500/70 transition-[width] duration-500"
                   style={{ width: `${widthPct}%` }}
@@ -214,8 +214,8 @@ function AttributionCard({ attribution }: { attribution: SignalAttribution[] }) 
 
 function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
-    <div className="rounded-xl border border-white/[0.08] bg-white/[0.02] p-4">
-      <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
+    <div className="rounded-xl border border-[var(--hairline)] bg-[var(--tint)] p-4">
+      <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
       <p className="mt-1.5 font-mono text-2xl font-semibold tabular-nums">{value}</p>
       {hint && <p className="mt-0.5 text-xs text-muted-foreground/70">{hint}</p>}
     </div>
@@ -254,9 +254,9 @@ function FunnelCard({ funnel, meetingsTracked }: { funnel: FunnelStage[]; meetin
                   <span className="font-mono font-semibold tabular-nums">{stage.count}</span>
                 </span>
               </div>
-              <div className="mt-1.5 h-2.5 w-full overflow-hidden rounded-full bg-white/[0.05]">
+              <div className="mt-1.5 h-2.5 w-full overflow-hidden rounded-full bg-[var(--tint)] ring-1 ring-inset ring-[var(--hairline)]">
                 <div
-                  className="h-full rounded-full bg-foreground/70 transition-[width] duration-500"
+                  className="h-full rounded-full bg-gradient-to-r from-[var(--cyan)] to-[var(--cyan-strong)] transition-[width] duration-500"
                   style={{ width: `${widthPct}%` }}
                 />
               </div>
