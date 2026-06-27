@@ -142,7 +142,7 @@ function RoiCard({
       <div className="mt-5">
         <div className="relative h-2 w-full overflow-hidden rounded-full bg-[var(--tint)] ring-1 ring-inset ring-[var(--hairline)]">
           <div
-            className="h-full rounded-full bg-gradient-to-r from-[var(--cyan)] to-[var(--cyan-strong)]"
+            className="h-full rounded-full bg-[var(--cyan)]"
             style={{ width: `${towardBar}%` }}
           />
           {/* the 2x threshold marker sits at the end of the track */}
@@ -196,7 +196,7 @@ function AttributionCard({ attribution }: { attribution: SignalAttribution[] }) 
               </div>
               <div className="mt-1.5 h-2.5 w-full overflow-hidden rounded-full bg-[var(--tint)] ring-1 ring-inset ring-[var(--hairline)]">
                 <div
-                  className="h-full rounded-full bg-emerald-500/70 transition-[width] duration-500"
+                  className="h-full rounded-full bg-[#0f9d58] transition-[width] duration-500"
                   style={{ width: `${widthPct}%` }}
                 />
               </div>
@@ -248,7 +248,7 @@ function FunnelCard({ funnel, meetingsTracked }: { funnel: FunnelStage[]; meetin
               </div>
               <div className="mt-1.5 h-2.5 w-full overflow-hidden rounded-full bg-[var(--tint)] ring-1 ring-inset ring-[var(--hairline)]">
                 <div
-                  className="h-full rounded-full bg-gradient-to-r from-[var(--cyan)] to-[var(--cyan-strong)] transition-[width] duration-500"
+                  className="h-full rounded-full bg-[var(--cyan)] transition-[width] duration-500"
                   style={{ width: `${widthPct}%` }}
                 />
               </div>

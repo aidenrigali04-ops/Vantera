@@ -84,7 +84,7 @@ export function AgentCard({
               }`}
             >
               <span
-                className={`size-2 rounded-full ${live ? "animate-pulse bg-[var(--cyan)]" : "bg-muted-foreground/40"}`}
+                className={`size-2 rounded-full ${live ? "animate-pulse bg-[var(--cyan)] shadow-[0_0_8px_rgba(48,207,255,0.9)]" : "bg-muted-foreground/40"}`}
               />
               {live ? "Live" : agent.status === "paused" ? "Paused" : "Draft"}
             </span>

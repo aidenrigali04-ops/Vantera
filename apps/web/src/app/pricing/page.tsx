@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import {
   PLAN_DISPLAY,
   PLAN_DISPLAY_ORDER,
@@ -7,9 +6,8 @@ import {
   annualMonthlyUsd,
   annualYearlyUsd,
 } from "@vantera/billing";
-import { DottedSurface } from "@/components/ui/dotted-surface";
-import { GlassFilter } from "@/components/ui/liquid-glass";
-import { Button } from "@/components/ui/button";
+import { LandingNav } from "@/components/landing/nav";
+import { LandingFooter } from "@/components/landing/footer";
 import type { PlanCard } from "@/components/pricing/pricing-grid";
 import { MarketingPricing } from "./marketing-pricing";
 
@@ -34,28 +32,17 @@ export default function PricingPage() {
   });
 
   return (
-    // Forced dark + a fixed backdrop behind the particle canvas (rule 07): the
-    // wrapper stays transparent so the dots show through the translucent panels.
-    <main className="dark relative flex min-h-screen flex-col items-center px-6 py-16">
-      <div aria-hidden className="fixed inset-0 -z-10 bg-background" />
-      <DottedSurface colorTheme="dark" />
-      <GlassFilter />
-
-      <div className="flex w-full max-w-6xl flex-col gap-14">
-        <nav className="flex items-center justify-between">
-          <Link href="/" className="font-heading text-base font-semibold tracking-tight">
-            Vantera
-          </Link>
-          <Button asChild variant="ghost" size="sm">
-            <Link href="/login">Sign in</Link>
-          </Button>
-        </nav>
-
+    // `.landing` scopes the 2026 premium light system (white + cyan + Poppins) so this
+    // standalone pricing page matches the marketing landing exactly (globals.css).
+    <div className="landing relative min-h-screen w-full overflow-x-clip">
+      <LandingNav />
+      <main className="mx-auto w-full max-w-6xl px-6 pb-24 pt-28 sm:pt-32">
         <MarketingPricing
           plans={plans}
           addons={ADDON_DISPLAY.map((a) => ({ key: a.key, label: a.label, blurb: a.blurb }))}
         />
-      </div>
-    </main>
+      </main>
+      <LandingFooter />
+    </div>
   );
 }

@@ -176,10 +176,7 @@ export default async function AgentsPage({
 function SectionHead({ title, sub }: { title: string; sub: string }) {
   return (
     <div className="mb-4">
-      <h2 className="font-heading flex items-center gap-2 text-lg font-semibold tracking-tight">
-        <span className="size-1.5 rounded-full bg-foreground/25" />
-        {title}
-      </h2>
+      <h2 className="font-heading text-lg font-semibold tracking-tight">{title}</h2>
       <p className="mt-1 text-sm text-muted-foreground">{sub}</p>
     </div>
   );

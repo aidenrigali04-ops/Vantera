@@ -86,7 +86,8 @@ export function RevealItem({
   );
 }
 
-/** Uppercase mono eyebrow with a small dot — the landing's section/label idiom. */
+/** Uppercase mono eyebrow — a quiet section/label idiom. No decorative dot: dots are
+ *  reserved for live/active system status, never panel headings. */
 export function Eyebrow({
   children,
   className,
@@ -97,11 +98,10 @@ export function Eyebrow({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground",
+        "inline-flex items-center font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground",
         className
       )}
     >
-      <span className="size-1.5 rounded-full bg-foreground/25" />
       {children}
     </span>
   );

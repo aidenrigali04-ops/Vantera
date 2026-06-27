@@ -6,7 +6,6 @@ import { Check } from "lucide-react";
 import { breakEvenCloses, type PlanTier } from "@vantera/billing";
 import { cn } from "@/lib/utils";
 import { Reveal, RevealItem, Eyebrow, PANEL_SURFACE } from "@/components/ui/panel";
-import { AnimatedPanelBorder } from "@/components/ui/animated-border";
 
 export type Interval = "month" | "year";
 
@@ -81,16 +80,24 @@ export function PricingGrid({
                     PANEL_SURFACE,
                     "relative flex h-full flex-col gap-6 overflow-hidden p-6",
                     plan.highlight &&
-                      "dark:border-white/20 dark:bg-white/[0.06] border-black/[0.12] bg-black/[0.03]"
+                      "border-[var(--cyan-line)] shadow-[var(--shadow-lift)] ring-1 ring-[var(--cyan-line)]"
                   )}
                 >
+                  {/* The recommended plan carries a thin cyan top accent — the brand
+                      signal that steers selection, not a full-card tint. */}
+                  {plan.highlight && (
+                    <span
+                      aria-hidden
+                      className="absolute inset-x-0 top-0 h-1 bg-[var(--cyan)]"
+                    />
+                  )}
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex flex-col gap-2">
                       <h2 className="font-heading text-lg font-semibold">{plan.name}</h2>
                       <p className="text-sm leading-relaxed text-muted-foreground">{plan.tagline}</p>
                     </div>
                     {plan.highlight && (
-                      <span className="shrink-0 rounded-full border border-foreground/20 px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.18em] text-foreground">
+                      <span className="shrink-0 rounded-full bg-[var(--cyan-tint)] px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--cyan-strong)] ring-1 ring-inset ring-[var(--cyan-line)]">
                         Most popular
                       </span>
                     )}
@@ -124,7 +131,7 @@ export function PricingGrid({
                         <Check
                           className={cn(
                             "mt-0.5 size-4 shrink-0",
-                            plan.highlight ? "text-foreground" : "text-foreground/55"
+                            plan.highlight ? "text-[var(--cyan-strong)]" : "text-foreground/55"
                           )}
                         />
                         <span className={plan.highlight ? "text-foreground" : "text-muted-foreground"}>
@@ -136,8 +143,6 @@ export function PricingGrid({
 
                   <div className="mt-auto pt-2">{renderCta({ plan, interval, isCurrent })}</div>
                 </div>
-
-                {plan.highlight && <AnimatedPanelBorder radius={16} />}
               </div>
             </RevealItem>
           );

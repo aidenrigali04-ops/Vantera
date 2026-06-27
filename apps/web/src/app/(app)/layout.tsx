@@ -10,6 +10,8 @@ import { VanteraLogo } from "@/components/landing/vantera-logo";
 import { NotificationsBell, type AppNotification } from "@/components/notifications/notifications-bell";
 import CopilotOverlay from "@/components/copilot/copilot-overlay";
 import { GlassFilter } from "@/components/ui/liquid-glass";
+import { TrialBanner, type TrialBannerProps } from "@/components/billing/trial-banner";
+import { trialDaysLeft, isTrialExpired } from "@vantera/billing";
 
 const NOTE_VERB: Record<AppNotification["kind"], string> = {
   reply: "replied — the sequence paused for you",
@@ -76,6 +78,45 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     href: NOTE_HREF[n.kind],
   }));
 
+  // Soft-lock trial strip: a live countdown while trialing, a clear "paused" state once
+  // it lapses. Server-set billing columns only (RLS-scoped) — never a placeholder.
+  const { data: billing } = await supabase
+    .from("accounts")
+    .select("plan, subscription_status, trial_ends_at")
+    .limit(1)
+    .maybeSingle<{ plan: string; subscription_status: string; trial_ends_at: string | null }>();
+
+  let trialBanner: TrialBannerProps | null = null;
+  if (billing) {
+    if (billing.subscription_status === "trialing") {
+      const d = trialDaysLeft(billing.trial_ends_at) ?? 0;
+      trialBanner = {
+        tone: d <= 1 ? "urgent" : "info",
+        message:
+          d === 0
+            ? "Your free trial ends today — choose a plan to keep your agents running."
+            : `${d} day${d === 1 ? "" : "s"} left in your free trial — choose a plan to keep your agents running.`,
+        cta: "Choose a plan",
+        href: "/settings/billing",
+      };
+    } else if (billing.plan === "none" && isTrialExpired(billing.trial_ends_at)) {
+      trialBanner = {
+        tone: "ended",
+        message:
+          "Your free trial has ended and your agents are paused. Choose a plan to pick up exactly where you left off.",
+        cta: "Choose a plan",
+        href: "/settings/billing",
+      };
+    } else if (["past_due", "canceled"].includes(billing.subscription_status)) {
+      trialBanner = {
+        tone: "ended",
+        message: "Your subscription needs attention — new outreach is paused until it's active again.",
+        cta: "Manage billing",
+        href: "/settings/billing",
+      };
+    }
+  }
+
   const email = data.user?.email ?? "";
   const initial = email.charAt(0).toUpperCase() || "?";
 
@@ -114,7 +155,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </form>
         </div>
       </aside>
-      <main className="glass-cards flex-1 px-8 py-6">{children}</main>
+      <main className="glass-cards flex-1 px-8 py-6">
+        {trialBanner && <TrialBanner {...trialBanner} />}
+        {children}
+      </main>
       <CopilotOverlay />
     </div>
   );

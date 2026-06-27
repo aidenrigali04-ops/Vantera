@@ -4,12 +4,10 @@ import Link from "next/link";
 import {
   Bot,
   CheckCircle2,
-  ChevronRight,
   Flame,
   Inbox,
   PencilLine,
   Send,
-  UserX,
   Users,
   type LucideIcon,
 } from "lucide-react";
@@ -19,8 +17,9 @@ import { cn } from "@/lib/utils";
 /**
  * Live pipeline — the autonomous outreach process, made visible end to end so the
  * silent post-launch waiting period (the named churn cliff) reads as "working", not
- * "broken". Funnel: Prospect Agent → pulled → disqualified → drafting → review →
- * sending → sent → active. Real counts from leads + scheduled_sends.
+ * "broken". Read top-to-bottom as a funnel: Sourcing → Pulled → Drafting → Review →
+ * Sending → Live. The single "Now" stage tells the user exactly where work sits.
+ * Real counts from leads + scheduled_sends.
  */
 export interface LivePipelineData {
   scoutDeployed: boolean;
@@ -44,71 +43,93 @@ type Stage = {
   icon: LucideIcon;
   label: string;
   value: number;
-  status?: string; // shown instead of a number (agent node)
+  status?: string; // shown instead of a number (the agent node)
   sub?: string;
-  live?: boolean; // in-progress → pulsing dot on the icon
+  reached: boolean; // work has arrived at (or passed) this stage
   attention?: boolean; // needs the user (drafts in review)
-  muted?: boolean; // disqualified — the filter working, de-emphasized
   href?: string;
 };
 
+/** The one stage that best represents "where the pipeline is right now". */
+function currentStageKey(p: LivePipelineData): string {
+  if (p.inReview > 0) return "review";
+  if (p.drafting > 0) return "drafting";
+  if (p.sending > 0) return "sending";
+  if (p.active > 0 || p.sent > 0) return "active";
+  if (p.pulled > 0) return "pulled";
+  return "agent";
+}
+
 export function LivePipeline(p: LivePipelineData) {
+  const downstreamFromPulled =
+    p.drafting + p.inReview + p.sending + p.sent + p.active > 0;
+  const downstreamFromDrafting = p.inReview + p.sending + p.sent + p.active > 0;
+  const downstreamFromReview = p.sending + p.sent + p.active > 0;
+  const downstreamFromSending = p.sent + p.active > 0;
+
   const stages: Stage[] = [
     {
       key: "agent",
       icon: Bot,
-      label: "Prospect Agent",
+      label: "Sourcing",
       value: 0,
       status: p.scoutLive ? "Live" : p.scoutDeployed ? "Paused" : "Off",
       sub: p.scoutLive
-        ? `next run ${p.scoutNextRunLabel}`
+        ? `Prospect Agent · next run ${p.scoutNextRunLabel}`
         : p.scoutDeployed
-          ? "paused"
-          : "not deployed",
-      live: p.scoutLive,
+          ? "Prospect Agent · paused"
+          : "Prospect Agent · not deployed",
+      reached: p.scoutDeployed,
     },
-    { key: "pulled", icon: Users, label: "Prospects pulled", value: p.pulled },
     {
-      key: "disqualified",
-      icon: UserX,
-      label: "Disqualified",
-      value: p.disqualified,
-      muted: true,
-      sub: "off-ICP, filtered",
+      key: "pulled",
+      icon: Users,
+      label: "Prospects pulled",
+      value: p.pulled,
+      reached: p.pulled > 0 || downstreamFromPulled,
+      sub: p.disqualified > 0 ? `${p.disqualified} filtered out as off-ICP` : undefined,
     },
     {
       key: "drafting",
       icon: PencilLine,
-      label: "Drafting",
+      label: "Drafting outreach",
       value: p.drafting,
-      live: p.drafting > 0,
+      reached: p.drafting > 0 || downstreamFromDrafting,
     },
     {
       key: "review",
       icon: Inbox,
-      label: "Drafted",
+      label: "In review",
       value: p.inReview,
+      reached: p.inReview > 0 || downstreamFromReview,
       attention: p.inReview > 0,
       href: "/review",
-      sub: p.inReview > 0 ? "awaiting approval" : "in review",
+      sub: p.inReview > 0 ? "awaiting your approval" : "nothing sends without you",
     },
     {
       key: "sending",
       icon: Send,
       label: "Sending",
       value: p.sending,
-      live: p.sending > 0,
-      sub: p.sendMode === "automatic" ? "auto" : "after approval",
+      reached: p.sending > 0 || downstreamFromSending,
+      sub:
+        p.sent > 0
+          ? `${p.sent} sent · ${p.sendMode === "automatic" ? "auto" : "after approval"}`
+          : p.sendMode === "automatic"
+            ? "auto"
+            : "after approval",
     },
-    { key: "sent", icon: CheckCircle2, label: "Sent", value: p.sent },
     {
       key: "active",
-      icon: Flame,
-      label: "Active",
+      icon: p.won > 0 ? CheckCircle2 : Flame,
+      label: "Live conversations",
       value: p.active,
+      reached: p.active > 0 || p.sent > 0,
       sub: `${p.replied} replied · ${p.won} won`,
     },
   ];
+
+  const currentKey = currentStageKey(p);
 
   return (
     <RevealItem className={cn(PANEL_SURFACE, "p-5")} data-copilot="live-pipeline">
@@ -118,7 +139,9 @@ export function LivePipeline(p: LivePipelineData) {
           <span
             className={cn(
               "size-2 rounded-full",
-              p.scoutLive ? "animate-pulse bg-[var(--cyan)]" : "bg-muted-foreground/40"
+              p.scoutLive
+                ? "animate-pulse bg-[var(--cyan)] shadow-[0_0_8px_rgba(48,207,255,0.9)]"
+                : "bg-muted-foreground/40",
             )}
             aria-hidden
           />
@@ -126,65 +149,73 @@ export function LivePipeline(p: LivePipelineData) {
         </span>
       </div>
 
-      <div className="mt-5 flex items-start gap-0.5 overflow-x-auto pb-1">
+      <ol className="mt-5">
         {stages.map((s, i) => (
-          <div key={s.key} className="flex items-start">
-            <StageNode stage={s} />
-            {i < stages.length - 1 && (
-              <ChevronRight
-                className="mx-0.5 mt-6 size-4 shrink-0 text-muted-foreground/30"
-                aria-hidden
-              />
-            )}
-          </div>
+          <StageRow
+            key={s.key}
+            stage={s}
+            current={s.key === currentKey}
+            last={i === stages.length - 1}
+          />
         ))}
-      </div>
+      </ol>
 
-      <p className="mt-3 border-t border-border/60 pt-3 text-xs text-muted-foreground">
+      <p className="mt-2 border-t border-border/60 pt-3 text-xs text-muted-foreground">
         {captionFor(p)}
       </p>
     </RevealItem>
   );
 }
 
-function StageNode({ stage }: { stage: Stage }) {
+function StageRow({
+  stage,
+  current,
+  last,
+}: {
+  stage: Stage;
+  current: boolean;
+  last: boolean;
+}) {
   const { icon: Icon } = stage;
-  // A stage reads as "engaged" (dark, filled) once work has reached it — so the funnel
-  // shows progress at a glance, not only via the dot. Attention = needs you (solid cyan),
-  // live = happening now (cyan tint + pulse), reached = done (dark), else pending (light).
-  const reached = stage.value > 0 || (stage.key === "agent" && stage.live);
-  const node = (
+
+  // Node treatment encodes status at a glance: current = cyan + glow (where we are now),
+  // attention = solid cyan (needs you), reached = filled dark (work got here), else light.
+  const nodeClass = current
+    ? "bg-[var(--cyan)] text-white shadow-[0_0_12px_rgba(48,207,255,0.5)]"
+    : stage.attention
+      ? "bg-[var(--cyan)] text-white"
+      : stage.reached
+        ? "bg-foreground text-background"
+        : "bg-foreground/[0.05] text-[var(--ink-4)]";
+
+  const body = (
     <div
       className={cn(
-        "flex min-w-[96px] flex-col items-center gap-1.5 rounded-xl px-2.5 py-2.5 text-center transition-colors",
-        stage.attention && "bg-[var(--cyan-tint)]",
-        stage.href && "hover:bg-[var(--cyan-tint)]/60"
+        "flex flex-1 items-center justify-between gap-3 rounded-xl px-3 py-2 transition-colors",
+        current && "bg-[var(--cyan-tint)]",
+        stage.href && "group-hover:bg-[var(--cyan-tint)]/60",
       )}
     >
-      <span
-        className={cn(
-          "relative flex size-9 items-center justify-center rounded-lg",
-          stage.muted
-            ? "bg-[var(--ink-4)]/12 text-[var(--ink-4)]"
-            : stage.attention
-              ? "bg-[var(--cyan)] text-white"
-              : stage.live
-                ? "bg-[var(--cyan-tint)] text-[var(--cyan-strong)] ring-1 ring-inset ring-[var(--cyan-line)]"
-                : reached
-                  ? "bg-foreground text-background"
-                  : "bg-foreground/[0.05] text-[var(--ink-4)]"
+      <div className="min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-foreground">{stage.label}</span>
+          {current && (
+            <span className="rounded-full bg-[var(--cyan)] px-1.5 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-[0.14em] text-white">
+              Now
+            </span>
+          )}
+        </div>
+        {stage.sub && (
+          <p className="mt-0.5 truncate text-[11px] leading-tight text-muted-foreground">
+            {stage.sub}
+          </p>
         )}
-      >
-        <Icon className="size-4" aria-hidden />
-        {stage.live && (
-          <span className="absolute -right-0.5 -top-0.5 size-2 animate-pulse rounded-full bg-[var(--cyan)] ring-2 ring-background" />
-        )}
-      </span>
+      </div>
       {stage.status ? (
         <span
           className={cn(
-            "text-sm font-semibold",
-            stage.live ? "text-[var(--cyan-strong)]" : "text-muted-foreground"
+            "shrink-0 text-sm font-semibold",
+            stage.reached ? "text-foreground" : "text-muted-foreground",
           )}
         >
           {stage.status}
@@ -192,24 +223,56 @@ function StageNode({ stage }: { stage: Stage }) {
       ) : (
         <span
           className={cn(
-            "font-mono text-lg font-semibold tabular-nums",
-            stage.muted && "text-muted-foreground"
+            "shrink-0 font-mono text-xl font-semibold tabular-nums",
+            stage.value > 0 ? "text-foreground" : "text-[var(--ink-4)]",
           )}
         >
           {stage.value}
         </span>
       )}
-      <span className="text-[11px] font-medium leading-tight text-foreground/80">{stage.label}</span>
-      {stage.sub && <span className="text-[10px] leading-tight text-muted-foreground">{stage.sub}</span>}
     </div>
   );
 
-  return stage.href ? (
-    <Link href={stage.href} className="rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-      {node}
-    </Link>
-  ) : (
-    node
+  return (
+    <li className="flex gap-3">
+      {/* connector rail */}
+      <div className="flex flex-col items-center">
+        <span
+          className={cn(
+            "relative grid size-9 shrink-0 place-items-center rounded-lg",
+            nodeClass,
+          )}
+        >
+          <Icon className="size-4" aria-hidden />
+          {current && (
+            <span className="absolute -right-0.5 -top-0.5 size-2 animate-pulse rounded-full bg-[var(--cyan)] shadow-[0_0_8px_rgba(48,207,255,0.9)] ring-2 ring-background" />
+          )}
+        </span>
+        {!last && (
+          <span
+            className={cn(
+              "my-1 w-px flex-1",
+              stage.reached ? "bg-foreground/25" : "bg-foreground/10",
+            )}
+            aria-hidden
+          />
+        )}
+      </div>
+
+      {/* body — clickable when the stage routes somewhere (review) */}
+      <div className={cn("flex-1", !last && "pb-3")}>
+        {stage.href ? (
+          <Link
+            href={stage.href}
+            className="group flex rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            {body}
+          </Link>
+        ) : (
+          body
+        )}
+      </div>
+    </li>
   );
 }
 

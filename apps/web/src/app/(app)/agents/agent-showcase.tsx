@@ -3,18 +3,14 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useActionState } from "react";
-import {
-  motion,
-  AnimatePresence,
-  useReducedMotion,
-  type Variants,
-} from "framer-motion";
-import { Bot, PenLine, MessageSquare, Radar, Settings2, ArrowRight } from "lucide-react";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
+import { Bot, PenLine, MessageSquare, Radar, Settings2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { AnimatedProgress } from "@/components/ui/animated-progress";
 import { CardGlass } from "@/components/ui/card";
 import { FormError } from "@/components/form-error";
+import { cn } from "@/lib/utils";
 import { setAgentStatus, type AgentActionState } from "./actions";
 import type { ShowcaseAgent, ShowcaseKind } from "./agent-showcase-data";
 
@@ -44,118 +40,102 @@ function statusLabel(s: ShowcaseAgent["status"]): string {
   return s === "live" ? "Live" : s === "paused" ? "Paused" : "Draft";
 }
 
-// ── motion ───────────────────────────────────────────────────────────────────
-const container: Variants = {
-  hidden: { opacity: 0 },
-  visible: { opacity: 1, transition: { staggerChildren: 0.08, delayChildren: 0.05 } },
-  exit: { opacity: 0, transition: { duration: 0.2 } },
+const ORB_ICON: Record<ShowcaseKind, typeof Bot> = {
+  scout: Bot,
+  intent: Radar,
+  copy: PenLine,
 };
-const item: Variants = {
-  hidden: { opacity: 0, y: 16, filter: "blur(8px)" },
-  visible: {
-    opacity: 1,
-    y: 0,
-    filter: "blur(0px)",
-    transition: { type: "spring", stiffness: 110, damping: 20 },
-  },
-  exit: { opacity: 0, y: -8, filter: "blur(4px)" },
-};
-function orbVariants(fromLeft: boolean): Variants {
-  return {
-    initial: { opacity: 0, scale: 0.8, filter: "blur(12px)", x: fromLeft ? -60 : 60 },
-    animate: {
-      opacity: 1,
-      scale: 1,
-      filter: "blur(0px)",
-      x: 0,
-      transition: { type: "spring", stiffness: 220, damping: 22 },
-    },
-    exit: { opacity: 0, scale: 0.7, filter: "blur(14px)", transition: { duration: 0.22 } },
-  };
-}
 
-// ── backdrop: faint warm wash that shifts to the active agent's side ─────────
-function Backdrop({ side }: { side: "left" | "right" }) {
+// ── segmented switcher: clean top tabs, sliding highlight ────────────────────
+function Switcher({
+  agents,
+  activeKind,
+  onSelect,
+}: {
+  agents: ShowcaseAgent[];
+  activeKind: ShowcaseKind;
+  onSelect: (k: ShowcaseKind) => void;
+}) {
   return (
-    <div className="pointer-events-none absolute inset-0 overflow-hidden">
-      <motion.div
-        aria-hidden
-        animate={{
-          background:
-            side === "left"
-              ? "radial-gradient(60% 60% at 18% 42%, rgba(48,207,255,0.14), transparent 70%)"
-              : "radial-gradient(60% 60% at 82% 42%, rgba(48,207,255,0.14), transparent 70%)",
-        }}
-        transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }}
-        className="absolute inset-0"
-      />
+    <div className="mb-10 flex justify-center">
+      <div className="inline-flex items-center gap-1 rounded-full border border-[var(--hairline)] bg-white p-1 shadow-[var(--shadow-card)]">
+        {agents.map((a) => {
+          const active = a.kind === activeKind;
+          return (
+            <button
+              key={a.kind}
+              type="button"
+              onClick={() => onSelect(a.kind)}
+              className="relative rounded-full px-4 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {active && (
+                <motion.span
+                  layoutId="agent-seg"
+                  className="absolute inset-0 rounded-full bg-foreground"
+                  transition={{ type: "spring", stiffness: 320, damping: 30 }}
+                />
+              )}
+              <span
+                className={cn(
+                  "relative z-10",
+                  active ? "text-background" : "text-[var(--ink-3)] hover:text-foreground",
+                )}
+              >
+                {a.roleLabel}
+              </span>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
 
-// ── orb: the agent, rings rotate only while Live ─────────────────────────────
-function AgentOrb({ agent, fromLeft }: { agent: ShowcaseAgent; fromLeft: boolean }) {
+// ── orb: the agent, ring rotates only while Live ─────────────────────────────
+function AgentOrb({ agent }: { agent: ShowcaseAgent }) {
   const reduce = useReducedMotion();
   const live = agent.status === "live";
-  const Icon = agent.kind === "scout" ? Bot : agent.kind === "intent" ? Radar : PenLine;
+  const Icon = ORB_ICON[agent.kind];
 
   return (
-    <motion.div layout="position" className="relative shrink-0">
-      {/* dashed orbit ring — spins while the agent is working */}
+    <div className="relative mx-auto shrink-0">
+      {/* dashed orbit ring — spins slowly only while the agent is working */}
       <motion.div
         aria-hidden
         animate={!reduce && live ? { rotate: 360 } : undefined}
-        transition={{ duration: 26, repeat: Infinity, ease: "linear" }}
-        className="absolute inset-[-14%] rounded-full border border-dashed border-foreground/15"
-      />
-      {/* soft white glow */}
-      <motion.div
-        aria-hidden
-        animate={!reduce && live ? { scale: [1, 1.06, 1], opacity: [0.5, 0.7, 0.5] } : undefined}
-        transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
-        className="absolute inset-[8%] rounded-full bg-[radial-gradient(circle,#ffffff_0%,#d4d4d4_55%,transparent_72%)] opacity-30 blur-2xl"
+        transition={{ duration: 32, repeat: Infinity, ease: "linear" }}
+        className="absolute inset-[-12%] rounded-full border border-dashed border-foreground/12"
       />
 
-      <div className="relative flex size-64 items-center justify-center overflow-hidden rounded-full border border-border bg-card shadow-sm md:size-80">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={agent.kind}
-            variants={orbVariants(fromLeft)}
-            initial="initial"
-            animate="animate"
-            exit="exit"
-            className="flex flex-col items-center gap-3"
-          >
-            <span className="flex size-20 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--cyan)] to-[var(--cyan-strong)] text-white shadow-[0_18px_40px_-16px_rgba(12,16,26,0.3)] md:size-24">
-              <Icon className="size-9 md:size-11" />
-            </span>
-          </motion.div>
-        </AnimatePresence>
+      <div className="relative grid size-44 place-items-center rounded-full border border-[var(--hairline)] bg-white shadow-[var(--shadow-card)] md:size-52">
+        <span className="grid size-16 place-items-center rounded-2xl bg-gradient-to-br from-[var(--cyan)] to-[var(--cyan-strong)] text-white md:size-20">
+          <Icon className="size-8 md:size-9" />
+        </span>
       </div>
 
       {/* status pill */}
-      <motion.div
-        layout="position"
-        className="absolute -bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap"
-      >
-        <div className="flex items-center gap-2 rounded-full border border-border bg-card px-4 py-1.5 text-xs font-medium uppercase tracking-widest text-muted-foreground shadow-sm">
+      <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 whitespace-nowrap">
+        <div className="flex items-center gap-2 rounded-full border border-[var(--hairline)] bg-white px-3.5 py-1.5 text-[11px] font-medium uppercase tracking-widest text-muted-foreground shadow-sm">
           <span
-            className={`size-1.5 rounded-full ${
-              live ? "animate-pulse bg-[var(--cyan)]" : "bg-muted-foreground/40"
-            }`}
+            className={cn(
+              "size-1.5 rounded-full",
+              live
+                ? "animate-pulse bg-[var(--cyan)] shadow-[0_0_8px_rgba(48,207,255,0.9)]"
+                : "bg-muted-foreground/40",
+            )}
           />
           {statusLabel(agent.status)}
         </div>
-      </motion.div>
-    </motion.div>
+      </div>
+    </div>
   );
 }
 
 // ── details: copy + run-summary panel + actions ──────────────────────────────
-function AgentDetails({ agent, alignRight }: { agent: ShowcaseAgent; alignRight: boolean }) {
+function AgentDetails({ agent }: { agent: ShowcaseAgent }) {
   const [statusState, statusAction] = useActionState<AgentActionState, FormData>(
     setAgentStatus,
-    {}
+    {},
   );
 
   const live = agent.status === "live";
@@ -171,50 +151,27 @@ function AgentDetails({ agent, alignRight }: { agent: ShowcaseAgent; alignRight:
         : "Drafts wait for your approval in the review queue.";
 
   return (
-    <motion.div
-      variants={container}
-      initial="hidden"
-      animate="visible"
-      exit="exit"
-      className={`flex flex-col ${alignRight ? "items-end text-right" : "items-start text-left"}`}
-    >
-      <motion.p
-        variants={item}
-        className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground"
-      >
+    <div className="flex flex-col items-start text-left">
+      <p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
         {agent.roleLabel}
-      </motion.p>
-      <motion.h1
-        variants={item}
-        className="mb-3 font-heading text-4xl font-semibold tracking-tight md:text-5xl"
-      >
+      </p>
+      <h1 className="font-heading mb-3 text-3xl font-semibold tracking-tight md:text-4xl">
         {agent.name}
-      </motion.h1>
-      <motion.p
-        variants={item}
-        className={`mb-7 max-w-sm leading-relaxed text-muted-foreground ${alignRight ? "ml-auto" : "mr-auto"}`}
-      >
-        {agent.summary}
-      </motion.p>
+      </h1>
+      <p className="mb-6 max-w-md leading-relaxed text-muted-foreground">{agent.summary}</p>
 
       {agent.icpNames.length > 0 && (
-        <motion.div
-          variants={item}
-          className={`mb-6 flex flex-wrap gap-1.5 ${alignRight ? "justify-end" : "justify-start"}`}
-        >
+        <div className="mb-6 flex flex-wrap gap-1.5">
           {agent.icpNames.map((name) => (
             <Badge key={name} variant="secondary" className="font-normal">
               {name}
             </Badge>
           ))}
-        </motion.div>
+        </div>
       )}
 
       {/* run-summary panel */}
-      <motion.div
-        variants={item}
-        className="relative isolate w-full space-y-5 overflow-hidden rounded-2xl border border-border p-6 text-left shadow-sm"
-      >
+      <div className="relative isolate w-full space-y-5 overflow-hidden rounded-2xl border border-[var(--hairline)] bg-white p-6 text-left shadow-[var(--shadow-card)]">
         <CardGlass />
         <div className="flex gap-8">
           {agent.stats.map((s) => (
@@ -246,14 +203,13 @@ function AgentDetails({ agent, alignRight }: { agent: ShowcaseAgent; alignRight:
           </div>
         )}
 
-        <p className="border-t border-border pt-4 text-xs text-muted-foreground">{runLine}</p>
-      </motion.div>
+        <p className="border-t border-[var(--hairline)] pt-4 text-xs text-muted-foreground">
+          {runLine}
+        </p>
+      </div>
 
       {/* actions */}
-      <motion.div
-        variants={item}
-        className={`mt-5 flex flex-wrap items-center gap-2 ${alignRight ? "justify-end" : "justify-start"}`}
-      >
+      <div className="mt-5 flex flex-wrap items-center gap-2">
         {agent.kind !== "intent" && (
           <Button asChild variant="outline" size="sm">
             <Link href={`/agents/${agent.kind}/edit`}>
@@ -268,73 +224,26 @@ function AgentDetails({ agent, alignRight }: { agent: ShowcaseAgent; alignRight:
             {live ? "Pause" : "Resume"}
           </Button>
         </form>
-      </motion.div>
+      </div>
       <FormError message={statusState.error} />
-    </motion.div>
+    </div>
   );
 }
 
 function ChannelChip({ on, icon, label }: { on: boolean; icon: React.ReactNode; label: string }) {
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs ${
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs",
         on
           ? "border-foreground/20 bg-foreground text-background"
-          : "border-border bg-muted text-muted-foreground"
-      }`}
+          : "border-border bg-muted text-muted-foreground",
+      )}
     >
       {icon}
       {label}
       {!on && <span className="opacity-70">· off</span>}
     </span>
-  );
-}
-
-// ── switcher: morphing pill, only when both agents exist ─────────────────────
-function Switcher({
-  agents,
-  activeKind,
-  onSelect,
-}: {
-  agents: ShowcaseAgent[];
-  activeKind: ShowcaseKind;
-  onSelect: (k: ShowcaseKind) => void;
-}) {
-  return (
-    <div className="pointer-events-none sticky bottom-6 z-20 mt-12 flex justify-center">
-      <motion.div
-        layout
-        className="pointer-events-auto flex items-center gap-1 rounded-full border border-border bg-card/90 p-1.5 shadow-lg backdrop-blur-xl"
-      >
-        {agents.map((a) => {
-          const active = a.kind === activeKind;
-          return (
-            <motion.button
-              key={a.kind}
-              type="button"
-              onClick={() => onSelect(a.kind)}
-              whileTap={{ scale: 0.96 }}
-              className="relative flex h-9 items-center justify-center rounded-full px-5 text-sm font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              {active && (
-                <motion.span
-                  layoutId="agent-switch-surface"
-                  className="absolute inset-0 rounded-full bg-foreground"
-                  transition={{ type: "spring", stiffness: 240, damping: 24 }}
-                />
-              )}
-              <span
-                className={`relative z-10 transition-colors ${
-                  active ? "text-background" : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {a.roleLabel}
-              </span>
-            </motion.button>
-          );
-        })}
-      </motion.div>
-    </div>
   );
 }
 
@@ -348,39 +257,33 @@ export function AgentShowcase({
 }) {
   const has = (k: ShowcaseKind) => agents.some((a) => a.kind === k);
   const [activeKind, setActiveKind] = useState<ShowcaseKind>(
-    has(initialKind) ? initialKind : (agents[0]?.kind ?? "scout")
+    has(initialKind) ? initialKind : (agents[0]?.kind ?? "scout"),
   );
 
   const current = agents.find((a) => a.kind === activeKind) ?? agents[0];
   if (!current) return null;
 
-  // scout anchors left, outreach mirrors to the right — the signature flip
-  const orbLeft = current.kind === "scout";
-
   return (
-    <div className="relative mx-auto flex min-h-[calc(100vh-9rem)] max-w-5xl flex-col">
-      <Backdrop side={orbLeft ? "left" : "right"} />
-
-      <div className="relative z-10 flex flex-1 items-center">
-        <motion.div
-          layout
-          transition={{ type: "spring", bounce: 0, duration: 0.7 }}
-          className={`flex w-full flex-col items-center justify-center gap-14 py-10 md:gap-24 lg:gap-32 ${
-            orbLeft ? "md:flex-row" : "md:flex-row-reverse"
-          }`}
-        >
-          <AgentOrb agent={current} fromLeft={orbLeft} />
-          <div className="w-full max-w-md">
-            <AnimatePresence mode="wait">
-              <AgentDetails key={current.kind} agent={current} alignRight={!orbLeft} />
-            </AnimatePresence>
-          </div>
-        </motion.div>
-      </div>
-
+    <div className="mx-auto max-w-4xl py-2">
       {agents.length > 1 && (
         <Switcher agents={agents} activeKind={activeKind} onSelect={setActiveKind} />
       )}
+
+      {/* one calm crossfade on switch — the layout never mirrors, so the eye
+          stays anchored and switching feels instant, not disorienting */}
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={current.kind}
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -8 }}
+          transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+          className="grid items-center gap-12 py-6 md:grid-cols-[auto_1fr] md:gap-16"
+        >
+          <AgentOrb agent={current} />
+          <AgentDetails agent={current} />
+        </motion.div>
+      </AnimatePresence>
     </div>
   );
 }

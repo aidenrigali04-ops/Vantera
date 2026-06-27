@@ -77,13 +77,13 @@ function DockTile({
       className={cn(
         "dock-tile group relative grid size-12 place-items-center rounded-xl ring-1 transition-transform duration-200 hover:translate-x-0.5 hover:scale-[1.05] focus-visible:scale-[1.05] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none",
         active
-          ? "bg-[var(--cyan)] text-white shadow-sm ring-[rgba(48,207,255,0.35)]"
-          : "bg-white text-[var(--cyan-strong)] shadow-sm ring-[var(--hairline)] hover:text-[var(--cyan)]",
+          ? "bg-white text-[var(--cyan-strong)] shadow-sm ring-[var(--hairline)]"
+          : "bg-white text-[var(--ink-3)] shadow-sm ring-[var(--hairline)] hover:text-foreground",
       )}
     >
       <Icon
         className="size-5 transition-transform duration-200 group-hover:scale-110"
-        strokeWidth={2.1}
+        strokeWidth={active ? 2.4 : 2.1}
       />
       {badge ? (
         <span className="absolute -top-1.5 -right-1.5 grid size-5 place-items-center rounded-full bg-foreground text-[10px] font-semibold text-background ring-2 ring-background">
