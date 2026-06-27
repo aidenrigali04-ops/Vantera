@@ -1,46 +1,29 @@
 import { logger, schedules } from "@trigger.dev/sdk";
-import { createClient } from "@supabase/supabase-js";
-import { isEligibleForDeletion } from "../lib/deletion";
+import { createDb } from "@vantera/db";
+import { runAccountDeletion } from "../pipeline/account-deletion";
+import { createAccountDeletionStore } from "../pipeline/pg-store";
 
-function serviceClient() {
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new Error("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set");
-  return createClient(url, key, { auth: { persistSession: false } });
-}
-
-/** Rule 11 deletion path: hard delete (FK cascades wipe all tenant data). */
+/**
+ * Rule 11 GDPR deletion path: hard delete (FK cascades wipe all tenant data). Uses the shared
+ * Drizzle/postgres-js client (createDb) like every other task — NOT @supabase/supabase-js, whose
+ * realtime client needs a native WebSocket the Trigger.dev Node-21 runtime lacks. supabase-js
+ * threw at client construction, failing this cron on every attempt; the guardrail in
+ * structure.test.ts now forbids that import in any trigger task.
+ */
 export const processAccountDeletion = schedules.task({
   id: "process-account-deletion",
   cron: "0 3 * * *",
   run: async () => {
-    const supabase = serviceClient();
-    const now = new Date();
-
-    const { data: requests, error } = await supabase
-      .from("account_deletion_requests")
-      .select("id, account_id, created_at")
-      .eq("status", "pending");
-    if (error) throw new Error(`failed to list deletion requests: ${error.message}`);
-
-    let processed = 0;
-    for (const request of requests ?? []) {
-      if (!isEligibleForDeletion(new Date(request.created_at), now)) continue;
-
-      const { error: deleteError } = await supabase
-        .from("accounts")
-        .delete()
-        .eq("id", request.account_id);
-      if (deleteError) {
+    const store = createAccountDeletionStore(createDb());
+    const summary = await runAccountDeletion({
+      store,
+      onError: (accountId, error) =>
         logger.error("account hard-delete failed", {
-          accountId: request.account_id,
-          error: deleteError.message,
-        });
-        continue;
-      }
-      processed += 1;
-      logger.info("account deleted", { accountId: request.account_id });
-    }
-    return { processed };
+          accountId,
+          error: error instanceof Error ? error.message : String(error),
+        }),
+    });
+    logger.info("account deletion sweep", { ...summary });
+    return summary;
   },
 });

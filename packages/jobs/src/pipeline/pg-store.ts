@@ -1,5 +1,6 @@
 import { and, count, desc, eq, gte, inArray, isNull, lt, lte, or, sql } from "drizzle-orm";
 import {
+  accountDeletionRequests,
   accounts,
   agentAssets,
   agentIcps,
@@ -35,6 +36,7 @@ import type {
 import { toStoredInsights, type LeadInsights, type WebsiteScan } from "@vantera/agent-brains";
 import { resolveEntitlements, type EntitlementSnapshot } from "@vantera/billing";
 import type { ClosedDeal, CrmProvider } from "@vantera/crm-infra";
+import type { AccountDeletionStore } from "./account-deletion";
 import type { CrmPushStore } from "./crm-push";
 import {
   SCOUT_DEFAULTS,
@@ -1464,6 +1466,26 @@ export function createCrmPushStore(db: Db): CrmPushStore {
         .where(and(eq(crmPushEvents.status, "pending"), lte(crmPushEvents.nextRetryAt, now)))
         .limit(limit);
       return rows.map((r) => r.id);
+    },
+  };
+}
+
+export function createAccountDeletionStore(db: Db): AccountDeletionStore {
+  return {
+    async listPendingDeletionRequests() {
+      // createdAt is a timestamptz column → drizzle/postgres-js returns a Date directly.
+      return db
+        .select({
+          accountId: accountDeletionRequests.accountId,
+          requestedAt: accountDeletionRequests.createdAt,
+        })
+        .from(accountDeletionRequests)
+        .where(eq(accountDeletionRequests.status, "pending"));
+    },
+
+    async deleteAccount(accountId) {
+      // Hard delete; FK cascades wipe all tenant data and the deletion-request row itself.
+      await db.delete(accounts).where(eq(accounts.id, accountId));
     },
   };
 }
