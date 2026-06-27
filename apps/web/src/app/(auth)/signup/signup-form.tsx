@@ -2,101 +2,83 @@
 
 import Link from "next/link";
 import { useActionState } from "react";
+import { Mail } from "lucide-react";
 import { signup, type AuthFormState } from "../actions";
-import { GlassEffect } from "@/components/ui/liquid-glass";
-import { AnimatedPanelBorder } from "@/components/ui/animated-border";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FormError } from "@/components/form-error";
-
-const inputClass =
-  "border-white/15 bg-white/[0.06] backdrop-blur-sm placeholder:text-muted-foreground focus-visible:border-white/40";
+import { AuthHeading, CtaArrow, FIELD, LinkedInMark, SubmitButton } from "../auth-ui";
 
 export function SignupForm() {
   const [state, action, pending] = useActionState<AuthFormState, FormData>(signup, {});
 
   if (state.sent) {
     return (
-      <div className="relative w-full rounded-3xl">
-        <GlassEffect className="w-full rounded-3xl">
-          <div className="flex flex-col gap-4 p-8">
-            <h1 className="text-xl font-semibold tracking-tight">Check your email</h1>
-            <p className="text-sm text-muted-foreground">
-              We sent a confirmation link to your inbox. Click it to continue setting up
-              your workspace.
-            </p>
-            <p className="text-sm text-muted-foreground">
-              Already confirmed?{" "}
-              <Link className="text-foreground hover:underline" href="/login">
-                Sign in
-              </Link>
-            </p>
-          </div>
-        </GlassEffect>
-        <AnimatedPanelBorder />
+      <div className="flex flex-col gap-4">
+        <span className="grid size-11 place-items-center rounded-xl bg-[var(--cyan-tint)] text-[var(--cyan-strong)] ring-1 ring-inset ring-[rgba(48,207,255,0.2)]">
+          <Mail className="size-5" strokeWidth={1.9} />
+        </span>
+        <h1 className="text-[30px] font-bold tracking-[-0.03em] text-foreground">Check your email</h1>
+        <p className="text-[15px] leading-relaxed text-[var(--ink-3)]">
+          We sent a confirmation link to your inbox. Click it to continue setting up your workspace.
+        </p>
+        <p className="text-[14px] text-[var(--ink-3)]">
+          Already confirmed?{" "}
+          <Link className="font-semibold text-[var(--cyan-strong)] hover:underline" href="/login">
+            Sign in
+          </Link>
+        </p>
       </div>
     );
   }
 
   return (
-    <div className="relative w-full rounded-3xl">
-      <GlassEffect className="w-full rounded-3xl">
-        <div className="flex flex-col gap-6 p-8">
-          <h1 className="text-xl font-semibold tracking-tight">Create your account</h1>
-          <form action={action} className="flex flex-col gap-4">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="companyName">Name</Label>
-              <Input
-                id="companyName"
-                name="companyName"
-                autoComplete="organization"
-                placeholder="Acme Inc"
-                className={inputClass}
-                required
-              />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                name="email"
-                type="email"
-                autoComplete="email"
-                className={inputClass}
-                required
-              />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                name="password"
-                type="password"
-                autoComplete="new-password"
-                minLength={8}
-                className={inputClass}
-                required
-              />
-              <p className="text-xs text-muted-foreground">At least 8 characters.</p>
-            </div>
-            <FormError message={state.error} />
-            <button
-              type="submit"
-              disabled={pending}
-              className="rounded-[18px] bg-foreground px-6 py-2.5 font-medium text-background transition-opacity hover:opacity-90 disabled:opacity-60"
-            >
-              {pending ? "Creating account…" : "Create account"}
-            </button>
-            <p className="text-center text-sm text-muted-foreground">
-              Already have an account?{" "}
-              <Link className="text-foreground hover:underline" href="/login">
-                Sign in
-              </Link>
-            </p>
-          </form>
+    <div className="flex flex-col gap-8">
+      <AuthHeading
+        title={
+          <>
+            Turn{" "}
+            <span className="whitespace-nowrap">
+              <LinkedInMark className="mr-[0.18em] inline-block size-[0.78em] align-[-0.1em]" />
+              LinkedIn
+            </span>{" "}
+            intent into booked revenue.
+          </>
+        }
+        sub="Vantera finds in-market buyers, qualifies them against your ICP, and drafts the outreach for your approval — your LinkedIn, run hands-off."
+      />
+
+      <form action={action} className="flex flex-col gap-5">
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="companyName" className="text-[13px] font-medium text-[var(--ink-2)]">Company name</Label>
+          <Input id="companyName" name="companyName" autoComplete="organization" placeholder="Acme Inc" className={FIELD} required />
         </div>
-      </GlassEffect>
-      <AnimatedPanelBorder />
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="email" className="text-[13px] font-medium text-[var(--ink-2)]">Business email</Label>
+          <Input id="email" name="email" type="email" autoComplete="email" placeholder="you@company.com" className={FIELD} required />
+        </div>
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="password" className="text-[13px] font-medium text-[var(--ink-2)]">Password</Label>
+          <Input id="password" name="password" type="password" autoComplete="new-password" minLength={8} placeholder="Create a password" className={FIELD} required />
+          <p className="text-[12px] text-[var(--ink-4)]">At least 8 characters.</p>
+        </div>
+        <FormError message={state.error} />
+        <SubmitButton pending={pending} idle={<>Create account <CtaArrow /></>} busy="Creating account…" className="mt-1" />
+      </form>
+
+      <p className="text-[12px] leading-relaxed text-[var(--ink-4)]">
+        By creating an account you agree to our{" "}
+        <Link href="#" className="font-medium text-[var(--ink-3)] underline-offset-2 hover:text-foreground hover:underline">Terms of Service</Link>{" "}
+        and{" "}
+        <Link href="#" className="font-medium text-[var(--ink-3)] underline-offset-2 hover:text-foreground hover:underline">Privacy Policy</Link>.
+      </p>
+
+      <p className="text-[14px] text-[var(--ink-3)]">
+        Already have an account?{" "}
+        <Link className="font-semibold text-[var(--cyan-strong)] hover:underline" href="/login">
+          Sign in
+        </Link>
+      </p>
     </div>
   );
 }

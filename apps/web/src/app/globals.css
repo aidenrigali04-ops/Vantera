@@ -153,7 +153,8 @@
    panels (the sleek mockups) where cyan glows. Scoped to `.landing` so the dark
    dashboard, auth, and onboarding surfaces are untouched.
 ---------------------------------------------------------------------------- */
-.landing {
+.landing,
+.auth-surface {
   --background: #ffffff;
   --foreground: #0a0c12;
   --card: #ffffff;
@@ -211,9 +212,29 @@
   letter-spacing: -0.014em;
 }
 
-.landing ::selection {
+.landing ::selection,
+.auth-surface ::selection {
   background: rgba(48, 207, 255, 0.24);
   color: #0a0c12;
+}
+
+/* Keep form fields crisp white even after the browser autofills saved
+   credentials. Chrome/Safari otherwise paint a pale grey/blue fill via the
+   UA `-webkit-autofill` style that overrides `bg-white`; the inset box-shadow
+   trick repaints it white and the long transition defers the UA color flash. */
+.landing input:-webkit-autofill,
+.landing input:-webkit-autofill:hover,
+.landing input:-webkit-autofill:focus,
+.landing input:-webkit-autofill:active,
+.auth-surface input:-webkit-autofill,
+.auth-surface input:-webkit-autofill:hover,
+.auth-surface input:-webkit-autofill:focus,
+.auth-surface input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px #ffffff inset;
+  box-shadow: 0 0 0 1000px #ffffff inset;
+  -webkit-text-fill-color: var(--foreground);
+  caret-color: var(--foreground);
+  transition: background-color 9999s ease-in-out 0s;
 }
 
 /* `(app)` dashboard cards: a refined, genuinely light liquid glass — frosted

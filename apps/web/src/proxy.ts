@@ -20,5 +20,8 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
+  // `auth-panel.html` is a self-contained static animation embedded as an isolated
+  // iframe on the auth pages. Excluding it means the strict-dynamic CSP (which would
+  // block its inline <script> once enforced) is never applied to that document.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|auth-panel\\.html|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
 };

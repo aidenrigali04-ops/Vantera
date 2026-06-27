@@ -1,12 +1,17 @@
-import { AuthShell } from "../auth-shell";
+import { redirect } from "next/navigation";
+import { getGateData, toGateContext } from "@/lib/auth/context";
+import { resolveGate } from "@/lib/auth/gate";
+import { AuthSplit } from "../auth-split";
 import { SignupForm } from "./signup-form";
 
-// No authenticated-redirect here for now: the owner needs these pages viewable
-// while designing. The app-side gate (unauthenticated → /login) still stands.
-export default function SignupPage() {
+export default async function SignupPage() {
+  // Production sends already-authenticated users to the app; local dev keeps the page
+  // viewable for design review.
+  const dest = resolveGate("auth", toGateContext(await getGateData()));
+  if (dest && process.env.NODE_ENV !== "development") redirect(dest);
   return (
-    <AuthShell>
+    <AuthSplit>
       <SignupForm />
-    </AuthShell>
+    </AuthSplit>
   );
 }
