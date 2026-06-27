@@ -143,9 +143,12 @@ describe("UnipileLinkedInInfra", () => {
   });
 
   describe("sendInvite", () => {
-    it("posts to the invite endpoint and returns SendOutcome", async () => {
+    it("resolves a public slug to the member provider_id, then invites with it", async () => {
+      // Unipile's /users/invite wants the Provider internal id (ACoAA…), NOT the public vanity
+      // slug — passing the slug 400s. The id is read from the user-profile endpoint first.
       const fetchFn = fetchMock({
-        "/api/v1/users/invite": { invitation_id: "inv_abc", sent_at: "2026-06-11T10:00:00Z" },
+        "/users/janedoe": { object: "UserProfile", public_identifier: "janedoe", provider_id: "ACoAA_jane" },
+        "/users/invite": { invitation_id: "inv_abc", sent_at: "2026-06-11T10:00:00Z" },
       });
       const adapter = new UnipileLinkedInInfra({
         apiKey: "key_test",
@@ -160,18 +163,54 @@ describe("UnipileLinkedInInfra", () => {
       });
       expect(result).toEqual({ id: "inv_abc", sentAt: "2026-06-11T10:00:00Z" });
 
-      const [, init] = (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0] as [string, RequestInit];
+      const calls = (fetchFn as ReturnType<typeof vi.fn>).mock.calls;
+      expect(String(calls[0]![0])).toContain("/api/v1/users/janedoe"); // GET resolution first
+      const [inviteUrl, init] = calls[1] as [string, RequestInit];
+      expect(inviteUrl).toContain("/api/v1/users/invite");
       const body = JSON.parse(init.body as string);
       expect(body.account_id).toBe("conn-1");
-      expect(body.provider_id).toBe("janedoe"); // invites go by provider_id (the /in/ slug), not a profile_url
+      expect(body.provider_id).toBe("ACoAA_jane"); // the resolved provider_id, NOT the public slug
       expect(body.profile_url).toBeUndefined();
-      expect(body.message).toBeUndefined(); // note-LESS request — LinkedIn caps invite notes; pitch goes in the post-accept message
+      expect(body.message).toBeUndefined(); // note-LESS request — LinkedIn caps invite notes
+    });
+
+    it("skips the lookup when the url already carries the provider_id (member-id url)", async () => {
+      const fetchFn = fetchMock({
+        "/users/invite": { invitation_id: "inv_2", sent_at: "2026-06-11T10:00:00Z" },
+      });
+      const adapter = new UnipileLinkedInInfra({
+        apiKey: "key_test",
+        dsn: "api.unipile.example.com:13000",
+        webhookSecret: "whsec_li",
+        fetchFn,
+      });
+      await adapter.sendInvite({ connectedAccountId: "conn-1", profileUrl: "https://www.linkedin.com/in/ACoAA_jane" });
+
+      const calls = (fetchFn as ReturnType<typeof vi.fn>).mock.calls;
+      expect(calls).toHaveLength(1); // no GET resolution — straight to the invite
+      const body = JSON.parse((calls[0]![1] as RequestInit).body as string);
+      expect(body.provider_id).toBe("ACoAA_jane");
+    });
+
+    it("throws when a public slug cannot be resolved to a provider_id", async () => {
+      const fetchFn = fetchMock({
+        "/users/ghost": { object: "UserProfile", public_identifier: "ghost" }, // no provider_id
+      });
+      const adapter = new UnipileLinkedInInfra({
+        apiKey: "key_test",
+        dsn: "api.unipile.example.com:13000",
+        webhookSecret: "whsec_li",
+        fetchFn,
+      });
+      await expect(adapter.sendInvite({ connectedAccountId: "c", profileUrl: "https://linkedin.com/in/ghost" }))
+        .rejects.toThrow(/provider_id/);
     });
   });
 
   describe("sendMessage", () => {
-    it("posts to the chats endpoint and returns SendOutcome", async () => {
+    it("resolves the slug to a provider_id, then starts a chat with it", async () => {
       const fetchFn = fetchMock({
+        "/users/johndoe": { object: "UserProfile", public_identifier: "johndoe", provider_id: "ACoAA_john" },
         "/api/v1/chats": { message_id: "msg_xyz", sent_at: "2026-06-11T11:00:00Z" },
       });
       const adapter = new UnipileLinkedInInfra({
@@ -187,10 +226,11 @@ describe("UnipileLinkedInInfra", () => {
       });
       expect(result).toEqual({ id: "msg_xyz", sentAt: "2026-06-11T11:00:00Z" });
 
-      const [, init] = (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0] as [string, RequestInit];
-      const body = JSON.parse(init.body as string);
+      const calls = (fetchFn as ReturnType<typeof vi.fn>).mock.calls;
+      const chatCall = calls.find((c) => String(c[0]).includes("/api/v1/chats"))!;
+      const body = JSON.parse((chatCall[1] as RequestInit).body as string);
       expect(body.account_id).toBe("conn-2");
-      expect(body.attendees_ids).toEqual(["johndoe"]); // chats take attendees_ids (provider_ids) + text
+      expect(body.attendees_ids).toEqual(["ACoAA_john"]); // the resolved provider_id, not the slug
       expect(body.text).toBe("Following up!");
     });
   });
@@ -367,9 +407,10 @@ describe("UnipileLinkedInInfra", () => {
         webhookSecret: "whsec_li",
         fetchFn: fetchError(403, "account not authorized"),
       });
-      await expect(adapter.sendInvite({ connectedAccountId: "c", profileUrl: "https://linkedin.com/in/x" }))
+      // member-id url → no resolution lookup, so the error surfaces from the invite POST itself
+      await expect(adapter.sendInvite({ connectedAccountId: "c", profileUrl: "https://linkedin.com/in/ACoAA_x" }))
         .rejects.toThrow(/403/);
-      await expect(adapter.sendInvite({ connectedAccountId: "c", profileUrl: "https://linkedin.com/in/x" }))
+      await expect(adapter.sendInvite({ connectedAccountId: "c", profileUrl: "https://linkedin.com/in/ACoAA_x" }))
         .rejects.toThrow(/account not authorized/);
     });
   });
@@ -392,7 +433,7 @@ describe("UnipileLinkedInInfra", () => {
         webhookSecret: "whsec_li",
         fetchFn: fetchMock({ "/api/v1/users/invite": {} }),
       });
-      await expect(adapter.sendInvite({ connectedAccountId: "c", profileUrl: "https://linkedin.com/in/x" }))
+      await expect(adapter.sendInvite({ connectedAccountId: "c", profileUrl: "https://linkedin.com/in/ACoAA_x" }))
         .rejects.toThrow(/missing invitation_id/);
     });
 
@@ -403,7 +444,7 @@ describe("UnipileLinkedInInfra", () => {
         webhookSecret: "whsec_li",
         fetchFn: fetchMock({ "/api/v1/chats": {} }),
       });
-      await expect(adapter.sendMessage({ connectedAccountId: "c", profileUrl: "https://linkedin.com/in/x", body: "hi" }))
+      await expect(adapter.sendMessage({ connectedAccountId: "c", profileUrl: "https://linkedin.com/in/ACoAA_x", body: "hi" }))
         .rejects.toThrow(/missing message_id/);
     });
   });

@@ -43,6 +43,15 @@ function profileIdentifier(profileUrl: string): string {
   return m ? m[1]! : profileUrl;
 }
 
+/**
+ * A Unipile LinkedIn provider_id (member internal id) looks like "ACoAA…". The write endpoints
+ * (invite, chats) require this id, not a public vanity slug — a URL whose slug is already a
+ * provider_id needs no lookup, while a public slug must be resolved (or the endpoints 400).
+ */
+function isProviderId(identifier: string): boolean {
+  return /^ACoA/i.test(identifier);
+}
+
 function mapItems<T>(items: unknown, map: (raw: unknown) => T | null, limit: number): T[] {
   if (!Array.isArray(items)) return [];
   const out: T[] = [];
@@ -226,30 +235,52 @@ export class UnipileLinkedInInfra implements LinkedInInfra {
     return out;
   }
 
+  /**
+   * Resolve a profile URL to the member's provider_id (ACoAA…) — the handle the invite and chat
+   * endpoints require. A member-id URL already carries it as the slug (no lookup). A public vanity
+   * slug is NOT a provider_id, so it is resolved via GET /users/{slug} (the same read path the
+   * posts/profile reads use); the write endpoints 400 on a bare public slug. Returns null when the
+   * lookup fails or yields no id, so the caller can fail loudly instead of sending a doomed request.
+   */
+  private async resolveProviderId(connectedAccountId: string, profileUrl: string): Promise<string | null> {
+    const identifier = profileIdentifier(profileUrl);
+    if (isProviderId(identifier)) return identifier;
+    const profile = await this.call<{ provider_id?: unknown }>(
+      `/api/v1/users/${encodeURIComponent(identifier)}?account_id=${encodeURIComponent(connectedAccountId)}`,
+      { method: "GET" }
+    ).catch(() => null);
+    return profile ? str(profile.provider_id) : null;
+  }
+
   async sendInvite(req: InviteRequest): Promise<SendOutcome> {
     // NOTE-LESS connection request: req.note is intentionally NOT sent. LinkedIn caps personalized
     // invitation notes hard — a free account gets only ~5/month and 403s the rest. Note-less requests
     // have far higher limits and better acceptance; the personalized pitch lands in the first message
     // after they accept (the follow-up the Copy agent already drafts). Invites go by the member's
-    // provider_id, NOT a profile_url (a profile_url 400s); member-id URLs (…/in/ACoAAA…, what the
-    // search source returns) carry the provider_id as the slug, so profileIdentifier yields it.
+    // provider_id (ACoAA…), which Unipile reads from the profile endpoint — a public vanity slug
+    // 400s, so resolve it first (member-id URLs already carry it, so that path skips the lookup).
+    const providerId = await this.resolveProviderId(req.connectedAccountId, req.profileUrl);
+    if (!providerId) throw new Error(`linkedin invite: could not resolve provider_id for ${req.profileUrl}`);
     const data = await this.call<{ invitation_id?: unknown; sent_at?: unknown }>(PATH_INVITE, {
       method: "POST",
       body: JSON.stringify({
         account_id: req.connectedAccountId,
-        provider_id: profileIdentifier(req.profileUrl),
+        provider_id: providerId,
       }),
     });
     return { id: requireString(data.invitation_id, "invitation_id"), sentAt: requireString(data.sent_at, "sent_at") };
   }
 
   async sendMessage(req: MessageRequest): Promise<SendOutcome> {
-    // Starting a chat takes attendees_ids (provider_ids) + text, not a profile_url + message.
+    // Starting a chat takes attendees_ids (provider_ids) + text, not a profile_url + message — the
+    // same provider_id the invite uses, so resolve a public slug before sending (a bare slug 400s).
+    const providerId = await this.resolveProviderId(req.connectedAccountId, req.profileUrl);
+    if (!providerId) throw new Error(`linkedin message: could not resolve provider_id for ${req.profileUrl}`);
     const data = await this.call<{ message_id?: unknown; sent_at?: unknown }>(PATH_CHATS, {
       method: "POST",
       body: JSON.stringify({
         account_id: req.connectedAccountId,
-        attendees_ids: [profileIdentifier(req.profileUrl)],
+        attendees_ids: [providerId],
         text: req.body,
       }),
     });
