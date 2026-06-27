@@ -18,6 +18,13 @@ import { Integrations } from "@/components/landing/integrations";
 import { Faq } from "@/components/landing/faq";
 import { FinalCta } from "@/components/landing/final-cta";
 import { LandingFooter } from "@/components/landing/footer";
+import type { Metadata } from "next";
+import { JsonLd, softwareApplicationLd, faqPageLd } from "@/lib/seo";
+import { FAQ_ITEMS } from "@/components/landing/faq-data";
+
+export const metadata: Metadata = {
+  alternates: { canonical: "/" },
+};
 
 export default function Home() {
   // Real plan data from the billing source of truth — never hardcoded marketing prices.
@@ -39,6 +46,8 @@ export default function Home() {
     // `.landing` scopes the 2026 premium light system (white + cyan + Poppins + dark
     // product panels) so the dark dashboard/auth surfaces are untouched (globals.css).
     <div className="landing relative min-h-screen w-full overflow-x-clip">
+      {/* Homepage entity + answer content for Google rich results and AI engines. */}
+      <JsonLd data={[softwareApplicationLd(plans), faqPageLd(FAQ_ITEMS)]} />
       <LandingNav />
       <main>
         <Hero />

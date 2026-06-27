@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Montserrat, Geist_Mono, Poppins } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
+import { SITE_URL, SITE_DESCRIPTION, JsonLd, organizationLd, websiteLd } from "@/lib/seo";
 
 const montserrat = Montserrat({
   variable: "--font-montserrat",
@@ -22,9 +23,23 @@ const poppins = Poppins({
 });
 
 export const metadata: Metadata = {
-  title: "Vantera — The LinkedIn automation power system",
-  description:
-    "Vantera runs your LinkedIn outreach end to end — it finds in-market buyers, writes a personal message to each, and surfaces every reply so no deal slips. You approve every send.",
+  metadataBase: new URL(SITE_URL),
+  title: "#1 LinkedIn Automation Tool | Vantera",
+  description: SITE_DESCRIPTION,
+  applicationName: "Vantera",
+  openGraph: {
+    title: "#1 LinkedIn Automation Tool",
+    description: SITE_DESCRIPTION,
+    url: "/",
+    siteName: "Vantera",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "#1 LinkedIn Automation Tool",
+    description: SITE_DESCRIPTION,
+  },
+  // app/icon.svg → favicon; app/opengraph-image.tsx + app/twitter-image.tsx → the social card.
 };
 
 export default function RootLayout({
@@ -39,6 +54,8 @@ export default function RootLayout({
       className={`${montserrat.variable} ${geistMono.variable} ${poppins.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
+        {/* Site-wide entity graph for Google + AI engines. */}
+        <JsonLd data={[organizationLd(), websiteLd()]} />
         {/* Light-only product: the dark theme was retired. forcedTheme pins it so the
             `.dark` class is never applied and every surface renders on the light system. */}
         <ThemeProvider
