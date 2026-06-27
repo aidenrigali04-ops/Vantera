@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getGateData } from "@/lib/auth/context";
 import { shapePipeline } from "./queries";
 import { PipelineBoard, type ActivityItem } from "./pipeline-board";
-import { LivePipeline, type LivePipelineData } from "../dashboard/live-pipeline";
+import { type LivePipelineData } from "../dashboard/live-pipeline";
 
 const usd = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -164,14 +164,12 @@ export async function PipelineSection() {
   const goalLabel = account.revenue_goal_cents ? usd.format(account.revenue_goal_cents / 100) : null;
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-6">
-      <LivePipeline {...livePipeline} />
-      <PipelineBoard
-        vm={vm}
-        activity={activity}
-        goalLabel={goalLabel}
-        pipelineValueLabel={usd.format(vm.pipelineValueCents / 100)}
-      />
-    </div>
+    <PipelineBoard
+      vm={vm}
+      activity={activity}
+      goalLabel={goalLabel}
+      pipelineValueLabel={usd.format(vm.pipelineValueCents / 100)}
+      livePipeline={livePipeline}
+    />
   );
 }

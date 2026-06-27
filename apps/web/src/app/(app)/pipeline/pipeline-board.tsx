@@ -1,20 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import {
-  ArrowRight,
-  Check,
-  ChevronRight,
-  UserPlus,
-  Rocket,
-  Settings2,
-  type LucideIcon,
-} from "lucide-react";
+import { ArrowRight, Check, Rocket, Settings2 } from "lucide-react";
 import { motion } from "framer-motion";
-import { Panel, Reveal, RevealItem, Eyebrow } from "@/components/ui/panel";
+import { Panel, Eyebrow } from "@/components/ui/panel";
 import { AnimatedProgress } from "@/components/ui/animated-progress";
 import { cn } from "@/lib/utils";
-import type { PipelineViewModel, SequenceStage } from "./queries";
+import type { PipelineViewModel } from "./queries";
+import { LivePipeline, type LivePipelineData } from "../dashboard/live-pipeline";
 
 export type ActivityItem = {
   id: string;
@@ -24,20 +17,18 @@ export type ActivityItem = {
   at: string;
 };
 
-const STAGE_ICON: Record<SequenceStage, LucideIcon> = {
-  linkedin: UserPlus,
-};
-
 export function PipelineBoard({
   vm,
   activity,
   goalLabel,
   pipelineValueLabel,
+  livePipeline,
 }: {
   vm: PipelineViewModel;
   activity: ActivityItem[];
   goalLabel: string | null;
   pipelineValueLabel: string;
+  livePipeline: LivePipelineData;
 }) {
   const empty = vm.activeTotal === 0 && vm.convertedClients === 0 && vm.pausedTotal === 0;
 
@@ -52,7 +43,7 @@ export function PipelineBoard({
         </div>
         <Link
           href="/sequence"
-          className="mt-1 inline-flex shrink-0 items-center gap-1.5 rounded-full border border-white/[0.16] bg-white/[0.04] px-4 py-2 text-sm transition-colors hover:border-white/25"
+          className="mt-1 inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[var(--hairline)] bg-white px-4 py-2 text-sm transition-colors hover:border-[var(--cyan-line)]"
         >
           <Settings2 className="size-4" aria-hidden /> Configure sequence
         </Link>
@@ -61,29 +52,19 @@ export function PipelineBoard({
       {empty ? (
         <EmptyState />
       ) : (
-        <Reveal className="space-y-4">
-          {/* Goal progress — the gradient everything is climbing toward */}
-          <RevealItem>
-            <GoalPanel vm={vm} goalLabel={goalLabel} pipelineValueLabel={pipelineValueLabel} />
-          </RevealItem>
-
-          {/* The stage rail — leads advancing channel by channel */}
-          <RevealItem>
-            <StageRail vm={vm} />
-          </RevealItem>
-
-          {/* Replies that need a human */}
-          {vm.pausedTotal > 0 && (
-            <RevealItem>
-              <PausedCallout count={vm.pausedTotal} />
-            </RevealItem>
-          )}
-
-          {/* Live activity — proof the machine is working */}
-          <RevealItem>
+        // Grounded two-column layout: the live funnel + its activity on the left, the
+        // revenue proof + the win count on the right — balanced, complementary panels.
+        <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr] lg:items-start">
+          <div className="flex flex-col gap-6">
+            <LivePipeline {...livePipeline} />
             <ActivityFeed activity={activity} />
-          </RevealItem>
-        </Reveal>
+          </div>
+          <div className="flex flex-col gap-6">
+            <GoalPanel vm={vm} goalLabel={goalLabel} pipelineValueLabel={pipelineValueLabel} />
+            <WonTile count={vm.convertedClients} />
+            {vm.pausedTotal > 0 && <PausedCallout count={vm.pausedTotal} />}
+          </div>
+        </div>
       )}
     </div>
   );
@@ -133,73 +114,20 @@ function GoalPanel({
   );
 }
 
-function StageRail({ vm }: { vm: PipelineViewModel }) {
-  return (
-    <div className="flex flex-col gap-3 md:flex-row md:items-stretch">
-      {vm.stages.map((s) => (
-        <div key={s.stage} className="flex items-center gap-3 md:flex-1 md:flex-col">
-          <StageTile stage={s.stage} label={s.label} count={s.count} />
-          <Connector />
-        </div>
-      ))}
-      <div className="flex md:flex-1">
-        <WonTile count={vm.convertedClients} />
-      </div>
-    </div>
-  );
-}
-
-function StageTile({
-  stage,
-  label,
-  count,
-}: {
-  stage: SequenceStage;
-  label: string;
-  count: number;
-}) {
-  const Icon = STAGE_ICON[stage];
-  return (
-    <Panel interactive className="w-full p-4 md:p-5">
-      <div className="flex items-center justify-between">
-        <Eyebrow>{label}</Eyebrow>
-        <Icon className="size-4 text-muted-foreground" aria-hidden />
-      </div>
-      <div className="mt-3 font-mono text-2xl font-semibold tabular-nums">{count}</div>
-      <div className="mt-0.5 text-xs text-muted-foreground">
-        {count === 1 ? "lead here" : "leads here"}
-      </div>
-    </Panel>
-  );
-}
-
 function WonTile({ count }: { count: number }) {
   return (
-    <div
-      className={cn(
-        "w-full rounded-2xl border p-4 md:p-5 shadow-lg",
-        "border-white/[0.18] bg-white/[0.06] shadow-black/30"
-      )}
-    >
+    <Panel className="p-5">
       <div className="flex items-center justify-between">
         <Eyebrow>Won</Eyebrow>
-        <Check className="size-4 text-foreground" aria-hidden />
+        <span className="grid size-6 place-items-center rounded-full bg-[#e9f9f0] text-[#0f9d58]">
+          <Check className="size-3.5" aria-hidden />
+        </span>
       </div>
-      <div className="mt-3 font-mono text-2xl font-semibold tabular-nums">{count}</div>
+      <div className="mt-3 text-3xl font-semibold tabular-nums">{count}</div>
       <div className="mt-0.5 text-xs text-muted-foreground">
         {count === 1 ? "meeting booked" : "meetings booked"}
       </div>
-    </div>
-  );
-}
-
-/** A → connector between stages; rotates on mobile so the column still reads as a flow. */
-function Connector() {
-  return (
-    <ChevronRight
-      className="size-4 shrink-0 rotate-90 text-muted-foreground/40 md:rotate-0"
-      aria-hidden
-    />
+    </Panel>
   );
 }
 
@@ -209,8 +137,8 @@ function PausedCallout({ count }: { count: number }) {
       <Panel interactive className="flex items-center justify-between p-4">
         <div className="flex items-center gap-3">
           <span className="relative flex size-2">
-            <span className="absolute inline-flex size-full animate-ping rounded-full bg-white/60 motion-reduce:animate-none" />
-            <span className="relative inline-flex size-2 rounded-full bg-white" />
+            <span className="absolute inline-flex size-full animate-ping rounded-full bg-[var(--cyan)]/60 motion-reduce:animate-none" />
+            <span className="relative inline-flex size-2 rounded-full bg-[var(--cyan)]" />
           </span>
           <p className="text-sm">
             <span className="font-mono font-semibold tabular-nums">{count}</span>{" "}
@@ -239,7 +167,11 @@ function ActivityFeed({ activity }: { activity: ActivityItem[] }) {
               <span
                 className={cn(
                   "size-1.5 shrink-0 rounded-full",
-                  a.kind === "converted" ? "bg-white shadow-[0_0_8px_rgba(255,255,255,0.7)]" : "bg-foreground/50"
+                  a.kind === "converted"
+                    ? "bg-[#13b07a] shadow-[0_0_8px_rgba(19,176,122,0.6)]"
+                    : a.kind === "reply"
+                      ? "bg-[var(--cyan)]"
+                      : "bg-foreground/40"
                 )}
               />
               <span className="text-foreground">{a.who}</span>
@@ -261,8 +193,8 @@ function EmptyState() {
       transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
     >
       <Panel className="flex flex-col items-center px-6 py-16 text-center">
-        <div className="flex size-12 items-center justify-center rounded-full border border-white/[0.12] bg-white/[0.04]">
-          <Rocket className="size-5 text-foreground" aria-hidden />
+        <div className="flex size-12 items-center justify-center rounded-full bg-[var(--cyan-tint)] text-[var(--cyan-strong)]">
+          <Rocket className="size-5" aria-hidden />
         </div>
         <h2 className="mt-5 font-heading text-lg font-semibold">Your pipeline is ready to run</h2>
         <p className="mt-2 max-w-sm text-sm text-muted-foreground">
@@ -271,7 +203,7 @@ function EmptyState() {
         </p>
         <Link
           href="/agents"
-          className="mt-6 inline-flex items-center gap-2 rounded-full border border-white/[0.16] bg-white/[0.06] px-5 py-2.5 text-sm font-medium transition-colors hover:border-white/25"
+          className="mt-6 inline-flex items-center gap-2 rounded-full bg-[#0a0c12] px-5 py-2.5 text-sm font-medium text-white transition-all hover:-translate-y-0.5 hover:shadow-[0_10px_30px_-8px_rgba(48,207,255,0.55)]"
         >
           Launch a campaign
           <ArrowRight className="size-4" aria-hidden />

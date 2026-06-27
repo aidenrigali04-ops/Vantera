@@ -149,22 +149,30 @@ export function LivePipeline(p: LivePipelineData) {
 
 function StageNode({ stage }: { stage: Stage }) {
   const { icon: Icon } = stage;
+  // A stage reads as "engaged" (dark, filled) once work has reached it — so the funnel
+  // shows progress at a glance, not only via the dot. Attention = needs you (solid cyan),
+  // live = happening now (cyan tint + pulse), reached = done (dark), else pending (light).
+  const reached = stage.value > 0 || (stage.key === "agent" && stage.live);
   const node = (
     <div
       className={cn(
-        "flex min-w-[94px] flex-col items-center gap-1.5 rounded-xl px-2.5 py-2.5 text-center transition-colors",
-        stage.attention && "bg-foreground/[0.06]",
-        stage.href && "hover:bg-foreground/[0.05]"
+        "flex min-w-[96px] flex-col items-center gap-1.5 rounded-xl px-2.5 py-2.5 text-center transition-colors",
+        stage.attention && "bg-[var(--cyan-tint)]",
+        stage.href && "hover:bg-[var(--cyan-tint)]/60"
       )}
     >
       <span
         className={cn(
           "relative flex size-9 items-center justify-center rounded-lg",
           stage.muted
-            ? "bg-foreground/[0.04] text-muted-foreground/60"
+            ? "bg-[var(--ink-4)]/12 text-[var(--ink-4)]"
             : stage.attention
-              ? "bg-foreground text-background"
-              : "bg-foreground/10 text-foreground/80"
+              ? "bg-[var(--cyan)] text-white shadow-[0_0_12px_rgba(48,207,255,0.5)]"
+              : stage.live
+                ? "bg-[var(--cyan-tint)] text-[var(--cyan-strong)] ring-1 ring-inset ring-[var(--cyan-line)]"
+                : reached
+                  ? "bg-foreground text-background"
+                  : "bg-foreground/[0.05] text-[var(--ink-4)]"
         )}
       >
         <Icon className="size-4" aria-hidden />
