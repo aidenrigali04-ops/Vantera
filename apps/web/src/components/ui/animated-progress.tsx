@@ -27,7 +27,7 @@ export function AnimatedProgress({
       className={cn("relative h-0.5 w-full rounded-full bg-muted", className)}
     >
       <div
-        className="absolute inset-y-0 left-0 rounded-full bg-[var(--cyan)] transition-[width] duration-500 ease-out shadow-[0_0_8px_rgba(48,207,255,0.6)]"
+        className="absolute inset-y-0 left-0 rounded-full bg-[var(--cyan)] transition-[width] duration-500 ease-out"
         style={{ width: `${pct}%` }}
       />
     </div>

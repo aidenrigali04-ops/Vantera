@@ -28,7 +28,7 @@ function initials(s: string): string {
 
 function Avatar({ label }: { label: string }) {
   return (
-    <span className="grid size-9 shrink-0 place-items-center rounded-full bg-[var(--cyan-tint)] text-[12px] font-semibold text-[var(--cyan-strong)]">
+    <span className="grid size-9 shrink-0 place-items-center rounded-full bg-foreground/[0.06] text-[12px] font-semibold text-[var(--ink-2)]">
       {initials(label)}
     </span>
   );
@@ -69,7 +69,7 @@ export function ShareCard({
     <div className="w-full max-w-xl rounded-3xl border border-[var(--hairline)] bg-white p-7 shadow-[var(--shadow-card)]">
       {/* header */}
       <div className="flex items-center gap-3">
-        <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-[var(--cyan)] text-base font-semibold text-white shadow-[0_8px_20px_-8px_rgba(48,207,255,0.7)]">
+        <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-foreground text-base font-semibold text-background">
           {initials(workspaceName)}
         </span>
         <div className="min-w-0">

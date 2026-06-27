@@ -77,7 +77,7 @@ function DockTile({
       className={cn(
         "dock-tile group relative grid size-12 place-items-center rounded-xl ring-1 transition-transform duration-200 hover:translate-x-0.5 hover:scale-[1.05] focus-visible:scale-[1.05] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none",
         active
-          ? "bg-[var(--cyan)] text-white shadow-[0_8px_22px_-8px_rgba(48,207,255,0.75)] ring-[rgba(48,207,255,0.35)]"
+          ? "bg-[var(--cyan)] text-white shadow-sm ring-[rgba(48,207,255,0.35)]"
           : "bg-white text-[var(--cyan-strong)] shadow-sm ring-[var(--hairline)] hover:text-[var(--cyan)]",
       )}
     >

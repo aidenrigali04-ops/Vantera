@@ -126,7 +126,7 @@ function AgentOrb({ agent, fromLeft }: { agent: ShowcaseAgent; fromLeft: boolean
             exit="exit"
             className="flex flex-col items-center gap-3"
           >
-            <span className="flex size-20 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--cyan)] to-[var(--cyan-strong)] text-white shadow-[0_18px_40px_-16px_rgba(48,207,255,0.8)] md:size-24">
+            <span className="flex size-20 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--cyan)] to-[var(--cyan-strong)] text-white shadow-[0_18px_40px_-16px_rgba(12,16,26,0.3)] md:size-24">
               <Icon className="size-9 md:size-11" />
             </span>
           </motion.div>
@@ -141,7 +141,7 @@ function AgentOrb({ agent, fromLeft }: { agent: ShowcaseAgent; fromLeft: boolean
         <div className="flex items-center gap-2 rounded-full border border-border bg-card px-4 py-1.5 text-xs font-medium uppercase tracking-widest text-muted-foreground shadow-sm">
           <span
             className={`size-1.5 rounded-full ${
-              live ? "animate-pulse bg-[var(--cyan)] shadow-[0_0_8px_rgba(48,207,255,0.9)]" : "bg-muted-foreground/40"
+              live ? "animate-pulse bg-[var(--cyan)]" : "bg-muted-foreground/40"
             }`}
           />
           {statusLabel(agent.status)}

@@ -79,13 +79,13 @@ export function NotificationsBell({ notifications }: { notifications: AppNotific
         aria-label="Notifications"
         aria-expanded={open}
         className={cn(
-          "group relative grid size-12 place-items-center rounded-xl bg-white text-[var(--cyan-strong)] shadow-sm ring-1 ring-[var(--hairline)] transition-colors hover:text-[var(--cyan)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-          open && "bg-[var(--cyan-tint)]"
+          "group relative grid size-12 place-items-center rounded-xl bg-white text-foreground/70 shadow-sm ring-1 ring-[var(--hairline)] transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          open && "bg-foreground/[0.05] text-foreground"
         )}
       >
         <Bell className="size-5" strokeWidth={2.1} />
         {unread > 0 && (
-          <span className="absolute -right-0.5 -top-0.5 grid min-w-[18px] place-items-center rounded-full bg-[var(--cyan)] px-1 text-[10px] font-semibold leading-[18px] text-white shadow-[0_0_8px_rgba(48,207,255,0.7)] ring-2 ring-white">
+          <span className="absolute -right-0.5 -top-0.5 grid min-w-[18px] place-items-center rounded-full bg-[var(--cyan)] px-1 text-[10px] font-semibold leading-[18px] text-white ring-2 ring-white">
             {unread > 9 ? "9+" : unread}
           </span>
         )}
@@ -110,7 +110,7 @@ export function NotificationsBell({ notifications }: { notifications: AppNotific
                       className="flex items-center gap-3 rounded-xl px-2 py-2 transition-colors hover:bg-[var(--cyan-tint)]/50"
                     >
                       <span className="relative shrink-0">
-                        <span className="grid size-9 place-items-center rounded-full bg-[var(--cyan-tint)] text-[12px] font-semibold text-[var(--cyan-strong)]">
+                        <span className="grid size-9 place-items-center rounded-full bg-foreground/[0.06] text-[12px] font-semibold text-[var(--ink-2)]">
                           {initials(n.who)}
                         </span>
                         <span

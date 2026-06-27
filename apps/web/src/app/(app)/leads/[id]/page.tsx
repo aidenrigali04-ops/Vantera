@@ -186,7 +186,7 @@ function buildTimeline(l: Lead): TimelineItem[] {
 function Section({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) {
   return (
     <section className={cn(PANEL_SURFACE, "p-5", className)}>
-      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--cyan-strong)]">{label}</p>
+      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ink-4)]">{label}</p>
       <div className="mt-3">{children}</div>
     </section>
   );
@@ -253,7 +253,7 @@ export default async function LeadProfilePage({ params }: { params: Promise<{ id
             <Badge>{STATUS_LABELS[lead.status] ?? lead.status}</Badge>
             {lead.source === "intent" && (
               <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--cyan-tint)] px-2.5 py-0.5 text-[11px] font-semibold text-[var(--cyan-strong)]">
-                <span className="size-1.5 rounded-full bg-[var(--cyan)] shadow-[0_0_8px_rgba(48,207,255,0.9)]" /> In-market
+                <span className="size-1.5 rounded-full bg-[var(--cyan)]" /> In-market
               </span>
             )}
             {f && (
@@ -281,7 +281,7 @@ export default async function LeadProfilePage({ params }: { params: Promise<{ id
         <div className="flex flex-col gap-5">
           {proj && (
             <section className={cn(PANEL_SURFACE, "p-5 ring-1 ring-inset ring-[var(--cyan-line)]")}>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--cyan-strong)]">Worth pursuing</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ink-4)]">Worth pursuing</p>
               <p className="mt-1.5 text-3xl font-semibold tabular-nums text-foreground">≈ {usd.format(proj.valueCents / 100)}</p>
               <p className="mt-1 text-xs text-muted-foreground">
                 {proj.dealsToGoal != null && goalStr

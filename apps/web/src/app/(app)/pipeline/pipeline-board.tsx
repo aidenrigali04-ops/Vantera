@@ -168,7 +168,7 @@ function ActivityFeed({ activity }: { activity: ActivityItem[] }) {
                 className={cn(
                   "size-1.5 shrink-0 rounded-full",
                   a.kind === "converted"
-                    ? "bg-[#13b07a] shadow-[0_0_8px_rgba(19,176,122,0.6)]"
+                    ? "bg-[#13b07a]"
                     : a.kind === "reply"
                       ? "bg-[var(--cyan)]"
                       : "bg-foreground/40"

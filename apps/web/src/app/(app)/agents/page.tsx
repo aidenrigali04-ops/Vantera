@@ -177,7 +177,7 @@ function SectionHead({ title, sub }: { title: string; sub: string }) {
   return (
     <div className="mb-4">
       <h2 className="font-heading flex items-center gap-2 text-lg font-semibold tracking-tight">
-        <span className="size-1.5 rounded-full bg-[var(--cyan)] shadow-[0_0_8px_rgba(48,207,255,0.9)]" />
+        <span className="size-1.5 rounded-full bg-foreground/25" />
         {title}
       </h2>
       <p className="mt-1 text-sm text-muted-foreground">{sub}</p>

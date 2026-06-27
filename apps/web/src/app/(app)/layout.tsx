@@ -98,7 +98,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
         {/* Account + sign out, kept in the dock idiom — pinned to the bottom. */}
         <div className="mt-auto flex flex-col items-center gap-3 rounded-[28px] border border-[var(--hairline)] bg-white/80 px-2 py-3 ring-1 ring-black/5 backdrop-blur-lg">
-          <span className="group relative grid size-10 place-items-center rounded-full bg-[var(--cyan-tint)] text-xs font-semibold text-[var(--cyan-strong)] ring-1 ring-[var(--cyan-line)]">
+          <span className="group relative grid size-10 place-items-center rounded-full bg-foreground/[0.06] text-xs font-semibold text-[var(--ink-2)] ring-1 ring-[var(--hairline)]">
             {initial}
             <DockTooltip>{email}</DockTooltip>
           </span>

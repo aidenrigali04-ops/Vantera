@@ -41,7 +41,7 @@ export function ModernTimeline({ items }: { items: TimelineItem[] }) {
                   <span
                     className={cn(
                       "size-2 rounded-full",
-                      upcoming ? "bg-[var(--ink-4)]/40" : "bg-[var(--cyan)] shadow-[0_0_8px_rgba(48,207,255,0.9)]"
+                      upcoming ? "bg-[var(--ink-4)]/40" : "bg-[var(--cyan)]"
                     )}
                   />
                 )}
@@ -82,7 +82,7 @@ export function ModernTimeline({ items }: { items: TimelineItem[] }) {
 function StatusPill({ status }: { status: TimelineStatus }) {
   const styles: Record<TimelineStatus, string> = {
     completed: "bg-[var(--cyan-tint)] text-[var(--cyan-strong)]",
-    current: "bg-[var(--cyan)] text-white shadow-[0_0_10px_rgba(48,207,255,0.5)]",
+    current: "bg-[var(--cyan)] text-white",
     upcoming: "bg-[#f1f2f4] text-[var(--ink-4)]",
   };
   const label: Record<TimelineStatus, string> = { completed: "Done", current: "Now", upcoming: "Next" };
