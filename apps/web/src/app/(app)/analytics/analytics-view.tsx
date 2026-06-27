@@ -183,10 +183,6 @@ function AttributionCard({ attribution }: { attribution: SignalAttribution[] }) 
   return (
     <Panel index={1}>
       <Eyebrow>Where your wins come from</Eyebrow>
-      <p className="mt-2 text-sm text-muted-foreground">
-        Closed deals traced back to the buying signal that opened the door — the moments worth working
-        the moment they appear on Leads.
-      </p>
       <div className="mt-5 space-y-4">
         {attribution.map((row) => {
           const widthPct = top > 0 ? Math.max(6, Math.round((row.wins / top) * 100)) : 0;
@@ -227,10 +223,6 @@ function FunnelCard({ funnel, meetingsTracked }: { funnel: FunnelStage[]; meetin
   return (
     <Panel index={1}>
       <Eyebrow>Conversion funnel</Eyebrow>
-      <p className="mt-2 text-sm text-muted-foreground">
-        Quality outreach trades volume for fit — so the rate that matters, not the raw count. Here&apos;s
-        how each stage compares to what&apos;s typical for gated, reviewed sending.
-      </p>
       <div className="mt-5 space-y-4">
         {funnel.map((stage) => {
           const widthPct = top > 0 && stage.count > 0 ? Math.max(3, Math.round((stage.count / top) * 100)) : 0;

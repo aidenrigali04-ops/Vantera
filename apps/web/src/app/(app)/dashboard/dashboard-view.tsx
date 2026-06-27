@@ -16,7 +16,6 @@ import {
   Workflow,
   X,
   Zap,
-  type LucideIcon,
 } from "lucide-react";
 import { markNotificationsRead } from "@/components/notifications/actions";
 import { Badge } from "@/components/ui/badge";
@@ -29,11 +28,7 @@ import { ProspectPanel, type Prospect } from "./prospect-panel";
 import { LeadProfileLink, type LeadProfile } from "@/components/lead-profile";
 import type { RevenuePoint, RevenueSnapshot } from "@/lib/revenue";
 import type { SignalAttribution } from "@/lib/analytics";
-import type { PipelineViewModel, SequenceStage } from "../pipeline/queries";
-
-const STAGE_ICON: Record<SequenceStage, LucideIcon> = {
-  linkedin: UserPlus,
-};
+import type { PipelineViewModel } from "../pipeline/queries";
 
 const usd = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -336,79 +331,12 @@ function NeedsYou({
   );
 }
 
-/** Compact pipeline pulse — stage counts + goal progress, linking to the full funnel on the Pipeline tab. */
-function PipelinePulse({
-  pipeline,
-  convertedClients,
-  goal,
-}: {
-  pipeline: PipelineViewModel;
-  convertedClients: number;
-  goal: string | null;
-}) {
-  return (
-    <RevealItem className={cn(PANEL_SURFACE, "p-5")}>
-      <div className="flex items-center justify-between gap-3">
-        <Eyebrow>Pipeline</Eyebrow>
-        <Link
-          href="/dashboard?view=pipeline"
-          className="inline-flex items-center gap-1 font-mono text-[11px] uppercase tracking-[0.18em] text-foreground/80 underline-offset-4 transition-colors hover:text-foreground hover:underline"
-        >
-          View all <ArrowRight className="size-3" aria-hidden />
-        </Link>
-      </div>
-      <div className="mt-4 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-black/[0.06] bg-black/[0.04] dark:border-white/[0.08] dark:bg-white/[0.06] sm:grid-cols-5">
-        {pipeline.stages.map((stage) => {
-          const Icon = STAGE_ICON[stage.stage];
-          return (
-            <Link
-              key={stage.stage}
-              href="/dashboard?view=pipeline"
-              className="group flex flex-col gap-1 bg-background/40 px-4 py-4 transition-colors hover:bg-foreground/[0.04] focus-visible:bg-foreground/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring dark:bg-background/20"
-            >
-              <div className="flex items-center justify-between">
-                <span className="font-mono text-2xl font-semibold tabular-nums">{stage.count}</span>
-                <Icon className="size-3.5 text-muted-foreground" aria-hidden />
-              </div>
-              <span className="text-xs text-muted-foreground group-hover:text-foreground">
-                {stage.label}
-              </span>
-            </Link>
-          );
-        })}
-        <Link
-          href="/dashboard?view=pipeline"
-          className="group flex flex-col gap-1 bg-white/[0.06] px-4 py-4 transition-colors hover:bg-white/[0.1] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-        >
-          <div className="flex items-center justify-between">
-            <span className="font-mono text-2xl font-semibold tabular-nums">{convertedClients}</span>
-            <CheckCircle2 className="size-3.5 text-foreground" aria-hidden />
-          </div>
-          <span className="text-xs text-muted-foreground group-hover:text-foreground">Won</span>
-        </Link>
-      </div>
-      <AnimatedProgress value={pipeline.goalProgressPct ?? 0} className="mt-4" />
-      <p className="mt-2 text-xs text-muted-foreground">
-        {convertedClients > 0
-          ? `${convertedClients} ${convertedClients === 1 ? "lead" : "leads"} converted toward your ${goal ?? "revenue"} goal.`
-          : "Leads move through your LinkedIn sequence, and stop the instant someone converts."}
-      </p>
-    </RevealItem>
-  );
-}
-
 /** Hot leads — the anticipation surface; each row leads with its real "why now" buying signal. */
 function HotLeads({ prospects }: { prospects: Prospect[] }) {
   return (
     <RevealItem className={cn(PANEL_SURFACE, "p-5")}>
       <div className="flex items-center justify-between gap-3">
-        <div>
-          <Eyebrow>Hot leads</Eyebrow>
-          <p className="mt-2 text-xs text-muted-foreground">
-            Your highest-fit prospects, each with the signal that makes now the moment — click a row
-            for the full profile.
-          </p>
-        </div>
+        <Eyebrow>Hot leads</Eyebrow>
         <Button asChild variant="ghost" size="sm" className="shrink-0">
           <Link href="/leads">
             View all <ArrowRight className="size-4" />
