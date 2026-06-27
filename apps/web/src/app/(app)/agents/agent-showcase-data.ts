@@ -196,7 +196,14 @@ export async function loadAgentShowcase(): Promise<ShowcaseAgent[]> {
         )
         .order("kind", { ascending: false }), // scout first
       supabase.from("leads").select("id", { count: "exact", head: true }),
-      supabase.from("leads").select("id", { count: "exact", head: true }).eq("status", "qualified"),
+      // "Qualified" = cumulative passed-the-bar, not just the not-yet-drafted pool —
+      // a lead that qualified and moved into outreach (in_campaign)/replied/converted
+      // still counts. Keeps the agent's headline yield + the qualification-rate honest
+      // instead of collapsing to ~3 the moment the pool drains into outreach.
+      supabase
+        .from("leads")
+        .select("id", { count: "exact", head: true })
+        .in("status", ["qualified", "enriched", "in_campaign", "replied", "converted"]),
       supabase
         .from("scheduled_sends")
         .select("id", { count: "exact", head: true })

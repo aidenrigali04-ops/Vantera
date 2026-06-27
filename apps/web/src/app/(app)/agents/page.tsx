@@ -22,10 +22,16 @@ export default async function AgentsPage({
   const copy = (agents as AgentRow[] | null)?.find((a) => a.kind === "copy") ?? null;
   const intent = (agents as AgentRow[] | null)?.find((a) => a.kind === "intent") ?? null;
 
-  // value proof: real pipeline counts, never placeholders
+  // value proof: real pipeline counts, never placeholders.
+  // "Qualified" = everyone who PASSED the bar, cumulatively — not just the waiting pool
+  // (status='qualified'). Leads that qualified and already advanced into outreach
+  // (in_campaign), got a reply, or converted still count: they were qualified. Counting
+  // only the waiting pool made a healthy 40+ look like "3 qualified" the instant the
+  // pipeline drained them into outreach.
+  const QUALIFIED_PLUS = ["qualified", "enriched", "in_campaign", "replied", "converted"];
   const [{ count: qualified }, { count: sourced }, { count: drafts }, { count: intentLeads }] =
     await Promise.all([
-      supabase.from("leads").select("id", { count: "exact", head: true }).eq("status", "qualified"),
+      supabase.from("leads").select("id", { count: "exact", head: true }).in("status", QUALIFIED_PLUS),
       supabase.from("leads").select("id", { count: "exact", head: true }),
       supabase
         .from("scheduled_sends")
