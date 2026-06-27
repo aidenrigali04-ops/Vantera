@@ -1,11 +1,23 @@
 import type { MetadataRoute } from "next";
 import { SITE_URL } from "@/lib/seo";
+import { getAllPosts } from "@/lib/blog";
 
-/** Indexable marketing pages only (the authed app is disallowed in robots.ts). */
+/** Indexable marketing pages + blog (the authed app is disallowed in robots.ts). */
 export default function sitemap(): MetadataRoute.Sitemap {
-  const lastModified = new Date();
-  return [
-    { url: `${SITE_URL}/`, lastModified, changeFrequency: "weekly", priority: 1 },
-    { url: `${SITE_URL}/pricing`, lastModified, changeFrequency: "monthly", priority: 0.8 },
+  const now = new Date();
+  const staticPages: MetadataRoute.Sitemap = [
+    { url: `${SITE_URL}/`, lastModified: now, changeFrequency: "weekly", priority: 1 },
+    { url: `${SITE_URL}/pricing`, lastModified: now, changeFrequency: "monthly", priority: 0.8 },
+    { url: `${SITE_URL}/blog`, lastModified: now, changeFrequency: "weekly", priority: 0.7 },
+    { url: `${SITE_URL}/about`, lastModified: now, changeFrequency: "monthly", priority: 0.5 },
+    { url: `${SITE_URL}/privacy`, lastModified: now, changeFrequency: "yearly", priority: 0.3 },
+    { url: `${SITE_URL}/terms`, lastModified: now, changeFrequency: "yearly", priority: 0.3 },
   ];
+  const posts: MetadataRoute.Sitemap = getAllPosts().map((p) => ({
+    url: `${SITE_URL}/blog/${p.slug}`,
+    lastModified: new Date(`${p.updated ?? p.date}T00:00:00Z`),
+    changeFrequency: "monthly",
+    priority: 0.6,
+  }));
+  return [...staticPages, ...posts];
 }
