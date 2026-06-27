@@ -208,14 +208,6 @@
   .url{margin-top:9px;font-size:11.5px;font-weight:650;letter-spacing:.02em;color:var(--bloom-deep);opacity:0;transition:.6s .95s ease}
   .brand.show .url{opacity:.9}
 
-  /* Replay (preview only) */
-  .replay{position:absolute;z-index:6;bottom:14px;right:14px;display:flex;align-items:center;gap:6px;
-    font-size:11px;font-weight:600;color:var(--ink-3);background:rgba(255,255,255,.7);backdrop-filter:blur(8px);
-    border:1px solid var(--line);border-radius:999px;padding:6px 11px;cursor:pointer;opacity:0;transition:opacity .4s ease}
-  .replay.show{opacity:1}
-  .replay:hover{color:var(--ink)}
-  .replay svg{width:12px;height:12px}
-
   @media (prefers-reduced-motion: reduce){
     .b1,.b2,.b3{animation:none;opacity:.22}
     .stage,.reveal,.brand,.cam,.bcam,.lockup *,.bub-in,.skipcard,.crm,.msg-body .ln,.hero-pop,.btn,.statuspill,.deal .amt{transition-duration:.001s!important;animation:none!important;filter:none!important;transform:none!important;opacity:1!important}
@@ -374,8 +366,6 @@
         </div>
       </div>
     </div>
-
-    <div class="replay" id="replay"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v4h4"/></svg>Replay</div>
   </div>
 
 <script>
@@ -389,7 +379,6 @@
   var stages=[].slice.call(document.querySelectorAll('.stage'));
   var sendStamp=document.getElementById('sendStamp');
   var scoreNum=document.getElementById('scoreNum');
-  var replay=document.getElementById('replay');
   var timers=[];
   var labels=['Intent Tracking','Qualification','Personalized Message','Outreach','Conversation','Close'];
 
@@ -453,10 +442,8 @@
     var end=2600+2600*6+400;
     after(end, function(){ brand.classList.remove('show'); root.setAttribute('data-phase','outro'); });
     after(end+650, function(){ showBrand(true); });
-    after(end+1400, function(){ replay.classList.add('show'); });
   }
 
-  replay.addEventListener('click', function(){ replay.classList.remove('show'); play(); });
   after(250, play);
 })();
 </script>
