@@ -142,6 +142,42 @@ describe("UnipileLinkedInInfra", () => {
     });
   });
 
+  describe("deleteConnectedAccount", () => {
+    it("DELETEs the provider account by ref", async () => {
+      const fetchFn = fetchMock({ "/api/v1/accounts/acc_1": { object: "AccountDeleted" } });
+      const adapter = new UnipileLinkedInInfra({
+        apiKey: "key_test",
+        dsn: "api.unipile.example.com:13000",
+        webhookSecret: "whsec_li",
+        fetchFn,
+      });
+      await adapter.deleteConnectedAccount("acc_1");
+      const [url, init] = (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0] as [string, RequestInit];
+      expect(url).toContain("/api/v1/accounts/acc_1");
+      expect(init.method).toBe("DELETE");
+    });
+
+    it("treats an already-removed account (404) as success", async () => {
+      const adapter = new UnipileLinkedInInfra({
+        apiKey: "k",
+        dsn: "api.unipile.example.com:13000",
+        webhookSecret: "s",
+        fetchFn: fetchError(404, "not found"),
+      });
+      await expect(adapter.deleteConnectedAccount("gone")).resolves.toBeUndefined();
+    });
+
+    it("propagates a non-404 provider error", async () => {
+      const adapter = new UnipileLinkedInInfra({
+        apiKey: "k",
+        dsn: "api.unipile.example.com:13000",
+        webhookSecret: "s",
+        fetchFn: fetchError(500, "server error"),
+      });
+      await expect(adapter.deleteConnectedAccount("x")).rejects.toThrow(/500/);
+    });
+  });
+
   describe("sendInvite", () => {
     it("resolves a public slug to the member provider_id, then invites with it", async () => {
       // Unipile's /users/invite wants the Provider internal id (ACoAA…), NOT the public vanity

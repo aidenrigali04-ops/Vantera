@@ -120,6 +120,12 @@ export interface LinkedInInfra {
    * path (that is the account_status webhook), but a reliable fallback.
    */
   listAccounts(): Promise<ConnectedAccount[]>;
+  /**
+   * Disconnect a connected identity from the provider workspace — called on account deletion so
+   * the provider stops holding (and billing for) the tenant's connection (rule 11 vendor cleanup).
+   * Idempotent + best-effort: an already-removed identity is a no-op, not an error.
+   */
+  deleteConnectedAccount(connectedAccountRef: string): Promise<void>;
   sendInvite(req: InviteRequest): Promise<SendOutcome>;
   sendMessage(req: MessageRequest): Promise<SendOutcome>;
   /**

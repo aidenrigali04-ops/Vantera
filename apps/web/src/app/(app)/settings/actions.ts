@@ -85,6 +85,14 @@ export async function requestAccountDeletion(
     .from("account_deletion_requests")
     .insert({ account_id: account.id, requested_by: user.id });
   if (error) return { error: "Could not request deletion. Only workspace admins can do this." };
+
+  // Stop all activity immediately so the grace window burns no platform usage: pause every live
+  // agent (no new prospecting/intent runs) and freeze outreach (the scheduler holds all sends and
+  // follow-up touches while outreach is paused). Best-effort — the request itself is already
+  // recorded, and the deletion sweep will run regardless. Restored if the request is canceled.
+  await supabase.from("agents").update({ status: "paused" }).eq("account_id", account.id).eq("status", "live");
+  await supabase.from("accounts").update({ outreach_paused: true }).eq("id", account.id);
+
   revalidatePath("/settings");
   return { saved: true };
 }
@@ -96,12 +104,21 @@ export async function cancelAccountDeletion(
   const requestId = String(formData.get("requestId") ?? "");
   const supabase = await createClient();
 
-  const { error } = await supabase
+  const { data: canceled, error } = await supabase
     .from("account_deletion_requests")
     .update({ status: "canceled" })
     .eq("id", requestId)
-    .eq("status", "pending"); // RLS scopes to the member's account; rule 02
+    .eq("status", "pending") // RLS scopes to the member's account; rule 02
+    .select("account_id")
+    .maybeSingle();
   if (error) return { error: "Could not cancel the request." };
+
+  // Un-freeze outreach so a canceled deletion leaves a usable workspace again. Agents stay paused
+  // (re-enable them deliberately from the Agents page) — we never auto-resume sourcing/sending.
+  if (canceled?.account_id) {
+    await supabase.from("accounts").update({ outreach_paused: false }).eq("id", canceled.account_id);
+  }
+
   revalidatePath("/settings");
   return { saved: true };
 }

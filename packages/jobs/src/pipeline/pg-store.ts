@@ -1483,6 +1483,14 @@ export function createAccountDeletionStore(db: Db): AccountDeletionStore {
         .where(eq(accountDeletionRequests.status, "pending"));
     },
 
+    async listAccountLinkedInRefs(accountId) {
+      const rows = await db
+        .select({ ref: linkedinAccounts.providerRef })
+        .from(linkedinAccounts)
+        .where(eq(linkedinAccounts.accountId, accountId));
+      return rows.map((r) => r.ref).filter((r): r is string => !!r);
+    },
+
     async deleteAccount(accountId) {
       // Hard delete; FK cascades wipe all tenant data and the deletion-request row itself.
       await db.delete(accounts).where(eq(accounts.id, accountId));

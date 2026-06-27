@@ -7,13 +7,16 @@ import {
 
 function fakeStore(
   pending: PendingDeletionRequest[],
-  opts: { failOn?: Set<string> } = {}
+  opts: { failOn?: Set<string>; refsByAccount?: Record<string, string[]> } = {}
 ): AccountDeletionStore & { deleted: string[] } {
   const deleted: string[] = [];
   return {
     deleted,
     async listPendingDeletionRequests() {
       return pending;
+    },
+    async listAccountLinkedInRefs(accountId) {
+      return opts.refsByAccount?.[accountId] ?? [];
     },
     async deleteAccount(accountId) {
       if (opts.failOn?.has(accountId)) throw new Error("boom");
@@ -22,6 +25,7 @@ function fakeStore(
   };
 }
 
+const noopDisconnect = async () => {};
 const now = new Date("2026-06-20T00:00:00Z");
 const past = new Date("2026-06-01T00:00:00Z"); // > 7 days → eligible
 const recent = new Date("2026-06-18T00:00:00Z"); // < 7 days → still in grace
@@ -29,16 +33,47 @@ const recent = new Date("2026-06-18T00:00:00Z"); // < 7 days → still in grace
 describe("runAccountDeletion (rule 11 GDPR)", () => {
   it("hard-deletes accounts past the 7-day grace window", async () => {
     const store = fakeStore([{ accountId: "a", requestedAt: past }]);
-    const summary = await runAccountDeletion({ store, now: () => now });
+    const summary = await runAccountDeletion({ store, disconnectLinkedIn: noopDisconnect, now: () => now });
     expect(store.deleted).toEqual(["a"]);
-    expect(summary).toEqual({ processed: 1, skipped: 0, failed: 0 });
+    expect(summary).toEqual({ processed: 1, skipped: 0, failed: 0, disconnected: 0 });
   });
 
   it("leaves accounts still inside the grace window untouched", async () => {
-    const store = fakeStore([{ accountId: "a", requestedAt: recent }]);
-    const summary = await runAccountDeletion({ store, now: () => now });
+    const store = fakeStore([{ accountId: "a", requestedAt: recent }], { refsByAccount: { a: ["li_1"] } });
+    const disconnect = vi.fn(noopDisconnect);
+    const summary = await runAccountDeletion({ store, disconnectLinkedIn: disconnect, now: () => now });
     expect(store.deleted).toEqual([]);
-    expect(summary).toEqual({ processed: 0, skipped: 1, failed: 0 });
+    expect(disconnect).not.toHaveBeenCalled(); // never touch the provider for a not-yet-eligible account
+    expect(summary).toEqual({ processed: 0, skipped: 1, failed: 0, disconnected: 0 });
+  });
+
+  it("disconnects the account's LinkedIn connections BEFORE the hard delete", async () => {
+    const order: string[] = [];
+    const store = fakeStore([{ accountId: "a", requestedAt: past }], { refsByAccount: { a: ["li_1", "li_2"] } });
+    const origDelete = store.deleteAccount.bind(store);
+    store.deleteAccount = async (id) => {
+      order.push(`delete:${id}`);
+      return origDelete(id);
+    };
+    const disconnect = vi.fn(async (ref: string) => {
+      order.push(`disconnect:${ref}`);
+    });
+    const summary = await runAccountDeletion({ store, disconnectLinkedIn: disconnect, now: () => now });
+    expect(disconnect).toHaveBeenCalledTimes(2);
+    expect(order).toEqual(["disconnect:li_1", "disconnect:li_2", "delete:a"]);
+    expect(summary).toEqual({ processed: 1, skipped: 0, failed: 0, disconnected: 2 });
+  });
+
+  it("still hard-deletes when a provider disconnect fails (fail-open, reported)", async () => {
+    const store = fakeStore([{ accountId: "a", requestedAt: past }], { refsByAccount: { a: ["li_1"] } });
+    const onError = vi.fn();
+    const disconnect = vi.fn(async () => {
+      throw new Error("provider down");
+    });
+    const summary = await runAccountDeletion({ store, disconnectLinkedIn: disconnect, now: () => now, onError });
+    expect(store.deleted).toEqual(["a"]); // erasure proceeds despite the vendor error
+    expect(onError).toHaveBeenCalledWith("a", expect.any(Error));
+    expect(summary).toEqual({ processed: 1, skipped: 0, failed: 0, disconnected: 0 });
   });
 
   it("continues the sweep when one delete fails, and reports it", async () => {
@@ -50,9 +85,9 @@ describe("runAccountDeletion (rule 11 GDPR)", () => {
       { failOn: new Set(["a"]) }
     );
     const onError = vi.fn();
-    const summary = await runAccountDeletion({ store, now: () => now, onError });
+    const summary = await runAccountDeletion({ store, disconnectLinkedIn: noopDisconnect, now: () => now, onError });
     expect(store.deleted).toEqual(["b"]); // b still processed after a threw
-    expect(summary).toEqual({ processed: 1, skipped: 0, failed: 1 });
+    expect(summary).toEqual({ processed: 1, skipped: 0, failed: 1, disconnected: 0 });
     expect(onError).toHaveBeenCalledWith("a", expect.any(Error));
   });
 });

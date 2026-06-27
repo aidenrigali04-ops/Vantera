@@ -13,4 +13,4 @@ routes: /settings
 
 ## Deleting your workspace
 
-In the danger zone, type your workspace name to confirm deletion. The workspace is then **scheduled for permanent deletion after a 7-day grace period** — during those 7 days an admin can cancel from the same screen. After the grace period, all workspace data is permanently erased, including data held by our processing partners.
+In the danger zone, type your workspace name to confirm deletion. The workspace is then **scheduled for permanent deletion after a 7-day grace period** — during those 7 days an admin can cancel from the same screen. Requesting deletion **immediately pauses all your agents and freezes outreach**, so nothing keeps running (or using up your plan) while the workspace winds down; canceling un-freezes outreach, and you re-enable agents from the Agents page. After the grace period, all workspace data is permanently erased, your connected LinkedIn account is disconnected, and data held by our processing partners is removed.

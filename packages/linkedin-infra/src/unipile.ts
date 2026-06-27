@@ -252,6 +252,20 @@ export class UnipileLinkedInInfra implements LinkedInInfra {
     return profile ? str(profile.provider_id) : null;
   }
 
+  async deleteConnectedAccount(connectedAccountRef: string): Promise<void> {
+    // Rule 11 vendor cleanup: remove the connection from the provider so it stops billing for it.
+    // Idempotent — a 404/410 (already gone) is success; any other status propagates to the caller.
+    try {
+      await this.call<unknown>(`${PATH_ACCOUNTS}/${encodeURIComponent(connectedAccountRef)}`, {
+        method: "DELETE",
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (/provider error (404|410) /.test(msg)) return;
+      throw err;
+    }
+  }
+
   async sendInvite(req: InviteRequest): Promise<SendOutcome> {
     // NOTE-LESS connection request: req.note is intentionally NOT sent. LinkedIn caps personalized
     // invitation notes hard — a free account gets only ~5/month and 403s the rest. Note-less requests

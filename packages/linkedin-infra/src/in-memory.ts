@@ -41,6 +41,14 @@ export class InMemoryLinkedInInfra implements LinkedInInfra {
     return [...this.accounts];
   }
 
+  /** Records disconnected refs and drops the identity from the workspace (idempotent). */
+  readonly disconnected: string[] = [];
+  async deleteConnectedAccount(connectedAccountRef: string): Promise<void> {
+    this.disconnected.push(connectedAccountRef);
+    const i = this.accounts.findIndex((a) => a.providerRef === connectedAccountRef);
+    if (i >= 0) this.accounts.splice(i, 1);
+  }
+
   async sendInvite(req: InviteRequest): Promise<SendOutcome> {
     this.sentInvites.push(req);
     return { id: `inv_${++this.counter}`, sentAt: new Date().toISOString() };
