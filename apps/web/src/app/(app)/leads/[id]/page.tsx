@@ -2,14 +2,29 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Clock, ExternalLink, Mail, Phone } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { getGateData } from "@/lib/auth/context";
 import { Badge } from "@/components/ui/badge";
 import { PANEL_SURFACE } from "@/components/ui/panel";
 import { LeadCrmControls } from "@/components/lead-crm-controls";
 import { ModernTimeline, type TimelineItem } from "@/components/ui/modern-timeline";
 import { cn } from "@/lib/utils";
+import { projectedRevenue } from "../lead-value";
+import { ReplyHandoff } from "../reply-panel";
+import { EraseControl } from "./erase-control";
 
 const LEAD_SELECT =
-  "id, first_name, last_name, title, company_name, company_size, industry, location, tech_stack, status, source, ai_score, ai_rationale, ai_insights, scored_at, email, email_status, phone, phone_status, linkedin_url, created_at, replies(channel, classification, classification_rationale, body, received_at), lead_signals(kind, label, detail, observed_at)";
+  "id, first_name, last_name, title, company_name, company_size, industry, location, tech_stack, status, source, ai_score, ai_rationale, ai_insights, rules_gate_reasons, scored_at, email, email_status, phone, phone_status, linkedin_url, created_at, replies(channel, classification, classification_rationale, body, received_at), lead_signals(kind, label, detail, observed_at)";
+
+const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+const REPLY_LABELS: Record<string, string> = {
+  interested: "Interested",
+  not_interested: "Not interested",
+  neutral: "Neutral",
+  out_of_office: "Out of office",
+  bounce: "Bounced",
+  unsubscribe: "Unsubscribed",
+  other: "Other",
+};
 
 type Insights = {
   pain_points?: string[];
@@ -42,6 +57,7 @@ type Lead = {
   ai_score: number | null;
   ai_rationale: string | null;
   ai_insights: Insights | null;
+  rules_gate_reasons: string[] | null;
   scored_at: string | null;
   email: string | null;
   email_status: string | null;
@@ -202,13 +218,20 @@ function InsightList({ label, items }: { label: string; items?: string[] }) {
 export default async function LeadProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createClient();
-  const { data } = await supabase.from("leads").select(LEAD_SELECT).eq("id", id).maybeSingle();
+  const [{ data }, { account }] = await Promise.all([
+    supabase.from("leads").select(LEAD_SELECT).eq("id", id).maybeSingle(),
+    getGateData(),
+  ]);
   const lead = data as unknown as Lead | null;
   if (!lead) notFound();
 
   const insights = lead.ai_insights;
   const f = freshness(lead.scored_at);
   const timeline = buildTimeline(lead);
+  const proj = projectedRevenue(account?.avg_deal_value_cents ?? null, account?.revenue_goal_cents ?? null, lead.ai_score);
+  const goalStr = account?.revenue_goal_cents ? usd.format(account.revenue_goal_cents / 100) : "";
+  const latestReply =
+    [...(lead.replies ?? [])].sort((a, b) => (b.received_at ?? "").localeCompare(a.received_at ?? ""))[0] ?? null;
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -256,9 +279,54 @@ export default async function LeadProfilePage({ params }: { params: Promise<{ id
       {/* body */}
       <div className="mt-6 grid gap-5 lg:grid-cols-[1.25fr_1fr] lg:items-start">
         <div className="flex flex-col gap-5">
+          {proj && (
+            <section className={cn(PANEL_SURFACE, "p-5 ring-1 ring-inset ring-[var(--cyan-line)]")}>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--cyan-strong)]">Worth pursuing</p>
+              <p className="mt-1.5 text-3xl font-semibold tabular-nums text-foreground">≈ {usd.format(proj.valueCents / 100)}</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {proj.dealsToGoal != null && goalStr
+                  ? `What a client like this is worth — one of ~${proj.dealsToGoal} closes to your ${goalStr} goal`
+                  : "What a client like this is worth to you"}
+              </p>
+            </section>
+          )}
+
           {lead.ai_rationale && (
             <Section label="Why this score">
               <p className="text-sm leading-relaxed text-[var(--ink-2)]">{lead.ai_rationale}</p>
+            </Section>
+          )}
+
+          {latestReply && (
+            <Section label="Latest reply">
+              <div className="space-y-2">
+                {latestReply.classification && (
+                  <Badge variant={latestReply.classification === "interested" ? "default" : "secondary"}>
+                    {REPLY_LABELS[latestReply.classification] ?? latestReply.classification}
+                  </Badge>
+                )}
+                {latestReply.body && (
+                  <p className="text-sm text-[var(--ink-2)]">
+                    “{latestReply.body.slice(0, 240)}
+                    {latestReply.body.length > 240 ? "…" : ""}”
+                  </p>
+                )}
+                {lead.status === "replied" && latestReply.channel && (
+                  <div className="border-t border-[var(--hairline)] pt-3">
+                    <ReplyHandoff leadId={lead.id} channel={latestReply.channel as "email" | "linkedin"} />
+                  </div>
+                )}
+              </div>
+            </Section>
+          )}
+
+          {lead.status === "rejected" && lead.rules_gate_reasons && lead.rules_gate_reasons.length > 0 && (
+            <Section label="Why it was filtered out">
+              <ul className="list-disc space-y-1 pl-4 text-sm text-muted-foreground">
+                {lead.rules_gate_reasons.map((r, i) => (
+                  <li key={i}>{r}</li>
+                ))}
+              </ul>
             </Section>
           )}
 
@@ -326,6 +394,10 @@ export default async function LeadProfilePage({ params }: { params: Promise<{ id
 
           <div className={cn(PANEL_SURFACE, "p-5")}>
             <LeadCrmControls leadId={lead.id} status={lead.status} />
+          </div>
+
+          <div className="border-t border-[var(--hairline)] pt-4">
+            <EraseControl leadId={lead.id} />
           </div>
         </div>
 
