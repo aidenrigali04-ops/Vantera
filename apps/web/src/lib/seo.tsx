@@ -1,4 +1,5 @@
 import type { FaqItem } from "@/components/landing/faq-data";
+import type { BlogPost } from "@/lib/blog";
 
 /** Single source for the production origin (also drives metadataBase, robots, sitemap). */
 export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://vanterasystem.dev";
@@ -84,6 +85,41 @@ export function faqPageLd(items: FaqItem[]) {
       "@type": "Question",
       name: item.q,
       acceptedAnswer: { "@type": "Answer", text: item.a },
+    })),
+  };
+}
+
+/** Article — the citable unit for blog posts (Google Discover/news + LLM source attribution). */
+export function articleLd(post: BlogPost, url: string) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    headline: post.title,
+    description: post.description,
+    datePublished: post.date,
+    dateModified: post.updated ?? post.date,
+    author: { "@type": "Organization", name: "Vantera", url: SITE_URL },
+    publisher: {
+      "@type": "Organization",
+      name: "Vantera",
+      logo: { "@type": "ImageObject", url: `${SITE_URL}/icon.svg` },
+    },
+    mainEntityOfPage: { "@type": "WebPage", "@id": url },
+    image: `${SITE_URL}/opengraph-image`,
+    keywords: post.keywords.join(", "),
+  };
+}
+
+/** BreadcrumbList — the page's place in the site so engines render a breadcrumb trail. */
+export function breadcrumbLd(items: { name: string; url: string }[]) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: items.map((it, i) => ({
+      "@type": "ListItem",
+      position: i + 1,
+      name: it.name,
+      item: it.url,
     })),
   };
 }

@@ -5,11 +5,13 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { VanteraLogo } from "./vantera-logo";
 
+// Absolute hrefs so the nav works from any page (subpages jump back to the homepage section).
 const LINKS = [
-  { label: "Product", href: "#features" },
-  { label: "How it works", href: "#showcase" },
-  { label: "Pricing", href: "#pricing" },
-  { label: "FAQ", href: "#faq" },
+  { label: "Product", href: "/#features" },
+  { label: "How it works", href: "/#showcase" },
+  { label: "Pricing", href: "/#pricing" },
+  { label: "Blog", href: "/blog" },
+  { label: "FAQ", href: "/#faq" },
 ];
 
 export function LandingNav() {
@@ -38,16 +40,23 @@ export function LandingNav() {
         </Link>
 
         <ul className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-1 md:flex">
-          {LINKS.map((l) => (
-            <li key={l.href}>
-              <a
-                href={l.href}
-                className="rounded-full px-3.5 py-2 text-[14px] font-medium text-[var(--ink-3)] transition-colors hover:text-foreground"
-              >
-                {l.label}
-              </a>
-            </li>
-          ))}
+          {LINKS.map((l) => {
+            const cls =
+              "rounded-full px-3.5 py-2 text-[14px] font-medium text-[var(--ink-3)] transition-colors hover:text-foreground";
+            return (
+              <li key={l.href}>
+                {l.href.includes("#") ? (
+                  <a href={l.href} className={cls}>
+                    {l.label}
+                  </a>
+                ) : (
+                  <Link href={l.href} className={cls}>
+                    {l.label}
+                  </Link>
+                )}
+              </li>
+            );
+          })}
         </ul>
 
         <div className="ml-auto flex items-center gap-1.5">
