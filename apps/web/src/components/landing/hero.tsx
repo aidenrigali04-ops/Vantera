@@ -87,7 +87,7 @@ export function Hero() {
             </motion.form>
 
             <motion.p {...rise(0.31)} className="mt-3.5 text-[13px] text-[var(--ink-4)]">
-              No credit card required · Free 7-day trial · You approve every message
+              No credit card required · Free 3-day trial · You approve every message
             </motion.p>
           </div>
 

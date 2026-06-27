@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { CalendarCheck, Radar, Search, Send } from "lucide-react";
+import { Check, Send } from "lucide-react";
 
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
-function useCountUp(target: number, run: boolean, ms = 1100) {
+function useCountUp(target: number, run: boolean, ms = 1200) {
   const [n, setN] = useState(0);
   useEffect(() => {
     if (!run) return;
@@ -24,141 +24,141 @@ function useCountUp(target: number, run: boolean, ms = 1100) {
   return n;
 }
 
-const AGENTS = [
-  { icon: Search, name: "Prospect Agent", note: "Sourcing in-market buyers" },
-  { icon: Radar, name: "Intent Agent", note: "Watching for buying signals" },
-  { icon: Send, name: "Outreach Agent", note: "Drafting for your approval" },
-];
+// Score ring geometry (viewBox 0 0 36 36, r = 15.5)
+const RING_R = 15.5;
+const RING_C = 2 * Math.PI * RING_R;
+const SCORE = 91;
 
-const WEEK = [34, 48, 41, 67, 52, 78, 71];
-
+/**
+ * Hero graphic — a single qualified-prospect card: the product's core promise in one
+ * frame (a real buyer, an honest fit score, and an AI-drafted message grounded in their
+ * activity, one click from your approval). Premium-light, self-contained (no external
+ * image), with a score ring that draws + counts up on enter.
+ */
 export function HeroDeck() {
   const [shown, setShown] = useState(false);
   useEffect(() => {
     const id = requestAnimationFrame(() => setShown(true));
     return () => cancelAnimationFrame(id);
   }, []);
-  const signals = useCountUp(41, shown);
-  const cleared = useCountUp(9, shown, 900);
-  const drafts = useCountUp(5, shown, 800);
+  const score = useCountUp(SCORE, shown);
 
   return (
-    <div className="relative">
-      {/* soft cyan glow lifting the light panel */}
+    <div className="relative mx-auto w-full max-w-[380px]">
+      {/* soft cyan glow lifting the card */}
       <div
         aria-hidden
-        className="pointer-events-none absolute -inset-x-6 -bottom-8 -top-4 -z-10 rounded-[2rem] blur-2xl"
-        style={{ background: "radial-gradient(60% 80% at 55% 30%, rgba(48,207,255,0.18), transparent 70%)" }}
+        className="pointer-events-none absolute -inset-x-8 -bottom-10 -top-6 -z-10 rounded-[2.25rem] blur-2xl"
+        style={{ background: "radial-gradient(60% 75% at 55% 30%, rgba(48,207,255,0.18), transparent 70%)" }}
       />
 
-      <div className="overflow-hidden rounded-2xl border border-[var(--hairline)] bg-white shadow-[var(--shadow-lift)]">
-        {/* chrome */}
-        <div className="flex items-center gap-3 border-b border-[var(--hairline)] bg-[#fbfbfc] px-4 py-3">
-          <div className="flex gap-1.5">
-            <span className="size-2.5 rounded-full bg-[#e5e6e8]" />
-            <span className="size-2.5 rounded-full bg-[#e5e6e8]" />
-            <span className="size-2.5 rounded-full bg-[#e5e6e8]" />
+      <div
+        className="rounded-[18px] border border-[#E6EAEE] bg-white p-5"
+        style={{
+          boxShadow:
+            "inset 0 1px 0 rgba(255,255,255,.7), 0 1px 2px rgba(16,24,32,.05), 0 18px 42px -20px rgba(16,24,32,.30)",
+        }}
+      >
+        {/* header */}
+        <div className="flex items-center gap-3">
+          <div className="relative h-11 w-11 flex-none">
+            <div className="grid h-11 w-11 place-items-center overflow-hidden rounded-full bg-gradient-to-br from-[#EEF2F6] to-[#E3E9EF] text-[14px] font-semibold text-[#5B6B78]">
+              SC
+            </div>
+            <span className="absolute -bottom-[3px] -right-[3px] grid h-[18px] w-[18px] place-items-center rounded-[6px] bg-[#0A66C2] text-[9px] font-bold leading-none tracking-[-0.02em] text-white ring-2 ring-white">
+              in
+            </span>
           </div>
-          <div className="mx-auto rounded-md bg-[#f1f2f4] px-3 py-1 text-[11px] text-[var(--ink-4)]">
-            app.vantera.com/pipeline
+          <div className="min-w-0">
+            <div className="truncate text-[15px] font-semibold leading-tight tracking-[-0.01em] text-[#0C1620]">
+              Sarah Chen
+            </div>
+            <div className="truncate text-[12.5px] text-[#8E9AA3]">VP Sales · Northwind</div>
           </div>
-          <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#1a9e4b]">
-            <span className="size-1.5 rounded-full bg-[#28c840]" />
-            Live
+          <span className="ml-auto inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-[rgba(48,207,255,0.12)] px-2.5 py-[5px] text-[11.5px] font-semibold text-[#0A7CA6]">
+            <span className="size-1.5 rounded-full bg-[#30CFFF]" />
+            High intent
           </span>
         </div>
 
-        <div className="grid grid-cols-[180px_1fr]">
-          {/* agents rail */}
-          <div className="border-r border-[var(--hairline)] bg-[#fbfbfc] p-3.5">
-            <p className="px-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--ink-4)]">
-              Agents
-            </p>
-            <div className="mt-3 flex flex-col gap-2">
-              {AGENTS.map((a, i) => (
-                <motion.div
-                  key={a.name}
-                  initial={{ opacity: 0, x: -8 }}
-                  animate={shown ? { opacity: 1, x: 0 } : {}}
-                  transition={{ duration: 0.45, delay: 0.2 + i * 0.1, ease: EASE }}
-                  className="flex items-start gap-2.5 rounded-xl border border-[var(--hairline)] bg-white p-2.5"
-                >
-                  <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-[var(--cyan-tint)] text-[var(--cyan-strong)] ring-1 ring-inset ring-[rgba(48,207,255,0.2)]">
-                    <a.icon className="size-3.5" strokeWidth={1.9} />
-                  </span>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <span className="truncate text-[12.5px] font-semibold text-foreground">{a.name}</span>
-                      <span className="size-1.5 shrink-0 rounded-full bg-[#28c840]" />
-                    </div>
-                    <p className="mt-0.5 text-[11px] leading-snug text-[var(--ink-4)]">{a.note}</p>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
+        {/* signal */}
+        <div className="mt-3 flex items-center gap-2 text-[11.5px] font-medium text-[#54636D]">
+          <span className="size-1.5 flex-none rounded-full bg-[#30CFFF]" />
+          Raised Series B · engaging on pipeline forecasting
+        </div>
+
+        <div className="my-3.5 h-px bg-[#EFF2F5]" />
+
+        {/* score */}
+        <div className="flex items-center gap-3.5">
+          <div className="relative h-[58px] w-[58px] flex-none">
+            <svg viewBox="0 0 36 36" className="h-[58px] w-[58px]">
+              <circle cx="18" cy="18" r={RING_R} fill="none" stroke="#EAEEF1" strokeWidth="3" />
+              <motion.circle
+                cx="18"
+                cy="18"
+                r={RING_R}
+                fill="none"
+                stroke="#30CFFF"
+                strokeWidth="3"
+                strokeLinecap="round"
+                transform="rotate(-90 18 18)"
+                strokeDasharray={RING_C}
+                initial={{ strokeDashoffset: RING_C }}
+                animate={shown ? { strokeDashoffset: RING_C * (1 - SCORE / 100) } : {}}
+                transition={{ duration: 1.2, ease: EASE }}
+              />
+            </svg>
+            <span className="absolute inset-0 grid place-items-center text-[18px] font-bold tabular-nums tracking-[-0.02em] text-[#0C1620]">
+              {score}
+            </span>
           </div>
-
-          {/* main */}
-          <div className="p-4">
-            <div className="grid grid-cols-3 gap-2.5">
-              {[
-                { k: "Signals", v: signals, suffix: " today" },
-                { k: "Qualified", v: cleared, suffix: " / 15" },
-                { k: "To approve", v: drafts, suffix: " drafts" },
-              ].map((s) => (
-                <div key={s.k} className="rounded-xl border border-[var(--hairline)] bg-[#fbfcfe] p-3">
-                  <p className="text-[9.5px] font-semibold uppercase tracking-[0.1em] text-[var(--ink-4)]">{s.k}</p>
-                  <p className="mt-1.5 text-2xl font-semibold tabular-nums text-foreground">
-                    {s.v}
-                    <span className="ml-1 text-[11px] font-normal text-[var(--ink-4)]">{s.suffix}</span>
-                  </p>
-                </div>
-              ))}
+          <div>
+            <div className="flex items-center gap-1.5 text-[13px] font-semibold leading-snug text-[#0C1620]">
+              <Check className="size-3.5 text-[#1A9463]" strokeWidth={3} />
+              Qualified
             </div>
-
-            <div className="mt-3 rounded-xl border border-[var(--hairline)] bg-[#fbfcfe] p-3.5">
-              <div className="flex items-center justify-between">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--ink-4)]">
-                  Replies this week
-                </p>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#1a9e4b]">+32%</p>
-              </div>
-              <div className="mt-3 flex h-16 items-end gap-1.5">
-                {WEEK.map((h, i) => {
-                  const last = i === WEEK.length - 1;
-                  return (
-                    <motion.div
-                      key={i}
-                      initial={{ height: 0 }}
-                      animate={shown ? { height: `${h}%` } : {}}
-                      transition={{ duration: 0.6, delay: 0.35 + i * 0.05, ease: EASE }}
-                      className="flex-1 rounded-sm"
-                      style={{
-                        backgroundColor: last ? "var(--cyan)" : "rgba(48,207,255,0.28)",
-                        boxShadow: last ? "0 0 12px rgba(48,207,255,0.5)" : undefined,
-                      }}
-                    />
-                  );
-                })}
-              </div>
-            </div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 8 }}
-              animate={shown ? { opacity: 1, y: 0 } : {}}
-              transition={{ duration: 0.5, delay: 0.85, ease: EASE }}
-              className="mt-3 flex items-center gap-3 rounded-xl border border-[rgba(48,207,255,0.22)] bg-[#f1fbff] p-3"
-            >
-              <span className="grid size-8 shrink-0 place-items-center rounded-full bg-[var(--cyan-tint)] text-[var(--cyan-strong)] ring-1 ring-inset ring-[rgba(48,207,255,0.2)]">
-                <CalendarCheck className="size-4" strokeWidth={1.9} />
-              </span>
-              <div className="min-w-0">
-                <p className="text-[12.5px] font-semibold text-foreground">Meeting booked</p>
-                <p className="truncate text-[11.5px] text-[var(--ink-3)]">Terri Spencer · Pinocchio LLC</p>
-              </div>
-              <span className="ml-auto shrink-0 text-[10px] font-medium text-[var(--ink-4)]">2m ago</span>
-            </motion.div>
+            <div className="mt-0.5 text-[11.5px] text-[#8E9AA3]">Fit 94 · Intent 88 · 70+ to pass</div>
           </div>
+        </div>
+
+        {/* drafted message */}
+        <div className="mt-3.5 rounded-l-none rounded-r-[12px] border border-l-[3px] border-[#EDF1F4] border-l-[#30CFFF] bg-[#F7F9FB] px-[13px] py-3">
+          <div className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.08em] text-[#9AA5AD]">
+            Drafted from her activity
+          </div>
+          <div className="text-[12.5px] leading-[1.55] text-[#1C2730]">
+            Hi Sarah — your point about forecasting accuracy after the raise stuck with me. Open to a
+            quick look at how Northwind could close it?
+          </div>
+        </div>
+
+        {/* tags */}
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          <span className="inline-flex items-center gap-1.5 rounded-[7px] bg-[#F2F5F8] px-2 py-[5px] text-[10.5px] font-medium text-[#54636D]">
+            <Check className="size-[11px] text-[#1A9463]" strokeWidth={3} />
+            No template variables
+          </span>
+          <span className="inline-flex items-center rounded-[7px] bg-[#F2F5F8] px-2 py-[5px] text-[10.5px] font-medium text-[#54636D]">
+            Grounded in her posts
+          </span>
+        </div>
+
+        {/* actions */}
+        <div className="mt-4 flex gap-2">
+          <button
+            type="button"
+            className="flex-none rounded-[11px] border border-[#E6EAEE] bg-white px-4 py-[11px] text-[13px] font-semibold text-[#54636D] transition-colors hover:bg-[#F6F8FA]"
+          >
+            Edit
+          </button>
+          <button
+            type="button"
+            className="flex flex-1 items-center justify-center gap-2 rounded-[11px] bg-[#30CFFF] py-[11px] text-[13.5px] font-semibold text-[#06303F] transition-colors hover:bg-[#22C2F4] active:bg-[#1AB6E9]"
+          >
+            <Send className="size-4" strokeWidth={2.4} />
+            Approve &amp; send
+          </button>
         </div>
       </div>
     </div>
