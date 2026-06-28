@@ -1,5 +1,5 @@
 import { createHash, timingSafeEqual } from "node:crypto";
-import type { ConnectedAccount, GetProfileRequest, HostedAuthLink, HostedAuthRedirects, InviteRequest, LinkedInEngager, LinkedInEvent, LinkedInInfra, LinkedInPost, LinkedInProfile, MessageRequest, PostEngagersRequest, ProfilePostsRequest, SearchPostsRequest, SendOutcome } from "./types";
+import type { ConnectedAccount, GetProfileRequest, HostedAuthLink, HostedAuthRedirects, InviteRequest, LinkedInEngager, LinkedInEvent, LinkedInInfra, LinkedInPost, LinkedInProfile, MessageRequest, PostEngagersRequest, ProfilePostsRequest, SearchPostsRequest, SendOutcome, WebhookSetupResult } from "./types";
 
 // ── endpoint constants ──────────────────────────────────────────────────────
 const PATH_HOSTED_AUTH = "/api/v1/hosted/accounts/link";
@@ -7,6 +7,11 @@ const HOSTED_AUTH_TTL_MS = 60 * 60_000;
 const PATH_INVITE = "/api/v1/users/invite";
 const PATH_CHATS = "/api/v1/chats";
 const PATH_ACCOUNTS = "/api/v1/accounts";
+const PATH_WEBHOOKS = "/api/v1/webhooks";
+// Our inbound route path — a webhook whose URL contains this is one of ours (any domain).
+const WEBHOOK_PATH = "/api/webhooks/linkedin";
+// The event sources our route parses (message_received / new_relation / account_status).
+const WEBHOOK_SOURCES = ["messaging", "users", "account_status"];
 
 function requireString(value: unknown, label: string): string {
   if (typeof value !== "string" || value === "") throw new Error(`provider response missing ${label}`);
@@ -440,6 +445,60 @@ export class UnipileLinkedInInfra implements LinkedInInfra {
     } catch {
       return null;
     }
+  }
+
+  async setupWebhook(requestUrl: string): Promise<WebhookSetupResult> {
+    const secretConfigured = this.webhookSecret.length > 0;
+    // 1. Read existing webhooks — learn the current config and find stale ones at our URL.
+    const list = await this.call<{ items?: unknown; webhooks?: unknown }>(PATH_WEBHOOKS, { method: "GET" }).catch(
+      () => ({}) as { items?: unknown; webhooks?: unknown }
+    );
+    const arr = (v: unknown): Record<string, unknown>[] =>
+      Array.isArray(v) ? (v as Record<string, unknown>[]) : [];
+    const items = [...arr(list.items), ...arr(list.webhooks)];
+    const existingHooks = items.map((w) => ({ requestUrl: str(w.request_url), source: str(w.source) }));
+    // Match by our route path (any domain / trailing slash), so a drifted URL is still cleaned up.
+    const ours = items.filter((w) => (str(w.request_url) ?? "").includes(WEBHOOK_PATH));
+
+    // 2. Delete the stale/misconfigured webhooks pointing at our route (their secret no longer matches).
+    let deleted = 0;
+    for (const w of ours) {
+      const id = str(w.id) ?? str(w.webhook_id);
+      if (!id) continue;
+      await this.call<unknown>(`${PATH_WEBHOOKS}/${encodeURIComponent(id)}`, { method: "DELETE" }).catch(() => {});
+      deleted += 1;
+    }
+
+    // 3. Recreate with the correct secret header — the sources already configured, plus our defaults.
+    const sources = new Set<string>(WEBHOOK_SOURCES);
+    for (const w of ours) {
+      const s = str(w.source);
+      if (s) sources.add(s);
+    }
+    const created: WebhookSetupResult["created"] = [];
+    for (const source of sources) {
+      created.push(await this.createWebhook(source, requestUrl));
+    }
+    return { requestUrl, secretConfigured, existing: items.length, existingHooks, deleted, created };
+  }
+
+  /** Create one provider webhook with our shared-secret header; tolerant of both header encodings. */
+  private async createWebhook(source: string, requestUrl: string): Promise<{ source: string; ok: boolean; detail: string }> {
+    const base = { source, request_url: requestUrl, name: `vantera-linkedin-${source}` };
+    const bodies = [
+      { ...base, headers: [{ key: "x-unipile-secret", value: this.webhookSecret }] },
+      { ...base, headers: { "x-unipile-secret": this.webhookSecret } },
+    ];
+    let detail = "";
+    for (const body of bodies) {
+      try {
+        const res = await this.call<unknown>(PATH_WEBHOOKS, { method: "POST", body: JSON.stringify(body) });
+        return { source, ok: true, detail: JSON.stringify(res).slice(0, 200) };
+      } catch (err) {
+        detail = err instanceof Error ? err.message : String(err);
+      }
+    }
+    return { source, ok: false, detail: detail.slice(0, 300) };
   }
 }
 

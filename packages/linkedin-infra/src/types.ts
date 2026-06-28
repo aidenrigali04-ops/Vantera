@@ -135,6 +135,14 @@ export interface LinkedInInfra {
    */
   verifyWebhook(headers: Record<string, string>, rawBody: string): boolean;
   parseEventWebhook(payload: unknown): LinkedInEvent | null;
+  /**
+   * (Re)register the provider webhook(s) that deliver inbound events to `requestUrl`, configured
+   * with the shared-secret header our route verifies. Removes any webhook already pointing at
+   * `requestUrl` (a stale/misconfigured one whose secret no longer matches) and recreates it with
+   * the correct header, covering the sources we parse (messages, new relations, account status).
+   * Idempotent — safe to run repeatedly.
+   */
+  setupWebhook(requestUrl: string): Promise<WebhookSetupResult>;
 
   // ── Reads (Intent Agent) — paced + ceilinged by the scheduler (rule 04) ──────
   /** Posts matching a keyword or #hashtag — content-intent + a source of posts to read engagers of. */
@@ -145,4 +153,16 @@ export interface LinkedInInfra {
   listPostEngagers(req: PostEngagersRequest): Promise<LinkedInEngager[]>;
   /** Resolve a profile URL into a contact candidate; null when the profile can't be read. */
   getProfile(req: GetProfileRequest): Promise<LinkedInProfile | null>;
+}
+
+/** Outcome of {@link LinkedInInfra.setupWebhook} — a diagnostic the setup task logs. */
+export interface WebhookSetupResult {
+  requestUrl: string;
+  /** false ⇒ the webhook secret env var is empty, so verification can never pass (a real misconfig). */
+  secretConfigured: boolean;
+  existing: number;
+  /** Every webhook the provider currently has — logged so the URL/source config is visible. */
+  existingHooks: { requestUrl: string | null; source: string | null }[];
+  deleted: number;
+  created: { source: string; ok: boolean; detail: string }[];
 }

@@ -565,4 +565,42 @@ describe("UnipileLinkedInInfra", () => {
       expect(await adapter.getProfile({ connectedAccountId: "c1", profileUrl: "https://linkedin.com/in/ghost" })).toBeNull();
     });
   });
+
+  describe("setupWebhook", () => {
+    it("deletes the stale webhook at our URL and recreates one per source WITH the secret header", async () => {
+      const HOOK_URL = "https://app.test/api/webhooks/linkedin";
+      const posts: any[] = [];
+      const deletes: string[] = [];
+      const fetchFn = (async (url: string, init?: RequestInit) => {
+        const method = init?.method ?? "GET";
+        if (url.includes("/api/v1/webhooks/") && method === "DELETE") {
+          deletes.push(url.split("/api/v1/webhooks/")[1]!);
+          return { ok: true, json: async () => ({}), text: async () => "" };
+        }
+        if (url.includes("/api/v1/webhooks") && method === "POST") {
+          posts.push(JSON.parse(String(init?.body)));
+          return { ok: true, json: async () => ({ webhook_id: "wh_new" }), text: async () => "" };
+        }
+        if (url.includes("/api/v1/webhooks")) {
+          // one pre-existing, misconfigured webhook at our URL
+          return { ok: true, json: async () => ({ items: [{ id: "wh_old", request_url: HOOK_URL, source: "messaging" }] }), text: async () => "" };
+        }
+        throw new Error(`unmocked ${method} ${url}`);
+      }) as unknown as typeof fetch;
+
+      const adapter = new UnipileLinkedInInfra({ apiKey: "k", dsn: "api.unipile.example.com:13000", webhookSecret: "whsec_li", fetchFn });
+      const result = await adapter.setupWebhook(HOOK_URL);
+
+      expect(result.secretConfigured).toBe(true);
+      expect(result.deleted).toBe(1);
+      expect(deletes).toEqual(["wh_old"]); // the stale one was removed
+      // every recreated webhook carries our secret header, so the route's verify will now pass
+      for (const body of posts) {
+        expect(body.request_url).toBe(HOOK_URL);
+        expect(body.headers).toEqual([{ key: "x-unipile-secret", value: "whsec_li" }]);
+      }
+      expect(posts.map((b) => b.source).sort()).toEqual(["account_status", "messaging", "users"]);
+      expect(result.created.every((c) => c.ok)).toBe(true);
+    });
+  });
 });

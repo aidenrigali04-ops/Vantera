@@ -14,6 +14,7 @@ import type {
   ProfilePostsRequest,
   SearchPostsRequest,
   SendOutcome,
+  WebhookSetupResult,
 } from "./types";
 
 /** Test/dev double. Also the reference behavior for real adapters. */
@@ -107,4 +108,17 @@ export class InMemoryLinkedInInfra implements LinkedInInfra {
         return null;
     }
   }
+
+  async setupWebhook(requestUrl: string): Promise<WebhookSetupResult> {
+    return {
+      requestUrl,
+      secretConfigured: this.webhookSecret.length > 0,
+      existing: 0,
+      existingHooks: [],
+      deleted: 0,
+      created: WEBHOOK_SOURCES_FAKE.map((source) => ({ source, ok: true, detail: "fake" })),
+    };
+  }
 }
+
+const WEBHOOK_SOURCES_FAKE = ["messaging", "users", "account_status"];
