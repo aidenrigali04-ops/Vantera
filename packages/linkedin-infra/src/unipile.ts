@@ -447,6 +447,22 @@ export class UnipileLinkedInInfra implements LinkedInInfra {
     }
   }
 
+  async getConnectionState(req: GetProfileRequest): Promise<{ connected: boolean; distance: string | null }> {
+    const id = encodeURIComponent(profileIdentifier(req.profileUrl));
+    try {
+      const data = await this.call<Record<string, unknown>>(
+        `/api/v1/users/${id}?account_id=${encodeURIComponent(req.connectedAccountId)}`,
+        { method: "GET" }
+      );
+      const distance = str(data.network_distance);
+      // Only an explicit 1st-degree signal counts (Unipile uses DISTANCE_1; tolerate FIRST_DEGREE).
+      const connected = !!distance && /distance_?1|first/i.test(distance);
+      return { connected, distance };
+    } catch {
+      return { connected: false, distance: null };
+    }
+  }
+
   async setupWebhook(requestUrl: string): Promise<WebhookSetupResult> {
     const secretConfigured = this.webhookSecret.length > 0;
     // 1. Read existing webhooks — learn the current config and find stale ones at our URL.

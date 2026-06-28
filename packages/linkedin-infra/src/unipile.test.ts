@@ -604,6 +604,23 @@ describe("UnipileLinkedInInfra", () => {
     });
   });
 
+  describe("getConnectionState", () => {
+    it("reports connected on a 1st-degree network_distance, with the raw value", async () => {
+      const adapter = infra({ "/users/ACoAA_x": { object: "UserProfile", network_distance: "DISTANCE_1" } });
+      expect(await adapter.getConnectionState({ connectedAccountId: "c", profileUrl: "https://linkedin.com/in/ACoAA_x" }))
+        .toEqual({ connected: true, distance: "DISTANCE_1" });
+    });
+
+    it("reports not-connected on 2nd-degree, and on a failed read", async () => {
+      const second = infra({ "/users/ACoAA_y": { object: "UserProfile", network_distance: "DISTANCE_2" } });
+      expect(await second.getConnectionState({ connectedAccountId: "c", profileUrl: "https://linkedin.com/in/ACoAA_y" }))
+        .toEqual({ connected: false, distance: "DISTANCE_2" });
+      const errAdapter = new UnipileLinkedInInfra({ apiKey: "k", dsn: "api.unipile.example.com:13000", webhookSecret: "w", fetchFn: fetchError(404, "nope") });
+      expect(await errAdapter.getConnectionState({ connectedAccountId: "c", profileUrl: "https://linkedin.com/in/ghost" }))
+        .toEqual({ connected: false, distance: null });
+    });
+  });
+
   describe("probeWebhook", () => {
     it("POSTs an empty event to OUR route with the secret header; non-401 ⇒ verified", async () => {
       let captured: { url?: string; init?: RequestInit } = {};

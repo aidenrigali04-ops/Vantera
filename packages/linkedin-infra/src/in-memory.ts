@@ -109,6 +109,10 @@ export class InMemoryLinkedInInfra implements LinkedInInfra {
     }
   }
 
+  async getConnectionState(_req: GetProfileRequest): Promise<{ connected: boolean; distance: string | null }> {
+    return { connected: false, distance: null };
+  }
+
   async probeWebhook(_requestUrl: string): Promise<{ status: number; verified: boolean }> {
     return { status: 200, verified: true };
   }

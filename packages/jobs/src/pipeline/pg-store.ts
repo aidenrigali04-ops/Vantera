@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gte, inArray, isNull, lt, lte, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, inArray, isNotNull, isNull, lt, lte, or, sql } from "drizzle-orm";
 import {
   accountDeletionRequests,
   accounts,
@@ -41,6 +41,7 @@ import type { CrmPushStore } from "./crm-push";
 import {
   SCOUT_DEFAULTS,
   type ConversionStore,
+  type ConnectionSyncStore,
   type CopyConfig,
   type CopyContext,
   type CopyDraftStore,
@@ -127,7 +128,7 @@ function toRow(send: NewScheduledSend) {
 }
 
 /** Drizzle-backed store used by the Trigger.dev tasks (service-role DATABASE_URL). */
-export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerStore & RetentionStore & TrialStore & SendDispatchStore & OutreachSendStore & InboundStore & SequenceStore & SequenceTouchStore & ConversionStore & RefreshLeadStore & IntentScanStore {
+export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerStore & RetentionStore & TrialStore & SendDispatchStore & OutreachSendStore & InboundStore & SequenceStore & SequenceTouchStore & ConversionStore & RefreshLeadStore & IntentScanStore & ConnectionSyncStore {
   return {
     async getScoutContext(agentId: string): Promise<ScoutContext | null> {
       const [agent] = await db.select().from(agents).where(eq(agents.id, agentId));
@@ -1038,6 +1039,23 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
 
     async setLeadConnected(leadId: string, at: Date) {
       await db.update(leads).set({ linkedinConnectedAt: at }).where(eq(leads.id, leadId));
+    },
+
+    // Leads we invited but never recorded as connected — candidates for an acceptance backfill
+    // (sync-connections) after the webhook outage that dropped new_relation events.
+    async getInvitedUnacceptedLeads(accountId: string): Promise<{ leadId: string; profileUrl: string }[]> {
+      const rows = await db
+        .select({ leadId: leads.id, profileUrl: leads.linkedinUrl })
+        .from(leads)
+        .where(
+          and(
+            eq(leads.accountId, accountId),
+            isNotNull(leads.linkedinInvitedAt),
+            isNull(leads.linkedinConnectedAt),
+            isNotNull(leads.linkedinUrl)
+          )
+        );
+      return rows.flatMap((r) => (r.profileUrl ? [{ leadId: r.leadId, profileUrl: r.profileUrl }] : []));
     },
 
     async setLeadReplied(leadId: string, campaignId: string | null) {

@@ -645,6 +645,11 @@ export type SequenceTouchOutcome = "drafted" | "suppressed" | "skipped" | "dropp
 
 // ── Conversion gate (tracked-CTA redirect) ────────────────────────────────────
 
+export interface ConnectionSyncStore {
+  /** Leads we invited but never recorded connected — candidates for an acceptance backfill. */
+  getInvitedUnacceptedLeads(accountId: string): Promise<{ leadId: string; profileUrl: string }[]>;
+}
+
 export interface ConversionStore {
   /** resolve a tracked CTA token to its lead/campaign/account; null if unknown/expired */
   resolveConversionToken(token: string): Promise<{ accountId: string; leadId: string; campaignId: string; targetUrl: string } | null>;

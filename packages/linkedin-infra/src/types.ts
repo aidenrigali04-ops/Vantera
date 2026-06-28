@@ -160,6 +160,13 @@ export interface LinkedInInfra {
   listPostEngagers(req: PostEngagersRequest): Promise<LinkedInEngager[]>;
   /** Resolve a profile URL into a contact candidate; null when the profile can't be read. */
   getProfile(req: GetProfileRequest): Promise<LinkedInProfile | null>;
+  /**
+   * Whether `profileUrl` is now a 1st-degree connection of the connected account — i.e. an invite
+   * we sent was accepted. Used to backfill acceptances missed while the webhook was down. Returns
+   * the raw provider `network_distance` for diagnostics. Conservative: only an explicit 1st-degree
+   * signal counts as connected (a false positive would try to message a non-connection).
+   */
+  getConnectionState(req: GetProfileRequest): Promise<{ connected: boolean; distance: string | null }>;
 }
 
 /** Outcome of {@link LinkedInInfra.setupWebhook} — a diagnostic the setup task logs. */
