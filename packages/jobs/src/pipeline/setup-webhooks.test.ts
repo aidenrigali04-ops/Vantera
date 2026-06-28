@@ -11,9 +11,10 @@ const okResult = (url: string) => ({
 });
 
 describe("runSetupWebhooks", () => {
-  it("builds the route URL from APP_URL (trailing slash stripped) and delegates to the adapter", async () => {
+  it("builds the route URL from APP_URL, forcing https (http→https) and stripping trailing slash", async () => {
     const setupWebhook = vi.fn(async (url: string) => okResult(url));
-    const res = await runSetupWebhooks({ linkedinInfra: { setupWebhook }, appUrl: "https://vanterasystem.dev/" });
+    // APP_URL is http:// in the runtime env — a Vercel http webhook never delivers, so it must upgrade.
+    const res = await runSetupWebhooks({ linkedinInfra: { setupWebhook }, appUrl: "http://vanterasystem.dev/" });
     expect(setupWebhook).toHaveBeenCalledWith("https://vanterasystem.dev/api/webhooks/linkedin");
     expect(res.requestUrl).toBe("https://vanterasystem.dev/api/webhooks/linkedin");
   });

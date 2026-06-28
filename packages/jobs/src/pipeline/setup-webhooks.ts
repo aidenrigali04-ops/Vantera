@@ -12,7 +12,10 @@ export interface SetupWebhooksDeps {
  * signature verification (which silently kills acceptance + reply processing). Idempotent.
  */
 export async function runSetupWebhooks(deps: SetupWebhooksDeps): Promise<WebhookSetupResult> {
-  const base = deps.appUrl.replace(/\/+$/, "");
+  // Force https: the endpoint is on Vercel, which 308-redirects http→https, and that redirect
+  // can drop the POST body / secret header — so an http webhook silently never delivers. (APP_URL
+  // is currently set to http:// in the runtime env; normalize defensively rather than depend on it.)
+  const base = deps.appUrl.replace(/\/+$/, "").replace(/^http:\/\//i, "https://");
   if (!base || base.includes("localhost")) {
     throw new Error(`APP_URL must be the public prod origin, got: "${deps.appUrl}"`);
   }
