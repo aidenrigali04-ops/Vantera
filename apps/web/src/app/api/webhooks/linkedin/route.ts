@@ -8,6 +8,23 @@ export async function POST(req: Request) {
   const rawBody = await req.text();
   const headers = Object.fromEntries(req.headers.entries());
   const infra = createLinkedInInfraFromEnv();
+  // TEMP DIAG (remove after fixing parseEventWebhook): events arrive + verify 200 but parse→null,
+  // so they're "ignored". Capture the real Unipile payload shape to align the parser.
+  try {
+    const p = JSON.parse(rawBody) as Record<string, unknown>;
+    console.log(
+      "[wh-diag]",
+      JSON.stringify({
+        topKeys: Object.keys(p),
+        event: p.event ?? p.event_type ?? p.type ?? null,
+        hasEventId: "event_id" in p,
+        accountKeys: Object.keys(p).filter((k) => /account|provider/i.test(k)),
+        snippet: rawBody.slice(0, 700),
+      })
+    );
+  } catch {
+    console.log("[wh-diag] non-json", rawBody.slice(0, 300));
+  }
   const result = await handleInboundWebhook("linkedin", headers, rawBody, {
     verify: (h, b) => infra.verifyWebhook(h, b),
     onUnverified: async () => {
