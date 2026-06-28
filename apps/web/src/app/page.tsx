@@ -5,6 +5,7 @@ import {
   annualYearlyUsd,
 } from "@vantera/billing";
 import { LandingNav } from "@/components/landing/nav";
+import { LiveBanner } from "@/components/landing/live-banner";
 import { Hero } from "@/components/landing/hero";
 import { TrustStrip } from "@/components/landing/trust-strip";
 import { FeaturesGrid } from "@/components/landing/features-grid";
@@ -49,6 +50,7 @@ export default function Home() {
       {/* Homepage entity + answer content for Google rich results and AI engines. */}
       <JsonLd data={[softwareApplicationLd(plans), faqPageLd(FAQ_ITEMS)]} />
       <LandingNav />
+      <LiveBanner />
       <main>
         <Hero />
         <TrustStrip />

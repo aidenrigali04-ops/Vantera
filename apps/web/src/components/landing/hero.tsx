@@ -1,13 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
-import { Accent } from "./heading";
-import { HeroDeck } from "./hero-deck";
+import { HeroCalendar } from "./hero-calendar";
+import { HeroConnector } from "./hero-connector";
 
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
+
+/** LinkedIn brand glyph — lucide dropped brand icons, so we render it inline. */
+function LinkedinMark({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden>
+      <path d="M20.45 20.45h-3.56v-5.57c0-1.33-.03-3.04-1.85-3.04-1.86 0-2.14 1.45-2.14 2.94v5.67H9.34V9h3.42v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.45v6.29zM5.34 7.43a2.06 2.06 0 1 1 0-4.13 2.06 2.06 0 0 1 0 4.13zM7.12 20.45H3.56V9h3.56v11.45zM22.22 0H1.77C.79 0 0 .77 0 1.72v20.56C0 23.23.79 24 1.77 24h20.45c.98 0 1.78-.77 1.78-1.72V1.72C24 .77 23.2 0 22.22 0z" />
+    </svg>
+  );
+}
 
 function rise(delay: number) {
   return {
@@ -21,8 +30,16 @@ export function Hero() {
   const router = useRouter();
   const [url, setUrl] = useState("");
 
+  // Pipeline connector: LinkedIn icon → calendar. Endpoints measured from these refs;
+  // each booked meeting bumps bookTick to send one packet down the pipe.
+  const sectionRef = useRef<HTMLElement>(null);
+  const linkedinRef = useRef<HTMLSpanElement>(null);
+  const calendarRef = useRef<HTMLDivElement>(null);
+  const [bookTick, setBookTick] = useState(0);
+  const handleBook = useCallback(() => setBookTick((t) => t + 1), []);
+
   return (
-    <section id="top" className="relative overflow-hidden pt-36 pb-20 sm:pt-40 lg:pb-28">
+    <section ref={sectionRef} id="top" className="relative overflow-hidden pt-36 pb-20 sm:pt-40 lg:pb-28">
       {/* subtle cyan ambience — a single soft wash, top-right, masked so it never reads as a glow blob */}
       <div
         aria-hidden
@@ -33,29 +50,42 @@ export function Hero() {
         }}
       />
 
+      {/* pipeline conduit: LinkedIn icon → calendar (rendered before the grid so it sits behind it) */}
+      <HeroConnector
+        sectionRef={sectionRef}
+        linkedinRef={linkedinRef}
+        calendarRef={calendarRef}
+        bookTick={bookTick}
+      />
+
       <div className="mx-auto w-full max-w-6xl px-6 lg:px-8">
         <div className="grid items-center gap-14 lg:grid-cols-[1.04fr_1fr] lg:gap-12">
           {/* LEFT — content */}
           <div className="max-w-xl">
-            <motion.div {...rise(0)}>
-              <span className="inline-flex items-center gap-2 rounded-full border border-[var(--hairline)] bg-white py-1 pl-1.5 pr-3 text-[12.5px] font-medium text-[var(--ink-2)] shadow-[var(--shadow-sm)]">
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--cyan-tint)] px-2 py-0.5 text-[11px] font-semibold text-[var(--cyan-strong)]">
-                  <span className="size-1.5 rounded-full bg-[var(--cyan)] shadow-[0_0_8px_rgba(48,207,255,0.9)]" />
-                  Live
-                </span>
-                Event in San Francisco
-              </span>
-            </motion.div>
-
             <motion.h1
-              {...rise(0.07)}
-              className="mt-6 text-[2.9rem] font-semibold leading-[1.02] tracking-[-0.04em] text-foreground sm:text-[3.6rem] lg:text-[4rem]"
+              {...rise(0)}
+              className="text-[2.9rem] font-semibold leading-[1.18] tracking-[-0.04em] text-foreground sm:text-[3.6rem] lg:text-[4rem]"
             >
-              Turn intent into <Accent>revenue</Accent> on LinkedIn
+              Turn intent into{" "}
+              <span className="relative inline-block rounded-[12px] px-3 pb-[0.12em] pt-[0.04em] text-white shadow-[0_12px_30px_-10px_rgba(24,119,242,0.6)] [background:linear-gradient(180deg,#2a82f7_0%,#1877f2_56%,#166fe5_100%)]">
+                revenue
+              </span>{" "}
+              <span className="whitespace-nowrap">
+                on{" "}
+                <span
+                  ref={linkedinRef}
+                  role="img"
+                  aria-label="LinkedIn"
+                  className="mx-[0.06em] inline-flex translate-y-[0.16em] items-center justify-center rounded-[12px] border border-[var(--hairline)] bg-white p-[0.2em] align-baseline shadow-[var(--shadow-card)]"
+                >
+                  <LinkedinMark className="h-[0.7em] w-[0.7em] text-[var(--fb)]" />
+                  <span className="sr-only">LinkedIn</span>
+                </span>
+              </span>
             </motion.h1>
 
             <motion.p
-              {...rise(0.15)}
+              {...rise(0.09)}
               className="mt-6 max-w-lg text-[17px] font-normal leading-relaxed text-[var(--ink-3)] sm:text-[19px]"
             >
               The smartest LinkedIn outreach automation — agents that find in-market buyers, qualify
@@ -63,12 +93,12 @@ export function Hero() {
             </motion.p>
 
             <motion.form
-              {...rise(0.23)}
+              {...rise(0.17)}
               onSubmit={(e) => {
                 e.preventDefault();
                 router.push("/signup");
               }}
-              className="mt-8 flex w-full max-w-md items-center gap-2 rounded-full border border-[var(--hairline)] bg-white py-1.5 pl-5 pr-1.5 shadow-[var(--shadow-card)]"
+              className="mt-8 flex w-full max-w-md items-center gap-2 rounded-[12px] border border-[var(--hairline)] bg-white py-1.5 pl-5 pr-1.5 shadow-[var(--shadow-card)] transition-shadow focus-within:border-[var(--fb)] focus-within:shadow-[0_0_0_3px_rgba(24,119,242,0.16),var(--shadow-card)]"
             >
               <input
                 value={url}
@@ -79,25 +109,25 @@ export function Hero() {
               />
               <button
                 type="submit"
-                className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[#0a0c12] px-5 py-2.5 text-[14px] font-medium text-white transition-all hover:shadow-[0_8px_24px_-8px_rgba(48,207,255,0.6)]"
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-[10px] bg-[var(--fb-strong)] px-5 py-2.5 text-[14px] font-semibold text-white transition-all hover:bg-[#1461d1] hover:shadow-[0_8px_24px_-8px_rgba(24,119,242,0.7)] active:scale-[0.98]"
               >
-                Start free
+                Get Started Free
                 <ArrowRight className="size-4" />
               </button>
             </motion.form>
 
-            <motion.p {...rise(0.31)} className="mt-3.5 text-[13px] text-[var(--ink-4)]">
+            <motion.p {...rise(0.25)} className="mt-3.5 text-[13px] text-[var(--ink-4)]">
               No credit card required · Free 3-day trial · You approve every message
             </motion.p>
           </div>
 
-          {/* RIGHT — sleek dark product panel (ready to swap for a generated hero image) */}
+          {/* RIGHT — live Google-Calendar filling with booked client meetings */}
           <motion.div
             initial={{ opacity: 0, y: 22, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             transition={{ duration: 0.9, delay: 0.2, ease: EASE }}
           >
-            <HeroDeck />
+            <HeroCalendar cardRef={calendarRef} onBook={handleBook} />
           </motion.div>
         </div>
       </div>

@@ -192,6 +192,13 @@
   --hairline: rgba(12, 16, 26, 0.07);
   --tint: #f6f8fb;
 
+  /* Facebook-blue accent — reserved for the hero "revenue" highlight, the LinkedIn
+     mark, and the primary "Get Started Free" CTA. Kept as tokens so the one hue is
+     tweakable in a single place. */
+  --fb: #1877f2;
+  --fb-strong: #166fe5;
+  --fb-tint: rgba(24, 119, 242, 0.12);
+
   /* premium soft elevation — multi-layer, neutral */
   --shadow-sm: 0 1px 2px rgba(12, 16, 26, 0.05);
   --shadow-card: 0 1px 2px rgba(12, 16, 26, 0.04), 0 12px 32px -14px rgba(12, 16, 26, 0.16);
@@ -307,5 +314,21 @@
   .dock-tile *,
   .dock-tile::after {
     transition: none !important;
+  }
+}
+
+/* Hero pipeline conduit — the gradient stroke drifts LinkedIn → calendar. Dash period
+   is 24 (10 + 14); -48 = two clean cycles, so the loop is seamless. */
+@keyframes vc-flow {
+  to {
+    stroke-dashoffset: -48;
+  }
+}
+.landing .vc-flow-line {
+  animation: vc-flow 3.2s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .landing .vc-flow-line {
+    animation: none;
   }
 }
