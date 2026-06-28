@@ -109,6 +109,10 @@ export class InMemoryLinkedInInfra implements LinkedInInfra {
     }
   }
 
+  async probeWebhook(_requestUrl: string): Promise<{ status: number; verified: boolean }> {
+    return { status: 200, verified: true };
+  }
+
   async setupWebhook(requestUrl: string): Promise<WebhookSetupResult> {
     return {
       requestUrl,

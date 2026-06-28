@@ -143,6 +143,13 @@ export interface LinkedInInfra {
    * Idempotent — safe to run repeatedly.
    */
   setupWebhook(requestUrl: string): Promise<WebhookSetupResult>;
+  /**
+   * Self-test the inbound route: POST a no-op (empty) event to `requestUrl` with the shared-secret
+   * header. The route verifies the header, finds no event id, and returns 200 "ignored" — so a 200
+   * proves the secret we register webhooks with matches what the route verifies, WITHOUT depending
+   * on the provider actually delivering an event. A 401 means the secret is still mismatched.
+   */
+  probeWebhook(requestUrl: string): Promise<{ status: number; verified: boolean }>;
 
   // ── Reads (Intent Agent) — paced + ceilinged by the scheduler (rule 04) ──────
   /** Posts matching a keyword or #hashtag — content-intent + a source of posts to read engagers of. */

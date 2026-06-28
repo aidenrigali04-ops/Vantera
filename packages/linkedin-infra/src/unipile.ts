@@ -482,6 +482,17 @@ export class UnipileLinkedInInfra implements LinkedInInfra {
     return { requestUrl, secretConfigured, existing: items.length, existingHooks, deleted, created };
   }
 
+  async probeWebhook(requestUrl: string): Promise<{ status: number; verified: boolean }> {
+    // Hit OUR OWN inbound route (not the provider) with the secret header + an empty body. A non-401
+    // means verification passed → the secret we'd register matches what the route checks.
+    const res = await this.fetchFn(requestUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-unipile-secret": this.webhookSecret },
+      body: "{}",
+    });
+    return { status: res.status, verified: res.status !== 401 };
+  }
+
   /** Create one provider webhook with our shared-secret header; tolerant of both header encodings. */
   private async createWebhook(source: string, requestUrl: string): Promise<{ source: string; ok: boolean; detail: string }> {
     const base = { source, request_url: requestUrl, name: `vantera-linkedin-${source}` };

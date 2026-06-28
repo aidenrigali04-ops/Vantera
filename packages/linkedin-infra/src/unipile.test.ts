@@ -603,4 +603,28 @@ describe("UnipileLinkedInInfra", () => {
       expect(result.created.every((c) => c.ok)).toBe(true);
     });
   });
+
+  describe("probeWebhook", () => {
+    it("POSTs an empty event to OUR route with the secret header; non-401 ⇒ verified", async () => {
+      let captured: { url?: string; init?: RequestInit } = {};
+      const fetchFn = (async (url: string, init?: RequestInit) => {
+        captured = { url, init };
+        return { status: 200, ok: true, json: async () => ({}), text: async () => "ignored" };
+      }) as unknown as typeof fetch;
+      const adapter = new UnipileLinkedInInfra({ apiKey: "k", dsn: "api.unipile.example.com:13000", webhookSecret: "whsec_li", fetchFn });
+
+      const r = await adapter.probeWebhook("https://app.test/api/webhooks/linkedin");
+      expect(r).toEqual({ status: 200, verified: true });
+      expect(captured.url).toBe("https://app.test/api/webhooks/linkedin");
+      expect(captured.init?.method).toBe("POST");
+      expect((captured.init?.headers as Record<string, string>)["x-unipile-secret"]).toBe("whsec_li");
+      expect(captured.init?.body).toBe("{}");
+    });
+
+    it("reports verified:false on a 401 (secret mismatch)", async () => {
+      const fetchFn = (async () => ({ status: 401, ok: false, json: async () => ({}), text: async () => "invalid signature" })) as unknown as typeof fetch;
+      const adapter = new UnipileLinkedInInfra({ apiKey: "k", dsn: "api.unipile.example.com:13000", webhookSecret: "x", fetchFn });
+      expect(await adapter.probeWebhook("https://app.test/api/webhooks/linkedin")).toEqual({ status: 401, verified: false });
+    });
+  });
 });
