@@ -227,6 +227,44 @@ describe("runOutreachSend — linkedin stages", () => {
     expect(deps.linkedinInfra.sentInvites).toHaveLength(0);
     expect(store.leadInvited).toHaveLength(0); // message, not invite
   });
+
+  it("linkedin invite: an 'already_invited_recently' response is treated as SENT, never failed", async () => {
+    // The connection request is already pending (a prior send whose bookkeeping we lost, or a
+    // duplicate). The invite IS out, so the lead must progress to the follow-up — never a red failure.
+    const store = new FakeOutreachStore();
+    store.ctx = makeCtx({ channel: "linkedin", linkedinStage: "invite" });
+    const deps = makeDeps(store);
+    deps.linkedinInfra.sendInvite = async () => {
+      throw new Error(
+        'linkedin provider error 422 on /api/v1/users/invite: {"status":422,"type":"errors/already_invited_recently","title":"Should delay new invitation to this recipient"}'
+      );
+    };
+
+    const outcome = await runOutreachSend({ sendId: "send1" }, deps);
+
+    expect(outcome).toBe("sent");
+    expect(store.failed).toHaveLength(0); // NOT a failure
+    expect(store.leadInvited).toHaveLength(1); // lead progresses to follow-up
+    expect(store.outreachRecords[0]?.channel).toBe("linkedin");
+    expect(store.outreachRecords[0]?.messageRef).toBeNull(); // original id was never captured
+    expect(store.campaignLeadStatuses.get("camp1:lead1")).toBe("sent");
+    expect(store.sent).toContain("send1");
+  });
+
+  it("linkedin invite: a genuine provider error (e.g. 403) still fails — guard not over-broadened", async () => {
+    const store = new FakeOutreachStore();
+    store.ctx = makeCtx({ channel: "linkedin", linkedinStage: "invite" });
+    const deps = makeDeps(store);
+    deps.linkedinInfra.sendInvite = async () => {
+      throw new Error("linkedin provider error 403 on /api/v1/users/invite: free account restriction");
+    };
+
+    const outcome = await runOutreachSend({ sendId: "send1" }, deps);
+
+    expect(outcome).toBe("failed");
+    expect(store.failed).toHaveLength(1);
+    expect(store.leadInvited).toHaveLength(0);
+  });
 });
 
 describe("runOutreachSend — failure and skip paths", () => {

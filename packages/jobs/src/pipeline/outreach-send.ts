@@ -22,6 +22,19 @@ export function sanitizeSendError(err: unknown): string {
 }
 
 /**
+ * Unipile 422 `errors/already_invited_recently`: a connection request to this person is already
+ * pending — either a prior send whose bookkeeping we lost, or a duplicate. The invite IS out, so
+ * this is NOT a failure: we treat it as a successful invite and let the lead progress to the
+ * follow-up, rather than showing a false red failure in the log. This is the belt-and-braces
+ * companion to the adapter's sent_at fix — both are ways a genuinely-sent invite used to be
+ * mislabeled failed.
+ */
+export function isAlreadyInvited(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err);
+  return message.includes("already_invited_recently");
+}
+
+/**
  * One live LinkedIn send. Re-checks suppression, kill switch, pause and identity health
  * immediately before the provider call (rule 11) — dispatch-time checks are not
  * trusted across the delay.
@@ -83,12 +96,19 @@ export async function runOutreachSend(
       });
       messageRef = r.id;
     } else {
-      const r = await deps.linkedinInfra.sendInvite({
-        connectedAccountId: identity.providerRef,
-        profileUrl: ctx.lead.linkedinUrl as string,
-        note: (ctx.body ?? "").slice(0, LINKEDIN_NOTE_MAX),
-      });
-      messageRef = r.id;
+      try {
+        const r = await deps.linkedinInfra.sendInvite({
+          connectedAccountId: identity.providerRef,
+          profileUrl: ctx.lead.linkedinUrl as string,
+          note: (ctx.body ?? "").slice(0, LINKEDIN_NOTE_MAX),
+        });
+        messageRef = r.id;
+      } catch (err) {
+        // "Already invited" isn't a failure — the request is already out. Fall through to the
+        // sent bookkeeping (messageRef stays null; we never captured the original id). Any other
+        // error rethrows to the outer catch and marks the row failed as before.
+        if (!isAlreadyInvited(err)) throw err;
+      }
       inviteSent = true;
     }
     providerResult = { linkedinAccountId: identity.id, messageRef, inviteSent };
