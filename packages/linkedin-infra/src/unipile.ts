@@ -282,7 +282,10 @@ export class UnipileLinkedInInfra implements LinkedInInfra {
         provider_id: providerId,
       }),
     });
-    return { id: requireString(data.invitation_id, "invitation_id"), sentAt: requireString(data.sent_at, "sent_at") };
+    // The invitation_id is proof the invite was sent; sent_at is informational and Unipile does not
+    // always echo it. Fall back to our own clock rather than throwing — otherwise a delivered invite
+    // gets caught downstream and marked failed (the "provider response missing sent_at" false-fail).
+    return { id: requireString(data.invitation_id, "invitation_id"), sentAt: str(data.sent_at) ?? new Date().toISOString() };
   }
 
   async sendMessage(req: MessageRequest): Promise<SendOutcome> {
@@ -298,7 +301,8 @@ export class UnipileLinkedInInfra implements LinkedInInfra {
         text: req.body,
       }),
     });
-    return { id: requireString(data.message_id, "message_id"), sentAt: requireString(data.sent_at, "sent_at") };
+    // Same as sendInvite: the message_id proves delivery; a missing sent_at must not throw.
+    return { id: requireString(data.message_id, "message_id"), sentAt: str(data.sent_at) ?? new Date().toISOString() };
   }
 
   /**

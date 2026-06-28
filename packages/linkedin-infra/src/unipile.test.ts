@@ -483,6 +483,33 @@ describe("UnipileLinkedInInfra", () => {
       await expect(adapter.sendMessage({ connectedAccountId: "c", profileUrl: "https://linkedin.com/in/ACoAA_x", body: "hi" }))
         .rejects.toThrow(/missing message_id/);
     });
+
+    // The invite/message is ALREADY sent once the provider returns its id — a missing sent_at
+    // (Unipile doesn't always echo it) must NOT throw, or a delivered send gets marked failed.
+    it("sendInvite does not throw when the provider omits sent_at (invite was sent)", async () => {
+      const adapter = new UnipileLinkedInInfra({
+        apiKey: "key_test",
+        dsn: "api.unipile.example.com:13000",
+        webhookSecret: "whsec_li",
+        fetchFn: fetchMock({ "/api/v1/users/invite": { invitation_id: "inv_ok" } }),
+      });
+      const result = await adapter.sendInvite({ connectedAccountId: "c", profileUrl: "https://linkedin.com/in/ACoAA_x" });
+      expect(result.id).toBe("inv_ok");
+      expect(() => new Date(result.sentAt).toISOString()).not.toThrow();
+      expect(Number.isNaN(Date.parse(result.sentAt))).toBe(false);
+    });
+
+    it("sendMessage does not throw when the provider omits sent_at (message was sent)", async () => {
+      const adapter = new UnipileLinkedInInfra({
+        apiKey: "key_test",
+        dsn: "api.unipile.example.com:13000",
+        webhookSecret: "whsec_li",
+        fetchFn: fetchMock({ "/api/v1/chats": { message_id: "msg_ok" } }),
+      });
+      const result = await adapter.sendMessage({ connectedAccountId: "c", profileUrl: "https://linkedin.com/in/ACoAA_x", body: "hi" });
+      expect(result.id).toBe("msg_ok");
+      expect(Number.isNaN(Date.parse(result.sentAt))).toBe(false);
+    });
   });
 
   describe("reads (Intent Agent) — real Unipile shapes", () => {
