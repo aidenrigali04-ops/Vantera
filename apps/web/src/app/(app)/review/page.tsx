@@ -1,12 +1,17 @@
 import Link from "next/link";
-import { Inbox, MessageSquare } from "lucide-react";
+import { Inbox } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { Badge } from "@/components/ui/badge";
 import { Panel, Eyebrow } from "@/components/ui/panel";
-import { LeadProfileLink, type LeadProfile } from "@/components/lead-profile";
+import { type LeadProfile } from "@/components/lead-profile";
 import { LEAD_PROFILE_FIELDS } from "@/components/lead-profile-fields";
 import { type DraftRow } from "./draft-card";
 import { ProspectReviewCard, type ProspectGroup } from "./prospect-review-card";
+import {
+  ProcessedConversation,
+  type ProcessedConversationGroup,
+  type ProcessedSend,
+  type ConversationReply,
+} from "./processed-conversation";
 
 /** Group queue drafts by prospect, preserving the rows' (created_at) order. */
 function groupByProspect(rows: DraftRow[]): ProspectGroup[] {
@@ -25,6 +30,41 @@ function groupByProspect(rows: DraftRow[]): ProspectGroup[] {
   return groups;
 }
 
+/**
+ * Group processed sends by prospect (first-seen order = most recent activity first), then
+ * attach each prospect's replies. The Processed tab thereby reads as a conversation log:
+ * always-approve users never see drafts in the Queue, so this is the only surface where they
+ * can read the actual copy the agent sent on their behalf — and the prospect's responses.
+ */
+function groupProcessed(rows: ProcessedSendRow[], repliesByLead: Map<string, ConversationReply[]>) {
+  const groups: ProcessedConversationGroup[] = [];
+  const index = new Map<string, number>();
+  for (const r of rows) {
+    const leadId = r.leads?.id ?? null;
+    const key = leadId ?? `none-${r.id}`;
+    const send: ProcessedSend = {
+      id: r.id,
+      body: r.body,
+      status: r.status,
+      error: r.error,
+      linkedin_stage: r.linkedin_stage,
+      created_at: r.created_at,
+    };
+    const at = index.get(key);
+    if (at === undefined) {
+      index.set(key, groups.length);
+      groups.push({
+        lead: r.leads,
+        sends: [send],
+        replies: leadId ? repliesByLead.get(leadId) ?? [] : [],
+      });
+    } else {
+      groups[at]!.sends.push(send);
+    }
+  }
+  return groups;
+}
+
 const VIEWS = ["queue", "processed"] as const;
 
 // post-approve lifecycle statuses (rule 08): everything past the review gate
@@ -38,23 +78,14 @@ const PROCESSED_STATUSES = [
   "suppressed",
 ] as const;
 
-const STATUS_LABELS: Record<string, string> = {
-  approved: "Approved",
-  scheduled: "Scheduled",
-  sending: "Sending",
-  sent: "Sent",
-  failed: "Failed",
-  canceled: "Canceled",
-  suppressed: "Suppressed",
-};
-
-type ProcessedRow = {
+type ProcessedSendRow = {
   id: string;
   channel: "linkedin";
-  subject: string | null;
+  body: string | null;
   status: string;
   error: string | null;
   linkedin_stage: "invite" | "message" | null;
+  created_at: string;
   leads: LeadProfile | null;
 };
 
@@ -83,6 +114,35 @@ export default async function ReviewPage({
   const { data: rows, count } = await query;
 
   const groups = view === "queue" ? groupByProspect((rows ?? []) as unknown as DraftRow[]) : [];
+
+  // Processed tab: pull the prospects' replies (RLS-scoped) so the log reads as a real
+  // conversation — the agent's copy and the prospect's responses, not just statuses.
+  let processedGroups: ProcessedConversationGroup[] = [];
+  if (view === "processed" && rows && rows.length > 0) {
+    const processedRows = rows as unknown as ProcessedSendRow[];
+    const leadIds = Array.from(
+      new Set(processedRows.map((r) => r.leads?.id).filter((id): id is string => Boolean(id)))
+    );
+    const repliesByLead = new Map<string, ConversationReply[]>();
+    if (leadIds.length > 0) {
+      const { data: replyRows } = await supabase
+        .from("replies")
+        .select("id, body, classification, received_at, lead_id")
+        .in("lead_id", leadIds)
+        .order("received_at", { ascending: true });
+      for (const reply of (replyRows ?? []) as Array<ConversationReply & { lead_id: string }>) {
+        const list = repliesByLead.get(reply.lead_id) ?? [];
+        list.push({
+          id: reply.id,
+          body: reply.body,
+          classification: reply.classification,
+          received_at: reply.received_at,
+        });
+        repliesByLead.set(reply.lead_id, list);
+      }
+    }
+    processedGroups = groupProcessed(processedRows, repliesByLead);
+  }
 
   const withChannel = (params: Record<string, string>) => {
     const sp = new URLSearchParams(params);
@@ -149,39 +209,14 @@ export default async function ReviewPage({
           ))}
         </div>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-border">
-          {(rows as unknown as ProcessedRow[]).map((r) => {
-            const name =
-              [r.leads?.first_name, r.leads?.last_name].filter(Boolean).join(" ") ||
-              "Unknown prospect";
-            const failed = r.status === "failed";
-            return (
-              <div key={r.id} className="flex items-start gap-3 border-b border-border px-4 py-3 last:border-b-0">
-                <MessageSquare className="mt-0.5 size-4 text-muted-foreground" />
-                <div className="min-w-0 flex-1">
-                  <LeadProfileLink
-                    lead={r.leads}
-                    className="block max-w-full truncate text-left text-sm font-medium hover:underline"
-                  >
-                    {name}
-                    {r.leads?.company_name ? ` · ${r.leads.company_name}` : ""}
-                  </LeadProfileLink>
-                  {r.subject && <p className="truncate text-xs text-muted-foreground">{r.subject}</p>}
-                  {failed && r.error && (
-                    <p className="mt-1 text-xs text-destructive">{r.error}</p>
-                  )}
-                </div>
-                {r.linkedin_stage && (
-                  <Badge variant="secondary">
-                    {r.linkedin_stage === "invite" ? "Invite" : "Follow-up"}
-                  </Badge>
-                )}
-                <Badge variant={failed ? "destructive" : r.status === "sent" ? "default" : "secondary"}>
-                  {STATUS_LABELS[r.status] ?? r.status}
-                </Badge>
-              </div>
-            );
-          })}
+        <div className="space-y-3">
+          {processedGroups.map((g, i) => (
+            <ProcessedConversation
+              key={g.lead?.id ?? g.sends[0]!.id}
+              group={g}
+              defaultOpen={processedGroups.length === 1 || i === 0}
+            />
+          ))}
         </div>
       )}
     </div>
