@@ -43,6 +43,10 @@ export const accounts = pgTable("accounts", {
   // 0001: onboarding capture + billing refs + per-account kill switch
   onboardingIndustry: text("onboarding_industry"),
   onboardingIcp: text("onboarding_icp"),
+  // 0038: the user's role (Founder / Sales / Marketing / …) + their own LinkedIn URL captured on
+  // the personalize step — personalize how the agent represents them. Null pre-0038.
+  onboardingRole: text("onboarding_role"),
+  onboardingLinkedinUrl: text("onboarding_linkedin_url"),
   revenueGoalCents: bigint("revenue_goal_cents", { mode: "number" }),
   // 0012: estimated monthly recurring value per closed client — powers the dashboard
   // revenue snapshot (closed + expected MRR vs. the goal). Null until set in Settings.

@@ -92,6 +92,69 @@ export function validateOnboarding(input: {
   };
 }
 
+/** Blank means "not provided"; otherwise require a linkedin.com URL, defaulting the scheme to https. */
+export function normalizeLinkedinUrl(input: string): { ok: true; url: string | null } | Invalid {
+  const trimmed = input.trim();
+  if (!trimmed) return { ok: true, url: null };
+  const candidate = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  try {
+    const parsed = new URL(candidate);
+    if (
+      (parsed.protocol === "http:" || parsed.protocol === "https:") &&
+      /(^|\.)linkedin\.com$/i.test(parsed.hostname)
+    ) {
+      return { ok: true, url: candidate };
+    }
+  } catch {
+    // fall through
+  }
+  return { ok: false, error: "Enter a valid LinkedIn URL (linkedin.com/in/…), or leave it blank." };
+}
+
+/**
+ * Step 1 "Personalize": identity only — what we can't derive. Industry/ICP/goals are derived from
+ * the website/LinkedIn pull and confirmed later, so they're NOT collected here (B=MAP: cut fields).
+ */
+export function validatePersonalize(input: {
+  companyName: string;
+  role: string;
+  websiteUrl: string;
+  linkedinUrl: string;
+}):
+  | Valid<{ companyName: string; role: string; websiteUrl: string | null; linkedinUrl: string | null }>
+  | Invalid {
+  const companyName = input.companyName.trim();
+  if (!companyName) return { ok: false, error: "Enter your company name." };
+  const role = input.role.trim();
+  if (!role) return { ok: false, error: "Select your role." };
+  const website = normalizeWebsiteUrl(input.websiteUrl);
+  if (!website.ok) return website;
+  const linkedin = normalizeLinkedinUrl(input.linkedinUrl);
+  if (!linkedin.ok) return linkedin;
+  return { ok: true, values: { companyName, role, websiteUrl: website.url, linkedinUrl: linkedin.url } };
+}
+
+/**
+ * Step 3 "Confirmation": the derived targeting + goal, confirmed/edited by the user. Same fields the
+ * Scout (targeting) and dashboard (dollar tracking) depend on — required before "Find my first leads".
+ */
+export function validateConfirmation(input: {
+  industry: string;
+  icp: string;
+  revenueGoal: string;
+  avgDealValue: string;
+}):
+  | Valid<{ industry: string; icp: string; revenueGoalCents: number; avgDealValueCents: number }>
+  | Invalid {
+  const targeting = validateTargeting(input);
+  if (!targeting.ok) return targeting;
+  const avgDealValueCents = dollarsToCents(input.avgDealValue);
+  if (avgDealValueCents === null) {
+    return { ok: false, error: "Enter your average deal value (what one new client is worth)." };
+  }
+  return { ok: true, values: { ...targeting.values, avgDealValueCents } };
+}
+
 export function validateSignup(input: {
   email: string;
   password: string;

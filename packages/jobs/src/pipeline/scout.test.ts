@@ -134,10 +134,12 @@ function makeDeps(
     prospectData,
     companySignals: opts.companySignals,
     scanFn: async () => ({
+      headline: "You sell SDR agents to B2B sales teams.",
       summary: "sells SDR agents",
       offerings: ["agents"],
       value_props: ["meetings"],
       scope_of_industry: "b2b sales",
+      suggested_icp: "VP of Sales at B2B companies",
     }),
     rankFn: async (candidates) => {
       ranked.push(candidates.map((c) => c.leadId));

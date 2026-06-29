@@ -3,21 +3,146 @@
 import { redirect } from "next/navigation";
 import { scanWebsite, deriveIntentWatchlist, type WebsiteScan } from "@vantera/agent-brains";
 import { createClient } from "@/lib/supabase/server";
-import { validateOnboarding } from "@/lib/validation";
-import { loadBillingRow, hasActivePlan } from "@/lib/billing/entitlement";
-
-export type OnboardingState = { error?: string; done?: boolean; scan?: WebsiteScan };
+import { validatePersonalize, validateConfirmation } from "@/lib/validation";
+import { loadBillingRow, hasActivePlan, gate } from "@/lib/billing/entitlement";
+import { createLinkedInInfraFromEnv } from "@vantera/linkedin-infra";
+import { reconcileLinkedInAccounts } from "@/lib/linkedin/sync";
 
 /** Default outreach CTA — sensible out of the box, refined later in Settings → Sharpen your results. */
 const DEFAULT_CTA = "a quick intro call to see if it's a fit";
 
-export async function completeOnboarding(
-  _prev: OnboardingState,
+export type PersonalizeState = { error?: string; saved?: boolean; scanned?: boolean };
+export type FindLeadsState = { error?: string };
+
+async function currentAccountId(): Promise<{ id: string } | "no-user"> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return "no-user";
+  const { data: account } = await supabase
+    .from("accounts")
+    .select("id")
+    .limit(1)
+    .maybeSingle<{ id: string }>();
+  return account ?? { id: "" };
+}
+
+// ── Step 1: Personalize ───────────────────────────────────────────────────────
+/**
+ * Save the only things we can't derive (company, role, the seller's URLs), then scan the website so
+ * the Confirmation step is instant on return from the LinkedIn connect redirect. Industry/ICP/goals
+ * are NOT collected here — they're derived from the scan and confirmed in step 3 (B=MAP: cut fields).
+ * Saving before the redirect is what lets the wizard resume at Confirmation when the user comes back.
+ */
+export async function savePersonalize(
+  _prev: PersonalizeState,
   formData: FormData
-): Promise<OnboardingState> {
-  const result = validateOnboarding({
+): Promise<PersonalizeState> {
+  const result = validatePersonalize({
     companyName: String(formData.get("companyName") ?? ""),
+    role: String(formData.get("role") ?? ""),
     websiteUrl: String(formData.get("websiteUrl") ?? ""),
+    linkedinUrl: String(formData.get("linkedinUrl") ?? ""),
+  });
+  if (!result.ok) return { error: result.error };
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  // first save creates the workspace under the company name
+  let { data: account } = await supabase.from("accounts").select("id").limit(1).maybeSingle();
+  if (!account) {
+    const { data: accountId, error: rpcError } = await supabase.rpc("create_account", {
+      account_name: result.values.companyName,
+    });
+    if (rpcError || !accountId) return { error: "Could not create your workspace. Please try again." };
+    account = { id: accountId as string };
+  }
+
+  const { error } = await supabase
+    .from("accounts")
+    .update({
+      name: result.values.companyName,
+      onboarding_role: result.values.role,
+      website_url: result.values.websiteUrl,
+      onboarding_linkedin_url: result.values.linkedinUrl,
+    })
+    .eq("id", account.id);
+  if (error) return { error: "Could not save your answers. Please try again." };
+
+  // Scan the site now so the derived Confirmation is ready when they return from connecting.
+  // A broken/missing site never blocks onboarding — the next Scout run retries the scan.
+  if (result.values.websiteUrl) {
+    try {
+      const scan = await scanWebsite(result.values.websiteUrl);
+      await supabase
+        .from("accounts")
+        .update({ website_scan: { ...scan, url: result.values.websiteUrl }, website_scanned_at: new Date().toISOString() })
+        .eq("id", account.id);
+      return { saved: true, scanned: true };
+    } catch (err) {
+      console.error("onboarding website scan failed", err);
+      return { saved: true, scanned: false };
+    }
+  }
+  return { saved: true, scanned: false };
+}
+
+// ── Step 2: Connect LinkedIn (hosted-auth redirect back to /onboarding) ─────────
+/** Hosted-auth link whose return URLs land back on /onboarding so the wizard resumes at Confirmation. */
+export async function createOnboardingConnectLink(): Promise<{ url?: string; error?: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Your session expired. Sign in again." };
+
+  const { data: account } = await supabase
+    .from("accounts")
+    .select("id")
+    .limit(1)
+    .maybeSingle<{ id: string }>();
+  if (!account) return { error: "Finish the first step, then connect." };
+
+  const { count: liCount } = await supabase
+    .from("linkedin_accounts")
+    .select("id", { count: "exact", head: true });
+  const billingRow = await loadBillingRow(supabase);
+  if (!billingRow) return { error: "Start your trial in Billing first, then connect." };
+  const planGate = gate(billingRow, "linkedinAccount", liCount ?? 0);
+  if (!planGate.ok) return { error: planGate.error };
+
+  try {
+    // Force https — a 308 http→https redirect is fine for the GET return, but we register the
+    // canonical https URL to avoid any ambiguity (mirrors the webhook URL fix).
+    const base = (process.env.APP_URL ?? "http://localhost:3000").replace(/\/+$/, "").replace(/^http:\/\//i, "https://");
+    const { url } = await createLinkedInInfraFromEnv().createHostedAuthLink(account.id, {
+      success: `${base}/onboarding?connected=1`,
+      failure: `${base}/onboarding?connected=failed`,
+    });
+    return { url };
+  } catch (err) {
+    console.error("createOnboardingConnectLink failed:", err);
+    return { error: "Could not generate a connection link. Try again shortly." };
+  }
+}
+
+// ── Step 4: Find my first leads (save confirmed targeting + provision live system) ──
+/**
+ * Save the confirmed targeting + goal, then auto-provision the live system (Scout from the ICP,
+ * Outreach with a default CTA, Intent with an auto-derived watchlist) and land on the dashboard,
+ * where the "finding your first prospects" signal takes over. Gated on email-confirmed + active
+ * plan/trial (consent + trial-abuse moment, rule 08). Idempotent: re-run once live → dashboard.
+ */
+export async function findFirstLeads(
+  _prev: FindLeadsState,
+  formData: FormData
+): Promise<FindLeadsState> {
+  const result = validateConfirmation({
     industry: String(formData.get("industry") ?? ""),
     icp: String(formData.get("icp") ?? ""),
     revenueGoal: String(formData.get("revenueGoal") ?? ""),
@@ -30,24 +155,23 @@ export async function completeOnboarding(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
-
-  // first completion creates the workspace under the company name from the wizard
-  let { data: account } = await supabase.from("accounts").select("id").limit(1).maybeSingle();
-  if (!account) {
-    const { data: accountId, error: rpcError } = await supabase.rpc("create_account", {
-      account_name: result.values.companyName,
-    });
-    if (rpcError || !accountId) {
-      return { error: "Could not create your workspace. Please try again." };
-    }
-    account = { id: accountId as string };
+  if (!user.email_confirmed_at) {
+    return { error: "Confirm your email to start — check your inbox for the verification link." };
   }
 
-  const { error } = await supabase
+  const { data: account } = await supabase
+    .from("accounts")
+    .select("id, website_scan")
+    .limit(1)
+    .maybeSingle<{ id: string; website_scan: WebsiteScan | null }>();
+  if (!account) return { error: "Start over — your workspace wasn't found." };
+
+  const billingRow = await loadBillingRow(supabase);
+  if (!hasActivePlan(billingRow)) redirect("/settings/billing?reason=deploy");
+
+  const { error: saveErr } = await supabase
     .from("accounts")
     .update({
-      name: result.values.companyName,
-      website_url: result.values.websiteUrl,
       onboarding_industry: result.values.industry,
       onboarding_icp: result.values.icp,
       revenue_goal_cents: result.values.revenueGoalCents,
@@ -55,75 +179,9 @@ export async function completeOnboarding(
       onboarding_completed_at: new Date().toISOString(),
     })
     .eq("id", account.id);
-  if (error) return { error: "Could not save your answers. Please try again." };
+  if (saveErr) return { error: "Could not save your targeting. Please try again." };
 
-  // learn the seller's offerings from their website so the Scout agent targets the
-  // right leads; the result is shown to the user and cached on the account (the
-  // pipeline's 30-day staleness check picks it up from here). When a website was
-  // given, the summary screen is the onboarding payoff, so we ALWAYS present it:
-  // a successful scan shows what we learned, a failed scan still confirms setup and
-  // hands the retry to the next Scout run. A broken/missing website never blocks
-  // onboarding. A blank website has nothing to summarize → straight to dashboard.
-  if (result.values.websiteUrl) {
-    try {
-      const scan = await scanWebsite(result.values.websiteUrl);
-      const { error: scanError } = await supabase
-        .from("accounts")
-        .update({
-          website_scan: { ...scan, url: result.values.websiteUrl },
-          website_scanned_at: new Date().toISOString(),
-        })
-        .eq("id", account.id);
-      // even if caching the scan failed, the user still earned their summary; the
-      // Scout run re-persists it via the staleness check.
-      if (scanError) console.error("onboarding website scan cache write failed", scanError);
-      return { done: true, scan };
-    } catch (err) {
-      // the scan itself failed (unreachable site, model error) — confirm setup
-      // anyway and let the next Scout run retry the scan.
-      console.error("onboarding website scan failed", err);
-      return { done: true };
-    }
-  }
-
-  redirect("/dashboard");
-}
-
-/**
- * Go live: the whole setup collapsed into one action. From the onboarding answers we already hold,
- * auto-provision the system live — Prospect (Scout) from the ICP, Outreach with a sensible default
- * CTA, and Intent with an auto-derived watchlist — no wizards, no per-agent deploys. Gated on
- * email-confirmed + active plan/trial (the consent + trial-abuse moment, rule 08). Idempotent: a
- * re-run once the system is live just lands on the dashboard. Intent is best-effort — a hiccup
- * deriving its watchlist never blocks going live.
- */
-export async function goLive(_prev: OnboardingState, _formData: FormData): Promise<OnboardingState> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-  if (!user.email_confirmed_at) {
-    return { error: "Confirm your email to go live — check your inbox for the verification link." };
-  }
-
-  const { data: account } = await supabase
-    .from("accounts")
-    .select("id, onboarding_icp, onboarding_industry, website_scan")
-    .limit(1)
-    .maybeSingle<{
-      id: string;
-      onboarding_icp: string | null;
-      onboarding_industry: string | null;
-      website_scan: { summary?: string; offerings?: string[]; value_props?: string[] } | null;
-    }>();
-  if (!account) return { error: "Finish onboarding first." };
-
-  // active plan / trial required to spend (rule 08) — fresh workspaces start on a trial
-  const billingRow = await loadBillingRow(supabase);
-  if (!hasActivePlan(billingRow)) redirect("/settings/billing?reason=deploy");
-
-  // idempotent: already live → straight to the dashboard
+  // idempotent: already provisioned → straight to the dashboard
   const { data: existingScout } = await supabase
     .from("agents")
     .select("id")
@@ -133,15 +191,11 @@ export async function goLive(_prev: OnboardingState, _formData: FormData): Promi
     .maybeSingle<{ id: string }>();
   if (existingScout) redirect("/dashboard");
 
-  const icpName = account.onboarding_icp?.trim();
-  if (!icpName) {
-    return { error: "Add your target audience in Settings, then go live." };
-  }
-
-  // ── Prospect (Scout) — sources + qualifies against the onboarding ICP ──
+  // ── Prospect (Scout) — sources + qualifies against the confirmed ICP. next_run_at left null
+  //    so the scheduler treats it as DUE and the first pull starts on the next tick (~15 min). ──
   const { data: icp } = await supabase
     .from("icps")
-    .insert({ account_id: account.id, name: icpName, criteria: {}, source: "onboarding" })
+    .insert({ account_id: account.id, name: result.values.icp, criteria: {}, source: "onboarding" })
     .select("id")
     .single<{ id: string }>();
   if (!icp) return { error: "Could not set up your system. Only workspace admins can do this." };
@@ -162,12 +216,10 @@ export async function goLive(_prev: OnboardingState, _formData: FormData): Promi
     })
     .select("id")
     .single<{ id: string }>();
-  if (scoutErr || !scout) {
-    return { error: "Could not go live. Only workspace admins can do this." };
-  }
+  if (scoutErr || !scout) return { error: "Could not start. Only workspace admins can do this." };
   await supabase.from("agent_icps").insert({ agent_id: scout.id, icp_id: icp.id, account_id: account.id, position: 0 });
 
-  // ── Outreach (Copy) — drafts on a default CTA into the review queue (refine it in Settings) ──
+  // ── Outreach (Copy) — drafts on a default CTA into the review queue (refine in Settings) ──
   const { data: campaign } = await supabase
     .from("campaigns")
     .insert({
@@ -175,7 +227,7 @@ export async function goLive(_prev: OnboardingState, _formData: FormData): Promi
       name: "Outreach (agent)",
       status: "active",
       channels: ["linkedin"],
-      targeting: [{ type: "icp", value: icpName }],
+      targeting: [{ type: "icp", value: result.values.icp }],
       copywriting_mode: "agent",
       send_mode: "review",
       created_by: user.id,
@@ -195,7 +247,7 @@ export async function goLive(_prev: OnboardingState, _formData: FormData): Promi
     });
   }
 
-  // ── Intent (best-effort) — auto-derived watchlist; no URL hunting, never blocks go-live ──
+  // ── Intent (best-effort) — auto-derived watchlist; never blocks the first pull ──
   try {
     const scan = account.website_scan;
     const offering = scan
@@ -208,9 +260,9 @@ export async function goLive(_prev: OnboardingState, _formData: FormData): Promi
           .join(". ")
       : "";
     const watch = await deriveIntentWatchlist({
-      industry: account.onboarding_industry,
-      offering: offering || icpName,
-      icp: icpName,
+      industry: result.values.industry,
+      offering: offering || result.values.icp,
+      icp: result.values.icp,
     });
     if (watch.keywords.length || watch.competitors.length || watch.hashtags.length) {
       await supabase.from("agents").insert({
@@ -236,8 +288,26 @@ export async function goLive(_prev: OnboardingState, _formData: FormData): Promi
       });
     }
   } catch (err) {
-    console.error("go-live: intent provisioning failed (non-blocking)", err);
+    console.error("find-first-leads: intent provisioning failed (non-blocking)", err);
   }
 
   redirect("/dashboard");
+}
+
+/** Backstop a lagging hosted-auth status webhook so a just-connected account shows connected. */
+export async function syncOnboardingConnection(): Promise<{ connected: boolean }> {
+  const acct = await currentAccountId();
+  if (acct === "no-user" || !acct.id) return { connected: false };
+  try {
+    await reconcileLinkedInAccounts(acct.id);
+  } catch (err) {
+    console.error("syncOnboardingConnection failed:", err);
+  }
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("linkedin_accounts")
+    .select("status")
+    .limit(1)
+    .maybeSingle<{ status: string }>();
+  return { connected: data?.status === "active" };
 }

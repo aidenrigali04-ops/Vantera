@@ -1,109 +1,45 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useState, useTransition } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, ChevronRight, Check, Loader2 } from "lucide-react";
-import { completeOnboarding, goLive, type OnboardingState } from "./actions";
+import { ChevronLeft, ChevronRight, Check, Loader2, Link2, Sparkles, Search } from "lucide-react";
+import {
+  savePersonalize,
+  createOnboardingConnectLink,
+  findFirstLeads,
+  type PersonalizeState,
+  type FindLeadsState,
+} from "./actions";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FormError } from "@/components/form-error";
 import { cn } from "@/lib/utils";
 
-type FieldKey = "companyName" | "websiteUrl" | "industry" | "icp" | "revenueGoal" | "avgDealValue";
-
-type Field = {
-  key: FieldKey;
-  label: string;
-  placeholder: string;
-  hint: string;
-  required: boolean;
+export type WizardInit = {
+  initialStep: number; // 0 personalize · 1 connect · 2 confirmation
+  connected: boolean;
+  connectFailed: boolean;
+  scan: { headline: string; summary: string } | null;
+  values: {
+    companyName: string;
+    role: string;
+    websiteUrl: string;
+    linkedinUrl: string;
+    industry: string;
+    icp: string;
+    revenueGoal: string;
+    avgDealValue: string;
+  };
 };
 
-const STEPS: { label: string; title: string; description: string; fields: Field[] }[] = [
-  {
-    label: "Company",
-    title: "Tell us about your company",
-    description: "Let's start with the basics about your business.",
-    fields: [
-      {
-        key: "companyName",
-        label: "Company name",
-        placeholder: "e.g. Acme Inc",
-        hint: "This names your workspace.",
-        required: true,
-      },
-      {
-        key: "websiteUrl",
-        label: "Website URL",
-        placeholder: "e.g. acme.com",
-        hint: "Leave blank if you don't have one. We scan it to learn your offerings so your agent finds the right leads.",
-        required: false,
-      },
-    ],
-  },
-  {
-    label: "Industry",
-    title: "What industry are you in?",
-    description: "Your agent tailors prospecting to your space.",
-    fields: [
-      {
-        key: "industry",
-        label: "Industry",
-        placeholder: "e.g. B2B SaaS, logistics, fintech",
-        hint: "Your agent tailors prospecting to your space.",
-        required: true,
-      },
-    ],
-  },
-  {
-    label: "Audience",
-    title: "Who is your target audience?",
-    description: "This becomes your default campaign targeting.",
-    fields: [
-      {
-        key: "icp",
-        label: "Target audience",
-        placeholder: "e.g. VP of Operations at mid-market logistics companies",
-        hint: "This becomes your default campaign targeting.",
-        required: true,
-      },
-    ],
-  },
-  {
-    label: "Goals",
-    title: "Set your revenue targets",
-    description: "We turn every lead into progress toward this — in dollars, not just counts.",
-    fields: [
-      {
-        key: "revenueGoal",
-        label: "Monthly revenue goal",
-        placeholder: "e.g. 25,000",
-        hint: "Your pipeline and results are tracked against this each month.",
-        required: true,
-      },
-      {
-        key: "avgDealValue",
-        label: "Average deal value",
-        placeholder: "e.g. 5,000",
-        hint: "What one new client is worth — this turns every qualified lead into a dollar figure.",
-        required: true,
-      },
-    ],
-  },
-];
-
-const ALL_FIELDS = STEPS.flatMap((s) => s.fields);
-const TOTAL_SEGMENTS = STEPS.length + 1; // 1 endowed segment (account created) + wizard steps
+const ROLES = ["Founder / CEO", "Sales", "Marketing", "RevOps", "Agency / Consultant", "Other"];
+const STEP_LABELS = ["Personalize", "Connect", "Confirm"];
+const TOTAL_SEGMENTS = STEP_LABELS.length + 1; // + endowed "account created"
 
 const FIELD =
   "h-11 w-full rounded-xl border border-[rgba(12,16,26,0.12)] bg-white px-4 text-[15px] text-foreground " +
   "placeholder:text-[var(--ink-4)] transition-colors " +
   "focus-visible:border-[var(--cyan-strong)] focus-visible:ring-2 focus-visible:ring-[rgba(48,207,255,0.2)]";
-
-const fadeInUp = {
-  hidden: { opacity: 0, y: 18 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.3 } },
-};
 
 const contentVariants = {
   hidden: { opacity: 0, x: 40 },
@@ -121,150 +57,58 @@ function Glow() {
   );
 }
 
-export function Wizard({ defaultCompanyName = "" }: { defaultCompanyName?: string }) {
-  const [step, setStep] = useState(0);
-  const [values, setValues] = useState<Record<FieldKey, string>>({
-    companyName: defaultCompanyName,
-    websiteUrl: "",
-    industry: "",
-    icp: "",
-    revenueGoal: "",
-    avgDealValue: "",
-  });
-  const [state, action, pending] = useActionState<OnboardingState, FormData>(completeOnboarding, {});
-  const [goLiveState, goLiveAction, goingLive] = useActionState<OnboardingState, FormData>(goLive, {});
+const DARK_BTN =
+  "inline-flex items-center justify-center gap-2 rounded-full bg-[#0a0c12] px-6 py-3 text-[15px] font-medium text-white transition-all hover:-translate-y-0.5 hover:shadow-[0_10px_30px_-8px_rgba(48,207,255,0.55)] disabled:opacity-60 disabled:hover:translate-y-0";
 
-  if (state.done) {
-    const company = values.companyName.trim();
-    const website = values.websiteUrl.trim();
-    return (
-      <motion.div
-        className="relative mx-auto max-w-lg"
-        initial={{ opacity: 0, y: 18 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-      >
-        <Glow />
-        <div className="overflow-hidden rounded-3xl border border-[var(--hairline)] bg-white p-8 shadow-[var(--shadow-lift)]">
-          <motion.div
-            className="mb-4 grid size-11 place-items-center rounded-xl bg-[var(--cyan-tint)] text-[var(--cyan-strong)] ring-1 ring-inset ring-[rgba(48,207,255,0.22)]"
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ type: "spring", stiffness: 260, damping: 18, delay: 0.15 }}
-          >
-            <Check className="size-5" strokeWidth={2.2} />
-          </motion.div>
-          <h2 className="text-[20px] font-semibold tracking-[-0.02em] text-foreground">
-            {state.scan ? `Here's what we learned about ${company}` : "You're all set"}
-          </h2>
+export function Wizard({ init }: { init: WizardInit }) {
+  const [step, setStep] = useState(init.initialStep);
+  const [values, setValues] = useState(init.values);
 
-          <div className="mt-5 flex flex-col gap-5">
-            {state.scan ? (
-              <>
-                <p className="text-[14px] leading-relaxed text-[var(--ink-2)]">{state.scan.summary}</p>
-                {state.scan.offerings.length > 0 && (
-                  <div className="space-y-2">
-                    <p className="text-[13px] font-semibold text-foreground">What you offer</p>
-                    <ul className="list-disc space-y-1 pl-5 text-[13.5px] text-[var(--ink-3)]">
-                      {state.scan.offerings.map((item) => (
-                        <li key={item}>{item}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                {state.scan.value_props.length > 0 && (
-                  <div className="space-y-2">
-                    <p className="text-[13px] font-semibold text-foreground">The outcomes you promise</p>
-                    <ul className="list-disc space-y-1 pl-5 text-[13.5px] text-[var(--ink-3)]">
-                      {state.scan.value_props.map((item) => (
-                        <li key={item}>{item}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                <p className="text-[12px] text-[var(--ink-4)]">
-                  Saved to your workspace — your Prospect Agent uses this to find leads that fit. You
-                  can update your website any time in Settings.
-                </p>
-              </>
-            ) : (
-              <>
-                <p className="text-[14px] leading-relaxed text-[var(--ink-2)]">
-                  Your workspace is ready. We couldn&apos;t read {website || "your website"} just now,
-                  so your Prospect Agent will scan it on its first run to learn your offerings —
-                  nothing for you to do.
-                </p>
-                <p className="text-[12px] text-[var(--ink-4)]">
-                  You can update your website any time in Settings.
-                </p>
-              </>
-            )}
+  const [findState, findAction, finding] = useActionState<FindLeadsState, FormData>(findFirstLeads, {});
+  const [connecting, startConnect] = useTransition();
+  const [connectError, setConnectError] = useState(init.connectFailed ? "LinkedIn didn't connect — try again." : "");
+  // Personalize uses a transition (not useActionState) so we can advance to Connect inside the
+  // event callback on success — the scan ran server-side and is ready for Confirmation.
+  const [savingPersonalize, startSaving] = useTransition();
+  const [personalizeError, setPersonalizeError] = useState("");
 
-            <div className="rounded-xl border border-[var(--hairline)] bg-[var(--tint)] p-4 text-[12.5px] leading-relaxed text-[var(--ink-3)]">
-              Your agent works quality over volume — fewer, better-fit messages, not a blast. A handful
-              of strong replies beats a flood of ignored ones, and Analytics shows your rates against
-              what&apos;s healthy.
-            </div>
+  function submitPersonalize(formData: FormData) {
+    setPersonalizeError("");
+    startSaving(async () => {
+      const res: PersonalizeState = await savePersonalize({}, formData);
+      if (res.saved) setStep(1);
+      else setPersonalizeError(res.error ?? "Couldn't save — try again.");
+    });
+  }
 
-            <form action={goLiveAction} className="flex flex-col gap-2">
-              <button
-                type="submit"
-                disabled={goingLive}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#0a0c12] px-6 py-3 text-[15px] font-medium text-white transition-all hover:-translate-y-0.5 hover:shadow-[0_10px_30px_-8px_rgba(48,207,255,0.55)] disabled:opacity-60"
-              >
-                {goingLive ? "Going live…" : "Go live"}
-              </button>
-              <FormError message={goLiveState.error} />
-              <p className="text-center text-[12px] text-[var(--ink-4)]">
-                We&apos;ll set up your agents and start sourcing — nothing sends until you approve.
-              </p>
-            </form>
-          </div>
-        </div>
-      </motion.div>
-    );
+  function connect() {
+    setConnectError("");
+    startConnect(async () => {
+      const res = await createOnboardingConnectLink();
+      if (res.url) window.location.href = res.url;
+      else setConnectError(res.error ?? "Could not start the connection. Try again.");
+    });
   }
 
   const segmentsDone = 1 + step;
-  const current = STEPS[step];
-  const isLast = step === STEPS.length - 1;
-  const remaining = STEPS.length - step;
-  const currentKeys = current.fields.map((f) => f.key);
-  const stepComplete = current.fields.every((f) => !f.required || values[f.key].trim().length > 0);
-  const willScan = values.websiteUrl.trim().length > 0;
 
   return (
     <div className="w-full">
-      {/* Progress — dots + cyan bar, carrying the endowed "account created" head start */}
-      <motion.div
-        className="mb-9"
-        initial={{ opacity: 0, y: -16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-      >
+      {/* Progress — endowed "account created" head start + the three steps */}
+      <motion.div className="mb-9" initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
         <div className="mb-3 flex justify-between">
-          {STEPS.map((s, index) => (
-            <div key={s.label} className="flex flex-col items-center">
-              <button
-                type="button"
-                aria-label={`Go to ${s.label}`}
-                onClick={() => {
-                  if (index <= step) setStep(index);
-                }}
+          {STEP_LABELS.map((label, index) => (
+            <div key={label} className="flex flex-col items-center">
+              <span
                 className={cn(
                   "size-4 rounded-full transition-all duration-300",
-                  index <= step ? "cursor-pointer" : "cursor-default bg-[#e2e5ea]",
-                  index === step && "ring-4 ring-[rgba(48,207,255,0.22)]",
+                  index <= step ? "" : "bg-[#e2e5ea]",
+                  index === step && "ring-4 ring-[rgba(48,207,255,0.22)]"
                 )}
                 style={index <= step ? { backgroundColor: "var(--cyan)" } : undefined}
               />
-              <span
-                className={cn(
-                  "mt-2 hidden text-xs sm:block",
-                  index === step ? "font-medium text-foreground" : "text-[var(--ink-4)]",
-                )}
-              >
-                {s.label}
+              <span className={cn("mt-2 hidden text-xs sm:block", index === step ? "font-medium text-foreground" : "text-[var(--ink-4)]")}>
+                {label}
               </span>
             </div>
           ))}
@@ -279,104 +123,174 @@ export function Wizard({ defaultCompanyName = "" }: { defaultCompanyName?: strin
           />
         </div>
         <p className="mt-3 text-[12.5px] text-[var(--ink-3)]">
-          Account created ✓ — {remaining} step{remaining === 1 ? "" : "s"} to your dashboard
+          Account created ✓ — {STEP_LABELS.length - step} step{STEP_LABELS.length - step === 1 ? "" : "s"} to your first leads
         </p>
       </motion.div>
 
-      {/* Form card */}
-      <motion.div
-        className="relative"
-        initial={{ opacity: 0, y: 18 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.15 }}
-      >
+      <motion.div className="relative" initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.15 }}>
         <Glow />
         <div className="overflow-hidden rounded-3xl border border-[var(--hairline)] bg-white shadow-[var(--shadow-lift)]">
-          <form
-            action={action}
-            onSubmit={(e) => {
-              if (!isLast) {
-                e.preventDefault();
-                if (stepComplete) setStep(step + 1);
-              }
-            }}
-          >
-            {/* earlier answers ride along as hidden fields; visible inputs own the current step */}
-            {ALL_FIELDS.filter(({ key }) => !currentKeys.includes(key)).map(({ key }) => (
-              <input key={key} type="hidden" name={key} value={values[key]} />
-            ))}
-
-            <AnimatePresence mode="wait">
-              <motion.div key={step} initial="hidden" animate="visible" exit="exit" variants={contentVariants}>
+          <AnimatePresence mode="wait">
+            {/* ── Step 0: Personalize ── */}
+            {step === 0 && (
+              <motion.form key="personalize" action={submitPersonalize} initial="hidden" animate="visible" exit="exit" variants={contentVariants}>
                 <div className="px-8 pt-8 pb-6">
-                  <h2 className="text-[20px] font-semibold tracking-[-0.02em] text-foreground">{current.title}</h2>
-                  <p className="mt-1.5 text-[14px] text-[var(--ink-3)]">{current.description}</p>
+                  <h2 className="text-[20px] font-semibold tracking-[-0.02em] text-foreground">Personalize your account</h2>
+                  <p className="mt-1.5 text-[14px] text-[var(--ink-3)]">
+                    A few basics so your agent sounds like you — and we&apos;ll read your site to learn the rest.
+                  </p>
                 </div>
                 <div className="space-y-7 px-8 pb-8">
-                  {current.fields.map((field, i) => (
-                    <motion.div key={field.key} variants={fadeInUp} className="space-y-2.5">
-                      <Label htmlFor={field.key} className="text-[13px] font-medium text-[var(--ink-2)]">
-                        {field.label}
-                      </Label>
-                      <Input
-                        id={field.key}
-                        name={field.key}
-                        value={values[field.key]}
-                        onChange={(e) => setValues({ ...values, [field.key]: e.target.value })}
-                        placeholder={field.placeholder}
-                        inputMode={field.key === "revenueGoal" || field.key === "avgDealValue" ? "decimal" : "text"}
-                        autoFocus={i === 0}
-                        required={field.required}
-                        className={FIELD}
-                      />
-                      <p className="text-[12px] text-[var(--ink-4)]">{field.hint}</p>
-                    </motion.div>
-                  ))}
-                  <FormError message={state.error} />
+                  <Field label="Company name" hint="This names your workspace.">
+                    <Input name="companyName" value={values.companyName} onChange={(e) => setValues({ ...values, companyName: e.target.value })} placeholder="e.g. Acme Inc" autoFocus required className={FIELD} />
+                  </Field>
+                  <Field label="Your role" hint="How the agent represents you in outreach.">
+                    <select
+                      name="role"
+                      value={values.role}
+                      onChange={(e) => setValues({ ...values, role: e.target.value })}
+                      required
+                      className={cn(FIELD, "appearance-none bg-white")}
+                    >
+                      <option value="" disabled>
+                        Select your role
+                      </option>
+                      {ROLES.map((r) => (
+                        <option key={r} value={r}>
+                          {r}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field label="Website URL" hint="We scan it to learn what you sell, so your agent finds the right leads.">
+                    <Input name="websiteUrl" value={values.websiteUrl} onChange={(e) => setValues({ ...values, websiteUrl: e.target.value })} placeholder="e.g. acme.com" className={FIELD} />
+                  </Field>
+                  <Field label="Your LinkedIn URL" hint="Optional — helps us tailor your outreach voice.">
+                    <Input name="linkedinUrl" value={values.linkedinUrl} onChange={(e) => setValues({ ...values, linkedinUrl: e.target.value })} placeholder="e.g. linkedin.com/in/you" className={FIELD} />
+                  </Field>
+                  <FormError message={personalizeError} />
+                </div>
+                <div className="flex items-center justify-end border-t border-[var(--hairline)] px-8 py-5">
+                  <button type="submit" disabled={savingPersonalize} className={DARK_BTN}>
+                    {savingPersonalize ? (
+                      <>
+                        <Loader2 className="size-4 animate-spin" />
+                        {values.websiteUrl.trim() ? "Reading your site…" : "Saving…"}
+                      </>
+                    ) : (
+                      <>
+                        Continue <ChevronRight className="size-4" />
+                      </>
+                    )}
+                  </button>
+                </div>
+              </motion.form>
+            )}
+
+            {/* ── Step 1: Connect LinkedIn ── */}
+            {step === 1 && (
+              <motion.div key="connect" initial="hidden" animate="visible" exit="exit" variants={contentVariants}>
+                <div className="px-8 pt-8 pb-2">
+                  <div className="mb-4 grid size-11 place-items-center rounded-xl bg-[var(--cyan-tint)] text-[var(--cyan-strong)] ring-1 ring-inset ring-[rgba(48,207,255,0.22)]">
+                    <Link2 className="size-5" strokeWidth={2.2} />
+                  </div>
+                  <h2 className="text-[20px] font-semibold tracking-[-0.02em] text-foreground">Connect your LinkedIn</h2>
+                  <p className="mt-1.5 text-[14px] leading-relaxed text-[var(--ink-3)]">
+                    Your agent runs outreach from your own LinkedIn — securely, through our partner&apos;s hosted login.
+                    You stay in control: nothing sends until you approve it.
+                  </p>
+                </div>
+                <div className="space-y-4 px-8 pt-4 pb-8">
+                  {init.connected ? (
+                    <div className="flex items-center gap-2 rounded-xl border border-[var(--hairline)] bg-[var(--tint)] p-4 text-[13.5px] text-foreground">
+                      <Check className="size-4 text-[var(--cyan-strong)]" /> LinkedIn connected — you&apos;re ready.
+                    </div>
+                  ) : null}
+                  {connectError && <FormError message={connectError} />}
+                  {init.connected ? (
+                    <button type="button" onClick={() => setStep(2)} className={cn(DARK_BTN, "w-full")}>
+                      Continue <ChevronRight className="size-4" />
+                    </button>
+                  ) : (
+                    <button type="button" onClick={connect} disabled={connecting} className={cn(DARK_BTN, "w-full")}>
+                      {connecting ? <Loader2 className="size-4 animate-spin" /> : <Link2 className="size-4" />}
+                      {connecting ? "Opening secure login…" : "Connect LinkedIn"}
+                    </button>
+                  )}
+                  <p className="text-center text-[12px] text-[var(--ink-4)]">
+                    We never see your password. You can disconnect any time in Settings.
+                  </p>
+                </div>
+                <div className="flex items-center justify-start border-t border-[var(--hairline)] px-8 py-5">
+                  <button type="button" onClick={() => setStep(0)} className="inline-flex items-center gap-1 rounded-full px-4 py-2.5 text-[14px] font-medium text-[var(--ink-3)] transition-colors hover:text-foreground">
+                    <ChevronLeft className="size-4" /> Back
+                  </button>
                 </div>
               </motion.div>
-            </AnimatePresence>
+            )}
 
-            <div className="flex items-center justify-between border-t border-[var(--hairline)] px-8 py-5">
-              <button
-                type="button"
-                onClick={() => setStep(step - 1)}
-                disabled={step === 0 || pending}
-                className="inline-flex items-center gap-1 rounded-full px-4 py-2.5 text-[14px] font-medium text-[var(--ink-3)] transition-colors hover:text-foreground disabled:opacity-40 disabled:hover:text-[var(--ink-3)]"
-              >
-                <ChevronLeft className="size-4" /> Back
-              </button>
-              <button
-                type="submit"
-                disabled={(!isLast && !stepComplete) || pending}
-                className="inline-flex items-center gap-1.5 rounded-full bg-[#0a0c12] px-6 py-2.5 text-[14px] font-medium text-white transition-all hover:-translate-y-0.5 hover:shadow-[0_10px_30px_-8px_rgba(48,207,255,0.55)] disabled:opacity-50 disabled:hover:translate-y-0"
-              >
-                {pending ? (
-                  <>
-                    <Loader2 className="size-4 animate-spin" />
-                    {willScan ? "Scanning your website…" : "Finishing…"}
-                  </>
-                ) : isLast ? (
-                  <>
-                    Finish setup <Check className="size-4" />
-                  </>
-                ) : (
-                  <>
-                    Continue <ChevronRight className="size-4" />
-                  </>
-                )}
-              </button>
-            </div>
-          </form>
+            {/* ── Step 2: Confirmation (derived, editable) ── */}
+            {step === 2 && (
+              <motion.form key="confirm" action={findAction} initial="hidden" animate="visible" exit="exit" variants={contentVariants}>
+                <div className="px-8 pt-8 pb-2">
+                  <div className="mb-4 grid size-11 place-items-center rounded-xl bg-[var(--cyan-tint)] text-[var(--cyan-strong)] ring-1 ring-inset ring-[rgba(48,207,255,0.22)]">
+                    <Sparkles className="size-5" strokeWidth={2.2} />
+                  </div>
+                  <h2 className="text-[20px] font-semibold tracking-[-0.02em] text-foreground">Here&apos;s what we got</h2>
+                  {init.scan?.headline ? (
+                    <p className="mt-2 text-[15px] font-medium leading-snug text-foreground">{init.scan.headline}</p>
+                  ) : (
+                    <p className="mt-1.5 text-[14px] text-[var(--ink-3)]">Confirm who to target — tweak anything that&apos;s off.</p>
+                  )}
+                  <p className="mt-2 inline-flex items-center gap-1.5 text-[12.5px] text-[var(--ink-3)]">
+                    <Check className="size-3.5 text-[var(--cyan-strong)]" /> LinkedIn connected
+                  </p>
+                </div>
+                <div className="space-y-7 px-8 pt-5 pb-8">
+                  <Field label="Your industry" hint="Pulled from your site — edit if it&apos;s off.">
+                    <Input name="industry" value={values.industry} onChange={(e) => setValues({ ...values, industry: e.target.value })} placeholder="e.g. B2B SaaS" required className={FIELD} />
+                  </Field>
+                  <Field label="Who to target" hint="Your agent prospects for this — make it specific.">
+                    <Input name="icp" value={values.icp} onChange={(e) => setValues({ ...values, icp: e.target.value })} placeholder="e.g. VP of Sales at mid-market SaaS" required className={FIELD} />
+                  </Field>
+                  <div className="grid gap-7 sm:grid-cols-2">
+                    <Field label="Monthly revenue goal" hint="We track pipeline against this.">
+                      <Input name="revenueGoal" value={values.revenueGoal} onChange={(e) => setValues({ ...values, revenueGoal: e.target.value })} placeholder="25,000" inputMode="decimal" required className={FIELD} />
+                    </Field>
+                    <Field label="Average deal value" hint="Turns each lead into a $ figure.">
+                      <Input name="avgDealValue" value={values.avgDealValue} onChange={(e) => setValues({ ...values, avgDealValue: e.target.value })} placeholder="5,000" inputMode="decimal" required className={FIELD} />
+                    </Field>
+                  </div>
+                  <FormError message={findState.error} />
+                </div>
+                <div className="flex items-center justify-between border-t border-[var(--hairline)] px-8 py-5">
+                  <button type="button" onClick={() => setStep(1)} className="inline-flex items-center gap-1 rounded-full px-4 py-2.5 text-[14px] font-medium text-[var(--ink-3)] transition-colors hover:text-foreground">
+                    <ChevronLeft className="size-4" /> Back
+                  </button>
+                  <button type="submit" disabled={finding} className={DARK_BTN}>
+                    {finding ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
+                    {finding ? "Setting up…" : "Find my first leads"}
+                  </button>
+                </div>
+              </motion.form>
+            )}
+          </AnimatePresence>
         </div>
       </motion.div>
 
-        <p className="mt-6 text-center text-[13px] text-[var(--ink-4)]">
-          Step {step + 1} of {STEPS.length}: {current.title}
-        </p>
-        <p className="mt-2 text-center text-[12px] text-[var(--ink-4)]">
-          You can change any of this later in Settings — nothing&apos;s locked in.
-        </p>
+      <p className="mt-6 text-center text-[12px] text-[var(--ink-4)]">
+        You can change any of this later in Settings — nothing&apos;s locked in.
+      </p>
+    </div>
+  );
+}
+
+function Field({ label, hint, children }: { label: string; hint: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-2.5">
+      <Label className="text-[13px] font-medium text-[var(--ink-2)]">{label}</Label>
+      {children}
+      <p className="text-[12px] text-[var(--ink-4)]">{hint}</p>
     </div>
   );
 }

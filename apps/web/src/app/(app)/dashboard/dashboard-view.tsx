@@ -932,9 +932,12 @@ function FirstRunInProgress({
     { label: "Sourcing & scoring your first leads", done: false, current: true },
     { label: "Your first qualified leads land here", done: false, current: false },
   ];
+  // LinkedIn is connected during onboarding now, so the connect panel only appears as a
+  // safety net for the rare un-connected account — never as a prompt on the happy path.
+  const liConnected = channels.liStatus === "active";
   return (
     <Reveal className="flex flex-col gap-6">
-      <div className="grid gap-6 md:grid-cols-[1.2fr_1fr]">
+      <div className={cn("grid gap-6", !liConnected && "md:grid-cols-[1.2fr_1fr]")}>
         <RevealItem className={cn(PANEL_SURFACE, "p-5")} data-copilot="dashboard-first-run">
           <div className="flex items-center justify-between gap-3">
             <Eyebrow>Your agents are working</Eyebrow>
@@ -947,7 +950,7 @@ function FirstRunInProgress({
             </span>
           </div>
           <h2 className="font-heading mt-3 text-xl font-semibold tracking-tight">
-            Sourcing your first leads now
+            Finding your first prospects
           </h2>
           <p className="mt-2 text-sm text-muted-foreground">
             Your Prospect Agent is scanning your market and scoring fits against your ICP. The
@@ -1002,7 +1005,7 @@ function FirstRunInProgress({
           </div>
         </RevealItem>
 
-        <ChannelSetupPanel channels={channels} />
+        {!liConnected && <ChannelSetupPanel channels={channels} />}
       </div>
     </Reveal>
   );
