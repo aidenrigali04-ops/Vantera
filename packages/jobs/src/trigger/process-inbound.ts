@@ -1,12 +1,17 @@
 import { logger, task } from "@trigger.dev/sdk";
 import { createDb } from "@vantera/db";
-import { classifyReply } from "@vantera/agent-brains";
+import { classifyReply, draftConversationReply } from "@vantera/agent-brains";
 import { createLinkedInInfraFromEnv } from "@vantera/linkedin-infra";
 import { runInbound } from "../pipeline/inbound";
 import { createPgStore } from "../pipeline/pg-store";
 import type { InboundPayload } from "../pipeline/types";
 
-/** Routes verified LinkedIn webhook events: replies, connection acceptances, account state. */
+/**
+ * Routes verified LinkedIn webhook events: replies, connection acceptances, account state.
+ * On a genuine, non-terminal reply the active responder drafts the seller's next message with
+ * the SAME grounding + humanizer as the outreach copy and queues it for delivery — continuing the
+ * conversation toward close (auto-sent in 'automatic' mode, queued for review otherwise).
+ */
 export const processInbound = task({
   id: "process-inbound",
   maxDuration: 600,
@@ -16,6 +21,7 @@ export const processInbound = task({
       store,
       linkedinInfra: createLinkedInInfraFromEnv(),
       classifyFn: (body) => classifyReply(body),
+      respondFn: (input) => draftConversationReply(input),
     });
     logger.info("inbound processed", { source: payload.source, ...summary });
     return summary;

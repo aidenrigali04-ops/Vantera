@@ -18,6 +18,11 @@ import type {
   RulesGateResult,
   StoredInsights,
   WebsiteScan,
+  CopyLead,
+  CopyContext as BrainCopyContext,
+  ConversationReply,
+  ConversationReplyInput,
+  ConversationTurn,
 } from "@vantera/agent-brains";
 import type { OutreachCapacity } from "./capacity";
 import type { SenderCandidate } from "./sender-assignment";
@@ -513,12 +518,44 @@ export interface InboundStore {
    */
   stopSequenceForReply(leadId: string): Promise<void>;
   insertLeadNotification(n: { accountId: string; leadId: string; kind: "reply"; body: string }): Promise<void>;
+  /**
+   * Inputs for an ACTIVE contextual reply (the "converse to close" step): the live Outreach agent's
+   * grounding + send mode + the running thread for this lead. Returns null when there's no live
+   * Outreach agent or the lead has no insights to ground a reply — the responder then stays silent
+   * and the inbound reply is merely classified + the user notified (the prior behavior).
+   */
+  getResponderBundle(accountId: string, leadId: string, campaignId: string | null): Promise<ResponderBundle | null>;
+  /** Queue the contextual reply as a message-stage send — the existing dispatch path delivers it. */
+  insertScheduledSend(send: NewScheduledSend): Promise<void>;
+}
+
+/** Everything runInbound needs to draft + queue one contextual reply with the outreach copy logic. */
+export interface ResponderBundle {
+  campaignId: string;
+  /** the Outreach agent's send mode: 'automatic' auto-sends a clean reply; 'review' queues it */
+  sendMode: "review" | "automatic";
+  lead: CopyLead;
+  insights: StoredInsights;
+  /** same grounding the first-touch copy used — CTA, value prop, seller identity, guardrails */
+  context: BrainCopyContext;
+  /** prior messages in the thread, oldest first (excludes the incoming one) */
+  thread: ConversationTurn[];
+  /** prior agent messages actually sent in this thread — drives the converse-to-close turn cap */
+  agentTurns: number;
+  /** a reply is already queued/in-flight for this lead — don't double-message */
+  hasUnsentMessage: boolean;
 }
 
 export interface InboundDeps {
   store: InboundStore;
   linkedinInfra: Pick<LinkedInInfra, "parseEventWebhook">;
   classifyFn: (body: string) => Promise<ReplyVerdict>;
+  /**
+   * Drafts the seller's next message with the same grounding + humanizer as outreach (the
+   * "use the same logic as outreach to converse until close" contract). Absent = responder
+   * disabled (a reply is only classified + notified, never auto-answered).
+   */
+  respondFn?: (input: ConversationReplyInput) => Promise<ConversationReply>;
   now?: () => Date;
 }
 

@@ -22,6 +22,19 @@ The Outreach Agent owns everything after a lead qualifies. For every qualified l
 - Every draft is personalized from the lead's insights — never a template with a name swapped in.
 - A style guard strips robotic phrasing. If a draft still trips a style rule, it's flagged for you in the review queue.
 
-## Nothing sends without you
+## When they reply
 
-Every draft lands in your review queue as **pending review**. Anyone on your suppression list is never drafted to at all — unsubscribes and opt-outs are honored before a single word is written.
+The agent doesn't stop at the first message — it handles the conversation. When a prospect replies, the agent reads what they actually said and writes the next message back, using the same grounding and voice as the first touch: it answers their question or objection and moves one step toward your CTA. It keeps the thread going each time they reply, until they book, opt out, or it's gone back and forth enough times to hand off to you.
+
+- **A booked meeting is the finish line** — once a prospect confirms a time, the agent celebrates the win and stops selling.
+- **"Not interested" or "unsubscribe" ends it** — the conversation stops and the prospect is added to your suppression list, so they're never contacted again.
+- **You stay in control of how replies go out** — in **review** mode every reply waits in your queue for approval; in **automatic** mode a clean reply sends on its own, and anything the style guard flags still routes to review. You can read the whole conversation — what the agent sent and what the prospect said — in the Processed tab.
+
+## Sending mode
+
+When you deploy, you choose how outreach and replies leave the agent:
+
+- **Review** — every message (first touch and every reply) lands in your queue as **pending review**. Nothing reaches a prospect until you approve it.
+- **Automatic** — clean messages send on their own; any message the style guard flags falls back to your review queue. Flagged copy never sends silently.
+
+Either way, anyone on your suppression list is never drafted to at all — unsubscribes and opt-outs are honored before a single word is written.

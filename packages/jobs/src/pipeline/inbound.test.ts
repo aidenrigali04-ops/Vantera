@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { InMemoryLinkedInInfra } from "@vantera/linkedin-infra";
 import type { ReplyVerdict } from "@vantera/agent-brains";
 import { runInbound } from "./inbound";
-import type { InboundDeps, InboundStore } from "./types";
+import type { InboundDeps, InboundStore, NewScheduledSend, ResponderBundle } from "./types";
 
 // ---------------------------------------------------------------------------
 // Fake store — records calls for assertions
@@ -19,6 +19,7 @@ function makeStore(overrides: Partial<InboundStore> = {}): InboundStore & {
   stoppedSequences: string[];
   notifications: Parameters<InboundStore["insertLeadNotification"]>[0][];
   bookedMeetings: { leadId: string; at: Date }[];
+  scheduledSends: NewScheduledSend[];
 } {
   let replyCounter = 0;
   const replies: Parameters<InboundStore["insertReply"]>[0][] = [];
@@ -31,6 +32,7 @@ function makeStore(overrides: Partial<InboundStore> = {}): InboundStore & {
   const stoppedSequences: string[] = [];
   const notifications: Parameters<InboundStore["insertLeadNotification"]>[0][] = [];
   const bookedMeetings: { leadId: string; at: Date }[] = [];
+  const scheduledSends: NewScheduledSend[] = [];
 
   const base: InboundStore = {
     findLinkedInAccountByProviderRef: async () => null,
@@ -50,6 +52,9 @@ function makeStore(overrides: Partial<InboundStore> = {}): InboundStore & {
     cancelPendingSends: async (leadId) => { canceledSends.push(leadId); return 0; },
     stopSequenceForReply: async (leadId) => { stoppedSequences.push(leadId); },
     insertLeadNotification: async (n) => { notifications.push(n); },
+    // Responder defaults to OFF: no bundle ⇒ a reply is only classified + notified (prior behavior).
+    getResponderBundle: async () => null,
+    insertScheduledSend: async (send) => { scheduledSends.push(send); },
     ...overrides,
   };
 
@@ -64,6 +69,7 @@ function makeStore(overrides: Partial<InboundStore> = {}): InboundStore & {
     stoppedSequences,
     notifications,
     bookedMeetings,
+    scheduledSends,
   });
 }
 
@@ -414,6 +420,147 @@ describe("runInbound — sequence stop gate (stop on close, not on reply)", () =
     expect(store.canceledSends).toHaveLength(0);
     expect(store.notifications).toHaveLength(0);
   });
+});
+
+describe("runInbound — active responder (converse to close)", () => {
+  const bundle = (over: Partial<ResponderBundle> = {}): ResponderBundle => ({
+    campaignId: "camp1",
+    sendMode: "automatic",
+    lead: { firstName: "Ryan", lastName: "C", title: "VP Sales", companyName: "Northwind", industry: "SaaS" },
+    insights: {
+      pain_points: ["unqualified leads"],
+      triggers: ["Series A"],
+      motivations: ["pipeline"],
+      value_angle: "qualify first",
+      aha_moment: "first booked meeting",
+      summary: "good fit",
+    },
+    context: { cta: "a quick intro" },
+    thread: [],
+    agentTurns: 0,
+    hasUnsentMessage: false,
+    ...over,
+  });
+
+  function storeWithBundle(b: ResponderBundle | null) {
+    return makeStore({
+      findLinkedInAccountByProviderRef: async () => ({ id: "li", accountId: "acc1" }),
+      findLeadByLinkedInUrl: async () => ({ id: "lead1", campaignId: "camp1" }),
+      getResponderBundle: async () => b,
+    });
+  }
+
+  const respond = (
+    message = "Here's the short version — worth a quick look?",
+    violations: unknown[] = []
+  ): InboundDeps["respondFn"] =>
+    async () => ({ message, violations: violations as never });
+
+  it("drafts + queues a contextual reply (automatic → approved) and supersedes any scripted touch", async () => {
+    const store = storeWithBundle(bundle({ sendMode: "automatic" }));
+
+    const result = await runInbound(
+      { source: "linkedin", payload: LINKEDIN_REPLY_FIXTURE },
+      deps(store, { classifyFn: classify("interested"), respondFn: respond() })
+    );
+
+    expect(result).toEqual({ handled: true, action: "reply:interested+responded" });
+    expect(store.scheduledSends).toHaveLength(1);
+    expect(store.scheduledSends[0]).toMatchObject({
+      accountId: "acc1",
+      campaignId: "camp1",
+      leadId: "lead1",
+      channel: "linkedin",
+      linkedinStage: "message",
+      status: "approved",
+      body: "Here's the short version — worth a quick look?",
+      styleFlags: null,
+    });
+    expect(store.canceledSends).toContain("lead1"); // contextual reply replaces the scripted touch
+  });
+
+  it("queues for review (pending_review) when the agent is in review mode", async () => {
+    const store = storeWithBundle(bundle({ sendMode: "review" }));
+
+    await runInbound(
+      { source: "linkedin", payload: LINKEDIN_REPLY_FIXTURE },
+      deps(store, { classifyFn: classify("neutral"), respondFn: respond() })
+    );
+
+    expect(store.scheduledSends[0]!.status).toBe("pending_review");
+  });
+
+  it("forces review on a style-flagged draft even in automatic mode (never silent-sends flagged copy)", async () => {
+    const store = storeWithBundle(bundle({ sendMode: "automatic" }));
+
+    await runInbound(
+      { source: "linkedin", payload: LINKEDIN_REPLY_FIXTURE },
+      deps(store, { respondFn: respond("salesy", [{ rule: "buzzword", detail: "game-changer" }]) })
+    );
+
+    expect(store.scheduledSends[0]!.status).toBe("pending_review");
+    expect(store.scheduledSends[0]!.styleFlags).toBeTruthy();
+  });
+
+  it("stops responding past the converse-to-close turn cap (hands off to the human)", async () => {
+    const store = storeWithBundle(bundle({ agentTurns: 6 }));
+
+    const result = await runInbound(
+      { source: "linkedin", payload: LINKEDIN_REPLY_FIXTURE },
+      deps(store, { respondFn: respond() })
+    );
+
+    expect(result.action).toBe("reply:interested");
+    expect(store.scheduledSends).toHaveLength(0);
+  });
+
+  it("does not double-message when a reply is already queued/in-flight", async () => {
+    const store = storeWithBundle(bundle({ hasUnsentMessage: true }));
+
+    await runInbound(
+      { source: "linkedin", payload: LINKEDIN_REPLY_FIXTURE },
+      deps(store, { respondFn: respond() })
+    );
+
+    expect(store.scheduledSends).toHaveLength(0);
+  });
+
+  it("stays silent when there is no live Outreach agent / no insights (null bundle)", async () => {
+    const store = storeWithBundle(null);
+
+    const result = await runInbound(
+      { source: "linkedin", payload: LINKEDIN_REPLY_FIXTURE },
+      deps(store, { respondFn: respond() })
+    );
+
+    expect(result.action).toBe("reply:interested");
+    expect(store.scheduledSends).toHaveLength(0);
+  });
+
+  it("never keeps selling after a booked meeting (the win) — books, does not respond", async () => {
+    const store = storeWithBundle(bundle());
+
+    await runInbound(
+      { source: "linkedin", payload: LINKEDIN_REPLY_FIXTURE },
+      deps(store, { classifyFn: classify("interested", true), respondFn: respond() })
+    );
+
+    expect(store.bookedMeetings).toHaveLength(1);
+    expect(store.scheduledSends).toHaveLength(0);
+  });
+
+  for (const c of ["not_interested", "unsubscribe"] as const) {
+    it(`never responds to a ${c} reply (terminal)`, async () => {
+      const store = storeWithBundle(bundle());
+
+      await runInbound(
+        { source: "linkedin", payload: LINKEDIN_REPLY_FIXTURE },
+        deps(store, { classifyFn: classify(c), respondFn: respond() })
+      );
+
+      expect(store.scheduledSends).toHaveLength(0);
+    });
+  }
 });
 
 describe("runInbound — junk payloads", () => {

@@ -48,6 +48,70 @@ function profileIdentifier(profileUrl: string): string {
   return m ? m[1]! : profileUrl;
 }
 
+/** A LinkedIn profile URL from a provider/member id (ACoAA…) — the form attendee_profile_url uses. */
+function profileUrlFromId(providerId: string): string {
+  return `https://www.linkedin.com/in/${providerId}`;
+}
+
+/**
+ * True when a `message_received` event is OUR OWN outbound message echoed back by the chat sync
+ * (Unipile fires the event for both directions). `is_sender` is the account-owner flag; tolerate the
+ * several encodings Unipile has used (boolean / 0-1 / "true"). Skipping these is what keeps the
+ * conversational responder from replying to itself in a loop.
+ */
+function isOwnMessage(p: Record<string, unknown>): boolean {
+  const v = p.is_sender;
+  return v === true || v === 1 || v === "1" || v === "true";
+}
+
+/**
+ * Resolve the SENDER's profile URL from a real Unipile `message_received` payload (shape captured
+ * 2026-06-28). The sender is one of the `attendees`; we prefer the attendee_profile_url (already the
+ * /in/<provider_id> form our leads store), then fall back to constructing it from the provider id,
+ * then — for a 1:1 chat — to the attendee that isn't us (account_info.user_id).
+ */
+function senderProfileUrl(p: Record<string, unknown>): string | null {
+  const sender = (p.sender ?? {}) as Record<string, unknown>;
+  const direct = str(sender.attendee_profile_url) ?? str(sender.profile_url);
+  if (direct) return direct;
+
+  const attendees: Record<string, unknown>[] = Array.isArray(p.attendees)
+    ? (p.attendees as Record<string, unknown>[])
+    : [];
+  const senderProviderId = str(sender.attendee_provider_id);
+  const senderAttendeeId = str(sender.attendee_id);
+  for (const a of attendees) {
+    const matchesProvider = senderProviderId && str(a.attendee_provider_id) === senderProviderId;
+    const matchesAttendee = senderAttendeeId && str(a.attendee_id) === senderAttendeeId;
+    if (matchesProvider || matchesAttendee) {
+      return str(a.attendee_profile_url) ?? (senderProviderId ? profileUrlFromId(senderProviderId) : null);
+    }
+  }
+
+  // 1:1 fallback: the attendee whose provider id isn't the connected account's own user_id.
+  const ownProviderId = str((p.account_info as Record<string, unknown> | undefined)?.user_id);
+  const other = attendees.find(
+    (a) => str(a.attendee_provider_id) && str(a.attendee_provider_id) !== ownProviderId
+  );
+  if (other) {
+    return str(other.attendee_profile_url) ?? profileUrlFromId(str(other.attendee_provider_id)!);
+  }
+  return senderProviderId ? profileUrlFromId(senderProviderId) : null;
+}
+
+/** Resolve the new connection's profile URL from a `new_relation` payload across Unipile encodings. */
+function relationProfileUrl(p: Record<string, unknown>): string | null {
+  const user = (p.user ?? {}) as Record<string, unknown>;
+  const slug = str(p.user_public_identifier) ?? str(user.public_identifier);
+  return (
+    str(p.user_profile_url) ??
+    str(user.profile_url) ??
+    (slug ? profileUrlFromId(slug) : null) ??
+    (str(p.user_provider_id) ? profileUrlFromId(str(p.user_provider_id)!) : null) ??
+    (str(user.provider_id) ? profileUrlFromId(str(user.provider_id)!) : null)
+  );
+}
+
 /**
  * A Unipile LinkedIn provider_id (member internal id) looks like "ACoAA…". The write endpoints
  * (invite, chats) require this id, not a public vanity slug — a URL whose slug is already a
@@ -326,6 +390,14 @@ export class UnipileLinkedInInfra implements LinkedInInfra {
     return timingSafeEqual(digest(this.webhookSecret), digest(presented));
   }
 
+  /**
+   * Parse a verified Unipile webhook into a typed LinkedInEvent.
+   *
+   * Reconciled 2026-06-28 against CAPTURED LIVE payloads (the prior shapes were assumed and silently
+   * returned null for every real event — the post-invite funnel was deaf). Real Unipile webhooks
+   * carry NO `event_id`: a message is identified by `message_id`, and the sender/connection is an
+   * `attendees[]` entry, not a flat `sender.profile_url`. `is_sender` flags our own echoed message.
+   */
   parseEventWebhook(payload: unknown): LinkedInEvent | null {
     if (typeof payload !== "object" || payload === null) return null;
     const p = payload as Record<string, unknown>;
@@ -333,37 +405,47 @@ export class UnipileLinkedInInfra implements LinkedInInfra {
     const event = p.event;
     if (typeof event !== "string") return null;
 
-    const eventId = typeof p.event_id === "string" ? p.event_id : null;
-    if (!eventId) return null;
-
     const connectedAccountRef = p.account_id != null ? String(p.account_id) : null;
     if (!connectedAccountRef) return null;
 
-    const base = { providerEventId: eventId, connectedAccountRef };
-
     switch (event) {
       case "message_received": {
-        const sender = p.sender as Record<string, unknown> | undefined;
-        const fromProfileUrl = typeof sender?.profile_url === "string" ? sender.profile_url : null;
-        if (!fromProfileUrl || typeof p.message !== "string" || typeof p.timestamp !== "string") return null;
+        if (isOwnMessage(p)) return null; // our own outbound copy echoed back — never a reply
+        // No event_id on real payloads: the message id IS the idempotency key.
+        const eventId = str(p.message_id) ?? str(p.provider_message_id);
+        if (!eventId) return null;
+        const fromProfileUrl = senderProfileUrl(p);
+        const body = str(p.message);
+        const receivedAt = str(p.timestamp);
+        if (!fromProfileUrl || !body || !receivedAt) return null;
         return {
           type: "reply",
-          ...base,
+          providerEventId: eventId,
+          connectedAccountRef,
           fromProfileUrl,
-          body: p.message,
-          receivedAt: p.timestamp,
+          body,
+          receivedAt,
         };
       }
       case "new_relation": {
-        if (typeof p.user_profile_url !== "string") return null;
+        const profileUrl = relationProfileUrl(p);
+        if (!profileUrl) return null;
+        // No natural id on relation events: synthesize a stable key so provider retries dedupe
+        // (one acceptance per account↔profile pair) without colliding distinct acceptances.
         return {
           type: "relationship_accepted",
-          ...base,
-          profileUrl: p.user_profile_url,
+          providerEventId: `relation:${connectedAccountRef}:${profileUrl}`,
+          connectedAccountRef,
+          profileUrl,
         };
       }
       case "account_status": {
-        const rawStatus = p.status;
+        // Tolerate both the flat `status` and the `message` field Unipile has used for the state.
+        const rawStatus = p.status ?? p.message;
+        // Synthesized id keyed on the state so a re-delivery of the SAME transition dedupes while a
+        // later state change (e.g. recovery back to OK) is still processed.
+        const eventId = `status:${connectedAccountRef}:${String(rawStatus ?? "unknown")}`;
+        const base = { providerEventId: eventId, connectedAccountRef };
         let status: "active" | "restricted" | "disconnected";
         if (rawStatus === "OK" || rawStatus === "CREATION_SUCCESS") {
           status = "active";

@@ -285,51 +285,102 @@ describe("UnipileLinkedInInfra", () => {
     });
   });
 
-  // TODO(Part B): these payloads use the old assumed shapes (event/event_id/status).
-  // Real Unipile webhooks carry none of those — to be replaced with captured fixtures
-  // when parseEventWebhook is reconciled (plan 2026-06-15, Part B). Until then the
-  // parser silently returns null for real payloads.
+  // Reconciled 2026-06-28 against CAPTURED LIVE payloads (Vercel runtime logs). Real Unipile
+  // webhooks carry NO event_id; a message is keyed by message_id and the sender is an attendees[]
+  // entry. The prior fixtures used assumed shapes and the parser returned null for every real event.
   describe("parseEventWebhook", () => {
     const adapter = infra({});
 
-    it("maps message_received to reply", () => {
-      const event = adapter.parseEventWebhook({
-        event: "message_received",
-        event_id: "ev_1",
-        account_id: "li_acct_1",
-        sender: { profile_url: "https://linkedin.com/in/jane" },
-        message: "I'm interested",
-        timestamp: "2026-06-11T12:00:00Z",
-      });
+    // The exact captured message_received shape (provider/member-id URLs, attendees, is_sender).
+    const realReply = (over: Record<string, unknown> = {}) => ({
+      event: "message_received",
+      account_id: "0uuEXoQMSKOiZiTtCb2cgg",
+      account_type: "LINKEDIN",
+      account_info: { type: "LINKEDIN", feature: "classic", user_id: "ACoAA_OWNER" },
+      webhook_name: "vantera-linkedin-messaging",
+      chat_id: "1pVHl3kUWG6CORRtlY9fyA",
+      attendees: [
+        {
+          attendee_id: "yq0vqte3XVaAOCzZn1SILw",
+          attendee_provider_id: "ACoAA_RYAN",
+          attendee_name: "Ryan Cunningham",
+          attendee_profile_url: "https://www.linkedin.com/in/ACoAA_RYAN",
+        },
+      ],
+      // sender carries no profile_url — resolution must fall back to the matching attendee
+      sender: { attendee_id: "yq0vqte3XVaAOCzZn1SILw", attendee_provider_id: "ACoAA_RYAN" },
+      message: "Sounds interesting, tell me more",
+      message_id: "msg_real_1",
+      timestamp: "2026-06-28T09:37:13Z",
+      is_sender: false,
+      ...over,
+    });
+
+    it("maps a real message_received to reply (message_id as id; sender via attendees)", () => {
+      const event = adapter.parseEventWebhook(realReply());
       expect(event).toEqual({
         type: "reply",
-        providerEventId: "ev_1",
-        connectedAccountRef: "li_acct_1",
-        fromProfileUrl: "https://linkedin.com/in/jane",
-        body: "I'm interested",
-        receivedAt: "2026-06-11T12:00:00Z",
+        providerEventId: "msg_real_1",
+        connectedAccountRef: "0uuEXoQMSKOiZiTtCb2cgg",
+        fromProfileUrl: "https://www.linkedin.com/in/ACoAA_RYAN",
+        body: "Sounds interesting, tell me more",
+        receivedAt: "2026-06-28T09:37:13Z",
       });
     });
 
-    it("maps new_relation to relationship_accepted", () => {
+    it("ignores our own outbound message echoed back (is_sender truthy)", () => {
+      expect(adapter.parseEventWebhook(realReply({ is_sender: true }))).toBeNull();
+      expect(adapter.parseEventWebhook(realReply({ is_sender: 1 }))).toBeNull();
+      expect(adapter.parseEventWebhook(realReply({ is_sender: "true" }))).toBeNull();
+    });
+
+    it("falls back to provider_message_id when message_id is absent", () => {
+      const event = adapter.parseEventWebhook(realReply({ message_id: undefined, provider_message_id: "pmid_9" }));
+      expect(event).toMatchObject({ type: "reply", providerEventId: "pmid_9" });
+    });
+
+    it("resolves the sender as the non-self attendee in a 1:1 chat", () => {
+      // sender has neither profile_url nor a matching provider id — pick the attendee that isn't us
+      const event = adapter.parseEventWebhook(
+        realReply({ sender: {}, attendees: [
+          { attendee_provider_id: "ACoAA_OWNER", attendee_profile_url: "https://www.linkedin.com/in/ACoAA_OWNER" },
+          { attendee_provider_id: "ACoAA_RYAN", attendee_profile_url: "https://www.linkedin.com/in/ACoAA_RYAN" },
+        ] })
+      );
+      expect(event).toMatchObject({ fromProfileUrl: "https://www.linkedin.com/in/ACoAA_RYAN" });
+    });
+
+    it("returns null when the message has no resolvable sender or body", () => {
+      expect(adapter.parseEventWebhook(realReply({ sender: {}, attendees: [], account_info: {} }))).toBeNull();
+      expect(adapter.parseEventWebhook(realReply({ message: "" }))).toBeNull();
+    });
+
+    it("maps new_relation to relationship_accepted with a synthesized dedupe id", () => {
       const event = adapter.parseEventWebhook({
         event: "new_relation",
-        event_id: "ev_2",
         account_id: "li_acct_2",
-        user_profile_url: "https://linkedin.com/in/bob",
+        user_profile_url: "https://www.linkedin.com/in/ACoAA_BOB",
       });
       expect(event).toEqual({
         type: "relationship_accepted",
-        providerEventId: "ev_2",
+        providerEventId: "relation:li_acct_2:https://www.linkedin.com/in/ACoAA_BOB",
         connectedAccountRef: "li_acct_2",
-        profileUrl: "https://linkedin.com/in/bob",
+        profileUrl: "https://www.linkedin.com/in/ACoAA_BOB",
       });
+    });
+
+    it("resolves new_relation profile url from a public identifier or provider id", () => {
+      expect(
+        adapter.parseEventWebhook({ event: "new_relation", account_id: "a", user_public_identifier: "jane-doe" })
+      ).toMatchObject({ profileUrl: "https://www.linkedin.com/in/jane-doe" });
+      expect(
+        adapter.parseEventWebhook({ event: "new_relation", account_id: "a", user_provider_id: "ACoAA_X" })
+      ).toMatchObject({ profileUrl: "https://www.linkedin.com/in/ACoAA_X" });
     });
 
     it("maps account_status OK to active with metadata round-trip", () => {
       const event = adapter.parseEventWebhook({
         event: "account_status",
-        event_id: "ev_3",
         account_id: "li_acct_3",
         status: "OK",
         profile_url: "https://linkedin.com/in/carol",
@@ -338,7 +389,7 @@ describe("UnipileLinkedInInfra", () => {
       });
       expect(event).toEqual({
         type: "account_status",
-        providerEventId: "ev_3",
+        providerEventId: "status:li_acct_3:OK",
         connectedAccountRef: "li_acct_3",
         status: "active",
         profileUrl: "https://linkedin.com/in/carol",
@@ -350,7 +401,6 @@ describe("UnipileLinkedInInfra", () => {
     it("maps account_status CREATION_SUCCESS to active", () => {
       const event = adapter.parseEventWebhook({
         event: "account_status",
-        event_id: "ev_4",
         account_id: "li_acct_4",
         status: "CREATION_SUCCESS",
         name: "acct-uuid-88",
@@ -365,13 +415,12 @@ describe("UnipileLinkedInInfra", () => {
     it("maps account_status DISCONNECTED to disconnected", () => {
       const event = adapter.parseEventWebhook({
         event: "account_status",
-        event_id: "ev_5",
         account_id: "li_acct_5",
         status: "DISCONNECTED",
       });
       expect(event).toEqual({
         type: "account_status",
-        providerEventId: "ev_5",
+        providerEventId: "status:li_acct_5:DISCONNECTED",
         connectedAccountRef: "li_acct_5",
         status: "disconnected",
         profileUrl: null,
@@ -383,9 +432,8 @@ describe("UnipileLinkedInInfra", () => {
     it("maps account_id to connectedAccountRef as string", () => {
       const event = adapter.parseEventWebhook({
         event: "new_relation",
-        event_id: "ev_6",
         account_id: 12345,
-        user_profile_url: "https://linkedin.com/in/dave",
+        user_profile_url: "https://www.linkedin.com/in/dave",
       });
       expect(event).not.toBeNull();
       expect(event!.connectedAccountRef).toBe("12345");
@@ -401,15 +449,15 @@ describe("UnipileLinkedInInfra", () => {
     it("maps checkpoint/credential states to restricted", () => {
       const infra = new UnipileLinkedInInfra({ apiKey: "k", dsn: "d", webhookSecret: "s" });
       for (const status of ["CREDENTIALS", "CHECKPOINT", "PERMISSIONS", "ERROR", "STOPPED", "SYNC_ERROR"]) {
-        const ev = infra.parseEventWebhook({ event: "account_status", event_id: "e1", account_id: "a1", status, name: "acc_1" });
+        const ev = infra.parseEventWebhook({ event: "account_status", account_id: "a1", status, name: "acc_1" });
         expect(ev).toMatchObject({ type: "account_status", status: "restricted" });
       }
     });
 
     it("still maps OK->active and DISCONNECTED->disconnected", () => {
       const infra = new UnipileLinkedInInfra({ apiKey: "k", dsn: "d", webhookSecret: "s" });
-      expect(infra.parseEventWebhook({ event: "account_status", event_id: "e", account_id: "a", status: "OK", name: "x" })).toMatchObject({ status: "active" });
-      expect(infra.parseEventWebhook({ event: "account_status", event_id: "e", account_id: "a", status: "DISCONNECTED", name: "x" })).toMatchObject({ status: "disconnected" });
+      expect(infra.parseEventWebhook({ event: "account_status", account_id: "a", status: "OK", name: "x" })).toMatchObject({ status: "active" });
+      expect(infra.parseEventWebhook({ event: "account_status", account_id: "a", status: "DISCONNECTED", name: "x" })).toMatchObject({ status: "disconnected" });
     });
   });
 

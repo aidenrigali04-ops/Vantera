@@ -32,6 +32,14 @@ export {
 export { leadBlock, type CopyLead, type CopyContext, type DraftInput } from "./copy/shared";
 export { classifyReply, preClassify, replyVerdictSchema, type ReplyVerdict } from "./reply/classify";
 export {
+  draftConversationReply,
+  conversationReplySchema,
+  CONVERSATION_REPLY_MAX_CHARS,
+  type ConversationReply,
+  type ConversationReplyInput,
+  type ConversationTurn,
+} from "./reply/respond";
+export {
   classifyIntent,
   normalizeVerdict,
   intentVerdictSchema,

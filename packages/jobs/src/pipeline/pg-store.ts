@@ -55,6 +55,7 @@ import {
   type NewScheduledSend,
   type OutreachSendStore,
   type PurgeCandidate,
+  type ResponderBundle,
   type RetentionStore,
   type TrialStore,
   type IntentConfig,
@@ -1022,6 +1023,103 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           classifiedAt: new Date(),
         })
         .where(eq(replies.id, replyId));
+    },
+
+    async getResponderBundle(
+      accountId: string,
+      leadId: string,
+      _campaignId: string | null
+    ): Promise<ResponderBundle | null> {
+      // The live Outreach (copy) agent owns reply handling (rule 08). No live agent ⇒ responder off.
+      const [agent] = await db
+        .select({ id: agents.id, campaignId: agents.campaignId, config: agents.config })
+        .from(agents)
+        .where(and(eq(agents.accountId, accountId), eq(agents.kind, "copy"), eq(agents.status, "live")))
+        .limit(1);
+      if (!agent?.campaignId) return null;
+
+      // No insights ⇒ nothing to ground a reply on; stay silent (just classify + notify).
+      const [lead] = await db
+        .select()
+        .from(leads)
+        .where(and(eq(leads.accountId, accountId), eq(leads.id, leadId)))
+        .limit(1);
+      if (!lead?.aiInsights) return null;
+
+      const [account] = await db.select().from(accounts).where(eq(accounts.id, accountId)).limit(1);
+      const [campaign] = await db
+        .select({ sendMode: campaigns.sendMode })
+        .from(campaigns)
+        .where(eq(campaigns.id, agent.campaignId))
+        .limit(1);
+      const assets = await db
+        .select({ url: agentAssets.url, filename: agentAssets.filename })
+        .from(agentAssets)
+        .where(eq(agentAssets.agentId, agent.id));
+      const config = (agent.config ?? {}) as { cta?: string };
+      const scan = account?.websiteScan as (WebsiteScan & { url?: string }) | null;
+
+      // Running thread: delivered agent messages + the lead's replies, merged oldest-first.
+      const sent = await db
+        .select({ body: scheduledSends.body, at: scheduledSends.createdAt })
+        .from(scheduledSends)
+        .where(
+          and(
+            eq(scheduledSends.leadId, leadId),
+            eq(scheduledSends.linkedinStage, "message"),
+            eq(scheduledSends.status, "sent"),
+            isNotNull(scheduledSends.body)
+          )
+        );
+      const got = await db
+        .select({ body: replies.body, at: replies.receivedAt })
+        .from(replies)
+        .where(eq(replies.leadId, leadId));
+      const thread = [
+        ...sent.map((s) => ({ role: "agent" as const, text: s.body ?? "", at: s.at })),
+        ...got.map((r) => ({ role: "lead" as const, text: r.body ?? "", at: r.at })),
+      ]
+        .filter((t) => t.text.trim() !== "")
+        .sort((a, b) => a.at.getTime() - b.at.getTime())
+        .map(({ role, text }) => ({ role, text }));
+
+      // A message-stage reply already queued/in-flight ⇒ don't double-message.
+      const [pending] = await db
+        .select({ id: scheduledSends.id })
+        .from(scheduledSends)
+        .where(
+          and(
+            eq(scheduledSends.leadId, leadId),
+            eq(scheduledSends.linkedinStage, "message"),
+            inArray(scheduledSends.status, ["pending_review", "approved", "scheduled", "sending"])
+          )
+        )
+        .limit(1);
+
+      return {
+        campaignId: agent.campaignId,
+        sendMode: campaign?.sendMode === "automatic" ? "automatic" : "review",
+        lead: {
+          firstName: lead.firstName,
+          lastName: lead.lastName,
+          title: lead.title,
+          companyName: lead.companyName,
+          industry: lead.industry,
+        },
+        insights: lead.aiInsights as ResponderBundle["insights"],
+        context: {
+          cta: config.cta ?? "a quick look",
+          contentLinks: assets
+            .map((a) => a.url ?? a.filename)
+            .filter((v): v is string => Boolean(v)),
+          accountName: account?.name ?? null,
+          accountIndustry: account?.onboardingIndustry ?? null,
+          valueProp: scan?.summary ?? null,
+        },
+        thread,
+        agentTurns: sent.length,
+        hasUnsentMessage: Boolean(pending),
+      };
     },
 
     async addSuppression(

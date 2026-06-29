@@ -1,4 +1,4 @@
-import type { ReplyVerdict } from "@vantera/agent-brains";
+import { describeViolations, type ReplyVerdict } from "@vantera/agent-brains";
 import { normalizeLinkedInUrl } from "./copy-draft";
 import type { InboundDeps, InboundPayload, InboundStore, InboundSummary } from "./types";
 
@@ -8,6 +8,18 @@ import type { InboundDeps, InboundPayload, InboundStore, InboundSummary } from "
  * neutral / other) keeps the sequence nurturing toward close — a reply alone is not a stop signal.
  */
 const STOPS_SEQUENCE = new Set<ReplyVerdict["classification"]>(["not_interested", "unsubscribe"]);
+
+/**
+ * Replies the responder actively answers. not_interested / unsubscribe stop (and suppress);
+ * out_of_office never reaches here; a booked meeting is the win — we celebrate, we don't keep selling.
+ */
+const RESPONDABLE = new Set<ReplyVerdict["classification"]>(["interested", "neutral", "other"]);
+
+/**
+ * Converse-to-close turn cap. After this many agent messages in one thread without converting, the
+ * responder goes quiet and leaves it to the human — automation should never pester a real prospect.
+ */
+const MAX_AGENT_TURNS = 6;
 
 /**
  * Effects of a genuine (non-OOO) LinkedIn reply. The lead is always marked replied and the user
@@ -37,6 +49,59 @@ async function applyGenuineReply(
     kind: "reply",
     body: `${lead.id} replied${verdict.classification === "not_interested" ? " (not interested)" : ""}.`,
   });
+}
+
+/**
+ * The ACTIVE responder: understand the lead's message and draft the seller's next move with the
+ * SAME grounding + humanizer as the outreach copy, then queue it as a message-stage send so the
+ * existing dispatch path delivers it (paced, suppression-checked, from the locked sender). In
+ * 'automatic' mode a clean reply auto-sends; in 'review' mode — or if the humanizer flags it — it
+ * waits in the review queue. Returns true if a reply was drafted + queued.
+ *
+ * The contextual reply SUPERSEDES any queued scripted touch for the lead: once the prospect engages,
+ * the conversation is driven by what they actually said, not the pre-written sequence — and it keeps
+ * going each time they reply until they book, opt out, or the turn cap is hit ("converse to close").
+ */
+async function maybeRespond(
+  deps: InboundDeps,
+  accountId: string,
+  lead: { id: string; campaignId: string | null },
+  incoming: string,
+  verdict: ReplyVerdict
+): Promise<boolean> {
+  if (!deps.respondFn) return false;
+  if (!RESPONDABLE.has(verdict.classification) || verdict.booked) return false;
+
+  const bundle = await deps.store.getResponderBundle(accountId, lead.id, lead.campaignId);
+  if (!bundle) return false; // no live Outreach agent, or no insights to ground a reply
+  if (bundle.agentTurns >= MAX_AGENT_TURNS) return false; // hand off to the human
+  if (bundle.hasUnsentMessage) return false; // a reply is already queued/in-flight — don't double-message
+
+  const reply = await deps.respondFn({
+    lead: bundle.lead,
+    insights: bundle.insights,
+    context: bundle.context,
+    thread: bundle.thread,
+    incoming,
+    classification: verdict.classification,
+  });
+  const clean = reply.violations.length === 0;
+  const autoSend = bundle.sendMode === "automatic" && clean;
+
+  // Replace any queued scripted touch — the contextual reply takes over the conversation.
+  await deps.store.cancelPendingSends(lead.id);
+  await deps.store.insertScheduledSend({
+    accountId,
+    campaignId: bundle.campaignId,
+    leadId: lead.id,
+    channel: "linkedin",
+    subject: null,
+    body: reply.message,
+    status: autoSend ? "approved" : "pending_review",
+    linkedinStage: "message",
+    styleFlags: clean ? null : describeViolations(reply.violations),
+  });
+  return true;
 }
 
 /**
@@ -97,8 +162,13 @@ export async function runInbound(payload: InboundPayload, deps: InboundDeps): Pr
   }
   if (verdict.classification === "not_interested") {
     await deps.store.addSuppression(accountId, "linkedin", url, "not_interested", lead.id);
-  } else if (verdict.classification === "unsubscribe") {
-    await deps.store.addSuppression(accountId, "linkedin", url, "unsubscribe", lead.id);
+    return { handled: true, action: "reply:not_interested" };
   }
-  return { handled: true, action: `reply:${verdict.classification}` };
+  if (verdict.classification === "unsubscribe") {
+    await deps.store.addSuppression(accountId, "linkedin", url, "unsubscribe", lead.id);
+    return { handled: true, action: "reply:unsubscribe" };
+  }
+  // Active responder: draft + queue the seller's next move, continuing the conversation toward close.
+  const responded = await maybeRespond(deps, accountId, lead, event.body, verdict);
+  return { handled: true, action: `reply:${verdict.classification}${responded ? "+responded" : ""}` };
 }
