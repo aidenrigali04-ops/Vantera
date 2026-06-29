@@ -11,7 +11,9 @@ import { generateHumanized, leadBlock, type DraftInput } from "./shared";
  * (the send path enforces the same cap; see LINKEDIN_NOTE_MAX in jobs).
  */
 export const CONNECTION_NOTE_MAX_CHARS = 200;
-export const FOLLOWUP_MAX_CHARS = 500;
+// First message after acceptance. Kept short on purpose — a long DM reads like a pitch and gets
+// ignored; 1–2 tight sentences earn a reply (was 500, trimmed 2026-06-29 on owner feedback).
+export const FOLLOWUP_MAX_CHARS = 300;
 
 export const linkedinDraftSchema = z.object({
   connection_note: z.string().max(300),
@@ -35,9 +37,10 @@ Connection note — under ${CONNECTION_NOTE_MAX_CHARS} characters:
 - Reference the prospect's trigger, work, or a genuine commonality. That's all.
 - NO pitch, no CTA, no links, no "I'd love to connect about our product". The only goal is an accepted request from a real-sounding peer.
 
-Follow-up message — under ${FOLLOWUP_MAX_CHARS} characters:
-- Thank them briefly (3-6 words, not gushing), then one observation tying their pain/trigger to the aha moment as a concrete outcome.
+Follow-up message — KEEP IT SHORT, under ${FOLLOWUP_MAX_CHARS} characters, ideally 1-2 sentences:
+- A brief thanks (3-6 words, not gushing), then ONE sharp observation tying their pain/trigger to the aha moment as a concrete outcome. Cut every word that isn't pulling weight.
 - End with ONE soft, interest-based ask aligned to the CTA goal. No meeting demands, no calendar links.
+- Brevity matters more than completeness — a tight two-sentence message beats a thorough one. Do not pad.
 
 Both: conversational chat register, no "Dear", no "Best regards", no signature. Plain human voice: no "I hope this finds you well", no buzzwords ("game-changer", "cutting-edge", "seamless"), no generic flattery ("big fan of", "love what you're doing"), no "As a …" openers, at most one em-dash, at most one exclamation mark, minimal hedging. Name the seller ONLY by the "Seller company" value from the block — ignore any other brand name that appears in the offer description.`;
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { MockLanguageModelV3 } from "ai/test";
-import { draftConversationReply, type ConversationReplyInput } from "./respond";
+import { draftConversationMessage, type ConversationMessageInput } from "./respond";
 import type { StoredInsights } from "../prospect/schema";
 
 const insights: StoredInsights = {
@@ -12,12 +12,12 @@ const insights: StoredInsights = {
   summary: "VP Sales scaling a young team",
 };
 
-const input = (over: Partial<ConversationReplyInput> = {}): ConversationReplyInput => ({
+const input = (over: Partial<ConversationMessageInput> = {}): ConversationMessageInput => ({
   lead: { firstName: "Ryan", lastName: "Cunningham", title: "VP Sales", companyName: "Northwind", industry: "SaaS" },
   insights,
   context: { cta: "a quick 15-min intro", accountName: "Vantera", accountIndustry: "sales tech", valueProp: "qualifies leads before outreach" },
   thread: [
-    { role: "agent", text: "Saw you just raised a Series A — congrats on the round." },
+    { role: "agent", text: "Thanks for connecting, Ryan." },
     { role: "lead", text: "Thanks! What does Vantera actually do?" },
   ],
   incoming: "Thanks! What does Vantera actually do?",
@@ -42,20 +42,21 @@ function capturing(json: unknown, sink: (prompt: string) => void) {
   };
 }
 
-describe("draftConversationReply", () => {
-  it("drafts a contextual next message and grounds the prompt in the lead facts + thread", async () => {
+describe("draftConversationMessage — reply mode", () => {
+  it("answers the prospect, grounded in the lead facts + the running thread", async () => {
     let seen = "";
     const model = new MockLanguageModelV3({
       doGenerate: capturing(
-        { message: "It flags the leads worth a rep's time before you reach out. Want a quick look at how it'd score Northwind's list?" },
+        { message: "It flags the leads worth a rep's time before you reach out. Want a quick look?" },
         (p) => (seen = p)
       ),
     });
-    const out = await draftConversationReply(input(), model);
+    const out = await draftConversationMessage(input(), model);
     expect(out.message).toContain("rep");
     expect(out.violations).toEqual([]);
-    // grounding carried: the prospect's question + the seller facts both reach the model
+    // grounding carried: the prospect's question + the prior thread + the seller facts all reach the model
     expect(seen).toContain("What does Vantera actually do?");
+    expect(seen).toContain("Thanks for connecting, Ryan.");
     expect(seen).toContain("qualify before you spend a rep's time");
   });
 
@@ -63,23 +64,34 @@ describe("draftConversationReply", () => {
     const model = new MockLanguageModelV3({
       doGenerate: textResponse({ message: "We boost reply rates by 312% for every customer, guaranteed." }),
     });
-    const out = await draftConversationReply(input(), model);
+    const out = await draftConversationMessage(input(), model);
     expect(out.violations.length).toBeGreaterThan(0);
   });
 
   it("passes the incoming objection through to the model", async () => {
     let seen = "";
     const model = new MockLanguageModelV3({
-      doGenerate: capturing(
-        { message: "Totally fair — most teams already have a tool. The difference is the qualify step. Worth 15 min to compare?" },
-        (p) => (seen = p)
-      ),
+      doGenerate: capturing({ message: "Totally fair — the difference is the qualify step. Worth 15 min to compare?" }, (p) => (seen = p)),
     });
-    const out = await draftConversationReply(
-      input({ incoming: "We already use Apollo for this.", classification: "neutral" }),
+    await draftConversationMessage(input({ incoming: "We already use Apollo for this." }), model);
+    expect(seen).toContain("We already use Apollo");
+  });
+});
+
+describe("draftConversationMessage — proactive follow-up mode (no incoming)", () => {
+  it("writes a follow-up that builds on the thread, told NOT to re-introduce or repeat", async () => {
+    let seen = "";
+    const model = new MockLanguageModelV3({
+      doGenerate: capturing({ message: "One more angle, Ryan — teams your size usually see the first qualified meeting in week one. Open to a quick look?" }, (p) => (seen = p)),
+    });
+    const out = await draftConversationMessage(
+      input({ incoming: undefined, classification: undefined, thread: [{ role: "agent", text: "Thanks for connecting, Ryan." }] }),
       model
     );
     expect(out.message.length).toBeGreaterThan(0);
-    expect(seen).toContain("We already use Apollo");
+    expect(out.violations).toEqual([]);
+    // the prompt tells the model it's a follow-up that must build on the thread (not a cold open)
+    expect(seen).toContain("hasn't replied");
+    expect(seen).toContain("Thanks for connecting, Ryan.");
   });
 });

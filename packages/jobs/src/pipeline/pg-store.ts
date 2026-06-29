@@ -582,17 +582,6 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
       };
     },
 
-    async getCampaignCta(campaignId: string): Promise<string> {
-      // CTA lives on the agent that owns this campaign (agents.config.cta).
-      const [agent] = await db
-        .select({ config: agents.config })
-        .from(agents)
-        .where(eq(agents.campaignId, campaignId))
-        .limit(1);
-      const config = (agent?.config ?? {}) as { cta?: string };
-      return config.cta ?? "a quick look";
-    },
-
     async isSuppressed(accountId, kind, value) {
       const [hit] = await db
         .select({ id: suppressionEntries.id })

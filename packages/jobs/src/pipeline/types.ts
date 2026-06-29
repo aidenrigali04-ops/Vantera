@@ -20,8 +20,8 @@ import type {
   WebsiteScan,
   CopyLead,
   CopyContext as BrainCopyContext,
-  ConversationReply,
-  ConversationReplyInput,
+  ConversationDraft,
+  ConversationMessageInput,
   ConversationTurn,
 } from "@vantera/agent-brains";
 import type { OutreachCapacity } from "./capacity";
@@ -555,7 +555,7 @@ export interface InboundDeps {
    * "use the same logic as outreach to converse until close" contract). Absent = responder
    * disabled (a reply is only classified + notified, never auto-answered).
    */
-  respondFn?: (input: ConversationReplyInput) => Promise<ConversationReply>;
+  respondFn?: (input: ConversationMessageInput) => Promise<ConversationDraft>;
   now?: () => Date;
 }
 
@@ -658,7 +658,10 @@ export interface SequenceStore {
 
 export interface SequenceTouchStore {
   getDraftableLead(accountId: string, leadId: string): Promise<DraftableLead | null>;
-  getCampaignCta(campaignId: string): Promise<string>;
+  /** Same grounding + running thread the reply responder uses — so a follow-up touch builds on the
+   *  conversation instead of re-sending a cold first message. null = no live Outreach agent / no
+   *  insights ⇒ skip the touch. */
+  getResponderBundle(accountId: string, leadId: string, campaignId: string | null): Promise<ResponderBundle | null>;
   isSuppressed(accountId: string, kind: "linkedin", value: string): Promise<boolean>;
   insertScheduledSend(send: NewScheduledSend): Promise<void>;
   /** stop a sequence run (lead exits the sequence — e.g. dropped below min_score on refresh) */
@@ -667,7 +670,9 @@ export interface SequenceTouchStore {
 
 export interface SequenceTouchDeps {
   store: SequenceTouchStore;
-  draftLinkedInFn: (input: DraftInput) => Promise<LinkedInDraft>;
+  /** Drafts a PROACTIVE follow-up (no incoming reply) with the same brain the responder uses, so the
+   *  message follows the thread. Returns the body + any unresolved humanizer violations. */
+  draftFollowupFn: (input: ConversationMessageInput) => Promise<ConversationDraft>;
   /** current time (injectable for tests); used by the freshness check before a touch */
   now: () => Date;
   /**

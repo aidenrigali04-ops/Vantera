@@ -1,5 +1,4 @@
 import { describeViolations } from "@vantera/agent-brains";
-import type { DraftInput, Violation } from "@vantera/agent-brains";
 import { normalizeLinkedInUrl } from "./copy-draft";
 import { needsRefresh, FRESHNESS_WINDOW_DAYS } from "./freshness";
 import type {
@@ -9,16 +8,16 @@ import type {
   SequenceTouchOutcome,
 } from "./types";
 
-/** Describe unresolved humanizer violations for the review queue (tolerant of an empty list). */
-function flagsFor(violations: Violation[] | undefined): string | null {
-  return violations && violations.length > 0 ? describeViolations(violations) : null;
-}
-
 /**
  * Draft and insert ONE LinkedIn follow-up touch for the orchestrator. The suppression re-check at
  * this boundary is the rule-11 send-path gate: it runs BEFORE any draft or insert, so a suppressed
  * lead is never drafted. Aged leads are re-ranked first; one that drops below min_score exits the
  * sequence (NOT suppression).
+ *
+ * The follow-up is drafted by the CONVERSATION brain (same one the reply responder uses), grounded
+ * in the running thread — so touch N builds on what was already said instead of re-sending a cold
+ * first message. (Previously this re-used the connection-note copy, which made every follow-up read
+ * like an intro — fixed 2026-06-29.)
  */
 export async function runSequenceTouch(
   d: SequenceTouchDispatch,
@@ -43,21 +42,23 @@ export async function runSequenceTouch(
     }
   }
 
-  const cta = await deps.store.getCampaignCta(d.campaignId);
-  const input: DraftInput = {
-    lead: {
-      firstName: lead.firstName,
-      lastName: lead.lastName,
-      title: lead.title,
-      companyName: lead.companyName,
-      industry: lead.industry,
-    },
-    insights: lead.aiInsights as DraftInput["insights"],
-    context: { cta },
-  };
+  // Grounding + running thread (same source the reply responder uses). null ⇒ no live Outreach
+  // agent or no insights to ground a message → skip rather than send something cold/generic.
+  const bundle = await deps.store.getResponderBundle(d.accountId, d.leadId, d.campaignId);
+  if (!bundle) return "skipped";
 
-  const draft = await deps.draftLinkedInFn(input);
-  const styleFlags = flagsFor(draft.violations);
+  // Proactive follow-up: no incoming reply → the brain writes a fresh nudge that builds on the thread.
+  const draft = await deps.draftFollowupFn({
+    lead: bundle.lead,
+    insights: bundle.insights,
+    context: bundle.context,
+    thread: bundle.thread,
+  });
+  const styleFlags = draft.violations.length > 0 ? describeViolations(draft.violations) : null;
+  // Respect the agent's send mode (like copy-draft / the responder): automatic auto-approves a clean
+  // follow-up; review mode — or any style-flagged draft — waits in the review queue.
+  const status: NewScheduledSend["status"] =
+    bundle.sendMode === "automatic" && styleFlags === null ? "approved" : "pending_review";
 
   const send: NewScheduledSend = {
     accountId: d.accountId,
@@ -65,8 +66,8 @@ export async function runSequenceTouch(
     leadId: d.leadId,
     channel: "linkedin",
     subject: null,
-    body: draft.connectionNote,
-    status: styleFlags ? "pending_review" : "approved",
+    body: draft.message,
+    status,
     linkedinStage: "message",
     styleFlags,
   };

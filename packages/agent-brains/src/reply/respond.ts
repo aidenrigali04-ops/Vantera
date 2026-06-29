@@ -12,71 +12,83 @@ export interface ConversationTurn {
   text: string;
 }
 
-export interface ConversationReplyInput {
+export interface ConversationMessageInput {
   lead: CopyLead;
   insights: StoredInsights;
   /** Same grounding the outreach copy used — CTA, value prop, seller identity, guardrails. */
   context: CopyContext;
   /** Prior messages (excludes the incoming one being answered), oldest first. */
   thread: ConversationTurn[];
-  /** The prospect's latest message — the one this reply answers. */
-  incoming: string;
-  /** How the incoming message was classified (interested / neutral / other). */
-  classification: ReplyVerdict["classification"];
+  /**
+   * The prospect's latest message — present when answering a REPLY. Omit for a PROACTIVE follow-up
+   * (the prospect went quiet): the brain then writes a fresh nudge that builds on the thread instead
+   * of responding to anything.
+   */
+  incoming?: string;
+  /** How the incoming message was classified (only meaningful in reply mode). */
+  classification?: ReplyVerdict["classification"];
 }
 
-export interface ConversationReply {
+export interface ConversationDraft {
   message: string;
   /** unresolved humanizer / grounding violations — route to review, never silent-send (rule 06/11) */
   violations: Violation[];
 }
 
-/** One LinkedIn DM. Cap mirrors the outreach follow-up so a reviewed reply is sent verbatim. */
-export const CONVERSATION_REPLY_MAX_CHARS = 500;
+/** One LinkedIn DM. Short by design — long DMs read like a pitch and get ignored. */
+export const CONVERSATION_REPLY_MAX_CHARS = 350;
 
 export const conversationReplySchema = z.object({
   message: z.string().max(600),
 });
 
 // The "converse to close" system prompt. Same voice + anti-pitch discipline as the outreach copy
-// brain (copy/linkedin), but reactive: it must answer what the prospect actually said and move ONE
-// step toward the CTA, never dump the pitch. Grounding + humanizer linting are shared with outreach.
-const RESPOND_SYSTEM = `You are the seller, continuing a 1:1 LinkedIn conversation you started. The prospect just replied; write ONLY the seller's next message.
+// brain (copy/linkedin), but conversational: it must FOLLOW the thread — never restart it or repeat
+// what's already been said — and move ONE step toward the CTA. Grounding + humanizer linting shared.
+const RESPOND_SYSTEM = `You are the seller, continuing a 1:1 LinkedIn conversation you already started. Write ONLY your next message — the raw DM text, nothing else.
 
-- Directly address what they actually said — answer their question, acknowledge their point or objection. Never ignore it to pivot to a pitch.
-- Move the conversation exactly ONE concrete step toward the CTA goal. Don't dump the whole pitch; earn the next reply.
-- Ground every claim in the facts block — never invent a metric, customer, feature, or outcome that isn't there.
-- If they objected, address it honestly and briefly. If they showed interest, make the CTA easy to say yes to (offer, don't demand; no calendar links).
+You are mid-conversation, NOT introducing yourself. The thread so far is given; build on it. NEVER restart, NEVER re-introduce yourself ("Wanted to connect", "Saw you reacted to…"), NEVER repeat a point you already made.
+
+Reply mode (the prospect just sent a message): directly address what they actually said — answer their question, acknowledge their point or objection — then move ONE step toward the CTA goal.
+Follow-up mode (the prospect hasn't replied yet): send a brief, natural nudge that adds a NEW angle or a light reason to respond. Do not guilt-trip ("just following up", "circling back").
+
+Rules for every message:
+- KEEP IT SHORT: 1-2 sentences, under ${CONVERSATION_REPLY_MAX_CHARS} characters. Brevity earns replies; cut every word not pulling weight.
+- Ground every claim in the facts block — never invent a metric, customer, feature, or outcome.
+- Soft asks only — offer, don't demand; no calendar links, no meeting ultimatums.
 - Conversational chat register: no "Dear", no "Best regards", no signature, no buzzwords ("game-changer", "seamless"), no generic flattery, at most one em-dash, at most one exclamation mark, minimal hedging.
-- Under ${CONVERSATION_REPLY_MAX_CHARS} characters. One message only, no subject line. Name the seller ONLY by the "Seller company" value in the block.`;
+- Name the seller ONLY by the "Seller company" value in the block.`;
 
 function renderThread(thread: ConversationTurn[]): string {
-  if (thread.length === 0) return "(no earlier messages)";
+  if (thread.length === 0) return "(no earlier messages yet)";
   return thread.map((t) => `${t.role === "agent" ? "You" : "Prospect"}: ${t.text}`).join("\n");
 }
 
 /**
- * Draft the seller's next message in an ongoing LinkedIn conversation. Reuses the outreach grounding
- * (leadBlock) + humanizer (generateHumanized → validate → one bounded regenerate) so the reply speaks
- * with the same voice and the same anti-hallucination guardrails as the first-touch copy — the
- * "use the same logic as outreach to converse until close" contract.
+ * Draft the seller's next message in an ongoing LinkedIn conversation — a contextual REPLY (when
+ * `incoming` is set) or a PROACTIVE follow-up (when it isn't). Reuses the outreach grounding
+ * (leadBlock) + humanizer (generate → validate → one bounded regenerate) so every message speaks
+ * with the same voice and anti-hallucination guardrails as the first touch — the "use the same logic
+ * as outreach to converse until close" contract, applied to both replies AND scripted follow-ups so
+ * neither reads like a cold first message.
  */
-export async function draftConversationReply(
-  input: ConversationReplyInput,
+export async function draftConversationMessage(
+  input: ConversationMessageInput,
   model: LanguageModel = getModel()
-): Promise<ConversationReply> {
+): Promise<ConversationDraft> {
   const block = leadBlock({ lead: input.lead, insights: input.insights, context: input.context });
-  const prompt = [
-    block,
-    ``,
-    `Conversation so far:`,
-    renderThread(input.thread),
-    ``,
-    `The prospect just said (classified: ${input.classification}):`,
-    input.incoming.slice(0, 2000),
-    ``,
-    `Write your next message.`,
-  ].join("\n");
+  const situation = input.incoming
+    ? [
+        `The prospect just replied (classified: ${input.classification ?? "neutral"}):`,
+        input.incoming.slice(0, 2000),
+        ``,
+        `Write your next message answering them.`,
+      ]
+    : [
+        `The prospect hasn't replied to your last message yet.`,
+        `Write a short, natural follow-up that builds on the thread above — a new angle or light nudge, never a repeat or a re-introduction.`,
+      ];
+  const prompt = [block, ``, `Conversation so far:`, renderThread(input.thread), ``, ...situation].join("\n");
 
   const { output, violations } = await generateHumanized(
     async (fixNote) =>
@@ -86,7 +98,7 @@ export async function draftConversationReply(
           schema: conversationReplySchema,
           system: RESPOND_SYSTEM,
           prompt: fixNote ? `${prompt}\n\n${fixNote}` : prompt,
-          maxOutputTokens: 400,
+          maxOutputTokens: 300,
         })
       ).object,
     (draft) => [
