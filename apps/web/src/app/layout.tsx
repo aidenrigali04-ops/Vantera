@@ -1,8 +1,15 @@
 import type { Metadata } from "next";
 import { Montserrat, Geist_Mono, Poppins } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { SITE_URL, SITE_DESCRIPTION, JsonLd, organizationLd, websiteLd } from "@/lib/seo";
+
+// Google Analytics 4 (gtag.js) — site-wide event tracking. Loaded via next/script so it's
+// injected once on every route. The CSP nonce is applied automatically by Next (proxy.ts sets the
+// enforcing CSP request header); GA's endpoints are allowlisted in connect-src (lib/security/csp).
+// Gated to production builds so local `pnpm dev` never pollutes the analytics property.
+const GA_MEASUREMENT_ID = "G-2WC6VEZB5C";
 
 const montserrat = Montserrat({
   variable: "--font-montserrat",
@@ -54,6 +61,21 @@ export default function RootLayout({
       className={`${montserrat.variable} ${geistMono.variable} ${poppins.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
+        {/* Google Analytics (gtag.js) — every route. afterInteractive: loads early, after hydration. */}
+        {process.env.NODE_ENV === "production" && (
+          <>
+            <Script
+              src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
+              strategy="afterInteractive"
+            />
+            <Script id="google-analytics" strategy="afterInteractive">
+              {`window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', '${GA_MEASUREMENT_ID}');`}
+            </Script>
+          </>
+        )}
         {/* Site-wide entity graph for Google + AI engines. */}
         <JsonLd data={[organizationLd(), websiteLd()]} />
         {/* Light-only product: the dark theme was retired. forcedTheme pins it so the

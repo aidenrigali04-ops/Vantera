@@ -12,8 +12,10 @@ export function buildCsp(nonce: string): string {
     `style-src 'self' 'unsafe-inline'`,
     `img-src 'self' data: blob: https:`,
     `font-src 'self' data:`,
-    // Browser fetches: same-origin API (copilot stream, etc.) + Supabase.
-    `connect-src 'self' https://*.supabase.co wss://*.supabase.co`,
+    // Browser fetches: same-origin API (copilot stream, etc.) + Supabase + Google Analytics
+    // (GA4 gtag.js loader + measurement beacons — without these the event sends are blocked once
+    // the policy is enforced). img-src already permits the GA pixel fallback via `https:`.
+    `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://www.googletagmanager.com https://*.google-analytics.com https://*.analytics.google.com`,
     `frame-ancestors 'none'`,
     `base-uri 'self'`,
     `form-action 'self'`,

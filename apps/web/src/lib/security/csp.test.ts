@@ -18,4 +18,11 @@ describe("buildCsp", () => {
   it("points reports at the collector", () => {
     expect(csp).toContain("report-uri /api/csp-report");
   });
+
+  it("allows Google Analytics endpoints in connect-src so GA4 event beacons aren't blocked", () => {
+    const connectSrc = csp.split(";").find((d) => d.trim().startsWith("connect-src")) ?? "";
+    expect(connectSrc).toContain("https://*.google-analytics.com");
+    expect(connectSrc).toContain("https://*.analytics.google.com");
+    expect(connectSrc).toContain("https://www.googletagmanager.com");
+  });
 });
