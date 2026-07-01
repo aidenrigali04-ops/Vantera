@@ -72,13 +72,13 @@ const STATUS_LABELS: Record<string, string> = {
   archived: "Archived",
 };
 
-// Color grade (rule 07 kept emerald as the positive accent; dopamine layer added
-// here per request): emerald = a win, neutral foreground = in motion, muted = dead.
-// A won deal glows; everything else steps down. Two hues only — never a rainbow.
+// Color grade: one positive green (the app-wide --positive) = a win, neutral foreground = in
+// motion, muted = dead. A won deal reads solid; everything else steps down. Two hues only — never
+// a rainbow, no glow (the fill carries the emphasis on its own).
 const STATUS_CLASS: Record<string, string> = {
-  converted: "bg-emerald-500 text-white shadow-[0_0_12px_rgba(16,185,129,0.4)]",
+  converted: "bg-[var(--positive)] text-white",
   replied:
-    "bg-emerald-500/12 text-emerald-700 ring-1 ring-inset ring-emerald-500/30 dark:text-emerald-300",
+    "bg-[var(--positive-tint)] text-[var(--positive)] ring-1 ring-inset ring-[var(--positive-line)]",
   in_campaign: "bg-foreground/10 text-foreground ring-1 ring-inset ring-border",
   qualified: "bg-foreground/10 text-foreground ring-1 ring-inset ring-border",
   enriched: "bg-foreground/10 text-foreground ring-1 ring-inset ring-border",
@@ -100,13 +100,12 @@ function StatusPill({ status }: { status: string }) {
   );
 }
 
-// Score is the dopamine metric — grade it on the same emerald→amber ramp. Hot leads
-// glow so the best prospects pull your eye straight out of the list.
+// Score tiers on the same positive→amber ramp: hot gets the filled tint, strong just the ring,
+// "look" steps to amber (caution), unscored is muted. No glow — the tint + the number carry it.
 const SCORE_BADGE_CLASS: Record<ScoreTier, string> = {
-  hot: "bg-emerald-500/15 text-emerald-700 ring-1 ring-inset ring-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.35)] dark:text-emerald-300",
-  strong:
-    "bg-emerald-500/10 text-emerald-700 ring-1 ring-inset ring-emerald-500/20 dark:text-emerald-300/90",
-  look: "bg-amber-500/10 text-amber-700 ring-1 ring-inset ring-amber-500/25 dark:text-amber-300",
+  hot: "bg-[var(--positive-tint)] text-[var(--positive)] ring-1 ring-inset ring-[var(--positive-line)]",
+  strong: "text-[var(--positive)] ring-1 ring-inset ring-[var(--positive-line)]",
+  look: "bg-amber-500/10 text-amber-700 ring-1 ring-inset ring-amber-500/25",
   unscored: "text-muted-foreground/60",
 };
 
@@ -135,7 +134,7 @@ function leadName(lead: LeadRow): string {
 function SourceBadge({ source }: { source: string }) {
   if (source !== "intent") return null;
   return (
-    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-500/12 px-2 py-0.5 text-[11px] font-medium text-emerald-700 ring-1 ring-inset ring-emerald-500/30 dark:text-emerald-300">
+    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[var(--positive-tint)] px-2 py-0.5 text-[11px] font-medium text-[var(--positive)] ring-1 ring-inset ring-[var(--positive-line)]">
       <Radar className="size-3" aria-hidden />
       In-market
     </span>
@@ -152,13 +151,13 @@ function WhyNowLine({ lead }: { lead: LeadRow }) {
     <p
       className={cn(
         "mt-1 flex items-center gap-1 text-xs",
-        isIntent ? "text-emerald-700 dark:text-emerald-300" : "text-muted-foreground"
+        isIntent ? "text-[var(--positive)]" : "text-muted-foreground"
       )}
     >
       {isIntent ? (
         <Radar className="size-3 shrink-0" aria-hidden />
       ) : (
-        <Zap className="size-3 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden />
+        <Zap className="size-3 shrink-0 text-[var(--positive)]" aria-hidden />
       )}
       <span className="truncate">{isIntent ? `In-market: ${signal}` : signal}</span>
     </p>
@@ -193,7 +192,7 @@ function HotNowStrip({
   return (
     <section className="mb-5" data-copilot="hot-leads">
       <div className="mb-2.5 flex items-center gap-1.5">
-        <Flame className="size-4 text-emerald-600 dark:text-emerald-400" aria-hidden />
+        <Flame className="size-4 text-[var(--positive)]" aria-hidden />
         <Eyebrow>Hot right now</Eyebrow>
         <span className="text-xs text-muted-foreground">— your strongest-fit leads to work today</span>
       </div>
@@ -205,7 +204,7 @@ function HotNowStrip({
             onClick={() => onSelect(lead)}
             className={cn(
               PANEL_SURFACE,
-              "group flex flex-col gap-2 p-4 text-left ring-1 ring-inset ring-emerald-500/20 transition-colors hover:ring-emerald-500/40 dark:bg-emerald-500/[0.05]"
+              "group flex flex-col gap-2 p-4 text-left ring-1 ring-inset ring-[var(--positive-line)] transition-colors hover:ring-[var(--positive)]"
             )}
           >
             <div className="flex items-start justify-between gap-2">
@@ -223,7 +222,7 @@ function HotNowStrip({
             {(() => {
               const signal = leadSignalLine(lead.lead_signals, lead.ai_insights);
               return signal ? (
-                <p className="flex items-center gap-1 text-xs text-emerald-700 dark:text-emerald-300">
+                <p className="flex items-center gap-1 text-xs text-[var(--positive)]">
                   <Zap className="size-3 shrink-0" aria-hidden />
                   <span className="truncate">{signal}</span>
                 </p>

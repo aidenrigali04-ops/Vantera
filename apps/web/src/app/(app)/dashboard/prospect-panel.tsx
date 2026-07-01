@@ -39,7 +39,7 @@ export function ProspectPanel({ prospects }: { prospects: Prospect[] }) {
             <tr
               key={p.id}
               onClick={() => p.id && router.push(`/leads/${p.id}`)}
-              className="cursor-pointer border-t border-[var(--hairline)] transition-colors hover:bg-[var(--cyan-tint)]/50"
+              className="cursor-pointer border-t border-[var(--hairline)] transition-colors hover:bg-[var(--tint)]"
             >
               <td className="px-4 py-3">
                 <p className="font-medium">{name(p)}</p>
@@ -56,7 +56,7 @@ export function ProspectPanel({ prospects }: { prospects: Prospect[] }) {
                   {leadSignalLine(p.lead_signals, p.ai_insights) ?? "—"}
                 </p>
               </td>
-              <td className="px-4 py-3 font-medium tabular-nums">{p.ai_score ?? "—"}</td>
+              <td className="px-4 py-3 font-data font-medium tabular-nums">{p.ai_score ?? "—"}</td>
               <td className="px-4 py-3">
                 <span className="flex justify-end gap-1.5">
                   <Mail className={`size-4 ${p.email ? "text-[var(--cyan-strong)]" : "text-muted-foreground/30"}`} />

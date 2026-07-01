@@ -153,7 +153,7 @@ export function MorphPanel({ surface }: MorphPanelProps) {
               exit={{ opacity: 0, scale: 0.96, y: 8 }}
               transition={{ type: "spring", stiffness: 460, damping: 36, mass: 0.7 }}
               style={{ originX: 1, originY: 1 }}
-              className="absolute bottom-0 right-0 flex h-[560px] w-[400px] flex-col overflow-hidden rounded-3xl border border-border bg-background shadow-2xl"
+              className="absolute bottom-0 right-0 flex h-[560px] w-[400px] flex-col overflow-hidden rounded-2xl border border-border bg-background shadow-2xl"
             >
               {/* Header */}
               <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
@@ -336,7 +336,7 @@ function ThumbButtons({
         onClick={() => void handleRate("up")}
         className={cn(
           "text-xs rounded px-1 py-0.5 transition-colors",
-          rated === "up" ? "text-green-600" : "text-muted-foreground hover:text-foreground"
+          rated === "up" ? "text-[var(--positive)]" : "text-muted-foreground hover:text-foreground"
         )}
         aria-label="Helpful"
         disabled={rated !== null}

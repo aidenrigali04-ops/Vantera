@@ -41,7 +41,7 @@ export function DockNav({ badges }: { badges?: Record<string, number> }) {
     <nav className="flex flex-col items-center">
       {/* The dock pill — vertical (top-to-bottom) restructure of the source's
           horizontal rail; same rounded, blurred, ringed container. */}
-      <div className="flex flex-col items-center gap-3 rounded-[28px] border border-[var(--hairline)] bg-white/80 px-2 py-3 shadow-[var(--shadow-card)] ring-1 ring-black/5 backdrop-blur-lg">
+      <div className="flex flex-col items-center gap-3 rounded-2xl border border-[var(--hairline)] bg-white/80 px-2 py-3 shadow-[var(--shadow-card)] ring-1 ring-black/5 backdrop-blur-lg">
         {MAIN.map((item) => (
           <DockTile
             key={item.key}
@@ -75,16 +75,13 @@ function DockTile({
       aria-label={label}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "dock-tile group relative grid size-12 place-items-center rounded-xl ring-1 transition-transform duration-200 hover:translate-x-0.5 hover:scale-[1.05] focus-visible:scale-[1.05] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none",
+        "dock-tile group relative grid size-12 place-items-center rounded-xl ring-1 transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none",
         active
-          ? "bg-white text-[var(--cyan-strong)] shadow-sm ring-[var(--hairline)]"
+          ? "bg-[var(--cyan-tint)] text-[var(--cyan-strong)] ring-[var(--cyan-line)]"
           : "bg-white text-[var(--ink-3)] shadow-sm ring-[var(--hairline)] hover:text-foreground",
       )}
     >
-      <Icon
-        className="size-5 transition-transform duration-200 group-hover:scale-110"
-        strokeWidth={active ? 2.4 : 2.1}
-      />
+      <Icon className="size-5" strokeWidth={active ? 2.4 : 2.1} />
       {badge ? (
         <span className="absolute -top-1.5 -right-1.5 grid size-5 place-items-center rounded-full bg-foreground text-[10px] font-semibold text-background ring-2 ring-background">
           {badge > 99 ? "99+" : badge}

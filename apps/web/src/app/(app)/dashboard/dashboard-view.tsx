@@ -104,7 +104,7 @@ export function DashboardView(props: DashboardViewProps) {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
-        className="flex flex-wrap items-end justify-between gap-3"
+        className="flex flex-wrap items-end justify-between gap-3 border-b border-[var(--hairline)] pb-5"
       >
         <div>
           <Eyebrow>Command center</Eyebrow>
@@ -160,6 +160,8 @@ function WorkingDashboard(props: DashboardViewProps) {
     drafts,
     liveAgentsCount,
     scoutNextRunLabel,
+    scoutLastRunLabel,
+    scoutLive,
     revenue,
     convertedClients,
     pipelineLeads,
@@ -170,11 +172,25 @@ function WorkingDashboard(props: DashboardViewProps) {
     revenuePace,
     prospects,
     attribution,
+    agents,
+    week,
+    recentReplies,
+    interested,
   } = props;
 
   return (
     <Reveal className="flex flex-col gap-6">
-      {/* 1 — Needs you: the single action surface (drafts to review + warm leads cooling). */}
+      {/* Scan — the four numbers that answer "are we winning?": closed + pipeline value, weekly
+          replies, and what's waiting on you. Each tile drills into the surface that explains it. */}
+      <KpiStrip
+        revenue={revenue}
+        convertedClients={convertedClients}
+        pipelineLeads={pipelineLeads}
+        repliesThisWeek={week.replies}
+        drafts={drafts}
+      />
+
+      {/* Act — the single action surface (drafts to review + warm leads cooling). */}
       <NeedsYou
         drafts={drafts}
         cold={cold}
@@ -182,21 +198,110 @@ function WorkingDashboard(props: DashboardViewProps) {
         scoutNextRunLabel={scoutNextRunLabel}
       />
 
-      {/* 2 — Revenue vs goal (the value proof) with the wins→signal attribution folded into it. */}
-      <RevenueCard
-        revenue={revenue}
-        convertedClients={convertedClients}
-        pipelineLeads={pipelineLeads}
-        goal={goal}
-        goalCents={goalCents}
-        series={series}
-        paceLabel={revenuePace}
-        attribution={attribution}
-      />
+      {/* Prove + reassure — revenue vs goal (the value proof, given the width a chart wants) beside
+          the agent heartbeat that shows the autonomous process is alive. */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <RevenueCard
+            revenue={revenue}
+            convertedClients={convertedClients}
+            pipelineLeads={pipelineLeads}
+            goal={goal}
+            goalCents={goalCents}
+            series={series}
+            paceLabel={revenuePace}
+            attribution={attribution}
+          />
+        </div>
+        <div className="flex flex-col gap-6">
+          <AgentsPanel agents={agents} scoutLive={scoutLive} scoutLastRunLabel={scoutLastRunLabel} />
+          <WarmReplies recentReplies={recentReplies} interested={interested} />
+        </div>
+      </div>
 
-      {/* 3 — Hot leads: the anticipation surface, each row led by its real why-now signal. */}
+      {/* Explore — hot leads, each row led by its real why-now signal. */}
       <HotLeads prospects={prospects} />
     </Reveal>
+  );
+}
+
+/**
+ * Top-of-page KPI strip — four mono metrics for an at-a-glance read of the business. Color is
+ * placed, not sprinkled: a cyan dot marks the hero (closed) and the value turns cyan only when a
+ * tile needs action (drafts waiting); every other number stays neutral ink so color carries meaning.
+ */
+function KpiStrip({
+  revenue,
+  convertedClients,
+  pipelineLeads,
+  repliesThisWeek,
+  drafts,
+}: {
+  revenue: RevenueSnapshot;
+  convertedClients: number;
+  pipelineLeads: number;
+  repliesThisWeek: number;
+  drafts: number;
+}) {
+  const closed = revenue.hasValue ? usd.format(revenue.closedCents / 100) : String(convertedClients);
+  const closedSub = revenue.hasValue
+    ? `${convertedClients} ${convertedClients === 1 ? "client" : "clients"} won`
+    : convertedClients === 1
+      ? "client won"
+      : "clients won";
+  const pipeline = revenue.hasValue ? usd.format(revenue.expectedCents / 100) : String(pipelineLeads);
+  const pipelineSub = `${pipelineLeads} ${pipelineLeads === 1 ? "lead" : "leads"} in motion`;
+
+  return (
+    <RevealItem className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <KpiTile href="/dashboard?view=pipeline" label="Closed" value={closed} sub={closedSub} hero />
+      <KpiTile href="/dashboard?view=pipeline" label="In pipeline" value={pipeline} sub={pipelineSub} />
+      <KpiTile href="/leads?tab=replied" label="Replies" value={String(repliesThisWeek)} sub="this week" />
+      <KpiTile
+        href="/review"
+        label="To review"
+        value={String(drafts)}
+        sub={drafts > 0 ? "awaiting you" : "all clear"}
+        actionable={drafts > 0}
+      />
+    </RevealItem>
+  );
+}
+
+function KpiTile({
+  href,
+  label,
+  value,
+  sub,
+  hero = false,
+  actionable = false,
+}: {
+  href: string;
+  label: string;
+  value: string;
+  sub: string;
+  hero?: boolean;
+  actionable?: boolean;
+}) {
+  return (
+    <Link
+      href={href}
+      className="group rounded-xl border border-[var(--hairline)] bg-white p-4 shadow-[var(--shadow-sm)] transition-colors hover:border-[rgba(12,16,26,0.16)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      <span className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+        {hero && <span className="size-1.5 rounded-full bg-[var(--cyan-strong)]" aria-hidden />}
+        {label}
+      </span>
+      <p
+        className={cn(
+          "mt-2 font-data text-2xl font-semibold tabular-nums",
+          actionable ? "text-[var(--cyan-strong)]" : "text-foreground"
+        )}
+      >
+        {value}
+      </p>
+      <p className="mt-0.5 text-xs text-muted-foreground">{sub}</p>
+    </Link>
   );
 }
 
@@ -212,7 +317,7 @@ function WinsAttributionLine({ attribution }: { attribution: SignalAttribution[]
       href="/dashboard?view=analytics"
       className="group flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
     >
-      <span className="flex items-center gap-1.5 font-mono uppercase tracking-[0.14em] text-foreground/70">
+      <span className="flex items-center gap-1.5 font-data uppercase tracking-[0.14em] text-foreground/70">
         <Zap className="size-3.5" aria-hidden /> Wins from
       </span>
       {top.map((row, i) => (
@@ -286,7 +391,7 @@ function NeedsYou({
 }) {
   const hasWork = drafts > 0 || cold > 0;
   return (
-    <RevealItem className={cn(PANEL_SURFACE, "p-5", hasWork && "dark:bg-white/[0.06]")}>
+    <RevealItem className={cn(PANEL_SURFACE, "p-5", hasWork && "border-[var(--cyan-line)] bg-[var(--cyan-tint)]/40")}>
       <Eyebrow>Needs you</Eyebrow>
       {hasWork ? (
         <div className="mt-4 flex flex-col gap-4">
@@ -372,14 +477,14 @@ function AgentsPanel({
               <span
                 className={`size-2 rounded-full ${
                   a.status === "live"
-                    ? "animate-pulse bg-[var(--cyan)] shadow-[0_0_8px_rgba(48,207,255,0.9)]"
+                    ? "bg-[var(--cyan-strong)] ring-2 ring-[var(--cyan)]/25"
                     : "bg-muted-foreground/40"
                 }`}
                 aria-hidden
               />
               <span className="text-sm font-medium">{a.name}</span>
               <Badge variant="secondary" className="capitalize">
-                {a.kind === "scout" ? "Prospect" : "Outreach"}
+                {a.kind === "scout" ? "Prospect" : a.kind === "intent" ? "Intent" : "Outreach"}
               </Badge>
             </div>
             <span className="text-xs text-muted-foreground">
@@ -530,7 +635,7 @@ function ChannelRow({
       <span className="flex items-center gap-2 text-xs text-muted-foreground">
         {detail}
         <span
-          className={`size-2 rounded-full ${ready ? "bg-emerald-400" : "bg-muted-foreground/40"}`}
+          className={`size-2 rounded-full ${ready ? "bg-[var(--positive)]" : "bg-muted-foreground/40"}`}
           aria-hidden
         />
       </span>
@@ -562,7 +667,7 @@ function RevenueCard({
     <RevealItem className={cn(PANEL_SURFACE, "p-5")} data-copilot="dashboard-revenue">
       <div className="flex items-center justify-between gap-2">
         <Eyebrow>Revenue</Eyebrow>
-        <span className="flex items-center gap-1 font-mono text-[11px] uppercase tracking-wide text-muted-foreground">
+        <span className="flex items-center gap-1 font-data text-[11px] uppercase tracking-wide text-muted-foreground">
           <TrendingUp className="size-3.5" /> {goal ? `goal ${goal}/mo` : "vs goal"}
         </span>
       </div>
@@ -575,7 +680,7 @@ function RevenueCard({
                   <span className="size-2 rounded-full bg-foreground" /> Closed ·{" "}
                   {convertedClients} {convertedClients === 1 ? "client" : "clients"}
                 </span>
-                <span className="font-mono text-2xl font-semibold tabular-nums">
+                <span className="font-data text-2xl font-semibold tabular-nums">
                   {usd.format(revenue.closedCents / 100)}
                 </span>
               </div>
@@ -584,7 +689,7 @@ function RevenueCard({
                   <span className="size-2 rounded-full bg-foreground/40" /> Projected ·{" "}
                   {pipelineLeads} in pipeline
                 </span>
-                <span className="font-mono text-2xl font-semibold tabular-nums text-muted-foreground">
+                <span className="font-data text-2xl font-semibold tabular-nums text-muted-foreground">
                   {usd.format(projectedTotalCents / 100)}
                 </span>
               </div>
@@ -616,7 +721,7 @@ function RevenueCard({
           <div className="flex flex-col gap-3">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <span className="font-mono text-2xl font-semibold tabular-nums">
+                <span className="font-data text-2xl font-semibold tabular-nums">
                   {convertedClients}
                 </span>
                 <p className="text-xs text-muted-foreground">
@@ -624,7 +729,7 @@ function RevenueCard({
                 </p>
               </div>
               <div>
-                <span className="font-mono text-2xl font-semibold tabular-nums text-muted-foreground">
+                <span className="font-data text-2xl font-semibold tabular-nums text-muted-foreground">
                   {pipelineLeads}
                 </span>
                 <p className="text-xs text-muted-foreground">In pipeline</p>
@@ -701,7 +806,7 @@ function ConversionCelebration({
       initial={{ opacity: 0, y: 16, scale: 0.99 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-      className={cn(PANEL_SURFACE, "relative p-5 dark:bg-white/[0.07]")}
+      className={cn(PANEL_SURFACE, "relative p-5 ring-1 ring-[var(--cyan-line)]")}
     >
       <button
         type="button"
@@ -712,7 +817,7 @@ function ConversionCelebration({
         <X className="size-4" />
       </button>
       <div className="flex flex-wrap items-center gap-4 pr-8">
-        <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-foreground text-background shadow-[0_0_20px_rgba(255,255,255,0.55)]">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-foreground text-background shadow-[var(--shadow-sm)]">
           <PartyPopper className="size-5" />
         </span>
         <div className="min-w-0">
@@ -749,7 +854,7 @@ function ReplyCelebration({ win }: { win: { id: string; leadName: string } }) {
       initial={{ opacity: 0, y: 16, scale: 0.99 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-      className={cn(PANEL_SURFACE, "relative p-5 dark:bg-white/[0.07]")}
+      className={cn(PANEL_SURFACE, "relative p-5 ring-1 ring-[var(--cyan-line)]")}
     >
       <button
         type="button"
@@ -760,7 +865,7 @@ function ReplyCelebration({ win }: { win: { id: string; leadName: string } }) {
         <X className="size-4" />
       </button>
       <div className="flex flex-wrap items-center gap-4 pr-8">
-        <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-foreground text-background shadow-[0_0_20px_rgba(255,255,255,0.55)]">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-foreground text-background shadow-[var(--shadow-sm)]">
           <Sparkles className="size-5" />
         </span>
         <div className="min-w-0">
@@ -805,7 +910,7 @@ function CrmNudge({ convertedClients }: { convertedClients: number }) {
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-      className={cn(PANEL_SURFACE, "relative p-5 dark:bg-white/[0.06]")}
+      className={cn(PANEL_SURFACE, "relative p-5")}
     >
       <button
         type="button"

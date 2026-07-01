@@ -190,13 +190,13 @@ function AttributionCard({ attribution }: { attribution: SignalAttribution[] }) 
             <div key={row.kind}>
               <div className="flex items-baseline justify-between text-sm">
                 <span className="text-foreground">{row.label}</span>
-                <span className="font-mono font-semibold tabular-nums">
+                <span className="font-data font-semibold tabular-nums">
                   {row.wins} {row.wins === 1 ? "win" : "wins"}
                 </span>
               </div>
               <div className="mt-1.5 h-2.5 w-full overflow-hidden rounded-full bg-[var(--tint)] ring-1 ring-inset ring-[var(--hairline)]">
                 <div
-                  className="h-full rounded-full bg-[#0f9d58] transition-[width] duration-500"
+                  className="h-full rounded-full bg-[var(--positive)] transition-[width] duration-500"
                   style={{ width: `${widthPct}%` }}
                 />
               </div>
@@ -212,7 +212,7 @@ function Stat({ label, value, hint }: { label: string; value: string; hint?: str
   return (
     <div className="rounded-xl border border-[var(--hairline)] bg-[var(--tint)] p-4">
       <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
-      <p className="mt-1.5 font-mono text-2xl font-semibold tabular-nums">{value}</p>
+      <p className="mt-1.5 font-data text-2xl font-semibold tabular-nums">{value}</p>
       {hint && <p className="mt-0.5 text-xs text-muted-foreground/70">{hint}</p>}
     </div>
   );
@@ -236,14 +236,14 @@ function FunnelCard({ funnel, meetingsTracked }: { funnel: FunnelStage[]; meetin
                   {stage.conversionPct != null && !isUntrackedMeetings && (
                     <span
                       className={cn(
-                        "font-mono text-[11px]",
+                        "font-data text-[11px]",
                         bench?.status === "below" ? "text-muted-foreground" : "text-foreground/80",
                       )}
                     >
                       {stage.conversionPct}%
                     </span>
                   )}
-                  <span className="font-mono font-semibold tabular-nums">{stage.count}</span>
+                  <span className="font-data font-semibold tabular-nums">{stage.count}</span>
                 </span>
               </div>
               <div className="mt-1.5 h-2.5 w-full overflow-hidden rounded-full bg-[var(--tint)] ring-1 ring-inset ring-[var(--hairline)]">

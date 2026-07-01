@@ -135,12 +135,12 @@ export function LivePipeline(p: LivePipelineData) {
     <RevealItem className={cn(PANEL_SURFACE, "p-5")} data-copilot="live-pipeline">
       <div className="flex items-center justify-between gap-2">
         <Eyebrow>Live pipeline</Eyebrow>
-        <span className="flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-wide text-muted-foreground">
+        <span className="flex items-center gap-1.5 font-data text-[11px] uppercase tracking-wide text-muted-foreground">
           <span
             className={cn(
               "size-2 rounded-full",
               p.scoutLive
-                ? "animate-pulse bg-[var(--cyan)] shadow-[0_0_8px_rgba(48,207,255,0.9)]"
+                ? "bg-[var(--cyan-strong)] ring-2 ring-[var(--cyan)]/25"
                 : "bg-muted-foreground/40",
             )}
             aria-hidden
@@ -178,12 +178,13 @@ function StageRow({
 }) {
   const { icon: Icon } = stage;
 
-  // Node treatment encodes status at a glance: current = cyan + glow (where we are now),
-  // attention = solid cyan (needs you), reached = filled dark (work got here), else light.
+  // Node treatment encodes status at a glance: current = solid legible cyan (where we are now,
+  // marked by the body tint + "Now" badge + corner dot), attention = same cyan (needs you),
+  // reached = filled dark (work got here), else light. cyan-strong so white text passes contrast.
   const nodeClass = current
-    ? "bg-[var(--cyan)] text-white shadow-[0_0_12px_rgba(48,207,255,0.5)]"
+    ? "bg-[var(--cyan-strong)] text-white"
     : stage.attention
-      ? "bg-[var(--cyan)] text-white"
+      ? "bg-[var(--cyan-strong)] text-white"
       : stage.reached
         ? "bg-foreground text-background"
         : "bg-foreground/[0.05] text-[var(--ink-4)]";
@@ -200,7 +201,7 @@ function StageRow({
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-foreground">{stage.label}</span>
           {current && (
-            <span className="rounded-full bg-[var(--cyan)] px-1.5 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-[0.14em] text-white">
+            <span className="rounded-full bg-[var(--cyan-strong)] px-1.5 py-0.5 font-data text-[9px] font-semibold uppercase tracking-[0.14em] text-white">
               Now
             </span>
           )}
@@ -223,7 +224,7 @@ function StageRow({
       ) : (
         <span
           className={cn(
-            "shrink-0 font-mono text-xl font-semibold tabular-nums",
+            "shrink-0 font-data text-xl font-semibold tabular-nums",
             stage.value > 0 ? "text-foreground" : "text-[var(--ink-4)]",
           )}
         >
@@ -245,7 +246,7 @@ function StageRow({
         >
           <Icon className="size-4" aria-hidden />
           {current && (
-            <span className="absolute -right-0.5 -top-0.5 size-2 animate-pulse rounded-full bg-[var(--cyan)] shadow-[0_0_8px_rgba(48,207,255,0.9)] ring-2 ring-background" />
+            <span className="absolute -right-0.5 -top-0.5 size-2 rounded-full bg-[var(--cyan-strong)] ring-2 ring-background" />
           )}
         </span>
         {!last && (

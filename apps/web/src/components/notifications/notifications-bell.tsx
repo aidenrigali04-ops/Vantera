@@ -27,7 +27,7 @@ const KIND_ICON: Record<AppNotification["kind"], LucideIcon> = {
 const KIND_BADGE: Record<AppNotification["kind"], string> = {
   reply: "bg-[var(--cyan)] text-white",
   hot_signal: "bg-[var(--cyan)] text-white",
-  converted: "bg-[#13b07a] text-white",
+  converted: "bg-[var(--positive)] text-white",
   exhausted: "bg-[var(--ink-4)] text-white",
 };
 

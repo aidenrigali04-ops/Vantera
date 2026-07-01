@@ -120,7 +120,7 @@ function AgentOrb({ agent }: { agent: ShowcaseAgent }) {
             className={cn(
               "size-1.5 rounded-full",
               live
-                ? "animate-pulse bg-[var(--cyan)] shadow-[0_0_8px_rgba(48,207,255,0.9)]"
+                ? "bg-[var(--cyan-strong)] ring-2 ring-[var(--cyan)]/25"
                 : "bg-muted-foreground/40",
             )}
           />

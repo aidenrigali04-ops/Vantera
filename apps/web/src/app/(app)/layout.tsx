@@ -138,7 +138,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <DockNav badges={badges} />
 
         {/* Account + sign out, kept in the dock idiom — pinned to the bottom. */}
-        <div className="mt-auto flex flex-col items-center gap-3 rounded-[28px] border border-[var(--hairline)] bg-white/80 px-2 py-3 ring-1 ring-black/5 backdrop-blur-lg">
+        <div className="mt-auto flex flex-col items-center gap-3 rounded-2xl border border-[var(--hairline)] bg-white/80 px-2 py-3 ring-1 ring-black/5 backdrop-blur-lg">
           <span className="group relative grid size-10 place-items-center rounded-full bg-foreground/[0.06] text-xs font-semibold text-[var(--ink-2)] ring-1 ring-[var(--hairline)]">
             {initial}
             <DockTooltip>{email}</DockTooltip>
@@ -147,9 +147,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <button
               type="submit"
               aria-label="Sign out"
-              className="dock-tile group relative grid size-12 place-items-center rounded-xl bg-white text-[var(--ink-3)] shadow-sm ring-1 ring-[var(--hairline)] transition-transform duration-200 hover:translate-x-0.5 hover:scale-[1.05] hover:text-foreground focus-visible:scale-[1.05] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none"
+              className="dock-tile group relative grid size-12 place-items-center rounded-xl bg-white text-[var(--ink-3)] shadow-sm ring-1 ring-[var(--hairline)] transition-colors duration-200 hover:bg-[var(--tint)] hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none"
             >
-              <LogOut className="size-5 transition-transform duration-200 group-hover:scale-110" strokeWidth={2.1} />
+              <LogOut className="size-5" strokeWidth={2.1} />
               <DockTooltip>Sign out</DockTooltip>
             </button>
           </form>

@@ -98,9 +98,9 @@ function GoalPanel({
       </div>
 
       <div className="mt-4 flex items-end gap-2">
-        <span className="font-mono text-3xl font-semibold tabular-nums">{pipelineValueLabel}</span>
+        <span className="font-data text-3xl font-semibold tabular-nums">{pipelineValueLabel}</span>
         {goalLabel && (
-          <span className="pb-1 font-mono text-sm text-muted-foreground">/ {goalLabel} mo</span>
+          <span className="pb-1 font-data text-sm text-muted-foreground">/ {goalLabel} mo</span>
         )}
       </div>
 
@@ -119,11 +119,11 @@ function WonTile({ count }: { count: number }) {
     <Panel className="p-5">
       <div className="flex items-center justify-between">
         <Eyebrow>Won</Eyebrow>
-        <span className="grid size-6 place-items-center rounded-full bg-[#e9f9f0] text-[#0f9d58]">
+        <span className="grid size-6 place-items-center rounded-full bg-[var(--positive-tint)] text-[var(--positive)]">
           <Check className="size-3.5" aria-hidden />
         </span>
       </div>
-      <div className="mt-3 text-3xl font-semibold tabular-nums">{count}</div>
+      <div className="mt-3 font-data text-3xl font-semibold tabular-nums">{count}</div>
       <div className="mt-0.5 text-xs text-muted-foreground">
         {count === 1 ? "meeting booked" : "meetings booked"}
       </div>
@@ -141,7 +141,7 @@ function PausedCallout({ count }: { count: number }) {
             <span className="relative inline-flex size-2 rounded-full bg-[var(--cyan)]" />
           </span>
           <p className="text-sm">
-            <span className="font-mono font-semibold tabular-nums">{count}</span>{" "}
+            <span className="font-data font-semibold tabular-nums">{count}</span>{" "}
             {count === 1 ? "lead replied" : "leads replied"} — the sequence paused for you
           </p>
         </div>
@@ -168,7 +168,7 @@ function ActivityFeed({ activity }: { activity: ActivityItem[] }) {
                 className={cn(
                   "size-1.5 shrink-0 rounded-full",
                   a.kind === "converted"
-                    ? "bg-[#13b07a]"
+                    ? "bg-[var(--positive)]"
                     : a.kind === "reply"
                       ? "bg-[var(--cyan)]"
                       : "bg-foreground/40"
@@ -176,7 +176,7 @@ function ActivityFeed({ activity }: { activity: ActivityItem[] }) {
               />
               <span className="text-foreground">{a.who}</span>
               <span className="text-muted-foreground">{a.verb}</span>
-              <span className="ml-auto font-mono text-xs text-muted-foreground/70">{a.at}</span>
+              <span className="ml-auto font-data text-xs text-muted-foreground/70">{a.at}</span>
             </li>
           ))}
         </ul>
