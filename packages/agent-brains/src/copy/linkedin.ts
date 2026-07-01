@@ -60,6 +60,11 @@ export function validateLinkedInDraft(
   if (/https?:\/\//i.test(draft.connection_note)) {
     violations.push({ rule: "no-links", detail: "no links in a connection note" });
   }
+  // The first follow-up is a soft, human ask — a raw link makes it read like a pitch (content is
+  // referenced, never pasted in the first touch). Same anti-pitch discipline as the note.
+  if (/https?:\/\//i.test(draft.followup_message)) {
+    violations.push({ rule: "no-links", detail: "no links in the first follow-up — keep it a soft ask" });
+  }
   if (grounding) {
     violations.push(
       ...findUngroundedClaims(`${draft.connection_note}\n${draft.followup_message}`, grounding),

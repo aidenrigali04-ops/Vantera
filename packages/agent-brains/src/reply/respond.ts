@@ -2,7 +2,7 @@ import { generateObject, type LanguageModel } from "ai";
 import { z } from "zod";
 import { getModel } from "@vantera/ai";
 import type { StoredInsights } from "../prospect/schema";
-import { validateHumanity, findUngroundedClaims, type Violation } from "../copy/humanizer";
+import { validateHumanity, findUngroundedClaims, findRestartPhrases, type Violation } from "../copy/humanizer";
 import { generateHumanized, leadBlock, type CopyContext, type CopyLead } from "../copy/shared";
 import type { ReplyVerdict } from "./classify";
 
@@ -103,6 +103,8 @@ export async function draftConversationMessage(
       ).object,
     (draft) => [
       ...validateHumanity(draft.message, { maxChars: CONVERSATION_REPLY_MAX_CHARS }),
+      // mid-conversation must never restart/re-introduce (rule enforced, not just prompted)
+      ...findRestartPhrases(draft.message),
       ...findUngroundedClaims(draft.message, block),
     ]
   );

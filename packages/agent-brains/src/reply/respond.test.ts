@@ -95,3 +95,13 @@ describe("draftConversationMessage — proactive follow-up mode (no incoming)", 
     expect(seen).toContain("Thanks for connecting, Ryan.");
   });
 });
+
+describe("draftConversationMessage — restart guard", () => {
+  it("flags a reply that re-introduces / cold-opens mid-thread", async () => {
+    const model = new MockLanguageModelV3({
+      doGenerate: textResponse({ message: "Wanted to connect and show you what Vantera does." }),
+    });
+    const out = await draftConversationMessage(input(), model);
+    expect(out.violations.some((v) => v.rule === "restart")).toBe(true);
+  });
+});

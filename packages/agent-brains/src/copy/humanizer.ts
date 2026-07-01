@@ -25,7 +25,7 @@ const BANNED_PHRASES = [
   "touching base",
   "circle back",
   "i know you're busy",
-  "i'd love to pick your brain",
+  "pick your brain",
   "in today's fast-paced",
   "game-changer",
   "game changer",
@@ -38,6 +38,42 @@ const BANNED_PHRASES = [
   "big fan of",
   "love what you're doing",
   "as an ai",
+  // additional high-signal slop / spam markers (unambiguous — won't appear in genuine copy)
+  "quick question",
+  "hope you don't mind",
+  "i'll keep this brief",
+  "i'll keep this short",
+  "worth a chat",
+  "worth a quick chat",
+  "worth a quick call",
+  "at your convenience",
+  "move the needle",
+  "low-hanging fruit",
+  "loop back",
+  "touch base",
+  "best-in-class",
+  "best in class",
+  "world-class",
+  "thought leader",
+  "needless to say",
+  "hit the ground running",
+  "synergy",
+  "as promised",
+  "per my last",
+  "does this resonate",
+];
+
+// Phrases that re-introduce or cold-open — always wrong MID-CONVERSATION: a reply or scripted
+// follow-up must build on the thread, never restart. Enforced for the conversation responder only,
+// not the first-touch copy (where introducing yourself is the whole point).
+const RESTART_PHRASES = [
+  "wanted to connect",
+  "saw you reacted",
+  "reaching out because",
+  "let me introduce",
+  "thought i'd reach out",
+  // NB: "quick intro" is deliberately NOT here — it's a legitimate soft CTA ("open to a quick
+  // intro?"), so flagging it would fight the ask. Only unambiguous cold-opens belong in this list.
 ];
 
 const HEDGES = ["just", "perhaps", "maybe", "i think", "i believe", "possibly"];
@@ -57,9 +93,10 @@ export function validateHumanity(text: string, limits: HumanityLimits = {}): Vio
     }
   }
 
-  const emDashes = (text.match(/—/g) ?? []).length;
-  if (emDashes > 1) {
-    violations.push({ rule: "em-dashes", detail: `${emDashes} em-dashes; use at most 1` });
+  // em-dash AND en-dash — both are the same "machine punctuation" tell.
+  const dashes = (text.match(/[—–]/g) ?? []).length;
+  if (dashes > 1) {
+    violations.push({ rule: "em-dashes", detail: `${dashes} em/en-dashes; use at most 1` });
   }
 
   const exclamations = (text.match(/!/g) ?? []).length;
@@ -92,6 +129,26 @@ export function validateHumanity(text: string, limits: HumanityLimits = {}): Vio
 
 export function describeViolations(violations: Violation[]): string {
   return violations.map((v) => `${v.rule}: ${v.detail}`).join("; ");
+}
+
+/**
+ * Mid-conversation guard: flags re-introduction / cold-open phrases in a reply or scripted follow-up.
+ * The responder is told never to restart the thread; this is the enforcement floor for that rule, so
+ * a model slip ("Wanted to connect…") is caught and regenerated/reviewed rather than sent as if it
+ * were a first message. Use only for the conversation responder, never for first-touch outreach.
+ */
+export function findRestartPhrases(text: string): Violation[] {
+  const lower = text.toLowerCase();
+  const violations: Violation[] = [];
+  for (const phrase of RESTART_PHRASES) {
+    if (lower.includes(phrase)) {
+      violations.push({
+        rule: "restart",
+        detail: `mid-conversation message must not re-introduce or cold-open ("${phrase}")`,
+      });
+    }
+  }
+  return violations;
 }
 
 // Specific metric claims a draft can fabricate: percentages, currency, multipliers. Bare

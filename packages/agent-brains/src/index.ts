@@ -21,7 +21,13 @@ export {
   SCAN_STALE_AFTER_DAYS,
   type WebsiteScan,
 } from "./prospect/website-scan";
-export { validateHumanity, describeViolations, type Violation } from "./copy/humanizer";
+export {
+  validateHumanity,
+  describeViolations,
+  findRestartPhrases,
+  findUngroundedClaims,
+  type Violation,
+} from "./copy/humanizer";
 export {
   draftLinkedIn,
   validateLinkedInDraft,

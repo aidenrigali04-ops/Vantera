@@ -100,3 +100,13 @@ describe("draftLinkedIn", () => {
     expect(draft.violations).toEqual([]);
   });
 });
+
+describe("validateLinkedInDraft — follow-up link guard", () => {
+  it("rejects a link in the first follow-up (anti-pitch, soft ask)", () => {
+    const violations = validateLinkedInDraft({
+      connection_note: "Dana — clean note, no pitch.",
+      followup_message: "Thanks for connecting. See a demo: https://example.com/demo",
+    });
+    expect(violations.some((v) => v.rule === "no-links")).toBe(true);
+  });
+});
