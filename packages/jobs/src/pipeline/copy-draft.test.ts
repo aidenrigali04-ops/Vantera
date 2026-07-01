@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { normalizeLinkedInUrl, runCopyDraft } from "./copy-draft";
 import type {
+  ActiveExperiment,
   CopyContext,
   CopyDraftDeps,
   CopyDraftStore,
   DraftableLead,
   NewScheduledSend,
 } from "./types";
+import type { CopyStrategy, DraftInput } from "@vantera/agent-brains";
 
 function lead(id: string, overrides: Partial<DraftableLead> = {}): DraftableLead {
   return {
@@ -43,6 +45,10 @@ class FakeCopyStore implements CopyDraftStore {
   suppressionLookups: string[] = [];
   /** tracks which store method was used per LinkedIn draft: 'pair' or 'single' */
   linkedInCallKinds: ("pair" | "single")[] = [];
+  // Phase 3 experiment plumbing — default to inert (no experiment, empty champion).
+  activeExperiment: ActiveExperiment | null = null;
+  championStrategy: CopyStrategy = {};
+  stamps: { leadId: string; experimentId: string; variant: string }[] = [];
 
   constructor(channels = { linkedin: true }, sendMode: "review" | "automatic" = "review") {
     this.context = {
@@ -87,6 +93,19 @@ class FakeCopyStore implements CopyDraftStore {
   }
   async setLeadStatus(leadId: string, status: string) {
     this.leadStatuses.set(leadId, status);
+  }
+  async getActiveExperiment() {
+    return this.activeExperiment;
+  }
+  async getChampionStrategy() {
+    return this.championStrategy;
+  }
+  async stampLeadExperiment(
+    leadId: string,
+    experimentId: string,
+    variant: "champion" | "challenger"
+  ) {
+    this.stamps.push({ leadId, experimentId, variant });
   }
 }
 
@@ -271,5 +290,60 @@ describe("runCopyDraft — LinkedIn invite+message pair", () => {
     for (const send of store.sends) {
       expect(send.status).toBe("pending_review");
     }
+  });
+});
+
+// ── Phase 3: experiment strategy plumbing ────────────────────────────────────
+function makeCapturingDeps(store: FakeCopyStore): { deps: CopyDraftDeps; inputs: DraftInput[] } {
+  const inputs: DraftInput[] = [];
+  return {
+    inputs,
+    deps: {
+      store,
+      draftLinkedInFn: async (input) => {
+        inputs.push(input);
+        return { connectionNote: "note", followupMessage: "follow", violations: [] };
+      },
+    },
+  };
+}
+
+describe("runCopyDraft — experiment plumbing (Phase 3)", () => {
+  it("no experiment: champion is empty, no directives, no stamp (identical to before)", async () => {
+    const store = new FakeCopyStore();
+    store.leads = [lead("l1")];
+    const { deps, inputs } = makeCapturingDeps(store);
+    await runCopyDraft(PAYLOAD, deps);
+    expect(inputs[0]!.context.strategy).toEqual({});
+    expect(store.stamps).toHaveLength(0);
+  });
+
+  it("active experiment at 100%: the challenger strategy is applied and the lead is stamped challenger", async () => {
+    const store = new FakeCopyStore();
+    store.leads = [lead("l1")];
+    store.activeExperiment = {
+      id: "exp1",
+      allocationPct: 100,
+      challengerStrategy: { followupLength: "tight" },
+    };
+    const { deps, inputs } = makeCapturingDeps(store);
+    await runCopyDraft(PAYLOAD, deps);
+    expect(inputs[0]!.context.strategy).toEqual({ followupLength: "tight" });
+    expect(store.stamps).toEqual([{ leadId: "l1", experimentId: "exp1", variant: "challenger" }]);
+  });
+
+  it("active experiment at 0%: the adopted champion strategy is applied and the lead is stamped champion", async () => {
+    const store = new FakeCopyStore();
+    store.leads = [lead("l1")];
+    store.championStrategy = { openWith: "trigger" };
+    store.activeExperiment = {
+      id: "exp1",
+      allocationPct: 0,
+      challengerStrategy: { followupLength: "tight" },
+    };
+    const { deps, inputs } = makeCapturingDeps(store);
+    await runCopyDraft(PAYLOAD, deps);
+    expect(inputs[0]!.context.strategy).toEqual({ openWith: "trigger" });
+    expect(store.stamps).toEqual([{ leadId: "l1", experimentId: "exp1", variant: "champion" }]);
   });
 });

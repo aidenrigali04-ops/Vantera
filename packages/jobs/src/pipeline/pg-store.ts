@@ -25,6 +25,8 @@ import {
   suppressionEntries,
   appSettings,
   webhookEvents,
+  optimizationExperiments,
+  optimizationPlaybook,
   type Db,
 } from "@vantera/db";
 import type {
@@ -33,6 +35,7 @@ import type {
   ProspectCandidate,
   ProspectSignal,
 } from "@vantera/prospect-data";
+import type { CopyStrategy } from "@vantera/agent-brains";
 import { toStoredInsights, type LeadInsights, type WebsiteScan } from "@vantera/agent-brains";
 import { resolveEntitlements, type EntitlementSnapshot } from "@vantera/billing";
 import type { ClosedDeal, CrmProvider } from "@vantera/crm-infra";
@@ -640,6 +643,45 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
 
     async setLeadStatus(leadId, status) {
       await db.update(leads).set({ status }).where(eq(leads.id, leadId));
+    },
+
+    async getActiveExperiment(accountId) {
+      const [row] = await db
+        .select({
+          id: optimizationExperiments.id,
+          allocationPct: optimizationExperiments.allocationPct,
+          challengerStrategy: optimizationExperiments.challengerStrategy,
+        })
+        .from(optimizationExperiments)
+        .where(
+          and(
+            eq(optimizationExperiments.accountId, accountId),
+            eq(optimizationExperiments.status, "running")
+          )
+        )
+        .limit(1);
+      if (!row) return null;
+      return {
+        id: row.id,
+        allocationPct: row.allocationPct,
+        challengerStrategy: (row.challengerStrategy ?? {}) as CopyStrategy,
+      };
+    },
+
+    async getChampionStrategy(accountId) {
+      const [row] = await db
+        .select({ championStrategy: optimizationPlaybook.championStrategy })
+        .from(optimizationPlaybook)
+        .where(eq(optimizationPlaybook.accountId, accountId))
+        .limit(1);
+      return (row?.championStrategy ?? {}) as CopyStrategy;
+    },
+
+    async stampLeadExperiment(leadId, experimentId, variant) {
+      await db
+        .update(leads)
+        .set({ experimentId, strategyVariant: variant })
+        .where(eq(leads.id, leadId));
     },
 
     // ── SchedulerStore ───────────────────────────────────────────────────────

@@ -220,6 +220,12 @@ export const leads = pgTable(
     closedAt: timestamp("closed_at", { withTimezone: true }),
     // 0028: meeting-booked stage for the attribution funnel; server-set only (not client-writable)
     meetingBookedAt: timestamp("meeting_booked_at", { withTimezone: true }),
+    // 0040: self-optimizing experiment attribution — stamped by copy-draft when a lead is drafted
+    // under a running experiment. Null for non-experiment leads; service-role write only.
+    experimentId: uuid("experiment_id").references(() => optimizationExperiments.id, {
+      onDelete: "set null",
+    }),
+    strategyVariant: text("strategy_variant", { enum: ["champion", "challenger"] }),
     status: text("status", {
       enum: [
         "sourced",
@@ -1051,6 +1057,45 @@ export const leadNotifications = pgTable(
     index("lead_notifications_lead_idx").on(t.leadId),
   ]
 );
+
+// ── 0040 self-optimizing outreach (Phase 3) ───────────────────────────────────
+// The champion/challenger experiment engine's store. Inert until an owner starts an experiment.
+// Members read; admins start/adopt/discard; the decide pipeline updates status via service role.
+export const optimizationExperiments = pgTable(
+  "optimization_experiments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    stageKey: text("stage_key", { enum: ["acceptance", "reply", "booking", "close"] }).notNull(),
+    championStrategy: jsonb("champion_strategy").notNull().default({}),
+    challengerStrategy: jsonb("challenger_strategy").notNull().default({}),
+    allocationPct: integer("allocation_pct").notNull().default(25),
+    minSample: integer("min_sample").notNull().default(30),
+    status: text("status", {
+      enum: ["running", "ready_to_adopt", "adopted", "discarded", "halted"],
+    })
+      .notNull()
+      .default("running"),
+    decisionReason: text("decision_reason"),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+    concludedAt: timestamp("concluded_at", { withTimezone: true }),
+    createdBy: uuid("created_by"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("optimization_experiments_account_status_idx").on(t.accountId, t.status)]
+);
+
+// The account's adopted champion copy strategy (version-bumped each adoption). One row per account.
+export const optimizationPlaybook = pgTable("optimization_playbook", {
+  accountId: uuid("account_id")
+    .primaryKey()
+    .references(() => accounts.id, { onDelete: "cascade" }),
+  championStrategy: jsonb("champion_strategy").notNull().default({}),
+  version: integer("version").notNull().default(1),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
 
 // ── 0018 conversion tokens ────────────────────────────────────────────────────
 

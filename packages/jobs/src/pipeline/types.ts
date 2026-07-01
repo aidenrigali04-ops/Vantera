@@ -23,6 +23,7 @@ import type {
   ConversationDraft,
   ConversationMessageInput,
   ConversationTurn,
+  CopyStrategy,
 } from "@vantera/agent-brains";
 import type { OutreachCapacity } from "./capacity";
 import type { SenderCandidate } from "./sender-assignment";
@@ -289,6 +290,24 @@ export interface CopyDraftStore {
   /** Both rows or neither — the dispatch core assumes complete pairs. */
   insertLinkedInSendPair(invite: NewScheduledSend, message: NewScheduledSend): Promise<void>;
   setLeadStatus(leadId: string, status: "in_campaign"): Promise<void>;
+  // ── self-optimizing loop (Phase 3), inert when no experiment/playbook exists ──
+  /** the account's running experiment, or null; loaded once per run */
+  getActiveExperiment(accountId: string): Promise<ActiveExperiment | null>;
+  /** the account's adopted champion copy strategy; {} (no directives = pre-optimizer) when none */
+  getChampionStrategy(accountId: string): Promise<CopyStrategy>;
+  /** attribute a lead's outreach to its experiment arm (service-role write) */
+  stampLeadExperiment(
+    leadId: string,
+    experimentId: string,
+    variant: "champion" | "challenger"
+  ): Promise<void>;
+}
+
+/** A running experiment as the copy-draft pipeline needs it: id, split, and the challenger strategy. */
+export interface ActiveExperiment {
+  id: string;
+  allocationPct: number;
+  challengerStrategy: CopyStrategy;
 }
 
 export interface CopyDraftDeps {

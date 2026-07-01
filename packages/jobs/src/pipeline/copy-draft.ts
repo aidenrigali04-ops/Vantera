@@ -1,5 +1,5 @@
-import { describeViolations } from "@vantera/agent-brains";
-import type { DraftInput } from "@vantera/agent-brains";
+import { describeViolations, assignVariant } from "@vantera/agent-brains";
+import type { DraftInput, CopyStrategy } from "@vantera/agent-brains";
 import type {
   CopyDraftDeps,
   CopyDraftPayload,
@@ -17,7 +17,7 @@ export function normalizeLinkedInUrl(url: string): string {
   return url.trim().toLowerCase().replace(/\/+$/, "");
 }
 
-function toDraftInput(lead: DraftableLead, ctx: CopyContext): DraftInput | null {
+function toDraftInput(lead: DraftableLead, ctx: CopyContext, strategy?: CopyStrategy): DraftInput | null {
   if (!lead.aiInsights) return null;
   return {
     lead: {
@@ -35,6 +35,8 @@ function toDraftInput(lead: DraftableLead, ctx: CopyContext): DraftInput | null 
         .filter((v): v is string => Boolean(v)),
       accountIndustry: ctx.account.industry,
       valueProp: ctx.account.websiteScan?.summary ?? null,
+      // Empty / absent → strategyDirectives("") → prompt unchanged from before the optimizer.
+      strategy,
     },
   };
 }
@@ -71,6 +73,12 @@ export async function runCopyDraft(
   const { accountId } = ctx.agent;
   const channels = ctx.agent.config.channels;
 
+  // Self-optimizing loop (Phase 3): resolve the account's running experiment + adopted champion
+  // strategy once. Inert by default — no experiment + an empty playbook means every lead resolves to
+  // {} (no strategy directives), so drafting is identical to before the optimizer existed.
+  const experiment = await deps.store.getActiveExperiment(accountId);
+  const champion = await deps.store.getChampionStrategy(accountId);
+
   const leads = await deps.store.getDraftableLeads(accountId, payload.leadIds);
   // Idempotency: a retried run (Trigger maxAttempts) must never re-draft a lead that already
   // has rows — that would duplicate the invite/message pair and waste an LLM call.
@@ -84,7 +92,10 @@ export async function runCopyDraft(
   // so its throughput is the account's outreach volume. DRAFT_CONCURRENCY caps in-flight drafts.
   const outcomes = await mapWithConcurrency(leads, DRAFT_CONCURRENCY, async (lead): Promise<Outcome> => {
     if (alreadyDrafted.has(lead.id)) return ZERO;
-    const input = toDraftInput(lead, ctx);
+    // Deterministic, sticky per-lead arm assignment; strategy is the challenger's or the champion.
+    const variant = experiment ? assignVariant(experiment, lead.id) : null;
+    const strategy = variant === "challenger" ? experiment!.challengerStrategy : champion;
+    const input = toDraftInput(lead, ctx, strategy);
     if (!input) return { drafted: 0, suppressed: 0, skipped: 1 };
     await deps.store.ensureCampaignLead(campaignId, lead.id, accountId);
 
@@ -121,6 +132,8 @@ export async function runCopyDraft(
     if (leadDrafted > 0) {
       await deps.store.setCampaignLeadStatus(campaignId, lead.id, "queued");
       await deps.store.setLeadStatus(lead.id, "in_campaign");
+      // Attribute this lead's whole sequence to its arm so later outcomes measure the experiment.
+      if (experiment && variant) await deps.store.stampLeadExperiment(lead.id, experiment.id, variant);
       return { drafted: leadDrafted, suppressed: leadSuppressed, skipped: 0 };
     } else if (leadSuppressed > 0) {
       await deps.store.setCampaignLeadStatus(campaignId, lead.id, "suppressed");
