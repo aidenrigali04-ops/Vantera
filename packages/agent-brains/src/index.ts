@@ -105,3 +105,4 @@ export {
   isTerminalStatus,
   type ExperimentStatus,
 } from "./optimize/experiment";
+export { aggregateArm, type LeadOutcomeFlags } from "./optimize/outcomes";

@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { ArrowRight, Lightbulb } from "lucide-react";
+import { ArrowRight, FlaskConical, Lightbulb } from "lucide-react";
 import { Panel, Eyebrow } from "@/components/ui/panel";
 import { cn } from "@/lib/utils";
 import type { StageStatus } from "@vantera/agent-brains";
 import type { OutreachDiagnosisVM } from "@/lib/optimize";
+import { adoptExperiment, discardExperiment, startExperiment } from "./optimize-actions";
 
 // Phase 1 surface of the self-optimizing loop: a read-only "where your outreach leaks" panel.
 // Shows the invite→accept→reply→book→close funnel with each stage's rate against a typical band,
@@ -24,7 +25,7 @@ function barColor(status: StageStatus | undefined): string {
 
 export function OutreachDiagnosis({ vm }: { vm: OutreachDiagnosisVM }) {
   if (!vm.hasOutreach) return null; // nothing sent yet — the panel would be all zeros
-  const { diagnosis, funnel, recommendation } = vm;
+  const { diagnosis, funnel, recommendation, experiment, experimentOffer } = vm;
 
   const chip =
     diagnosis.status === "insufficient_data"
@@ -69,6 +70,79 @@ export function OutreachDiagnosis({ vm }: { vm: OutreachDiagnosisVM }) {
           )}
         </div>
       )}
+
+      {/* Phase 3 — the self-optimizing test: offer, running status, or the adopt decision. */}
+      {experiment ? (
+        experiment.status === "ready_to_adopt" ? (
+          <div className="mt-4 rounded-xl border border-[var(--positive-line)] bg-[var(--positive-tint)] p-4">
+            <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-[var(--positive)]">
+              <FlaskConical className="size-3.5" aria-hidden /> Test result
+            </p>
+            <p className="mt-1.5 text-sm font-semibold text-foreground">
+              A proven change is ready — {experiment.challengerLabel}
+            </p>
+            {experiment.decisionReason && (
+              <p className="mt-1 text-sm text-muted-foreground">
+                {experiment.decisionReason}. Adopt it as your agent&apos;s default, or keep the
+                current approach.
+              </p>
+            )}
+            <div className="mt-3 flex flex-wrap gap-2">
+              <form action={adoptExperiment}>
+                <input type="hidden" name="id" value={experiment.id} />
+                <button
+                  type="submit"
+                  className="inline-flex items-center rounded-lg bg-foreground px-3.5 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90"
+                >
+                  Adopt as default
+                </button>
+              </form>
+              <form action={discardExperiment}>
+                <input type="hidden" name="id" value={experiment.id} />
+                <button
+                  type="submit"
+                  className="inline-flex items-center rounded-lg border border-[var(--hairline)] px-3.5 py-2 text-sm font-medium transition-colors hover:bg-[var(--tint)]"
+                >
+                  Keep current
+                </button>
+              </form>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-4 rounded-xl border border-[var(--hairline)] bg-[var(--tint)] p-4">
+            <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+              <FlaskConical className="size-3.5" aria-hidden /> Testing now
+            </p>
+            <p className="mt-1.5 text-sm text-muted-foreground">
+              Trying <span className="font-medium text-foreground">{experiment.challengerLabel}</span>{" "}
+              on a slice of new drafts, measured against your current approach. It concludes on its own
+              once there&apos;s enough data — and stops immediately if it does any harm. Nothing sends
+              without your approval.
+            </p>
+          </div>
+        )
+      ) : experimentOffer ? (
+        <form action={startExperiment} className="mt-4">
+          <input type="hidden" name="stageKey" value={experimentOffer.stageKey} />
+          <div className="rounded-xl border border-[var(--hairline)] p-4">
+            <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+              <FlaskConical className="size-3.5" aria-hidden /> Or let the agent test a fix
+            </p>
+            <p className="mt-1.5 text-sm text-muted-foreground">
+              Vantera can safely A/B test{" "}
+              <span className="font-medium text-foreground">{experimentOffer.label}</span> on a small
+              slice of new drafts and keep it only if it genuinely helps — with a hard stop if it ever
+              backfires.
+            </p>
+            <button
+              type="submit"
+              className="mt-3 inline-flex items-center rounded-lg border border-[var(--cyan-line)] px-3.5 py-2 text-sm font-medium text-[var(--cyan-strong)] transition-colors hover:bg-[var(--cyan-tint)]"
+            >
+              Start the test
+            </button>
+          </div>
+        </form>
+      ) : null}
 
       <div className="mt-5 space-y-2.5">
         {funnel.map((s) => (

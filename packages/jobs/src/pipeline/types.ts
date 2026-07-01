@@ -24,6 +24,9 @@ import type {
   ConversationMessageInput,
   ConversationTurn,
   CopyStrategy,
+  FunnelStageKey,
+  LeadOutcomeFlags,
+  ExperimentStatus,
 } from "@vantera/agent-brains";
 import type { OutreachCapacity } from "./capacity";
 import type { SenderCandidate } from "./sender-assignment";
@@ -308,6 +311,32 @@ export interface ActiveExperiment {
   id: string;
   allocationPct: number;
   challengerStrategy: CopyStrategy;
+}
+
+// ── OptimizeStore: the decide pipeline (Phase 3), suggest-only ────────────────
+/** A running experiment as the decide pipeline needs it. */
+export interface RunningExperiment {
+  id: string;
+  stageKey: FunnelStageKey;
+  minSample: number;
+}
+
+export interface OptimizeStore {
+  /** all running experiments across accounts (service-role scan) */
+  getRunningExperiments(): Promise<RunningExperiment[]>;
+  /** per-lead outcome flags for one arm of an experiment */
+  getArmFlags(experimentId: string, variant: "champion" | "challenger"): Promise<LeadOutcomeFlags[]>;
+  /** conclude an experiment (ready_to_adopt / discarded / halted) with the decision reason */
+  concludeExperiment(id: string, status: ExperimentStatus, reason: string): Promise<void>;
+}
+
+export interface OptimizeDeps {
+  store: OptimizeStore;
+}
+
+export interface OptimizeSummary {
+  evaluated: number;
+  concluded: number;
 }
 
 export interface CopyDraftDeps {

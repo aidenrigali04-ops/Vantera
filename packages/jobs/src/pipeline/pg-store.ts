@@ -35,7 +35,12 @@ import type {
   ProspectCandidate,
   ProspectSignal,
 } from "@vantera/prospect-data";
-import type { CopyStrategy } from "@vantera/agent-brains";
+import type {
+  CopyStrategy,
+  FunnelStageKey,
+  LeadOutcomeFlags,
+  ExperimentStatus,
+} from "@vantera/agent-brains";
 import { toStoredInsights, type LeadInsights, type WebsiteScan } from "@vantera/agent-brains";
 import { resolveEntitlements, type EntitlementSnapshot } from "@vantera/billing";
 import type { ClosedDeal, CrmProvider } from "@vantera/crm-infra";
@@ -45,6 +50,7 @@ import {
   SCOUT_DEFAULTS,
   type ConversionStore,
   type ConnectionSyncStore,
+  type OptimizeStore,
   type CopyConfig,
   type CopyContext,
   type CopyDraftStore,
@@ -132,7 +138,7 @@ function toRow(send: NewScheduledSend) {
 }
 
 /** Drizzle-backed store used by the Trigger.dev tasks (service-role DATABASE_URL). */
-export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerStore & RetentionStore & TrialStore & SendDispatchStore & OutreachSendStore & InboundStore & SequenceStore & SequenceTouchStore & ConversionStore & RefreshLeadStore & IntentScanStore & ConnectionSyncStore {
+export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerStore & RetentionStore & TrialStore & SendDispatchStore & OutreachSendStore & InboundStore & SequenceStore & SequenceTouchStore & ConversionStore & RefreshLeadStore & IntentScanStore & ConnectionSyncStore & OptimizeStore {
   return {
     async getScoutContext(agentId: string): Promise<ScoutContext | null> {
       const [agent] = await db.select().from(agents).where(eq(agents.id, agentId));
@@ -682,6 +688,65 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         .update(leads)
         .set({ experimentId, strategyVariant: variant })
         .where(eq(leads.id, leadId));
+    },
+
+    // ── OptimizeStore (decide pipeline) ──────────────────────────────────────
+
+    async getRunningExperiments() {
+      const rows = await db
+        .select({
+          id: optimizationExperiments.id,
+          stageKey: optimizationExperiments.stageKey,
+          minSample: optimizationExperiments.minSample,
+        })
+        .from(optimizationExperiments)
+        .where(eq(optimizationExperiments.status, "running"));
+      return rows.map((r) => ({
+        id: r.id,
+        stageKey: r.stageKey as FunnelStageKey,
+        minSample: r.minSample,
+      }));
+    },
+
+    async getArmFlags(experimentId, variant): Promise<LeadOutcomeFlags[]> {
+      const armLeads = await db
+        .select({
+          id: leads.id,
+          invitedAt: leads.linkedinInvitedAt,
+          connectedAt: leads.linkedinConnectedAt,
+          bookedAt: leads.meetingBookedAt,
+          status: leads.status,
+        })
+        .from(leads)
+        .where(and(eq(leads.experimentId, experimentId), eq(leads.strategyVariant, variant)));
+      if (armLeads.length === 0) return [];
+      const ids = armLeads.map((l) => l.id);
+      const replyRows = await db
+        .select({ leadId: replies.leadId, classification: replies.classification })
+        .from(replies)
+        .where(inArray(replies.leadId, ids));
+      const interested = new Set<string>();
+      const negative = new Set<string>();
+      for (const r of replyRows) {
+        if (r.classification === "interested") interested.add(r.leadId);
+        else if (r.classification === "not_interested" || r.classification === "unsubscribe")
+          negative.add(r.leadId);
+      }
+      return armLeads.map((l) => ({
+        invited: l.invitedAt != null,
+        accepted: l.connectedAt != null,
+        interested: interested.has(l.id),
+        negative: negative.has(l.id),
+        booked: l.bookedAt != null,
+        converted: l.status === "converted",
+      }));
+    },
+
+    async concludeExperiment(id, status: ExperimentStatus, reason) {
+      await db
+        .update(optimizationExperiments)
+        .set({ status, decisionReason: reason, concludedAt: new Date() })
+        .where(eq(optimizationExperiments.id, id));
     },
 
     // ── SchedulerStore ───────────────────────────────────────────────────────

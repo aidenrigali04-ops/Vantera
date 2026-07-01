@@ -3,9 +3,13 @@ import {
   computeOutreachFunnel,
   diagnoseOutreach,
   recommendForDiagnosis,
+  describeStrategy,
+  proposeChallengerStrategy,
   type OutreachDiagnosis,
   type OutreachFunnelStage,
   type OutreachRecommendation,
+  type FunnelStageKey,
+  type CopyStrategy,
 } from "@vantera/agent-brains";
 
 // Phase 1 of the self-optimizing loop (docs/superpowers/specs/2026-06-29-self-optimizing-outreach-
@@ -20,6 +24,15 @@ export type OutreachDiagnosisVM = {
   recommendation: OutreachRecommendation | null;
   /** any invite has been sent — gates the whole panel */
   hasOutreach: boolean;
+  /** the account's live experiment (Phase 3), running or awaiting the owner's adopt decision */
+  experiment: {
+    id: string;
+    status: "running" | "ready_to_adopt";
+    challengerLabel: string;
+    decisionReason: string | null;
+  } | null;
+  /** an offer to auto-test a copy change for the diagnosed leak — only when nothing is running */
+  experimentOffer: { stageKey: FunnelStageKey; label: string } | null;
 };
 
 export async function loadOutreachDiagnosis(db: SupabaseClient): Promise<OutreachDiagnosisVM> {
@@ -45,10 +58,42 @@ export async function loadOutreachDiagnosis(db: SupabaseClient): Promise<Outreac
 
   const funnel = computeOutreachFunnel({ invited, accepted, interestedReplies, booked, closed });
   const diagnosis = diagnoseOutreach(funnel);
+
+  // The account's live experiment (running or awaiting the owner's adopt decision), if any.
+  const { data: expRow } = await db
+    .from("optimization_experiments")
+    .select("id, status, challenger_strategy, decision_reason")
+    .in("status", ["running", "ready_to_adopt"])
+    .order("started_at", { ascending: false })
+    .limit(1)
+    .maybeSingle<{
+      id: string;
+      status: "running" | "ready_to_adopt";
+      challenger_strategy: CopyStrategy;
+      decision_reason: string | null;
+    }>();
+  const experiment = expRow
+    ? {
+        id: expRow.id,
+        status: expRow.status,
+        challengerLabel: describeStrategy(expRow.challenger_strategy ?? {}),
+        decisionReason: expRow.decision_reason,
+      }
+    : null;
+
+  // Offer to auto-test only when there's a copy-controllable leak and nothing is already running.
+  let experimentOffer: OutreachDiagnosisVM["experimentOffer"] = null;
+  if (!experiment && diagnosis.status === "leak" && diagnosis.stageKey) {
+    const challenger = proposeChallengerStrategy(diagnosis.stageKey);
+    if (challenger) experimentOffer = { stageKey: diagnosis.stageKey, label: describeStrategy(challenger) };
+  }
+
   return {
     funnel,
     diagnosis,
     recommendation: recommendForDiagnosis(diagnosis),
     hasOutreach: invited > 0,
+    experiment,
+    experimentOffer,
   };
 }

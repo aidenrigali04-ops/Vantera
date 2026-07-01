@@ -45,6 +45,15 @@ suggestion: **you decide and you make the change** — nothing is applied automa
 recommendation states the honest expected direction (never a promised number) and whether the signal
 behind it is early or clear.
 
+## Optional: let the agent test a fix
+
+Where the fix is in the agent's own copy, Vantera can run a safe A/B test for you — trying the change
+on a small slice of new drafts and measuring it against your current approach. It only ever
+*suggests*: a change becomes your default only when **you** adopt it. The test concludes on its own
+once there's enough data, and it **stops immediately** if the challenger generates more negative
+replies — a variant that gets more replies but angrier ones loses. It never increases send volume,
+runs one change at a time, and every draft still passes the same honesty and humanity checks.
+
 ## What it will never do
 
 The goal is more replies and more booked meetings — but never at the cost of your account or your
