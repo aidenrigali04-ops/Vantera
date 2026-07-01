@@ -75,7 +75,7 @@ export function HeroDeck() {
             </div>
             <div className="truncate text-[12.5px] text-[#8E9AA3]">VP Sales · Northwind</div>
           </div>
-          <span className="ml-auto inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-[rgba(11, 87, 171,0.12)] px-2.5 py-[5px] text-[11.5px] font-semibold text-[#0A7CA6]">
+          <span className="ml-auto inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-[rgba(11, 87, 171,0.12)] px-2.5 py-[5px] text-[11.5px] font-semibold text-[#0b57ab]">
             <span className="size-1.5 rounded-full bg-[#0b57ab]" />
             High intent
           </span>
@@ -154,7 +154,7 @@ export function HeroDeck() {
           </button>
           <button
             type="button"
-            className="flex flex-1 items-center justify-center gap-2 rounded-[11px] bg-[#0b57ab] py-[11px] text-[13.5px] font-semibold text-[#06303F] transition-colors hover:bg-[#22C2F4] active:bg-[#1AB6E9]"
+            className="flex flex-1 items-center justify-center gap-2 rounded-[11px] bg-[#0b57ab] py-[11px] text-[13.5px] font-semibold text-white transition-colors hover:bg-[#0e63c4] active:bg-[#093f7a]"
           >
             <Send className="size-4" strokeWidth={2.4} />
             Approve &amp; send

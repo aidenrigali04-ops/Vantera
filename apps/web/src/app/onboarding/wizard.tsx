@@ -2,7 +2,7 @@
 
 import { useActionState, useState, useTransition } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, ChevronRight, Check, Loader2, Link2, Sparkles, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, Check, Loader2, Link2, Target, Search } from "lucide-react";
 import {
   savePersonalize,
   createOnboardingConnectLink,
@@ -103,7 +103,7 @@ export function Wizard({ init }: { init: WizardInit }) {
                 className={cn(
                   "size-4 rounded-full transition-all duration-300",
                   index <= step ? "" : "bg-[#e2e5ea]",
-                  index === step && "ring-4 ring-[rgba(11, 87, 171,0.22)]"
+                  index === step && "ring-4 ring-white"
                 )}
                 style={index <= step ? { backgroundColor: "var(--cyan)" } : undefined}
               />
@@ -191,7 +191,7 @@ export function Wizard({ init }: { init: WizardInit }) {
             {step === 1 && (
               <motion.div key="connect" initial="hidden" animate="visible" exit="exit" variants={contentVariants}>
                 <div className="px-8 pt-8 pb-2">
-                  <div className="mb-4 grid size-11 place-items-center rounded-xl bg-[var(--cyan-tint)] text-[var(--cyan-strong)] ring-1 ring-inset ring-[rgba(11, 87, 171,0.22)]">
+                  <div className="mb-4 grid size-11 place-items-center rounded-lg bg-[var(--cyan-tint)] text-[var(--cyan-strong)] ring-1 ring-inset ring-[rgba(11, 87, 171,0.22)]">
                     <Link2 className="size-5" strokeWidth={2.2} />
                   </div>
                   <h2 className="text-[20px] font-semibold tracking-[-0.02em] text-foreground">Connect your LinkedIn</h2>
@@ -233,8 +233,8 @@ export function Wizard({ init }: { init: WizardInit }) {
             {step === 2 && (
               <motion.form key="confirm" action={findAction} initial="hidden" animate="visible" exit="exit" variants={contentVariants}>
                 <div className="px-8 pt-8 pb-2">
-                  <div className="mb-4 grid size-11 place-items-center rounded-xl bg-[var(--cyan-tint)] text-[var(--cyan-strong)] ring-1 ring-inset ring-[rgba(11, 87, 171,0.22)]">
-                    <Sparkles className="size-5" strokeWidth={2.2} />
+                  <div className="mb-4 grid size-11 place-items-center rounded-lg bg-[var(--cyan-tint)] text-[var(--cyan-strong)] ring-1 ring-inset ring-[rgba(11, 87, 171,0.22)]">
+                    <Target className="size-5" strokeWidth={2.2} />
                   </div>
                   <h2 className="text-[20px] font-semibold tracking-[-0.02em] text-foreground">Here&apos;s what we got</h2>
                   {init.scan?.headline ? (

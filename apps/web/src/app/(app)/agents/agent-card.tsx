@@ -111,7 +111,11 @@ export function AgentCard({
       {icpNames.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
           {icpNames.map((name) => (
-            <Badge key={name} variant="secondary" className="font-normal">
+            <Badge
+              key={name}
+              variant="secondary"
+              className="max-w-full whitespace-normal break-words font-normal"
+            >
               {name}
             </Badge>
           ))}

@@ -8,9 +8,10 @@ import {
   CheckCircle2,
   Circle,
   Inbox,
+  MessageSquare,
   PartyPopper,
   Snowflake,
-  Sparkles,
+  Star,
   TrendingUp,
   UserPlus,
   Workflow,
@@ -519,7 +520,7 @@ function WarmReplies({
       <div className="mt-4">
         {!recentReplies || recentReplies.length === 0 ? (
           <div className="flex flex-col items-center gap-2 py-6 text-center">
-            <Sparkles className="size-6 text-muted-foreground" />
+            <MessageSquare className="size-6 text-muted-foreground" />
             <p className="max-w-xs text-sm text-muted-foreground">
               Interested replies show up here the moment they land. This is the number that matters
               most.
@@ -827,7 +828,7 @@ function ReplyCelebration({ win }: { win: { id: string; leadName: string } }) {
       </button>
       <div className="flex flex-wrap items-center gap-4 pr-8">
         <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-foreground text-background shadow-[var(--shadow-sm)]">
-          <Sparkles className="size-5" />
+          <Star className="size-5" />
         </span>
         <div className="min-w-0">
           <p className="text-sm font-medium">{win.leadName} is interested</p>
