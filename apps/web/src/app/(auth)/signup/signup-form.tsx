@@ -15,7 +15,7 @@ export function SignupForm() {
   if (state.sent) {
     return (
       <div className="flex flex-col gap-4">
-        <span className="grid size-11 place-items-center rounded-xl bg-[var(--cyan-tint)] text-[var(--cyan-strong)] ring-1 ring-inset ring-[rgba(48,207,255,0.2)]">
+        <span className="grid size-11 place-items-center rounded-xl bg-[var(--cyan-tint)] text-[var(--cyan-strong)] ring-1 ring-inset ring-[rgba(11, 87, 171,0.2)]">
           <Mail className="size-5" strokeWidth={1.9} />
         </span>
         <h1 className="text-[30px] font-bold tracking-[-0.03em] text-foreground">Check your email</h1>

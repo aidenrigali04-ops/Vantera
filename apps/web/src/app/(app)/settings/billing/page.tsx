@@ -72,7 +72,7 @@ export default async function BillingPage({
   });
 
   return (
-    <div className="flex max-w-6xl flex-col gap-10">
+    <div className="mx-auto flex max-w-6xl flex-col gap-10">
       {reason === "deploy" && !hasEntitlement && (
         <div className={cn(PANEL_SURFACE, "p-5 text-sm")}>
           <span className="font-heading font-semibold">Choose a plan to deploy your agent.</span>{" "}

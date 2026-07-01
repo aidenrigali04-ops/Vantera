@@ -49,9 +49,9 @@ export default async function TeamPage() {
 
   return (
     <div className="mx-auto max-w-2xl">
-      <div className="mb-6">
+      <div className="mb-6 border-b border-[var(--hairline)] pb-5">
         <h1 className="text-2xl font-semibold tracking-tight">Team</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <p className="mt-1.5 text-sm text-muted-foreground">
           Invite teammates into your workspace and manage who has access.
         </p>
       </div>

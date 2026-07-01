@@ -42,10 +42,10 @@ export default async function ChannelsPage({
   const linkedinAccounts = linkedinRows ?? [];
 
   return (
-    <div className="flex max-w-2xl flex-col gap-6">
-      <div>
+    <div className="mx-auto flex max-w-2xl flex-col gap-6">
+      <div className="border-b border-[var(--hairline)] pb-5">
         <h1 className="text-2xl font-semibold tracking-tight">LinkedIn</h1>
-        <p className="text-sm text-muted-foreground">
+        <p className="mt-1.5 text-sm text-muted-foreground">
           Connect the LinkedIn account your agents send from — it&apos;s the one step before
           outreach can go out.{" "}
           <Link href="/settings" className="underline underline-offset-2">

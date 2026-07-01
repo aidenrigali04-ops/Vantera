@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Check, Rocket, Settings2 } from "lucide-react";
+import { ArrowRight, Rocket, Settings2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { Panel, Eyebrow } from "@/components/ui/panel";
+import { KpiTile, KpiGrid } from "@/components/ui/kpi";
 import { AnimatedProgress } from "@/components/ui/animated-progress";
 import { cn } from "@/lib/utils";
 import type { PipelineViewModel } from "./queries";
@@ -34,16 +35,16 @@ export function PipelineBoard({
 
   return (
     <div className="mx-auto max-w-5xl">
-      <div className="mb-8 flex flex-wrap items-start justify-between gap-3">
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-3 border-b border-[var(--hairline)] pb-5">
         <div>
-          <h1 className="font-heading text-3xl font-semibold tracking-tight">Pipeline</h1>
+          <h1 className="font-heading text-2xl font-semibold tracking-tight">Pipeline</h1>
           <p className="mt-1.5 text-sm text-muted-foreground">
             Every validated lead, moving through the sequence — and stopping the instant they convert.
           </p>
         </div>
         <Link
           href="/sequence"
-          className="mt-1 inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[var(--hairline)] bg-white px-4 py-2 text-sm transition-colors hover:border-[var(--cyan-line)]"
+          className="mt-1 inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-[var(--hairline)] bg-white px-4 py-2 text-sm transition-colors hover:border-[var(--cyan-line)] hover:bg-[var(--tint)]"
         >
           <Settings2 className="size-4" aria-hidden /> Configure sequence
         </Link>
@@ -52,17 +53,39 @@ export function PipelineBoard({
       {empty ? (
         <EmptyState />
       ) : (
-        // Grounded two-column layout: the live funnel + its activity on the left, the
-        // revenue proof + the win count on the right — balanced, complementary panels.
-        <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr] lg:items-start">
-          <div className="flex flex-col gap-6">
+        <div className="space-y-6">
+          {/* Scan — top-line pipeline health. */}
+          <KpiGrid>
+            <KpiTile
+              hero
+              label="In pipeline"
+              value={pipelineValueLabel}
+              sub={goalLabel ? `toward ${goalLabel}/mo` : "projected value"}
+            />
+            <KpiTile label="In motion" value={String(vm.activeTotal)} sub="active in sequence" />
+            <KpiTile
+              label="Replied"
+              value={String(vm.pausedTotal)}
+              sub={vm.pausedTotal > 0 ? "waiting on you" : "none waiting"}
+              actionable={vm.pausedTotal > 0}
+              href={vm.pausedTotal > 0 ? "/leads?tab=replied" : undefined}
+            />
+            <KpiTile
+              label="Won"
+              value={String(vm.convertedClients)}
+              sub={vm.convertedClients === 1 ? "meeting booked" : "meetings booked"}
+            />
+          </KpiGrid>
+
+          {vm.pausedTotal > 0 && <PausedCallout count={vm.pausedTotal} />}
+
+          {/* The live funnel gets the width; the goal proof + activity ride alongside. */}
+          <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr] lg:items-start">
             <LivePipeline {...livePipeline} />
-            <ActivityFeed activity={activity} />
-          </div>
-          <div className="flex flex-col gap-6">
-            <GoalPanel vm={vm} goalLabel={goalLabel} pipelineValueLabel={pipelineValueLabel} />
-            <WonTile count={vm.convertedClients} />
-            {vm.pausedTotal > 0 && <PausedCallout count={vm.pausedTotal} />}
+            <div className="flex flex-col gap-6">
+              <GoalPanel vm={vm} goalLabel={goalLabel} pipelineValueLabel={pipelineValueLabel} />
+              <ActivityFeed activity={activity} />
+            </div>
           </div>
         </div>
       )}
@@ -110,23 +133,6 @@ function GoalPanel({
         <span className="text-foreground tabular-nums">{vm.convertedClients}</span> won ·{" "}
         <span className="text-foreground tabular-nums">{vm.activeTotal}</span> in motion
       </p>
-    </Panel>
-  );
-}
-
-function WonTile({ count }: { count: number }) {
-  return (
-    <Panel className="p-5">
-      <div className="flex items-center justify-between">
-        <Eyebrow>Won</Eyebrow>
-        <span className="grid size-6 place-items-center rounded-full bg-[var(--positive-tint)] text-[var(--positive)]">
-          <Check className="size-3.5" aria-hidden />
-        </span>
-      </div>
-      <div className="mt-3 font-data text-3xl font-semibold tabular-nums">{count}</div>
-      <div className="mt-0.5 text-xs text-muted-foreground">
-        {count === 1 ? "meeting booked" : "meetings booked"}
-      </div>
     </Panel>
   );
 }
@@ -203,7 +209,7 @@ function EmptyState() {
         </p>
         <Link
           href="/agents"
-          className="mt-6 inline-flex items-center gap-2 rounded-full bg-[#0a0c12] px-5 py-2.5 text-sm font-medium text-white transition-all hover:-translate-y-0.5 hover:shadow-[0_10px_30px_-8px_rgba(48,207,255,0.55)]"
+          className="mt-6 inline-flex items-center gap-2 rounded-lg bg-[#0a0c12] px-5 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90"
         >
           Launch a campaign
           <ArrowRight className="size-4" aria-hidden />

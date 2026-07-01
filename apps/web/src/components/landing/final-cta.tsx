@@ -18,13 +18,13 @@ export function FinalCta() {
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0"
-          style={{ background: "radial-gradient(60% 70% at 50% -10%, rgba(48,207,255,0.2), transparent 60%)" }}
+          style={{ background: "radial-gradient(60% 70% at 50% -10%, rgba(11, 87, 171,0.2), transparent 60%)" }}
         />
         <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/15" />
 
         <div className="relative">
           <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[12px] font-medium text-white/70">
-            <span className="size-1.5 rounded-full bg-[var(--cyan)] shadow-[0_0_8px_rgba(48,207,255,0.9)]" />
+            <span className="size-1.5 rounded-full bg-[var(--cyan)] shadow-[0_0_8px_rgba(11, 87, 171,0.9)]" />
             Get started
           </span>
           <h2 className="mx-auto mt-6 max-w-2xl text-[2.4rem] font-semibold leading-[1.04] tracking-[-0.035em] text-white sm:text-[3.2rem]">

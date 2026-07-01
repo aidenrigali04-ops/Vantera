@@ -35,7 +35,7 @@ export function LandingHeading({
             align === "center" ? "mx-auto" : "",
           )}
         >
-          <span className="size-1.5 rounded-full bg-[var(--cyan)] shadow-[0_0_8px_rgba(48,207,255,0.8)]" />
+          <span className="size-1.5 rounded-full bg-[var(--cyan)] shadow-[0_0_8px_rgba(11, 87, 171,0.8)]" />
           {eyebrow}
         </span>
       )}

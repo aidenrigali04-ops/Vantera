@@ -39,7 +39,7 @@ const TOTAL_SEGMENTS = STEP_LABELS.length + 1; // + endowed "account created"
 const FIELD =
   "h-11 w-full rounded-xl border border-[rgba(12,16,26,0.12)] bg-white px-4 text-[15px] text-foreground " +
   "placeholder:text-[var(--ink-4)] transition-colors " +
-  "focus-visible:border-[var(--cyan-strong)] focus-visible:ring-2 focus-visible:ring-[rgba(48,207,255,0.2)]";
+  "focus-visible:border-[var(--cyan-strong)] focus-visible:ring-2 focus-visible:ring-[rgba(11, 87, 171,0.2)]";
 
 const contentVariants = {
   hidden: { opacity: 0, x: 40 },
@@ -52,13 +52,13 @@ function Glow() {
     <div
       aria-hidden
       className="pointer-events-none absolute -inset-5 -z-10 rounded-[2.5rem] blur-2xl"
-      style={{ background: "radial-gradient(55% 60% at 50% 0%, rgba(48,207,255,0.18), transparent 70%)" }}
+      style={{ background: "radial-gradient(55% 60% at 50% 0%, rgba(11, 87, 171,0.18), transparent 70%)" }}
     />
   );
 }
 
 const DARK_BTN =
-  "inline-flex items-center justify-center gap-2 rounded-full bg-[#0a0c12] px-6 py-3 text-[15px] font-medium text-white transition-all hover:-translate-y-0.5 hover:shadow-[0_10px_30px_-8px_rgba(48,207,255,0.55)] disabled:opacity-60 disabled:hover:translate-y-0";
+  "inline-flex items-center justify-center gap-2 rounded-full bg-[#0a0c12] px-6 py-3 text-[15px] font-medium text-white transition-all hover:-translate-y-0.5 hover:shadow-[0_10px_30px_-8px_rgba(11, 87, 171,0.55)] disabled:opacity-60 disabled:hover:translate-y-0";
 
 export function Wizard({ init }: { init: WizardInit }) {
   const [step, setStep] = useState(init.initialStep);
@@ -103,7 +103,7 @@ export function Wizard({ init }: { init: WizardInit }) {
                 className={cn(
                   "size-4 rounded-full transition-all duration-300",
                   index <= step ? "" : "bg-[#e2e5ea]",
-                  index === step && "ring-4 ring-[rgba(48,207,255,0.22)]"
+                  index === step && "ring-4 ring-[rgba(11, 87, 171,0.22)]"
                 )}
                 style={index <= step ? { backgroundColor: "var(--cyan)" } : undefined}
               />
@@ -116,7 +116,7 @@ export function Wizard({ init }: { init: WizardInit }) {
         <div className="relative mt-3 h-1 w-full overflow-hidden rounded-full bg-[#eef0f3]">
           <motion.div
             className="absolute inset-y-0 left-0 rounded-full"
-            style={{ backgroundColor: "var(--cyan)", boxShadow: "0 0 8px rgba(48,207,255,0.5)" }}
+            style={{ backgroundColor: "var(--cyan)", boxShadow: "0 0 8px rgba(11, 87, 171,0.5)" }}
             initial={false}
             animate={{ width: `${(segmentsDone / TOTAL_SEGMENTS) * 100}%` }}
             transition={{ duration: 0.5, ease: "easeOut" }}
@@ -191,7 +191,7 @@ export function Wizard({ init }: { init: WizardInit }) {
             {step === 1 && (
               <motion.div key="connect" initial="hidden" animate="visible" exit="exit" variants={contentVariants}>
                 <div className="px-8 pt-8 pb-2">
-                  <div className="mb-4 grid size-11 place-items-center rounded-xl bg-[var(--cyan-tint)] text-[var(--cyan-strong)] ring-1 ring-inset ring-[rgba(48,207,255,0.22)]">
+                  <div className="mb-4 grid size-11 place-items-center rounded-xl bg-[var(--cyan-tint)] text-[var(--cyan-strong)] ring-1 ring-inset ring-[rgba(11, 87, 171,0.22)]">
                     <Link2 className="size-5" strokeWidth={2.2} />
                   </div>
                   <h2 className="text-[20px] font-semibold tracking-[-0.02em] text-foreground">Connect your LinkedIn</h2>
@@ -233,7 +233,7 @@ export function Wizard({ init }: { init: WizardInit }) {
             {step === 2 && (
               <motion.form key="confirm" action={findAction} initial="hidden" animate="visible" exit="exit" variants={contentVariants}>
                 <div className="px-8 pt-8 pb-2">
-                  <div className="mb-4 grid size-11 place-items-center rounded-xl bg-[var(--cyan-tint)] text-[var(--cyan-strong)] ring-1 ring-inset ring-[rgba(48,207,255,0.22)]">
+                  <div className="mb-4 grid size-11 place-items-center rounded-xl bg-[var(--cyan-tint)] text-[var(--cyan-strong)] ring-1 ring-inset ring-[rgba(11, 87, 171,0.22)]">
                     <Sparkles className="size-5" strokeWidth={2.2} />
                   </div>
                   <h2 className="text-[20px] font-semibold tracking-[-0.02em] text-foreground">Here&apos;s what we got</h2>

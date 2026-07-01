@@ -69,7 +69,7 @@
   --brand-foreground: #ffffff;
   /* Landing accent constants (used on the light landing; brand-stable across themes). */
   --accent-azure: #0099ff;
-  --accent-cyan: #30cfff;
+  --accent-cyan: #0b57ab;
   --accent-amber: #f2b11c;
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
@@ -151,7 +151,7 @@
 
 /* ----------------------------------------------------------------------------
    Landing surface — 2026 premium SaaS system (rebuilt 2026-06-26).
-   Clean light canvas, Poppins type, ONE electric-cyan signature (#30cfff) used as
+   Clean light canvas, Poppins type, ONE electric-cyan signature (#0b57ab) used as
    accent + subtle glow, premium multi-layer soft shadows, and DARK glassy product
    panels (the sleek mockups) where cyan glows. Scoped to `.landing` so the dark
    dashboard, auth, and onboarding surfaces are untouched.
@@ -171,12 +171,12 @@
   --secondary-foreground: #0a0c12;
   --muted: #f4f6f9;
   --muted-foreground: #5e636c;
-  --accent: #30cfff;
+  --accent: #0b57ab;
   --accent-foreground: #0a0c12;
   --destructive: #e5484d;
   --border: rgba(12, 16, 26, 0.07);
   --input: rgba(12, 16, 26, 0.1);
-  --ring: rgba(48, 207, 255, 0.5);
+  --ring: rgba(11, 87, 171, 0.5);
   --radius: 0.85rem;
 
   /* ink ramp — rich near-black → mid-grey → caption grey */
@@ -185,10 +185,10 @@
   --ink-4: #9aa0a8;
 
   /* electric-cyan signature system */
-  --cyan: #30cfff;
-  --cyan-strong: #0c9fce; /* legible cyan for text / links / icons on white */
-  --cyan-tint: #e7faff; /* soft cyan surface */
-  --cyan-line: rgba(48, 207, 255, 0.28);
+  --cyan: #0b57ab;
+  --cyan-strong: #0a4685; /* legible cyan for text / links / icons on white */
+  --cyan-tint: #eaf1fb; /* soft cyan surface */
+  --cyan-line: rgba(11, 87, 171, 0.28);
   --hairline: rgba(12, 16, 26, 0.07);
   --tint: #f6f8fb;
 
@@ -201,7 +201,7 @@
   --panel: #0b0d13;
   --panel-2: #14171f;
   --panel-line: rgba(255, 255, 255, 0.09);
-  --panel-glow: 0 40px 120px -40px rgba(48, 207, 255, 0.32), 0 30px 70px -34px rgba(12, 16, 26, 0.55);
+  --panel-glow: 0 40px 120px -40px rgba(11, 87, 171, 0.32), 0 30px 70px -34px rgba(12, 16, 26, 0.55);
 
   /* nav chrome */
   --glass-fill: rgba(255, 255, 255, 0.78);
@@ -256,9 +256,24 @@
   letter-spacing: -0.012em;
 }
 
+/* Navigation rail — a deep brand-blue sidebar against the white content canvas (the Stripe
+   colored-sidebar idiom). The whole palette hangs off these tokens, so re-hueing the rail is a
+   one-line change. Icons/logo go white; the active tile inverts to a white chip with a deep-blue
+   glyph; electric-cyan stays the live/alert accent. */
+.app-rail {
+  background: linear-gradient(180deg, #0b57ab 0%, #093c74 100%);
+  --nav-fg: rgba(255, 255, 255, 0.72);
+  --nav-fg-strong: #ffffff;
+  --nav-ink: #0a3f7d; /* deep blue for a glyph sitting on a white active chip */
+  --nav-tile: rgba(255, 255, 255, 0.1);
+  --nav-tile-hover: rgba(255, 255, 255, 0.18);
+  --nav-line: rgba(255, 255, 255, 0.16);
+  --nav-bg-solid: #0a4685; /* solid mid-tone for rings/badges that must match the rail */
+}
+
 .landing ::selection,
 .auth-surface ::selection {
-  background: rgba(48, 207, 255, 0.24);
+  background: rgba(11, 87, 171, 0.24);
   color: #0a0c12;
 }
 

@@ -33,7 +33,7 @@ export function LinkedInMark({ className }: { className?: string }) {
 export const FIELD =
   "h-11 rounded-xl border border-[rgba(12,16,26,0.12)] bg-white px-4 text-[15px] text-foreground " +
   "placeholder:text-[var(--ink-4)] transition-colors " +
-  "focus-visible:border-[var(--cyan-strong)] focus-visible:ring-2 focus-visible:ring-[rgba(48,207,255,0.2)]";
+  "focus-visible:border-[var(--cyan-strong)] focus-visible:ring-2 focus-visible:ring-[rgba(11, 87, 171,0.2)]";
 
 /** Near-black rectangular submit (rankvolt-style) with a pending state + faint cyan hover glow. */
 export function SubmitButton({
@@ -53,7 +53,7 @@ export function SubmitButton({
       disabled={pending}
       className={cn(
         "group inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#0a0c12] px-6 py-3.5 text-[15px] font-semibold text-white",
-        "transition-all hover:-translate-y-0.5 hover:shadow-[0_12px_34px_-10px_rgba(48,207,255,0.6)] disabled:opacity-60 disabled:hover:translate-y-0",
+        "transition-all hover:-translate-y-0.5 hover:shadow-[0_12px_34px_-10px_rgba(11, 87, 171,0.6)] disabled:opacity-60 disabled:hover:translate-y-0",
         className,
       )}
     >

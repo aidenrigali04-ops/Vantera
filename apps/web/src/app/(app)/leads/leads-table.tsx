@@ -204,7 +204,7 @@ function HotNowStrip({
             onClick={() => onSelect(lead)}
             className={cn(
               PANEL_SURFACE,
-              "group flex flex-col gap-2 p-4 text-left ring-1 ring-inset ring-[var(--positive-line)] transition-colors hover:ring-[var(--positive)]"
+              "group flex flex-col gap-2 p-4 text-left shadow-none ring-1 ring-inset ring-[var(--positive-line)] transition-colors hover:ring-[var(--positive)]"
             )}
           >
             <div className="flex items-start justify-between gap-2">

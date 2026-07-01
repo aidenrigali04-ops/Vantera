@@ -62,7 +62,7 @@ export function Pricing({ plans }: { plans: LandingPlan[] }) {
               <RevealItem
                 key={plan.tier}
                 className={cn(CARD_INTERACTIVE, "flex h-full flex-col p-7")}
-                style={plan.highlight ? { borderColor: "rgba(48,207,255,0.5)" } : undefined}
+                style={plan.highlight ? { borderColor: "rgba(11, 87, 171,0.5)" } : undefined}
               >
                 <div className="flex items-center justify-between">
                   <h3 className="text-[17px] font-semibold text-foreground">{plan.name}</h3>

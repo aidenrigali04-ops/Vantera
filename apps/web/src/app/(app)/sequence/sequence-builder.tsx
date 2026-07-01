@@ -9,7 +9,7 @@ import {
   UserPlus,
   type LucideIcon,
 } from "lucide-react";
-import { Panel, Eyebrow } from "@/components/ui/panel";
+import { Panel } from "@/components/ui/panel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -31,10 +31,9 @@ export function SequenceBuilder({
 
   return (
     <div className="mx-auto max-w-3xl">
-      <div className="mb-6">
-        <Eyebrow>Outreach sequence</Eyebrow>
-        <h1 className="font-heading mt-3 text-3xl font-semibold tracking-tight">The flow every lead runs</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
+      <div className="mb-6 border-b border-[var(--hairline)] pb-5">
+        <h1 className="text-2xl font-semibold tracking-tight">The flow every lead runs</h1>
+        <p className="mt-1.5 text-sm text-muted-foreground">
           {config.stages.linkedin.touches} LinkedIn touches — a connection request, then personalized
           follow-ups — and it stops the instant a lead books.
         </p>

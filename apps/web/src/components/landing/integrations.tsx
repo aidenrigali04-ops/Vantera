@@ -42,7 +42,7 @@ export function Integrations() {
         <Reveal className="mt-14 grid grid-cols-2 gap-4 sm:grid-cols-3">
           {TILES.map((t) => (
             <RevealItem key={t.name} className={cn(CARD_INTERACTIVE, "flex items-center gap-3 p-4")}>
-              <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[var(--cyan-tint)] text-[var(--cyan-strong)] ring-1 ring-inset ring-[rgba(48,207,255,0.2)]">
+              <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[var(--cyan-tint)] text-[var(--cyan-strong)] ring-1 ring-inset ring-[rgba(11, 87, 171,0.2)]">
                 <t.icon className="size-5" />
               </span>
               <div className="min-w-0">

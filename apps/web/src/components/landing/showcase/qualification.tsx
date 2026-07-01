@@ -19,7 +19,7 @@ export function Qualification() {
           <p className="text-[13px] font-semibold text-foreground">Qualification</p>
           <p className="text-[11px] text-[var(--ink-4)]">15 reviewed · 9 cleared the bar</p>
         </div>
-        <span className="rounded-full border border-[rgba(48,207,255,0.3)] bg-[var(--cyan-tint)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--cyan-strong)]">
+        <span className="rounded-full border border-[rgba(11, 87, 171,0.3)] bg-[var(--cyan-tint)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--cyan-strong)]">
           Bar {BAR}
         </span>
       </div>

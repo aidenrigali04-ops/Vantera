@@ -22,6 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { AnimatedProgress } from "@/components/ui/animated-progress";
 import { Reveal, RevealItem, Eyebrow, PANEL_SURFACE } from "@/components/ui/panel";
+import { KpiTile } from "@/components/ui/kpi";
 import { cn } from "@/lib/utils";
 import { RevenueChart } from "./revenue-chart";
 import { ProspectPanel, type Prospect } from "./prospect-panel";
@@ -107,11 +108,10 @@ export function DashboardView(props: DashboardViewProps) {
         className="flex flex-wrap items-end justify-between gap-3 border-b border-[var(--hairline)] pb-5"
       >
         <div>
-          <Eyebrow>Command center</Eyebrow>
-          <h1 className="font-heading mt-3 text-3xl font-semibold tracking-tight text-foreground">
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
             Good to see you, {firstName}
           </h1>
-          <p className="mt-2 text-sm text-muted-foreground">
+          <p className="mt-1.5 text-sm text-muted-foreground">
             Targeting <span className="font-medium text-foreground">{icp}</span> in{" "}
             <span className="font-medium text-foreground">{industry}</span>
             {goal && (
@@ -198,29 +198,27 @@ function WorkingDashboard(props: DashboardViewProps) {
         scoutNextRunLabel={scoutNextRunLabel}
       />
 
-      {/* Prove + reassure — revenue vs goal (the value proof, given the width a chart wants) beside
-          the agent heartbeat that shows the autonomous process is alive. */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2">
-          <RevenueCard
-            revenue={revenue}
-            convertedClients={convertedClients}
-            pipelineLeads={pipelineLeads}
-            goal={goal}
-            goalCents={goalCents}
-            series={series}
-            paceLabel={revenuePace}
-            attribution={attribution}
-          />
-        </div>
-        <div className="flex flex-col gap-6">
-          <AgentsPanel agents={agents} scoutLive={scoutLive} scoutLastRunLabel={scoutLastRunLabel} />
-          <WarmReplies recentReplies={recentReplies} interested={interested} />
-        </div>
-      </div>
+      {/* Prove — revenue vs goal, the value proof, at the full width a chart wants. */}
+      <RevenueCard
+        revenue={revenue}
+        convertedClients={convertedClients}
+        pipelineLeads={pipelineLeads}
+        goal={goal}
+        goalCents={goalCents}
+        series={series}
+        paceLabel={revenuePace}
+        attribution={attribution}
+      />
 
       {/* Explore — hot leads, each row led by its real why-now signal. */}
       <HotLeads prospects={prospects} />
+
+      {/* Reassure — the agent heartbeat + the warm replies that reward the daily check-in. Paired
+          in a balanced two-up row so neither one's height drags a gap into the primary content. */}
+      <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
+        <AgentsPanel agents={agents} scoutLive={scoutLive} scoutLastRunLabel={scoutLastRunLabel} />
+        <WarmReplies recentReplies={recentReplies} interested={interested} />
+      </div>
     </Reveal>
   );
 }
@@ -265,43 +263,6 @@ function KpiStrip({
         actionable={drafts > 0}
       />
     </RevealItem>
-  );
-}
-
-function KpiTile({
-  href,
-  label,
-  value,
-  sub,
-  hero = false,
-  actionable = false,
-}: {
-  href: string;
-  label: string;
-  value: string;
-  sub: string;
-  hero?: boolean;
-  actionable?: boolean;
-}) {
-  return (
-    <Link
-      href={href}
-      className="group rounded-xl border border-[var(--hairline)] bg-white p-4 shadow-[var(--shadow-sm)] transition-colors hover:border-[rgba(12,16,26,0.16)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-    >
-      <span className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
-        {hero && <span className="size-1.5 rounded-full bg-[var(--cyan-strong)]" aria-hidden />}
-        {label}
-      </span>
-      <p
-        className={cn(
-          "mt-2 font-data text-2xl font-semibold tabular-nums",
-          actionable ? "text-[var(--cyan-strong)]" : "text-foreground"
-        )}
-      >
-        {value}
-      </p>
-      <p className="mt-0.5 text-xs text-muted-foreground">{sub}</p>
-    </Link>
   );
 }
 

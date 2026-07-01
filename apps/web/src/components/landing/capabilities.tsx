@@ -36,7 +36,7 @@ export function Capabilities() {
         <Reveal className="mt-14 grid gap-4 lg:grid-cols-3">
           {CARDS.map((c) => (
             <RevealItem key={c.title} className={cn(CARD_INTERACTIVE, "group p-7")}>
-              <span className="grid size-12 place-items-center rounded-xl bg-[var(--cyan-tint)] text-[var(--cyan-strong)] ring-1 ring-inset ring-[rgba(48,207,255,0.2)] transition-transform duration-300 group-hover:scale-105">
+              <span className="grid size-12 place-items-center rounded-xl bg-[var(--cyan-tint)] text-[var(--cyan-strong)] ring-1 ring-inset ring-[rgba(11, 87, 171,0.2)] transition-transform duration-300 group-hover:scale-105">
                 <c.icon className="size-5" strokeWidth={1.9} />
               </span>
               <h3 className="mt-5 text-[19px] font-semibold tracking-[-0.015em] text-foreground">{c.title}</h3>

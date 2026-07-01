@@ -29,7 +29,7 @@ export function Hero() {
         className="pointer-events-none absolute inset-0 -z-10"
         style={{
           background:
-            "radial-gradient(48% 42% at 78% 6%, rgba(48,207,255,0.16) 0%, transparent 62%), radial-gradient(40% 36% at 12% 0%, rgba(48,207,255,0.06) 0%, transparent 60%)",
+            "radial-gradient(48% 42% at 78% 6%, rgba(11, 87, 171,0.16) 0%, transparent 62%), radial-gradient(40% 36% at 12% 0%, rgba(11, 87, 171,0.06) 0%, transparent 60%)",
         }}
       />
 
@@ -40,7 +40,7 @@ export function Hero() {
             <motion.div {...rise(0)}>
               <span className="inline-flex items-center gap-2 rounded-full border border-[var(--hairline)] bg-white py-1 pl-1.5 pr-3 text-[12.5px] font-medium text-[var(--ink-2)] shadow-[var(--shadow-sm)]">
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--cyan-tint)] px-2 py-0.5 text-[11px] font-semibold text-[var(--cyan-strong)]">
-                  <span className="size-1.5 rounded-full bg-[var(--cyan)] shadow-[0_0_8px_rgba(48,207,255,0.9)]" />
+                  <span className="size-1.5 rounded-full bg-[var(--cyan)] shadow-[0_0_8px_rgba(11, 87, 171,0.9)]" />
                   Live
                 </span>
                 Event in San Francisco
@@ -79,7 +79,7 @@ export function Hero() {
               />
               <button
                 type="submit"
-                className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[#0a0c12] px-5 py-2.5 text-[14px] font-medium text-white transition-all hover:shadow-[0_8px_24px_-8px_rgba(48,207,255,0.6)]"
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[#0a0c12] px-5 py-2.5 text-[14px] font-medium text-white transition-all hover:shadow-[0_8px_24px_-8px_rgba(11, 87, 171,0.6)]"
               >
                 Start free
                 <ArrowRight className="size-4" />

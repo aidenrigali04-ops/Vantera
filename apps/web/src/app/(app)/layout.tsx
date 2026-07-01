@@ -124,13 +124,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <div className="app-surface flex min-h-screen bg-[var(--tint)]">
       <GlassFilter />
       {/* Sticky full-height rail: stays in view while main scrolls. */}
-      <aside className="sticky top-0 flex h-screen w-20 shrink-0 flex-col items-center gap-4 overflow-y-auto border-r border-[var(--hairline)] bg-white px-2 py-4">
+      <aside className="app-rail sticky top-0 flex h-screen w-20 shrink-0 flex-col items-center gap-4 overflow-y-auto px-2 py-4">
         <Link
           href="/dashboard"
           aria-label="Vantera home"
-          className="grid size-11 shrink-0 place-items-center text-foreground"
+          className="grid size-11 shrink-0 place-items-center text-[var(--nav-fg-strong)]"
         >
-          <VanteraLogo className="size-8 text-foreground" />
+          <VanteraLogo className="size-8 text-[var(--nav-fg-strong)]" />
         </Link>
 
         <NotificationsBell notifications={notifications} />
@@ -138,8 +138,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <DockNav badges={badges} />
 
         {/* Account + sign out, kept in the dock idiom — pinned to the bottom. */}
-        <div className="mt-auto flex flex-col items-center gap-3 rounded-2xl border border-[var(--hairline)] bg-white/80 px-2 py-3 ring-1 ring-black/5 backdrop-blur-lg">
-          <span className="group relative grid size-10 place-items-center rounded-full bg-foreground/[0.06] text-xs font-semibold text-[var(--ink-2)] ring-1 ring-[var(--hairline)]">
+        <div className="mt-auto flex flex-col items-center gap-3 rounded-2xl border border-[var(--nav-line)] bg-white/[0.06] px-2 py-3 backdrop-blur-lg">
+          <span className="group relative grid size-10 place-items-center rounded-full bg-[var(--nav-tile)] text-xs font-semibold text-[var(--nav-fg-strong)] ring-1 ring-[var(--nav-line)]">
             {initial}
             <DockTooltip>{email}</DockTooltip>
           </span>
@@ -147,7 +147,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <button
               type="submit"
               aria-label="Sign out"
-              className="dock-tile group relative grid size-12 place-items-center rounded-xl bg-white text-[var(--ink-3)] shadow-sm ring-1 ring-[var(--hairline)] transition-colors duration-200 hover:bg-[var(--tint)] hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none"
+              className="group relative grid size-12 place-items-center rounded-xl bg-[var(--nav-tile)] text-[var(--nav-fg)] ring-1 ring-[var(--nav-line)] transition-colors duration-200 hover:bg-[var(--nav-tile-hover)] hover:text-[var(--nav-fg-strong)] focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none"
             >
               <LogOut className="size-5" strokeWidth={2.1} />
               <DockTooltip>Sign out</DockTooltip>

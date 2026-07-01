@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { Inbox } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { Panel, Eyebrow } from "@/components/ui/panel";
+import { Panel } from "@/components/ui/panel";
+import { cn } from "@/lib/utils";
 import { type LeadProfile } from "@/components/lead-profile";
 import { LEAD_PROFILE_FIELDS } from "@/components/lead-profile-fields";
 import { type DraftRow } from "./draft-card";
@@ -151,10 +152,9 @@ export default async function ReviewPage({
 
   return (
     <div className="mx-auto max-w-3xl">
-      <div className="mb-6">
-        <Eyebrow>Your sign-off</Eyebrow>
-        <h1 className="font-heading mt-3 text-3xl font-semibold tracking-tight">Review queue</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
+      <div className="mb-6 border-b border-[var(--hairline)] pb-5">
+        <h1 className="text-2xl font-semibold tracking-tight">Review queue</h1>
+        <p className="mt-1.5 text-sm text-muted-foreground">
           {view === "queue"
             ? `${count ?? 0} draft${count === 1 ? "" : "s"} across ${groups.length} prospect${
                 groups.length === 1 ? "" : "s"
@@ -163,18 +163,27 @@ export default async function ReviewPage({
         </p>
       </div>
 
-      <div className="mb-4 flex gap-2 text-sm">
-        {VIEWS.map((v) => (
-          <Link
-            key={v}
-            href={withChannel(v === "queue" ? {} : { view: v })}
-            className={`rounded-full border px-3 py-1 capitalize ${
-              view === v ? "border-primary bg-primary/10 font-medium" : "border-border"
-            }`}
-          >
-            {v === "queue" ? "Queue" : "Processed"}
-          </Link>
-        ))}
+      <div className="mb-5">
+        <div className="inline-flex items-center gap-1 rounded-xl border border-[var(--hairline)] bg-[var(--tint)] p-1 text-sm">
+          {VIEWS.map((v) => {
+            const isActive = view === v;
+            return (
+              <Link
+                key={v}
+                href={withChannel(v === "queue" ? {} : { view: v })}
+                aria-current={isActive ? "page" : undefined}
+                className={cn(
+                  "inline-flex items-center rounded-lg px-3 py-1.5 font-medium transition-colors",
+                  isActive
+                    ? "bg-white text-foreground shadow-[var(--shadow-sm)] ring-1 ring-[var(--hairline)]"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {v === "queue" ? "Queue" : "Processed"}
+              </Link>
+            );
+          })}
+        </div>
       </div>
 
       {!rows || rows.length === 0 ? (

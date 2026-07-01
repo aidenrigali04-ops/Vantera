@@ -68,7 +68,7 @@ export function LandingNav() {
           </Link>
           <Link
             href="/signup"
-            className="inline-flex items-center rounded-full bg-[#0a0c12] px-4 py-2.5 text-[14px] font-medium text-white shadow-[0_1px_2px_rgba(12,16,26,0.2)] transition-all hover:shadow-[0_8px_24px_-8px_rgba(48,207,255,0.55)]"
+            className="inline-flex items-center rounded-full bg-[#0a0c12] px-4 py-2.5 text-[14px] font-medium text-white shadow-[0_1px_2px_rgba(12,16,26,0.2)] transition-all hover:shadow-[0_8px_24px_-8px_rgba(11, 87, 171,0.55)]"
           >
             Get started
           </Link>

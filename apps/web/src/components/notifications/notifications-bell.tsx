@@ -79,13 +79,13 @@ export function NotificationsBell({ notifications }: { notifications: AppNotific
         aria-label="Notifications"
         aria-expanded={open}
         className={cn(
-          "group relative grid size-12 place-items-center rounded-xl bg-white text-foreground/70 shadow-sm ring-1 ring-[var(--hairline)] transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-          open && "bg-foreground/[0.05] text-foreground"
+          "group relative grid size-12 place-items-center rounded-xl bg-[var(--nav-tile)] text-[var(--nav-fg)] ring-1 ring-[var(--nav-line)] transition-colors hover:bg-[var(--nav-tile-hover)] hover:text-[var(--nav-fg-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70",
+          open && "bg-white text-[var(--nav-ink)]"
         )}
       >
         <Bell className="size-5" strokeWidth={2.1} />
         {unread > 0 && (
-          <span className="absolute -right-0.5 -top-0.5 grid min-w-[18px] place-items-center rounded-full bg-[var(--cyan)] px-1 text-[10px] font-semibold leading-[18px] text-white ring-2 ring-white">
+          <span className="absolute -right-0.5 -top-0.5 grid min-w-[18px] place-items-center rounded-full bg-foreground px-1 text-[10px] font-semibold leading-[18px] text-background ring-2 ring-[var(--nav-bg-solid)]">
             {unread > 9 ? "9+" : unread}
           </span>
         )}

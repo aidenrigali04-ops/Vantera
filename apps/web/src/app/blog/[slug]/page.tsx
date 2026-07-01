@@ -88,7 +88,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
             </p>
             <Link
               href="/signup"
-              className="mt-6 inline-flex items-center gap-1.5 rounded-full bg-[#0a0c12] px-5 py-2.5 text-[14px] font-medium text-white transition-all hover:shadow-[0_8px_24px_-8px_rgba(48,207,255,0.6)]"
+              className="mt-6 inline-flex items-center gap-1.5 rounded-full bg-[#0a0c12] px-5 py-2.5 text-[14px] font-medium text-white transition-all hover:shadow-[0_8px_24px_-8px_rgba(11, 87, 171,0.6)]"
             >
               Start free
               <ArrowRight className="size-4" />

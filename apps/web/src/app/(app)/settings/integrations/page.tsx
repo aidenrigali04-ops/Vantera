@@ -50,10 +50,10 @@ export default async function IntegrationsPage() {
   const connectedCount = (rows ?? []).filter((r) => r.status === "active").length;
 
   return (
-    <div className="flex max-w-2xl flex-col gap-6">
-      <div>
+    <div className="mx-auto flex max-w-2xl flex-col gap-6">
+      <div className="border-b border-[var(--hairline)] pb-5">
         <h1 className="text-2xl font-semibold tracking-tight">CRM &amp; integrations</h1>
-        <p className="text-sm text-muted-foreground">
+        <p className="mt-1.5 text-sm text-muted-foreground">
           Send closed-won deals straight into the tools your team already uses. Connect once and
           every win flows through automatically.{" "}
           <Link href="/settings" className="underline underline-offset-2">

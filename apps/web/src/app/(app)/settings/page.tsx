@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Panel, Eyebrow } from "@/components/ui/panel";
+import { Panel } from "@/components/ui/panel";
 import { createClient } from "@/lib/supabase/server";
 import { getGateData } from "@/lib/auth/context";
 import { ProfileForm } from "./profile-form";
@@ -38,9 +38,11 @@ export default async function SettingsPage() {
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-6">
-      <div>
-        <Eyebrow>Workspace</Eyebrow>
-        <h1 className="font-heading mt-3 text-3xl font-semibold tracking-tight">Settings</h1>
+      <div className="border-b border-[var(--hairline)] pb-5">
+        <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
+        <p className="mt-1.5 text-sm text-muted-foreground">
+          Your profile, workspace, team, billing, and connections.
+        </p>
       </div>
 
       <Panel className="flex flex-col gap-4">

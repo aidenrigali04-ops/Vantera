@@ -6,6 +6,7 @@ import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { LeadsTable, type LeadRow } from "./leads-table";
 import { HOT_MIN_SCORE } from "./lead-value";
+import { cn } from "@/lib/utils";
 
 const PAGE_SIZE = 25;
 
@@ -69,25 +70,36 @@ export default async function LeadsPage({
 
   return (
     <div className="mx-auto max-w-5xl">
-      <div className="mb-6">
+      <div className="mb-6 border-b border-[var(--hairline)] pb-5">
         <h1 className="text-2xl font-semibold tracking-tight">Leads</h1>
-        <p className="text-sm text-muted-foreground">
+        <p className="mt-1.5 text-sm text-muted-foreground">
           Every prospect your agents sourced, with the reasoning behind each score.
         </p>
       </div>
 
-      <div className="mb-4 flex flex-wrap gap-2 text-sm">
-        {TABS.map((t) => (
-          <Link
-            key={t.key}
-            href={t.key === "all" ? "/leads" : `/leads?tab=${t.key}`}
-            className={`rounded-full border px-3 py-1 ${
-              tab.key === t.key ? "border-primary bg-primary/10 font-medium" : "border-border"
-            }`}
-          >
-            {t.label}
-          </Link>
-        ))}
+      {/* Segmented control (matches the Results tabs) — one bordered track, active is a raised
+          white segment. Replaces the old full-pill tabs. */}
+      <div className="mb-5" data-copilot="leads-tabs">
+        <div className="inline-flex flex-wrap items-center gap-1 rounded-xl border border-[var(--hairline)] bg-[var(--tint)] p-1 text-sm">
+          {TABS.map((t) => {
+            const isActive = tab.key === t.key;
+            return (
+              <Link
+                key={t.key}
+                href={t.key === "all" ? "/leads" : `/leads?tab=${t.key}`}
+                aria-current={isActive ? "page" : undefined}
+                className={cn(
+                  "inline-flex items-center rounded-lg px-3 py-1.5 font-medium transition-colors",
+                  isActive
+                    ? "bg-white text-foreground shadow-[var(--shadow-sm)] ring-1 ring-[var(--hairline)]"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {t.label}
+              </Link>
+            );
+          })}
+        </div>
       </div>
 
       {!leads || leads.length === 0 ? (

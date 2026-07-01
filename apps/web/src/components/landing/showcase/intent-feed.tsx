@@ -18,7 +18,7 @@ export function IntentFeed() {
           <p className="text-[11px] text-[var(--ink-4)]">Tracking 15 prospects in real time</p>
         </div>
         <span className="inline-flex items-center gap-1.5 text-[9.5px] font-semibold uppercase tracking-[0.12em] text-[var(--cyan-strong)]">
-          <span className="size-1.5 rounded-full bg-[var(--cyan)] shadow-[0_0_8px_rgba(48,207,255,0.9)]" />
+          <span className="size-1.5 rounded-full bg-[var(--cyan)] shadow-[0_0_8px_rgba(11, 87, 171,0.9)]" />
           Live
         </span>
       </div>

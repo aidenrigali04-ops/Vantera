@@ -18,7 +18,7 @@ export default async function OnboardingLayout({ children }: { children: React.R
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0 -z-10"
-        style={{ background: "radial-gradient(44% 34% at 50% 0%, rgba(48,207,255,0.12), transparent 62%)" }}
+        style={{ background: "radial-gradient(44% 34% at 50% 0%, rgba(11, 87, 171,0.12), transparent 62%)" }}
       />
       <Link href="/" className="mb-8 flex items-center gap-2 text-foreground">
         <VanteraLogo className="size-6 text-foreground" />

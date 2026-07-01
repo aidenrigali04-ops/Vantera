@@ -55,7 +55,7 @@ export function Showcase() {
                 className={row.flip ? "lg:order-2" : ""}
               >
                 <span className="inline-flex items-center gap-2 text-[13px] font-semibold text-[var(--cyan-strong)]">
-                  <span className="size-1.5 rounded-full bg-[var(--cyan)] shadow-[0_0_8px_rgba(48,207,255,0.7)]" />
+                  <span className="size-1.5 rounded-full bg-[var(--cyan)] shadow-[0_0_8px_rgba(11, 87, 171,0.7)]" />
                   {row.tag}
                 </span>
                 <h3 className="mt-4 text-[1.75rem] font-semibold leading-tight tracking-[-0.025em] text-foreground sm:text-[2.25rem]">

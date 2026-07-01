@@ -34,7 +34,7 @@ export function ModernTimeline({ items }: { items: TimelineItem[] }) {
                   upcoming
                     ? "border-[var(--hairline)] text-[var(--ink-4)]"
                     : "border-[var(--cyan)] text-[var(--cyan-strong)]",
-                  status === "current" && "shadow-[0_0_0_4px_rgba(48,207,255,0.18)]"
+                  status === "current" && "shadow-[0_0_0_4px_rgba(11, 87, 171,0.18)]"
                 )}
               >
                 {item.icon ?? (

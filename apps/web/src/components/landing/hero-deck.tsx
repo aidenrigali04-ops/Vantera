@@ -49,7 +49,7 @@ export function HeroDeck() {
       <div
         aria-hidden
         className="pointer-events-none absolute -inset-x-8 -bottom-10 -top-6 -z-10 rounded-[2.25rem] blur-2xl"
-        style={{ background: "radial-gradient(60% 75% at 55% 30%, rgba(48,207,255,0.18), transparent 70%)" }}
+        style={{ background: "radial-gradient(60% 75% at 55% 30%, rgba(11, 87, 171,0.18), transparent 70%)" }}
       />
 
       <div
@@ -75,15 +75,15 @@ export function HeroDeck() {
             </div>
             <div className="truncate text-[12.5px] text-[#8E9AA3]">VP Sales · Northwind</div>
           </div>
-          <span className="ml-auto inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-[rgba(48,207,255,0.12)] px-2.5 py-[5px] text-[11.5px] font-semibold text-[#0A7CA6]">
-            <span className="size-1.5 rounded-full bg-[#30CFFF]" />
+          <span className="ml-auto inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-[rgba(11, 87, 171,0.12)] px-2.5 py-[5px] text-[11.5px] font-semibold text-[#0A7CA6]">
+            <span className="size-1.5 rounded-full bg-[#0b57ab]" />
             High intent
           </span>
         </div>
 
         {/* signal */}
         <div className="mt-3 flex items-center gap-2 text-[11.5px] font-medium text-[#54636D]">
-          <span className="size-1.5 flex-none rounded-full bg-[#30CFFF]" />
+          <span className="size-1.5 flex-none rounded-full bg-[#0b57ab]" />
           Raised Series B · engaging on pipeline forecasting
         </div>
 
@@ -99,7 +99,7 @@ export function HeroDeck() {
                 cy="18"
                 r={RING_R}
                 fill="none"
-                stroke="#30CFFF"
+                stroke="#0b57ab"
                 strokeWidth="3"
                 strokeLinecap="round"
                 transform="rotate(-90 18 18)"
@@ -123,7 +123,7 @@ export function HeroDeck() {
         </div>
 
         {/* drafted message */}
-        <div className="mt-3.5 rounded-l-none rounded-r-[12px] border border-l-[3px] border-[#EDF1F4] border-l-[#30CFFF] bg-[#F7F9FB] px-[13px] py-3">
+        <div className="mt-3.5 rounded-l-none rounded-r-[12px] border border-l-[3px] border-[#EDF1F4] border-l-[#0b57ab] bg-[#F7F9FB] px-[13px] py-3">
           <div className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.08em] text-[#9AA5AD]">
             Drafted from her activity
           </div>
@@ -154,7 +154,7 @@ export function HeroDeck() {
           </button>
           <button
             type="button"
-            className="flex flex-1 items-center justify-center gap-2 rounded-[11px] bg-[#30CFFF] py-[11px] text-[13.5px] font-semibold text-[#06303F] transition-colors hover:bg-[#22C2F4] active:bg-[#1AB6E9]"
+            className="flex flex-1 items-center justify-center gap-2 rounded-[11px] bg-[#0b57ab] py-[11px] text-[13.5px] font-semibold text-[#06303F] transition-colors hover:bg-[#22C2F4] active:bg-[#1AB6E9]"
           >
             <Send className="size-4" strokeWidth={2.4} />
             Approve &amp; send
