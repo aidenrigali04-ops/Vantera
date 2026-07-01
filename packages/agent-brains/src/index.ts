@@ -55,3 +55,26 @@ export {
   type IntentWatchlist,
   type WatchlistContext,
 } from "./intent/watchlist";
+export {
+  computeOutreachFunnel,
+  wilsonInterval,
+  MIN_STAGE_SAMPLE,
+  STRONG_STAGE_SAMPLE,
+  type OutreachFunnelInput,
+  type OutreachFunnelStage,
+  type FunnelStageKey,
+  type StageBand,
+  type StageStatus,
+  type WilsonInterval,
+} from "./optimize/funnel";
+export {
+  diagnoseOutreach,
+  type OutreachDiagnosis,
+  type DiagnosisStatus,
+} from "./optimize/diagnose";
+export {
+  recommendForDiagnosis,
+  type OutreachRecommendation,
+  type RecommendationLever,
+  type RecommendationAction,
+} from "./optimize/recommend";

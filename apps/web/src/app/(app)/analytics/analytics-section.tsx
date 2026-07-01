@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getGateData } from "@/lib/auth/context";
 import { loadAnalytics, loadSignalAttribution } from "@/lib/analytics";
+import { loadOutreachDiagnosis } from "@/lib/optimize";
 import { AnalyticsView } from "./analytics-view";
 
 // The Analytics view of the Results surface — the renewal proof: conversion funnel + the ROI the
@@ -11,9 +12,10 @@ export async function AnalyticsSection() {
   if (!account) return null; // layout gate guarantees this; satisfies TS
 
   const supabase = await createClient();
-  const [vm, attribution] = await Promise.all([
+  const [vm, attribution, outreach] = await Promise.all([
     loadAnalytics(supabase),
     loadSignalAttribution(supabase),
+    loadOutreachDiagnosis(supabase),
   ]);
 
   return (
@@ -27,6 +29,7 @@ export async function AnalyticsSection() {
       pipelineCents={vm.pipelineCents}
       goalCents={vm.goalCents}
       attribution={attribution}
+      outreach={outreach}
     />
   );
 }

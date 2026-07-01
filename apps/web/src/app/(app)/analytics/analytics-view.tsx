@@ -6,6 +6,8 @@ import { KpiTile, KpiGrid } from "@/components/ui/kpi";
 import { cn } from "@/lib/utils";
 import { benchmarkForStage, type FunnelStage, type Roi } from "@/lib/revenue";
 import type { SignalAttribution } from "@/lib/analytics";
+import type { OutreachDiagnosisVM } from "@/lib/optimize";
+import { OutreachDiagnosis } from "./outreach-diagnosis";
 
 const usd = (cents: number) =>
   new Intl.NumberFormat("en-US", {
@@ -24,6 +26,7 @@ type Props = {
   pipelineCents: number;
   goalCents: number | null;
   attribution: SignalAttribution[];
+  outreach: OutreachDiagnosisVM;
 };
 
 export function AnalyticsView({
@@ -35,6 +38,7 @@ export function AnalyticsView({
   closedCents,
   pipelineCents,
   attribution,
+  outreach,
 }: Props) {
   return (
     <div className="mx-auto max-w-5xl">
@@ -44,6 +48,10 @@ export function AnalyticsView({
           What your spend is actually returning — the numbers that decide whether this stays.
         </p>
       </header>
+
+      {/* Phase 1 of the self-optimizing loop: where outreach leaks + the single biggest opportunity.
+          Renders only once there's outreach; null otherwise. */}
+      <OutreachDiagnosis vm={outreach} />
 
       {!hasLeads ? (
         <EmptyLeads />
