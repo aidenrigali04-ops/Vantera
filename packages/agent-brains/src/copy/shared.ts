@@ -23,6 +23,52 @@ export interface CopyContext {
   brandVoice?: string | null;
   /** things the agent must never say or do — topics, claims, or words to avoid */
   guardrails?: string | null;
+  /**
+   * Optional per-variant copy strategy from the self-optimizing loop (Phase 3). Steers HOW the
+   * message is written, never WHAT is claimed (facts + compliance are unchanged). Absent for the
+   * champion baseline, so generation is identical to pre-optimizer behavior when unset.
+   */
+  strategy?: CopyStrategy;
+}
+
+/**
+ * Structured, bounded copy knobs an experiment may vary — never free-form prompt edits. Each is a
+ * single stylistic lever; a challenger changes exactly one. Every field is optional; an empty/absent
+ * strategy adds no directives (the champion baseline).
+ */
+export type CopyStrategy = {
+  /** what the first touch leads with */
+  openWith?: "trigger" | "pain";
+  /** follow-up length target */
+  followupLength?: "tight" | "standard";
+  /** the register of the ask */
+  askStyle?: "soft" | "specific";
+};
+
+const STRATEGY_LINES: Record<string, string> = {
+  "openWith:trigger": "Open by naming the prospect's specific trigger or recent activity before anything else.",
+  "openWith:pain": "Open from the prospect's core pain, framed as the outcome they want.",
+  "followupLength:tight": "Make the follow-up a single, ruthlessly tight sentence.",
+  "followupLength:standard": "", // the default register — no extra directive
+  "askStyle:soft": "Keep the ask a soft, low-pressure interest check — no meeting demand.",
+  "askStyle:specific": "Make the ask one concrete next step — propose a specific short call.",
+};
+
+/**
+ * Render a strategy as extra prompt directives, appended AFTER the base rules so it never overrides
+ * compliance/humanity. Returns "" for an absent or no-op strategy, so a champion draft is prompted
+ * byte-for-byte the same as before the optimizer existed.
+ */
+export function strategyDirectives(strategy?: CopyStrategy): string {
+  if (!strategy) return "";
+  const lines: string[] = [];
+  for (const [key, value] of Object.entries(strategy)) {
+    if (!value) continue;
+    const line = STRATEGY_LINES[`${key}:${value}`];
+    if (line) lines.push(`- ${line}`);
+  }
+  if (lines.length === 0) return "";
+  return `Strategy for this message (apply in addition to — never overriding — the rules above):\n${lines.join("\n")}`;
 }
 
 export interface DraftInput {

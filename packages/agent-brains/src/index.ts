@@ -29,7 +29,14 @@ export {
   FOLLOWUP_MAX_CHARS,
   type LinkedInDraft,
 } from "./copy/linkedin";
-export { leadBlock, type CopyLead, type CopyContext, type DraftInput } from "./copy/shared";
+export {
+  leadBlock,
+  strategyDirectives,
+  type CopyLead,
+  type CopyContext,
+  type DraftInput,
+  type CopyStrategy,
+} from "./copy/shared";
 export { classifyReply, preClassify, replyVerdictSchema, type ReplyVerdict } from "./reply/classify";
 export {
   draftConversationMessage,
@@ -78,3 +85,23 @@ export {
   type RecommendationLever,
   type RecommendationAction,
 } from "./optimize/recommend";
+export {
+  assignVariant,
+  leadBucket,
+  type Variant,
+  type ExperimentAllocation,
+} from "./optimize/allocate";
+export {
+  decideExperiment,
+  DECIDE_DEFAULTS,
+  type VariantOutcome,
+  type ExperimentVerdict,
+  type ExperimentDecision,
+  type DecideOptions,
+} from "./optimize/decide";
+export {
+  proposeChallengerStrategy,
+  describeStrategy,
+  isTerminalStatus,
+  type ExperimentStatus,
+} from "./optimize/experiment";
