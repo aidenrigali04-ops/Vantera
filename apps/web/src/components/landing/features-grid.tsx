@@ -1,55 +1,293 @@
 "use client";
 
-import { Radar, Filter, BadgeCheck, Sparkles } from "lucide-react";
 import { LandingHeading } from "./heading";
 import { Reveal, RevealItem, CARD_INTERACTIVE } from "./surface";
+import {
+  ControlIcon,
+  CrmSyncIcon,
+  OutreachIcon,
+  ProspectingIcon,
+  RepliesIcon,
+  SafetyIcon,
+  type ProductIcon,
+} from "./product-icons";
+import { BarChart, INSET_CARD_SHADOW, LegendRow, StatusDot, useInViewOnce } from "./viz";
 import { cn } from "@/lib/utils";
 
-const FEATURES = [
+/**
+ * Feature grid — the six pillars that make Vantera run an entire LinkedIn outreach
+ * motion end to end. Built on the hero's light-card system (CARD_INTERACTIVE +
+ * Reveal/RevealItem, one-accent Facebook-blue treatment on white cards with hairline
+ * borders). One card — SAFETY, the anti-ban pacing only Vantera does — spans two
+ * columns and carries the heavier --fb/blue wash plus a "Vantera only" badge so it
+ * reads as the differentiator, not just another tile. The grid closes on a full-width
+ * CRM tile so the last row stays balanced (no dangling half-row).
+ */
+
+type Feature = {
+  label: string;
+  title: string;
+  line: string;
+  chips: string[];
+  icon: ProductIcon;
+};
+
+const FEATURES: Feature[] = [
   {
-    icon: Radar,
-    title: "Advanced user intent tracking",
-    body: "Vantera reads buying intent across LinkedIn — the topics people engage with, the problems they raise, the company moves they make — to surface the buyers your product actually solves a problem for, while they're in-market. Not just the few who already found you.",
+    label: "Prospecting",
+    title: "Finds and prioritizes your best buyers",
+    line: "Agents watch LinkedIn for in-market behavior, then rank every match against your ICP so effort lands on the accounts most likely to close.",
+    chips: ["intent signals", "lookalikes", "lead scoring", "ICP filtering"],
+    icon: ProspectingIcon,
   },
   {
-    icon: Filter,
-    title: "Qualified prospects only",
-    body: "Every prospect is scored on fit, seniority, and intent against your ICP. Anyone below the bar is filtered out automatically — you only ever pursue the leads with the highest close rate.",
+    label: "Outreach",
+    title: "Human-quality LinkedIn messages at scale",
+    line: "Every message is written from a prospect's real activity — never a template — so it reads like you sat down and wrote it yourself.",
+    chips: ["context-aware", "personalized", "right person, right moment"],
+    icon: OutreachIcon,
   },
   {
-    icon: BadgeCheck,
-    title: "Outreach & close on approval",
-    body: "Agents draft a personal message for each qualified lead and queue it for your sign-off. Nothing sends without you. Approve, and the sequence runs the conversation toward a booked meeting.",
+    label: "Control",
+    title: "Full auto or approve before it sends",
+    line: "Run hands-off, or keep a human in the loop and sign off on each message. No rigid sequences you have to fight — you set the level of control.",
+    chips: ["human-in-the-loop default", "no rigid workflows"],
+    icon: ControlIcon,
   },
   {
-    icon: Sparkles,
-    title: "Efficiency powered by AI",
-    body: "Sourcing, scoring, enrichment, and copywriting run autonomously in the background. The busywork disappears — you spend your time only on the people who are ready to talk.",
+    label: "Replies",
+    title: "100% reply visibility",
+    line: "Every response is captured and surfaced in one place, with a suggested reply already drafted — one click to send, nothing slips through.",
+    chips: ["every reply captured", "responses pre-drafted", "one click to send"],
+    icon: RepliesIcon,
+  },
+  {
+    label: "CRM",
+    title: "Clean CRM handoff",
+    line: "Qualified conversations flow straight into your CRM — no copy-paste, no lost context. Vantera fills the pipeline; your CRM keeps it.",
+    chips: ["HubSpot", "Pipedrive", "syncs automatically"],
+    icon: CrmSyncIcon,
   },
 ];
+
+/** LinkedIn brand glyph — lucide dropped brand icons, so we inline it. */
+function LinkedinMark({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden>
+      <path d="M20.45 20.45h-3.56v-5.57c0-1.33-.03-3.04-1.85-3.04-1.86 0-2.14 1.45-2.14 2.94v5.67H9.34V9h3.42v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.45v6.29zM5.34 7.43a2.06 2.06 0 1 1 0-4.13 2.06 2.06 0 0 1 0 4.13zM7.12 20.45H3.56V9h3.56v11.45zM22.22 0H1.77C.79 0 0 .77 0 1.72v20.56C0 23.23.79 24 1.77 24h20.45c.98 0 1.78-.77 1.78-1.72V1.72C24 .77 23.2 0 22.22 0z" />
+    </svg>
+  );
+}
+
+function Chip({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="inline-flex items-center rounded-full border border-[var(--hairline)] bg-[var(--tint)] px-2.5 py-1 text-[12px] font-medium text-[var(--ink-3)]">
+      {children}
+    </span>
+  );
+}
+
+/** Shared icon well — rounded blue-tint square with a blue glyph and a soft inner highlight. */
+function IconWell({ icon: Icon }: { icon: ProductIcon }) {
+  return (
+    <span className="grid size-11 place-items-center rounded-xl bg-[var(--cyan-tint)] text-[var(--cyan-strong)] shadow-[inset_0_1px_0_rgba(255,255,255,0.6)] ring-1 ring-inset ring-[rgba(24,119,242,0.2)] transition-transform duration-300 group-hover:scale-105">
+      <Icon className="size-5" />
+    </span>
+  );
+}
+
+function FeatureCard({ f, wide = false }: { f: Feature; wide?: boolean }) {
+  // The wide close spans both columns and lays out horizontally on ≥sm so a single
+  // full-width tile still reads dense — pitch on the left, chips gathered on the right.
+  if (wide) {
+    return (
+      <RevealItem
+        className={cn(CARD_INTERACTIVE, "group flex flex-col p-7 sm:col-span-2 sm:flex-row sm:items-center sm:gap-8")}
+      >
+        <div className="flex min-w-0 flex-1 flex-col">
+          <div className="flex items-center gap-3">
+            <IconWell icon={f.icon} />
+            <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ink-4)]">
+              {f.label}
+            </span>
+          </div>
+          <h3 className="mt-6 text-[18px] font-semibold leading-snug tracking-[-0.015em] text-foreground">
+            {f.title}
+          </h3>
+          <p className="mt-2.5 max-w-md text-[14.5px] leading-relaxed text-[var(--ink-3)]">{f.line}</p>
+        </div>
+
+        <div className="mt-6 flex flex-wrap gap-1.5 sm:mt-0 sm:max-w-[280px] sm:flex-none sm:justify-end">
+          {f.chips.map((c) => (
+            <Chip key={c}>{c}</Chip>
+          ))}
+        </div>
+      </RevealItem>
+    );
+  }
+
+  return (
+    <RevealItem className={cn(CARD_INTERACTIVE, "group flex flex-col p-7")}>
+      <div className="flex items-center justify-between">
+        <IconWell icon={f.icon} />
+        <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ink-4)]">
+          {f.label}
+        </span>
+      </div>
+
+      <h3 className="mt-6 text-[18px] font-semibold leading-snug tracking-[-0.015em] text-foreground">
+        {f.title}
+      </h3>
+      <p className="mt-2.5 text-[14.5px] leading-relaxed text-[var(--ink-3)]">{f.line}</p>
+
+      {/* mt-auto floats the chip row to a shared baseline so cards in a row align */}
+      <div className="mt-auto flex flex-wrap gap-1.5 pt-6">
+        {f.chips.map((c) => (
+          <Chip key={c}>{c}</Chip>
+        ))}
+      </div>
+    </RevealItem>
+  );
+}
+
+/** The Vantera-only card — safe pacing that keeps a user's account off LinkedIn's radar. */
+function SafetyCard() {
+  const chips = ["human-like limits", "smart timing", "multi-sender distribution"];
+  return (
+    <RevealItem
+      className={cn(
+        CARD_INTERACTIVE,
+        "group relative flex flex-col overflow-hidden p-7 sm:col-span-2",
+        "border-[var(--cyan-line)]",
+        "hover:shadow-[0_1px_2px_rgba(12,16,26,0.04),0_12px_28px_-14px_rgba(24,119,242,0.16)]",
+      )}
+    >
+      {/* signature blue wash, top-right — a single restrained lift marking the one accent card */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 -z-0"
+        style={{
+          background:
+            "radial-gradient(46% 85% at 100% 0%, rgba(24,119,242,0.07) 0%, transparent 60%)",
+        }}
+      />
+
+      <div className="relative flex items-start gap-5 lg:gap-6">
+        {/* left — the pitch */}
+        <div className="flex min-w-0 flex-1 flex-col">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="grid size-11 place-items-center rounded-xl bg-[var(--fb-tint)] text-[var(--fb)] shadow-[inset_0_1px_0_rgba(255,255,255,0.5)] ring-1 ring-inset ring-[rgba(24,119,242,0.22)] transition-transform duration-300 group-hover:scale-105">
+              <SafetyIcon className="size-5" />
+            </span>
+            <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ink-4)]">
+              Safety
+            </span>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--fb)] px-2.5 py-1 text-[11px] font-semibold text-white shadow-[0_4px_12px_-4px_rgba(24,119,242,0.35)]">
+              <LinkedinMark className="size-3" />
+              Vantera only
+            </span>
+          </div>
+
+          <h3 className="mt-6 text-[20px] font-semibold leading-snug tracking-[-0.02em] text-foreground sm:text-[22px]">
+            LinkedIn-safe, anti-ban pacing
+          </h3>
+          <p className="mt-2.5 max-w-md text-[14.5px] leading-relaxed text-[var(--ink-3)]">
+            Volume that would flag any other tool is spread across human-like limits, realistic
+            timing, and multiple senders — so you scale outreach without ever putting your account
+            at risk. Built in, never a setting you can push past.
+          </p>
+
+          <div className="mt-6 flex flex-wrap gap-1.5">
+            {chips.map((c) => (
+              <span
+                key={c}
+                className="inline-flex items-center rounded-full border border-[var(--cyan-line)] bg-[var(--cyan-tint)] px-2.5 py-1 text-[12px] font-medium text-[var(--cyan-strong)]"
+              >
+                {c}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {/* right — a small pacing mockup in the hero's light-card recipe (lg only) */}
+        <div className="hidden w-[248px] flex-none lg:block">
+          <PacingMock />
+        </div>
+      </div>
+    </RevealItem>
+  );
+}
+
+/** A "safe send pace" instrument — a gridlined weekly bar chart with a real weekly-cap
+ *  threshold line, y-axis ticks, a value label, and a legend, in the hero-calendar's
+ *  white-card language. Proves the pacing headroom rather than gesturing at it. */
+function PacingMock() {
+  const [ref, inView] = useInViewOnce();
+  const bars = [28, 42, 55, 63, 71, 78, 84];
+  const days = ["M", "T", "W", "T", "F", "S", "S"];
+  return (
+    <div
+      ref={ref}
+      className="overflow-hidden rounded-[14px] border border-[#E6EAEE] bg-white"
+      style={{ boxShadow: INSET_CARD_SHADOW }}
+    >
+      <div className="flex items-center justify-between border-b border-[#EFF2F5] px-3.5 pb-2.5 pt-3">
+        <div>
+          <span className="text-[12px] font-semibold tracking-[-0.01em] text-[#0C1620]">Safe send pace</span>
+          <div className="mt-0.5 text-[9.5px] font-medium text-[var(--ink-4)]">This week · invites sent</div>
+        </div>
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-[rgba(24,119,242,0.1)] px-2 py-[3px] text-[10px] font-semibold tabular-nums text-[#1461d1]">
+          <StatusDot size="sm" />
+          84 / 100
+        </span>
+      </div>
+
+      <div className="px-3.5 pb-3 pt-4">
+        <BarChart
+          values={bars}
+          max={100}
+          yTicks={[0, 50, 100]}
+          labels={days}
+          ceiling={{ at: 100, label: "100 / wk cap" }}
+          valueLabel
+          run={inView}
+          height={84}
+        />
+        <LegendRow
+          className="mt-3 border-t border-[#EFF2F5] pt-2.5"
+          items={[
+            { label: "invites sent", kind: "fill" },
+            { label: "weekly cap", kind: "dashed" },
+          ]}
+        />
+      </div>
+    </div>
+  );
+}
 
 export function FeaturesGrid() {
   return (
     <section id="features" className="relative border-t border-[var(--hairline)] py-24 sm:py-28">
       <div className="mx-auto max-w-6xl px-6 lg:px-8">
         <LandingHeading
-          eyebrow="The system"
-          title="Everything you need to make LinkedIn profitable"
-          subtitle="Outreach tailored to your niche, filtered to only the prospects who match your ICP and show intent — run end to end, until close."
+          eyebrow="Capabilities"
+          title="Built to run outbound end to end"
+          subtitle="From finding the right buyer to a clean CRM handoff — every part of the motion, working as one system with you in control."
         />
 
-        <Reveal className="mt-14 grid gap-4 sm:grid-cols-2">
-          {FEATURES.map((f) => (
-            <RevealItem key={f.title} className={cn(CARD_INTERACTIVE, "group p-7")}>
-              <span className="grid size-12 place-items-center rounded-xl bg-[var(--cyan-tint)] text-[var(--cyan-strong)] ring-1 ring-inset ring-[rgba(11, 87, 171,0.2)] transition-transform duration-300 group-hover:scale-105">
-                <f.icon className="size-5" strokeWidth={1.9} />
-              </span>
-              <h3 className="mt-5 text-[19px] font-semibold tracking-[-0.015em] text-foreground">
-                {f.title}
-              </h3>
-              <p className="mt-2.5 text-[15px] leading-relaxed text-[var(--ink-3)]">{f.body}</p>
-            </RevealItem>
-          ))}
+        <Reveal className="mt-14 grid gap-5 sm:grid-cols-2">
+          {/* PROSPECTING + OUTREACH */}
+          <FeatureCard f={FEATURES[0]} />
+          <FeatureCard f={FEATURES[1]} />
+
+          {/* SAFETY — the differentiator, full-width */}
+          <SafetyCard />
+
+          {/* CONTROL + REPLIES + CRM — the last two-up pairs to a full-width close, so
+              the grid ends balanced (no dangling half-row) and bookends the Safety card. */}
+          <FeatureCard f={FEATURES[2]} />
+          <FeatureCard f={FEATURES[3]} />
+          <FeatureCard f={FEATURES[4]} wide />
         </Reveal>
       </div>
     </section>

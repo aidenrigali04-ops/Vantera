@@ -69,7 +69,7 @@
   --brand-foreground: #ffffff;
   /* Landing accent constants (used on the light landing; brand-stable across themes). */
   --accent-azure: #0099ff;
-  --accent-cyan: #0b57ab;
+  --accent-cyan: #30cfff;
   --accent-amber: #f2b11c;
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
@@ -192,6 +192,13 @@
   --hairline: rgba(12, 16, 26, 0.07);
   --tint: #f6f8fb;
 
+  /* Facebook-blue accent — reserved for the hero "revenue" highlight, the LinkedIn
+     mark, and the primary "Get Started Free" CTA. Kept as tokens so the one hue is
+     tweakable in a single place. */
+  --fb: #1877f2;
+  --fb-strong: #166fe5;
+  --fb-tint: rgba(24, 119, 242, 0.12);
+
   /* premium soft elevation — multi-layer, neutral */
   --shadow-sm: 0 1px 2px rgba(12, 16, 26, 0.05);
   --shadow-card: 0 1px 2px rgba(12, 16, 26, 0.04), 0 12px 32px -14px rgba(12, 16, 26, 0.16);
@@ -214,6 +221,27 @@
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   letter-spacing: -0.014em;
+}
+
+/* Landing/marketing accent unified to Facebook blue (was electric cyan). Scoped to
+   `.landing` — later in source than the shared block above, same specificity, so it
+   wins for `.landing` while auth (.auth-surface) and dashboard (.app-surface) keep
+   their own accent system. The `--cyan*` token names are kept (used across many
+   components) but now carry blue. */
+.landing {
+  --cyan: #1877f2;
+  --cyan-strong: #1461d1; /* legible blue for text / links / icons on white */
+  --cyan-tint: #e9f1fe; /* soft blue surface */
+  --cyan-line: rgba(24, 119, 242, 0.28);
+  --ring: rgba(24, 119, 242, 0.5);
+  --panel-glow: 0 40px 120px -40px rgba(24, 119, 242, 0.32), 0 30px 70px -34px rgba(12, 16, 26, 0.55);
+
+  /* Elevation — Framer/Figma-restrained: crisp hairline + a tight, near-invisible
+     shadow. Depth reads from the border and precision, not a big floaty drop.
+     (Auth + dashboard keep the shared elevation defined in the block above.) */
+  --shadow-sm: 0 1px 1px rgba(12, 16, 26, 0.04);
+  --shadow-card: 0 1px 1px rgba(12, 16, 26, 0.03), 0 4px 12px -4px rgba(12, 16, 26, 0.06);
+  --shadow-lift: 0 1px 2px rgba(12, 16, 26, 0.04), 0 10px 24px -10px rgba(12, 16, 26, 0.09);
 }
 
 /* Dashboard shell rides the premium-light system above, but keeps shadcn `accent`
@@ -271,7 +299,10 @@
   --nav-bg-solid: #0a4685; /* solid mid-tone for rings/badges that must match the rail */
 }
 
-.landing ::selection,
+.landing ::selection {
+  background: rgba(24, 119, 242, 0.22);
+  color: #0a0c12;
+}
 .auth-surface ::selection {
   background: rgba(11, 87, 171, 0.24);
   color: #0a0c12;
@@ -354,5 +385,21 @@
   .dock-tile *,
   .dock-tile::after {
     transition: none !important;
+  }
+}
+
+/* Hero pipeline conduit — the gradient stroke drifts LinkedIn → calendar. Dash period
+   is 24 (10 + 14); -48 = two clean cycles, so the loop is seamless. */
+@keyframes vc-flow {
+  to {
+    stroke-dashoffset: -48;
+  }
+}
+.landing .vc-flow-line {
+  animation: vc-flow 3.2s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .landing .vc-flow-line {
+    animation: none;
   }
 }

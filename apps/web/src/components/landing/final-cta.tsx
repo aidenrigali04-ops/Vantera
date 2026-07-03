@@ -1,59 +1,229 @@
 "use client";
 
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { motion } from "framer-motion";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, CalendarCheck, Check } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Reveal, RevealItem, CARD } from "./surface";
+import {
+  DeltaChip,
+  INSET_CARD_SHADOW,
+  MetricCell,
+  Sparkline,
+  StatRail,
+  StatusDot,
+  useInViewOnce,
+} from "./viz";
 
-export function FinalCta() {
+/** LinkedIn brand glyph — lucide dropped brand icons, so we render it inline. */
+function LinkedinMark({ className }: { className?: string }) {
   return (
-    <section className="px-6 py-20 lg:px-8 lg:py-28">
-      <motion.div
-        initial={{ opacity: 0, y: 24 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true, margin: "-80px" }}
-        transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-        className="relative mx-auto max-w-6xl overflow-hidden rounded-[28px] border border-white/[0.08] bg-[#0a0c12] px-6 py-16 text-center shadow-[var(--panel-glow)] sm:py-24"
-      >
-        {/* subtle cyan ambience + top rim */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0"
-          style={{ background: "radial-gradient(60% 70% at 50% -10%, rgba(11, 87, 171,0.2), transparent 60%)" }}
-        />
-        <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/15" />
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden>
+      <path d="M20.45 20.45h-3.56v-5.57c0-1.33-.03-3.04-1.85-3.04-1.86 0-2.14 1.45-2.14 2.94v5.67H9.34V9h3.42v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.45v6.29zM5.34 7.43a2.06 2.06 0 1 1 0-4.13 2.06 2.06 0 0 1 0 4.13zM7.12 20.45H3.56V9h3.56v11.45zM22.22 0H1.77C.79 0 0 .77 0 1.72v20.56C0 23.23.79 24 1.77 24h20.45c.98 0 1.78-.77 1.78-1.72V1.72C24 .77 23.2 0 22.22 0z" />
+    </svg>
+  );
+}
 
-        <div className="relative">
-          <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[12px] font-medium text-white/70">
-            <span className="size-1.5 rounded-full bg-[var(--cyan)] shadow-[0_0_8px_rgba(11, 87, 171,0.9)]" />
-            Get started
-          </span>
-          <h2 className="mx-auto mt-6 max-w-2xl text-[2.4rem] font-semibold leading-[1.04] tracking-[-0.035em] text-white sm:text-[3.2rem]">
-            Turn intent into <span className="text-[var(--cyan)]">revenue</span> on LinkedIn
-          </h2>
-          <p className="mx-auto mt-5 max-w-xl text-[16px] leading-relaxed text-white/55 sm:text-[18px]">
-            Deploy your agents in minutes. They find in-market buyers, qualify them, and draft every
-            message — you approve the sends and watch the meetings land.
-          </p>
+/**
+ * Final CTA — the closing conversion band. Light system to match the hero: near-black
+ * heading on white, a faint on-palette gold/blue pool behind a centered card, one
+ * reserved --fb primary CTA, and a compact inline booking pill (lighter than the
+ * hero's). Cyan is used only for the eyebrow dot and hairline accents. Honors
+ * prefers-reduced-motion for the ambient pool.
+ */
+export function FinalCta() {
+  const router = useRouter();
+  const [url, setUrl] = useState("");
+  const [cardRef, inView] = useInViewOnce();
 
-          <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
-            <Link
-              href="/signup"
-              className="group inline-flex items-center gap-2 rounded-full bg-white px-7 py-3.5 text-[15px] font-medium text-[#0a0c12] transition-transform hover:-translate-y-0.5"
+  return (
+    <section className="relative border-t border-[var(--hairline)] bg-[var(--tint)] py-24 sm:py-28 lg:py-32">
+      {/* one restrained on-palette pool marking the closing moment — static, no breathing blob */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 -z-0"
+        style={{
+          background:
+            "radial-gradient(50% 44% at 50% 6%, rgba(24,119,242,0.08) 0%, transparent 62%)",
+        }}
+      />
+
+      <div className="relative mx-auto max-w-6xl px-6 lg:px-8">
+        <Reveal className="mx-auto max-w-3xl text-center">
+          <RevealItem>
+            <span className="block text-[12.5px] font-semibold uppercase tracking-[0.18em] text-[var(--cyan-strong)]">
+              Get started
+            </span>
+          </RevealItem>
+
+          <RevealItem>
+            <h2 className="mx-auto mt-6 max-w-3xl text-[2.3rem] font-semibold leading-[1.06] tracking-[-0.035em] text-foreground sm:text-[3rem] lg:text-[3.35rem]">
+              Your next 10 customers are already on{" "}
+              <span className="whitespace-nowrap">
+                <span
+                  role="img"
+                  aria-label="LinkedIn"
+                  className="mx-[0.08em] inline-flex translate-y-[0.14em] items-center justify-center rounded-[10px] border border-[var(--hairline)] bg-white p-[0.18em] align-baseline shadow-[var(--shadow-card)]"
+                >
+                  <LinkedinMark className="h-[0.62em] w-[0.62em] text-[var(--fb)]" />
+                  <span className="sr-only">LinkedIn</span>
+                </span>
+                .
+              </span>
+              <br className="hidden sm:block" /> Let your agents find them.
+            </h2>
+          </RevealItem>
+
+          <RevealItem>
+            <p className="mx-auto mt-6 max-w-xl text-[16px] font-normal leading-relaxed text-[var(--ink-3)] sm:text-[17.5px]">
+              Deploy your Scout and Outreach agents in minutes. They surface in-market buyers,
+              qualify against your ICP, and draft every message — you approve the sends.
+            </p>
+          </RevealItem>
+
+          {/* primary CTA + reassurance row */}
+          <RevealItem>
+            <div className="mt-9 flex flex-col items-center gap-4">
+              <Link
+                href="/signup"
+                className="group inline-flex items-center gap-2 rounded-full bg-[var(--fb)] px-8 py-3.5 text-[15px] font-semibold text-white shadow-[0_6px_18px_-8px_rgba(24,119,242,0.4)] transition-all hover:bg-[var(--fb-strong)] hover:-translate-y-0.5 hover:shadow-[0_12px_28px_-12px_rgba(24,119,242,0.45)] active:scale-[0.98]"
+              >
+                Start free
+                <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
+              </Link>
+
+              <p className="text-[13px] font-medium text-[var(--ink-4)]">
+                Free trial{" "}
+                <span className="mx-1.5 text-[var(--cyan-line)]">·</span> Live in minutes{" "}
+                <span className="mx-1.5 text-[var(--cyan-line)]">·</span> Cancel anytime
+              </p>
+            </div>
+          </RevealItem>
+
+          {/* compact inline booking prompt — a lighter echo of the hero's URL pill */}
+          <RevealItem>
+            <div className="mx-auto mt-10 max-w-lg">
+              <div className="mb-3 text-[12.5px] font-medium text-[var(--ink-4)]">
+                Or start with your site — we&apos;ll map your ICP for you
+              </div>
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  router.push("/signup");
+                }}
+                className="flex w-full items-center gap-2 rounded-full border border-[var(--hairline)] bg-white py-1.5 pl-5 pr-1.5 shadow-[var(--shadow-sm)] transition-shadow focus-within:border-[var(--fb)] focus-within:shadow-[0_0_0_3px_rgba(24,119,242,0.16),var(--shadow-card)]"
+              >
+                <input
+                  value={url}
+                  onChange={(e) => setUrl(e.target.value)}
+                  placeholder="yourcompany.com"
+                  aria-label="Your website URL"
+                  className="min-w-0 flex-1 bg-transparent text-[14.5px] text-foreground outline-none placeholder:text-[var(--ink-4)]"
+                />
+                <button
+                  type="submit"
+                  className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[#0a0b0d] px-5 py-2.5 text-[13.5px] font-semibold text-white transition-all hover:bg-[#1a1c20] active:scale-[0.98]"
+                >
+                  Get my plan
+                  <ArrowRight className="size-3.5" />
+                </button>
+              </form>
+            </div>
+          </RevealItem>
+        </Reveal>
+
+        {/* supporting visual — a compact "outcome" card built with the contract's
+            light-card recipe, echoing the hero-calendar's booked-meeting language. */}
+        <Reveal className="mx-auto mt-14 max-w-2xl">
+          <RevealItem>
+            <div
+              ref={cardRef}
+              className={cn(
+                CARD,
+                "group relative overflow-hidden rounded-3xl p-6 transition-all duration-300 sm:p-7",
+                "hover:-translate-y-0.5 hover:border-[var(--cyan-line)]",
+              )}
+              style={{ boxShadow: INSET_CARD_SHADOW }}
             >
-              Start free
-              <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
-            </Link>
-            <a
-              href="mailto:sales@vanterasystem.com?subject=Vantera%20demo"
-              className="inline-flex items-center gap-2 rounded-full border border-white/20 px-7 py-3.5 text-[15px] font-medium text-white transition-colors hover:bg-white/[0.06]"
-            >
-              Book a demo
-            </a>
-          </div>
+              {/* header — a live pipeline readout */}
+              <div className="flex items-center justify-between gap-3 border-b border-[var(--hairline)] pb-4">
+                <div className="flex items-center gap-2.5">
+                  <span className="grid size-8 place-items-center rounded-[9px] bg-[var(--cyan-tint)] text-[var(--cyan-strong)] ring-1 ring-inset ring-[var(--cyan-line)]">
+                    <CalendarCheck className="size-[17px]" strokeWidth={2} />
+                  </span>
+                  <div className="leading-tight">
+                    <div className="text-[13px] font-semibold tracking-[-0.01em] text-foreground">
+                      Your pipeline, live
+                    </div>
+                    <div className="mt-0.5 text-[11px] text-[var(--ink-4)]">Updated just now</div>
+                  </div>
+                </div>
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--fb-tint)] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--cyan-strong)] ring-1 ring-inset ring-[var(--cyan-line)]">
+                  <StatusDot size="md" pulse />
+                  Live
+                </span>
+              </div>
 
-          <p className="mt-6 text-[13px] text-white/40">No credit card · You approve every message</p>
-        </div>
-      </motion.div>
+              {/* metric rail */}
+              <StatRail className="mt-5">
+                {METRICS.map((m) => (
+                  <MetricCell key={m.label} value={m.value} label={m.label} />
+                ))}
+              </StatRail>
+
+              {/* booked-meetings trend */}
+              <div className="mt-6 flex items-center justify-between gap-4 border-t border-[var(--hairline)] pt-5">
+                <div>
+                  <div className="text-[10.5px] font-semibold uppercase tracking-[0.09em] text-[var(--ink-4)]">
+                    Booked meetings
+                  </div>
+                  <div className="mt-0.5 text-[11px] text-[var(--ink-4)]">last 6 weeks</div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Sparkline points={[12, 17, 15, 24, 31, 44]} width={148} height={40} halo draw={inView} />
+                  <DeltaChip value="+41%" dir="up" />
+                </div>
+              </div>
+
+              {/* pipeline rail — the hero's LinkedIn → calendar story as live progress */}
+              <div className="mt-6 flex flex-wrap items-center justify-center gap-2 border-t border-[var(--hairline)] pt-5 sm:justify-start">
+                {PIPELINE.map((step, i) => {
+                  const active = i === PIPELINE.length - 1;
+                  return (
+                    <span key={step} className="flex items-center gap-2">
+                      <span
+                        className={cn(
+                          "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11.5px] font-medium",
+                          active
+                            ? "bg-[var(--fb-tint)] text-[var(--cyan-strong)] ring-1 ring-inset ring-[var(--cyan-line)]"
+                            : "border border-[var(--hairline)] bg-[var(--tint)] text-[var(--ink-2)] shadow-[var(--shadow-sm)]",
+                        )}
+                      >
+                        {active ? (
+                          <StatusDot size="sm" pulse />
+                        ) : (
+                          <Check className="size-3 text-[var(--cyan-strong)]" strokeWidth={2.6} />
+                        )}
+                        {step}
+                      </span>
+                      {i < PIPELINE.length - 1 && <ArrowRight className="size-3 text-[var(--ink-4)]" aria-hidden />}
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          </RevealItem>
+        </Reveal>
+      </div>
     </section>
   );
 }
+
+const METRICS: { value: string; label: string }[] = [
+  { value: "~15 min", label: "Deploy to first run" },
+  { value: "100%", label: "Messages you approve" },
+  { value: "0", label: "Cold spray sent" },
+];
+
+const PIPELINE = ["Identify", "Qualify", "Draft", "Book"] as const;

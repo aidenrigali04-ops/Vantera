@@ -7,20 +7,18 @@ import {
 import { LandingNav } from "@/components/landing/nav";
 import { Hero } from "@/components/landing/hero";
 import { TrustStrip } from "@/components/landing/trust-strip";
-import { FeaturesGrid } from "@/components/landing/features-grid";
 import { Showcase } from "@/components/landing/showcase";
-import { Results } from "@/components/landing/results";
-import { Teams } from "@/components/landing/teams";
-import { Pricing, type LandingPlan } from "@/components/landing/pricing";
+import { HowItWorks } from "@/components/landing/how-it-works";
+import { FeaturesGrid } from "@/components/landing/features-grid";
+import { Consolidation } from "@/components/landing/consolidation";
+import { Stats } from "@/components/landing/stats";
 import { Testimonials } from "@/components/landing/testimonials";
-import { Capabilities } from "@/components/landing/capabilities";
 import { Integrations } from "@/components/landing/integrations";
-import { Faq } from "@/components/landing/faq";
+import { Pricing, type LandingPlan } from "@/components/landing/pricing";
 import { FinalCta } from "@/components/landing/final-cta";
 import { LandingFooter } from "@/components/landing/footer";
 import type { Metadata } from "next";
-import { JsonLd, softwareApplicationLd, faqPageLd } from "@/lib/seo";
-import { FAQ_ITEMS } from "@/components/landing/faq-data";
+import { JsonLd, softwareApplicationLd } from "@/lib/seo";
 
 export const metadata: Metadata = {
   alternates: { canonical: "/" },
@@ -46,21 +44,24 @@ export default function Home() {
     // `.landing` scopes the 2026 premium light system (white + cyan + Poppins + dark
     // product panels) so the dark dashboard/auth surfaces are untouched (globals.css).
     <div className="landing relative min-h-screen w-full overflow-x-clip">
-      {/* Homepage entity + answer content for Google rich results and AI engines. */}
-      <JsonLd data={[softwareApplicationLd(plans), faqPageLd(FAQ_ITEMS)]} />
+      {/* Homepage entity + offer content for Google rich results and AI engines. */}
+      <JsonLd data={[softwareApplicationLd(plans)]} />
       <LandingNav />
       <main>
-        <Hero />
-        <TrustStrip />
-        <FeaturesGrid />
+        {/* Hero + social proof are one above-the-fold screen on lg+. */}
+        <div className="lg:flex lg:min-h-[100svh] lg:flex-col">
+          <Hero />
+          <TrustStrip />
+        </div>
+        {/* 3 → 12 */}
         <Showcase />
-        <Results />
-        <Teams />
-        <Pricing plans={plans} />
+        <HowItWorks />
+        <FeaturesGrid />
+        <Consolidation />
+        <Stats />
         <Testimonials />
-        <Capabilities />
         <Integrations />
-        <Faq />
+        <Pricing plans={plans} />
         <FinalCta />
       </main>
       <LandingFooter />
