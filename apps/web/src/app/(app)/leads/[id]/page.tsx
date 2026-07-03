@@ -4,11 +4,20 @@ import { ArrowLeft, Clock, ExternalLink, Mail, Phone } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getGateData } from "@/lib/auth/context";
 import { Badge } from "@/components/ui/badge";
-import { PANEL_SURFACE } from "@/components/ui/panel";
+import { Eyebrow, PANEL_SURFACE } from "@/components/ui/panel";
 import { LeadCrmControls } from "@/components/lead-crm-controls";
 import { ModernTimeline, type TimelineItem } from "@/components/ui/modern-timeline";
 import { cn } from "@/lib/utils";
-import { projectedRevenue } from "../lead-value";
+import {
+  coolingState,
+  dataFreshness,
+  humanizeEmailStatus,
+  humanizePhoneStatus,
+  isVerified,
+  leadSignalLine,
+  projectedRevenue,
+  scoreVerdict,
+} from "../lead-value";
 import { ReplyHandoff } from "../reply-panel";
 import { EraseControl } from "./erase-control";
 
@@ -86,16 +95,6 @@ const fmt = (iso: string | null | undefined) => (iso ? dateFmt.format(new Date(i
 
 function fullName(l: Lead): string {
   return [l.first_name, l.last_name].filter(Boolean).join(" ") || "Unknown prospect";
-}
-
-function freshness(scoredAt: string | null): { label: string; stale: boolean } | null {
-  if (!scoredAt) return null;
-  const t = new Date(scoredAt).getTime();
-  if (!Number.isFinite(t)) return null;
-  const days = Math.floor((Date.now() - t) / 86_400_000);
-  if (days < 0) return { label: "just now", stale: false };
-  const label = days === 0 ? "today" : days < 14 ? `${days}d ago` : days < 60 ? `${Math.round(days / 7)}w ago` : `${Math.round(days / 30)}mo ago`;
-  return { label, stale: days > 30 };
 }
 
 const CLASS_LABEL: Record<string, string> = {
@@ -186,7 +185,7 @@ function buildTimeline(l: Lead): TimelineItem[] {
 function Section({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) {
   return (
     <section className={cn(PANEL_SURFACE, "p-5", className)}>
-      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ink-4)]">{label}</p>
+      <Eyebrow>{label}</Eyebrow>
       <div className="mt-3">{children}</div>
     </section>
   );
@@ -195,25 +194,25 @@ function Section({ label, children, className }: { label: string; children: Reac
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">{label}</p>
+      <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{label}</p>
       <div className="mt-1 text-sm">{children}</div>
     </div>
   );
 }
 
-function InsightList({ label, items }: { label: string; items?: string[] }) {
-  if (!items || items.length === 0) return null;
+/** One line of the research brief — a fixed label gutter keeps the column scannable. */
+function BriefRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div>
-      <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">{label}</p>
-      <ul className="mt-1 list-disc space-y-1 pl-4 text-sm">
-        {items.map((i, k) => (
-          <li key={k}>{i}</li>
-        ))}
-      </ul>
+    <div className="flex gap-4 border-t border-[var(--hairline)] py-2.5 first:border-t-0 first:pt-0 last:pb-0">
+      <p className="w-24 shrink-0 pt-0.5 font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+        {label}
+      </p>
+      <div className="min-w-0 flex-1 text-sm leading-relaxed text-[var(--ink-2)]">{children}</div>
     </div>
   );
 }
+
+const TECH_STACK_MAX = 6;
 
 export default async function LeadProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -226,77 +225,144 @@ export default async function LeadProfilePage({ params }: { params: Promise<{ id
   if (!lead) notFound();
 
   const insights = lead.ai_insights;
-  const f = freshness(lead.scored_at);
   const timeline = buildTimeline(lead);
+  const verdict = scoreVerdict(lead.ai_score);
+  const fresh = dataFreshness(lead.scored_at);
   const proj = projectedRevenue(account?.avg_deal_value_cents ?? null, account?.revenue_goal_cents ?? null, lead.ai_score);
   const goalStr = account?.revenue_goal_cents ? usd.format(account.revenue_goal_cents / 100) : "";
   const latestReply =
     [...(lead.replies ?? [])].sort((a, b) => (b.received_at ?? "").localeCompare(a.received_at ?? ""))[0] ?? null;
+  const cooling = coolingState(lead.status, latestReply?.received_at ?? null);
+  const whyNow = leadSignalLine(lead.lead_signals, insights);
+  const pains = insights?.pain_points?.slice(0, 2) ?? [];
+  const techStack = lead.tech_stack ?? [];
+  const techOverflow = techStack.length - TECH_STACK_MAX;
 
   return (
-    <div className="mx-auto max-w-5xl">
-      <Link
-        href="/leads"
-        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
-      >
-        <ArrowLeft className="size-4" /> Leads
-      </Link>
+    // One-screen brief: the page itself never scrolls on desktop (viewport minus the
+    // shell's py-6); a column scrolls internally only if its real data overflows.
+    <div className="mx-auto flex w-full max-w-6xl flex-col lg:h-[calc(100dvh-3rem)]">
+      <header className="shrink-0">
+        <Link
+          href="/leads"
+          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <ArrowLeft className="size-4" /> Leads
+        </Link>
 
-      {/* header */}
-      <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-semibold tracking-tight">{fullName(lead)}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {[lead.title, lead.company_name].filter(Boolean).join(" · ") || "—"}
-          </p>
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <Badge>{STATUS_LABELS[lead.status] ?? lead.status}</Badge>
-            {lead.source === "intent" && (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--cyan-tint)] px-2.5 py-0.5 text-[11px] font-semibold text-[var(--cyan-strong)]">
-                <span className="size-1.5 rounded-full bg-[var(--cyan)]" /> In-market
-              </span>
-            )}
-            {f && (
-              <span
+        <div className="mt-3 flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
+          <div className="min-w-0">
+            <h1 className="text-2xl font-semibold tracking-tight">{fullName(lead)}</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {[lead.title, lead.company_name].filter(Boolean).join(" · ") || "—"}
+            </p>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <Badge>{STATUS_LABELS[lead.status] ?? lead.status}</Badge>
+              {lead.source === "intent" && (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--cyan-tint)] px-2.5 py-0.5 text-[11px] font-semibold text-[var(--cyan-strong)]">
+                  <span className="size-1.5 rounded-full bg-[var(--cyan)]" /> In-market
+                </span>
+              )}
+              {cooling && (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/12 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700 ring-1 ring-inset ring-amber-500/30">
+                  <span className="size-1.5 rounded-full bg-amber-500" /> {cooling.label} — going cold
+                </span>
+              )}
+              {fresh && (
+                <span
+                  className={cn(
+                    "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px]",
+                    fresh.stale
+                      ? "bg-amber-500/12 text-amber-700 ring-1 ring-inset ring-amber-500/30"
+                      : "text-muted-foreground ring-1 ring-inset ring-border"
+                  )}
+                >
+                  <Clock className="size-3" /> {fresh.stale ? `Researched ${fresh.label} · may be stale` : `Researched ${fresh.label}`}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Value framing, in the dashboard's stat idiom: eyebrow → font-data number → caption. */}
+          <div className={cn(PANEL_SURFACE, "flex shrink-0 items-stretch px-5 py-4")}>
+            <div className={cn(proj && "pr-6")}>
+              <Eyebrow>Fit score</Eyebrow>
+              <p className="mt-1 font-data text-3xl font-semibold tabular-nums">{lead.ai_score ?? "—"}</p>
+              <p
                 className={cn(
-                  "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px]",
-                  f.stale
-                    ? "bg-amber-500/12 text-amber-700 ring-1 ring-inset ring-amber-500/30"
-                    : "text-muted-foreground ring-1 ring-inset ring-border"
+                  "mt-0.5 text-xs",
+                  verdict.tier === "hot" ? "font-medium text-[var(--cyan-strong)]" : "text-muted-foreground"
                 )}
               >
-                <Clock className="size-3" /> {f.stale ? `Researched ${f.label} · may be stale` : `Researched ${f.label}`}
-              </span>
+                {verdict.label}
+              </p>
+            </div>
+            {proj && (
+              <div className="border-l border-[var(--hairline)] pl-6">
+                <Eyebrow>Projected value</Eyebrow>
+                <p className="mt-1 font-data text-3xl font-semibold tabular-nums">
+                  {usd.format(proj.valueCents / 100)}
+                </p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {proj.dealsToGoal != null && goalStr
+                    ? `1 of ~${proj.dealsToGoal} wins to your ${goalStr}/mo goal`
+                    : "Your average client value"}
+                </p>
+              </div>
             )}
           </div>
         </div>
-        <div className="text-right">
-          <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Fit score</p>
-          <p className="text-4xl font-semibold tabular-nums text-foreground">{lead.ai_score ?? "—"}</p>
-        </div>
-      </div>
+      </header>
 
-      {/* body */}
-      <div className="mt-6 grid gap-5 lg:grid-cols-[1.25fr_1fr] lg:items-start">
-        <div className="flex flex-col gap-5">
-          {proj && (
-            <section className={cn(PANEL_SURFACE, "p-5 ring-1 ring-inset ring-[var(--cyan-line)]")}>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ink-4)]">Worth pursuing</p>
-              <p className="mt-1.5 text-3xl font-semibold tabular-nums text-foreground">≈ {usd.format(proj.valueCents / 100)}</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {proj.dealsToGoal != null && goalStr
-                  ? `What a client like this is worth — one of ~${proj.dealsToGoal} closes to your ${goalStr} goal`
-                  : "What a client like this is worth to you"}
+      <div className="mt-5 grid flex-1 gap-4 lg:min-h-0 lg:grid-cols-[1.15fr_1fr_1.05fr]">
+        {/* Why — the research brief, summarized to what outreach actually uses. */}
+        <div className="flex min-h-0 flex-col gap-4 lg:overflow-y-auto">
+          <Section label="Why this prospect">
+            {insights?.summary && (
+              <p className="text-sm leading-relaxed text-[var(--ink-2)] lg:line-clamp-4">{insights.summary}</p>
+            )}
+            {(whyNow || pains.length > 0 || insights?.value_angle) && (
+              <div className={cn(insights?.summary && "mt-3 border-t border-[var(--hairline)] pt-3")}>
+                {whyNow && <BriefRow label="Why now">{whyNow}</BriefRow>}
+                {pains.length > 0 && (
+                  <BriefRow label="Pain points">
+                    {pains.map((p, i) => (
+                      <span key={i} className="block lg:line-clamp-2">
+                        {p}
+                      </span>
+                    ))}
+                  </BriefRow>
+                )}
+                {insights?.value_angle && <BriefRow label="Angle">{insights.value_angle}</BriefRow>}
+              </div>
+            )}
+            {!insights && lead.status !== "rejected" && (
+              <p className="text-sm text-muted-foreground">
+                Research lands after your Scout&apos;s next pass — pain points, timing, and the angle to
+                lead with will show here.
               </p>
-            </section>
-          )}
+            )}
+          </Section>
 
-          {lead.ai_rationale && (
-            <Section label="Why this score">
-              <p className="text-sm leading-relaxed text-[var(--ink-2)]">{lead.ai_rationale}</p>
+          {lead.status === "rejected" && lead.rules_gate_reasons && lead.rules_gate_reasons.length > 0 ? (
+            <Section label="Why it was filtered out">
+              <ul className="list-disc space-y-1 pl-4 text-sm text-muted-foreground">
+                {lead.rules_gate_reasons.map((r, i) => (
+                  <li key={i}>{r}</li>
+                ))}
+              </ul>
             </Section>
+          ) : (
+            lead.ai_rationale && (
+              <Section label="Why this score">
+                <p className="text-sm leading-relaxed text-[var(--ink-2)] lg:line-clamp-5">{lead.ai_rationale}</p>
+              </Section>
+            )
           )}
+        </div>
 
+        {/* Act — the waiting conversation, the contact card, the deal controls. */}
+        <div className="flex min-h-0 flex-col gap-4 lg:overflow-y-auto">
           {latestReply && (
             <Section label="Latest reply">
               <div className="space-y-2">
@@ -306,10 +372,7 @@ export default async function LeadProfilePage({ params }: { params: Promise<{ id
                   </Badge>
                 )}
                 {latestReply.body && (
-                  <p className="text-sm text-[var(--ink-2)]">
-                    “{latestReply.body.slice(0, 240)}
-                    {latestReply.body.length > 240 ? "…" : ""}”
-                  </p>
+                  <p className="text-sm text-[var(--ink-2)] lg:line-clamp-3">“{latestReply.body}”</p>
                 )}
                 {lead.status === "replied" && latestReply.channel && (
                   <div className="border-t border-[var(--hairline)] pt-3">
@@ -320,51 +383,36 @@ export default async function LeadProfilePage({ params }: { params: Promise<{ id
             </Section>
           )}
 
-          {lead.status === "rejected" && lead.rules_gate_reasons && lead.rules_gate_reasons.length > 0 && (
-            <Section label="Why it was filtered out">
-              <ul className="list-disc space-y-1 pl-4 text-sm text-muted-foreground">
-                {lead.rules_gate_reasons.map((r, i) => (
-                  <li key={i}>{r}</li>
-                ))}
-              </ul>
-            </Section>
-          )}
-
-          {insights && (insights.summary || insights.pain_points?.length || insights.triggers?.length) && (
-            <Section label="Why this prospect">
-              <div className="space-y-3">
-                {insights.summary && <p className="text-sm text-[var(--ink-2)]">{insights.summary}</p>}
-                <InsightList label="Pain points" items={insights.pain_points} />
-                <InsightList label="Buying triggers" items={insights.triggers} />
-                <InsightList label="Motivations" items={insights.motivations} />
-                {insights.value_angle && <Field label="Value angle">{insights.value_angle}</Field>}
-                {insights.aha_moment && <Field label="Aha moment">{insights.aha_moment}</Field>}
-              </div>
-            </Section>
-          )}
-
           <Section label="Company & contact">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-x-4 gap-y-3">
               <Field label="Company">{lead.company_name ?? "—"}</Field>
               <Field label="Headcount">{lead.company_size ?? "—"}</Field>
               <Field label="Industry">{lead.industry ?? "—"}</Field>
               <Field label="Location">{lead.location ?? "—"}</Field>
             </div>
-            <div className="mt-4 space-y-2 border-t border-[var(--hairline)] pt-4">
+            <div className="mt-4 space-y-2 border-t border-[var(--hairline)] pt-3">
               {lead.email ? (
                 <p className="flex items-center gap-2 text-sm">
-                  <Mail className="size-4 text-muted-foreground" />
+                  <Mail className="size-4 shrink-0 text-muted-foreground" />
                   <span className="truncate">{lead.email}</span>
-                  {lead.email_status && <Badge variant={lead.email_status === "valid" ? "default" : "secondary"}>{lead.email_status}</Badge>}
+                  {lead.email_status && (
+                    <Badge variant={isVerified(lead.email_status) ? "default" : "secondary"}>
+                      {humanizeEmailStatus(lead.email_status)}
+                    </Badge>
+                  )}
                 </p>
               ) : (
                 <p className="text-sm text-muted-foreground">No email yet</p>
               )}
               {lead.phone && (
                 <p className="flex items-center gap-2 text-sm">
-                  <Phone className="size-4 text-muted-foreground" />
+                  <Phone className="size-4 shrink-0 text-muted-foreground" />
                   <span>{lead.phone}</span>
-                  {lead.phone_status && <Badge variant={lead.phone_status === "valid" ? "default" : "secondary"}>{lead.phone_status}</Badge>}
+                  {lead.phone_status && (
+                    <Badge variant={isVerified(lead.phone_status) ? "default" : "secondary"}>
+                      {humanizePhoneStatus(lead.phone_status)}
+                    </Badge>
+                  )}
                 </p>
               )}
               {lead.linkedin_url && (
@@ -378,33 +426,39 @@ export default async function LeadProfilePage({ params }: { params: Promise<{ id
                 </a>
               )}
             </div>
-            {lead.tech_stack && lead.tech_stack.length > 0 && (
-              <div className="mt-4 border-t border-[var(--hairline)] pt-4">
-                <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Tech stack</p>
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {lead.tech_stack.map((t) => (
+            {techStack.length > 0 && (
+              <div className="mt-4 border-t border-[var(--hairline)] pt-3">
+                <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Tech stack</p>
+                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                  {techStack.slice(0, TECH_STACK_MAX).map((t) => (
                     <Badge key={t} variant="secondary">
                       {t}
                     </Badge>
                   ))}
+                  {techOverflow > 0 && (
+                    <span className="text-xs text-muted-foreground">+{techOverflow} more</span>
+                  )}
                 </div>
               </div>
             )}
           </Section>
 
-          <div className={cn(PANEL_SURFACE, "p-5")}>
+          <div className={cn(PANEL_SURFACE, "p-4")}>
             <LeadCrmControls leadId={lead.id} status={lead.status} />
           </div>
 
-          <div className="border-t border-[var(--hairline)] pt-4">
+          <div className="flex justify-end">
             <EraseControl leadId={lead.id} />
           </div>
         </div>
 
-        {/* activity timeline */}
-        <Section label="Activity" className="lg:sticky lg:top-6">
-          <ModernTimeline items={timeline} />
-        </Section>
+        {/* Journey — the only column with unbounded data; it scrolls inside its panel. */}
+        <section className={cn(PANEL_SURFACE, "flex min-h-0 flex-col p-5")}>
+          <Eyebrow>Activity</Eyebrow>
+          <div className="mt-3 min-h-0 flex-1 lg:overflow-y-auto lg:pr-1">
+            <ModernTimeline items={timeline} />
+          </div>
+        </section>
       </div>
     </div>
   );
