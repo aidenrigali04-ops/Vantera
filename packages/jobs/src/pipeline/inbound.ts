@@ -77,14 +77,20 @@ async function maybeRespond(
   if (bundle.agentTurns >= MAX_AGENT_TURNS) return false; // hand off to the human
   if (bundle.hasUnsentMessage) return false; // a reply is already queued/in-flight — don't double-message
 
-  const reply = await deps.respondFn({
+  const respondInput = {
     lead: bundle.lead,
     insights: bundle.insights,
     context: bundle.context,
     thread: bundle.thread,
     incoming,
     classification: verdict.classification,
-  });
+  };
+  let reply = await deps.respondFn(respondInput);
+  // Automatic senders get ONE targeted fix of a flagged reply before it may auto-send; the fix is
+  // re-linted with the same bar, so a still-flagged result falls through to review below.
+  if (bundle.sendMode === "automatic" && reply.violations.length > 0 && deps.fixReplyFn) {
+    reply = await deps.fixReplyFn(reply, respondInput);
+  }
   const clean = reply.violations.length === 0;
   const autoSend = bundle.sendMode === "automatic" && clean;
 

@@ -502,6 +502,57 @@ describe("runInbound — active responder (converse to close)", () => {
     expect(store.scheduledSends[0]!.styleFlags).toBeTruthy();
   });
 
+  it("automatic mode: a flagged reply gets one fix pass, and a clean fix auto-sends the fixed body", async () => {
+    const store = storeWithBundle(bundle({ sendMode: "automatic" }));
+    const fixFn = vi.fn(async () => ({ message: "clean rewrite", violations: [] }));
+
+    await runInbound(
+      { source: "linkedin", payload: LINKEDIN_REPLY_FIXTURE },
+      {
+        ...deps(store, { respondFn: respond("salesy", [{ rule: "buzzword", detail: "game-changer" }]) }),
+        fixReplyFn: fixFn,
+      }
+    );
+
+    expect(fixFn).toHaveBeenCalledOnce();
+    expect(store.scheduledSends[0]).toMatchObject({ status: "approved", body: "clean rewrite", styleFlags: null });
+  });
+
+  it("automatic mode: a still-flagged fix waits in review (never silent-sends)", async () => {
+    const store = storeWithBundle(bundle({ sendMode: "automatic" }));
+    const fixFn = vi.fn(async () => ({
+      message: "still salesy",
+      violations: [{ rule: "buzzword", detail: "seamless" }],
+    }));
+
+    await runInbound(
+      { source: "linkedin", payload: LINKEDIN_REPLY_FIXTURE },
+      {
+        ...deps(store, { respondFn: respond("salesy", [{ rule: "buzzword", detail: "game-changer" }]) }),
+        fixReplyFn: fixFn,
+      }
+    );
+
+    expect(store.scheduledSends[0]!.status).toBe("pending_review");
+    expect(store.scheduledSends[0]!.styleFlags).toBeTruthy();
+  });
+
+  it("review mode: the fix pass is not spent — flags go straight to the queue's Fix button", async () => {
+    const store = storeWithBundle(bundle({ sendMode: "review" }));
+    const fixFn = vi.fn(async () => ({ message: "unused", violations: [] }));
+
+    await runInbound(
+      { source: "linkedin", payload: LINKEDIN_REPLY_FIXTURE },
+      {
+        ...deps(store, { respondFn: respond("salesy", [{ rule: "buzzword", detail: "game-changer" }]) }),
+        fixReplyFn: fixFn,
+      }
+    );
+
+    expect(fixFn).not.toHaveBeenCalled();
+    expect(store.scheduledSends[0]!.status).toBe("pending_review");
+  });
+
   it("stops responding past the converse-to-close turn cap (hands off to the human)", async () => {
     const store = storeWithBundle(bundle({ agentTurns: 6 }));
 

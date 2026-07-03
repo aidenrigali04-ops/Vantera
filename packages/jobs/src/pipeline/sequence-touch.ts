@@ -48,12 +48,18 @@ export async function runSequenceTouch(
   if (!bundle) return "skipped";
 
   // Proactive follow-up: no incoming reply → the brain writes a fresh nudge that builds on the thread.
-  const draft = await deps.draftFollowupFn({
+  const followupInput = {
     lead: bundle.lead,
     insights: bundle.insights,
     context: bundle.context,
     thread: bundle.thread,
-  });
+  };
+  let draft = await deps.draftFollowupFn(followupInput);
+  // Automatic senders get ONE targeted fix of a flagged follow-up before it may auto-send; the fix
+  // is re-linted with the same bar, so a still-flagged result falls through to review below.
+  if (bundle.sendMode === "automatic" && draft.violations.length > 0 && deps.fixFollowupFn) {
+    draft = await deps.fixFollowupFn(draft, followupInput);
+  }
   const styleFlags = draft.violations.length > 0 ? describeViolations(draft.violations) : null;
   // Respect the agent's send mode (like copy-draft / the responder): automatic auto-approves a clean
   // follow-up; review mode — or any style-flagged draft — waits in the review queue.

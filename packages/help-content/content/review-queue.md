@@ -8,9 +8,10 @@ routes: /review
 
 Every message your Outreach Agent writes waits in the review queue — nothing sends without your approval.
 
-Each draft shows who it's for, the channel, and the message. If our style check spotted anything that could read as robotic, you'll see a flag on the card; edit the draft and the flag clears once the text passes.
+Each draft shows who it's for, the channel, and the message. If our style check spotted anything that could read as robotic, you'll see a flag on the card. You have two ways to clear it: press **Fix** on the flag and the draft is rewritten for you — the fix is re-checked against the same style rules, so a flag only disappears when the text genuinely passes — or edit the draft yourself and the flag clears once the text passes.
 
 - **Approve** — the draft is cleared to send.
+- **Fix** — one-click rewrite of a style-flagged draft; the copy is corrected without changing what the message says, then re-checked. The draft stays in the queue for your approval.
 - **Edit** — change the subject or message; we re-check the style automatically.
 - **Decline** — drop this draft.
 - **Decline & never contact** — drop the draft and add the contact to your suppression list so no agent messages them again.
@@ -30,4 +31,4 @@ Each prospect appears once, with their full conversation underneath — the exac
 - **Canceled** → stopped before sending (for example, a LinkedIn invite that was never accepted).
 - **Suppressed** → the contact was added to your suppression list, so the message was held back.
 
-If your Outreach Agent is set to **automatic** sending, clean drafts skip the queue and send for you — anything with a style flag still comes to you first. The **Processed** tab is where you see exactly what went out: the full copy of every message and the replies it earned, so automatic never means invisible.
+If your Outreach Agent is set to **automatic** sending, clean drafts skip the queue and send for you. A style-flagged draft gets one automatic fix pass first — the same rewrite the **Fix** button runs — and if the corrected copy passes the style check it sends on its own. Anything that still carries a flag after the fix comes to you in the queue instead; flagged copy is never sent without your eyes on it. The **Processed** tab is where you see exactly what went out: the full copy of every message and the replies it earned, so automatic never means invisible.

@@ -43,6 +43,12 @@ export {
   type DraftInput,
   type CopyStrategy,
 } from "./copy/shared";
+export {
+  fixConversationMessage,
+  fixDraftText,
+  fixLinkedInDraft,
+  type DraftTextFix,
+} from "./copy/fix";
 export { classifyReply, preClassify, replyVerdictSchema, type ReplyVerdict } from "./reply/classify";
 export {
   draftConversationMessage,

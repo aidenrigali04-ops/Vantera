@@ -342,6 +342,12 @@ export interface OptimizeSummary {
 export interface CopyDraftDeps {
   store: CopyDraftStore;
   draftLinkedInFn: (input: DraftInput) => Promise<LinkedInDraft>;
+  /**
+   * One targeted EDIT of a style-flagged pair, run only on the AUTOMATIC send path before the
+   * draft may auto-approve (review mode surfaces the flags + the queue's Fix button instead).
+   * The fix is re-linted with the same validator; still-flagged output waits in review (rule 06/11).
+   */
+  fixLinkedInFn?: (draft: LinkedInDraft, input: DraftInput) => Promise<LinkedInDraft>;
 }
 
 export interface CopyDraftSummary {
@@ -604,6 +610,12 @@ export interface InboundDeps {
    * disabled (a reply is only classified + notified, never auto-answered).
    */
   respondFn?: (input: ConversationMessageInput) => Promise<ConversationDraft>;
+  /** AUTOMATIC-mode only: one targeted edit of a style-flagged reply before it may auto-send;
+   *  re-linted with the same mid-conversation bar, still-flagged output waits in review. */
+  fixReplyFn?: (
+    original: ConversationDraft,
+    input: ConversationMessageInput
+  ) => Promise<ConversationDraft>;
   now?: () => Date;
 }
 
@@ -721,6 +733,12 @@ export interface SequenceTouchDeps {
   /** Drafts a PROACTIVE follow-up (no incoming reply) with the same brain the responder uses, so the
    *  message follows the thread. Returns the body + any unresolved humanizer violations. */
   draftFollowupFn: (input: ConversationMessageInput) => Promise<ConversationDraft>;
+  /** AUTOMATIC-mode only: one targeted edit of a style-flagged follow-up before it may auto-send;
+   *  re-linted with the same mid-conversation bar, still-flagged output waits in review. */
+  fixFollowupFn?: (
+    original: ConversationDraft,
+    input: ConversationMessageInput
+  ) => Promise<ConversationDraft>;
   /** current time (injectable for tests); used by the freshness check before a touch */
   now: () => Date;
   /**

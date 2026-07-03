@@ -1,6 +1,6 @@
 import { logger, task } from "@trigger.dev/sdk";
 import { createDb } from "@vantera/db";
-import { classifyReply, draftConversationMessage } from "@vantera/agent-brains";
+import { classifyReply, draftConversationMessage, fixConversationMessage } from "@vantera/agent-brains";
 import { createLinkedInInfraFromEnv } from "@vantera/linkedin-infra";
 import { runInbound } from "../pipeline/inbound";
 import { createPgStore } from "../pipeline/pg-store";
@@ -22,6 +22,7 @@ export const processInbound = task({
       linkedinInfra: createLinkedInInfraFromEnv(),
       classifyFn: (body) => classifyReply(body),
       respondFn: (input) => draftConversationMessage(input),
+      fixReplyFn: (original, input) => fixConversationMessage(original, input),
     });
     logger.info("inbound processed", { source: payload.source, ...summary });
     return summary;

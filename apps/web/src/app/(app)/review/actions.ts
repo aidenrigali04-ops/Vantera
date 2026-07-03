@@ -1,12 +1,18 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { describeViolations, validateHumanity } from "@vantera/agent-brains";
+import {
+  CONNECTION_NOTE_MAX_CHARS,
+  FOLLOWUP_MAX_CHARS,
+  describeViolations,
+  fixDraftText,
+  validateHumanity,
+} from "@vantera/agent-brains";
 import { createClient } from "@/lib/supabase/server";
 import { normalizeSuppressionValue } from "@/lib/suppression";
 import { parseDraftEdit } from "./validation";
 
-export type ReviewActionState = { error?: string };
+export type ReviewActionState = { error?: string; notice?: string };
 
 async function session() {
   const supabase = await createClient();
@@ -64,6 +70,64 @@ export async function saveDraftEdit(
   if (error) return { error: "Could not save the edit. Only workspace admins can review." };
   revalidatePath("/review");
   return {};
+}
+
+/**
+ * The review queue's "Fix" button: one targeted AI edit of a style-flagged draft. The fixed body is
+ * re-linted (same humanizer bar, at the stage's send cap) before it's saved — flags that survive the
+ * fix stay visible on the card, so the fix can never quietly dodge the style check. The draft stays
+ * in pending_review either way; the owner still approves the send.
+ */
+export async function fixDraft(
+  _prev: ReviewActionState,
+  formData: FormData
+): Promise<ReviewActionState> {
+  const sendId = String(formData.get("sendId") ?? "");
+  if (!sendId) return { error: "Invalid request." };
+  const { supabase, user } = await session();
+  if (!user) return { error: "Your session expired. Sign in again." };
+
+  const { data: send } = await supabase
+    .from("scheduled_sends")
+    .select("id, body, style_flags, linkedin_stage")
+    .eq("id", sendId)
+    .eq("status", "pending_review")
+    .maybeSingle<{
+      id: string;
+      body: string;
+      style_flags: string | null;
+      linkedin_stage: "invite" | "message" | null;
+    }>();
+  if (!send) return { error: "Draft not found." };
+  if (!send.style_flags) return {}; // nothing flagged — nothing to fix
+
+  const isInvite = send.linkedin_stage === "invite";
+  let fixed: Awaited<ReturnType<typeof fixDraftText>>;
+  try {
+    fixed = await fixDraftText({
+      text: send.body,
+      flags: send.style_flags,
+      // invite = LinkedIn's connection-note cap; everything else the follow-up cap (the strictest
+      // message-stage limit, so a fixed body is valid at every send boundary)
+      maxChars: isInvite ? CONNECTION_NOTE_MAX_CHARS : FOLLOWUP_MAX_CHARS,
+      // links are always banned on an invite; elsewhere only when the original flag was about one
+      banLinks: isInvite || /link/i.test(send.style_flags),
+    });
+  } catch {
+    return { error: "The fix pass didn't complete — try again, or edit the draft manually." };
+  }
+  const styleFlags = fixed.violations.length > 0 ? describeViolations(fixed.violations) : null;
+
+  const { error } = await supabase
+    .from("scheduled_sends")
+    .update({ body: fixed.text, style_flags: styleFlags })
+    .eq("id", sendId)
+    .eq("status", "pending_review");
+  if (error) return { error: "Could not save the fix. Only workspace admins can review." };
+  revalidatePath("/review");
+  return styleFlags
+    ? { notice: "Cleaned up what it could — a flag still remains, so give the copy a quick read." }
+    : {};
 }
 
 export async function declineDraft(

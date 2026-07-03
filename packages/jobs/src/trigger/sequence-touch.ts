@@ -1,6 +1,6 @@
 import { logger, task } from "@trigger.dev/sdk";
 import { createDb } from "@vantera/db";
-import { draftConversationMessage, rankLeads } from "@vantera/agent-brains";
+import { draftConversationMessage, fixConversationMessage, rankLeads } from "@vantera/agent-brains";
 import { runSequenceTouch } from "../pipeline/sequence-touch";
 import { createPgStore } from "../pipeline/pg-store";
 import { createProspectData } from "../pipeline/prospect-source";
@@ -19,6 +19,7 @@ export const sequenceTouch = task({
     const outcome = await runSequenceTouch(payload, {
       store,
       draftFollowupFn: (input) => draftConversationMessage(input),
+      fixFollowupFn: (original, input) => fixConversationMessage(original, input),
       now: () => new Date(),
       refreshLead: (accountId, leadId) =>
         runRefreshLead(accountId, leadId, {

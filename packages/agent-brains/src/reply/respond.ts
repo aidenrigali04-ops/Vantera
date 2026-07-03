@@ -59,9 +59,20 @@ Rules for every message:
 - Conversational chat register: no "Dear", no "Best regards", no signature, no buzzwords ("game-changer", "seamless"), no generic flattery, at most one em-dash, at most one exclamation mark, minimal hedging.
 - Name the seller ONLY by the "Seller company" value in the block.`;
 
-function renderThread(thread: ConversationTurn[]): string {
+export function renderThread(thread: ConversationTurn[]): string {
   if (thread.length === 0) return "(no earlier messages yet)";
   return thread.map((t) => `${t.role === "agent" ? "You" : "Prospect"}: ${t.text}`).join("\n");
+}
+
+/** The full mid-conversation ruleset — shared with the fix pass so a "fixed" message is held to
+ *  the exact bar that flagged the original (humanity + no-restart + grounded claims). */
+export function validateConversationMessage(message: string, block: string): Violation[] {
+  return [
+    ...validateHumanity(message, { maxChars: CONVERSATION_REPLY_MAX_CHARS }),
+    // mid-conversation must never restart/re-introduce (rule enforced, not just prompted)
+    ...findRestartPhrases(message),
+    ...findUngroundedClaims(message, block),
+  ];
 }
 
 /**
@@ -101,12 +112,7 @@ export async function draftConversationMessage(
           maxOutputTokens: 300,
         })
       ).object,
-    (draft) => [
-      ...validateHumanity(draft.message, { maxChars: CONVERSATION_REPLY_MAX_CHARS }),
-      // mid-conversation must never restart/re-introduce (rule enforced, not just prompted)
-      ...findRestartPhrases(draft.message),
-      ...findUngroundedClaims(draft.message, block),
-    ]
+    (draft) => validateConversationMessage(draft.message, block)
   );
 
   return { message: output.message, violations };

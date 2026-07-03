@@ -109,7 +109,12 @@ export async function runCopyDraft(
         leadSuppressed += 1;
       } else {
         // suppression checked above; one draft call yields both the invite note and follow-up
-        const draft = await deps.draftLinkedInFn(input);
+        let draft = await deps.draftLinkedInFn(input);
+        // Automatic senders get ONE targeted fix of a flagged pair before it may auto-approve; the
+        // fix is re-linted with the same validator, so a still-flagged pair waits in review.
+        if (ctx.agent.sendMode === "automatic" && draft.violations.length > 0 && deps.fixLinkedInFn) {
+          draft = await deps.fixLinkedInFn(draft, input);
+        }
         const status = draftStatus(ctx.agent.sendMode, draft.violations);
         const flags = draft.violations.length > 0 ? describeViolations(draft.violations) : null;
         const common = {

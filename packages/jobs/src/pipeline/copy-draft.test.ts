@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { normalizeLinkedInUrl, runCopyDraft } from "./copy-draft";
 import type {
   ActiveExperiment,
@@ -287,6 +287,75 @@ describe("runCopyDraft — LinkedIn invite+message pair", () => {
 
     await runCopyDraft(PAYLOAD, deps);
 
+    for (const send of store.sends) {
+      expect(send.status).toBe("pending_review");
+    }
+  });
+
+  it("automatic mode: a flagged pair gets one fix pass, and a clean fix auto-approves the fixed copy", async () => {
+    const store = new FakeCopyStore({ linkedin: true }, "automatic");
+    store.leads = [lead("l1")];
+    const deps = makeDeps(store);
+    deps.draftLinkedInFn = async () => ({
+      connectionNote: "salesy note",
+      followupMessage: "salesy follow-up",
+      violations: [{ rule: "banned-phrase", detail: 'remove "game-changer"' }],
+    });
+    const fixFn = vi.fn(async () => ({
+      connectionNote: "clean note",
+      followupMessage: "clean follow-up",
+      violations: [],
+    }));
+    deps.fixLinkedInFn = fixFn;
+
+    await runCopyDraft(PAYLOAD, deps);
+
+    expect(fixFn).toHaveBeenCalledOnce();
+    expect(store.sends.map((x) => x.body).sort()).toEqual(["clean follow-up", "clean note"]);
+    for (const send of store.sends) {
+      expect(send.status).toBe("approved");
+      expect(send.styleFlags).toBeNull();
+    }
+  });
+
+  it("automatic mode: a still-flagged fix waits in review with its flags (never silent-sends)", async () => {
+    const store = new FakeCopyStore({ linkedin: true }, "automatic");
+    store.leads = [lead("l1")];
+    const deps = makeDeps(store);
+    deps.draftLinkedInFn = async () => ({
+      connectionNote: "salesy note",
+      followupMessage: "salesy follow-up",
+      violations: [{ rule: "banned-phrase", detail: 'remove "game-changer"' }],
+    });
+    deps.fixLinkedInFn = async () => ({
+      connectionNote: "still salesy",
+      followupMessage: "still salesy follow-up",
+      violations: [{ rule: "banned-phrase", detail: 'remove "seamless"' }],
+    });
+
+    await runCopyDraft(PAYLOAD, deps);
+
+    for (const send of store.sends) {
+      expect(send.status).toBe("pending_review");
+      expect(send.styleFlags).toContain("banned-phrase");
+    }
+  });
+
+  it("review mode: the fix pass is not spent — flags go straight to the queue's Fix button", async () => {
+    const store = new FakeCopyStore({ linkedin: true }, "review");
+    store.leads = [lead("l1")];
+    const deps = makeDeps(store);
+    deps.draftLinkedInFn = async () => ({
+      connectionNote: "salesy note",
+      followupMessage: "salesy follow-up",
+      violations: [{ rule: "banned-phrase", detail: 'remove "game-changer"' }],
+    });
+    const fixFn = vi.fn(async () => ({ connectionNote: "unused", followupMessage: "unused", violations: [] }));
+    deps.fixLinkedInFn = fixFn;
+
+    await runCopyDraft(PAYLOAD, deps);
+
+    expect(fixFn).not.toHaveBeenCalled();
     for (const send of store.sends) {
       expect(send.status).toBe("pending_review");
     }

@@ -1,13 +1,13 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { AlertTriangle, MessageSquare } from "lucide-react";
+import { AlertTriangle, MessageSquare, Wand2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
 import { Textarea } from "@/components/ui/textarea";
 import { LeadProfileLink, type LeadProfile } from "@/components/lead-profile";
-import { approveDraft, declineDraft, declineAndSuppress, saveDraftEdit } from "./actions";
+import { approveDraft, declineDraft, declineAndSuppress, fixDraft, saveDraftEdit } from "./actions";
 import type { ReviewActionState } from "./actions";
 
 export interface DraftRow {
@@ -46,21 +46,44 @@ export function DraftCard({ draft, compact = false }: { draft: DraftRow; compact
     saveDraftEdit,
     {}
   );
+  const [fixState, fix, fixing] = useActionState<ReviewActionState, FormData>(fixDraft, {});
 
   const lead = draft.leads;
   const name = [lead?.first_name, lead?.last_name].filter(Boolean).join(" ") || "Unknown prospect";
   const context = [lead?.title, lead?.company_name].filter(Boolean).join(" · ");
-  const error = approveState.error ?? declineState.error ?? suppressState.error ?? editState.error;
+  const error =
+    approveState.error ?? declineState.error ?? suppressState.error ?? editState.error ?? fixState.error;
   const stageLabel = draft.linkedin_stage === "invite" ? "Invite" : draft.linkedin_stage === "message" ? "Follow-up" : null;
 
   // Shared body + actions — identical in both modes.
   const content = (
     <div className="space-y-3">
       {draft.style_flags && (
-        <p className="flex items-start gap-1.5 rounded-md bg-amber-500/10 px-2.5 py-1.5 text-xs text-amber-700 dark:text-amber-400">
-          <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
-          Style check: {draft.style_flags}
-        </p>
+        <div className="flex items-start justify-between gap-3 rounded-md bg-amber-500/10 px-2.5 py-1.5">
+          <p className="flex items-start gap-1.5 text-xs text-amber-700 dark:text-amber-400">
+            <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
+            Style check: {draft.style_flags}
+          </p>
+          {!editing && (
+            <form action={fix} className="shrink-0">
+              <input type="hidden" name="sendId" value={draft.id} />
+              <Button
+                type="submit"
+                size="sm"
+                variant="outline"
+                disabled={fixing}
+                data-copilot="fix-draft"
+                className="h-6 gap-1 border-amber-500/40 bg-transparent px-2 text-xs text-amber-700 hover:bg-amber-500/15 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300"
+              >
+                <Wand2 className="size-3" />
+                {fixing ? "Fixing…" : "Fix"}
+              </Button>
+            </form>
+          )}
+        </div>
+      )}
+      {fixState.notice && (
+        <p className="text-xs text-amber-700 dark:text-amber-400">{fixState.notice}</p>
       )}
 
       {editing ? (

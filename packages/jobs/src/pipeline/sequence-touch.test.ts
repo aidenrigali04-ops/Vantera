@@ -120,6 +120,42 @@ describe("runSequenceTouch", () => {
     );
   });
 
+  it("automatic mode: a flagged draft gets one fix pass, and a clean fix auto-sends the fixed body", async () => {
+    const insert = vi.fn(async () => {});
+    const draftFn = vi.fn(async () => ({ message: "salesy", violations: [{ rule: "buzzword", detail: "game-changer" }] }));
+    const fixFn = vi.fn(async () => ({ message: "clean rewrite that builds on the thread", violations: [] }));
+    const d = { ...deps({ insertScheduledSend: insert }, "ok", [], draftFn), fixFollowupFn: fixFn };
+    await runSequenceTouch(dispatch, d);
+    expect(fixFn).toHaveBeenCalledOnce();
+    expect(insert).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "approved", body: "clean rewrite that builds on the thread", styleFlags: null })
+    );
+  });
+
+  it("automatic mode: a still-flagged fix waits in review with its flags (never silent-sends)", async () => {
+    const insert = vi.fn(async () => {});
+    const draftFn = vi.fn(async () => ({ message: "salesy", violations: [{ rule: "buzzword", detail: "game-changer" }] }));
+    const fixFn = vi.fn(async () => ({ message: "still salesy", violations: [{ rule: "buzzword", detail: "seamless" }] }));
+    const d = { ...deps({ insertScheduledSend: insert }, "ok", [], draftFn), fixFollowupFn: fixFn };
+    await runSequenceTouch(dispatch, d);
+    expect(insert).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "pending_review", body: "still salesy", styleFlags: expect.any(String) })
+    );
+  });
+
+  it("review mode: the fix pass is not spent — flags go straight to the queue's Fix button", async () => {
+    const insert = vi.fn(async () => {});
+    const draftFn = vi.fn(async () => ({ message: "salesy", violations: [{ rule: "buzzword", detail: "game-changer" }] }));
+    const fixFn = vi.fn(async () => ({ message: "unused", violations: [] }));
+    const d = {
+      ...deps({ getResponderBundle: async () => bundle({ sendMode: "review" }), insertScheduledSend: insert }, "ok", [], draftFn),
+      fixFollowupFn: fixFn,
+    };
+    await runSequenceTouch(dispatch, d);
+    expect(fixFn).not.toHaveBeenCalled();
+    expect(insert).toHaveBeenCalledWith(expect.objectContaining({ status: "pending_review" }));
+  });
+
   it("skips when there is no conversation context (no live Outreach agent / no insights)", async () => {
     const insert = vi.fn(async () => {});
     const d = deps({ getResponderBundle: async () => null, insertScheduledSend: insert });
