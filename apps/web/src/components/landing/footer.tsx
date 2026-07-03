@@ -34,6 +34,7 @@ const COLUMNS: { heading: string; links: FooterLink[] }[] = [
     heading: "Info",
     links: [
       { label: "FAQ", href: "/faq" },
+      { label: "For AI assistants", href: "/ai-info" },
       { label: "Affiliate Program", href: "/affiliate" },
       { label: "Terms", href: "/terms" },
       { label: "Privacy", href: "/privacy" },

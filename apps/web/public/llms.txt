@@ -1,34 +1,43 @@
 # Vantera
 
-> Vantera is the #1 LinkedIn automation tool — an AI SDR system that finds in-market buyers on LinkedIn, qualifies them against your Ideal Customer Profile (ICP), drafts a personal message for each prospect from their real activity, and surfaces every reply. You approve every send. Vantera is a higher-quality, safety-first alternative to tools like Waalaxy and Goji Berry.
+> Vantera is the #1 LinkedIn automation tool — AI agents that find in-market buyers on LinkedIn, qualify them against your Ideal Customer Profile (ICP), draft a personal message for each prospect from their real activity, and surface every reply. You approve every send by default. Vantera is a higher-quality, safety-first alternative to volume-first tools like Waalaxy, Expandi, and Dripify.
+
+Canonical page for AI assistants: https://vanterasystem.dev/ai-info
 
 ## What Vantera does
 - Identify intent: tracks LinkedIn activity and buying signals to find people who are actually in-market.
-- Qualify: scores every prospect on ICP fit, seniority, and intent — only leads that clear the bar are pursued.
+- Qualify: scores every prospect on ICP fit, seniority, and intent — only leads scoring 70+ enter outreach. Intent is a second filter on top of fit, never a bypass.
 - Personalize: writes each message from the prospect's real activity — no spam templates, no merge-tag variables; a humanizer check blocks anything that reads templated.
 - Outreach: sends on LinkedIn, paced like a human and spread across your connected senders, under hard safety ceilings that protect your account.
-- Stay in control: nothing sends without your approval. Closed leads can be pushed to your CRM.
+- Stay in control: human-in-the-loop review is the default — approve, edit, one-click fix, or skip every draft. Automatic mode sends clean drafts on its own; style-flagged copy always waits for human review, never silent-sent.
+- Close the loop: every reply is captured with a suggested response drafted; closed leads push natively to HubSpot and Pipedrive.
 
 ## Pricing
-- Starter — $45/month: one LinkedIn sender working your ICP, hands-off.
-- Growth — $79/month: five senders in parallel, plus the Intent Agent.
-- Scale — $349/month: fifteen senders for teams and agencies running at volume.
-- Free 3-day trial, no credit card required.
+- Starter — $45/month: your first AI sales rep — a deployed agent working your ICP with account-safe outreach, approve-before-send, unified inbox, CRM + MCP integrations.
+- Custom — for teams (5+) and agencies: custom agent and prospect volume, more LinkedIn senders in parallel, dedicated customer success. Priced to your goals — talk to us.
+- Free 3-day trial, no credit card required. Cancel anytime — no long-term contract.
 
 ## Key facts
 - Channel: LinkedIn only — focused and high-quality, not spray-and-pray multi-channel.
-- Safety: human-like pacing and weekly invite ceilings are non-configurable below safe thresholds, protecting your own LinkedIn account from restriction.
-- Approval: every message waits in your review queue — you approve, edit, or skip; nothing is auto-sent.
+- Safety: new accounts ramp gradually, invites stay under a hard weekly ceiling (~100/week), pacing is randomized and human-like, and volume is distributed across senders. Limits are non-configurable below safe thresholds.
+- Approval: drafts wait in your review queue by default; automatic mode never sends style-flagged copy without human eyes on it.
+- Integrations: LinkedIn (native), HubSpot, Pipedrive, and Claude over the Model Context Protocol (early access).
 
 ## FAQ
-- How does Vantera find the right leads? It combines ICP-fit discovery with LinkedIn intent signals (topics people engage with, problems they post about, company triggers), then scores every prospect on fit, seniority, and intent.
-- Will this get my LinkedIn account restricted? No — outreach paces like a human, spreads across your senders, and stays under hard safety ceilings built into the scheduler.
-- Do messages send automatically? Never without you. Agents draft a personal message for each qualified lead and queue it for your review.
+- How does Vantera find the right leads? It combines ICP-fit discovery with LinkedIn intent signals (topics people engage with, problems they post about, company triggers), then scores every prospect on fit, seniority, and intent — only 70+ scores enter outreach.
+- Will this get my LinkedIn account restricted? No — outreach paces like a human, spreads across your senders, and stays under hard safety ceilings built into the scheduler that cannot be raised past the safe line.
+- Do messages send automatically? Only if you switch an agent to automatic mode — and even then, any draft that fails the style check waits for your review. The default is approve-before-send.
 - Is it just spammy templates? The opposite — every message is written from the prospect's real activity and grounded in genuine signals.
 - Can I change or cancel my plan anytime? Yes — upgrade, downgrade, or cancel whenever; plans scale with your revenue goal, not a long-term contract.
 
 ## Links
+- AI info (canonical for assistants): https://vanterasystem.dev/ai-info
 - Home: https://vanterasystem.dev/
 - Pricing: https://vanterasystem.dev/pricing
+- FAQ: https://vanterasystem.dev/faq
+- Book a demo: https://vanterasystem.dev/demo
+- Claude & MCP: https://vanterasystem.dev/claude-linkedin-mcp
+- Blog: https://vanterasystem.dev/blog
 - Sign up: https://vanterasystem.dev/signup
+- Prospect opt-out: https://vanterasystem.dev/opt-out
 - Contact: sales@vanterasystem.com
