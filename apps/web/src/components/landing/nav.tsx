@@ -29,7 +29,7 @@ const FLAT_LINKS = [
   { label: "How it works", href: "/#showcase" },
   { label: "Pricing", href: "/#pricing" },
   { label: "Blog", href: "/blog" },
-  { label: "FAQ", href: "/#faq" },
+  { label: "FAQ", href: "/faq" },
 ];
 
 type ProductLink = { icon: ProductIcon; title: string; desc: string; href: string };
