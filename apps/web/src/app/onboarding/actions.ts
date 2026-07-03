@@ -11,7 +11,13 @@ import { reconcileLinkedInAccounts } from "@/lib/linkedin/sync";
 /** Default outreach CTA — sensible out of the box, refined later in Settings → Sharpen your results. */
 const DEFAULT_CTA = "a quick intro call to see if it's a fit";
 
-export type PersonalizeState = { error?: string; saved?: boolean; scanned?: boolean };
+export type PersonalizeState = {
+  error?: string;
+  saved?: boolean;
+  scanned?: boolean;
+  /** the derived positioning, returned so the analysis tracker can pay off live */
+  scan?: { headline: string; suggested_icp: string; scope_of_industry: string };
+};
 export type FindLeadsState = { error?: string };
 
 async function currentAccountId(): Promise<{ id: string } | "no-user"> {
@@ -83,7 +89,15 @@ export async function savePersonalize(
         .from("accounts")
         .update({ website_scan: { ...scan, url: result.values.websiteUrl }, website_scanned_at: new Date().toISOString() })
         .eq("id", account.id);
-      return { saved: true, scanned: true };
+      return {
+        saved: true,
+        scanned: true,
+        scan: {
+          headline: scan.headline,
+          suggested_icp: scan.suggested_icp,
+          scope_of_industry: scan.scope_of_industry,
+        },
+      };
     } catch (err) {
       console.error("onboarding website scan failed", err);
       return { saved: true, scanned: false };
