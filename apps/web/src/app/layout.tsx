@@ -11,6 +11,11 @@ import { SITE_URL, SITE_DESCRIPTION, JsonLd, organizationLd, websiteLd } from "@
 // Gated to production builds so local `pnpm dev` never pollutes the analytics property.
 const GA_MEASUREMENT_ID = "G-2WC6VEZB5C";
 
+// Microsoft Clarity — heatmaps + session recordings. Same loading rules as GA: next/script
+// (nonce'd, so the inline bootstrap passes the strict-dynamic CSP) and production-only.
+// Clarity's upload endpoints are allowlisted in connect-src (lib/security/csp).
+const CLARITY_PROJECT_ID = "xgheo2rq8n";
+
 const montserrat = Montserrat({
   variable: "--font-montserrat",
   subsets: ["latin"],
@@ -73,6 +78,13 @@ export default function RootLayout({
 function gtag(){dataLayer.push(arguments);}
 gtag('js', new Date());
 gtag('config', '${GA_MEASUREMENT_ID}');`}
+            </Script>
+            <Script id="microsoft-clarity" strategy="afterInteractive">
+              {`(function(c,l,a,r,i,t,y){
+    c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+    t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+    y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+})(window, document, "clarity", "script", "${CLARITY_PROJECT_ID}");`}
             </Script>
           </>
         )}

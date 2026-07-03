@@ -14,8 +14,9 @@ export function buildCsp(nonce: string): string {
     `font-src 'self' data:`,
     // Browser fetches: same-origin API (copilot stream, etc.) + Supabase + Google Analytics
     // (GA4 gtag.js loader + measurement beacons — without these the event sends are blocked once
-    // the policy is enforced). img-src already permits the GA pixel fallback via `https:`.
-    `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://www.googletagmanager.com https://*.google-analytics.com https://*.analytics.google.com`,
+    // the policy is enforced) + Microsoft Clarity (heatmap/session-recording uploads go to
+    // *.clarity.ms and c.bing.com). img-src already permits pixel fallbacks via `https:`.
+    `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://www.googletagmanager.com https://*.google-analytics.com https://*.analytics.google.com https://*.clarity.ms https://c.bing.com`,
     `frame-ancestors 'none'`,
     `base-uri 'self'`,
     `form-action 'self'`,
