@@ -107,7 +107,11 @@ const CLASS_LABEL: Record<string, string> = {
   unsubscribe: "Opt-out",
 };
 
-/** The prospect's real journey, assembled from captured events — no placeholders. */
+/**
+ * The prospect's real journey, newest first — no placeholders, and no re-stating what
+ * the other panels already say in full: the Qualified row doesn't repeat the rationale
+ * ("Why this score" owns it) and reply rows carry the excerpt the component clamps.
+ */
 function buildTimeline(l: Lead): TimelineItem[] {
   const rows: { t: number; item: TimelineItem }[] = [];
 
@@ -116,13 +120,9 @@ function buildTimeline(l: Lead): TimelineItem[] {
       t: ms(l.created_at),
       item: {
         title: l.source === "intent" ? "Surfaced from buying intent" : "Sourced from LinkedIn",
-        category: "Pipeline",
         date: fmt(l.created_at),
         description:
-          l.source === "intent"
-            ? "Spotted showing in-market behavior on LinkedIn and pulled into your pipeline."
-            : "Added to your pipeline by prospect sourcing.",
-        status: "completed",
+          l.source === "intent" ? "Spotted showing in-market behavior on LinkedIn." : undefined,
       },
     });
 
@@ -131,10 +131,7 @@ function buildTimeline(l: Lead): TimelineItem[] {
       t: ms(l.scored_at),
       item: {
         title: l.ai_score != null ? `Qualified — scored ${l.ai_score}` : "Qualified against your ICP",
-        category: "Qualification",
         date: fmt(l.scored_at),
-        description: l.ai_rationale ?? "Cleared your qualification bar on fit, seniority, and intent.",
-        status: "completed",
       },
     });
 
@@ -143,10 +140,8 @@ function buildTimeline(l: Lead): TimelineItem[] {
       t: ms(s.observed_at),
       item: {
         title: s.label ?? "Buying signal detected",
-        category: "Buying signal",
         date: fmt(s.observed_at),
         description: s.detail ?? undefined,
-        status: "completed",
       },
     });
 
@@ -155,31 +150,46 @@ function buildTimeline(l: Lead): TimelineItem[] {
       t: ms(r.received_at),
       item: {
         title: `Reply — ${CLASS_LABEL[r.classification ?? ""] ?? "received"}`,
-        category: "Conversation",
         date: fmt(r.received_at),
         description: r.body ?? r.classification_rationale ?? undefined,
-        status: "completed",
       },
     });
 
-  rows.sort((a, b) => a.t - b.t);
+  rows.sort((a, b) => b.t - a.t);
   const items = rows.map((r) => r.item);
-  if (items.length) items[items.length - 1].status = "current";
-
-  // Goal-gradient: always show the next step so the journey points forward.
-  const next: TimelineItem | null =
-    l.status === "converted"
-      ? { title: "Closed — meeting booked", category: "Won", description: "Revenue in your pipeline.", status: "current" }
-      : l.status === "replied"
-        ? { title: "Book the meeting", category: "Next", description: "A reply landed — take the conversation to a booked call.", status: "upcoming" }
-        : l.status === "in_campaign"
-          ? { title: "Awaiting reply", category: "Next", description: "Your outreach is out — replies surface here and pause the sequence for you.", status: "upcoming" }
-          : l.status === "rejected"
-            ? null
-            : { title: "Outreach drafted for approval", category: "Next", description: "Your outreach layer writes a personalized message and queues it in Review.", status: "upcoming" };
-  if (next) items.push(next);
-
+  if (items.length) items[0].current = true;
   return items;
+}
+
+/**
+ * Goal-gradient: the journey's forward pointer, pinned at the top of the Activity
+ * panel so it can never scroll out of view. "Won" is the closed peak state.
+ */
+function nextStep(l: Lead): { label: "Next" | "Won"; title: string; description: string } | null {
+  switch (l.status) {
+    case "converted":
+      return { label: "Won", title: "Closed — meeting booked", description: "Revenue in your pipeline." };
+    case "replied":
+      return {
+        label: "Next",
+        title: "Book the meeting",
+        description: "A reply landed — take the conversation to a booked call.",
+      };
+    case "in_campaign":
+      return {
+        label: "Next",
+        title: "Awaiting reply",
+        description: "Your outreach is out — replies surface here and pause the sequence for you.",
+      };
+    case "rejected":
+      return null;
+    default:
+      return {
+        label: "Next",
+        title: "Outreach drafted for approval",
+        description: "Your outreach layer writes a personalized message and queues it in Review.",
+      };
+  }
 }
 
 function Section({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) {
@@ -226,6 +236,7 @@ export default async function LeadProfilePage({ params }: { params: Promise<{ id
 
   const insights = lead.ai_insights;
   const timeline = buildTimeline(lead);
+  const next = nextStep(lead);
   const verdict = scoreVerdict(lead.ai_score);
   const fresh = dataFreshness(lead.scored_at);
   const proj = projectedRevenue(account?.avg_deal_value_cents ?? null, account?.revenue_goal_cents ?? null, lead.ai_score);
@@ -452,11 +463,34 @@ export default async function LeadProfilePage({ params }: { params: Promise<{ id
           </div>
         </div>
 
-        {/* Journey — the only column with unbounded data; it scrolls inside its panel. */}
+        {/* Journey — next step pinned on top, history behind it; only the history scrolls. */}
         <section className={cn(PANEL_SURFACE, "flex min-h-0 flex-col p-5")}>
           <Eyebrow>Activity</Eyebrow>
-          <div className="mt-3 min-h-0 flex-1 lg:overflow-y-auto lg:pr-1">
-            <ModernTimeline items={timeline} />
+          {next && (
+            <div
+              className={cn(
+                "mt-3 shrink-0 rounded-xl px-3.5 py-2.5",
+                next.label === "Won" ? "bg-[var(--positive-tint)]" : "bg-[var(--cyan-tint)]"
+              )}
+            >
+              <p
+                className={cn(
+                  "font-mono text-[11px] uppercase tracking-[0.18em]",
+                  next.label === "Won" ? "text-[var(--positive)]" : "text-[var(--cyan-strong)]"
+                )}
+              >
+                {next.label}
+              </p>
+              <p className="mt-0.5 text-sm font-medium text-foreground">{next.title}</p>
+              <p className="mt-0.5 text-[13px] leading-relaxed text-[var(--ink-3)]">{next.description}</p>
+            </div>
+          )}
+          <div className="mt-4 min-h-0 flex-1 lg:overflow-y-auto lg:pr-1">
+            {timeline.length > 0 ? (
+              <ModernTimeline items={timeline} />
+            ) : (
+              <p className="text-sm text-muted-foreground">No activity captured yet.</p>
+            )}
           </div>
         </section>
       </div>
