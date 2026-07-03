@@ -50,6 +50,9 @@ const STEP_LABELS = ["Personalize", "Connect", "Confirm"];
 type ScanResult = { headline: string; suggested_icp: string; scope_of_industry: string };
 type Analysis = { domain: string; done: boolean; scan: ScanResult | null };
 
+/** The tracker always holds long enough to read as real work — never a flash. */
+const MIN_ANALYSIS_MS = 3600;
+
 /** Real work, narrated: the stages of savePersonalize's server-side site analysis. */
 function analysisStages(domain: string) {
   return [
@@ -71,10 +74,13 @@ const DARK_BTN =
 const GHOST_BTN =
   "inline-flex items-center gap-1 rounded-full px-4 py-2.5 text-[14px] font-medium text-[var(--ink-3)] transition-colors hover:text-foreground";
 
+// Height-collapse panel swap: the outgoing panel folds shut, then the incoming one
+// unfolds — the "form collapses, analysis runs" motion. The card has overflow-hidden,
+// so height animates cleanly between auto measurements.
 const contentVariants = {
-  hidden: { opacity: 0, y: 18 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: EASE } },
-  exit: { opacity: 0, y: -14, transition: { duration: 0.2 } },
+  hidden: { opacity: 0, height: 0 },
+  visible: { opacity: 1, height: "auto", transition: { duration: 0.45, ease: EASE } },
+  exit: { opacity: 0, height: 0, transition: { duration: 0.32, ease: EASE } },
 };
 
 function Glow() {
@@ -106,7 +112,7 @@ export function Wizard({ init }: { init: WizardInit }) {
   // Pace the tracker through the in-flight stages (the last one holds until the action resolves).
   useEffect(() => {
     if (!analysis || analysis.done) return;
-    const timers = [1000, 3400, 6400].map((d, i) =>
+    const timers = [700, 2200, 4200].map((d, i) =>
       setTimeout(() => setStageIdx((s) => Math.max(s, i + 1)), d)
     );
     return () => timers.forEach(clearTimeout);
@@ -125,10 +131,16 @@ export function Wizard({ init }: { init: WizardInit }) {
     return () => clearTimeout(t);
   }, [analysis]);
 
-  function submitPersonalize(formData: FormData) {
+  // Plain onSubmit, NOT <form action>: React wraps form actions in a transition, which
+  // defers our state updates until the server action resolves — the tracker would only
+  // flash at the end. Setting `analysis` synchronously here paints the collapse at once.
+  function submitPersonalize(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
     setPersonalizeError("");
     const site = String(formData.get("websiteUrl") ?? "").trim();
     const domain = site.replace(/^https?:\/\//i, "").replace(/\/.*$/, "");
+    const startedAt = Date.now();
     if (site) {
       setStageIdx(0);
       setAnalysis({ domain, done: false, scan: null });
@@ -144,6 +156,9 @@ export function Wizard({ init }: { init: WizardInit }) {
         setStep(1);
         return;
       }
+      // Fast (cached) scans still get a readable pass through the stages.
+      const hold = Math.max(0, MIN_ANALYSIS_MS - (Date.now() - startedAt));
+      if (hold > 0) await new Promise((r) => setTimeout(r, hold));
       const scan = res.scan ?? null;
       if (scan) {
         setScanHeadline(scan.headline);
@@ -221,7 +236,7 @@ export function Wizard({ init }: { init: WizardInit }) {
                   )}
 
                   {step === 0 && !analysis && (
-                    <motion.form key="personalize" action={submitPersonalize} initial="hidden" animate="visible" exit="exit" variants={contentVariants}>
+                    <motion.form key="personalize" onSubmit={submitPersonalize} initial="hidden" animate="visible" exit="exit" variants={contentVariants}>
                       <div className="px-8 pt-8 pb-6">
                         <h2 className="text-[21px] font-semibold tracking-[-0.02em] text-foreground">Personalize your account</h2>
                         <p className="mt-2 text-[14px] leading-relaxed text-[var(--ink-3)]">
@@ -308,10 +323,15 @@ export function Wizard({ init }: { init: WizardInit }) {
                           We never see your password. You can disconnect any time in Settings.
                         </p>
                       </div>
-                      <div className="flex items-center justify-start border-t border-[var(--hairline)] px-8 py-5">
+                      <div className="flex items-center justify-between border-t border-[var(--hairline)] px-8 py-5">
                         <button type="button" onClick={() => setStep(0)} className={GHOST_BTN}>
                           <ChevronLeft className="size-4" /> Back
                         </button>
+                        {!init.connected && (
+                          <button type="button" onClick={() => setStep(2)} className={GHOST_BTN}>
+                            Skip for now <ChevronRight className="size-4" />
+                          </button>
+                        )}
                       </div>
                     </motion.div>
                   )}
@@ -326,9 +346,16 @@ export function Wizard({ init }: { init: WizardInit }) {
                         ) : (
                           <p className="mt-2 text-[14px] text-[var(--ink-3)]">Confirm who to target — tweak anything that&apos;s off.</p>
                         )}
-                        <p className="mt-2 inline-flex items-center gap-1.5 text-[12.5px] text-[var(--ink-3)]">
-                          <Check className="size-3.5 text-[var(--cyan-strong)]" /> LinkedIn connected
-                        </p>
+                        {init.connected ? (
+                          <p className="mt-2 inline-flex items-center gap-1.5 text-[12.5px] text-[var(--ink-3)]">
+                            <Check className="size-3.5 text-[var(--cyan-strong)]" /> LinkedIn connected
+                          </p>
+                        ) : (
+                          <p className="mt-2 text-[12.5px] text-[var(--ink-4)]">
+                            LinkedIn not connected yet — your agents source and qualify either way, and you
+                            can connect any time from the dashboard.
+                          </p>
+                        )}
                       </div>
                       <div className="space-y-8 px-8 pt-5 pb-8">
                         <Field label="Your industry" hint="Pulled from your site — edit if it&apos;s off.">
@@ -346,6 +373,10 @@ export function Wizard({ init }: { init: WizardInit }) {
                           </Field>
                         </div>
                         <FormError message={findState.error} />
+                        <p className="rounded-xl bg-[var(--tint)] px-4 py-3 text-[12.5px] leading-relaxed text-[var(--ink-3)]">
+                          This is the last step — it deploys your Prospect, Outreach, and Intent agents.
+                          They start working within ~15 minutes, and nothing sends without your approval.
+                        </p>
                       </div>
                       <div className="flex items-center justify-between border-t border-[var(--hairline)] px-8 py-5">
                         <button type="button" onClick={() => setStep(1)} className={GHOST_BTN}>
@@ -353,7 +384,7 @@ export function Wizard({ init }: { init: WizardInit }) {
                         </button>
                         <button type="submit" disabled={finding} className={DARK_BTN}>
                           {finding ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
-                          {finding ? "Setting up…" : "Find my first leads"}
+                          {finding ? "Deploying your agents…" : "Find my first leads"}
                         </button>
                       </div>
                     </motion.form>
@@ -372,29 +403,28 @@ export function Wizard({ init }: { init: WizardInit }) {
   );
 }
 
-/* ── Left rail — the landing's dark glassy panel, carrying the top-to-bottom pipeline ── */
+/* ── Left rail — light system to match the input panel, carrying the top-to-bottom pipeline ── */
 
 function PipelineRail({ current, working }: { current: number; working: boolean }) {
   return (
-    <aside className="relative hidden w-[400px] shrink-0 flex-col overflow-hidden bg-[var(--panel)] px-10 py-10 lg:flex xl:w-[440px]">
-      {/* cyan ambience — the landing panel signature, masked so it never reads as a blob */}
+    <aside className="relative hidden w-[400px] shrink-0 flex-col overflow-hidden border-r border-[var(--hairline)] bg-[var(--tint)] px-10 py-10 lg:flex xl:w-[440px]">
+      {/* one soft cyan wash up top — same ambience recipe as the input side */}
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0"
         style={{
           background:
-            "radial-gradient(56% 38% at 18% 0%, rgba(11,87,171,0.4) 0%, transparent 64%), radial-gradient(44% 30% at 92% 100%, rgba(11,87,171,0.22) 0%, transparent 60%)",
+            "radial-gradient(58% 36% at 22% 0%, rgba(11,87,171,0.10) 0%, transparent 64%), radial-gradient(44% 30% at 96% 100%, rgba(11,87,171,0.05) 0%, transparent 60%)",
         }}
       />
-      <div aria-hidden className="pointer-events-none absolute inset-y-0 right-0 w-px bg-[var(--panel-line)]" />
 
-      <Link href="/" className="relative flex items-center gap-2 text-white">
-        <VanteraLogo className="size-6 text-white" />
+      <Link href="/" className="relative flex items-center gap-2 text-foreground">
+        <VanteraLogo className="size-6 text-foreground" />
         <span className="text-[19px] font-semibold tracking-[-0.02em]">Vantera</span>
       </Link>
 
       <div className="relative mt-16 flex-1">
-        <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-white/40">Getting set up</p>
+        <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--ink-4)]">Getting set up</p>
         <ol className="mt-6">
           {PIPELINE.map((s, i) => {
             const done = i < current;
@@ -407,9 +437,9 @@ function PipelineRail({ current, working }: { current: number; working: boolean 
                   <span
                     className={cn(
                       "grid size-8 shrink-0 place-items-center rounded-full text-[12.5px] transition-all duration-300",
-                      done && "bg-[#30cfff] text-[#062033] shadow-[0_0_18px_rgba(48,207,255,0.35)]",
-                      active && "bg-white text-[#0b57ab] ring-4 ring-white/15",
-                      !done && !active && "border border-white/20 bg-white/[0.04] text-white/40"
+                      done && "bg-[var(--cyan)] text-white shadow-[0_6px_16px_-6px_rgba(11,87,171,0.5)]",
+                      active && "bg-white text-[var(--cyan-strong)] ring-2 ring-[var(--cyan)] shadow-[var(--shadow-card)]",
+                      !done && !active && "border border-[rgba(12,16,26,0.12)] bg-white text-[var(--ink-4)]"
                     )}
                   >
                     {done ? (
@@ -421,9 +451,9 @@ function PipelineRail({ current, working }: { current: number; working: boolean 
                     )}
                   </span>
                   {!last && (
-                    <span className="relative my-1.5 w-px flex-1 overflow-hidden rounded-full bg-white/12">
+                    <span className="relative my-1.5 w-px flex-1 overflow-hidden rounded-full bg-[rgba(12,16,26,0.08)]">
                       <motion.span
-                        className="absolute inset-x-0 top-0 rounded-full bg-[#30cfff]/70"
+                        className="absolute inset-x-0 top-0 rounded-full bg-[var(--cyan)]"
                         initial={false}
                         animate={{ height: done ? "100%" : "0%" }}
                         transition={{ duration: 0.5, ease: EASE }}
@@ -435,12 +465,12 @@ function PipelineRail({ current, working }: { current: number; working: boolean 
                   <p
                     className={cn(
                       "pt-1 text-[15px] font-medium tracking-[-0.01em] transition-colors duration-300",
-                      active ? "text-white" : done ? "text-white/75" : "text-white/40"
+                      active ? "text-foreground" : done ? "text-[var(--ink-2)]" : "text-[var(--ink-4)]"
                     )}
                   >
                     {s.title}
                   </p>
-                  <p className={cn("mt-1 text-[12.5px] leading-relaxed", active ? "text-white/55" : "text-white/35")}>
+                  <p className={cn("mt-1 text-[12.5px] leading-relaxed", active ? "text-[var(--ink-3)]" : "text-[var(--ink-4)]")}>
                     {s.desc}
                   </p>
                 </div>
@@ -450,23 +480,23 @@ function PipelineRail({ current, working }: { current: number; working: boolean 
         </ol>
 
         {/* the payoff the pipeline points at */}
-        <div className="mt-9 rounded-2xl border border-white/10 bg-white/[0.05] px-5 py-4">
-          <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[#30cfff]">Then</p>
-          <p className="mt-1.5 text-[14px] font-medium text-white">Your first leads land</p>
-          <p className="mt-1 text-[12.5px] leading-relaxed text-white/50">
-            Your Scout starts sourcing within ~15 minutes of deploy.
+        <div className="mt-9 rounded-2xl border border-[var(--hairline)] bg-white px-5 py-4 shadow-[var(--shadow-card)]">
+          <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--cyan-strong)]">Then</p>
+          <p className="mt-1.5 text-[14px] font-medium text-foreground">Your first leads land</p>
+          <p className="mt-1 text-[12.5px] leading-relaxed text-[var(--ink-3)]">
+            Your agents start sourcing within ~15 minutes — you approve everything they send.
           </p>
         </div>
       </div>
 
-      <div className="relative mt-10 space-y-2.5 border-t border-white/10 pt-6">
+      <div className="relative mt-10 space-y-2.5 border-t border-[var(--hairline)] pt-6">
         {[
           "You approve every message before it sends",
           "We never see your LinkedIn password",
           "Change anything later in Settings",
         ].map((line) => (
-          <p key={line} className="flex items-start gap-2 text-[12.5px] leading-relaxed text-white/55">
-            <Check className="mt-0.5 size-3.5 shrink-0 text-[#30cfff]" /> {line}
+          <p key={line} className="flex items-start gap-2 text-[12.5px] leading-relaxed text-[var(--ink-3)]">
+            <Check className="mt-0.5 size-3.5 shrink-0 text-[var(--cyan-strong)]" /> {line}
           </p>
         ))}
       </div>

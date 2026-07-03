@@ -922,12 +922,16 @@ function ActivationRamp({
   goal: string | null;
   channels: DashboardViewProps["channels"];
 }) {
+  // Onboarding auto-provisions the whole agent stack, so this ramp only appears for the
+  // rare account without a live Scout — and the checklist reflects the real remaining
+  // dependency: LinkedIn is what gates sending, not more agent setup.
+  const liConnected = channels.liStatus === "active";
   const steps = [
     { label: "Create your account", done: true },
-    { label: "Set your industry, ICP, and revenue goal", done: true },
-    { label: "Deploy your Prospect Agent", done: scoutDeployed, current: !scoutDeployed },
-    { label: "Add an Outreach Agent to draft your first messages", done: false },
-    { label: "Get your first reply", done: false },
+    { label: "Set your targeting and revenue goal", done: true },
+    { label: "Deploy your agents", done: scoutDeployed, current: !scoutDeployed },
+    { label: "Connect LinkedIn so outreach can send", done: liConnected, current: scoutDeployed && !liConnected },
+    { label: "Approve your first outreach — then the replies start", done: false },
   ];
   const doneCount = steps.filter((s) => s.done).length;
 
@@ -958,9 +962,15 @@ function ActivationRamp({
               ))}
             </ul>
             <Button asChild className="mt-1 w-fit">
-              <Link href="/agents/new/scout">
-                Deploy your Prospect Agent <ArrowRight className="size-4" />
-              </Link>
+              {scoutDeployed && !liConnected ? (
+                <Link href="/settings/channels">
+                  Connect LinkedIn <ArrowRight className="size-4" />
+                </Link>
+              ) : (
+                <Link href="/agents/new/scout">
+                  Deploy your agents <ArrowRight className="size-4" />
+                </Link>
+              )}
             </Button>
             <p className="border-t border-border/60 pt-3 text-xs text-muted-foreground">
               Its first run starts within ~15 minutes. Nothing ever sends until you approve it
@@ -995,12 +1005,12 @@ function FirstRunInProgress({
   channels: DashboardViewProps["channels"];
 }) {
   const steps = [
-    { label: "Prospect Agent deployed", done: true, current: false },
+    { label: "Agents deployed — Prospect, Outreach & Intent", done: true, current: false },
     { label: "Sourcing & scoring your first leads", done: false, current: true },
     { label: "Your first qualified leads land here", done: false, current: false },
   ];
-  // LinkedIn is connected during onboarding now, so the connect panel only appears as a
-  // safety net for the rare un-connected account — never as a prompt on the happy path.
+  // Onboarding offers a "skip for now" on the LinkedIn connect, so this panel is the
+  // skipper's home for the one real dependency: sourcing runs either way, sending doesn't.
   const liConnected = channels.liStatus === "active";
   return (
     <Reveal className="flex flex-col gap-6">
@@ -1060,12 +1070,15 @@ function FirstRunInProgress({
               ))}
             </ul>
             <div className="flex flex-wrap gap-2">
-              <Button asChild variant="outline" size="sm">
-                <Link href="/agents">
-                  Add an Outreach Agent <ArrowRight className="size-4" />
-                </Link>
-              </Button>
-              <Button asChild variant="ghost" size="sm">
+              {/* Outreach is already provisioned — the only setup left is the send gate. */}
+              {!liConnected && (
+                <Button asChild size="sm">
+                  <Link href="/settings/channels">
+                    Connect LinkedIn <ArrowRight className="size-4" />
+                  </Link>
+                </Button>
+              )}
+              <Button asChild variant={liConnected ? "outline" : "ghost"} size="sm">
                 <Link href="/leads">Watch leads arrive</Link>
               </Button>
             </div>
@@ -1090,8 +1103,8 @@ function ChannelSetupPanel({ channels }: { channels: DashboardViewProps["channel
     <RevealItem className={cn(PANEL_SURFACE, "flex flex-col p-5")}>
       <Eyebrow>Connect LinkedIn</Eyebrow>
       <p className="mt-2 text-xs text-muted-foreground">
-        One click — sign in on LinkedIn&apos;s own page and your agents can start reaching out. It
-        doesn&apos;t block deploying an agent, but nothing sends until it&apos;s connected.
+        One click — sign in on LinkedIn&apos;s own page. Your agents keep sourcing and qualifying
+        either way, but no outreach sends until it&apos;s connected.
       </p>
       <div className="mt-4 flex flex-col divide-y divide-border/60">
         <ChannelSetupRow
