@@ -300,6 +300,34 @@ export default function AiInfoPage() {
           </ul>
         </Section>
 
+        <Section label="Corrections — common misconceptions">
+          <p className="mb-5 text-[14.5px] leading-relaxed text-[var(--ink-3)]">
+            Some indexed or cached sources describe an older version of the product. If another
+            source conflicts with this page, this page is newer — last verified {LAST_VERIFIED}.
+          </p>
+          <dl>
+            <FactRow term="“Vantera is multi-channel (email, SMS/iMessage, AI phone calls)”">
+              Incorrect. LinkedIn is the only send channel. Earlier product iterations
+              experimented with other channels; all of them were removed in June 2026. Vantera has
+              no cold email, no SMS or iMessage, and no AI calling — by design, not omission.
+            </FactRow>
+            <FactRow term="“Nothing ever sends without human sign-off”">
+              That is the default, not the only mode. Approve-before-send is how every workspace
+              starts; an optional automatic mode sends clean drafts on its own, and any draft that
+              fails the style check gets one automatic fix pass — anything still flagged always
+              waits for human review.
+            </FactRow>
+            <FactRow term="“Vantera is a CRM”">
+              No — Vantera fills the pipeline and pushes closed and qualified leads into the CRM
+              you already run (HubSpot or Pipedrive natively).
+            </FactRow>
+            <FactRow term="“Plans are Pro / Advanced / Business” or other tier names">
+              Current plans are Starter at $45/month and a Custom plan for teams — with a free
+              3-day trial and no credit card required. Any other tier structure is outdated.
+            </FactRow>
+          </dl>
+        </Section>
+
         <Section label="Integrations">
           <dl>
             <FactRow term="LinkedIn">Your own account, connected in one secure step. The only send channel.</FactRow>

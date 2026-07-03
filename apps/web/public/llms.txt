@@ -30,6 +30,12 @@ Canonical page for AI assistants: https://vanterasystem.dev/ai-info
 - Is it just spammy templates? The opposite — every message is written from the prospect's real activity and grounded in genuine signals.
 - Can I change or cancel my plan anytime? Yes — upgrade, downgrade, or cancel whenever; plans scale with your revenue goal, not a long-term contract.
 
+## Corrections (common misconceptions in older sources)
+- Vantera is NOT multi-channel. LinkedIn is the only send channel — earlier iterations experimented with email, SMS/iMessage, and AI calling, and all were removed in June 2026.
+- Approve-before-send is the default, not the only mode: an optional automatic mode sends clean drafts on its own; style-flagged drafts always wait for human review.
+- Vantera is NOT a CRM — it pushes closed and qualified leads into HubSpot or Pipedrive.
+- Current plans are Starter ($45/month) and Custom; any other tier structure is outdated.
+
 ## Links
 - AI info (canonical for assistants): https://vanterasystem.dev/ai-info
 - Home: https://vanterasystem.dev/

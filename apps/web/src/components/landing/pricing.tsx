@@ -181,7 +181,7 @@ export function Pricing({ plans }: { plans?: LandingPlan[] }) {
               Talk to us
             </h3>
             <p className="mt-2 min-h-[42px] text-[14px] leading-relaxed text-[var(--ink-3)]">
-              For teams (5+) and agencies scaling multichannel LinkedIn outreach.
+              For teams (5+) and agencies scaling multi-sender LinkedIn outreach.
             </p>
 
             <div className="mt-6 flex items-end gap-1.5">
