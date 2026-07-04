@@ -1,6 +1,7 @@
 import { and, count, desc, eq, gte, inArray, isNotNull, isNull, lt, lte, or, sql } from "drizzle-orm";
 import {
   accountDeletionRequests,
+  accountMembers,
   accounts,
   agentAssets,
   agentIcps,
@@ -1695,12 +1696,32 @@ export function createAccountDeletionStore(db: Db): AccountDeletionStore {
         .where(eq(accountDeletionRequests.status, "pending"));
     },
 
+    async listOrphanAccountIds() {
+      // Zero members = the auth users were deleted outside the app (account_members cascades
+      // on auth deletion, accounts do not). No one is left to file a deletion request.
+      const rows = await db
+        .select({ id: accounts.id })
+        .from(accounts)
+        .leftJoin(accountMembers, eq(accountMembers.accountId, accounts.id))
+        .where(isNull(accountMembers.userId));
+      return rows.map((r) => r.id);
+    },
+
     async listAccountLinkedInRefs(accountId) {
       const rows = await db
         .select({ ref: linkedinAccounts.providerRef })
         .from(linkedinAccounts)
         .where(eq(linkedinAccounts.accountId, accountId));
       return rows.map((r) => r.ref).filter((r): r is string => !!r);
+    },
+
+    async pauseAccountUsage(accountId) {
+      // Quarantine: stop agent runs (discovery + AI spend) and freeze outreach. Idempotent.
+      await db
+        .update(agents)
+        .set({ status: "paused" })
+        .where(and(eq(agents.accountId, accountId), eq(agents.status, "live")));
+      await db.update(accounts).set({ outreachPaused: true }).where(eq(accounts.id, accountId));
     },
 
     async deleteAccount(accountId) {
