@@ -120,9 +120,7 @@ function AgentOrb({ agent }: { agent: ShowcaseAgent }) {
           <span
             className={cn(
               "size-1.5 rounded-full",
-              live
-                ? "bg-[var(--cyan-strong)] ring-2 ring-[var(--cyan)]/25"
-                : "bg-muted-foreground/40",
+              live ? "bg-[var(--fb)]" : "bg-muted-foreground/40",
             )}
           />
           {statusLabel(agent.status)}

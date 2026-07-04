@@ -463,9 +463,7 @@ function AgentsPanel({
             <div className="flex items-center gap-2">
               <span
                 className={`size-2 rounded-full ${
-                  a.status === "live"
-                    ? "bg-[var(--cyan-strong)] ring-2 ring-[var(--cyan)]/25"
-                    : "bg-muted-foreground/40"
+                  a.status === "live" ? "bg-[var(--fb)]" : "bg-muted-foreground/40"
                 }`}
                 aria-hidden
               />

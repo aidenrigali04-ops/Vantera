@@ -142,9 +142,7 @@ export function LivePipeline(p: LivePipelineData) {
           <span
             className={cn(
               "size-2 rounded-full",
-              p.scoutLive
-                ? "bg-[var(--cyan-strong)] ring-2 ring-[var(--cyan)]/25"
-                : "bg-muted-foreground/40",
+              p.scoutLive ? "bg-[var(--fb)]" : "bg-muted-foreground/40",
             )}
             aria-hidden
           />
