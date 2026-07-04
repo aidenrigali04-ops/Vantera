@@ -12,7 +12,7 @@ import type { ReviewActionState } from "./actions";
 
 export interface DraftRow {
   id: string;
-  channel: "email" | "linkedin";
+  channel: "linkedin";
   subject: string | null;
   body: string;
   style_flags: string | null;

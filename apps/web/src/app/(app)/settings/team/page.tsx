@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getGateData } from "@/lib/auth/context";
 import { resolveEntitlements } from "@vantera/billing";
 import { snapshotFromRow, type AccountBillingRow } from "@/lib/billing/entitlement";
-import { canManageTeam } from "./validation";
+import { canManageTeam, matchMemberEmails } from "./validation";
 import { ShareCard, type ShareMember, type ShareInvite } from "@/components/ui/share-card";
 
 export default async function TeamPage() {
@@ -11,19 +11,29 @@ export default async function TeamPage() {
 
   const supabase = await createClient();
 
-  const [{ data: members }, { data: invites }, { data: billingRow }] = await Promise.all([
-    supabase.from("account_members").select("user_id, role").eq("account_id", account.id),
-    supabase
-      .from("account_invites")
-      .select("id, email, role, created_at")
-      .eq("account_id", account.id)
-      .eq("status", "pending"),
-    supabase
-      .from("accounts")
-      .select("plan, subscription_status, seats_purchased, linkedin_accounts_purchased, current_period_end")
-      .eq("id", account.id)
-      .maybeSingle<AccountBillingRow>(),
-  ]);
+  const [{ data: members }, { data: invites }, { data: billingRow }, { data: acceptedInvites }] =
+    await Promise.all([
+      supabase.from("account_members").select("user_id, role, created_at").eq("account_id", account.id),
+      supabase
+        .from("account_invites")
+        .select("id, email, role, created_at")
+        .eq("account_id", account.id)
+        .eq("status", "pending"),
+      supabase
+        .from("accounts")
+        .select("plan, subscription_status, seats_purchased, linkedin_accounts_purchased, current_period_end")
+        .eq("id", account.id)
+        .maybeSingle<AccountBillingRow>(),
+      // Real names on the roster: accepted-invite emails, zipped to members in join order
+      // (see matchMemberEmails — invites are email-verified at accept time).
+      supabase
+        .from("account_invites")
+        .select("email, accepted_at")
+        .eq("account_id", account.id)
+        .eq("status", "accepted")
+        .returns<{ email: string; accepted_at: string | null }[]>(),
+    ]);
+  const emailById = matchMemberEmails(members ?? [], acceptedInvites ?? []);
 
   const callerRole = (members ?? []).find((m) => m.user_id === user.id)?.role ?? "";
   const canManage = canManageTeam(callerRole);
@@ -36,7 +46,9 @@ export default async function TeamPage() {
     const isOwner = m.role === "owner";
     return {
       id: m.user_id,
-      label: isYou ? user.email ?? "You" : isOwner ? "Workspace owner" : "Team member",
+      label:
+        (isYou ? user.email : emailById.get(m.user_id)) ??
+        (isOwner ? "Workspace owner" : "Team member"),
       sublabel: null,
       role: m.role,
       isOwner,

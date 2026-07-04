@@ -129,6 +129,10 @@ export async function PipelineSection() {
     active: inOutreach + repliedOnly + converted,
     replied: repliedOnly,
     won: converted,
+    wonValueLabel:
+      account.avg_deal_value_cents && converted > 0
+        ? usd.format((converted * account.avg_deal_value_cents) / 100)
+        : null,
     sendMode: (outreachCampaign.data?.send_mode === "automatic" ? "automatic" : "review") as
       | "review"
       | "automatic",

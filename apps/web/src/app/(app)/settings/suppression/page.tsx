@@ -27,8 +27,8 @@ export default async function SuppressionPage() {
       <div className="border-b border-[var(--hairline)] pb-5">
         <h1 className="text-2xl font-semibold tracking-tight">Suppression list</h1>
         <p className="mt-1.5 text-sm text-muted-foreground">
-          Contacts here are never messaged by your agents on the channel they&apos;re suppressed
-          for. Entries are permanent — they protect you and your prospects.{" "}
+          Contacts here are never messaged by your agents. Entries are permanent — they protect
+          you and your prospects.{" "}
           <Link href="/settings" className="underline underline-offset-2">
             Back to settings
           </Link>

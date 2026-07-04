@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { PenLine, Radar } from "lucide-react";
+import { PenLine, Radar, Search } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
@@ -96,7 +96,8 @@ export default async function AgentsPage({
 
       {!scout && !copy ? (
         <Panel className="flex flex-col items-center gap-4 border-dashed py-10 text-center">
-          <Radar className="size-10 text-[var(--cyan-strong)]" />
+          {/* Search = sourcing; Radar stays reserved for intent (the In-market mark). */}
+          <Search className="size-10 text-[var(--cyan-strong)]" />
           <div className="flex flex-col gap-2">
             <h2 className="font-heading text-lg font-semibold">Set up your pipeline</h2>
             <p className="mx-auto max-w-md text-pretty text-sm text-muted-foreground">
@@ -124,7 +125,7 @@ export default async function AgentsPage({
             />
           ) : (
             <AddAgentPanel
-              icon={<Radar className="size-6 text-[var(--cyan-strong)]" />}
+              icon={<Search className="size-6 text-[var(--cyan-strong)]" />}
               title="Set up prospect sourcing"
               body="Prospect sourcing hunts your ideal customers on a schedule, scores them, and keeps only the high-quality ones."
               href="/agents/new/scout"

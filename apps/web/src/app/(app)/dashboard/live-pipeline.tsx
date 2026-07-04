@@ -35,6 +35,8 @@ export interface LivePipelineData {
   active: number;
   replied: number;
   won: number;
+  /** closed value of the won deals (converted × avg deal value), null until a deal value is set */
+  wonValueLabel?: string | null;
   sendMode: "review" | "automatic";
 }
 
@@ -125,7 +127,8 @@ export function LivePipeline(p: LivePipelineData) {
       label: "Live conversations",
       value: p.active,
       reached: p.active > 0 || p.sent > 0,
-      sub: `${p.replied} replied · ${p.won} won`,
+      // The won count carries its closed $ value once a deal value is set — wins read as revenue.
+      sub: `${p.replied} replied · ${p.won} won${p.won > 0 && p.wonValueLabel ? ` · ${p.wonValueLabel} closed` : ""}`,
     },
   ];
 

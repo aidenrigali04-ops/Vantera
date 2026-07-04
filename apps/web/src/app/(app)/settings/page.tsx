@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
 import { createClient } from "@/lib/supabase/server";
 import { getGateData } from "@/lib/auth/context";
+import { matchMemberEmails } from "./team/validation";
 import { ProfileForm } from "./profile-form";
 import { WorkspaceForm } from "./workspace-form";
 import { DangerZone } from "./danger-zone";
@@ -25,16 +26,26 @@ export default async function SettingsPage() {
   if (!user || !account) return null; // layout gate guarantees this; satisfies TS
 
   const supabase = await createClient();
-  const [{ data: profile }, { data: members }, { data: deletionRequest }] = await Promise.all([
-    supabase.from("user_profiles").select("display_name").maybeSingle(),
-    supabase.from("account_members").select("user_id, role").eq("account_id", account.id),
-    supabase
-      .from("account_deletion_requests")
-      .select("id, created_at")
-      .eq("account_id", account.id)
-      .eq("status", "pending")
-      .maybeSingle(),
-  ]);
+  const [{ data: profile }, { data: members }, { data: deletionRequest }, { data: acceptedInvites }] =
+    await Promise.all([
+      supabase.from("user_profiles").select("display_name").maybeSingle(),
+      supabase.from("account_members").select("user_id, role, created_at").eq("account_id", account.id),
+      supabase
+        .from("account_deletion_requests")
+        .select("id, created_at")
+        .eq("account_id", account.id)
+        .eq("status", "pending")
+        .maybeSingle(),
+      // Real names on the roster: accepted-invite emails, zipped to members in join order
+      // (see matchMemberEmails — invites are email-verified at accept time).
+      supabase
+        .from("account_invites")
+        .select("email, accepted_at")
+        .eq("account_id", account.id)
+        .eq("status", "accepted")
+        .returns<{ email: string; accepted_at: string | null }[]>(),
+    ]);
+  const emailById = matchMemberEmails(members ?? [], acceptedInvites ?? []);
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-6">
@@ -70,7 +81,9 @@ export default async function SettingsPage() {
         <ul className="flex flex-col gap-2">
           {(members ?? []).map((m) => (
             <li key={m.user_id} className="flex items-center justify-between text-sm">
-              <span>{m.user_id === user.id ? (user.email ?? "You") : "Team member"}</span>
+              <span>
+                {(m.user_id === user.id ? user.email : emailById.get(m.user_id)) ?? "Team member"}
+              </span>
               <Badge variant="secondary">{m.role}</Badge>
             </li>
           ))}

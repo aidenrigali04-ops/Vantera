@@ -18,7 +18,7 @@ const STATUS_LABEL: Record<StageStatus, string> = {
 };
 
 function barColor(status: StageStatus | undefined): string {
-  if (status === "below") return "#c2830a"; // amber — attention, not alarm
+  if (status === "below") return "#d97706"; // amber-600 — the app's amber attention family
   if (status === "above") return "var(--positive)";
   return "var(--cyan)"; // healthy / default
 }
@@ -170,7 +170,7 @@ function StageRow({
     <div
       className={cn(
         "rounded-xl border p-3",
-        highlight ? "border-[#c2830a]/40 bg-[#c2830a]/[0.05]" : "border-[var(--hairline)]"
+        highlight ? "border-amber-500/40 bg-amber-500/[0.06]" : "border-[var(--hairline)]"
       )}
     >
       <div className="flex items-baseline justify-between gap-3">
