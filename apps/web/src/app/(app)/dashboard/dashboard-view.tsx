@@ -79,6 +79,8 @@ export interface DashboardViewProps {
   revenue: RevenueSnapshot;
   convertedClients: number;
   pipelineLeads: number;
+  avgDealValueCents: number | null;
+  pendingDraftLeadIds: string[];
   series: RevenuePoint[];
   pipeline: PipelineViewModel;
   cold: number;
@@ -172,6 +174,8 @@ function WorkingDashboard(props: DashboardViewProps) {
     cold,
     revenuePace,
     prospects,
+    avgDealValueCents,
+    pendingDraftLeadIds,
     attribution,
     agents,
     week,
@@ -211,8 +215,13 @@ function WorkingDashboard(props: DashboardViewProps) {
         attribution={attribution}
       />
 
-      {/* Explore — hot leads, each row led by its real why-now signal. */}
-      <HotLeads prospects={prospects} />
+      {/* Explore — hot leads: the top prospect spotlighted with its why-now + next action. */}
+      <HotLeads
+        prospects={prospects}
+        pendingDraftLeadIds={pendingDraftLeadIds}
+        avgDealValueCents={avgDealValueCents}
+        goalCents={goalCents}
+      />
 
       {/* Reassure — the agent heartbeat + the warm replies that reward the daily check-in. Paired
           in a balanced two-up row so neither one's height drags a gap into the primary content. */}
@@ -398,8 +407,19 @@ function NeedsYou({
   );
 }
 
-/** Hot leads — the anticipation surface; each row leads with its real "why now" buying signal. */
-function HotLeads({ prospects }: { prospects: Prospect[] }) {
+/** Hot leads — the anticipation surface: the top prospect spotlighted with its "why now"
+ *  buying signal, value framing, and next action; the rest as a scannable queue. */
+function HotLeads({
+  prospects,
+  pendingDraftLeadIds,
+  avgDealValueCents,
+  goalCents,
+}: {
+  prospects: Prospect[];
+  pendingDraftLeadIds: string[];
+  avgDealValueCents: number | null;
+  goalCents: number | null;
+}) {
   return (
     <RevealItem className={cn(PANEL_SURFACE, "p-5")}>
       <div className="flex items-center justify-between gap-3">
@@ -411,7 +431,12 @@ function HotLeads({ prospects }: { prospects: Prospect[] }) {
         </Button>
       </div>
       <div className="mt-4">
-        <ProspectPanel prospects={prospects} />
+        <ProspectPanel
+          prospects={prospects}
+          pendingDraftLeadIds={pendingDraftLeadIds}
+          avgDealValueCents={avgDealValueCents}
+          goalCents={goalCents}
+        />
       </div>
     </RevealItem>
   );

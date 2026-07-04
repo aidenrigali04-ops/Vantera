@@ -39,6 +39,8 @@ export interface LeadProfile {
   phone: string | null;
   phone_status: string | null;
   linkedin_url: string | null;
+  /** where the lead entered the funnel — "intent" drives the In-market badge */
+  source?: string | null;
   /** real captured buying signals (lead_signals, 0031) — the "why now" line, when present */
   lead_signals?: { kind: string; label: string | null; detail?: string | null; observed_at?: string | null }[] | null;
 }

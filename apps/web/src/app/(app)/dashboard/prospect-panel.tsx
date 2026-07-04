@@ -1,17 +1,44 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Mail, MessageSquare } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import type { LeadProfile } from "@/components/lead-profile";
-import { leadSignalLine } from "../leads/lead-value";
+import { ScoreBadge, SourceBadge, WhyNowLine } from "@/components/lead-why-now";
+import { cn } from "@/lib/utils";
+import { projectedRevenue } from "../leads/lead-value";
 
 export type Prospect = LeadProfile;
+
+const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 
 function name(p: Prospect): string {
   return [p.first_name, p.last_name].filter(Boolean).join(" ") || "Unknown";
 }
 
-export function ProspectPanel({ prospects }: { prospects: Prospect[] }) {
+/** The one thing to do with this lead right now — draft waiting beats everything. */
+function nextAction(p: Prospect, hasDraft: boolean): { label: string; href: string } {
+  if (hasDraft) return { label: "Draft waiting — review", href: "/review" };
+  if (p.status === "replied") return { label: "Reply waiting", href: p.id ? `/leads/${p.id}` : "/leads" };
+  return { label: "View profile", href: p.id ? `/leads/${p.id}` : "/leads" };
+}
+
+/**
+ * Hot leads as spotlight + queue: the #1 prospect gets a featured card that answers
+ * who / why now / what it's worth / what to do, the rest read as a compact why-now-led
+ * queue. Intent leads carry the shared In-market treatment everywhere.
+ */
+export function ProspectPanel({
+  prospects,
+  pendingDraftLeadIds = [],
+  avgDealValueCents = null,
+  goalCents = null,
+}: {
+  prospects: Prospect[];
+  pendingDraftLeadIds?: string[];
+  avgDealValueCents?: number | null;
+  goalCents?: number | null;
+}) {
   const router = useRouter();
 
   if (prospects.length === 0) {
@@ -22,53 +49,82 @@ export function ProspectPanel({ prospects }: { prospects: Prospect[] }) {
     );
   }
 
+  const [top, ...rest] = prospects;
+  const open = (p: Prospect) => p.id && router.push(`/leads/${p.id}`);
+  const topProj = projectedRevenue(avgDealValueCents, goalCents, top.ai_score);
+  const topAction = nextAction(top, Boolean(top.id && pendingDraftLeadIds.includes(top.id)));
+
   return (
-    <div className="overflow-hidden rounded-xl border border-[var(--hairline)]">
-      <table className="w-full text-sm">
-        <thead className="bg-foreground/[0.03] text-left text-[11px] uppercase tracking-wide text-muted-foreground">
-          <tr>
-            <th className="px-4 py-2 font-medium">Prospect</th>
-            <th className="hidden px-4 py-2 font-medium sm:table-cell">Company</th>
-            <th className="hidden px-4 py-2 font-medium md:table-cell">Why now</th>
-            <th className="px-4 py-2 font-medium">Score</th>
-            <th className="px-4 py-2 text-right font-medium">Data</th>
-          </tr>
-        </thead>
-        <tbody>
-          {prospects.map((p) => (
-            <tr
+    <div className="flex flex-col gap-3">
+      {/* Spotlight — the strongest lead, framed as work-this-today (HotNowStrip ring idiom). */}
+      <div
+        role="link"
+        tabIndex={0}
+        onClick={() => open(top)}
+        onKeyDown={(e) => e.key === "Enter" && open(top)}
+        className="cursor-pointer rounded-xl p-4 ring-1 ring-inset ring-[var(--positive-line)] transition-colors hover:ring-[var(--positive)]"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="truncate text-[15px] font-medium">{name(top)}</p>
+              <SourceBadge source={top.source} />
+            </div>
+            <p className="mt-0.5 truncate text-xs text-muted-foreground">
+              {[top.title, top.company_name].filter(Boolean).join(" · ") || "—"}
+            </p>
+          </div>
+          <ScoreBadge score={top.ai_score} withVerdict />
+        </div>
+        <WhyNowLine lead={top} className="mt-2" />
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-[var(--hairline)] pt-3">
+          <p className="text-xs text-muted-foreground">
+            {topProj ? (
+              <>
+                Worth <span className="font-data font-semibold text-foreground">{usd.format(topProj.valueCents / 100)}</span>
+                {topProj.dealsToGoal != null && <> · 1 of ~{topProj.dealsToGoal} wins to your goal</>}
+              </>
+            ) : (
+              "Qualified against your ICP"
+            )}
+          </p>
+          <Link
+            href={topAction.href}
+            onClick={(e) => e.stopPropagation()}
+            className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-[var(--cyan-strong)] underline-offset-2 hover:underline"
+          >
+            {topAction.label} <ArrowRight className="size-3.5" />
+          </Link>
+        </div>
+      </div>
+
+      {/* Queue — the rest, why-now-led, one glance per row. */}
+      {rest.length > 0 && (
+        <div className="divide-y divide-[var(--hairline)] border-t border-[var(--hairline)]">
+          {rest.map((p) => (
+            <div
               key={p.id}
-              onClick={() => p.id && router.push(`/leads/${p.id}`)}
-              className="cursor-pointer border-t border-[var(--hairline)] transition-colors hover:bg-[var(--tint)]"
+              role="link"
+              tabIndex={0}
+              onClick={() => open(p)}
+              onKeyDown={(e) => e.key === "Enter" && open(p)}
+              className="flex cursor-pointer items-center justify-between gap-3 px-1 py-2.5 transition-colors hover:bg-[var(--tint)]"
             >
-              <td className="px-4 py-3">
-                <p className="font-medium">{name(p)}</p>
-                {p.title && <p className="text-xs text-muted-foreground">{p.title}</p>}
-              </td>
-              <td className="hidden px-4 py-3 sm:table-cell">
-                <p>{p.company_name ?? "—"}</p>
-                <p className="text-xs text-muted-foreground">
-                  {[p.company_size && `${p.company_size} emp`, p.location].filter(Boolean).join(" · ")}
-                </p>
-              </td>
-              <td className="hidden max-w-[16rem] px-4 py-3 md:table-cell">
-                <p className="truncate text-xs text-muted-foreground">
-                  {leadSignalLine(p.lead_signals, p.ai_insights) ?? "—"}
-                </p>
-              </td>
-              <td className="px-4 py-3 font-data font-medium tabular-nums">{p.ai_score ?? "—"}</td>
-              <td className="px-4 py-3">
-                <span className="flex justify-end gap-1.5">
-                  <Mail className={`size-4 ${p.email ? "text-[var(--cyan-strong)]" : "text-muted-foreground/30"}`} />
-                  <MessageSquare
-                    className={`size-4 ${p.linkedin_url ? "text-[var(--cyan-strong)]" : "text-muted-foreground/30"}`}
-                  />
-                </span>
-              </td>
-            </tr>
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="truncate text-sm font-medium">
+                    {name(p)}
+                    {p.company_name && <span className="font-normal text-muted-foreground"> · {p.company_name}</span>}
+                  </p>
+                  <SourceBadge source={p.source} />
+                </div>
+                <WhyNowLine lead={p} className={cn("max-w-[34rem]")} />
+              </div>
+              <ScoreBadge score={p.ai_score} withVerdict />
+            </div>
           ))}
-        </tbody>
-      </table>
+        </div>
+      )}
     </div>
   );
 }

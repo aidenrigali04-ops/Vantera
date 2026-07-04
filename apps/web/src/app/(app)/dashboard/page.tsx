@@ -154,7 +154,7 @@ async function OverviewTab() {
     supabase
       .from("leads")
       .select(
-        "id, first_name, last_name, title, company_name, company_domain, company_size, industry, location, tech_stack, status, ai_score, ai_rationale, ai_insights, scored_at, email, email_status, phone, phone_status, linkedin_url, lead_signals(kind, label, detail, observed_at)"
+        "id, first_name, last_name, title, company_name, company_domain, company_size, industry, location, tech_stack, status, source, ai_score, ai_rationale, ai_insights, scored_at, email, email_status, phone, phone_status, linkedin_url, lead_signals(kind, label, detail, observed_at)"
       )
       .in("status", ["qualified", "enriched", "in_campaign", "replied", "converted"])
       .order("ai_score", { ascending: false, nullsFirst: false })
@@ -257,7 +257,10 @@ async function OverviewTab() {
   // Loss-aversion + variable-reward metrics for the retention panels.
   const dayAgo = isoDaysAgo(1);
   const coldCutoff = isoDaysAgo(3);
-  const [coldRes, sent24Res, replies24Res, sourced24Res] = await Promise.all([
+  // Hot-leads next-action chip: which of the (≤6) surfaced prospects have a draft
+  // waiting in Review. Bounded to the surfaced ids; RLS scopes the rest (rule 02).
+  const prospectIds = (prospects ?? []).map((p) => p.id).filter((id): id is string => Boolean(id));
+  const [coldRes, sent24Res, replies24Res, sourced24Res, pendingDraftRes] = await Promise.all([
     // warm leads cooling: replied (not converted) and untouched 3+ days
     supabase
       .from("leads")
@@ -267,7 +270,16 @@ async function OverviewTab() {
     supabase.from("outreach_sends").select("id", { count: "exact", head: true }).gte("sent_at", dayAgo),
     supabase.from("replies").select("id", { count: "exact", head: true }).gte("received_at", dayAgo),
     supabase.from("leads").select("id", { count: "exact", head: true }).gte("created_at", dayAgo),
+    prospectIds.length
+      ? supabase
+          .from("scheduled_sends")
+          .select("lead_id")
+          .eq("status", "pending_review")
+          .in("lead_id", prospectIds)
+          .returns<{ lead_id: string }[]>()
+      : Promise.resolve({ data: [] as { lead_id: string }[] }),
   ]);
+  const pendingDraftLeadIds = [...new Set((pendingDraftRes.data ?? []).map((r) => r.lead_id))];
   const cold = coldRes.count ?? 0;
   const today = {
     sourced: sourced24Res.count ?? 0,
@@ -378,6 +390,8 @@ async function OverviewTab() {
       revenue={revenue}
       convertedClients={converted}
       pipelineLeads={pipelineLeads}
+      avgDealValueCents={account.avg_deal_value_cents}
+      pendingDraftLeadIds={pendingDraftLeadIds}
       series={revenueSeries}
       pipeline={pipeline}
       cold={cold}
