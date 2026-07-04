@@ -204,14 +204,14 @@ function EmptyState() {
         </div>
         <h2 className="mt-5 font-heading text-lg font-semibold">Your pipeline is ready to run</h2>
         <p className="mt-2 max-w-sm text-sm text-muted-foreground">
-          Launch a campaign and every qualified lead flows through your LinkedIn sequence
+          Once your agents are live, every qualified lead flows through your LinkedIn sequence
           automatically — pausing the instant someone replies.
         </p>
         <Link
           href="/agents"
           className="mt-6 inline-flex items-center gap-2 rounded-lg bg-[#0a0c12] px-5 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90"
         >
-          Launch a campaign
+          Check your agents
           <ArrowRight className="size-4" aria-hidden />
         </Link>
       </Panel>

@@ -126,7 +126,7 @@ export function AgentCard({
         <div className="flex gap-6">
           {stats.map((s) => (
             <div key={s.label}>
-              <p className="font-mono text-2xl font-semibold tabular-nums">{s.value}</p>
+              <p className="font-data text-2xl font-semibold tabular-nums">{s.value}</p>
               <p className="text-xs text-muted-foreground">{s.label}</p>
             </div>
           ))}

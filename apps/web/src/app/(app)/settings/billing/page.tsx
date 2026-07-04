@@ -19,6 +19,15 @@ import { snapshotFromRow, type AccountBillingRow } from "@/lib/billing/entitleme
 import { ManageBillingButton } from "./billing-actions";
 import { PricingPlans, type PlanCard } from "./pricing-plans";
 
+// Human labels for raw Stripe subscription statuses — never show `past_due` to a user.
+const STATUS_LABELS: Record<string, string> = {
+  active: "Active",
+  trialing: "Trial",
+  past_due: "Past due",
+  canceled: "Canceled",
+  incomplete: "Incomplete",
+};
+
 export default async function BillingPage({
   searchParams,
 }: {
@@ -92,7 +101,7 @@ export default async function BillingPage({
                   : `Your free trial ends in ${daysLeft} day${daysLeft === 1 ? "" : "s"}.`}
               </span>{" "}
               <span className="text-muted-foreground">
-                Choose a plan below to keep your agents running — your leads, campaigns, and history stay exactly as they are.
+                Choose a plan below to keep your agents running — your leads, agents, and history stay exactly as they are.
               </span>
             </p>
             <Badge variant="secondary" className="font-mono uppercase tracking-[0.14em]">
@@ -102,7 +111,7 @@ export default async function BillingPage({
           <ul className="text-sm text-muted-foreground">
             <li>Seats: {seatCount ?? 0} / {limits.maxSeats}</li>
             <li>LinkedIn accounts: {liCount ?? 0} / {limits.maxLinkedinAccounts}</li>
-            <li>Campaigns: {campaignCount ?? 0} / {limits.maxCampaigns}</li>
+            <li>Outreach agents: {campaignCount ?? 0} / {limits.maxCampaigns}</li>
           </ul>
         </div>
       )}
@@ -121,7 +130,7 @@ export default async function BillingPage({
             <CardTitle>Current plan</CardTitle>
             <CardAction>
               <Badge variant={snap?.subscriptionStatus === "active" ? "default" : "secondary"}>
-                {`${snap?.plan} · ${snap?.subscriptionStatus}`}
+                {`${(currentTier !== "none" && PLAN_DISPLAY[currentTier]?.name) || snap?.plan} · ${STATUS_LABELS[snap?.subscriptionStatus ?? ""] ?? snap?.subscriptionStatus}`}
               </Badge>
             </CardAction>
           </CardHeader>
@@ -129,7 +138,7 @@ export default async function BillingPage({
             <ul className="text-sm text-muted-foreground">
               <li>Seats: {seatCount ?? 0} / {limits.maxSeats}</li>
               <li>LinkedIn accounts: {liCount ?? 0} / {limits.maxLinkedinAccounts}</li>
-              <li>Campaigns: {campaignCount ?? 0} / {limits.maxCampaigns}</li>
+              <li>Outreach agents: {campaignCount ?? 0} / {limits.maxCampaigns}</li>
             </ul>
             <ManageBillingButton />
           </CardContent>

@@ -21,7 +21,7 @@ export function ScorePill({ score }: { score: number }) {
       className={cn(
         "grid h-9 min-w-9 shrink-0 place-items-center rounded-lg border px-2 text-[15px] font-semibold tabular-nums",
         qualified
-          ? "border-[rgba(11, 87, 171,0.32)] bg-[var(--cyan-tint)] text-[var(--cyan-strong)]"
+          ? "border-[rgba(11,87,171,0.32)] bg-[var(--cyan-tint)] text-[var(--cyan-strong)]"
           : "border-[var(--hairline)] bg-[#f1f2f4] text-[var(--ink-4)]",
       )}
     >
@@ -37,7 +37,7 @@ export function MockChrome({ label, children }: { label: string; children: React
       <div
         aria-hidden
         className="pointer-events-none absolute -inset-3 -z-10 rounded-[28px] blur-2xl"
-        style={{ background: "radial-gradient(60% 70% at 60% 25%, rgba(11, 87, 171,0.16), transparent 70%)" }}
+        style={{ background: "radial-gradient(60% 70% at 60% 25%, rgba(11,87,171,0.16), transparent 70%)" }}
       />
       <div className="overflow-hidden rounded-2xl border border-[var(--hairline)] bg-white shadow-[var(--shadow-lift)]">
         <div className="flex items-center gap-2.5 border-b border-[var(--hairline)] bg-[#fbfbfc] px-3.5 py-2.5">

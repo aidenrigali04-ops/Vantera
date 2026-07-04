@@ -42,7 +42,7 @@ export function SequenceBuilder({
       {!hasCampaign && (
         <Panel className="mb-4 flex items-center justify-between gap-3 p-4">
           <p className="text-sm text-muted-foreground">
-            Launch a campaign to activate this sequence — you can still tune it here.
+            Deploy your Outreach Agent to activate this sequence — you can still tune it here.
           </p>
           <Button asChild size="sm" variant="outline">
             <Link href="/agents">

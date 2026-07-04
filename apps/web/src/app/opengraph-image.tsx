@@ -24,7 +24,7 @@ export default function OpengraphImage() {
           padding: "0 96px",
           background: BG,
           color: "#ffffff",
-          backgroundImage: `radial-gradient(900px 520px at 80% 16%, rgba(11, 87, 171,0.20), transparent 60%)`,
+          backgroundImage: `radial-gradient(900px 520px at 80% 16%, rgba(11,87,171,0.20), transparent 60%)`,
         }}
       >
         {/* brand mark: cyan rounded diamond with a sharp cut-out matching the stage */}

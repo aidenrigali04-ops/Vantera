@@ -92,12 +92,12 @@ export function ShareCard({
               required
               placeholder="colleague@company.com"
               autoComplete="off"
-              className="h-11 flex-1 rounded-xl border border-[rgba(12,16,26,0.12)] bg-white px-4 text-[14px] text-foreground placeholder:text-[var(--ink-4)] transition-colors focus-visible:border-[var(--cyan-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(11, 87, 171,0.2)]"
+              className="h-11 flex-1 rounded-xl border border-[rgba(12,16,26,0.12)] bg-white px-4 text-[14px] text-foreground placeholder:text-[var(--ink-4)] transition-colors focus-visible:border-[var(--cyan-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(11,87,171,0.2)]"
             />
             <select
               name="role"
               defaultValue="member"
-              className="h-11 rounded-xl border border-[rgba(12,16,26,0.12)] bg-white px-3 text-[14px] text-foreground transition-colors focus-visible:border-[var(--cyan-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(11, 87, 171,0.2)]"
+              className="h-11 rounded-xl border border-[rgba(12,16,26,0.12)] bg-white px-3 text-[14px] text-foreground transition-colors focus-visible:border-[var(--cyan-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(11,87,171,0.2)]"
             >
               <option value="member">Member</option>
               <option value="admin">Admin</option>
@@ -105,7 +105,7 @@ export function ShareCard({
             <button
               type="submit"
               disabled={inviting || seatsLeft === 0}
-              className="inline-flex h-11 items-center justify-center gap-1.5 rounded-xl bg-[#0a0c12] px-5 text-[14px] font-semibold text-white transition-all hover:-translate-y-0.5 hover:shadow-[0_10px_30px_-8px_rgba(11, 87, 171,0.55)] disabled:opacity-50 disabled:hover:translate-y-0"
+              className="inline-flex h-11 items-center justify-center gap-1.5 rounded-xl bg-[#0a0c12] px-5 text-[14px] font-semibold text-white transition-all hover:-translate-y-0.5 hover:shadow-[0_10px_30px_-8px_rgba(11,87,171,0.55)] disabled:opacity-50 disabled:hover:translate-y-0"
             >
               {inviting ? <Loader2 className="size-4 animate-spin" /> : "Send invite"}
             </button>

@@ -5,7 +5,9 @@ import { Flame, Mail, Phone, Snowflake, UserPlus, Zap } from "lucide-react";
 import { PANEL_SURFACE, Eyebrow } from "@/components/ui/panel";
 import { ScoreBadge, SourceBadge, WhyNowLine } from "@/components/lead-why-now";
 import { cn } from "@/lib/utils";
-import { coolingState, leadSignalLine, type LeadSignalView } from "./lead-value";
+import { coolingState, leadSignalLine, projectedRevenue, type LeadSignalView } from "./lead-value";
+
+const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 
 export interface LeadInsightsView {
   pain_points?: string[];
@@ -121,9 +123,13 @@ function CoolingChip({ lead }: { lead: LeadRow }) {
 function HotNowStrip({
   hotLeads,
   onSelect,
+  avgDealValueCents,
+  goalCents,
 }: {
   hotLeads: LeadRow[];
   onSelect: (lead: LeadRow) => void;
+  avgDealValueCents: number | null;
+  goalCents: number | null;
 }) {
   if (hotLeads.length === 0) return null;
   return (
@@ -165,6 +171,16 @@ function HotNowStrip({
                 </p>
               ) : null;
             })()}
+            {/* Value framing — the same worth-toward-goal line as the dashboard spotlight. */}
+            {(() => {
+              const proj = projectedRevenue(avgDealValueCents, goalCents, lead.ai_score);
+              return proj ? (
+                <p className="text-xs text-muted-foreground">
+                  Worth <span className="font-data font-semibold text-foreground">{usd.format(proj.valueCents / 100)}</span>
+                  {proj.dealsToGoal != null && <> · 1 of ~{proj.dealsToGoal} to your goal</>}
+                </p>
+              ) : null;
+            })()}
             <span className="mt-auto flex gap-1.5 pt-1 text-muted-foreground">
               <Mail className={cn("size-4", lead.email ? "text-foreground" : "text-muted-foreground/30")} />
               <UserPlus
@@ -195,7 +211,12 @@ export function LeadsTable({
 
   return (
     <>
-      <HotNowStrip hotLeads={hotLeads} onSelect={open} />
+      <HotNowStrip
+        hotLeads={hotLeads}
+        onSelect={open}
+        avgDealValueCents={avgDealValueCents}
+        goalCents={goalCents}
+      />
       <div
         className="overflow-hidden rounded-xl border border-[var(--hairline)]"
         data-copilot="leads-table"

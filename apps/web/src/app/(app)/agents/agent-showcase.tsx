@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { AnimatedProgress } from "@/components/ui/animated-progress";
 import { CardGlass } from "@/components/ui/card";
+import { Eyebrow, PANEL_SURFACE } from "@/components/ui/panel";
 import { FormError } from "@/components/form-error";
 import { cn } from "@/lib/utils";
 import { setAgentStatus, type AgentActionState } from "./actions";
@@ -152,9 +153,7 @@ function AgentDetails({ agent }: { agent: ShowcaseAgent }) {
 
   return (
     <div className="flex flex-col items-start text-left">
-      <p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-        {agent.roleLabel}
-      </p>
+      <Eyebrow className="mb-2">{agent.roleLabel}</Eyebrow>
       <h1 className="font-heading mb-3 text-3xl font-semibold tracking-tight md:text-4xl">
         {agent.name}
       </h1>
@@ -171,12 +170,12 @@ function AgentDetails({ agent }: { agent: ShowcaseAgent }) {
       )}
 
       {/* run-summary panel */}
-      <div className="relative isolate w-full space-y-5 overflow-hidden rounded-2xl border border-[var(--hairline)] bg-white p-6 text-left shadow-[var(--shadow-card)]">
+      <div className={cn(PANEL_SURFACE, "relative isolate w-full space-y-5 overflow-hidden p-6 text-left")}>
         <CardGlass />
         <div className="flex gap-8">
           {agent.stats.map((s) => (
             <div key={s.label}>
-              <p className="font-mono text-3xl font-semibold tabular-nums">{s.value}</p>
+              <p className="font-data text-3xl font-semibold tabular-nums">{s.value}</p>
               <p className="mt-1 text-xs text-muted-foreground">{s.label}</p>
             </div>
           ))}
@@ -186,7 +185,7 @@ function AgentDetails({ agent }: { agent: ShowcaseAgent }) {
           <div className="space-y-2">
             <div className="flex items-center justify-between text-xs">
               <span className="font-medium text-foreground">{agent.progress.label}</span>
-              <span className="font-mono text-muted-foreground">{agent.progress.value}%</span>
+              <span className="font-data text-muted-foreground">{agent.progress.value}%</span>
             </div>
             <AnimatedProgress value={agent.progress.value} label={agent.progress.label} />
             <p className="text-xs text-muted-foreground">{agent.progress.caption}</p>

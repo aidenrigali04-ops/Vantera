@@ -50,8 +50,9 @@ export default async function SuppressionPage() {
             <ShieldBan className="mx-auto size-8 text-muted-foreground" />
             <CardTitle className="text-base">Nothing suppressed yet</CardTitle>
             <p className="mx-auto max-w-md text-pretty text-sm text-muted-foreground">
-              Unsubscribes, bounces, and &quot;not interested&quot; replies land here automatically
-              once sending goes live. You can add contacts manually any time.
+              &quot;Not interested&quot; replies and opt-outs land here automatically as your agents
+              work — no agent ever messages a suppressed contact. You can add contacts manually any
+              time.
             </p>
           </CardHeader>
         </Card>

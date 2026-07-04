@@ -182,7 +182,6 @@ async function OverviewTab() {
   const total = [...leadCounts.values()].reduce((a, b) => a + b, 0);
   const qualified = countOf("qualified", "enriched");
   const inOutreach = countOf("in_campaign");
-  const replied = countOf("replied", "converted");
   const repliedOnly = countOf("replied");
   const converted = countOf("converted");
   const drafts = draftsRes.count ?? 0;

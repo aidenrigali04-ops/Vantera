@@ -499,35 +499,6 @@ function AgentsPanel({
   );
 }
 
-/** LinkedIn connect nudge — rendered only while LinkedIn isn't connected (the activation gate). */
-function ChannelsPanel({ channels }: { channels: DashboardViewProps["channels"] }) {
-  return (
-    <RevealItem className={cn(PANEL_SURFACE, "flex flex-col gap-3 p-5")}>
-      <Eyebrow>Finish setup</Eyebrow>
-      <ChannelRow
-        icon={<UserPlus className="size-4" />}
-        label="LinkedIn"
-        ready={channels.liStatus === "active"}
-        detail={
-          channels.liStatus === "active"
-            ? "Connected"
-            : channels.liStatus === "restricted"
-              ? "Restricted — reconnect"
-              : channels.liStatus
-                ? "Connecting"
-                : "Not connected"
-        }
-      />
-      <Button asChild variant="ghost" size="sm" className="-mx-2 mt-1 justify-start">
-        <Link href="/settings/channels">
-          Connect LinkedIn <ArrowRight className="size-4" />
-        </Link>
-      </Button>
-    </RevealItem>
-  );
-}
-
-
 /** Warm replies — the variable reward that anchors the daily habit loop. */
 function WarmReplies({
   recentReplies,
@@ -599,34 +570,6 @@ function WarmReplies({
         )}
       </div>
     </RevealItem>
-  );
-}
-
-function ChannelRow({
-  icon,
-  label,
-  detail,
-  ready,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  detail: string;
-  ready: boolean;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-2">
-      <span className="flex items-center gap-2 text-sm font-medium">
-        <span className="text-muted-foreground">{icon}</span>
-        {label}
-      </span>
-      <span className="flex items-center gap-2 text-xs text-muted-foreground">
-        {detail}
-        <span
-          className={`size-2 rounded-full ${ready ? "bg-[var(--positive)]" : "bg-muted-foreground/40"}`}
-          aria-hidden
-        />
-      </span>
-    </div>
   );
 }
 

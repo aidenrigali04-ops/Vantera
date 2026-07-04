@@ -42,10 +42,10 @@ export function Teams() {
             <RevealItem
               key={t.name}
               className={cn(CARD_INTERACTIVE, "group flex flex-col p-7")}
-              style={t.highlight ? { borderColor: "rgba(11, 87, 171,0.5)" } : undefined}
+              style={t.highlight ? { borderColor: "rgba(11,87,171,0.5)" } : undefined}
             >
               <div className="flex items-center justify-between">
-                <span className="grid size-12 place-items-center rounded-xl bg-[var(--cyan-tint)] text-[var(--cyan-strong)] ring-1 ring-inset ring-[rgba(11, 87, 171,0.2)] transition-transform duration-300 group-hover:scale-105">
+                <span className="grid size-12 place-items-center rounded-xl bg-[var(--cyan-tint)] text-[var(--cyan-strong)] ring-1 ring-inset ring-[rgba(11,87,171,0.2)] transition-transform duration-300 group-hover:scale-105">
                   <t.icon className="size-5" strokeWidth={1.9} />
                 </span>
                 <span className="rounded-full border border-[var(--hairline)] bg-[#fbfbfc] px-2.5 py-1 text-[11px] font-semibold text-[var(--ink-3)]">

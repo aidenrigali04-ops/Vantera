@@ -138,10 +138,10 @@ function NeedSpend({ closedCents, pipelineCents }: { closedCents: number; pipeli
         pipeline-to-spend ratio that decides renewal.
       </p>
       <Link
-        href="/pricing"
+        href="/settings/billing"
         className="mt-4 inline-flex rounded-lg border border-[var(--hairline)] px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-[var(--cyan-tint)]"
       >
-        See plans
+        Choose a plan
       </Link>
     </Panel>
   );

@@ -49,7 +49,7 @@ export function HeroDeck() {
       <div
         aria-hidden
         className="pointer-events-none absolute -inset-x-8 -bottom-10 -top-6 -z-10 rounded-[2.25rem] blur-2xl"
-        style={{ background: "radial-gradient(60% 75% at 55% 30%, rgba(11, 87, 171,0.18), transparent 70%)" }}
+        style={{ background: "radial-gradient(60% 75% at 55% 30%, rgba(11,87,171,0.18), transparent 70%)" }}
       />
 
       <div
@@ -75,7 +75,7 @@ export function HeroDeck() {
             </div>
             <div className="truncate text-[12.5px] text-[#8E9AA3]">VP Sales · Northwind</div>
           </div>
-          <span className="ml-auto inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-[rgba(11, 87, 171,0.12)] px-2.5 py-[5px] text-[11.5px] font-semibold text-[#0b57ab]">
+          <span className="ml-auto inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-[rgba(11,87,171,0.12)] px-2.5 py-[5px] text-[11.5px] font-semibold text-[#0b57ab]">
             <span className="size-1.5 rounded-full bg-[#0b57ab]" />
             High intent
           </span>

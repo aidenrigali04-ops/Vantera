@@ -24,7 +24,7 @@ export function AiDraft() {
         {SIGNALS.map((s) => (
           <span
             key={s}
-            className="inline-flex items-center gap-1 rounded-full border border-[rgba(11, 87, 171,0.3)] bg-[var(--cyan-tint)] px-2.5 py-1 text-[10px] font-medium text-[var(--cyan-strong)]"
+            className="inline-flex items-center gap-1 rounded-full border border-[rgba(11,87,171,0.3)] bg-[var(--cyan-tint)] px-2.5 py-1 text-[10px] font-medium text-[var(--cyan-strong)]"
           >
             {s}
           </span>
@@ -56,7 +56,7 @@ export function AiDraft() {
             <Pencil className="size-3.5" strokeWidth={1.9} />
             Edit
           </button>
-          <span className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--cyan-strong)] px-3.5 py-1.5 text-[12px] font-semibold text-white shadow-[0_0_16px_rgba(11, 87, 171,0.4)]">
+          <span className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--cyan-strong)] px-3.5 py-1.5 text-[12px] font-semibold text-white shadow-[0_0_16px_rgba(11,87,171,0.4)]">
             <Check className="size-3.5" strokeWidth={2.5} />
             Approve
           </span>
