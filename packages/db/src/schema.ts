@@ -1184,3 +1184,29 @@ export const intentObservations = pgTable(
   ]
 );
 
+
+// ── 0041 CRM activity sync ────────────────────────────────────────────────────
+
+// retention(crm_contact_refs): cascades with the lead (GDPR erasure), the connection
+// (disconnect), and the account. Service-role writes only — no client write policy.
+export const crmContactRefs = pgTable(
+  "crm_contact_refs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    connectionId: uuid("connection_id")
+      .notNull()
+      .references(() => crmConnections.id, { onDelete: "cascade" }),
+    leadId: uuid("lead_id")
+      .notNull()
+      .references(() => leads.id, { onDelete: "cascade" }),
+    externalRef: text("external_ref").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("crm_contact_refs_connection_lead_idx").on(t.connectionId, t.leadId),
+    index("crm_contact_refs_account_idx").on(t.accountId),
+  ]
+);

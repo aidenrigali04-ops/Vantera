@@ -1,5 +1,35 @@
 import { describe, expect, it } from "vitest";
-import { validateProvider, validateConnectionConfig } from "./validation";
+import { validateProvider, validateConnectionConfig, nextActivityConfig } from "./validation";
+
+describe("nextActivityConfig", () => {
+  const NOW = new Date("2026-07-04T12:00:00.000Z");
+  const on = { enabled: true, outreach: true, replies: true, meetings: true };
+
+  it("stamps the watermark at now on a fresh enable — history is never back-dumped", () => {
+    const next = nextActivityConfig(undefined, on, NOW);
+    expect(next.enabled).toBe(true);
+    expect(next.watermark).toBe(NOW.toISOString());
+  });
+
+  it("keeps the existing watermark while staying enabled", () => {
+    const prev = { enabled: true, watermark: "2026-07-01T00:00:00.000Z" };
+    expect(nextActivityConfig(prev, on, NOW).watermark).toBe("2026-07-01T00:00:00.000Z");
+  });
+
+  it("drops the watermark on disable so a re-enable starts fresh (the gap is never back-filled)", () => {
+    const prev = { enabled: true, watermark: "2026-07-01T00:00:00.000Z" };
+    const off = nextActivityConfig(prev, { ...on, enabled: false }, NOW);
+    expect(off.enabled).toBe(false);
+    expect(off.watermark).toBeUndefined();
+    const reOn = nextActivityConfig(off, on, NOW);
+    expect(reOn.watermark).toBe(NOW.toISOString());
+  });
+
+  it("carries the per-event toggles through", () => {
+    const next = nextActivityConfig(undefined, { enabled: true, outreach: false, replies: true, meetings: true }, NOW);
+    expect(next.events).toEqual({ outreach: false, replies: true, meetings: true });
+  });
+});
 
 describe("validateProvider", () => {
   it("accepts a registry provider", () => {

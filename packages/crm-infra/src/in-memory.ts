@@ -1,8 +1,10 @@
 import { CONNECTOR_REGISTRY } from "./index";
 import type {
+  ActivityLogInput,
   ClosedDeal,
   ConnectorCtx,
   ConnectorResult,
+  ContactStub,
   CrmConnector,
   CrmContactLookup,
   CrmProvider,
@@ -19,6 +21,10 @@ export class InMemoryConnector implements CrmConnector {
   readonly pushed: ClosedDeal[] = [];
   /** Seed by email/domain (lowercased) for findContact in dedup tests. */
   contacts: Record<string, CrmContactLookup> = {};
+  /** activity-sync recordings — contacts ensured + notes logged, in call order */
+  readonly ensured: ContactStub[] = [];
+  readonly activities: ActivityLogInput[] = [];
+  private contactIdsByEmail: Record<string, string> = {};
   failNext = false;
 
   constructor(provider: CrmProvider = "hubspot") {
@@ -76,5 +82,35 @@ export class InMemoryConnector implements CrmConnector {
     }
     const key = (query.email ?? query.domain ?? "").toLowerCase();
     return { ok: true, data: this.contacts[key] ?? { exists: false } };
+  }
+
+  async ensureContact(
+    _ctx: ConnectorCtx,
+    contact: ContactStub
+  ): Promise<ConnectorResult<{ contactId: string }>> {
+    if (this.failNext) {
+      this.failNext = false;
+      return { ok: false, error: "Ensure failed", retryable: true };
+    }
+    this.ensured.push(contact);
+    const key = (contact.email ?? "").toLowerCase();
+    if (key && this.contactIdsByEmail[key]) {
+      return { ok: true, data: { contactId: this.contactIdsByEmail[key] } };
+    }
+    const id = `mem-contact-${this.ensured.length}`;
+    if (key) this.contactIdsByEmail[key] = id;
+    return { ok: true, data: { contactId: id } };
+  }
+
+  async logActivity(
+    _ctx: ConnectorCtx,
+    input: ActivityLogInput
+  ): Promise<ConnectorResult<{ externalRef?: string }>> {
+    if (this.failNext) {
+      this.failNext = false;
+      return { ok: false, error: "Note failed", retryable: true };
+    }
+    this.activities.push(input);
+    return { ok: true, data: { externalRef: `mem-note-${this.activities.length}` } };
   }
 }

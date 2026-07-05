@@ -1,7 +1,9 @@
 import type {
+  ActivityLogInput,
   ClosedDeal,
   ConnectorCtx,
   ConnectorResult,
+  ContactStub,
   CrmProvider,
   ProviderAdapter,
 } from "./types";
@@ -114,6 +116,59 @@ const monday: ProviderAdapter = {
 };
 
 // ── HubSpot (crm) ───────────────────────────────────────────────────────────────
+const HS = "https://api.hubapi.com";
+
+function hsHeaders(ctx: ConnectorCtx) {
+  return { Authorization: `Bearer ${ctx.accessToken}`, "Content-Type": "application/json" };
+}
+
+async function hsSearchContactByEmail(
+  headers: Record<string, string>,
+  email: string
+): Promise<{ ok: boolean; status: number; contactId?: string }> {
+  const search = await http(`${HS}/crm/v3/objects/contacts/search`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      filterGroups: [{ filters: [{ propertyName: "email", operator: "EQ", value: email }] }],
+    }),
+  });
+  const results = search.json.results as Array<{ id?: string }> | undefined;
+  return { ok: search.ok, status: search.status, contactId: results?.[0]?.id };
+}
+
+// The journey note (why-now, fit score, origin) written at push time. Rendered here so the
+// wording lives with the wire call; the payload stays provider-agnostic.
+function journeyNoteBody(deal: ClosedDeal): string | null {
+  const c = deal.context;
+  if (!c || (c.score == null && !c.whyNow && !c.origin)) return null;
+  const lines = [`Closed via ${deal.source}${c.score != null ? ` — fit score ${c.score}` : ""}`];
+  if (c.whyNow) lines.push(`Why now: ${c.whyNow}`);
+  if (c.origin === "intent") lines.push("Origin: LinkedIn buying-intent signal");
+  return lines.join("\n");
+}
+
+async function hsCreateNote(
+  headers: Record<string, string>,
+  input: ActivityLogInput
+): Promise<{ ok: boolean; status: number; id?: string }> {
+  const res = await http(`${HS}/crm/v3/objects/notes`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      properties: { hs_note_body: input.body, hs_timestamp: input.occurredAt },
+      associations: [
+        {
+          to: { id: input.contactId },
+          // HUBSPOT_DEFINED 202 = note → contact
+          types: [{ associationCategory: "HUBSPOT_DEFINED", associationTypeId: 202 }],
+        },
+      ],
+    }),
+  });
+  return { ok: res.ok, status: res.status, id: res.json.id as string | undefined };
+}
+
 const hubspot: ProviderAdapter = {
   async pushClosedDeal(ctx, deal) {
     const headers = {
@@ -180,7 +235,58 @@ const hubspot: ProviderAdapter = {
       }),
     });
     if (!dealRes.ok) return failFromStatus(dealRes.status, `HubSpot deal failed (${dealRes.status}).`);
+
+    // Journey note (why-now, score, origin) — best-effort AFTER the deal exists. A note
+    // failure must never fail the push: retrying now would duplicate the deal.
+    const noteBody = journeyNoteBody(deal);
+    if (noteBody && contactId) {
+      await hsCreateNote(headers, {
+        contactId,
+        body: noteBody,
+        occurredAt: deal.closedAt || new Date().toISOString(),
+      }).catch(() => undefined);
+    }
+
     return { ok: true, data: { externalRef: dealRes.json.id as string | undefined } };
+  },
+  async ensureContact(ctx, contact: ContactStub) {
+    const headers = hsHeaders(ctx);
+    // Email is the dedupe key when we have one; without it we create directly and rely on
+    // the caller's stored ref for every later touch.
+    if (contact.email) {
+      const found = await hsSearchContactByEmail(headers, contact.email);
+      if (!found.ok && (found.status >= 500 || found.status === 429)) {
+        return failFromStatus(found.status, `HubSpot search failed (${found.status}).`);
+      }
+      if (found.contactId) return { ok: true, data: { contactId: found.contactId } };
+    }
+    const props: Record<string, string> = {};
+    if (contact.email) props.email = contact.email;
+    if (contact.firstName) props.firstname = contact.firstName;
+    if (contact.lastName) props.lastname = contact.lastName;
+    if (contact.title) props.jobtitle = contact.title;
+    if (contact.company) props.company = contact.company;
+    const created = await http(`${HS}/crm/v3/objects/contacts`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ properties: props }),
+    });
+    if (created.ok) {
+      const id = created.json.id as string | undefined;
+      if (id) return { ok: true, data: { contactId: id } };
+      return { ok: false, error: "HubSpot returned no contact id.", retryable: true };
+    }
+    // 409 = created concurrently since our search — recover the existing id.
+    if (created.status === 409 && contact.email) {
+      const again = await hsSearchContactByEmail(headers, contact.email);
+      if (again.contactId) return { ok: true, data: { contactId: again.contactId } };
+    }
+    return failFromStatus(created.status, `HubSpot contact failed (${created.status}).`);
+  },
+  async logActivity(ctx, input) {
+    const res = await hsCreateNote(hsHeaders(ctx), input);
+    if (!res.ok) return failFromStatus(res.status, `HubSpot note failed (${res.status}).`);
+    return { ok: true, data: { externalRef: res.id } };
   },
   async testConnection(ctx) {
     const { ok, status } = await http(

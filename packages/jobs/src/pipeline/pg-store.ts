@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gte, inArray, isNotNull, isNull, lt, lte, max, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, max, or, sql } from "drizzle-orm";
 import {
   accountDeletionRequests,
   accountMembers,
@@ -11,6 +11,7 @@ import {
   conversionTokens,
   copilotConversations,
   crmConnections,
+  crmContactRefs,
   crmPushEvents,
   enrichmentResults,
   icps,
@@ -47,6 +48,11 @@ import { resolveEntitlements, type EntitlementSnapshot } from "@vantera/billing"
 import type { ClosedDeal, CrmProvider } from "@vantera/crm-infra";
 import type { AccountDeletionStore } from "./account-deletion";
 import type { CrmPushStore } from "./crm-push";
+import type {
+  ActivityConnectionRow,
+  CrmActivityStore,
+  LeadActivityEvent,
+} from "./crm-activity-sync";
 import {
   SCOUT_DEFAULTS,
   type ConversionStore,
@@ -1772,6 +1778,189 @@ export function createAccountDeletionStore(db: Db): AccountDeletionStore {
     async deleteAccount(accountId) {
       // Hard delete; FK cascades wipe all tenant data and the deletion-request row itself.
       await db.delete(accounts).where(eq(accounts.id, accountId));
+    },
+  };
+}
+
+// ── CRM activity sync (0041) ─────────────────────────────────────────────────────
+
+/** Drizzle implementation of the activity-sync store. Service-role db (RLS-exempt);
+ *  tenancy comes from the per-connection accountId the pipeline scopes every query with. */
+export function createCrmActivityStore(db: Db): CrmActivityStore {
+  const leadShape = {
+    firstName: leads.firstName,
+    lastName: leads.lastName,
+    email: leads.email,
+    title: leads.title,
+    company: leads.companyName,
+    linkedinUrl: leads.linkedinUrl,
+  };
+
+  return {
+    async listActivityConnections(): Promise<ActivityConnectionRow[]> {
+      const rows = await db
+        .select()
+        .from(crmConnections)
+        .where(
+          and(
+            eq(crmConnections.status, "active"),
+            sql`(${crmConnections.config} -> 'activity' ->> 'enabled') = 'true'`
+          )
+        );
+      return rows.map((c) => ({
+        id: c.id,
+        accountId: c.accountId,
+        provider: c.provider as ActivityConnectionRow["provider"],
+        status: c.status,
+        accessTokenEnc: c.accessTokenEnc,
+        refreshTokenEnc: c.refreshTokenEnc,
+        tokenExpiresAt: c.tokenExpiresAt ? c.tokenExpiresAt.toISOString() : null,
+        externalAccountRef: c.externalAccountRef,
+        config: (c.config ?? {}) as ActivityConnectionRow["config"],
+      }));
+    },
+
+    async eventsSince(accountId, sinceIso, limit): Promise<LeadActivityEvent[]> {
+      const since = new Date(sinceIso);
+
+      const sends = await db
+        .select({ occurredAt: outreachSends.sentAt, leadId: outreachSends.leadId, ...leadShape })
+        .from(outreachSends)
+        .innerJoin(leads, eq(outreachSends.leadId, leads.id))
+        .where(and(eq(outreachSends.accountId, accountId), gt(outreachSends.sentAt, since)))
+        .orderBy(asc(outreachSends.sentAt))
+        .limit(limit);
+
+      const replyRows = await db
+        .select({
+          occurredAt: replies.receivedAt,
+          leadId: replies.leadId,
+          excerpt: replies.body,
+          ...leadShape,
+        })
+        .from(replies)
+        .innerJoin(leads, eq(replies.leadId, leads.id))
+        .where(and(eq(replies.accountId, accountId), gt(replies.receivedAt, since)))
+        .orderBy(asc(replies.receivedAt))
+        .limit(limit);
+
+      const meetings = await db
+        .select({ occurredAt: leads.closedAt, leadId: leads.id, ...leadShape })
+        .from(leads)
+        .where(
+          and(
+            eq(leads.accountId, accountId),
+            eq(leads.status, "converted"),
+            isNotNull(leads.closedAt),
+            gt(leads.closedAt, since)
+          )
+        )
+        .orderBy(asc(leads.closedAt))
+        .limit(limit);
+
+      type EventRow = {
+        occurredAt: Date | null;
+        leadId: string | null;
+        excerpt?: string | null;
+        firstName: string | null;
+        lastName: string | null;
+        email: string | null;
+        title: string | null;
+        company: string | null;
+        linkedinUrl: string | null;
+      };
+      const toEvent = (row: EventRow, kind: LeadActivityEvent["kind"]): LeadActivityEvent | null =>
+        row.leadId && row.occurredAt
+          ? {
+              leadId: row.leadId,
+              kind,
+              occurredAt: row.occurredAt.toISOString(),
+              excerpt: row.excerpt ?? null,
+              lead: {
+                firstName: row.firstName,
+                lastName: row.lastName,
+                email: row.email,
+                title: row.title,
+                company: row.company,
+                linkedinUrl: row.linkedinUrl,
+              },
+            }
+          : null;
+
+      return [
+        ...sends.map((r) => toEvent(r, "outreach")),
+        ...replyRows.map((r) => toEvent(r, "reply")),
+        ...meetings.map((r) => toEvent(r, "meeting")),
+      ]
+        .filter((e): e is LeadActivityEvent => e !== null)
+        .sort((a, b) => a.occurredAt.localeCompare(b.occurredAt))
+        .slice(0, limit);
+    },
+
+    async getContactRef(connectionId, leadId) {
+      const [row] = await db
+        .select({ externalRef: crmContactRefs.externalRef })
+        .from(crmContactRefs)
+        .where(
+          and(eq(crmContactRefs.connectionId, connectionId), eq(crmContactRefs.leadId, leadId))
+        )
+        .limit(1);
+      return row?.externalRef ?? null;
+    },
+
+    async saveContactRef(args) {
+      await db
+        .insert(crmContactRefs)
+        .values({
+          accountId: args.accountId,
+          connectionId: args.connectionId,
+          leadId: args.leadId,
+          externalRef: args.externalRef,
+        })
+        .onConflictDoUpdate({
+          target: [crmContactRefs.connectionId, crmContactRefs.leadId],
+          set: { externalRef: args.externalRef },
+        });
+    },
+
+    async saveWatermark(connectionId, iso) {
+      // Defensive double-set: create the activity object if a concurrent config write
+      // dropped it, then stamp the watermark. jsonb_set never creates missing parents.
+      await db
+        .update(crmConnections)
+        .set({
+          config: sql`jsonb_set(
+            jsonb_set(
+              coalesce(${crmConnections.config}, '{}'::jsonb),
+              '{activity}',
+              coalesce(coalesce(${crmConnections.config}, '{}'::jsonb) -> 'activity', '{}'::jsonb),
+              true
+            ),
+            '{activity,watermark}',
+            to_jsonb(${iso}::text),
+            true
+          )`,
+          lastSyncAt: new Date(),
+        })
+        .where(eq(crmConnections.id, connectionId));
+    },
+
+    async saveRefreshedTokens(connectionId, t) {
+      await db
+        .update(crmConnections)
+        .set({
+          accessTokenEnc: t.accessTokenEnc,
+          refreshTokenEnc: t.refreshTokenEnc,
+          tokenExpiresAt: t.tokenExpiresAt ? new Date(t.tokenExpiresAt) : null,
+        })
+        .where(eq(crmConnections.id, connectionId));
+    },
+
+    async markConnectionError(connectionId, error) {
+      await db
+        .update(crmConnections)
+        .set({ status: "error", lastError: error })
+        .where(eq(crmConnections.id, connectionId));
     },
   };
 }

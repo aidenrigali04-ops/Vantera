@@ -36,7 +36,14 @@ export const CONNECTOR_REGISTRY: Record<CrmProvider, ConnectorMeta> = {
     kind: "crm",
     label: "HubSpot",
     blurb: "Creates the contact and a won deal in your HubSpot pipeline on close.",
-    oauthScopes: ["oauth", "crm.objects.contacts.write", "crm.objects.deals.write"],
+    // notes.write powers activity sync (timeline notes). Connections authorized before it
+    // was added need a one-click reconnect to grant it.
+    oauthScopes: [
+      "oauth",
+      "crm.objects.contacts.write",
+      "crm.objects.deals.write",
+      "crm.objects.notes.write",
+    ],
     authorizeEndpoint: "https://app.hubspot.com/oauth/authorize",
     tokenEndpoint: "https://api.hubapi.com/oauth/v1/token",
     apiBase: "https://api.hubapi.com",
@@ -46,6 +53,7 @@ export const CONNECTOR_REGISTRY: Record<CrmProvider, ConnectorMeta> = {
       { key: "pipelineId", label: "Deal pipeline", required: true },
       { key: "stageId", label: "Won stage", required: true },
     ],
+    supportsActivitySync: true,
   },
   salesforce: {
     provider: "salesforce",
@@ -154,6 +162,13 @@ export function getConnector(provider: CrmProvider, creds?: OAuthCreds): CrmConn
     refreshToken: (rt) => refreshAccessToken(meta, creds ?? envCreds(provider), rt),
     testConnection: (ctx) => adapter.testConnection(ctx),
     pushClosedDeal: (ctx, deal) => adapter.pushClosedDeal(ctx, deal),
+    // activity-sync pair — present only when the adapter implements it (HubSpot today)
+    ensureContact: adapter.ensureContact
+      ? (ctx, contact) => adapter.ensureContact!(ctx, contact)
+      : undefined,
+    logActivity: adapter.logActivity
+      ? (ctx, input) => adapter.logActivity!(ctx, input)
+      : undefined,
   };
 }
 

@@ -59,6 +59,8 @@ export interface ConnectorMeta {
   fields: FieldDescriptor[];
   /** destination target the user picks post-connect */
   targets: TargetField[];
+  /** the destination can log LinkedIn touches onto a contact timeline (activity sync) */
+  supportsActivitySync?: boolean;
 }
 
 // Normalized, provider-agnostic closed-won payload. No DB or vendor types leak in.
@@ -76,10 +78,37 @@ export interface ClosedDeal {
   dealValueCents: number;
   closedAt: string; // ISO
   source: string; // label, e.g. "Vantera"
+  /** journey context written to the destination as a note alongside the push (score, why-now,
+   *  origin). Optional; a note failure never fails the push — the deal is already created. */
+  context?: {
+    score?: number | null;
+    whyNow?: string | null;
+    /** where the lead entered the funnel, e.g. "intent" */
+    origin?: string | null;
+  };
   config: {
     mapping?: FieldMapping;
     target?: Record<string, string>;
   };
+}
+
+// A pre-close contact stub for activity sync — just enough to find-or-create the person in
+// the destination before any deal exists.
+export interface ContactStub {
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  title?: string;
+  company?: string;
+  linkedinUrl?: string;
+}
+
+// One LinkedIn touch rendered for the destination's timeline (activity sync). The body is
+// pre-rendered by the pipeline so adapters stay dumb pipes.
+export interface ActivityLogInput {
+  contactId: string;
+  body: string;
+  occurredAt: string; // ISO
 }
 
 export interface TokenSet {
@@ -99,6 +128,16 @@ export interface ProviderAdapter {
     deal: ClosedDeal
   ): Promise<ConnectorResult<{ externalRef?: string }>>;
   testConnection(ctx: ConnectorCtx): Promise<ConnectorResult<{ detail?: string }>>;
+  /** find-or-create a contact pre-close (activity sync). Optional — HubSpot-only today. */
+  ensureContact?(
+    ctx: ConnectorCtx,
+    contact: ContactStub
+  ): Promise<ConnectorResult<{ contactId: string }>>;
+  /** append one rendered touch to the contact's timeline (activity sync). Optional. */
+  logActivity?(
+    ctx: ConnectorCtx,
+    input: ActivityLogInput
+  ): Promise<ConnectorResult<{ externalRef?: string }>>;
 }
 
 export interface ConnectorCtx {
@@ -146,4 +185,13 @@ export interface CrmConnector {
     ctx: ConnectorCtx,
     query: { email?: string; domain?: string }
   ): Promise<ConnectorResult<CrmContactLookup>>;
+  // optional activity-sync pair (present when the destination supports timeline logging)
+  ensureContact?(
+    ctx: ConnectorCtx,
+    contact: ContactStub
+  ): Promise<ConnectorResult<{ contactId: string }>>;
+  logActivity?(
+    ctx: ConnectorCtx,
+    input: ActivityLogInput
+  ): Promise<ConnectorResult<{ externalRef?: string }>>;
 }

@@ -5,6 +5,7 @@ import { tasks } from "@trigger.dev/sdk";
 import { createClient } from "@/lib/supabase/server";
 import { optionalDollarsToCents } from "@/lib/validation";
 import type { ClosedDeal } from "@vantera/crm-infra";
+import { leadSignalLine, type LeadSignalView } from "./lead-value";
 
 export type LeadCrmActionState = { error?: string; success?: string };
 
@@ -19,6 +20,10 @@ interface LeadRow {
   company_domain: string | null;
   deal_value_cents: number | null;
   closed_at: string | null;
+  source: string | null;
+  ai_score: number | null;
+  ai_insights: { triggers?: string[]; pain_points?: string[] } | null;
+  lead_signals: LeadSignalView[] | null;
 }
 
 async function resolveAccountId(
@@ -44,7 +49,7 @@ async function loadLead(
   const { data } = await supabase
     .from("leads")
     .select(
-      "id, first_name, last_name, email, phone, title, company_name, company_domain, deal_value_cents, closed_at"
+      "id, first_name, last_name, email, phone, title, company_name, company_domain, deal_value_cents, closed_at, source, ai_score, ai_insights, lead_signals(kind, label, detail, observed_at)"
     )
     .eq("id", leadId)
     .maybeSingle<LeadRow>();
@@ -66,6 +71,12 @@ function buildClosedDeal(lead: LeadRow): ClosedDeal {
     dealValueCents: lead.deal_value_cents ?? 0,
     closedAt: lead.closed_at ?? new Date().toISOString(),
     source: "Vantera",
+    // Journey context → the note written next to the deal (why-now, score, origin).
+    context: {
+      score: lead.ai_score,
+      whyNow: leadSignalLine(lead.lead_signals, lead.ai_insights),
+      origin: lead.source,
+    },
     config: {},
   };
 }

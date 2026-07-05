@@ -9,7 +9,7 @@ import {
   getConnectorMeta,
   type CrmProvider,
 } from "@vantera/crm-infra";
-import { validateProvider, validateConnectionConfig } from "./validation";
+import { validateProvider, validateConnectionConfig, nextActivityConfig, type ActivityConfig } from "./validation";
 
 export type IntegrationActionState = { error?: string; success?: string };
 
@@ -151,13 +151,61 @@ export async function saveConnectionConfig(
   if (!parsed.ok) return { error: parsed.error };
 
   const supabase = await createClient();
+  // Merge over the existing config — replacing it wholesale would silently wipe keys other
+  // features own (activity sync settings, the OAuth state).
+  const { data: row } = await supabase
+    .from("crm_connections")
+    .select("config")
+    .eq("id", id)
+    .maybeSingle<{ config: Record<string, unknown> }>();
+  if (!row) return { error: "Connection not found." };
+
   const { error } = await supabase
     .from("crm_connections")
-    .update({ config: parsed.values })
+    .update({ config: { ...row.config, ...parsed.values } })
     .eq("id", id);
   if (error) return { error: "Could not save settings. Try again shortly." };
   revalidatePath(PATH);
   return { success: "Settings saved." };
+}
+
+// ── Activity sync (timeline notes) ────────────────────────────────────────────────
+// Opt-in per connection: LinkedIn touches (outreach, replies, meetings) are logged onto
+// the destination's contact timeline by the sync pipeline. Fresh enables start from NOW —
+// history is never imported (see nextActivityConfig).
+export async function saveActivitySync(
+  _prev: IntegrationActionState,
+  formData: FormData
+): Promise<IntegrationActionState> {
+  const id = String(formData.get("connectionId") ?? "");
+  if (!id) return { error: "Missing connection." };
+
+  const supabase = await createClient();
+  const { data: row } = await supabase
+    .from("crm_connections")
+    .select("config")
+    .eq("id", id)
+    .maybeSingle<{ config: Record<string, unknown> & { activity?: Partial<ActivityConfig> } }>();
+  if (!row) return { error: "Connection not found." };
+
+  const activity = nextActivityConfig(row.config?.activity, {
+    enabled: formData.get("enabled") === "on",
+    outreach: formData.get("events.outreach") === "on",
+    replies: formData.get("events.replies") === "on",
+    meetings: formData.get("events.meetings") === "on",
+  });
+
+  const { error } = await supabase
+    .from("crm_connections")
+    .update({ config: { ...row.config, activity } })
+    .eq("id", id);
+  if (error) return { error: "Could not save activity sync. Try again shortly." };
+  revalidatePath(PATH);
+  return {
+    success: activity.enabled
+      ? "Activity sync on — touches from now on will appear on the contact timeline."
+      : "Activity sync off.",
+  };
 }
 
 // ── Toggle auto-push ──────────────────────────────────────────────────────────────
