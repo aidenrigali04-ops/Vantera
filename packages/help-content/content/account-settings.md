@@ -11,6 +11,14 @@ routes: /settings
 - **Average value per client** — the recurring monthly revenue one closed client is worth. Optional, but setting it powers the Revenue snapshot on your dashboard (closed and projected MRR against your goal). Leave it blank to track client counts only.
 - **Team** — who's in your workspace. Invites are coming soon.
 
+## Weekly summary email
+
+Every Monday, workspace owners and admins get a one-screen recap of what the agents did that week: outreach sent, replies, meetings booked, in-market leads surfaced, leads qualified, and your pipeline value against the revenue goal.
+
+- A **quiet week** (agents live, nothing landed yet) sends a short note so you know the system is running.
+- A **dead week** (no activity and no live agents) sends nothing at all.
+- Turn it off (or back on) under **Settings → Notifications** — one toggle, admins only.
+
 ## Deleting your workspace
 
 In the danger zone, type your workspace name to confirm deletion. The workspace is then **scheduled for permanent deletion after a 7-day grace period** — during those 7 days an admin can cancel from the same screen. Requesting deletion **immediately pauses all your agents and freezes outreach**, so nothing keeps running (or using up your plan) while the workspace winds down; canceling un-freezes outreach, and you re-enable agents from the Agents page. After the grace period, all workspace data is permanently erased, your connected LinkedIn account is disconnected, and data held by our processing partners is removed.

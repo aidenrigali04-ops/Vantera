@@ -59,6 +59,27 @@ export async function updateWorkspace(
   return { saved: true };
 }
 
+// Monday recap email opt-out (0042). One boolean, admins only via the accounts RLS
+// update policy + the column grant.
+export async function setWeeklySummary(
+  _prev: SettingsState,
+  formData: FormData
+): Promise<SettingsState> {
+  const next = formData.get("enabled") === "true";
+
+  const supabase = await createClient();
+  const { data: account } = await supabase.from("accounts").select("id").limit(1).maybeSingle();
+  if (!account) return { error: "No workspace found." };
+
+  const { error } = await supabase
+    .from("accounts")
+    .update({ weekly_summary_enabled: next })
+    .eq("id", account.id); // RLS: admins only
+  if (error) return { error: "Could not save. Only workspace admins can change this." };
+  revalidatePath("/settings");
+  return { saved: true };
+}
+
 export async function requestAccountDeletion(
   _prev: SettingsState,
   formData: FormData

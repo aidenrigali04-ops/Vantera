@@ -7,6 +7,7 @@ import { getGateData } from "@/lib/auth/context";
 import { matchMemberEmails } from "./team/validation";
 import { ProfileForm } from "./profile-form";
 import { WorkspaceForm } from "./workspace-form";
+import { WeeklySummaryToggle } from "./notifications-form";
 import { DangerZone } from "./danger-zone";
 
 function SettingsLink({ title, body, href, cta }: { title: string; body: string; href: string; cta: string }) {
@@ -26,8 +27,13 @@ export default async function SettingsPage() {
   if (!user || !account) return null; // layout gate guarantees this; satisfies TS
 
   const supabase = await createClient();
-  const [{ data: profile }, { data: members }, { data: deletionRequest }, { data: acceptedInvites }] =
-    await Promise.all([
+  const [
+    { data: profile },
+    { data: members },
+    { data: deletionRequest },
+    { data: acceptedInvites },
+    { data: prefs },
+  ] = await Promise.all([
       supabase.from("user_profiles").select("display_name").maybeSingle(),
       supabase.from("account_members").select("user_id, role, created_at").eq("account_id", account.id),
       supabase
@@ -44,6 +50,11 @@ export default async function SettingsPage() {
         .eq("account_id", account.id)
         .eq("status", "accepted")
         .returns<{ email: string; accepted_at: string | null }[]>(),
+      supabase
+        .from("accounts")
+        .select("weekly_summary_enabled")
+        .eq("id", account.id)
+        .maybeSingle<{ weekly_summary_enabled: boolean }>(),
     ]);
   const emailById = matchMemberEmails(members ?? [], acceptedInvites ?? []);
 
@@ -92,6 +103,11 @@ export default async function SettingsPage() {
         <Button asChild variant="outline" size="sm" className="w-fit">
           <Link href="/settings/team">Manage team</Link>
         </Button>
+      </Panel>
+
+      <Panel className="flex flex-col gap-4">
+        <h2 className="font-heading text-base font-semibold">Notifications</h2>
+        <WeeklySummaryToggle enabled={prefs?.weekly_summary_enabled ?? true} />
       </Panel>
 
       <SettingsLink

@@ -23,6 +23,7 @@
     "@vantera/db": "workspace:*",
     "@vantera/linkedin-infra": "workspace:*",
     "@vantera/prospect-data": "workspace:*",
+    "@vantera/transactional-email": "workspace:*",
     "drizzle-orm": "^0.45.0"
   },
   "devDependencies": {

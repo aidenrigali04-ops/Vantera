@@ -53,6 +53,7 @@ import type {
   CrmActivityStore,
   LeadActivityEvent,
 } from "./crm-activity-sync";
+import type { WeeklySummaryRow, WeeklySummaryStore } from "./weekly-summary";
 import {
   SCOUT_DEFAULTS,
   type ConversionStore,
@@ -1961,6 +1962,114 @@ export function createCrmActivityStore(db: Db): CrmActivityStore {
         .update(crmConnections)
         .set({ status: "error", lastError: error })
         .where(eq(crmConnections.id, connectionId));
+    },
+  };
+}
+
+// ── Weekly summary (0042) ────────────────────────────────────────────────────────
+
+const WEEKLY_QUALIFIED_MIN_SCORE = 70; // rule 06 default bar
+const ACTIVE_PIPELINE_STATUSES = ["qualified", "enriched", "in_campaign", "replied"] as const;
+
+/** Drizzle implementation of the weekly-summary store. Service-role db; recipients come
+ *  from auth.users via raw SQL (the auth schema isn't modeled in Drizzle) — owner/admin
+ *  emails only, never exposed to clients. */
+export function createWeeklySummaryStore(db: Db): WeeklySummaryStore {
+  return {
+    async listAccountsForSummary(start, end): Promise<WeeklySummaryRow[]> {
+      const accountRows = await db
+        .select({
+          id: accounts.id,
+          name: accounts.name,
+          enabled: accounts.weeklySummaryEnabled,
+          goalCents: accounts.revenueGoalCents,
+          avgDealValueCents: accounts.avgDealValueCents,
+        })
+        .from(accounts);
+
+      const inWindow = (col: Parameters<typeof gt>[0]) => and(gt(col, start), lte(col, end));
+
+      const [liveAgents, sends, replyCounts, meetings, intent, qualified, activePipeline] =
+        await Promise.all([
+          db
+            .select({ accountId: agents.accountId, n: count() })
+            .from(agents)
+            .where(eq(agents.status, "live"))
+            .groupBy(agents.accountId),
+          db
+            .select({ accountId: outreachSends.accountId, n: count() })
+            .from(outreachSends)
+            .where(inWindow(outreachSends.sentAt))
+            .groupBy(outreachSends.accountId),
+          db
+            .select({ accountId: replies.accountId, n: count() })
+            .from(replies)
+            .where(inWindow(replies.receivedAt))
+            .groupBy(replies.accountId),
+          db
+            .select({ accountId: leads.accountId, n: count() })
+            .from(leads)
+            .where(and(eq(leads.status, "converted"), inWindow(leads.closedAt)))
+            .groupBy(leads.accountId),
+          db
+            .select({ accountId: leads.accountId, n: count() })
+            .from(leads)
+            .where(and(eq(leads.source, "intent"), inWindow(leads.createdAt)))
+            .groupBy(leads.accountId),
+          db
+            .select({ accountId: leads.accountId, n: count() })
+            .from(leads)
+            .where(and(gte(leads.aiScore, WEEKLY_QUALIFIED_MIN_SCORE), inWindow(leads.scoredAt)))
+            .groupBy(leads.accountId),
+          db
+            .select({ accountId: leads.accountId, n: count() })
+            .from(leads)
+            .where(inArray(leads.status, [...ACTIVE_PIPELINE_STATUSES]))
+            .groupBy(leads.accountId),
+        ]);
+
+      // Owner + admin emails per account, straight from auth (service-role only).
+      const recipientRows = await db.execute<{ account_id: string; email: string | null }>(sql`
+        select m.account_id, u.email
+        from public.account_members m
+        join auth.users u on u.id = m.user_id
+        where m.role in ('owner', 'admin')
+      `);
+
+      const byAccount = <T extends { accountId: string; n: number }>(rows: T[]) =>
+        new Map(rows.map((r) => [r.accountId, r.n]));
+      const liveMap = byAccount(liveAgents);
+      const sentMap = byAccount(sends);
+      const replyMap = byAccount(replyCounts);
+      const meetingMap = byAccount(meetings);
+      const intentMap = byAccount(intent);
+      const qualifiedMap = byAccount(qualified);
+      const pipelineMap = byAccount(activePipeline);
+      const recipientMap = new Map<string, string[]>();
+      for (const r of recipientRows) {
+        if (!r.email) continue;
+        const list = recipientMap.get(r.account_id) ?? [];
+        list.push(r.email);
+        recipientMap.set(r.account_id, list);
+      }
+
+      return accountRows.map((a) => ({
+        accountId: a.id,
+        accountName: a.name,
+        weeklySummaryEnabled: a.enabled,
+        liveAgents: liveMap.get(a.id) ?? 0,
+        sent: sentMap.get(a.id) ?? 0,
+        replies: replyMap.get(a.id) ?? 0,
+        meetings: meetingMap.get(a.id) ?? 0,
+        intentLeads: intentMap.get(a.id) ?? 0,
+        qualified: qualifiedMap.get(a.id) ?? 0,
+        pipelineValueCents:
+          a.avgDealValueCents && a.avgDealValueCents > 0
+            ? (pipelineMap.get(a.id) ?? 0) * a.avgDealValueCents
+            : null,
+        goalCents: a.goalCents,
+        recipients: recipientMap.get(a.id) ?? [],
+      }));
     },
   };
 }
