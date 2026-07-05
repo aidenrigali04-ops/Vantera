@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { INVITE_EXPIRY_DAYS, runSendDispatch } from "./send-dispatch";
+import { INVITE_EXPIRY_DAYS, MIN_LEAD_MESSAGE_GAP_MS, runSendDispatch } from "./send-dispatch";
 import { TRIAL_SEND_CAP } from "./types";
 import type { DispatchSender, DispatchableSend, SendDispatchDeps, SendDispatchStore } from "./types";
 
@@ -14,12 +14,15 @@ function makeSend(overrides: Partial<DispatchableSend> = {}): DispatchableSend {
     channel: "linkedin",
     linkedinStage: "invite",
     status: "approved",
+    createdAt: new Date("2026-06-01T00:00:00Z"),
     accountPaused: false,
     campaignStatus: "active",
     leadInvitedAt: null,
     leadConnectedAt: null,
     leadAssignedSenderId: null,
     subscriptionStatus: "active",
+    leadLastMessageSentAt: null,
+    leadRepliedAt: null,
     ...overrides,
   };
 }
@@ -512,5 +515,90 @@ describe("runSendDispatch — multi-sender distribution", () => {
 
     expect(result.scheduled).toBe(0);
     expect(result.skipped).toBe(1);
+  });
+});
+
+// ─── per-lead message gating (backlog can never burst a prospect) ────────────
+
+describe("runSendDispatch — per-lead message gating", () => {
+  const NOW = new Date("2026-07-04T12:00:00Z");
+  const connected = new Date("2026-07-04T10:00:00Z");
+
+  it("cancels stale duplicate messages for a lead and schedules only the newest", async () => {
+    const store = new FakeDispatchStore();
+    store.sends = [
+      makeSend({
+        id: "old1", linkedinStage: "message", leadConnectedAt: connected,
+        leadAssignedSenderId: "li1", createdAt: new Date("2026-06-30T08:10:00Z"),
+      }),
+      makeSend({
+        id: "old2", linkedinStage: "message", leadConnectedAt: connected,
+        leadAssignedSenderId: "li1", createdAt: new Date("2026-06-30T08:15:00Z"),
+      }),
+      makeSend({
+        id: "newest", linkedinStage: "message", leadConnectedAt: connected,
+        leadAssignedSenderId: "li1", createdAt: new Date("2026-07-04T09:00:00Z"),
+      }),
+    ];
+    const deps = { ...makeDeps(store), now: () => NOW };
+
+    const result = await runSendDispatch(deps);
+
+    expect(result.scheduled).toBe(1);
+    expect(result.canceled).toBe(2);
+    expect(store.scheduled.map((s) => s.sendId)).toEqual(["newest"]);
+    expect(store.canceled.map((c) => c.sendId).sort()).toEqual(["old1", "old2"]);
+  });
+
+  it("parks a proactive message when the last delivered message is inside the per-lead gap", async () => {
+    const store = new FakeDispatchStore();
+    store.sends = [
+      makeSend({
+        id: "s1", linkedinStage: "message", leadConnectedAt: connected,
+        leadAssignedSenderId: "li1",
+        leadLastMessageSentAt: new Date(NOW.getTime() - MIN_LEAD_MESSAGE_GAP_MS / 2),
+      }),
+    ];
+    const deps = { ...makeDeps(store), now: () => NOW };
+
+    const result = await runSendDispatch(deps);
+
+    expect(result.scheduled).toBe(0);
+    expect(result.skipped).toBe(1);
+  });
+
+  it("lets a reply-answering message through the gap (the lead's reply resets the clock)", async () => {
+    const store = new FakeDispatchStore();
+    const lastSent = new Date(NOW.getTime() - 30 * 60_000);
+    store.sends = [
+      makeSend({
+        id: "reply1", linkedinStage: "message", leadConnectedAt: connected,
+        leadAssignedSenderId: "li1",
+        leadLastMessageSentAt: lastSent,
+        leadRepliedAt: new Date(lastSent.getTime() + 5 * 60_000), // they replied after our message
+      }),
+    ];
+    const deps = { ...makeDeps(store), now: () => NOW };
+
+    const result = await runSendDispatch(deps);
+
+    expect(result.scheduled).toBe(1);
+    expect(store.scheduled.map((s) => s.sendId)).toEqual(["reply1"]);
+  });
+
+  it("dispatches a proactive message once the delivered gap has fully elapsed", async () => {
+    const store = new FakeDispatchStore();
+    store.sends = [
+      makeSend({
+        id: "s1", linkedinStage: "message", leadConnectedAt: connected,
+        leadAssignedSenderId: "li1",
+        leadLastMessageSentAt: new Date(NOW.getTime() - MIN_LEAD_MESSAGE_GAP_MS - 60_000),
+      }),
+    ];
+    const deps = { ...makeDeps(store), now: () => NOW };
+
+    const result = await runSendDispatch(deps);
+
+    expect(result.scheduled).toBe(1);
   });
 });

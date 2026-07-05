@@ -439,6 +439,7 @@ describe("runInbound — active responder (converse to close)", () => {
     thread: [],
     agentTurns: 0,
     hasUnsentMessage: false,
+    lastAgentMessageAt: null,
     ...over,
   });
 

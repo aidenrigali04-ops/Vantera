@@ -420,10 +420,17 @@ export interface DispatchableSend {
   channel: "linkedin";
   linkedinStage: "invite" | "message" | null;
   status: "approved" | "scheduled";
+  createdAt: Date;
   accountPaused: boolean;
   campaignStatus: string;
   leadInvitedAt: Date | null;
   leadConnectedAt: Date | null;
+  /** When the last agent MESSAGE to this lead actually delivered — drives the per-lead
+   *  proactive gap so a drained backlog can never land two messages minutes apart. */
+  leadLastMessageSentAt: Date | null;
+  /** When the lead last replied. A reply after our last message exempts the gap — answering
+   *  a prospect promptly is human behavior; a second proactive nudge minutes later is not. */
+  leadRepliedAt: Date | null;
   /** Multi-sender: the LinkedIn account already assigned to this lead (rule 04/13).
    *  Null until first invite — invites without one are assigned here; a connected
    *  lead's messages are LOCKED to this account (can't message from another). */
@@ -598,6 +605,10 @@ export interface ResponderBundle {
   agentTurns: number;
   /** a reply is already queued/in-flight for this lead — don't double-message */
   hasUnsentMessage: boolean;
+  /** when the last agent message to this lead actually DELIVERED (null = never messaged) —
+   *  proactive touches keep a minimum delivery-time gap so a held backlog can't collapse
+   *  the cadence into a burst */
+  lastAgentMessageAt: Date | null;
 }
 
 export interface InboundDeps {

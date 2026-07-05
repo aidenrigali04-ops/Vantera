@@ -8,6 +8,11 @@ import type {
   SequenceTouchOutcome,
 } from "./types";
 
+/** Minimum time since the previous message actually DELIVERED before a proactive touch may be
+ *  drafted. A floor, not the cadence — sequence-config's touchGapDays governs normal spacing;
+ *  this only stops a drained backlog from collapsing that spacing into a burst. */
+export const MIN_TOUCH_GAP_HOURS = 24;
+
 /**
  * Draft and insert ONE LinkedIn follow-up touch for the orchestrator. The suppression re-check at
  * this boundary is the rule-11 send-path gate: it runs BEFORE any draft or insert, so a suppressed
@@ -46,6 +51,25 @@ export async function runSequenceTouch(
   // agent or no insights to ground a message → skip rather than send something cold/generic.
   const bundle = await deps.store.getResponderBundle(d.accountId, d.leadId, d.campaignId);
   if (!bundle) return "skipped";
+
+  // Never stack: if ANY message for this lead is still queued/in-flight (the first-touch
+  // follow-up parked on acceptance, an unapproved draft, a scheduled touch), drafting another
+  // would (a) pile messages that later drain as a burst and (b) write against a thread that
+  // can't see the unsent one — the "reads like a second cold intro" failure. Same guard the
+  // reply responder uses; skipping loses this touch (consistent with every skip here), and the
+  // cadence's next touch still comes with full context.
+  if (bundle.hasUnsentMessage) return "skipped";
+
+  // Delivery-time cadence floor: touchGapDays paces when touches are DRAFTED, but after a hold
+  // (unhealthy sender, unaccepted invite) the backlog drains fast and draft-time spacing means
+  // nothing. Never draft a proactive touch until the previous message has been delivered for
+  // at least this long — a prospect must never get two nudges in the same sitting.
+  if (
+    bundle.lastAgentMessageAt !== null &&
+    deps.now().getTime() - bundle.lastAgentMessageAt.getTime() < MIN_TOUCH_GAP_HOURS * 3_600_000
+  ) {
+    return "skipped";
+  }
 
   // Proactive follow-up: no incoming reply → the brain writes a fresh nudge that builds on the thread.
   const followupInput = {

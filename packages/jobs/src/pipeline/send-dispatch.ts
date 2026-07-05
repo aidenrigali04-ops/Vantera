@@ -11,6 +11,10 @@ import {
 export const INVITE_EXPIRY_DAYS = 30;
 export const STALE_TASK_MINUTES = 30;
 const BASE_GAP_MS = 15 * 60_000; // ~human pacing between sends per sender account
+/** Per-LEAD floor between proactive messages (rule 04): after a hold drains, a prospect must
+ *  never get two nudges in the same sitting. A reply from the lead AFTER our last message
+ *  exempts the gap — answering promptly is human; a second unprompted nudge minutes later is not. */
+export const MIN_LEAD_MESSAGE_GAP_MS = 24 * 3_600_000;
 
 function seedFrom(id: string): number {
   let h = 0;
@@ -102,6 +106,18 @@ export async function runSendDispatch(deps: SendDispatchDeps): Promise<SendDispa
       trialRemaining -= 1;
     };
 
+    // Per-lead message gating (rule 04 pacing survives a drained backlog):
+    // if the queue holds several message rows for one lead (stacked while sends were held),
+    // only the NEWEST is real — older ones were drafted blind to it and read as duplicate
+    // cold intros, so they cancel rather than linger and fire later.
+    const newestMessageByLead = new Map<string, DispatchableSend>();
+    for (const row of lis) {
+      if (row.linkedinStage !== "message") continue;
+      const cur = newestMessageByLead.get(row.leadId);
+      if (!cur || row.createdAt > cur.createdAt) newestMessageByLead.set(row.leadId, row);
+    }
+    const messagedLeads = new Set<string>(); // one message per lead per run, belt-and-braces
+
     for (const row of lis) {
       if (trialRemaining <= 0) {
         skipped += 1; // trial ceiling reached mid-run
@@ -109,6 +125,28 @@ export async function runSendDispatch(deps: SendDispatchDeps): Promise<SendDispa
       }
 
       if (row.linkedinStage === "message") {
+        if (newestMessageByLead.get(row.leadId)?.id !== row.id) {
+          await deps.store.cancelSend(row.id, "superseded by a newer queued message for this lead");
+          canceled += 1;
+          continue;
+        }
+        if (messagedLeads.has(row.leadId)) {
+          skipped += 1; // a message for this lead is already going out this run
+          continue;
+        }
+        // Proactive gap: the last delivered message must be MIN_LEAD_MESSAGE_GAP_MS old —
+        // unless the lead replied after it (their reply resets the conversation clock).
+        const repliedSince =
+          row.leadRepliedAt !== null &&
+          (row.leadLastMessageSentAt === null || row.leadRepliedAt > row.leadLastMessageSentAt);
+        if (
+          !repliedSince &&
+          row.leadLastMessageSentAt !== null &&
+          now.getTime() - row.leadLastMessageSentAt.getTime() < MIN_LEAD_MESSAGE_GAP_MS
+        ) {
+          skipped += 1; // too soon after the last delivered message — wait for the gap
+          continue;
+        }
         if (!row.leadConnectedAt) {
           const invitedMs = row.leadInvitedAt ? now.getTime() - row.leadInvitedAt.getTime() : 0;
           if (row.leadInvitedAt && invitedMs > INVITE_EXPIRY_DAYS * 86_400_000) {
@@ -126,6 +164,7 @@ export async function runSendDispatch(deps: SendDispatchDeps): Promise<SendDispa
           continue;
         }
         st.messageBudget -= 1;
+        messagedLeads.add(row.leadId);
         await schedule(row, st);
         continue;
       }

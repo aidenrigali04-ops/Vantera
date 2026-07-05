@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { runSequenceTouch } from "./sequence-touch";
+import { MIN_TOUCH_GAP_HOURS, runSequenceTouch } from "./sequence-touch";
 import type { ResponderBundle, SequenceTouchDeps, SequenceTouchDispatch } from "./types";
 
 const NOW = new Date("2026-06-15T00:00:00Z");
@@ -35,6 +35,7 @@ const bundle = (over: Partial<ResponderBundle> = {}): ResponderBundle => ({
   thread: [{ role: "agent", text: "Thanks for connecting, Sam." }],
   agentTurns: 1,
   hasUnsentMessage: false,
+  lastAgentMessageAt: null,
   ...over,
 });
 
@@ -154,6 +155,45 @@ describe("runSequenceTouch", () => {
     await runSequenceTouch(dispatch, d);
     expect(fixFn).not.toHaveBeenCalled();
     expect(insert).toHaveBeenCalledWith(expect.objectContaining({ status: "pending_review" }));
+  });
+
+  it("never stacks: skips the touch while ANY message for the lead is still queued/in-flight", async () => {
+    const insert = vi.fn(async () => {});
+    const draftFn = vi.fn(async () => ({ message: "unused", violations: [] }));
+    const d = deps(
+      { getResponderBundle: async () => bundle({ hasUnsentMessage: true }), insertScheduledSend: insert },
+      "ok",
+      [],
+      draftFn
+    );
+    const out = await runSequenceTouch(dispatch, d);
+    expect(out).toBe("skipped");
+    expect(draftFn).not.toHaveBeenCalled();
+    expect(insert).not.toHaveBeenCalled();
+  });
+
+  it("delivery-time floor: skips a touch drafted within MIN_TOUCH_GAP_HOURS of the last delivered message", async () => {
+    const insert = vi.fn(async () => {});
+    const draftFn = vi.fn(async () => ({ message: "unused", violations: [] }));
+    const recent = new Date(NOW.getTime() - (MIN_TOUCH_GAP_HOURS - 1) * 3_600_000);
+    const d = deps(
+      { getResponderBundle: async () => bundle({ lastAgentMessageAt: recent }), insertScheduledSend: insert },
+      "ok",
+      [],
+      draftFn
+    );
+    const out = await runSequenceTouch(dispatch, d);
+    expect(out).toBe("skipped");
+    expect(draftFn).not.toHaveBeenCalled();
+  });
+
+  it("drafts normally once the delivered gap has elapsed", async () => {
+    const insert = vi.fn(async () => {});
+    const old = new Date(NOW.getTime() - (MIN_TOUCH_GAP_HOURS + 1) * 3_600_000);
+    const d = deps({ getResponderBundle: async () => bundle({ lastAgentMessageAt: old }), insertScheduledSend: insert });
+    const out = await runSequenceTouch(dispatch, d);
+    expect(out).toBe("drafted");
+    expect(insert).toHaveBeenCalled();
   });
 
   it("skips when there is no conversation context (no live Outreach agent / no insights)", async () => {

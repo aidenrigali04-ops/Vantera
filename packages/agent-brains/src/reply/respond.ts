@@ -50,7 +50,7 @@ const RESPOND_SYSTEM = `You are the seller, continuing a 1:1 LinkedIn conversati
 You are mid-conversation, NOT introducing yourself. The thread so far is given; build on it. NEVER restart, NEVER re-introduce yourself ("Wanted to connect", "Saw you reacted to…"), NEVER repeat a point you already made.
 
 Reply mode (the prospect just sent a message): directly address what they actually said — answer their question, acknowledge their point or objection — then move ONE step toward the CTA goal.
-Follow-up mode (the prospect hasn't replied yet): send a brief, natural nudge that adds a NEW angle or a light reason to respond. Do not guilt-trip ("just following up", "circling back").
+Follow-up mode (the prospect hasn't replied yet): CONTINUE the conversation your last message started — write as the same person picking the thread back up, presuming they read it. Build directly on your last message's angle (deepen it, add one concrete detail, or ask the question it implied) rather than opening an unrelated new pitch; a follow-up that ignores what you already said reads as a second cold intro. Do not guilt-trip ("just following up", "circling back"), do not re-state your offer from scratch, and never repeat a hook you already used in the thread.
 
 Rules for every message:
 - KEEP IT SHORT: 1-2 sentences, under ${CONVERSATION_REPLY_MAX_CHARS} characters. Brevity earns replies; cut every word not pulling weight.
@@ -97,7 +97,7 @@ export async function draftConversationMessage(
       ]
     : [
         `The prospect hasn't replied to your last message yet.`,
-        `Write a short, natural follow-up that builds on the thread above — a new angle or light nudge, never a repeat or a re-introduction.`,
+        `Write a short, natural follow-up that CONTINUES the thread above — pick up from your own last message (deepen its angle, add one concrete detail, or ask the question it implied). Assume they read it. Never a repeat, never a re-introduction, never a fresh pitch that ignores what you already said.`,
       ];
   const prompt = [block, ``, `Conversation so far:`, renderThread(input.thread), ``, ...situation].join("\n");
 

@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gte, inArray, isNotNull, isNull, lt, lte, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, inArray, isNotNull, isNull, lt, lte, max, or, sql } from "drizzle-orm";
 import {
   accountDeletionRequests,
   accountMembers,
@@ -831,6 +831,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           leadInvitedAt: leads.linkedinInvitedAt,
           leadConnectedAt: leads.linkedinConnectedAt,
           leadAssignedSenderId: leads.linkedinAccountId,
+          createdAt: scheduledSends.createdAt,
         })
         .from(scheduledSends)
         .innerJoin(accounts, eq(scheduledSends.accountId, accounts.id))
@@ -842,6 +843,36 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
             and(eq(scheduledSends.status, "scheduled"), lt(scheduledSends.scheduledFor, staleCutoff))
           )
         );
+
+      // Per-lead delivery facts for the message-stage rows (batched, two grouped queries):
+      // when the last agent message DELIVERED and when the lead last REPLIED. These drive the
+      // dispatcher's per-lead proactive gap (rule 04 pacing survives a drained backlog).
+      const messageLeadIds = [
+        ...new Set(rows.filter((r) => r.linkedinStage === "message").map((r) => r.leadId)),
+      ];
+      const lastSentByLead = new Map<string, Date>();
+      const lastReplyByLead = new Map<string, Date>();
+      if (messageLeadIds.length > 0) {
+        const sentAgg = await db
+          .select({ leadId: scheduledSends.leadId, at: max(scheduledSends.updatedAt) })
+          .from(scheduledSends)
+          .where(
+            and(
+              inArray(scheduledSends.leadId, messageLeadIds),
+              eq(scheduledSends.linkedinStage, "message"),
+              eq(scheduledSends.status, "sent")
+            )
+          )
+          .groupBy(scheduledSends.leadId);
+        for (const r of sentAgg) if (r.at) lastSentByLead.set(r.leadId, r.at);
+        const replyAgg = await db
+          .select({ leadId: replies.leadId, at: max(replies.receivedAt) })
+          .from(replies)
+          .where(inArray(replies.leadId, messageLeadIds))
+          .groupBy(replies.leadId);
+        for (const r of replyAgg) if (r.leadId && r.at) lastReplyByLead.set(r.leadId, r.at);
+      }
+
       return rows.map((r) => ({
         id: r.id,
         accountId: r.accountId,
@@ -850,12 +881,15 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         channel: r.channel as "linkedin",
         linkedinStage: r.linkedinStage as "invite" | "message" | null,
         status: r.status as "approved" | "scheduled",
+        createdAt: r.createdAt,
         accountPaused: r.accountPaused,
         campaignStatus: r.campaignStatus,
         leadInvitedAt: r.leadInvitedAt,
         leadConnectedAt: r.leadConnectedAt,
         leadAssignedSenderId: r.leadAssignedSenderId,
         subscriptionStatus: r.subscriptionStatus,
+        leadLastMessageSentAt: lastSentByLead.get(r.leadId) ?? null,
+        leadRepliedAt: lastReplyByLead.get(r.leadId) ?? null,
       }));
     },
 
@@ -1158,7 +1192,11 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
 
       // Running thread: delivered agent messages + the lead's replies, merged oldest-first.
       const sent = await db
-        .select({ body: scheduledSends.body, at: scheduledSends.createdAt })
+        .select({
+          body: scheduledSends.body,
+          at: scheduledSends.createdAt,
+          deliveredAt: scheduledSends.updatedAt, // markSent stamps updated_at ⇒ delivery-time proxy
+        })
         .from(scheduledSends)
         .where(
           and(
@@ -1179,6 +1217,12 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         .filter((t) => t.text.trim() !== "")
         .sort((a, b) => a.at.getTime() - b.at.getTime())
         .map(({ role, text }) => ({ role, text }));
+
+      // Delivery time of the most recent agent message — the proactive-touch gap floor.
+      const lastAgentMessageAt = sent.reduce<Date | null>(
+        (max, r) => (max === null || r.deliveredAt > max ? r.deliveredAt : max),
+        null
+      );
 
       // A message-stage reply already queued/in-flight ⇒ don't double-message.
       const [pending] = await db
@@ -1216,6 +1260,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         thread,
         agentTurns: sent.length,
         hasUnsentMessage: Boolean(pending),
+        lastAgentMessageAt,
       };
     },
 
