@@ -35,7 +35,7 @@ For HubSpot, you can go further than closed deals: **Log LinkedIn activity to th
 - **The contact is created early.** With activity sync on, the HubSpot contact is created at the first synced touch — before the deal closes. If you prefer contacts to appear only when deals close, leave activity sync off; closed-won pushing works either way.
 - **Choose what syncs.** Three checkboxes — outreach sent, replies received, meetings booked — control which touches are logged.
 - **One contact per lead.** Vantera remembers which HubSpot contact belongs to each lead, so repeat touches never create duplicates.
-- Connected HubSpot before activity sync existed? **Reconnect once** to grant the note permission if syncing reports an authorization error.
+- Connected HubSpot before activity sync existed? **Reconnect once** to grant the updated permissions if syncing reports an authorization error.
 
 Closed-won pushes also carry a short **journey note** onto the contact — the fit score, the "why now" buying signal, and whether the lead came from LinkedIn buying intent — so your team sees why the deal happened, right in the CRM.
 

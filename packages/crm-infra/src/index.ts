@@ -36,13 +36,17 @@ export const CONNECTOR_REGISTRY: Record<CrmProvider, ConnectorMeta> = {
     kind: "crm",
     label: "HubSpot",
     blurb: "Creates the contact and a won deal in your HubSpot pipeline on close.",
-    // notes.write powers activity sync (timeline notes). Connections authorized before it
-    // was added need a one-click reconnect to grant it.
+    // Requested scopes must EXACTLY match the app's requiredScopes (src/app/app-hsmeta.json)
+    // or HubSpot rejects authorization with "error validating the app authorization".
+    // contacts.read backs the dedupe/search + testConnection calls. There is NO granular
+    // notes scope in HubSpot OAuth — contact-associated notes (activity sync + the journey
+    // note) are covered by crm.objects.contacts.write. Connections authorized before
+    // contacts.read was requested need a one-click reconnect.
     oauthScopes: [
       "oauth",
+      "crm.objects.contacts.read",
       "crm.objects.contacts.write",
       "crm.objects.deals.write",
-      "crm.objects.notes.write",
     ],
     authorizeEndpoint: "https://app.hubspot.com/oauth/authorize",
     tokenEndpoint: "https://api.hubapi.com/oauth/v1/token",

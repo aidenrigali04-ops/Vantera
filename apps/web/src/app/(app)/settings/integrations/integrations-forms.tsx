@@ -224,8 +224,8 @@ function ActivitySyncPanel({
       <FormError message={state.error} />
       {activity.enabled && (
         <p className="pl-7 text-xs text-muted-foreground">
-          Connected {meta.label} before activity sync existed? Reconnect once to grant the note
-          permission if syncing reports an authorization error.
+          Connected {meta.label} before activity sync existed? Reconnect once to grant the updated
+          permissions if syncing reports an authorization error.
         </p>
       )}
     </form>

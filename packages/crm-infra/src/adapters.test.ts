@@ -204,10 +204,15 @@ describe("HubSpot adapter", () => {
     if (!limited.ok) expect(limited.retryable).toBe(true);
   });
 
-  it("declares activity-sync support in the registry (scope + flag)", async () => {
+  it("declares activity-sync support in the registry (flag + the scopes the wire calls need)", async () => {
     const meta = getConnector("hubspot").meta;
     expect(meta.supportsActivitySync).toBe(true);
-    expect(meta.oauthScopes).toContain("crm.objects.notes.write");
+    // the dedupe search + testConnection are READ calls — without this scope HubSpot 403s
+    expect(meta.oauthScopes).toContain("crm.objects.contacts.read");
+    // contact-associated notes are covered by contacts.write (no granular notes scope
+    // exists in HubSpot OAuth — requesting one fails app validation)
+    expect(meta.oauthScopes).toContain("crm.objects.contacts.write");
+    expect(meta.oauthScopes.join(" ")).not.toContain("notes");
   });
 });
 
