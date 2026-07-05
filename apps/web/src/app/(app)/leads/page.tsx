@@ -97,8 +97,10 @@ export default async function LeadsPage({
   return (
     // Data surface: fluid width (rule 07 width doctrine) — the table gets the screen,
     // with a guard so ultrawide monitors don't stretch rows past scannability.
-    <div className="mx-auto w-full max-w-[1680px]">
-      <div className="mb-6 border-b border-[var(--hairline)] pb-5">
+    // One-screen on desktop (same contract as the lead brief): the PAGE never scrolls —
+    // header/tabs/toolbar/pagination stay pinned, the table body scrolls internally.
+    <div className="mx-auto flex w-full max-w-[1680px] flex-col lg:h-[calc(100dvh-3rem)]">
+      <div className="mb-6 shrink-0 border-b border-[var(--hairline)] pb-5">
         <h1 className="text-2xl font-semibold tracking-tight">Leads</h1>
         <p className="mt-1.5 text-sm text-muted-foreground">
           Every prospect your agents sourced, with the reasoning behind each score.
@@ -107,7 +109,7 @@ export default async function LeadsPage({
 
       {/* Segmented control (matches the Results tabs) — one bordered track, active is a raised
           white segment. Replaces the old full-pill tabs. */}
-      <div className="mb-5" data-copilot="leads-tabs">
+      <div className="mb-5 shrink-0" data-copilot="leads-tabs">
         <div className="inline-flex flex-wrap items-center gap-1 rounded-xl border border-[var(--hairline)] bg-[var(--tint)] p-1 text-sm">
           {TABS.map((t) => {
             const isActive = tab.key === t.key;
@@ -181,7 +183,7 @@ export default async function LeadsPage({
             sort={sort}
           />
           {totalPages > 1 && (
-            <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
+            <div className="mt-4 flex shrink-0 items-center justify-between text-sm text-muted-foreground">
               <span>
                 Page {page} of {totalPages} · {count} leads
               </span>

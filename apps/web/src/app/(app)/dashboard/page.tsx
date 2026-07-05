@@ -26,16 +26,20 @@ export default async function DashboardPage({
 }) {
   const view = resolveView((await searchParams).view);
   return (
-    <>
+    // One-screen on desktop: the tabs bar stays pinned and the PAGE never scrolls —
+    // the active view scrolls inside its own region only when its content overflows.
+    <div className="flex flex-col lg:h-[calc(100dvh-3rem)]">
       <ResultsTabsBar active={view} />
-      {view === "analytics" ? (
-        <AnalyticsSection />
-      ) : view === "pipeline" ? (
-        <PipelineSection />
-      ) : (
-        <OverviewTab />
-      )}
-    </>
+      <div className="min-h-0 flex-1 lg:overflow-y-auto">
+        {view === "analytics" ? (
+          <AnalyticsSection />
+        ) : view === "pipeline" ? (
+          <PipelineSection />
+        ) : (
+          <OverviewTab />
+        )}
+      </div>
+    </div>
   );
 }
 

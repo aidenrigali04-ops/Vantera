@@ -96,3 +96,10 @@ hierarchy; full saturation is reserved for meaning: status (the two-hue grade), 
 elements (cyan), wins (`--positive`), attention (amber). Never decorative color.
 
 Reference implementation: `apps/web/src/app/(app)/leads/page.tsx` + `leads-table.tsx`.
+
+**One-screen shells (2026-07-05).** App pages are one-screen on desktop: the page wrapper is
+`flex flex-col lg:h-[calc(100dvh-3rem)]`, the header/tabs/toolbars are `shrink-0`, and the
+content sits in ONE `min-h-0 flex-1 lg:overflow-y-auto` region — the PAGE never scrolls; only
+the data region does (mobile keeps natural flow). Sticky table headers stick to that region's
+top. Settings/wizard forms are exempt (focused surfaces). Reference: `leads/page.tsx` +
+`dashboard/page.tsx` + the lead brief.

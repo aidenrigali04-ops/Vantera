@@ -41,14 +41,17 @@ export default async function AgentsPage({
     ]);
 
   return (
-    <div className="mx-auto w-full max-w-[1400px]">
-      <div className="mb-6 border-b border-[var(--hairline)] pb-5">
+    // One-screen on desktop: the page never scrolls — content scrolls in its own region.
+    <div className="mx-auto flex w-full max-w-[1400px] flex-col lg:h-[calc(100dvh-3rem)]">
+      <div className="mb-6 shrink-0 border-b border-[var(--hairline)] pb-5">
         <h1 className="text-2xl font-semibold tracking-tight">Your system</h1>
         <p className="mt-1.5 text-sm text-muted-foreground">
           Set it up once. Your pipeline finds and qualifies the right people on LinkedIn, then your
           relationship layer turns every qualified prospect into a conversation.
         </p>
       </div>
+
+      <div className="min-h-0 flex-1 lg:overflow-y-auto">
 
       {updated && (
         <Panel className="mb-6">
@@ -169,6 +172,7 @@ export default async function AgentsPage({
           )}
         </div>
       )}
+      </div>
     </div>
   );
 }

@@ -284,16 +284,11 @@ export function LeadsTable({
   };
 
   return (
-    <>
-      <HotNowStrip
-        hotLeads={hotLeads}
-        onSelect={open}
-        avgDealValueCents={avgDealValueCents}
-        goalCents={goalCents}
-      />
-
+    // Fills the page's one-screen column: toolbar pinned, the region below scrolls
+    // internally (the Hot strip scrolls away with it; the thead sticks to the region top).
+    <div className="flex min-h-0 flex-1 flex-col">
       {/* Toolbar — search on the left, density on the right; one quiet row, no panel chrome. */}
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+      <div className="mb-3 flex shrink-0 flex-wrap items-center justify-between gap-3">
         <form action="/leads" method="get" role="search" className="relative">
           {tab !== "all" && <input type="hidden" name="tab" value={tab} />}
           {sort !== "newest" && <input type="hidden" name="sort" value={sort} />}
@@ -335,8 +330,17 @@ export function LeadsTable({
         </div>
       </div>
 
-      {/* No overflow-hidden on the container: it would break the sticky header. The thead carries
-          its own solid bg + top rounding instead. */}
+      {/* The internal scroll region — the page stays put; only this scrolls. */}
+      <div className="min-h-0 flex-1 lg:overflow-y-auto">
+      <HotNowStrip
+        hotLeads={hotLeads}
+        onSelect={open}
+        avgDealValueCents={avgDealValueCents}
+        goalCents={goalCents}
+      />
+
+      {/* No overflow-hidden on the table container itself: it would break the sticky header.
+          The thead carries its own solid bg + top rounding instead. */}
       <div className="rounded-xl border border-[var(--hairline)] bg-white" data-copilot="leads-table">
         <table className="w-full text-sm">
           <thead className="sticky top-0 z-10 text-left text-[11px] uppercase tracking-wide text-muted-foreground">
@@ -439,6 +443,7 @@ export function LeadsTable({
           </tbody>
         </table>
       </div>
+      </div>
 
       {/* Side peek — work a lead without losing your place in the list; the full brief is one
           click deeper. Same shared profiler as the dashboard prospects (never a second code path). */}
@@ -451,6 +456,6 @@ export function LeadsTable({
           fullProfileHref={`/leads/${peek.id}`}
         />
       )}
-    </>
+    </div>
   );
 }

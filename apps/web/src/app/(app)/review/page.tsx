@@ -151,8 +151,9 @@ export default async function ReviewPage({
   };
 
   return (
-    <div className="mx-auto max-w-3xl">
-      <div className="mb-6 border-b border-[var(--hairline)] pb-5">
+    // One-screen on desktop: header + view tabs pinned; the queue scrolls in its own region.
+    <div className="mx-auto flex w-full max-w-3xl flex-col lg:h-[calc(100dvh-3rem)]">
+      <div className="mb-6 shrink-0 border-b border-[var(--hairline)] pb-5">
         <h1 className="text-2xl font-semibold tracking-tight">Review queue</h1>
         <p className="mt-1.5 text-sm text-muted-foreground">
           {view === "queue"
@@ -163,7 +164,7 @@ export default async function ReviewPage({
         </p>
       </div>
 
-      <div className="mb-5">
+      <div className="mb-5 shrink-0">
         <div className="inline-flex items-center gap-1 rounded-xl border border-[var(--hairline)] bg-[var(--tint)] p-1 text-sm">
           {VIEWS.map((v) => {
             const isActive = view === v;
@@ -185,6 +186,8 @@ export default async function ReviewPage({
           })}
         </div>
       </div>
+
+      <div className="min-h-0 flex-1 lg:overflow-y-auto">
 
       {!rows || rows.length === 0 ? (
         <Panel className="flex flex-col items-center gap-3 border-dashed py-10 text-center">
@@ -228,6 +231,7 @@ export default async function ReviewPage({
           ))}
         </div>
       )}
+      </div>
     </div>
   );
 }

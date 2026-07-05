@@ -30,14 +30,17 @@ export function SequenceBuilder({
   const [state, action, pending] = useActionState<SequenceState, FormData>(saveSequenceConfig, {});
 
   return (
-    <div className="mx-auto max-w-3xl">
-      <div className="mb-6 border-b border-[var(--hairline)] pb-5">
+    // One-screen on desktop: header pinned; the form scrolls in its own region if it overflows.
+    <div className="mx-auto flex w-full max-w-3xl flex-col lg:h-[calc(100dvh-3rem)]">
+      <div className="mb-6 shrink-0 border-b border-[var(--hairline)] pb-5">
         <h1 className="text-2xl font-semibold tracking-tight">The flow every lead runs</h1>
         <p className="mt-1.5 text-sm text-muted-foreground">
           {config.stages.linkedin.touches} LinkedIn touches — a connection request, then personalized
           follow-ups — and it stops the instant a lead books.
         </p>
       </div>
+
+      <div className="min-h-0 flex-1 lg:overflow-y-auto">
 
       {!hasCampaign && (
         <Panel className="mb-4 flex items-center justify-between gap-3 p-4">
@@ -76,6 +79,7 @@ export function SequenceBuilder({
           {state.error && <span className="text-sm text-muted-foreground">{state.error}</span>}
         </div>
       </form>
+      </div>
     </div>
   );
 }

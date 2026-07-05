@@ -20,7 +20,7 @@ export function resolveView(v: string | undefined): ResultsView {
 
 export function ResultsTabsBar({ active }: { active: ResultsView }) {
   return (
-    <div className="mx-auto mb-6 flex w-full max-w-[1400px]" data-copilot="results-tabs">
+    <div className="mx-auto mb-6 flex w-full max-w-[1400px] shrink-0" data-copilot="results-tabs">
       {/* Segmented control (Stripe/Vercel idiom) — a single bordered track; the active view is a
           raised white segment. Replaces the old full-pill tabs. */}
       <div className="inline-flex items-center gap-1 rounded-xl border border-[var(--hairline)] bg-[var(--tint)] p-1">
