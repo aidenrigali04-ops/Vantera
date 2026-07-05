@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Clock, ExternalLink, Mail, Phone } from "lucide-react";
+import { ArrowLeft, Clock, ExternalLink } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getGateData } from "@/lib/auth/context";
 import { Badge } from "@/components/ui/badge";
@@ -11,9 +11,6 @@ import { cn } from "@/lib/utils";
 import {
   coolingState,
   dataFreshness,
-  humanizeEmailStatus,
-  humanizePhoneStatus,
-  isVerified,
   leadSignalLine,
   projectedRevenue,
   scoreVerdict,
@@ -401,32 +398,10 @@ export default async function LeadProfilePage({ params }: { params: Promise<{ id
               <Field label="Industry">{lead.industry ?? "—"}</Field>
               <Field label="Location">{lead.location ?? "—"}</Field>
             </div>
-            <div className="mt-4 space-y-2 border-t border-[var(--hairline)] pt-3">
-              {lead.email ? (
-                <p className="flex items-center gap-2 text-sm">
-                  <Mail className="size-4 shrink-0 text-muted-foreground" />
-                  <span className="truncate">{lead.email}</span>
-                  {lead.email_status && (
-                    <Badge variant={isVerified(lead.email_status) ? "default" : "secondary"}>
-                      {humanizeEmailStatus(lead.email_status)}
-                    </Badge>
-                  )}
-                </p>
-              ) : (
-                <p className="text-sm text-muted-foreground">No email yet</p>
-              )}
-              {lead.phone && (
-                <p className="flex items-center gap-2 text-sm">
-                  <Phone className="size-4 shrink-0 text-muted-foreground" />
-                  <span>{lead.phone}</span>
-                  {lead.phone_status && (
-                    <Badge variant={isVerified(lead.phone_status) ? "default" : "secondary"}>
-                      {humanizePhoneStatus(lead.phone_status)}
-                    </Badge>
-                  )}
-                </p>
-              )}
-              {lead.linkedin_url && (
+            {/* LinkedIn-only platform: the profile link is the contact surface — email/phone
+                stay internal (CRM-push dedupe data), never product UI. */}
+            {lead.linkedin_url && (
+              <div className="mt-4 border-t border-[var(--hairline)] pt-3">
                 <a
                   href={lead.linkedin_url}
                   target="_blank"
@@ -435,8 +410,8 @@ export default async function LeadProfilePage({ params }: { params: Promise<{ id
                 >
                   LinkedIn profile <ExternalLink className="size-3" />
                 </a>
-              )}
-            </div>
+              </div>
+            )}
             {techStack.length > 0 && (
               <div className="mt-4 border-t border-[var(--hairline)] pt-3">
                 <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Tech stack</p>

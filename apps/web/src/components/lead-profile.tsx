@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowRight, Clock, ExternalLink, Mail, X } from "lucide-react";
+import { ArrowRight, Clock, ExternalLink, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { LeadCrmControls } from "@/components/lead-crm-controls";
@@ -230,42 +230,21 @@ export function LeadProfileSheet({
             </section>
           )}
 
-          <section className="space-y-2">
-            <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Verified contact</p>
-            {lead.email ? (
-              <p className="flex items-center gap-2 text-sm">
-                <Mail className="size-4 text-muted-foreground" />
-                <span className="truncate">{lead.email}</span>
-                {lead.email_status && (
-                  <Badge variant={lead.email_status === "valid" ? "default" : "secondary"}>
-                    {lead.email_status}
-                  </Badge>
-                )}
-              </p>
-            ) : (
-              <p className="text-sm text-muted-foreground">No email yet</p>
-            )}
-            {lead.phone && (
-              <p className="flex items-center gap-2 text-sm">
-                <span>{lead.phone}</span>
-                {lead.phone_status && (
-                  <Badge variant={lead.phone_status === "valid" ? "default" : "secondary"}>
-                    {lead.phone_status}
-                  </Badge>
-                )}
-              </p>
-            )}
-            {lead.linkedin_url && (
+          {/* LinkedIn-only platform: the prospect's profile link is the contact surface —
+              email/phone stay internal (CRM-push dedupe data), never product UI. */}
+          {lead.linkedin_url && (
+            <section>
+              <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">LinkedIn</p>
               <a
                 href={lead.linkedin_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-1 text-sm underline underline-offset-2"
+                className="mt-2 flex items-center gap-1 text-sm underline underline-offset-2"
               >
                 LinkedIn profile <ExternalLink className="size-3" />
               </a>
-            )}
-          </section>
+            </section>
+          )}
 
           {lead.id && <LeadCrmControls leadId={lead.id} status={lead.status} />}
         </div>

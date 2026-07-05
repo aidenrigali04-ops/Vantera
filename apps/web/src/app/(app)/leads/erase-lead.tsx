@@ -25,8 +25,8 @@ export function EraseLead({ leadId, onErased }: { leadId: string; onErased: () =
   return (
     <div className="space-y-2.5 rounded-lg border border-destructive/30 bg-destructive/5 p-3">
       <p className="text-xs text-muted-foreground">
-        Permanently erase this prospect and all of their data. Their email and LinkedIn are added to
-        your suppression list so they&rsquo;re never contacted again. This can&rsquo;t be undone.
+        Permanently erase this prospect and all of their data. They&rsquo;re added to your
+        suppression list so no agent ever contacts them again. This can&rsquo;t be undone.
       </p>
       {error && <p className="text-xs text-destructive">{error}</p>}
       <div className="flex gap-2">

@@ -14,7 +14,7 @@ Each lead carries a fit verdict at a glance — Hot lead, Strong fit, or Worth a
 
 You can **search** the list by name, company, or title, sort by **Score** (click the column header; click again to go back to newest first), and switch the table between comfortable and compact row density — it remembers your choice.
 
-Click any lead to open a **quick side panel** — the score and rationale, why-now signal, worth toward your goal, pain points and buying triggers, and verified contact details — without losing your place in the list. From there, **Open full profile** takes you to the complete brief: "Your opening" with the angle most likely to land, the full activity timeline, and deal controls. Leads that didn't fit are under "Filtered out", each with the reasons.
+Click any lead to open a **quick side panel** — the score and rationale, why-now signal, worth toward your goal, pain points and buying triggers, and their LinkedIn profile — without losing your place in the list. From there, **Open full profile** takes you to the complete brief: "Your opening" with the angle most likely to land, the full activity timeline, and deal controls. Leads that didn't fit are under "Filtered out", each with the reasons.
 
 When a newly qualified lead carries a fresh, high-value signal — a funding round, an executive hire, an acquisition, or active buying intent — you'll get a **hot-signal notification** in the bell, so you can pounce while the timing is right.
 

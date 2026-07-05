@@ -2,7 +2,7 @@
 
 import { useState, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { ArrowDown, Flame, Mail, Phone, Rows3, Search, Snowflake, UserPlus, Zap } from "lucide-react";
+import { ArrowDown, Flame, Rows3, Search, Snowflake, Zap } from "lucide-react";
 import { PANEL_SURFACE, Eyebrow } from "@/components/ui/panel";
 import { ScoreBadge, SourceBadge, WhyNowLine } from "@/components/lead-why-now";
 import { LeadProfileSheet } from "@/components/lead-profile";
@@ -193,13 +193,6 @@ function HotNowStrip({
                 </p>
               ) : null;
             })()}
-            <span className="mt-auto flex gap-1.5 pt-1 text-muted-foreground">
-              <Mail className={cn("size-4", lead.email ? "text-foreground" : "text-muted-foreground/30")} />
-              <UserPlus
-                className={cn("size-4", lead.linkedin_url ? "text-foreground" : "text-muted-foreground/30")}
-              />
-              <Phone className={cn("size-4", lead.phone ? "text-foreground" : "text-muted-foreground/30")} />
-            </span>
           </button>
         ))}
       </div>
@@ -365,9 +358,8 @@ export function LeadsTable({
                 </Link>
               </Th>
               <Th className="hidden xl:table-cell">Worth</Th>
-              <Th className="hidden lg:table-cell">Last activity</Th>
-              <Th last className="text-right">
-                Channels
+              <Th last className="hidden lg:table-cell">
+                Last activity
               </Th>
             </tr>
           </thead>
@@ -440,28 +432,6 @@ export function LeadsTable({
                     ) : (
                       <span className="text-muted-foreground/40">—</span>
                     )}
-                  </td>
-                  <td className={cn("px-4", cellY)}>
-                    <span className="flex justify-end gap-1.5">
-                      <Mail
-                        className={cn(
-                          "size-4",
-                          lead.email ? "text-foreground" : "text-muted-foreground/30"
-                        )}
-                      />
-                      <UserPlus
-                        className={cn(
-                          "size-4",
-                          lead.linkedin_url ? "text-foreground" : "text-muted-foreground/30"
-                        )}
-                      />
-                      <Phone
-                        className={cn(
-                          "size-4",
-                          lead.phone ? "text-foreground" : "text-muted-foreground/30"
-                        )}
-                      />
-                    </span>
                   </td>
                 </tr>
               );
