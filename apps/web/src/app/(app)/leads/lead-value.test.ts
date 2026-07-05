@@ -5,6 +5,7 @@ import {
   humanizeEmailStatus,
   humanizePhoneStatus,
   isVerified,
+  lastActivity,
   leadSignalLine,
   projectedRevenue,
   scoreVerdict,
@@ -13,6 +14,35 @@ import {
   COOLING_DAYS,
   FRESHNESS_STALE_DAYS,
 } from "./lead-value";
+
+describe("lastActivity", () => {
+  const now = new Date("2026-06-16T12:00:00Z");
+
+  it("prefers the latest reply over scoring and sourcing", () => {
+    expect(
+      lastActivity("2026-06-14T12:00:00Z", "2026-06-10T12:00:00Z", "2026-06-01T12:00:00Z", now)
+    ).toEqual({ kind: "reply", label: "Replied 2d ago" });
+  });
+
+  it("falls back to the scoring pass when no reply has landed", () => {
+    expect(lastActivity(null, "2026-06-16T09:00:00Z", "2026-06-01T12:00:00Z", now)).toEqual({
+      kind: "scored",
+      label: "Researched today",
+    });
+  });
+
+  it("falls back to sourcing when the lead was never scored", () => {
+    expect(lastActivity(null, null, "2026-05-16T12:00:00Z", now)).toEqual({
+      kind: "sourced",
+      label: "Sourced 4w ago",
+    });
+  });
+
+  it("returns null when nothing is dated (never fabricates a timestamp)", () => {
+    expect(lastActivity(null, null, null, now)).toBeNull();
+    expect(lastActivity("not-a-date", null, null, now)).toBeNull();
+  });
+});
 
 describe("scoreVerdict", () => {
   it("tiers a score into a felt verdict", () => {

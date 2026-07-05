@@ -61,3 +61,38 @@ The source of truth for breathing room on **focused, single-task surfaces** (aut
 - Beam color = the page's particle palette. Onboarding/auth use the warm sunset sweep (`#FFCC1A → #FF730D → #EB291C`), passed via the `gradient` prop (`PARTICLE_BEAM`). The component default stays the auth orange/magenta/violet; pass `gradient` to match a surface's particles.
 
 Reference implementation: `apps/web/src/app/onboarding/wizard.tsx` + `apps/web/src/components/ui/animated-border.tsx`.
+
+## Data-surface doctrine (locked 2026-07-04)
+
+**The surface is the unit of work, never the existing container** (owner directive 2026-07-04 —
+UI changes must not stay "within the small box"; grounded in the Attio/Linear/enterprise-table
+research in the 2026-07-04 market+UI plan).
+
+**Width**
+- Data surfaces (Leads, lead brief, Results/Analytics/Pipeline, Agents) are **fluid**:
+  `mx-auto w-full` + a scannability guard — `max-w-[1680px]` for full tables (Leads),
+  `max-w-[1560px]` for the lead brief, `max-w-[1400px]` for mixed panel/KPI surfaces.
+  Never a `max-w-5xl`-class cap on a data surface.
+- Focused, single-task surfaces (auth, wizards, settings forms, modals) **keep their caps** and
+  the spacing scale above — whitespace lowers perceived effort there, and only there.
+
+**One border level per region.** A table or board sits in ONE `rounded-xl` hairline container —
+never a card inside a card. Nested boxes are the visual root of cramped UI.
+
+**Tables**
+- Sticky `thead` (`sticky top-0 z-10`; solid `bg-[var(--tint)]` on the header cells with the top
+  corners rounded on the cells). **Never `overflow-hidden` on the table container** — it kills the
+  sticky header.
+- Header cells 11px uppercase tracking-wide muted; body `text-sm`; every number `font-data`
+  tabular. Row hover is mandatory (`hover:bg-[var(--cyan-tint)]/50`) — eyes track rows across
+  wide tables.
+- Row click opens the shared side-peek profiler (`components/lead-profile.tsx`) — never a full
+  navigation from a scan surface. The full-page brief is the peek's pinned footer link.
+- Row density (comfortable `py-3` / compact `py-1.5`, localStorage-persisted) on any table
+  expected to exceed ~25 rows.
+
+**Color on data surfaces (the Linear rule).** Neutral text/icons at 40–60% opacity carry the
+hierarchy; full saturation is reserved for meaning: status (the two-hue grade), interactive
+elements (cyan), wins (`--positive`), attention (amber). Never decorative color.
+
+Reference implementation: `apps/web/src/app/(app)/leads/page.tsx` + `leads-table.tsx`.

@@ -41,7 +41,7 @@ export function AnalyticsView({
   outreach,
 }: Props) {
   return (
-    <div className="mx-auto max-w-5xl">
+    <div className="mx-auto w-full max-w-[1400px]">
       <header className="mb-6 border-b border-[var(--hairline)] pb-5">
         <h1 className="font-heading text-2xl font-semibold tracking-tight">Analytics</h1>
         <p className="mt-1.5 text-sm text-muted-foreground">

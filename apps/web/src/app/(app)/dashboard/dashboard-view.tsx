@@ -102,7 +102,7 @@ export function DashboardView(props: DashboardViewProps) {
 
   return (
     <MotionConfig reducedMotion="user">
-    <div className="mx-auto flex max-w-5xl flex-col gap-6">
+    <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-6">
       {/* Header — eyebrow + display heading in the landing idiom */}
       <motion.header
         initial={{ opacity: 0, y: 20 }}

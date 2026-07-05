@@ -252,7 +252,7 @@ export default async function LeadProfilePage({ params }: { params: Promise<{ id
   return (
     // One-screen brief: the page itself never scrolls on desktop (viewport minus the
     // shell's py-6); a column scrolls internally only if its real data overflows.
-    <div className="mx-auto flex w-full max-w-6xl flex-col lg:h-[calc(100dvh-3rem)]">
+    <div className="mx-auto flex w-full max-w-[1560px] flex-col lg:h-[calc(100dvh-3rem)]">
       <header className="shrink-0">
         <Link
           href="/leads"
