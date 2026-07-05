@@ -395,6 +395,9 @@ export interface OutreachSendStore {
     messageRef: string | null;
   }): Promise<void>;
   setLeadInvited(leadId: string, at: Date): Promise<void>;
+  /** Persist the prospect's member provider_id resolved at send time — the reply-attribution
+   *  key inbound webhooks match on (0043). Idempotent overwrite. */
+  saveLeadProviderRef(leadId: string, providerRef: string): Promise<void>;
   setCampaignLeadStatus(campaignId: string, leadId: string, status: "queued" | "suppressed" | "skipped" | "sent"): Promise<void>;
 }
 
@@ -549,6 +552,14 @@ export interface InboundStore {
     displayName: string | null;
   }): Promise<void>;
   findLeadByLinkedInUrl(accountId: string, normalizedUrl: string): Promise<{ id: string; campaignId: string | null } | null>;
+  /** PRIMARY reply-attribution lookup: the member provider_id captured at send time (0043). */
+  findLeadByProviderRef(accountId: string, providerRef: string): Promise<{ id: string; campaignId: string | null } | null>;
+  /** Unique-name fallback among leads we actually contacted (invited or beyond). Exact
+   *  case-insensitive full-name match; return at most 2 rows — the caller only matches
+   *  when the name is unambiguous. */
+  findContactedLeadsByName(accountId: string, name: string): Promise<Array<{ id: string; campaignId: string | null }>>;
+  /** Backfill/refresh the provider ref whenever any match succeeds (self-healing key). */
+  saveLeadProviderRef(leadId: string, providerRef: string): Promise<void>;
   insertReply(r: {
     accountId: string;
     leadId: string;
@@ -557,7 +568,7 @@ export interface InboundStore {
     providerMessageRef: string | null;
     body: string;
     receivedAt: Date;
-  }): Promise<string>;
+  }): Promise<{ id: string; created: boolean }>;
   setReplyClassification(replyId: string, verdict: ReplyVerdict): Promise<void>;
   addSuppression(
     accountId: string,

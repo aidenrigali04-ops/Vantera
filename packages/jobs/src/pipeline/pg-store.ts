@@ -1138,6 +1138,52 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
       return { id: leadId, campaignId: cl?.campaignId ?? null };
     },
 
+    async findLeadByProviderRef(accountId: string, providerRef: string) {
+      const [row] = await db
+        .select({ id: leads.id })
+        .from(leads)
+        .where(and(eq(leads.accountId, accountId), eq(leads.linkedinProviderRef, providerRef)))
+        .limit(1);
+      if (!row) return null;
+      const [cl] = await db
+        .select({ campaignId: campaignLeads.campaignId })
+        .from(campaignLeads)
+        .where(eq(campaignLeads.leadId, row.id))
+        .limit(1);
+      return { id: row.id, campaignId: cl?.campaignId ?? null };
+    },
+
+    async findContactedLeadsByName(accountId: string, name: string) {
+      // Unique-or-bust: at most 2 rows so the caller can tell "unique" from "ambiguous".
+      // Contacted = the lead has been invited (or beyond) — a stranger with the same name
+      // as an uncontacted prospect can never claim their reply.
+      const rows = await db
+        .select({ id: leads.id })
+        .from(leads)
+        .where(
+          and(
+            eq(leads.accountId, accountId),
+            isNotNull(leads.linkedinInvitedAt),
+            sql`lower(btrim(concat_ws(' ', ${leads.firstName}, ${leads.lastName}))) = lower(btrim(${name}))`
+          )
+        )
+        .limit(2);
+      const out: Array<{ id: string; campaignId: string | null }> = [];
+      for (const r of rows) {
+        const [cl] = await db
+          .select({ campaignId: campaignLeads.campaignId })
+          .from(campaignLeads)
+          .where(eq(campaignLeads.leadId, r.id))
+          .limit(1);
+        out.push({ id: r.id, campaignId: cl?.campaignId ?? null });
+      }
+      return out;
+    },
+
+    async saveLeadProviderRef(leadId: string, providerRef: string) {
+      await db.update(leads).set({ linkedinProviderRef: providerRef }).where(eq(leads.id, leadId));
+    },
+
     async insertReply(r: {
       accountId: string;
       leadId: string;
@@ -1147,9 +1193,31 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
       body: string;
       receivedAt: Date;
     }) {
-      const [row] = await db.insert(replies).values(r).returning({ id: replies.id });
-      if (!row) throw new Error("failed to insert reply");
-      return row.id;
+      // Idempotent on (account_id, provider_message_ref) — 0043 partial unique index. A
+      // provider retry or the stored-event replay lands on the existing row (created: false)
+      // so downstream effects (notification, responder) never double-fire.
+      const [row] = await db
+        .insert(replies)
+        .values(r)
+        .onConflictDoNothing({
+          target: [replies.accountId, replies.providerMessageRef],
+          where: sql`provider_message_ref is not null`,
+        })
+        .returning({ id: replies.id });
+      if (row) return { id: row.id, created: true };
+      if (!r.providerMessageRef) throw new Error("failed to insert reply");
+      const [existing] = await db
+        .select({ id: replies.id })
+        .from(replies)
+        .where(
+          and(
+            eq(replies.accountId, r.accountId),
+            eq(replies.providerMessageRef, r.providerMessageRef)
+          )
+        )
+        .limit(1);
+      if (!existing) throw new Error("failed to insert reply");
+      return { id: existing.id, created: false };
     },
 
     async setReplyClassification(replyId: string, verdict: import("@vantera/agent-brains").ReplyVerdict) {

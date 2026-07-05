@@ -99,6 +99,32 @@ function senderProfileUrl(p: Record<string, unknown>): string | null {
   return senderProviderId ? profileUrlFromId(senderProviderId) : null;
 }
 
+/**
+ * The SENDER attendee record from a `message_received` payload — the same resolution walk
+ * senderProfileUrl does, returned whole so identity fields (provider id, public identifier,
+ * name) come from one place and can't disagree with the URL.
+ */
+function senderAttendee(p: Record<string, unknown>): Record<string, unknown> | null {
+  const sender = (p.sender ?? {}) as Record<string, unknown>;
+  const attendees: Record<string, unknown>[] = Array.isArray(p.attendees)
+    ? (p.attendees as Record<string, unknown>[])
+    : [];
+  const senderProviderId = str(sender.attendee_provider_id);
+  const senderAttendeeId = str(sender.attendee_id);
+  for (const a of attendees) {
+    const matchesProvider = senderProviderId && str(a.attendee_provider_id) === senderProviderId;
+    const matchesAttendee = senderAttendeeId && str(a.attendee_id) === senderAttendeeId;
+    if (matchesProvider || matchesAttendee) return a;
+  }
+  if (senderProviderId || senderAttendeeId || str(sender.attendee_name)) return sender;
+  const ownProviderId = str((p.account_info as Record<string, unknown> | undefined)?.user_id);
+  return (
+    attendees.find(
+      (a) => str(a.attendee_provider_id) && str(a.attendee_provider_id) !== ownProviderId
+    ) ?? null
+  );
+}
+
 /** Resolve the new connection's profile URL from a `new_relation` payload across Unipile encodings. */
 function relationProfileUrl(p: Record<string, unknown>): string | null {
   const user = (p.user ?? {}) as Record<string, unknown>;
@@ -354,7 +380,11 @@ export class UnipileLinkedInInfra implements LinkedInInfra {
     // The invitation_id is proof the invite was sent; sent_at is informational and Unipile does not
     // always echo it. Fall back to our own clock rather than throwing — otherwise a delivered invite
     // gets caught downstream and marked failed (the "provider response missing sent_at" false-fail).
-    return { id: requireString(data.invitation_id, "invitation_id"), sentAt: str(data.sent_at) ?? new Date().toISOString() };
+    return {
+      id: requireString(data.invitation_id, "invitation_id"),
+      sentAt: str(data.sent_at) ?? new Date().toISOString(),
+      prospectProviderRef: providerId,
+    };
   }
 
   async sendMessage(req: MessageRequest): Promise<SendOutcome> {
@@ -371,7 +401,11 @@ export class UnipileLinkedInInfra implements LinkedInInfra {
       }),
     });
     // Same as sendInvite: the message_id proves delivery; a missing sent_at must not throw.
-    return { id: requireString(data.message_id, "message_id"), sentAt: str(data.sent_at) ?? new Date().toISOString() };
+    return {
+      id: requireString(data.message_id, "message_id"),
+      sentAt: str(data.sent_at) ?? new Date().toISOString(),
+      prospectProviderRef: providerId,
+    };
   }
 
   /**
@@ -418,11 +452,18 @@ export class UnipileLinkedInInfra implements LinkedInInfra {
         const body = str(p.message);
         const receivedAt = str(p.timestamp);
         if (!fromProfileUrl || !body || !receivedAt) return null;
+        // Every identity handle the payload carries: attendee_profile_url is the
+        // /in/<provider_id> form (NOT the vanity URL leads store), so the provider id +
+        // public identifier + name ride along for the pipeline's layered lead matching.
+        const who = senderAttendee(p);
         return {
           type: "reply",
           providerEventId: eventId,
           connectedAccountRef,
           fromProfileUrl,
+          fromProviderRef: str(who?.attendee_provider_id),
+          fromPublicIdentifier: str(who?.attendee_public_identifier),
+          fromName: str(who?.attendee_name),
           body,
           receivedAt,
         };
@@ -430,6 +471,7 @@ export class UnipileLinkedInInfra implements LinkedInInfra {
       case "new_relation": {
         const profileUrl = relationProfileUrl(p);
         if (!profileUrl) return null;
+        const user = (p.user ?? {}) as Record<string, unknown>;
         // No natural id on relation events: synthesize a stable key so provider retries dedupe
         // (one acceptance per account↔profile pair) without colliding distinct acceptances.
         return {
@@ -437,6 +479,15 @@ export class UnipileLinkedInInfra implements LinkedInInfra {
           providerEventId: `relation:${connectedAccountRef}:${profileUrl}`,
           connectedAccountRef,
           profileUrl,
+          fromProviderRef: str(p.user_provider_id) ?? str(user.provider_id),
+          fromPublicIdentifier: str(p.user_public_identifier) ?? str(user.public_identifier),
+          fromName:
+            str(p.user_full_name) ??
+            str(user.name) ??
+            ([str(p.user_first_name) ?? str(user.first_name), str(p.user_last_name) ?? str(user.last_name)]
+              .filter(Boolean)
+              .join(" ") ||
+              null),
         };
       }
       case "account_status": {

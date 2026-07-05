@@ -197,7 +197,11 @@ describe("UnipileLinkedInInfra", () => {
         profileUrl: "https://linkedin.com/in/janedoe",
         note: "Hi Jane",
       });
-      expect(result).toEqual({ id: "inv_abc", sentAt: "2026-06-11T10:00:00Z" });
+      expect(result).toEqual({
+        id: "inv_abc",
+        sentAt: "2026-06-11T10:00:00Z",
+        prospectProviderRef: "ACoAA_jane",
+      });
 
       const calls = (fetchFn as ReturnType<typeof vi.fn>).mock.calls;
       expect(String(calls[0]![0])).toContain("/api/v1/users/janedoe"); // GET resolution first
@@ -260,7 +264,11 @@ describe("UnipileLinkedInInfra", () => {
         profileUrl: "https://linkedin.com/in/johndoe",
         body: "Following up!",
       });
-      expect(result).toEqual({ id: "msg_xyz", sentAt: "2026-06-11T11:00:00Z" });
+      expect(result).toEqual({
+        id: "msg_xyz",
+        sentAt: "2026-06-11T11:00:00Z",
+        prospectProviderRef: "ACoAA_john",
+      });
 
       const calls = (fetchFn as ReturnType<typeof vi.fn>).mock.calls;
       const chatCall = calls.find((c) => String(c[0]).includes("/api/v1/chats"))!;
@@ -323,6 +331,10 @@ describe("UnipileLinkedInInfra", () => {
         providerEventId: "msg_real_1",
         connectedAccountRef: "0uuEXoQMSKOiZiTtCb2cgg",
         fromProfileUrl: "https://www.linkedin.com/in/ACoAA_RYAN",
+        // the layered-matching identity: provider id + name ride along (no public slug here)
+        fromProviderRef: "ACoAA_RYAN",
+        fromPublicIdentifier: null,
+        fromName: "Ryan Cunningham",
         body: "Sounds interesting, tell me more",
         receivedAt: "2026-06-28T09:37:13Z",
       });
@@ -366,6 +378,9 @@ describe("UnipileLinkedInInfra", () => {
         providerEventId: "relation:li_acct_2:https://www.linkedin.com/in/ACoAA_BOB",
         connectedAccountRef: "li_acct_2",
         profileUrl: "https://www.linkedin.com/in/ACoAA_BOB",
+        fromProviderRef: null,
+        fromPublicIdentifier: null,
+        fromName: null,
       });
     });
 

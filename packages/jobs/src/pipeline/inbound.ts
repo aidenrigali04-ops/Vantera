@@ -111,6 +111,43 @@ async function maybeRespond(
 }
 
 /**
+ * Match an inbound event to a lead, layered by identity strength (found 2026-07-05: Unipile
+ * identifies people by member provider_id, NOT the vanity URL discovery stores — URL-only
+ * matching left every reply at "no matching lead" and analytics at 0 replied):
+ *
+ *   1. provider_id (0043 column, captured at send time) — the reliable key
+ *   2. profile URL as sent (matches leads whose stored URL is already the /in/<id> form)
+ *   3. public vanity slug, when the payload happens to carry one
+ *   4. exact-unique display-name among contacted leads — last resort, only when unambiguous
+ *
+ * Any successful match BACKFILLS the provider ref, so leads contacted before 0043 self-heal
+ * on their first inbound event and match by the strong key forever after.
+ */
+async function matchLead(
+  store: InboundDeps["store"],
+  accountId: string,
+  who: { profileUrl: string; providerRef: string | null; publicIdentifier: string | null; name: string | null }
+): Promise<{ id: string; campaignId: string | null } | null> {
+  let lead: { id: string; campaignId: string | null } | null = null;
+
+  if (who.providerRef) lead = await store.findLeadByProviderRef(accountId, who.providerRef);
+  if (!lead) lead = await store.findLeadByLinkedInUrl(accountId, normalizeLinkedInUrl(who.profileUrl));
+  if (!lead && who.publicIdentifier) {
+    lead = await store.findLeadByLinkedInUrl(
+      accountId,
+      normalizeLinkedInUrl(`https://www.linkedin.com/in/${who.publicIdentifier}`)
+    );
+  }
+  if (!lead && who.name) {
+    const byName = await store.findContactedLeadsByName(accountId, who.name);
+    if (byName.length === 1) lead = byName[0]!;
+  }
+
+  if (lead && who.providerRef) await store.saveLeadProviderRef(lead.id, who.providerRef);
+  return lead;
+}
+
+/**
  * Routes one verified, deduped LinkedIn webhook event (rules 04/11). Replies are
  * classified BEFORE reactions so an out-of-office never kills the sequence;
  * not_interested / unsubscribe write suppression (entries never expire).
@@ -138,10 +175,12 @@ export async function runInbound(payload: InboundPayload, deps: InboundDeps): Pr
   const { accountId } = identity;
 
   if (event.type === "relationship_accepted") {
-    const lead = await deps.store.findLeadByLinkedInUrl(
-      accountId,
-      normalizeLinkedInUrl(event.profileUrl)
-    );
+    const lead = await matchLead(deps.store, accountId, {
+      profileUrl: event.profileUrl,
+      providerRef: event.fromProviderRef,
+      publicIdentifier: event.fromPublicIdentifier,
+      name: event.fromName,
+    });
     if (!lead) return { handled: false, action: "no matching lead" };
     await deps.store.setLeadConnected(lead.id, now);
     return { handled: true, action: "relationship_accepted" };
@@ -150,17 +189,26 @@ export async function runInbound(payload: InboundPayload, deps: InboundDeps): Pr
   // LinkedIn reply — explicit narrow so a future event variant can't fall into the reply path
   if (event.type !== "reply") return { handled: false, action: "unhandled event type" };
   const url = normalizeLinkedInUrl(event.fromProfileUrl);
-  const lead = await deps.store.findLeadByLinkedInUrl(accountId, url);
+  const lead = await matchLead(deps.store, accountId, {
+    profileUrl: event.fromProfileUrl,
+    providerRef: event.fromProviderRef,
+    publicIdentifier: event.fromPublicIdentifier,
+    name: event.fromName,
+  });
   if (!lead) return { handled: false, action: "no matching lead" };
-  const replyId = await deps.store.insertReply({
+  // provider_message_ref makes the insert idempotent (0043 partial unique index) — provider
+  // retries and the stored-event replay can never double-count a reply.
+  const inserted = await deps.store.insertReply({
     accountId,
     leadId: lead.id,
     campaignId: lead.campaignId,
     channel: "linkedin",
-    providerMessageRef: null,
+    providerMessageRef: event.providerEventId,
     body: event.body,
     receivedAt: new Date(event.receivedAt),
   });
+  if (!inserted.created) return { handled: true, action: "reply:duplicate" };
+  const replyId = inserted.id;
   const verdict = await deps.classifyFn(event.body);
   await deps.store.setReplyClassification(replyId, verdict);
   if (verdict.classification !== "out_of_office") {

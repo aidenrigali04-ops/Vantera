@@ -25,6 +25,23 @@ export interface MessageRequest {
 export interface SendOutcome {
   id: string;
   sentAt: string;
+  /**
+   * The PROSPECT's member provider_id (ACoAA…) the send resolved. Persisted on the lead so
+   * inbound webhooks — which identify people by provider_id, not vanity URL — can match a
+   * reply back to the lead. Null when the adapter had no resolution step.
+   */
+  prospectProviderRef?: string | null;
+}
+
+/** Who an inbound event is from — every identity handle the payload carries, so the
+ *  pipeline can match a lead by provider id, by URL, or (last resort) by unique name. */
+export interface InboundIdentity {
+  /** member provider_id (ACoAA…) — the ONLY identifier Unipile reliably sends */
+  fromProviderRef: string | null;
+  /** public vanity slug when the payload happens to carry it */
+  fromPublicIdentifier: string | null;
+  /** display name — unique-match fallback only, never a primary key */
+  fromName: string | null;
 }
 
 /** A LinkedIn account currently connected in the provider workspace. */
@@ -37,8 +54,8 @@ export interface ConnectedAccount {
 }
 
 export type LinkedInEvent =
-  | { type: "reply"; providerEventId: string; connectedAccountRef: string; fromProfileUrl: string; body: string; receivedAt: string }
-  | { type: "relationship_accepted"; providerEventId: string; connectedAccountRef: string; profileUrl: string }
+  | ({ type: "reply"; providerEventId: string; connectedAccountRef: string; fromProfileUrl: string; body: string; receivedAt: string } & InboundIdentity)
+  | ({ type: "relationship_accepted"; providerEventId: string; connectedAccountRef: string; profileUrl: string } & InboundIdentity)
   | { type: "account_status"; providerEventId: string; connectedAccountRef: string; status: "active" | "restricted" | "disconnected"; profileUrl: string | null; displayName: string | null; vanteraAccountId: string | null };
 
 // ── Read surface (Intent Agent, Phase 13) ────────────────────────────────────

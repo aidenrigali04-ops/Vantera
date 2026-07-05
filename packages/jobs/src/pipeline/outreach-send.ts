@@ -75,7 +75,12 @@ export async function runOutreachSend(
   // so there is zero double-send risk. A stuck "sending" row is the ops signal
   // that bookkeeping needs a manual fix.
   let providerResult:
-    | { linkedinAccountId: string; messageRef: string | null; inviteSent: boolean }
+    | {
+        linkedinAccountId: string;
+        messageRef: string | null;
+        inviteSent: boolean;
+        prospectProviderRef: string | null;
+      }
     | { parked: true };
 
   try {
@@ -88,6 +93,7 @@ export async function runOutreachSend(
     }
     let messageRef: string | null = null;
     let inviteSent = false;
+    let prospectProviderRef: string | null = null;
     if (ctx.linkedinStage === "message") {
       const r = await deps.linkedinInfra.sendMessage({
         connectedAccountId: identity.providerRef,
@@ -95,6 +101,7 @@ export async function runOutreachSend(
         body: ctx.body ?? "",
       });
       messageRef = r.id;
+      prospectProviderRef = r.prospectProviderRef ?? null;
     } else {
       try {
         const r = await deps.linkedinInfra.sendInvite({
@@ -103,6 +110,7 @@ export async function runOutreachSend(
           note: (ctx.body ?? "").slice(0, LINKEDIN_NOTE_MAX),
         });
         messageRef = r.id;
+        prospectProviderRef = r.prospectProviderRef ?? null;
       } catch (err) {
         // "Already invited" isn't a failure — the request is already out. Fall through to the
         // sent bookkeeping (messageRef stays null; we never captured the original id). Any other
@@ -111,7 +119,7 @@ export async function runOutreachSend(
       }
       inviteSent = true;
     }
-    providerResult = { linkedinAccountId: identity.id, messageRef, inviteSent };
+    providerResult = { linkedinAccountId: identity.id, messageRef, inviteSent, prospectProviderRef };
   } catch (err) {
     // Capture the full provider error server-side first (the DB column gets only the sanitized
     // neutral prefix, so the real 400/403 body would otherwise be lost — that's why prior invite
@@ -129,6 +137,11 @@ export async function runOutreachSend(
   // Any throw here propagates; see invariant comment above.
   if (providerResult.inviteSent) {
     await deps.store.setLeadInvited(ctx.leadId, now);
+  }
+  // The provider_id resolved for this send IS the identity inbound webhooks carry —
+  // persist it so the reply matches back to this lead (0043 reply attribution).
+  if (providerResult.prospectProviderRef) {
+    await deps.store.saveLeadProviderRef(ctx.leadId, providerResult.prospectProviderRef);
   }
   await deps.store.recordOutreachSend({
     accountId: ctx.accountId, campaignId: ctx.campaignId, leadId: ctx.leadId,

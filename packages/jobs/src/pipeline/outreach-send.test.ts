@@ -91,6 +91,10 @@ class FakeOutreachStore implements OutreachSendStore {
   async setLeadInvited(leadId: string, at: Date) {
     this.leadInvited.push({ leadId, at });
   }
+  savedProviderRefs: { leadId: string; providerRef: string }[] = [];
+  async saveLeadProviderRef(leadId: string, providerRef: string) {
+    this.savedProviderRefs.push({ leadId, providerRef });
+  }
   async setCampaignLeadStatus(campaignId: string, leadId: string, status: string) {
     this.campaignLeadStatuses.set(`${campaignId}:${leadId}`, status);
   }
@@ -366,5 +370,28 @@ describe("runOutreachSend — state integrity: bookkeeping isolation", () => {
     expect(auditIdx).toBeGreaterThanOrEqual(0);
     expect(sentIdx).toBeGreaterThanOrEqual(0);
     expect(auditIdx).toBeLessThan(sentIdx);
+  });
+});
+
+describe("runOutreachSend — reply-attribution key (0043)", () => {
+  it("persists the prospect provider_id the send resolved, so inbound webhooks can match", async () => {
+    const store = new FakeOutreachStore();
+    store.ctx = makeCtx({ channel: "linkedin", linkedinStage: "invite", body: "Hi" });
+    const deps = makeDeps(store);
+    deps.linkedinInfra.providerRefsByUrl[store.ctx!.lead.linkedinUrl as string] = "ACoAA_TARGET";
+
+    await runOutreachSend({ sendId: "send1" }, deps);
+
+    expect(store.savedProviderRefs).toEqual([{ leadId: "lead1", providerRef: "ACoAA_TARGET" }]);
+  });
+
+  it("skips the ref write when the adapter resolved none (fake default)", async () => {
+    const store = new FakeOutreachStore();
+    store.ctx = makeCtx({ channel: "linkedin", linkedinStage: "message", body: "hello" });
+    const deps = makeDeps(store);
+
+    await runOutreachSend({ sendId: "send1" }, deps);
+
+    expect(store.savedProviderRefs).toHaveLength(0);
   });
 });

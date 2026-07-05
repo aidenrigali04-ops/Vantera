@@ -50,14 +50,25 @@ export class InMemoryLinkedInInfra implements LinkedInInfra {
     if (i >= 0) this.accounts.splice(i, 1);
   }
 
+  /** provider ids the fake "resolves" per profile URL — seed to test ref persistence */
+  providerRefsByUrl: Record<string, string> = {};
+
   async sendInvite(req: InviteRequest): Promise<SendOutcome> {
     this.sentInvites.push(req);
-    return { id: `inv_${++this.counter}`, sentAt: new Date().toISOString() };
+    return {
+      id: `inv_${++this.counter}`,
+      sentAt: new Date().toISOString(),
+      prospectProviderRef: this.providerRefsByUrl[req.profileUrl] ?? null,
+    };
   }
 
   async sendMessage(req: MessageRequest): Promise<SendOutcome> {
     this.sentMessages.push(req);
-    return { id: `msg_${++this.counter}`, sentAt: new Date().toISOString() };
+    return {
+      id: `msg_${++this.counter}`,
+      sentAt: new Date().toISOString(),
+      prospectProviderRef: this.providerRefsByUrl[req.profileUrl] ?? null,
+    };
   }
 
   // ── Reads (Intent Agent) ──────────────────────────────────────────────────
@@ -89,13 +100,18 @@ export class InMemoryLinkedInInfra implements LinkedInInfra {
     const p = payload as Record<string, unknown>;
     if (typeof p.event_id !== "string" || typeof p.connected_account !== "string") return null;
     const base = { providerEventId: p.event_id, connectedAccountRef: p.connected_account };
+    const identity = {
+      fromProviderRef: typeof p.from_provider_ref === "string" ? p.from_provider_ref : null,
+      fromPublicIdentifier: typeof p.from_public_identifier === "string" ? p.from_public_identifier : null,
+      fromName: typeof p.from_name === "string" ? p.from_name : null,
+    };
     switch (p.event_type) {
       case "reply":
         if (typeof p.from_profile_url !== "string" || typeof p.body !== "string" || typeof p.received_at !== "string") return null;
-        return { type: "reply", ...base, fromProfileUrl: p.from_profile_url, body: p.body, receivedAt: p.received_at };
+        return { type: "reply", ...base, ...identity, fromProfileUrl: p.from_profile_url, body: p.body, receivedAt: p.received_at };
       case "relationship_accepted":
         if (typeof p.profile_url !== "string") return null;
-        return { type: "relationship_accepted", ...base, profileUrl: p.profile_url };
+        return { type: "relationship_accepted", ...base, ...identity, profileUrl: p.profile_url };
       case "account_status":
         if ((p.status !== "active" && p.status !== "restricted" && p.status !== "disconnected")) return null;
         return {

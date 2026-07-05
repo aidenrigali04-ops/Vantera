@@ -10,6 +10,7 @@ import type { InboundDeps, InboundStore, NewScheduledSend, ResponderBundle } fro
 
 function makeStore(overrides: Partial<InboundStore> = {}): InboundStore & {
   replies: Parameters<InboundStore["insertReply"]>[0][];
+  savedProviderRefs: { leadId: string; providerRef: string }[];
   classifications: { replyId: string; verdict: ReplyVerdict }[];
   suppressions: Parameters<InboundStore["addSuppression"]>[];
   connectedLeads: { leadId: string; at: Date }[];
@@ -34,13 +35,19 @@ function makeStore(overrides: Partial<InboundStore> = {}): InboundStore & {
   const bookedMeetings: { leadId: string; at: Date }[] = [];
   const scheduledSends: NewScheduledSend[] = [];
 
+  const savedProviderRefs: { leadId: string; providerRef: string }[] = [];
   const base: InboundStore = {
     findLinkedInAccountByProviderRef: async () => null,
     upsertLinkedInAccountStatus: async (e) => { upsertedLinkedInStatuses.push(e); },
     findLeadByLinkedInUrl: async () => null,
+    findLeadByProviderRef: async () => null,
+    findContactedLeadsByName: async () => [],
+    saveLeadProviderRef: async (leadId, providerRef) => {
+      savedProviderRefs.push({ leadId, providerRef });
+    },
     insertReply: async (r) => {
       replies.push(r);
-      return `reply_${++replyCounter}`;
+      return { id: `reply_${++replyCounter}`, created: true };
     },
     setReplyClassification: async (replyId, verdict) => {
       classifications.push({ replyId, verdict });
@@ -70,6 +77,7 @@ function makeStore(overrides: Partial<InboundStore> = {}): InboundStore & {
     notifications,
     bookedMeetings,
     scheduledSends,
+    savedProviderRefs,
   });
 }
 
@@ -627,5 +635,132 @@ describe("runInbound — junk payloads", () => {
     expect(result).toEqual({ handled: false, action: "unparseable" });
     expect(store.replies).toHaveLength(0);
     expect(store.suppressions).toHaveLength(0);
+  });
+});
+
+// ── Layered lead matching (0043) — provider id first, URL, public slug, unique name ─────
+describe("runInbound — layered lead matching", () => {
+  const PROVIDER_URL_FIXTURE = {
+    event_id: "li_evt_prov_1",
+    connected_account: LINKEDIN_ACCOUNT_REF,
+    event_type: "reply",
+    // the real webhook shape: profile URL is the /in/<provider_id> form, never the vanity slug
+    from_profile_url: "https://www.linkedin.com/in/ACoAA_PROSPECT",
+    from_provider_ref: "ACoAA_PROSPECT",
+    from_name: "Prospect Smith",
+    body: "Yes sure",
+    received_at: "2026-07-05T15:09:15.246Z",
+  };
+
+  it("matches by provider ref when the URL match misses (the prod zero-replies bug)", async () => {
+    const store = makeStore({
+      findLinkedInAccountByProviderRef: async () => ({ id: "li_id_1", accountId: "acc1" }),
+      findLeadByLinkedInUrl: async () => null, // vanity URL on the lead ≠ provider-id URL in the event
+      findLeadByProviderRef: async (_acc, ref) =>
+        ref === "ACoAA_PROSPECT" ? { id: "lead1", campaignId: "camp1" } : null,
+    });
+
+    const result = await runInbound(
+      { source: "linkedin", payload: PROVIDER_URL_FIXTURE },
+      deps(store, { classifyFn: classify("interested") })
+    );
+
+    expect(result.handled).toBe(true);
+    expect(store.replies).toHaveLength(1);
+    expect(store.repliedLeads).toEqual([{ leadId: "lead1", campaignId: "camp1" }]);
+    // the strong key is (re)stamped on every successful match
+    expect(store.savedProviderRefs).toEqual([{ leadId: "lead1", providerRef: "ACoAA_PROSPECT" }]);
+  });
+
+  it("falls back to a UNIQUE contacted-lead name match and backfills the provider ref", async () => {
+    const store = makeStore({
+      findLinkedInAccountByProviderRef: async () => ({ id: "li_id_1", accountId: "acc1" }),
+      findLeadByLinkedInUrl: async () => null,
+      findLeadByProviderRef: async () => null, // lead contacted before 0043 — no ref stored yet
+      findContactedLeadsByName: async (_acc, name) =>
+        name === "Prospect Smith" ? [{ id: "lead1", campaignId: "camp1" }] : [],
+    });
+
+    const result = await runInbound(
+      { source: "linkedin", payload: PROVIDER_URL_FIXTURE },
+      deps(store, { classifyFn: classify("interested") })
+    );
+
+    expect(result.handled).toBe(true);
+    expect(store.savedProviderRefs).toEqual([{ leadId: "lead1", providerRef: "ACoAA_PROSPECT" }]);
+  });
+
+  it("never matches an AMBIGUOUS name (two contacted leads share it)", async () => {
+    const store = makeStore({
+      findLinkedInAccountByProviderRef: async () => ({ id: "li_id_1", accountId: "acc1" }),
+      findLeadByLinkedInUrl: async () => null,
+      findLeadByProviderRef: async () => null,
+      findContactedLeadsByName: async () => [
+        { id: "lead1", campaignId: null },
+        { id: "lead2", campaignId: null },
+      ],
+    });
+
+    const result = await runInbound(
+      { source: "linkedin", payload: PROVIDER_URL_FIXTURE },
+      deps(store, { classifyFn: classify("interested") })
+    );
+
+    expect(result).toEqual({ handled: false, action: "no matching lead" });
+    expect(store.replies).toHaveLength(0);
+  });
+
+  it("matches by the public vanity slug when the payload carries one", async () => {
+    const store = makeStore({
+      findLinkedInAccountByProviderRef: async () => ({ id: "li_id_1", accountId: "acc1" }),
+      findLeadByLinkedInUrl: async (_acc, url) =>
+        url === "https://www.linkedin.com/in/prospect-smith" ? { id: "lead1", campaignId: null } : null,
+      findLeadByProviderRef: async () => null,
+    });
+
+    const result = await runInbound(
+      {
+        source: "linkedin",
+        payload: { ...PROVIDER_URL_FIXTURE, from_public_identifier: "Prospect-Smith" },
+      },
+      deps(store, { classifyFn: classify("interested") })
+    );
+
+    expect(result.handled).toBe(true);
+    expect(store.repliedLeads).toEqual([{ leadId: "lead1", campaignId: null }]);
+  });
+
+  it("short-circuits a duplicate reply (provider retry / replay) — no double effects", async () => {
+    const store = makeStore({
+      findLinkedInAccountByProviderRef: async () => ({ id: "li_id_1", accountId: "acc1" }),
+      findLeadByLinkedInUrl: async () => null,
+      findLeadByProviderRef: async () => ({ id: "lead1", campaignId: null }),
+      insertReply: async () => ({ id: "existing_reply", created: false }),
+    });
+
+    const result = await runInbound(
+      { source: "linkedin", payload: PROVIDER_URL_FIXTURE },
+      deps(store, { classifyFn: classify("interested") })
+    );
+
+    expect(result).toEqual({ handled: true, action: "reply:duplicate" });
+    expect(store.classifications).toHaveLength(0);
+    expect(store.repliedLeads).toHaveLength(0);
+    expect(store.notifications).toHaveLength(0);
+  });
+
+  it("stores the provider message id on the reply (the idempotency key)", async () => {
+    const store = makeStore({
+      findLinkedInAccountByProviderRef: async () => ({ id: "li_id_1", accountId: "acc1" }),
+      findLeadByProviderRef: async () => ({ id: "lead1", campaignId: null }),
+      findLeadByLinkedInUrl: async () => null,
+    });
+
+    await runInbound(
+      { source: "linkedin", payload: PROVIDER_URL_FIXTURE },
+      deps(store, { classifyFn: classify("interested") })
+    );
+
+    expect(store.replies[0]?.providerMessageRef).toBe("li_evt_prov_1");
   });
 });

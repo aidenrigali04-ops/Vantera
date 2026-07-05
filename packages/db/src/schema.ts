@@ -202,6 +202,10 @@ export const leads = pgTable(
     linkedinUrlNormalized: text("linkedin_url_normalized").generatedAlwaysAs(
       sql`regexp_replace(lower(btrim(linkedin_url)), '/+$', '')`
     ),
+    // 0043: the member provider_id (ACoAA…) — the identity inbound webhooks actually carry.
+    // Written at send time (resolved for the provider call anyway) and backfilled whenever a
+    // fallback match succeeds; the PRIMARY reply-attribution key from then on. Service-role only.
+    linkedinProviderRef: text("linkedin_provider_ref"),
     // 0034: sticky sender — the LinkedIn account assigned to send this lead's whole
     // sequence (multi-sender distribution, rule 04/13). Null until the first invite.
     linkedinAccountId: uuid("linkedin_account_id").references(() => linkedinAccounts.id, {
