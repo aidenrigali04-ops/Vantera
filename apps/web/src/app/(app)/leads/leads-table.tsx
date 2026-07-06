@@ -145,12 +145,13 @@ function HotNowStrip({
 }) {
   if (hotLeads.length === 0) return null;
   return (
-    <section className="mb-5" data-copilot="hot-leads">
-      <div className="mb-2.5 flex items-center gap-1.5">
+    <section className="mb-4" data-copilot="hot-leads">
+      <div className="mb-2 flex items-center gap-1.5">
         <Flame className="size-4 text-[var(--positive)]" aria-hidden />
         <Eyebrow>Hot right now</Eyebrow>
         <span className="text-xs text-muted-foreground">— your strongest-fit leads to work today</span>
       </div>
+      {/* Compact cards — one screen is the page's contract, so the strip stays shallow. */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {hotLeads.map((lead) => (
           <button
@@ -159,39 +160,41 @@ function HotNowStrip({
             onClick={() => onSelect(lead)}
             className={cn(
               PANEL_SURFACE,
-              "group flex flex-col gap-2 p-4 text-left shadow-none ring-1 ring-inset ring-[var(--positive-line)] transition-colors hover:ring-[var(--positive)]"
+              "group flex min-w-0 flex-col gap-1 p-3 text-left shadow-none ring-1 ring-inset ring-[var(--positive-line)] transition-colors hover:ring-[var(--positive)]"
             )}
           >
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <div className="flex items-center gap-1.5">
-                  <p className="truncate font-medium">{leadName(lead)}</p>
-                  <SourceBadge source={lead.source} />
-                </div>
-                <p className="truncate text-xs text-muted-foreground">
-                  {[lead.title, lead.company_name].filter(Boolean).join(" · ") || "—"}
-                </p>
+            <div className="flex min-w-0 items-center justify-between gap-2">
+              <div className="flex min-w-0 items-center gap-1.5">
+                <p className="truncate font-medium">{leadName(lead)}</p>
+                <SourceBadge source={lead.source} />
               </div>
               <ScoreBadge score={lead.ai_score} />
             </div>
+            <p className="truncate text-xs text-muted-foreground">
+              {[lead.title, lead.company_name].filter(Boolean).join(" · ") || "—"}
+            </p>
             {(() => {
               const signal = leadSignalLine(lead.lead_signals, lead.ai_insights);
-              return signal ? (
-                <p className="flex items-center gap-1 text-xs text-[var(--positive)]">
-                  <Zap className="size-3 shrink-0" aria-hidden />
-                  <span className="truncate">{signal}</span>
-                </p>
-              ) : null;
-            })()}
-            {/* Value framing — the same worth-toward-goal line as the dashboard spotlight. */}
-            {(() => {
               const proj = projectedRevenue(avgDealValueCents, goalCents, lead.ai_score);
-              return proj ? (
-                <p className="text-xs text-muted-foreground">
-                  Worth <span className="font-data font-semibold text-foreground">{usd.format(proj.valueCents / 100)}</span>
-                  {proj.dealsToGoal != null && <> · 1 of ~{proj.dealsToGoal} to your goal</>}
+              if (!signal && !proj) return null;
+              return (
+                <p className="flex min-w-0 items-center gap-1 text-xs">
+                  {signal ? (
+                    <>
+                      <Zap className="size-3 shrink-0 text-[var(--positive)]" aria-hidden />
+                      <span className="min-w-0 truncate text-[var(--positive)]">{signal}</span>
+                    </>
+                  ) : (
+                    <span className="truncate text-muted-foreground">
+                      Worth{" "}
+                      <span className="font-data font-semibold text-foreground">
+                        {usd.format(proj!.valueCents / 100)}
+                      </span>
+                      {proj!.dealsToGoal != null && <> · 1 of ~{proj!.dealsToGoal} to your goal</>}
+                    </span>
+                  )}
                 </p>
-              ) : null;
+              );
             })()}
           </button>
         ))}
@@ -330,8 +333,10 @@ export function LeadsTable({
         </div>
       </div>
 
-      {/* The internal scroll region — the page stays put; only this scrolls. */}
-      <div className="min-h-0 flex-1 lg:overflow-y-auto">
+      {/* Content region. overflow-x-hidden is the hard guarantee against sideways scroll;
+          the fixed-layout table below cannot exceed its container anyway. Vertical overflow
+          only ever happens on very short windows (page size fits a normal screen). */}
+      <div className="min-h-0 flex-1 overflow-x-hidden lg:overflow-y-auto">
       <HotNowStrip
         hotLeads={hotLeads}
         onSelect={open}
@@ -342,14 +347,19 @@ export function LeadsTable({
       {/* No overflow-hidden on the table container itself: it would break the sticky header.
           The thead carries its own solid bg + top rounding instead. */}
       <div className="rounded-xl border border-[var(--hairline)] bg-white" data-copilot="leads-table">
-        <table className="w-full text-sm">
+        {/* table-fixed: columns hold their proportional widths no matter how long the content
+            is — text truncates inside its cell instead of stretching the table past the
+            viewport (the fix for the sideways-scrolling page). */}
+        <table className="w-full table-fixed text-sm">
           <thead className="sticky top-0 z-10 text-left text-[11px] uppercase tracking-wide text-muted-foreground">
             <tr>
-              <Th first>Prospect</Th>
-              <Th className="hidden sm:table-cell">Company</Th>
-              <Th className="hidden md:table-cell">Why now</Th>
-              <Th>Status</Th>
-              <Th>
+              <Th first className="w-[24%]">
+                Prospect
+              </Th>
+              <Th className="hidden w-[15%] sm:table-cell">Company</Th>
+              <Th className="hidden w-[23%] md:table-cell">Why now</Th>
+              <Th className="w-[11%]">Status</Th>
+              <Th className="w-[8%]">
                 <Link
                   href={sortHref(sort === "score" ? "newest" : "score")}
                   className={cn(
@@ -361,8 +371,8 @@ export function LeadsTable({
                   <ArrowDown className={cn("size-3", sort !== "score" && "opacity-30")} aria-hidden />
                 </Link>
               </Th>
-              <Th className="hidden xl:table-cell">Worth</Th>
-              <Th last className="hidden lg:table-cell">
+              <Th className="hidden w-[8%] xl:table-cell">Worth</Th>
+              <Th last className="hidden w-[11%] lg:table-cell">
                 Last activity
               </Th>
             </tr>
@@ -381,16 +391,16 @@ export function LeadsTable({
                   onClick={() => open(lead)}
                   className="cursor-pointer border-t border-[var(--hairline)] transition-colors hover:bg-[var(--cyan-tint)]/50"
                 >
-                  <td className={cn("px-4", cellY)}>
-                    <div className="flex items-center gap-2">
-                      <p className="font-medium">{leadName(lead)}</p>
+                  <td className={cn("overflow-hidden px-4", cellY)}>
+                    <div className="flex min-w-0 items-center gap-2">
+                      <p className="truncate font-medium">{leadName(lead)}</p>
                       <SourceBadge source={lead.source} />
                     </div>
                     {lead.title && (
                       <p className="truncate text-xs text-muted-foreground">{lead.title}</p>
                     )}
                   </td>
-                  <td className={cn("hidden px-4 sm:table-cell", cellY)}>
+                  <td className={cn("hidden overflow-hidden px-4 sm:table-cell", cellY)}>
                     <p className="truncate">{lead.company_name ?? "—"}</p>
                     {lead.industry && (
                       <p className="truncate text-xs text-muted-foreground">{lead.industry}</p>
@@ -398,7 +408,7 @@ export function LeadsTable({
                   </td>
                   {/* The anticipation column — the real signal gets its own room, never crammed
                       under the name. Cooling rides here too: both answer "why act on this row". */}
-                  <td className={cn("hidden max-w-64 px-4 md:table-cell", cellY)}>
+                  <td className={cn("hidden overflow-hidden px-4 md:table-cell", cellY)}>
                     <WhyNowLine lead={lead} className="mt-0" />
                     <CoolingChip lead={lead} />
                     {!leadSignalLine(lead.lead_signals, lead.ai_insights) &&
@@ -412,20 +422,20 @@ export function LeadsTable({
                   <td className={cn("px-4", cellY)}>
                     <ScoreBadge score={lead.ai_score} />
                   </td>
-                  <td className={cn("hidden whitespace-nowrap px-4 xl:table-cell", cellY)}>
+                  <td className={cn("hidden overflow-hidden px-4 xl:table-cell", cellY)}>
                     {proj ? (
-                      <span className="font-data font-medium tabular-nums">
+                      <span className="block truncate font-data font-medium tabular-nums">
                         {usd.format(proj.valueCents / 100)}
                       </span>
                     ) : (
                       <span className="text-muted-foreground/40">—</span>
                     )}
                   </td>
-                  <td className={cn("hidden whitespace-nowrap px-4 lg:table-cell", cellY)}>
+                  <td className={cn("hidden overflow-hidden px-4 lg:table-cell", cellY)}>
                     {activity ? (
                       <span
                         className={cn(
-                          "text-xs",
+                          "block truncate text-xs",
                           activity.kind === "reply"
                             ? "font-medium text-[var(--positive)]"
                             : "text-muted-foreground"

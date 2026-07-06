@@ -155,7 +155,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </form>
         </div>
       </aside>
-      <main className="glass-cards flex-1 px-8 py-6">
+      {/* min-w-0 + overflow-x-clip: a flex child never stretches past the viewport, so no
+          surface can ever produce a sideways-scrolling page — wide content clips instead. */}
+      <main className="glass-cards min-w-0 flex-1 overflow-x-clip px-8 py-6">
         {trialBanner && <TrialBanner {...trialBanner} />}
         {children}
       </main>

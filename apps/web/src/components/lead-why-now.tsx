@@ -53,7 +53,8 @@ export function WhyNowLine({ lead, className }: { lead: WhyNowLead; className?: 
       ) : (
         <Zap className="size-3 shrink-0 text-[var(--positive)]" aria-hidden />
       )}
-      <span className="truncate">{isIntent ? `In-market: ${signal}` : signal}</span>
+      {/* min-w-0 lets the flex item shrink so truncate actually clips inside fixed table cells */}
+      <span className="min-w-0 truncate">{isIntent ? `In-market: ${signal}` : signal}</span>
     </p>
   );
 }

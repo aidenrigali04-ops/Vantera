@@ -8,7 +8,9 @@ import { LeadsTable, type LeadRow, type LeadsSort } from "./leads-table";
 import { HOT_MIN_SCORE } from "./lead-value";
 import { cn } from "@/lib/utils";
 
-const PAGE_SIZE = 25;
+// Sized so a full page fits ON SCREEN inside the one-screen shell (no inner scrollbar on a
+// typical desktop) — more leads = more pages, never a scrolling table.
+const PAGE_SIZE = 10;
 
 // Shared column set so the paginated table and the "Hot right now" spotlight return the same shape.
 // lead_signals (0031) are the REAL "why now" — events + intent captured at enrichment.
