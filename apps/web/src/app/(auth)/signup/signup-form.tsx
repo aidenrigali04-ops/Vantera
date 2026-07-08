@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useActionState } from "react";
-import { Mail } from "lucide-react";
 import { signup, type AuthFormState } from "../actions";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,27 +9,9 @@ import { FormError } from "@/components/form-error";
 import { AuthHeading, CtaArrow, FIELD, LinkedInMark, SubmitButton } from "../auth-ui";
 
 export function SignupForm() {
+  // No confirmation-email interstitial: signup signs the user in and redirects
+  // straight to onboarding (see the signup action).
   const [state, action, pending] = useActionState<AuthFormState, FormData>(signup, {});
-
-  if (state.sent) {
-    return (
-      <div className="flex flex-col gap-4">
-        <span className="grid size-11 place-items-center rounded-xl bg-[var(--cyan-tint)] text-[var(--cyan-strong)] ring-1 ring-inset ring-[rgba(11,87,171,0.2)]">
-          <Mail className="size-5" strokeWidth={1.9} />
-        </span>
-        <h1 className="text-[30px] font-bold tracking-[-0.03em] text-foreground">Check your email</h1>
-        <p className="text-[15px] leading-relaxed text-[var(--ink-3)]">
-          We sent a confirmation link to your inbox. Click it to continue setting up your workspace.
-        </p>
-        <p className="text-[14px] text-[var(--ink-3)]">
-          Already confirmed?{" "}
-          <Link className="font-semibold text-[var(--cyan-strong)] hover:underline" href="/login">
-            Sign in
-          </Link>
-        </p>
-      </div>
-    );
-  }
 
   return (
     <div className="flex flex-col gap-8">

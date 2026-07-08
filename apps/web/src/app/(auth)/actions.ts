@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 import { friendlyAuthError } from "@/lib/auth/errors";
 import { validateSignup } from "@/lib/validation";
 import { siteUrl } from "@/lib/site-url";
@@ -41,17 +42,27 @@ export async function signup(_prev: AuthFormState, formData: FormData): Promise<
   });
   if (!result.ok) return { error: result.error };
 
-  const supabase = await createClient();
-  const { error } = await supabase.auth.signUp({
+  // Confirmation-free signup (owner call, 2026-07-08): the confirm-link step was
+  // losing signups. The admin API creates the user already confirmed — Supabase
+  // sends no email — then a normal password sign-in opens the session and the app
+  // gate routes to onboarding. The deploy-time email_confirmed_at guards stay
+  // satisfied because every user is confirmed at creation.
+  const service = createServiceClient();
+  const { error: createError } = await service.auth.admin.createUser({
     email: result.values.email,
     password: result.values.password,
-    options: {
-      data: { company_name: result.values.companyName },
-      emailRedirectTo: `${siteUrl()}/auth/confirm?next=/onboarding`,
-    },
+    email_confirm: true,
+    user_metadata: { company_name: result.values.companyName },
   });
-  if (error) return { error: friendlyAuthError(error.message) };
-  return { sent: true };
+  if (createError) return { error: friendlyAuthError(createError.message) };
+
+  const supabase = await createClient();
+  const { error: signInError } = await supabase.auth.signInWithPassword({
+    email: result.values.email,
+    password: result.values.password,
+  });
+  if (signInError) return { error: friendlyAuthError(signInError.message) };
+  redirect("/dashboard"); // app gate forwards to /onboarding
 }
 
 export async function requestPasswordReset(
