@@ -69,12 +69,21 @@ describe("parseCopyForm", () => {
     expect(bad.ok).toBe(false);
   });
 
+  it("accepts a website destination on its own — traffic-first businesses need no booking link", () => {
+    const ok = parseCopyForm(copyForm({ websiteUrl: "https://cityscale.example/portfolio" }));
+    expect(ok.ok && ok.ok === true && ok.values.websiteUrl).toBe("https://cityscale.example/portfolio");
+    expect(ok.ok && ok.ok === true && ok.values.bookingUrl).toBeNull();
+    const bad = parseCopyForm(copyForm({ websiteUrl: "not-a-url" }));
+    expect(bad.ok).toBe(false);
+  });
+
 
   it("accepts a complete form — LinkedIn is the only channel, always enabled", () => {
     expect(parseCopyForm(copyForm())).toEqual({
       ok: true,
       values: {
         bookingUrl: null,
+        websiteUrl: null,
         name: "Penn",
         cta: "book a 15-min intro",
         links: ["https://acme.com/case-study"],

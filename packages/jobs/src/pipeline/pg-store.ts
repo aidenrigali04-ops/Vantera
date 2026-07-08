@@ -582,6 +582,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           config: {
             cta: config.cta ?? "a quick look",
             bookingUrl: config.bookingUrl ?? null,
+            websiteUrl: config.websiteUrl ?? null,
             channels: { linkedin: config.channels?.linkedin ?? false },
           },
           sendMode: campaign?.sendMode === "automatic" ? "automatic" : "review",
@@ -1451,7 +1452,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         .select({ url: agentAssets.url, filename: agentAssets.filename })
         .from(agentAssets)
         .where(eq(agentAssets.agentId, agent.id));
-      const config = (agent.config ?? {}) as { cta?: string; bookingUrl?: string | null };
+      const config = (agent.config ?? {}) as { cta?: string; bookingUrl?: string | null; websiteUrl?: string | null };
       const scan = account?.websiteScan as (WebsiteScan & { url?: string }) | null;
 
       // Running thread: delivered agent touches + the lead's replies, merged oldest-first.
@@ -1521,6 +1522,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         context: {
           cta: config.cta ?? "a quick look",
           bookingUrl: config.bookingUrl ?? null,
+          websiteUrl: config.websiteUrl ?? null,
           contentLinks: assets
             .map((a) => a.url ?? a.filename)
             .filter((v): v is string => Boolean(v)),

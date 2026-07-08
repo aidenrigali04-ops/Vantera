@@ -259,6 +259,9 @@ export interface CopyConfig {
   /** the seller's meeting-booking URL (0044) — the conversation brain offers it once when the
    *  prospect shows interest in talking; null until set in the Outreach agent's settings */
   bookingUrl?: string | null;
+  /** the seller's destination page — offered once when the prospect wants to see/learn rather
+   *  than talk; the conversion path for traffic-first businesses (no booking required) */
+  websiteUrl?: string | null;
   /** LinkedIn is the only channel; retained as an object for back-compat with stored agent configs. */
   channels: { linkedin: boolean };
 }

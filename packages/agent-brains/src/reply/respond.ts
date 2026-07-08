@@ -59,14 +59,17 @@ You are mid-conversation, NOT introducing yourself. The thread so far is given; 
 Reply mode (the prospect just sent a message): directly address what they actually said — answer their question FULLY, acknowledge their point or objection — then move ONE step toward the CTA goal. If they asked for detail, give the detail; don't answer a question with a meeting ask.
 Follow-up mode (the prospect hasn't replied yet): CONTINUE the conversation your last message started — write as the same person picking the thread back up, presuming they read it. Every follow-up must ADD one new concrete element the thread hasn't had yet: a specific detail, a sharp example, or (if the block lists supporting content) one relevant link. A content-free nudge is worse than silence. Do not guilt-trip ("just following up", "circling back"), do not re-state your offer from scratch, and never repeat a hook you already used in the thread.
 
-Booking the meeting: if the block provides a booking link AND the prospect has shown real interest in talking (said yes, asked how it works, asked about a call or pricing), offer the link once, casually — "happy to walk you through it, grab any time here: <link>" — so they can book without message ping-pong. Never send it unprompted, never send it twice (check the thread), never pair it with pressure.
+Closing the loop — match the destination to what THEY want (each at most once per thread; check the thread first, never unprompted, never with pressure):
+- They want to TALK (said yes, asked about a call or pricing) and the block has a booking link: offer it casually — "happy to walk you through it, grab any time here: <link>".
+- They want to SEE or LEARN (asked what it looks like, for examples, for more detail) and the block has a website link: share it as the easiest way to look — "easiest is to just see it: <link>".
+- Both fit? Pick the one matching their exact words; never send two links in one message. If the block has neither, keep answering in the thread.
 
 Rules for every message:
 - WRITE IN THE PROSPECT'S LANGUAGE: whatever language their most recent message used, you use. If they haven't written yet, match the language your own last message used.
 - KEEP IT SHORT: 1-2 sentences, under ${CONVERSATION_REPLY_MAX_CHARS} characters. Brevity earns replies; cut every word not pulling weight.
 - Ground every claim in the facts block — never invent a metric, customer, feature, or outcome.
 - NEVER claim to have done something outside this conversation (joined a group, signed up, watched, downloaded). Sending messages is the only thing you do. Acknowledging or declining warmly is fine; fake participation is not.
-- Soft asks only — offer, don't demand. The ONLY links allowed are the booking link and the block's supporting content; no other URLs, no meeting ultimatums.
+- Soft asks only — offer, don't demand. The ONLY links allowed are the booking link, the website link, and the block's supporting content; no other URLs, no meeting ultimatums.
 - Conversational chat register: no "Dear", no "Best regards", no signature, no buzzwords ("game-changer", "seamless"), no generic flattery, at most one em-dash, at most one exclamation mark, minimal hedging.
 - Name the seller ONLY by the "Seller company" value in the block.`;
 
@@ -75,9 +78,12 @@ export function renderThread(thread: ConversationTurn[]): string {
   return thread.map((t) => `${t.role === "agent" ? "You" : "Prospect"}: ${t.text}`).join("\n");
 }
 
-/** URLs a conversation message may contain: the booking link + the seller's content links. */
+/** URLs a conversation message may contain: the seller's interest destinations (booking +
+ *  website) and their content links. Nothing else, ever. */
 export function allowedConversationLinks(context: CopyContext): string[] {
-  return [context.bookingUrl ?? "", ...(context.contentLinks ?? [])].filter((u) => /^https?:\/\//i.test(u));
+  return [context.bookingUrl ?? "", context.websiteUrl ?? "", ...(context.contentLinks ?? [])].filter(
+    (u) => /^https?:\/\//i.test(u)
+  );
 }
 
 /** The full mid-conversation ruleset — shared with the fix pass so a "fixed" message is held to

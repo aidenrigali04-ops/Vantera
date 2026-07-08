@@ -15,6 +15,10 @@ export interface CopyContext {
   /** the seller's meeting-booking URL — the conversation brain offers it ONCE when the
    *  prospect shows interest in talking; the only way a chat converts without ping-pong */
   bookingUrl?: string | null;
+  /** the seller's destination page (site, portfolio, product) — offered ONCE when the prospect
+   *  wants to SEE or learn more rather than talk; the conversion path for traffic-first
+   *  businesses that don't book calls for revenue */
+  websiteUrl?: string | null;
   /** filenames/links from Add Content — referenced, never attached in first touch */
   contentLinks?: string[];
   /** openers/CTA phrasings from the account's recent sends — injected as "do not reuse" so
@@ -106,6 +110,7 @@ export function leadBlock({ lead, insights, context }: DraftInput): string {
     `Seller offer: ${context.valueProp ?? "unknown"}`,
     `CTA goal: ${context.cta}`,
     context.bookingUrl ? `Booking link (offer ONLY once the prospect shows interest in talking): ${context.bookingUrl}` : null,
+    context.websiteUrl ? `Website link (offer ONLY once the prospect wants to see or learn more): ${context.websiteUrl}` : null,
     context.brandVoice ? `Brand voice (match this tone): ${context.brandVoice}` : null,
     context.guardrails ? `Guardrails (never violate): ${context.guardrails}` : null,
     context.contentLinks?.length ? `Supporting content: ${context.contentLinks.join(", ")}` : null,

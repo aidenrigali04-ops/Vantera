@@ -128,9 +128,23 @@ describe("validateConversationMessage — link whitelist + action claims (2026-0
     expect(out.some((v) => v.rule === "action-claim")).toBe(true);
   });
 
-  it("allowedConversationLinks collects booking + content links only", () => {
+  it("allowedConversationLinks collects booking + website + content links only", () => {
     expect(
-      allowedConversationLinks({ cta: "x", bookingUrl: "https://cal.com/a", contentLinks: ["https://v.dev/p", "deck.pdf"] })
-    ).toEqual(["https://cal.com/a", "https://v.dev/p"]);
+      allowedConversationLinks({
+        cta: "x",
+        bookingUrl: "https://cal.com/a",
+        websiteUrl: "https://cityscale.example/portfolio",
+        contentLinks: ["https://v.dev/p", "deck.pdf"],
+      })
+    ).toEqual(["https://cal.com/a", "https://cityscale.example/portfolio", "https://v.dev/p"]);
+  });
+
+  it("the website destination passes the link whitelist (traffic-first conversion path)", () => {
+    const out = validateConversationMessage(
+      "Easiest is to just see the work: https://cityscale.example/portfolio",
+      "Seller company: City Scale",
+      allowedConversationLinks({ cta: "x", websiteUrl: "https://cityscale.example/portfolio" })
+    );
+    expect(out.filter((v) => v.rule === "unapproved-link")).toEqual([]);
   });
 });
