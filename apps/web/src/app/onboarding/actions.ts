@@ -305,7 +305,9 @@ export async function findFirstLeads(
     console.error("find-first-leads: intent provisioning failed (non-blocking)", err);
   }
 
-  redirect("/dashboard");
+  // ?onboarded=1 is analytics-only: RouteEvents fires onboarding_completed on
+  // landing, then strips the param. The idempotent re-run above stays plain.
+  redirect("/dashboard?onboarded=1");
 }
 
 /** Backstop a lagging hosted-auth status webhook so a just-connected account shows connected. */

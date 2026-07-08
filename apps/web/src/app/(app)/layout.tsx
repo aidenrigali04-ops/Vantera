@@ -10,6 +10,9 @@ import { VanteraLogo } from "@/components/landing/vantera-logo";
 import { NotificationsBell, type AppNotification } from "@/components/notifications/notifications-bell";
 import CopilotOverlay from "@/components/copilot/copilot-overlay";
 import { GlassFilter } from "@/components/ui/liquid-glass";
+import { ClarityIdentity } from "@/components/analytics/clarity-identity";
+import { RouteEvents } from "@/components/analytics/route-events";
+import { Suspense } from "react";
 import { TrialBanner, type TrialBannerProps } from "@/components/billing/trial-banner";
 import { trialDaysLeft, isTrialExpired } from "@vantera/billing";
 
@@ -122,6 +125,23 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="app-surface flex min-h-screen bg-[var(--tint)]">
+      {/* Session-scoped analytics identity: recordings become filterable by user,
+          account, and plan. Values come from the validated session (rule 02). */}
+      {data.user && (
+        <ClarityIdentity
+          userId={data.user.id}
+          friendlyName={data.user.email ?? undefined}
+          tags={{
+            surface: "dashboard",
+            accountId: data.account?.id ?? "",
+            plan: billing?.plan ?? "",
+            subscriptionStatus: billing?.subscription_status ?? "",
+          }}
+        />
+      )}
+      <Suspense fallback={null}>
+        <RouteEvents />
+      </Suspense>
       <GlassFilter />
       {/* Sticky full-height rail: stays in view while main scrolls. */}
       <aside className="app-rail sticky top-0 flex h-screen w-20 shrink-0 flex-col items-center gap-4 overflow-y-auto px-2 py-4">
