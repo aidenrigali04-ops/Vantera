@@ -224,9 +224,20 @@ const TECH_STACK_MAX = 6;
 export default async function LeadProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createClient();
-  const [{ data }, { account }] = await Promise.all([
+  const [{ data }, { account }, { data: queuedSend }] = await Promise.all([
     supabase.from("leads").select(LEAD_SELECT).eq("id", id).maybeSingle(),
     getGateData(),
+    // A reply already queued/in-flight for this lead — the compose box must show it instead of
+    // inviting a re-send (a re-typed duplicate used to reach the prospect twice).
+    supabase
+      .from("scheduled_sends")
+      .select("body")
+      .eq("lead_id", id)
+      .eq("linkedin_stage", "message")
+      .in("status", ["pending_review", "approved", "scheduled", "sending"])
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
   const lead = data as unknown as Lead | null;
   if (!lead) notFound();
@@ -384,7 +395,11 @@ export default async function LeadProfilePage({ params }: { params: Promise<{ id
                 )}
                 {lead.status === "replied" && latestReply.channel && (
                   <div className="border-t border-[var(--hairline)] pt-3">
-                    <ReplyHandoff leadId={lead.id} channel={latestReply.channel as "email" | "linkedin"} />
+                    <ReplyHandoff
+                      leadId={lead.id}
+                      channel={latestReply.channel as "email" | "linkedin"}
+                      queuedBody={queuedSend?.body ?? null}
+                    />
                   </div>
                 )}
               </div>

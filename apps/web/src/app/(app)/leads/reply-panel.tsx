@@ -14,9 +14,14 @@ import { sendManualReply, delegateToAgent, type ReplyState } from "./reply-actio
 export function ReplyHandoff({
   leadId,
   channel,
+  queuedBody = null,
 }: {
   leadId: string;
   channel: "email" | "linkedin";
+  /** A reply already queued/in-flight for this lead (server-derived). Without it the queued
+   *  state lived only in client state — a reload brought the compose box back with no trace,
+   *  and re-sending the "lost" reply delivered a duplicate to the prospect. */
+  queuedBody?: string | null;
 }) {
   const [body, setBody] = useState("");
   const [state, setState] = useState<ReplyState | null>(null);
@@ -29,11 +34,19 @@ export function ReplyHandoff({
     start(async () => setState(await delegateToAgent(leadId)));
   }
 
-  if (state?.sent) {
+  if (state?.sent || queuedBody) {
+    const queued = state?.sent ? body.trim() : queuedBody;
     return (
-      <p className="flex items-center gap-2 text-xs text-foreground">
-        <CheckCircle2 className="size-3.5" aria-hidden /> Reply queued — it&apos;ll send shortly.
-      </p>
+      <div className="space-y-2">
+        <p className="flex items-center gap-2 text-xs text-foreground">
+          <CheckCircle2 className="size-3.5" aria-hidden /> Reply queued — it&apos;ll send shortly.
+        </p>
+        {queued && (
+          <p className="border-l-2 border-[var(--hairline)] pl-2 text-xs text-muted-foreground lg:line-clamp-3">
+            {queued}
+          </p>
+        )}
+      </div>
     );
   }
 

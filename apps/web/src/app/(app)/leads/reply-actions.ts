@@ -62,6 +62,7 @@ export async function sendManualReply(
   });
   if (error) return { error: "Could not queue your reply. Please try again." };
   revalidatePath("/leads");
+  revalidatePath(`/leads/${leadId}`); // the brief shows the queued reply on next load
   return { sent: true };
 }
 
