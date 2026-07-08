@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { CONNECTION_NOTE_MAX_CHARS } from "@vantera/agent-brains";
 import { InMemoryLinkedInInfra } from "@vantera/linkedin-infra";
 import { LINKEDIN_NOTE_MAX, runOutreachSend, sanitizeSendError } from "./outreach-send";
+import { MIN_LEAD_MESSAGE_GAP_MS } from "./send-dispatch";
 import type { OutreachSendDeps, OutreachSendStore, SendContext } from "./types";
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
@@ -98,6 +99,20 @@ class FakeOutreachStore implements OutreachSendStore {
   async setCampaignLeadStatus(campaignId: string, leadId: string, status: string) {
     this.campaignLeadStatuses.set(`${campaignId}:${leadId}`, status);
   }
+  guardFacts: {
+    lastMessageDeliveredAt: Date | null;
+    lastReplyAt: Date | null;
+    duplicateBodyDelivered: boolean;
+  } = { lastMessageDeliveredAt: null, lastReplyAt: null, duplicateBodyDelivered: false };
+  guardFactsCalls: { leadId: string; body: string | null }[] = [];
+  async getLeadMessageGuardFacts(leadId: string, body: string | null) {
+    this.guardFactsCalls.push({ leadId, body });
+    return this.guardFacts;
+  }
+  canceled: { id: string; error: string }[] = [];
+  async cancelSend(sendId: string, error: string) {
+    this.canceled.push({ id: sendId, error });
+  }
 }
 
 function makeDeps(store: FakeOutreachStore): OutreachSendDeps & {
@@ -122,6 +137,95 @@ describe("runOutreachSend — rule 11: suppression gate", () => {
     expect(deps.linkedinInfra.sentInvites).toHaveLength(0);
     expect(store.suppressed).toContain("send1");
     expect(store.campaignLeadStatuses.get("camp1:lead1")).toBe("suppressed");
+  });
+});
+
+describe("runOutreachSend — send-boundary per-lead re-check (fresh facts, not the claim's)", () => {
+  const NOW = new Date("2026-07-07T22:06:00Z");
+  const msgCtx = () =>
+    makeCtx({ linkedinStage: "message", body: "Thanks for the reply — happy to share more." });
+
+  it("cancels (never sends) a message whose exact body was already delivered to the lead", async () => {
+    const store = new FakeOutreachStore();
+    store.ctx = msgCtx();
+    store.guardFacts = {
+      lastMessageDeliveredAt: new Date(NOW.getTime() - 60_000),
+      lastReplyAt: null,
+      duplicateBodyDelivered: true,
+    };
+    const deps = { ...makeDeps(store), now: () => NOW };
+
+    const outcome = await runOutreachSend({ sendId: "send1" }, deps);
+
+    expect(outcome).toBe("canceled");
+    expect(deps.linkedinInfra.sentMessages).toHaveLength(0);
+    expect(store.canceled.map((c) => c.id)).toContain("send1");
+    expect(store.canceled[0]?.error).toMatch(/duplicate/);
+  });
+
+  it("parks a message when another message delivered inside the per-lead gap (no fresher reply)", async () => {
+    const store = new FakeOutreachStore();
+    store.ctx = msgCtx();
+    store.guardFacts = {
+      lastMessageDeliveredAt: new Date(NOW.getTime() - MIN_LEAD_MESSAGE_GAP_MS / 2),
+      lastReplyAt: new Date(NOW.getTime() - MIN_LEAD_MESSAGE_GAP_MS), // replied BEFORE that delivery
+      duplicateBodyDelivered: false,
+    };
+    const deps = { ...makeDeps(store), now: () => NOW };
+
+    const outcome = await runOutreachSend({ sendId: "send1" }, deps);
+
+    expect(outcome).toBe("parked");
+    expect(deps.linkedinInfra.sentMessages).toHaveLength(0);
+    expect(store.reverted).toContain("send1");
+  });
+
+  it("sends when the lead replied after our last delivery (answering promptly is human)", async () => {
+    const store = new FakeOutreachStore();
+    store.ctx = msgCtx();
+    const lastDelivered = new Date(NOW.getTime() - 30 * 60_000);
+    store.guardFacts = {
+      lastMessageDeliveredAt: lastDelivered,
+      lastReplyAt: new Date(lastDelivered.getTime() + 5 * 60_000),
+      duplicateBodyDelivered: false,
+    };
+    const deps = { ...makeDeps(store), now: () => NOW };
+
+    const outcome = await runOutreachSend({ sendId: "send1" }, deps);
+
+    expect(outcome).toBe("sent");
+    expect(deps.linkedinInfra.sentMessages).toHaveLength(1);
+  });
+
+  it("sends normally once the delivered gap has elapsed", async () => {
+    const store = new FakeOutreachStore();
+    store.ctx = msgCtx();
+    store.guardFacts = {
+      lastMessageDeliveredAt: new Date(NOW.getTime() - MIN_LEAD_MESSAGE_GAP_MS - 60_000),
+      lastReplyAt: null,
+      duplicateBodyDelivered: false,
+    };
+    const deps = { ...makeDeps(store), now: () => NOW };
+
+    const outcome = await runOutreachSend({ sendId: "send1" }, deps);
+
+    expect(outcome).toBe("sent");
+  });
+
+  it("invite sends never consult the message guard (first touch has no thread to pace against)", async () => {
+    const store = new FakeOutreachStore();
+    store.ctx = makeCtx({ linkedinStage: "invite" });
+    store.guardFacts = {
+      lastMessageDeliveredAt: new Date(NOW.getTime() - 60_000),
+      lastReplyAt: null,
+      duplicateBodyDelivered: true,
+    };
+    const deps = { ...makeDeps(store), now: () => NOW };
+
+    const outcome = await runOutreachSend({ sendId: "send1" }, deps);
+
+    expect(outcome).toBe("sent");
+    expect(store.guardFactsCalls).toHaveLength(0);
   });
 });
 

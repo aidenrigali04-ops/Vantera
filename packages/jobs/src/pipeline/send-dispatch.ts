@@ -134,6 +134,14 @@ export async function runSendDispatch(deps: SendDispatchDeps): Promise<SendDispa
           skipped += 1; // a message for this lead is already going out this run
           continue;
         }
+        // A claimed message (scheduled/sending) is already flying to this lead from an earlier
+        // run. The gap + reply checks below only see DELIVERIES, so they'd wave this row through
+        // and it would land minutes behind the claimed one. Wait — once that delivery lands,
+        // the next run re-evaluates this row against real facts.
+        if (row.leadHasInFlightMessage) {
+          skipped += 1;
+          continue;
+        }
         // Proactive gap: the last delivered message must be MIN_LEAD_MESSAGE_GAP_MS old —
         // unless the lead replied after it (their reply resets the conversation clock).
         const repliedSince =

@@ -399,6 +399,16 @@ export interface OutreachSendStore {
    *  key inbound webhooks match on (0043). Idempotent overwrite. */
   saveLeadProviderRef(leadId: string, providerRef: string): Promise<void>;
   setCampaignLeadStatus(campaignId: string, leadId: string, status: "queued" | "suppressed" | "skipped" | "sent"): Promise<void>;
+  /** Fresh per-lead facts for the send-boundary pacing re-check (message stage only). Dispatch's
+   *  claim ran up to a jitter-delay earlier and can't be trusted across it — same rationale as
+   *  the suppression re-check. `duplicateBodyDelivered` = an identical body already DELIVERED
+   *  to this lead (double-submitted compose, replayed draft). */
+  getLeadMessageGuardFacts(leadId: string, body: string | null): Promise<{
+    lastMessageDeliveredAt: Date | null;
+    lastReplyAt: Date | null;
+    duplicateBodyDelivered: boolean;
+  }>;
+  cancelSend(sendId: string, error: string): Promise<void>;
 }
 
 export interface OutreachSendDeps {
@@ -413,7 +423,7 @@ export interface OutreachSendDeps {
   onProviderError?: (detail: string) => void;
 }
 
-export type OutreachSendOutcome = "sent" | "suppressed" | "parked" | "failed" | "skipped";
+export type OutreachSendOutcome = "sent" | "suppressed" | "parked" | "failed" | "skipped" | "canceled";
 
 export interface DispatchableSend {
   id: string;
@@ -434,6 +444,11 @@ export interface DispatchableSend {
   /** When the lead last replied. A reply after our last message exempts the gap — answering
    *  a prospect promptly is human behavior; a second proactive nudge minutes later is not. */
   leadRepliedAt: Date | null;
+  /** Another message row for this lead is already claimed and undelivered (status 'scheduled'
+   *  with a live runAt, or 'sending'). The per-lead clock advances on DELIVERIES, so claim-time
+   *  facts can't see a sibling claim — two rows approved across adjacent ticks used to both fly
+   *  minutes apart (2026-07-07 triple-send). One claimed message per lead at a time. */
+  leadHasInFlightMessage: boolean;
   /** Multi-sender: the LinkedIn account already assigned to this lead (rule 04/13).
    *  Null until first invite — invites without one are assigned here; a connected
    *  lead's messages are LOCKED to this account (can't message from another). */
@@ -614,8 +629,11 @@ export interface ResponderBundle {
   thread: ConversationTurn[];
   /** prior agent messages actually sent in this thread — drives the converse-to-close turn cap */
   agentTurns: number;
-  /** a reply is already queued/in-flight for this lead — don't double-message */
-  hasUnsentMessage: boolean;
+  /** created_at of the NEWEST queued/in-flight message for this lead (null = none). Sequence
+   *  touches skip whenever one exists (never stack). The responder compares it to the reply's
+   *  receivedAt: a draft newer than the reply IS the answer; an older one was drafted blind to
+   *  what the lead said and gets superseded, not deferred to. */
+  newestUnsentMessageCreatedAt: Date | null;
   /** when the last agent message to this lead actually DELIVERED (null = never messaged) —
    *  proactive touches keep a minimum delivery-time gap so a held backlog can't collapse
    *  the cadence into a burst */

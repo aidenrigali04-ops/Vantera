@@ -22,6 +22,13 @@ const RESPONDABLE = new Set<ReplyVerdict["classification"]>(["interested", "neut
 const MAX_AGENT_TURNS = 6;
 
 /**
+ * Freshness window for auto-answering. A reply processed days after it arrived (webhook outage
+ * replay, backfill) is still classified + notified, but answering it reads as a bot waking up —
+ * the human decides whether that thread is worth reviving.
+ */
+export const RESPOND_MAX_REPLY_AGE_MS = 72 * 3_600_000;
+
+/**
  * Effects of a genuine (non-OOO) LinkedIn reply. The lead is always marked replied and the user
  * is notified. The sequence is stopped — and its queued sends canceled — ONLY on a hard-negative;
  * otherwise outbound keeps running until the lead converts (conversion gate) or is exhausted,
@@ -67,15 +74,28 @@ async function maybeRespond(
   accountId: string,
   lead: { id: string; campaignId: string | null },
   incoming: string,
-  verdict: ReplyVerdict
+  verdict: ReplyVerdict,
+  receivedAt: Date,
+  now: Date
 ): Promise<boolean> {
   if (!deps.respondFn) return false;
   if (!RESPONDABLE.has(verdict.classification) || verdict.booked) return false;
+  // Stale reply (replay/backfill artifact) — never auto-answer days later.
+  if (now.getTime() - receivedAt.getTime() > RESPOND_MAX_REPLY_AGE_MS) return false;
 
   const bundle = await deps.store.getResponderBundle(accountId, lead.id, lead.campaignId);
   if (!bundle) return false; // no live Outreach agent, or no insights to ground a reply
   if (bundle.agentTurns >= MAX_AGENT_TURNS) return false; // hand off to the human
-  if (bundle.hasUnsentMessage) return false; // a reply is already queued/in-flight — don't double-message
+  // A queued message NEWER than this reply is (or already covers) the answer — don't double-
+  // message. An OLDER one was drafted blind to what the lead just said: fall through and let
+  // cancelPendingSends below supersede it (a blind scripted draft used to both block this
+  // response AND later send as a tone-deaf duplicate).
+  if (
+    bundle.newestUnsentMessageCreatedAt !== null &&
+    bundle.newestUnsentMessageCreatedAt > receivedAt
+  ) {
+    return false;
+  }
 
   const respondInput = {
     lead: bundle.lead,
@@ -223,6 +243,8 @@ export async function runInbound(payload: InboundPayload, deps: InboundDeps): Pr
     return { handled: true, action: "reply:unsubscribe" };
   }
   // Active responder: draft + queue the seller's next move, continuing the conversation toward close.
-  const responded = await maybeRespond(deps, accountId, lead, event.body, verdict);
+  const responded = await maybeRespond(
+    deps, accountId, lead, event.body, verdict, new Date(event.receivedAt), now
+  );
   return { handled: true, action: `reply:${verdict.classification}${responded ? "+responded" : ""}` };
 }

@@ -31,12 +31,32 @@ export async function sendManualReply(
     .maybeSingle();
   if (!send) return { error: "This lead isn't in a campaign yet." };
 
+  const trimmed = body.trim();
+
+  // Double-submit guard: delivery happens minutes after this returns, so an impatient resubmit
+  // of the same text used to queue a real second message (a prospect got the identical reply
+  // twice, 2 minutes apart, 2026-07-07). Same text already queued = this message; already
+  // delivered = tell the user instead of silently re-sending.
+  const { data: duplicate } = await supabase
+    .from("scheduled_sends")
+    .select("id, status")
+    .eq("lead_id", leadId)
+    .eq("body", trimmed)
+    .in("status", ["pending_review", "approved", "scheduled", "sending", "sent"])
+    .limit(1)
+    .maybeSingle();
+  if (duplicate) {
+    return duplicate.status === "sent"
+      ? { error: "This exact message was already sent to this lead." }
+      : { sent: true }; // already queued — sending it is in progress
+  }
+
   const { error } = await supabase.from("scheduled_sends").insert({
     account_id: send.account_id,
     campaign_id: send.campaign_id,
     lead_id: leadId,
     channel,
-    body: body.trim(),
+    body: trimmed,
     status: "approved",
     linkedin_stage: channel === "linkedin" ? "message" : null,
   });

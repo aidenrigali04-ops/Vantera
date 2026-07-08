@@ -23,6 +23,7 @@ function makeSend(overrides: Partial<DispatchableSend> = {}): DispatchableSend {
     subscriptionStatus: "active",
     leadLastMessageSentAt: null,
     leadRepliedAt: null,
+    leadHasInFlightMessage: false,
     ...overrides,
   };
 }
@@ -584,6 +585,28 @@ describe("runSendDispatch — per-lead message gating", () => {
 
     expect(result.scheduled).toBe(1);
     expect(store.scheduled.map((s) => s.sendId)).toEqual(["reply1"]);
+  });
+
+  it("skips a message while another message for the lead is already claimed/in flight — even when the lead just replied", async () => {
+    const store = new FakeDispatchStore();
+    const lastSent = new Date(NOW.getTime() - 2 * 60 * 60_000);
+    store.sends = [
+      makeSend({
+        id: "second", linkedinStage: "message", leadConnectedAt: connected,
+        leadAssignedSenderId: "li1",
+        leadLastMessageSentAt: lastSent,
+        // the reply exemption would let this through — the in-flight claim must still block it
+        leadRepliedAt: new Date(lastSent.getTime() + 5 * 60_000),
+        leadHasInFlightMessage: true,
+      }),
+    ];
+    const deps = { ...makeDeps(store), now: () => NOW };
+
+    const result = await runSendDispatch(deps);
+
+    expect(result.scheduled).toBe(0);
+    expect(result.skipped).toBe(1);
+    expect(store.canceled).toHaveLength(0); // it waits for the delivery; nothing is destroyed
   });
 
   it("dispatches a proactive message once the delivered gap has fully elapsed", async () => {

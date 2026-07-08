@@ -132,6 +132,8 @@ function deps(store: InboundStore, extra?: Partial<InboundDeps>): InboundDeps {
     store,
     linkedinInfra,
     classifyFn: classify("interested"),
+    // minutes after the reply fixtures' received_at — keeps replies "fresh" for the responder
+    now: () => new Date("2026-06-12T10:06:00.000Z"),
     ...extra,
   };
 }
@@ -446,7 +448,7 @@ describe("runInbound — active responder (converse to close)", () => {
     context: { cta: "a quick intro" },
     thread: [],
     agentTurns: 0,
-    hasUnsentMessage: false,
+    newestUnsentMessageCreatedAt: null,
     lastAgentMessageAt: null,
     ...over,
   });
@@ -574,8 +576,11 @@ describe("runInbound — active responder (converse to close)", () => {
     expect(store.scheduledSends).toHaveLength(0);
   });
 
-  it("does not double-message when a reply is already queued/in-flight", async () => {
-    const store = storeWithBundle(bundle({ hasUnsentMessage: true }));
+  it("does not double-message when a response NEWER than this reply is already queued/in-flight", async () => {
+    // fixture reply received 10:05:00 — a draft from 10:05:30 already answers it
+    const store = storeWithBundle(
+      bundle({ newestUnsentMessageCreatedAt: new Date("2026-06-12T10:05:30.000Z") })
+    );
 
     await runInbound(
       { source: "linkedin", payload: LINKEDIN_REPLY_FIXTURE },
@@ -583,6 +588,37 @@ describe("runInbound — active responder (converse to close)", () => {
     );
 
     expect(store.scheduledSends).toHaveLength(0);
+    expect(store.canceledSends).toHaveLength(0); // the newer draft IS the answer — keep it
+  });
+
+  it("supersedes a queued draft OLDER than the reply (drafted blind) — cancels it and responds", async () => {
+    // a scripted touch drafted at 09:00 can't know what the lead said at 10:05: replace it
+    const store = storeWithBundle(
+      bundle({ newestUnsentMessageCreatedAt: new Date("2026-06-12T09:00:00.000Z") })
+    );
+
+    const result = await runInbound(
+      { source: "linkedin", payload: LINKEDIN_REPLY_FIXTURE },
+      deps(store, { respondFn: respond() })
+    );
+
+    expect(result.action).toBe("reply:interested+responded");
+    expect(store.canceledSends).toContain("lead1");
+    expect(store.scheduledSends).toHaveLength(1);
+  });
+
+  it("never auto-answers a stale reply (replay/backfill artifact) — classifies and notifies only", async () => {
+    const store = storeWithBundle(bundle());
+
+    const result = await runInbound(
+      { source: "linkedin", payload: LINKEDIN_REPLY_FIXTURE },
+      // reply received 2026-06-12; processed four days later (well past the freshness window)
+      deps(store, { respondFn: respond(), now: () => new Date("2026-06-16T10:06:00.000Z") })
+    );
+
+    expect(result.action).toBe("reply:interested");
+    expect(store.scheduledSends).toHaveLength(0);
+    expect(store.notifications).toHaveLength(1);
   });
 
   it("stays silent when there is no live Outreach agent / no insights (null bundle)", async () => {

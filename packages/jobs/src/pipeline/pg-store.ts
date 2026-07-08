@@ -859,6 +859,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
       ];
       const lastSentByLead = new Map<string, Date>();
       const lastReplyByLead = new Map<string, Date>();
+      const inFlightLeads = new Set<string>();
       if (messageLeadIds.length > 0) {
         const sentAgg = await db
           .select({ leadId: scheduledSends.leadId, at: max(scheduledSends.updatedAt) })
@@ -878,6 +879,27 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           .where(inArray(replies.leadId, messageLeadIds))
           .groupBy(replies.leadId);
         for (const r of replyAgg) if (r.leadId && r.at) lastReplyByLead.set(r.leadId, r.at);
+        // Messages already claimed and still live for these leads: 'sending', or 'scheduled' with
+        // a runAt newer than the stale cutoff (a stale scheduled row is being re-dispatched in
+        // THIS batch, so it must not block itself). One claimed message per lead at a time.
+        const inFlightAgg = await db
+          .select({ leadId: scheduledSends.leadId })
+          .from(scheduledSends)
+          .where(
+            and(
+              inArray(scheduledSends.leadId, messageLeadIds),
+              eq(scheduledSends.linkedinStage, "message"),
+              or(
+                eq(scheduledSends.status, "sending"),
+                and(
+                  eq(scheduledSends.status, "scheduled"),
+                  gte(scheduledSends.scheduledFor, staleCutoff)
+                )
+              )
+            )
+          )
+          .groupBy(scheduledSends.leadId);
+        for (const r of inFlightAgg) inFlightLeads.add(r.leadId);
       }
 
       return rows.map((r) => ({
@@ -897,7 +919,46 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         subscriptionStatus: r.subscriptionStatus,
         leadLastMessageSentAt: lastSentByLead.get(r.leadId) ?? null,
         leadRepliedAt: lastReplyByLead.get(r.leadId) ?? null,
+        leadHasInFlightMessage: inFlightLeads.has(r.leadId),
       }));
+    },
+
+    async getLeadMessageGuardFacts(leadId: string, body: string | null) {
+      const [sentAgg] = await db
+        .select({ at: max(scheduledSends.updatedAt) }) // markSent stamps updated_at ⇒ delivery time
+        .from(scheduledSends)
+        .where(
+          and(
+            eq(scheduledSends.leadId, leadId),
+            eq(scheduledSends.linkedinStage, "message"),
+            eq(scheduledSends.status, "sent")
+          )
+        );
+      const [replyAgg] = await db
+        .select({ at: max(replies.receivedAt) })
+        .from(replies)
+        .where(eq(replies.leadId, leadId));
+      let duplicateBodyDelivered = false;
+      if (body !== null && body.trim() !== "") {
+        const [dup] = await db
+          .select({ id: scheduledSends.id })
+          .from(scheduledSends)
+          .where(
+            and(
+              eq(scheduledSends.leadId, leadId),
+              eq(scheduledSends.linkedinStage, "message"),
+              eq(scheduledSends.status, "sent"),
+              eq(scheduledSends.body, body)
+            )
+          )
+          .limit(1);
+        duplicateBodyDelivered = Boolean(dup);
+      }
+      return {
+        lastMessageDeliveredAt: sentAgg?.at ?? null,
+        lastReplyAt: replyAgg?.at ?? null,
+        duplicateBodyDelivered,
+      };
     },
 
     async countAccountSends(accountId: string): Promise<number> {
@@ -1265,10 +1326,13 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
       const config = (agent.config ?? {}) as { cta?: string };
       const scan = account?.websiteScan as (WebsiteScan & { url?: string }) | null;
 
-      // Running thread: delivered agent messages + the lead's replies, merged oldest-first.
+      // Running thread: delivered agent touches + the lead's replies, merged oldest-first.
+      // The INVITE note is included — it's the actual first touch, and a brain that can't see
+      // it can regenerate the same hook, making a follow-up read like a second cold intro.
       const sent = await db
         .select({
           body: scheduledSends.body,
+          stage: scheduledSends.linkedinStage,
           at: scheduledSends.createdAt,
           deliveredAt: scheduledSends.updatedAt, // markSent stamps updated_at ⇒ delivery-time proxy
         })
@@ -1276,7 +1340,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         .where(
           and(
             eq(scheduledSends.leadId, leadId),
-            eq(scheduledSends.linkedinStage, "message"),
+            inArray(scheduledSends.linkedinStage, ["invite", "message"]),
             eq(scheduledSends.status, "sent"),
             isNotNull(scheduledSends.body)
           )
@@ -1293,15 +1357,17 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         .sort((a, b) => a.at.getTime() - b.at.getTime())
         .map(({ role, text }) => ({ role, text }));
 
-      // Delivery time of the most recent agent message — the proactive-touch gap floor.
-      const lastAgentMessageAt = sent.reduce<Date | null>(
+      // Turn cap + delivery gap count MESSAGES only — the invite is thread context, not a turn.
+      const sentMessages = sent.filter((s) => s.stage === "message");
+      const lastAgentMessageAt = sentMessages.reduce<Date | null>(
         (max, r) => (max === null || r.deliveredAt > max ? r.deliveredAt : max),
         null
       );
 
-      // A message-stage reply already queued/in-flight ⇒ don't double-message.
+      // Newest message-stage draft still queued/in-flight — callers decide what it means:
+      // sequence touches never stack on one; the responder supersedes it when it predates the reply.
       const [pending] = await db
-        .select({ id: scheduledSends.id })
+        .select({ createdAt: scheduledSends.createdAt })
         .from(scheduledSends)
         .where(
           and(
@@ -1310,6 +1376,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
             inArray(scheduledSends.status, ["pending_review", "approved", "scheduled", "sending"])
           )
         )
+        .orderBy(desc(scheduledSends.createdAt))
         .limit(1);
 
       return {
@@ -1333,8 +1400,8 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           valueProp: scan?.summary ?? null,
         },
         thread,
-        agentTurns: sent.length,
-        hasUnsentMessage: Boolean(pending),
+        agentTurns: sentMessages.length,
+        newestUnsentMessageCreatedAt: pending?.createdAt ?? null,
         lastAgentMessageAt,
       };
     },

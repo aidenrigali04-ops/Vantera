@@ -34,7 +34,7 @@ const bundle = (over: Partial<ResponderBundle> = {}): ResponderBundle => ({
   // a prior agent message in the thread — the follow-up must build on it, not restart
   thread: [{ role: "agent", text: "Thanks for connecting, Sam." }],
   agentTurns: 1,
-  hasUnsentMessage: false,
+  newestUnsentMessageCreatedAt: null,
   lastAgentMessageAt: null,
   ...over,
 });
@@ -161,7 +161,11 @@ describe("runSequenceTouch", () => {
     const insert = vi.fn(async () => {});
     const draftFn = vi.fn(async () => ({ message: "unused", violations: [] }));
     const d = deps(
-      { getResponderBundle: async () => bundle({ hasUnsentMessage: true }), insertScheduledSend: insert },
+      {
+        getResponderBundle: async () =>
+          bundle({ newestUnsentMessageCreatedAt: new Date("2026-06-14T00:00:00Z") }),
+        insertScheduledSend: insert,
+      },
       "ok",
       [],
       draftFn

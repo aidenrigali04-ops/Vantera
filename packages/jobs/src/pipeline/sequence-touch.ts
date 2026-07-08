@@ -58,7 +58,7 @@ export async function runSequenceTouch(
   // can't see the unsent one — the "reads like a second cold intro" failure. Same guard the
   // reply responder uses; skipping loses this touch (consistent with every skip here), and the
   // cadence's next touch still comes with full context.
-  if (bundle.hasUnsentMessage) return "skipped";
+  if (bundle.newestUnsentMessageCreatedAt !== null) return "skipped";
 
   // Delivery-time cadence floor: touchGapDays paces when touches are DRAFTED, but after a hold
   // (unhealthy sender, unaccepted invite) the backlog drains fast and draft-time spacing means

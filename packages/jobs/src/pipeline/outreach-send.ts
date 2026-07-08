@@ -1,5 +1,6 @@
 import { CONNECTION_NOTE_MAX_CHARS } from "@vantera/agent-brains";
 import { normalizeLinkedInUrl } from "./copy-draft";
+import { MIN_LEAD_MESSAGE_GAP_MS } from "./send-dispatch";
 import type { OutreachSendDeps, OutreachSendOutcome } from "./types";
 
 /**
@@ -61,6 +62,29 @@ export async function runOutreachSend(
     await deps.store.markSuppressed(ctx.id);
     await deps.store.setCampaignLeadStatus(ctx.campaignId, ctx.leadId, "suppressed");
     return "suppressed";
+  }
+
+  // Per-lead pacing re-check on FRESH facts (message stage): the dispatch claim ran up to a
+  // jitter-delay ago and is blind to deliveries since. An identical body already delivered is a
+  // duplicate (double-submitted compose, replayed draft) → cancel, never send. A delivery inside
+  // the gap with no fresher reply → park; the dispatcher re-claims once the gap truly passes.
+  if (ctx.linkedinStage === "message") {
+    const facts = await deps.store.getLeadMessageGuardFacts(ctx.leadId, ctx.body);
+    if (facts.duplicateBodyDelivered) {
+      await deps.store.cancelSend(ctx.id, "duplicate of a message already sent to this lead");
+      return "canceled";
+    }
+    const repliedSince =
+      facts.lastReplyAt !== null &&
+      (facts.lastMessageDeliveredAt === null || facts.lastReplyAt > facts.lastMessageDeliveredAt);
+    if (
+      !repliedSince &&
+      facts.lastMessageDeliveredAt !== null &&
+      now.getTime() - facts.lastMessageDeliveredAt.getTime() < MIN_LEAD_MESSAGE_GAP_MS
+    ) {
+      await deps.store.revertToApproved(ctx.id);
+      return "parked";
+    }
   }
 
   if (!(await deps.store.claimSending(ctx.id))) return "skipped";
