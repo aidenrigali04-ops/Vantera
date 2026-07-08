@@ -1,4 +1,4 @@
-import { logger, schedules } from "@trigger.dev/sdk";
+import { logger, task } from "@trigger.dev/sdk";
 import { createDb } from "@vantera/db";
 import { createLinkedInInfraFromEnv } from "@vantera/linkedin-infra";
 import { createTransactionalEmailFromEnv } from "@vantera/transactional-email";
@@ -6,15 +6,19 @@ import { runAccountHealth } from "../pipeline/account-health";
 import { createAccountHealthStore } from "../pipeline/pg-store";
 
 /**
- * LinkedIn connection health reconcile, every 30 min: the provider's live account list is
- * the truth; stale rows are reconciled so a dead session pauses the pipeline cleanly AND
- * surfaces to the user (banner + admin alert). Exists because a real disconnect once sat
- * invisible for two days behind a stale 'active' row (2026-07-08 incident) — the status
- * webhook alone is not a reliable signal.
+ * LinkedIn connection health reconcile: the provider's live account list is the truth;
+ * stale rows are reconciled so a dead session pauses the pipeline cleanly AND surfaces to
+ * the user (banner + admin alert). Exists because a real disconnect once sat invisible
+ * for two days behind a stale 'active' row (2026-07-08 incident) — the status webhook
+ * alone is not a reliable signal.
+ *
+ * A plain task fired from the agent-scheduler tick (every 15 min), NOT its own cron: the
+ * Trigger plan's schedule quota is fully used (10/10 — adding an 11th failed the deploy),
+ * and the reconcile has no timing needs a piggybacked tick doesn't satisfy.
  */
-export const accountHealth = schedules.task({
+export const accountHealth = task({
   id: "account-health",
-  cron: "*/30 * * * *",
+  maxDuration: 300,
   run: async () => {
     const mailer = createTransactionalEmailFromEnv();
     const summary = await runAccountHealth({

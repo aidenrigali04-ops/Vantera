@@ -7,6 +7,9 @@ import { computeNextRunAt } from "../pipeline/schedule";
  * Cron scan over live scheduled agents (Scout + Intent). Schedule state lives in our DB
  * (agents.next_run_at) — pausing an agent is a status flip, no provider sync. Each kind
  * dispatches its own run task.
+ *
+ * Also fires the account-health reconcile each tick (a plain task piggybacking this cron:
+ * the plan's schedule quota is at 10/10, so it can't own a schedule of its own).
  */
 export const agentScheduler = schedules.task({
   id: "agent-scheduler",
@@ -23,6 +26,7 @@ export const agentScheduler = schedules.task({
         computeNextRunAt(agent.runAtTime ?? "08:00", agent.cadence ?? "daily", agent.timezone, now)
       );
     }
+    await tasks.trigger("account-health", {});
     logger.info("agent scheduler tick", { due: due.length });
     return { triggered: due.length };
   },
