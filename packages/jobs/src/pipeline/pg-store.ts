@@ -54,6 +54,7 @@ import type {
   LeadActivityEvent,
 } from "./crm-activity-sync";
 import type { WeeklySummaryRow, WeeklySummaryStore } from "./weekly-summary";
+import type { AccountHealthStore, LinkedInAccountRow } from "./account-health";
 import {
   SCOUT_DEFAULTS,
   type ConversionStore,
@@ -185,6 +186,10 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           }).features.intent,
         },
       };
+    },
+
+    async saveIcpCriteria(icpId: string, criteria: IcpCriteria) {
+      await db.update(icps).set({ criteria }).where(eq(icps.id, icpId));
     },
 
     // ── Intent Agent (Phase 13) ────────────────────────────────────────────
@@ -2205,6 +2210,46 @@ export function createWeeklySummaryStore(db: Db): WeeklySummaryStore {
         goalCents: a.goalCents,
         recipients: recipientMap.get(a.id) ?? [],
       }));
+    },
+  };
+}
+
+// ── LinkedIn connection health (account-health cron) ─────────────────────────
+
+export function createAccountHealthStore(db: Db): AccountHealthStore {
+  return {
+    async listLinkedInAccounts() {
+      const rows = await db
+        .select({
+          id: linkedinAccounts.id,
+          accountId: linkedinAccounts.accountId,
+          providerRef: linkedinAccounts.providerRef,
+          status: linkedinAccounts.status,
+        })
+        .from(linkedinAccounts);
+      return rows.map((r) => ({ ...r, status: r.status as LinkedInAccountRow["status"] }));
+    },
+
+    async setLinkedInAccountStatus(id, status) {
+      await db
+        .update(linkedinAccounts)
+        .set(
+          // a reconnect restarts the rule-04 ramp clock, same contract as the status webhook
+          status === "active" ? { status, connectedAt: new Date() } : { status }
+        )
+        .where(eq(linkedinAccounts.id, id));
+    },
+
+    async getAccountAdminEmails(accountId) {
+      // Owner + admin emails straight from auth (service-role only) — same lane as the
+      // weekly summary; alerts are product notifications, never cold outreach (rule 11 N/A).
+      const rows = await db.execute<{ email: string | null }>(sql`
+        select u.email
+        from public.account_members m
+        join auth.users u on u.id = m.user_id
+        where m.account_id = ${accountId} and m.role in ('owner', 'admin')
+      `);
+      return [...new Set(rows.map((r) => r.email).filter((e): e is string => Boolean(e)))];
     },
   };
 }

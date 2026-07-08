@@ -65,6 +65,10 @@ class FakeScoutStore implements ScoutStore {
   async markRulesGate(leadId: string, result: { passed: boolean }) {
     this.gates.set(leadId, result.passed);
   }
+  savedCriteria: { icpId: string; criteria: Record<string, unknown> }[] = [];
+  async saveIcpCriteria(icpId: string, criteria: Record<string, unknown>) {
+    this.savedCriteria.push({ icpId, criteria });
+  }
   enrichmentSaved: { leadId: string; signals?: { kind: string }[] }[] = [];
   async saveEnrichment(leadId: string, _accountId: string, enriched: { externalRef: string; signals?: { kind: string }[] }) {
     this.enriched.push(enriched.externalRef);
@@ -123,7 +127,7 @@ function makeDeps(
   store: FakeScoutStore,
   pool: ReturnType<typeof makeCandidate>[],
   scores: Record<string, number>,
-  opts: { companySignals?: ScoutDeps["companySignals"] } = {}
+  opts: { companySignals?: ScoutDeps["companySignals"]; deriveCriteriaFn?: ScoutDeps["deriveCriteriaFn"] } = {}
 ) {
   const prospectData = new InMemoryProspectData(pool);
   const ranked: string[][] = [];
@@ -133,6 +137,8 @@ function makeDeps(
     store,
     prospectData,
     companySignals: opts.companySignals,
+    // default fake: tests exercising the self-heal override this
+    deriveCriteriaFn: opts.deriveCriteriaFn ?? (async () => ({ titles: ["CEO"] })),
     scanFn: async () => ({
       headline: "You sell SDR agents to B2B sales teams.",
       summary: "sells SDR agents",
@@ -532,5 +538,81 @@ describe("runScout — company-event signals (Phase 15)", () => {
     const summary = await runScout("scout1", deps);
 
     expect(summary.qualified).toBe(1);
+  });
+});
+
+// ── criteria self-heal (the wizard stores ICPs as free text with EMPTY criteria) ──
+
+describe("runScout — ICP criteria self-heal", () => {
+  function emptyCriteriaContext(): ScoutContext {
+    const ctx = makeContext();
+    return { ...ctx, icps: [{ id: "icp1", name: "Small Team SaaS Company", criteria: {} }] };
+  }
+
+  it("derives criteria from the ICP text, persists them, and discovers with the derived filters", async () => {
+    const pool = [makeCandidate({ externalRef: "hit", title: "CTO", industry: "saas" })];
+    const store = new FakeScoutStore(emptyCriteriaContext());
+    const derivedWith: { icpText: string; accountIndustry?: string | null }[] = [];
+    const { deps } = makeDeps(store, pool, { hit: 90 }, {
+      deriveCriteriaFn: async (icpText, ctx) => {
+        derivedWith.push({ icpText, accountIndustry: ctx.accountIndustry });
+        return { titles: ["CTO"], industries: ["saas"] };
+      },
+    });
+
+    const summary = await runScout("scout1", deps);
+
+    expect(derivedWith).toEqual([{ icpText: "Small Team SaaS Company", accountIndustry: "devtools" }]);
+    expect(store.savedCriteria).toEqual([{ icpId: "icp1", criteria: { titles: ["CTO"], industries: ["saas"] } }]);
+    expect(summary.criteriaDerived).toBe(1);
+    expect(summary.criteriaPending).toBe(0);
+    expect(summary.discovered).toBe(1);
+    expect(summary.qualified).toBe(1);
+  });
+
+  it("a failed derivation parks the ICP (criteriaPending) — the run completes, nothing is searched", async () => {
+    const pool = [makeCandidate({ externalRef: "hit", title: "CTO" })];
+    const store = new FakeScoutStore(emptyCriteriaContext());
+    const { deps, prospectData } = makeDeps(store, pool, {}, {
+      deriveCriteriaFn: async () => { throw new Error("model down"); },
+    });
+
+    const summary = await runScout("scout1", deps);
+
+    expect(summary.status).toBe("completed");
+    expect(summary.criteriaPending).toBe(1);
+    expect(summary.discovered).toBe(0);
+    expect(summary.discoveryTarget).toBeGreaterThan(0); // the ops signal: wanted leads, got none
+    expect(prospectData.discoverCalls).toHaveLength(0); // never searches with an empty input
+    expect(store.savedCriteria).toHaveLength(0);
+    expect(store.completedAt).not.toBeNull();
+  });
+
+  it("an empty derivation result is parked too — empty filters must never reach the source", async () => {
+    const store = new FakeScoutStore(emptyCriteriaContext());
+    const { deps, prospectData } = makeDeps(store, [makeCandidate({ externalRef: "x" })], {}, {
+      deriveCriteriaFn: async () => ({}),
+    });
+
+    const summary = await runScout("scout1", deps);
+
+    expect(summary.criteriaPending).toBe(1);
+    expect(prospectData.discoverCalls).toHaveLength(0);
+    expect(store.savedCriteria).toHaveLength(0);
+  });
+
+  it("never derives for an ICP that already has criteria", async () => {
+    const pool = [makeCandidate({ externalRef: "good", industry: "saas" })];
+    const store = new FakeScoutStore(makeContext()); // criteria: { industries: ["saas"] }
+    let called = 0;
+    const { deps } = makeDeps(store, pool, { good: 90 }, {
+      deriveCriteriaFn: async () => { called += 1; return {}; },
+    });
+
+    const summary = await runScout("scout1", deps);
+
+    expect(called).toBe(0);
+    expect(summary.criteriaDerived).toBe(0);
+    expect(summary.discovered).toBe(1);
   });
 });

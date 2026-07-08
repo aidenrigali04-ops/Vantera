@@ -1,5 +1,6 @@
 export { stripLoneSurrogates } from "./text";
 export { applyRulesGate, type RulesGateResult } from "./prospect/rules-gate";
+export { deriveIcpCriteria, type DeriveCriteriaContext } from "./prospect/derive-criteria";
 export {
   compactLead,
   rankLeads,

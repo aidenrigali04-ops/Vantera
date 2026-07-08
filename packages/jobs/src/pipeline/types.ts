@@ -6,6 +6,7 @@ import type {
   ProspectDataSource,
 } from "@vantera/prospect-data";
 import type {
+  DeriveCriteriaContext,
   IntentContext,
   IntentObservationInput,
   IntentVerdict,
@@ -113,6 +114,8 @@ export interface ScoutStore {
   saveWebsiteScan(accountId: string, url: string, scan: WebsiteScan): Promise<void>;
   /** insert unseen candidates, return new-or-unscored leads only (dedupe by external_ref per account) */
   upsertLeads(accountId: string, icpId: string, candidates: ProspectCandidate[]): Promise<FreshLead[]>;
+  /** persist criteria derived from an ICP's free text (self-heal — derived once, reused forever) */
+  saveIcpCriteria(icpId: string, criteria: IcpCriteria): Promise<void>;
   markRulesGate(leadId: string, result: RulesGateResult): Promise<void>;
   saveEnrichment(leadId: string, accountId: string, enriched: EnrichedProspect): Promise<void>;
   saveScore(leadId: string, insights: LeadInsights, qualified: boolean): Promise<void>;
@@ -138,6 +141,9 @@ export interface ScoutDeps {
   companySignals?: CompanySignalSource;
   scanFn: (url: string) => Promise<WebsiteScan>;
   rankFn: (candidates: RankCandidate[], ctx: RankContext) => Promise<LeadInsights[]>;
+  /** ICP free text → structured discovery criteria — heals ICPs saved with empty criteria,
+   *  which otherwise search with an empty input and silently discover nothing */
+  deriveCriteriaFn: (icpText: string, ctx: DeriveCriteriaContext) => Promise<IcpCriteria>;
   triggerCopyDraft: (payload: CopyDraftPayload) => Promise<void>;
   now?: () => Date;
 }
@@ -146,6 +152,13 @@ export interface ScoutRunSummary {
   status: "completed" | "skipped";
   /** present only on a "skipped" run when the shared credit pool can't cover this run's worst case */
   reason?: "low_credits";
+  /** raw prospects this run intended to pull (0 = pool full / no capacity — discovery idled by
+   *  design). target > 0 with discovered 0 is the ops signal that the source came back empty. */
+  discoveryTarget: number;
+  /** ICPs whose criteria were derived from free text and persisted this run */
+  criteriaDerived: number;
+  /** ICPs still without usable criteria after a failed derivation — retried next run */
+  criteriaPending: number;
   discovered: number;
   gatePassed: number;
   qualified: number;
@@ -229,6 +242,12 @@ export interface IntentScanDeps {
 export interface IntentScanSummary {
   status: "completed" | "skipped";
   reason?: "no_connection" | "empty_watchlist";
+  /** watch targets this run attempted to read */
+  targets: number;
+  /** targets whose provider read FAILED (swallowed per-target so one bad read never sinks the
+   *  run) — targets > 0 with sourcingErrors === targets means the source is dead, not quiet
+   *  (a disconnected account once reported "observed 0" as healthy for 2 days). */
+  sourcingErrors: number;
   observed: number;
   intent: number;
   qualified: number;

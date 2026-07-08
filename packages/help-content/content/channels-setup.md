@@ -14,7 +14,7 @@ Connect your own existing LinkedIn account to turn on outreach. Click **Connect 
 
 If you finish signing in but don't see your account listed yet, use **Refresh status** on the LinkedIn card to sync it immediately — no need to reconnect.
 
-If your connection drops (LinkedIn sessions expire periodically), return to this page and reconnect. A disconnected or restricted account pauses outreach for your workspace; reconnecting resumes it.
+If your connection drops (LinkedIn sessions expire periodically), Vantera notices within about half an hour: a banner appears across the dashboard, the account's workspace admins get an email, and your agents pause safely — no sourcing, no sending, and replies stop syncing until it's back. Reconnect from this page (the banner's **Reconnect LinkedIn** button brings you here) and everything resumes automatically.
 
 ## Connecting is the activation gate
 

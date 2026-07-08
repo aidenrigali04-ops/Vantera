@@ -1,6 +1,6 @@
 import { logger, task, tasks } from "@trigger.dev/sdk";
 import { createDb } from "@vantera/db";
-import { rankLeads, scanWebsite } from "@vantera/agent-brains";
+import { deriveIcpCriteria, rankLeads, scanWebsite } from "@vantera/agent-brains";
 import { runScout } from "../pipeline/scout";
 import { createPgStore } from "../pipeline/pg-store";
 import { createCompanySignals, createProspectData } from "../pipeline/prospect-source";
@@ -20,6 +20,7 @@ export const scoutRun = task({
       companySignals: createCompanySignals(),
       scanFn: (url) => scanWebsite(url),
       rankFn: (candidates, ctx) => rankLeads(candidates, ctx),
+      deriveCriteriaFn: (icpText, ctx) => deriveIcpCriteria(icpText, ctx),
       triggerCopyDraft: async (p) => {
         await tasks.trigger("copy-draft", p, { concurrencyKey: p.accountId });
       },
@@ -28,6 +29,15 @@ export const scoutRun = task({
       // Ops alert: the shared prospect-data credit pool can't cover this run. The run skipped
       // before spending (no partial/mid-run hard-stop) — top up the pool to resume prospecting.
       logger.error("scout run skipped: prospect-data credit pool below this run's cost — top up to resume", {
+        ...summary,
+        agentId: payload.agentId,
+        accountId: payload.accountId,
+      });
+    } else if (summary.discoveryTarget > 0 && summary.discovered === 0) {
+      // Ops alert: discovery WANTED prospects and the source returned none — a dead search
+      // (underivable criteria, provider outage, empty query). Never let this pass as healthy;
+      // it once idled silently for 11 days (2026-07-08 dead-scout incident).
+      logger.error("scout discovery returned zero prospects for a non-zero target", {
         ...summary,
         agentId: payload.agentId,
         accountId: payload.accountId,

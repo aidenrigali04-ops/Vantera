@@ -25,7 +25,19 @@ export const intentScan = task({
         await tasks.trigger("copy-draft", p, { concurrencyKey: p.accountId });
       },
     });
-    logger.info("intent scan finished", { ...summary, agentId: payload.agentId });
+    if (summary.targets > 0 && summary.sourcingErrors === summary.targets) {
+      // Ops alert: EVERY watch-target read failed — the LinkedIn connection is dead or rate
+      // limited, not quiet. This once passed as "observed 0" for 2 days (2026-07-08 incident).
+      logger.error("intent scan: every watch-target read failed — check the LinkedIn connection", {
+        ...summary,
+        agentId: payload.agentId,
+        accountId: payload.accountId,
+      });
+    } else if (summary.sourcingErrors > 0) {
+      logger.warn("intent scan finished with partial sourcing failures", { ...summary, agentId: payload.agentId });
+    } else {
+      logger.info("intent scan finished", { ...summary, agentId: payload.agentId });
+    }
     return summary;
   },
 });

@@ -120,6 +120,24 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     }
   }
 
+  // Dead LinkedIn connection = every agent silently stopped (no sourcing, no sends, no
+  // replies coming in) — the one state that must never be invisible (2026-07-08 incident).
+  // The account-health cron reconciles the status; this banner is its user-facing half.
+  const { count: unhealthyConnections } = await supabase
+    .from("linkedin_accounts")
+    .select("id", { count: "exact", head: true })
+    .in("status", ["disconnected", "restricted"]);
+  const connectionBanner: TrialBannerProps | null =
+    unhealthyConnections && unhealthyConnections > 0
+      ? {
+          tone: "urgent",
+          message:
+            "Your LinkedIn connection dropped — your agents are paused and replies aren't coming in. Reconnect to resume.",
+          cta: "Reconnect LinkedIn",
+          href: "/settings/channels",
+        }
+      : null;
+
   const email = data.user?.email ?? "";
   const initial = email.charAt(0).toUpperCase() || "?";
 
@@ -178,6 +196,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       {/* min-w-0 + overflow-x-clip: a flex child never stretches past the viewport, so no
           surface can ever produce a sideways-scrolling page — wide content clips instead. */}
       <main className="glass-cards min-w-0 flex-1 overflow-x-clip px-8 py-6">
+        {connectionBanner && <TrialBanner {...connectionBanner} />}
         {trialBanner && <TrialBanner {...trialBanner} />}
         {children}
       </main>
