@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { validateHumanity, findRestartPhrases } from "./humanizer";
+import { validateHumanity, findRestartPhrases, findActionClaims, findUnapprovedLinks } from "./humanizer";
 
 const CLEAN_EMAIL = `Saw you're hiring three SDRs while running outbound yourself. That usually means pipeline is outgrowing the team.
 
@@ -85,5 +85,34 @@ describe("findRestartPhrases", () => {
 
   it("passes a normal in-thread reply — including a 'quick intro' CTA", () => {
     expect(findRestartPhrases("Totally fair. The qualify step is the difference; open to a quick intro?")).toEqual([]);
+  });
+});
+
+describe("findActionClaims", () => {
+  it("flags completed platform actions the agent cannot perform", () => {
+    expect(findActionClaims("That's kind — just joined.")).toHaveLength(1);
+    expect(findActionClaims("I've signed up for the beta")).toHaveLength(1);
+    expect(findActionClaims("I have subscribed to your newsletter")).toHaveLength(1);
+  });
+
+  it("never flags observation or future-tense phrasing", () => {
+    expect(findActionClaims("Saw your post on churn — sharp take.")).toHaveLength(0);
+    expect(findActionClaims("Happy to take a look when it ships.")).toHaveLength(0);
+    expect(findActionClaims("I noticed you're hiring SDRs.")).toHaveLength(0);
+  });
+});
+
+describe("findUnapprovedLinks", () => {
+  it("allows whitelisted links (booking + content) and flags everything else", () => {
+    const allowed = ["https://cal.com/aiden/15min", "https://vantera.dev/one-pager"];
+    expect(findUnapprovedLinks("grab a slot: https://cal.com/aiden/15min", allowed)).toHaveLength(0);
+    expect(findUnapprovedLinks("see https://cal.com/aiden/15min?d=30.", allowed)).toHaveLength(0);
+    const flagged = findUnapprovedLinks("check https://random-site.io/pricing", allowed);
+    expect(flagged).toHaveLength(1);
+    expect(flagged[0]!.rule).toBe("unapproved-link");
+  });
+
+  it("flags every link when nothing is whitelisted", () => {
+    expect(findUnapprovedLinks("https://cal.com/x", [])).toHaveLength(1);
   });
 });

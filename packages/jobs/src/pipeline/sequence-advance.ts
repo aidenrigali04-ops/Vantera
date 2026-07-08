@@ -5,6 +5,11 @@ import type {
 
 const DAY = 86_400_000;
 
+/** One-shot soft-no revival (0044): a run exhausting on a lead who DID reply parks for this
+ *  long, then gets exactly one more thread-aware touch. "Not right now" is a timing objection,
+ *  not a no — but only once, and never for leads who never engaged. */
+export const SOFT_NO_REVIVAL_DAYS = 30;
+
 function hasIdentifier(_stage: SequenceStage, ch: LeadChannels): boolean {
   return !!ch.linkedinUrl;
 }
@@ -72,6 +77,19 @@ export function advanceSequence(ctx: SequenceTickContext): SequenceDecision {
         touchesDone: touchNo,
         lastTouchAt: ctx.now,
         nextActionAt: new Date(ctx.now.getTime() + delayDays * DAY),
+      },
+    };
+  }
+
+  // Touches exhausted and the wait window elapsed. A lead who REPLIED earns one parked
+  // revival before the run may exhaust — spent by stamping revivedAt (never repeats).
+  if (ctx.leadReplied && ctx.run.revivedAt === null) {
+    return {
+      kind: "park",
+      patch: {
+        touchesDone: Math.max(0, target - 1), // exactly one touch of headroom
+        nextActionAt: new Date(ctx.now.getTime() + SOFT_NO_REVIVAL_DAYS * DAY),
+        revivedAt: ctx.now,
       },
     };
   }

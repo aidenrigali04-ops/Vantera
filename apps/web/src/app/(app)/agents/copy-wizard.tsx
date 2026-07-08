@@ -21,6 +21,7 @@ const CTA_EXAMPLES = [
 export type CopyEditValues = {
   name: string;
   cta: string;
+  bookingUrl: string;
   links: string;
   channels: { linkedin: boolean };
   sendMode: "review" | "automatic";
@@ -42,6 +43,7 @@ export function CopyWizard({
   const [step, setStep] = useState(0);
   const [name, setName] = useState(edit?.name ?? "");
   const [cta, setCta] = useState(edit?.cta ?? "");
+  const [bookingUrl, setBookingUrl] = useState(edit?.bookingUrl ?? "");
   const [links, setLinks] = useState(edit?.links ?? "");
   const [fileCount, setFileCount] = useState(0);
   const [sendMode, setSendMode] = useState<"review" | "automatic">(edit?.sendMode ?? "review");
@@ -89,6 +91,7 @@ export function CopyWizard({
       <form action={action} className="flex flex-col gap-5">
         <input type="hidden" name="name" value={name} />
         <input type="hidden" name="cta" value={cta} />
+        <input type="hidden" name="bookingUrl" value={bookingUrl} />
         <input type="hidden" name="links" value={links} />
         <input type="hidden" name="sendMode" value={sendMode} />
 
@@ -141,6 +144,20 @@ export function CopyWizard({
                   {example}
                 </button>
               ))}
+            </div>
+            <div className="flex flex-col gap-2 pt-4">
+              <Label htmlFor="copy-booking">Booking link (optional, recommended)</Label>
+              <Input
+                id="copy-booking"
+                value={bookingUrl}
+                onChange={(e) => setBookingUrl(e.target.value)}
+                placeholder="e.g. https://cal.com/you/15min"
+                inputMode="url"
+              />
+              <p className="text-xs text-muted-foreground">
+                When a prospect says yes, the agent shares this link so they can book without
+                message ping-pong. Without one, interested conversations stall at scheduling.
+              </p>
             </div>
           </div>
         )}

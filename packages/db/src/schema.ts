@@ -402,6 +402,11 @@ export const scheduledSends = pgTable(
     styleFlags: text("style_flags"),
     // 0009: LinkedIn invite/message pair sequencing (null for email)
     linkedinStage: text("linkedin_stage", { enum: ["invite", "message"] }),
+    // 0044: which machine queued this send — 'reply_response' rides the dispatch priority
+    // lane (speed-to-lead), 'sequence' keeps full pacing + send windows, 'manual' = human-typed
+    origin: text("origin", { enum: ["sequence", "reply_response", "manual"] })
+      .notNull()
+      .default("sequence"),
     scheduledFor: timestamp("scheduled_for", { withTimezone: true }),
     approvedBy: uuid("approved_by"),
     approvedAt: timestamp("approved_at", { withTimezone: true }),
@@ -1025,6 +1030,9 @@ export const sequenceRuns = pgTable(
       .default("linkedin"),
     touchesDone: smallint("touches_done").notNull().default(0),
     callAttempts: smallint("call_attempts").notNull().default(0),
+    // 0044: one-shot soft-no revival — an exhausted run whose lead replied gets ONE
+    // respectful re-touch ~30 days later; a set timestamp means it's been spent
+    revivedAt: timestamp("revived_at", { withTimezone: true }),
     nextActionAt: timestamp("next_action_at", { withTimezone: true }).notNull().defaultNow(),
     enteredStageAt: timestamp("entered_stage_at", { withTimezone: true }).notNull().defaultNow(),
     lastTouchAt: timestamp("last_touch_at", { withTimezone: true }),
@@ -1051,7 +1059,7 @@ export const leadNotifications = pgTable(
       .notNull()
       .references(() => accounts.id, { onDelete: "cascade" }),
     leadId: uuid("lead_id").notNull(),
-    kind: text("kind", { enum: ["reply", "converted", "exhausted", "hot_signal"] }).notNull(),
+    kind: text("kind", { enum: ["reply", "converted", "exhausted", "hot_signal", "needs_human"] }).notNull(),
     body: text("body").notNull(),
     // no updated_at: read_at is the only mutable field
     readAt: timestamp("read_at", { withTimezone: true }),

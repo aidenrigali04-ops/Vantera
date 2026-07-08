@@ -17,9 +17,16 @@ const RESPONDABLE = new Set<ReplyVerdict["classification"]>(["interested", "neut
 
 /**
  * Converse-to-close turn cap. After this many agent messages in one thread without converting, the
- * responder goes quiet and leaves it to the human — automation should never pester a real prospect.
+ * agent steps aside and HANDS OFF — the human is told to pick the thread up (needs_human), never
+ * a silent stall. Shared with sequence-touch so proactive nudges respect the same ceiling.
  */
-const MAX_AGENT_TURNS = 6;
+export const MAX_AGENT_TURNS = 6;
+
+/** Conversation cadence (0044): after a prospect replies, the next proactive nudge (if they go
+ *  quiet again) comes this many days after the last agent message — an engaged thread stays on
+ *  a conversation clock instead of dying with the 2-touch cold sequence. */
+export const CONVERSATION_NUDGE_GAP_DAYS = 2;
+const DAY_MS = 86_400_000;
 
 /**
  * Freshness window for auto-answering. A reply processed days after it arrived (webhook outage
@@ -85,7 +92,17 @@ async function maybeRespond(
 
   const bundle = await deps.store.getResponderBundle(accountId, lead.id, lead.campaignId);
   if (!bundle) return false; // no live Outreach agent, or no insights to ground a reply
-  if (bundle.agentTurns >= MAX_AGENT_TURNS) return false; // hand off to the human
+  if (bundle.agentTurns >= MAX_AGENT_TURNS) {
+    // Turn cap reached and a real prospect is still talking — the human must take over,
+    // loudly (a capped thread used to just go silent).
+    await deps.store.insertLeadNotification({
+      accountId,
+      leadId: lead.id,
+      kind: "needs_human",
+      body: "The agent hit its conversation limit on this thread — reply personally from the lead's page.",
+    });
+    return false;
+  }
   // A queued message NEWER than this reply is (or already covers) the answer — don't double-
   // message. An OLDER one was drafted blind to what the lead just said: fall through and let
   // cancelPendingSends below supersede it (a blind scripted draft used to both block this
@@ -125,6 +142,7 @@ async function maybeRespond(
     body: reply.message,
     status: autoSend ? "approved" : "pending_review",
     linkedinStage: "message",
+    origin: "reply_response", // rides the dispatch speed-to-lead lane (0044)
     styleFlags: clean ? null : describeViolations(reply.violations),
   });
   return true;
@@ -259,5 +277,11 @@ export async function runInbound(payload: InboundPayload, deps: InboundDeps): Pr
   const responded = await maybeRespond(
     deps, accountId, lead, event.body, verdict, new Date(event.receivedAt), now
   );
+  // Conversation cadence (0044): an engaged prospect's run switches to the conversation clock —
+  // if they go quiet after this exchange, a thread-aware nudge follows in a couple of days
+  // instead of the thread dying with the cold sequence. Booked = the win; no nudging needed.
+  if (RESPONDABLE.has(verdict.classification) && !verdict.booked) {
+    await deps.store.reviveSequenceRun(lead.id, new Date(now.getTime() + CONVERSATION_NUDGE_GAP_DAYS * DAY_MS));
+  }
   return { handled: true, action: `reply:${verdict.classification}${responded ? "+responded" : ""}` };
 }

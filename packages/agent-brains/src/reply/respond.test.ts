@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { MockLanguageModelV3 } from "ai/test";
-import { draftConversationMessage, type ConversationMessageInput } from "./respond";
+import { draftConversationMessage, type ConversationMessageInput , allowedConversationLinks, validateConversationMessage } from "./respond";
 import type { StoredInsights } from "../prospect/schema";
 
 const insights: StoredInsights = {
@@ -103,5 +103,34 @@ describe("draftConversationMessage — restart guard", () => {
     });
     const out = await draftConversationMessage(input(), model);
     expect(out.violations.some((v) => v.rule === "restart")).toBe(true);
+  });
+});
+
+describe("validateConversationMessage — link whitelist + action claims (2026-07-08)", () => {
+  const BLOCK = "Seller company: Vantera\nSeller offer: outreach agents";
+
+  it("allows the booking link when whitelisted", () => {
+    const out = validateConversationMessage(
+      "Happy to walk you through it — grab any time here: https://cal.com/aiden/15min",
+      BLOCK,
+      ["https://cal.com/aiden/15min"]
+    );
+    expect(out.filter((v) => v.rule === "unapproved-link")).toEqual([]);
+  });
+
+  it("flags any non-whitelisted URL", () => {
+    const out = validateConversationMessage("See https://sketchy.example/pricing", BLOCK, []);
+    expect(out.some((v) => v.rule === "unapproved-link")).toBe(true);
+  });
+
+  it("flags fabricated platform actions", () => {
+    const out = validateConversationMessage("That's kind — just joined!", BLOCK, []);
+    expect(out.some((v) => v.rule === "action-claim")).toBe(true);
+  });
+
+  it("allowedConversationLinks collects booking + content links only", () => {
+    expect(
+      allowedConversationLinks({ cta: "x", bookingUrl: "https://cal.com/a", contentLinks: ["https://v.dev/p", "deck.pdf"] })
+    ).toEqual(["https://cal.com/a", "https://v.dev/p"]);
   });
 });

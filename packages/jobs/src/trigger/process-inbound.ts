@@ -1,4 +1,4 @@
-import { logger, task } from "@trigger.dev/sdk";
+import { logger, task, tasks } from "@trigger.dev/sdk";
 import { createDb } from "@vantera/db";
 import { classifyReply, draftConversationMessage, fixConversationMessage } from "@vantera/agent-brains";
 import { createLinkedInInfraFromEnv } from "@vantera/linkedin-infra";
@@ -24,6 +24,11 @@ export const processInbound = task({
       respondFn: (input) => draftConversationMessage(input),
       fixReplyFn: (original, input) => fixConversationMessage(original, input),
     });
+    if (summary.action.endsWith("+responded")) {
+      // Speed-to-lead: a response just queued on the priority lane — run dispatch NOW instead
+      // of waiting for the next cron tick, so the prospect hears back in ~1-2 minutes.
+      await tasks.trigger("send-dispatch", {});
+    }
     logger.info("inbound processed", { source: payload.source, ...summary });
     return summary;
   },

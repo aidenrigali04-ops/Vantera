@@ -62,6 +62,7 @@ class FakeCopyStore implements CopyDraftStore {
       },
       assets: [{ kind: "link", url: "https://acme.com/case-study", filename: null }],
       account: { industry: "devtools", websiteScan: null },
+      avoidPhrases: [],
     };
   }
   async getCopyContext() {

@@ -30,11 +30,14 @@ function toDraftInput(lead: DraftableLead, ctx: CopyContext, strategy?: CopyStra
     insights: lead.aiInsights,
     context: {
       cta: ctx.agent.config.cta,
+      // no bookingUrl here on purpose: the first touch is link-free by rule; the link
+      // belongs to the conversation stage (responder bundle), where interest exists
       contentLinks: ctx.assets
         .map((a) => a.url ?? a.filename)
         .filter((v): v is string => Boolean(v)),
       accountIndustry: ctx.account.industry,
       valueProp: ctx.account.websiteScan?.summary ?? null,
+      avoidPhrases: ctx.avoidPhrases,
       // Empty / absent → strategyDirectives("") → prompt unchanged from before the optimizer.
       strategy,
     },

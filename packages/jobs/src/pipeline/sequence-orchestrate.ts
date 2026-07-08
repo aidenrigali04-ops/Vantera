@@ -47,6 +47,7 @@ export async function driveSequenceRun(
       suppressed,
       accountPaused: item.accountPaused,
       killSwitch: env.killSwitch,
+      leadReplied: item.leadReplied,
       now: env.now,
     };
     const decision = advanceSequence(ctx);
@@ -55,6 +56,9 @@ export async function driveSequenceRun(
     // optimistic claim; if another tick already moved this run, stop
     const claimed = await env.store.applyRunPatch(run.id, run.nextActionAt, decision.patch);
     if (!claimed) return { dispatched: 0, archived: 0 };
+
+    // park: the soft-no revival wrote its future next_action_at — nothing more this tick
+    if (decision.kind === "park") return { dispatched: 0, archived: 0 };
 
     if (decision.kind === "dispatch") {
       await env.dispatch.dispatchTouch({

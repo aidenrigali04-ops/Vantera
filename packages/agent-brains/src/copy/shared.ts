@@ -12,8 +12,15 @@ export interface CopyLead {
 export interface CopyContext {
   /** the user's CTA from the Copy agent wizard, e.g. "book a 15-min intro" */
   cta: string;
+  /** the seller's meeting-booking URL — the conversation brain offers it ONCE when the
+   *  prospect shows interest in talking; the only way a chat converts without ping-pong */
+  bookingUrl?: string | null;
   /** filenames/links from Add Content — referenced, never attached in first touch */
   contentLinks?: string[];
+  /** openers/CTA phrasings from the account's recent sends — injected as "do not reuse" so
+   *  a batch of drafts doesn't converge on the model's favorite template (AI-detectable
+   *  messaging is the #1 churn driver in the category). NEVER part of grounding. */
+  avoidPhrases?: string[];
   /** the seller's company name — so the caller can honestly say "this is {rep} from {company}" */
   accountName?: string | null;
   accountIndustry?: string | null;
@@ -77,6 +84,19 @@ export interface DraftInput {
   context: CopyContext;
 }
 
+/**
+ * "Do not reuse" block for recent phrasings — appended to the PROMPT only, never to the
+ * grounding string (old messages may contain metrics that would falsely whitelist new claims).
+ */
+export function avoidBlock(avoidPhrases?: string[]): string {
+  const phrases = (avoidPhrases ?? []).map((p) => p.trim()).filter(Boolean);
+  if (phrases.length === 0) return "";
+  return [
+    `Vary your language. These phrasings were used in this account's recent messages — do NOT reuse or lightly rephrase any of them:`,
+    ...phrases.map((p) => `- "${p}"`),
+  ].join("\n");
+}
+
 /** Compact per-lead block shared by both copy brains; context first for prompt caching. */
 export function leadBlock({ lead, insights, context }: DraftInput): string {
   const name = [lead.firstName, lead.lastName].filter(Boolean).join(" ") || "unknown";
@@ -85,6 +105,7 @@ export function leadBlock({ lead, insights, context }: DraftInput): string {
     `Seller industry: ${context.accountIndustry ?? "unknown"}`,
     `Seller offer: ${context.valueProp ?? "unknown"}`,
     `CTA goal: ${context.cta}`,
+    context.bookingUrl ? `Booking link (offer ONLY once the prospect shows interest in talking): ${context.bookingUrl}` : null,
     context.brandVoice ? `Brand voice (match this tone): ${context.brandVoice}` : null,
     context.guardrails ? `Guardrails (never violate): ${context.guardrails}` : null,
     context.contentLinks?.length ? `Supporting content: ${context.contentLinks.join(", ")}` : null,

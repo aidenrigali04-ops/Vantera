@@ -256,6 +256,9 @@ export interface IntentScanSummary {
 
 export interface CopyConfig {
   cta: string;
+  /** the seller's meeting-booking URL (0044) — the conversation brain offers it once when the
+   *  prospect shows interest in talking; null until set in the Outreach agent's settings */
+  bookingUrl?: string | null;
   /** LinkedIn is the only channel; retained as an object for back-compat with stored agent configs. */
   channels: { linkedin: boolean };
 }
@@ -264,6 +267,8 @@ export interface CopyContext {
   agent: { id: string; accountId: string; status: string; campaignId: string | null; config: CopyConfig; sendMode: "review" | "automatic" };
   assets: { kind: string; url: string | null; filename: string | null }[];
   account: { industry: string | null; websiteScan: (WebsiteScan & { url?: string }) | null };
+  /** recent sent openers — anti-template "do not reuse" list for the draft prompt (0044) */
+  avoidPhrases: string[];
 }
 
 export interface DraftableLead {
@@ -292,6 +297,9 @@ export interface NewScheduledSend {
   status: "pending_review" | "approved";
   /** invite/message pair for LinkedIn (0009) */
   linkedinStage: "invite" | "message" | null;
+  /** which machine queued it (0044): 'reply_response' rides the dispatch priority lane;
+   *  omitted = 'sequence' (full pacing + send windows) */
+  origin?: "sequence" | "reply_response" | "manual";
   styleFlags: string | null;
 }
 
@@ -476,6 +484,11 @@ export interface DispatchableSend {
    *  facts can't see a sibling claim — two rows approved across adjacent ticks used to both fly
    *  minutes apart (2026-07-07 triple-send). One claimed message per lead at a time. */
   leadHasInFlightMessage: boolean;
+  /** which machine queued it (0044) — reply responses jump the pacing queue; manual sends
+   *  skip the send window (a human chose to send now) */
+  origin: "sequence" | "reply_response" | "manual";
+  /** free-text lead location — drives the proactive business-hours send window */
+  leadLocation: string | null;
   /** Multi-sender: the LinkedIn account already assigned to this lead (rule 04/13).
    *  Null until first invite — invites without one are assigned here; a connected
    *  lead's messages are LOCKED to this account (can't message from another). */
@@ -636,7 +649,14 @@ export interface InboundStore {
    * nurturing until the lead converts (conversion gate) or is exhausted.
    */
   stopSequenceForReply(leadId: string): Promise<void>;
-  insertLeadNotification(n: { accountId: string; leadId: string; kind: "reply"; body: string }): Promise<void>;
+  insertLeadNotification(n: { accountId: string; leadId: string; kind: "reply" | "needs_human"; body: string }): Promise<void>;
+  /**
+   * A live prospect replied: put their run back in CONVERSATION cadence — status active,
+   * one touch of headroom, next nudge at `nextActionAt` — so an engaged thread never dies
+   * with the cold sequence (2026-07-08: replied leads were exhausting at 2 cold touches).
+   * The MAX_AGENT_TURNS cap in sequence-touch bounds total agent messages.
+   */
+  reviveSequenceRun(leadId: string, nextActionAt: Date): Promise<void>;
   /**
    * Inputs for an ACTIVE contextual reply (the "converse to close" step): the live Outreach agent's
    * grounding + send mode + the running thread for this lead. Returns null when there's no live
@@ -724,6 +744,8 @@ export interface SequenceRun {
   touchesDone: number;
   nextActionAt: Date;
   enteredStageAt: Date;
+  /** one-shot soft-no revival timestamp (0044); null = revival still available */
+  revivedAt: Date | null;
 }
 
 export interface LeadChannels {
@@ -737,6 +759,8 @@ export interface SequenceTickContext {
   suppressed: { linkedin: boolean };
   accountPaused: boolean;
   killSwitch: boolean;
+  /** the lead has replied at least once — an exhausting run earns ONE ~30-day revival */
+  leadReplied: boolean;
   now: Date;
 }
 
@@ -747,12 +771,15 @@ export interface SequenceRunPatch {
   nextActionAt?: Date;
   enteredStageAt?: Date;
   lastTouchAt?: Date;
+  revivedAt?: Date;
 }
 
 export type SequenceDecision =
   | { kind: "hold" }
   | { kind: "dispatch"; stage: SequenceStage; touchNo: number; patch: SequenceRunPatch }
   | { kind: "advance"; patch: SequenceRunPatch }
+  /** write the patch and stop this tick — the soft-no revival parks the run ~30 days out */
+  | { kind: "park"; patch: SequenceRunPatch }
   | { kind: "exhaust"; patch: SequenceRunPatch };
 
 export interface SequenceTouchDispatch {
@@ -769,6 +796,8 @@ export interface DueSequenceRun {
   channels: LeadChannels;
   config: SequenceConfig;
   accountPaused: boolean;
+  /** the lead has replied at least once (drives the one-shot soft-no revival) */
+  leadReplied: boolean;
 }
 
 export interface SequenceStore {
@@ -799,6 +828,8 @@ export interface SequenceTouchStore {
   insertScheduledSend(send: NewScheduledSend): Promise<void>;
   /** stop a sequence run (lead exits the sequence — e.g. dropped below min_score on refresh) */
   stopSequenceRun(runId: string): Promise<void>;
+  /** turn-cap handoff: tell the human the agent is stepping aside on this thread */
+  insertLeadNotification(n: { accountId: string; leadId: string; kind: "needs_human"; body: string }): Promise<void>;
 }
 
 export interface SequenceTouchDeps {
@@ -822,7 +853,7 @@ export interface SequenceTouchDeps {
   refreshLead: (accountId: string, leadId: string) => Promise<"ok" | "dropped">;
 }
 
-export type SequenceTouchOutcome = "drafted" | "suppressed" | "skipped" | "dropped";
+export type SequenceTouchOutcome = "drafted" | "suppressed" | "skipped" | "dropped" | "handed_off";
 
 // ── Conversion gate (tracked-CTA redirect) ────────────────────────────────────
 

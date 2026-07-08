@@ -26,6 +26,7 @@ function run(over: Partial<SequenceRun> = {}): SequenceRun {
     touchesDone: 0,
     nextActionAt: NOW,
     enteredStageAt: NOW,
+    revivedAt: null,
     ...over,
   };
 }
@@ -36,6 +37,7 @@ function dueItem(over: Partial<DueSequenceRun> = {}): DueSequenceRun {
     channels: fullChannels,
     config: SEQUENCE_DEFAULTS,
     accountPaused: false,
+    leadReplied: false,
     ...over,
   };
 }
@@ -192,5 +194,22 @@ describe("runSequenceTick", () => {
     expect(out).toMatchObject({ due: 1, dispatched: 0, archived: 0 });
     expect(d.dispatchTouch).not.toHaveBeenCalled();
     expect(s.applyRunPatch).not.toHaveBeenCalled();
+  });
+});
+
+describe("driveSequenceRun — soft-no park (0044)", () => {
+  it("a park decision writes the patch and stops the tick — nothing dispatched, nothing archived", async () => {
+    const st = store();
+    const d = dispatch();
+    const acted = await driveSequenceRun(
+      dueItem({ run: run({ touchesDone: 2 }), leadReplied: true }),
+      { store: st, dispatch: d, killSwitch: false, suppressed: { linkedin: false }, now: NOW }
+    );
+    expect(acted).toEqual({ dispatched: 0, archived: 0 });
+    expect(st.applyRunPatch).toHaveBeenCalledTimes(1);
+    const patch = (st.applyRunPatch as ReturnType<typeof vi.fn>).mock.calls[0]![2];
+    expect(patch.revivedAt).toEqual(NOW);
+    expect(st.archiveLead).not.toHaveBeenCalled();
+    expect(d.dispatchTouch).not.toHaveBeenCalled();
   });
 });

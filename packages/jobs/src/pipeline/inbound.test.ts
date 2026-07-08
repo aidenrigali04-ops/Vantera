@@ -16,6 +16,7 @@ function makeStore(overrides: Partial<InboundStore> = {}): InboundStore & {
   connectedLeads: { leadId: string; at: Date }[];
   repliedLeads: { leadId: string; campaignId: string | null }[];
   canceledSends: string[];
+  revivedRuns: { leadId: string; nextActionAt: Date }[];
   upsertedLinkedInStatuses: Parameters<InboundStore["upsertLinkedInAccountStatus"]>[0][];
   stoppedSequences: string[];
   notifications: Parameters<InboundStore["insertLeadNotification"]>[0][];
@@ -36,6 +37,7 @@ function makeStore(overrides: Partial<InboundStore> = {}): InboundStore & {
   const scheduledSends: NewScheduledSend[] = [];
 
   const savedProviderRefs: { leadId: string; providerRef: string }[] = [];
+  const revivedRuns: { leadId: string; nextActionAt: Date }[] = [];
   const base: InboundStore = {
     findLinkedInAccountByProviderRef: async () => null,
     upsertLinkedInAccountStatus: async (e) => {
@@ -61,6 +63,7 @@ function makeStore(overrides: Partial<InboundStore> = {}): InboundStore & {
     markMeetingBooked: async (leadId, at) => { bookedMeetings.push({ leadId, at }); },
     cancelPendingSends: async (leadId) => { canceledSends.push(leadId); return 0; },
     stopSequenceForReply: async (leadId) => { stoppedSequences.push(leadId); },
+    reviveSequenceRun: async (leadId, nextActionAt) => { revivedRuns.push({ leadId, nextActionAt }); },
     insertLeadNotification: async (n) => { notifications.push(n); },
     // Responder defaults to OFF: no bundle ⇒ a reply is only classified + notified (prior behavior).
     getResponderBundle: async () => null,
@@ -70,6 +73,7 @@ function makeStore(overrides: Partial<InboundStore> = {}): InboundStore & {
 
   return Object.assign(base, {
     replies,
+    revivedRuns,
     classifications,
     suppressions,
     connectedLeads,
@@ -600,7 +604,7 @@ describe("runInbound — active responder (converse to close)", () => {
     expect(store.scheduledSends[0]!.status).toBe("pending_review");
   });
 
-  it("stops responding past the converse-to-close turn cap (hands off to the human)", async () => {
+  it("stops responding past the converse-to-close turn cap — and hands off LOUDLY (needs_human)", async () => {
     const store = storeWithBundle(bundle({ agentTurns: 6 }));
 
     const result = await runInbound(
@@ -610,6 +614,18 @@ describe("runInbound — active responder (converse to close)", () => {
 
     expect(result.action).toBe("reply:interested");
     expect(store.scheduledSends).toHaveLength(0);
+    expect(store.notifications.some((n) => n.kind === "needs_human")).toBe(true);
+  });
+
+  it("queues the response on the speed lane (origin reply_response)", async () => {
+    const store = storeWithBundle(bundle({ sendMode: "automatic" }));
+
+    await runInbound(
+      { source: "linkedin", payload: LINKEDIN_REPLY_FIXTURE },
+      deps(store, { classifyFn: classify("interested"), respondFn: respond() })
+    );
+
+    expect(store.scheduledSends[0]!.origin).toBe("reply_response");
   });
 
   it("does not double-message when a response NEWER than this reply is already queued/in-flight", async () => {
@@ -834,5 +850,43 @@ describe("runInbound — layered lead matching", () => {
     );
 
     expect(store.replies[0]?.providerMessageRef).toBe("li_evt_prov_1");
+  });
+});
+
+describe("runInbound — conversation cadence + speed lane (0044)", () => {
+  function storeForLead() {
+    return makeStore({
+      findLinkedInAccountByProviderRef: async () => ({ id: "li_id_1", accountId: "acc1" }),
+      findLeadByLinkedInUrl: async (_a, url) => (url === NORMALIZED_URL ? { id: "lead1", campaignId: "camp1" } : null),
+    });
+  }
+
+  it("a respondable reply revives the lead's run on the conversation clock", async () => {
+    const store = storeForLead();
+    await runInbound(
+      { source: "linkedin", payload: LINKEDIN_REPLY_FIXTURE },
+      deps(store, { classifyFn: classify("interested") })
+    );
+    expect(store.revivedRuns).toHaveLength(1);
+    expect(store.revivedRuns[0]!.leadId).toBe("lead1");
+    // nudge lands ~2 days out (the conversation gap), not on the cold cadence
+    const gapMs = store.revivedRuns[0]!.nextActionAt.getTime() - new Date("2026-06-12T10:06:00.000Z").getTime();
+    expect(gapMs).toBe(2 * 86_400_000);
+  });
+
+  it("hard negatives and booked wins never revive the run", async () => {
+    const store = storeForLead();
+    await runInbound(
+      { source: "linkedin", payload: LINKEDIN_REPLY_FIXTURE },
+      deps(store, { classifyFn: classify("not_interested") })
+    );
+    expect(store.revivedRuns).toHaveLength(0);
+
+    const store2 = storeForLead();
+    await runInbound(
+      { source: "linkedin", payload: LINKEDIN_REPLY_FIXTURE },
+      deps(store2, { classifyFn: classify("interested", true) })
+    );
+    expect(store2.revivedRuns).toHaveLength(0);
   });
 });

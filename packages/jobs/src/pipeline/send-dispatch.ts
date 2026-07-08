@@ -1,4 +1,5 @@
 import { dailyAllowance, paceWithJitter } from "./safety-limits";
+import { isWithinSendWindow } from "./send-window";
 import { assignSender, inviteBudget } from "./sender-assignment";
 import {
   TRIAL_SEND_CAP,
@@ -11,6 +12,12 @@ import {
 export const INVITE_EXPIRY_DAYS = 30;
 export const STALE_TASK_MINUTES = 30;
 const BASE_GAP_MS = 15 * 60_000; // ~human pacing between sends per sender account
+/** Speed-to-lead lane (0044): a reply-response goes out within seconds-to-90s of dispatch
+ *  instead of queueing behind the day's proactive sends. Responding to a live prospect fast
+ *  is the highest-leverage conversion move measured anywhere (<5 min ≈ 21x qualification);
+ *  it consumes the same per-sender message budget and passes every per-lead guard. */
+const REPLY_LANE_MIN_DELAY_MS = 15_000;
+const REPLY_LANE_JITTER_MS = 75_000;
 /** Per-LEAD floor between proactive messages (rule 04): after a hold drains, a prospect must
  *  never get two nudges in the same sitting. A reply from the lead AFTER our last message
  *  exempts the gap — answering promptly is human; a second unprompted nudge minutes later is not. */
@@ -98,8 +105,14 @@ export async function runSendDispatch(deps: SendDispatchDeps): Promise<SendDispa
     }
 
     const schedule = async (row: DispatchableSend, st: SenderState) => {
-      st.offsetMs += paceWithJitter(BASE_GAP_MS, seedFrom(row.id));
-      const runAt = new Date(now.getTime() + st.offsetMs);
+      let runAt: Date;
+      if (row.origin === "reply_response") {
+        // priority lane — never pays the accumulated human-pacing offset
+        runAt = new Date(now.getTime() + REPLY_LANE_MIN_DELAY_MS + ((seedFrom(row.id) >>> 0) % REPLY_LANE_JITTER_MS));
+      } else {
+        st.offsetMs += paceWithJitter(BASE_GAP_MS, seedFrom(row.id));
+        runAt = new Date(now.getTime() + st.offsetMs);
+      }
       await deps.store.markScheduled(row.id, runAt);
       await deps.enqueue(row.id, runAt);
       scheduled += 1;
@@ -121,6 +134,14 @@ export async function runSendDispatch(deps: SendDispatchDeps): Promise<SendDispa
     for (const row of lis) {
       if (trialRemaining <= 0) {
         skipped += 1; // trial ceiling reached mid-run
+        continue;
+      }
+
+      // Proactive sends wait for the prospect's business hours (0044): 62% of sends had gone
+      // out on weekends, and reply data + account-safety both favor weekday working hours.
+      // Reply-responses and human-typed sends are exempt — answering promptly is human.
+      if (row.origin === "sequence" && !isWithinSendWindow(now, row.leadLocation)) {
+        skipped += 1; // outside the prospect's window — re-evaluated next tick
         continue;
       }
 

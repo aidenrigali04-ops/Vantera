@@ -12,7 +12,8 @@ The Outreach Agent owns everything after a lead qualifies. For every qualified l
 
 1. **Name your agent** — its byline on every draft.
 2. **Targeting** — inherited from your Prospect Agent, shown read-only. Change targeting there and both stay in sync.
-3. **CTA** — the one thing each message invites the prospect to do (e.g. "book a 15-minute intro"). Example chips get you started; tailor the ask to your offer.
+3. **CTA** — the one thing each message invites the prospect to do (e.g. "book a 15-minute intro"). Example chips get you started; tailor the ask to your offer. The CTA sets the *direction* the conversation heads — the very first message never pitches or asks for a meeting; it earns a reply with a sharp, genuinely curious question about the prospect's situation, and the ask comes once they engage.
+4. **Booking link (optional, recommended)** — your scheduling URL (Cal.com, Calendly, …). When a prospect shows real interest, the agent shares it once so they can book a time without message ping-pong. Without one, interested conversations stall at "when works for you?".
 4. **Add content** — optional links, case studies, images, or files the agent can reference. The more you add, the smarter every message gets.
 5. **Deploy** — choose review or automatic sending, then it starts drafting as soon as qualified leads arrive.
 
@@ -24,7 +25,9 @@ The Outreach Agent owns everything after a lead qualifies. For every qualified l
 
 ## When they reply
 
-The agent doesn't stop at the first message — it handles the conversation. When a prospect replies, the agent reads what they actually said and writes the next message back, using the same grounding and voice as the first touch: it answers their question or objection and moves one step toward your CTA. It keeps the thread going each time they reply, until they book, opt out, or it's gone back and forth enough times to hand off to you.
+The agent doesn't stop at the first message — it handles the conversation. When a prospect replies, the agent reads what they actually said and writes the next message back in the prospect's own language, using the same grounding and voice as the first touch: it answers their question or objection fully and moves one step toward your CTA — offering your booking link once when they show real interest. Replies go out within minutes (answering a live prospect fast is the single biggest conversion lever), while brand-new outreach waits for the prospect's local business hours.
+
+If a prospect engages and then goes quiet, the agent follows up on a conversation rhythm — each nudge adds something new (a detail, an example, a piece of your content), never a "just following up". A prospect who said "not right now" gets exactly one respectful re-touch about a month later. And when the agent has gone back and forth enough times (six of its messages in one thread), it steps aside and notifies you — look for the "needs you" note on the bell — so a warm conversation always ends with a human, never a bot loop.
 
 - **A booked meeting is the finish line** — once a prospect confirms a time, the agent celebrates the win and stops selling.
 - **"Not interested" or "unsubscribe" ends it** — the conversation stops and the prospect is added to your suppression list, so they're never contacted again.

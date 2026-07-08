@@ -188,3 +188,46 @@ export function findUngroundedClaims(text: string, grounding: string): Violation
   }
   return violations;
 }
+
+// Completed platform actions the agent physically cannot perform — sending messages is its
+// only capability. "Just joined your group" shipped to a real prospect on 2026-07-08; a
+// fabricated action is the same trust-killer as a fabricated metric (report pain point #6).
+// Observation verbs (read/saw/noticed) are NOT flagged: the agent genuinely observes posts
+// and activity through its grounding data.
+const ACTION_CLAIM_PATTERN =
+  /\b(?:just\s+|i(?:'ve|\s+have)\s+(?:just\s+)?|i\s+(?:just\s+)?)(joined|signed\s+up|subscribed|registered|downloaded|installed|booked|enrolled)\b/i;
+
+/**
+ * Flags claims of completed actions the agent cannot have performed (joining groups,
+ * signing up, downloading…). Conversation-responder only — the enforcement floor for
+ * "you can only send messages".
+ */
+export function findActionClaims(text: string): Violation[] {
+  const match = text.match(ACTION_CLAIM_PATTERN);
+  if (!match) return [];
+  return [
+    {
+      rule: "action-claim",
+      detail: `claims to have "${match[1]}" — the agent can only send messages, never claim other actions`,
+    },
+  ];
+}
+
+/**
+ * Link whitelist for mid-conversation messages: the only URLs allowed are the seller's
+ * booking link and their Add-Content links (from the facts block). Anything else — invented
+ * domains, pasted articles — is flagged. First-touch copy stays fully link-free (see
+ * validateLinkedInDraft); this is the conversation-stage counterpart.
+ */
+export function findUnapprovedLinks(text: string, allowed: string[]): Violation[] {
+  const urls = text.match(/https?:\/\/[^\s)>"']+/gi) ?? [];
+  const violations: Violation[] = [];
+  const allowedNorm = allowed.filter(Boolean).map((a) => a.toLowerCase().replace(/\/+$/, ""));
+  for (const url of urls) {
+    const norm = url.toLowerCase().replace(/[.,;!?]+$/, "").replace(/\/+$/, "");
+    if (!allowedNorm.some((a) => norm === a || norm.startsWith(a))) {
+      violations.push({ rule: "unapproved-link", detail: `"${url}" is not an approved link` });
+    }
+  }
+  return violations;
+}

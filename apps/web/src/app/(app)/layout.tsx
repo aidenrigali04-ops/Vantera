@@ -21,12 +21,14 @@ const NOTE_VERB: Record<AppNotification["kind"], string> = {
   converted: "booked a meeting",
   exhausted: "went cold after the full sequence",
   hot_signal: "is heating up — a fresh buying signal, worth reaching out now",
+  needs_human: "needs YOU — the agent hit its conversation limit, take the thread over",
 };
 const NOTE_HREF: Record<AppNotification["kind"], string> = {
   reply: "/leads?tab=replied",
   converted: "/dashboard?view=pipeline",
   exhausted: "/leads?tab=rejected",
   hot_signal: "/leads?tab=qualified",
+  needs_human: "/leads?tab=replied",
 };
 
 // Relative time on the server → passed as a static string (no client Date.now()).

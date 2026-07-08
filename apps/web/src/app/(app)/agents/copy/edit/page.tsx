@@ -13,7 +13,7 @@ export default async function EditCopyAgentPage() {
     .maybeSingle<{
       id: string;
       name: string;
-      config: { cta?: string; channels?: { linkedin?: boolean } } | null;
+      config: { cta?: string; bookingUrl?: string | null; channels?: { linkedin?: boolean } } | null;
       campaigns: { send_mode: string | null } | null;
     }>();
   if (!agent) redirect("/agents");
@@ -52,6 +52,7 @@ export default async function EditCopyAgentPage() {
       edit={{
         name: agent.name,
         cta: agent.config?.cta ?? "",
+        bookingUrl: agent.config?.bookingUrl ?? "",
         links,
         channels: {
           linkedin: agent.config?.channels?.linkedin ?? true,

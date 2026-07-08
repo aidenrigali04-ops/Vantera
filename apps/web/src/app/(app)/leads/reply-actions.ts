@@ -59,6 +59,7 @@ export async function sendManualReply(
     body: trimmed,
     status: "approved",
     linkedin_stage: channel === "linkedin" ? "message" : null,
+    origin: "manual", // human-typed: exempt from the proactive send window, normal pacing otherwise
   });
   if (error) return { error: "Could not queue your reply. Please try again." };
   revalidatePath("/leads");

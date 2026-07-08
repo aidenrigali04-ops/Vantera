@@ -11,6 +11,7 @@ import {
   type LinkedInDraft,
 } from "./linkedin";
 import {
+  allowedConversationLinks,
   renderThread,
   validateConversationMessage,
   type ConversationDraft,
@@ -75,7 +76,7 @@ export async function fixLinkedInDraft(
           maxOutputTokens: 600,
         })
       ).object,
-    (fixed) => validateLinkedInDraft(fixed, block)
+    (fixed) => validateLinkedInDraft(fixed, block, input.context.accountName)
   );
   return {
     connectionNote: output.connection_note,
@@ -120,7 +121,7 @@ export async function fixConversationMessage(
           maxOutputTokens: 300,
         })
       ).object,
-    (fixed) => validateConversationMessage(fixed.message, block)
+    (fixed) => validateConversationMessage(fixed.message, block, allowedConversationLinks(input.context))
   );
   return { message: output.message, violations };
 }

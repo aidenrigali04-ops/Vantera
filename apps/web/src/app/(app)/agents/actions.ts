@@ -294,7 +294,7 @@ export async function deployCopyAgent(
 ): Promise<AgentActionState> {
   const parsed = parseCopyForm(formData);
   if (!parsed.ok) return { error: parsed.error };
-  const { name, cta, links, channels, sendMode } = parsed.values;
+  const { name, cta, bookingUrl, links, channels, sendMode } = parsed.values;
 
   const { supabase, user, account } = await sessionAccount();
   if (!user || !account) return { error: "Your session expired. Sign in again." };
@@ -355,7 +355,7 @@ export async function deployCopyAgent(
       kind: "copy",
       name,
       status: "live",
-      config: { cta, channels },
+      config: { cta, bookingUrl, channels },
       campaign_id: campaign.id,
       deployed_at: new Date().toISOString(),
       created_by: user.id,
@@ -438,7 +438,7 @@ export async function updateCopyAgent(
 ): Promise<AgentActionState> {
   const parsed = parseCopyForm(formData);
   if (!parsed.ok) return { error: parsed.error };
-  const { name, cta, links, channels, sendMode } = parsed.values;
+  const { name, cta, bookingUrl, links, channels, sendMode } = parsed.values;
 
   const { supabase, user, account } = await sessionAccount();
   if (!user || !account) return { error: "Your session expired. Sign in again." };
@@ -456,7 +456,7 @@ export async function updateCopyAgent(
 
   const { error: updateError } = await supabase
     .from("agents")
-    .update({ name, config: { ...(agent.config ?? {}), cta, channels } })
+    .update({ name, config: { ...(agent.config ?? {}), cta, bookingUrl, channels } })
     .eq("id", agent.id); // RLS scopes to the admin's account (rule 02)
   if (updateError) return { error: "Could not save changes. Only workspace admins can do this." };
 

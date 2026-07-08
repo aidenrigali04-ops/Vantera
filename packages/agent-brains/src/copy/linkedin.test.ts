@@ -110,3 +110,37 @@ describe("validateLinkedInDraft — follow-up link guard", () => {
     expect(violations.some((v) => v.rule === "no-links")).toBe(true);
   });
 });
+
+describe("validateLinkedInDraft — de-pitched first touch (2026-07-08)", () => {
+  it("flags the product name in the first message — touch 1 earns a conversation, never sells", () => {
+    const violations = validateLinkedInDraft(
+      {
+        connection_note: "Your PMO work in Doha caught my eye.",
+        followup_message: "Thanks for connecting. Vantera finds in-market buyers for you.",
+      },
+      undefined,
+      "Vantera"
+    );
+    expect(violations.some((v) => v.rule === "no-product-pitch")).toBe(true);
+  });
+
+  it("flags a call/meeting ask in the first message — the question IS the CTA", () => {
+    const violations = validateLinkedInDraft({
+      connection_note: "Sharp take on churn.",
+      followup_message: "Thanks for connecting. Would a quick call make sense this week?",
+    });
+    expect(violations.some((v) => v.rule === "no-meeting-ask")).toBe(true);
+  });
+
+  it("accepts a question-led, pitch-free first message", () => {
+    const violations = validateLinkedInDraft(
+      {
+        connection_note: "Your PMO work in Doha caught my eye.",
+        followup_message: "Thanks for connecting. Curious — when pipeline depends on you alone, what eats more hours: finding the right people or writing to them?",
+      },
+      undefined,
+      "Vantera"
+    );
+    expect(violations).toEqual([]);
+  });
+});

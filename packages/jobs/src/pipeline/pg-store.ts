@@ -142,8 +142,40 @@ function toRow(send: NewScheduledSend) {
     subject: send.subject,
     body: send.body,
     linkedinStage: send.linkedinStage,
+    origin: send.origin ?? "sequence",
     styleFlags: send.styleFlags,
   };
+}
+
+/**
+ * The account's most recent sent-message openers (first line, clipped) — injected into draft
+ * prompts as "do not reuse" so a batch of drafts can't converge on one scaffold (69% of sends
+ * had shared the same opener before this; AI-detectable templating is the category's #1
+ * churn driver). Never used as grounding — see avoidBlock in @vantera/agent-brains.
+ */
+const AVOID_PHRASES_LIMIT = 10;
+async function recentSendOpeners(db: Db, accountId: string): Promise<string[]> {
+  const rows = await db
+    .select({ body: scheduledSends.body })
+    .from(scheduledSends)
+    .where(
+      and(
+        eq(scheduledSends.accountId, accountId),
+        eq(scheduledSends.status, "sent"),
+        isNotNull(scheduledSends.body)
+      )
+    )
+    .orderBy(desc(scheduledSends.updatedAt))
+    .limit(AVOID_PHRASES_LIMIT);
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const r of rows) {
+    const opener = (r.body ?? "").split("\n")[0]!.slice(0, 70).trim();
+    if (opener.length < 12 || seen.has(opener.toLowerCase())) continue;
+    seen.add(opener.toLowerCase());
+    out.push(opener);
+  }
+  return out;
 }
 
 /** Drizzle-backed store used by the Trigger.dev tasks (service-role DATABASE_URL). */
@@ -549,6 +581,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           campaignId: agent.campaignId,
           config: {
             cta: config.cta ?? "a quick look",
+            bookingUrl: config.bookingUrl ?? null,
             channels: { linkedin: config.channels?.linkedin ?? false },
           },
           sendMode: campaign?.sendMode === "automatic" ? "automatic" : "review",
@@ -558,6 +591,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           industry: account.onboardingIndustry,
           websiteScan: account.websiteScan as CopyContext["account"]["websiteScan"],
         },
+        avoidPhrases: await recentSendOpeners(db, agent.accountId),
       };
     },
 
@@ -651,6 +685,27 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         .update(sequenceRuns)
         .set({ status: "stopped", updatedAt: new Date() })
         .where(eq(sequenceRuns.id, runId));
+    },
+
+    async reviveSequenceRun(leadId: string, nextActionAt: Date) {
+      // Conversation cadence (0044): the engaged lead's run goes back on the clock with one
+      // touch of headroom — touches_done drops to (target-1)-equivalent by simply stepping
+      // back one from wherever it is, floored at 0. Exhausted/stopped runs come back active;
+      // converted runs stay converted (the win is never reopened).
+      await db
+        .update(sequenceRuns)
+        .set({
+          status: "active",
+          touchesDone: sql`greatest(${sequenceRuns.touchesDone} - 1, 0)`,
+          nextActionAt,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(sequenceRuns.leadId, leadId),
+            inArray(sequenceRuns.status, ["active", "paused_reply", "exhausted", "stopped"])
+          )
+        );
     },
 
     async insertLinkedInSendPair(invite: NewScheduledSend, message: NewScheduledSend) {
@@ -843,6 +898,8 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           leadInvitedAt: leads.linkedinInvitedAt,
           leadConnectedAt: leads.linkedinConnectedAt,
           leadAssignedSenderId: leads.linkedinAccountId,
+          leadLocation: leads.location,
+          origin: scheduledSends.origin,
           createdAt: scheduledSends.createdAt,
         })
         .from(scheduledSends)
@@ -925,6 +982,8 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         leadLastMessageSentAt: lastSentByLead.get(r.leadId) ?? null,
         leadRepliedAt: lastReplyByLead.get(r.leadId) ?? null,
         leadHasInFlightMessage: inFlightLeads.has(r.leadId),
+        origin: r.origin as "sequence" | "reply_response" | "manual",
+        leadLocation: r.leadLocation,
       }));
     },
 
@@ -1392,7 +1451,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         .select({ url: agentAssets.url, filename: agentAssets.filename })
         .from(agentAssets)
         .where(eq(agentAssets.agentId, agent.id));
-      const config = (agent.config ?? {}) as { cta?: string };
+      const config = (agent.config ?? {}) as { cta?: string; bookingUrl?: string | null };
       const scan = account?.websiteScan as (WebsiteScan & { url?: string }) | null;
 
       // Running thread: delivered agent touches + the lead's replies, merged oldest-first.
@@ -1461,12 +1520,14 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         insights: lead.aiInsights as ResponderBundle["insights"],
         context: {
           cta: config.cta ?? "a quick look",
+          bookingUrl: config.bookingUrl ?? null,
           contentLinks: assets
             .map((a) => a.url ?? a.filename)
             .filter((v): v is string => Boolean(v)),
           accountName: account?.name ?? null,
           accountIndustry: account?.onboardingIndustry ?? null,
           valueProp: scan?.summary ?? null,
+          avoidPhrases: await recentSendOpeners(db, accountId),
         },
         thread,
         agentTurns: sentMessages.length,
@@ -1556,9 +1617,12 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           touchesDone: sequenceRuns.touchesDone,
           nextActionAt: sequenceRuns.nextActionAt,
           enteredStageAt: sequenceRuns.enteredStageAt,
+          revivedAt: sequenceRuns.revivedAt,
           linkedinUrl: leads.linkedinUrl,
           sequenceConfig: campaigns.sequenceConfig,
           accountPaused: accounts.outreachPaused,
+          // the lead engaged at least once — an exhausting run earns the one-shot soft-no revival
+          leadReplied: sql<boolean>`exists (select 1 from replies r where r.lead_id = ${sequenceRuns.leadId})`,
         })
         .from(sequenceRuns)
         .innerJoin(
@@ -1584,6 +1648,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           touchesDone: r.touchesDone,
           nextActionAt: r.nextActionAt,
           enteredStageAt: r.enteredStageAt,
+          revivedAt: r.revivedAt,
         },
         channels: {
           linkedinUrl: r.linkedinUrl,
@@ -1592,6 +1657,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           (r.sequenceConfig ?? null) as Parameters<typeof resolveSequenceConfig>[0]
         ),
         accountPaused: r.accountPaused,
+        leadReplied: r.leadReplied,
       }));
     },
 
@@ -1646,6 +1712,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
       if (patch.nextActionAt !== undefined) set.nextActionAt = patch.nextActionAt;
       if (patch.enteredStageAt !== undefined) set.enteredStageAt = patch.enteredStageAt;
       if (patch.lastTouchAt !== undefined) set.lastTouchAt = patch.lastTouchAt;
+      if (patch.revivedAt !== undefined) set.revivedAt = patch.revivedAt;
       const rows = await db
         .update(sequenceRuns)
         .set(set)
@@ -1727,12 +1794,12 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         .where(and(eq(sequenceRuns.campaignId, campaignId), eq(sequenceRuns.leadId, leadId)));
     },
 
-    // Widened union satisfies both ConversionStore ("converted") and InboundStore ("reply");
-    // lead_notifications.kind check (migration 0017) permits reply | converted | exhausted.
+    // Widened union satisfies every notifying store (reply/converted/exhausted/needs_human);
+    // lead_notifications.kind check (0017, extended by 0044) permits all of them.
     async insertLeadNotification(n: {
       accountId: string;
       leadId: string;
-      kind: "reply" | "converted" | "exhausted";
+      kind: "reply" | "converted" | "exhausted" | "needs_human";
       body: string;
     }) {
       await db.insert(leadNotifications).values({

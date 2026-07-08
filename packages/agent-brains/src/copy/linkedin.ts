@@ -2,7 +2,7 @@ import { generateObject, type LanguageModel } from "ai";
 import { z } from "zod";
 import { getModel } from "@vantera/ai";
 import { validateHumanity, findUngroundedClaims, type Violation } from "./humanizer";
-import { generateHumanized, leadBlock, strategyDirectives, type DraftInput } from "./shared";
+import { avoidBlock, generateHumanized, leadBlock, strategyDirectives, type DraftInput } from "./shared";
 
 /**
  * LinkedIn's hard cap on a connection-request note is 300 chars, but free-tier
@@ -37,21 +37,26 @@ Connection note — under ${CONNECTION_NOTE_MAX_CHARS} characters:
 - Reference the prospect's trigger, work, or a genuine commonality. That's all.
 - NO pitch, no CTA, no links, no "I'd love to connect about our product". The only goal is an accepted request from a real-sounding peer.
 
-Follow-up message — KEEP IT SHORT, under ${FOLLOWUP_MAX_CHARS} characters, ideally 1-2 sentences:
-- A brief thanks (3-6 words, not gushing), then ONE sharp observation tying their pain/trigger to the aha moment as a concrete outcome. Cut every word that isn't pulling weight.
-- End with ONE soft, interest-based ask aligned to the CTA goal. No meeting demands, no calendar links.
+Follow-up message — KEEP IT SHORT, under ${FOLLOWUP_MAX_CHARS} characters, ideally 1-2 sentences. This is the FIRST real exchange, and buyers delete anything that opens with a pitch, so:
+- Do NOT name the seller's company or product. Do NOT list features or describe what the seller does. Do NOT ask for a call, meeting, or demo. All of that comes later, after they engage.
+- Structure: a brief thanks (3-6 words, not gushing), then ONE sharp, specific observation about THEIR situation — their trigger or pain framed as something worth reacting to — and ONE genuinely curious question about how they handle it today. The question is the whole CTA; make it easy and interesting to answer.
+- The "CTA goal" in the block tells you the direction the conversation should eventually head — it must NOT appear as an ask in this message.
 - Brevity matters more than completeness — a tight two-sentence message beats a thorough one. Do not pad.
+- If the prospect's location strongly implies a primary language other than English, writing in that language is welcome.
 
-Both: conversational chat register, no "Dear", no "Best regards", no signature. Plain human voice: no "I hope this finds you well", no buzzwords ("game-changer", "cutting-edge", "seamless"), no generic flattery ("big fan of", "love what you're doing"), no "As a …" openers, at most one em-dash, at most one exclamation mark, minimal hedging. Name the seller ONLY by the "Seller company" value from the block — ignore any other brand name that appears in the offer description.`;
+Both: conversational chat register, no "Dear", no "Best regards", no signature. Plain human voice: no "I hope this finds you well", no buzzwords ("game-changer", "cutting-edge", "seamless"), no generic flattery ("big fan of", "love what you're doing"), no "As a …" openers, at most one em-dash, at most one exclamation mark, minimal hedging. If you ever reference the seller, use ONLY the "Seller company" value from the block — never any other brand name from the offer description.`;
 
 // `grounding` is the per-lead facts (leadBlock). When provided, both messages are checked for
 // fabricated metric claims (rule 11 / anti-hallucination); unresolved ones surface in review.
+// `sellerName` enforces the de-pitched first touch: naming the product in message 1 is the
+// "pitch slap" buyers cite as the top delete trigger (2026-07-08 copy analysis).
 export function validateLinkedInDraft(
   draft: {
     connection_note: string;
     followup_message: string;
   },
   grounding?: string,
+  sellerName?: string | null,
 ): Violation[] {
   const violations = [
     ...validateHumanity(draft.connection_note, { maxChars: CONNECTION_NOTE_MAX_CHARS }),
@@ -64,6 +69,14 @@ export function validateLinkedInDraft(
   // referenced, never pasted in the first touch). Same anti-pitch discipline as the note.
   if (/https?:\/\//i.test(draft.followup_message)) {
     violations.push({ rule: "no-links", detail: "no links in the first follow-up — keep it a soft ask" });
+  }
+  // Touch 1 earns a conversation; it never sells. Product name or a meeting ask here is the
+  // classic pitch-slap — enforced, not just prompted.
+  if (sellerName && sellerName.trim().length > 2 && draft.followup_message.toLowerCase().includes(sellerName.trim().toLowerCase())) {
+    violations.push({ rule: "no-product-pitch", detail: `the first message must not name ${sellerName.trim()} — earn the conversation first` });
+  }
+  if (/\b(?:a\s+(?:quick\s+)?call|meeting|demo|calendar|15\s*min)\b/i.test(draft.followup_message)) {
+    violations.push({ rule: "no-meeting-ask", detail: "no call/meeting ask in the first message — the question IS the CTA" });
   }
   if (grounding) {
     violations.push(
@@ -79,11 +92,12 @@ export async function draftLinkedIn(
   model: LanguageModel = getModel()
 ): Promise<LinkedInDraft> {
   const block = leadBlock(input);
-  // Optional experiment strategy is appended after the block; empty for the champion baseline, so the
-  // prompt is unchanged when no experiment is running. Grounding stays the block (strategy adds no
-  // facts), so the humanizer/anti-hallucination checks are identical.
+  // Optional experiment strategy + recent-phrasing avoidance are appended after the block; both are
+  // empty by default, so the prompt is unchanged when neither applies. Grounding stays the BLOCK
+  // alone (neither adds facts), so the humanizer/anti-hallucination checks are identical.
   const strat = strategyDirectives(input.context.strategy);
-  const basePrompt = strat ? `${block}\n\n${strat}` : block;
+  const avoid = avoidBlock(input.context.avoidPhrases);
+  const basePrompt = [block, strat, avoid].filter(Boolean).join("\n\n");
   const { output, violations } = await generateHumanized(
     async (fixNote) =>
       (
@@ -95,7 +109,7 @@ export async function draftLinkedIn(
           maxOutputTokens: 600,
         })
       ).object,
-    (draft) => validateLinkedInDraft(draft, block)
+    (draft) => validateLinkedInDraft(draft, block, input.context.accountName)
   );
   return {
     connectionNote: output.connection_note,

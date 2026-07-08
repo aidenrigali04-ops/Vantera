@@ -1,5 +1,6 @@
 import { describeViolations } from "@vantera/agent-brains";
 import { normalizeLinkedInUrl } from "./copy-draft";
+import { MAX_AGENT_TURNS } from "./inbound";
 import { needsRefresh, FRESHNESS_WINDOW_DAYS } from "./freshness";
 import type {
   NewScheduledSend,
@@ -51,6 +52,20 @@ export async function runSequenceTouch(
   // agent or no insights to ground a message → skip rather than send something cold/generic.
   const bundle = await deps.store.getResponderBundle(d.accountId, d.leadId, d.campaignId);
   if (!bundle) return "skipped";
+
+  // Converse-to-close turn cap (shared with the responder): past it, the agent steps aside
+  // LOUDLY — the run stops and the human is told to take the thread over. Only threads with
+  // real engagement can reach the cap, so the notification is always about a live prospect.
+  if (bundle.agentTurns >= MAX_AGENT_TURNS) {
+    await deps.store.stopSequenceRun(d.runId);
+    await deps.store.insertLeadNotification({
+      accountId: d.accountId,
+      leadId: d.leadId,
+      kind: "needs_human",
+      body: "The agent hit its conversation limit on this thread — reply personally from the lead's page.",
+    });
+    return "handed_off";
+  }
 
   // Never stack: if ANY message for this lead is still queued/in-flight (the first-touch
   // follow-up parked on acceptance, an unapproved draft, a scheduled touch), drafting another

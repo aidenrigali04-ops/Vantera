@@ -57,6 +57,7 @@ function deps(
       isSuppressed: async () => false,
       insertScheduledSend: vi.fn(async () => {}),
       stopSequenceRun: vi.fn(async (runId: string) => { stoppedRunIds.push(runId); }),
+      insertLeadNotification: vi.fn(async () => {}),
       ...over,
     },
     draftFollowupFn,
@@ -264,5 +265,29 @@ describe("runSequenceTouch — refresh-on-release", () => {
     );
     await runSequenceTouch(dispatch, d);
     expect(refreshedLeadIds).toHaveLength(0);
+  });
+});
+
+describe("runSequenceTouch — converse-to-close turn cap (0044)", () => {
+  it("past the cap: stops the run, notifies needs_human, drafts nothing", async () => {
+    const insert = vi.fn(async () => {});
+    const notify = vi.fn(async () => {});
+    const draftFn = vi.fn(async () => ({ message: "unused", violations: [] }));
+    const d = deps(
+      {
+        getResponderBundle: async () => bundle({ agentTurns: 6 }),
+        insertScheduledSend: insert,
+        insertLeadNotification: notify,
+      },
+      "ok",
+      [],
+      draftFn
+    );
+    const out = await runSequenceTouch(dispatch, d);
+    expect(out).toBe("handed_off");
+    expect(d.stoppedRunIds).toContain(dispatch.runId);
+    expect(notify).toHaveBeenCalledWith(expect.objectContaining({ kind: "needs_human", leadId: "l1" }));
+    expect(draftFn).not.toHaveBeenCalled();
+    expect(insert).not.toHaveBeenCalled();
   });
 });
