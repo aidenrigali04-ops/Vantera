@@ -61,8 +61,8 @@ const STRATEGY_LINES: Record<string, string> = {
   "openWith:pain": "Open from the prospect's core pain, framed as the outcome they want.",
   "followupLength:tight": "Make the follow-up a single, ruthlessly tight sentence.",
   "followupLength:standard": "", // the default register — no extra directive
-  "askStyle:soft": "Keep the ask a soft, low-pressure interest check — no meeting demand.",
-  "askStyle:specific": "Make the ask one concrete next step — propose a specific short call.",
+  "askStyle:soft": "Keep the ask a soft, low-pressure interest check, never a meeting demand.",
+  "askStyle:specific": "Make the ask one concrete next step: propose a specific short call.",
 };
 
 /**
@@ -79,7 +79,7 @@ export function strategyDirectives(strategy?: CopyStrategy): string {
     if (line) lines.push(`- ${line}`);
   }
   if (lines.length === 0) return "";
-  return `Strategy for this message (apply in addition to — never overriding — the rules above):\n${lines.join("\n")}`;
+  return `Strategy for this message (apply in addition to the rules above, never overriding them):\n${lines.join("\n")}`;
 }
 
 export interface DraftInput {
@@ -89,6 +89,21 @@ export interface DraftInput {
 }
 
 /**
+ * The voice contract shared by every prospect-facing message (first touch, follow-up,
+ * mid-conversation). Interpolated into each system prompt so the surfaces can't drift apart,
+ * and written dash-free on purpose: prompt prose primes output style, so instructions that
+ * lean on em-dashes teach the model to write them. The humanizer enforces the hard rules
+ * deterministically (zero dashes, no semicolons, no lists, banned vocabulary).
+ */
+export const VOICE_RULES = `Voice, for every message:
+- Write like you'd text a sharp colleague you respect. Plain, warm, specific. Use contractions (you're, that's, we've).
+- Short and flowing. One thought per sentence. Cut every word that isn't pulling weight.
+- NEVER use a dash of any kind as punctuation. No em-dashes, no hyphens between clauses. Use a comma, or start a new sentence. No semicolons, no bullet points, no numbered lists.
+- Everyday words over business words. Say "use" not "utilize" or "leverage", "help" not "empower", "look into" not "delve". Never: streamline, elevate, seamless, game-changer, thrilled, kudos.
+- No "Dear", no "Best regards", no signature, no generic flattery, at most one exclamation mark, minimal hedging.
+- Read it back as if it were a text message. If it sounds like marketing, a template, or an assistant, rewrite it plainer and shorter.`;
+
+/**
  * "Do not reuse" block for recent phrasings — appended to the PROMPT only, never to the
  * grounding string (old messages may contain metrics that would falsely whitelist new claims).
  */
@@ -96,7 +111,7 @@ export function avoidBlock(avoidPhrases?: string[]): string {
   const phrases = (avoidPhrases ?? []).map((p) => p.trim()).filter(Boolean);
   if (phrases.length === 0) return "";
   return [
-    `Vary your language. These phrasings were used in this account's recent messages — do NOT reuse or lightly rephrase any of them:`,
+    `Vary your language. These phrasings were used in this account's recent messages, do NOT reuse or lightly rephrase any of them:`,
     ...phrases.map((p) => `- "${p}"`),
   ].join("\n");
 }
@@ -137,7 +152,7 @@ export async function generateHumanized<T>(
     return { output: first, violations: [] };
   }
   const second = await run(
-    `Your previous draft broke these style rules — rewrite and fix every one: ${describeViolations(firstViolations)}`
+    `Your previous draft broke these style rules, rewrite and fix every one: ${describeViolations(firstViolations)}`
   );
   return { output: second, violations: validate(second) };
 }

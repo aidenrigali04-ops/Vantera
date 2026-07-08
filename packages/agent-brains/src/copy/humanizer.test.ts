@@ -23,13 +23,23 @@ describe("validateHumanity", () => {
     expect(violations.some((v) => v.rule === "banned-phrase")).toBe(true);
   });
 
-  it("flags em-dash chains but allows a single em-dash", () => {
-    expect(validateHumanity("One thought — worth a look.")).toEqual([]);
+  it("flags ANY dash used as punctuation (zero tolerance, 2026-07-08)", () => {
+    expect(validateHumanity("One thought — worth a look.").some((v) => v.rule === "dashes")).toBe(true);
+    expect(validateHumanity("One thought -- worth a look.").some((v) => v.rule === "dashes")).toBe(true);
+    expect(validateHumanity("One thought - worth a look.").some((v) => v.rule === "dashes")).toBe(true);
+  });
+
+  it("keeps hyphenated words and URLs legal under the dash rule", () => {
+    expect(validateHumanity("Open to a 15-min look at how co-founders handle this?")).toEqual([]);
     expect(
-      validateHumanity("One thought — worth a look — let me know — anytime.").some(
-        (v) => v.rule === "em-dashes"
-      )
-    ).toBe(true);
+      validateHumanity("grab a slot: https://cal.com/aiden--team/15min").filter((v) => v.rule === "dashes")
+    ).toEqual([]);
+  });
+
+  it("flags semicolons and list formatting as machine voice", () => {
+    expect(validateHumanity("Fair point; the qualify step differs.").some((v) => v.rule === "semicolon")).toBe(true);
+    expect(validateHumanity("Two things:\n- speed\n- quality").some((v) => v.rule === "list-format")).toBe(true);
+    expect(validateHumanity("Two things:\n1. speed\n2. quality").some((v) => v.rule === "list-format")).toBe(true);
   });
 
   it("flags multiple exclamation marks", () => {
@@ -65,8 +75,23 @@ describe("validateHumanity — expanded slop + dashes", () => {
 
   it("counts en-dashes as dash slop, not just em-dashes", () => {
     expect(
-      validateHumanity("One – two – three – four.").some((v) => v.rule === "em-dashes")
+      validateHumanity("One – two – three – four.").some((v) => v.rule === "dashes")
     ).toBe(true);
+  });
+
+  it.each([
+    ["i'm reaching out", "I'm reaching out because your post stood out."],
+    ["leverage", "You could leverage the new team for outbound."],
+    ["delve", "Happy to delve into the details."],
+    ["thrilled", "Thrilled to see the Series A news."],
+    ["caught my eye", "Your growth caught my eye."],
+    ["feel free to", "Feel free to ping me anytime."],
+  ])("flags the 2026-07-08 AI-tell vocabulary: %s", (_p, text) => {
+    expect(validateHumanity(text).some((v) => v.rule === "banned-phrase")).toBe(true);
+  });
+
+  it("matches banned phrases through curly apostrophes", () => {
+    expect(validateHumanity("Don’t hesitate to reach back.").some((v) => v.rule === "banned-phrase")).toBe(true);
   });
 
   it("keeps a genuine, personalized message clean", () => {

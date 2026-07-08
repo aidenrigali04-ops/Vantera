@@ -18,9 +18,9 @@ const INPUT: DraftInput = {
 
 const CLEAN = {
   connection_note:
-    "Dana — noticed Acme is hiring three SDRs at once. Scaling outbound that fast is a ride; happy to swap notes from the builder side.",
+    "Dana, noticed Acme is hiring three SDRs at once. Scaling outbound that fast is a ride, happy to swap notes from the builder side.",
   followup_message:
-    "Thanks for connecting. When teams hire SDRs in batches, pipeline usually outruns ramp time. We put agents on sourcing so meetings land while new reps train. Open to a 15-min look?",
+    "Thanks for connecting. When teams hire SDRs in batches, pipeline usually outruns ramp time. How are you keeping sourcing ahead of the new reps?",
 };
 
 function textResponse(json: unknown) {
@@ -65,7 +65,7 @@ describe("validateLinkedInDraft", () => {
   it("flags a metric claim not grounded in the lead facts", () => {
     const violations = validateLinkedInDraft(
       {
-        connection_note: "Dana — saw Acme grew 40% last quarter, impressive.",
+        connection_note: "Dana, saw Acme grew 40% last quarter, impressive.",
         followup_message: "Thanks for connecting. Worth a quick look?",
       },
       leadBlock(INPUT),
@@ -104,7 +104,7 @@ describe("draftLinkedIn", () => {
 describe("validateLinkedInDraft — follow-up link guard", () => {
   it("rejects a link in the first follow-up (anti-pitch, soft ask)", () => {
     const violations = validateLinkedInDraft({
-      connection_note: "Dana — clean note, no pitch.",
+      connection_note: "Dana, clean note, no pitch.",
       followup_message: "Thanks for connecting. See a demo: https://example.com/demo",
     });
     expect(violations.some((v) => v.rule === "no-links")).toBe(true);
@@ -115,7 +115,7 @@ describe("validateLinkedInDraft — de-pitched first touch (2026-07-08)", () => 
   it("flags the product name in the first message — touch 1 earns a conversation, never sells", () => {
     const violations = validateLinkedInDraft(
       {
-        connection_note: "Your PMO work in Doha caught my eye.",
+        connection_note: "Your PMO work in Doha stood out.",
         followup_message: "Thanks for connecting. Vantera finds in-market buyers for you.",
       },
       undefined,
@@ -135,8 +135,8 @@ describe("validateLinkedInDraft — de-pitched first touch (2026-07-08)", () => 
   it("accepts a question-led, pitch-free first message", () => {
     const violations = validateLinkedInDraft(
       {
-        connection_note: "Your PMO work in Doha caught my eye.",
-        followup_message: "Thanks for connecting. Curious — when pipeline depends on you alone, what eats more hours: finding the right people or writing to them?",
+        connection_note: "Your PMO work in Doha stood out.",
+        followup_message: "Thanks for connecting. When pipeline depends on you alone, what eats more hours: finding the right people or writing to them?",
       },
       undefined,
       "Vantera"

@@ -117,8 +117,8 @@ describe("fixLinkedInDraft — automatic-send first-touch fix", () => {
   it("fixes the pair and re-validates both messages against the grounding", async () => {
     const model = new MockLanguageModelV3({
       doGenerate: textResponse({
-        connection_note: "Your Series A news caught my eye — congrats, Ryan.",
-        followup_message: "Thanks for connecting. Curious how you qualify leads before reps dig in — open to comparing notes?",
+        connection_note: "Congrats on the Series A, Ryan. Sharp timing to grow the team.",
+        followup_message: "Thanks for connecting. Curious how you qualify leads before reps dig in, open to comparing notes?",
       }),
     });
     const out = await fixLinkedInDraft(

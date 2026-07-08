@@ -36,7 +36,8 @@ const FIX_SYSTEM = `You EDIT B2B outreach copy that failed a style check. Rewrit
 Rules:
 - Do NOT add any new facts, numbers, metrics, claims, customer names, or links. You may only rephrase or remove.
 - Keep the same conversational chat register. Do not make the message longer; shorter is better.
-- No greetings/sign-offs that weren't there, at most one em-dash, at most one exclamation mark, minimal hedging.
+- Never use a dash of any kind as punctuation. Use a comma or start a new sentence. No semicolons, no bullet points.
+- No greetings/sign-offs that weren't there, at most one exclamation mark, minimal hedging. Plain everyday words, never business-speak (utilize, leverage, streamline).
 - Return only the corrected text.`;
 
 function violationList(violations: Violation[]): string {
@@ -52,7 +53,7 @@ export async function fixLinkedInDraft(
 ): Promise<LinkedInDraft> {
   const block = leadBlock(input);
   const prompt = [
-    `Lead facts (for context only — do not add anything not already in the messages):`,
+    `Lead facts (for context only, do not add anything not already in the messages):`,
     block,
     ``,
     `Connection note (max ${CONNECTION_NOTE_MAX_CHARS} chars, no links, no pitch):`,
@@ -97,13 +98,13 @@ export async function fixConversationMessage(
 ): Promise<ConversationDraft> {
   const block = leadBlock({ lead: input.lead, insights: input.insights, context: input.context });
   const prompt = [
-    `Lead facts (for context only — do not add anything not already in the message):`,
+    `Lead facts (for context only, do not add anything not already in the message):`,
     block,
     ``,
     `Conversation so far:`,
     renderThread(input.thread),
     ``,
-    `Your flagged next message (mid-conversation — never re-introduce yourself):`,
+    `Your flagged next message (mid-conversation, never re-introduce yourself):`,
     original.message,
     ``,
     `Style violations to fix:`,

@@ -71,7 +71,7 @@ describe("draftConversationMessage — reply mode", () => {
   it("passes the incoming objection through to the model", async () => {
     let seen = "";
     const model = new MockLanguageModelV3({
-      doGenerate: capturing({ message: "Totally fair — the difference is the qualify step. Worth 15 min to compare?" }, (p) => (seen = p)),
+      doGenerate: capturing({ message: "Totally fair, the difference is the qualify step. Worth 15 min to compare?" }, (p) => (seen = p)),
     });
     await draftConversationMessage(input({ incoming: "We already use Apollo for this." }), model);
     expect(seen).toContain("We already use Apollo");
@@ -82,7 +82,7 @@ describe("draftConversationMessage — proactive follow-up mode (no incoming)", 
   it("writes a follow-up that builds on the thread, told NOT to re-introduce or repeat", async () => {
     let seen = "";
     const model = new MockLanguageModelV3({
-      doGenerate: capturing({ message: "One more angle, Ryan — teams your size usually see the first qualified meeting in week one. Open to a quick look?" }, (p) => (seen = p)),
+      doGenerate: capturing({ message: "One more angle, Ryan. Teams your size usually see the first qualified meeting in week one. Open to a quick look?" }, (p) => (seen = p)),
     });
     const out = await draftConversationMessage(
       input({ incoming: undefined, classification: undefined, thread: [{ role: "agent", text: "Thanks for connecting, Ryan." }] }),
@@ -111,7 +111,7 @@ describe("validateConversationMessage — link whitelist + action claims (2026-0
 
   it("allows the booking link when whitelisted", () => {
     const out = validateConversationMessage(
-      "Happy to walk you through it — grab any time here: https://cal.com/aiden/15min",
+      "Happy to walk you through it, grab any time here: https://cal.com/aiden/15min",
       BLOCK,
       ["https://cal.com/aiden/15min"]
     );
@@ -124,7 +124,7 @@ describe("validateConversationMessage — link whitelist + action claims (2026-0
   });
 
   it("flags fabricated platform actions", () => {
-    const out = validateConversationMessage("That's kind — just joined!", BLOCK, []);
+    const out = validateConversationMessage("That's kind, just joined!", BLOCK, []);
     expect(out.some((v) => v.rule === "action-claim")).toBe(true);
   });
 

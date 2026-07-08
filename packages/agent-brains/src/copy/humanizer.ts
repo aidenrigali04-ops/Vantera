@@ -61,6 +61,31 @@ const BANNED_PHRASES = [
   "as promised",
   "per my last",
   "does this resonate",
+  // conversational-voice pass (2026-07-08, owner directive): the newer AI-tell vocabulary —
+  // business-speak verbs and template warmth that read machine-written in a DM. Substring
+  // matched, so verb forms are covered too (leveraging, delved, utilized…).
+  "i'm reaching out",
+  "im reaching out",
+  "reaching out to",
+  "caught my eye",
+  "caught my attention",
+  "your journey",
+  "truly impressive",
+  "thrilled",
+  "kudos",
+  "delve",
+  "utilize",
+  "leverage",
+  "streamline",
+  "elevate",
+  "empower",
+  "state of the art",
+  "state-of-the-art",
+  "excited to connect",
+  "eager to connect",
+  "looking forward to hearing",
+  "don't hesitate",
+  "feel free to",
 ];
 
 // Phrases that re-introduce or cold-open — always wrong MID-CONVERSATION: a reply or scripted
@@ -85,7 +110,10 @@ export interface HumanityLimits {
 
 export function validateHumanity(text: string, limits: HumanityLimits = {}): Violation[] {
   const violations: Violation[] = [];
-  const lower = text.toLowerCase();
+  // Curly apostrophes normalize to straight so "don't hesitate" can't dodge the phrase list.
+  const lower = text.toLowerCase().replace(/[‘’]/g, "'");
+  // URLs are exempt from punctuation lints (a whitelisted booking slug may contain "--").
+  const noUrls = text.replace(/https?:\/\/[^\s]+/gi, " ");
 
   for (const phrase of BANNED_PHRASES) {
     if (lower.includes(phrase)) {
@@ -93,10 +121,25 @@ export function validateHumanity(text: string, limits: HumanityLimits = {}): Vio
     }
   }
 
-  // em-dash AND en-dash — both are the same "machine punctuation" tell.
-  const dashes = (text.match(/[—–]/g) ?? []).length;
-  if (dashes > 1) {
-    violations.push({ rule: "em-dashes", detail: `${dashes} em/en-dashes; use at most 1` });
+  // ANY dash used as punctuation is machine voice (zero tolerance since 2026-07-08, owner
+  // directive; was "at most one"): em/en dashes anywhere, doubled or spaced hyphens between
+  // words. Hyphenated words ("co-founder", "15-min") stay legal.
+  const dashes = (noUrls.match(/[—–]|--|\s-\s/g) ?? []).length;
+  if (dashes > 0) {
+    violations.push({
+      rule: "dashes",
+      detail: `${dashes} dash(es) used as punctuation; use a comma or start a new sentence`,
+    });
+  }
+
+  // Nobody semicolons a DM. Two sentences read human; a semicolon reads generated.
+  if (noUrls.includes(";")) {
+    violations.push({ rule: "semicolon", detail: "no semicolons in a chat message, split it into two sentences" });
+  }
+
+  // Bullet/numbered lines are generated formatting, never chat.
+  if (/^\s*(?:[-•*]|\d+[.)])\s+/m.test(noUrls)) {
+    violations.push({ rule: "list-format", detail: "no bullet or numbered lists, write flowing sentences" });
   }
 
   const exclamations = (text.match(/!/g) ?? []).length;
