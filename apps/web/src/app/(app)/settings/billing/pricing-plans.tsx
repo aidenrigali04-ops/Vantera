@@ -9,6 +9,7 @@ import {
   type Interval,
 } from "@/components/pricing/pricing-grid";
 import { startCheckout, openBillingPortal } from "./actions";
+import { trackEvent } from "@/lib/analytics/clarity";
 
 const SALES_EMAIL = "sales@vanterasystem.com";
 
@@ -79,7 +80,12 @@ function PlanCta({
   }
 
   return (
-    <form action={startCheckout}>
+    // onSubmit (not the action) carries the analytics fire: it runs immediately on
+    // click, before the server action redirects the browser to Stripe.
+    <form
+      action={startCheckout}
+      onSubmit={() => trackEvent("checkout_started", { plan: plan.tier, interval })}
+    >
       <input type="hidden" name="tier" value={plan.tier} />
       <input type="hidden" name="interval" value={interval} />
       <Button

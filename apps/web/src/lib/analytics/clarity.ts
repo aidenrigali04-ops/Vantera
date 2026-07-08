@@ -4,6 +4,8 @@
 // calls made before the script loads are replayed once it does. In dev the tag
 // never loads (production-only), so calls queue harmlessly and send nothing.
 
+import { metaFunnelEvent } from "./meta";
+
 type ClarityFn = ((...args: unknown[]) => void) & { q?: unknown[] };
 
 declare global {
@@ -46,10 +48,13 @@ export function clarityUpgrade(reason: string): void {
   clarity("upgrade", reason);
 }
 
-/** Funnel event, dual-fired: Clarity smart event + GA4 event through the gtag
- *  dataLayer (both tags load in app/layout.tsx). Same queue-before-load semantics. */
+/** Funnel event, fired to all three destinations: Clarity smart event + GA4 event
+ *  through the gtag dataLayer + Meta Pixel (standard event when the name maps to
+ *  one — see lib/analytics/meta). All tags load in app/layout.tsx; same
+ *  queue-before-load semantics everywhere. */
 export function trackEvent(name: string, params?: Record<string, string>): void {
   clarityEvent(name);
+  metaFunnelEvent(name, params);
   if (typeof window === "undefined") return;
   window.dataLayer = window.dataLayer ?? [];
   // gtag.js only processes `arguments` objects pushed to the dataLayer — not arrays.

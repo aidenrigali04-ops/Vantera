@@ -2,7 +2,8 @@
 
 import { useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
-import { clarityEvent, clarityIdentify, claritySet, clarityUpgrade } from "@/lib/analytics/clarity";
+import { clarityIdentify, claritySet, clarityUpgrade, trackEvent } from "@/lib/analytics/clarity";
+import { metaIdentify } from "@/lib/analytics/meta";
 
 /**
  * Ties the Clarity session to the signed-in user and stamps filterable tags.
@@ -29,8 +30,12 @@ export function ClarityIdentity({
   const pathname = usePathname();
 
   // Clarity recommends identify on every page view — SPA navigations included.
+  // Meta advanced matching rides the same seam: the signed-in email (the friendly
+  // name everywhere this component is rendered) lets Meta match Lead/Subscribe
+  // conversions back to the ad click that produced them. fbq dedupes re-inits.
   useEffect(() => {
     clarityIdentify(userId, friendlyName);
+    if (friendlyName?.includes("@")) metaIdentify(friendlyName);
   }, [pathname, userId, friendlyName]);
 
   // Serialized so a fresh object literal from a server re-render doesn't re-tag.
@@ -46,7 +51,9 @@ export function ClarityIdentity({
     if (firedMount.current) return;
     firedMount.current = true;
     if (upgradeReason) clarityUpgrade(upgradeReason);
-    if (mountEvent) clarityEvent(mountEvent);
+    // trackEvent (not clarityEvent): the mount moment reaches GA4 + Meta too —
+    // onboarding_started is the signup conversion (maps to Meta's Lead event).
+    if (mountEvent) trackEvent(mountEvent);
   }, [upgradeReason, mountEvent]);
 
   return null;

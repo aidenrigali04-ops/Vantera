@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { createBillingFromEnv, type PlanTier } from "@vantera/billing";
+import { createBillingFromEnv, PLAN_DISPLAY, annualYearlyUsd, type PlanTier } from "@vantera/billing";
 
 function appUrl(path: string): string {
   return `${process.env.APP_URL ?? "http://localhost:3000"}${path}`;
@@ -34,7 +34,16 @@ export async function startCheckout(formData: FormData): Promise<void> {
     interval,
     seatAddons,
     linkedinAddons,
-    successUrl: appUrl("/settings/billing?checkout=success"),
+    // plan/interval/value ride the success URL so the landing client can fire the
+    // Subscribe conversion (Meta/GA) with the real subscription value — the redirect
+    // from Stripe is the only moment the browser learns checkout succeeded.
+    // RouteEvents strips the params after firing. Analytics-only; never trusted for
+    // entitlements (the Stripe webhook writes those).
+    successUrl: appUrl(
+      `/settings/billing?checkout=success&plan=${tier}&interval=${interval}&value=${
+        interval === "year" ? annualYearlyUsd(PLAN_DISPLAY[tier].monthlyUsd) : PLAN_DISPLAY[tier].monthlyUsd
+      }`
+    ),
     cancelUrl: appUrl("/settings/billing?checkout=cancel"),
   });
   redirect(url);

@@ -3,6 +3,7 @@ import { Montserrat, Geist_Mono, Poppins } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
+import { MetaRouteTracker } from "@/components/analytics/meta-route-tracker";
 import { SITE_URL, SITE_DESCRIPTION, JsonLd, organizationLd, websiteLd } from "@/lib/seo";
 
 // Google Analytics 4 (gtag.js) — site-wide event tracking. Loaded via next/script so it's
@@ -15,6 +16,13 @@ const GA_MEASUREMENT_ID = "G-2WC6VEZB5C";
 // (nonce'd, so the inline bootstrap passes the strict-dynamic CSP) and production-only.
 // Clarity's upload endpoints are allowlisted in connect-src (lib/security/csp).
 const CLARITY_PROJECT_ID = "xgheo2rq8n";
+
+// Meta Pixel — conversion tracking + audience building for ad campaigns. Env-gated
+// (unlike GA/Clarity's hardcoded ids) so the pixel simply never renders until the
+// owner pastes the id from Meta Events Manager into Vercel. Funnel events fire
+// through trackEvent (lib/analytics/clarity → meta); SPA PageViews + high-intent
+// ViewContent come from MetaRouteTracker. Endpoints allowlisted in lib/security/csp.
+const META_PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID;
 
 const montserrat = Montserrat({
   variable: "--font-montserrat",
@@ -88,6 +96,33 @@ gtag('config', '${GA_MEASUREMENT_ID}');`}
             </Script>
           </>
         )}
+        {/* Meta Pixel — the official bootstrap (no-ops if lib/analytics/meta already
+            stubbed fbq; fbevents.js replays any queued calls). Base PageView here;
+            route-change PageViews + funnel events come from the client wrappers. */}
+        {process.env.NODE_ENV === "production" && META_PIXEL_ID && (
+          <>
+            <Script id="meta-pixel" strategy="afterInteractive">
+              {`!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
+n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;
+t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,
+document,'script','https://connect.facebook.net/en_US/fbevents.js');
+fbq('init', '${META_PIXEL_ID}');
+fbq('track', 'PageView');`}
+            </Script>
+            <noscript>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                height="1"
+                width="1"
+                style={{ display: "none" }}
+                alt=""
+                src={`https://www.facebook.com/tr?id=${META_PIXEL_ID}&ev=PageView&noscript=1`}
+              />
+            </noscript>
+          </>
+        )}
+        <MetaRouteTracker />
         {/* Site-wide entity graph for Google + AI engines. */}
         <JsonLd data={[organizationLd(), websiteLd()]} />
         {/* Light-only product: the dark theme was retired. forcedTheme pins it so the
