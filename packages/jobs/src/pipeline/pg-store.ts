@@ -1155,7 +1155,70 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
       status: "active" | "restricted" | "disconnected";
       profileUrl: string | null;
       displayName: string | null;
-    }) {
+    }): Promise<{ supersededRefs: string[] }> {
+      // Identity dedupe BEFORE the ref-keyed upsert: an ACTIVE arrival for a profile this
+      // tenant already holds under a DIFFERENT ref is a reconnect that minted a fresh
+      // provider account. Revive the existing row in place — its id carries the lead
+      // assignments and send history — and hand back the replaced refs for seat cleanup.
+      // (Without this, every reconnect added a billable duplicate seat: 2026-07-08.)
+      if (e.status === "active" && e.profileUrl) {
+        const identity = normalizeLinkedInUrl(e.profileUrl);
+        const siblings = (
+          await db
+            .select({
+              id: linkedinAccounts.id,
+              providerRef: linkedinAccounts.providerRef,
+              profileUrl: linkedinAccounts.profileUrl,
+              createdAt: linkedinAccounts.createdAt,
+            })
+            .from(linkedinAccounts)
+            .where(eq(linkedinAccounts.accountId, e.vanteraAccountId))
+        ).filter((r) => r.profileUrl && normalizeLinkedInUrl(r.profileUrl) === identity);
+
+        if (siblings.some((r) => r.providerRef !== e.providerRef)) {
+          const counts = new Map<string, number>();
+          const leadAgg = await db
+            .select({ id: leads.linkedinAccountId, n: count() })
+            .from(leads)
+            .where(inArray(leads.linkedinAccountId, siblings.map((r) => r.id)))
+            .groupBy(leads.linkedinAccountId);
+          for (const r of leadAgg) if (r.id) counts.set(r.id, r.n);
+          // keeper = the row carrying the lead history (most assigned, tie oldest)
+          const keeper = [...siblings].sort(
+            (a, b) =>
+              (counts.get(b.id) ?? 0) - (counts.get(a.id) ?? 0) ||
+              a.createdAt.getTime() - b.createdAt.getTime()
+          )[0]!;
+          const dupIds = siblings.filter((r) => r.id !== keeper.id).map((r) => r.id);
+          if (dupIds.length > 0) {
+            await db
+              .update(leads)
+              .set({ linkedinAccountId: keeper.id })
+              .where(inArray(leads.linkedinAccountId, dupIds));
+            await db
+              .update(outreachSends)
+              .set({ linkedinAccountId: keeper.id })
+              .where(inArray(outreachSends.linkedinAccountId, dupIds));
+            await db.delete(linkedinAccounts).where(inArray(linkedinAccounts.id, dupIds));
+          }
+          await db
+            .update(linkedinAccounts)
+            .set({
+              providerRef: e.providerRef,
+              status: "active",
+              profileUrl: e.profileUrl,
+              displayName: e.displayName,
+              connectedAt: new Date(), // a reconnect restarts the rule-04 ramp clock
+            })
+            .where(eq(linkedinAccounts.id, keeper.id));
+          return {
+            supersededRefs: [...new Set(siblings.map((r) => r.providerRef))].filter(
+              (ref) => ref !== e.providerRef
+            ),
+          };
+        }
+      }
+
       await db
         .insert(linkedinAccounts)
         .values({
@@ -1176,6 +1239,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
             connectedAt: e.status === "active" ? new Date() : sql`${linkedinAccounts.connectedAt}`,
           },
         });
+      return { supersededRefs: [] };
     },
 
     async findLeadByLinkedInUrl(accountId: string, normalizedUrl: string) {
@@ -2225,9 +2289,22 @@ export function createAccountHealthStore(db: Db): AccountHealthStore {
           accountId: linkedinAccounts.accountId,
           providerRef: linkedinAccounts.providerRef,
           status: linkedinAccounts.status,
+          profileUrl: linkedinAccounts.profileUrl,
+          createdAt: linkedinAccounts.createdAt,
         })
         .from(linkedinAccounts);
-      return rows.map((r) => ({ ...r, status: r.status as LinkedInAccountRow["status"] }));
+      const leadAgg = await db
+        .select({ id: leads.linkedinAccountId, n: count() })
+        .from(leads)
+        .where(isNotNull(leads.linkedinAccountId))
+        .groupBy(leads.linkedinAccountId);
+      const assigned = new Map<string, number>();
+      for (const r of leadAgg) if (r.id) assigned.set(r.id, r.n);
+      return rows.map((r) => ({
+        ...r,
+        status: r.status as LinkedInAccountRow["status"],
+        assignedLeads: assigned.get(r.id) ?? 0,
+      }));
     },
 
     async setLinkedInAccountStatus(id, status) {
@@ -2237,6 +2314,30 @@ export function createAccountHealthStore(db: Db): AccountHealthStore {
           // a reconnect restarts the rule-04 ramp clock, same contract as the status webhook
           status === "active" ? { status, connectedAt: new Date() } : { status }
         )
+        .where(eq(linkedinAccounts.id, id));
+    },
+
+    async reassignSenderHistory(fromIds, toId) {
+      if (fromIds.length === 0) return;
+      await db
+        .update(leads)
+        .set({ linkedinAccountId: toId })
+        .where(inArray(leads.linkedinAccountId, fromIds));
+      await db
+        .update(outreachSends)
+        .set({ linkedinAccountId: toId })
+        .where(inArray(outreachSends.linkedinAccountId, fromIds));
+    },
+
+    async deleteLinkedInAccountRows(ids) {
+      if (ids.length === 0) return;
+      await db.delete(linkedinAccounts).where(inArray(linkedinAccounts.id, ids));
+    },
+
+    async repointLinkedInAccount(id, providerRef) {
+      await db
+        .update(linkedinAccounts)
+        .set({ providerRef, status: "active", connectedAt: new Date() })
         .where(eq(linkedinAccounts.id, id));
     },
 

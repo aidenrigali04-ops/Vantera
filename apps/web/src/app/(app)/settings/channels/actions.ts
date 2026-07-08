@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 import { createLinkedInInfraFromEnv } from "@vantera/linkedin-infra";
 import { buildConnectRedirects } from "./redirects";
 import { gate, loadBillingRow } from "@/lib/billing/entitlement";
@@ -75,6 +76,78 @@ export async function createLinkedInConnectLink(): Promise<{ url?: string; error
     console.error("createLinkedInConnectLink failed:", err);
     return { error: "Could not generate a connection link. Try again shortly." };
   }
+}
+
+/**
+ * Reconnect an EXISTING LinkedIn connection in place — same provider account, same
+ * billable seat, same row (lead assignments survive). This is the expired-session flow;
+ * plain connect would mint a duplicate seat (the 2026-07-08 triple-seat incident).
+ * Ownership proof: the row must be visible through the session's RLS scope.
+ */
+export async function createLinkedInReconnectLink(
+  rowId: string
+): Promise<{ url?: string; error?: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Your session expired. Sign in again." };
+
+  const { data: row } = await supabase
+    .from("linkedin_accounts")
+    .select("id, account_id, provider_ref")
+    .eq("id", rowId)
+    .maybeSingle<{ id: string; account_id: string; provider_ref: string }>();
+  if (!row) return { error: "That LinkedIn account is no longer connected here." };
+
+  try {
+    const redirects = buildConnectRedirects(process.env.APP_URL ?? "http://localhost:3000");
+    const { url } = await createLinkedInInfraFromEnv().createHostedAuthLink(
+      row.account_id,
+      redirects,
+      { providerRef: row.provider_ref }
+    );
+    return { url };
+  } catch (err) {
+    console.error("createLinkedInReconnectLink failed:", err);
+    return { error: "Could not generate a reconnection link. Try again shortly." };
+  }
+}
+
+/**
+ * Remove a connected LinkedIn account entirely: disconnect it at the provider (the seat
+ * stops billing) and delete the row. Lead/send references null out via FK (history rows
+ * survive); affected leads simply get re-assigned a sender on their next dispatch.
+ * Ownership proof: the row must be visible through the session's RLS scope; the delete
+ * itself runs service-role (linkedin_accounts writes are server-owned).
+ */
+export async function removeLinkedInAccount(rowId: string): Promise<ChannelActionState> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Your session expired. Sign in again." };
+
+  const { data: row } = await supabase
+    .from("linkedin_accounts")
+    .select("id, provider_ref")
+    .eq("id", rowId)
+    .maybeSingle<{ id: string; provider_ref: string }>();
+  if (!row) return { error: "That LinkedIn account is no longer connected here." };
+
+  try {
+    await createLinkedInInfraFromEnv().deleteConnectedAccount(row.provider_ref);
+  } catch (err) {
+    // Best-effort: the provider may already have dropped it; the health sweep retries.
+    console.error("removeLinkedInAccount provider delete failed:", err);
+  }
+
+  const svc = createServiceClient();
+  const { error } = await svc.from("linkedin_accounts").delete().eq("id", row.id);
+  if (error) return { error: "Could not remove the account. Try again shortly." };
+
+  revalidatePath("/settings/channels");
+  return { success: "LinkedIn account removed." };
 }
 
 /**

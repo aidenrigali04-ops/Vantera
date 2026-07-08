@@ -229,6 +229,23 @@ describe("runOutreachSend — send-boundary per-lead re-check (fresh facts, not 
   });
 });
 
+describe("runOutreachSend — dead sender connection", () => {
+  it("a provider disconnected_account error PARKS the send (never a red failure) and reports it", async () => {
+    const store = new FakeOutreachStore();
+    store.ctx = makeCtx({ linkedinStage: "message", body: "hello" });
+    const deps = makeDeps(store);
+    deps.linkedinInfra.sendMessage = async () => {
+      throw new Error("provider message failed (401): errors/disconnected_account");
+    };
+
+    const outcome = await runOutreachSend({ sendId: "send1" }, deps);
+
+    expect(outcome).toBe("sender_disconnected");
+    expect(store.reverted).toContain("send1"); // parked — retries after reconnect
+    expect(store.failed).toHaveLength(0); // never shown to the user as a failed send
+  });
+});
+
 describe("runOutreachSend — kill switch / pause / inactive", () => {
   it("kill switch on after dispatch → 'parked', nothing sent, row reverted to approved", async () => {
     const store = new FakeOutreachStore();

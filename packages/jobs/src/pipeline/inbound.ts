@@ -180,14 +180,27 @@ export async function runInbound(payload: InboundPayload, deps: InboundDeps): Pr
 
   if (event.type === "account_status") {
     if (!event.vanteraAccountId) return { handled: false, action: "account event without tenant" };
-    await deps.store.upsertLinkedInAccountStatus({
+    const { supersededRefs } = await deps.store.upsertLinkedInAccountStatus({
       vanteraAccountId: event.vanteraAccountId,
       providerRef: event.connectedAccountRef,
       status: event.status,
       profileUrl: event.profileUrl,
       displayName: event.displayName,
     });
-    return { handled: true, action: `account:${event.status}` };
+    // A reconnect under a fresh provider account superseded the old connection(s):
+    // delete them provider-side so the tenant never pays for a seat we no longer use.
+    // Best-effort — the account-health sweep is the janitor for anything missed.
+    for (const ref of supersededRefs) {
+      try {
+        await deps.linkedinInfra.deleteConnectedAccount(ref);
+      } catch {
+        /* swept later */
+      }
+    }
+    return {
+      handled: true,
+      action: `account:${event.status}${supersededRefs.length > 0 ? "+merged" : ""}`,
+    };
   }
 
   const identity = await deps.store.findLinkedInAccountByProviderRef(event.connectedAccountRef);

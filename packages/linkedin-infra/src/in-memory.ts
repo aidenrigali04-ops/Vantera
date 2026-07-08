@@ -31,9 +31,15 @@ export class InMemoryLinkedInInfra implements LinkedInInfra {
 
   constructor(private readonly webhookSecret = "in-memory-secret") {}
 
-  async createHostedAuthLink(accountId: string, _redirects?: HostedAuthRedirects): Promise<HostedAuthLink> {
+  readonly hostedAuthCalls: { accountId: string; reconnectRef: string | null }[] = [];
+  async createHostedAuthLink(
+    accountId: string,
+    _redirects?: HostedAuthRedirects,
+    reconnect?: { providerRef: string }
+  ): Promise<HostedAuthLink> {
+    this.hostedAuthCalls.push({ accountId, reconnectRef: reconnect?.providerRef ?? null });
     return {
-      url: `https://auth.example.com/connect/${accountId}`,
+      url: `https://auth.example.com/${reconnect ? "reconnect" : "connect"}/${accountId}`,
       expiresAt: new Date(Date.now() + 3_600_000).toISOString(),
     };
   }

@@ -6,6 +6,8 @@ import { FormError } from "@/components/form-error";
 import {
   toggleSendingPause,
   createLinkedInConnectLink,
+  createLinkedInReconnectLink,
+  removeLinkedInAccount,
   refreshLinkedInAccounts,
   type ChannelActionState,
 } from "./actions";
@@ -134,5 +136,72 @@ export function RefreshLinkedInButton({ inline = false }: { inline?: boolean }) 
       </Button>
       {message && <p className="text-sm text-muted-foreground">{message}</p>}
     </div>
+  );
+}
+
+// ── LinkedIn reconnect (same seat) ────────────────────────────────────────────
+
+/**
+ * Re-authenticates an EXISTING connection in place — same provider seat, same row,
+ * lead assignments survive. Never use the plain connect button for an expired
+ * session: that mints a duplicate billable seat for the same person.
+ */
+export function LinkedInReconnectButton({ rowId }: { rowId: string }) {
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  function handleReconnect() {
+    startTransition(async () => {
+      setError(null);
+      const result = await createLinkedInReconnectLink(rowId);
+      if (result.error) {
+        setError(result.error);
+      } else if (result.url) {
+        window.location.assign(result.url);
+      }
+    });
+  }
+
+  return (
+    <span className="inline-flex items-center gap-2">
+      <Button onClick={handleReconnect} disabled={isPending} variant="outline" size="sm">
+        {isPending ? "Preparing…" : "Reconnect"}
+      </Button>
+      {error && <span className="text-xs text-destructive">{error}</span>}
+    </span>
+  );
+}
+
+// ── LinkedIn remove ───────────────────────────────────────────────────────────
+
+/** Fully removes a connected account: provider seat released + row deleted. */
+export function RemoveLinkedInButton({ rowId, name }: { rowId: string; name: string }) {
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  function handleRemove() {
+    const ok = window.confirm(
+      `Remove ${name}? Outreach from this account stops immediately and its seat is freed. ` +
+        "Lead history is kept; leads it was messaging will pause until another account is connected."
+    );
+    if (!ok) return;
+    startTransition(async () => {
+      setError(null);
+      const result = await removeLinkedInAccount(rowId);
+      if (result.error) {
+        setError(result.error);
+      } else {
+        window.location.reload();
+      }
+    });
+  }
+
+  return (
+    <span className="inline-flex items-center gap-2">
+      <Button onClick={handleRemove} disabled={isPending} variant="ghost" size="sm" className="text-destructive hover:text-destructive">
+        {isPending ? "Removing…" : "Remove"}
+      </Button>
+      {error && <span className="text-xs text-destructive">{error}</span>}
+    </span>
   );
 }

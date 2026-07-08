@@ -33,6 +33,9 @@ export const intentScan = task({
         agentId: payload.agentId,
         accountId: payload.accountId,
       });
+      // Reconcile NOW: if the connection is dead this flips the status, shows the banner,
+      // and emails the admins within minutes instead of waiting for the next cron tick.
+      await tasks.trigger("account-health", {});
     } else if (summary.sourcingErrors > 0) {
       logger.warn("intent scan finished with partial sourcing failures", { ...summary, agentId: payload.agentId });
     } else {

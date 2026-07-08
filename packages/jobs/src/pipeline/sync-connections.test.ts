@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { runSyncConnections, type SyncConnectionsStore } from "./sync-connections";
+import { runSyncConnections, SYNC_CHECKS_PER_RUN, type SyncConnectionsStore } from "./sync-connections";
 
 function makeStore(over: Partial<SyncConnectionsStore> = {}): SyncConnectionsStore & {
   connectedCalls: { leadId: string }[];
@@ -30,7 +30,7 @@ describe("runSyncConnections", () => {
       ),
     };
 
-    const res = await runSyncConnections({ store, linkedinInfra, accountId: "acc1" });
+    const res = await runSyncConnections({ store, linkedinInfra, accountId: "acc1", sleep: async () => {} });
 
     expect(res.checked).toBe(2);
     expect(res.connected).toBe(1);
@@ -45,10 +45,26 @@ describe("runSyncConnections", () => {
     const store = makeStore({ getLeadAssignedIdentity: vi.fn(async () => ({ providerRef: "x", status: "restricted" })) });
     const linkedinInfra = { getConnectionState: vi.fn(async () => ({ connected: true, distance: "DISTANCE_1" })) };
 
-    const res = await runSyncConnections({ store, linkedinInfra, accountId: "acc1" });
+    const res = await runSyncConnections({ store, linkedinInfra, accountId: "acc1", sleep: async () => {} });
 
     expect(res.connected).toBe(0);
     expect(store.connectedCalls).toEqual([]);
     expect(linkedinInfra.getConnectionState).not.toHaveBeenCalled();
   });
+});
+
+it("caps profile reads per run — a big backlog drains over several runs, never a read storm", async () => {
+  const many = Array.from({ length: 40 }, (_, i) => ({
+    leadId: `l${i}`,
+    profileUrl: `https://linkedin.com/in/p${i}`,
+  }));
+  const store = makeStore({ getInvitedUnacceptedLeads: vi.fn(async () => many) });
+  const linkedinInfra = {
+    getConnectionState: vi.fn(async () => ({ connected: false, distance: "DISTANCE_2" })),
+  };
+
+  const res = await runSyncConnections({ store, linkedinInfra, accountId: "acc1", sleep: async () => {} });
+
+  expect(res.checked).toBe(SYNC_CHECKS_PER_RUN);
+  expect(linkedinInfra.getConnectionState).toHaveBeenCalledTimes(SYNC_CHECKS_PER_RUN);
 });

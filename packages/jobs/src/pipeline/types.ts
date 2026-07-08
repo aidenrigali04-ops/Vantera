@@ -442,7 +442,15 @@ export interface OutreachSendDeps {
   onProviderError?: (detail: string) => void;
 }
 
-export type OutreachSendOutcome = "sent" | "suppressed" | "parked" | "failed" | "skipped" | "canceled";
+export type OutreachSendOutcome =
+  | "sent"
+  | "suppressed"
+  | "parked"
+  | "failed"
+  | "skipped"
+  | "canceled"
+  /** the sender's LinkedIn session is dead — send parked; wrapper fires an immediate health check */
+  | "sender_disconnected";
 
 export interface DispatchableSend {
   id: string;
@@ -577,6 +585,11 @@ export interface InboundStore {
    * insert-or-update by (accountId, providerRef); sets connected_at when turning active.
    * 'restricted' is written as-is to linkedin_accounts.status (enum already includes the value);
    * connectedAt is preserved on restrict — only reset on reconnect (active).
+   *
+   * Identity dedupe: an ACTIVE arrival for a profile the tenant already holds under a
+   * DIFFERENT provider ref is a reconnect that minted a fresh provider account — the
+   * existing row is revived in place (same row id, so lead assignments and send history
+   * survive) and the replaced/duplicate refs are returned for provider-side seat cleanup.
    */
   upsertLinkedInAccountStatus(e: {
     vanteraAccountId: string;
@@ -584,7 +597,7 @@ export interface InboundStore {
     status: "active" | "restricted" | "disconnected";
     profileUrl: string | null;
     displayName: string | null;
-  }): Promise<void>;
+  }): Promise<{ supersededRefs: string[] }>;
   findLeadByLinkedInUrl(accountId: string, normalizedUrl: string): Promise<{ id: string; campaignId: string | null } | null>;
   /** PRIMARY reply-attribution lookup: the member provider_id captured at send time (0043). */
   findLeadByProviderRef(accountId: string, providerRef: string): Promise<{ id: string; campaignId: string | null } | null>;
@@ -661,7 +674,8 @@ export interface ResponderBundle {
 
 export interface InboundDeps {
   store: InboundStore;
-  linkedinInfra: Pick<LinkedInInfra, "parseEventWebhook">;
+  /** deleteConnectedAccount: seat cleanup after an identity merge (superseded provider refs). */
+  linkedinInfra: Pick<LinkedInInfra, "parseEventWebhook" | "deleteConnectedAccount">;
   classifyFn: (body: string) => Promise<ReplyVerdict>;
   /**
    * Drafts the seller's next message with the same grounding + humanizer as outreach (the

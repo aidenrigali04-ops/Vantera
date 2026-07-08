@@ -128,8 +128,17 @@ export interface LinkedInInfra {
    * accountId rides through the provider as hosted-auth metadata and comes back
    * as vanteraAccountId on account_status events — that round-trip is how a
    * connected identity is attributed to a tenant.
+   *
+   * `reconnect` re-authenticates an EXISTING connected identity in place (same
+   * provider ref, same billable seat) — the flow for an expired session. Without
+   * it a "reconnect" mints a brand-new provider account: a duplicate seat and a
+   * second row for the same human (the 2026-07-08 triple-seat incident).
    */
-  createHostedAuthLink(accountId: string, redirects?: HostedAuthRedirects): Promise<HostedAuthLink>;
+  createHostedAuthLink(
+    accountId: string,
+    redirects?: HostedAuthRedirects,
+    reconnect?: { providerRef: string }
+  ): Promise<HostedAuthLink>;
   /**
    * The LinkedIn accounts connected in the provider workspace. Used to reconcile
    * connected identities into our store when a hosted-auth status webhook is

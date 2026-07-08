@@ -14,7 +14,9 @@ Connect your own existing LinkedIn account to turn on outreach. Click **Connect 
 
 If you finish signing in but don't see your account listed yet, use **Refresh status** on the LinkedIn card to sync it immediately — no need to reconnect.
 
-If your connection drops (LinkedIn sessions expire periodically), Vantera notices within about half an hour: a banner appears across the dashboard, the account's workspace admins get an email, and your agents pause safely — no sourcing, no sending, and replies stop syncing until it's back. Reconnect from this page (the banner's **Reconnect LinkedIn** button brings you here) and everything resumes automatically.
+If your connection drops (LinkedIn sessions expire periodically), Vantera notices within minutes: a banner appears across the dashboard, the account's workspace admins get an email, and your agents pause safely — no sourcing, no sending, and replies stop syncing until it's back. Use the **Reconnect** button next to the flagged account (the dashboard banner brings you here) — it re-authenticates the SAME account in place, so your seat count, lead assignments, and history all stay exactly as they were. Never use "Connect another account" to fix a dropped session.
+
+To remove a connected account entirely, use **Remove** next to it: outreach from that account stops immediately, its seat is freed, and your lead history is kept. Leads it was messaging pause until another account is connected.
 
 ## Connecting is the activation gate
 

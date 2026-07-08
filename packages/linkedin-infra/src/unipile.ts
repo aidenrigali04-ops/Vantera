@@ -278,10 +278,18 @@ export class UnipileLinkedInInfra implements LinkedInInfra {
   }
 
   // ── LinkedInInfra implementation ─────────────────────────────────────────
-  async createHostedAuthLink(accountId: string, redirects?: HostedAuthRedirects): Promise<HostedAuthLink> {
+  async createHostedAuthLink(
+    accountId: string,
+    redirects?: HostedAuthRedirects,
+    reconnect?: { providerRef: string }
+  ): Promise<HostedAuthLink> {
     const expiresOn = new Date(Date.now() + HOSTED_AUTH_TTL_MS).toISOString();
+    // Reconnect mode re-authenticates the EXISTING provider account (same ref, same
+    // billable seat) instead of creating a new one — the provider takes the target id.
     const body: Record<string, unknown> = {
-      type: "create",
+      ...(reconnect
+        ? { type: "reconnect", reconnect_account: reconnect.providerRef }
+        : { type: "create" }),
       providers: ["LINKEDIN"],
       api_url: `https://${this.dsn}`,
       expiresOn,

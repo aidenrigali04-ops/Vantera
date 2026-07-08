@@ -5,6 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import {
   PauseSendingForm,
   LinkedInConnectButton,
+  LinkedInReconnectButton,
+  RemoveLinkedInButton,
   RefreshLinkedInButton,
 } from "./channels-forms";
 import { reconcileLinkedInAccounts } from "@/lib/linkedin/sync";
@@ -119,9 +121,17 @@ export default async function ChannelsPage({
                         </Badge>
                       </td>
                       <td className="py-2">
-                        {(la.status === "disconnected" || la.status === "restricted") && (
-                          <LinkedInConnectButton label="Reconnect" variant="outline" />
-                        )}
+                        <span className="flex items-center justify-end gap-1">
+                          {(la.status === "disconnected" || la.status === "restricted") && (
+                            // Reconnect IN PLACE — same seat, same row. A plain connect here
+                            // used to mint a duplicate billable seat for the same person.
+                            <LinkedInReconnectButton rowId={la.id} />
+                          )}
+                          <RemoveLinkedInButton
+                            rowId={la.id}
+                            name={la.display_name ?? la.profile_url ?? "this account"}
+                          />
+                        </span>
                       </td>
                     </tr>
                   ))}

@@ -36,6 +36,18 @@ export function isAlreadyInvited(err: unknown): boolean {
 }
 
 /**
+ * Provider 401 `errors/disconnected_account`: the LinkedIn session behind the sender died.
+ * Not this send's failure — the whole CONNECTION is down: the send parks (never a red
+ * failure row) and the wrapper fires an immediate health reconcile so the banner + admin
+ * alert land in minutes, not on the next cron tick (2026-07-06: this burned queued sends
+ * as "failed" for two days before anyone knew).
+ */
+export function isDisconnectedAccount(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err);
+  return message.includes("disconnected_account");
+}
+
+/**
  * One live LinkedIn send. Re-checks suppression, kill switch, pause and identity health
  * immediately before the provider call (rule 11) — dispatch-time checks are not
  * trusted across the delay.
@@ -149,6 +161,12 @@ export async function runOutreachSend(
     // neutral prefix, so the real 400/403 body would otherwise be lost — that's why prior invite
     // failures couldn't be diagnosed).
     deps.onProviderError?.(err instanceof Error ? err.message : String(err));
+    if (isDisconnectedAccount(err)) {
+      // The sender's LinkedIn session is dead — park the send (it retries after reconnect)
+      // and let the wrapper trigger an immediate health reconcile + admin alert.
+      await deps.store.revertToApproved(ctx.id);
+      return "sender_disconnected";
+    }
     await deps.store.markFailed(ctx.id, sanitizeSendError(err));
     return "failed";
   }

@@ -38,7 +38,10 @@ function makeStore(overrides: Partial<InboundStore> = {}): InboundStore & {
   const savedProviderRefs: { leadId: string; providerRef: string }[] = [];
   const base: InboundStore = {
     findLinkedInAccountByProviderRef: async () => null,
-    upsertLinkedInAccountStatus: async (e) => { upsertedLinkedInStatuses.push(e); },
+    upsertLinkedInAccountStatus: async (e) => {
+      upsertedLinkedInStatuses.push(e);
+      return { supersededRefs: [] };
+    },
     findLeadByLinkedInUrl: async () => null,
     findLeadByProviderRef: async () => null,
     findContactedLeadsByName: async () => [],
@@ -368,6 +371,39 @@ describe("runInbound — account_status", () => {
 
     expect(result).toEqual({ handled: false, action: "account event without tenant" });
     expect(store.upsertedLinkedInStatuses).toHaveLength(0);
+  });
+
+  it("an identity merge deletes the superseded provider seats (best-effort billing cleanup)", async () => {
+    const store = makeStore({
+      upsertLinkedInAccountStatus: async () => ({ supersededRefs: ["old_dead_ref", "dup_ref"] }),
+    });
+    const infra = new InMemoryLinkedInInfra();
+
+    const result = await runInbound(
+      { source: "linkedin", payload: LINKEDIN_ACCOUNT_STATUS_FIXTURE },
+      { ...deps(store), linkedinInfra: infra }
+    );
+
+    expect(result).toEqual({ handled: true, action: "account:active+merged" });
+    expect(infra.disconnected.sort()).toEqual(["dup_ref", "old_dead_ref"]);
+  });
+
+  it("a failing provider delete never fails the status event", async () => {
+    const store = makeStore({
+      upsertLinkedInAccountStatus: async () => ({ supersededRefs: ["old_dead_ref"] }),
+    });
+    const infra = Object.assign(new InMemoryLinkedInInfra(), {
+      deleteConnectedAccount: async () => {
+        throw new Error("provider down");
+      },
+    });
+
+    const result = await runInbound(
+      { source: "linkedin", payload: LINKEDIN_ACCOUNT_STATUS_FIXTURE },
+      { ...deps(store), linkedinInfra: infra }
+    );
+
+    expect(result.handled).toBe(true); // the sweep cleans up later
   });
 });
 
