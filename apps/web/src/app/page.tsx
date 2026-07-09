@@ -4,19 +4,26 @@ import {
   annualMonthlyUsd,
   annualYearlyUsd,
 } from "@vantera/billing";
+import dynamic from "next/dynamic";
 import { LandingNav } from "@/components/landing/nav";
 import { Hero } from "@/components/landing/hero";
 import { TrustStrip } from "@/components/landing/trust-strip";
-import { Showcase } from "@/components/landing/showcase";
-import { HowItWorks } from "@/components/landing/how-it-works";
-import { FeaturesGrid } from "@/components/landing/features-grid";
-import { Consolidation } from "@/components/landing/consolidation";
-import { Integrations } from "@/components/landing/integrations";
-import { Pricing, type LandingPlan } from "@/components/landing/pricing";
-import { FinalCta } from "@/components/landing/final-cta";
-import { LandingFooter } from "@/components/landing/footer";
+import { type LandingPlan } from "@/components/landing/pricing";
 import type { Metadata } from "next";
 import { JsonLd, softwareApplicationLd } from "@/lib/seo";
+
+// Below-the-fold sections are code-split so their (animation-heavy) client JS lands in
+// separate chunks instead of the initial bundle — the above-the-fold hero hydrates first
+// and the main thread isn't monopolised in the LCP/TTI window (mobile perf). ssr stays on
+// (the default) so the content is still server-rendered for SEO and there's no layout shift.
+const Showcase = dynamic(() => import("@/components/landing/showcase").then((m) => m.Showcase));
+const HowItWorks = dynamic(() => import("@/components/landing/how-it-works").then((m) => m.HowItWorks));
+const FeaturesGrid = dynamic(() => import("@/components/landing/features-grid").then((m) => m.FeaturesGrid));
+const Consolidation = dynamic(() => import("@/components/landing/consolidation").then((m) => m.Consolidation));
+const Integrations = dynamic(() => import("@/components/landing/integrations").then((m) => m.Integrations));
+const Pricing = dynamic(() => import("@/components/landing/pricing").then((m) => m.Pricing));
+const FinalCta = dynamic(() => import("@/components/landing/final-cta").then((m) => m.FinalCta));
+const LandingFooter = dynamic(() => import("@/components/landing/footer").then((m) => m.LandingFooter));
 
 export const metadata: Metadata = {
   alternates: { canonical: "/" },

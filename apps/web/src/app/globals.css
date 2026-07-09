@@ -427,3 +427,43 @@
     animation: none;
   }
 }
+
+/* Scroll reveal (Reveal / RevealItem in surface.tsx) — CSS + IntersectionObserver,
+   replacing Framer Motion so the animation runtime stays off the hydration path. Content
+   is VISIBLE BY DEFAULT: the hidden state applies only after JS arms the container
+   ([data-reveal="armed"]), so SSR / no-JS always shows everything. The transition is
+   declared on the "shown" state alone, so arming is instant (no fade-out) and only the
+   reveal-in animates. Stagger via nth-child on direct children. */
+.landing [data-reveal="armed"] .landing-reveal-item {
+  opacity: 0;
+  transform: translateY(22px);
+}
+.landing [data-reveal="shown"] .landing-reveal-item {
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.landing [data-reveal="shown"] > .landing-reveal-item:nth-child(2) {
+  transition-delay: 0.08s;
+}
+.landing [data-reveal="shown"] > .landing-reveal-item:nth-child(3) {
+  transition-delay: 0.16s;
+}
+.landing [data-reveal="shown"] > .landing-reveal-item:nth-child(4) {
+  transition-delay: 0.24s;
+}
+.landing [data-reveal="shown"] > .landing-reveal-item:nth-child(5) {
+  transition-delay: 0.32s;
+}
+.landing [data-reveal="shown"] > .landing-reveal-item:nth-child(n + 6) {
+  transition-delay: 0.4s;
+}
+@media (prefers-reduced-motion: reduce) {
+  .landing [data-reveal] .landing-reveal-item {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
