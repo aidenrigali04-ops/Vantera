@@ -31,6 +31,9 @@ const tenantExempt = new Set([
   // security audit log — account_id is nullable so system/global events (no resolvable account)
   // can be recorded; account-scoped rows still cascade (0027).
   "security_events",
+  // operator-side lifecycle ledger about OUR OWN users (0045) — platform data, not tenant
+  // data; service-role only (RLS on, no policies)
+  "lifecycle_touches",
 ]);
 
 // returns the create-table DDL block for a table from the concatenated migrations
@@ -278,5 +281,20 @@ describe("column-grant lockdown (0026 — crm_connections tokens)", () => {
     expect(grant, "expected a column-scoped crm_connections SELECT grant").toBeTruthy();
     expect(grant![1]).not.toMatch(/access_token_enc/);
     expect(grant![1]).not.toMatch(/refresh_token_enc/);
+  });
+});
+
+describe("lifecycle touches (0045)", () => {
+  const sql = fileContents.get("0045_lifecycle_touches.sql") ?? "";
+  it("is service-role only: RLS on, no policies, no client grants", () => {
+    expect(sql).toContain("alter table public.lifecycle_touches enable row level security");
+    expect(sql).not.toContain("create policy");
+    expect(sql).not.toContain("grant ");
+  });
+  it("deletes with the auth user (GDPR deletion path, rule 11)", () => {
+    expect(tableDdl("lifecycle_touches")).toContain("references auth.users(id) on delete cascade");
+  });
+  it("enforces one touch per (user, segment, touch_number)", () => {
+    expect(sql).toContain("create unique index lifecycle_touches_user_segment_touch_idx");
   });
 });
