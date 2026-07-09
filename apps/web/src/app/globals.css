@@ -403,3 +403,27 @@
     animation: none;
   }
 }
+
+/* Above-the-fold entrance — CSS-driven so the hero paints on server render and animates
+   on first paint, never gated on JS hydration. Framer's initial:{opacity:0} left the
+   headline (the LCP element) invisible until hydration, pushing mobile LCP to ~7s. These
+   elements are visible in SSR; the animation is a pure enhancement, and the LCP headline
+   itself carries no opacity gate at all. Reduced motion shows the final state instantly. */
+@keyframes landing-rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.landing .landing-rise {
+  animation: landing-rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .landing .landing-rise {
+    animation: none;
+  }
+}

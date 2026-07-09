@@ -16,6 +16,11 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   // Don't advertise the framework/version (production-readiness, rule 10).
   poweredByHeader: false,
+  // Tree-shake the heavy client deps the landing leans on so unused exports never reach
+  // the browser bundle — cuts JS execution / main-thread work on mobile (Lighthouse).
+  experimental: {
+    optimizePackageImports: ["framer-motion", "lucide-react"],
+  },
   transpilePackages: [
     "@vantera/db",
     "@vantera/ai",

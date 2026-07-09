@@ -74,20 +74,21 @@ export default function RootLayout({
       className={`${montserrat.variable} ${geistMono.variable} ${poppins.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        {/* Google Analytics (gtag.js) — every route. afterInteractive: loads early, after hydration. */}
+        {/* Google Analytics + Clarity — every route, lazyOnload so they run during idle after
+            load instead of competing for the main thread in the LCP/TTI window (mobile perf). */}
         {process.env.NODE_ENV === "production" && (
           <>
             <Script
               src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
-              strategy="afterInteractive"
+              strategy="lazyOnload"
             />
-            <Script id="google-analytics" strategy="afterInteractive">
+            <Script id="google-analytics" strategy="lazyOnload">
               {`window.dataLayer = window.dataLayer || [];
 function gtag(){dataLayer.push(arguments);}
 gtag('js', new Date());
 gtag('config', '${GA_MEASUREMENT_ID}');`}
             </Script>
-            <Script id="microsoft-clarity" strategy="afterInteractive">
+            <Script id="microsoft-clarity" strategy="lazyOnload">
               {`(function(c,l,a,r,i,t,y){
     c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
     t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
