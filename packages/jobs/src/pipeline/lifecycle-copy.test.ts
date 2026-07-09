@@ -32,6 +32,16 @@ describe("buildLifecycleMessage", () => {
     }
   });
 
+  it("never says '0 qualified' when leads exist but none qualified yet", () => {
+    for (const seed of [0, 1]) {
+      for (const segment of ["idle_after_onboarding", "trial_lapsed"] as const) {
+        const msg = buildLifecycleMessage(segment, 1, data({ leadCount: 3, qualifiedCount: 0 }), seed);
+        expect(msg).not.toMatch(/\b0\b/);
+        expect(msg).toContain("3");
+      }
+    }
+  });
+
   it("merges the stalled step into segment A touch 1", () => {
     expect(buildLifecycleMessage("stalled_onboarding", 1, data(), 0)).toContain("your ideal customer profile");
   });
