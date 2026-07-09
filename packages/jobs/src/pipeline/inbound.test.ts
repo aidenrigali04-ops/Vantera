@@ -890,3 +890,92 @@ describe("runInbound — conversation cadence + speed lane (0044)", () => {
     expect(store2.revivedRuns).toHaveLength(0);
   });
 });
+
+describe("lifecycle sender interception (0045)", () => {
+  const SENDER = "unipile:founder";
+  const lifecycleDeps = (over: Partial<import("./types").InboundLifecycleHooks> = {}) => ({
+    senderRef: SENDER,
+    recordReply: vi.fn(async () => ({ userId: "u1", displayName: "Sara Bright" })),
+    recordAcceptance: vi.fn(async () => true),
+    notifyReply: vi.fn(async () => {}),
+    ...over,
+  });
+
+  const replyPayload = {
+    event_id: "ev1",
+    event_type: "reply",
+    connected_account: SENDER,
+    from_profile_url: "https://www.linkedin.com/in/sara",
+    from_provider_ref: "ACoAA-sara",
+    body: "hey! yes let's talk",
+    received_at: "2026-07-09T15:00:00.000Z",
+  };
+
+  it("a reply on the founder identity stops the sequence and notifies the founder", async () => {
+    const lifecycle = lifecycleDeps();
+    // the intercepted path never touches the store — an empty stub proves it
+    const summary = await runInbound(
+      { source: "linkedin", payload: replyPayload },
+      {
+        store: {} as never,
+        linkedinInfra: new InMemoryLinkedInInfra(),
+        classifyFn: vi.fn(),
+        lifecycle,
+      } as never
+    );
+    expect(summary).toEqual({ handled: true, action: "lifecycle:reply" });
+    expect(lifecycle.recordReply).toHaveBeenCalledWith(
+      { providerRef: "ACoAA-sara", profileUrl: "https://www.linkedin.com/in/sara" },
+      expect.any(Date)
+    );
+    expect(lifecycle.notifyReply).toHaveBeenCalledWith("Sara Bright", "hey! yes let's talk");
+  });
+
+  it("an acceptance on the founder identity opens the DM gate", async () => {
+    const lifecycle = lifecycleDeps();
+    const summary = await runInbound(
+      {
+        source: "linkedin",
+        payload: {
+          event_id: "ev2",
+          event_type: "relationship_accepted",
+          connected_account: SENDER,
+          profile_url: "https://www.linkedin.com/in/sara",
+          from_provider_ref: "ACoAA-sara",
+        },
+      },
+      { store: {} as never, linkedinInfra: new InMemoryLinkedInInfra(), classifyFn: vi.fn(), lifecycle } as never
+    );
+    expect(summary).toEqual({ handled: true, action: "lifecycle:accepted" });
+  });
+
+  it("an unmatched sender event falls through to the tenant path", async () => {
+    const lifecycle = lifecycleDeps({ recordReply: vi.fn(async () => null) });
+    const store = { findLinkedInAccountByProviderRef: vi.fn(async () => null) };
+    const summary = await runInbound(
+      { source: "linkedin", payload: replyPayload },
+      { store: store as never, linkedinInfra: new InMemoryLinkedInInfra(), classifyFn: vi.fn(), lifecycle } as never
+    );
+    expect(store.findLinkedInAccountByProviderRef).toHaveBeenCalledWith(SENDER);
+    expect(summary.action).toBe("unknown linkedin identity");
+  });
+
+  it("a notify failure never blocks the stop-on-reply write", async () => {
+    const lifecycle = lifecycleDeps({ notifyReply: vi.fn(async () => { throw new Error("smtp down"); }) });
+    const summary = await runInbound(
+      { source: "linkedin", payload: replyPayload },
+      { store: {} as never, linkedinInfra: new InMemoryLinkedInInfra(), classifyFn: vi.fn(), lifecycle } as never
+    );
+    expect(summary.action).toBe("lifecycle:reply");
+  });
+
+  it("events on other identities are untouched by the lifecycle hooks", async () => {
+    const lifecycle = lifecycleDeps();
+    const store = { findLinkedInAccountByProviderRef: vi.fn(async () => null) };
+    await runInbound(
+      { source: "linkedin", payload: { ...replyPayload, connected_account: "unipile:customer" } },
+      { store: store as never, linkedinInfra: new InMemoryLinkedInInfra(), classifyFn: vi.fn(), lifecycle } as never
+    );
+    expect(lifecycle.recordReply).not.toHaveBeenCalled();
+  });
+});

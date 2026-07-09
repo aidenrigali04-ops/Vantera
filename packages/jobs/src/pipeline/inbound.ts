@@ -221,6 +221,35 @@ export async function runInbound(payload: InboundPayload, deps: InboundDeps): Pr
     };
   }
 
+  // Lifecycle sender (0045): events on the founder identity are operator traffic, not
+  // tenant outreach. A reply stops that user's lifecycle sequence forever and hands the
+  // thread to the founder's real inbox; an acceptance opens the DM gate for a parked
+  // invite. account_status events fall through above — the sender identity rides the
+  // normal connection-health machinery. An unmatched event falls through to the tenant
+  // path (the ops workspace may legitimately hold other traffic).
+  if (deps.lifecycle && event.connectedAccountRef === deps.lifecycle.senderRef) {
+    if (event.type === "relationship_accepted") {
+      const matched = await deps.lifecycle.recordAcceptance(
+        { providerRef: event.fromProviderRef, profileUrl: event.profileUrl },
+        now
+      );
+      if (matched) return { handled: true, action: "lifecycle:accepted" };
+    } else {
+      const who = await deps.lifecycle.recordReply(
+        { providerRef: event.fromProviderRef, profileUrl: event.fromProfileUrl },
+        now
+      );
+      if (who) {
+        try {
+          await deps.lifecycle.notifyReply(who.displayName, event.body);
+        } catch {
+          // notification is best-effort; the stop-on-reply write already happened
+        }
+        return { handled: true, action: "lifecycle:reply" };
+      }
+    }
+  }
+
   const identity = await deps.store.findLinkedInAccountByProviderRef(event.connectedAccountRef);
   if (!identity) return { handled: false, action: "unknown linkedin identity" };
   const { accountId } = identity;

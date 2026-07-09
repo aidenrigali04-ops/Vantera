@@ -2,8 +2,10 @@ import { logger, task, tasks } from "@trigger.dev/sdk";
 import { createDb } from "@vantera/db";
 import { classifyReply, draftConversationMessage, fixConversationMessage } from "@vantera/agent-brains";
 import { createLinkedInInfraFromEnv } from "@vantera/linkedin-infra";
+import { createTransactionalEmailFromEnv } from "@vantera/transactional-email";
 import { runInbound } from "../pipeline/inbound";
-import { createPgStore } from "../pipeline/pg-store";
+import { buildLifecycleReplyAlert } from "../pipeline/lifecycle-outreach";
+import { createLifecycleStore, createPgStore } from "../pipeline/pg-store";
 import type { InboundPayload } from "../pipeline/types";
 
 /**
@@ -16,13 +18,30 @@ export const processInbound = task({
   id: "process-inbound",
   maxDuration: 600,
   run: async (payload: InboundPayload) => {
-    const store = createPgStore(createDb());
+    const db = createDb();
+    const store = createPgStore(db);
+    const lifecycleStore = createLifecycleStore(db);
+    const lifecycleConfig = await lifecycleStore.getLifecycleConfig();
     const summary = await runInbound(payload, {
       store,
       linkedinInfra: createLinkedInInfraFromEnv(),
       classifyFn: (body) => classifyReply(body),
       respondFn: (input) => draftConversationMessage(input),
       fixReplyFn: (original, input) => fixConversationMessage(original, input),
+      // 0045: intercept events on the founder identity (stop-on-reply + invite acceptance)
+      lifecycle: lifecycleConfig.senderRef
+        ? {
+            senderRef: lifecycleConfig.senderRef,
+            recordReply: (who, now) => lifecycleStore.recordLifecycleReply(who, now),
+            recordAcceptance: (who, now) => lifecycleStore.recordLifecycleAcceptance(who, now),
+            notifyReply: async (name, body) => {
+              if (!lifecycleConfig.notifyEmail) return;
+              await createTransactionalEmailFromEnv().send(
+                buildLifecycleReplyAlert(lifecycleConfig.notifyEmail, name, body)
+              );
+            },
+          }
+        : undefined,
     });
     if (summary.action.endsWith("+responded")) {
       // Speed-to-lead: a response just queued on the priority lane — run dispatch NOW instead
