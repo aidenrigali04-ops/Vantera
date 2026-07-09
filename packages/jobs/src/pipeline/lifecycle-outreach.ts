@@ -1,7 +1,12 @@
 import { dailyAllowance, paceWithJitter } from "./safety-limits";
 import { isWithinSendWindow } from "./send-window";
 import { buildLifecycleMessage, firstNameOf } from "./lifecycle-copy";
-import type { LifecycleOutreachDeps, LifecycleOutreachSummary } from "./types";
+import type {
+  LifecycleDueTouch,
+  LifecycleOutreachDeps,
+  LifecycleOutreachSummary,
+  LifecycleSegment,
+} from "./types";
 
 // Operator-side lifecycle re-engagement (0045). Deliberately BYPASSES the campaign/lead
 // machinery — targets are our own users, not prospects — but keeps the same safety
@@ -100,14 +105,32 @@ export async function runLifecycleOutreach(deps: LifecycleOutreachDeps): Promise
     ? (now.getTime() - sender.connectedAt.getTime()) / 86_400_000
     : 0;
   const cap = dailyAllowance("linkedin", senderAgeDays, { requested: config.dailyCap, kind: "message" });
+  // invites are the scarcer, ramped resource (rule 04): budget them separately so a young
+  // sender connection never exceeds its 5/10/15-a-day ramp even when the message cap allows more
+  const inviteCap = dailyAllowance("linkedin", senderAgeDays, { requested: config.dailyCap, kind: "invite" });
   const due = await deps.store.getDueTouches(now, cap);
+
+  // Segment exclusivity (spec: at most one segment per user; C supersedes B supersedes A).
+  // getDueTouches can return one pending row per segment for the same user — send only the
+  // highest-priority one this run; trial-lapsed enqueue cancels superseded rows in the store.
+  const SEGMENT_PRIORITY: Record<LifecycleSegment, number> = {
+    trial_lapsed: 0,
+    idle_after_onboarding: 1,
+    stalled_onboarding: 2,
+  };
+  const byUser = new Map<string, LifecycleDueTouch>();
+  for (const t of due) {
+    const held = byUser.get(t.userId);
+    if (!held || SEGMENT_PRIORITY[t.segment] < SEGMENT_PRIORITY[held.segment]) byUser.set(t.userId, t);
+  }
+  const batch = [...byUser.values()];
 
   let messagesSent = 0;
   let invitesSent = 0;
   let skipped = 0;
   let failed = 0;
   let i = 0;
-  for (const t of due) {
+  for (const t of batch) {
     if (i > 0) await deps.pause?.(paceWithJitter(LIFECYCLE_SEND_GAP_MS, seedFor(t.id)));
     i += 1;
     if (!t.linkedinUrl) {
@@ -150,6 +173,7 @@ export async function runLifecycleOutreach(deps: LifecycleOutreachDeps): Promise
         });
         messagesSent += 1;
       } else if (!t.inviteSent) {
+        if (invitesSent >= inviteCap) continue; // ramp exhausted — row stays pending for the next run
         // invite gate: DMs need a 1st-degree connection; ONE note-less invite, then wait
         // for the acceptance webhook to flip the row back to 'pending'
         const out = await deps.linkedin.sendInvite({

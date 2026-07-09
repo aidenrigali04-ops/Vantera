@@ -70,4 +70,15 @@ describe("runTrialExpiry lifecycle chaining (0045)", () => {
     });
     expect(summary.expired).toBe(1);
   });
+
+  it("a lifecycle capture failure never blocks the expiry flip (fails open)", async () => {
+    const s: TrialStore = {
+      getExpiredTrialAccounts: vi.fn(async () => [{ id: "a" }]),
+      expireTrials: vi.fn(async () => 1),
+    };
+    const lifecycle = { enqueueTrialLapsedForAccounts: vi.fn(async () => { throw new Error("relation does not exist"); }) };
+    const summary = await runTrialExpiry({ store: s, lifecycle });
+    expect(s.expireTrials).toHaveBeenCalledWith(["a"]);
+    expect(summary).toEqual({ status: "completed", expired: 1 });
+  });
 });

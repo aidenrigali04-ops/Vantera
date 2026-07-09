@@ -2469,7 +2469,7 @@ export function createLifecycleStore(db: Db): LifecycleStore {
       return {
         enabled: enabled === true,
         senderRef: typeof senderRef === "string" && senderRef.length > 0 ? senderRef : null,
-        dailyCap: typeof dailyCap === "number" && dailyCap > 0 ? dailyCap : 10,
+        dailyCap: typeof dailyCap === "number" && dailyCap >= 0 ? dailyCap : 10,
         senderLocation:
           typeof senderLocation === "string" && senderLocation.length > 0 ? senderLocation : "New York",
         notifyEmail: typeof notifyEmail === "string" && notifyEmail.length > 0 ? notifyEmail : null,
@@ -2515,12 +2515,16 @@ export function createLifecycleStore(db: Db): LifecycleStore {
     },
 
     async scanStalledOnboarding(now, excludeAccountId) {
-      const rows = await db.execute<ScanRow & { onboardingIcp: string | null; websiteUrl: string | null; revenueGoal: number | null }>(
+      // The onboarding wizard writes onboarding_icp + revenue_goal_cents atomically WITH
+      // onboarding_completed_at (they land in the same final-step write) — so every stalled
+      // account has onboarding_icp = null regardless of how far it actually got. Those columns
+      // can't distinguish stall points; the only mid-wizard signal is whether a linkedin_accounts
+      // row exists (a separate, earlier step), so that's the one fork we can honestly report.
+      const rows = await db.execute<ScanRow & { hasLinkedin: boolean }>(
         sql`
           select m.user_id as "userId", a.id as "accountId", p.display_name as "displayName",
                  coalesce(x.profile_url, a.onboarding_linkedin_url) as "linkedinUrl",
-                 a.onboarding_icp as "onboardingIcp", a.website_url as "websiteUrl",
-                 a.revenue_goal_cents as "revenueGoal"
+                 exists(select 1 from public.linkedin_accounts la2 where la2.account_id = a.id) as "hasLinkedin"
           from public.accounts a
           join public.account_members m on m.account_id = a.id and m.role = 'owner'
           left join public.user_profiles p on p.user_id = m.user_id
@@ -2534,20 +2538,12 @@ export function createLifecycleStore(db: Db): LifecycleStore {
             and a.id <> ${excludeAccountId}
         `
       );
-      // wizard order: ICP → website → revenue goal → final "find leads" step
       return rows.map((r) => ({
         userId: r.userId,
         accountId: r.accountId,
         displayName: r.displayName,
         linkedinUrl: r.linkedinUrl,
-        stalledStep:
-          r.onboardingIcp === null
-            ? "your ideal customer profile"
-            : r.websiteUrl === null
-              ? "your website"
-              : r.revenueGoal === null
-                ? "your revenue goal"
-                : "the final step",
+        stalledStep: r.hasLinkedin ? "the final details step" : "connecting your LinkedIn",
       }));
     },
 
@@ -2592,6 +2588,15 @@ export function createLifecycleStore(db: Db): LifecycleStore {
           stalledStep: c.stalledStep,
         })
         .onConflictDoNothing();
+
+      if (segment === "trial_lapsed") {
+        // C supersedes A/B (spec) — same rule as the trial-expiry chained path
+        await db.execute(sql`
+          update public.lifecycle_touches
+          set status = 'canceled'
+          where user_id = ${c.userId} and segment <> 'trial_lapsed' and status in ('pending', 'invited')
+        `);
+      }
     },
 
     async enqueueDueFollowUps(now) {
@@ -2731,6 +2736,19 @@ export function createLifecycleStore(db: Db): LifecycleStore {
         on conflict do nothing
         returning id
       `);
+
+      // C supersedes A/B (spec): a lapsed user's other-segment queue is dead copy now
+      await db.execute(sql`
+        update public.lifecycle_touches t
+        set status = 'canceled'
+        from public.account_members m
+        where m.account_id in (${sql.join(accountIds.map((id) => sql`${id}`), sql`, `)})
+          and m.role = 'owner'
+          and t.user_id = m.user_id
+          and t.segment <> 'trial_lapsed'
+          and t.status in ('pending', 'invited')
+      `);
+
       return rows.length;
     },
   };

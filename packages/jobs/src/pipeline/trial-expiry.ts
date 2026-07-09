@@ -13,7 +13,12 @@ export async function runTrialExpiry(deps: TrialExpiryDeps): Promise<TrialExpiry
   // 0045: capture BEFORE the flip — post-expiry these rows are indistinguishable from any
   // canceled account, so the moment of lapse is the only clean capture point.
   if (expired.length > 0 && deps.lifecycle) {
-    await deps.lifecycle.enqueueTrialLapsedForAccounts(expired.map((a) => a.id));
+    try {
+      await deps.lifecycle.enqueueTrialLapsedForAccounts(expired.map((a) => a.id));
+    } catch {
+      // lifecycle capture is an add-on: never block trial expiry (entitlement + outreach
+      // shutdown is compliance-relevant). The 60-day backfill scan self-heals missed captures.
+    }
   }
   const count = expired.length > 0 ? await deps.store.expireTrials(expired.map((a) => a.id)) : 0;
   return { status: "completed", expired: count };

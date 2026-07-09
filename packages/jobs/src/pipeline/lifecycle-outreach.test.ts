@@ -229,6 +229,35 @@ describe("runLifecycleOutreach sending", () => {
     await runLifecycleOutreach(deps);
     expect(store.setLifecycleLastRun).toHaveBeenCalledWith(IN_WINDOW);
   });
+
+  it("segment exclusivity: one touch per user per run, trial_lapsed wins", async () => {
+    const store = makeStore({
+      getDueTouches: vi.fn(async () => [
+        touch({ id: "b-row", segment: "idle_after_onboarding", connected: true }),
+        touch({ id: "c-row", segment: "trial_lapsed", connected: true }),
+      ]),
+    });
+    const { deps, linkedin } = makeDeps(store);
+    const summary = await runLifecycleOutreach(deps);
+    expect(summary.messagesSent).toBe(1);
+    expect(linkedin.sentMessages).toHaveLength(1);
+    expect(store.markTouchSent).toHaveBeenCalledTimes(1);
+    expect((store.markTouchSent as ReturnType<typeof vi.fn>).mock.calls[0]![0]).toBe("c-row");
+  });
+
+  it("invites are budgeted by the rule-04 invite ramp, not the message cap", async () => {
+    const now = IN_WINDOW;
+    const store = makeStore({
+      getSenderRow: vi.fn(async () => ({ accountId: "ops", status: "active", connectedAt: new Date(now.getTime() - 2 * 86_400_000) })),
+      getDueTouches: vi.fn(async () =>
+        Array.from({ length: 6 }, (_, i) => touch({ id: `t${i}`, userId: `u${i}` }))
+      ),
+    });
+    const { deps, linkedin } = makeDeps(store);
+    const summary = await runLifecycleOutreach(deps);
+    expect(summary.invitesSent).toBe(5); // <7d-old connection ramps at 5 invites/day
+    expect(linkedin.sentInvites).toHaveLength(5);
+  });
 });
 
 describe("alert builders", () => {

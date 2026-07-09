@@ -22,7 +22,11 @@ export const processInbound = task({
     const store = createPgStore(db);
     const lifecycleStore = createLifecycleStore(db);
     // lifecycle is an add-on: a failed config read must never block tenant inbound processing
-    const lifecycleConfig = await lifecycleStore.getLifecycleConfig().catch(() => null);
+    const lifecycleConfig = await lifecycleStore.getLifecycleConfig().catch((err) => {
+      // degraded mode must be diagnosable: lifecycle interception is silently off for this event
+      logger.warn("lifecycle config read failed; lifecycle interception skipped", { err: String(err) });
+      return null;
+    });
     const senderRef = lifecycleConfig?.senderRef ?? null;
     const notifyEmail = lifecycleConfig?.notifyEmail ?? null;
     const summary = await runInbound(payload, {

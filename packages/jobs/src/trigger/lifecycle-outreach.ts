@@ -14,7 +14,7 @@ import { createLifecycleStore } from "../pipeline/pg-store";
  */
 export const lifecycleOutreach = task({
   id: "lifecycle-outreach",
-  maxDuration: 3600, // paced sends: up to cap × ~2min jittered gaps
+  maxDuration: 7200, // paced sends: cap × jittered ~2min gaps can exceed an hour at the 25-message ceiling
   run: async () => {
     const mailer = createTransactionalEmailFromEnv();
     const summary = await runLifecycleOutreach({
