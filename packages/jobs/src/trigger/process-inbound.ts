@@ -21,7 +21,10 @@ export const processInbound = task({
     const db = createDb();
     const store = createPgStore(db);
     const lifecycleStore = createLifecycleStore(db);
-    const lifecycleConfig = await lifecycleStore.getLifecycleConfig();
+    // lifecycle is an add-on: a failed config read must never block tenant inbound processing
+    const lifecycleConfig = await lifecycleStore.getLifecycleConfig().catch(() => null);
+    const senderRef = lifecycleConfig?.senderRef ?? null;
+    const notifyEmail = lifecycleConfig?.notifyEmail ?? null;
     const summary = await runInbound(payload, {
       store,
       linkedinInfra: createLinkedInInfraFromEnv(),
@@ -29,15 +32,15 @@ export const processInbound = task({
       respondFn: (input) => draftConversationMessage(input),
       fixReplyFn: (original, input) => fixConversationMessage(original, input),
       // 0045: intercept events on the founder identity (stop-on-reply + invite acceptance)
-      lifecycle: lifecycleConfig.senderRef
+      lifecycle: senderRef
         ? {
-            senderRef: lifecycleConfig.senderRef,
+            senderRef,
             recordReply: (who, now) => lifecycleStore.recordLifecycleReply(who, now),
             recordAcceptance: (who, now) => lifecycleStore.recordLifecycleAcceptance(who, now),
             notifyReply: async (name, body) => {
-              if (!lifecycleConfig.notifyEmail) return;
+              if (!notifyEmail) return;
               await createTransactionalEmailFromEnv().send(
-                buildLifecycleReplyAlert(lifecycleConfig.notifyEmail, name, body)
+                buildLifecycleReplyAlert(notifyEmail, name, body)
               );
             },
           }
