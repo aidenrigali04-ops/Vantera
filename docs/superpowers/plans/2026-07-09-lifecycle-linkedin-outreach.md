@@ -12,6 +12,7 @@
 
 ## Global Constraints
 
+- **Admin-pin (owner directive 2026-07-09): this feature belongs to the `aiden@vanterasystem.com` account ONLY.** The core hard-verifies the configured sender's `linkedin_accounts` row lives under the account owned by `LIFECYCLE_ADMIN_EMAIL = "aiden@vanterasystem.com"` and refuses to run otherwise (`skipped: sender_not_admin`). No other account can ever be, or configure, the sender.
 - LinkedIn-only: no email fallback; a user with no LinkedIn URL is marked `skipped_no_linkedin` and never retried (owner decision 2026-07-09).
 - Auto-send, hard daily cap default **10**, always clamped through `dailyAllowance("linkedin", …, { kind: "message" })` (rule 04 — this is the founder's personal account).
 - Message the account **owner** only (`account_members.role = 'owner'`), never other members.
@@ -252,6 +253,8 @@ export interface LifecycleStore {
   getSenderRow(
     providerRef: string
   ): Promise<{ accountId: string; status: string; connectedAt: Date | null } | null>;
+  /** admin-pin guard: owner emails for an account (role='owner' only) */
+  getAccountOwnerEmails(accountId: string): Promise<string[]>;
   scanStalledOnboarding(now: Date, excludeAccountId: string): Promise<LifecycleCandidate[]>;
   scanIdleAfterOnboarding(now: Date, excludeAccountId: string): Promise<LifecycleCandidate[]>;
   /** pre-ship lapses only: trial_ends_at within the last 60 days */
@@ -295,7 +298,7 @@ export interface LifecycleOutreachDeps {
 
 export interface LifecycleOutreachSummary {
   status: "completed" | "skipped";
-  reason?: "disabled" | "kill_switch" | "outside_window" | "already_ran" | "sender_unavailable";
+  reason?: "disabled" | "kill_switch" | "outside_window" | "already_ran" | "sender_unavailable" | "sender_not_admin";
   enqueued: number;
   followUps: number;
   messagesSent: number;
@@ -593,6 +596,17 @@ export function createLifecycleStore(db: Db): LifecycleStore {
         .from(linkedinAccounts)
         .where(eq(linkedinAccounts.providerRef, providerRef));
       return row ?? null;
+    },
+
+    async getAccountOwnerEmails(accountId) {
+      // admin-pin guard — same auth.users lane as getAccountAdminEmails, owners only
+      const rows = await db.execute<{ email: string | null }>(sql`
+        select u.email
+        from public.account_members m
+        join auth.users u on u.id = m.user_id
+        where m.account_id = ${accountId} and m.role = 'owner'
+      `);
+      return [...new Set(rows.map((r) => r.email).filter((e): e is string => Boolean(e)))];
     },
 
     async scanStalledOnboarding(now, excludeAccountId) {
@@ -914,6 +928,7 @@ function makeStore(over: Partial<Record<keyof LifecycleStore, unknown>> = {}) {
     setLifecycleLastRun: vi.fn(async () => {}),
     isKillSwitchOn: vi.fn(async () => false),
     getSenderRow: vi.fn(async () => ({ accountId: "ops", status: "active", connectedAt: new Date("2026-01-01") })),
+    getAccountOwnerEmails: vi.fn(async () => ["aiden@vanterasystem.com"]),
     scanStalledOnboarding: vi.fn(async () => []),
     scanIdleAfterOnboarding: vi.fn(async () => []),
     scanTrialLapsedBackfill: vi.fn(async () => []),
@@ -981,6 +996,19 @@ describe("runLifecycleOutreach gates", () => {
     });
     const { deps } = makeDeps(store);
     expect((await runLifecycleOutreach(deps)).reason).toBe("already_ran");
+  });
+
+  it("admin pin: refuses a sender that is not under the aiden@vanterasystem.com account", async () => {
+    const store = makeStore({
+      getAccountOwnerEmails: vi.fn(async () => ["someone-else@example.com"]),
+      getDueTouches: vi.fn(async () => [touch({ connected: true })]),
+    });
+    const { deps, linkedin } = makeDeps(store);
+    const summary = await runLifecycleOutreach(deps);
+    expect(summary.reason).toBe("sender_not_admin");
+    expect(linkedin.sentMessages).toHaveLength(0);
+    expect(linkedin.sentInvites).toHaveLength(0);
+    expect(store.scanStalledOnboarding).not.toHaveBeenCalled();
   });
 
   it("aborts + alerts the founder when the sender connection is not active", async () => {
@@ -1126,6 +1154,12 @@ import type { LifecycleOutreachDeps, LifecycleOutreachSummary } from "./types";
 export const LIFECYCLE_SEND_GAP_MS = 120_000;
 /** Once-a-day gate: a run inside the last 20h makes this tick a no-op (fired every 15 min). */
 export const LIFECYCLE_RUN_GAP_MS = 20 * 3_600_000;
+/**
+ * Admin pin (owner directive 2026-07-09): lifecycle sends run ONLY from a LinkedIn identity
+ * connected under the account owned by this email. Any other configured sender is refused —
+ * this capability never applies to another account.
+ */
+export const LIFECYCLE_ADMIN_EMAIL = "aiden@vanterasystem.com";
 
 const seedFor = (s: string) => [...s].reduce((a, c) => a + c.charCodeAt(0), 0);
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -1178,6 +1212,13 @@ export async function runLifecycleOutreach(deps: LifecycleOutreachDeps): Promise
       }
     }
     return { status: "skipped", reason: "sender_unavailable", ...none };
+  }
+
+  // admin pin: the sender identity must live under the admin workspace — refuse anything else
+  const ownerEmails = await deps.store.getAccountOwnerEmails(sender.accountId);
+  if (!ownerEmails.includes(LIFECYCLE_ADMIN_EMAIL)) {
+    await deps.store.setLifecycleLastRun(now);
+    return { status: "skipped", reason: "sender_not_admin", ...none };
   }
 
   // scan → enqueue (idempotent; the unique index swallows re-scans)
@@ -1681,7 +1722,7 @@ Apply `packages/db/migrations/0045_lifecycle_touches.sql` to the production Supa
 
 - [ ] **Step 4: Connect the founder LinkedIn identity**
 
-1. Log into the ops workspace (`aiden@vanterasystem.com`) in prod → Settings → Channels → connect LinkedIn (the founder's personal profile) through the normal hosted-auth flow.
+1. Log into the admin workspace (`aiden@vanterasystem.com`) in prod → Settings → Channels → connect LinkedIn (the founder's personal profile) through the normal hosted-auth flow. **This must be the aiden@vanterasystem.com account** — the core's admin-pin guard refuses a sender connected under any other account.
 2. Get the ref: `select provider_ref, profile_url, status from linkedin_accounts la join accounts a on a.id = la.account_id where a.stripe_customer_id is null and la.profile_url is not null;` — confirm `status = 'active'` and note `provider_ref` and the ops `account_id`.
 
 - [ ] **Step 5: Seed config (feature still OFF)**

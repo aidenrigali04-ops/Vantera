@@ -37,8 +37,9 @@ Copy rules: founder voice, honest, no fake personalization, no prospect-style pi
 
 ### Sender identity
 
-- Founder connects his **personal** LinkedIn profile through the existing Unipile connection flow, under an internal ops workspace (his comped `aiden@vanterasystem.com` account works).
+- Founder connects his **personal** LinkedIn profile through the existing Unipile connection flow, under the admin workspace (`aiden@vanterasystem.com`, the comped ops account).
 - The resulting `linkedin_accounts.provider_ref` is recorded in `app_settings` under key **`lifecycle_sender_ref`**. The job resolves the sender from this key at runtime; unset key = feature inert.
+- **Admin-pin guard (owner directive 2026-07-09):** this capability belongs to the `aiden@vanterasystem.com` account ONLY. The pipeline verifies at runtime that the configured sender's `linkedin_accounts` row lives under the account owned by that email and refuses to run otherwise (`skipped: sender_not_admin`). Combined with the service-role-only config and table, no other account can ever act as — or configure — the lifecycle sender.
 - Sends go through the account-scoped infra primitive `UnipileLinkedInInfra.sendMessage({connectedAccountId, profileUrl, body})` (`packages/linkedin-infra/src/unipile.ts`) — no campaign, lead, or `scheduled_sends` row involved.
 
 ### New table: `lifecycle_touches`
