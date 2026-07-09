@@ -1,30 +1,22 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { RevealItem } from "./surface";
-import {
-  HubSpotLogo,
-  IntuitLogo,
-  NaverLogo,
-  OktaLogo,
-  ScribdLogo,
-  ZendeskLogo,
-} from "./brand-logos";
+import { ShieldCheck, CheckCircle2, Hand, Ban } from "lucide-react";
 
 /**
- * "Powering revenue for modern teams" — a social-proof logo cloud. The marks sit in
- * one cohesive monochrome grey so the row reads as a calm set (the label never
- * competes with the brands), and each lights to its own colour on hover. Sizes are
- * optically balanced per-mark rather than set to a single height.
+ * Above-the-fold trust row. This replaced a fabricated customer-logo cloud
+ * (HubSpot/Okta/Zendesk/… — none are Vantera customers, so it was false
+ * endorsement and legal exposure). Until real, attributable customer logos or
+ * numbers exist, the honest thing to show here is the product's actual
+ * guarantees — which also answer the category's #1 objection: "will this get my
+ * LinkedIn account restricted?" Every claim below is literally true of the product.
  */
-const LOGOS = [
-  { name: "HubSpot", color: "#ff5c35", node: <HubSpotLogo className="h-[27px] w-auto" /> },
-  { name: "Intuit", color: "#236cff", node: <IntuitLogo className="h-[19px] w-auto" /> },
-  { name: "NAVER", color: "#03c75a", node: <NaverLogo className="text-[22px]" /> },
-  { name: "Okta", color: "#0a0c12", node: <OktaLogo className="h-[26px] w-auto" /> },
-  { name: "Scribd", color: "#0a0c12", node: <ScribdLogo className="h-[22px] w-auto" /> },
-  { name: "Zendesk", color: "#0a0c12", node: <ZendeskLogo className="h-[19px] w-auto" /> },
-];
+const SIGNALS = [
+  { icon: ShieldCheck, label: "LinkedIn-safe pacing", sub: "human-like limits, built in" },
+  { icon: Hand, label: "You approve every send", sub: "nothing goes out without you" },
+  { icon: CheckCircle2, label: "Live in minutes", sub: "connect and it's working" },
+  { icon: Ban, label: "No card to start", sub: "cancel anytime" },
+] as const;
 
 export function TrustStrip() {
   return (
@@ -37,23 +29,31 @@ export function TrustStrip() {
           transition={{ duration: 0.6, delay: 0.1 }}
           className="text-center font-mono text-[11px] uppercase tracking-[0.2em] text-[var(--ink-4)]"
         >
-          Powering revenue for modern teams
+          Built to protect your account
         </motion.p>
 
         <motion.div
           initial="hidden"
           animate="show"
           variants={{ hidden: {}, show: { transition: { staggerChildren: 0.08, delayChildren: 0.18 } } }}
-          className="mt-10 flex flex-wrap items-center justify-center gap-x-10 gap-y-8 sm:gap-x-12 lg:mt-7 lg:gap-x-16"
+          className="mt-10 grid grid-cols-2 gap-x-8 gap-y-7 sm:flex sm:flex-wrap sm:items-start sm:justify-center sm:gap-x-12 lg:mt-7 lg:gap-x-16"
         >
-          {LOGOS.map((l) => (
-            <RevealItem
-              key={l.name}
-              style={{ "--logo": l.color } as React.CSSProperties}
-              className="flex items-center text-[#8e96a1] transition-colors duration-300 hover:text-[var(--logo)]"
+          {SIGNALS.map((s) => (
+            <motion.div
+              key={s.label}
+              variants={{ hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }}
+              className="flex items-start gap-2.5"
             >
-              {l.node}
-            </RevealItem>
+              <span className="mt-0.5 grid size-[26px] shrink-0 place-items-center rounded-[8px] bg-[var(--cyan-tint)] ring-1 ring-inset ring-[rgba(24,119,242,0.22)]">
+                <s.icon className="size-[15px] text-[var(--cyan-strong)]" strokeWidth={2.2} />
+              </span>
+              <span className="leading-tight">
+                <span className="block text-[13.5px] font-semibold tracking-[-0.01em] text-foreground">
+                  {s.label}
+                </span>
+                <span className="block text-[12px] text-[var(--ink-4)]">{s.sub}</span>
+              </span>
+            </motion.div>
           ))}
         </motion.div>
       </div>

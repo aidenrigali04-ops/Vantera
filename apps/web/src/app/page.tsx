@@ -11,8 +11,6 @@ import { Showcase } from "@/components/landing/showcase";
 import { HowItWorks } from "@/components/landing/how-it-works";
 import { FeaturesGrid } from "@/components/landing/features-grid";
 import { Consolidation } from "@/components/landing/consolidation";
-import { Stats } from "@/components/landing/stats";
-import { Testimonials } from "@/components/landing/testimonials";
 import { Integrations } from "@/components/landing/integrations";
 import { Pricing, type LandingPlan } from "@/components/landing/pricing";
 import { FinalCta } from "@/components/landing/final-cta";
@@ -58,8 +56,6 @@ export default function Home() {
         <HowItWorks />
         <FeaturesGrid />
         <Consolidation />
-        <Stats />
-        <Testimonials />
         <Integrations />
         <Pricing plans={plans} />
         <FinalCta />
