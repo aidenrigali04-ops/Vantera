@@ -48,17 +48,25 @@ Operator-scoped, **service-role only** — no tenant RLS policies, no client gra
 ```sql
 lifecycle_touches (
   id uuid pk,
-  user_id uuid not null references auth.users(id),
-  account_id uuid references accounts(id),
+  user_id uuid not null references auth.users(id) on delete cascade,  -- GDPR deletion rides the cascade
+  account_id uuid references accounts(id) on delete set null,
   segment text not null check (segment in ('stalled_onboarding','idle_after_onboarding','trial_lapsed')),
   touch_number int not null check (touch_number in (1,2)),
-  status text not null check (status in ('pending','sent','failed','skipped_no_linkedin','canceled')),
-  linkedin_profile_url text,
+  status text not null default 'pending'
+    check (status in ('pending','invited','sent','failed','skipped_no_linkedin','canceled')),
+  attempts int not null default 0,        -- failed sends retry once, then park as failed
+  linkedin_url text,
+  target_provider_ref text,               -- member id captured at send; the strong reply-match key
+  display_name text,
+  stalled_step text,                      -- segment A merge field
   message_body text,
-  message_ref text,           -- Unipile chat/message id
+  message_ref text,                       -- provider chat/message id
+  error text,
+  invite_sent_at timestamptz,             -- invite gate: connection request sent
+  connected_at timestamptz,               -- invite accepted (or already 1st-degree)
   sent_at timestamptz,
   replied_at timestamptz,
-  created_at timestamptz default now()
+  created_at timestamptz not null default now()
 )
 -- unique (user_id, segment, touch_number)
 ```
@@ -82,7 +90,9 @@ LinkedIn URL resolution order: verified `linkedin_accounts.profile_url` (the use
 
 ### Sequences
 
-Two touches per segment: initial + one follow-up ≥4 days later, stop on reply. Founder-voice templates per segment with merge fields (first name, stalled step, real lead counts), with 2–3 phrasing variants rotated to avoid identical-message patterns. Templates live in the pipeline package (not agent-brains — that copy path is tuned for cold prospects and conflicts with the copy guard).
+Two touches per segment: initial + one follow-up ≥4 days later, stop on reply. Founder-voice templates per segment with merge fields (first name, stalled step, real lead counts), with 2 phrasing variants rotated to avoid identical-message patterns. Templates live in the pipeline package (not agent-brains — that copy path is tuned for cold prospects and conflicts with the copy guard).
+
+**Invite gate (LinkedIn reality):** a DM generally requires a 1st-degree connection. Before sending, the pipeline checks `getConnectionState`; a non-connection gets a note-less connection invite instead (counted against the same daily cap), the touch row parks as `invited`, and the acceptance webhook flips it back to `pending` so the message goes out on the next run. A never-accepted invite is simply the end of that user's sequence — no chasing.
 
 ### Reply handling (stop-on-reply)
 
