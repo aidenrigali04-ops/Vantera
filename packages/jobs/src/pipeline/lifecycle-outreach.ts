@@ -139,6 +139,9 @@ export async function runLifecycleOutreach(deps: LifecycleOutreachDeps): Promise
       skipped += 1;
       continue;
     }
+    // ramp exhausted — a touch that could need an invite stays pending for the next run,
+    // and skips the getConnectionState lookup it would otherwise burn
+    if (!t.connected && !t.inviteSent && invitesSent >= inviteCap) continue;
     try {
       const connected = t.connected
         ? true
@@ -173,7 +176,7 @@ export async function runLifecycleOutreach(deps: LifecycleOutreachDeps): Promise
         });
         messagesSent += 1;
       } else if (!t.inviteSent) {
-        if (invitesSent >= inviteCap) continue; // ramp exhausted — row stays pending for the next run
+        // invite budget already enforced by the hoisted ramp check above the connection lookup
         // invite gate: DMs need a 1st-degree connection; ONE note-less invite, then wait
         // for the acceptance webhook to flip the row back to 'pending'
         const out = await deps.linkedin.sendInvite({

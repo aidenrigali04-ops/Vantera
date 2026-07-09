@@ -2566,6 +2566,9 @@ export function createLifecycleStore(db: Db): LifecycleStore {
 
     async scanTrialLapsedBackfill(now, excludeAccountId) {
       // accounts that lapsed BEFORE this feature shipped; live lapses ride trial-expiry chaining
+      // LOAD-BEARING: this scan runs EVERY run (not first-run-only). Re-enqueueing a lapsed user
+      // is what triggers enqueueTouch's supersede for A/B rows created AFTER the C row (e.g. the
+      // same-day idle scan) — do not optimize this to a one-shot.
       const rows = await db.execute<ScanRow>(candidateSql(sql`
         a.subscription_status = 'none' and a.plan = 'none' and a.stripe_subscription_id is null
         and a.trial_ends_at is not null
@@ -2590,7 +2593,21 @@ export function createLifecycleStore(db: Db): LifecycleStore {
         .onConflictDoNothing();
 
       if (segment === "trial_lapsed") {
+        // carry a pending invite's state onto the C row so it waits for the acceptance instead of re-inviting
+        await db.execute(sql`
+          update public.lifecycle_touches c
+          set invite_sent_at = coalesce(c.invite_sent_at, s.invite_sent_at),
+              target_provider_ref = coalesce(c.target_provider_ref, s.target_provider_ref),
+              connected_at = coalesce(c.connected_at, s.connected_at),
+              status = case when c.status = 'pending' and s.status = 'invited' and s.connected_at is null then 'invited' else c.status end
+          from public.lifecycle_touches s
+          where c.user_id = s.user_id
+            and c.segment = 'trial_lapsed' and c.touch_number = 1
+            and s.segment <> 'trial_lapsed' and s.status in ('pending', 'invited')
+            and c.user_id = ${c.userId}
+        `);
         // C supersedes A/B (spec) — same rule as the trial-expiry chained path
+        // runs even when the insert conflicts — that unconditional sweep is what cancels later-created A/B rows
         await db.execute(sql`
           update public.lifecycle_touches
           set status = 'canceled'
@@ -2735,6 +2752,22 @@ export function createLifecycleStore(db: Db): LifecycleStore {
         where a.id in (${sql.join(accountIds.map((id) => sql`${id}`), sql`, `)})
         on conflict do nothing
         returning id
+      `);
+
+      // carry a pending invite's state onto the C row so it waits for the acceptance instead of re-inviting
+      await db.execute(sql`
+        update public.lifecycle_touches c
+        set invite_sent_at = coalesce(c.invite_sent_at, s.invite_sent_at),
+            target_provider_ref = coalesce(c.target_provider_ref, s.target_provider_ref),
+            connected_at = coalesce(c.connected_at, s.connected_at),
+            status = case when c.status = 'pending' and s.status = 'invited' and s.connected_at is null then 'invited' else c.status end
+        from public.lifecycle_touches s, public.account_members m
+        where m.account_id in (${sql.join(accountIds.map((id) => sql`${id}`), sql`, `)})
+          and m.role = 'owner'
+          and c.user_id = m.user_id
+          and c.user_id = s.user_id
+          and c.segment = 'trial_lapsed' and c.touch_number = 1
+          and s.segment <> 'trial_lapsed' and s.status in ('pending', 'invited')
       `);
 
       // C supersedes A/B (spec): a lapsed user's other-segment queue is dead copy now
