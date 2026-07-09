@@ -2632,11 +2632,12 @@ export function createLifecycleStore(db: Db): LifecycleStore {
         ) l on true
         where t.status = 'pending'
           and not exists (
-            -- 30-day cross-segment cooldown + replied users are never auto-messaged again
+            -- replied ever = never auto-message again (global); the 30-day recency
+            -- cooldown is CROSS-segment only, so a chain's own touch-1 never blocks its touch-2
             select 1 from public.lifecycle_touches x
             where x.user_id = t.user_id
               and (x.replied_at is not null
-                   or (x.sent_at is not null and x.sent_at > ${new Date(now.getTime() - 30 * DAY)}))
+                   or (x.segment <> t.segment and x.sent_at is not null and x.sent_at > ${new Date(now.getTime() - 30 * DAY)}))
           )
         order by t.created_at asc
         limit ${limit}
@@ -2726,7 +2727,7 @@ export function createLifecycleStore(db: Db): LifecycleStore {
           where la.account_id = a.id and la.profile_url is not null
           order by la.connected_at desc nulls last limit 1
         ) x on true
-        where a.id = any(${accountIds})
+        where a.id in (${sql.join(accountIds.map((id) => sql`${id}`), sql`, `)})
         on conflict do nothing
         returning id
       `);
