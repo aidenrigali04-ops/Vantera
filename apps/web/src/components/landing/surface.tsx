@@ -1,6 +1,6 @@
 "use client";
 
-import { motion, type HTMLMotionProps } from "framer-motion";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -9,6 +9,11 @@ import { cn } from "@/lib/utils";
  * kept in the light Poppins/cyan system. A clean white panel with a hairline border
  * and premium soft shadow; the interactive variant lifts and picks up a faint cyan
  * halo on hover, exactly like the dashboard's `interactive` panels.
+ *
+ * Reveal is CSS-driven (native IntersectionObserver + globals.css `landing-reveal-*`),
+ * not Framer Motion — this keeps the animation runtime off the landing's hydration path
+ * (mobile perf). Content is VISIBLE BY DEFAULT: the hidden→shown states apply only once
+ * JS has armed the container, so a no-JS / pre-hydration render always shows everything.
  */
 export const CARD = "rounded-2xl border border-[var(--hairline)] bg-white shadow-[var(--shadow-card)]";
 
@@ -18,35 +23,49 @@ export const CARD_INTERACTIVE = cn(
     "hover:shadow-[0_1px_2px_rgba(12,16,26,0.04),0_10px_24px_-12px_rgba(24,119,242,0.16)]",
 );
 
-const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
+/** Scroll-triggered staggered reveal container — children fade/rise as one on first view. */
+export function Reveal({
+  className,
+  children,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement>) {
+  const ref = useRef<HTMLDivElement>(null);
+  // "" (SSR / no-JS) → children visible. "armed" → hidden, ready. "shown" → animate in.
+  const [state, setState] = useState<"" | "armed" | "shown">("");
 
-/** Scroll-triggered staggered reveal container — children animate as one orchestrated motion. */
-export function Reveal({ className, children, ...props }: HTMLMotionProps<"div">) {
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    setState("armed");
+    const io = new IntersectionObserver(
+      ([entry], obs) => {
+        if (entry.isIntersecting) {
+          setState("shown");
+          obs.disconnect();
+        }
+      },
+      { rootMargin: "-80px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
   return (
-    <motion.div
-      initial="hidden"
-      whileInView="show"
-      viewport={{ once: true, margin: "-80px" }}
-      variants={{ hidden: {}, show: { transition: { staggerChildren: 0.08 } } }}
-      className={className}
-      {...props}
-    >
+    <div ref={ref} data-reveal={state || undefined} className={className} {...props}>
       {children}
-    </motion.div>
+    </div>
   );
 }
 
-export function RevealItem({ className, children, ...props }: HTMLMotionProps<"div">) {
+/** A single revealed child — carries the class the parent's data-reveal state drives. */
+export function RevealItem({
+  className,
+  children,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement>) {
   return (
-    <motion.div
-      variants={{
-        hidden: { opacity: 0, y: 22 },
-        show: { opacity: 1, y: 0, transition: { duration: 0.6, ease: EASE } },
-      }}
-      className={className}
-      {...props}
-    >
+    <div className={cn("landing-reveal-item", className)} {...props}>
       {children}
-    </motion.div>
+    </div>
   );
 }

@@ -4,6 +4,7 @@ import Script from "next/script";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { MetaRouteTracker } from "@/components/analytics/meta-route-tracker";
+import { linkedinPartnerId } from "@/lib/analytics/linkedin";
 import { SITE_URL, SITE_DESCRIPTION, JsonLd, organizationLd, websiteLd } from "@/lib/seo";
 
 // Google Analytics 4 (gtag.js) — site-wide event tracking. Loaded via next/script so it's
@@ -23,6 +24,12 @@ const CLARITY_PROJECT_ID = "xgheo2rq8n";
 // through trackEvent (lib/analytics/clarity → meta); SPA PageViews + high-intent
 // ViewContent come from MetaRouteTracker. Endpoints allowlisted in lib/security/csp.
 const META_PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID;
+
+// LinkedIn Insight Tag — conversion tracking + retargeting + audience insights for
+// LinkedIn Ads. Partner id is hardcoded like the GA/Clarity ids (single source of truth in
+// lib/analytics/linkedin), env-overridable. Conversions fire through trackEvent
+// (lib/analytics/clarity → linkedin). Beacon origins are allowlisted in lib/security/csp.
+const LINKEDIN_PARTNER_ID = linkedinPartnerId();
 
 const montserrat = Montserrat({
   variable: "--font-montserrat",
@@ -74,20 +81,21 @@ export default function RootLayout({
       className={`${montserrat.variable} ${geistMono.variable} ${poppins.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        {/* Google Analytics (gtag.js) — every route. afterInteractive: loads early, after hydration. */}
+        {/* Google Analytics + Clarity — every route, lazyOnload so they run during idle after
+            load instead of competing for the main thread in the LCP/TTI window (mobile perf). */}
         {process.env.NODE_ENV === "production" && (
           <>
             <Script
               src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
-              strategy="afterInteractive"
+              strategy="lazyOnload"
             />
-            <Script id="google-analytics" strategy="afterInteractive">
+            <Script id="google-analytics" strategy="lazyOnload">
               {`window.dataLayer = window.dataLayer || [];
 function gtag(){dataLayer.push(arguments);}
 gtag('js', new Date());
 gtag('config', '${GA_MEASUREMENT_ID}');`}
             </Script>
-            <Script id="microsoft-clarity" strategy="afterInteractive">
+            <Script id="microsoft-clarity" strategy="lazyOnload">
               {`(function(c,l,a,r,i,t,y){
     c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
     t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
@@ -118,6 +126,38 @@ fbq('track', 'PageView');`}
                 style={{ display: "none" }}
                 alt=""
                 src={`https://www.facebook.com/tr?id=${META_PIXEL_ID}&ev=PageView&noscript=1`}
+              />
+            </noscript>
+          </>
+        )}
+        {/* LinkedIn Insight Tag — the official bootstrap. lazyOnload keeps it off the
+            LCP/TTI window (it's retargeting/conversion, not needed for first paint);
+            conversion fires come through trackEvent → lib/analytics/linkedin. */}
+        {process.env.NODE_ENV === "production" && LINKEDIN_PARTNER_ID && (
+          <>
+            <Script id="linkedin-insight-init" strategy="lazyOnload">
+              {`_linkedin_partner_id = "${LINKEDIN_PARTNER_ID}";
+window._linkedin_data_partner_ids = window._linkedin_data_partner_ids || [];
+window._linkedin_data_partner_ids.push(_linkedin_partner_id);`}
+            </Script>
+            <Script id="linkedin-insight" strategy="lazyOnload">
+              {`(function(l) {
+if (!l){window.lintrk = function(a,b){window.lintrk.q.push([a,b])};
+window.lintrk.q=[]}
+var s = document.getElementsByTagName("script")[0];
+var b = document.createElement("script");
+b.type = "text/javascript";b.async = true;
+b.src = "https://snap.licdn.com/li.lms-analytics/insight.min.js";
+s.parentNode.insertBefore(b, s);})(window.lintrk);`}
+            </Script>
+            <noscript>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                height="1"
+                width="1"
+                style={{ display: "none" }}
+                alt=""
+                src={`https://px.ads.linkedin.com/collect/?pid=${LINKEDIN_PARTNER_ID}&fmt=gif`}
               />
             </noscript>
           </>

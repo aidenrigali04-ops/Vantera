@@ -5,7 +5,6 @@ import { cn } from "@/lib/utils";
 import { LandingHeading } from "./heading";
 import { PrimaryCta, SecondaryCta } from "./cta";
 import { Reveal, RevealItem, CARD_INTERACTIVE } from "./surface";
-import { useCountUp, useInViewOnce } from "./viz";
 
 /**
  * Landing pricing — kept in the exact shape `page.tsx` already passes: the real
@@ -77,12 +76,13 @@ function FeatureItem({ children }: { children: React.ReactNode }) {
 }
 
 export function Pricing({ plans }: { plans?: LandingPlan[] }) {
-  // Real Starter monthly price, straight from the billing-derived data. When it isn't
-  // provided we render a clearly-placeholder token instead of inventing a number.
+  // Real Starter monthly price, straight from the billing-derived data. Rendered as a
+  // static number (no count-up): the animation initialised at 0, so SSR / no-JS / any
+  // pre-scroll paint showed "$0" — a false free-price flash, worst on slow mobile where
+  // hydration lags. The real price must be the first and only thing shown. When billing
+  // data is absent we render a clearly-placeholder token, never an invented number.
   const starter = plans?.find((p) => p.tier === "starter");
-  const [priceRef, inView] = useInViewOnce();
-  const priceCount = useCountUp(starter?.monthlyUsd ?? 0, inView);
-  const starterPrice = starter ? `$${priceCount}` : "$[X]";
+  const starterPrice = starter ? `$${starter.monthlyUsd}` : "$[X]";
 
   return (
     <section id="pricing" className="relative border-t border-[var(--hairline)] bg-[var(--tint)] py-24 sm:py-28">
@@ -140,7 +140,7 @@ export function Pricing({ plans }: { plans?: LandingPlan[] }) {
                 For founders and operators running their own outbound.
               </p>
 
-              <div ref={priceRef} className="mt-6 flex items-end gap-1.5">
+              <div className="mt-6 flex items-end gap-1.5">
                 <span className="text-[3.25rem] font-semibold leading-none tabular-nums tracking-[-0.03em] text-foreground">
                   {starterPrice}
                 </span>
