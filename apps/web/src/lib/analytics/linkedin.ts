@@ -16,12 +16,18 @@ declare global {
   }
 }
 
-function partnerId(): string {
-  return process.env.NEXT_PUBLIC_LINKEDIN_PARTNER_ID ?? "";
+// The Insight Tag partner id, hardcoded like the GA/Clarity ids (known, non-secret,
+// account-level, stable) with NEXT_PUBLIC_LINKEDIN_PARTNER_ID as an override. Single source
+// of truth: app/layout.tsx imports this to render the tag, and it gates sends here.
+const LINKEDIN_PARTNER_ID_DEFAULT = "9356898";
+
+export function linkedinPartnerId(): string {
+  const v = process.env.NEXT_PUBLIC_LINKEDIN_PARTNER_ID;
+  return v && v.trim() ? v : LINKEDIN_PARTNER_ID_DEFAULT;
 }
 
 function lintrk(action: string, data?: Record<string, unknown>): void {
-  if (typeof window === "undefined" || !partnerId()) return;
+  if (typeof window === "undefined" || !linkedinPartnerId()) return;
   if (!window.lintrk) {
     // Mirror the official snippet's stub exactly — insight.min.js detects `.q` and
     // replays queued [action, data] pairs on load.

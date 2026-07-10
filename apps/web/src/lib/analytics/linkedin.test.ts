@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { linkedinFunnelEvent } from "./linkedin";
+import { linkedinFunnelEvent, linkedinPartnerId } from "./linkedin";
 
 type LintrkStub = ((action: string, data?: Record<string, unknown>) => void) & {
   q?: unknown[][];
@@ -46,10 +46,10 @@ describe("linkedin insight tag wrapper", () => {
     expect(win.lintrk).toBeUndefined();
   });
 
-  it("no-ops entirely when the partner id is unset (unset environments never send)", () => {
-    vi.stubEnv("NEXT_PUBLIC_LINKEDIN_PARTNER_ID", "");
-    const win = fakeWindow();
-    linkedinFunnelEvent("onboarding_completed");
-    expect(win.lintrk).toBeUndefined();
+  it("uses the hardcoded partner id by default and honors the env override", () => {
+    vi.stubEnv("NEXT_PUBLIC_LINKEDIN_PARTNER_ID", ""); // blank env = use the default
+    expect(linkedinPartnerId()).toBe("9356898");
+    vi.stubEnv("NEXT_PUBLIC_LINKEDIN_PARTNER_ID", "7654321");
+    expect(linkedinPartnerId()).toBe("7654321");
   });
 });

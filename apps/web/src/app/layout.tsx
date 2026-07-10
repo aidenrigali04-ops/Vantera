@@ -4,6 +4,7 @@ import Script from "next/script";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { MetaRouteTracker } from "@/components/analytics/meta-route-tracker";
+import { linkedinPartnerId } from "@/lib/analytics/linkedin";
 import { SITE_URL, SITE_DESCRIPTION, JsonLd, organizationLd, websiteLd } from "@/lib/seo";
 
 // Google Analytics 4 (gtag.js) — site-wide event tracking. Loaded via next/script so it's
@@ -25,11 +26,10 @@ const CLARITY_PROJECT_ID = "xgheo2rq8n";
 const META_PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID;
 
 // LinkedIn Insight Tag — conversion tracking + retargeting + audience insights for
-// LinkedIn Ads. Env-gated like the Meta Pixel (never renders until the owner pastes the
-// partner id from LinkedIn Campaign Manager → Analytics → Insight Tag). Conversions fire
-// through trackEvent (lib/analytics/clarity → linkedin) once per-event conversion ids are
-// set. Beacon origins are allowlisted in lib/security/csp (connect-src).
-const LINKEDIN_PARTNER_ID = process.env.NEXT_PUBLIC_LINKEDIN_PARTNER_ID;
+// LinkedIn Ads. Partner id is hardcoded like the GA/Clarity ids (single source of truth in
+// lib/analytics/linkedin), env-overridable. Conversions fire through trackEvent
+// (lib/analytics/clarity → linkedin). Beacon origins are allowlisted in lib/security/csp.
+const LINKEDIN_PARTNER_ID = linkedinPartnerId();
 
 const montserrat = Montserrat({
   variable: "--font-montserrat",
