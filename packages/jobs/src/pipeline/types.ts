@@ -581,6 +581,8 @@ export interface TrialStore {
 
 export interface TrialExpiryDeps {
   store: TrialStore;
+  /** 0045: capture lapsing accounts as trial_lapsed touches at the moment of expiry */
+  lifecycle?: Pick<LifecycleStore, "enqueueTrialLapsedForAccounts">;
   now?: () => Date;
 }
 
@@ -712,6 +714,7 @@ export interface InboundDeps {
     original: ConversationDraft,
     input: ConversationMessageInput
   ) => Promise<ConversationDraft>;
+  lifecycle?: InboundLifecycleHooks;
   now?: () => Date;
 }
 
@@ -882,4 +885,115 @@ export interface ConversionDeps {
 export interface ConversionResult {
   converted: boolean;
   redirectUrl: string | null;
+}
+
+// ── Lifecycle outreach (0045) — operator-side re-engagement DMs ──────────────
+
+export type LifecycleSegment = "stalled_onboarding" | "idle_after_onboarding" | "trial_lapsed";
+
+/** A user a segment scan wants to touch. */
+export interface LifecycleCandidate {
+  userId: string;
+  accountId: string;
+  displayName: string | null;
+  linkedinUrl: string | null;
+  /** segment A only: the onboarding step they stalled on (merge field) */
+  stalledStep: string | null;
+}
+
+/** A sendable pending touch joined with fresh value-proof counts. */
+export interface LifecycleDueTouch {
+  id: string;
+  userId: string;
+  accountId: string | null;
+  segment: LifecycleSegment;
+  touchNumber: 1 | 2;
+  linkedinUrl: string | null;
+  displayName: string | null;
+  stalledStep: string | null;
+  /** invite gate state (booleans, not timestamps — raw-SQL rows skip driver date parsing) */
+  inviteSent: boolean;
+  connected: boolean;
+  leadCount: number;
+  qualifiedCount: number;
+}
+
+export interface LifecycleConfig {
+  enabled: boolean;
+  /** the founder identity's linkedin_accounts.provider_ref; null = feature inert */
+  senderRef: string | null;
+  dailyCap: number;
+  /** free-text location fed to isWithinSendWindow (founder's business hours) */
+  senderLocation: string;
+  notifyEmail: string | null;
+  lastRunAt: Date | null;
+}
+
+export interface LifecycleStore {
+  getLifecycleConfig(): Promise<LifecycleConfig>;
+  setLifecycleLastRun(now: Date): Promise<void>;
+  isKillSwitchOn(): Promise<boolean>;
+  getSenderRow(
+    providerRef: string
+  ): Promise<{ accountId: string; status: string; connectedAt: Date | null } | null>;
+  /** admin-pin guard: owner emails for an account (role='owner' only) */
+  getAccountOwnerEmails(accountId: string): Promise<string[]>;
+  scanStalledOnboarding(now: Date, excludeAccountId: string): Promise<LifecycleCandidate[]>;
+  scanIdleAfterOnboarding(now: Date, excludeAccountId: string): Promise<LifecycleCandidate[]>;
+  /** pre-ship lapses only: trial_ends_at within the last 60 days */
+  scanTrialLapsedBackfill(now: Date, excludeAccountId: string): Promise<LifecycleCandidate[]>;
+  /** idempotent — the (user, segment, touch) unique index swallows re-scans */
+  enqueueTouch(c: LifecycleCandidate, segment: LifecycleSegment, touchNumber: 1 | 2): Promise<void>;
+  /** touch-2 derivation: touch-1 sent ≥4d ago, no reply, no touch-2 yet; returns rows created */
+  enqueueDueFollowUps(now: Date): Promise<number>;
+  /** status='pending', 30-day cooldown enforced, replied users excluded — oldest first */
+  getDueTouches(now: Date, limit: number): Promise<LifecycleDueTouch[]>;
+  markTouchSent(
+    id: string,
+    patch: { messageRef: string; body: string; targetProviderRef: string | null; sentAt: Date }
+  ): Promise<void>;
+  markTouchInvited(id: string, targetProviderRef: string | null, now: Date): Promise<void>;
+  /** attempts+1; stays 'pending' for one retry, then parks as 'failed' */
+  markTouchFailed(id: string, error: string): Promise<void>;
+  markTouchSkipped(id: string): Promise<void>;
+  /** stop-on-reply; null = the sender's inbound didn't match any lifecycle touch */
+  recordLifecycleReply(
+    who: { providerRef: string | null; profileUrl: string },
+    now: Date
+  ): Promise<{ userId: string; displayName: string | null } | null>;
+  /** invite accepted: connected_at stamped, 'invited' flips back to 'pending' */
+  recordLifecycleAcceptance(
+    who: { providerRef: string | null; profileUrl: string },
+    now: Date
+  ): Promise<boolean>;
+  /** trial-expiry chaining: enqueue touch-1 trial_lapsed rows BEFORE the accounts are flipped */
+  enqueueTrialLapsedForAccounts(accountIds: string[]): Promise<number>;
+}
+
+export interface LifecycleOutreachDeps {
+  store: LifecycleStore;
+  linkedin: Pick<LinkedInInfra, "sendMessage" | "sendInvite" | "getConnectionState">;
+  send: (alert: { to: string; subject: string; html: string; text: string }) => Promise<void>;
+  /** inter-send pacing; tests inject a no-op */
+  pause?: (ms: number) => Promise<void>;
+  now?: () => Date;
+}
+
+export interface LifecycleOutreachSummary {
+  status: "completed" | "skipped";
+  reason?: "disabled" | "kill_switch" | "outside_window" | "already_ran" | "sender_unavailable" | "sender_not_admin";
+  enqueued: number;
+  followUps: number;
+  messagesSent: number;
+  invitesSent: number;
+  skipped: number;
+  failed: number;
+}
+
+/** Inbound interception (0045): events on the founder identity are operator traffic. */
+export interface InboundLifecycleHooks {
+  senderRef: string;
+  recordReply: LifecycleStore["recordLifecycleReply"];
+  recordAcceptance: LifecycleStore["recordLifecycleAcceptance"];
+  notifyReply(displayName: string | null, body: string): Promise<void>;
 }

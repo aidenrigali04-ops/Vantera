@@ -33,3 +33,52 @@ describe("runTrialExpiry", () => {
     expect(s.getExpiredTrialAccounts).toHaveBeenCalledWith(now);
   });
 });
+
+describe("runTrialExpiry lifecycle chaining (0045)", () => {
+  it("captures lapsing accounts as trial_lapsed touches BEFORE the flip", async () => {
+    const calls: string[] = [];
+    const s: TrialStore = {
+      getExpiredTrialAccounts: vi.fn(async () => [{ id: "a" }, { id: "b" }]),
+      expireTrials: vi.fn(async (ids: string[]) => {
+        calls.push("expire");
+        return ids.length;
+      }),
+    };
+    const lifecycle = {
+      enqueueTrialLapsedForAccounts: vi.fn(async (ids: string[]) => {
+        calls.push("enqueue");
+        return ids.length;
+      }),
+    };
+    await runTrialExpiry({ store: s, lifecycle });
+    expect(lifecycle.enqueueTrialLapsedForAccounts).toHaveBeenCalledWith(["a", "b"]);
+    expect(calls).toEqual(["enqueue", "expire"]); // capture must precede the flip
+  });
+
+  it("skips the lifecycle hook when nothing lapsed", async () => {
+    const lifecycle = { enqueueTrialLapsedForAccounts: vi.fn(async () => 0) };
+    await runTrialExpiry({
+      store: { getExpiredTrialAccounts: vi.fn(async () => []), expireTrials: vi.fn(async () => 0) },
+      lifecycle,
+    });
+    expect(lifecycle.enqueueTrialLapsedForAccounts).not.toHaveBeenCalled();
+  });
+
+  it("still works with no lifecycle dep (backward compatible)", async () => {
+    const summary = await runTrialExpiry({
+      store: { getExpiredTrialAccounts: vi.fn(async () => [{ id: "a" }]), expireTrials: vi.fn(async () => 1) },
+    });
+    expect(summary.expired).toBe(1);
+  });
+
+  it("a lifecycle capture failure never blocks the expiry flip (fails open)", async () => {
+    const s: TrialStore = {
+      getExpiredTrialAccounts: vi.fn(async () => [{ id: "a" }]),
+      expireTrials: vi.fn(async () => 1),
+    };
+    const lifecycle = { enqueueTrialLapsedForAccounts: vi.fn(async () => { throw new Error("relation does not exist"); }) };
+    const summary = await runTrialExpiry({ store: s, lifecycle });
+    expect(s.expireTrials).toHaveBeenCalledWith(["a"]);
+    expect(summary).toEqual({ status: "completed", expired: 1 });
+  });
+});

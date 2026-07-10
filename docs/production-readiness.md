@@ -99,3 +99,31 @@ This is the highest-risk surface: real emails and LinkedIn actions on customers'
 - >50 active accounts: dedicated staging environment + Supabase branching workflow.
 - First enterprise customer: SOC 2 readiness assessment, SSO (Supabase Auth supports SAML), audit-log export.
 - Multi-region demand: revisit Supabase region + Vercel regional functions.
+
+---
+
+## Lifecycle LinkedIn outreach (operator-side, 0045 — added 2026-07-09)
+
+Founder-voice DMs from the founder's own LinkedIn identity to our OWN users at three cliffs
+(stalled onboarding / idle after onboarding / trial lapsed). Admin-pinned: runs ONLY when the
+configured sender identity lives under the account owned by aiden@vanterasystem.com.
+
+**Config (app_settings keys, service-role written):** `lifecycle_outreach_enabled` (bool, absent=off),
+`lifecycle_sender_ref` (the founder identity's linkedin_accounts.provider_ref), `lifecycle_daily_cap`
+(default 10; 0 = paused), `lifecycle_sender_location` (business-hours window, default "New York"),
+`lifecycle_notify_email` (reply/sender-down alerts), `lifecycle_last_run_at` (run gate, self-managed).
+
+**Kill paths:** `lifecycle_outreach_enabled=false`, `lifecycle_daily_cap=0`, or the platform
+`outreach_kill_switch` (all honored before any send).
+
+**Operational notes / known v1 limits:**
+- Segment B uses the `auth.users.last_sign_in_at` proxy (no last-seen tracking exists); fast-follow
+  is `accounts.last_dashboard_seen_at`. Users who never started onboarding step 1 have no account
+  row and are unreachable by design (LinkedIn-only, no email fallback).
+- A/B scans are unbounded in age: first enable queues the full backlog oldest-first at the daily
+  cap. Trial-lapsed capture is chained off trial-expiry + a 60-day backfill sweep (the every-run
+  sweep is LOAD-BEARING for segment exclusivity — see pg-store comments).
+- Replies land in the founder's real LinkedIn inbox; the system only stops the sequence forever
+  and emails `lifecycle_notify_email`. Never auto-replies.
+- Accepted-risk edge: if a send succeeds but the sent-marking write fails, one retry can
+  double-message that user (tiny window, rated Minor in review).

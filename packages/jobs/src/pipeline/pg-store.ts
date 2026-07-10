@@ -19,6 +19,7 @@ import {
   leadNotifications,
   leadSignals,
   leads,
+  lifecycleTouches,
   linkedinAccounts,
   outreachSends,
   replies,
@@ -26,6 +27,7 @@ import {
   sequenceRuns,
   suppressionEntries,
   appSettings,
+  userProfiles,
   webhookEvents,
   optimizationExperiments,
   optimizationPlaybook,
@@ -70,6 +72,10 @@ import {
   type FreshLead,
   type InboundStore,
   type LeadChannels,
+  type LifecycleCandidate,
+  type LifecycleConfig,
+  type LifecycleDueTouch,
+  type LifecycleStore,
   type NewScheduledSend,
   type OutreachSendStore,
   type PurgeCandidate,
@@ -2422,4 +2428,382 @@ export function createAccountHealthStore(db: Db): AccountHealthStore {
       return [...new Set(rows.map((r) => r.email).filter((e): e is string => Boolean(e)))];
     },
   };
+}
+
+// Lifecycle outreach (0045). Operator-side — every method runs as service role; the
+// lifecycle_touches table has no client policies by design.
+export function createLifecycleStore(db: Db): LifecycleStore {
+  const DAY = 86_400_000;
+  const readSetting = async (key: string): Promise<unknown> => {
+    const [row] = await db.select().from(appSettings).where(eq(appSettings.key, key));
+    return row?.value;
+  };
+
+  // owner + profile + best LinkedIn URL for a set of accounts — shared by the scans
+  const candidateSql = (where: ReturnType<typeof sql>) => sql`
+    select m.user_id as "userId", a.id as "accountId", p.display_name as "displayName",
+           coalesce(x.profile_url, a.onboarding_linkedin_url) as "linkedinUrl"
+    from public.accounts a
+    join public.account_members m on m.account_id = a.id and m.role = 'owner'
+    left join public.user_profiles p on p.user_id = m.user_id
+    left join lateral (
+      select la.profile_url from public.linkedin_accounts la
+      where la.account_id = a.id and la.profile_url is not null
+      order by la.connected_at desc nulls last limit 1
+    ) x on true
+    where ${where}
+  `;
+
+  type ScanRow = { userId: string; accountId: string; displayName: string | null; linkedinUrl: string | null };
+
+  return {
+    async getLifecycleConfig() {
+      const [enabled, senderRef, dailyCap, senderLocation, notifyEmail, lastRunAt] = await Promise.all([
+        readSetting("lifecycle_outreach_enabled"),
+        readSetting("lifecycle_sender_ref"),
+        readSetting("lifecycle_daily_cap"),
+        readSetting("lifecycle_sender_location"),
+        readSetting("lifecycle_notify_email"),
+        readSetting("lifecycle_last_run_at"),
+      ]);
+      return {
+        enabled: enabled === true,
+        senderRef: typeof senderRef === "string" && senderRef.length > 0 ? senderRef : null,
+        dailyCap: typeof dailyCap === "number" && dailyCap >= 0 ? dailyCap : 10,
+        senderLocation:
+          typeof senderLocation === "string" && senderLocation.length > 0 ? senderLocation : "New York",
+        notifyEmail: typeof notifyEmail === "string" && notifyEmail.length > 0 ? notifyEmail : null,
+        lastRunAt: typeof lastRunAt === "string" ? new Date(lastRunAt) : null,
+      };
+    },
+
+    async setLifecycleLastRun(now) {
+      await db
+        .insert(appSettings)
+        .values({ key: "lifecycle_last_run_at", value: now.toISOString(), updatedAt: now })
+        .onConflictDoUpdate({
+          target: appSettings.key,
+          set: { value: now.toISOString(), updatedAt: now },
+        });
+    },
+
+    async isKillSwitchOn() {
+      return (await readSetting("outreach_kill_switch")) === true;
+    },
+
+    async getSenderRow(providerRef) {
+      const [row] = await db
+        .select({
+          accountId: linkedinAccounts.accountId,
+          status: linkedinAccounts.status,
+          connectedAt: linkedinAccounts.connectedAt,
+        })
+        .from(linkedinAccounts)
+        .where(eq(linkedinAccounts.providerRef, providerRef));
+      return row ?? null;
+    },
+
+    async getAccountOwnerEmails(accountId) {
+      // admin-pin guard — same auth.users lane as getAccountAdminEmails, owners only
+      const rows = await db.execute<{ email: string | null }>(sql`
+        select u.email
+        from public.account_members m
+        join auth.users u on u.id = m.user_id
+        where m.account_id = ${accountId} and m.role = 'owner'
+      `);
+      return [...new Set(rows.map((r) => r.email).filter((e): e is string => Boolean(e)))];
+    },
+
+    async scanStalledOnboarding(now, excludeAccountId) {
+      // The onboarding wizard writes onboarding_icp + revenue_goal_cents atomically WITH
+      // onboarding_completed_at (they land in the same final-step write) — so every stalled
+      // account has onboarding_icp = null regardless of how far it actually got. Those columns
+      // can't distinguish stall points; the only mid-wizard signal is whether a linkedin_accounts
+      // row exists (a separate, earlier step), so that's the one fork we can honestly report.
+      const rows = await db.execute<ScanRow & { hasLinkedin: boolean }>(
+        sql`
+          select m.user_id as "userId", a.id as "accountId", p.display_name as "displayName",
+                 coalesce(x.profile_url, a.onboarding_linkedin_url) as "linkedinUrl",
+                 exists(select 1 from public.linkedin_accounts la2 where la2.account_id = a.id) as "hasLinkedin"
+          from public.accounts a
+          join public.account_members m on m.account_id = a.id and m.role = 'owner'
+          left join public.user_profiles p on p.user_id = m.user_id
+          left join lateral (
+            select la.profile_url from public.linkedin_accounts la
+            where la.account_id = a.id and la.profile_url is not null
+            order by la.connected_at desc nulls last limit 1
+          ) x on true
+          where a.onboarding_completed_at is null
+            and a.created_at < ${new Date(now.getTime() - 2 * DAY)}
+            and a.id <> ${excludeAccountId}
+        `
+      );
+      return rows.map((r) => ({
+        userId: r.userId,
+        accountId: r.accountId,
+        displayName: r.displayName,
+        linkedinUrl: r.linkedinUrl,
+        stalledStep: r.hasLinkedin ? "the final details step" : "connecting your LinkedIn",
+      }));
+    },
+
+    async scanIdleAfterOnboarding(now, excludeAccountId) {
+      // v1 proxy (no last-seen tracking exists): owner's last sign-in ≈ signup and the
+      // account is >3 days old → they completed onboarding and never came back.
+      const rows = await db.execute<ScanRow>(candidateSql(sql`
+        a.onboarding_completed_at is not null
+        and a.created_at < ${new Date(now.getTime() - 3 * DAY)}
+        and a.id <> ${excludeAccountId}
+        and exists (
+          select 1 from auth.users u
+          where u.id = m.user_id
+            and u.last_sign_in_at is not null
+            and u.last_sign_in_at < u.created_at + interval '24 hours'
+        )
+      `));
+      return rows.map((r) => ({ ...r, stalledStep: null }));
+    },
+
+    async scanTrialLapsedBackfill(now, excludeAccountId) {
+      // accounts that lapsed BEFORE this feature shipped; live lapses ride trial-expiry chaining
+      // LOAD-BEARING: this scan runs EVERY run (not first-run-only). Re-enqueueing a lapsed user
+      // is what triggers enqueueTouch's supersede for A/B rows created AFTER the C row (e.g. the
+      // same-day idle scan) — do not optimize this to a one-shot.
+      const rows = await db.execute<ScanRow>(candidateSql(sql`
+        a.subscription_status = 'none' and a.plan = 'none' and a.stripe_subscription_id is null
+        and a.trial_ends_at is not null
+        and a.trial_ends_at < ${now} and a.trial_ends_at > ${new Date(now.getTime() - 60 * DAY)}
+        and a.id <> ${excludeAccountId}
+      `));
+      return rows.map((r) => ({ ...r, stalledStep: null }));
+    },
+
+    async enqueueTouch(c, segment, touchNumber) {
+      await db
+        .insert(lifecycleTouches)
+        .values({
+          userId: c.userId,
+          accountId: c.accountId,
+          segment,
+          touchNumber,
+          linkedinUrl: c.linkedinUrl,
+          displayName: c.displayName,
+          stalledStep: c.stalledStep,
+        })
+        .onConflictDoNothing();
+
+      if (segment === "trial_lapsed") {
+        // carry a pending invite's state onto the C row so it waits for the acceptance instead of re-inviting
+        await db.execute(sql`
+          update public.lifecycle_touches c
+          set invite_sent_at = coalesce(c.invite_sent_at, s.invite_sent_at),
+              target_provider_ref = coalesce(c.target_provider_ref, s.target_provider_ref),
+              connected_at = coalesce(c.connected_at, s.connected_at),
+              status = case when c.status = 'pending' and s.status = 'invited' and s.connected_at is null then 'invited' else c.status end
+          from public.lifecycle_touches s
+          where c.user_id = s.user_id
+            and c.segment = 'trial_lapsed' and c.touch_number = 1
+            and s.segment <> 'trial_lapsed' and s.status in ('pending', 'invited')
+            and c.user_id = ${c.userId}
+        `);
+        // C supersedes A/B (spec) — same rule as the trial-expiry chained path
+        // runs even when the insert conflicts — that unconditional sweep is what cancels later-created A/B rows
+        await db.execute(sql`
+          update public.lifecycle_touches
+          set status = 'canceled'
+          where user_id = ${c.userId} and segment <> 'trial_lapsed' and status in ('pending', 'invited')
+        `);
+      }
+    },
+
+    async enqueueDueFollowUps(now) {
+      const rows = await db.execute<{ id: string }>(sql`
+        insert into public.lifecycle_touches
+          (user_id, account_id, segment, touch_number, linkedin_url, target_provider_ref,
+           display_name, stalled_step, connected_at)
+        select t.user_id, t.account_id, t.segment, 2, t.linkedin_url, t.target_provider_ref,
+               t.display_name, t.stalled_step, coalesce(t.connected_at, t.sent_at)
+        from public.lifecycle_touches t
+        where t.touch_number = 1 and t.status = 'sent' and t.replied_at is null
+          and t.sent_at < ${new Date(now.getTime() - 4 * DAY)}
+          and not exists (
+            select 1 from public.lifecycle_touches t2
+            where t2.user_id = t.user_id and t2.segment = t.segment and t2.touch_number = 2
+          )
+        on conflict do nothing
+        returning id
+      `);
+      return rows.length;
+    },
+
+    async getDueTouches(now, limit) {
+      // named interfaces have no implicit index signature (unlike object literals), so the
+      // generic must be intersected with Record<string, unknown> to satisfy db.execute's constraint
+      const rows = await db.execute<LifecycleDueTouch & Record<string, unknown>>(sql`
+        select t.id, t.user_id as "userId", t.account_id as "accountId", t.segment,
+               t.touch_number as "touchNumber", t.linkedin_url as "linkedinUrl",
+               t.display_name as "displayName", t.stalled_step as "stalledStep",
+               (t.invite_sent_at is not null) as "inviteSent",
+               (t.connected_at is not null) as "connected",
+               coalesce(l.total, 0)::int as "leadCount", coalesce(l.qualified, 0)::int as "qualifiedCount"
+        from public.lifecycle_touches t
+        left join lateral (
+          select count(*)::int as total,
+                 (count(*) filter (where ai_score >= 70))::int as qualified
+          from public.leads where account_id = t.account_id
+        ) l on true
+        where t.status = 'pending'
+          and not exists (
+            -- replied ever = never auto-message again (global); the 30-day recency
+            -- cooldown is CROSS-segment only, so a chain's own touch-1 never blocks its touch-2
+            select 1 from public.lifecycle_touches x
+            where x.user_id = t.user_id
+              and (x.replied_at is not null
+                   or (x.segment <> t.segment and x.sent_at is not null and x.sent_at > ${new Date(now.getTime() - 30 * DAY)}))
+          )
+        order by t.created_at asc
+        limit ${limit}
+      `);
+      return [...rows];
+    },
+
+    async markTouchSent(id, patch) {
+      await db
+        .update(lifecycleTouches)
+        .set({
+          status: "sent",
+          messageRef: patch.messageRef,
+          messageBody: patch.body,
+          sentAt: patch.sentAt,
+          ...(patch.targetProviderRef ? { targetProviderRef: patch.targetProviderRef } : {}),
+        })
+        .where(eq(lifecycleTouches.id, id));
+    },
+
+    async markTouchInvited(id, targetProviderRef, now) {
+      await db
+        .update(lifecycleTouches)
+        .set({
+          status: "invited",
+          inviteSentAt: now,
+          ...(targetProviderRef ? { targetProviderRef } : {}),
+        })
+        .where(eq(lifecycleTouches.id, id));
+    },
+
+    async markTouchFailed(id, error) {
+      // one retry on the next run, then park — never hammer a personal account
+      await db.execute(sql`
+        update public.lifecycle_touches
+        set attempts = attempts + 1, error = ${error},
+            status = case when attempts + 1 >= 2 then 'failed' else 'pending' end
+        where id = ${id}
+      `);
+    },
+
+    async markTouchSkipped(id) {
+      await db.update(lifecycleTouches).set({ status: "skipped_no_linkedin" }).where(eq(lifecycleTouches.id, id));
+    },
+
+    async recordLifecycleReply(who, now) {
+      const userId = await matchLifecycleUser(db, who);
+      if (!userId) return null;
+      await db
+        .update(lifecycleTouches)
+        .set({ repliedAt: now })
+        .where(and(eq(lifecycleTouches.userId, userId), eq(lifecycleTouches.status, "sent")));
+      await db
+        .update(lifecycleTouches)
+        .set({ status: "canceled" })
+        .where(and(eq(lifecycleTouches.userId, userId), inArray(lifecycleTouches.status, ["pending", "invited"])));
+      const [p] = await db
+        .select({ displayName: userProfiles.displayName })
+        .from(userProfiles)
+        .where(eq(userProfiles.userId, userId));
+      return { userId, displayName: p?.displayName ?? null };
+    },
+
+    async recordLifecycleAcceptance(who, now) {
+      const userId = await matchLifecycleUser(db, who);
+      if (!userId) return false;
+      await db.update(lifecycleTouches).set({ connectedAt: now }).where(eq(lifecycleTouches.userId, userId));
+      await db
+        .update(lifecycleTouches)
+        .set({ status: "pending" })
+        .where(and(eq(lifecycleTouches.userId, userId), eq(lifecycleTouches.status, "invited")));
+      return true;
+    },
+
+    async enqueueTrialLapsedForAccounts(accountIds) {
+      if (accountIds.length === 0) return 0;
+      const rows = await db.execute<{ id: string }>(sql`
+        insert into public.lifecycle_touches
+          (user_id, account_id, segment, touch_number, linkedin_url, display_name)
+        select m.user_id, a.id, 'trial_lapsed', 1,
+               coalesce(x.profile_url, a.onboarding_linkedin_url), p.display_name
+        from public.accounts a
+        join public.account_members m on m.account_id = a.id and m.role = 'owner'
+        left join public.user_profiles p on p.user_id = m.user_id
+        left join lateral (
+          select la.profile_url from public.linkedin_accounts la
+          where la.account_id = a.id and la.profile_url is not null
+          order by la.connected_at desc nulls last limit 1
+        ) x on true
+        where a.id in (${sql.join(accountIds.map((id) => sql`${id}`), sql`, `)})
+        on conflict do nothing
+        returning id
+      `);
+
+      // carry a pending invite's state onto the C row so it waits for the acceptance instead of re-inviting
+      await db.execute(sql`
+        update public.lifecycle_touches c
+        set invite_sent_at = coalesce(c.invite_sent_at, s.invite_sent_at),
+            target_provider_ref = coalesce(c.target_provider_ref, s.target_provider_ref),
+            connected_at = coalesce(c.connected_at, s.connected_at),
+            status = case when c.status = 'pending' and s.status = 'invited' and s.connected_at is null then 'invited' else c.status end
+        from public.lifecycle_touches s, public.account_members m
+        where m.account_id in (${sql.join(accountIds.map((id) => sql`${id}`), sql`, `)})
+          and m.role = 'owner'
+          and c.user_id = m.user_id
+          and c.user_id = s.user_id
+          and c.segment = 'trial_lapsed' and c.touch_number = 1
+          and s.segment <> 'trial_lapsed' and s.status in ('pending', 'invited')
+      `);
+
+      // C supersedes A/B (spec): a lapsed user's other-segment queue is dead copy now
+      await db.execute(sql`
+        update public.lifecycle_touches t
+        set status = 'canceled'
+        from public.account_members m
+        where m.account_id in (${sql.join(accountIds.map((id) => sql`${id}`), sql`, `)})
+          and m.role = 'owner'
+          and t.user_id = m.user_id
+          and t.segment <> 'trial_lapsed'
+          and t.status in ('pending', 'invited')
+      `);
+
+      return rows.length;
+    },
+  };
+}
+
+/** Reply/acceptance → lifecycle user: provider ref first (strong key), normalized URL fallback. */
+async function matchLifecycleUser(
+  db: Db,
+  who: { providerRef: string | null; profileUrl: string }
+): Promise<string | null> {
+  if (who.providerRef) {
+    const [r] = await db
+      .select({ userId: lifecycleTouches.userId })
+      .from(lifecycleTouches)
+      .where(eq(lifecycleTouches.targetProviderRef, who.providerRef))
+      .limit(1);
+    if (r) return r.userId;
+  }
+  const norm = normalizeLinkedInUrl(who.profileUrl);
+  const candidates = await db
+    .select({ userId: lifecycleTouches.userId, url: lifecycleTouches.linkedinUrl })
+    .from(lifecycleTouches)
+    .where(isNotNull(lifecycleTouches.linkedinUrl));
+  return candidates.find((c) => c.url && normalizeLinkedInUrl(c.url) === norm)?.userId ?? null;
 }

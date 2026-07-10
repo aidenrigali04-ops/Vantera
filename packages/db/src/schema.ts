@@ -1225,3 +1225,43 @@ export const crmContactRefs = pgTable(
     index("crm_contact_refs_account_idx").on(t.accountId),
   ]
 );
+
+// ── 0045 lifecycle touches — operator-side re-engagement ledger ─────────────
+// Service-role only (RLS on, no policies): platform data about OUR OWN users,
+// never tenant data. See migration 0045 for the full contract.
+export const lifecycleTouches = pgTable(
+  "lifecycle_touches",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    // FK to auth.users(id) ON DELETE CASCADE lives in SQL (auth schema isn't modeled in Drizzle)
+    userId: uuid("user_id").notNull(),
+    accountId: uuid("account_id").references(() => accounts.id, { onDelete: "set null" }),
+    segment: text("segment", {
+      enum: ["stalled_onboarding", "idle_after_onboarding", "trial_lapsed"],
+    }).notNull(),
+    touchNumber: integer("touch_number").notNull(),
+    status: text("status", {
+      enum: ["pending", "invited", "sent", "failed", "skipped_no_linkedin", "canceled"],
+    })
+      .notNull()
+      .default("pending"),
+    attempts: integer("attempts").notNull().default(0),
+    linkedinUrl: text("linkedin_url"),
+    targetProviderRef: text("target_provider_ref"),
+    displayName: text("display_name"),
+    stalledStep: text("stalled_step"),
+    messageBody: text("message_body"),
+    messageRef: text("message_ref"),
+    error: text("error"),
+    inviteSentAt: timestamp("invite_sent_at", { withTimezone: true }),
+    connectedAt: timestamp("connected_at", { withTimezone: true }),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    repliedAt: timestamp("replied_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("lifecycle_touches_user_segment_touch_idx").on(t.userId, t.segment, t.touchNumber),
+    index("lifecycle_touches_status_idx").on(t.status),
+    index("lifecycle_touches_target_ref_idx").on(t.targetProviderRef),
+  ]
+);
