@@ -1,4 +1,4 @@
--- 0045: lengthen the no-card free trial from 3 days to 5 days.
+-- 0046: lengthen the no-card free trial from 3 days to 5 days.
 -- Rationale: the product's aha moment (a first LinkedIn reply / booked meeting) is a
 -- multi-day loop — connect → accept → reply — so a 3-day trial routinely expired before
 -- a trialing account could see any value. 5 days gives the loop room to produce a signal.
