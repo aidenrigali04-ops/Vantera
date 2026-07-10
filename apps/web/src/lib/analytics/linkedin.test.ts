@@ -1,0 +1,48 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { linkedinFunnelEvent } from "./linkedin";
+
+type LintrkStub = ((action: string, data?: Record<string, unknown>) => void) & {
+  q?: unknown[][];
+};
+
+function fakeWindow(overrides: Record<string, unknown> = {}) {
+  const win = { ...overrides } as Record<string, unknown> & { lintrk?: LintrkStub };
+  vi.stubGlobal("window", win);
+  return win;
+}
+
+beforeEach(() => {
+  vi.stubEnv("NEXT_PUBLIC_LINKEDIN_PARTNER_ID", "9999999");
+  vi.stubEnv("NEXT_PUBLIC_LI_CONV_SIGNUP", "12345");
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
+});
+
+describe("linkedin insight tag wrapper", () => {
+  it("no-ops without throwing when window is undefined (SSR safety)", () => {
+    expect(() => linkedinFunnelEvent("onboarding_completed")).not.toThrow();
+  });
+
+  it("fires a mapped funnel event as a lintrk conversion with the env id", () => {
+    const win = fakeWindow();
+    linkedinFunnelEvent("onboarding_completed");
+    // queued on the stub as [action, data] since insight.min.js hasn't loaded
+    expect(win.lintrk?.q).toEqual([["track", { conversion_id: 12345 }]]);
+  });
+
+  it("does not fire for a funnel event with no mapped conversion id", () => {
+    const win = fakeWindow();
+    linkedinFunnelEvent("checkout_started"); // NEXT_PUBLIC_LI_CONV_CHECKOUT unset
+    expect(win.lintrk).toBeUndefined();
+  });
+
+  it("no-ops entirely when the partner id is unset (unset environments never send)", () => {
+    vi.stubEnv("NEXT_PUBLIC_LINKEDIN_PARTNER_ID", "");
+    const win = fakeWindow();
+    linkedinFunnelEvent("onboarding_completed");
+    expect(win.lintrk).toBeUndefined();
+  });
+});

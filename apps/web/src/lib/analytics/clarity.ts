@@ -5,6 +5,7 @@
 // never loads (production-only), so calls queue harmlessly and send nothing.
 
 import { metaFunnelEvent } from "./meta";
+import { linkedinFunnelEvent } from "./linkedin";
 
 type ClarityFn = ((...args: unknown[]) => void) & { q?: unknown[] };
 
@@ -48,13 +49,15 @@ export function clarityUpgrade(reason: string): void {
   clarity("upgrade", reason);
 }
 
-/** Funnel event, fired to all three destinations: Clarity smart event + GA4 event
- *  through the gtag dataLayer + Meta Pixel (standard event when the name maps to
- *  one — see lib/analytics/meta). All tags load in app/layout.tsx; same
- *  queue-before-load semantics everywhere. */
+/** Funnel event, fired to all destinations: Clarity smart event + GA4 event through
+ *  the gtag dataLayer + Meta Pixel (standard event when the name maps to one) + the
+ *  LinkedIn Insight Tag (conversion when the name maps to a configured conversion id —
+ *  see lib/analytics/meta + lib/analytics/linkedin). All tags load in app/layout.tsx;
+ *  same queue-before-load semantics everywhere. */
 export function trackEvent(name: string, params?: Record<string, string>): void {
   clarityEvent(name);
   metaFunnelEvent(name, params);
+  linkedinFunnelEvent(name);
   if (typeof window === "undefined") return;
   window.dataLayer = window.dataLayer ?? [];
   // gtag.js only processes `arguments` objects pushed to the dataLayer — not arrays.
