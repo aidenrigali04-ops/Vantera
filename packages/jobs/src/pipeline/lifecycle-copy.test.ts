@@ -46,6 +46,24 @@ describe("buildLifecycleMessage", () => {
     expect(buildLifecycleMessage("stalled_onboarding", 1, data(), 0)).toContain("your ideal customer profile");
   });
 
+  it("touch 1 always says who's messaging (founder identification, owner directive)", () => {
+    for (const segment of SEGMENTS)
+      for (const seed of [0, 1])
+        for (const d of [data(), data({ leadCount: 0, qualifiedCount: 0, firstName: null })]) {
+          const msg = buildLifecycleMessage(segment, 1, d, seed);
+          expect(msg).toContain("Aiden");
+          expect(msg).toContain("Vantera");
+        }
+  });
+
+  it("stalled-signup copy invites the user to continue where they left off", () => {
+    for (const seed of [0, 1]) {
+      expect(buildLifecycleMessage("stalled_onboarding", 1, data(), seed)).toMatch(
+        /where you left off/
+      );
+    }
+  });
+
   it("variant pick is deterministic and seed-dependent", () => {
     const a = buildLifecycleMessage("stalled_onboarding", 1, data(), 0);
     expect(buildLifecycleMessage("stalled_onboarding", 1, data(), 0)).toBe(a);
