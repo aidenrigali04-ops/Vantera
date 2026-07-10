@@ -162,10 +162,10 @@ export const HeroCalendar = memo(function HeroCalendar({
               <span className="size-1.5 rounded-full bg-[#1877f2]" />
               {booked} booked
             </span>
-            <span className="grid size-6 place-items-center rounded-[7px] text-[#9AA5AD] ring-1 ring-[#EEF1F4]">
+            <span className="grid size-6 place-items-center rounded-[7px] text-[#6B7480] ring-1 ring-[#EEF1F4]">
               <ChevronLeft className="size-3.5" strokeWidth={2.4} />
             </span>
-            <span className="grid size-6 place-items-center rounded-[7px] text-[#9AA5AD] ring-1 ring-[#EEF1F4]">
+            <span className="grid size-6 place-items-center rounded-[7px] text-[#6B7480] ring-1 ring-[#EEF1F4]">
               <ChevronRight className="size-3.5" strokeWidth={2.4} />
             </span>
           </div>
@@ -178,7 +178,7 @@ export const HeroCalendar = memo(function HeroCalendar({
               key={w}
               className={
                 "text-center text-[10px] font-semibold uppercase tracking-[0.08em] " +
-                (i >= 5 ? "text-[#C4CBD2]" : "text-[#9AA5AD]")
+                (i >= 5 ? "text-[#C4CBD2]" : "text-[#6B7480]")
               }
             >
               {w}
@@ -245,7 +245,7 @@ export const HeroCalendar = memo(function HeroCalendar({
         {/* ── Footer — booking-pace trend ────────────────────────────────── */}
         <div className="flex items-center justify-between gap-4 border-t border-[#EFF2F5] px-4 pb-3.5 pt-3">
           <div>
-            <div className="text-[9.5px] font-semibold uppercase tracking-[0.12em] text-[#9AA5AD]">
+            <div className="text-[9.5px] font-semibold uppercase tracking-[0.12em] text-[#6B7480]">
               Booking pace
             </div>
             <div className="mt-1.5">
@@ -257,7 +257,7 @@ export const HeroCalendar = memo(function HeroCalendar({
               <TrendingUp className="size-3" strokeWidth={2.6} />
               38%
             </span>
-            <span className="text-[10px] text-[#9AA5AD]">vs. last month</span>
+            <span className="text-[10px] text-[#6B7480]">vs. last month</span>
           </div>
         </div>
       </div>
