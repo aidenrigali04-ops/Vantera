@@ -33,6 +33,13 @@ describe("linkedin insight tag wrapper", () => {
     expect(win.lintrk?.q).toEqual([["track", { conversion_id: 12345 }]]);
   });
 
+  it("falls back to the hardcoded signup conversion id when the env override is blank", () => {
+    vi.stubEnv("NEXT_PUBLIC_LI_CONV_SIGNUP", ""); // blank env (as in .env.example) = unset
+    const win = fakeWindow();
+    linkedinFunnelEvent("onboarding_completed");
+    expect(win.lintrk?.q).toEqual([["track", { conversion_id: 28665098 }]]);
+  });
+
   it("does not fire for a funnel event with no mapped conversion id", () => {
     const win = fakeWindow();
     linkedinFunnelEvent("checkout_started"); // NEXT_PUBLIC_LI_CONV_CHECKOUT unset

@@ -34,17 +34,23 @@ function lintrk(action: string, data?: Record<string, unknown>): void {
   window.lintrk(action, data);
 }
 
-// Funnel-name → LinkedIn conversion id (numeric, created in Campaign Manager and pasted
-// into the env). Mirrors the Meta standard-event bridge: one trackEvent() call fans out
-// to Clarity + GA4 + Meta + here. Ids are read at call time (each NEXT_PUBLIC_* is inlined
-// at build) so unset ids simply no-op — only the conversions you've defined fire.
-// onboarding_completed is the signup conversion to optimize LinkedIn campaigns toward.
+// Funnel-name → LinkedIn conversion id (numeric, from Campaign Manager). Mirrors the Meta
+// standard-event bridge: one trackEvent() call fans out to Clarity + GA4 + Meta + here.
+// The signup conversion (onboarding_completed → 28665098) is hardcoded like the GA/Clarity
+// ids — it's a known, non-secret, stable value — with an env override for flexibility. The
+// other events stay env-only and no-op until their ids are set. Reads at call time (each
+// NEXT_PUBLIC_* is inlined at build).
+const LI_CONV_SIGNUP_DEFAULT = "28665098";
+
 function conversionIdFor(name: string): string | undefined {
   switch (name) {
     case "onboarding_started":
       return process.env.NEXT_PUBLIC_LI_CONV_LEAD;
-    case "onboarding_completed":
-      return process.env.NEXT_PUBLIC_LI_CONV_SIGNUP;
+    case "onboarding_completed": {
+      // Empty string (a blank env from .env.example) counts as unset, so the default holds.
+      const override = process.env.NEXT_PUBLIC_LI_CONV_SIGNUP;
+      return override && override.trim() ? override : LI_CONV_SIGNUP_DEFAULT;
+    }
     case "checkout_started":
       return process.env.NEXT_PUBLIC_LI_CONV_CHECKOUT;
     case "subscription_started":
