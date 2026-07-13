@@ -31,4 +31,10 @@ describe("buildCsp", () => {
     expect(connectSrc).toContain("https://*.clarity.ms");
     expect(connectSrc).toContain("https://c.bing.com");
   });
+
+  it("allows LinkedIn Insight Tag endpoints in connect-src so conversion beacons aren't blocked", () => {
+    const connectSrc = csp.split(";").find((d) => d.trim().startsWith("connect-src")) ?? "";
+    expect(connectSrc).toContain("https://snap.licdn.com");
+    expect(connectSrc).toContain("https://px.ads.linkedin.com");
+  });
 });

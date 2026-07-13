@@ -2,12 +2,9 @@
 
 import { useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 import { HeroCalendar } from "./hero-calendar";
 import { HeroConnector } from "./hero-connector";
-
-const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
 /** LinkedIn brand glyph — lucide dropped brand icons, so we render it inline. */
 function LinkedinMark({ className }: { className?: string }) {
@@ -16,14 +13,6 @@ function LinkedinMark({ className }: { className?: string }) {
       <path d="M20.45 20.45h-3.56v-5.57c0-1.33-.03-3.04-1.85-3.04-1.86 0-2.14 1.45-2.14 2.94v5.67H9.34V9h3.42v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.45v6.29zM5.34 7.43a2.06 2.06 0 1 1 0-4.13 2.06 2.06 0 0 1 0 4.13zM7.12 20.45H3.56V9h3.56v11.45zM22.22 0H1.77C.79 0 0 .77 0 1.72v20.56C0 23.23.79 24 1.77 24h20.45c.98 0 1.78-.77 1.78-1.72V1.72C24 .77 23.2 0 22.22 0z" />
     </svg>
   );
-}
-
-function rise(delay: number) {
-  return {
-    initial: { opacity: 0, y: 16 },
-    animate: { opacity: 1, y: 0 },
-    transition: { duration: 0.7, delay, ease: EASE },
-  };
 }
 
 export function Hero() {
@@ -66,10 +55,9 @@ export function Hero() {
         <div className="grid items-center gap-14 lg:grid-cols-[1.04fr_1fr] lg:gap-12">
           {/* LEFT — content */}
           <div className="max-w-xl">
-            <motion.h1
-              {...rise(0)}
-              className="text-[2.9rem] font-semibold leading-[1.18] tracking-[-0.04em] text-foreground sm:text-[3.6rem] lg:text-[4rem]"
-            >
+            {/* h1 is the LCP element: no opacity gate, painted in SSR so it renders at
+                first paint instead of waiting on hydration. */}
+            <h1 className="text-[2.9rem] font-semibold leading-[1.18] tracking-[-0.04em] text-foreground sm:text-[3.6rem] lg:text-[4rem]">
               Turn Intent into{" "}
               <span className="relative inline-block rounded-[12px] px-3 pb-[0.12em] pt-[0.04em] text-white shadow-[0_12px_30px_-10px_rgba(24,119,242,0.6)] [background:linear-gradient(180deg,#2a82f7_0%,#1877f2_56%,#166fe5_100%)]">
                 Revenue
@@ -86,23 +74,23 @@ export function Hero() {
                   <span className="sr-only">LinkedIn</span>
                 </span>
               </span>
-            </motion.h1>
+            </h1>
 
-            <motion.p
-              {...rise(0.09)}
-              className="mt-6 max-w-lg text-[17px] font-normal leading-relaxed text-[var(--ink-3)] sm:text-[19px]"
+            <p
+              className="landing-rise mt-6 max-w-lg text-[17px] font-normal leading-relaxed text-[var(--ink-3)] sm:text-[19px]"
+              style={{ animationDelay: "90ms" }}
             >
               The smartest LinkedIn outreach automation — agents that find in-market buyers, qualify
               them, and write every message from real activity. You approve every send.
-            </motion.p>
+            </p>
 
-            <motion.form
-              {...rise(0.17)}
+            <form
               onSubmit={(e) => {
                 e.preventDefault();
                 router.push("/signup");
               }}
-              className="mt-8 flex w-full max-w-md items-center gap-2 rounded-[12px] border border-[var(--hairline)] bg-white py-1.5 pl-5 pr-1.5 shadow-[var(--shadow-card)] transition-shadow focus-within:border-[var(--fb)] focus-within:shadow-[0_0_0_3px_rgba(24,119,242,0.16),var(--shadow-card)]"
+              className="landing-rise mt-8 flex w-full max-w-md items-center gap-2 rounded-[12px] border border-[var(--hairline)] bg-white py-1.5 pl-5 pr-1.5 shadow-[var(--shadow-card)] transition-shadow focus-within:border-[var(--fb)] focus-within:shadow-[0_0_0_3px_rgba(24,119,242,0.16),var(--shadow-card)]"
+              style={{ animationDelay: "170ms" }}
             >
               <input
                 value={url}
@@ -118,24 +106,19 @@ export function Hero() {
                 Get Started Free
                 <ArrowRight className="size-4" />
               </button>
-            </motion.form>
+            </form>
 
-            <motion.p {...rise(0.25)} className="mt-3.5 text-[13px] text-[var(--ink-4)]">
-              No credit card required · Free 3-day trial · You approve every message
-            </motion.p>
+            <p className="landing-rise mt-3.5 text-[13px] text-[var(--ink-3)]" style={{ animationDelay: "250ms" }}>
+              No credit card required · Free 5-day trial · You approve every message
+            </p>
           </div>
 
           {/* RIGHT — live Google-Calendar filling with booked client meetings.
               min-w-0 lets the (intentionally wider) calendar overflow this grid track
               rightward instead of growing the track and squeezing the left column. */}
-          <motion.div
-            className="min-w-0"
-            initial={{ opacity: 0, y: 22, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ duration: 0.9, delay: 0.2, ease: EASE }}
-          >
+          <div className="landing-rise min-w-0" style={{ animationDelay: "200ms" }}>
             <HeroCalendar cardRef={calendarRef} onBook={handleBook} />
-          </motion.div>
+          </div>
         </div>
       </div>
     </section>

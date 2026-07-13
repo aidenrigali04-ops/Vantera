@@ -16,8 +16,10 @@ export function buildCsp(nonce: string): string {
     // (GA4 gtag.js loader + measurement beacons — without these the event sends are blocked once
     // the policy is enforced) + Microsoft Clarity (heatmap/session-recording uploads go to
     // *.clarity.ms and c.bing.com) + Meta Pixel (fbevents.js from connect.facebook.net,
-    // conversion sends to facebook.com/tr). img-src already permits pixel fallbacks via `https:`.
-    `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://www.googletagmanager.com https://*.google-analytics.com https://*.analytics.google.com https://*.clarity.ms https://c.bing.com https://connect.facebook.net https://www.facebook.com`,
+    // conversion sends to facebook.com/tr) + LinkedIn Insight Tag (insight.min.js from
+    // snap.licdn.com, conversion/collect beacons to px.ads.linkedin.com). img-src already
+    // permits pixel fallbacks via `https:`.
+    `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://www.googletagmanager.com https://*.google-analytics.com https://*.analytics.google.com https://*.clarity.ms https://c.bing.com https://connect.facebook.net https://www.facebook.com https://snap.licdn.com https://px.ads.linkedin.com`,
     `frame-ancestors 'none'`,
     `base-uri 'self'`,
     `form-action 'self'`,

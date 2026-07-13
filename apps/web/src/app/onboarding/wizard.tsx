@@ -109,6 +109,11 @@ export function Wizard({ init }: { init: WizardInit }) {
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [stageIdx, setStageIdx] = useState(0);
 
+  // Whether the confirmation fields were actually derived from a website scan. When no
+  // site was given (or the scan failed), the "Pulled from your site" hint is misleading
+  // and the user faces empty required fields cold — so the copy adapts to guide them.
+  const derivedFromSite = Boolean(init.scan || analysis?.scan);
+
   // Pace the tracker through the in-flight stages (the last one holds until the action resolves).
   useEffect(() => {
     if (!analysis || analysis.done) return;
@@ -358,10 +363,16 @@ export function Wizard({ init }: { init: WizardInit }) {
                         )}
                       </div>
                       <div className="space-y-8 px-8 pt-5 pb-8">
-                        <Field label="Your industry" hint="Pulled from your site — edit if it&apos;s off.">
+                        <Field
+                          label="Your industry"
+                          hint={derivedFromSite ? "Pulled from your site — edit if it’s off." : "In a few words, what does your company do?"}
+                        >
                           <Input name="industry" value={values.industry} onChange={(e) => setValues({ ...values, industry: e.target.value })} placeholder="e.g. B2B SaaS" required className={FIELD} />
                         </Field>
-                        <Field label="Who to target" hint="Your agent prospects for this — make it specific.">
+                        <Field
+                          label="Who to target"
+                          hint={derivedFromSite ? "Your agent prospects for this — make it specific." : "Who buys from you? Role + company type works best."}
+                        >
                           <Input name="icp" value={values.icp} onChange={(e) => setValues({ ...values, icp: e.target.value })} placeholder="e.g. VP of Sales at mid-market SaaS" required className={FIELD} />
                         </Field>
                         <div className="grid gap-8 sm:grid-cols-2">
