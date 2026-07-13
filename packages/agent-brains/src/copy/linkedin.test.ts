@@ -54,6 +54,14 @@ describe("validateLinkedInDraft", () => {
     expect(violations.some((v) => v.rule === "length")).toBe(true);
   });
 
+  it("flags a first DM that runs past the tightened 180-char / 28-word ceiling (too long)", () => {
+    // A wordy first message, each word short enough to stay under a naive char cap — the word cap
+    // is what catches it. This is the "initial outreach message is too long" fix (2026-07-10).
+    const wordy = Array.from({ length: 40 }, (_, i) => `word${i % 9}`).join(" ");
+    const violations = validateLinkedInDraft({ connection_note: "Hi Dana, fellow SaaS founder here.", followup_message: wordy });
+    expect(violations.some((v) => v.rule === "length")).toBe(true);
+  });
+
   it("rejects links in the connection note", () => {
     const violations = validateLinkedInDraft({
       connection_note: "Check https://example.com",

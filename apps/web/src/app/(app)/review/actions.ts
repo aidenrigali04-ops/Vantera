@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import {
   CONNECTION_NOTE_MAX_CHARS,
   FOLLOWUP_MAX_CHARS,
+  FOLLOWUP_MAX_WORDS,
   describeViolations,
   fixDraftText,
   validateHumanity,
@@ -110,6 +111,7 @@ export async function fixDraft(
       // invite = LinkedIn's connection-note cap; everything else the follow-up cap (the strictest
       // message-stage limit, so a fixed body is valid at every send boundary)
       maxChars: isInvite ? CONNECTION_NOTE_MAX_CHARS : FOLLOWUP_MAX_CHARS,
+      maxWords: isInvite ? undefined : FOLLOWUP_MAX_WORDS,
       // links are always banned on an invite; elsewhere only when the original flag was about one
       banLinks: isInvite || /link/i.test(send.style_flags),
     });

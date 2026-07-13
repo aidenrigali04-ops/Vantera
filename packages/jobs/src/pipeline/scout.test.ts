@@ -15,6 +15,7 @@ function insight(leadId: string, score: number): LeadInsights {
     pain_points: ["p"],
     triggers: ["t"],
     motivations: ["m"],
+    prospect_offering: "o",
     value_angle: "v",
     aha_moment: "a",
     summary: "s",

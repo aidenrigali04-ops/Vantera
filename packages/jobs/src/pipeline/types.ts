@@ -695,6 +695,10 @@ export interface ResponderBundle {
    *  proactive touches keep a minimum delivery-time gap so a held backlog can't collapse
    *  the cadence into a burst */
   lastAgentMessageAt: Date | null;
+  /** a human took this thread over (replied manually → run is `paused_reply`). Both the reply
+   *  responder and proactive touches stand down: once a person is driving the conversation, the
+   *  agent never messages on top of them until the user resumes automation. */
+  humanHandled: boolean;
 }
 
 export interface InboundDeps {

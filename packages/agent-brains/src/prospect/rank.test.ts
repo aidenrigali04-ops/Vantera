@@ -12,6 +12,7 @@ function insight(leadId: string, overrides: Partial<LeadInsights> = {}): LeadIns
     pain_points: ["pipeline coverage"],
     triggers: ["hiring 3 SDRs"],
     motivations: ["hit growth targets"],
+    prospect_offering: "VP Sales at a 40-person B2B SaaS",
     value_angle: "fills top-of-funnel without headcount",
     aha_moment: "qualified meetings landing on the calendar in week one",
     summary: "Strong fit. Hiring signal suggests budget and urgency.",
@@ -58,6 +59,21 @@ describe("compactLead", () => {
     expect(parts[1]).toHaveLength(60);
     expect(parts[1]!.endsWith("…")).toBe(true);
     expect(parts.slice(2)).toEqual(["-", "-", "-", "-", "-", "-"]);
+  });
+
+  it("keeps the full headline (title) instead of slicing it mid-claim at 60 chars", () => {
+    // The real misread: a title truncated to 60 chars lost "no cold DMs" and the direction of the
+    // offering. The prospect's positioning must survive into the rank prompt intact (cap now 160).
+    const title =
+      "I help founders & consultants get 10-20 inbound LinkedIn leads/month, no cold DMs, no bans";
+    const line = compactLead({ leadId: "l1", title });
+    expect(line).toContain(title); // whole headline preserved, not "...get 10-20 inbound Link…"
+  });
+
+  it("keeps signal detail up to 120 chars (the prospect's own words), not 40", () => {
+    const detail = "asked the group how to book more meetings without cold outreach eating his week";
+    const line = compactLead({ leadId: "l1", signals: [{ kind: "intent", detail }] });
+    expect(line).toContain(detail);
   });
 
   it("drops stale timing signals so the model doesn't treat a 2022 event as 'active'", () => {

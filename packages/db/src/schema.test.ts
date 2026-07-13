@@ -298,3 +298,17 @@ describe("lifecycle touches (0045)", () => {
     expect(sql).toContain("create unique index lifecycle_touches_user_segment_touch_idx");
   });
 });
+
+describe("proof grounding (0046)", () => {
+  const sql = fileContents.get("0046_proof_points.sql") ?? "";
+  it("is member-read + admin-manage client-editable config (rule 02)", () => {
+    expect(sql).toContain("alter table public.proof_points enable row level security");
+    expect(sql).toMatch(/create policy proof_points_select on public\.proof_points\s+for select/i);
+    expect(sql).toMatch(/create policy proof_points_manage on public\.proof_points\s+for all/i);
+    expect(sql).toMatch(/is_account_admin\(account_id\)/);
+  });
+  it("cascades with the account (seller config, not prospect data — no retention window)", () => {
+    expect(tableDdl("proof_points")).toContain("references public.accounts(id) on delete cascade");
+    expect(sql).not.toContain("retention(proof_points)");
+  });
+});

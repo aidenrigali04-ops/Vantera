@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { validateHumanity, findRestartPhrases, findActionClaims, findUnapprovedLinks } from "./humanizer";
+import { validateHumanity, findRestartPhrases, findActionClaims, findUnapprovedLinks, normalizeDashes } from "./humanizer";
 
 const CLEAN_EMAIL = `Saw you're hiring three SDRs while running outbound yourself. That usually means pipeline is outgrowing the team.
 
@@ -139,5 +139,23 @@ describe("findUnapprovedLinks", () => {
 
   it("flags every link when nothing is whitelisted", () => {
     expect(findUnapprovedLinks("https://cal.com/x", [])).toHaveLength(1);
+  });
+});
+
+describe("normalizeDashes", () => {
+  it("turns em/en dashes and spaced hyphens used as punctuation into commas", () => {
+    expect(normalizeDashes("great, I love it — worth a look?")).toBe("great, I love it, worth a look?");
+    expect(normalizeDashes("yes—exactly what we do")).toBe("yes, exactly what we do");
+    expect(normalizeDashes("it works - most of the time")).toBe("it works, most of the time");
+    expect(normalizeDashes("two things -- speed and fit")).toBe("two things, speed and fit");
+    // and the result is clean per the linter
+    expect(validateHumanity(normalizeDashes("good news — it shipped")).some((v) => v.rule === "dashes")).toBe(false);
+  });
+
+  it("never touches hyphens inside words, prices, or numeric ranges", () => {
+    expect(normalizeDashes("our co-founder ran a 15-min demo")).toBe("our co-founder ran a 15-min demo");
+    expect(normalizeDashes("pricing is $2-4k per month")).toBe("pricing is $2-4k per month");
+    expect(normalizeDashes("we get you 10–20 leads")).toBe("we get you 10–20 leads");
+    expect(normalizeDashes("a range of 10 - 20 works")).toBe("a range of 10 - 20 works");
   });
 });

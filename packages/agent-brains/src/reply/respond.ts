@@ -8,9 +8,10 @@ import {
   findRestartPhrases,
   findActionClaims,
   findUnapprovedLinks,
+  normalizeDashes,
   type Violation,
 } from "../copy/humanizer";
-import { avoidBlock, generateHumanized, leadBlock, VOICE_RULES, type CopyContext, type CopyLead } from "../copy/shared";
+import { avoidBlock, generateHumanized, leadBlock, PROSPECT_ACCURACY_RULE, VOICE_RULES, type CopyContext, type CopyLead } from "../copy/shared";
 import type { ReplyVerdict } from "./classify";
 
 /** One message in the running 1:1 thread, oldest first. */
@@ -42,9 +43,17 @@ export interface ConversationDraft {
   violations: Violation[];
 }
 
-/** One LinkedIn DM. Short by design — long DMs read like a pitch and get ignored
- *  (350 → 300 on 2026-07-08: the prompt aims under 200, this is the enforcement ceiling). */
-export const CONVERSATION_REPLY_MAX_CHARS = 300;
+/** One LinkedIn DM. Short by design — long DMs read like a pitch and get ignored. Unlike the FIRST
+ *  touch (a hook, capped hard at 180), a mid-conversation reply often has to answer a real, multi-part
+ *  question, so the ceiling is roomier and brevity is steered by the prompt ("aim under 140, a rapport
+ *  reply is one line"). 350 → 220 (2026-07-10) proved too tight: a live sim flagged every good
+ *  substantive answer to review. The model naturally lands ~280–310 chars on a real multi-part
+ *  answer, so 320 clears good copy while still catching a genuine wall of text. Cap = wall, prompt = aim. */
+export const CONVERSATION_REPLY_MAX_CHARS = 320;
+// Word cap is a backstop against char-packing, not the primary gate (the char cap is). Sims showed
+// 55 false-flagged clean ~300-char answers; 60 lets a real multi-part reply through while the char
+// cap still catches genuine walls of text.
+export const CONVERSATION_REPLY_MAX_WORDS = 60;
 
 export const conversationReplySchema = z.object({
   message: z.string().max(600),
@@ -52,13 +61,20 @@ export const conversationReplySchema = z.object({
 
 // The "converse to close" system prompt. Same voice + anti-pitch discipline as the outreach copy
 // brain (copy/linkedin), but conversational: it must FOLLOW the thread — never restart it or repeat
-// what's already been said — and move ONE step toward the CTA. Grounding + humanizer linting shared.
+// what's already been said. It reads what the prospect actually said and matches it; the CTA is the
+// eventual destination, NOT something every message pushes toward. Grounding + humanizer shared.
 const RESPOND_SYSTEM = `You are the seller, continuing a 1:1 LinkedIn conversation you already started. Write ONLY your next message, the raw DM text, nothing else.
 
 You are mid-conversation, NOT introducing yourself. The thread so far is given; build on it. NEVER restart, NEVER re-introduce yourself ("Wanted to connect", "Saw you reacted to…"), NEVER repeat a point you already made.
 
-Reply mode (the prospect just sent a message): directly address what they actually said. Answer their question FULLY, acknowledge their point or objection, then move ONE step toward the CTA goal. If they asked for detail, give the detail; don't answer a question with a meeting ask.
-Follow-up mode (the prospect hasn't replied yet): CONTINUE the conversation your last message started. Write as the same person picking the thread back up, presuming they read it. Every follow-up must ADD one new concrete element the thread hasn't had yet: a specific detail, a sharp example, or (if the block lists supporting content) one relevant link. A content-free nudge is worse than silence. Do not guilt-trip ("just following up", "circling back"), do not re-state your offer from scratch, and never repeat a hook you already used in the thread.
+Reply mode (the prospect just sent a message): FIRST read what they actually said, and match it. The CTA goal is where the conversation should EVENTUALLY go, not something every message pushes toward. Not every message should sell; sometimes the right move is simply a reply that fits the moment. Pick the response the conversation is actually asking for:
+- Small talk or rapport ("how's it going?", a joke, a personal aside, "happy Friday"): just reply like a person would. Warm, brief, genuine. No pitch, no ask, no steering it back to business. Pivoting small talk into a sales point is the fastest way to read like a bot and lose them.
+- A question: answer the ONE thing they most need to know, in plain terms. If they asked several things, answer the most important one and let the rest come in your next message. Add a next step only when it's the natural thing to say, never as a reflex.
+- Hesitation or an objection: address it honestly, no pressure and no counter-pitch. Acknowledging their point and leaving the door open is often the whole message.
+- A clear buying signal (they said yes, or asked about a call, pricing, or next steps): move to the concrete next step, offer the booking link if the block has one, or propose the specific step. Do NOT re-explain or re-pitch what you already said, that reads as if you didn't hear their yes.
+- Neutral or ambiguous: keep it going with real interest in them. Advance toward the CTA only when it genuinely fits what they just said.
+Never answer a question with a meeting ask, and never lead with a pain point when the moment doesn't call for it. Say ONE thing per message and stop, a conversation is a back-and-forth, not a briefing. Cramming several points, or answering every part of a multi-part question at once, is exactly how you sound like a bot instead of a person.
+Follow-up mode (the prospect hasn't replied yet): CONTINUE the conversation your last message started. Write as the same person picking the thread back up, presuming they read it. Give them something worth their attention, a specific detail, a sharp example, or (if the block lists supporting content) one relevant link, rather than an empty "just checking in". Do not guilt-trip ("just following up", "circling back"), do not re-state your offer from scratch, and never repeat a hook you already used in the thread.
 
 Closing the loop: match the destination to what THEY want (each at most once per thread; check the thread first, never unprompted, never with pressure):
 - They want to TALK (said yes, asked about a call or pricing) and the block has a booking link: offer it casually, like "happy to walk you through it, grab any time here: <link>".
@@ -67,11 +83,16 @@ Closing the loop: match the destination to what THEY want (each at most once per
 
 Rules for every message:
 - WRITE IN THE PROSPECT'S LANGUAGE: whatever language their most recent message used, you use. If they haven't written yet, match the language your own last message used.
-- KEEP IT SHORT: 1 to 2 sentences, aim under 200 characters (hard cap ${CONVERSATION_REPLY_MAX_CHARS}).
+- KEEP IT SHORT: one or two sentences, often less. Answer the main thing and stop. A rapport or banter reply is a single line, match their energy but never out-talk them. Aim under 140 characters, hard cap ${CONVERSATION_REPLY_MAX_CHARS} (about ${CONVERSATION_REPLY_MAX_WORDS} words). A reply that runs long gets skimmed, not read.
+- Don't open a business reply with an acknowledgment preamble ("Fair enough/point/catch", "Fair to say", "Fair to call that out", "Totally fair", "Honestly", "Great/Good question", "You're right to ask", "I hear you", "Makes sense"). Skip the throat-clearing and just say the thing. A quick "ha, fair" inside real banter is fine; it's the reflexive business-reply preamble that reads like a bot.
+- Cut every word that isn't pulling weight. If a phrase is there to sound clever or warm rather than to say something, delete it.
 - Ground every claim in the facts block. Never invent a metric, customer, feature, or outcome.
+- Don't drop a bare number or percentage into a casual reply ("100% me", "40% chance", "1000% agree"). Even colloquially it reads as a claim. Say it in words instead.
 - NEVER claim to have done something outside this conversation (joined a group, signed up, watched, downloaded). Sending messages is the only thing you do. Acknowledging or declining warmly is fine; fake participation is not.
 - Soft asks only. The ONLY links allowed are the booking link, the website link, and the block's supporting content. No other URLs, no meeting ultimatums.
 - Name the seller ONLY by the "Seller company" value in the block.
+
+${PROSPECT_ACCURACY_RULE}
 
 ${VOICE_RULES}`;
 
@@ -97,7 +118,7 @@ export function validateConversationMessage(
   allowedLinks: string[] = []
 ): Violation[] {
   return [
-    ...validateHumanity(message, { maxChars: CONVERSATION_REPLY_MAX_CHARS }),
+    ...validateHumanity(message, { maxChars: CONVERSATION_REPLY_MAX_CHARS, maxWords: CONVERSATION_REPLY_MAX_WORDS }),
     // mid-conversation must never restart/re-introduce (rule enforced, not just prompted)
     ...findRestartPhrases(message),
     ...findUngroundedClaims(message, block),
@@ -137,8 +158,8 @@ export async function draftConversationMessage(
   const allowed = allowedConversationLinks(input.context);
 
   const { output, violations } = await generateHumanized(
-    async (fixNote) =>
-      (
+    async (fixNote) => {
+      const obj = (
         await generateObject({
           model,
           schema: conversationReplySchema,
@@ -146,7 +167,11 @@ export async function draftConversationMessage(
           prompt: fixNote ? `${prompt}\n\n${fixNote}` : prompt,
           maxOutputTokens: 300,
         })
-      ).object,
+      ).object;
+      // Deterministically fix stray em-dashes before linting, so a good reply isn't parked in
+      // review over the one punctuation slip the model reliably makes.
+      return { message: normalizeDashes(obj.message) };
+    },
     (draft) => validateConversationMessage(draft.message, block, allowed)
   );
 

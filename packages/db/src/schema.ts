@@ -1072,6 +1072,28 @@ export const leadNotifications = pgTable(
   ]
 );
 
+// ── 0046 proof grounding ──────────────────────────────────────────────────────
+// Account-scoped, citable proof / pricing / FAQ facts the conversation brains may quote when a
+// prospect asks for evidence or price (injected into the leadBlock grounding). Member-read,
+// admin-manage. FK to auth.users(id) for created_by lives in the SQL migration.
+export const proofPoints = pgTable(
+  "proof_points",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: ["metric", "outcome", "pricing", "faq"] }).notNull(),
+    text: text("text").notNull(),
+    question: text("question"),
+    sort: integer("sort").notNull().default(0),
+    createdBy: uuid("created_by"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("proof_points_account_idx").on(t.accountId)]
+);
+
 // ── 0040 self-optimizing outreach (Phase 3) ───────────────────────────────────
 // The champion/challenger experiment engine's store. Inert until an owner starts an experiment.
 // Members read; admins start/adopt/discard; the decide pipeline updates status via service role.

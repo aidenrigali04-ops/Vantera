@@ -34,6 +34,10 @@ export interface CopyContext {
   brandVoice?: string | null;
   /** things the agent must never say or do — topics, claims, or words to avoid */
   guardrails?: string | null;
+  /** the account's citable proof/pricing/FAQ facts (0046). Rendered into the grounding so the brain
+   *  can answer "prove it / what's the price" truthfully — and so findUngroundedClaims whitelists any
+   *  metric quoted from one. The seller attests these are true; the brain never invents beyond them. */
+  proofPoints?: ProofPoint[];
   /**
    * Optional per-variant copy strategy from the self-optimizing loop (Phase 3). Steers HOW the
    * message is written, never WHAT is claimed (facts + compliance are unchanged). Absent for the
@@ -82,10 +86,44 @@ export function strategyDirectives(strategy?: CopyStrategy): string {
   return `Strategy for this message (apply in addition to the rules above, never overriding them):\n${lines.join("\n")}`;
 }
 
+/** One citable seller fact (0046). `kind` steers when the brain reaches for it; `question` is the
+ *  objection an `faq` fact answers. Text is quoted verbatim, never invented beyond. */
+export interface ProofPoint {
+  kind: "metric" | "outcome" | "pricing" | "faq";
+  text: string;
+  question?: string | null;
+}
+
 export interface DraftInput {
   lead: CopyLead;
   insights: StoredInsights;
   context: CopyContext;
+}
+
+const PROOF_LABEL: Record<ProofPoint["kind"], string> = {
+  metric: "proof",
+  outcome: "result",
+  pricing: "pricing",
+  faq: "faq",
+};
+
+/**
+ * Render the account's proof facts into the grounding. Because these lines live in the leadBlock
+ * string, findUngroundedClaims whitelists any metric the message quotes from them. The inline rule
+ * keeps them a mid-conversation tool used sparingly — never a first-touch stat dump.
+ */
+export function proofSection(points?: ProofPoint[]): string | null {
+  const list = (points ?? []).filter((p) => p.text?.trim());
+  if (list.length === 0) return null;
+  const lines = list.map((p) =>
+    p.kind === "faq" && p.question?.trim()
+      ? `- (faq) if they ask "${p.question.trim()}": ${p.text.trim()}`
+      : `- (${PROOF_LABEL[p.kind]}) ${p.text.trim()}`
+  );
+  return [
+    `Proof you may cite, ONLY when the prospect asks for evidence or price or it genuinely strengthens your point (never in a first message, never more than one at a time, quote it as written, and never state a number or claim beyond these. If they ask for something not here, say you don't have that rather than guessing):`,
+    ...lines,
+  ].join("\n");
 }
 
 /**
@@ -102,6 +140,18 @@ export const VOICE_RULES = `Voice, for every message:
 - Everyday words over business words. Say "use" not "utilize" or "leverage", "help" not "empower", "look into" not "delve". Never: streamline, elevate, seamless, game-changer, thrilled, kudos.
 - No "Dear", no "Best regards", no signature, no generic flattery, at most one exclamation mark, minimal hedging.
 - Read it back as if it were a text message. If it sounds like marketing, a template, or an assistant, rewrite it plainer and shorter.`;
+
+/**
+ * Factual-accuracy contract about the PROSPECT's business, shared by every prospect-facing prompt.
+ * Separate from VOICE_RULES (that's style; this is truth). Anchors the message on the prospect's
+ * own title/offering so the seller's offer never gets projected onto them — the "we run LinkedIn
+ * lead gen for 10-20 founders" misread of a prospect who actually SELLS inbound-lead services
+ * (Tejas C, ConnectSafely.ai, 2026-07-09). Because it points at the raw title (always in the
+ * block), it also corrects leads ranked before prospect_offering existed.
+ */
+export const PROSPECT_ACCURACY_RULE = `Getting their business right, for every message:
+- When you mention what the prospect does, use THEIR OWN words from their title and "What they do". Never describe their business as if it were the seller's offer, never change their numbers, and never flip the direction of what they do (bringing in leads vs sending outreach, buyer vs seller, inbound vs outbound).
+- If the "Value angle" seems to contradict their own title, trust their title. When you are not sure what they do, refer to their work only in the vaguest true terms, or not at all. Misdescribing their business ends the conversation, every time.`;
 
 /**
  * "Do not reuse" block for recent phrasings — appended to the PROMPT only, never to the
@@ -129,8 +179,10 @@ export function leadBlock({ lead, insights, context }: DraftInput): string {
     context.brandVoice ? `Brand voice (match this tone): ${context.brandVoice}` : null,
     context.guardrails ? `Guardrails (never violate): ${context.guardrails}` : null,
     context.contentLinks?.length ? `Supporting content: ${context.contentLinks.join(", ")}` : null,
+    proofSection(context.proofPoints),
     ``,
     `Prospect: ${name}, ${lead.title ?? "unknown role"} at ${lead.companyName ?? "unknown"} (${lead.industry ?? "unknown industry"})`,
+    insights.prospect_offering ? `What they do (their words, do not restate through our offer): ${insights.prospect_offering}` : null,
     `Pain points: ${insights.pain_points.join("; ") || "unknown"}`,
     `Triggers: ${insights.triggers.join("; ") || "none observed"}`,
     `Motivations: ${insights.motivations.join("; ") || "unknown"}`,

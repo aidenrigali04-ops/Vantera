@@ -34,15 +34,18 @@ export {
   validateLinkedInDraft,
   CONNECTION_NOTE_MAX_CHARS,
   FOLLOWUP_MAX_CHARS,
+  FOLLOWUP_MAX_WORDS,
   type LinkedInDraft,
 } from "./copy/linkedin";
 export {
   leadBlock,
   strategyDirectives,
+  proofSection,
   type CopyLead,
   type CopyContext,
   type DraftInput,
   type CopyStrategy,
+  type ProofPoint,
 } from "./copy/shared";
 export {
   fixConversationMessage,
@@ -55,6 +58,7 @@ export {
   draftConversationMessage,
   conversationReplySchema,
   CONVERSATION_REPLY_MAX_CHARS,
+  CONVERSATION_REPLY_MAX_WORDS,
   type ConversationDraft,
   type ConversationMessageInput,
   type ConversationTurn,

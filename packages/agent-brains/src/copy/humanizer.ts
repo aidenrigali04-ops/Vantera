@@ -175,6 +175,25 @@ export function describeViolations(violations: Violation[]): string {
 }
 
 /**
+ * Deterministically turn a dash-used-as-punctuation into a comma — the exact fix the voice rules
+ * prescribe — so a good message isn't parked in review over one em-dash the model wouldn't drop.
+ * Applied to generated copy before it's linted. Safe by construction:
+ *  - hyphens inside words/numbers ("co-founder", "15-min", "$2-4k") have no surrounding spaces and
+ *    aren't em/en dashes, so they're untouched;
+ *  - a digit–digit range ("2–4", "10 - 20") is left alone (the guards exclude digit neighbours).
+ */
+export function normalizeDashes(text: string): string {
+  return text
+    .replace(/(?<!\d)\s*[—–]+\s*(?!\d)/g, ", ") // em/en dash as clause punctuation
+    .replace(/(?<!\d)\s-\s(?!\d)/g, ", ") // spaced ascii hyphen as punctuation
+    .replace(/\s*--+\s*/g, ", ") // double hyphen (never a range)
+    .replace(/ +,/g, ",")
+    .replace(/,\s*,/g, ", ")
+    .replace(/ {2,}/g, " ")
+    .trim();
+}
+
+/**
  * Mid-conversation guard: flags re-introduction / cold-open phrases in a reply or scripted follow-up.
  * The responder is told never to restart the thread; this is the enforcement floor for that rule, so
  * a model slip ("Wanted to connect…") is caught and regenerated/reviewed rather than sent as if it

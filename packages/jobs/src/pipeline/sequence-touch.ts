@@ -53,6 +53,11 @@ export async function runSequenceTouch(
   const bundle = await deps.store.getResponderBundle(d.accountId, d.leadId, d.campaignId);
   if (!bundle) return "skipped";
 
+  // The orchestrator only dispatches ACTIVE runs, but a manual reply can flip the run to
+  // paused_reply in the window between dispatch and this task running. Re-checked here so a
+  // proactive nudge never lands on top of a human who just took the thread over.
+  if (bundle.humanHandled) return "skipped";
+
   // Converse-to-close turn cap (shared with the responder): past it, the agent steps aside
   // LOUDLY — the run stops and the human is told to take the thread over. Only threads with
   // real engagement can reach the cap, so the notification is always about a live prospect.

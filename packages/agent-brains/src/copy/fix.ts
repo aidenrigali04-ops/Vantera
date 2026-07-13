@@ -139,11 +139,11 @@ export interface DraftTextFix {
  * instruction stands in for the grounding check the original draft already passed.
  */
 export async function fixDraftText(
-  input: { text: string; flags: string; maxChars: number; banLinks?: boolean },
+  input: { text: string; flags: string; maxChars: number; maxWords?: number; banLinks?: boolean },
   model: LanguageModel = getModel()
 ): Promise<DraftTextFix> {
   const validate = (text: string): Violation[] => {
-    const violations = validateHumanity(text, { maxChars: input.maxChars });
+    const violations = validateHumanity(text, { maxChars: input.maxChars, maxWords: input.maxWords });
     if (input.banLinks && /https?:\/\//i.test(text)) {
       violations.push({ rule: "no-links", detail: "no links in this message" });
     }

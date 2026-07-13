@@ -22,6 +22,7 @@ import {
   lifecycleTouches,
   linkedinAccounts,
   outreachSends,
+  proofPoints,
   replies,
   scheduledSends,
   sequenceRuns,
@@ -45,7 +46,7 @@ import type {
   LeadOutcomeFlags,
   ExperimentStatus,
 } from "@vantera/agent-brains";
-import { toStoredInsights, type LeadInsights, type WebsiteScan } from "@vantera/agent-brains";
+import { toStoredInsights, type LeadInsights, type ProofPoint, type WebsiteScan } from "@vantera/agent-brains";
 import { resolveEntitlements, type EntitlementSnapshot } from "@vantera/billing";
 import type { ClosedDeal, CrmProvider } from "@vantera/crm-infra";
 import type { AccountDeletionStore } from "./account-deletion";
@@ -57,6 +58,7 @@ import type {
 } from "./crm-activity-sync";
 import type { WeeklySummaryRow, WeeklySummaryStore } from "./weekly-summary";
 import type { AccountHealthStore, LinkedInAccountRow } from "./account-health";
+import type { ReplyBacklogStore } from "./reply-backlog";
 import {
   SCOUT_DEFAULTS,
   type ConversionStore,
@@ -182,6 +184,17 @@ async function recentSendOpeners(db: Db, accountId: string): Promise<string[]> {
     out.push(opener);
   }
   return out;
+}
+
+/** The account's citable proof/pricing/FAQ facts (0046), oldest-sort first — fed into the responder
+ *  grounding so the brain can answer "prove it / what's the price" truthfully (never in a first touch). */
+async function loadProofPoints(db: Db, accountId: string): Promise<ProofPoint[]> {
+  const rows = await db
+    .select({ kind: proofPoints.kind, text: proofPoints.text, question: proofPoints.question })
+    .from(proofPoints)
+    .where(eq(proofPoints.accountId, accountId))
+    .orderBy(asc(proofPoints.sort), asc(proofPoints.createdAt));
+  return rows.map((r) => ({ kind: r.kind, text: r.text, question: r.question }));
 }
 
 /** Drizzle-backed store used by the Trigger.dev tasks (service-role DATABASE_URL). */
@@ -699,6 +712,10 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
       // touch of headroom — touches_done drops to (target-1)-equivalent by simply stepping
       // back one from wherever it is, floored at 0. Exhausted/stopped runs come back active;
       // converted runs stay converted (the win is never reopened).
+      //
+      // paused_reply is EXCLUDED: that status means a human took the thread over (manual reply).
+      // A later prospect reply must never silently re-arm automation on a human-driven thread —
+      // only an explicit "resume automation" does that. (Human-takeover fix, 2026-07-10.)
       await db
         .update(sequenceRuns)
         .set({
@@ -710,7 +727,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         .where(
           and(
             eq(sequenceRuns.leadId, leadId),
-            inArray(sequenceRuns.status, ["active", "paused_reply", "exhausted", "stopped"])
+            inArray(sequenceRuns.status, ["active", "exhausted", "stopped"])
           )
         );
     },
@@ -1514,6 +1531,14 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         .orderBy(desc(scheduledSends.createdAt))
         .limit(1);
 
+      // Human takeover: a manual reply pauses the lead's run (paused_reply). While it's paused the
+      // agent never messages the thread — the responder and proactive touches both read this flag.
+      const [paused] = await db
+        .select({ id: sequenceRuns.id })
+        .from(sequenceRuns)
+        .where(and(eq(sequenceRuns.leadId, leadId), eq(sequenceRuns.status, "paused_reply")))
+        .limit(1);
+
       return {
         campaignId: agent.campaignId,
         sendMode: campaign?.sendMode === "automatic" ? "automatic" : "review",
@@ -1536,11 +1561,15 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           accountIndustry: account?.onboardingIndustry ?? null,
           valueProp: scan?.summary ?? null,
           avoidPhrases: await recentSendOpeners(db, accountId),
+          // Citable proof/pricing/FAQ facts — lets the responder answer evidence/price questions
+          // truthfully instead of deflecting or getting flagged for a fabricated number (0046).
+          proofPoints: await loadProofPoints(db, accountId),
         },
         thread,
         agentTurns: sentMessages.length,
         newestUnsentMessageCreatedAt: pending?.createdAt ?? null,
         lastAgentMessageAt,
+        humanHandled: paused !== undefined,
       };
     },
 
@@ -2426,6 +2455,49 @@ export function createAccountHealthStore(db: Db): AccountHealthStore {
         where m.account_id = ${accountId} and m.role in ('owner', 'admin')
       `);
       return [...new Set(rows.map((r) => r.email).filter((e): e is string => Boolean(e)))];
+    },
+  };
+}
+
+// Stale-reply safeguard — escalates orphaned respondable replies to needs_human (see reply-backlog.ts).
+export function createReplyBacklogStore(db: Db): ReplyBacklogStore {
+  return {
+    async getStaleUnansweredReplies(now: Date, staleMs: number, lookbackMs: number) {
+      const staleBefore = new Date(now.getTime() - staleMs);
+      const lookbackAfter = new Date(now.getTime() - lookbackMs);
+      return db
+        .select({
+          accountId: replies.accountId,
+          leadId: replies.leadId,
+          receivedAt: replies.receivedAt,
+        })
+        .from(replies)
+        .where(
+          and(
+            inArray(replies.classification, ["interested", "neutral", "other"]),
+            lt(replies.receivedAt, staleBefore),
+            gt(replies.receivedAt, lookbackAfter),
+            // no agent message delivered AFTER this reply (updated_at is markSent's delivery stamp)
+            sql`not exists (select 1 from ${scheduledSends} s where s.lead_id = ${replies.leadId} and s.linkedin_stage = 'message' and s.status = 'sent' and s.updated_at > ${replies.receivedAt})`,
+            // nothing queued/in-flight to answer it (a review-mode draft awaiting approval counts)
+            sql`not exists (select 1 from ${scheduledSends} s where s.lead_id = ${replies.leadId} and s.linkedin_stage = 'message' and s.status in ('pending_review','approved','scheduled','sending'))`,
+            // not human-handled (paused_reply) or terminal (converted win / stopped) for any run
+            sql`not exists (select 1 from ${sequenceRuns} sr where sr.lead_id = ${replies.leadId} and sr.status in ('paused_reply','converted','stopped'))`,
+            // no needs_human alert already raised since this reply — the once-per-reply idempotency guard
+            sql`not exists (select 1 from ${leadNotifications} n where n.lead_id = ${replies.leadId} and n.kind = 'needs_human' and n.created_at >= ${replies.receivedAt})`
+          )
+        )
+        .orderBy(desc(replies.receivedAt))
+        .limit(500);
+    },
+
+    async insertLeadNotification(n) {
+      await db.insert(leadNotifications).values({
+        accountId: n.accountId,
+        leadId: n.leadId,
+        kind: n.kind,
+        body: n.body,
+      });
     },
   };
 }

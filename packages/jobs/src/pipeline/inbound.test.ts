@@ -490,6 +490,7 @@ describe("runInbound — active responder (converse to close)", () => {
     agentTurns: 0,
     newestUnsentMessageCreatedAt: null,
     lastAgentMessageAt: null,
+    humanHandled: false,
     ...over,
   });
 
@@ -602,6 +603,23 @@ describe("runInbound — active responder (converse to close)", () => {
 
     expect(fixFn).not.toHaveBeenCalled();
     expect(store.scheduledSends[0]!.status).toBe("pending_review");
+  });
+
+  it("stands down when a HUMAN has taken over the thread (manual reply) — never re-engages", async () => {
+    // A human replied from the lead's page → the run is paused_reply (humanHandled). A later
+    // prospect reply must NOT trigger the bot: it classifies + notifies, never auto-drafts, and
+    // does NOT emit the turn-cap needs_human note (that's for capped BOT threads, not human ones).
+    const store = storeWithBundle(bundle({ humanHandled: true, sendMode: "automatic" }));
+
+    const result = await runInbound(
+      { source: "linkedin", payload: LINKEDIN_REPLY_FIXTURE },
+      deps(store, { classifyFn: classify("interested"), respondFn: respond() })
+    );
+
+    expect(result.action).toBe("reply:interested"); // classified + notified, not "+responded"
+    expect(store.scheduledSends).toHaveLength(0);
+    expect(store.canceledSends).toHaveLength(0);
+    expect(store.notifications.some((n) => n.kind === "needs_human")).toBe(false);
   });
 
   it("stops responding past the converse-to-close turn cap — and hands off LOUDLY (needs_human)", async () => {

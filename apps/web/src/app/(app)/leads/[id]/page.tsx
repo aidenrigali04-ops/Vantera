@@ -224,7 +224,7 @@ const TECH_STACK_MAX = 6;
 export default async function LeadProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createClient();
-  const [{ data }, { account }, { data: queuedSend }] = await Promise.all([
+  const [{ data }, { account }, { data: queuedSend }, { data: pausedRun }] = await Promise.all([
     supabase.from("leads").select(LEAD_SELECT).eq("id", id).maybeSingle(),
     getGateData(),
     // A reply already queued/in-flight for this lead — the compose box must show it instead of
@@ -236,6 +236,15 @@ export default async function LeadProfilePage({ params }: { params: Promise<{ id
       .eq("linkedin_stage", "message")
       .in("status", ["pending_review", "approved", "scheduled", "sending"])
       .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    // Human takeover: a manual reply paused the sequence run. The reply panel surfaces this
+    // ("you're handling this — Resume automation") so the pause is visible and reversible.
+    supabase
+      .from("sequence_runs")
+      .select("id")
+      .eq("lead_id", id)
+      .eq("status", "paused_reply")
       .limit(1)
       .maybeSingle(),
   ]);
@@ -399,6 +408,7 @@ export default async function LeadProfilePage({ params }: { params: Promise<{ id
                       leadId={lead.id}
                       channel={latestReply.channel as "email" | "linkedin"}
                       queuedBody={queuedSend?.body ?? null}
+                      paused={!!pausedRun}
                     />
                   </div>
                 )}

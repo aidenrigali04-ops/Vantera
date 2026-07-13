@@ -61,11 +61,14 @@ function signalAgeLabel(observedAt: string, now: Date): string | null {
 /** One pipe-delimited line per lead — compact, stable field order, lossy by design. */
 export function compactLead(c: RankCandidate, now: Date = new Date()): string {
   const tech = (c.technographics ?? []).slice(0, 3).join(",");
+  // Signal detail carries the prospect's own words (intent-post text, what they asked for) — the
+  // primary evidence for prospect_offering. A 40-char cap sliced that context off and drove the
+  // business misread; 120 keeps the substance while staying compact (2026-07-10).
   const signals = freshSignals(c.signals ?? [], now)
     .slice(0, 3)
     .map((s) => {
       const age = s.observedAt ? signalAgeLabel(s.observedAt, now) : null;
-      return `${s.kind}:${trunc(s.detail, 40)}${age ? ` (${age})` : ""}`;
+      return `${s.kind}:${trunc(s.detail, 120)}${age ? ` (${age})` : ""}`;
     })
     .join(",");
   return [
@@ -74,7 +77,9 @@ export function compactLead(c: RankCandidate, now: Date = new Date()): string {
     trunc(c.companySize, 12),
     trunc(c.industry),
     trunc(c.location, 30),
-    trunc(c.title),
+    // Title is the prospect's headline — where their real positioning lives ("...get 10-20 inbound
+    // leads, no cold DMs"). 60 chars truncated it mid-claim; 160 preserves the whole headline.
+    trunc(c.title, 160),
     tech || "-",
     signals || "-",
   ].join("|");
@@ -92,9 +97,13 @@ Rubric:
 
 A \`signals\` entry of kind \`intent\` is the strongest "why now": it means THIS person is actively showing they have the problem the seller solves (asking for a tool, describing the pain) — weight it above generic company events. A lead with a recent, explicit intent signal AND a role/company that plausibly fits the ICP belongs at the top of the range, even when size/industry are blank (normal for an intent-sourced lead — do not mark it down only for missing firmographics). Intent never overrides a clear ICP mismatch: a wrong-persona or wrong-space lead is still weak, intent or not.
 
-For each lead emit: lead_id (copy the id exactly), reasoning (one dense sentence weighing fit vs timing — think here before scoring), score, rationale (one plain-English line a sales rep reads on a dashboard), pain_points/triggers/motivations (max 3 each, specific to THIS lead, never generic), value_angle (how the seller's offer maps to this lead), aha_moment (the single concrete outcome that would make this prospect lean in), summary (2-3 sentences a rep reads before writing to this person).
+For each lead emit: lead_id (copy the id exactly), reasoning (one dense sentence weighing fit vs timing — think here before scoring), score, rationale (one plain-English line a sales rep reads on a dashboard), pain_points/triggers/motivations (max 3 each, specific to THIS lead, never generic), prospect_offering, value_angle, aha_moment (the single concrete outcome that would make this prospect lean in), summary (2-3 sentences a rep reads before writing to this person).
 
-Ground every field in the data given. If signals are absent, say so in reasoning and score accordingly — never invent facts.`;
+prospect_offering — what THIS prospect's own company or role does, in THEIR terms, grounded only in their title/company/signals. This is about them, never about the seller. Preserve their exact numbers and the DIRECTION of what they do: a title that says "I help founders get 10-20 inbound leads" means they PROVIDE that service (their client gets the leads), it does NOT mean "they run lead gen for 10-20 founders" and it is NOT the seller's offer. Never flip inbound vs outbound, buyer vs seller, or who does what for whom. If their title is vague, state only what is certain and no more.
+
+value_angle — how the SELLER's offer could specifically help this prospect. Keep the seller's offer and the prospect's own business DISTINCT: describe the benefit to them without restating their business as if it were the seller's.
+
+Ground every field in the data given. If signals are absent, say so in reasoning and score accordingly — never invent facts. Never alter a prospect's stated numbers or flip the direction of what they do; use their own words. Misrepresenting a prospect's business is a worse error than saying less about it.`;
 
 function contextBlock(ctx: RankContext): string {
   return [

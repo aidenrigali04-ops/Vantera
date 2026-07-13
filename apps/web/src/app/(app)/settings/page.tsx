@@ -129,6 +129,12 @@ export default async function SettingsPage() {
         cta="Manage integrations"
       />
       <SettingsLink
+        title="Proof & pricing"
+        body="The true stats, results, pricing, and FAQ answers your agent can cite when a prospect asks for proof."
+        href="/settings/proof"
+        cta="Manage proof points"
+      />
+      <SettingsLink
         title="Suppression list"
         body="Contacts your agents must never message — unsubscribes, bounces, and manual adds."
         href="/settings/suppression"

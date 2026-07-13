@@ -92,6 +92,11 @@ async function maybeRespond(
 
   const bundle = await deps.store.getResponderBundle(accountId, lead.id, lead.campaignId);
   if (!bundle) return false; // no live Outreach agent, or no insights to ground a reply
+  // A human took this thread over (replied manually → paused_reply). Stand down silently — the
+  // person is driving now, and the reply notification above already told them a reply came in.
+  // Sending on top of a human reply is the "bot re-pitches after I answered" failure (Mohamed K,
+  // 2026-07-05). No turn-cap needs_human note here: that's for capped BOT threads, not human ones.
+  if (bundle.humanHandled) return false;
   if (bundle.agentTurns >= MAX_AGENT_TURNS) {
     // Turn cap reached and a real prospect is still talking — the human must take over,
     // loudly (a capped thread used to just go silent).

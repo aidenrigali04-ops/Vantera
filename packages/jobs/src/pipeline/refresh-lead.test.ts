@@ -14,6 +14,7 @@ function makeInsight(leadId: string, score: number): LeadInsights {
     pain_points: [],
     triggers: [],
     motivations: [],
+    prospect_offering: "what they do",
     value_angle: "value",
     aha_moment: "aha",
     summary: "summary",

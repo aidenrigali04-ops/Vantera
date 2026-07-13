@@ -36,6 +36,7 @@ const bundle = (over: Partial<ResponderBundle> = {}): ResponderBundle => ({
   agentTurns: 1,
   newestUnsentMessageCreatedAt: null,
   lastAgentMessageAt: null,
+  humanHandled: false,
   ...over,
 });
 
@@ -110,6 +111,20 @@ describe("runSequenceTouch", () => {
     const d = deps({ getResponderBundle: async () => bundle({ sendMode: "review" }), insertScheduledSend: insert });
     await runSequenceTouch(dispatch, d);
     expect(insert).toHaveBeenCalledWith(expect.objectContaining({ status: "pending_review" }));
+  });
+
+  it("stands down (never drafts) if a human took the thread over after this touch was dispatched", async () => {
+    // Race: the orchestrator dispatched this touch while the run was active, then the user sent a
+    // manual reply (paused_reply) before the task ran. The re-fetched bundle now reports
+    // humanHandled — the proactive nudge must not fire on top of the human's message.
+    const insert = vi.fn(async () => {});
+    const d = deps({
+      getResponderBundle: async () => bundle({ humanHandled: true }),
+      insertScheduledSend: insert,
+    });
+    const out = await runSequenceTouch(dispatch, d);
+    expect(out).toBe("skipped");
+    expect(insert).not.toHaveBeenCalled();
   });
 
   it("forces review on a style-flagged draft even in automatic mode", async () => {

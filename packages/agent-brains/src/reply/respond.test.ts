@@ -78,6 +78,27 @@ describe("draftConversationMessage — reply mode", () => {
   });
 });
 
+describe("draftConversationMessage — conversational posture (not every message pitches)", () => {
+  it("carries the small-talk message + its classification to the brain, with a no-pitch-on-rapport rule", async () => {
+    let seen = "";
+    const model = new MockLanguageModelV3({
+      doGenerate: async (opts) => {
+        seen = JSON.stringify(opts);
+        return textResponse({ message: "Going well thanks, hope yours is too. You?" });
+      },
+    });
+    await draftConversationMessage(
+      input({ incoming: "Hey Ryan, how's your week going?", classification: "neutral" }),
+      model
+    );
+    // the actual message reaches the brain so it can match rapport, not reflexively pitch
+    expect(seen).toContain("how's your week going");
+    // and the system prompt grants explicit permission to just reply to small talk
+    expect(seen.toLowerCase()).toContain("small talk");
+    expect(seen.toLowerCase()).toContain("not every message should sell");
+  });
+});
+
 describe("draftConversationMessage — proactive follow-up mode (no incoming)", () => {
   it("writes a follow-up that builds on the thread, told NOT to re-introduce or repeat", async () => {
     let seen = "";
@@ -121,6 +142,12 @@ describe("validateConversationMessage — link whitelist + action claims (2026-0
   it("flags any non-whitelisted URL", () => {
     const out = validateConversationMessage("See https://sketchy.example/pricing", BLOCK, []);
     expect(out.some((v) => v.rule === "unapproved-link")).toBe(true);
+  });
+
+  it("flags a reply that runs long past the 300-char / 52-word ceiling (a wall of text)", () => {
+    const wall = Array.from({ length: 70 }, (_, i) => `bit${i % 7}`).join(" ");
+    const out = validateConversationMessage(wall, BLOCK, []);
+    expect(out.some((v) => v.rule === "length")).toBe(true);
   });
 
   it("flags fabricated platform actions", () => {
