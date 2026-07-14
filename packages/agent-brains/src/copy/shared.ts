@@ -34,7 +34,7 @@ export interface CopyContext {
   brandVoice?: string | null;
   /** things the agent must never say or do — topics, claims, or words to avoid */
   guardrails?: string | null;
-  /** the account's citable proof/pricing/FAQ facts (0046). Rendered into the grounding so the brain
+  /** the account's citable proof/pricing/FAQ facts (0047). Rendered into the grounding so the brain
    *  can answer "prove it / what's the price" truthfully — and so findUngroundedClaims whitelists any
    *  metric quoted from one. The seller attests these are true; the brain never invents beyond them. */
   proofPoints?: ProofPoint[];
@@ -86,7 +86,7 @@ export function strategyDirectives(strategy?: CopyStrategy): string {
   return `Strategy for this message (apply in addition to the rules above, never overriding them):\n${lines.join("\n")}`;
 }
 
-/** One citable seller fact (0046). `kind` steers when the brain reaches for it; `question` is the
+/** One citable seller fact (0047). `kind` steers when the brain reaches for it; `question` is the
  *  objection an `faq` fact answers. Text is quoted verbatim, never invented beyond. */
 export interface ProofPoint {
   kind: "metric" | "outcome" | "pricing" | "faq";

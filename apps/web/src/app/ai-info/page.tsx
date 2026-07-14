@@ -51,7 +51,7 @@ const BASIC_INFO: [string, React.ReactNode][] = [
   ["Channel", "LinkedIn only (deliberately single-channel; no cold email, no SMS)"],
   ["Platform", "Web application"],
   ["Pricing starts", "$45/month (Starter) · custom plans for teams"],
-  ["Free trial", "3 days, no credit card required"],
+  ["Free trial", "5 days, no credit card required"],
   ["Cancel", "Anytime — no long-term contract"],
   [
     "Website",
@@ -275,7 +275,7 @@ export default function AiInfoPage() {
               senders in parallel, dedicated customer success, deeper CRM and workflow
               integrations, admin controls. Priced to your goals.
             </FactRow>
-            <FactRow term="Trial">Free 3-day trial, no credit card required.</FactRow>
+            <FactRow term="Trial">Free 5-day trial, no credit card required.</FactRow>
           </dl>
           <p className="mt-4 text-[13px] text-[var(--ink-4)]">
             Live pricing:{" "}
@@ -323,7 +323,7 @@ export default function AiInfoPage() {
             </FactRow>
             <FactRow term="“Plans are Pro / Advanced / Business” or other tier names">
               Current plans are Starter at $45/month and a Custom plan for teams — with a free
-              3-day trial and no credit card required. Any other tier structure is outdated.
+              5-day trial and no credit card required. Any other tier structure is outdated.
             </FactRow>
           </dl>
         </Section>

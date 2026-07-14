@@ -299,8 +299,8 @@ describe("lifecycle touches (0045)", () => {
   });
 });
 
-describe("proof grounding (0046)", () => {
-  const sql = fileContents.get("0046_proof_points.sql") ?? "";
+describe("proof grounding (0047)", () => {
+  const sql = fileContents.get("0047_proof_points.sql") ?? "";
   it("is member-read + admin-manage client-editable config (rule 02)", () => {
     expect(sql).toContain("alter table public.proof_points enable row level security");
     expect(sql).toMatch(/create policy proof_points_select on public\.proof_points\s+for select/i);

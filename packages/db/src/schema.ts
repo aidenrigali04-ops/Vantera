@@ -1073,7 +1073,7 @@ export const leadNotifications = pgTable(
   ]
 );
 
-// ── 0046 proof grounding ──────────────────────────────────────────────────────
+// ── 0047 proof grounding ──────────────────────────────────────────────────────
 // Account-scoped, citable proof / pricing / FAQ facts the conversation brains may quote when a
 // prospect asks for evidence or price (injected into the leadBlock grounding). Member-read,
 // admin-manage. FK to auth.users(id) for created_by lives in the SQL migration.
