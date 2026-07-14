@@ -1,14 +1,21 @@
 ---
-title: How Vantera finds where your outreach can improve
+title: What's working — how Vera tests and improves your outreach
 surface: analytics
 routes: /dashboard?view=analytics
 ---
 
-# Where your outreach leaks
+# What's working
 
-On the **Analytics** tab, the **Optimization** panel shows your outreach as a funnel and points to
-the single biggest place it can improve. It's read-only — it measures and explains, it never changes
-anything on its own.
+On the **Analytics** tab, the **What's working** panel is the visible face of Vera's improvement
+loop: your outreach funnel, what Vera is testing right now, and what she adopted last — with the
+proof behind each.
+
+## Where Vera starts
+
+Every account starts on a **proven play** — a complete way of running a first conversation
+(what to lead with, how long to write, how to ask), matched to your buyer at onboarding. Plays
+are honestly sourced: proven on our own outbound, or grounded in buyer research. You'll see them
+on your dashboard while your first results land.
 
 ## The funnel
 
@@ -20,43 +27,34 @@ Every touch moves through four stages, and each has a conversion rate:
 4. **Close rate** — meetings booked → closed deals.
 
 Each stage is compared to a **typical range** for quality outreach (fewer, better-targeted
-touches — not blast volume). The band is a reference, never a target or a promise.
+touches — not blast volume). The band is a reference, never a target or a promise. A rate only
+counts once enough touches have completed, and the panel shows a **95% confidence interval** so
+you can see how firm each number is — Vera will not invent a problem from a few touches.
 
-## Why it waits before saying anything
+## How the testing works
 
-A conversion rate over a handful of touches is noise, not a real number. So a stage only counts once
-enough touches have completed, and the panel shows a **95% confidence interval** so you can see how
-firm each rate is. Until there's enough data it says so plainly — it will not invent a problem from a
-few touches.
+Vera runs one careful test at a time: a single change (for example, opening from the prospect's
+pain instead of their trigger), tried on a small slice of new drafts and measured against your
+current approach on real outcomes.
 
-## The one biggest opportunity
+- **If it genuinely wins** — with statistical confidence, not vibes — Vera adopts it as your new
+  default on her own, and the panel shows what changed and why. Then she lines up the next test.
+- **If it loses**, it's dropped and your current approach stands.
+- **If it ever does harm** — more negative replies — a circuit breaker stops it immediately.
+  A variant that gets more replies but angrier ones loses.
 
-Rather than a list of everything that could be better, it names the **single** stage that's furthest
-below its typical range — the highest-leverage place to focus first. If nothing is dragging, it says
-your outreach is on track and that no change is warranted. Fixing one real bottleneck beats
-scattering effort across many.
+## You stay in charge
 
-## The one recommended change
+- Every adoption shows in the panel with a **Revert to the previous approach** button — one
+  click undoes it.
+- Nothing sends without your approval in review mode, tested or not.
+- Every draft — including every test — passes the same honesty and humanity checks. A test can
+  change how a message is written, never what it claims.
 
-Alongside the diagnosis, it suggests **one concrete change** for that bottleneck and links you
-straight to where you'd make it — for example, tightening your targeting when acceptance is low, or
-turning a soft CTA into a concrete next step when interested replies aren't booking. It's a
-suggestion: **you decide and you make the change** — nothing is applied automatically. Each
-recommendation states the honest expected direction (never a promised number) and whether the signal
-behind it is early or clear.
+## What Vera will never do
 
-## Optional: let the agent test a fix
-
-Where the fix is in the agent's own copy, Vantera can run a safe A/B test for you — trying the change
-on a small slice of new drafts and measuring it against your current approach. It only ever
-*suggests*: a change becomes your default only when **you** adopt it. The test concludes on its own
-once there's enough data, and it **stops immediately** if the challenger generates more negative
-replies — a variant that gets more replies but angrier ones loses. It never increases send volume,
-runs one change at a time, and every draft still passes the same honesty and humanity checks.
-
-## What it will never do
-
-The goal is more replies and more booked meetings — but never at the cost of your account or your
-brand. It never increases send volume (your safety limits are fixed), never lowers the quality bar on
-who gets contacted, and never loosens the rules that keep messages honest and human. Improvement
-comes from targeting the right bottleneck, not from doing more or cutting corners.
+The goal is more replies and more booked meetings — never at the cost of your account or your
+brand. She never increases send volume (your safety limits are fixed and she can't touch them),
+never lowers the quality bar on who gets contacted, and never loosens the rules that keep
+messages honest and human. Improvement comes from keeping what works, not from doing more or
+cutting corners.
