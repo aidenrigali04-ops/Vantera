@@ -8,6 +8,7 @@ import { LandingHeading } from "./heading";
 import { Reveal, RevealItem, CARD_INTERACTIVE } from "./surface";
 import { Gauge, StatusDot, useInViewOnce } from "./viz";
 import { cn } from "@/lib/utils";
+import { trackEvent } from "@/lib/analytics/clarity";
 
 /** LinkedIn brand glyph — lucide dropped brand icons, so we render it inline. */
 function LinkedinMark({ className }: { className?: string }) {
@@ -135,7 +136,9 @@ export function HowItWorks() {
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              router.push("/signup");
+              const site = url.trim();
+              trackEvent("cta_click", { location: "how_it_works", has_site: site ? "1" : "0" });
+              router.push(site ? `/signup?site=${encodeURIComponent(site)}` : "/signup");
             }}
             className="flex w-full items-center gap-2 rounded-[12px] border border-[var(--hairline)] bg-white py-1.5 pl-5 pr-1.5 shadow-[var(--shadow-card)] transition-shadow focus-within:border-[var(--fb)] focus-within:shadow-[0_0_0_3px_rgba(24,119,242,0.16),var(--shadow-card)]"
           >
@@ -155,7 +158,7 @@ export function HowItWorks() {
             </button>
           </form>
           <p className="mt-4 text-[13px] text-[var(--ink-4)]">
-            No credit card required · Free 3-day trial
+            No credit card required · Free 5-day trial
           </p>
         </motion.div>
       </div>

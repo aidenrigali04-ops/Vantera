@@ -42,6 +42,11 @@ export async function signup(_prev: AuthFormState, formData: FormData): Promise<
   });
   if (!result.ok) return { error: result.error };
 
+  // A website URL typed on the landing page rides through as ?site= → a hidden field.
+  // Stash it on user_metadata so onboarding can pre-fill + scan it, keeping the
+  // landing promise ("we'll scan your site"). Cap length; onboarding validates it.
+  const site = String(formData.get("site") ?? "").trim().slice(0, 300);
+
   // Confirmation-free signup (owner call, 2026-07-08): the confirm-link step was
   // losing signups. The admin API creates the user already confirmed — Supabase
   // sends no email — then a normal password sign-in opens the session and the app
@@ -52,7 +57,10 @@ export async function signup(_prev: AuthFormState, formData: FormData): Promise<
     email: result.values.email,
     password: result.values.password,
     email_confirm: true,
-    user_metadata: { company_name: result.values.companyName },
+    user_metadata: {
+      company_name: result.values.companyName,
+      ...(site ? { pending_site: site } : {}),
+    },
   });
   if (createError) return { error: friendlyAuthError(createError.message) };
 

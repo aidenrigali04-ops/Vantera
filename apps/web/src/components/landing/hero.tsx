@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight } from "lucide-react";
+import { trackEvent } from "@/lib/analytics/clarity";
 import { HeroCalendar } from "./hero-calendar";
 import { HeroConnector } from "./hero-connector";
 
@@ -87,7 +88,9 @@ export function Hero() {
             <form
               onSubmit={(e) => {
                 e.preventDefault();
-                router.push("/signup");
+                const site = url.trim();
+                trackEvent("cta_click", { location: "hero", has_site: site ? "1" : "0" });
+                router.push(site ? `/signup?site=${encodeURIComponent(site)}` : "/signup");
               }}
               className="landing-rise mt-8 flex w-full max-w-md items-center gap-2 rounded-[12px] border border-[var(--hairline)] bg-white py-1.5 pl-5 pr-1.5 shadow-[var(--shadow-card)] transition-shadow focus-within:border-[var(--fb)] focus-within:shadow-[0_0_0_3px_rgba(24,119,242,0.16),var(--shadow-card)]"
               style={{ animationDelay: "170ms" }}

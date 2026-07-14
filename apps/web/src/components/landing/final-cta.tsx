@@ -5,16 +5,9 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowRight, CalendarCheck, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { trackEvent } from "@/lib/analytics/clarity";
 import { Reveal, RevealItem, CARD } from "./surface";
-import {
-  DeltaChip,
-  INSET_CARD_SHADOW,
-  MetricCell,
-  Sparkline,
-  StatRail,
-  StatusDot,
-  useInViewOnce,
-} from "./viz";
+import { INSET_CARD_SHADOW, MetricCell, StatRail, StatusDot, useInViewOnce } from "./viz";
 
 /** LinkedIn brand glyph — lucide dropped brand icons, so we render it inline. */
 function LinkedinMark({ className }: { className?: string }) {
@@ -35,7 +28,7 @@ function LinkedinMark({ className }: { className?: string }) {
 export function FinalCta() {
   const router = useRouter();
   const [url, setUrl] = useState("");
-  const [cardRef, inView] = useInViewOnce();
+  const [cardRef] = useInViewOnce();
 
   return (
     <section className="relative border-t border-[var(--hairline)] bg-[var(--tint)] py-24 sm:py-28 lg:py-32">
@@ -87,6 +80,7 @@ export function FinalCta() {
             <div className="mt-9 flex flex-col items-center gap-4">
               <Link
                 href="/signup"
+                onClick={() => trackEvent("cta_click", { location: "final_cta_button" })}
                 className="group inline-flex items-center gap-2 rounded-full bg-[var(--fb)] px-8 py-3.5 text-[15px] font-semibold text-white shadow-[0_6px_18px_-8px_rgba(24,119,242,0.4)] transition-all hover:bg-[var(--fb-strong)] hover:-translate-y-0.5 hover:shadow-[0_12px_28px_-12px_rgba(24,119,242,0.45)] active:scale-[0.98]"
               >
                 Start free
@@ -110,7 +104,9 @@ export function FinalCta() {
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
-                  router.push("/signup");
+                  const site = url.trim();
+                  trackEvent("cta_click", { location: "final_cta", has_site: site ? "1" : "0" });
+                  router.push(site ? `/signup?site=${encodeURIComponent(site)}` : "/signup");
                 }}
                 className="flex w-full items-center gap-2 rounded-full border border-[var(--hairline)] bg-white py-1.5 pl-5 pr-1.5 shadow-[var(--shadow-sm)] transition-shadow focus-within:border-[var(--fb)] focus-within:shadow-[0_0_0_3px_rgba(24,119,242,0.16),var(--shadow-card)]"
               >
@@ -146,7 +142,7 @@ export function FinalCta() {
               )}
               style={{ boxShadow: INSET_CARD_SHADOW }}
             >
-              {/* header — a live pipeline readout */}
+              {/* header — honest first-party proof: our own account, real numbers */}
               <div className="flex items-center justify-between gap-3 border-b border-[var(--hairline)] pb-4">
                 <div className="flex items-center gap-2.5">
                   <span className="grid size-8 place-items-center rounded-[9px] bg-[var(--cyan-tint)] text-[var(--cyan-strong)] ring-1 ring-inset ring-[var(--cyan-line)]">
@@ -154,14 +150,13 @@ export function FinalCta() {
                   </span>
                   <div className="leading-tight">
                     <div className="text-[13px] font-semibold tracking-[-0.01em] text-foreground">
-                      Your pipeline, live
+                      We run Vantera on our own outbound
                     </div>
-                    <div className="mt-0.5 text-[11px] text-[var(--ink-4)]">Updated just now</div>
+                    <div className="mt-0.5 text-[11px] text-[var(--ink-4)]">Our account · first ~2.5 weeks · real numbers</div>
                   </div>
                 </div>
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--fb-tint)] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--cyan-strong)] ring-1 ring-inset ring-[var(--cyan-line)]">
-                  <StatusDot size="md" pulse />
-                  Live
+                  Real data
                 </span>
               </div>
 
@@ -172,18 +167,14 @@ export function FinalCta() {
                 ))}
               </StatRail>
 
-              {/* booked-meetings trend */}
-              <div className="mt-6 flex items-center justify-between gap-4 border-t border-[var(--hairline)] pt-5">
-                <div>
-                  <div className="text-[10.5px] font-semibold uppercase tracking-[0.09em] text-[var(--ink-4)]">
-                    Booked meetings
-                  </div>
-                  <div className="mt-0.5 text-[11px] text-[var(--ink-4)]">last 6 weeks</div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Sparkline points={[12, 17, 15, 24, 31, 44]} width={148} height={40} halo draw={inView} />
-                  <DeltaChip value="+41%" dir="up" />
-                </div>
+              {/* the real funnel those numbers took — no invented trend */}
+              <div className="mt-6 border-t border-[var(--hairline)] pt-5">
+                <p className="text-[12.5px] leading-relaxed text-[var(--ink-3)]">
+                  <span className="font-medium text-foreground">
+                    467 buyers sourced → 133 qualified → 90 contacted → 24 replies.
+                  </span>{" "}
+                  The same agents you get, run on our own pipeline. Yours start within ~15 minutes.
+                </p>
               </div>
 
               {/* pipeline rail — the hero's LinkedIn → calendar story as live progress */}
@@ -221,9 +212,9 @@ export function FinalCta() {
 }
 
 const METRICS: { value: string; label: string }[] = [
-  { value: "~15 min", label: "Deploy to first run" },
-  { value: "100%", label: "Messages you approve" },
-  { value: "0", label: "Cold spray sent" },
+  { value: "133", label: "Qualified buyers" },
+  { value: "90", label: "Contacted" },
+  { value: "9", label: "Interested replies" },
 ];
 
 const PIPELINE = ["Identify", "Qualify", "Draft", "Book"] as const;
