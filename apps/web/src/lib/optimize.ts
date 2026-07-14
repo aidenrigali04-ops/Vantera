@@ -33,6 +33,13 @@ export type OutreachDiagnosisVM = {
   } | null;
   /** an offer to auto-test a copy change for the diagnosed leak — only when nothing is running */
   experimentOffer: { stageKey: FunnelStageKey; label: string } | null;
+  /** the most recent autonomous adoption (Stage 0) — what Vera changed and why, revertable */
+  lastAdoption: {
+    experimentId: string;
+    label: string;
+    reason: string | null;
+    concludedAt: string | null;
+  } | null;
 };
 
 export async function loadOutreachDiagnosis(db: SupabaseClient): Promise<OutreachDiagnosisVM> {
@@ -88,6 +95,30 @@ export async function loadOutreachDiagnosis(db: SupabaseClient): Promise<Outreac
     if (challenger) experimentOffer = { stageKey: diagnosis.stageKey, label: describeStrategy(challenger) };
   }
 
+  // The most recent autonomous adoption (Stage 0) — shown with a Revert control. Reverted
+  // adoptions are filtered by the "· reverted" marker revertAdoption appends to the reason.
+  const { data: adoptedRow } = await db
+    .from("optimization_experiments")
+    .select("id, challenger_strategy, decision_reason, concluded_at")
+    .eq("status", "adopted")
+    .order("concluded_at", { ascending: false })
+    .limit(1)
+    .maybeSingle<{
+      id: string;
+      challenger_strategy: CopyStrategy;
+      decision_reason: string | null;
+      concluded_at: string | null;
+    }>();
+  const lastAdoption =
+    adoptedRow && !(adoptedRow.decision_reason ?? "").includes("· reverted")
+      ? {
+          experimentId: adoptedRow.id,
+          label: describeStrategy(adoptedRow.challenger_strategy ?? {}),
+          reason: adoptedRow.decision_reason,
+          concludedAt: adoptedRow.concluded_at,
+        }
+      : null;
+
   return {
     funnel,
     diagnosis,
@@ -95,5 +126,6 @@ export async function loadOutreachDiagnosis(db: SupabaseClient): Promise<Outreac
     hasOutreach: invited > 0,
     experiment,
     experimentOffer,
+    lastAdoption,
   };
 }

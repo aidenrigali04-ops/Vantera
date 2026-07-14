@@ -94,6 +94,10 @@ export interface DashboardViewProps {
   channels: { liStatus: string | null };
   week: { sends: number; li: number; replies: number };
   attribution: SignalAttribution[];
+  /** Vera's visible heartbeat (Stage 0): what she's testing now + her latest adoption */
+  whatsWorking: { testingLabel: string | null; adoptedLabel: string | null };
+  /** matched starter plays — fill the waiting states with proven competence, honestly labeled */
+  plays: { slug: string; name: string; description: string; sourceLabel: string }[];
 }
 
 export function DashboardView(props: DashboardViewProps) {
@@ -143,12 +147,16 @@ export function DashboardView(props: DashboardViewProps) {
           scoutDeployed={props.scoutDeployed}
           goal={goal}
           channels={props.channels}
+          plays={props.plays}
+          icp={icp}
         />
       ) : isWorkingEmpty ? (
         <FirstRunInProgress
           scoutNextRunLabel={props.scoutNextRunLabel}
           goal={goal}
           channels={props.channels}
+          plays={props.plays}
+          icp={icp}
         />
       ) : (
         <WorkingDashboard {...props} />
@@ -223,6 +231,9 @@ function WorkingDashboard(props: DashboardViewProps) {
         goalCents={goalCents}
       />
 
+      {/* Vera's heartbeat (Stage 0) — what she's testing and what she adopted, one glance. */}
+      <WhatsWorkingStrip whatsWorking={props.whatsWorking} />
+
       {/* Reassure — the agent heartbeat + the warm replies that reward the daily check-in. Paired
           in a balanced two-up row so neither one's height drags a gap into the primary content. */}
       <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
@@ -230,6 +241,90 @@ function WorkingDashboard(props: DashboardViewProps) {
         <WarmReplies recentReplies={recentReplies} interested={interested} />
       </div>
     </Reveal>
+  );
+}
+
+/** Vera's visible loop on the Overview (Stage 0): the current test and the latest adoption,
+ *  linking into the full What's-working panel on Analytics. Hidden until either exists. */
+function WhatsWorkingStrip({
+  whatsWorking,
+}: {
+  whatsWorking: DashboardViewProps["whatsWorking"];
+}) {
+  const { testingLabel, adoptedLabel } = whatsWorking;
+  if (!testingLabel && !adoptedLabel) return null;
+  return (
+    <RevealItem className={cn(PANEL_SURFACE, "p-5")} data-copilot="dashboard-whats-working">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          <Eyebrow>What&apos;s working</Eyebrow>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {adoptedLabel && (
+              <>
+                Vera adopted <span className="font-medium text-foreground">{adoptedLabel}</span>{" "}
+                after it won its test.{" "}
+              </>
+            )}
+            {testingLabel ? (
+              <>
+                Right now she&apos;s testing{" "}
+                <span className="font-medium text-foreground">{testingLabel}</span> on a small
+                slice of new drafts — she keeps it only if it genuinely wins.
+              </>
+            ) : (
+              <>She&apos;s watching the results and lines up the next test on its own.</>
+            )}
+          </p>
+        </div>
+        <Button asChild variant="outline" size="sm" className="shrink-0">
+          <Link href="/dashboard?view=analytics">
+            See the numbers <ArrowRight className="size-4" />
+          </Link>
+        </Button>
+      </div>
+    </RevealItem>
+  );
+}
+
+/** The proven plays Vera runs, shown while the first results are still landing — competence in
+ *  the waiting room instead of silence. Honest source labels, never network claims (Stage 0). */
+function ProvenPlaysPanel({
+  plays,
+  icp,
+}: {
+  plays: DashboardViewProps["plays"];
+  icp: string | null;
+}) {
+  if (plays.length === 0) return null;
+  return (
+    <RevealItem className={cn(PANEL_SURFACE, "p-5")} data-copilot="dashboard-proven-plays">
+      <Eyebrow>Vera&apos;s plays</Eyebrow>
+      <p className="mt-2 text-sm text-muted-foreground">
+        While the first results land, here&apos;s what Vera is running
+        {icp ? (
+          <>
+            {" "}
+            for <span className="font-medium text-foreground">{icp}</span>
+          </>
+        ) : null}
+        :
+      </p>
+      <ul className="mt-3 flex flex-col gap-2.5">
+        {plays.map((p) => (
+          <li key={p.slug} className="rounded-xl border border-[var(--hairline)] p-3">
+            <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+              <span className="text-sm font-medium text-foreground">{p.name}</span>
+              <span className="text-[11px] text-muted-foreground/80">{p.sourceLabel}</span>
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">{p.description}</p>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-3 border-t border-border/60 pt-3 text-xs text-muted-foreground">
+        Vera tests improvements against these on real conversations and keeps what wins — you
+        approve every send.
+      </p>
+    </RevealItem>
   );
 }
 
@@ -883,10 +978,14 @@ function ActivationRamp({
   scoutDeployed,
   goal,
   channels,
+  plays,
+  icp,
 }: {
   scoutDeployed: boolean;
   goal: string | null;
   channels: DashboardViewProps["channels"];
+  plays: DashboardViewProps["plays"];
+  icp: string | null;
 }) {
   // Onboarding auto-provisions the whole agent stack, so this ramp only appears for the
   // rare account without a live Scout — and the checklist reflects the real remaining
@@ -954,6 +1053,9 @@ function ActivationRamp({
 
         <ChannelSetupPanel channels={channels} />
       </div>
+
+      {/* Competence in the waiting room (Stage 0): the proven plays Vera starts on. */}
+      <ProvenPlaysPanel plays={plays} icp={icp} />
     </Reveal>
   );
 }
@@ -965,10 +1067,14 @@ function FirstRunInProgress({
   scoutNextRunLabel,
   goal,
   channels,
+  plays,
+  icp,
 }: {
   scoutNextRunLabel: string;
   goal: string | null;
   channels: DashboardViewProps["channels"];
+  plays: DashboardViewProps["plays"];
+  icp: string | null;
 }) {
   const steps = [
     { label: "Agents deployed — Prospect, Outreach & Intent", done: true, current: false },
@@ -983,7 +1089,7 @@ function FirstRunInProgress({
       <div className={cn("grid gap-6", !liConnected && "md:grid-cols-[1.2fr_1fr]")}>
         <RevealItem className={cn(PANEL_SURFACE, "p-5")} data-copilot="dashboard-first-run">
           <div className="flex items-center justify-between gap-3">
-            <Eyebrow>Your agents are working</Eyebrow>
+            <Eyebrow>Vera is working</Eyebrow>
             <span className="flex items-center gap-1.5 text-xs font-medium text-foreground">
               <span className="relative flex size-2" aria-hidden>
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-foreground/60" />
@@ -996,7 +1102,7 @@ function FirstRunInProgress({
             Finding your first prospects
           </h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            Your Prospect Agent is scanning your market and scoring fits against your ICP. The
+            Vera is scanning your market and scoring fits against your ICP. The
             first qualified leads land here{" "}
             {scoutNextRunLabel ? (
               <>
@@ -1053,6 +1159,9 @@ function FirstRunInProgress({
 
         {!liConnected && <ChannelSetupPanel channels={channels} />}
       </div>
+
+      {/* Competence in the waiting room (Stage 0): the proven plays Vera is running right now. */}
+      <ProvenPlaysPanel plays={plays} icp={icp} />
     </Reveal>
   );
 }

@@ -4,12 +4,13 @@ import { Panel, Eyebrow } from "@/components/ui/panel";
 import { cn } from "@/lib/utils";
 import type { StageStatus } from "@vantera/agent-brains";
 import type { OutreachDiagnosisVM } from "@/lib/optimize";
-import { adoptExperiment, discardExperiment, startExperiment } from "./optimize-actions";
+import { adoptExperiment, discardExperiment, revertAdoption, startExperiment } from "./optimize-actions";
 
-// Phase 1 surface of the self-optimizing loop: a read-only "where your outreach leaks" panel.
+// "What's working" — the visible face of Vera's self-improving loop (Stage 0, spec 2026-07-14).
 // Shows the invite→accept→reply→book→close funnel with each stage's rate against a typical band,
-// plus the single biggest opportunity the diagnosis brain found. No autonomy, no writes — just the
-// measurement that makes the rest of the loop trustworthy.
+// what Vera is testing right now, and what she adopted last (with an owner Revert control).
+// Adoption is autonomous inside the envelope; the legacy ready_to_adopt approve UI stays for any
+// experiment parked before the autonomy flip.
 
 const STATUS_LABEL: Record<StageStatus, string> = {
   below: "below typical",
@@ -37,7 +38,7 @@ export function OutreachDiagnosis({ vm }: { vm: OutreachDiagnosisVM }) {
   return (
     <Panel className="mb-6 p-5">
       <div className="flex items-center justify-between gap-3">
-        <Eyebrow>Optimization</Eyebrow>
+        <Eyebrow>What&apos;s working</Eyebrow>
         <span className="rounded-full border border-[var(--hairline)] bg-[var(--tint)] px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground">
           {chip}
         </span>
@@ -114,10 +115,10 @@ export function OutreachDiagnosis({ vm }: { vm: OutreachDiagnosisVM }) {
               <FlaskConical className="size-3.5" aria-hidden /> Testing now
             </p>
             <p className="mt-1.5 text-sm text-muted-foreground">
-              Trying <span className="font-medium text-foreground">{experiment.challengerLabel}</span>{" "}
-              on a slice of new drafts, measured against your current approach. It concludes on its own
-              once there&apos;s enough data — and stops immediately if it does any harm. Nothing sends
-              without your approval.
+              Vera is trying <span className="font-medium text-foreground">{experiment.challengerLabel}</span>{" "}
+              on a slice of new drafts, measured against your current approach. She keeps it only if it
+              genuinely wins, stops it instantly if it ever does harm — and nothing sends without your
+              approval either way.
             </p>
           </div>
         )
@@ -129,7 +130,7 @@ export function OutreachDiagnosis({ vm }: { vm: OutreachDiagnosisVM }) {
               <FlaskConical className="size-3.5" aria-hidden /> Or let the agent test a fix
             </p>
             <p className="mt-1.5 text-sm text-muted-foreground">
-              Vantera can safely A/B test{" "}
+              Vera can safely test{" "}
               <span className="font-medium text-foreground">{experimentOffer.label}</span> on a small
               slice of new drafts and keep it only if it genuinely helps — with a hard stop if it ever
               backfires.
@@ -143,6 +144,32 @@ export function OutreachDiagnosis({ vm }: { vm: OutreachDiagnosisVM }) {
           </div>
         </form>
       ) : null}
+
+      {/* Stage 0: the most recent autonomous adoption — evidence the loop is really improving,
+          with the owner's Revert control. Filtered out once reverted. */}
+      {vm.lastAdoption && (
+        <div className="mt-4 rounded-xl border border-[var(--positive-line)] bg-[var(--positive-tint)] p-4">
+          <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-[var(--positive)]">
+            <FlaskConical className="size-3.5" aria-hidden /> Adopted
+          </p>
+          <p className="mt-1.5 text-sm font-semibold text-foreground">
+            {vm.lastAdoption.label} won its test and is now your default
+          </p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {vm.lastAdoption.reason ? `${vm.lastAdoption.reason}. ` : ""}Vera adopted it
+            automatically — and rolls back anything that ever makes results worse.
+          </p>
+          <form action={revertAdoption} className="mt-3">
+            <input type="hidden" name="id" value={vm.lastAdoption.experimentId} />
+            <button
+              type="submit"
+              className="inline-flex items-center rounded-lg border border-[var(--hairline)] px-3.5 py-2 text-sm font-medium transition-colors hover:bg-[var(--tint)]"
+            >
+              Revert to the previous approach
+            </button>
+          </form>
+        </div>
+      )}
 
       <div className="mt-5 space-y-2.5">
         {funnel.map((s) => (

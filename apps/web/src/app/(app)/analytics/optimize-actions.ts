@@ -78,6 +78,48 @@ export async function adoptExperiment(formData: FormData): Promise<void> {
   revalidatePath("/dashboard");
 }
 
+/** Owner control over the autonomous loop (Stage 0): undo Vera's last adoption — the playbook
+ *  champion returns to the strategy the experiment tested AGAINST (stored on the experiment row).
+ *  The adoption stays in history; a "· reverted" marker keeps it out of the What's-working display. */
+export async function revertAdoption(formData: FormData): Promise<void> {
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+
+  const db = await createClient();
+  const { data: exp } = await db
+    .from("optimization_experiments")
+    .select("account_id, champion_strategy, decision_reason, status")
+    .eq("id", id)
+    .maybeSingle<{
+      account_id: string;
+      champion_strategy: unknown;
+      decision_reason: string | null;
+      status: string;
+    }>();
+  if (!exp || exp.status !== "adopted") return;
+
+  const { data: cur } = await db
+    .from("optimization_playbook")
+    .select("version")
+    .eq("account_id", exp.account_id)
+    .maybeSingle<{ version: number }>();
+
+  await db.from("optimization_playbook").upsert(
+    {
+      account_id: exp.account_id,
+      champion_strategy: exp.champion_strategy ?? {},
+      version: (cur?.version ?? 0) + 1,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "account_id" }
+  );
+  await db
+    .from("optimization_experiments")
+    .update({ decision_reason: `${exp.decision_reason ?? ""} · reverted`.trim() })
+    .eq("id", id);
+  revalidatePath("/dashboard");
+}
+
 /** Keep the current champion: discard the challenger. */
 export async function discardExperiment(formData: FormData): Promise<void> {
   const id = String(formData.get("id") ?? "");

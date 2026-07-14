@@ -1,5 +1,7 @@
+import { describeStrategy, type CopyStrategy } from "@vantera/agent-brains";
 import { createClient } from "@/lib/supabase/server";
 import { getGateData } from "@/lib/auth/context";
+import { playCards } from "@/lib/plays";
 import { shapePipeline } from "../pipeline/queries";
 import {
   buildRevenueSeries,
@@ -373,6 +375,36 @@ async function OverviewTab() {
   // proof). Surfaced as a one-liner on Overview when there's at least one attributed win.
   const signalAttribution = await loadSignalAttribution(supabase);
 
+  // What's-working pulse (Stage 0): what Vera is testing right now + her latest adoption —
+  // the loop's visible heartbeat on the Overview. Two cheap maybeSingle reads, RLS-scoped.
+  const [{ data: runningExp }, { data: adoptedExp }] = await Promise.all([
+    supabase
+      .from("optimization_experiments")
+      .select("challenger_strategy")
+      .eq("status", "running")
+      .order("started_at", { ascending: false })
+      .limit(1)
+      .maybeSingle<{ challenger_strategy: CopyStrategy }>(),
+    supabase
+      .from("optimization_experiments")
+      .select("challenger_strategy, decision_reason")
+      .eq("status", "adopted")
+      .order("concluded_at", { ascending: false })
+      .limit(1)
+      .maybeSingle<{ challenger_strategy: CopyStrategy; decision_reason: string | null }>(),
+  ]);
+  const whatsWorking = {
+    testingLabel: runningExp ? describeStrategy(runningExp.challenger_strategy ?? {}) : null,
+    adoptedLabel:
+      adoptedExp && !(adoptedExp.decision_reason ?? "").includes("· reverted")
+        ? describeStrategy(adoptedExp.challenger_strategy ?? {})
+        : null,
+  };
+
+  // Vera's matched starter plays — fill the waiting states with proven competence instead
+  // of silence (honest source labels; server-computed).
+  const plays = playCards({ industry: account.onboarding_industry, icp: account.onboarding_icp });
+
   return (
     <DashboardView
       firstName={firstName}
@@ -408,6 +440,8 @@ async function OverviewTab() {
       channels={{ liStatus }}
       week={{ sends: sendsWeek, li: liWeek, replies: repliesWeek }}
       attribution={signalAttribution}
+      whatsWorking={whatsWorking}
+      plays={plays}
     />
   );
 }
