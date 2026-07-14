@@ -59,21 +59,21 @@ export function Hero() {
             {/* h1 is the LCP element: no opacity gate, painted in SSR so it renders at
                 first paint instead of waiting on hydration. */}
             <h1 className="text-[2.9rem] font-semibold leading-[1.18] tracking-[-0.04em] text-foreground sm:text-[3.6rem] lg:text-[4rem]">
-              Turn Intent into{" "}
-              <span className="relative inline-block rounded-[12px] px-3 pb-[0.12em] pt-[0.04em] text-white shadow-[0_12px_30px_-10px_rgba(24,119,242,0.6)] [background:linear-gradient(180deg,#2a82f7_0%,#1877f2_56%,#166fe5_100%)]">
-                Revenue
-              </span>{" "}
+              Turn{" "}
               <span className="whitespace-nowrap">
-                on{" "}
                 <span
                   ref={linkedinRef}
                   role="img"
                   aria-label="LinkedIn"
-                  className="mx-[0.06em] inline-flex translate-y-[0.16em] items-center justify-center rounded-[12px] border border-[var(--hairline)] bg-white p-[0.2em] align-baseline shadow-[var(--shadow-card)]"
+                  className="mx-[0.02em] inline-flex translate-y-[0.16em] items-center justify-center rounded-[12px] border border-[var(--hairline)] bg-white p-[0.2em] align-baseline shadow-[var(--shadow-card)]"
                 >
                   <LinkedinMark className="h-[0.7em] w-[0.7em] text-[var(--fb)]" />
                   <span className="sr-only">LinkedIn</span>
                 </span>
+              </span>{" "}
+              into booked{" "}
+              <span className="relative inline-block whitespace-nowrap rounded-[12px] px-3 pb-[0.12em] pt-[0.04em] text-white shadow-[0_12px_30px_-10px_rgba(24,119,242,0.6)] [background:linear-gradient(180deg,#2a82f7_0%,#1877f2_56%,#166fe5_100%)]">
+                sales calls
               </span>
             </h1>
 
@@ -81,8 +81,8 @@ export function Hero() {
               className="landing-rise mt-6 max-w-lg text-[17px] font-normal leading-relaxed text-[var(--ink-3)] sm:text-[19px]"
               style={{ animationDelay: "90ms" }}
             >
-              The smartest LinkedIn outreach automation — agents that find in-market buyers, qualify
-              them, and write every message from real activity. You approve every send.
+              Your agents find in-market buyers, qualify them against your ICP, and draft every message
+              from their real activity. You approve every send — and your account stays safe.
             </p>
 
             <form
@@ -106,7 +106,7 @@ export function Hero() {
                 type="submit"
                 className="inline-flex shrink-0 items-center gap-1.5 rounded-[10px] bg-[var(--fb-strong)] px-5 py-2.5 text-[14px] font-semibold text-white transition-all hover:bg-[#1461d1] hover:shadow-[0_8px_24px_-8px_rgba(24,119,242,0.7)] active:scale-[0.98]"
               >
-                Get Started Free
+                Start free
                 <ArrowRight className="size-4" />
               </button>
             </form>

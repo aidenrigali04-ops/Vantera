@@ -153,7 +153,7 @@ export function HowItWorks() {
               type="submit"
               className="group/btn inline-flex shrink-0 items-center gap-1.5 rounded-[10px] bg-[var(--fb-strong)] px-5 py-2.5 text-[14px] font-semibold text-white transition-all hover:bg-[#1461d1] hover:shadow-[0_8px_20px_-8px_rgba(24,119,242,0.4)] active:scale-[0.98]"
             >
-              Get started free
+              Start free
               <ArrowRight className="size-4 transition-transform duration-300 group-hover/btn:translate-x-0.5 motion-reduce:transition-none motion-reduce:group-hover/btn:translate-x-0" />
             </button>
           </form>
