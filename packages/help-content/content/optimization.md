@@ -37,6 +37,13 @@ Vera runs one careful test at a time: a single change (for example, opening from
 pain instead of their trigger), tried on a small slice of new drafts and measured against your
 current approach on real outcomes.
 
+Vera also comes up with what to test next. New candidate approaches are generated — including
+fresh opener angles beyond the built-in styles — then screened by hard rules (an angle can never
+add numbers, prices, or promises), and the most promising candidate is picked using the real
+results of every approach tried so far. Approaches that keep winning get tested more; unproven
+ideas still get their fair shot. What actually becomes your default is decided the same way as
+always: a controlled test on real outcomes, with the do-no-harm circuit breaker.
+
 - **If it genuinely wins** — with statistical confidence, not vibes — Vera adopts it as your new
   default automatically, and the panel shows what changed and why. Then the next test is lined up.
 - **If it loses**, it's dropped and your current approach stands.
