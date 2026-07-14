@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { leadBlock, proofSection, PROSPECT_ACCURACY_RULE } from "./shared";
+import { exemplarBlock, leadBlock, proofSection, PROSPECT_ACCURACY_RULE } from "./shared";
 import { findUngroundedClaims } from "./humanizer";
 import type { StoredInsights } from "../prospect/schema";
 
@@ -77,5 +77,35 @@ describe("PROSPECT_ACCURACY_RULE", () => {
   it("forbids restating the prospect's business through the seller's offer and flipping direction", () => {
     expect(PROSPECT_ACCURACY_RULE).toMatch(/never.*flip.*direction/i);
     expect(PROSPECT_ACCURACY_RULE).toMatch(/trust their title/i);
+  });
+});
+
+describe("exemplarBlock — Vera's winning-message memory (Stage 0.5)", () => {
+  it("returns empty for absent or empty exemplars (prompt byte-identical without wins)", () => {
+    expect(exemplarBlock()).toBe("");
+    expect(exemplarBlock([])).toBe("");
+    expect(exemplarBlock(["  ", ""])).toBe("");
+  });
+
+  it("renders quoted exemplars with guide-not-copy instructions", () => {
+    const block = exemplarBlock(["Saw your post on hiring SDRs", "Congrats on the Series B"]);
+    expect(block).toContain('"Saw your post on hiring SDRs"');
+    expect(block).toContain('"Congrats on the Series B"');
+    // the load-bearing instructions: guide for angle, never copy, never borrow claims
+    expect(block.toLowerCase()).toContain("guide");
+    expect(block.toLowerCase()).toContain("do not copy");
+    expect(block.toLowerCase()).toContain("numbers");
+  });
+
+  it("is prompt-only: a metric inside an exemplar must never whitelist a claim", () => {
+    // Grounding stays the leadBlock alone. If a draft borrows "42%" from an exemplar,
+    // the anti-hallucination check must still flag it as ungrounded.
+    const grounding = leadBlock({
+      lead: { firstName: "A", lastName: "B", title: "VP Sales", companyName: "Acme", industry: "SaaS" },
+      insights: insights(),
+      context: { cta: "a quick intro", accountName: "Vantera" },
+    });
+    const flagged = findUngroundedClaims("We lifted reply rates 42% for a peer", grounding);
+    expect(flagged.length).toBeGreaterThan(0);
   });
 });

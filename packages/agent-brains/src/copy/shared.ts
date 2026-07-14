@@ -44,6 +44,13 @@ export interface CopyContext {
    * champion baseline, so generation is identical to pre-optimizer behavior when unset.
    */
   strategy?: CopyStrategy;
+  /**
+   * Vera's winning-message memory (Stage 0.5): openers from THIS account that earned interested
+   * replies, injected as guide-for-angle exemplars. PER-ACCOUNT ONLY (prospect-facing text never
+   * crosses tenants) and PROMPT-only, never grounding — see exemplarBlock. Absent/empty → the
+   * prompt is byte-identical to before the memory existed.
+   */
+  winningExemplars?: string[];
 }
 
 /**
@@ -163,6 +170,21 @@ export function avoidBlock(avoidPhrases?: string[]): string {
   return [
     `Vary your language. These phrasings were used in this account's recent messages, do NOT reuse or lightly rephrase any of them:`,
     ...phrases.map((p) => `- "${p}"`),
+  ].join("\n");
+}
+
+/**
+ * Vera's positive memory block (Stage 0.5) — openers that earned interested replies, offered as
+ * a guide for angle and energy, NEVER copy material. Appended to the PROMPT only, never to the
+ * grounding string (same rule as avoidBlock: an old message's metric must never whitelist a new
+ * claim — the prompt-only invariant is guarded by test). Empty input → "" → prompt unchanged.
+ */
+export function exemplarBlock(winningExemplars?: string[]): string {
+  const exemplars = (winningExemplars ?? []).map((e) => e.trim()).filter(Boolean);
+  if (exemplars.length === 0) return "";
+  return [
+    `These openers from this account earned interested replies from similar prospects. Use them ONLY as a guide for the angle and energy that works here. Write a fresh message for THIS prospect: do not copy or lightly rephrase any of them, and never borrow their specific numbers, names, or claims:`,
+    ...exemplars.map((e) => `- "${e}"`),
   ].join("\n");
 }
 

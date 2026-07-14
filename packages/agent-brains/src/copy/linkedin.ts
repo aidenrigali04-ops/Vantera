@@ -2,7 +2,7 @@ import { generateObject, type LanguageModel } from "ai";
 import { z } from "zod";
 import { getModel } from "@vantera/ai";
 import { validateHumanity, findUngroundedClaims, normalizeDashes, type Violation } from "./humanizer";
-import { avoidBlock, generateHumanized, leadBlock, strategyDirectives, PROSPECT_ACCURACY_RULE, VOICE_RULES, type DraftInput } from "./shared";
+import { avoidBlock, exemplarBlock, generateHumanized, leadBlock, strategyDirectives, PROSPECT_ACCURACY_RULE, VOICE_RULES, type DraftInput } from "./shared";
 
 /**
  * LinkedIn's hard cap on a connection-request note is 300 chars, but free-tier
@@ -98,12 +98,15 @@ export async function draftLinkedIn(
   model: LanguageModel = getModel()
 ): Promise<LinkedInDraft> {
   const block = leadBlock(input);
-  // Optional experiment strategy + recent-phrasing avoidance are appended after the block; both are
-  // empty by default, so the prompt is unchanged when neither applies. Grounding stays the BLOCK
-  // alone (neither adds facts), so the humanizer/anti-hallucination checks are identical.
+  // Optional experiment strategy + recent-phrasing avoidance + winning-opener exemplars are
+  // appended after the block; all are empty by default, so the prompt is unchanged when none
+  // applies. Grounding stays the BLOCK alone (none of them adds facts), so the humanizer /
+  // anti-hallucination checks are identical — an exemplar's old metric can never whitelist a
+  // new claim (Stage 0.5).
   const strat = strategyDirectives(input.context.strategy);
   const avoid = avoidBlock(input.context.avoidPhrases);
-  const basePrompt = [block, strat, avoid].filter(Boolean).join("\n\n");
+  const exemplars = exemplarBlock(input.context.winningExemplars);
+  const basePrompt = [block, strat, avoid, exemplars].filter(Boolean).join("\n\n");
   const { output, violations } = await generateHumanized(
     async (fixNote) => {
       const obj = (
