@@ -43,6 +43,14 @@ current approach on real outcomes.
 - **If it ever does harm** — more negative replies — a circuit breaker stops it immediately.
   A variant that gets more replies but angrier ones loses.
 
+## Vera remembers what wins
+
+Openers from your own account that earned interested replies become part of Vera's memory. When
+she drafts for a new prospect, she uses those winners as a guide for the angle and energy that
+works on your buyers — never copying them (every prospect gets a fresh message), and never
+borrowing their specific numbers or claims. This memory is yours alone: nothing from your
+messages is ever shared with any other account.
+
 ## You stay in charge
 
 - Every adoption shows in the panel with a **Revert to the previous approach** button — one

@@ -19,6 +19,11 @@ export function normalizeLinkedInUrl(url: string): string {
 
 function toDraftInput(lead: DraftableLead, ctx: CopyContext, strategy?: CopyStrategy): DraftInput | null {
   if (!lead.aiInsights) return null;
+  // Vera's positive memory (Stage 0.5): a winning opener must never also sit in the avoid list —
+  // "use as a guide" + "do not reuse" on the same string is a contradictory prompt. Exemplars win.
+  const winners = ctx.winningOpeners ?? [];
+  const winnerSet = new Set(winners.map((w) => w.trim().toLowerCase()));
+  const avoidPhrases = ctx.avoidPhrases.filter((p) => !winnerSet.has(p.trim().toLowerCase()));
   return {
     lead: {
       firstName: lead.firstName,
@@ -37,7 +42,8 @@ function toDraftInput(lead: DraftableLead, ctx: CopyContext, strategy?: CopyStra
         .filter((v): v is string => Boolean(v)),
       accountIndustry: ctx.account.industry,
       valueProp: ctx.account.websiteScan?.summary ?? null,
-      avoidPhrases: ctx.avoidPhrases,
+      avoidPhrases,
+      winningExemplars: winners,
       // Empty / absent → strategyDirectives("") → prompt unchanged from before the optimizer.
       strategy,
     },

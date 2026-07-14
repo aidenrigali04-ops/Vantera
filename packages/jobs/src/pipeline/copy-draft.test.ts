@@ -63,6 +63,7 @@ class FakeCopyStore implements CopyDraftStore {
       assets: [{ kind: "link", url: "https://acme.com/case-study", filename: null }],
       account: { industry: "devtools", websiteScan: null },
       avoidPhrases: [],
+      winningOpeners: [],
     };
   }
   async getCopyContext() {
@@ -415,5 +416,46 @@ describe("runCopyDraft — experiment plumbing (Phase 3)", () => {
     await runCopyDraft(PAYLOAD, deps);
     expect(inputs[0]!.context.strategy).toEqual({ openWith: "trigger" });
     expect(store.stamps).toEqual([{ leadId: "l1", experimentId: "exp1", variant: "champion" }]);
+  });
+});
+
+describe("runCopyDraft — Vera's winning-opener memory (Stage 0.5)", () => {
+  it("passes winning openers to the draft brain and filters them out of avoidPhrases", async () => {
+    const store = new FakeCopyStore();
+    store.leads = [lead("l1")];
+    store.context.winningOpeners = ["Saw your post on hiring SDRs"];
+    store.context.avoidPhrases = ["saw your post on hiring sdrs", "Congrats on the new role"];
+    const captured: DraftInput[] = [];
+    const deps: CopyDraftDeps = {
+      store,
+      draftLinkedInFn: async (input) => {
+        captured.push(input);
+        return { connectionNote: "note", followupMessage: "follow", violations: [] };
+      },
+    };
+
+    await runCopyDraft(PAYLOAD, deps);
+
+    // exemplars reach the brain; the same opener never appears in BOTH lists
+    // (guide-for-angle beats do-not-reuse — a contradictory prompt is worse than either)
+    expect(captured[0]?.context.winningExemplars).toEqual(["Saw your post on hiring SDRs"]);
+    expect(captured[0]?.context.avoidPhrases).toEqual(["Congrats on the new role"]);
+  });
+
+  it("is inert when there are no wins yet", async () => {
+    const store = new FakeCopyStore();
+    store.leads = [lead("l1")];
+    const captured: DraftInput[] = [];
+    const deps: CopyDraftDeps = {
+      store,
+      draftLinkedInFn: async (input) => {
+        captured.push(input);
+        return { connectionNote: "n", followupMessage: "f", violations: [] };
+      },
+    };
+
+    await runCopyDraft(PAYLOAD, deps);
+
+    expect(captured[0]?.context.winningExemplars ?? []).toEqual([]);
   });
 });

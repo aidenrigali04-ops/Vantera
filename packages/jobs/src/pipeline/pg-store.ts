@@ -186,6 +186,49 @@ async function recentSendOpeners(db: Db, accountId: string): Promise<string[]> {
   return out;
 }
 
+/**
+ * Vera's positive memory (Stage 0.5) — openers from THIS account that earned an interested reply,
+ * DERIVED at read time (no stored snapshot): leads with an interested reply, joined to each lead's
+ * earliest sent scheduled_send body, newest wins first. Same first-line/70-char clip as the avoid
+ * list so exemplars stay guides for angle, never full copy material. Per-account only (prospect-
+ * facing text never crosses tenants); prompt-only downstream (see exemplarBlock in agent-brains).
+ */
+const WINNING_OPENERS_LIMIT = 3;
+async function winningOpeners(db: Db, accountId: string): Promise<string[]> {
+  const rows = await db
+    .select({
+      leadId: scheduledSends.leadId,
+      body: scheduledSends.body,
+      sentOrder: scheduledSends.createdAt,
+      wonAt: replies.receivedAt,
+    })
+    .from(scheduledSends)
+    .innerJoin(replies, eq(replies.leadId, scheduledSends.leadId))
+    .where(
+      and(
+        eq(scheduledSends.accountId, accountId),
+        eq(scheduledSends.status, "sent"),
+        isNotNull(scheduledSends.body),
+        eq(replies.classification, "interested")
+      )
+    )
+    .orderBy(desc(replies.receivedAt), scheduledSends.createdAt)
+    .limit(40); // small scan window; reduced to ≤3 exemplars below
+  const seenLead = new Set<string>();
+  const seenOpener = new Set<string>();
+  const out: string[] = [];
+  for (const r of rows) {
+    if (!r.leadId || seenLead.has(r.leadId)) continue; // earliest send per lead (ordered asc within lead)
+    seenLead.add(r.leadId);
+    const opener = (r.body ?? "").split("\n")[0]!.slice(0, 70).trim();
+    if (opener.length < 12 || seenOpener.has(opener.toLowerCase())) continue;
+    seenOpener.add(opener.toLowerCase());
+    out.push(opener);
+    if (out.length >= WINNING_OPENERS_LIMIT) break;
+  }
+  return out;
+}
+
 /** The account's citable proof/pricing/FAQ facts (0046), oldest-sort first — fed into the responder
  *  grounding so the brain can answer "prove it / what's the price" truthfully (never in a first touch). */
 async function loadProofPoints(db: Db, accountId: string): Promise<ProofPoint[]> {
@@ -612,6 +655,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           websiteScan: account.websiteScan as CopyContext["account"]["websiteScan"],
         },
         avoidPhrases: await recentSendOpeners(db, agent.accountId),
+        winningOpeners: await winningOpeners(db, agent.accountId),
       };
     },
 

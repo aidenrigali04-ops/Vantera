@@ -272,6 +272,9 @@ export interface CopyContext {
   account: { industry: string | null; websiteScan: (WebsiteScan & { url?: string }) | null };
   /** recent sent openers — anti-template "do not reuse" list for the draft prompt (0044) */
   avoidPhrases: string[];
+  /** openers from THIS account that earned interested replies — Vera's positive memory,
+   *  injected as guide-for-angle exemplars (Stage 0.5). Derived at read time, never stored. */
+  winningOpeners: string[];
 }
 
 export interface DraftableLead {
