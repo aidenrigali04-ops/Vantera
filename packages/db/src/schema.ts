@@ -408,6 +408,9 @@ export const scheduledSends = pgTable(
     origin: text("origin", { enum: ["sequence", "reply_response", "manual"] })
       .notNull()
       .default("sequence"),
+    // 0049: message-level recipe attribution (Vera Stage 1) — the SendRecipe stamp written at
+    // draft time by the drafting pipelines. Null = pre-Stage-1 row or human-typed message.
+    recipe: jsonb("recipe"),
     scheduledFor: timestamp("scheduled_for", { withTimezone: true }),
     approvedBy: uuid("approved_by"),
     approvedAt: timestamp("approved_at", { withTimezone: true }),
