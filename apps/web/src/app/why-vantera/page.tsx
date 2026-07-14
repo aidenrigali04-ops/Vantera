@@ -81,7 +81,8 @@ export default function WhyVanteraPage() {
             A sequencer vs. Vantera
           </h2>
           <div className="mt-10 overflow-hidden rounded-2xl border border-[var(--hairline)] bg-white shadow-[var(--shadow-sm)]">
-            <div className="grid grid-cols-[1fr_1.4fr_1.4fr] border-b border-[var(--hairline)] bg-[var(--cyan-tint)]/30 px-6 py-4 text-[12px] font-semibold uppercase tracking-[0.14em] text-[var(--ink-3)]">
+            {/* Column headers — desktop only; mobile rows carry their own mini-labels. */}
+            <div className="hidden border-b border-[var(--hairline)] bg-[var(--cyan-tint)]/30 px-6 py-4 text-[12px] font-semibold uppercase tracking-[0.14em] text-[var(--ink-3)] sm:grid sm:grid-cols-[1fr_1.4fr_1.4fr]">
               <span />
               <span>A sequencer</span>
               <span className="text-[var(--cyan-strong)]">Vantera</span>
@@ -89,18 +90,28 @@ export default function WhyVanteraPage() {
             {COMPARISON.map((row, i) => (
               <div
                 key={row.dimension}
-                className={`grid grid-cols-[1fr_1.4fr_1.4fr] gap-x-4 px-6 py-5 ${
+                className={`grid grid-cols-1 gap-y-2.5 px-6 py-5 sm:grid-cols-[1fr_1.4fr_1.4fr] sm:gap-x-4 sm:gap-y-0 ${
                   i < COMPARISON.length - 1 ? "border-b border-[var(--hairline)]" : ""
                 }`}
               >
                 <span className="text-[14px] font-semibold text-foreground">{row.dimension}</span>
                 <span className="flex items-start gap-2 text-[14px] leading-relaxed text-[var(--ink-3)]">
                   <Minus className="mt-1 size-3.5 shrink-0 text-[var(--ink-3)]/50" />
-                  {row.sequencer}
+                  <span>
+                    <span className="mr-1 font-semibold text-[var(--ink-4)] sm:hidden">
+                      A sequencer:
+                    </span>
+                    {row.sequencer}
+                  </span>
                 </span>
                 <span className="flex items-start gap-2 text-[14px] leading-relaxed text-[var(--ink-3)]">
                   <Check className="mt-1 size-3.5 shrink-0 text-[var(--cyan-strong)]" />
-                  {row.vantera}
+                  <span>
+                    <span className="mr-1 font-semibold text-[var(--cyan-strong)] sm:hidden">
+                      Vantera:
+                    </span>
+                    {row.vantera}
+                  </span>
                 </span>
               </div>
             ))}

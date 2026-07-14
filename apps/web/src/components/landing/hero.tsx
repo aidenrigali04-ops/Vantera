@@ -58,7 +58,9 @@ export function Hero() {
           <div className="max-w-xl">
             {/* h1 is the LCP element: no opacity gate, painted in SSR so it renders at
                 first paint instead of waiting on hydration. */}
-            <h1 className="text-[2.9rem] font-semibold leading-[1.18] tracking-[-0.04em] text-foreground sm:text-[3.6rem] lg:text-[4rem]">
+            {/* Base size stepped down from 2.9rem: the nowrap "knows what works" pill must fit a
+                390px viewport; sm+ keeps the original scale. */}
+            <h1 className="text-[2.3rem] font-semibold leading-[1.18] tracking-[-0.04em] text-foreground sm:text-[3.6rem] lg:text-[4rem]">
               The{" "}
               <span className="whitespace-nowrap">
                 <span
