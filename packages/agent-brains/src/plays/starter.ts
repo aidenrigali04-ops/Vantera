@@ -21,8 +21,9 @@ export type StarterPlay = {
   description: string;
   /** why the play works, in user words */
   why: string;
-  /** the real engine configuration this play is — seeds the champion strategy */
-  strategy: Required<CopyStrategy>;
+  /** the real engine configuration this play is — seeds the champion strategy. All three enum
+   *  knobs are required; the open-ended openerAngle (Stage 1b) is generated later, never curated. */
+  strategy: Required<Pick<CopyStrategy, "openWith" | "followupLength" | "askStyle">>;
   /** an example first-touch opener in the product voice; must pass validateHumanity (≤200 chars) */
   exampleOpener: string;
   source: "first_party" | "research";

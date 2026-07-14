@@ -46,7 +46,7 @@ import type {
   LeadOutcomeFlags,
   ExperimentStatus,
 } from "@vantera/agent-brains";
-import { toStoredInsights, type LeadInsights, type ProofPoint, type WebsiteScan } from "@vantera/agent-brains";
+import { describeStrategy, toStoredInsights, type LeadInsights, type ProofPoint, type WebsiteScan } from "@vantera/agent-brains";
 import { resolveEntitlements, type EntitlementSnapshot } from "@vantera/billing";
 import type { ClosedDeal, CrmProvider } from "@vantera/crm-infra";
 import type { AccountDeletionStore } from "./account-deletion";
@@ -886,6 +886,77 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         negative: negative.has(l.id),
         booked: l.bookedAt != null,
         converted: l.status === "converted",
+      }));
+    },
+
+    async getStampedOutcomes() {
+      // Stage 1b collective prior: every SENT first-touch invite with a Stage-1 recipe stamp,
+      // across ALL accounts (service role) — aggregate patterns only (strategy knobs + outcome
+      // booleans). Message text and lead identity never leave this method.
+      const rows = await db
+        .select({
+          strategy: sql<CopyStrategy | null>`${scheduledSends.recipe} -> 'strategy'`,
+          leadId: scheduledSends.leadId,
+          invitedAt: leads.linkedinInvitedAt,
+          connectedAt: leads.linkedinConnectedAt,
+          bookedAt: leads.meetingBookedAt,
+          status: leads.status,
+        })
+        .from(scheduledSends)
+        .innerJoin(leads, eq(leads.id, scheduledSends.leadId))
+        .where(
+          and(
+            eq(scheduledSends.status, "sent"),
+            eq(scheduledSends.linkedinStage, "invite"),
+            sql`${scheduledSends.recipe} ->> 'brain' = 'first_touch'`
+          )
+        );
+      if (rows.length === 0) return [];
+      const ids = [...new Set(rows.map((r) => r.leadId).filter((v): v is string => Boolean(v)))];
+      const replyRows = ids.length
+        ? await db
+            .select({ leadId: replies.leadId, classification: replies.classification })
+            .from(replies)
+            .where(inArray(replies.leadId, ids))
+        : [];
+      const interested = new Set<string>();
+      const negative = new Set<string>();
+      for (const r of replyRows) {
+        if (r.classification === "interested") interested.add(r.leadId);
+        else if (r.classification === "not_interested" || r.classification === "unsubscribe")
+          negative.add(r.leadId);
+      }
+      return rows.map((r) => ({
+        strategy: (r.strategy ?? {}) as CopyStrategy,
+        flags: {
+          invited: r.invitedAt != null,
+          accepted: r.connectedAt != null,
+          interested: r.leadId ? interested.has(r.leadId) : false,
+          negative: r.leadId ? negative.has(r.leadId) : false,
+          booked: r.bookedAt != null,
+          converted: r.status === "converted",
+        },
+      }));
+    },
+
+    async getRecentConclusions(accountId, limit) {
+      const rows = await db
+        .select({
+          challengerStrategy: optimizationExperiments.challengerStrategy,
+          status: optimizationExperiments.status,
+        })
+        .from(optimizationExperiments)
+        .where(
+          and(
+            eq(optimizationExperiments.accountId, accountId),
+            inArray(optimizationExperiments.status, ["adopted", "discarded", "halted"])
+          )
+        )
+        .orderBy(desc(optimizationExperiments.concludedAt))
+        .limit(limit);
+      return rows.map((r) => ({
+        label: describeStrategy((r.challengerStrategy ?? {}) as CopyStrategy),
+        status: r.status,
       }));
     },
 

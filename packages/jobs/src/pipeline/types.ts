@@ -26,6 +26,7 @@ import type {
   ConversationTurn,
   CopyStrategy,
   FunnelStageKey,
+  GenerateRecipesInput,
   LeadOutcomeFlags,
   ExperimentStatus,
   SendRecipe,
@@ -386,10 +387,26 @@ export interface OptimizeStore {
    * live experiment (the one-live unique index) — the loop simply skips chaining then.
    */
   startExperiment(input: StartExperimentInput): Promise<boolean>;
+  /**
+   * Stage 1b collective prior: every SENT first-touch message with a Stage-1 recipe stamp,
+   * ACROSS accounts (service role) — strategy knobs + outcome booleans only, never text.
+   */
+  getStampedOutcomes(): Promise<{ strategy: CopyStrategy; flags: LeadOutcomeFlags }[]>;
+  /** recently concluded experiments for one account (label + status) — generation context so
+   *  the recipe generator doesn't re-propose already-tested ideas */
+  getRecentConclusions(accountId: string, limit: number): Promise<{ label: string; status: string }[]>;
 }
 
 export interface OptimizeDeps {
   store: OptimizeStore;
+  /**
+   * Stage 1b generate→gate: LLM-proposed candidates for the next challenger (knob-flip baseline
+   * always included by the brain). ABSENT ⇒ chaining is the deterministic knob-flip, exactly the
+   * pre-1b behavior — guarded by test.
+   */
+  proposeCandidatesFn?: (input: GenerateRecipesInput) => Promise<CopyStrategy[]>;
+  /** RNG for Thompson sampling (injectable for deterministic tests); defaults to Math.random */
+  rand?: () => number;
 }
 
 export interface OptimizeSummary {

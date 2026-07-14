@@ -1,5 +1,7 @@
 import {
   aggregateArm,
+  aggregateBySignature,
+  chooseChallenger,
   decideExperiment,
   nextExperimentStage,
   proposeNextChallenger,
@@ -16,11 +18,14 @@ import type { OptimizeDeps, OptimizeSummary, RunningExperiment } from "./types";
  * loop), and act on a decisive verdict:
  *   - a proven winner is ADOPTED on the spot (playbook champion ← challenger, version-bumped);
  *   - a loser is discarded, a harmful challenger is halted (both revert to the champion);
- *   - after ANY conclusion the loop CHAINS the next single-knob test on the rotated stage, so the
- *     account is always either testing or between tests for at most one cron tick.
- * Strategies remain the bounded CopyStrategy knobs; every draft still passes the humanizer. The
- * owner keeps a Revert control in the What's-working panel. Pure core; deps injected + the real
- * store wired in the thin trigger.
+ *   - after ANY conclusion the loop CHAINS the next test on the rotated stage, so the account is
+ *     always either testing or between tests for at most one cron tick. Stage 1b: the next
+ *     challenger comes from generate→gate→bandit (LLM candidates incl. the linted openerAngle
+ *     knob, Thompson-sampled against collective recipe aggregates) with the deterministic
+ *     knob-flip as the ever-present fallback.
+ * Strategies remain bounded CopyStrategy knobs (openerAngle is linted style-only); every draft
+ * still passes the humanizer. The owner keeps a Revert control in the What's-working panel.
+ * Pure core; deps injected + the real store wired in the thin trigger.
  */
 
 async function chainNext(
@@ -29,7 +34,21 @@ async function chainNext(
   champion: CopyStrategy
 ): Promise<boolean> {
   const stageKey = nextExperimentStage(exp.stageKey);
-  const challenger = proposeNextChallenger(stageKey, champion);
+  // Stage 1b: generate → gate → bandit. Without a generator the loop is byte-identical to the
+  // deterministic knob-flip it shipped with; with one, Thompson sampling over the collective
+  // recipe aggregates (Stage-1 stamps, cross-account, knobs + outcomes only) picks what to test
+  // next. The decide gate + circuit breaker stay the adjudicator of what actually wins.
+  let challenger: CopyStrategy | null = null;
+  if (deps.proposeCandidatesFn) {
+    const recentConclusions = await deps.store.getRecentConclusions(exp.accountId, 8);
+    const [candidates, stamped] = await Promise.all([
+      deps.proposeCandidatesFn({ stageKey, champion, recentConclusions }),
+      deps.store.getStampedOutcomes(),
+    ]);
+    const stats = aggregateBySignature(stageKey, stamped);
+    challenger = chooseChallenger(candidates, stats, deps.rand ?? Math.random);
+  }
+  challenger ??= proposeNextChallenger(stageKey, champion);
   if (!challenger) return false;
   return deps.store.startExperiment({ accountId: exp.accountId, stageKey, champion, challenger });
 }

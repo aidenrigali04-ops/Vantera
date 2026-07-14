@@ -24,6 +24,11 @@ class FakeOptimizeStore implements OptimizeStore {
   adoptedChampion: CopyStrategy = { followupLength: "tight" };
   /** simulate the one-live-experiment unique index */
   startConflicts = false;
+  // Stage 1b: collective aggregates + generation context
+  stampedOutcomes: { strategy: CopyStrategy; flags: LeadOutcomeFlags }[] = [];
+  conclusionsHistory: { label: string; status: string }[] = [];
+  stampedOutcomesCalls = 0;
+  recentConclusionsCalls = 0;
 
   async getRunningExperiments() {
     return this.experiments;
@@ -42,6 +47,14 @@ class FakeOptimizeStore implements OptimizeStore {
     if (this.startConflicts) return false;
     this.started.push(input);
     return true;
+  }
+  async getStampedOutcomes() {
+    this.stampedOutcomesCalls++;
+    return this.stampedOutcomes;
+  }
+  async getRecentConclusions() {
+    this.recentConclusionsCalls++;
+    return this.conclusionsHistory;
   }
 }
 
@@ -145,6 +158,66 @@ describe("runOptimize (decide pipeline — autonomous within the envelope, spec 
     expect(summary).toEqual({ evaluated: 1, concluded: 0, adopted: 0, chained: 0 });
     expect(store.concluded).toHaveLength(0);
     expect(store.started).toHaveLength(0);
+  });
+
+  // ── Stage 1b: generate → gate → bandit challenger chaining ────────────────
+  const winningArms = (store: FakeOptimizeStore) => {
+    store.experiments = [exp("e1")];
+    store.arms.set(
+      "e1:champion",
+      flags(100, { accepted: true }).map((f, i) => ({ ...f, interested: i < 20 }))
+    );
+    store.arms.set(
+      "e1:challenger",
+      flags(100, { accepted: true }).map((f, i) => ({ ...f, interested: i < 40 }))
+    );
+  };
+
+  it("without a generator, chains exactly the deterministic knob-flip (pre-1b behavior)", async () => {
+    const store = new FakeOptimizeStore();
+    winningArms(store);
+    await runOptimize({ store });
+    expect(store.started[0]?.challenger).toEqual({ askStyle: "specific" }); // booking flip vs {followupLength:"tight"} champion
+    expect(store.stampedOutcomesCalls).toBe(0);
+  });
+
+  it("with a generator, starts the bandit's choice — collective stats steer the pick", async () => {
+    const store = new FakeOptimizeStore();
+    winningArms(store);
+    const angleCandidate: CopyStrategy = { openerAngle: "a peer just solved this pain" };
+    // Collective aggregates massively favor the angle candidate on the booking stage
+    store.stampedOutcomes = [
+      ...Array.from({ length: 150 }, () => ({
+        strategy: angleCandidate,
+        flags: { invited: true, accepted: true, interested: true, negative: false, booked: true, converted: false },
+      })),
+      ...Array.from({ length: 150 }, () => ({
+        strategy: { askStyle: "specific" as const },
+        flags: { invited: true, accepted: true, interested: true, negative: false, booked: false, converted: false },
+      })),
+    ];
+    let seed = 123456789;
+    const rand = () => ((seed = (seed * 1664525 + 1013904223) >>> 0), seed / 2 ** 32);
+    const summary = await runOptimize({
+      store,
+      proposeCandidatesFn: async (input) => {
+        expect(input.stageKey).toBe("booking"); // rotated from reply
+        expect(input.champion).toEqual(store.adoptedChampion);
+        return [{ askStyle: "specific" }, angleCandidate];
+      },
+      rand,
+    });
+    expect(summary.chained).toBe(1);
+    expect(store.started[0]?.challenger).toEqual(angleCandidate);
+    expect(store.stampedOutcomesCalls).toBe(1);
+    expect(store.recentConclusionsCalls).toBe(1);
+  });
+
+  it("falls back to the knob-flip when generation returns no candidates", async () => {
+    const store = new FakeOptimizeStore();
+    winningArms(store);
+    await runOptimize({ store, proposeCandidatesFn: async () => [], rand: () => 0.5 });
+    expect(store.started[0]?.challenger).toEqual({ askStyle: "specific" });
   });
 
   it("tolerates a chain-start conflict (another experiment already live) without throwing", async () => {
