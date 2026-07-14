@@ -32,6 +32,55 @@ export function proposeChallengerStrategy(stageKey: FunnelStageKey): CopyStrateg
   }
 }
 
+/** The single knob each copy-tunable stage tests. */
+const STAGE_KNOB = {
+  acceptance: "openWith",
+  reply: "followupLength",
+  booking: "askStyle",
+} as const;
+
+/**
+ * Each knob's two values, ordered so the FIRST value is what an empty champion gets — matching
+ * the classic proposeChallengerStrategy defaults (trigger / tight / specific) exactly.
+ */
+const KNOB_VALUES = {
+  openWith: ["trigger", "pain"],
+  followupLength: ["tight", "standard"],
+  askStyle: ["specific", "soft"],
+} as const;
+
+/**
+ * The next single-knob challenger for a stage — always different from the champion's current
+ * setting on that stage's knob, so the autonomous loop keeps finding a real test after every
+ * adoption instead of re-running the variant it just adopted (spec 2026-07-14). Null for `close`
+ * (a sales-conversation gap, not a copy lever). Pure.
+ */
+export function proposeNextChallenger(
+  stageKey: FunnelStageKey,
+  champion: CopyStrategy
+): CopyStrategy | null {
+  if (stageKey === "close") return null;
+  const knob = STAGE_KNOB[stageKey];
+  const [first, second] = KNOB_VALUES[knob];
+  const next = champion[knob] === first ? second : first;
+  return { [knob]: next } as CopyStrategy;
+}
+
+/**
+ * Stage rotation for the autonomous loop: after any conclusion, the next test moves to the next
+ * copy-tunable stage, so the loop cycles opener → follow-up → ask instead of camping on one knob.
+ */
+export function nextExperimentStage(prev: FunnelStageKey): "acceptance" | "reply" | "booking" {
+  switch (prev) {
+    case "acceptance":
+      return "reply";
+    case "reply":
+      return "booking";
+    default:
+      return "acceptance";
+  }
+}
+
 const KNOB_LABEL: Record<string, string> = {
   "openWith:trigger": "lead with the prospect's trigger",
   "openWith:pain": "lead with the prospect's pain",

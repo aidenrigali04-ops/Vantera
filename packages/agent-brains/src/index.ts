@@ -118,6 +118,8 @@ export {
 } from "./optimize/decide";
 export {
   proposeChallengerStrategy,
+  proposeNextChallenger,
+  nextExperimentStage,
   describeStrategy,
   isTerminalStatus,
   type ExperimentStatus,
