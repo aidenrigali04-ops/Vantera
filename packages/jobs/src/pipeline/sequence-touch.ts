@@ -1,4 +1,4 @@
-import { describeViolations } from "@vantera/agent-brains";
+import { describeViolations, buildSendRecipe } from "@vantera/agent-brains";
 import { normalizeLinkedInUrl } from "./copy-draft";
 import { MAX_AGENT_TURNS } from "./inbound";
 import { needsRefresh, FRESHNESS_WINDOW_DAYS } from "./freshness";
@@ -120,6 +120,12 @@ export async function runSequenceTouch(
     status,
     linkedinStage: "message",
     styleFlags,
+    // Stage 1: proactive follow-ups carry the lead's arm so message-level attribution is complete.
+    recipe: buildSendRecipe({
+      brain: "sequence_followup",
+      experimentId: bundle.attribution.experimentId,
+      variant: bundle.attribution.variant,
+    }),
   };
   await deps.store.insertScheduledSend(send);
   return "drafted";

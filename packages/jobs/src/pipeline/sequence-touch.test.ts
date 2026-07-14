@@ -37,6 +37,7 @@ const bundle = (over: Partial<ResponderBundle> = {}): ResponderBundle => ({
   newestUnsentMessageCreatedAt: null,
   lastAgentMessageAt: null,
   humanHandled: false,
+  attribution: { experimentId: null, variant: null },
   ...over,
 });
 
@@ -104,6 +105,29 @@ describe("runSequenceTouch", () => {
     await runSequenceTouch(dispatch, d);
     expect(captured?.thread).toEqual([{ role: "agent", text: "Thanks for connecting, Sam." }]);
     expect(captured?.incoming).toBeUndefined();
+  });
+
+  it("stamps the proactive follow-up with a sequence_followup recipe carrying the lead's arm (Stage 1)", async () => {
+    const insert = vi.fn(async () => {});
+    const d = deps({
+      getResponderBundle: async () =>
+        bundle({ attribution: { experimentId: "exp-3", variant: "challenger" } }),
+      insertScheduledSend: insert,
+    });
+    await runSequenceTouch(dispatch, d);
+    expect(insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        recipe: {
+          v: 1,
+          brain: "sequence_followup",
+          strategy: {},
+          experimentId: "exp-3",
+          variant: "challenger",
+          playbookVersion: null,
+          exemplars: 0,
+        },
+      })
+    );
   });
 
   it("queues for review when the agent is in review mode", async () => {

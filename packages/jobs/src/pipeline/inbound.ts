@@ -1,4 +1,4 @@
-import { describeViolations, type ReplyVerdict } from "@vantera/agent-brains";
+import { describeViolations, buildSendRecipe, type ReplyVerdict } from "@vantera/agent-brains";
 import { normalizeLinkedInUrl } from "./copy-draft";
 import type { InboundDeps, InboundPayload, InboundStore, InboundSummary } from "./types";
 
@@ -149,6 +149,12 @@ async function maybeRespond(
     linkedinStage: "message",
     origin: "reply_response", // rides the dispatch speed-to-lead lane (0044)
     styleFlags: clean ? null : describeViolations(reply.violations),
+    // Stage 1: conversation replies carry the lead's arm so message-level attribution is complete.
+    recipe: buildSendRecipe({
+      brain: "conversation_reply",
+      experimentId: bundle.attribution.experimentId,
+      variant: bundle.attribution.variant,
+    }),
   });
   return true;
 }

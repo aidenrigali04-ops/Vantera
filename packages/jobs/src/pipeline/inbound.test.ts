@@ -491,6 +491,7 @@ describe("runInbound — active responder (converse to close)", () => {
     newestUnsentMessageCreatedAt: null,
     lastAgentMessageAt: null,
     humanHandled: false,
+    attribution: { experimentId: null, variant: null },
     ...over,
   });
 
@@ -529,6 +530,27 @@ describe("runInbound — active responder (converse to close)", () => {
       styleFlags: null,
     });
     expect(store.canceledSends).toContain("lead1"); // contextual reply replaces the scripted touch
+  });
+
+  it("stamps the contextual reply with a conversation_reply recipe carrying the lead's arm (Stage 1)", async () => {
+    const store = storeWithBundle(
+      bundle({ attribution: { experimentId: "exp-9", variant: "champion" } })
+    );
+
+    await runInbound(
+      { source: "linkedin", payload: LINKEDIN_REPLY_FIXTURE },
+      deps(store, { classifyFn: classify("interested"), respondFn: respond() })
+    );
+
+    expect(store.scheduledSends[0]!.recipe).toEqual({
+      v: 1,
+      brain: "conversation_reply",
+      strategy: {},
+      experimentId: "exp-9",
+      variant: "champion",
+      playbookVersion: null,
+      exemplars: 0,
+    });
   });
 
   it("queues for review (pending_review) when the agent is in review mode", async () => {

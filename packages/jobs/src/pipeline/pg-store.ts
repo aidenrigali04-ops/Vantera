@@ -1687,6 +1687,10 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         newestUnsentMessageCreatedAt: pending?.createdAt ?? null,
         lastAgentMessageAt,
         humanHandled: paused !== undefined,
+        attribution: {
+          experimentId: lead.experimentId ?? null,
+          variant: (lead.strategyVariant as "champion" | "challenger" | null) ?? null,
+        },
       };
     },
 

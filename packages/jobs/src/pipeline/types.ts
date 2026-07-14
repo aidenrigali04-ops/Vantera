@@ -729,6 +729,9 @@ export interface ResponderBundle {
    *  responder and proactive touches stand down: once a person is driving the conversation, the
    *  agent never messages on top of them until the user resumes automation. */
   humanHandled: boolean;
+  /** the lead's experiment-arm stamp (0040, lead-level) — carried onto every conversation
+   *  send's recipe so message-level attribution never loses the arm (Stage 1) */
+  attribution: { experimentId: string | null; variant: "champion" | "challenger" | null };
 }
 
 export interface InboundDeps {
