@@ -47,7 +47,7 @@ class FakeCopyStore implements CopyDraftStore {
   linkedInCallKinds: ("pair" | "single")[] = [];
   // Phase 3 experiment plumbing — default to inert (no experiment, empty champion).
   activeExperiment: ActiveExperiment | null = null;
-  championStrategy: CopyStrategy = {};
+  champion: { strategy: CopyStrategy; version: number | null } = { strategy: {}, version: null };
   stamps: { leadId: string; experimentId: string; variant: string }[] = [];
 
   constructor(channels = { linkedin: true }, sendMode: "review" | "automatic" = "review") {
@@ -99,8 +99,8 @@ class FakeCopyStore implements CopyDraftStore {
   async getActiveExperiment() {
     return this.activeExperiment;
   }
-  async getChampionStrategy() {
-    return this.championStrategy;
+  async getChampion() {
+    return this.champion;
   }
   async stampLeadExperiment(
     leadId: string,
@@ -406,7 +406,7 @@ describe("runCopyDraft — experiment plumbing (Phase 3)", () => {
   it("active experiment at 0%: the adopted champion strategy is applied and the lead is stamped champion", async () => {
     const store = new FakeCopyStore();
     store.leads = [lead("l1")];
-    store.championStrategy = { openWith: "trigger" };
+    store.champion = { strategy: { openWith: "trigger" }, version: 1 };
     store.activeExperiment = {
       id: "exp1",
       allocationPct: 0,
@@ -416,6 +416,50 @@ describe("runCopyDraft — experiment plumbing (Phase 3)", () => {
     await runCopyDraft(PAYLOAD, deps);
     expect(inputs[0]!.context.strategy).toEqual({ openWith: "trigger" });
     expect(store.stamps).toEqual([{ leadId: "l1", experimentId: "exp1", variant: "champion" }]);
+  });
+});
+
+// ── Stage 1: message-level recipe attribution ────────────────────────────────
+describe("runCopyDraft — recipe stamp (Stage 1)", () => {
+  it("stamps both rows of the pair with the first-touch recipe (challenger arm)", async () => {
+    const store = new FakeCopyStore();
+    store.leads = [lead("l1")];
+    store.champion = { strategy: { openWith: "trigger" }, version: 2 };
+    store.context.winningOpeners = ["Saw the Series B announcement"];
+    store.activeExperiment = {
+      id: "exp-1",
+      allocationPct: 100,
+      challengerStrategy: { openWith: "pain" },
+    };
+    await runCopyDraft(PAYLOAD, makeDeps(store));
+    expect(store.sends).toHaveLength(2);
+    for (const row of store.sends) {
+      expect(row.recipe).toEqual({
+        v: 1,
+        brain: "first_touch",
+        strategy: { openWith: "pain" },
+        experimentId: "exp-1",
+        variant: "challenger",
+        playbookVersion: 2,
+        exemplars: 1,
+      });
+    }
+  });
+
+  it("stamps a champion recipe with null experiment when nothing is running", async () => {
+    const store = new FakeCopyStore();
+    store.leads = [lead("l1")];
+    await runCopyDraft(PAYLOAD, makeDeps(store));
+    expect(store.sends).toHaveLength(2);
+    expect(store.sends[0]!.recipe).toEqual({
+      v: 1,
+      brain: "first_touch",
+      strategy: {},
+      experimentId: null,
+      variant: null,
+      playbookVersion: null,
+      exemplars: 0,
+    });
   });
 });
 

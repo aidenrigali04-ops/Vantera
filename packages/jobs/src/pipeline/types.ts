@@ -28,6 +28,7 @@ import type {
   FunnelStageKey,
   LeadOutcomeFlags,
   ExperimentStatus,
+  SendRecipe,
 } from "@vantera/agent-brains";
 import type { OutreachCapacity } from "./capacity";
 import type { SenderCandidate } from "./sender-assignment";
@@ -307,6 +308,8 @@ export interface NewScheduledSend {
    *  omitted = 'sequence' (full pacing + send windows) */
   origin?: "sequence" | "reply_response" | "manual";
   styleFlags: string | null;
+  /** message-level recipe stamp (Stage 1) — null/omitted only for human-typed sends */
+  recipe?: SendRecipe | null;
 }
 
 export interface CopyDraftStore {
@@ -329,8 +332,8 @@ export interface CopyDraftStore {
   // ── self-optimizing loop (Phase 3), inert when no experiment/playbook exists ──
   /** the account's running experiment, or null; loaded once per run */
   getActiveExperiment(accountId: string): Promise<ActiveExperiment | null>;
-  /** the account's adopted champion copy strategy; {} (no directives = pre-optimizer) when none */
-  getChampionStrategy(accountId: string): Promise<CopyStrategy>;
+  /** the account's adopted champion strategy + playbook version; {strategy:{}, version:null} when none */
+  getChampion(accountId: string): Promise<{ strategy: CopyStrategy; version: number | null }>;
   /** attribute a lead's outreach to its experiment arm (service-role write) */
   stampLeadExperiment(
     leadId: string,

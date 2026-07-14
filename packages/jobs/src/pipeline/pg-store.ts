@@ -152,6 +152,7 @@ function toRow(send: NewScheduledSend) {
     linkedinStage: send.linkedinStage,
     origin: send.origin ?? "sequence",
     styleFlags: send.styleFlags,
+    recipe: send.recipe ?? null,
   };
 }
 
@@ -810,13 +811,19 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
       };
     },
 
-    async getChampionStrategy(accountId) {
+    async getChampion(accountId) {
       const [row] = await db
-        .select({ championStrategy: optimizationPlaybook.championStrategy })
+        .select({
+          championStrategy: optimizationPlaybook.championStrategy,
+          version: optimizationPlaybook.version,
+        })
         .from(optimizationPlaybook)
         .where(eq(optimizationPlaybook.accountId, accountId))
         .limit(1);
-      return (row?.championStrategy ?? {}) as CopyStrategy;
+      return {
+        strategy: (row?.championStrategy ?? {}) as CopyStrategy,
+        version: row?.version ?? null,
+      };
     },
 
     async stampLeadExperiment(leadId, experimentId, variant) {

@@ -1,4 +1,4 @@
-import { describeViolations, assignVariant } from "@vantera/agent-brains";
+import { describeViolations, assignVariant, buildSendRecipe } from "@vantera/agent-brains";
 import type { DraftInput, CopyStrategy } from "@vantera/agent-brains";
 import type {
   CopyDraftDeps,
@@ -86,7 +86,7 @@ export async function runCopyDraft(
   // strategy once. Inert by default — no experiment + an empty playbook means every lead resolves to
   // {} (no strategy directives), so drafting is identical to before the optimizer existed.
   const experiment = await deps.store.getActiveExperiment(accountId);
-  const champion = await deps.store.getChampionStrategy(accountId);
+  const champion = await deps.store.getChampion(accountId);
 
   const leads = await deps.store.getDraftableLeads(accountId, payload.leadIds);
   // Idempotency: a retried run (Trigger maxAttempts) must never re-draft a lead that already
@@ -103,7 +103,7 @@ export async function runCopyDraft(
     if (alreadyDrafted.has(lead.id)) return ZERO;
     // Deterministic, sticky per-lead arm assignment; strategy is the challenger's or the champion.
     const variant = experiment ? assignVariant(experiment, lead.id) : null;
-    const strategy = variant === "challenger" ? experiment!.challengerStrategy : champion;
+    const strategy = variant === "challenger" ? experiment!.challengerStrategy : champion.strategy;
     const input = toDraftInput(lead, ctx, strategy);
     if (!input) return { drafted: 0, suppressed: 0, skipped: 1 };
     await deps.store.ensureCampaignLead(campaignId, lead.id, accountId);
@@ -126,6 +126,15 @@ export async function runCopyDraft(
         }
         const status = draftStatus(ctx.agent.sendMode, draft.violations);
         const flags = draft.violations.length > 0 ? describeViolations(draft.violations) : null;
+        // Stage 1: stamp the pair with the recipe that produced it — outcomes join back to this.
+        const recipe = buildSendRecipe({
+          brain: "first_touch",
+          strategy,
+          experimentId: experiment?.id ?? null,
+          variant,
+          playbookVersion: champion.version,
+          exemplars: (ctx.winningOpeners ?? []).length,
+        });
         const common = {
           accountId,
           campaignId,
@@ -134,6 +143,7 @@ export async function runCopyDraft(
           subject: null,
           status,
           styleFlags: flags,
+          recipe,
         };
         await deps.store.insertLinkedInSendPair(
           { ...common, linkedinStage: "invite", body: draft.connectionNote },
