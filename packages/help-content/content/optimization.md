@@ -43,6 +43,14 @@ current approach on real outcomes.
 - **If it ever does harm** — more negative replies — a circuit breaker stops it immediately.
   A variant that gets more replies but angrier ones loses.
 
+## Every message keeps its receipt
+
+Every message Vera drafts is stamped with the exact approach used to write it — which opener
+style, which test it belonged to, which version of your playbook. When a change is adopted,
+the panel shows the real numbers behind it: how many messages have gone out under the new
+approach and how many earned an interested reply. The numbers are always your real results —
+never estimates, and never shown before at least one message has actually been sent.
+
 ## Vera remembers what wins
 
 Openers from your own account that earned interested replies become part of Vera's memory. When
