@@ -1,7 +1,14 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { scanWebsite, deriveIntentWatchlist, type WebsiteScan } from "@vantera/agent-brains";
+import {
+  scanWebsite,
+  deriveIntentWatchlist,
+  matchStarterPlays,
+  proposeNextChallenger,
+  type WebsiteScan,
+} from "@vantera/agent-brains";
+import { playCards, type PlayCard } from "@/lib/plays";
 import { createClient } from "@/lib/supabase/server";
 import { validatePersonalize, validateConfirmation } from "@/lib/validation";
 import { loadBillingRow, hasActivePlan, gate } from "@/lib/billing/entitlement";
@@ -17,6 +24,8 @@ export type PersonalizeState = {
   scanned?: boolean;
   /** the derived positioning, returned so the analysis tracker can pay off live */
   scan?: { headline: string; suggested_icp: string; scope_of_industry: string };
+  /** Vera's matched starter plays for the derived buyer — the proven-play payoff (Stage 0) */
+  plays?: PlayCard[];
 };
 export type FindLeadsState = { error?: string };
 
@@ -97,6 +106,7 @@ export async function savePersonalize(
           suggested_icp: scan.suggested_icp,
           scope_of_industry: scan.scope_of_industry,
         },
+        plays: playCards({ industry: scan.scope_of_industry, icp: scan.suggested_icp }),
       };
     } catch (err) {
       console.error("onboarding website scan failed", err);
@@ -259,6 +269,43 @@ export async function findFirstLeads(
       deployed_at: new Date().toISOString(),
       created_by: user.id,
     });
+  }
+
+  // ── Vera's playbook (Stage 0, spec 2026-07-14) — seed the matched starter play as the
+  //    champion strategy and start the first live test, so every new account runs a proven
+  //    play with an experiment testing improvements from day one. Best-effort: never blocks
+  //    onboarding; the one-live-experiment index makes a duplicate start a caught no-op. ──
+  try {
+    const [play] = matchStarterPlays({ industry: result.values.industry, icp: result.values.icp });
+    if (play) {
+      const { data: existingPb } = await supabase
+        .from("optimization_playbook")
+        .select("account_id")
+        .eq("account_id", account.id)
+        .maybeSingle<{ account_id: string }>();
+      if (!existingPb) {
+        await supabase.from("optimization_playbook").insert({
+          account_id: account.id,
+          champion_strategy: play.strategy,
+          version: 1,
+        });
+      }
+      const challenger = proposeNextChallenger("acceptance", play.strategy);
+      if (challenger) {
+        await supabase.from("optimization_experiments").insert({
+          account_id: account.id,
+          stage_key: "acceptance",
+          champion_strategy: play.strategy,
+          challenger_strategy: challenger,
+          allocation_pct: 25,
+          min_sample: 30,
+          status: "running",
+          created_by: user.id,
+        });
+      }
+    }
+  } catch (err) {
+    console.error("find-first-leads: playbook seeding failed (non-blocking)", err);
   }
 
   // ── Intent (best-effort) — auto-derived watchlist; never blocks the first pull ──

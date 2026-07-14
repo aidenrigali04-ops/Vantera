@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import type { WebsiteScan } from "@vantera/agent-brains";
 import { createClient } from "@/lib/supabase/server";
 import { reconcileLinkedInAccounts } from "@/lib/linkedin/sync";
+import { playCards } from "@/lib/plays";
 import { Wizard, type WizardInit } from "./wizard";
 
 type AccountRow = {
@@ -67,19 +68,24 @@ export default async function OnboardingPage({
   const initialStep = !personalizeDone ? 0 : !connected ? 1 : 2;
   const scan = account?.website_scan ?? null;
 
+  // Confirmation values: prefer what they already saved, else the derived suggestions from the scan.
+  const industry = account?.onboarding_industry ?? scan?.scope_of_industry ?? "";
+  const icp = account?.onboarding_icp ?? scan?.suggested_icp ?? "";
+
   const init: WizardInit = {
     initialStep,
     connected,
     connectFailed: connectedParam === "failed",
     scan: scan ? { headline: scan.headline ?? "", summary: scan.summary ?? "" } : null,
+    // Vera's matched starter plays for this buyer (server-computed, honest source labels).
+    plays: playCards({ industry, icp }),
     values: {
       companyName: account?.name ?? metaCompany,
       role: account?.onboarding_role ?? "",
       websiteUrl: account?.website_url ?? metaSite,
       linkedinUrl: account?.onboarding_linkedin_url ?? "",
-      // Confirmation: prefer what they already saved, else the derived suggestions from the scan.
-      industry: account?.onboarding_industry ?? scan?.scope_of_industry ?? "",
-      icp: account?.onboarding_icp ?? scan?.suggested_icp ?? "",
+      industry,
+      icp,
       revenueGoal: centsToDollars(account?.revenue_goal_cents ?? null),
       avgDealValue: centsToDollars(account?.avg_deal_value_cents ?? null),
     },

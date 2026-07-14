@@ -11,6 +11,7 @@ import {
   type FindLeadsState,
   type PersonalizeState,
 } from "./actions";
+import type { PlayCard } from "@/lib/plays";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FormError } from "@/components/form-error";
@@ -22,6 +23,8 @@ export type WizardInit = {
   connected: boolean;
   connectFailed: boolean;
   scan: { headline: string; summary: string } | null;
+  /** Vera's matched starter plays (server-computed, honest source labels) */
+  plays: PlayCard[];
   values: {
     companyName: string;
     role: string;
@@ -97,6 +100,7 @@ export function Wizard({ init }: { init: WizardInit }) {
   const [step, setStep] = useState(init.initialStep);
   const [values, setValues] = useState(init.values);
   const [scanHeadline, setScanHeadline] = useState(init.scan?.headline ?? "");
+  const [plays, setPlays] = useState<PlayCard[]>(init.plays);
 
   const [findState, findAction, finding] = useActionState<FindLeadsState, FormData>(findFirstLeads, {});
   const [connecting, startConnect] = useTransition();
@@ -173,6 +177,7 @@ export function Wizard({ init }: { init: WizardInit }) {
           icp: v.icp || scan.suggested_icp,
         }));
       }
+      if (res.plays?.length) setPlays(res.plays);
       setStageIdx(4);
       setAnalysis((a) => (a ? { ...a, done: true, scan } : a));
     });
@@ -236,7 +241,7 @@ export function Wizard({ init }: { init: WizardInit }) {
                   {/* ── Step 0: Personalize — form, or the live analysis tracker while it runs ── */}
                   {step === 0 && analysis && (
                     <motion.div key="analysis" initial="hidden" animate="visible" exit="exit" variants={contentVariants}>
-                      <AnalysisTracker analysis={analysis} stageIdx={stageIdx} />
+                      <AnalysisTracker analysis={analysis} stageIdx={stageIdx} plays={plays} />
                     </motion.div>
                   )}
 
@@ -309,8 +314,8 @@ export function Wizard({ init }: { init: WizardInit }) {
                         </h2>
                         <p className="mt-2 text-[14px] leading-relaxed text-[var(--ink-3)]">
                           {init.connected
-                            ? "You're activated — your agents can now reach buyers from your own LinkedIn, and nothing sends until you approve it."
-                            : "This is the step that turns your agents on. They run outreach from your own LinkedIn — securely, through our partner's hosted login."}
+                            ? "You're activated — Vera can now reach buyers from your own LinkedIn, and nothing sends until you approve it."
+                            : "This is the step that turns Vera loose. She runs outreach from your own LinkedIn — securely, through our partner's hosted login."}
                         </p>
                       </div>
                       <div className="space-y-4 px-8 pt-4 pb-8">
@@ -323,16 +328,31 @@ export function Wizard({ init }: { init: WizardInit }) {
                           </div>
                         ) : (
                           <>
-                            {/* value-before-friction: tie the ask to the buyer the scan already found */}
+                            {/* value-before-friction (Stage 0): show the proven plays BEFORE the ask, so
+                                connecting stops being a blind permission grant and becomes "turn on the
+                                thing I've already seen work". Honest source labels, never network claims. */}
                             {values.icp && (
                               <div className="rounded-xl bg-[var(--cyan-tint)] px-4 py-3">
                                 <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-[var(--cyan-strong)]">
-                                  We found your buyer
+                                  Vera is ready
                                 </p>
                                 <p className="mt-1 text-[13.5px] leading-snug text-foreground">
-                                  <span className="font-medium">{values.icp}</span> — connect LinkedIn to let your
-                                  agents start reaching them.
+                                  Here are the plays she&apos;ll run for{" "}
+                                  <span className="font-medium">{values.icp}</span> — connect LinkedIn to turn
+                                  them on.
                                 </p>
+                                {plays.length > 0 && (
+                                  <ul className="mt-2.5 space-y-1.5 border-t border-[rgba(11,87,171,0.16)] pt-2.5">
+                                    {plays.map((p) => (
+                                      <li key={p.slug} className="flex items-baseline justify-between gap-3">
+                                        <span className="text-[12.5px] font-medium text-foreground">{p.name}</span>
+                                        <span className="shrink-0 text-[10.5px] text-[var(--ink-4)]">
+                                          {p.sourceLabel}
+                                        </span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                )}
                               </div>
                             )}
                             {/* defuse the category's #1 fear ("will this get my account restricted?") at the button */}
@@ -435,8 +455,9 @@ export function Wizard({ init }: { init: WizardInit }) {
                         </div>
                         <FormError message={findState.error} />
                         <p className="rounded-xl bg-[var(--tint)] px-4 py-3 text-[12.5px] leading-relaxed text-[var(--ink-3)]">
-                          This is the last step — it deploys your Prospect, Outreach, and Intent agents.
-                          They start working within ~15 minutes, and nothing sends without your approval.
+                          This is the last step — it puts Vera to work: your Prospect, Outreach, and Intent
+                          agents deploy, starting on proven plays and getting sharper from your results.
+                          They start within ~15 minutes, and nothing sends without your approval.
                         </p>
                       </div>
                       <div className="flex items-center justify-between border-t border-[var(--hairline)] px-8 py-5">
@@ -445,7 +466,7 @@ export function Wizard({ init }: { init: WizardInit }) {
                         </button>
                         <button type="submit" disabled={finding} className={DARK_BTN}>
                           {finding ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
-                          {finding ? "Deploying your agents…" : "Find my first leads"}
+                          {finding ? "Vera is going to work…" : "Put Vera to work"}
                         </button>
                       </div>
                     </motion.form>
@@ -543,9 +564,9 @@ function PipelineRail({ current, working }: { current: number; working: boolean 
         {/* the payoff the pipeline points at */}
         <div className="mt-9 rounded-2xl border border-[var(--hairline)] bg-white px-5 py-4 shadow-[var(--shadow-card)]">
           <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--cyan-strong)]">Then</p>
-          <p className="mt-1.5 text-[14px] font-medium text-foreground">Your first leads land</p>
+          <p className="mt-1.5 text-[14px] font-medium text-foreground">Vera goes to work</p>
           <p className="mt-1 text-[12.5px] leading-relaxed text-[var(--ink-3)]">
-            Your agents start sourcing within ~15 minutes — you approve everything they send.
+            She starts sourcing within ~15 minutes on proven plays — you approve everything she sends.
           </p>
         </div>
       </div>
@@ -567,7 +588,15 @@ function PipelineRail({ current, working }: { current: number; working: boolean 
 
 /* ── The live analysis tracker — top-to-bottom stages while the real scan runs ── */
 
-function AnalysisTracker({ analysis, stageIdx }: { analysis: Analysis; stageIdx: number }) {
+function AnalysisTracker({
+  analysis,
+  stageIdx,
+  plays,
+}: {
+  analysis: Analysis;
+  stageIdx: number;
+  plays: PlayCard[];
+}) {
   const stages = analysisStages(analysis.domain);
   return (
     <div>
@@ -649,6 +678,19 @@ function AnalysisTracker({ analysis, stageIdx }: { analysis: Analysis; stageIdx:
             <p className="mt-1.5 text-[12.5px] text-[var(--ink-3)]">
               Best-fit buyer: <span className="font-medium text-foreground">{analysis.scan.suggested_icp}</span>
             </p>
+            {/* The proven-play payoff (Stage 0): show competence BEFORE any ask — Vera already
+                has an opening that works for this buyer, honestly sourced. */}
+            {plays[0] && (
+              <div className="mt-3 border-t border-[rgba(11,87,171,0.16)] pt-3">
+                <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--cyan-strong)]">
+                  Your first play
+                </p>
+                <p className="mt-1 text-[13px] leading-snug text-foreground">
+                  <span className="font-medium">{plays[0].name}</span> — {plays[0].description}
+                </p>
+                <p className="mt-1 text-[11.5px] text-[var(--ink-4)]">{plays[0].sourceLabel}</p>
+              </div>
+            )}
           </motion.div>
         )}
         {analysis.done && !analysis.scan && (
