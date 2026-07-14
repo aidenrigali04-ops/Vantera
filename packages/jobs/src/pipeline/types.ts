@@ -343,12 +343,23 @@ export interface ActiveExperiment {
   challengerStrategy: CopyStrategy;
 }
 
-// ── OptimizeStore: the decide pipeline (Phase 3), suggest-only ────────────────
+// ── OptimizeStore: the decide pipeline (Phase 3 → autonomous, spec 2026-07-14) ─
 /** A running experiment as the decide pipeline needs it. */
 export interface RunningExperiment {
   id: string;
+  accountId: string;
   stageKey: FunnelStageKey;
   minSample: number;
+  /** the champion strategy this experiment tested against (jsonb on the row) */
+  championStrategy: CopyStrategy;
+}
+
+/** A new experiment the autonomous loop chains after a conclusion. */
+export interface StartExperimentInput {
+  accountId: string;
+  stageKey: FunnelStageKey;
+  champion: CopyStrategy;
+  challenger: CopyStrategy;
 }
 
 export interface OptimizeStore {
@@ -356,8 +367,19 @@ export interface OptimizeStore {
   getRunningExperiments(): Promise<RunningExperiment[]>;
   /** per-lead outcome flags for one arm of an experiment */
   getArmFlags(experimentId: string, variant: "champion" | "challenger"): Promise<LeadOutcomeFlags[]>;
-  /** conclude an experiment (ready_to_adopt / discarded / halted) with the decision reason */
+  /** conclude an experiment (discarded / halted) with the decision reason */
   concludeExperiment(id: string, status: ExperimentStatus, reason: string): Promise<void>;
+  /**
+   * Adopt a proven challenger autonomously: playbook champion ← challenger_strategy
+   * (version-bumped), experiment → 'adopted' with the decision reason. Returns the NEW
+   * champion strategy so the loop can chain the next test against it.
+   */
+  adoptChallenger(experimentId: string, reason: string): Promise<CopyStrategy>;
+  /**
+   * Start the chained experiment. Returns false (never throws) when the account already has a
+   * live experiment (the one-live unique index) — the loop simply skips chaining then.
+   */
+  startExperiment(input: StartExperimentInput): Promise<boolean>;
 }
 
 export interface OptimizeDeps {
@@ -367,6 +389,8 @@ export interface OptimizeDeps {
 export interface OptimizeSummary {
   evaluated: number;
   concluded: number;
+  adopted: number;
+  chained: number;
 }
 
 export interface CopyDraftDeps {

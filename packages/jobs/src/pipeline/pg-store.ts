@@ -788,15 +788,19 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
       const rows = await db
         .select({
           id: optimizationExperiments.id,
+          accountId: optimizationExperiments.accountId,
           stageKey: optimizationExperiments.stageKey,
           minSample: optimizationExperiments.minSample,
+          championStrategy: optimizationExperiments.championStrategy,
         })
         .from(optimizationExperiments)
         .where(eq(optimizationExperiments.status, "running"));
       return rows.map((r) => ({
         id: r.id,
+        accountId: r.accountId,
         stageKey: r.stageKey as FunnelStageKey,
         minSample: r.minSample,
+        championStrategy: (r.championStrategy ?? {}) as CopyStrategy,
       }));
     },
 
@@ -839,6 +843,68 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         .update(optimizationExperiments)
         .set({ status, decisionReason: reason, concludedAt: new Date() })
         .where(eq(optimizationExperiments.id, id));
+    },
+
+    async adoptChallenger(experimentId, reason): Promise<CopyStrategy> {
+      // Autonomous adoption (spec 2026-07-14): playbook champion ← challenger, version-bumped;
+      // experiment → 'adopted'. Mirrors the manual adopt action's writes, run by the service role.
+      const [exp] = await db
+        .select({
+          accountId: optimizationExperiments.accountId,
+          challengerStrategy: optimizationExperiments.challengerStrategy,
+        })
+        .from(optimizationExperiments)
+        .where(eq(optimizationExperiments.id, experimentId))
+        .limit(1);
+      const newChampion = ((exp?.challengerStrategy as CopyStrategy | null) ?? {}) as CopyStrategy;
+      if (exp) {
+        const [cur] = await db
+          .select({ version: optimizationPlaybook.version })
+          .from(optimizationPlaybook)
+          .where(eq(optimizationPlaybook.accountId, exp.accountId))
+          .limit(1);
+        await db
+          .insert(optimizationPlaybook)
+          .values({
+            accountId: exp.accountId,
+            championStrategy: newChampion,
+            version: (cur?.version ?? 0) + 1,
+            updatedAt: new Date(),
+          })
+          .onConflictDoUpdate({
+            target: optimizationPlaybook.accountId,
+            set: {
+              championStrategy: newChampion,
+              version: (cur?.version ?? 0) + 1,
+              updatedAt: new Date(),
+            },
+          });
+      }
+      await db
+        .update(optimizationExperiments)
+        .set({ status: "adopted", decisionReason: reason, concludedAt: new Date() })
+        .where(eq(optimizationExperiments.id, experimentId));
+      return newChampion;
+    },
+
+    async startExperiment(input): Promise<boolean> {
+      // The chained next test. The one-live-experiment partial unique index guards double-starts;
+      // a conflict means another experiment is already live for the account — skip, never throw.
+      try {
+        await db.insert(optimizationExperiments).values({
+          accountId: input.accountId,
+          stageKey: input.stageKey,
+          championStrategy: input.champion,
+          challengerStrategy: input.challenger,
+          allocationPct: 25,
+          minSample: 30,
+          status: "running",
+        });
+        return true;
+      } catch (err) {
+        if ((err as { code?: string }).code === "23505") return false;
+        throw err;
+      }
     },
 
     // ── SchedulerStore ───────────────────────────────────────────────────────
