@@ -32,15 +32,15 @@ export function SignupForm({ initialSite }: { initialSite?: string }) {
       <AuthHeading
         title={
           <>
-            Turn{" "}
+            Start with{" "}
             <span className="whitespace-nowrap">
               <LinkedInMark className="mr-[0.18em] inline-block size-[0.78em] align-[-0.1em]" />
               LinkedIn
             </span>{" "}
-            intent into booked revenue.
+            outreach that already knows what works.
           </>
         }
-        sub="Vantera finds in-market buyers, qualifies them against your ICP, and drafts the outreach for your approval — your LinkedIn, run hands-off."
+        sub="Vera finds your in-market buyers and reaches them with proven plays — drafted for your approval, sharper every week, your LinkedIn run hands-off."
       />
 
       {siteHost && (
@@ -49,7 +49,7 @@ export function SignupForm({ initialSite }: { initialSite?: string }) {
           <span>
             Next, we&rsquo;ll scan{" "}
             <span className="font-semibold text-foreground">{siteHost}</span> to map your ICP and
-            surface your first in-market buyers — automatically.
+            show you what already works for buyers like yours — automatically.
           </span>
         </div>
       )}

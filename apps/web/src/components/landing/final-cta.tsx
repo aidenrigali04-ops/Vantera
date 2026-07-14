@@ -64,14 +64,15 @@ export function FinalCta() {
                 </span>
                 .
               </span>
-              <br className="hidden sm:block" /> Let your agents find them.
+              <br className="hidden sm:block" /> Let Vera find them.
             </h2>
           </RevealItem>
 
           <RevealItem>
             <p className="mx-auto mt-6 max-w-xl text-[16px] font-normal leading-relaxed text-[var(--ink-3)] sm:text-[17.5px]">
-              Deploy your Scout and Outreach agents in minutes. They surface in-market buyers,
-              qualify against your ICP, and draft every message — you approve the sends.
+              Live in minutes. Vera starts on plays that already work, surfaces your in-market
+              buyers, and drafts every message — you approve the sends, and it gets sharper every
+              week.
             </p>
           </RevealItem>
 
@@ -173,7 +174,14 @@ export function FinalCta() {
                   <span className="font-medium text-foreground">
                     467 buyers sourced → 133 qualified → 90 contacted → 24 replies.
                   </span>{" "}
-                  The same agents you get, run on our own pipeline. Yours start within ~15 minutes.
+                  The same system you get, run on our own pipeline. Yours starts within ~15
+                  minutes.{" "}
+                  <Link
+                    href="/how-we-prove-it"
+                    className="font-medium text-[var(--cyan-strong)] underline-offset-4 hover:underline"
+                  >
+                    Why we only show real numbers
+                  </Link>
                 </p>
               </div>
 

@@ -240,7 +240,7 @@
             <span class="x">×</span>
             <span class="li"><span class="li-tile">in</span><span class="li-word">LinkedIn</span></span>
           </div>
-          <div class="tagline" id="tagline">Turn intent into revenue on LinkedIn.</div>
+          <div class="tagline" id="tagline">Outreach that already knows what works — and keeps getting sharper.</div>
           <div class="url" id="url"></div>
         </div>
       </div>
@@ -403,7 +403,7 @@
     sendStamp.classList.remove('go');
     if(scoreNum){scoreNum.textContent='0';scoreNum.classList.remove('pop');}
     document.querySelectorAll('.val[data-count]').forEach(function(v){v.textContent='0'});
-    url.textContent=''; tagline.textContent='Turn intent into revenue on LinkedIn.';
+    url.textContent=''; tagline.textContent='Outreach that already knows what works — and keeps getting sharper.';
   }
 
   function showStage(n){
@@ -425,7 +425,7 @@
   function showBrand(isOutro){
     root.setAttribute('data-phase', isOutro?'outro':'intro');
     stages.forEach(function(s){s.classList.remove('active')});
-    if(isOutro){ tagline.textContent='Turn intent into revenue on LinkedIn.'; url.textContent='vanterasystem.dev'; }
+    if(isOutro){ tagline.textContent='Outreach that already knows what works — and keeps getting sharper.'; url.textContent='vanterasystem.dev'; }
     void brand.offsetWidth;
     brand.classList.add('show');
   }

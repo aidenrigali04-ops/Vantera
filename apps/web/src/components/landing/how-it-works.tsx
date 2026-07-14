@@ -43,7 +43,7 @@ const STEPS: Step[] = [
     icon: Radar,
     title: "Prospect",
     headline: "Your agents find and message your buyers.",
-    body: "Sources in-market prospects, scores them, drafts personalized messages — safe-paced, multi-sender.",
+    body: "Sources in-market prospects, scores them, drafts from proven plays personalized to each — safe-paced, multi-sender.",
     mock: <ProspectMock />,
   },
   {
@@ -158,7 +158,7 @@ export function HowItWorks() {
             </button>
           </form>
           <p className="mt-4 text-[13px] text-[var(--ink-4)]">
-            No credit card required · Free 5-day trial
+            No credit card required · Free 7-day trial
           </p>
         </motion.div>
       </div>

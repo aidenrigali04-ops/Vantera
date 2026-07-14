@@ -66,7 +66,7 @@ export const accounts = pgTable("accounts", {
   // 0013: subscription entitlement snapshot (server-managed; Stripe webhook only)
   // No-card free trial (0020; shortened to 3 days in 0037; lengthened to 5 days in 0046):
   // new accounts default to a Starter trial. Defaults are applied by the DB on create_account
-  // insert; the trial_ends_at default expression (now() + 5 days) lives in the SQL migration
+  // insert; the trial_ends_at default expression (now() + 7 days, migration 0048) lives in the SQL migration
   // (source of truth).
   plan: text("plan", { enum: ["none", "starter", "growth", "scale"] })
     .notNull()

@@ -113,7 +113,7 @@ export function Hero() {
             </form>
 
             <p className="landing-rise mt-3.5 text-[13px] text-[var(--ink-3)]" style={{ animationDelay: "250ms" }}>
-              No credit card required · Free 5-day trial · You approve every message
+              No credit card required · Free 7-day trial · You approve every message
             </p>
           </div>
 

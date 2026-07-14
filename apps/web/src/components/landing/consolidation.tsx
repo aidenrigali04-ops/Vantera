@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
-import { Search, PenLine, ListOrdered, ShieldCheck, Inbox } from "lucide-react";
+import { ArrowRight, Search, PenLine, ListOrdered, ShieldCheck, Inbox } from "lucide-react";
 import { LandingHeading } from "./heading";
 import { Reveal, RevealItem, CARD, CARD_INTERACTIVE } from "./surface";
 import { cn } from "@/lib/utils";
@@ -56,7 +57,7 @@ export function Consolidation() {
         <LandingHeading
           eyebrow="One platform"
           title="Replace your entire outbound stack"
-          subtitle="No more stitching a lead-list tool to a sequencer to a separate inbox to safety tooling that all half-talk to each other. Vantera runs the whole motion, end to end."
+          subtitle="No more stitching a lead-list tool to a sequencer to a separate inbox to safety tooling that all half-talk to each other. Vantera runs the whole motion, end to end — and unlike the stack it replaces, it keeps getting sharper."
         />
 
         <div className="mt-16 grid items-center gap-14 lg:mt-20 lg:grid-cols-[1.05fr_1fr] lg:gap-20">
@@ -111,6 +112,22 @@ export function Consolidation() {
           <span className="size-1.5 shrink-0 rounded-full bg-[var(--cyan)]" />
           One system, from first touch to booked meeting.
         </motion.p>
+
+        <motion.div
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true, margin: "-90px" }}
+          transition={{ duration: 0.6, ease: EASE, delay: 0.15 }}
+          className="mt-5 text-center"
+        >
+          <Link
+            href="/why-vantera"
+            className="inline-flex items-center gap-1.5 text-[14px] font-medium text-[var(--cyan-strong)] transition-colors hover:text-foreground"
+          >
+            How this compares to the tools it replaces
+            <ArrowRight className="size-4" />
+          </Link>
+        </motion.div>
       </div>
     </section>
   );
