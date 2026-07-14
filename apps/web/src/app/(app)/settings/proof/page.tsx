@@ -31,9 +31,9 @@ export default async function ProofPointsPage() {
       <div className="border-b border-[var(--hairline)] pb-5">
         <h1 className="text-2xl font-semibold tracking-tight">Proof &amp; pricing</h1>
         <p className="mt-1.5 text-sm text-muted-foreground">
-          The true facts your agent is allowed to share when a prospect asks &quot;can you prove
-          it?&quot; or &quot;what does it cost?&quot;. Without these, your agent won&apos;t invent a
-          number, it&apos;ll say it doesn&apos;t have one, which can stall a warm conversation.{" "}
+          The true facts Vera is allowed to prove with when a prospect asks &quot;can you prove
+          it?&quot; or &quot;what does it cost?&quot;. Without these, Vera won&apos;t invent a
+          number, she&apos;ll say she doesn&apos;t have one, which can stall a warm conversation.{" "}
           <Link href="/settings" className="underline underline-offset-2">
             Back to settings
           </Link>

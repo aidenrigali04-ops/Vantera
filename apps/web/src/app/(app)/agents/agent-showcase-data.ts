@@ -66,7 +66,7 @@ function scoutSummary(status: string, names: string[], cadence: string | null): 
   const who = icpPhrase(names);
   const every = cadence === "weekly" ? "week" : "day";
   if (status === "live")
-    return `Hunting companies that fit ${who} every ${every}, scoring each one and keeping only the leads worth your time.`;
+    return `Hunting companies that fit ${who} every ${every}, scoring each one and keeping only the leads worth your time — and learning which buyers actually convert.`;
   if (status === "paused")
     return `Paused. Resume and it goes straight back to sourcing and scoring companies that fit ${who}.`;
   return `Not deployed yet. Finish setup and it starts sourcing ${who} on your schedule.`;
@@ -75,7 +75,7 @@ function scoutSummary(status: string, names: string[], cadence: string | null): 
 function copySummary(status: string, channels: string[]): string {
   const where = channelPhrase(channels);
   if (status === "live")
-    return `Writing a personalized message on ${where} for every qualified lead — each draft waits in your review queue until you approve it.`;
+    return `Writing a personalized message on ${where} for every qualified lead from plays that are proven, keeping what works and dropping what doesn't — each draft waits in your review queue until you approve it.`;
   if (status === "paused")
     return `Paused. Resume and every qualified lead gets a personalized draft on ${where} again.`;
   return `Not deployed yet. Deploy it and qualified leads turn into personalized drafts on ${where}.`;

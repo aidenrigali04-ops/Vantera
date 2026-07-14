@@ -894,7 +894,8 @@ function ReplyCelebration({ win }: { win: { id: string; leadName: string } }) {
         <div className="min-w-0">
           <p className="text-sm font-medium">{win.leadName} is interested</p>
           <p className="text-sm text-muted-foreground">
-            A reply landed in your favor — keep the thread warm and move it toward a meeting.
+            A reply landed in your favor, from a play Vera is running — keep the thread warm and
+            move it toward a meeting.
           </p>
         </div>
         <Button asChild size="sm" variant="outline" className="ml-auto shrink-0">

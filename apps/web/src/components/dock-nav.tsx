@@ -22,7 +22,7 @@ type NavItem = { key: string; href: string; label: string; icon: LucideIcon };
 // Analytics tiles were removed — their routes redirect into Results' tabs.
 const MAIN: NavItem[] = [
   { key: "dashboard", href: "/dashboard", label: "Results", icon: LayoutDashboard },
-  { key: "agents", href: "/agents", label: "System", icon: Bot },
+  { key: "agents", href: "/agents", label: "Brain", icon: Bot },
   { key: "leads", href: "/leads", label: "Leads", icon: Users },
   { key: "review", href: "/review", label: "Review", icon: Inbox },
 ];
