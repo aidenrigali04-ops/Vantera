@@ -31,6 +31,9 @@ export default async function OnboardingPage({
     data: { user },
   } = await supabase.auth.getUser();
   const metaCompany = (user?.user_metadata?.company_name as string | undefined)?.trim() ?? "";
+  // URL the visitor typed on the landing page (carried via signup) — pre-fills the
+  // website field so the site scan runs without them re-typing it.
+  const metaSite = (user?.user_metadata?.pending_site as string | undefined)?.trim() ?? "";
 
   const { data: account } = await supabase
     .from("accounts")
@@ -72,7 +75,7 @@ export default async function OnboardingPage({
     values: {
       companyName: account?.name ?? metaCompany,
       role: account?.onboarding_role ?? "",
-      websiteUrl: account?.website_url ?? "",
+      websiteUrl: account?.website_url ?? metaSite,
       linkedinUrl: account?.onboarding_linkedin_url ?? "",
       // Confirmation: prefer what they already saved, else the derived suggestions from the scan.
       industry: account?.onboarding_industry ?? scan?.scope_of_industry ?? "",

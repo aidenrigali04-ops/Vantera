@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { trackEvent } from "@/lib/analytics/clarity";
 import { VanteraLogo } from "./vantera-logo";
 import { LiveBanner } from "./live-banner";
 import {
@@ -169,6 +170,7 @@ export function LandingNav() {
             </Link>
             <Link
               href="/signup"
+              onClick={() => trackEvent("cta_click", { location: "nav" })}
               className="inline-flex items-center rounded-full bg-[#0a0c12] px-4 py-2.5 text-[14px] font-medium text-white shadow-[0_1px_2px_rgba(12,16,26,0.2)] transition-all hover:shadow-[0_8px_24px_-8px_rgba(24,119,242,0.55)]"
             >
               Get started

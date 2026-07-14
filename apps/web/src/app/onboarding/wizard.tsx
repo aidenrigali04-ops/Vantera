@@ -294,26 +294,65 @@ export function Wizard({ init }: { init: WizardInit }) {
                     </motion.form>
                   )}
 
-                  {/* ── Step 1: Connect LinkedIn ── */}
+                  {/* ── Step 1: Connect LinkedIn — the activation gate, and the moment the
+                        product turns on. Framed as the payoff, not a hurdle: value first
+                        (the buyer we found), the ban-fear defused right at the button, and
+                        only a deliberate, cost-stating opt-out (no casual "Skip"). ── */}
                   {step === 1 && (
                     <motion.div key="connect" initial="hidden" animate="visible" exit="exit" variants={contentVariants}>
                       <div className="px-8 pt-8 pb-2">
                         <div className="mb-4 grid size-11 place-items-center rounded-lg bg-[var(--cyan-tint)] text-[var(--cyan-strong)] ring-1 ring-inset ring-[rgba(11,87,171,0.22)]">
                           <Link2 className="size-5" strokeWidth={2.2} />
                         </div>
-                        <h2 className="text-[21px] font-semibold tracking-[-0.02em] text-foreground">Connect your LinkedIn</h2>
+                        <h2 className="text-[21px] font-semibold tracking-[-0.02em] text-foreground">
+                          {init.connected ? "LinkedIn connected" : "Connect your LinkedIn"}
+                        </h2>
                         <p className="mt-2 text-[14px] leading-relaxed text-[var(--ink-3)]">
-                          Your agent runs outreach from your own LinkedIn — securely, through our partner&apos;s hosted login.
-                          You stay in control: nothing sends until you approve it.
+                          {init.connected
+                            ? "You're activated — your agents can now reach buyers from your own LinkedIn, and nothing sends until you approve it."
+                            : "This is the step that turns your agents on. They run outreach from your own LinkedIn — securely, through our partner's hosted login."}
                         </p>
                       </div>
                       <div className="space-y-4 px-8 pt-4 pb-8">
                         {init.connected ? (
-                          <div className="flex items-center gap-2 rounded-xl border border-[var(--hairline)] bg-[var(--tint)] p-4 text-[13.5px] text-foreground">
-                            <Check className="size-4 text-[var(--cyan-strong)]" /> LinkedIn connected — you&apos;re ready.
+                          <div className="flex items-center gap-2.5 rounded-xl border border-[rgba(11,87,171,0.28)] bg-[var(--cyan-tint)] p-4 text-[13.5px] font-medium text-foreground">
+                            <span className="grid size-6 shrink-0 place-items-center rounded-full bg-[var(--cyan)] text-white">
+                              <Check className="size-3.5" strokeWidth={2.6} />
+                            </span>
+                            LinkedIn connected — you&apos;re ready to go.
                           </div>
-                        ) : null}
+                        ) : (
+                          <>
+                            {/* value-before-friction: tie the ask to the buyer the scan already found */}
+                            {values.icp && (
+                              <div className="rounded-xl bg-[var(--cyan-tint)] px-4 py-3">
+                                <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-[var(--cyan-strong)]">
+                                  We found your buyer
+                                </p>
+                                <p className="mt-1 text-[13.5px] leading-snug text-foreground">
+                                  <span className="font-medium">{values.icp}</span> — connect LinkedIn to let your
+                                  agents start reaching them.
+                                </p>
+                              </div>
+                            )}
+                            {/* defuse the category's #1 fear ("will this get my account restricted?") at the button */}
+                            <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                              {[
+                                "LinkedIn-safe, human-like pacing",
+                                "You approve every message",
+                                "We never see your password",
+                                "Disconnect anytime in Settings",
+                              ].map((line) => (
+                                <li key={line} className="flex items-start gap-2 text-[12.5px] leading-snug text-[var(--ink-2)]">
+                                  <Check className="mt-0.5 size-3.5 shrink-0 text-[var(--cyan-strong)]" strokeWidth={2.4} /> {line}
+                                </li>
+                              ))}
+                            </ul>
+                          </>
+                        )}
+
                         {connectError && <FormError message={connectError} />}
+
                         {init.connected ? (
                           <button type="button" onClick={() => setStep(2)} className={cn(DARK_BTN, "w-full")}>
                             Continue <ChevronRight className="size-4" />
@@ -324,19 +363,23 @@ export function Wizard({ init }: { init: WizardInit }) {
                             {connecting ? "Opening secure login…" : "Connect LinkedIn"}
                           </button>
                         )}
-                        <p className="text-center text-[12px] text-[var(--ink-4)]">
-                          We never see your password. You can disconnect any time in Settings.
-                        </p>
+
+                        {/* deliberate, cost-stating opt-out — not a peer action, and it never
+                            claims skipping is fine. Removed the old one-tap "Skip for now". */}
+                        {!init.connected && (
+                          <button
+                            type="button"
+                            onClick={() => setStep(2)}
+                            className="mx-auto block max-w-xs text-center text-[12px] leading-relaxed text-[var(--ink-4)] underline-offset-2 transition-colors hover:text-[var(--ink-3)] hover:underline"
+                          >
+                            I&apos;ll connect later — no outreach can send until I do
+                          </button>
+                        )}
                       </div>
-                      <div className="flex items-center justify-between border-t border-[var(--hairline)] px-8 py-5">
+                      <div className="flex items-center justify-start border-t border-[var(--hairline)] px-8 py-5">
                         <button type="button" onClick={() => setStep(0)} className={GHOST_BTN}>
                           <ChevronLeft className="size-4" /> Back
                         </button>
-                        {!init.connected && (
-                          <button type="button" onClick={() => setStep(2)} className={GHOST_BTN}>
-                            Skip for now <ChevronRight className="size-4" />
-                          </button>
-                        )}
                       </div>
                     </motion.div>
                   )}
@@ -356,10 +399,17 @@ export function Wizard({ init }: { init: WizardInit }) {
                             <Check className="size-3.5 text-[var(--cyan-strong)]" /> LinkedIn connected
                           </p>
                         ) : (
-                          <p className="mt-2 text-[12.5px] text-[var(--ink-4)]">
-                            LinkedIn not connected yet — your agents source and qualify either way, and you
-                            can connect any time from the dashboard.
-                          </p>
+                          <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-[rgba(200,129,27,0.32)] bg-[rgba(200,129,27,0.08)] px-3 py-2 text-[12.5px] leading-snug text-[var(--ink-2)]">
+                            <span className="font-medium text-foreground">LinkedIn isn&apos;t connected.</span>
+                            <span>Your agents can source and qualify, but they can&apos;t send outreach until you connect.</span>
+                            <button
+                              type="button"
+                              onClick={() => setStep(1)}
+                              className="font-semibold text-[var(--cyan-strong)] underline-offset-2 hover:underline"
+                            >
+                              Connect now →
+                            </button>
+                          </div>
                         )}
                       </div>
                       <div className="space-y-8 px-8 pt-5 pb-8">

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Sparkles } from "lucide-react";
 import { useActionState } from "react";
 import { signup, type AuthFormState } from "../actions";
 import { Input } from "@/components/ui/input";
@@ -8,10 +9,23 @@ import { Label } from "@/components/ui/label";
 import { FormError } from "@/components/form-error";
 import { AuthHeading, CtaArrow, FIELD, LinkedInMark, SubmitButton } from "../auth-ui";
 
-export function SignupForm() {
+export function SignupForm({ initialSite }: { initialSite?: string }) {
   // No confirmation-email interstitial: signup signs the user in and redirects
   // straight to onboarding (see the signup action).
   const [state, action, pending] = useActionState<AuthFormState, FormData>(signup, {});
+
+  // The URL a visitor typed on the landing page is carried here so the promise
+  // ("start with your site — we'll map your ICP") is kept: we show it back, submit
+  // it, and onboarding pre-fills + scans it. Derive a clean host for display.
+  const site = initialSite?.trim() ?? "";
+  const siteHost = (() => {
+    if (!site) return "";
+    try {
+      return new URL(site.includes("://") ? site : `https://${site}`).host;
+    } catch {
+      return site;
+    }
+  })();
 
   return (
     <div className="flex flex-col gap-8">
@@ -29,7 +43,19 @@ export function SignupForm() {
         sub="Vantera finds in-market buyers, qualifies them against your ICP, and drafts the outreach for your approval — your LinkedIn, run hands-off."
       />
 
+      {siteHost && (
+        <div className="-mt-3 flex items-start gap-2.5 rounded-xl border border-[var(--hairline)] bg-[var(--tint)] px-4 py-3 text-[13px] leading-snug text-[var(--ink-2)]">
+          <Sparkles className="mt-0.5 size-4 shrink-0 text-[var(--cyan-strong)]" aria-hidden />
+          <span>
+            Next, we&rsquo;ll scan{" "}
+            <span className="font-semibold text-foreground">{siteHost}</span> to map your ICP and
+            surface your first in-market buyers — automatically.
+          </span>
+        </div>
+      )}
+
       <form action={action} className="flex flex-col gap-5">
+        <input type="hidden" name="site" value={site} />
         <div className="flex flex-col gap-2">
           <Label htmlFor="companyName" className="text-[13px] font-medium text-[var(--ink-2)]">Company name</Label>
           <Input id="companyName" name="companyName" autoComplete="organization" placeholder="Acme Inc" className={FIELD} required />
@@ -49,9 +75,9 @@ export function SignupForm() {
 
       <p className="text-[12px] leading-relaxed text-[var(--ink-4)]">
         By creating an account you agree to our{" "}
-        <Link href="#" className="font-medium text-[var(--ink-3)] underline-offset-2 hover:text-foreground hover:underline">Terms of Service</Link>{" "}
+        <Link href="/terms" className="font-medium text-[var(--ink-3)] underline-offset-2 hover:text-foreground hover:underline">Terms of Service</Link>{" "}
         and{" "}
-        <Link href="#" className="font-medium text-[var(--ink-3)] underline-offset-2 hover:text-foreground hover:underline">Privacy Policy</Link>.
+        <Link href="/privacy" className="font-medium text-[var(--ink-3)] underline-offset-2 hover:text-foreground hover:underline">Privacy Policy</Link>.
       </p>
 
       <p className="text-[14px] text-[var(--ink-3)]">

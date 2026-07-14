@@ -6,6 +6,7 @@ import {
 } from "@vantera/billing";
 import dynamic from "next/dynamic";
 import { LandingNav } from "@/components/landing/nav";
+import { ScrollDepthTracker } from "@/components/analytics/scroll-depth";
 import { Hero } from "@/components/landing/hero";
 import { TrustStrip } from "@/components/landing/trust-strip";
 import { type LandingPlan } from "@/components/landing/pricing";
@@ -51,6 +52,7 @@ export default function Home() {
     <div className="landing relative min-h-screen w-full overflow-x-clip">
       {/* Homepage entity + offer content for Google rich results and AI engines. */}
       <JsonLd data={[softwareApplicationLd(plans)]} />
+      <ScrollDepthTracker />
       <LandingNav />
       <main>
         {/* Hero + social proof are one above-the-fold screen on lg+. */}
