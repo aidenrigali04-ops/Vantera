@@ -126,4 +126,5 @@ export {
 } from "./optimize/experiment";
 export { aggregateArm, type LeadOutcomeFlags } from "./optimize/outcomes";
 export { buildSendRecipe, type SendRecipe, type RecipeBrain } from "./optimize/recipe";
+export { validateRecipeAngle } from "./optimize/angle";
 export { STARTER_PLAYS, SOURCE_LABEL, matchStarterPlays, type StarterPlay } from "./plays/starter";

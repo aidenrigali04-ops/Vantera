@@ -94,6 +94,10 @@ const KNOB_LABEL: Record<string, string> = {
 export function describeStrategy(strategy: CopyStrategy): string {
   const parts = Object.entries(strategy)
     .filter(([, v]) => v)
-    .map(([k, v]) => KNOB_LABEL[`${k}:${String(v)}`] ?? `${k}: ${String(v)}`);
+    .map(([k, v]) =>
+      k === "openerAngle"
+        ? `open with the angle "${String(v)}"`
+        : (KNOB_LABEL[`${k}:${String(v)}`] ?? `${k}: ${String(v)}`)
+    );
   return parts.length > 0 ? parts.join(", ") : "the current approach";
 }

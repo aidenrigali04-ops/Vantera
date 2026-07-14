@@ -65,6 +65,10 @@ export type CopyStrategy = {
   followupLength?: "tight" | "standard";
   /** the register of the ask */
   askStyle?: "soft" | "specific";
+  /** Stage 1b open-ended knob: a short, linted, STYLE-ONLY angle for the opener. Every generated
+   *  value passes validateRecipeAngle before it can enter an experiment, so an angle can never
+   *  instruct a number, price, or promise. */
+  openerAngle?: string;
 };
 
 const STRATEGY_LINES: Record<string, string> = {
@@ -86,6 +90,14 @@ export function strategyDirectives(strategy?: CopyStrategy): string {
   const lines: string[] = [];
   for (const [key, value] of Object.entries(strategy)) {
     if (!value) continue;
+    // Stage 1b open-ended knob: the angle is interpolated as a style directive. Values reach
+    // here only through validateRecipeAngle (generation gate), so no claim can ride along.
+    if (key === "openerAngle") {
+      lines.push(
+        `- Angle the opener around: "${String(value).trim()}". This shapes the angle only, never add facts or numbers because of it.`
+      );
+      continue;
+    }
     const line = STRATEGY_LINES[`${key}:${value}`];
     if (line) lines.push(`- ${line}`);
   }
