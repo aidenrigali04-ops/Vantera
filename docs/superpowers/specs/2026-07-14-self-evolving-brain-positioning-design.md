@@ -1,7 +1,7 @@
 # Self-Evolving Brain — Positioning + Product Design
 
 **Date:** 2026-07-14
-**Status:** Design / awaiting review
+**Status:** Approved — owner decisions locked 2026-07-14; gap-pass applied (honesty-label fix, trial sweep, pricing reconciliation, conditional substantiation)
 **Type:** Positioning shift + product capability (spans marketing, onboarding, dashboard, and the outreach intelligence layer)
 **Builds on:** `2026-06-29-self-optimizing-outreach-design.md` (the champion/challenger engine this expands), relates to `2026-07-13-vantera-scaling-plan-design.md` (the in-flight growth plan, which turns on existing engines and does **not** yet include this).
 
@@ -141,10 +141,28 @@ Every change points at a proven behavior-data leak: **① the 0% LinkedIn-connec
 - **TrustStrip** (`trust-strip.tsx`): add/swap a signal → **"Gets sharper every week / learns what works, on its own."**
 - **Showcase "The system"** (`showcase.tsx`): reframe the Prospect loop's "Repeat every day" rail → "…and gets sharper each cycle," or add a 5th "Learn — keeps what works, drops what doesn't" beat.
 - **FeaturesGrid** (`features-grid.tsx`): add a 6th "Learns & improves" pillar with co-"Vantera only" differentiator status alongside Safety. Safety + Learning = the pair no sequencer can claim.
-- **FinalCta** (`final-cta.tsx`): the first-party proof card ("our own account, real numbers") is where "gets sharper" gets honestly substantiated — add a real reply-rate-climbed line from Vantera's own account.
+- **FinalCta** (`final-cta.tsx`): the first-party proof card ("our own account, real numbers") is where "gets sharper" gets honestly substantiated — add a real reply-rate-climbed line from Vantera's own account **only after verifying the numbers exist** (see honesty rule).
 - **Footer** (`footer.tsx`): tagline "The AI SDR team for LinkedIn" (old AI-SDR positioning) → **"LinkedIn outreach that learns what works."**
 - **/ai-info AEO page** (`app/ai-info/page.tsx`): critical + cheap — add a self-improving capabilities row and a "learns vs. static sequencers" line to the "How Vantera compares" table (vs Waalaxy/Expandi/Dripify); update the "Corrections" table. Otherwise LLMs keep citing the old positioning.
-- **Cleanups the map exposed:** reconcile the pricing inconsistency (homepage + /ai-info = 2 tiers Starter/Custom; /pricing + billing = 3 tiers Starter/Growth/Scale + Enterprise) before driving traffic. Honesty bar is already strict (fabricated logo cloud deliberately removed) — "gets sharper" must be first-party-substantiated to survive here.
+- **Cleanups the map exposed (now mandatory pre-launch, per gap-pass):**
+  - **Pricing reconciliation.** Homepage teaser says "two plans" (Starter + Custom); /pricing + billing source of truth say three (Starter $45 / Growth $79 / Scale $349 + Enterprise); /ai-info describes the Intent Agent as generally shipped while billing gates it to Growth+. **Default: billing is the source of truth** — fix the homepage subtitle and /ai-info to match /pricing (owner can override).
+  - **7-day trial sweep.** Trial moves 5 → 7 days (owner decision). This is a **billing-engine change + full copy sweep**, not a wording tweak: locate and change the trial-duration constant in the billing layer, then sweep every "5-day" mention — hero reassurance line (`hero.tsx:114-116`), HowItWorks, /ai-info fact table, FAQ, in-app trial banner — and verify end-to-end that a new signup actually receives 7 days. Marketing saying 7 while billing grants 5 is a false claim at the moment of highest scrutiny.
+  - Honesty bar is already strict (fabricated logo cloud deliberately removed) — "gets sharper" must be first-party-substantiated to survive here.
+
+#### Deeper information pages (new — owner-approved 2026-07-14)
+
+The homepage makes the promise; deeper pages let a motivated evaluator verify it (**progressive disclosure**; claims-with-a-mechanism beat bare claims — the "reason-why" effect). Hub-and-spoke: homepage = hub, each page expands one homepage section and funnels back to signup. All hand-crafted in the existing `.landing` system (`MarketingShell`/`MarketingHeader`), written **name-agnostic** until the brain's name is chosen.
+
+Three flagships first, then two supporting:
+1. **/how-it-learns — the mechanism page (most important).** The loop in plain language + clean visual: starts with what works → tries new ideas → keeps winners, drops losers → remembers what wins → gets sharper. Psychology: cognitive fluency + labor-illusion + reason-why. Includes "what it will never do" (the safety envelope in user words) and "you stay in control."
+2. **/proven-plays — the proof + day-one page.** Kills the "weak start" fear: real, honestly-labeled example plays (launch label: first-party, per honesty rule). Competence-first, present tense. Psychology: concreteness + social proof + "already good" framing.
+3. **/why-vantera — the category page.** Not another LinkedIn tool: direct contrast with static sequencers (Waalaxy/Expandi/Dripify — already named on /ai-info, reinforces AEO). Psychology: categorization + contrast + naming the old way as the enemy.
+4. **/safety (supporting).** Deepens the existing "Vantera only" safety differentiator into its own page. Risk-reversal / loss-aversion — the account-ban fear grows once "autonomous AI" enters the story.
+5. **/how-we-prove-it (supporting).** Radical-transparency page: names skepticism and disarms it — real numbers, no fake claims, what we will never show you. Turns the historical weakness into a stated principle.
+
+**Internal-link model:** each homepage section gets a "See how →" deep link into its matching page (Showcase → how-it-learns; proof/Features → proven-plays; Consolidation → why-vantera; Safety card → safety). Each page cross-links two siblings in-content + persistent signup CTA. New "Learn" footer column + "How it works" entry in the nav Products dropdown. All content mirrored into /ai-info so the AEO story matches. Builds topical authority for the (later) traffic phase.
+
+**Deploy sequencing (gap-pass finding):** these pages are built on the branch now but **deploy with Stage 0** — their copy must match what the product truthfully does at deploy time (e.g. auto-adopt is only claimable once Stage 0's auto-adopt is live; today's truth is test-and-keep-winners with owner approval).
 
 ### B. Auth (light split-screen; email/password only, no SSO)
 
@@ -182,13 +200,19 @@ Every change points at a proven behavior-data leak: **① the 0% LinkedIn-connec
 
 ## The honesty rule (leak ③ — the whole ballgame)
 
-Every number on every surface is real or clearly labeled as a starter/network benchmark — never invented. The site already enforces this (fabricated logos removed; "our own account, real numbers"; /ai-info "zero invented numbers"). The "gets sharper" claim inherits that bar: substantiate from Vantera's own real improvement curve, and label day-1 plays as **"proven across accounts like yours,"** never as personalized results not yet earned. One invented stat detonates the repositioning.
+Every number on every surface is real or clearly labeled as a starter/network benchmark — never invented. The site already enforces this (fabricated logos removed; "our own account, real numbers"; /ai-info "zero invented numbers"). The "gets sharper" claim inherits that bar: substantiate from Vantera's own real improvement curve, and never label day-1 plays as personalized results not yet earned. One invented stat detonates the repositioning.
+
+**Launch-time label correction (gap-pass finding):** at launch the network is effectively N=1 (prod: 3 signups ever, ~0 external activations) — so **"proven across accounts like yours" would itself be a fabricated claim on day one.** The only honest launch labels are first-party and research-grounded: **"proven on our own real outbound"** (same model as the FinalCta card) and "grounded in what works for {industry} buyers" (SDR market report). The label graduates to "proven across accounts like yours" only once multiple accounts' real data backs it. This applies everywhere day-1 plays appear: onboarding scan payoff, Step 1 playbook, dashboard empty states, and the marketing pages.
+
+**Conditional substantiation (gap-pass finding):** the FinalCta "our reply rate climbed from X% → Y% as the system learned" line is **conditional on the data actually existing** — verify Vantera's own account shows a real learning curve before writing it; if the curve isn't measurable yet, omit the line entirely. Never write the sentence first and find the numbers later.
 
 ---
 
 ## Phased build
 
-Positioning goes live **only when Stage 0 is live** — never the promise ahead of the proof.
+Positioning goes live **only when Stage 0 is live** — never the promise ahead of the proof. The new deep pages follow the same rule (built on-branch, deployed with Stage 0).
+
+**Verification mandate (owner directive, 2026-07-14, tied to the 7-day trial):** a longer trial only helps if the product delivers inside it — otherwise it's more time to be disappointed. Therefore every build in every stage is **built → verified end-to-end → re-verified against the promise it makes to the user** before it's called done. Nothing ships on "it should work." A build that can't yet deliver the promise it carries does not go live carrying that promise.
 
 - **Stage 0 — the first version that ships *with* the new marketing (minimum credible brain).**
   - Flip the existing message-testing engine to **adopt winners on its own** within the safety envelope (auto-adopt, auto-rollback) — machinery exists (`optimize/*`, `optimization_playbook`).
@@ -197,6 +221,8 @@ Positioning goes live **only when Stage 0 is live** — never the promise ahead 
   - **Promote + rename** the buried Optimization panel → "What's working," surfaced on Overview.
   - Add **positive content memory** (retrieve winning exemplars) — reuses the Voyage embedder.
   - User-facing copy swaps across landing/auth/onboarding/dashboard per Section 3.
+  - **The five deeper information pages** (Section 3A) + internal-link model + /ai-info mirror.
+  - **7-day trial change** (billing + copy sweep + end-to-end verify) and **pricing reconciliation** (Section 3A cleanups).
 
 - **Stage 1 — messages that fully prove and sharpen themselves.** Full generate→gate→bandit→measure→decide→remember loop on copy, plus the foundational plumbing: **stamp every send with its recipe** and join to outcome (message-level attribution).
 
@@ -232,9 +258,9 @@ Positioning goes live **only when Stage 0 is live** — never the promise ahead 
 
 ---
 
-## Open decisions for owner
+## Owner decisions (locked 2026-07-14)
 
-1. **Trial length** vs. time-to-first-reply (structural leak ②) — extend, add a "first reply or extended" mechanic, or accept and lean on day-1 proven-play value?
-2. **The brain's name** (for personification in the UI).
-3. **Google SSO** timing (fast follow vs. later).
-4. **Hero calendar visual** — leave as-is (copy carries it) or invest in the proven-play overlay?
+1. **Trial length → 7 days**, conditioned on the verification mandate above: the product must verifiably deliver inside the trial or the extension just grows churn. See the trial sweep item (billing change + copy sweep + end-to-end verify).
+2. **The brain's name → candidates proposed, not yet chosen:** Vera (from Vant*era*; warm, reads as a rep's name — recommended), Axon (neural, leans "intelligence"), Sage (proven wisdom; common in AI products), "the Brain" (plainest, least distinctive). **All new copy is written name-agnostic** ("it" / "your brain") so the chosen name threads in as a replace, not a rewrite.
+3. **Google SSO → later** (still a known B=MAP friction leak at signup; revisit post-launch).
+4. **Hero calendar proven-play overlay → idea explained, build as a polish pass after copy + pages land.** The idea: the hero currently tells a two-node story (LinkedIn → calendar) and skips the *why*. Insert the missing middle node — a small glass "play card" mid-conduit that each animated packet passes through, showing the play in use ("Proven opener · peer-reference angle · 9.4% reply ▲") with a periodic subtle upgrade-swap to a sharper play. Three-node story: **LinkedIn → the proven play (the intelligence) → booked calendar.** Built in the calendar's own design language (same glassmorphism, brand tint, motion system) so it reads as one piece. Any stat shown must be real or the chip ships label-only.
