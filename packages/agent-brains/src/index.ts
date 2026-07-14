@@ -129,4 +129,15 @@ export { buildSendRecipe, type SendRecipe, type RecipeBrain } from "./optimize/r
 export { validateRecipeAngle } from "./optimize/angle";
 export { strategySignature, aggregateBySignature, chooseChallenger } from "./optimize/bandit";
 export { proposeRecipeCandidates, type GenerateRecipesInput } from "./optimize/generate";
+export {
+  seniorityBucket,
+  buildTargetingProfile,
+  targetingTilt,
+  rankByTilt,
+  topTiltSegment,
+  SEGMENT_FLOOR,
+  type TargetingRow,
+  type TargetingProfile,
+  type SegmentStat,
+} from "./targeting/tilt";
 export { STARTER_PLAYS, SOURCE_LABEL, matchStarterPlays, type StarterPlay } from "./plays/starter";
