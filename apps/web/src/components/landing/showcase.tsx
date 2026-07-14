@@ -144,7 +144,7 @@ const PipelineLoop = memo(function PipelineLoop() {
             />
           )}
           <span className="absolute inset-x-0 top-1/2 mt-2 flex justify-center text-[9px] font-medium uppercase tracking-[0.14em] text-[var(--ink-4)]">
-            Repeats every day — sharper each cycle
+            Repeats every day — smarter each cycle
           </span>
         </div>
       </div>
@@ -434,7 +434,7 @@ const PANELS: Panel[] = [
     step: "01",
     tag: "Prospect",
     title: "Finds and ranks your best buyers first.",
-    body: "Vera sources in-market prospects on LinkedIn and scores each one against your ICP, working the highest-intent people first. She runs on a loop, day after day, learning which buyers actually convert — no manual research.",
+    body: "Vera sources in-market prospects on LinkedIn and scores each one against your ICP, working the highest-intent people first — running daily and learning which buyers actually convert. No manual research.",
     points: ["Sourced from live LinkedIn activity", "Highest-intent buyers surfaced first"],
     visual: <PipelineLoop />,
   },

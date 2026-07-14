@@ -40,7 +40,7 @@ export function SignupForm({ initialSite }: { initialSite?: string }) {
             outreach that already knows what works.
           </>
         }
-        sub="Vera finds your in-market buyers and reaches them with proven plays — drafted for your approval, sharper every week, your LinkedIn run hands-off."
+        sub="Vera finds your in-market buyers and reaches them with proven plays — drafted for your approval, smarter every week, your LinkedIn run hands-off."
       />
 
       {siteHost && (

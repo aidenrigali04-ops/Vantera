@@ -7,7 +7,7 @@ routes: /dashboard?view=analytics
 # What's working
 
 On the **Analytics** tab, the **What's working** panel is the visible face of Vera's improvement
-loop: your outreach funnel, what Vera is testing right now, and what she adopted last — with the
+loop: your outreach funnel, what Vera is testing right now, and the latest adoption — with the
 proof behind each.
 
 ## Where Vera starts
@@ -38,7 +38,7 @@ pain instead of their trigger), tried on a small slice of new drafts and measure
 current approach on real outcomes.
 
 - **If it genuinely wins** — with statistical confidence, not vibes — Vera adopts it as your new
-  default on her own, and the panel shows what changed and why. Then she lines up the next test.
+  default automatically, and the panel shows what changed and why. Then the next test is lined up.
 - **If it loses**, it's dropped and your current approach stands.
 - **If it ever does harm** — more negative replies — a circuit breaker stops it immediately.
   A variant that gets more replies but angrier ones loses.
@@ -46,7 +46,7 @@ current approach on real outcomes.
 ## Vera remembers what wins
 
 Openers from your own account that earned interested replies become part of Vera's memory. When
-she drafts for a new prospect, she uses those winners as a guide for the angle and energy that
+drafting for a new prospect, Vera uses those winners as a guide for the angle and energy that
 works on your buyers — never copying them (every prospect gets a fresh message), and never
 borrowing their specific numbers or claims. This memory is yours alone: nothing from your
 messages is ever shared with any other account.
@@ -62,7 +62,7 @@ messages is ever shared with any other account.
 ## What Vera will never do
 
 The goal is more replies and more booked meetings — never at the cost of your account or your
-brand. She never increases send volume (your safety limits are fixed and she can't touch them),
+brand. Vera never increases send volume (your safety limits are fixed and the loop can't touch them),
 never lowers the quality bar on who gets contacted, and never loosens the rules that keep
 messages honest and human. Improvement comes from keeping what works, not from doing more or
 cutting corners.

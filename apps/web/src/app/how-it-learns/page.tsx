@@ -15,7 +15,7 @@ import { MarketingHeader } from "@/components/landing/marketing-header";
 export const metadata: Metadata = {
   title: "How It Learns — Vantera",
   description:
-    "No magic, no black box. Here's exactly how Vantera figures out what works for your buyers on LinkedIn — and gets sharper every week.",
+    "No magic, no black box. Here's exactly how Vantera figures out what works for your buyers on LinkedIn — and gets smarter every week.",
   alternates: { canonical: "/how-it-learns" },
 };
 
@@ -54,7 +54,7 @@ const LOOP_STEPS = [
     icon: Repeat,
     step: "05",
     title: "It repeats — every week",
-    body: "The loop never stops. Each cycle, your outreach is a little sharper than the last — better openers, better targeting, better timing. That's the compounding other tools can't do: they only change when you change them.",
+    body: "The loop never stops. Each cycle, your outreach is a little smarter than the last — better openers, better targeting, better timing. That's the compounding other tools can't do: they only change when you change them.",
   },
 ];
 
@@ -89,7 +89,7 @@ export default function HowItLearnsPage() {
       <section className="px-6 pt-36 pb-10 sm:pt-40 lg:px-8">
         <MarketingHeader
           eyebrow="How it works"
-          title="How your outreach gets sharper every week"
+          title="How your outreach gets smarter every week"
           subtitle="No magic, no black box. Here's exactly how Vantera figures out what works for your buyers — in plain English."
         />
       </section>

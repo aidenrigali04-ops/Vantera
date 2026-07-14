@@ -43,7 +43,7 @@ const STEPS: Step[] = [
     icon: Radar,
     title: "Prospect",
     headline: "Vera finds and messages your buyers.",
-    body: "She sources in-market prospects, scores them, and drafts from proven plays personalized to each — safe-paced, multi-sender.",
+    body: "In-market prospects get sourced, scored, and drafted from proven plays personalized to each — safe-paced, multi-sender.",
     mock: <ProspectMock />,
   },
   {

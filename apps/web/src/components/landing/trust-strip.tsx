@@ -9,12 +9,12 @@ import { ShieldCheck, TrendingUp, Hand, Ban } from "lucide-react";
  * endorsement and legal exposure). Until real, attributable customer logos or
  * numbers exist, the honest thing to show here is the product's actual
  * guarantees — safety + control (the category's #1 objection: "will this get my
- * LinkedIn account restricted?") plus the learning promise ("gets sharper every
+ * LinkedIn account restricted?") plus the learning promise ("gets smarter every
  * week" — the self-evolving positioning). Every claim below is literally true
  * of the product.
  */
 const SIGNALS = [
-  { icon: TrendingUp, label: "Gets sharper every week", sub: "learns what works, on its own" },
+  { icon: TrendingUp, label: "Gets smarter every week", sub: "learns what works, on its own" },
   { icon: ShieldCheck, label: "LinkedIn-safe pacing", sub: "human-like limits, built in" },
   { icon: Hand, label: "You approve every send", sub: "nothing goes out without you" },
   { icon: Ban, label: "No card to start", sub: "cancel anytime" },

@@ -94,7 +94,7 @@ export interface DashboardViewProps {
   channels: { liStatus: string | null };
   week: { sends: number; li: number; replies: number };
   attribution: SignalAttribution[];
-  /** Vera's visible heartbeat (Stage 0): what she's testing now + her latest adoption */
+  /** Vera's visible heartbeat (Stage 0): the current test + the latest adoption */
   whatsWorking: { testingLabel: string | null; adoptedLabel: string | null };
   /** matched starter plays — fill the waiting states with proven competence, honestly labeled */
   plays: { slug: string; name: string; description: string; sourceLabel: string }[];
@@ -231,7 +231,7 @@ function WorkingDashboard(props: DashboardViewProps) {
         goalCents={goalCents}
       />
 
-      {/* Vera's heartbeat (Stage 0) — what she's testing and what she adopted, one glance. */}
+      {/* Vera's heartbeat (Stage 0) — the current test and the latest adoption, one glance. */}
       <WhatsWorkingStrip whatsWorking={props.whatsWorking} />
 
       {/* Reassure — the agent heartbeat + the warm replies that reward the daily check-in. Paired
@@ -267,12 +267,12 @@ function WhatsWorkingStrip({
             )}
             {testingLabel ? (
               <>
-                Right now she&apos;s testing{" "}
+                Right now Vera is testing{" "}
                 <span className="font-medium text-foreground">{testingLabel}</span> on a small
-                slice of new drafts — she keeps it only if it genuinely wins.
+                slice of new drafts — kept only if it genuinely wins.
               </>
             ) : (
-              <>She&apos;s watching the results and lines up the next test on its own.</>
+              <>Vera is watching the results and lines up the next test on its own.</>
             )}
           </p>
         </div>

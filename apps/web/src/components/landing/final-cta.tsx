@@ -71,8 +71,8 @@ export function FinalCta() {
           <RevealItem>
             <p className="mx-auto mt-6 max-w-xl text-[16px] font-normal leading-relaxed text-[var(--ink-3)] sm:text-[17.5px]">
               Live in minutes. Vera starts on plays that already work, surfaces your in-market
-              buyers, and drafts every message — you approve the sends, and she gets sharper every
-              week.
+              buyers, and drafts every message, getting smarter with every reply. You approve
+              every send.
             </p>
           </RevealItem>
 

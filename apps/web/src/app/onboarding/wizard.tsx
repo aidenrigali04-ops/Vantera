@@ -315,7 +315,7 @@ export function Wizard({ init }: { init: WizardInit }) {
                         <p className="mt-2 text-[14px] leading-relaxed text-[var(--ink-3)]">
                           {init.connected
                             ? "You're activated — Vera can now reach buyers from your own LinkedIn, and nothing sends until you approve it."
-                            : "This is the step that turns Vera loose. She runs outreach from your own LinkedIn — securely, through our partner's hosted login."}
+                            : "This is the step that turns Vera loose — outreach runs from your own LinkedIn, securely, through our partner's hosted login."}
                         </p>
                       </div>
                       <div className="space-y-4 px-8 pt-4 pb-8">
@@ -337,7 +337,7 @@ export function Wizard({ init }: { init: WizardInit }) {
                                   Vera is ready
                                 </p>
                                 <p className="mt-1 text-[13.5px] leading-snug text-foreground">
-                                  Here are the plays she&apos;ll run for{" "}
+                                  Here are the plays queued for{" "}
                                   <span className="font-medium">{values.icp}</span> — connect LinkedIn to turn
                                   them on.
                                 </p>
@@ -456,7 +456,7 @@ export function Wizard({ init }: { init: WizardInit }) {
                         <FormError message={findState.error} />
                         <p className="rounded-xl bg-[var(--tint)] px-4 py-3 text-[12.5px] leading-relaxed text-[var(--ink-3)]">
                           This is the last step — it puts Vera to work: your Prospect, Outreach, and Intent
-                          agents deploy, starting on proven plays and getting sharper from your results.
+                          agents deploy, starting on proven plays and getting smarter from your results.
                           They start within ~15 minutes, and nothing sends without your approval.
                         </p>
                       </div>
@@ -566,7 +566,7 @@ function PipelineRail({ current, working }: { current: number; working: boolean 
           <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--cyan-strong)]">Then</p>
           <p className="mt-1.5 text-[14px] font-medium text-foreground">Vera goes to work</p>
           <p className="mt-1 text-[12.5px] leading-relaxed text-[var(--ink-3)]">
-            She starts sourcing within ~15 minutes on proven plays — you approve everything she sends.
+            Sourcing starts within ~15 minutes on proven plays — you approve everything Vera sends.
           </p>
         </div>
       </div>

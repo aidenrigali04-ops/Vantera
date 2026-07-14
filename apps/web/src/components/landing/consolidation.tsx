@@ -57,7 +57,7 @@ export function Consolidation() {
         <LandingHeading
           eyebrow="One platform"
           title="Replace your entire outbound stack"
-          subtitle="No more stitching a lead-list tool to a sequencer to a separate inbox to safety tooling that all half-talk to each other. Vantera runs the whole motion, end to end — and unlike the stack it replaces, it keeps getting sharper."
+          subtitle="No more stitching a lead-list tool to a sequencer to a separate inbox to safety tooling that all half-talk to each other. Vantera runs the whole motion, end to end — and unlike the stack it replaces, it keeps getting smarter."
         />
 
         <div className="mt-16 grid items-center gap-14 lg:mt-20 lg:grid-cols-[1.05fr_1fr] lg:gap-20">

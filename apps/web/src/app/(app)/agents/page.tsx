@@ -47,7 +47,7 @@ export default async function AgentsPage({
         <h1 className="text-2xl font-semibold tracking-tight">Vera, your brain</h1>
         <p className="mt-1.5 text-sm text-muted-foreground">
           Set it up once. Vera finds and qualifies the right people on LinkedIn, turns every
-          qualified prospect into a conversation — and gets sharper every week, starting from
+          qualified prospect into a conversation — and gets smarter every week, starting from
           proven plays.
         </p>
       </div>

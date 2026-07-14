@@ -1,11 +1,10 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight } from "lucide-react";
 import { trackEvent } from "@/lib/analytics/clarity";
 import { HeroCalendar } from "./hero-calendar";
-import { HeroConnector } from "./hero-connector";
 
 /** LinkedIn brand glyph — lucide dropped brand icons, so we render it inline. */
 function LinkedinMark({ className }: { className?: string }) {
@@ -20,17 +19,8 @@ export function Hero() {
   const router = useRouter();
   const [url, setUrl] = useState("");
 
-  // Pipeline connector: LinkedIn icon → calendar. Endpoints measured from these refs;
-  // each booked meeting bumps bookTick to send one packet down the pipe.
-  const sectionRef = useRef<HTMLElement>(null);
-  const linkedinRef = useRef<HTMLSpanElement>(null);
-  const calendarRef = useRef<HTMLDivElement>(null);
-  const [bookTick, setBookTick] = useState(0);
-  const handleBook = useCallback(() => setBookTick((t) => t + 1), []);
-
   return (
     <section
-      ref={sectionRef}
       id="top"
       className="relative min-h-[100svh] overflow-hidden pt-32 pb-16 sm:pt-36 lg:flex lg:min-h-fit lg:flex-1 lg:flex-col lg:justify-center lg:pt-28 lg:pb-6"
     >
@@ -44,30 +34,16 @@ export function Hero() {
         }}
       />
 
-      {/* pipeline conduit: LinkedIn icon → calendar (rendered before the grid so it sits behind it) */}
-      <HeroConnector
-        sectionRef={sectionRef}
-        linkedinRef={linkedinRef}
-        calendarRef={calendarRef}
-        bookTick={bookTick}
-      />
-
       <div className="mx-auto w-full max-w-6xl px-6 lg:px-8">
         <div className="grid items-center gap-14 lg:grid-cols-[1.04fr_1fr] lg:gap-12">
           {/* LEFT — content */}
           <div className="max-w-xl">
             {/* h1 is the LCP element: no opacity gate, painted in SSR so it renders at
                 first paint instead of waiting on hydration. */}
-            {/* Base size stepped down from 2.9rem: the nowrap "Self-learning" pill must fit a
-                390px viewport; sm+ keeps the original scale. */}
             <h1 className="text-[2.3rem] font-semibold leading-[1.18] tracking-[-0.04em] text-foreground sm:text-[3.6rem] lg:text-[4rem]">
-              <span className="relative inline-block whitespace-nowrap rounded-[12px] px-3 pb-[0.12em] pt-[0.04em] text-white shadow-[0_12px_30px_-10px_rgba(24,119,242,0.6)] [background:linear-gradient(180deg,#2a82f7_0%,#1877f2_56%,#166fe5_100%)]">
-                Self-learning
-              </span>{" "}
-              lead gen for{" "}
+              Self-learning lead gen for{" "}
               <span className="whitespace-nowrap">
                 <span
-                  ref={linkedinRef}
                   role="img"
                   aria-label="LinkedIn"
                   className="mx-[0.02em] inline-flex translate-y-[0.16em] items-center justify-center rounded-[12px] border border-[var(--hairline)] bg-white p-[0.2em] align-baseline shadow-[var(--shadow-card)]"
@@ -83,8 +59,9 @@ export function Hero() {
               className="landing-rise mt-6 max-w-lg text-[17px] font-normal leading-relaxed text-[var(--ink-3)] sm:text-[19px]"
               style={{ animationDelay: "90ms" }}
             >
-              Vera finds your buyers, reaches out with what&apos;s proven to work, and gets sharper
-              every week. You approve everything she sends.
+              Always-evolving outreach that turns LinkedIn into a scalable flow of booked
+              revenue. Vera starts with what works, gets smarter with every reply — and you
+              approve every send.
             </p>
 
             <form
@@ -122,7 +99,7 @@ export function Hero() {
               min-w-0 lets the (intentionally wider) calendar overflow this grid track
               rightward instead of growing the track and squeezing the left column. */}
           <div className="landing-rise min-w-0" style={{ animationDelay: "200ms" }}>
-            <HeroCalendar cardRef={calendarRef} onBook={handleBook} />
+            <HeroCalendar />
           </div>
         </div>
       </div>

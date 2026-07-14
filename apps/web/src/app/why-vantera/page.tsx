@@ -7,14 +7,14 @@ import { MarketingHeader } from "@/components/landing/marketing-header";
 export const metadata: Metadata = {
   title: "Why Vantera — Not Another LinkedIn Tool",
   description:
-    "Sequencers wait for your instructions and never improve. Vantera starts from what's proven, shows its work, and gets sharper every week.",
+    "Sequencers wait for your instructions and never improve. Vantera starts from what's proven, shows its work, and gets smarter every week.",
   alternates: { canonical: "/why-vantera" },
 };
 
 const INTRO_PARAS = [
   "Almost every LinkedIn outreach tool is the same machine underneath: a sequencer. You write the messages, you guess the targeting, you set the steps — and it sends on a schedule. Tools like Waalaxy, Expandi, and Dripify all work this way. The thinking is yours; the tool is a pipe.",
   "That has a cost people rarely name: a sequencer is the best it will ever be on the day you configure it. If your messages don't land, nothing in the tool will fix them. It doesn't know what's working. It doesn't remember what won. It just keeps sending.",
-  "Vantera is a different kind of system. It arrives already knowing what works, it measures every conversation it runs, and it gets sharper every week — while you stay in charge of every send.",
+  "Vantera is a different kind of system. It arrives already knowing what works, it measures every conversation it runs, and it gets smarter every week — while you stay in charge of every send.",
 ];
 
 const COMPARISON: { dimension: string; sequencer: string; vantera: string }[] = [
@@ -26,7 +26,7 @@ const COMPARISON: { dimension: string; sequencer: string; vantera: string }[] = 
   {
     dimension: "Over time",
     sequencer: "Frozen. It only changes when you rewrite it.",
-    vantera: "Tests improvements, keeps winners, drops losers — sharper every week.",
+    vantera: "Tests improvements, keeps winners, drops losers — smarter every week.",
   },
   {
     dimension: "What it shows you",
@@ -62,7 +62,7 @@ export default function WhyVanteraPage() {
         <MarketingHeader
           eyebrow="The difference"
           title="Every other tool waits for instructions"
-          subtitle="Vantera already knows what works — and gets sharper every week. Here's the honest comparison."
+          subtitle="Vantera already knows what works — and gets smarter every week. Here's the honest comparison."
         />
       </section>
 

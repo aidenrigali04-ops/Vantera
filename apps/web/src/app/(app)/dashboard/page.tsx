@@ -375,7 +375,7 @@ async function OverviewTab() {
   // proof). Surfaced as a one-liner on Overview when there's at least one attributed win.
   const signalAttribution = await loadSignalAttribution(supabase);
 
-  // What's-working pulse (Stage 0): what Vera is testing right now + her latest adoption —
+  // What's-working pulse (Stage 0): what Vera is testing right now + the latest adoption —
   // the loop's visible heartbeat on the Overview. Two cheap maybeSingle reads, RLS-scoped.
   const [{ data: runningExp }, { data: adoptedExp }] = await Promise.all([
     supabase

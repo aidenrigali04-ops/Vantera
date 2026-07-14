@@ -23,7 +23,7 @@ import { cn } from "@/lib/utils";
  * Reveal/RevealItem, one-accent Facebook-blue treatment on white cards with hairline
  * borders). TWO cards span both columns and carry the heavier --fb/blue wash plus a
  * "Vantera only" badge — SAFETY (anti-ban pacing) and LEARNING (tests, keeps winners,
- * gets sharper) — the differentiator pair no sequencer can claim. The grid closes on
+ * gets smarter) — the differentiator pair no sequencer can claim. The grid closes on
  * a full-width CRM tile so the last row stays balanced (no dangling half-row).
  */
 
@@ -229,7 +229,7 @@ function SafetyCard() {
   );
 }
 
-/** The second Vantera-only card — the learning loop: starts proven, keeps winners, gets sharper. */
+/** The second Vantera-only card — the learning loop: starts proven, keeps winners, gets smarter. */
 function LearningCard() {
   const chips = ["starts from proven plays", "keeps winners, drops losers", "rolls back anything that hurts"];
   return (
@@ -268,7 +268,7 @@ function LearningCard() {
           </div>
 
           <h3 className="mt-6 text-[20px] font-semibold leading-snug tracking-[-0.02em] text-foreground sm:text-[22px]">
-            It learns what works — and gets sharper every week
+            Learns what works — and gets smarter every week
           </h3>
           <p className="mt-2.5 max-w-md text-[14.5px] leading-relaxed text-[var(--ink-3)]">
             Every other tool is frozen the day you configure it. Vera starts from proven plays,
@@ -405,7 +405,7 @@ export function FeaturesGrid() {
         <LandingHeading
           eyebrow="Capabilities"
           title="Built to run outbound end to end"
-          subtitle="From finding the right buyer to a clean CRM handoff — every part of the motion, working as one system that keeps getting sharper, with you in control."
+          subtitle="From finding the right buyer to a clean CRM handoff — every part of the motion, working as one system that keeps getting smarter, with you in control."
         />
 
         <Reveal className="mt-14 grid gap-5 sm:grid-cols-2">

@@ -36,7 +36,7 @@ const STANDARDS = [
   {
     icon: Eye,
     title: "The improvement claim is watchable",
-    body: "When we say your outreach gets sharper, you don't have to take our word for it. Your dashboard shows what's being tested, what won, and what changed — so the claim is something you watch happen on your own account, not something you're asked to believe.",
+    body: "When we say your outreach gets smarter, you don't have to take our word for it. Your dashboard shows what's being tested, what won, and what changed — so the claim is something you watch happen on your own account, not something you're asked to believe.",
   },
 ];
 

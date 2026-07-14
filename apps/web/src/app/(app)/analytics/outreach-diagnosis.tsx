@@ -8,7 +8,7 @@ import { adoptExperiment, discardExperiment, revertAdoption, startExperiment } f
 
 // "What's working" — the visible face of Vera's self-improving loop (Stage 0, spec 2026-07-14).
 // Shows the invite→accept→reply→book→close funnel with each stage's rate against a typical band,
-// what Vera is testing right now, and what she adopted last (with an owner Revert control).
+// what Vera is testing right now, and the latest adoption (with an owner Revert control).
 // Adoption is autonomous inside the envelope; the legacy ready_to_adopt approve UI stays for any
 // experiment parked before the autonomy flip.
 
@@ -116,8 +116,8 @@ export function OutreachDiagnosis({ vm }: { vm: OutreachDiagnosisVM }) {
             </p>
             <p className="mt-1.5 text-sm text-muted-foreground">
               Vera is trying <span className="font-medium text-foreground">{experiment.challengerLabel}</span>{" "}
-              on a slice of new drafts, measured against your current approach. She keeps it only if it
-              genuinely wins, stops it instantly if it ever does harm — and nothing sends without your
+              on a slice of new drafts, measured against your current approach — kept only if it
+              genuinely wins, stopped instantly if it ever does harm. Nothing sends without your
               approval either way.
             </p>
           </div>

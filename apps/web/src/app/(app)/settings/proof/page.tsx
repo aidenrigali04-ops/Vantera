@@ -33,7 +33,7 @@ export default async function ProofPointsPage() {
         <p className="mt-1.5 text-sm text-muted-foreground">
           The true facts Vera is allowed to prove with when a prospect asks &quot;can you prove
           it?&quot; or &quot;what does it cost?&quot;. Without these, Vera won&apos;t invent a
-          number, she&apos;ll say she doesn&apos;t have one, which can stall a warm conversation.{" "}
+          number — the reply simply says there isn&apos;t one, which can stall a warm conversation.{" "}
           <Link href="/settings" className="underline underline-offset-2">
             Back to settings
           </Link>

@@ -14,14 +14,14 @@ import { MarketingHeader } from "@/components/landing/marketing-header";
 export const metadata: Metadata = {
   title: "Proven Plays — Vantera",
   description:
-    "Vantera doesn't start from a blank page. From the first message, your outreach runs plays that already work — and gets sharper from there.",
+    "Vantera doesn't start from a blank page. From the first message, your outreach runs plays that already work — and gets smarter from there.",
   alternates: { canonical: "/proven-plays" },
 };
 
 const INTRO_PARAS = [
   "Every other outreach tool starts you at zero: a blank message editor, a targeting form, and good luck. Whatever you type on day one is what gets sent — and if it doesn't work, that's on you.",
   "Vantera starts you somewhere very different: with plays that already work. A play is a complete, proven way to run a conversation — who to reach out to, what to lead with, what proof to share, and how to ask. When you sign up, your outreach is matched to the plays that fit your buyers, and it runs those from the very first message.",
-  "So the first message you send isn't a guess. It's the best starting point we can honestly give you — and it only gets sharper from there.",
+  "So the first message you send isn't a guess. It's the best starting point we can honestly give you — and it only gets smarter from there.",
 ];
 
 const PLAY_ANATOMY = [
@@ -144,7 +144,7 @@ export default function ProvenPlaysPage() {
             <span className="font-semibold text-foreground">Where these come from, honestly: </span>
             our starting plays are proven on our own real LinkedIn outbound — the same numbers we
             publish on our homepage — and grounded in research on what buyers actually respond to.
-            As more real conversations run through Vantera, the plays keep getting sharper. We
+            As more real conversations run through Vantera, the plays keep getting smarter. We
             don&apos;t claim results we haven&apos;t earned, and we never show you an invented
             number.
           </p>
@@ -173,7 +173,7 @@ export default function ProvenPlaysPage() {
               href="/how-it-learns"
               className="font-medium text-[var(--cyan-strong)] underline-offset-4 hover:underline"
             >
-              testing, keeping winners, and getting sharper every week
+              testing, keeping winners, and getting smarter every week
             </Link>
             .
           </p>
@@ -188,7 +188,7 @@ export default function ProvenPlaysPage() {
             className="group rounded-2xl border border-[var(--hairline)] bg-white p-6 shadow-[var(--shadow-sm)] transition-colors hover:border-[var(--cyan-strong)]/40"
           >
             <h3 className="text-[1.05rem] font-semibold tracking-[-0.01em] text-foreground">
-              How it gets sharper
+              How it gets smarter
             </h3>
             <p className="mt-2 text-[14.5px] leading-relaxed text-[var(--ink-3)]">
               The full loop — how plays are tested, measured, and improved every week.
