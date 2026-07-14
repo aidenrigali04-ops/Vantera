@@ -159,6 +159,20 @@ export function OutreachDiagnosis({ vm }: { vm: OutreachDiagnosisVM }) {
             {vm.lastAdoption.reason ? `${vm.lastAdoption.reason}. ` : ""}Vera adopted it
             automatically — and rolls back anything that ever makes results worse.
           </p>
+          {/* Stage 1 receipts: real message-level counts under the adopted approach — never
+              shown until at least one stamped message has actually been sent. */}
+          {vm.lastAdoption.receipts && (
+            <p className="mt-1.5 text-sm text-muted-foreground">
+              Since this change: {vm.lastAdoption.receipts.sent}{" "}
+              {vm.lastAdoption.receipts.sent === 1 ? "message" : "messages"} sent
+              {vm.lastAdoption.receipts.interested > 0 && (
+                <>
+                  {" "}· {vm.lastAdoption.receipts.interested} interested{" "}
+                  {vm.lastAdoption.receipts.interested === 1 ? "reply" : "replies"}
+                </>
+              )}
+            </p>
+          )}
           <form action={revertAdoption} className="mt-3">
             <input type="hidden" name="id" value={vm.lastAdoption.experimentId} />
             <button

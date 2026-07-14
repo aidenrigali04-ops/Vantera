@@ -39,8 +39,27 @@ export type OutreachDiagnosisVM = {
     label: string;
     reason: string | null;
     concludedAt: string | null;
+    /** real message-level receipts (Stage 1): sends stamped with the CURRENT playbook version.
+     *  null until at least one stamped send exists — numbers are never invented. */
+    receipts: { sent: number; interested: number } | null;
   } | null;
 };
+
+/** Distinct stamped leads with an interested reply after the adoption moment (Stage 1 receipts). Pure. */
+export function countInterestedSince(
+  stampedLeadIds: Set<string>,
+  interested: { lead_id: string; received_at: string }[],
+  concludedAt: string | null
+): number {
+  const cutoff = concludedAt ? new Date(concludedAt).getTime() : null;
+  const winners = new Set<string>();
+  for (const r of interested) {
+    if (!stampedLeadIds.has(r.lead_id)) continue;
+    if (cutoff !== null && new Date(r.received_at).getTime() <= cutoff) continue;
+    winners.add(r.lead_id);
+  }
+  return winners.size;
+}
 
 export async function loadOutreachDiagnosis(db: SupabaseClient): Promise<OutreachDiagnosisVM> {
   const notNull = (col: string) =>
@@ -51,7 +70,7 @@ export async function loadOutreachDiagnosis(db: SupabaseClient): Promise<Outreac
     notNull("linkedin_connected_at"),
     notNull("meeting_booked_at"),
     db.from("leads").select("id", { count: "exact", head: true }).eq("status", "converted"),
-    db.from("replies").select("lead_id").eq("classification", "interested"),
+    db.from("replies").select("lead_id, received_at").eq("classification", "interested"),
   ]);
 
   const invited = invitedRes.count ?? 0;
@@ -109,6 +128,35 @@ export async function loadOutreachDiagnosis(db: SupabaseClient): Promise<Outreac
       decision_reason: string | null;
       concluded_at: string | null;
     }>();
+  // Stage 1 receipts: real counts of sends stamped with the CURRENT playbook version, plus
+  // distinct leads among them that replied interested after the adoption. Null (no line shown)
+  // until at least one stamped send exists — the panel never shows an invented number.
+  let receipts: { sent: number; interested: number } | null = null;
+  if (adoptedRow && !(adoptedRow.decision_reason ?? "").includes("· reverted")) {
+    const { data: pb } = await db
+      .from("optimization_playbook")
+      .select("version")
+      .maybeSingle<{ version: number }>();
+    if (pb?.version) {
+      const { data: stamped } = await db
+        .from("scheduled_sends")
+        .select("lead_id")
+        .eq("status", "sent")
+        .eq("recipe->>playbookVersion", String(pb.version));
+      const stampedRows = (stamped ?? []) as { lead_id: string }[];
+      if (stampedRows.length > 0) {
+        receipts = {
+          sent: stampedRows.length,
+          interested: countInterestedSince(
+            new Set(stampedRows.map((r) => r.lead_id)),
+            (interestedRes.data ?? []) as { lead_id: string; received_at: string }[],
+            adoptedRow.concluded_at
+          ),
+        };
+      }
+    }
+  }
+
   const lastAdoption =
     adoptedRow && !(adoptedRow.decision_reason ?? "").includes("· reverted")
       ? {
@@ -116,6 +164,7 @@ export async function loadOutreachDiagnosis(db: SupabaseClient): Promise<Outreac
           label: describeStrategy(adoptedRow.challenger_strategy ?? {}),
           reason: adoptedRow.decision_reason,
           concludedAt: adoptedRow.concluded_at,
+          receipts,
         }
       : null;
 
