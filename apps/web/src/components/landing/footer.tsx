@@ -25,9 +25,19 @@ const COLUMNS: { heading: string; links: FooterLink[] }[] = [
     links: [
       { label: "Prospecting", href: "/#features" },
       { label: "Outreach", href: "/#features" },
-      { label: "Safety", href: "/#features" },
+      { label: "Safety", href: "/safety" },
       { label: "Replies", href: "/#features" },
       { label: "Connect MCP", href: "/claude-linkedin-mcp" },
+    ],
+  },
+  {
+    heading: "Learn",
+    links: [
+      { label: "How it learns", href: "/how-it-learns" },
+      { label: "Proven plays", href: "/proven-plays" },
+      { label: "Why Vantera", href: "/why-vantera" },
+      { label: "Account safety", href: "/safety" },
+      { label: "How we prove it", href: "/how-we-prove-it" },
     ],
   },
   {
@@ -47,7 +57,7 @@ const COLUMNS: { heading: string; links: FooterLink[] }[] = [
 export function LandingFooter() {
   return (
     <footer className="relative border-t border-[var(--hairline)] bg-[var(--tint)] px-6 py-16 lg:px-8">
-      <div className="mx-auto grid max-w-6xl gap-x-12 gap-y-12 sm:grid-cols-2 lg:grid-cols-[1.5fr_repeat(3,1fr)]">
+      <div className="mx-auto grid max-w-6xl gap-x-12 gap-y-12 sm:grid-cols-2 lg:grid-cols-[1.5fr_repeat(4,1fr)]">
         {/* Identity block */}
         <div className="max-w-xs">
           <Link
@@ -57,7 +67,9 @@ export function LandingFooter() {
             <VanteraLogo className="size-6 text-foreground transition-transform duration-300 ease-out group-hover:scale-105" />
             <span className="text-[17px] font-semibold tracking-[-0.02em]">Vantera</span>
           </Link>
-          <p className="mt-4 text-[14px] leading-relaxed text-[var(--ink-3)]">The AI SDR team for LinkedIn.</p>
+          <p className="mt-4 text-[14px] leading-relaxed text-[var(--ink-3)]">
+            LinkedIn outreach that learns what works.
+          </p>
           <p className="mt-6 font-mono text-[11px] tracking-[0.02em] text-[var(--ink-4)]">© 2026 Vantera</p>
         </div>
 

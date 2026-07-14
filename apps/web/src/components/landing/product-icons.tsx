@@ -129,6 +129,35 @@ export function McpIcon({ className }: { className?: string }) {
   );
 }
 
+/** How it learns — compounding: a rising line carried inside the improvement cycle. */
+export function LearnIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <circle cx="12" cy="12" r="7.6" fill="currentColor" opacity="0.1" />
+      <g {...STROKE}>
+        <path d="M19.6 12a7.6 7.6 0 1 1-2.2-5.4" />
+        <path d="M17.6 3.4v3.4h-3.4" strokeWidth="1.5" />
+        <path d="M8.2 13.6l2.2-2.2 1.7 1.7 3.4-3.4" strokeWidth="1.5" />
+        <path d="M13 9.7h2.5v2.5" strokeWidth="1.5" />
+      </g>
+    </Svg>
+  );
+}
+
+/** Proven plays — a play card that earned its check, stacked on the plays behind it. */
+export function PlaysIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <rect x="4.2" y="7" width="13.5" height="12.5" rx="2.4" fill="currentColor" opacity="0.1" />
+      <g {...STROKE}>
+        <path d="M8 4.4h9.4a2.4 2.4 0 0 1 2.4 2.4v9" />
+        <rect x="4.2" y="7" width="13.5" height="12.5" rx="2.4" />
+        <path d="M8.3 13.6l2 2 3.6-3.6" strokeWidth="1.5" />
+      </g>
+    </Svg>
+  );
+}
+
 /** Control — full-auto or approve-before-send: a toggle you set. */
 export function ControlIcon({ className }: { className?: string }) {
   return (

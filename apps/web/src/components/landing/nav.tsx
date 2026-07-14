@@ -9,8 +9,10 @@ import { VanteraLogo } from "./vantera-logo";
 import { LiveBanner } from "./live-banner";
 import {
   CrmSyncIcon,
+  LearnIcon,
   McpIcon,
   OutreachIcon,
+  PlaysIcon,
   ProspectingIcon,
   RepliesIcon,
   SafetyIcon,
@@ -38,7 +40,9 @@ type ProductLink = { icon: ProductIcon; title: string; desc: string; href: strin
 const PRODUCTS: ProductLink[] = [
   { icon: ProspectingIcon, title: "Prospecting", desc: "Find and rank in-market buyers", href: "/#features" },
   { icon: OutreachIcon, title: "Outreach", desc: "Personalized LinkedIn messages", href: "/#features" },
-  { icon: SafetyIcon, title: "Safety", desc: "LinkedIn-safe, anti-ban pacing", href: "/#features" },
+  { icon: LearnIcon, title: "How it learns", desc: "Tests, keeps winners, gets sharper", href: "/how-it-learns" },
+  { icon: PlaysIcon, title: "Proven plays", desc: "Good from the first message", href: "/proven-plays" },
+  { icon: SafetyIcon, title: "Safety", desc: "LinkedIn-safe, anti-ban pacing", href: "/safety" },
   { icon: RepliesIcon, title: "Replies", desc: "Every reply captured in one place", href: "/#features" },
   { icon: CrmSyncIcon, title: "CRM sync", desc: "Closed deals pushed to your CRM", href: "/#integrations" },
   { icon: McpIcon, title: "Claude & MCP", desc: "Drive Vantera from Claude", href: "/claude-linkedin-mcp" },
