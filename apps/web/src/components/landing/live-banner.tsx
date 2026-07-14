@@ -22,7 +22,7 @@ export function LiveBanner() {
         <span className="relative inline-flex size-1.5 rounded-full bg-white" />
       </span>
       <span className="text-[12.5px] font-medium tracking-[-0.005em]">
-        Your LinkedIn, run hands-off — you approve every message.
+        Meet Vera — LinkedIn outreach that already knows what works. You approve every message.
       </span>
       <span className="hidden items-center gap-1 text-[12.5px] font-semibold sm:inline-flex">
         Start free

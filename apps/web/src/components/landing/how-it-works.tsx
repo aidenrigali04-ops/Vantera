@@ -35,15 +35,15 @@ const STEPS: Step[] = [
     icon: Globe,
     title: "Connect",
     headline: "Enter your website, connect LinkedIn.",
-    body: "Vantera reads your site, learns what you sell and who you target. No manual setup.",
+    body: "Vera reads your site, learns what you sell, and matches you to plays that already work. No manual setup.",
     mock: <ConnectMock />,
   },
   {
     n: "02",
     icon: Radar,
     title: "Prospect",
-    headline: "Your agents find and message your buyers.",
-    body: "Sources in-market prospects, scores them, drafts from proven plays personalized to each — safe-paced, multi-sender.",
+    headline: "Vera finds and messages your buyers.",
+    body: "She sources in-market prospects, scores them, and drafts from proven plays personalized to each — safe-paced, multi-sender.",
     mock: <ProspectMock />,
   },
   {
@@ -65,7 +65,7 @@ export function HowItWorks() {
       <div className="relative mx-auto max-w-6xl px-6 lg:px-8">
         <LandingHeading
           eyebrow="Getting started"
-          title="Live in minutes. First replies this week."
+          title="Live in minutes. Good from the first message."
           subtitle="Connect once. Three agents run the whole motion — sourcing, qualifying, and drafting — while you stay in control of every send."
         />
 

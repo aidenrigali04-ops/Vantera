@@ -50,6 +50,9 @@ export const PLAN_DISPLAY: Record<PlanTier, PlanDisplay> = {
     highlight: false,
     features: [
       "Prospect & Outreach agents (LinkedIn)",
+      // Vera's self-improving loop runs on EVERY tier (no entitlement gate) — the capability
+      // claim is checked against the Stage 0 engine, not hand-waved (spec 2026-07-14).
+      "Vera — self-improving outreach on proven plays",
       "ICP-tailored enrichment & lead scoring",
       ...capacity("starter"),
     ],

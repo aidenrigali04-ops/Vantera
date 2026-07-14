@@ -46,8 +46,8 @@ const FEATURES: Feature[] = [
   {
     label: "Outreach",
     title: "Human-quality LinkedIn messages at scale",
-    line: "Every message is written from a prospect's real activity — never a template — so it reads like you sat down and wrote it yourself.",
-    chips: ["context-aware", "personalized", "right person, right moment"],
+    line: "Every message starts from a play that's proven, then is written from the prospect's real activity — never a template — so it reads like you sat down and wrote it yourself.",
+    chips: ["starts from proven plays", "context-aware", "personalized"],
     icon: OutreachIcon,
   },
   {

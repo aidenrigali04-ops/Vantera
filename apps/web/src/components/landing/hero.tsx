@@ -21,9 +21,12 @@ export function Hero() {
   const [url, setUrl] = useState("");
 
   // Pipeline connector: LinkedIn icon → calendar. Endpoints measured from these refs;
-  // each booked meeting bumps bookTick to send one packet down the pipe.
+  // each booked meeting bumps bookTick to send one packet down the pipe. The pill ref
+  // measures the headline's bottom edge so the play chip can sit in the real whitespace
+  // band between headline and subhead (never guessed — font sizes jump across breakpoints).
   const sectionRef = useRef<HTMLElement>(null);
   const linkedinRef = useRef<HTMLSpanElement>(null);
+  const pillRef = useRef<HTMLSpanElement>(null);
   const calendarRef = useRef<HTMLDivElement>(null);
   const [bookTick, setBookTick] = useState(0);
   const handleBook = useCallback(() => setBookTick((t) => t + 1), []);
@@ -48,6 +51,7 @@ export function Hero() {
       <HeroConnector
         sectionRef={sectionRef}
         linkedinRef={linkedinRef}
+        pillRef={pillRef}
         calendarRef={calendarRef}
         bookTick={bookTick}
       />
@@ -74,7 +78,9 @@ export function Hero() {
                 </span>
               </span>{" "}
               outreach that already{" "}
-              <span className="relative inline-block whitespace-nowrap rounded-[12px] px-3 pb-[0.12em] pt-[0.04em] text-white shadow-[0_12px_30px_-10px_rgba(24,119,242,0.6)] [background:linear-gradient(180deg,#2a82f7_0%,#1877f2_56%,#166fe5_100%)]">
+              <span
+                ref={pillRef}
+                className="relative inline-block whitespace-nowrap rounded-[12px] px-3 pb-[0.12em] pt-[0.04em] text-white shadow-[0_12px_30px_-10px_rgba(24,119,242,0.6)] [background:linear-gradient(180deg,#2a82f7_0%,#1877f2_56%,#166fe5_100%)]">
                 knows what works
               </span>
             </h1>
