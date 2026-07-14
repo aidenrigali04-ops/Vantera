@@ -537,8 +537,8 @@ export function Showcase() {
       <div className="mx-auto max-w-6xl px-6 lg:px-8">
         <LandingHeading
           eyebrow="Meet Vera"
-          title="Everything an SDR does — running itself, sharpening itself"
-          subtitle="Vera sources in-market buyers, qualifies them against your ICP, writes every message from proven plays and real activity — and learns from every reply. You approve every send."
+          title="From in-market buyer to booked call"
+          subtitle="Vera sources your buyers, qualifies them, and writes from proven plays — learning from every reply. You approve every send."
         />
 
         <div className="mt-20 flex flex-col gap-20 lg:mt-24 lg:gap-24">

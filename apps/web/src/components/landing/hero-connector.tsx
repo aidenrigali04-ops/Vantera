@@ -1,28 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
-/**
- * The plays shown in the conduit's play card — REAL starter-play names, mirroring
- * STARTER_PLAYS in @vantera/agent-brains (packages/agent-brains/src/plays/starter.ts);
- * keep in sync by hand (marketing copy never imports the brains package into the client
- * bundle). Label-only on purpose: no performance numbers here until real ones exist
- * (honesty rule, spec 2026-07-14).
- */
-const PLAY_NAMES = ["The trigger opener", "The problem-first note", "The direct ask"];
-/** Swap the play label every Nth booking — the "keeps upgrading" beat, kept unhurried. */
-const SWAP_EVERY = 3;
-
-type Geo = { sx: number; sy: number; ex: number; ey: number; w: number; h: number; pillBottom: number | null };
+type Geo = { sx: number; sy: number; ex: number; ey: number; w: number; h: number };
 
 type Props = {
   sectionRef: React.RefObject<HTMLElement | null>;
   linkedinRef: React.RefObject<HTMLSpanElement | null>;
-  /** the headline's "knows what works" pill — the play chip docks in the band below it */
-  pillRef: React.RefObject<HTMLSpanElement | null>;
   calendarRef: React.RefObject<HTMLDivElement | null>;
   /** Increments once per booked meeting — fires one packet down the pipe. */
   bookTick: number;
@@ -63,13 +50,10 @@ function sampleBezier(g: Geo, n = 22) {
  * light show. lg+ only; honors prefers-reduced-motion. Decorative (aria-hidden), sits
  * behind the content so it emerges from behind the icon and tucks into the calendar.
  */
-export function HeroConnector({ sectionRef, linkedinRef, pillRef, calendarRef, bookTick }: Props) {
+export function HeroConnector({ sectionRef, linkedinRef, calendarRef, bookTick }: Props) {
   const reduce = useReducedMotion();
   const [geo, setGeo] = useState<Geo | null>(null);
   const rafRef = useRef(0);
-  // The play card's label rotates through the real starter plays as bookings flow — the
-  // hero's third node: LinkedIn → the proven play (Vera) → the booked calendar.
-  const playIdx = reduce ? 0 : Math.floor(bookTick / SWAP_EVERY) % PLAY_NAMES.length;
 
   useEffect(() => {
     const measure = () => {
@@ -86,9 +70,7 @@ export function HeroConnector({ sectionRef, linkedinRef, pillRef, calendarRef, b
       const ex = B.left - S.left;
       const ey = B.top - S.top + B.height / 2;
       if (ex <= sx + 24) return setGeo(null); // crossed / stacked / nonsensical
-      const P = pillRef.current?.getBoundingClientRect() ?? null;
-      const pillBottom = P ? P.bottom - S.top : null;
-      setGeo({ sx, sy, ex, ey, w: S.width, h: S.height, pillBottom });
+      setGeo({ sx, sy, ex, ey, w: S.width, h: S.height });
     };
     const schedule = () => {
       cancelAnimationFrame(rafRef.current);
@@ -117,7 +99,7 @@ export function HeroConnector({ sectionRef, linkedinRef, pillRef, calendarRef, b
       ro.disconnect();
       mq.removeEventListener("change", schedule);
     };
-  }, [sectionRef, linkedinRef, pillRef, calendarRef]);
+  }, [sectionRef, linkedinRef, calendarRef]);
 
   // Path + packet keyframes, recomputed only when the measured geometry changes.
   const path = useMemo(() => {
@@ -173,8 +155,7 @@ export function HeroConnector({ sectionRef, linkedinRef, pillRef, calendarRef, b
       <circle cx={geo.sx} cy={geo.sy} r={3.2} fill="#1877f2" />
       <circle cx={geo.ex} cy={geo.ey} r={3} fill="#1877f2" stroke="#fff" strokeWidth={1.5} />
 
-      {/* one luminous packet per booked meeting — drawn BEFORE the play card so each packet
-          visibly passes through it (under the card, out the other side) */}
+      {/* one luminous packet per booked meeting */}
       {!reduce && (
         <motion.circle
           key={`${bookTick}-${Math.round(geo.sx)}-${Math.round(geo.ex)}`}
@@ -186,51 +167,6 @@ export function HeroConnector({ sectionRef, linkedinRef, pillRef, calendarRef, b
           transition={{ duration: 0.7, ease: EASE }}
         />
       )}
-
-      {/* The play chip — the conduit's intelligence node: LinkedIn → Vera's proven play →
-          the booked calendar. Docked in the MEASURED whitespace band between the headline
-          pill and the subhead (never guessed — the band exists at every lg+ width), right-
-          anchored toward the calendar port so the pipe visibly threads through it. The
-          label rotates through the real starter plays as bookings pass. Label-only: no
-          invented stats (honesty rule, spec 2026-07-14). */}
-      {(() => {
-        if (geo.pillBottom == null) return null;
-        const CHIP_W = 292; // fits the longest play name ("The problem-first note") untruncated
-        const CHIP_H = 28;
-        const cy = geo.pillBottom + 5; // top of the band, 5px under the pill
-        const cx = Math.min(geo.ex - 14, geo.w - 24) - CHIP_W; // right edge short of the port
-        if (cx < 24 || cy + CHIP_H > geo.ey + 120) return null; // no sane pocket → skip cleanly
-        return (
-          <foreignObject x={cx} y={cy} width={CHIP_W} height={CHIP_H} className="overflow-visible">
-            <div className="flex h-full items-center gap-2 rounded-full border border-[var(--hairline)] bg-white pl-2.5 pr-1 shadow-[var(--shadow-card)]">
-              <span className="relative flex size-2 shrink-0 items-center justify-center" aria-hidden>
-                <span className="absolute inline-flex size-full rounded-full bg-[var(--cyan)]/50 motion-safe:animate-ping" />
-                <span className="relative inline-flex size-1.5 rounded-full bg-[var(--cyan)]" />
-              </span>
-              <span className="shrink-0 text-[8.5px] font-semibold uppercase tracking-[0.13em] text-[var(--ink-4)]">
-                Vera&apos;s play
-              </span>
-              <span className="relative h-[14px] min-w-0 flex-1">
-                <AnimatePresence mode="popLayout" initial={false}>
-                  <motion.span
-                    key={playIdx}
-                    initial={reduce ? false : { opacity: 0, y: 7 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={reduce ? undefined : { opacity: 0, y: -7 }}
-                    transition={{ duration: 0.35, ease: EASE }}
-                    className="absolute inset-x-0 truncate text-[10.5px] font-semibold leading-[14px] tracking-[-0.01em] text-[#0C1620]"
-                  >
-                    {PLAY_NAMES[playIdx]}
-                  </motion.span>
-                </AnimatePresence>
-              </span>
-              <span className="shrink-0 rounded-full bg-[var(--cyan-tint)] px-1.5 py-[2px] text-[8px] font-semibold uppercase tracking-[0.06em] text-[var(--cyan-strong)] ring-1 ring-inset ring-[rgba(24,119,242,0.22)]">
-                proven
-              </span>
-            </div>
-          </foreignObject>
-        );
-      })()}
     </svg>
   );
 }

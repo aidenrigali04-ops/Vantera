@@ -242,7 +242,7 @@ export const HeroCalendar = memo(function HeroCalendar({
           </motion.div>
         </div>
 
-        {/* ── Footer — booking-pace trend ────────────────────────────────── */}
+        {/* ── Footer — booking-pace trend + the play behind the bookings ──── */}
         <div className="flex items-center justify-between gap-4 border-t border-[#EFF2F5] px-4 pb-3.5 pt-3">
           <div>
             <div className="text-[9.5px] font-semibold uppercase tracking-[0.12em] text-[#6B7480]">
@@ -252,6 +252,7 @@ export const HeroCalendar = memo(function HeroCalendar({
               <PaceSparkline />
             </div>
           </div>
+          <PlayTicker />
           <div className="flex flex-col items-end gap-1">
             <span className="inline-flex items-center gap-1 rounded-full bg-[rgba(24,119,242,0.1)] px-2 py-[3px] text-[11px] font-semibold tabular-nums text-[#1461d1]">
               <TrendingUp className="size-3" strokeWidth={2.6} />
@@ -278,6 +279,50 @@ function EventPill({ brand }: { brand: string }) {
         {brand}
       </span>
     </span>
+  );
+}
+
+/**
+ * The play behind the bookings — Vera's intelligence, shown INSIDE the product visual
+ * (Stripe register: the value lives in the artifact, not floating beside it). Cycles
+ * through the REAL starter-play names (mirrors STARTER_PLAYS in
+ * packages/agent-brains/src/plays/starter.ts — keep in sync by hand; the brains package
+ * never enters the client bundle). Label-only: no invented stats. Static under
+ * prefers-reduced-motion; hidden on narrow cards where the footer would crowd.
+ */
+const PLAY_NAMES = ["The trigger opener", "The problem-first note", "The direct ask"];
+
+function PlayTicker() {
+  const reduce = useReducedMotion();
+  const [idx, setIdx] = useState(0);
+  useEffect(() => {
+    if (reduce) return;
+    const t = setInterval(() => setIdx((i) => (i + 1) % PLAY_NAMES.length), 4200);
+    return () => clearInterval(t);
+  }, [reduce]);
+  return (
+    <div className="hidden min-w-0 flex-col items-center sm:flex" aria-hidden>
+      <div className="flex items-center gap-1.5 text-[9.5px] font-semibold uppercase tracking-[0.12em] text-[#6B7480]">
+        <span className="relative flex size-1.5 items-center justify-center">
+          <span className="absolute inline-flex size-full rounded-full bg-[#1877f2]/45 motion-safe:animate-ping" />
+          <span className="relative inline-flex size-1 rounded-full bg-[#1877f2]" />
+        </span>
+        Vera&apos;s play
+      </div>
+      <div className="relative mt-1 h-[14px] w-[150px] overflow-hidden text-center">
+        {PLAY_NAMES.map((name, i) => (
+          <motion.span
+            key={name}
+            initial={false}
+            animate={{ opacity: i === idx ? 1 : 0, y: i === idx ? 0 : 6 }}
+            transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+            className="absolute inset-x-0 truncate text-[11px] font-semibold leading-[14px] tracking-[-0.01em] text-[#0C1620]"
+          >
+            {name}
+          </motion.span>
+        ))}
+      </div>
+    </div>
   );
 }
 

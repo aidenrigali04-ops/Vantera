@@ -21,12 +21,9 @@ export function Hero() {
   const [url, setUrl] = useState("");
 
   // Pipeline connector: LinkedIn icon → calendar. Endpoints measured from these refs;
-  // each booked meeting bumps bookTick to send one packet down the pipe. The pill ref
-  // measures the headline's bottom edge so the play chip can sit in the real whitespace
-  // band between headline and subhead (never guessed — font sizes jump across breakpoints).
+  // each booked meeting bumps bookTick to send one packet down the pipe.
   const sectionRef = useRef<HTMLElement>(null);
   const linkedinRef = useRef<HTMLSpanElement>(null);
-  const pillRef = useRef<HTMLSpanElement>(null);
   const calendarRef = useRef<HTMLDivElement>(null);
   const [bookTick, setBookTick] = useState(0);
   const handleBook = useCallback(() => setBookTick((t) => t + 1), []);
@@ -51,7 +48,6 @@ export function Hero() {
       <HeroConnector
         sectionRef={sectionRef}
         linkedinRef={linkedinRef}
-        pillRef={pillRef}
         calendarRef={calendarRef}
         bookTick={bookTick}
       />
@@ -62,10 +58,13 @@ export function Hero() {
           <div className="max-w-xl">
             {/* h1 is the LCP element: no opacity gate, painted in SSR so it renders at
                 first paint instead of waiting on hydration. */}
-            {/* Base size stepped down from 2.9rem: the nowrap "knows what works" pill must fit a
+            {/* Base size stepped down from 2.9rem: the nowrap "Self-learning" pill must fit a
                 390px viewport; sm+ keeps the original scale. */}
             <h1 className="text-[2.3rem] font-semibold leading-[1.18] tracking-[-0.04em] text-foreground sm:text-[3.6rem] lg:text-[4rem]">
-              The{" "}
+              <span className="relative inline-block whitespace-nowrap rounded-[12px] px-3 pb-[0.12em] pt-[0.04em] text-white shadow-[0_12px_30px_-10px_rgba(24,119,242,0.6)] [background:linear-gradient(180deg,#2a82f7_0%,#1877f2_56%,#166fe5_100%)]">
+                Self-learning
+              </span>{" "}
+              lead gen for{" "}
               <span className="whitespace-nowrap">
                 <span
                   ref={linkedinRef}
@@ -75,13 +74,8 @@ export function Hero() {
                 >
                   <LinkedinMark className="h-[0.7em] w-[0.7em] text-[var(--fb)]" />
                   <span className="sr-only">LinkedIn</span>
-                </span>
-              </span>{" "}
-              outreach that already{" "}
-              <span
-                ref={pillRef}
-                className="relative inline-block whitespace-nowrap rounded-[12px] px-3 pb-[0.12em] pt-[0.04em] text-white shadow-[0_12px_30px_-10px_rgba(24,119,242,0.6)] [background:linear-gradient(180deg,#2a82f7_0%,#1877f2_56%,#166fe5_100%)]">
-                knows what works
+                </span>{" "}
+                LinkedIn
               </span>
             </h1>
 
@@ -89,9 +83,8 @@ export function Hero() {
               className="landing-rise mt-6 max-w-lg text-[17px] font-normal leading-relaxed text-[var(--ink-3)] sm:text-[19px]"
               style={{ animationDelay: "90ms" }}
             >
-              Meet Vera — the brain behind your outreach. It finds your in-market buyers, reaches
-              them with plays that are already proven, and gets sharper every week from what
-              actually lands. You approve every send — and your account stays safe.
+              Vera finds your buyers, reaches out with what&apos;s proven to work, and gets sharper
+              every week. You approve everything she sends.
             </p>
 
             <form
