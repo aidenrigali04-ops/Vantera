@@ -1,6 +1,7 @@
 "use client";
 
 import { memo } from "react";
+import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
 import {
   ArrowRight,
@@ -143,7 +144,7 @@ const PipelineLoop = memo(function PipelineLoop() {
             />
           )}
           <span className="absolute inset-x-0 top-1/2 mt-2 flex justify-center text-[9px] font-medium uppercase tracking-[0.14em] text-[var(--ink-4)]">
-            Repeat every day
+            Repeats every day — sharper each cycle
           </span>
         </div>
       </div>
@@ -449,8 +450,8 @@ const PANELS: Panel[] = [
     step: "03",
     tag: "Outreach",
     title: "Personal messages, never a template.",
-    body: "Each message is written from that prospect's real activity, then sent on LinkedIn-safe pacing across multiple senders. You scale outreach without putting your accounts at risk.",
-    points: ["Written from each prospect's activity", "Safe pacing keeps every account protected"],
+    body: "Each message starts from a play that's already proven, then gets written from that prospect's real activity — and sent on LinkedIn-safe pacing across multiple senders. What lands gets kept; what doesn't gets dropped.",
+    points: ["Starts proven, personalized to each prospect", "Safe pacing keeps every account protected"],
     visual: <OutreachMock />,
   },
   {
@@ -535,15 +536,25 @@ export function Showcase() {
     >
       <div className="mx-auto max-w-6xl px-6 lg:px-8">
         <LandingHeading
-          eyebrow="The system"
-          title="Everything an SDR does, running on its own"
-          subtitle="Four steps, fully automated: your agents source in-market buyers, qualify them against your ICP, write every message from real activity, and route the reply to you."
+          eyebrow="Meet Vera"
+          title="Everything an SDR does — running itself, sharpening itself"
+          subtitle="Vera sources in-market buyers, qualifies them against your ICP, writes every message from proven plays and real activity — and learns from every reply. You approve every send."
         />
 
         <div className="mt-20 flex flex-col gap-20 lg:mt-24 lg:gap-24">
           {PANELS.map((panel, i) => (
             <StepPanel key={panel.step} panel={panel} index={i} />
           ))}
+        </div>
+
+        <div className="mt-16 text-center lg:mt-20">
+          <Link
+            href="/how-it-learns"
+            className="inline-flex items-center gap-1.5 text-[14.5px] font-medium text-[var(--cyan-strong)] transition-colors hover:text-foreground"
+          >
+            See how the learning works
+            <ArrowRight className="size-4" />
+          </Link>
         </div>
       </div>
     </section>

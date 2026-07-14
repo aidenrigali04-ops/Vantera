@@ -1,20 +1,22 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { ShieldCheck, CheckCircle2, Hand, Ban } from "lucide-react";
+import { ShieldCheck, TrendingUp, Hand, Ban } from "lucide-react";
 
 /**
  * Above-the-fold trust row. This replaced a fabricated customer-logo cloud
  * (HubSpot/Okta/Zendesk/… — none are Vantera customers, so it was false
  * endorsement and legal exposure). Until real, attributable customer logos or
  * numbers exist, the honest thing to show here is the product's actual
- * guarantees — which also answer the category's #1 objection: "will this get my
- * LinkedIn account restricted?" Every claim below is literally true of the product.
+ * guarantees — safety + control (the category's #1 objection: "will this get my
+ * LinkedIn account restricted?") plus the learning promise ("gets sharper every
+ * week" — the self-evolving positioning). Every claim below is literally true
+ * of the product.
  */
 const SIGNALS = [
+  { icon: TrendingUp, label: "Gets sharper every week", sub: "learns what works, on its own" },
   { icon: ShieldCheck, label: "LinkedIn-safe pacing", sub: "human-like limits, built in" },
   { icon: Hand, label: "You approve every send", sub: "nothing goes out without you" },
-  { icon: CheckCircle2, label: "Live in minutes", sub: "connect and it's working" },
   { icon: Ban, label: "No card to start", sub: "cancel anytime" },
 ] as const;
 
@@ -29,7 +31,7 @@ export function TrustStrip() {
           transition={{ duration: 0.6, delay: 0.1 }}
           className="text-center font-mono text-[11px] uppercase tracking-[0.2em] text-[var(--ink-4)]"
         >
-          Built to protect your account
+          The promises we keep
         </motion.p>
 
         <motion.div

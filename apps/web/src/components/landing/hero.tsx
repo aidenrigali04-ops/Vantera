@@ -59,7 +59,7 @@ export function Hero() {
             {/* h1 is the LCP element: no opacity gate, painted in SSR so it renders at
                 first paint instead of waiting on hydration. */}
             <h1 className="text-[2.9rem] font-semibold leading-[1.18] tracking-[-0.04em] text-foreground sm:text-[3.6rem] lg:text-[4rem]">
-              Turn{" "}
+              The{" "}
               <span className="whitespace-nowrap">
                 <span
                   ref={linkedinRef}
@@ -71,9 +71,9 @@ export function Hero() {
                   <span className="sr-only">LinkedIn</span>
                 </span>
               </span>{" "}
-              into booked{" "}
+              outreach that already{" "}
               <span className="relative inline-block whitespace-nowrap rounded-[12px] px-3 pb-[0.12em] pt-[0.04em] text-white shadow-[0_12px_30px_-10px_rgba(24,119,242,0.6)] [background:linear-gradient(180deg,#2a82f7_0%,#1877f2_56%,#166fe5_100%)]">
-                sales calls
+                knows what works
               </span>
             </h1>
 
@@ -81,8 +81,9 @@ export function Hero() {
               className="landing-rise mt-6 max-w-lg text-[17px] font-normal leading-relaxed text-[var(--ink-3)] sm:text-[19px]"
               style={{ animationDelay: "90ms" }}
             >
-              Your agents find in-market buyers, qualify them against your ICP, and draft every message
-              from their real activity. You approve every send — and your account stays safe.
+              Meet Vera — the brain behind your outreach. It finds your in-market buyers, reaches
+              them with plays that are already proven, and gets sharper every week from what
+              actually lands. You approve every send — and your account stays safe.
             </p>
 
             <form
