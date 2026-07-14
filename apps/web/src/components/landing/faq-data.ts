@@ -39,6 +39,6 @@ export const FAQ_ITEMS: FaqItem[] = [
   },
   {
     q: "How much does it cost?",
-    a: "Starter is $45/month and gets a solo operator up and running with a deployed agent and account-safe outreach. For teams that need more senders, seats, and volume, our Custom plan is priced to your goals — talk to us and we'll scope it with you. Plans scale with your revenue goal, not a long-term contract, so you can change or cancel anytime.",
+    a: "Starter is $45/month for a solo operator — one LinkedIn sender, agents deployed, account-safe outreach. Growth is $79/month (our most popular) with five senders in parallel plus the Intent Agent. Scale is $349/month with fifteen senders for teams and agencies at volume, and Enterprise is custom. Annual billing saves two months, there's no long-term contract, and you can change or cancel anytime.",
   },
 ];

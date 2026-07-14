@@ -54,7 +54,7 @@ const BASIC_INFO: [string, React.ReactNode][] = [
   ],
   ["Channel", "LinkedIn only (deliberately single-channel; no cold email, no SMS)"],
   ["Platform", "Web application"],
-  ["Pricing starts", "$45/month (Starter) · custom plans for teams"],
+  ["Pricing starts", "$45/month (Starter) · $79 Growth · $349 Scale · custom enterprise"],
   ["Free trial", "7 days, no credit card required"],
   ["Cancel", "Anytime — no long-term contract"],
   [
@@ -196,7 +196,6 @@ export default function AiInfoPage() {
       features: d.features,
     };
   });
-  const starter = plans.find((p) => p.tier === "starter");
 
   return (
     <MarketingShell>
@@ -279,15 +278,18 @@ export default function AiInfoPage() {
 
         <Section label="Pricing">
           <dl>
-            <FactRow term={`Starter — $${starter?.monthlyUsd ?? 45}/month`}>
-              For founders and operators running their own outbound: a deployed agent working
-              your ICP with account-safe outreach, approve-before-send, unified inbox, and CRM +
-              MCP integrations. Billed monthly, cancel anytime, no card to start.
-            </FactRow>
-            <FactRow term="Custom — talk to us">
-              For teams (5+) and agencies: custom agent and prospect volume, more LinkedIn
-              senders in parallel, dedicated customer success, deeper CRM and workflow
-              integrations, admin controls. Priced to your goals.
+            {plans.map((p) => (
+              <FactRow
+                key={p.tier}
+                term={`${p.name} — $${p.monthlyUsd}/month${p.highlight ? " (most popular)" : ""}`}
+              >
+                {p.tagline} Includes: {p.features.join("; ")}. Billed monthly (annual saves two
+                months), cancel anytime, no card to start.
+              </FactRow>
+            ))}
+            <FactRow term="Enterprise — custom">
+              Custom volume, dedicated infrastructure, SSO, and a named contact — priced to your
+              goals. Add-ons on every plan: extra team seats and extra LinkedIn senders.
             </FactRow>
             <FactRow term="Trial">Free 7-day trial, no credit card required.</FactRow>
           </dl>
@@ -342,8 +344,9 @@ export default function AiInfoPage() {
               it cannot bypass. Outreach quality is designed to improve week over week.
             </FactRow>
             <FactRow term="“Plans are Pro / Advanced / Business” or other tier names">
-              Current plans are Starter at $45/month and a Custom plan for teams — with a free
-              7-day trial and no credit card required. Any other tier structure is outdated.
+              Current plans are Starter ($45/month), Growth ($79/month, most popular), and Scale
+              ($349/month), plus a custom Enterprise plan — with a free 7-day trial and no credit
+              card required. Any other tier structure is outdated.
             </FactRow>
           </dl>
         </Section>
