@@ -227,6 +227,10 @@ export const leads = pgTable(
     closedAt: timestamp("closed_at", { withTimezone: true }),
     // 0028: meeting-booked stage for the attribution funnel; server-set only (not client-writable)
     meetingBookedAt: timestamp("meeting_booked_at", { withTimezone: true }),
+    // 0050 meeting layer: scheduled time when known + which writer recorded the booking
+    // ('agent' = reply-classification detector, 'manual' = the user's control, authoritative)
+    meetingAt: timestamp("meeting_at", { withTimezone: true }),
+    meetingSource: text("meeting_source", { enum: ["agent", "manual"] }),
     // 0040: self-optimizing experiment attribution — stamped by copy-draft when a lead is drafted
     // under a running experiment. Null for non-experiment leads; service-role write only.
     experimentId: uuid("experiment_id").references(() => optimizationExperiments.id, {
@@ -1063,7 +1067,9 @@ export const leadNotifications = pgTable(
       .notNull()
       .references(() => accounts.id, { onDelete: "cascade" }),
     leadId: uuid("lead_id").notNull(),
-    kind: text("kind", { enum: ["reply", "converted", "exhausted", "hot_signal", "needs_human"] }).notNull(),
+    kind: text("kind", {
+      enum: ["reply", "converted", "exhausted", "hot_signal", "needs_human", "meeting_booked"],
+    }).notNull(),
     body: text("body").notNull(),
     // no updated_at: read_at is the only mutable field
     readAt: timestamp("read_at", { withTimezone: true }),
