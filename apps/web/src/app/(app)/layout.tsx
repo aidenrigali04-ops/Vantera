@@ -5,7 +5,7 @@ import { getGateData, toGateContext } from "@/lib/auth/context";
 import { resolveGate } from "@/lib/auth/gate";
 import { createClient } from "@/lib/supabase/server";
 import { signOut } from "./actions";
-import { DockNav, DockTooltip } from "@/components/dock-nav";
+import { DockNav, DockTooltip, MobileNav } from "@/components/dock-nav";
 import { VanteraLogo } from "@/components/landing/vantera-logo";
 import { NotificationsBell, type AppNotification } from "@/components/notifications/notifications-bell";
 import CopilotOverlay from "@/components/copilot/copilot-overlay";
@@ -197,7 +197,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       </Suspense>
       <GlassFilter />
       {/* Sticky full-height rail: stays in view while main scrolls. */}
-      <aside className="app-rail sticky top-0 flex h-screen w-20 shrink-0 flex-col items-center gap-4 overflow-y-auto px-2 py-4">
+      <aside className="app-rail sticky top-0 hidden h-screen w-20 shrink-0 flex-col items-center gap-4 overflow-y-auto px-2 py-4 lg:flex">
         <Link
           href="/dashboard"
           aria-label="Vantera home"
@@ -230,11 +230,28 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       </aside>
       {/* min-w-0 + overflow-x-clip: a flex child never stretches past the viewport, so no
           surface can ever produce a sideways-scrolling page — wide content clips instead. */}
-      <main className="glass-cards min-w-0 flex-1 overflow-x-clip px-8 py-6">
+      <main className="glass-cards min-w-0 flex-1 overflow-x-clip px-4 py-4 pb-24 sm:px-8 sm:py-6 lg:pb-6">
+        {/* Mobile top bar: logo + bell + settings (the rail is desktop-only). */}
+        <div className="mb-4 flex items-center justify-between lg:hidden">
+          <Link href="/dashboard" aria-label="Vantera home" className="text-foreground">
+            <VanteraLogo className="size-7" />
+          </Link>
+          <div className="flex items-center gap-2">
+            <NotificationsBell notifications={notifications} />
+            <Link
+              href="/settings"
+              aria-label="Settings"
+              className="grid size-10 place-items-center rounded-xl border border-[var(--hairline)] text-muted-foreground"
+            >
+              <span className="text-sm font-semibold">{initial}</span>
+            </Link>
+          </div>
+        </div>
         {connectionBanner && <TrialBanner {...connectionBanner} />}
         {trialBanner && <TrialBanner {...trialBanner} />}
         {children}
       </main>
+      <MobileNav badges={badges} />
       <CopilotOverlay />
     </div>
   );

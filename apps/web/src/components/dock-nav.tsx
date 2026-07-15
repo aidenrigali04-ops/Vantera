@@ -106,3 +106,44 @@ export function DockTooltip({ children }: { children: React.ReactNode }) {
     </span>
   );
 }
+
+/**
+ * Mobile bottom nav (P2 mobile shell, 2026-07-15): the desktop rail is hidden below lg;
+ * the five core destinations ride a fixed bottom bar, thumb-reachable. Settings lives in
+ * the mobile top bar (layout).
+ */
+export function MobileNav({ badges }: { badges?: Record<string, number> }) {
+  const pathname = usePathname();
+  const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/");
+  return (
+    <nav
+      aria-label="Primary"
+      className="app-rail fixed inset-x-0 bottom-0 z-40 flex items-stretch justify-around border-t border-[var(--nav-line)] pb-[env(safe-area-inset-bottom)] lg:hidden"
+    >
+      {MAIN.map((item) => {
+        const Icon = item.icon;
+        const active = isActive(item.href);
+        const badge = badges?.[item.key];
+        return (
+          <Link
+            key={item.key}
+            href={item.href}
+            aria-current={active ? "page" : undefined}
+            className={cn(
+              "relative flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px] font-medium",
+              active ? "text-[var(--nav-fg-strong)]" : "text-[var(--nav-fg)]"
+            )}
+          >
+            <Icon className="size-5" strokeWidth={2.1} />
+            {item.label}
+            {badge != null && badge > 0 && (
+              <span className="absolute right-[22%] top-1 grid min-w-[16px] place-items-center rounded-full bg-white px-1 text-[9px] font-semibold leading-[16px] text-[var(--nav-ink)]">
+                {badge > 9 ? "9+" : badge}
+              </span>
+            )}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
