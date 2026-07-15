@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Panel } from "@/components/ui/panel";
 import { cn } from "@/lib/utils";
 import { type LeadProfile } from "@/components/lead-profile";
+import { BulkApprove } from "./bulk-approve";
 import { LEAD_PROFILE_FIELDS } from "@/components/lead-profile-fields";
 import { type DraftRow } from "./draft-card";
 import { ProspectReviewCard, type ProspectGroup } from "./prospect-review-card";
@@ -153,7 +154,8 @@ export default async function ReviewPage({
   return (
     // One-screen on desktop: header + view tabs pinned; the queue scrolls in its own region.
     <div className="mx-auto flex w-full max-w-3xl flex-col lg:h-[calc(100dvh-3rem)]">
-      <div className="mb-6 shrink-0 border-b border-[var(--hairline)] pb-5">
+      <div className="mb-6 flex shrink-0 flex-wrap items-end justify-between gap-3 border-b border-[var(--hairline)] pb-5">
+        <div>
         <h1 className="text-2xl font-semibold tracking-tight">Review queue</h1>
         <p className="mt-1.5 text-sm text-muted-foreground">
           {view === "queue"
@@ -162,6 +164,10 @@ export default async function ReviewPage({
               } waiting. Nothing sends without your approval.`
             : `${count ?? 0} message${count === 1 ? "" : "s"} past review — approved, scheduled, sent, or stopped.`}
         </p>
+        </div>
+        {view === "queue" && (
+          <BulkApprove cleanCount={(rows ?? []).filter((r) => !r.style_flags).length} />
+        )}
       </div>
 
       <div className="mb-5 shrink-0">

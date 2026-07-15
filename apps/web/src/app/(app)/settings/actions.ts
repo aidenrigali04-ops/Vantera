@@ -98,6 +98,22 @@ export async function setLeadEventEmails(
   return { saved: true };
 }
 
+// P1 (2026-07-15): in-app password change — the only path used to be the forgot-password email.
+export async function changePassword(
+  _prev: SettingsState,
+  formData: FormData
+): Promise<SettingsState> {
+  const password = String(formData.get("password") ?? "");
+  const confirm = String(formData.get("confirm") ?? "");
+  if (password.length < 8) return { error: "Password must be at least 8 characters." };
+  if (password !== confirm) return { error: "Passwords don't match." };
+  const supabase = await createClient();
+  const { error } = await supabase.auth.updateUser({ password });
+  if (error) return { error: "Could not change your password. Try again shortly." };
+  revalidatePath("/settings");
+  return { saved: true };
+}
+
 export async function requestAccountDeletion(
   _prev: SettingsState,
   formData: FormData

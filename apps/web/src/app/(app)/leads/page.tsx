@@ -102,11 +102,20 @@ export default async function LeadsPage({
     // One-screen on desktop (same contract as the lead brief): the PAGE never scrolls —
     // header/tabs/toolbar/pagination stay pinned, the table body scrolls internally.
     <div className="mx-auto flex w-full max-w-[1680px] flex-col lg:h-[calc(100dvh-3rem)]">
-      <div className="mb-6 shrink-0 border-b border-[var(--hairline)] pb-5">
-        <h1 className="text-2xl font-semibold tracking-tight">Leads</h1>
-        <p className="mt-1.5 text-sm text-muted-foreground">
-          Every prospect your agents sourced, with the reasoning behind each score.
-        </p>
+      <div className="mb-6 flex shrink-0 flex-wrap items-end justify-between gap-3 border-b border-[var(--hairline)] pb-5">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Leads</h1>
+          <p className="mt-1.5 text-sm text-muted-foreground">
+            Every prospect your agents sourced, with the reasoning behind each score.
+          </p>
+        </div>
+        {/* P1: CSV export — the user's own data, one click. */}
+        <a
+          href="/api/export/leads"
+          className="inline-flex items-center rounded-lg border border-[var(--hairline)] px-3.5 py-2 text-sm font-medium transition-colors hover:bg-[var(--tint)]"
+        >
+          Export CSV
+        </a>
       </div>
 
       {/* Segmented control (matches the Results tabs) — one bordered track, active is a raised

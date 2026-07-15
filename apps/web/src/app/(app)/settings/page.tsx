@@ -5,7 +5,7 @@ import { Panel } from "@/components/ui/panel";
 import { createClient } from "@/lib/supabase/server";
 import { getGateData } from "@/lib/auth/context";
 import { matchMemberEmails } from "./team/validation";
-import { ProfileForm } from "./profile-form";
+import { PasswordForm, ProfileForm } from "./profile-form";
 import { WorkspaceForm } from "./workspace-form";
 import { LeadEventEmailsToggle, WeeklySummaryToggle } from "./notifications-form";
 import { DangerZone } from "./danger-zone";
@@ -70,6 +70,7 @@ export default async function SettingsPage() {
       <Panel className="flex flex-col gap-4">
         <h2 className="font-heading text-base font-semibold">Profile</h2>
         <ProfileForm displayName={profile?.display_name ?? ""} email={user.email ?? ""} />
+        <div className="border-t border-[var(--hairline)] pt-5"><PasswordForm /></div>
       </Panel>
 
       <Panel className="flex flex-col gap-4">

@@ -49,6 +49,31 @@ export async function approveDraft(
   return {};
 }
 
+/**
+ * P1 bulk approve (2026-07-15): approve every CLEAN pending draft in one click. Style-flagged
+ * drafts are deliberately excluded — flagged copy always gets human eyes (rule 06/11).
+ */
+export async function approveAllClean(
+  _prev: ReviewActionState,
+  _formData: FormData
+): Promise<ReviewActionState> {
+  const { supabase, user } = await session();
+  if (!user) return { error: "Your session expired. Sign in again." };
+
+  const { data, error } = await supabase
+    .from("scheduled_sends")
+    .update({ status: "approved", approved_by: user.id, approved_at: new Date().toISOString() })
+    .eq("status", "pending_review")
+    .is("style_flags", null)
+    .select("id");
+  if (error) return { error: "Could not bulk-approve. Only workspace admins can review." };
+  const n = (data ?? []).length;
+  revalidatePath("/review");
+  return n === 0
+    ? { error: "Nothing clean to approve — the remaining drafts are style-flagged and need your eyes." }
+    : {};
+}
+
 export async function saveDraftEdit(
   _prev: ReviewActionState,
   formData: FormData

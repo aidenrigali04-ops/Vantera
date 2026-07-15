@@ -170,13 +170,13 @@ async function OverviewTab() {
       .order("ai_score", { ascending: false, nullsFirst: false })
       .limit(6)
       .returns<Prospect[]>(),
-    // Closed-revenue history: conversion dates (updated_at) of converted leads.
+    // Closed-revenue history + REAL per-deal values (P1: actuals over estimates).
     supabase
       .from("leads")
-      .select("updated_at")
+      .select("updated_at, deal_value_cents")
       .eq("status", "converted")
       .order("updated_at", { ascending: true })
-      .returns<{ updated_at: string }[]>(),
+      .returns<{ updated_at: string; deal_value_cents: number | null }[]>(),
     // Active CRM connections — drives the just-in-time "connect your CRM" nudge.
     supabase
       .from("crm_connections")
@@ -198,11 +198,17 @@ async function OverviewTab() {
 
   // Revenue snapshot: real counts × the account's value per client (Settings).
   const pipelineLeads = qualified + inOutreach + repliedOnly;
+  // Actuals where actuals exist: real typed deal values beat the avg×count estimate.
+  const closedActualCents = (convertedDates ?? []).reduce(
+    (sum, r) => sum + (r.deal_value_cents ?? account.avg_deal_value_cents ?? 0),
+    0
+  );
   const revenue = computeRevenueSnapshot({
     convertedClients: converted,
     pipeline: { qualified, inOutreach, replied: repliedOnly },
     avgDealValueCents: account.avg_deal_value_cents,
     goalCents: account.revenue_goal_cents,
+    closedActualCents,
   });
   const revenueSeries = buildRevenueSeries({
     conversionDates: (convertedDates ?? []).map((r) => r.updated_at),

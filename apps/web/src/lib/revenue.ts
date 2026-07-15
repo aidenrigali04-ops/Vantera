@@ -131,12 +131,19 @@ export function computeRevenueSnapshot(input: {
   pipeline: PipelineStageCounts;
   avgDealValueCents: number | null;
   goalCents: number | null;
+  /** P1 (2026-07-15): sum of REAL per-deal values (leads.deal_value_cents) captured at
+   *  close. When present it replaces the avg×count estimate for CLOSED revenue — the
+   *  dashboard shows actuals where actuals exist. Pipeline stays estimated (it must). */
+  closedActualCents?: number | null;
 }): RevenueSnapshot {
-  const { convertedClients, pipeline, avgDealValueCents, goalCents } = input;
+  const { convertedClients, pipeline, avgDealValueCents, goalCents, closedActualCents } = input;
   const hasValue = avgDealValueCents != null && avgDealValueCents > 0;
   const value = hasValue ? avgDealValueCents! : 0;
 
-  const closedCents = convertedClients * value;
+  const closedCents =
+    closedActualCents != null && closedActualCents > 0
+      ? closedActualCents
+      : convertedClients * value;
   const weightedLeads =
     pipeline.qualified * STAGE_WEIGHTS.qualified +
     pipeline.inOutreach * STAGE_WEIGHTS.inOutreach +

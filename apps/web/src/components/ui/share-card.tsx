@@ -6,6 +6,7 @@ import {
   inviteMember,
   revokeInvite,
   removeMember,
+  changeMemberRole,
   type TeamActionState,
 } from "@/app/(app)/settings/team/actions";
 import { cn } from "@/lib/utils";
@@ -45,7 +46,7 @@ function RoleBadge({ role }: { role: string }) {
 /**
  * Workspace share card — invite teammates + see who has access. Wired to the real
  * team model (owner/admin/member). Roles are shown as badges, not editable dropdowns,
- * because there's no change-role action — we never ship a control that does nothing.
+ * P1 2026-07-15: RoleSelect now switches admin/member for manageable members.
  */
 export function ShareCard({
   workspaceName,
@@ -134,6 +135,9 @@ export function ShareCard({
             <div className="ml-auto flex items-center gap-2">
               {m.isOwner ? (
                 <span className="text-[13px] font-medium text-[var(--ink-3)]">Owner</span>
+              ) : m.removable ? (
+                // P1: role is a control, not a label, for members you can manage
+                <RoleSelect userId={m.id} role={m.role} />
               ) : (
                 <RoleBadge role={m.role} />
               )}
@@ -191,6 +195,26 @@ function RevokeButton({ inviteId }: { inviteId: string }) {
       >
         {pending ? "Revoking…" : "Revoke"}
       </button>
+    </form>
+  );
+}
+
+/** P1: admin↔member switcher — submits on change; the owner role never changes here. */
+function RoleSelect({ userId, role }: { userId: string; role: string }) {
+  const [state, action, pending] = useActionState<TeamActionState, FormData>(changeMemberRole, {});
+  return (
+    <form action={action} title={state.error ?? "Change role"}>
+      <input type="hidden" name="userId" value={userId} />
+      <select
+        name="role"
+        defaultValue={role}
+        disabled={pending}
+        onChange={(e) => e.currentTarget.form?.requestSubmit()}
+        className="rounded-lg border border-[var(--hairline)] bg-transparent px-2 py-1 text-[13px] font-medium text-[var(--ink-2)]"
+      >
+        <option value="admin">admin</option>
+        <option value="member">member</option>
+      </select>
     </form>
   );
 }
