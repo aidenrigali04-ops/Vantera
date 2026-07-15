@@ -31,9 +31,9 @@ const STATUS_LABELS: Record<string, string> = {
 export default async function BillingPage({
   searchParams,
 }: {
-  searchParams: Promise<{ reason?: string }>;
+  searchParams: Promise<{ reason?: string; portal?: string }>;
 }) {
-  const { reason } = await searchParams;
+  const { reason, portal } = await searchParams;
   const { account } = await getGateData();
   if (!account) return null;
 
@@ -82,6 +82,15 @@ export default async function BillingPage({
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-10">
+      {portal === "unavailable" && (
+        <div className={cn(PANEL_SURFACE, "p-5 text-sm")}>
+          <span className="font-heading font-semibold">The billing portal isn&apos;t available yet.</span>{" "}
+          <span className="text-muted-foreground">
+            It opens after your first payment — choose a plan below to get started.
+          </span>
+        </div>
+      )}
+
       {reason === "deploy" && !hasEntitlement && (
         <div className={cn(PANEL_SURFACE, "p-5 text-sm")}>
           <span className="font-heading font-semibold">Choose a plan to deploy your agent.</span>{" "}

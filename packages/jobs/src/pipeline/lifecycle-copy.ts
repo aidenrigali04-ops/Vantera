@@ -1,3 +1,4 @@
+import { TRIAL_DAYS } from "@vantera/billing";
 import type { LifecycleSegment } from "./types";
 
 /**
@@ -59,11 +60,11 @@ const TEMPLATES: Record<LifecycleSegment, { touch1: Builder[]; touch2: Builder[]
       (d) =>
         d.leadCount > 0
           ? `${greet(d.firstName)} Aiden here, I run Vantera. Your trial wrapped up. While it ran, your scout found ${d.leadCount} leads${d.qualifiedCount > 0 ? ` and ${d.qualifiedCount} qualified` : ""}. They're going cold sitting there. Want me to turn it back on for you?`
-          : `${greet(d.firstName)} Aiden here, I run Vantera. Your trial ended before it really got going. If 3 days was too short to see value, tell me and I'll extend it.`,
+          : `${greet(d.firstName)} Aiden here, I run Vantera. Your trial ended before it really got going. If ${TRIAL_DAYS} days was too short to see value, tell me and I'll extend it.`,
       (d) =>
         d.leadCount > 0
           ? `${greet(d.firstName)} this is Aiden, CEO of Vantera. Your trial ended with ${d.leadCount} leads found${d.qualifiedCount > 0 ? ` and ${d.qualifiedCount} qualified` : ""}. That pipeline is just parked now. Happy to restart it if you want to keep going.`
-          : `${greet(d.firstName)} this is Aiden, CEO of Vantera. Your trial expired. If it didn't get a fair shot in 3 days, say the word and I'll extend it.`,
+          : `${greet(d.firstName)} this is Aiden, CEO of Vantera. Your trial expired. If it didn't get a fair shot in ${TRIAL_DAYS} days, say the word and I'll extend it.`,
     ],
     touch2: [
       () =>

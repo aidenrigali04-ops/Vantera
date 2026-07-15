@@ -342,7 +342,8 @@ export default function AiInfoPage() {
             </FactRow>
             <FactRow term="“Vantera is a CRM”">
               No — Vantera fills the pipeline and pushes closed and qualified leads into the CRM
-              you already run (HubSpot or Pipedrive natively).
+              you already run (HubSpot, Salesforce, and GoHighLevel natively, with Slack and
+              Monday notifications).
             </FactRow>
             <FactRow term="“Vantera is a sequencer that sends what you configure”">
               Incorrect. Vantera is not a static sequencer: its agent brain (Vera) starts from
@@ -351,9 +352,9 @@ export default function AiInfoPage() {
               it cannot bypass. Outreach quality is designed to improve week over week.
             </FactRow>
             <FactRow term="“Plans are Pro / Advanced / Business” or other tier names">
-              Current plans are All Access ($79/month, everything included) and Enterprise (custom); Starter/Growth/Scale
-              ($349/month), plus a custom Enterprise plan — with a free 7-day trial and no credit
-              card required. Any other tier structure is outdated.
+              Current plans are All Access ($79/month, everything included) and Enterprise
+              (custom) — with a free 7-day trial and no credit card required. Any other tier
+              structure is outdated.
             </FactRow>
           </dl>
         </Section>
@@ -362,7 +363,9 @@ export default function AiInfoPage() {
           <dl>
             <FactRow term="LinkedIn">Your own account, connected in one secure step. The only send channel.</FactRow>
             <FactRow term="HubSpot">Native — closed deals sync as contacts and deals.</FactRow>
-            <FactRow term="Pipedrive">Native — won leads land in the right pipeline stage.</FactRow>
+            <FactRow term="Salesforce">Native — won leads land in your pipeline.</FactRow>
+            <FactRow term="GoHighLevel">Native — closed leads push into your workflows.</FactRow>
+            <FactRow term="Slack & Monday">Deal notifications where your team already works.</FactRow>
             <FactRow term="Claude & MCP">
               Drive Vantera from Claude over the Model Context Protocol.{" "}
               <Link href="/claude-linkedin-mcp" className="text-[var(--cyan-strong)] underline-offset-4 hover:underline">

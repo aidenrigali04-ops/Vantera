@@ -167,14 +167,17 @@ export function ShareCard({
 function RemoveButton({ userId }: { userId: string }) {
   const [state, action, pending] = useActionState<TeamActionState, FormData>(removeMember, {});
   return (
-    <form action={action} title={state.error ?? "Remove member"}>
+    <form action={action} className="flex items-center gap-2" title="Remove member">
       <input type="hidden" name="userId" value={userId} />
+      {state.error && (
+        <p role="alert" className="text-[12px] text-destructive">{state.error}</p>
+      )}
       <button
         type="submit"
         disabled={pending}
         aria-label="Remove member"
         className={cn(
-          "grid size-7 place-items-center rounded-full text-[var(--ink-4)] transition-colors hover:bg-[var(--tint)] hover:text-destructive disabled:opacity-50",
+          "grid size-7 place-items-center rounded-full text-[var(--ink-4)] transition-colors hover:bg-[var(--tint)] hover:text-destructive focus-visible:ring-2 focus-visible:ring-[rgba(11,87,171,0.35)] focus-visible:outline-none disabled:opacity-50",
         )}
       >
         {pending ? <Loader2 className="size-3.5 animate-spin" /> : <X className="size-4" />}
@@ -186,12 +189,15 @@ function RemoveButton({ userId }: { userId: string }) {
 function RevokeButton({ inviteId }: { inviteId: string }) {
   const [state, action, pending] = useActionState<TeamActionState, FormData>(revokeInvite, {});
   return (
-    <form action={action} title={state.error ?? "Revoke invite"}>
+    <form action={action} className="flex items-center gap-2" title="Revoke invite">
       <input type="hidden" name="inviteId" value={inviteId} />
+      {state.error && (
+        <p role="alert" className="text-[12px] text-destructive">{state.error}</p>
+      )}
       <button
         type="submit"
         disabled={pending}
-        className="rounded-full px-2.5 py-1 text-[12px] font-medium text-[var(--ink-3)] transition-colors hover:bg-[var(--tint)] hover:text-destructive disabled:opacity-50"
+        className="rounded-full px-2.5 py-1 text-[12px] font-medium text-[var(--ink-3)] transition-colors hover:bg-[var(--tint)] hover:text-destructive focus-visible:ring-2 focus-visible:ring-[rgba(11,87,171,0.35)] focus-visible:outline-none disabled:opacity-50"
       >
         {pending ? "Revoking…" : "Revoke"}
       </button>
@@ -203,14 +209,17 @@ function RevokeButton({ inviteId }: { inviteId: string }) {
 function RoleSelect({ userId, role }: { userId: string; role: string }) {
   const [state, action, pending] = useActionState<TeamActionState, FormData>(changeMemberRole, {});
   return (
-    <form action={action} title={state.error ?? "Change role"}>
+    <form action={action} className="flex items-center gap-2" title="Change role">
       <input type="hidden" name="userId" value={userId} />
+      {state.error && (
+        <p role="alert" className="text-[12px] text-destructive">{state.error}</p>
+      )}
       <select
         name="role"
         defaultValue={role}
         disabled={pending}
         onChange={(e) => e.currentTarget.form?.requestSubmit()}
-        className="rounded-lg border border-[var(--hairline)] bg-transparent px-2 py-1 text-[13px] font-medium text-[var(--ink-2)]"
+        className="rounded-lg border border-[var(--hairline)] bg-transparent px-2 py-1 text-[13px] font-medium text-[var(--ink-2)] focus-visible:ring-2 focus-visible:ring-[rgba(11,87,171,0.35)] focus-visible:outline-none"
       >
         <option value="admin">admin</option>
         <option value="member">member</option>

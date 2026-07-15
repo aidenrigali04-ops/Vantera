@@ -11,7 +11,6 @@ import {
 import { startCheckout, openBillingPortal } from "./actions";
 import { trackEvent } from "@/lib/analytics/clarity";
 
-const SALES_EMAIL = "sales@vanterasystem.com";
 
 interface Props {
   plans: PlanCard[];
@@ -31,11 +30,6 @@ export function PricingPlans({ plans, addons, currentTier, hasActivePlan, dealVa
       dealValueUsd={dealValueUsd}
       title="Choose the plan that matches your goal"
       subtitle="Every plan runs the same agents on your ICP. Move up as your team grows — more seats and connected LinkedIn accounts; your enrichment and scoring never change."
-      enterpriseCta={
-        <Button asChild variant="outline" size="sm">
-          <a href={`mailto:${SALES_EMAIL}`}>Talk to us</a>
-        </Button>
-      }
       renderCta={({ plan, interval, isCurrent }) => (
         <PlanCta
           plan={plan}

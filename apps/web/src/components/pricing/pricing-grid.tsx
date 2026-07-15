@@ -35,7 +35,6 @@ interface Props {
   currentTier?: PlanTier | "none";
   title: string;
   subtitle: string;
-  enterpriseCta: React.ReactNode;
   /** The account's average deal value (USD). When set, each card shows an honest payback line.
    *  Omit on the public page (no deal value pre-login) so no payback is shown. */
   dealValueUsd?: number | null;
@@ -49,7 +48,6 @@ export function PricingGrid({
   currentTier = "none",
   title,
   subtitle,
-  enterpriseCta,
   dealValueUsd,
   renderCta,
 }: Props) {
@@ -149,17 +147,6 @@ export function PricingGrid({
         })}
       <EnterpriseCard />
       </Reveal>
-
-      <div className={cn(PANEL_SURFACE, "flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between")}>
-        <div className="flex flex-col gap-1.5">
-          <h2 className="font-heading text-base font-semibold">Enterprise</h2>
-          <p className="text-sm text-muted-foreground">
-            Custom volume, dedicated infrastructure, SSO, and a named contact. For teams running
-            outbound at scale.
-          </p>
-        </div>
-        <div className="shrink-0">{enterpriseCta}</div>
-      </div>
 
       <div className="flex flex-col gap-4">
         <Eyebrow>Add-ons</Eyebrow>
