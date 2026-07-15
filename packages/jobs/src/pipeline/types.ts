@@ -131,9 +131,13 @@ export interface ScoutStore {
   countUncontactedLeads(accountId: string): Promise<number>;
   /** size of the qualified, not-yet-drafted pool (status 'qualified') — gates discovery overscan */
   countQualifiedPool(accountId: string): Promise<number>;
-  /** top-N qualified, not-yet-drafted lead ids by score — best-first draft draining (overscan) */
+  /** top-N qualified, not-yet-drafted lead ids — best-first draft draining (overscan). Stage 2:
+   *  ordering = ai_score + the bounded outcome tilt (rankByTilt); ordering ONLY, never a gate. */
   getTopQualifiedLeadIds(accountId: string, limit: number): Promise<string[]>;
   getLiveCopyAgent(accountId: string): Promise<{ id: string } | null>;
+  /** Stage 2: per-ICP outcome evidence (invited leads → flags) for the discovery allocator.
+   *  Empty ⇒ the allocator falls back to the equal split. */
+  getIcpOutcomeRows(accountId: string): Promise<{ icpId: string; flags: LeadOutcomeFlags }[]>;
 }
 
 export interface ScoutDeps {
@@ -148,6 +152,8 @@ export interface ScoutDeps {
   deriveCriteriaFn: (icpText: string, ctx: DeriveCriteriaContext) => Promise<IcpCriteria>;
   triggerCopyDraft: (payload: CopyDraftPayload) => Promise<void>;
   now?: () => Date;
+  /** RNG for the Stage-2 discovery allocator (injectable for deterministic tests) */
+  rand?: () => number;
 }
 
 export interface ScoutRunSummary {

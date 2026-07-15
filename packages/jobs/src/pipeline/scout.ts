@@ -1,6 +1,6 @@
-import { applyRulesGate, isScanStale } from "@vantera/agent-brains";
+import { applyRulesGate, isScanStale, allocateDiscovery } from "@vantera/agent-brains";
 import { computeRunTarget, computeDiscoveryTarget, dailyOutreachCapacity } from "./capacity";
-import type { RankCandidate } from "@vantera/agent-brains";
+import type { RankCandidate, LeadOutcomeFlags } from "@vantera/agent-brains";
 import { companyKey, icpCriteriaToFilters, type CompanyRef, type EnrichedProspect, type IcpCriteria, type ProspectSignal } from "@vantera/prospect-data";
 import {
   SCOUT_DEFAULTS,
@@ -133,9 +133,25 @@ export async function runScout(agentId: string, deps: ScoutDeps): Promise<ScoutR
 
     const fresh: FreshLead[] = [];
     if (icps.length > 0) {
-      const perIcp = Math.max(1, Math.floor(discoveryTarget / icps.length));
+      // Stage 2: the split learns from outcomes — Thompson on deep conversion (interested/booked
+      // among invited) with a 40% equal exploration floor so no ICP is ever starved. No outcome
+      // data ⇒ identical to the old equal split. The TOTAL discovery target is never raised.
+      const outcomeRows = await deps.store.getIcpOutcomeRows(accountId);
+      const flagsByIcp = new Map<string, LeadOutcomeFlags[]>();
+      for (const r of outcomeRows) {
+        const list = flagsByIcp.get(r.icpId) ?? [];
+        list.push(r.flags);
+        flagsByIcp.set(r.icpId, list);
+      }
+      const quotas = allocateDiscovery(
+        discoveryTarget,
+        icps.map((icp) => ({ id: icp.id, flags: flagsByIcp.get(icp.id) ?? [] })),
+        deps.rand ?? Math.random
+      );
       for (const icp of icps) {
-        const candidates = await deps.prospectData.discoverProspects(icpCriteriaToFilters(icp.criteria), perIcp);
+        const quota = quotas.get(icp.id) ?? 0;
+        if (quota <= 0) continue;
+        const candidates = await deps.prospectData.discoverProspects(icpCriteriaToFilters(icp.criteria), quota);
         discovered += candidates.length;
         fresh.push(...(await deps.store.upsertLeads(accountId, icp.id, candidates)));
       }

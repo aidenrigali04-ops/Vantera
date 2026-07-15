@@ -46,7 +46,16 @@ import type {
   LeadOutcomeFlags,
   ExperimentStatus,
 } from "@vantera/agent-brains";
-import { describeStrategy, toStoredInsights, type LeadInsights, type ProofPoint, type WebsiteScan } from "@vantera/agent-brains";
+import {
+  buildTargetingProfile,
+  describeStrategy,
+  rankByTilt,
+  toStoredInsights,
+  type LeadInsights,
+  type ProofPoint,
+  type TargetingRow,
+  type WebsiteScan,
+} from "@vantera/agent-brains";
 import { resolveEntitlements, type EntitlementSnapshot } from "@vantera/billing";
 import type { ClosedDeal, CrmProvider } from "@vantera/crm-infra";
 import type { AccountDeletionStore } from "./account-deletion";
@@ -228,6 +237,56 @@ async function winningOpeners(db: Db, accountId: string): Promise<string[]> {
     if (out.length >= WINNING_OPENERS_LIMIT) break;
   }
   return out;
+}
+
+/**
+ * Stage 2 targeting evidence: every INVITED lead's segment fields + outcome flags, derived at
+ * read time (no stored profile). Feeds both the discovery allocator (per-ICP) and the qualified-
+ * pool drain tilt (per-segment). Per-account only.
+ */
+async function invitedOutcomeRows(
+  db: Db,
+  accountId: string
+): Promise<{ icpId: string | null; title: string | null; industry: string | null; flags: LeadOutcomeFlags }[]> {
+  const rows = await db
+    .select({
+      id: leads.id,
+      icpId: leads.icpId,
+      title: leads.title,
+      industry: leads.industry,
+      invitedAt: leads.linkedinInvitedAt,
+      connectedAt: leads.linkedinConnectedAt,
+      bookedAt: leads.meetingBookedAt,
+      status: leads.status,
+    })
+    .from(leads)
+    .where(and(eq(leads.accountId, accountId), isNotNull(leads.linkedinInvitedAt)));
+  if (rows.length === 0) return [];
+  const ids = rows.map((r) => r.id);
+  const replyRows = await db
+    .select({ leadId: replies.leadId, classification: replies.classification })
+    .from(replies)
+    .where(inArray(replies.leadId, ids));
+  const interested = new Set<string>();
+  const negative = new Set<string>();
+  for (const r of replyRows) {
+    if (r.classification === "interested") interested.add(r.leadId);
+    else if (r.classification === "not_interested" || r.classification === "unsubscribe")
+      negative.add(r.leadId);
+  }
+  return rows.map((r) => ({
+    icpId: r.icpId,
+    title: r.title,
+    industry: r.industry,
+    flags: {
+      invited: true,
+      accepted: r.connectedAt != null,
+      interested: interested.has(r.id),
+      negative: negative.has(r.id),
+      booked: r.bookedAt != null,
+      converted: r.status === "converted",
+    },
+  }));
 }
 
 /** The account's citable proof/pricing/FAQ facts (0046), oldest-sort first — fed into the responder
@@ -603,14 +662,35 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
 
     async getTopQualifiedLeadIds(accountId: string, limit: number) {
       if (limit <= 0) return [];
-      // qualified, not-yet-drafted leads (drafting flips status to 'in_campaign'), best score first
+      // qualified, not-yet-drafted leads (drafting flips status to 'in_campaign'), best first.
+      // Stage 2: ordering = ai_score + the bounded outcome tilt (rankByTilt) so buyers like the
+      // ones who actually replied/booked drain first. Ordering ONLY — the qualification gate and
+      // the draft budget are unchanged, and an empty profile keeps pure score order.
       const rows = await db
-        .select({ id: leads.id })
+        .select({
+          id: leads.id,
+          title: leads.title,
+          industry: leads.industry,
+          aiScore: leads.aiScore,
+        })
         .from(leads)
         .where(and(eq(leads.accountId, accountId), eq(leads.status, "qualified")))
-        .orderBy(desc(leads.aiScore), desc(leads.scoredAt))
-        .limit(limit);
-      return rows.map((r) => r.id);
+        .orderBy(desc(leads.aiScore), desc(leads.scoredAt));
+      const targeting: TargetingRow[] = (await invitedOutcomeRows(db, accountId)).map((r) => ({
+        title: r.title,
+        industry: r.industry,
+        flags: r.flags,
+      }));
+      const profile = buildTargetingProfile(targeting);
+      return rankByTilt(rows, profile)
+        .slice(0, limit)
+        .map((r) => r.id);
+    },
+
+    async getIcpOutcomeRows(accountId: string) {
+      return (await invitedOutcomeRows(db, accountId))
+        .filter((r): r is typeof r & { icpId: string } => r.icpId != null)
+        .map((r) => ({ icpId: r.icpId, flags: r.flags }));
     },
 
     async getLiveCopyAgent(accountId: string) {

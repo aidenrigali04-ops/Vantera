@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { InMemoryProspectData, InMemoryCompanySignals, makeCandidate, type CompanyRef, type ProspectSignal } from "@vantera/prospect-data";
-import type { LeadInsights } from "@vantera/agent-brains";
+import type { LeadInsights, LeadOutcomeFlags } from "@vantera/agent-brains";
 import { runScout, pickHotSignal } from "./scout";
 import { TRIAL_LEAD_CAP } from "./types";
 import type { CopyDraftPayload, FreshLead, ScoutContext, ScoutDeps, ScoutStore } from "./types";
@@ -105,6 +105,11 @@ class FakeScoutStore implements ScoutStore {
       .sort((a, b) => b[1].score - a[1].score)
       .slice(0, limit)
       .map(([id]) => id);
+  }
+  // Stage 2: per-ICP outcome evidence for the discovery allocator (empty = inert equal split)
+  icpOutcomeRows: { icpId: string; flags: LeadOutcomeFlags }[] = [];
+  async getIcpOutcomeRows() {
+    return this.icpOutcomeRows;
   }
 }
 
@@ -615,5 +620,63 @@ describe("runScout — ICP criteria self-heal", () => {
     expect(called).toBe(0);
     expect(summary.criteriaDerived).toBe(0);
     expect(summary.discovered).toBe(1);
+  });
+});
+
+// ── Stage 2: outcome-tilted discovery allocation across ICPs ─────────────────
+describe("runScout — discovery allocation (Stage 2)", () => {
+  const outcomeFlags = (o: Partial<LeadOutcomeFlags>): LeadOutcomeFlags => ({
+    invited: true,
+    accepted: false,
+    interested: false,
+    negative: false,
+    booked: false,
+    converted: false,
+    ...o,
+  });
+  const lcg = (seed: number) => {
+    let s = seed >>> 0;
+    return () => ((s = (s * 1664525 + 1013904223) >>> 0), s / 2 ** 32);
+  };
+  const twoIcpContext = () => {
+    const ctx = makeContext();
+    ctx.icps = [
+      { id: "icpA", name: "SaaS CTOs", criteria: { industries: ["saas"] } },
+      { id: "icpB", name: "Logistics VPs", criteria: { industries: ["logistics"] } },
+    ];
+    return ctx;
+  };
+
+  it("splits discovery equally across ICPs when there is no outcome data (inert)", async () => {
+    const store = new FakeScoutStore(twoIcpContext());
+    const { deps, prospectData } = makeDeps(store, [], {});
+    deps.rand = lcg(1);
+    await runScout("scout1", deps);
+    const limits = prospectData.discoverCalls.map((c) => c.limit);
+    expect(limits).toHaveLength(2);
+    expect(limits[0]).toBe(limits[1]);
+  });
+
+  it("tilts discovery toward the ICP whose leads actually convert, keeping the exploration floor", async () => {
+    const store = new FakeScoutStore(twoIcpContext());
+    // icpA: 20 invited, 10 interested. icpB: 20 invited, 0 deep.
+    store.icpOutcomeRows = [
+      ...Array.from({ length: 20 }, (_, i) => ({
+        icpId: "icpA",
+        flags: outcomeFlags({ accepted: true, interested: i < 10 }),
+      })),
+      ...Array.from({ length: 20 }, () => ({ icpId: "icpB", flags: outcomeFlags({ accepted: true }) })),
+    ];
+    const { deps, prospectData } = makeDeps(store, [], {});
+    deps.rand = lcg(42);
+    await runScout("scout1", deps);
+    const byIcp = new Map(
+      prospectData.discoverCalls.map((c, i) => [i === 0 ? "icpA" : "icpB", c.limit])
+    );
+    const a = byIcp.get("icpA") ?? 0;
+    const b = byIcp.get("icpB") ?? 0;
+    const total = a + b;
+    expect(a).toBeGreaterThan(b); // evidence tilts the split
+    expect(b).toBeGreaterThanOrEqual(Math.max(1, Math.floor((total * 0.4) / 2))); // floor keeps exploring
   });
 });
