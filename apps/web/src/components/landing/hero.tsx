@@ -37,32 +37,37 @@ export function Hero() {
       <div className="mx-auto w-full max-w-6xl px-6 lg:px-8">
         <div className="grid items-center gap-14 lg:grid-cols-[1.04fr_1fr] lg:gap-12">
           {/* LEFT — content */}
-          <div className="max-w-xl">
+          <div className="max-w-2xl">
             {/* h1 is the LCP element: no opacity gate, painted in SSR so it renders at
                 first paint instead of waiting on hydration. */}
-            <h1 className="text-[2.05rem] font-semibold leading-[1.16] tracking-[-0.04em] text-foreground sm:text-[3.1rem] lg:text-[3.45rem]">
-              Adaptive prospecting system for{" "}
-              <span className="whitespace-nowrap">
-                <span
-                  role="img"
-                  aria-label="LinkedIn"
-                  className="mx-[0.02em] inline-flex translate-y-[0.16em] items-center justify-center rounded-[12px] border border-[var(--hairline)] bg-white p-[0.2em] align-baseline shadow-[var(--shadow-card)]"
-                >
-                  <LinkedinMark className="h-[0.7em] w-[0.7em] text-[var(--fb)]" />
-                  <span className="sr-only">LinkedIn</span>
+            {/* Two deliberate lines ("Adaptive prospecting system" / "for LinkedIn lead gen") —
+                uncontrolled wrapping orphaned "gen" on its own line. Sized so line 1 fits the
+                column at every breakpoint; mobile keeps natural flow with "lead gen" kept whole. */}
+            <h1 className="text-[1.95rem] font-semibold leading-[1.16] tracking-[-0.04em] text-foreground sm:text-[2.5rem]">
+              <span className="sm:block sm:whitespace-nowrap">Adaptive prospecting system</span>{" "}
+              <span className="sm:block">
+                for{" "}
+                <span className="whitespace-nowrap">
+                  <span
+                    role="img"
+                    aria-label="LinkedIn"
+                    className="mx-[0.02em] inline-flex translate-y-[0.16em] items-center justify-center rounded-[12px] border border-[var(--hairline)] bg-white p-[0.2em] align-baseline shadow-[var(--shadow-card)]"
+                  >
+                    <LinkedinMark className="h-[0.7em] w-[0.7em] text-[var(--fb)]" />
+                    <span className="sr-only">LinkedIn</span>
+                  </span>{" "}
+                  LinkedIn
                 </span>{" "}
-                LinkedIn
-              </span>{" "}
-              lead gen
+                <span className="whitespace-nowrap">lead gen</span>
+              </span>
             </h1>
 
             <p
               className="landing-rise mt-6 max-w-lg text-[17px] font-normal leading-relaxed text-[var(--ink-3)] sm:text-[19px]"
               style={{ animationDelay: "90ms" }}
             >
-              Vantera is a self-optimizing lead gen engine — tracking prospect intent and
-              action, building qualified campaign pipelines from your target audience, and
-              getting smarter with every reply.
+              A self-optimizing engine that tracks prospect intent and action — and turns
+              your target audience into qualified pipeline.
             </p>
 
             <form
