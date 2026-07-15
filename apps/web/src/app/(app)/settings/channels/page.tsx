@@ -11,6 +11,11 @@ import {
 } from "./channels-forms";
 import { reconcileLinkedInAccounts } from "@/lib/linkedin/sync";
 
+// Date.now() stays in a module helper (React purity lint) — same idiom as the dashboard.
+function isoDaysAgo(days: number): string {
+  return new Date(Date.now() - days * 86_400_000).toISOString();
+}
+
 export default async function ChannelsPage({
   searchParams,
 }: {
@@ -45,8 +50,8 @@ export default async function ChannelsPage({
 
   // P1 safety visibility: the pacing the Safety page promises, shown against real counts.
   // Ceilings mirror packages/jobs/src/pipeline/safety-limits.ts (locked, rule 04).
-  const weekAgoIso = new Date(Date.now() - 7 * 86_400_000).toISOString();
-  const dayAgoIso = new Date(Date.now() - 86_400_000).toISOString();
+  const weekAgoIso = isoDaysAgo(7);
+  const dayAgoIso = isoDaysAgo(1);
   const { data: weekSendRows } = await supabase
     .from("outreach_sends")
     .select("linkedin_account_id, sent_at, scheduled_sends(linkedin_stage)")
