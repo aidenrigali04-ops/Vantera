@@ -29,14 +29,26 @@ export async function loadAnalytics(db: SupabaseClient): Promise<AnalyticsViewMo
   const countByStatus = (statuses: string[]) =>
     db.from("leads").select("id", { count: "exact", head: true }).in("status", statuses);
 
-  const [qualifiedEnrichedRes, inCampaignRes, repliedOnlyRes, convertedRes, meetingsRes, accountRes] =
+  const [qualifiedEnrichedRes, inCampaignRes, repliedOnlyRes, convertedRes, meetingsRes, accountRes, convertedValueRows] =
     await Promise.all([
       countByStatus(["qualified", "enriched"]),
       countByStatus(["in_campaign"]),
       countByStatus(["replied"]),
       countByStatus(["converted"]),
-      db.from("leads").select("id", { count: "exact", head: true }).not("meeting_booked_at", "is", null),
+      // T1: cumulative funnel semantics — a closed deal has, by definition, progressed
+      // past the Meetings stage, so Meetings counts leads at-or-past it. Without this a
+      // straight-to-close deal rendered Meetings 0 above Closed N (a broken funnel).
+      db
+        .from("leads")
+        .select("id", { count: "exact", head: true })
+        .or("meeting_booked_at.not.is.null,status.eq.converted"),
       db.from("accounts").select("avg_deal_value_cents, revenue_goal_cents, plan").limit(1).maybeSingle(),
+      // T1: real per-deal values at close — the same actuals path the Overview uses.
+      db
+        .from("leads")
+        .select("deal_value_cents")
+        .eq("status", "converted")
+        .returns<{ deal_value_cents: number | null }[]>(),
     ]);
 
   const qualifiedEnriched = qualifiedEnrichedRes.count ?? 0;
@@ -60,11 +72,17 @@ export async function loadAnalytics(db: SupabaseClient): Promise<AnalyticsViewMo
   });
 
   // Non-cumulative buckets for the stage-weighted snapshot (same weighting the dashboard uses).
+  // T1: actuals where actuals exist — Analytics and Overview must show the SAME "Closed".
+  const closedActualCents = (convertedValueRows.data ?? []).reduce(
+    (sum, r) => sum + (r.deal_value_cents ?? avgDealValueCents ?? 0),
+    0
+  );
   const snapshot = computeRevenueSnapshot({
     convertedClients: converted,
     pipeline: { qualified: qualifiedEnriched, inOutreach: inCampaign, replied: repliedOnly },
     avgDealValueCents,
     goalCents,
+    closedActualCents,
   });
 
   const roi = computeRoi({

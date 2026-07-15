@@ -23,12 +23,16 @@ export function PipelineBoard({
   activity,
   goalLabel,
   pipelineValueLabel,
+  closedValueLabel,
   livePipeline,
 }: {
   vm: PipelineViewModel;
   activity: ActivityItem[];
   goalLabel: string | null;
+  /** stage-weighted EXPECTED pipeline — same meaning as the Overview's "In pipeline" */
   pipelineValueLabel: string;
+  /** closed-won revenue (actuals-first) — same meaning as the Overview's "Closed" */
+  closedValueLabel: string;
   livePipeline: LivePipelineData;
 }) {
   const empty = vm.activeTotal === 0 && vm.convertedClients === 0 && vm.pausedTotal === 0;
@@ -60,7 +64,7 @@ export function PipelineBoard({
               hero
               label="In pipeline"
               value={pipelineValueLabel}
-              sub={goalLabel ? `toward ${goalLabel}/mo` : "projected value"}
+              sub="expected value · not yet won"
             />
             <KpiTile label="In motion" value={String(vm.activeTotal)} sub="active in sequence" />
             <KpiTile
@@ -73,7 +77,7 @@ export function PipelineBoard({
             <KpiTile
               label="Won"
               value={String(vm.convertedClients)}
-              sub={vm.convertedClients === 1 ? "meeting booked" : "meetings booked"}
+              sub={vm.convertedClients === 1 ? "client closed" : "clients closed"}
             />
           </KpiGrid>
 
@@ -83,7 +87,7 @@ export function PipelineBoard({
           <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr] lg:items-start">
             <LivePipeline {...livePipeline} />
             <div className="flex flex-col gap-6">
-              <GoalPanel vm={vm} goalLabel={goalLabel} pipelineValueLabel={pipelineValueLabel} />
+              <GoalPanel vm={vm} goalLabel={goalLabel} closedValueLabel={closedValueLabel} />
               <ActivityFeed activity={activity} />
             </div>
           </div>
@@ -93,14 +97,16 @@ export function PipelineBoard({
   );
 }
 
+// T1: revenue progress is CLOSED revenue vs. the goal — the same semantics as the
+// Overview's revenue card (expected pipeline is shown separately, in the KPI strip).
 function GoalPanel({
   vm,
   goalLabel,
-  pipelineValueLabel,
+  closedValueLabel,
 }: {
   vm: PipelineViewModel;
   goalLabel: string | null;
-  pipelineValueLabel: string;
+  closedValueLabel: string;
 }) {
   return (
     <Panel className="p-6">
@@ -121,7 +127,7 @@ function GoalPanel({
       </div>
 
       <div className="mt-4 flex items-end gap-2">
-        <span className="font-data text-3xl font-semibold tabular-nums">{pipelineValueLabel}</span>
+        <span className="font-data text-3xl font-semibold tabular-nums">{closedValueLabel}</span>
         {goalLabel && (
           <span className="pb-1 font-data text-sm text-muted-foreground">/ {goalLabel} mo</span>
         )}

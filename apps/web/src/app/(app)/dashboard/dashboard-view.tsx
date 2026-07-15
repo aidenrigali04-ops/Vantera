@@ -894,8 +894,9 @@ function RevenueCard({
               </div>
               <div>
                 <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <span className="size-2 rounded-full bg-foreground/40" /> Projected ·{" "}
-                  {pipelineLeads} in pipeline
+                  {/* T1: closed + today's expected pipeline — "projected" overclaimed. */}
+                  <span className="size-2 rounded-full bg-foreground/40" /> With pipeline ·{" "}
+                  {pipelineLeads} in motion
                 </span>
                 <span className="font-data text-2xl font-semibold tabular-nums text-muted-foreground">
                   {usd.format(projectedTotalCents / 100)}
@@ -1035,7 +1036,8 @@ function ConversionCelebration({
           <PartyPopper className="size-5" />
         </span>
         <div className="min-w-0">
-          <p className="text-sm font-medium">{win.leadName} just booked a meeting</p>
+          {/* T1: `converted` is closed-won, not a meeting — say what actually happened. */}
+          <p className="text-sm font-medium">{win.leadName} just closed — new client</p>
           <p className="text-sm text-muted-foreground">
             {convertedClients} {convertedClients === 1 ? "win" : "wins"}
             {goal && ` toward your ${goal}/mo goal`} — keep the pipeline full to stack the next one.

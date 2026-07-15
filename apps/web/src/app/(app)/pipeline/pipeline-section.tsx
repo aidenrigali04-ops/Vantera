@@ -73,6 +73,8 @@ export async function PipelineSection() {
     sendingRes,
     sentRes,
     outreachCampaign,
+    qualifiedRes,
+    convertedValueRows,
   ] = await Promise.all([
     supabase.from("sequence_runs").select("current_stage, status"),
     supabase
@@ -102,15 +104,31 @@ export async function PipelineSection() {
       .eq("copywriting_mode", "agent")
       .limit(1)
       .maybeSingle<{ send_mode: string }>(),
+    // T1 truth layer: the same inputs the Overview snapshot uses, so "In pipeline" and
+    // "Revenue progress" mean the same thing on every tab.
+    leadCount(["qualified", "enriched"]),
+    supabase
+      .from("leads")
+      .select("deal_value_cents")
+      .eq("status", "converted")
+      .returns<{ deal_value_cents: number | null }[]>(),
   ]);
 
   const converted = convertedRes.count ?? 0;
   const repliedOnly = repliedRes.count ?? 0;
   const inOutreach = inCampaignRes.count ?? 0;
+  const qualified = qualifiedRes.count ?? 0;
+  // Actuals where actuals exist: real typed deal values beat the avg×count estimate.
+  const closedActualCents = (convertedValueRows.data ?? []).reduce(
+    (sum, r) => sum + (r.deal_value_cents ?? account.avg_deal_value_cents ?? 0),
+    0
+  );
 
   const vm = shapePipeline({
     runs: runs ?? [],
+    counts: { qualified, inOutreach, replied: repliedOnly },
     convertedClients: converted,
+    closedActualCents,
     avgDealValueCents: account.avg_deal_value_cents,
     revenueGoalCents: account.revenue_goal_cents,
   });
@@ -129,10 +147,8 @@ export async function PipelineSection() {
     active: inOutreach + repliedOnly + converted,
     replied: repliedOnly,
     won: converted,
-    wonValueLabel:
-      account.avg_deal_value_cents && converted > 0
-        ? usd.format((converted * account.avg_deal_value_cents) / 100)
-        : null,
+    // Actuals-first, same number the Overview's "Closed" shows.
+    wonValueLabel: converted > 0 && vm.closedCents > 0 ? usd.format(vm.closedCents / 100) : null,
     sendMode: (outreachCampaign.data?.send_mode === "automatic" ? "automatic" : "review") as
       | "review"
       | "automatic",
@@ -152,9 +168,10 @@ export async function PipelineSection() {
     (leadRows ?? []).map((l) => [l.id, l.company_name || l.first_name || "A lead"])
   );
 
+  // T1: `converted` is closed-won (status set by Mark-closed-won) — never call it a meeting.
   const VERB: Record<NotificationRow["kind"], string> = {
     reply: "replied",
-    converted: "booked a meeting",
+    converted: "closed as a client",
     exhausted: "went cold",
   };
   const activity: ActivityItem[] = (notes ?? []).map((n) => ({
@@ -172,7 +189,8 @@ export async function PipelineSection() {
       vm={vm}
       activity={activity}
       goalLabel={goalLabel}
-      pipelineValueLabel={usd.format(vm.pipelineValueCents / 100)}
+      pipelineValueLabel={usd.format(vm.expectedCents / 100)}
+      closedValueLabel={usd.format(vm.closedCents / 100)}
       livePipeline={livePipeline}
     />
   );

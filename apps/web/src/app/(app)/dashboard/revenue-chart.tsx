@@ -61,7 +61,10 @@ function RevenueTooltip({
       </div>
       <div className="flex items-center justify-between gap-6">
         <span className="flex items-center gap-1.5 text-muted-foreground">
-          <span className="size-2 rounded-full" style={{ background: BRAND_ACCENT }} /> Projected
+          {/* T1: this series is closed + TODAY'S expected pipeline (a constant offset),
+              not a modeled forecast — the label must not claim more than that. */}
+          <span className="size-2 rounded-full" style={{ background: BRAND_ACCENT }} /> With today&apos;s
+          pipeline
         </span>
         <span className="font-data tabular-nums">{usdFull.format(projected / 100)}</span>
       </div>

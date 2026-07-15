@@ -67,7 +67,9 @@ export function LeadNotes({
           placeholder="Add a note — context only you know…"
           className="text-sm"
         />
-        <Button type="submit" size="sm" variant="outline" className="self-end" disabled={busy}>
+        {/* self-start: right-aligned this sat under the fixed Ask-AI pill at 1440px —
+            puppeteer's center-click (and a user's cursor) hit the pill, not the button. */}
+        <Button type="submit" size="sm" variant="outline" className="self-start" disabled={busy}>
           {busy ? "Saving…" : "Add note"}
         </Button>
       </form>

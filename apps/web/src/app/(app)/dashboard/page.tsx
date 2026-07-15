@@ -308,7 +308,10 @@ async function OverviewTab() {
     .returns<{ current_stage: string; status: string }[]>();
   const pipeline = shapePipeline({
     runs: seqRuns ?? [],
+    // T1: same buckets + actuals as the revenue snapshot above — one meaning per metric.
+    counts: { qualified, inOutreach, replied: repliedOnly },
     convertedClients: converted,
+    closedActualCents,
     avgDealValueCents: account.avg_deal_value_cents,
     revenueGoalCents: account.revenue_goal_cents,
   });

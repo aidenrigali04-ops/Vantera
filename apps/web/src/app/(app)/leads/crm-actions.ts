@@ -156,6 +156,16 @@ export async function markClosedWon(
   const lead = await loadLead(supabase, leadId);
   const pushed = lead ? await enqueuePushes(supabase, accountId, lead, { onlyAutoPush: true }) : 0;
 
+  // T1: real closes get their celebration — the only other writer of `converted`
+  // notifications is the inert CTA-token pipeline, so without this a closed-won deal
+  // never reached the dashboard's win moment. Best-effort (the close itself is saved).
+  await supabase.from("lead_notifications").insert({
+    account_id: accountId,
+    lead_id: leadId,
+    kind: "converted",
+    body: "Closed-won.",
+  });
+
   revalidatePath("/leads");
   revalidatePath("/dashboard");
   return {
