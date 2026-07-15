@@ -56,7 +56,7 @@ import {
   type TargetingRow,
   type WebsiteScan,
 } from "@vantera/agent-brains";
-import { resolveEntitlements, type EntitlementSnapshot } from "@vantera/billing";
+import { resolveEntitlements, TRIAL_DAYS, type EntitlementSnapshot } from "@vantera/billing";
 import type { ClosedDeal, CrmProvider } from "@vantera/crm-infra";
 import type { AccountDeletionStore } from "./account-deletion";
 import type { CrmPushStore } from "./crm-push";
@@ -1515,6 +1515,21 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
       profileUrl: string | null;
       displayName: string | null;
     }): Promise<{ supersededRefs: string[] }> {
+      // Trial-on-activation (owner decision 2026-07-15): the 7-day clock starts at the FIRST
+      // active LinkedIn connect, not at signup. Idempotent: only when trialing and unset.
+      if (e.status === "active") {
+        await db
+          .update(accounts)
+          .set({ trialEndsAt: new Date(Date.now() + TRIAL_DAYS * 86_400_000) })
+          .where(
+            and(
+              eq(accounts.id, e.vanteraAccountId),
+              eq(accounts.subscriptionStatus, "trialing"),
+              isNull(accounts.trialEndsAt)
+            )
+          );
+      }
+
       // Identity dedupe BEFORE the ref-keyed upsert: an ACTIVE arrival for a profile this
       // tenant already holds under a DIFFERENT ref is a reconnect that minted a fresh
       // provider account. Revive the existing row in place — its id carries the lead

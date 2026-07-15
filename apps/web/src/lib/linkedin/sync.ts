@@ -122,5 +122,14 @@ export async function reconcileLinkedInAccounts(
     });
     if (!error) synced++;
   }
+  // Trial-on-activation (2026-07-15): first active connect starts the 7-day clock.
+  if (synced > 0) {
+    await svc
+      .from("accounts")
+      .update({ trial_ends_at: new Date(Date.now() + 7 * 86_400_000).toISOString() })
+      .eq("id", accountId)
+      .eq("subscription_status", "trialing")
+      .is("trial_ends_at", null);
+  }
   return { synced };
 }

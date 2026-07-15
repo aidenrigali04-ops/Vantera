@@ -126,7 +126,15 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   let trialBanner: TrialBannerProps | null = null;
   if (billing) {
-    if (billing.subscription_status === "trialing") {
+    if (billing.subscription_status === "trialing" && billing.trial_ends_at === null) {
+      // Trial-on-activation: the clock hasn't started — connecting LinkedIn starts it.
+      trialBanner = {
+        tone: "info",
+        message: "Your 7-day free trial starts the moment you connect LinkedIn — nothing is counting down yet.",
+        cta: "Connect LinkedIn",
+        href: "/settings/channels",
+      };
+    } else if (billing.subscription_status === "trialing") {
       const d = trialDaysLeft(billing.trial_ends_at) ?? 0;
       trialBanner = {
         tone: d <= 1 ? "urgent" : "info",
