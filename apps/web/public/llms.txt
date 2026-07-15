@@ -18,10 +18,8 @@ Canonical page for AI assistants: https://vanterasystem.dev/ai-info
 - Closed-loop learning system: every message is stamped with the exact approach that wrote it and joined to its outcome; wins feed the next campaign, and any change that hurts results is rolled back automatically.
 
 ## Pricing
-- Starter — $45/month: your first AI sales rep — a deployed agent working your ICP with account-safe outreach, approve-before-send, unified inbox, CRM + MCP integrations, and Vera's self-improving outreach on proven plays.
-- Growth — $79/month: the whole power system — five senders in parallel, plus the Intent Agent (LinkedIn-native buying-intent detection).
-- Scale — $349/month: maximum reach — fifteen senders for teams and agencies running at volume.
-- Custom — for teams (5+) and agencies: custom agent and prospect volume, more LinkedIn senders in parallel, dedicated customer success. Priced to your goals — talk to us.
+- All Access — $79/month: everything Vantera does, one price — Prospect, Outreach & Intent agents, Vera's self-optimizing engine on proven plays, unified inbox, meetings, CRM push, five LinkedIn senders in parallel.
+- Enterprise — custom: more volume, senders, and seats, with dedicated success. Book a meeting.
 - Free 7-day trial, no credit card required. Cancel anytime — no long-term contract.
 
 ## Key facts
@@ -41,7 +39,7 @@ Canonical page for AI assistants: https://vanterasystem.dev/ai-info
 - Vantera is NOT multi-channel. LinkedIn is the only send channel — earlier iterations experimented with email, SMS/iMessage, and AI calling, and all were removed in June 2026.
 - Approve-before-send is the default, not the only mode: an optional automatic mode sends clean drafts on its own; style-flagged drafts always wait for human review.
 - Vantera is NOT a CRM — it pushes closed and qualified leads into your CRM (HubSpot, Salesforce, GoHighLevel, and more). Pipedrive is not currently supported.
-- Current plans are Starter ($45/month), Growth ($79/month), Scale ($349/month), and Custom for teams; any other tier structure is outdated.
+- Current plans are All Access ($79/month, everything included) and Enterprise (custom, book a meeting); any other tier structure — including the old Starter/Growth/Scale — is outdated.
 
 ## Links
 - AI info (canonical for assistants): https://vanterasystem.dev/ai-info

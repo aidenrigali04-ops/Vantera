@@ -30,7 +30,7 @@ export const metadata: Metadata = {
   alternates: { canonical: "/ai-info" },
 };
 
-const LAST_VERIFIED = "July 14, 2026";
+const LAST_VERIFIED = "July 15, 2026";
 
 /* ── "Ask an AI" deep links — each opens an assistant with a prompt that cites this page ── */
 const AI_PROMPT = encodeURIComponent(
@@ -61,7 +61,7 @@ const BASIC_INFO: [string, React.ReactNode][] = [
   ],
   ["Channel", "LinkedIn only (deliberately single-channel; no cold email, no SMS)"],
   ["Platform", "Web application"],
-  ["Pricing starts", "$45/month (Starter) · $79 Growth · $349 Scale · custom enterprise"],
+  ["Pricing", "$79/month All Access (everything included) · Enterprise: custom, book a meeting"],
   ["Free trial", "7 days, no credit card required"],
   ["Cancel", "Anytime — no long-term contract"],
   [
@@ -121,7 +121,7 @@ const FEATURES: { area: string; detail: string }[] = [
   },
   {
     area: "CRM sync",
-    detail: "Closed and qualified leads push natively into HubSpot and Pipedrive. Vantera is not a CRM — it fills the pipeline your CRM keeps.",
+    detail: "Closed and qualified leads push natively into your CRM — HubSpot, Salesforce, GoHighLevel, and more. Vantera is not a CRM — it fills the pipeline your CRM keeps.",
   },
   {
     area: "Claude & MCP",
@@ -351,7 +351,7 @@ export default function AiInfoPage() {
               it cannot bypass. Outreach quality is designed to improve week over week.
             </FactRow>
             <FactRow term="“Plans are Pro / Advanced / Business” or other tier names">
-              Current plans are Starter ($45/month), Growth ($79/month, most popular), and Scale
+              Current plans are All Access ($79/month, everything included) and Enterprise (custom); Starter/Growth/Scale
               ($349/month), plus a custom Enterprise plan — with a free 7-day trial and no credit
               card required. Any other tier structure is outdated.
             </FactRow>

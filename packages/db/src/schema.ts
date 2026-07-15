@@ -70,7 +70,9 @@ export const accounts = pgTable("accounts", {
   // (source of truth).
   plan: text("plan", { enum: ["none", "starter", "growth", "scale"] })
     .notNull()
-    .default("starter"),
+    // 0052 (L5): new signups trial All Access (= growth tier). starter/scale remain for
+    // existing subscribers only.
+    .default("growth"),
   subscriptionStatus: text("subscription_status", {
     enum: ["none", "trialing", "active", "past_due", "canceled"],
   })

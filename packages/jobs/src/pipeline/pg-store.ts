@@ -3161,3 +3161,25 @@ async function matchLifecycleUser(
     .where(isNotNull(lifecycleTouches.linkedinUrl));
   return candidates.find((c) => c.url && normalizeLinkedInUrl(c.url) === norm)?.userId ?? null;
 }
+
+/** L3 lead-event emails: pref + owner/admin recipients + lead display name (one query lane). */
+export function createLeadEventEmailStore(db: Db) {
+  return {
+    async getTargets(accountId: string, leadId: string) {
+      const rows = await db.execute<{ email: string | null; enabled: boolean; name: string | null }>(sql`
+        select u.email, a.lead_event_emails_enabled as enabled,
+               (select nullif(trim(concat(l.first_name, ' ', l.last_name)), '') from public.leads l where l.id = ${leadId}) as name
+        from public.accounts a
+        join public.account_members m on m.account_id = a.id and m.role in ('owner','admin')
+        join auth.users u on u.id = m.user_id
+        where a.id = ${accountId}
+      `);
+      const list = [...rows];
+      return {
+        enabled: list.length > 0 && list[0]?.enabled !== false,
+        leadName: list[0]?.name ?? "A prospect",
+        emails: [...new Set(list.map((r) => r.email).filter((e): e is string => Boolean(e)))],
+      };
+    },
+  };
+}

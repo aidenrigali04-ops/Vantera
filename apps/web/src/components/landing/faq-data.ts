@@ -39,6 +39,6 @@ export const FAQ_ITEMS: FaqItem[] = [
   },
   {
     q: "How much does it cost?",
-    a: "Starter is $45/month for a solo operator — one LinkedIn sender, agents deployed, account-safe outreach. Growth is $79/month (our most popular) with five senders in parallel plus the Intent Agent. Scale is $349/month with fifteen senders for teams and agencies at volume, and Enterprise is custom. Annual billing saves two months, there's no long-term contract, and you can change or cancel anytime.",
+    a: "One plan, everything included: All Access is $79/month — all three agents (Prospect, Outreach, Intent), Vera's self-optimizing engine, the unified inbox, meetings, and CRM push. Enterprise is custom for teams that need more volume, senders, or seats — book a meeting. Annual billing saves two months, there's no long-term contract, and you can change or cancel anytime.",
   },
 ];

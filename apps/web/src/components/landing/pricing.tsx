@@ -164,13 +164,31 @@ export function Pricing({ plans }: { plans?: LandingPlan[] }) {
         <LandingHeading
           eyebrow="Pricing"
           title="Simple, transparent pricing"
-          subtitle="Start free. Pick a plan when you deploy your first agent. No contracts, no surprises — three plans, priced to your goals."
+          subtitle="Start free. One plan with everything in it, and an enterprise lane when you outgrow it. No contracts, no surprises."
         />
 
-        <Reveal className="mx-auto mt-14 grid max-w-5xl items-stretch gap-5 lg:grid-cols-3">
+        <Reveal className="mx-auto mt-14 grid max-w-4xl items-stretch gap-5 lg:grid-cols-2">
           {ordered.map((p) => (
             <PlanCard key={p.tier} plan={p} />
           ))}
+          {/* L5: the second plan is a conversation, not a checkout. */}
+          <RevealItem className="relative h-full">
+            <div className="flex h-full flex-col gap-5 rounded-2xl border border-[var(--hairline)] bg-white p-6 shadow-[var(--shadow-sm)]">
+              <div>
+                <h3 className="text-[1.15rem] font-semibold tracking-[-0.01em] text-foreground">Enterprise</h3>
+                <p className="mt-1.5 text-[14px] leading-relaxed text-[var(--ink-3)]">
+                  Custom volume, senders, and seats — the same system, built around your team.
+                </p>
+              </div>
+              <p className="text-[2rem] font-semibold tracking-[-0.02em] text-foreground">Let&apos;s talk</p>
+              <a
+                href="/demo"
+                className="mt-auto inline-flex items-center justify-center rounded-[10px] border border-[var(--hairline)] px-5 py-2.5 text-[14px] font-semibold transition-colors hover:bg-[var(--cyan-tint)]/50"
+              >
+                Book a meeting
+              </a>
+            </div>
+          </RevealItem>
         </Reveal>
 
         <p className="mt-8 text-center text-[13px] text-[var(--ink-4)]">

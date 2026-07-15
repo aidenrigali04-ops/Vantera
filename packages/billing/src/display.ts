@@ -59,14 +59,16 @@ export const PLAN_DISPLAY: Record<PlanTier, PlanDisplay> = {
   },
   growth: {
     tier: "growth",
-    name: "Growth",
-    tagline: "The whole power system — five senders in parallel, plus the Intent Agent.",
+    name: "All Access",
+    tagline: "Everything Vantera does, one price — the whole self-optimizing system.",
     monthlyUsd: 79,
     highlight: true,
     features: [
-      "Everything in Starter",
-      "Intent Agent — LinkedIn-native buying-intent detection",
-      "Multi-sender distribution across your connected accounts",
+      "Prospect, Outreach & Intent agents (LinkedIn)",
+      // Vera's self-improving loop runs on every account — checked against the real engine.
+      "Vera — self-optimizing outreach on proven plays",
+      "Unified inbox, meetings, and CRM push",
+      "ICP-tailored enrichment & lead scoring",
       ...capacity("growth"),
     ],
   },
@@ -84,8 +86,11 @@ export const PLAN_DISPLAY: Record<PlanTier, PlanDisplay> = {
   },
 };
 
-/** Render order, left → right. */
-export const PLAN_DISPLAY_ORDER: PlanTier[] = ["starter", "growth", "scale"];
+/** Render order, left → right. Two-plan restructure (L5, 2026-07-15): one self-serve
+ *  All Access plan (internally the `growth` tier — same Stripe price, same entitlements)
+ *  plus Enterprise (book a meeting). Starter/scale display entries remain for existing
+ *  subscribers' billing pages; they are no longer sold. */
+export const PLAN_DISPLAY_ORDER: PlanTier[] = ["growth"];
 
 /** Annual billing gives two months free. Charged yearly; shown as an effective /mo. */
 export const MONTHS_FREE_ANNUAL = 2;

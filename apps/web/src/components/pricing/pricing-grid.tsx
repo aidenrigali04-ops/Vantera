@@ -64,7 +64,7 @@ export function PricingGrid({
         <IntervalToggle interval={interval} onChange={setInterval} />
       </header>
 
-      <Reveal className="grid items-stretch gap-5 lg:grid-cols-3">
+      <Reveal className="mx-auto grid w-full max-w-4xl items-stretch gap-5 lg:grid-cols-2">
         {plans.map((plan) => {
           const isCurrent = plan.tier === currentTier;
           const price = interval === "year" ? plan.annualMonthlyUsd : plan.monthlyUsd;
@@ -147,6 +147,7 @@ export function PricingGrid({
             </RevealItem>
           );
         })}
+      <EnterpriseCard />
       </Reveal>
 
       <div className={cn(PANEL_SURFACE, "flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between")}>
@@ -221,5 +222,33 @@ function IntervalToggle({
         Save 2 months
       </span>
     </div>
+  );
+}
+
+/** L5 two-plan restructure: the second plan is a conversation, not a checkout. */
+function EnterpriseCard() {
+  return (
+    <RevealItem className="h-full">
+      <div className={cn(PANEL_SURFACE, "relative flex h-full flex-col gap-6 overflow-hidden p-6")}>
+        <div className="flex flex-col gap-1.5">
+          <h2 className="font-heading text-xl font-semibold tracking-tight">Enterprise</h2>
+          <p className="text-sm text-muted-foreground">
+            Custom volume, senders, and seats — the same system, built around your team.
+          </p>
+        </div>
+        <p className="font-heading text-3xl font-semibold tracking-tight">Let&apos;s talk</p>
+        <ul className="flex flex-col gap-2.5 text-sm text-muted-foreground">
+          <li>Custom prospect volume and LinkedIn senders</li>
+          <li>Team seats and roles at your scale</li>
+          <li>Dedicated success — priced to your goals</li>
+        </ul>
+        <a
+          href="/demo"
+          className="mt-auto inline-flex items-center justify-center rounded-lg border border-[var(--hairline)] px-4 py-2.5 text-sm font-medium transition-colors hover:bg-[var(--cyan-tint)]/50"
+        >
+          Book a meeting
+        </a>
+      </div>
+    </RevealItem>
   );
 }
