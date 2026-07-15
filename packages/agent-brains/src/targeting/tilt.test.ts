@@ -110,4 +110,15 @@ describe("topTiltSegment", () => {
     expect(topTiltSegment(buildTargetingProfile([]))).toBeNull();
     expect(topTiltSegment(buildTargetingProfile(ROWS.slice(0, 5)))).toBeNull();
   });
+
+  it("never surfaces the unclassifiable 'other' bucket as the UI focus", () => {
+    // 10 unclassifiable titles converting above 10 founders — tilt math may use it, the UI must not
+    const rows = [
+      ...Array.from({ length: 10 }, (_, i) =>
+        row("Ninja of Vibes", null, { accepted: i < 8, interested: i < 6 })
+      ),
+      ...Array.from({ length: 10 }, (_, i) => row("Founder", null, { accepted: i < 2 })),
+    ];
+    expect(topTiltSegment(buildTargetingProfile(rows))?.key).not.toBe("seniority:other");
+  });
 });

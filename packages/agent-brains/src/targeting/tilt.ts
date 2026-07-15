@@ -124,6 +124,9 @@ export function topTiltSegment(profile: TargetingProfile): {
   let best: { key: string; stat: SegmentStat; score: number } | null = null;
   for (const [key, stat] of profile.segments) {
     if (stat.n < SEGMENT_FLOOR) continue;
+    // "other" = titles we couldn't classify — real for the tilt math, meaningless as a UI focus
+    // ("prioritizing other roles" tells the user nothing actionable).
+    if (key === "seniority:other") continue;
     // prefer deep-conversion evidence; fall back to acceptance when deep rates tie
     const score = stat.deep / stat.n - baseDeep || stat.accepted / stat.n - baseAccept;
     if (score > 0 && (!best || score > best.score)) best = { key, stat, score };
