@@ -86,6 +86,10 @@ export const accounts = pgTable("accounts", {
   weeklySummaryEnabled: boolean("weekly_summary_enabled").notNull().default(true),
   // 0051 (L3): interested-reply / meeting-booked / needs-you emails to the account owners
   leadEventEmailsEnabled: boolean("lead_event_emails_enabled").notNull().default(true),
+  // 0055 (R5): lifecycle emails (trial-ending, payment-failed) + their idempotence stamps
+  lifecycleEmailsEnabled: boolean("lifecycle_emails_enabled").notNull().default(true),
+  trialEndingNotifiedAt: timestamp("trial_ending_notified_at", { withTimezone: true }),
+  paymentFailedNotifiedAt: timestamp("payment_failed_notified_at", { withTimezone: true }),
 });
 
 export const accountMembers = pgTable(

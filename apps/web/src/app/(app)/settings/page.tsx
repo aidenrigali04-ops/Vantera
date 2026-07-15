@@ -7,7 +7,7 @@ import { getGateData } from "@/lib/auth/context";
 import { matchMemberEmails } from "./team/validation";
 import { PasswordForm, ProfileForm } from "./profile-form";
 import { WorkspaceForm } from "./workspace-form";
-import { LeadEventEmailsToggle, WeeklySummaryToggle } from "./notifications-form";
+import { LeadEventEmailsToggle, LifecycleEmailsToggle, WeeklySummaryToggle } from "./notifications-form";
 import { DangerZone } from "./danger-zone";
 
 export const metadata = { title: "Settings" };
@@ -54,9 +54,13 @@ export default async function SettingsPage() {
         .returns<{ email: string; accepted_at: string | null }[]>(),
       supabase
         .from("accounts")
-        .select("weekly_summary_enabled, lead_event_emails_enabled")
+        .select("weekly_summary_enabled, lead_event_emails_enabled, lifecycle_emails_enabled")
         .eq("id", account.id)
-        .maybeSingle<{ weekly_summary_enabled: boolean; lead_event_emails_enabled: boolean }>(),
+        .maybeSingle<{
+          weekly_summary_enabled: boolean;
+          lead_event_emails_enabled: boolean;
+          lifecycle_emails_enabled: boolean;
+        }>(),
     ]);
   const emailById = matchMemberEmails(members ?? [], acceptedInvites ?? []);
 
@@ -112,6 +116,7 @@ export default async function SettingsPage() {
         <h2 className="font-heading text-base font-semibold">Notifications</h2>
         <LeadEventEmailsToggle enabled={prefs?.lead_event_emails_enabled ?? true} />
         <WeeklySummaryToggle enabled={prefs?.weekly_summary_enabled ?? true} />
+        <LifecycleEmailsToggle enabled={prefs?.lifecycle_emails_enabled ?? true} />
       </Panel>
 
       <SettingsLink

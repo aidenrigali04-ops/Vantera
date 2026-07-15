@@ -59,6 +59,7 @@ import {
 import { resolveEntitlements, TRIAL_DAYS, type EntitlementSnapshot } from "@vantera/billing";
 import type { ClosedDeal, CrmProvider } from "@vantera/crm-infra";
 import type { AccountDeletionStore } from "./account-deletion";
+import type { TrialEndingAccount } from "./trial-ending";
 import type { CrmPushStore } from "./crm-push";
 import type {
   ActivityConnectionRow,
@@ -3195,6 +3196,42 @@ export function createLeadEventEmailStore(db: Db) {
         leadName: list[0]?.name ?? "A prospect",
         emails: [...new Set(list.map((r) => r.email).filter((e): e is string => Boolean(e)))],
       };
+    },
+  };
+}
+
+/** R5 trial-ending emails: due trials + owner/admin recipients + idempotence stamp. */
+export function createTrialEndingStore(db: Db) {
+  return {
+    async getTrialEndingAccounts(now: Date, withinMs: number): Promise<TrialEndingAccount[]> {
+      const until = new Date(now.getTime() + withinMs);
+      const rows = await db.execute<{ id: string; trial_ends_at: string; email: string | null }>(sql`
+        select a.id, a.trial_ends_at, u.email
+        from public.accounts a
+        join public.account_members m on m.account_id = a.id and m.role in ('owner','admin')
+        join auth.users u on u.id = m.user_id
+        where a.subscription_status = 'trialing'
+          and a.trial_ends_at is not null
+          and a.trial_ends_at > ${now.toISOString()}
+          and a.trial_ends_at <= ${until.toISOString()}
+          and a.trial_ending_notified_at is null
+          and a.lifecycle_emails_enabled = true
+          and a.stripe_subscription_id is null
+      `);
+      const byId = new Map<string, TrialEndingAccount>();
+      for (const r of [...rows]) {
+        const cur = byId.get(r.id) ?? { id: r.id, trialEndsAt: r.trial_ends_at, emails: [] };
+        if (r.email && !cur.emails.includes(r.email)) cur.emails.push(r.email);
+        byId.set(r.id, cur);
+      }
+      return [...byId.values()];
+    },
+    async markTrialEndingNotified(ids: string[]): Promise<void> {
+      if (ids.length === 0) return;
+      await db
+        .update(accounts)
+        .set({ trialEndingNotifiedAt: new Date() })
+        .where(inArray(accounts.id, ids));
     },
   };
 }

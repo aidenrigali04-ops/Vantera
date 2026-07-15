@@ -19,6 +19,15 @@ Every Monday, workspace owners and admins get a one-screen recap of what the age
 - A **dead week** (no activity and no live agents) sends nothing at all.
 - Turn it off (or back on) under **Settings → Notifications** — one toggle, admins only.
 
+## Lifecycle emails
+
+Workspace owners and admins also get two account-level emails, each sent exactly once per
+event: a **heads-up two days before your free trial ends** (your data and agents stay exactly
+as they are either way), and a **notice if a subscription payment fails** and outreach pauses —
+with a link to fix billing and pick back up. New signups also get a short **welcome email**
+covering how the trial starts. Turn the trial/payment emails off under
+**Settings → Notifications**.
+
 ## Deleting your workspace
 
 In the danger zone, type your workspace name to confirm deletion. The workspace is then **scheduled for permanent deletion after a 7-day grace period** — during those 7 days an admin can cancel from the same screen. Requesting deletion **immediately pauses all your agents and freezes outreach**, so nothing keeps running (or using up your plan) while the workspace winds down; canceling un-freezes outreach, and you re-enable agents from the Agents page. After the grace period, all workspace data is permanently erased, your connected LinkedIn account is disconnected, and data held by our processing partners is removed.

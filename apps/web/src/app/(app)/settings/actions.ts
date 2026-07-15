@@ -98,6 +98,24 @@ export async function setLeadEventEmails(
   return { saved: true };
 }
 
+/** R5: the lifecycle-email toggle (trial-ending heads-up + payment-failure notice). */
+export async function setLifecycleEmails(
+  _prev: SettingsState,
+  formData: FormData
+): Promise<SettingsState> {
+  const next = formData.get("enabled") === "true";
+  const supabase = await createClient();
+  const { data: account } = await supabase.from("accounts").select("id").limit(1).maybeSingle();
+  if (!account) return { error: "No workspace found." };
+  const { error } = await supabase
+    .from("accounts")
+    .update({ lifecycle_emails_enabled: next })
+    .eq("id", account.id); // RLS: admins only
+  if (error) return { error: "Could not save. Only workspace admins can change this." };
+  revalidatePath("/settings");
+  return { saved: true };
+}
+
 // P1 (2026-07-15): in-app password change — the only path used to be the forgot-password email.
 export async function changePassword(
   _prev: SettingsState,

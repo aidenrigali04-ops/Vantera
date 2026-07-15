@@ -10,6 +10,9 @@ import { ScoreBadge, SourceBadge, WhyNowLine } from "@/components/lead-why-now";
 import { LeadProfileSheet } from "@/components/lead-profile";
 import { bulkArchiveLeads, bulkSuppressLeads, type BulkResult } from "./bulk-actions";
 import { cn } from "@/lib/utils";
+import { EMPTY_FILTERS, leadsHref, type LeadsFilters, type LeadsSort } from "./leads-params";
+
+export type { LeadsFilters, LeadsSort } from "./leads-params";
 import {
   coolingState,
   lastActivity,
@@ -64,40 +67,6 @@ export interface ReplyView {
   received_at: string;
 }
 
-export type LeadsSort = "newest" | "score" | "company" | "activity";
-
-export type LeadsFilters = {
-  industry: string;
-  min: number | null;
-  days: number | null;
-  intent: boolean;
-};
-
-export const EMPTY_FILTERS: LeadsFilters = { industry: "", min: null, days: null, intent: false };
-
-/** One place to build /leads URLs so every link (tabs, sort, filters, pages) preserves the rest. */
-export function leadsHref(opts: {
-  tab: string;
-  q: string;
-  sort: LeadsSort;
-  page?: number;
-  per?: number;
-  filters?: LeadsFilters;
-}): string {
-  const params = new URLSearchParams();
-  if (opts.tab !== "all") params.set("tab", opts.tab);
-  if (opts.q) params.set("q", opts.q);
-  if (opts.sort !== "newest") params.set("sort", opts.sort);
-  if (opts.page && opts.page > 1) params.set("page", String(opts.page));
-  if (opts.per && opts.per !== 25) params.set("per", String(opts.per));
-  const f = opts.filters;
-  if (f?.industry) params.set("industry", f.industry);
-  if (f?.min) params.set("min", String(f.min));
-  if (f?.days) params.set("days", String(f.days));
-  if (f?.intent) params.set("intent", "1");
-  const query = params.toString();
-  return query ? `/leads?${query}` : "/leads";
-}
 
 function latestReply(lead: LeadRow): ReplyView | null {
   const replies = lead.replies ?? [];

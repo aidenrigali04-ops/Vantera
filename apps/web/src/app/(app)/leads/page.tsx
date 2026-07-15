@@ -5,7 +5,8 @@ import { orThrow } from "@/lib/supabase/guard";
 import { getGateData } from "@/lib/auth/context";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { LeadsTable, leadsHref, type LeadRow, type LeadsFilters, type LeadsSort } from "./leads-table";
+import { LeadsTable, type LeadRow } from "./leads-table";
+import { leadsHref, type LeadsFilters, type LeadsSort } from "./leads-params";
 import { HOT_MIN_SCORE } from "./lead-value";
 import { cn } from "@/lib/utils";
 

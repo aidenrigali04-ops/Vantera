@@ -7,6 +7,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { friendlyAuthError } from "@/lib/auth/errors";
 import { safeNext } from "@/lib/auth/safe-next";
 import { validateMemberSignup, validateSignup } from "@/lib/validation";
+import { sendWelcomeEmail } from "@vantera/transactional-email";
 import { siteUrl } from "@/lib/site-url";
 import { recordSecurityEvent } from "@/lib/security/audit";
 
@@ -124,6 +125,15 @@ export async function signup(_prev: AuthFormState, formData: FormData): Promise<
     password: result.values.password,
   });
   if (signInError) return { error: friendlyAuthError(signInError.message) };
+
+  // R5: the welcome email — the first thing the product ever says off-screen (the email
+  // channel used to be silent until the weekly summary, 7 days in). Best-effort: a mail
+  // hiccup must never break signup. Invite signups skip it (they got the invite email).
+  try {
+    await sendWelcomeEmail({ to: result.values.email, appUrl: siteUrl() });
+  } catch {
+    // no-op — signup continues
+  }
   redirect("/dashboard"); // app gate forwards to /onboarding
 }
 
