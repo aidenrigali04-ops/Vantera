@@ -82,6 +82,8 @@ export const accounts = pgTable("accounts", {
   trialEndsAt: timestamp("trial_ends_at", { withTimezone: true }),
   // 0042: Monday recap email opt-out (default on); client-settable in Settings (column grant)
   weeklySummaryEnabled: boolean("weekly_summary_enabled").notNull().default(true),
+  // 0051 (L3): interested-reply / meeting-booked / needs-you emails to the account owners
+  leadEventEmailsEnabled: boolean("lead_event_emails_enabled").notNull().default(true),
 });
 
 export const accountMembers = pgTable(

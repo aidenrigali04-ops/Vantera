@@ -120,6 +120,12 @@ async function maybeRespond(
       kind: "needs_human",
       body: "The agent hit its conversation limit on this thread — reply personally from the lead's page.",
     });
+    // L3: the handoff is the third moment worth an email — a live prospect is waiting on a human.
+    try {
+      await deps.notifyLeadEvent?.({ kind: "needs_human", accountId, leadId: lead.id, snippet: incoming });
+    } catch {
+      // best-effort by design
+    }
     return false;
   }
   // A queued message NEWER than this reply is (or already covers) the answer — don't double-
@@ -318,6 +324,19 @@ export async function runInbound(payload: InboundPayload, deps: InboundDeps): Pr
   await deps.store.setReplyClassification(replyId, verdict);
   if (verdict.classification !== "out_of_office") {
     await applyGenuineReply(deps.store, accountId, lead, verdict, now);
+    // Moment-of-value emails (L3): the two reply-driven events worth interrupting someone for.
+    // Best-effort — an email failure must never sink reply processing.
+    if (deps.notifyLeadEvent) {
+      try {
+        if (verdict.booked) {
+          await deps.notifyLeadEvent({ kind: "meeting_booked", accountId, leadId: lead.id, snippet: event.body });
+        } else if (verdict.classification === "interested") {
+          await deps.notifyLeadEvent({ kind: "interested_reply", accountId, leadId: lead.id, snippet: event.body });
+        }
+      } catch {
+        // swallowed by design
+      }
+    }
   }
   if (verdict.classification === "not_interested") {
     await deps.store.addSuppression(accountId, "linkedin", url, "not_interested", lead.id);

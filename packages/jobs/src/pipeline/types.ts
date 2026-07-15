@@ -780,6 +780,17 @@ export interface InboundDeps {
     input: ConversationMessageInput
   ) => Promise<ConversationDraft>;
   lifecycle?: InboundLifecycleHooks;
+  /**
+   * Moment-of-value emails (L3): called on interested replies, detected bookings, and
+   * needs-human handoffs. Wrapper-wired (pref check + owner lookup + Resend); absent = no
+   * emails (tests, dev). Always best-effort — failures never sink reply processing.
+   */
+  notifyLeadEvent?: (e: {
+    kind: "interested_reply" | "meeting_booked" | "needs_human";
+    accountId: string;
+    leadId: string;
+    snippet: string;
+  }) => Promise<void>;
   now?: () => Date;
 }
 

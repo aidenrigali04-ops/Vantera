@@ -80,6 +80,24 @@ export async function setWeeklySummary(
   return { saved: true };
 }
 
+// L3 (0051): interested-reply / meeting-booked / needs-you emails — same one-boolean idiom.
+export async function setLeadEventEmails(
+  _prev: SettingsState,
+  formData: FormData
+): Promise<SettingsState> {
+  const next = formData.get("enabled") === "true";
+  const supabase = await createClient();
+  const { data: account } = await supabase.from("accounts").select("id").limit(1).maybeSingle();
+  if (!account) return { error: "No workspace found." };
+  const { error } = await supabase
+    .from("accounts")
+    .update({ lead_event_emails_enabled: next })
+    .eq("id", account.id); // RLS: admins only
+  if (error) return { error: "Could not save. Only workspace admins can change this." };
+  revalidatePath("/settings");
+  return { saved: true };
+}
+
 export async function requestAccountDeletion(
   _prev: SettingsState,
   formData: FormData
