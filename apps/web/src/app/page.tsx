@@ -18,6 +18,9 @@ import { JsonLd, softwareApplicationLd } from "@/lib/seo";
 // and the main thread isn't monopolised in the LCP/TTI window (mobile perf). ssr stays on
 // (the default) so the content is still server-rendered for SEO and there's no layout shift.
 const Showcase = dynamic(() => import("@/components/landing/showcase").then((m) => m.Showcase));
+const SystemPillars = dynamic(() =>
+  import("@/components/landing/system-pillars").then((m) => m.SystemPillars)
+);
 const HowItWorks = dynamic(() => import("@/components/landing/how-it-works").then((m) => m.HowItWorks));
 const FeaturesGrid = dynamic(() => import("@/components/landing/features-grid").then((m) => m.FeaturesGrid));
 const Consolidation = dynamic(() => import("@/components/landing/consolidation").then((m) => m.Consolidation));
@@ -62,6 +65,7 @@ export default function Home() {
         </div>
         {/* 3 → 12 */}
         <Showcase />
+        <SystemPillars />
         <HowItWorks />
         <FeaturesGrid />
         <Consolidation />

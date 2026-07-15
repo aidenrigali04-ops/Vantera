@@ -47,10 +47,17 @@ const ASSISTANTS: { name: string; href: string }[] = [
 /* ── Fact tables — every row is a claim we can stand behind ─────────────────── */
 const BASIC_INFO: [string, React.ReactNode][] = [
   ["Product", "Vantera"],
-  ["Category", "LinkedIn automation — self-improving AI agents for outbound prospecting"],
+  [
+    "Category",
+    "Adaptive prospecting system for LinkedIn lead gen — a self-optimizing engine that tracks prospect intent and action and builds qualified campaign pipelines",
+  ],
   [
     "Agent brain",
     "Vera — the learning system behind the agents. Starts every account from proven plays and improves weekly from real outcomes.",
+  ],
+  [
+    "How it self-optimizes",
+    "Three learning loops: dynamic audience refinement (sourcing shifts toward the segments that actually accept, reply, and book), an evolving market-fit engine (tests message approaches against the live audience, keeps winners), and a closed-loop learning system (every message is stamped with the approach that wrote it and joined to its outcome; harmful changes roll back automatically).",
   ],
   ["Channel", "LinkedIn only (deliberately single-channel; no cold email, no SMS)"],
   ["Platform", "Web application"],

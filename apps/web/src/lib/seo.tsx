@@ -6,7 +6,7 @@ export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://vanterasyst
 
 /** The site's canonical description — reused by metadata AND structured data so they never drift. */
 export const SITE_DESCRIPTION =
-  "Vantera is the #1 LinkedIn automation tool — find in-market buyers, qualify them, and draft a personal message for each from their real activity. You approve every send. Start free.";
+  "Vantera is an adaptive prospecting system for LinkedIn lead gen — a self-optimizing engine that tracks prospect intent and action, builds qualified campaign pipelines from your target audience, and gets smarter with every reply. You approve every send. Start free.";
 
 /** Renders a JSON-LD <script>. Accepts one object or an array of schema.org objects. */
 export function JsonLd({ data }: { data: object | object[] }) {

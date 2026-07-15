@@ -40,8 +40,8 @@ export function Hero() {
           <div className="max-w-xl">
             {/* h1 is the LCP element: no opacity gate, painted in SSR so it renders at
                 first paint instead of waiting on hydration. */}
-            <h1 className="text-[2.3rem] font-semibold leading-[1.18] tracking-[-0.04em] text-foreground sm:text-[3.6rem] lg:text-[4rem]">
-              Self-learning lead gen for{" "}
+            <h1 className="text-[2.05rem] font-semibold leading-[1.16] tracking-[-0.04em] text-foreground sm:text-[3.1rem] lg:text-[3.45rem]">
+              Adaptive prospecting system for{" "}
               <span className="whitespace-nowrap">
                 <span
                   role="img"
@@ -52,16 +52,17 @@ export function Hero() {
                   <span className="sr-only">LinkedIn</span>
                 </span>{" "}
                 LinkedIn
-              </span>
+              </span>{" "}
+              lead gen
             </h1>
 
             <p
               className="landing-rise mt-6 max-w-lg text-[17px] font-normal leading-relaxed text-[var(--ink-3)] sm:text-[19px]"
               style={{ animationDelay: "90ms" }}
             >
-              Always-evolving outreach that turns LinkedIn into a scalable flow of booked
-              revenue. Vera starts with what works, gets smarter with every reply — and you
-              approve every send.
+              Vantera is a self-optimizing lead gen engine — tracking prospect intent and
+              action, building qualified campaign pipelines from your target audience, and
+              getting smarter with every reply.
             </p>
 
             <form
