@@ -27,10 +27,11 @@ function noteVerb(kind: AppNotification["kind"], body: string): string {
     return "replied — read it and jump in";
   }
   return {
-    converted: "booked a meeting",
+    converted: "closed — a new client",
     exhausted: "went cold after the full sequence",
     hot_signal: "is heating up — a fresh buying signal, worth reaching out now",
     needs_human: "needs YOU — the agent hit its conversation limit, take the thread over",
+    meeting_booked: "booked a meeting — it's on your meetings list",
   }[kind];
 }
 

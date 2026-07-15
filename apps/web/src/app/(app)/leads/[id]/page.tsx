@@ -19,7 +19,7 @@ import { ReplyHandoff } from "../reply-panel";
 import { EraseControl } from "./erase-control";
 
 const LEAD_SELECT =
-  "id, first_name, last_name, title, company_name, company_size, industry, location, tech_stack, status, source, ai_score, ai_rationale, ai_insights, rules_gate_reasons, scored_at, email, email_status, phone, phone_status, linkedin_url, created_at, replies(channel, classification, classification_rationale, body, received_at), lead_signals(kind, label, detail, observed_at)";
+  "id, first_name, last_name, title, company_name, company_size, industry, location, tech_stack, status, source, ai_score, ai_rationale, ai_insights, rules_gate_reasons, scored_at, email, email_status, phone, phone_status, linkedin_url, created_at, meeting_booked_at, meeting_source, replies(channel, classification, classification_rationale, body, received_at), lead_signals(kind, label, detail, observed_at)";
 
 const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 const REPLY_LABELS: Record<string, string> = {
@@ -71,6 +71,8 @@ type Lead = {
   phone_status: string | null;
   linkedin_url: string | null;
   created_at: string | null;
+  meeting_booked_at: string | null;
+  meeting_source: string | null;
   replies: Reply[] | null;
   lead_signals: Signal[] | null;
 };
@@ -455,7 +457,12 @@ export default async function LeadProfilePage({ params }: { params: Promise<{ id
           </Section>
 
           <div className={cn(PANEL_SURFACE, "p-4")}>
-            <LeadCrmControls leadId={lead.id} status={lead.status} />
+            <LeadCrmControls
+              leadId={lead.id}
+              status={lead.status}
+              meetingBooked={lead.meeting_booked_at != null}
+              meetingSource={lead.meeting_source ?? null}
+            />
           </div>
 
           <div className="flex justify-end">

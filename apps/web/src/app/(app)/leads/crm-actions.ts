@@ -166,6 +166,62 @@ export async function markClosedWon(
   };
 }
 
+/**
+ * Manual "Mark meeting booked" (L1 meeting layer, spec 2026-07-15). Authoritative writer
+ * (source='manual'); booking is an EVENT: queued sends cancel, the sequence stops, and a
+ * meeting_booked notification fires — a prospect who booked never gets another scripted nudge.
+ * Distinct from closed-won: this records the meeting, not the deal.
+ */
+export async function markMeetingBookedAction(
+  _prev: LeadCrmActionState,
+  formData: FormData
+): Promise<LeadCrmActionState> {
+  const leadId = String(formData.get("leadId") ?? "");
+  if (!leadId) return { error: "Missing lead." };
+  const rawWhen = String(formData.get("meetingAt") ?? "").trim();
+  const meetingAt = rawWhen ? new Date(rawWhen) : null;
+  if (meetingAt && Number.isNaN(meetingAt.getTime())) {
+    return { error: "That meeting time doesn't parse — pick it again." };
+  }
+
+  const supabase = await createClient();
+  const accountId = await resolveAccountId(supabase);
+  if (!accountId) return { error: "Your session expired. Sign in again." };
+
+  const { error } = await supabase
+    .from("leads")
+    .update({
+      meeting_booked_at: new Date().toISOString(),
+      meeting_at: meetingAt ? meetingAt.toISOString() : null,
+      meeting_source: "manual",
+    })
+    .eq("id", leadId);
+  if (error) return { error: "Couldn't record the meeting. Try again shortly." };
+
+  // Outreach stands down (best-effort; RLS-scoped): cancel queued drafts, stop the run.
+  await supabase
+    .from("scheduled_sends")
+    .update({ status: "canceled", error: "meeting booked — outreach stood down" })
+    .eq("lead_id", leadId)
+    .in("status", ["pending_review", "approved", "scheduled"]);
+  await supabase
+    .from("sequence_runs")
+    .update({ status: "stopped" })
+    .eq("lead_id", leadId)
+    .eq("status", "active");
+  await supabase.from("lead_notifications").insert({
+    account_id: accountId,
+    lead_id: leadId,
+    kind: "meeting_booked",
+    body: "manual",
+  });
+
+  revalidatePath("/leads");
+  revalidatePath("/dashboard");
+  revalidatePath("/meetings");
+  return { success: "Meeting recorded — outreach to this prospect stood down." };
+}
+
 // Manual push / re-push of an already-closed lead to all active destinations.
 export async function pushLeadToCrm(
   _prev: LeadCrmActionState,

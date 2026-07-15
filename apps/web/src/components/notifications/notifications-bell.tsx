@@ -3,13 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { Bell, CheckCircle2, Flame, MessageSquare, Snowflake, UserRound, type LucideIcon } from "lucide-react";
+import { Bell, CalendarCheck2, CheckCircle2, Flame, MessageSquare, Snowflake, UserRound, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { markNotificationsRead } from "./actions";
 
 export type AppNotification = {
   id: string;
-  kind: "reply" | "converted" | "exhausted" | "hot_signal" | "needs_human";
+  kind: "reply" | "converted" | "exhausted" | "hot_signal" | "needs_human" | "meeting_booked";
   who: string;
   verb: string;
   at: string;
@@ -23,6 +23,7 @@ const KIND_ICON: Record<AppNotification["kind"], LucideIcon> = {
   exhausted: Snowflake,
   hot_signal: Flame,
   needs_human: UserRound,
+  meeting_booked: CalendarCheck2,
 };
 
 // Brand badge per event: a win is green (success), cold is muted, replies + hot signals
@@ -34,6 +35,7 @@ const KIND_BADGE: Record<AppNotification["kind"], string> = {
   exhausted: "bg-[var(--ink-4)] text-white",
   // amber = attention: the agent stepped aside and this thread is waiting on the human
   needs_human: "bg-amber-500 text-white",
+  meeting_booked: "bg-[var(--positive)] text-white",
 };
 
 function initials(name: string): string {
