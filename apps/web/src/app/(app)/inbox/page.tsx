@@ -2,7 +2,7 @@ import Link from "next/link";
 import { MessagesSquare } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { loadInbox, loadThread } from "@/lib/conversations";
-import { ConversationThread, Composer } from "@/components/conversation";
+import { ConversationPanel } from "@/components/conversation-panel";
 import { cn } from "@/lib/utils";
 
 export const metadata = { title: "Inbox — Vantera" };
@@ -107,12 +107,13 @@ export default async function InboxPage({
                     Full profile
                   </Link>
                 </div>
-                <div className="min-h-0 flex-1 overflow-y-auto p-5">
-                  <ConversationThread turns={turns} />
-                </div>
-                <div className="shrink-0 border-t border-[var(--hairline)] p-4">
-                  <Composer leadId={selected.leadId} initialDraft={queuedDraft} />
-                </div>
+                <ConversationPanel
+                  leadId={selected.leadId}
+                  turns={turns}
+                  initialDraft={queuedDraft}
+                  threadClassName="min-h-0 flex-1 overflow-y-auto p-5"
+                  composerClassName="shrink-0 border-t border-[var(--hairline)] p-4"
+                />
               </>
             ) : (
               <p className="py-16 text-center text-sm text-muted-foreground">Pick a conversation.</p>

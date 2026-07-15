@@ -31,9 +31,9 @@ const STATUS_LABELS: Record<string, string> = {
 export default async function BillingPage({
   searchParams,
 }: {
-  searchParams: Promise<{ reason?: string; portal?: string }>;
+  searchParams: Promise<{ reason?: string; portal?: string; checkout?: string }>;
 }) {
-  const { reason, portal } = await searchParams;
+  const { reason, portal, checkout } = await searchParams;
   const { account } = await getGateData();
   if (!account) return null;
 
@@ -82,6 +82,32 @@ export default async function BillingPage({
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-10">
+      {checkout === "success" &&
+        (hasEntitlement ? (
+          <div className={cn(PANEL_SURFACE, "p-5 text-sm")} role="status">
+            <span className="font-heading font-semibold">Payment confirmed — your plan is active.</span>{" "}
+            <span className="text-muted-foreground">
+              Your agents keep running without interruption. A receipt is on its way to your email.
+            </span>
+          </div>
+        ) : (
+          <div className={cn(PANEL_SURFACE, "p-5 text-sm")} role="status">
+            <span className="font-heading font-semibold">Payment received — activating your plan…</span>{" "}
+            <span className="text-muted-foreground">
+              This usually takes a few seconds. Refresh this page if it doesn&apos;t update shortly.
+            </span>
+          </div>
+        ))}
+
+      {checkout === "cancel" && (
+        <div className={cn(PANEL_SURFACE, "p-5 text-sm")} role="status">
+          <span className="font-heading font-semibold">Checkout canceled — nothing was charged.</span>{" "}
+          <span className="text-muted-foreground">
+            Your account is unchanged. Pick a plan whenever you&apos;re ready.
+          </span>
+        </div>
+      )}
+
       {portal === "unavailable" && (
         <div className={cn(PANEL_SURFACE, "p-5 text-sm")}>
           <span className="font-heading font-semibold">The billing portal isn&apos;t available yet.</span>{" "}

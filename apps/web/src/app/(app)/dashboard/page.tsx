@@ -5,6 +5,7 @@ import {
   type CopyStrategy,
 } from "@vantera/agent-brains";
 import { createClient } from "@/lib/supabase/server";
+import { orThrow } from "@/lib/supabase/guard";
 import { getGateData } from "@/lib/auth/context";
 import { countInterestedSince } from "@/lib/optimize";
 import { playCards } from "@/lib/plays";
@@ -123,8 +124,8 @@ async function OverviewTab() {
 
   // RLS scopes every query to this account (rule 02) — no account id is passed.
   const [
-    { data: agents },
-    { data: leadCountRows },
+    agentsRes,
+    leadCountsRes,
     draftsRes,
     { data: recentReplies },
     { data: linkedinAccounts },
@@ -183,6 +184,11 @@ async function OverviewTab() {
       .select("id", { count: "exact", head: true })
       .eq("status", "active"),
   ]);
+
+  // R1c: these two reads drive the dashboard's state machine — a failed read must hit the
+  // error boundary, or an outage would show a working account the new-user checklist.
+  const agents = orThrow(agentsRes, "your agents");
+  const leadCountRows = orThrow(leadCountsRes, "lead counts");
 
   // status is single-valued per lead, so the multi-status figures are exact sums
   // of the per-status counts returned by the aggregate (no double counting).

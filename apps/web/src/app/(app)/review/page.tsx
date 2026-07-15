@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Inbox } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { orThrow } from "@/lib/supabase/guard";
 import { Panel } from "@/components/ui/panel";
 import { cn } from "@/lib/utils";
 import { type LeadProfile } from "@/components/lead-profile";
@@ -113,7 +114,9 @@ export default async function ReviewPage({
     view === "queue"
       ? query.eq("status", "pending_review")
       : query.in("status", PROCESSED_STATUSES as unknown as string[]);
-  const { data: rows, count } = await query;
+  const res = await query;
+  const rows = orThrow(res, "the review queue");
+  const count = res.count;
 
   const groups = view === "queue" ? groupByProspect((rows ?? []) as unknown as DraftRow[]) : [];
 

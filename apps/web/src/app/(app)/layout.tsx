@@ -14,6 +14,7 @@ import { ClarityIdentity } from "@/components/analytics/clarity-identity";
 import { RouteEvents } from "@/components/analytics/route-events";
 import { Suspense } from "react";
 import { TrialBanner, type TrialBannerProps } from "@/components/billing/trial-banner";
+import { Toaster } from "@/components/ui/sonner";
 import { trialDaysLeft, isTrialExpired } from "@vantera/billing";
 
 /** Honest per-event copy. A reply's body carries its classification (inbound pipeline), so an
@@ -56,33 +57,55 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const dest = resolveGate("app", toGateContext(data));
   if (dest) redirect(dest);
 
-  // Real data behind the dock's badge: drafts waiting in the review queue.
-  // RLS scopes this to the session's account (rule 02) — no account id passed.
+  // Shell data — four independent reads, fired concurrently (R1a): every app navigation
+  // pays this layout's latency, so it must be one round-trip, not a waterfall. All reads
+  // are RLS-scoped to the session's account (rule 02) — no account id passed. Shell reads
+  // stay non-fatal: a failed badge/bell/banner degrades to empty, never crashes the frame.
   const supabase = await createClient();
-  const { count } = await supabase
-    .from("scheduled_sends")
-    .select("id", { count: "exact", head: true })
-    .eq("status", "pending_review");
+  const [
+    { count },
+    { data: notes },
+    { data: billing },
+    { count: unhealthyConnections },
+  ] = await Promise.all([
+    supabase
+      .from("scheduled_sends")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "pending_review"),
+    // Recent lead events for the dock bell — read AND unread, so opening the bell always
+    // rewards the click with the recent history (an unread-only feed goes permanently empty
+    // the moment it's opened once). Unread stays visually distinct; only unread gets marked.
+    supabase
+      .from("lead_notifications")
+      .select("id, kind, lead_id, body, created_at, read_at")
+      .order("created_at", { ascending: false })
+      .limit(20)
+      .returns<
+        {
+          id: string;
+          kind: AppNotification["kind"];
+          lead_id: string;
+          body: string;
+          created_at: string;
+          read_at: string | null;
+        }[]
+      >(),
+    // Soft-lock trial strip: a live countdown while trialing, a clear "paused" state once
+    // it lapses. Server-set billing columns only (RLS-scoped) — never a placeholder.
+    supabase
+      .from("accounts")
+      .select("plan, subscription_status, trial_ends_at")
+      .limit(1)
+      .maybeSingle<{ plan: string; subscription_status: string; trial_ends_at: string | null }>(),
+    // Dead LinkedIn connection = every agent silently stopped (no sourcing, no sends, no
+    // replies coming in) — the one state that must never be invisible (2026-07-08 incident).
+    // The account-health cron reconciles the status; this banner is its user-facing half.
+    supabase
+      .from("linkedin_accounts")
+      .select("id", { count: "exact", head: true })
+      .in("status", ["disconnected", "restricted"]),
+  ]);
   const badges = count && count > 0 ? { review: count } : undefined;
-
-  // Recent lead events for the dock bell — read AND unread, so opening the bell always
-  // rewards the click with the recent history (an unread-only feed goes permanently empty
-  // the moment it's opened once). Unread stays visually distinct; only unread gets marked.
-  const { data: notes } = await supabase
-    .from("lead_notifications")
-    .select("id, kind, lead_id, body, created_at, read_at")
-    .order("created_at", { ascending: false })
-    .limit(20)
-    .returns<
-      {
-        id: string;
-        kind: AppNotification["kind"];
-        lead_id: string;
-        body: string;
-        created_at: string;
-        read_at: string | null;
-      }[]
-    >();
   const noteLeadIds = [...new Set((notes ?? []).map((n) => n.lead_id))];
   const { data: noteLeads } = noteLeadIds.length
     ? await supabase
@@ -115,14 +138,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     href: noteHref(n.kind, n.lead_id),
     unread: n.read_at === null,
   }));
-
-  // Soft-lock trial strip: a live countdown while trialing, a clear "paused" state once
-  // it lapses. Server-set billing columns only (RLS-scoped) — never a placeholder.
-  const { data: billing } = await supabase
-    .from("accounts")
-    .select("plan, subscription_status, trial_ends_at")
-    .limit(1)
-    .maybeSingle<{ plan: string; subscription_status: string; trial_ends_at: string | null }>();
 
   let trialBanner: TrialBannerProps | null = null;
   if (billing) {
@@ -163,13 +178,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     }
   }
 
-  // Dead LinkedIn connection = every agent silently stopped (no sourcing, no sends, no
-  // replies coming in) — the one state that must never be invisible (2026-07-08 incident).
-  // The account-health cron reconciles the status; this banner is its user-facing half.
-  const { count: unhealthyConnections } = await supabase
-    .from("linkedin_accounts")
-    .select("id", { count: "exact", head: true })
-    .in("status", ["disconnected", "restricted"]);
   const connectionBanner: TrialBannerProps | null =
     unhealthyConnections && unhealthyConnections > 0
       ? {
@@ -260,6 +268,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         {children}
       </main>
       <MobileNav badges={badges} />
+      <Toaster />
       <CopilotOverlay />
     </div>
   );

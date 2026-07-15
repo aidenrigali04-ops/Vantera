@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { CalendarCheck2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { orThrow } from "@/lib/supabase/guard";
 import { LeadProfileLink, type LeadProfile } from "@/components/lead-profile";
 import { LEAD_PROFILE_FIELDS } from "@/components/lead-profile-fields";
 
@@ -32,13 +33,13 @@ const fmtDay = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric"
 export default async function MeetingsPage() {
   const supabase = await createClient();
   // RLS scopes to the session's account (rule 02).
-  const { data } = await supabase
+  const res = await supabase
     .from("leads")
     .select(`meeting_booked_at, meeting_at, meeting_source, ${LEAD_PROFILE_FIELDS}`)
     .not("meeting_booked_at", "is", null)
     .order("meeting_booked_at", { ascending: false })
     .returns<(LeadProfile & Omit<MeetingRow, "id" | "leads">)[]>();
-  const meetings = data ?? [];
+  const meetings = orThrow(res, "your meetings") ?? [];
 
   return (
     <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-6">

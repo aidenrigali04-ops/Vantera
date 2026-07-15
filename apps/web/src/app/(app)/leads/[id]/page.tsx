@@ -15,7 +15,7 @@ import {
   projectedRevenue,
   scoreVerdict,
 } from "../lead-value";
-import { ConversationThread, Composer } from "@/components/conversation";
+import { ConversationPanel } from "@/components/conversation-panel";
 import { loadThread } from "@/lib/conversations";
 import { EraseControl } from "./erase-control";
 
@@ -391,17 +391,18 @@ export default async function LeadProfilePage({ params }: { params: Promise<{ id
               latest-message-only. The human never takes over blind again. */}
           <Section label="Conversation">
             <div className="space-y-3">
-              <div className="max-h-96 overflow-y-auto pr-1">
-                <ConversationThread turns={conversationTurns} />
-              </div>
               {pausedRun && (
                 <p className="text-xs text-muted-foreground">
                   You&apos;re driving this thread — automation is paused until you hand it back.
                 </p>
               )}
-              <div className="border-t border-[var(--hairline)] pt-3">
-                <Composer leadId={lead.id} initialDraft={queuedSend?.body ?? ""} />
-              </div>
+              <ConversationPanel
+                leadId={lead.id}
+                turns={conversationTurns}
+                initialDraft={queuedSend?.body ?? ""}
+                threadClassName="max-h-96 overflow-y-auto pr-1"
+                composerClassName="border-t border-[var(--hairline)] pt-3"
+              />
             </div>
           </Section>
 

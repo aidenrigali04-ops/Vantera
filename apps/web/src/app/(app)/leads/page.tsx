@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { orThrow } from "@/lib/supabase/guard";
 import { getGateData } from "@/lib/auth/context";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -88,11 +89,11 @@ export default async function LeadsPage({
     .limit(3);
 
   // Account carries the revenue numbers that turn each lead into "≈ $X to your goal".
-  const [{ data: leads, count }, { data: hotLeads }, { account }] = await Promise.all([
-    query,
-    hotQuery,
-    getGateData(),
-  ]);
+  const [leadsRes, hotRes, { account }] = await Promise.all([query, hotQuery, getGateData()]);
+  // R1c: a failed read hits the error boundary — never renders as "0 leads".
+  const leads = orThrow(leadsRes, "your leads");
+  const count = leadsRes.count;
+  const hotLeads = orThrow(hotRes, "hot leads");
 
   const totalPages = Math.max(1, Math.ceil((count ?? 0) / PAGE_SIZE));
 

@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { describeStrategy, type CopyStrategy, type SendRecipe } from "@vantera/agent-brains";
+import { orThrow } from "@/lib/supabase/guard";
 
 /**
  * The conversation cockpit's data layer (L2, spec 2026-07-15). The full two-way thread has
@@ -17,6 +18,8 @@ export type ThreadTurn = {
   classification: string | null;
   /** human-typed vs agent-written */
   manual: boolean;
+  /** R1d optimistic echo: true while a just-sent message awaits server confirmation */
+  pending?: boolean;
 };
 
 type SentRow = {
@@ -89,7 +92,8 @@ export type InboxItem = {
 
 /** Every conversation, newest activity first, unanswered-interested pinned. */
 export async function loadInbox(db: SupabaseClient): Promise<InboxItem[]> {
-  const [{ data: sent }, { data: got }] = await Promise.all([
+  // R1c: a failed read must hit the route's error boundary, never render an empty inbox.
+  const [sentRes, gotRes] = await Promise.all([
     db
       .from("scheduled_sends")
       .select("lead_id, body, updated_at, origin, recipe, linkedin_stage")
@@ -104,6 +108,8 @@ export async function loadInbox(db: SupabaseClient): Promise<InboxItem[]> {
       .limit(400)
       .returns<ReplyRow[]>(),
   ]);
+  const sent = orThrow(sentRes, "your sent messages");
+  const got = orThrow(gotRes, "replies");
   const byLead = new Map<
     string,
     { lastAt: string; lastSnippet: string; lastRole: "agent" | "lead"; lastSentAt: string; lastInterestedAt: string }

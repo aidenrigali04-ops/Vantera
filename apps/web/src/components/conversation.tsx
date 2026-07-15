@@ -54,7 +54,11 @@ export function ConversationThread({ turns }: { turns: ThreadTurn[] }) {
                   {t.classification.replace("_", " ")}
                 </span>
               )}
-              <span>{new Date(t.at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</span>
+              {t.pending ? (
+                <span className="font-medium text-[var(--cyan-strong)]">Sending…</span>
+              ) : (
+                <span>{new Date(t.at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</span>
+              )}
             </p>
           </div>
         </li>
@@ -67,11 +71,14 @@ export function Composer({
   leadId,
   initialDraft = "",
   draftSource = null,
+  onQueued,
 }: {
   leadId: string;
   /** a queued agent draft, when one exists — "pre-drafted, one click to send" */
   initialDraft?: string;
   draftSource?: string | null;
+  /** R1d: notifies the thread so the sent message echoes immediately */
+  onQueued?: (text: string) => void;
 }) {
   const [body, setBody] = useState(initialDraft);
   const [note, setNote] = useState<string | null>(
@@ -96,11 +103,13 @@ export function Composer({
           onClick={() =>
             start(async () => {
               setError(null);
-              const res = await sendManualReply(leadId, "linkedin", body);
+              const sentText = body;
+              const res = await sendManualReply(leadId, "linkedin", sentText);
               if (res.error) setError(res.error);
               else {
                 setBody("");
                 setNote("Queued — it sends through the normal pacing.");
+                onQueued?.(sentText);
               }
             })
           }

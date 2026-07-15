@@ -18,7 +18,8 @@ not interested, and so on).
 
 ## Replying
 
-- **Send** — queues your message through the normal, account-safe send path.
+- **Send** — queues your message through the normal, account-safe send path. Your message
+  appears in the thread immediately, marked "Sending…" until it's confirmed on its way.
 - **Draft with Vera** — Vera writes the next message for this exact thread, grounded in the
   conversation so far and your proof points. You edit, then send. If a queued draft already
   exists, the composer opens with it — one click to send.
