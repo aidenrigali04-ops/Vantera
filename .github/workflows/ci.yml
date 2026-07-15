@@ -33,7 +33,20 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # npm retired pnpm's audit endpoints (410, 2026-07-15) — until pnpm migrates to the bulk
+      # advisory API the audit signal is unavailable upstream. Tolerate EXACTLY that failure
+      # (loud warning, Dependabot stays the remediation path); any real critical advisory or
+      # other audit error still fails the build.
       - name: Fail on critical advisories
-        run: pnpm audit --audit-level=critical
+        run: |
+          set +e
+          out=$(pnpm audit --audit-level=critical 2>&1)
+          code=$?
+          echo "$out"
+          if [ $code -ne 0 ] && echo "$out" | grep -q "ERR_PNPM_AUDIT_BAD_RESPONSE"; then
+            echo "::warning::npm audit endpoint retired (410) — audit signal unavailable, not blocking."
+            exit 0
+          fi
+          exit $code
       - name: Report high advisories (non-blocking)
         run: pnpm audit --audit-level=high || true
