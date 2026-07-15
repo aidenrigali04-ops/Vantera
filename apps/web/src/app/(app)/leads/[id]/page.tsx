@@ -15,23 +15,14 @@ import {
   projectedRevenue,
   scoreVerdict,
 } from "../lead-value";
-import { ReplyHandoff } from "../reply-panel";
+import { ConversationThread, Composer } from "@/components/conversation";
+import { loadThread } from "@/lib/conversations";
 import { EraseControl } from "./erase-control";
 
 const LEAD_SELECT =
   "id, first_name, last_name, title, company_name, company_size, industry, location, tech_stack, status, source, ai_score, ai_rationale, ai_insights, rules_gate_reasons, scored_at, email, email_status, phone, phone_status, linkedin_url, created_at, meeting_booked_at, meeting_source, replies(channel, classification, classification_rationale, body, received_at), lead_signals(kind, label, detail, observed_at)";
 
 const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
-const REPLY_LABELS: Record<string, string> = {
-  interested: "Interested",
-  not_interested: "Not interested",
-  neutral: "Neutral",
-  out_of_office: "Out of office",
-  bounce: "Bounced",
-  unsubscribe: "Unsubscribed",
-  other: "Other",
-};
-
 type Insights = {
   pain_points?: string[];
   triggers?: string[];
@@ -253,6 +244,9 @@ export default async function LeadProfilePage({ params }: { params: Promise<{ id
   const lead = data as unknown as Lead | null;
   if (!lead) notFound();
 
+  // L2: the full two-way thread (sent + received, oldest first) for the Conversation section.
+  const conversationTurns = await loadThread(supabase, id);
+
   const insights = lead.ai_insights;
   const timeline = buildTimeline(lead);
   const next = nextStep(lead);
@@ -393,30 +387,23 @@ export default async function LeadProfilePage({ params }: { params: Promise<{ id
 
         {/* Act — the waiting conversation, the contact card, the deal controls. */}
         <div className="flex min-h-0 flex-col gap-4 lg:overflow-y-auto">
-          {latestReply && (
-            <Section label="Latest reply">
-              <div className="space-y-2">
-                {latestReply.classification && (
-                  <Badge variant={latestReply.classification === "interested" ? "default" : "secondary"}>
-                    {REPLY_LABELS[latestReply.classification] ?? latestReply.classification}
-                  </Badge>
-                )}
-                {latestReply.body && (
-                  <p className="text-sm text-[var(--ink-2)] lg:line-clamp-3">“{latestReply.body}”</p>
-                )}
-                {lead.status === "replied" && latestReply.channel && (
-                  <div className="border-t border-[var(--hairline)] pt-3">
-                    <ReplyHandoff
-                      leadId={lead.id}
-                      channel={latestReply.channel as "email" | "linkedin"}
-                      queuedBody={queuedSend?.body ?? null}
-                      paused={!!pausedRun}
-                    />
-                  </div>
-                )}
+          {/* L2 cockpit: the FULL two-way thread + composer — no longer reply-gated, no longer
+              latest-message-only. The human never takes over blind again. */}
+          <Section label="Conversation">
+            <div className="space-y-3">
+              <div className="max-h-96 overflow-y-auto pr-1">
+                <ConversationThread turns={conversationTurns} />
               </div>
-            </Section>
-          )}
+              {pausedRun && (
+                <p className="text-xs text-muted-foreground">
+                  You&apos;re driving this thread — automation is paused until you hand it back.
+                </p>
+              )}
+              <div className="border-t border-[var(--hairline)] pt-3">
+                <Composer leadId={lead.id} initialDraft={queuedSend?.body ?? ""} />
+              </div>
+            </div>
+          </Section>
 
           <Section label="Company & contact">
             <div className="grid grid-cols-2 gap-x-4 gap-y-3">
