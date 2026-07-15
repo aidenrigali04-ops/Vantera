@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Bot,
+  CalendarCheck2,
   Inbox,
   LayoutDashboard,
   Settings,
@@ -25,6 +26,8 @@ const MAIN: NavItem[] = [
   { key: "agents", href: "/agents", label: "Brain", icon: Bot },
   { key: "leads", href: "/leads", label: "Leads", icon: Users },
   { key: "review", href: "/review", label: "Review", icon: Inbox },
+  // L1 meeting layer: the destination the whole funnel points at — booked meetings, visible.
+  { key: "meetings", href: "/meetings", label: "Meetings", icon: CalendarCheck2 },
 ];
 
 const SECONDARY: NavItem[] = [
