@@ -762,10 +762,18 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
     },
 
     async getDraftableLead(accountId: string, leadId: string): Promise<DraftableLead | null> {
+      // 0050 meeting layer: a booked lead never receives another scripted touch — null here
+      // makes the sequence-touch path report "skipped" (its existing missing-lead handling).
       const [r] = await db
         .select()
         .from(leads)
-        .where(and(eq(leads.accountId, accountId), eq(leads.id, leadId)))
+        .where(
+          and(
+            eq(leads.accountId, accountId),
+            eq(leads.id, leadId),
+            isNull(leads.meetingBookedAt)
+          )
+        )
         .limit(1);
       if (!r) return null;
       return {
@@ -1890,10 +1898,12 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
     },
 
     async markMeetingBooked(leadId: string, at: Date) {
-      // First booking wins — never overwrite an earlier meeting timestamp.
+      // First booking wins — never overwrite an earlier meeting timestamp. This is the
+      // reply-classification DETECTOR's writer, so source='agent' (manual is authoritative
+      // and writes through the web action, 0050).
       await db
         .update(leads)
-        .set({ meetingBookedAt: at })
+        .set({ meetingBookedAt: at, meetingSource: "agent" })
         .where(and(eq(leads.id, leadId), isNull(leads.meetingBookedAt)));
     },
 
@@ -2103,12 +2113,12 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         .where(and(eq(sequenceRuns.campaignId, campaignId), eq(sequenceRuns.leadId, leadId)));
     },
 
-    // Widened union satisfies every notifying store (reply/converted/exhausted/needs_human);
-    // lead_notifications.kind check (0017, extended by 0044) permits all of them.
+    // Widened union satisfies every notifying store; lead_notifications.kind check
+    // (0017, extended by 0044 + 0050) permits all of them.
     async insertLeadNotification(n: {
       accountId: string;
       leadId: string;
-      kind: "reply" | "converted" | "exhausted" | "needs_human";
+      kind: "reply" | "converted" | "exhausted" | "needs_human" | "meeting_booked";
       body: string;
     }) {
       await db.insert(leadNotifications).values({

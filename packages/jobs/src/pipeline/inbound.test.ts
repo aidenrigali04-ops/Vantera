@@ -198,6 +198,21 @@ describe("runInbound — meeting booked (funnel writer)", () => {
     expect(store.bookedMeetings).toEqual([{ leadId: "lead1", at: fixedNow }]);
   });
 
+  it("treats a booking as an EVENT: cancels queued sends, stops the sequence, notifies (L1)", async () => {
+    const store = storeForLead();
+
+    await runInbound(
+      { source: "linkedin", payload: LINKEDIN_REPLY_FIXTURE },
+      deps(store, { classifyFn: classify("interested", true) })
+    );
+
+    expect(store.canceledSends).toContain("lead1"); // no scripted nudge after "I booked"
+    expect(store.stoppedSequences).toContain("lead1");
+    expect(store.notifications).toContainEqual(
+      expect.objectContaining({ leadId: "lead1", kind: "meeting_booked" })
+    );
+  });
+
   it("does not stamp meeting_booked_at on an ordinary interested reply", async () => {
     const store = storeForLead();
 

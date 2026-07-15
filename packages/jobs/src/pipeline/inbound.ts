@@ -56,6 +56,18 @@ async function applyGenuineReply(
     // A genuine reply confirming a scheduled meeting stamps meeting_booked_at — the
     // LinkedIn-native writer for the funnel's Meetings stage (the removed caller used to do this).
     await store.markMeetingBooked(lead.id, now);
+    // Booking is an EVENT (L1, spec 2026-07-15): outreach stands down and the user is told
+    // loudly. A prospect who just booked must never receive another scripted nudge — the
+    // "keeps selling after I said yes" failure. The responder may still send its contextual
+    // confirmation below; scheduled touches stop here.
+    await store.cancelPendingSends(lead.id);
+    await store.stopSequenceForReply(lead.id);
+    await store.insertLeadNotification({
+      accountId,
+      leadId: lead.id,
+      kind: "meeting_booked",
+      body: verdict.classification,
+    });
   }
   // body carries the machine-readable classification — the app layer maps it to honest
   // human copy (an interested reply and a not-interested one are different events).

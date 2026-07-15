@@ -707,7 +707,12 @@ export interface InboundStore {
    * nurturing until the lead converts (conversion gate) or is exhausted.
    */
   stopSequenceForReply(leadId: string): Promise<void>;
-  insertLeadNotification(n: { accountId: string; leadId: string; kind: "reply" | "needs_human"; body: string }): Promise<void>;
+  insertLeadNotification(n: {
+    accountId: string;
+    leadId: string;
+    kind: "reply" | "needs_human" | "meeting_booked";
+    body: string;
+  }): Promise<void>;
   /**
    * A live prospect replied: put their run back in CONVERSATION cadence — status active,
    * one touch of headroom, next nudge at `nextActionAt` — so an engaged thread never dies
