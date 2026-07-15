@@ -7,6 +7,7 @@ import {
   CalendarCheck2,
   Inbox,
   LayoutDashboard,
+  MessagesSquare,
   Settings,
   Users,
   type LucideIcon,
@@ -26,6 +27,8 @@ const MAIN: NavItem[] = [
   { key: "agents", href: "/agents", label: "Brain", icon: Bot },
   { key: "leads", href: "/leads", label: "Leads", icon: Users },
   { key: "review", href: "/review", label: "Review", icon: Inbox },
+  // L2 cockpit: every conversation, both sides, one place.
+  { key: "inbox", href: "/inbox", label: "Inbox", icon: MessagesSquare },
   // L1 meeting layer: the destination the whole funnel points at — booked meetings, visible.
   { key: "meetings", href: "/meetings", label: "Meetings", icon: CalendarCheck2 },
 ];
