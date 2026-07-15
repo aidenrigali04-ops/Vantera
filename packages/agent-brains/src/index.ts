@@ -140,4 +140,5 @@ export {
   type TargetingProfile,
   type SegmentStat,
 } from "./targeting/tilt";
+export { allocateDiscovery } from "./targeting/allocate";
 export { STARTER_PLAYS, SOURCE_LABEL, matchStarterPlays, type StarterPlay } from "./plays/starter";

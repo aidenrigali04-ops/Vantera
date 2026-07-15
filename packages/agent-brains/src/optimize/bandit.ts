@@ -59,7 +59,8 @@ function sampleGamma(shape: number, rand: () => number): number {
   }
 }
 
-function sampleBeta(alpha: number, beta: number, rand: () => number): number {
+/** Beta sampler shared with the Stage-2 discovery allocator. */
+export function sampleBeta(alpha: number, beta: number, rand: () => number): number {
   const a = sampleGamma(alpha, rand);
   const b = sampleGamma(beta, rand);
   return a / (a + b);
