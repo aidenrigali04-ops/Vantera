@@ -19,6 +19,8 @@ import { snapshotFromRow, type AccountBillingRow } from "@/lib/billing/entitleme
 import { ManageBillingButton } from "./billing-actions";
 import { PricingPlans, type PlanCard } from "./pricing-plans";
 
+export const metadata = { title: "Billing" };
+
 // Human labels for raw Stripe subscription statuses — never show `past_due` to a user.
 const STATUS_LABELS: Record<string, string> = {
   active: "Active",

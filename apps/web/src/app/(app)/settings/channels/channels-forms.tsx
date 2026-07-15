@@ -2,6 +2,7 @@
 
 import { useActionState, useTransition, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { FormError } from "@/components/form-error";
 import {
   toggleSendingPause,
@@ -174,17 +175,13 @@ export function LinkedInReconnectButton({ rowId }: { rowId: string }) {
 
 // ── LinkedIn remove ───────────────────────────────────────────────────────────
 
-/** Fully removes a connected account: provider seat released + row deleted. */
+/** Fully removes a connected account: provider seat released + row deleted.
+ *  R2: the shared ConfirmDialog replaces the native window.confirm — one confirmation idiom. */
 export function RemoveLinkedInButton({ rowId, name }: { rowId: string; name: string }) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
   function handleRemove() {
-    const ok = window.confirm(
-      `Remove ${name}? Outreach from this account stops immediately and its seat is freed. ` +
-        "Lead history is kept; leads it was messaging will pause until another account is connected."
-    );
-    if (!ok) return;
     startTransition(async () => {
       setError(null);
       const result = await removeLinkedInAccount(rowId);
@@ -198,9 +195,18 @@ export function RemoveLinkedInButton({ rowId, name }: { rowId: string; name: str
 
   return (
     <span className="inline-flex items-center gap-2">
-      <Button onClick={handleRemove} disabled={isPending} variant="ghost" size="sm" className="text-destructive hover:text-destructive">
-        {isPending ? "Removing…" : "Remove"}
-      </Button>
+      <ConfirmDialog
+        title={`Remove ${name}?`}
+        description="Outreach from this account stops immediately and its seat is freed. Lead history is kept; leads it was messaging will pause until another account is connected."
+        confirmLabel="Remove account"
+        destructive
+        onConfirm={handleRemove}
+        trigger={(open) => (
+          <Button onClick={open} disabled={isPending} variant="ghost" size="sm" className="text-destructive hover:text-destructive">
+            {isPending ? "Removing…" : "Remove"}
+          </Button>
+        )}
+      />
       {error && <span className="text-xs text-destructive">{error}</span>}
     </span>
   );

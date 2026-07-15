@@ -16,6 +16,8 @@ import {
   type ConversationReply,
 } from "./processed-conversation";
 
+export const metadata = { title: "Review" };
+
 /** Group queue drafts by prospect, preserving the rows' (created_at) order. */
 function groupByProspect(rows: DraftRow[]): ProspectGroup[] {
   const groups: ProspectGroup[] = [];

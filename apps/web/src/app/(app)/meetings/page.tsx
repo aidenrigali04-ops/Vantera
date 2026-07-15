@@ -5,7 +5,7 @@ import { orThrow } from "@/lib/supabase/guard";
 import { LeadProfileLink, type LeadProfile } from "@/components/lead-profile";
 import { LEAD_PROFILE_FIELDS } from "@/components/lead-profile-fields";
 
-export const metadata = { title: "Meetings — Vantera" };
+export const metadata = { title: "Meetings" };
 
 /**
  * The Meetings surface (L1, spec 2026-07-15): every booked meeting in one place — the

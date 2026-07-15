@@ -5,6 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AddSuppressionForm } from "./add-form";
 
+export const metadata = { title: "Suppression list" };
+
 const SOURCE_LABELS: Record<string, string> = {
   unsubscribe: "Unsubscribed",
   bounce: "Bounced",

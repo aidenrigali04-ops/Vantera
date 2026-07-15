@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
 import { AgentCard, type AgentRow } from "./agent-card";
 
+export const metadata = { title: "Brain" };
+
 export default async function AgentsPage({
   searchParams,
 }: {

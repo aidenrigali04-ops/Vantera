@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ScoutWizard } from "../../scout-wizard";
 
+export const metadata = { title: "Edit prospect sourcing" };
+
 export default async function EditScoutAgentPage() {
   const supabase = await createClient();
 

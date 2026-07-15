@@ -11,6 +11,8 @@ import {
 } from "./channels-forms";
 import { reconcileLinkedInAccounts } from "@/lib/linkedin/sync";
 
+export const metadata = { title: "LinkedIn accounts" };
+
 // Date.now() stays in a module helper (React purity lint) — same idiom as the dashboard.
 function isoDaysAgo(days: number): string {
   return new Date(Date.now() - days * 86_400_000).toISOString();

@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
 import { CopyWizard } from "../../copy-wizard";
 
+export const metadata = { title: "Deploy outreach" };
+
 export default async function NewCopyAgentPage() {
   const supabase = await createClient();
 

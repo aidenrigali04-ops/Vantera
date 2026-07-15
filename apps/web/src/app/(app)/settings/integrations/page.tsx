@@ -9,6 +9,8 @@ import {
   type CrmConnectionRow,
 } from "./integrations-forms";
 
+export const metadata = { title: "Integrations" };
+
 type Status = CrmConnectionRow["status"];
 
 const STATUS_LABELS: Record<Status, string> = {

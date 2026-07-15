@@ -5,7 +5,7 @@ import { loadInbox, loadThread } from "@/lib/conversations";
 import { ConversationPanel } from "@/components/conversation-panel";
 import { cn } from "@/lib/utils";
 
-export const metadata = { title: "Inbox — Vantera" };
+export const metadata = { title: "Inbox" };
 
 /**
  * The unified inbox (L2, spec 2026-07-15): every conversation in one place — the full

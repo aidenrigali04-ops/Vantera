@@ -17,6 +17,12 @@ import { TrialBanner, type TrialBannerProps } from "@/components/billing/trial-b
 import { Toaster } from "@/components/ui/sonner";
 import { trialDaysLeft, isTrialExpired } from "@vantera/billing";
 
+/** R2: app tabs get real names — "Leads · Vantera", not five identical marketing titles.
+ *  Scoped here (not the root layout) so marketing pages keep their full SEO titles. */
+export const metadata = {
+  title: { template: "%s · Vantera", default: "Vantera" },
+};
+
 /** Honest per-event copy. A reply's body carries its classification (inbound pipeline), so an
  *  interested reply and a not-interested one read as the different events they are. */
 function noteVerb(kind: AppNotification["kind"], body: string): string {

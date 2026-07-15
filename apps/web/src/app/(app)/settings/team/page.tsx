@@ -5,6 +5,8 @@ import { snapshotFromRow, type AccountBillingRow } from "@/lib/billing/entitleme
 import { canManageTeam, matchMemberEmails } from "./validation";
 import { ShareCard, type ShareMember, type ShareInvite } from "@/components/ui/share-card";
 
+export const metadata = { title: "Team" };
+
 export default async function TeamPage() {
   const { user, account } = await getGateData();
   if (!user || !account) return null;

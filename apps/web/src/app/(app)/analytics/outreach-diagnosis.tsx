@@ -4,7 +4,8 @@ import { Panel, Eyebrow } from "@/components/ui/panel";
 import { cn } from "@/lib/utils";
 import type { StageStatus } from "@vantera/agent-brains";
 import type { OutreachDiagnosisVM } from "@/lib/optimize";
-import { adoptExperiment, discardExperiment, revertAdoption, startExperiment } from "./optimize-actions";
+import { adoptExperiment, discardExperiment, startExperiment } from "./optimize-actions";
+import { RevertAdoptionButton } from "./revert-adoption-button";
 
 // "What's working" — the visible face of Vera's self-improving loop (Stage 0, spec 2026-07-14).
 // Shows the invite→accept→reply→book→close funnel with each stage's rate against a typical band,
@@ -173,15 +174,7 @@ export function OutreachDiagnosis({ vm }: { vm: OutreachDiagnosisVM }) {
               )}
             </p>
           )}
-          <form action={revertAdoption} className="mt-3">
-            <input type="hidden" name="id" value={vm.lastAdoption.experimentId} />
-            <button
-              type="submit"
-              className="inline-flex items-center rounded-lg border border-[var(--hairline)] px-3.5 py-2 text-sm font-medium transition-colors hover:bg-[var(--tint)]"
-            >
-              Revert to the previous approach
-            </button>
-          </form>
+          <RevertAdoptionButton experimentId={vm.lastAdoption.experimentId} />
         </div>
       )}
 

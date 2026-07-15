@@ -9,6 +9,8 @@ import { LeadsTable, type LeadRow, type LeadsSort } from "./leads-table";
 import { HOT_MIN_SCORE } from "./lead-value";
 import { cn } from "@/lib/utils";
 
+export const metadata = { title: "Leads" };
+
 // Sized so a full page fits ON SCREEN inside the one-screen shell (no inner scrollbar on a
 // typical desktop) — more leads = more pages, never a scrolling table.
 const PAGE_SIZE = 10;

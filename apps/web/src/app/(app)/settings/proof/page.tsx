@@ -7,6 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AddProofForm } from "./proof-editor";
 import { removeProofPoint } from "./actions";
 
+export const metadata = { title: "Proof & pricing" };
+
 const KIND_LABELS: Record<string, string> = {
   metric: "Stat",
   outcome: "Result",

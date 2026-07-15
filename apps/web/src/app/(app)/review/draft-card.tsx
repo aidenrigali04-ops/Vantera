@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { AlertTriangle, MessageSquare, Wand2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Panel } from "@/components/ui/panel";
 import { Textarea } from "@/components/ui/textarea";
 import { LeadProfileLink, type LeadProfile } from "@/components/lead-profile";
@@ -36,6 +37,7 @@ type BusyKey = "approve" | "decline" | "suppress" | "save" | "fix";
  */
 export function DraftCard({ draft, compact = false }: { draft: DraftRow; compact?: boolean }) {
   const [editing, setEditing] = useState(false);
+  const suppressFormRef = useRef<HTMLFormElement>(null);
   const [busy, setBusy] = useState<BusyKey | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -144,20 +146,32 @@ export function DraftCard({ draft, compact = false }: { draft: DraftRow; compact
             </Button>
           </form>
           <form
+            ref={suppressFormRef}
             action={(fd) =>
               run("suppress", declineAndSuppress, fd, "Declined — this prospect will never be contacted.")
             }
           >
             <input type="hidden" name="sendId" value={draft.id} />
-            <Button
-              type="submit"
-              size="sm"
-              variant="ghost"
-              className="text-destructive"
-              disabled={busy !== null}
-            >
-              Decline &amp; never contact
-            </Button>
+            {/* R2: suppression is permanent (rule 11 — entries never expire), so it confirms. */}
+            <ConfirmDialog
+              title="Never contact this prospect?"
+              description="This declines the draft and adds the prospect to your suppression list permanently — no agent or teammate can ever message them again. This cannot be undone."
+              confirmLabel="Never contact"
+              destructive
+              onConfirm={() => suppressFormRef.current?.requestSubmit()}
+              trigger={(open) => (
+                <Button
+                  type="button"
+                  onClick={open}
+                  size="sm"
+                  variant="ghost"
+                  className="text-destructive"
+                  disabled={busy !== null}
+                >
+                  Decline &amp; never contact
+                </Button>
+              )}
+            />
           </form>
         </div>
       )}

@@ -1,7 +1,8 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useRef } from "react";
 import { Loader2, X } from "lucide-react";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   inviteMember,
   revokeInvite,
@@ -166,41 +167,63 @@ export function ShareCard({
 
 function RemoveButton({ userId }: { userId: string }) {
   const [state, action, pending] = useActionState<TeamActionState, FormData>(removeMember, {});
+  const formRef = useRef<HTMLFormElement>(null);
   return (
-    <form action={action} className="flex items-center gap-2" title="Remove member">
+    <form ref={formRef} action={action} className="flex items-center gap-2" title="Remove member">
       <input type="hidden" name="userId" value={userId} />
       {state.error && (
         <p role="alert" className="text-[12px] text-destructive">{state.error}</p>
       )}
-      <button
-        type="submit"
-        disabled={pending}
-        aria-label="Remove member"
-        className={cn(
-          "grid size-7 place-items-center rounded-full text-[var(--ink-4)] transition-colors hover:bg-[var(--tint)] hover:text-destructive focus-visible:ring-2 focus-visible:ring-[rgba(11,87,171,0.35)] focus-visible:outline-none disabled:opacity-50",
+      <ConfirmDialog
+        title="Remove this teammate?"
+        description="They lose access to this workspace immediately. Their past work stays; you can invite them again later."
+        confirmLabel="Remove teammate"
+        destructive
+        onConfirm={() => formRef.current?.requestSubmit()}
+        trigger={(open) => (
+          <button
+            type="button"
+            onClick={open}
+            disabled={pending}
+            aria-label="Remove member"
+            className={cn(
+              "grid size-7 place-items-center rounded-full text-[var(--ink-4)] transition-colors hover:bg-[var(--tint)] hover:text-destructive focus-visible:ring-2 focus-visible:ring-[rgba(11,87,171,0.35)] focus-visible:outline-none disabled:opacity-50",
+            )}
+          >
+            {pending ? <Loader2 className="size-3.5 animate-spin" /> : <X className="size-4" />}
+          </button>
         )}
-      >
-        {pending ? <Loader2 className="size-3.5 animate-spin" /> : <X className="size-4" />}
-      </button>
+      />
     </form>
   );
 }
 
 function RevokeButton({ inviteId }: { inviteId: string }) {
   const [state, action, pending] = useActionState<TeamActionState, FormData>(revokeInvite, {});
+  const formRef = useRef<HTMLFormElement>(null);
   return (
-    <form action={action} className="flex items-center gap-2" title="Revoke invite">
+    <form ref={formRef} action={action} className="flex items-center gap-2" title="Revoke invite">
       <input type="hidden" name="inviteId" value={inviteId} />
       {state.error && (
         <p role="alert" className="text-[12px] text-destructive">{state.error}</p>
       )}
-      <button
-        type="submit"
-        disabled={pending}
-        className="rounded-full px-2.5 py-1 text-[12px] font-medium text-[var(--ink-3)] transition-colors hover:bg-[var(--tint)] hover:text-destructive focus-visible:ring-2 focus-visible:ring-[rgba(11,87,171,0.35)] focus-visible:outline-none disabled:opacity-50"
-      >
-        {pending ? "Revoking…" : "Revoke"}
-      </button>
+      <ConfirmDialog
+        title="Revoke this invite?"
+        description="The invite link stops working immediately. You can send a fresh invite anytime."
+        confirmLabel="Revoke invite"
+        destructive
+        onConfirm={() => formRef.current?.requestSubmit()}
+        trigger={(open) => (
+          <button
+            type="button"
+            onClick={open}
+            disabled={pending}
+            className="rounded-full px-2.5 py-1 text-[12px] font-medium text-[var(--ink-3)] transition-colors hover:bg-[var(--tint)] hover:text-destructive focus-visible:ring-2 focus-visible:ring-[rgba(11,87,171,0.35)] focus-visible:outline-none disabled:opacity-50"
+          >
+            {pending ? "Revoking…" : "Revoke"}
+          </button>
+        )}
+      />
     </form>
   );
 }

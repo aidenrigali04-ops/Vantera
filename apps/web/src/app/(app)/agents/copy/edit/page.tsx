@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { CopyWizard } from "../../copy-wizard";
 
+export const metadata = { title: "Edit outreach" };
+
 export default async function EditCopyAgentPage() {
   const supabase = await createClient();
 

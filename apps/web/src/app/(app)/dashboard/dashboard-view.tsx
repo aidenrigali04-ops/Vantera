@@ -5,6 +5,7 @@ import { useState, useSyncExternalStore } from "react";
 import { motion, MotionConfig } from "framer-motion";
 import {
   ArrowRight,
+  Check,
   CheckCircle2,
   Circle,
   Crosshair,
@@ -103,6 +104,15 @@ export interface DashboardViewProps {
   needsBookingUrl: boolean;
   /** matched starter plays — fill the waiting states with proven competence, honestly labeled */
   plays: { slug: string; name: string; description: string; sourceLabel: string }[];
+  /** R2 early-days regime: real firsts, so a $0 chart under a $45k goal never reads as failure */
+  milestones: Milestones;
+}
+
+export interface Milestones {
+  sent: boolean;
+  replied: boolean;
+  met: boolean;
+  closed: boolean;
 }
 
 export interface LearningProps {
@@ -211,6 +221,7 @@ function WorkingDashboard(props: DashboardViewProps) {
     week,
     recentReplies,
     repliesWaiting,
+    milestones,
   } = props;
 
   return (
@@ -243,6 +254,7 @@ function WorkingDashboard(props: DashboardViewProps) {
         series={series}
         paceLabel={revenuePace}
         attribution={attribution}
+        milestones={milestones}
       />
 
       {/* Explore — hot leads: the top prospect spotlighted with its why-now + next action. */}
@@ -472,6 +484,57 @@ function KpiStrip({
         actionable={drafts > 0}
       />
     </RevealItem>
+  );
+}
+
+/** R2: the early-days revenue framing — the four real firsts on the way to the goal.
+ *  Every boolean comes from the account's own activity; nothing is invented. */
+function MilestoneLadder({ milestones, goal }: { milestones: Milestones; goal: string | null }) {
+  const steps: { label: string; done: boolean }[] = [
+    { label: "First message sent", done: milestones.sent },
+    { label: "First warm reply", done: milestones.replied },
+    { label: "First meeting booked", done: milestones.met },
+    { label: "First client closed", done: milestones.closed },
+  ];
+  const nextIdx = steps.findIndex((s) => !s.done);
+  return (
+    <div className="mt-3 rounded-lg border border-border/60 p-4">
+      <p className="text-xs font-medium text-foreground">
+        {goal ? `The path to ${goal}/mo starts with four firsts.` : "Four firsts on the way to revenue."}
+      </p>
+      <ul className="mt-3 grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
+        {steps.map((s, i) => (
+          <li key={s.label} className="flex items-center gap-2 text-xs">
+            <span
+              className={cn(
+                "grid size-4 shrink-0 place-items-center rounded-full",
+                s.done
+                  ? "bg-[var(--positive)] text-white"
+                  : "ring-1 ring-inset ring-border text-transparent"
+              )}
+              aria-hidden
+            >
+              <Check className="size-3" strokeWidth={3} />
+            </span>
+            <span
+              className={cn(
+                s.done
+                  ? "text-foreground"
+                  : i === nextIdx
+                    ? "font-medium text-foreground"
+                    : "text-muted-foreground"
+              )}
+            >
+              {s.label}
+              {i === nextIdx && <span className="ml-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--cyan-strong)]">next</span>}
+            </span>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-2.5 text-xs text-muted-foreground">
+        The goal chart takes over as pipeline builds — every step here is your own real activity.
+      </p>
+    </div>
   );
 }
 
@@ -786,6 +849,7 @@ function RevenueCard({
   series,
   paceLabel,
   attribution,
+  milestones,
 }: {
   revenue: RevenueSnapshot;
   convertedClients: number;
@@ -795,8 +859,14 @@ function RevenueCard({
   series: RevenuePoint[];
   paceLabel: string | null;
   attribution: SignalAttribution[];
+  milestones: Milestones;
 }) {
   const projectedTotalCents = revenue.closedCents + revenue.expectedCents;
+  // R2 early-days regime: nothing closed and pipeline under 5% of goal — a flat $0 line
+  // under a distant dashed goal reads as failure during exactly the weeks the surface must
+  // sustain belief. Same truth, staged as the real firsts instead.
+  const earlyDays =
+    revenue.closedCents === 0 && goalCents !== null && projectedTotalCents < goalCents * 0.05;
   return (
     <RevealItem className={cn(PANEL_SURFACE, "p-5")} data-copilot="dashboard-revenue">
       <div className="flex items-center justify-between gap-2">
@@ -828,22 +898,28 @@ function RevenueCard({
                 </span>
               </div>
             </div>
-            <div className="mt-3">
-              <RevenueChart data={series} goalCents={goalCents} />
-            </div>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {revenue.closedPctOfGoal !== null ? (
-                <>
-                  <span className="font-medium text-foreground">{revenue.closedPctOfGoal}%</span> of
-                  your {goal}/mo goal closed
-                  {revenue.projectedPctOfGoal !== null &&
-                    ` — projected ${revenue.projectedPctOfGoal}% as your pipeline closes`}
-                  .
-                </>
-              ) : (
-                "Set a monthly revenue goal in Settings to track progress."
-              )}
-            </p>
+            {earlyDays ? (
+              <MilestoneLadder milestones={milestones} goal={goal} />
+            ) : (
+              <>
+                <div className="mt-3">
+                  <RevenueChart data={series} goalCents={goalCents} />
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {revenue.closedPctOfGoal !== null ? (
+                    <>
+                      <span className="font-medium text-foreground">{revenue.closedPctOfGoal}%</span> of
+                      your {goal}/mo goal closed
+                      {revenue.projectedPctOfGoal !== null &&
+                        ` — projected ${revenue.projectedPctOfGoal}% as your pipeline closes`}
+                      .
+                    </>
+                  ) : (
+                    "Set a monthly revenue goal in Settings to track progress."
+                  )}
+                </p>
+              </>
+            )}
             {paceLabel && (
               <p className="mt-1.5 flex items-center gap-1.5 text-xs font-medium text-foreground">
                 <TrendingUp className="size-3.5 text-muted-foreground" aria-hidden />

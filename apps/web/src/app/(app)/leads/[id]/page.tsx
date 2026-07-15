@@ -214,6 +214,19 @@ function BriefRow({ label, children }: { label: string; children: React.ReactNod
 
 const TECH_STACK_MAX = 6;
 
+/** R2: the browser tab names the prospect — five open briefs are five different tabs. */
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("leads")
+    .select("first_name, last_name, company_name")
+    .eq("id", id)
+    .maybeSingle<{ first_name: string | null; last_name: string | null; company_name: string | null }>();
+  const name = [data?.first_name, data?.last_name].filter(Boolean).join(" ") || data?.company_name;
+  return { title: name || "Lead" };
+}
+
 export default async function LeadProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createClient();
@@ -251,6 +264,7 @@ export default async function LeadProfilePage({ params }: { params: Promise<{ id
   const timeline = buildTimeline(lead);
   const next = nextStep(lead);
   const verdict = scoreVerdict(lead.ai_score);
+  const inactiveStatus = ["archived", "rejected"].includes(lead.status);
   const fresh = dataFreshness(lead.scored_at);
   const proj = projectedRevenue(account?.avg_deal_value_cents ?? null, account?.revenue_goal_cents ?? null, lead.ai_score);
   const goalStr = account?.revenue_goal_cents ? usd.format(account.revenue_goal_cents / 100) : "";
@@ -312,13 +326,17 @@ export default async function LeadProfilePage({ params }: { params: Promise<{ id
             <div className={cn(proj && "pr-6")}>
               <Eyebrow>Fit score</Eyebrow>
               <p className="mt-1 font-data text-3xl font-semibold tabular-nums">{lead.ai_score ?? "—"}</p>
+              {/* R2: an archived/filtered lead keeps its score but never the live "Hot lead"
+                  framing — "Archived" and "Hot lead" side by side read as a contradiction. */}
               <p
                 className={cn(
                   "mt-0.5 text-xs",
-                  verdict.tier === "hot" ? "font-medium text-[var(--cyan-strong)]" : "text-muted-foreground"
+                  verdict.tier === "hot" && !inactiveStatus
+                    ? "font-medium text-[var(--cyan-strong)]"
+                    : "text-muted-foreground"
                 )}
               >
-                {verdict.label}
+                {inactiveStatus ? `${verdict.label} (inactive)` : verdict.label}
               </p>
             </div>
             {proj && (

@@ -24,6 +24,8 @@ import { ResultsTabsBar, resolveView } from "./results-tabs";
 import { AnalyticsSection } from "../analytics/analytics-section";
 import { PipelineSection } from "../pipeline/pipeline-section";
 
+export const metadata = { title: "Results" };
+
 // The Results surface (Surface B). One destination, three views (Overview / Analytics / Pipeline)
 // selected by ?view= so each is server-rendered and deep-linkable. Only the active view loads its
 // data. Overview is the command-center home (OverviewTab below); the other two reuse the sections
@@ -134,6 +136,9 @@ async function OverviewTab() {
     { data: prospects },
     { data: convertedDates },
     crmActiveRes,
+    sendsEverRes,
+    warmEverRes,
+    meetingsEverRes,
   ] = await Promise.all([
     supabase
       .from("agents")
@@ -183,6 +188,16 @@ async function OverviewTab() {
       .from("crm_connections")
       .select("id", { count: "exact", head: true })
       .eq("status", "active"),
+    // R2 milestone regime — the account's real firsts (ever, not windowed).
+    supabase.from("outreach_sends").select("id", { count: "exact", head: true }),
+    supabase
+      .from("replies")
+      .select("id", { count: "exact", head: true })
+      .eq("classification", "interested"),
+    supabase
+      .from("leads")
+      .select("id", { count: "exact", head: true })
+      .not("meeting_booked_at", "is", null),
   ]);
 
   // R1c: these two reads drive the dashboard's state machine — a failed read must hit the
@@ -588,6 +603,12 @@ async function OverviewTab() {
       scoutLive={scout?.status === "live"}
       revenue={revenue}
       convertedClients={converted}
+      milestones={{
+        sent: (sendsEverRes.count ?? 0) > 0,
+        replied: (warmEverRes.count ?? 0) > 0,
+        met: (meetingsEverRes.count ?? 0) > 0,
+        closed: converted > 0,
+      }}
       pipelineLeads={pipelineLeads}
       avgDealValueCents={account.avg_deal_value_cents}
       pendingDraftLeadIds={pendingDraftLeadIds}

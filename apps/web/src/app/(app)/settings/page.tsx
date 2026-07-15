@@ -10,6 +10,8 @@ import { WorkspaceForm } from "./workspace-form";
 import { LeadEventEmailsToggle, WeeklySummaryToggle } from "./notifications-form";
 import { DangerZone } from "./danger-zone";
 
+export const metadata = { title: "Settings" };
+
 function SettingsLink({ title, body, href, cta }: { title: string; body: string; href: string; cta: string }) {
   return (
     <Panel interactive className="flex flex-col gap-3">
