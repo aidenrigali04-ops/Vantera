@@ -18,6 +18,9 @@ On the **Overview** tab:
 - **Vera is learning** — the self-optimizing loop, live. It shows the test running right now with its progress toward a decision, the last change Vera adopted (with the real send and reply numbers since), and which buyer segment is being prioritized based on your actual outcomes. Every line is real data from your account — click through to Analytics for the full loop.
 - **Warm replies** — interested replies that are still **waiting on your answer**. Once a reply has been answered (by you or by the agent) it leaves this list, so the count always matches reality. Not-interested replies never appear here — they show in the notification bell and stop the sequence automatically.
 
+**Meetings** in the sidebar lists every booked meeting your outreach produced — detected from
+replies or marked by you on the lead's page. Booking stands outreach down automatically.
+
 **Notifications** (the bell in the left rail) collects your lead events — an interested reply, a booked meeting, a fresh buying signal, a thread that needs you. Clicking a notification takes you straight to that lead's page. Unread events are highlighted; opening the bell marks them read.
 
 **Leads** in the sidebar is your daily opportunity feed — sourced and scored prospects, with the hottest ones pulled to the top. **Analytics** and **Pipeline** are now tabs here on Results rather than separate sidebar pages.
