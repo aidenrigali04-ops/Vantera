@@ -7,6 +7,11 @@ import { ShareCard, type ShareMember, type ShareInvite } from "@/components/ui/s
 
 export const metadata = { title: "Team" };
 
+// Module scope (not render) — the react purity lint bars Date.now() inside components.
+function inviteExpired(expiresAt: string | null): boolean {
+  return Boolean(expiresAt) && new Date(expiresAt as string).getTime() < Date.now();
+}
+
 export default async function TeamPage() {
   const { user, account } = await getGateData();
   if (!user || !account) return null;
@@ -18,7 +23,7 @@ export default async function TeamPage() {
       supabase.from("account_members").select("user_id, role, created_at").eq("account_id", account.id),
       supabase
         .from("account_invites")
-        .select("id, email, role, created_at")
+        .select("id, email, role, created_at, expires_at")
         .eq("account_id", account.id)
         .eq("status", "pending"),
       supabase
@@ -58,7 +63,13 @@ export default async function TeamPage() {
       removable: canManage && !isYou && !isOwner,
     };
   });
-  const inviteRows: ShareInvite[] = (invites ?? []).map((i) => ({ id: i.id, email: i.email, role: i.role }));
+  // R3: expired invites are shown as expired (with a resend), never as still "awaiting".
+  const inviteRows: ShareInvite[] = (invites ?? []).map((i) => ({
+    id: i.id,
+    email: i.email,
+    role: i.role,
+    expired: inviteExpired(i.expires_at as string | null),
+  }));
   const workspaceName = (account as { name?: string | null }).name ?? "Your workspace";
 
   return (

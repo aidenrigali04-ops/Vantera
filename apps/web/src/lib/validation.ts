@@ -170,6 +170,27 @@ export function validateSignup(input: {
   return { ok: true, values: { email, password: input.password, companyName } };
 }
 
+/** R3: signup via a team invite — the member joins an existing workspace, so there is
+ *  no company field; the email must match the one the invite was issued to. */
+export function validateMemberSignup(input: {
+  email: string;
+  password: string;
+  inviteEmail: string;
+}): Valid<{ email: string; password: string }> | Invalid {
+  const email = input.email.trim();
+  if (!email || !email.includes("@")) return { ok: false, error: "Enter a valid email address." };
+  if (input.password.length < 8) {
+    return { ok: false, error: "Password must be at least 8 characters." };
+  }
+  if (email.toLowerCase() !== input.inviteEmail.trim().toLowerCase()) {
+    return {
+      ok: false,
+      error: `This invite was sent to ${input.inviteEmail} — sign up with that address, or ask for a new invite.`,
+    };
+  }
+  return { ok: true, values: { email, password: input.password } };
+}
+
 export function validateWorkspace(input: {
   name: string;
   industry: string;

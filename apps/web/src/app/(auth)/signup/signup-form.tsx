@@ -9,7 +9,17 @@ import { Label } from "@/components/ui/label";
 import { FormError } from "@/components/form-error";
 import { AuthHeading, CtaArrow, FIELD, LinkedInMark, SubmitButton } from "../auth-ui";
 
-export function SignupForm({ initialSite }: { initialSite?: string }) {
+export function SignupForm({
+  initialSite,
+  invite,
+  inviteDead = false,
+}: {
+  initialSite?: string;
+  /** R3: signup through a team invite — join the inviting workspace, no company field */
+  invite?: { token: string; email: string; workspaceName: string };
+  /** the URL carried an invite token that is expired/used/unknown */
+  inviteDead?: boolean;
+}) {
   // No confirmation-email interstitial: signup signs the user in and redirects
   // straight to onboarding (see the signup action).
   const [state, action, pending] = useActionState<AuthFormState, FormData>(signup, {});
@@ -29,21 +39,35 @@ export function SignupForm({ initialSite }: { initialSite?: string }) {
 
   return (
     <div className="flex flex-col gap-8">
-      <AuthHeading
-        title={
-          <>
-            Start with{" "}
-            <span className="whitespace-nowrap">
-              <LinkedInMark className="mr-[0.18em] inline-block size-[0.78em] align-[-0.1em]" />
-              LinkedIn
-            </span>{" "}
-            outreach that already knows what works.
-          </>
-        }
-        sub="Vera finds your in-market buyers and reaches them with proven plays — drafted for your approval, smarter every week, your LinkedIn run hands-off."
-      />
+      {invite ? (
+        <AuthHeading
+          title={<>Join {invite.workspaceName} on Vantera.</>}
+          sub="Create your account and you'll land inside your team's workspace — their pipeline, leads, and agents, shared with you."
+        />
+      ) : (
+        <AuthHeading
+          title={
+            <>
+              Start with{" "}
+              <span className="whitespace-nowrap">
+                <LinkedInMark className="mr-[0.18em] inline-block size-[0.78em] align-[-0.1em]" />
+                LinkedIn
+              </span>{" "}
+              outreach that already knows what works.
+            </>
+          }
+          sub="Vera finds your in-market buyers and reaches them with proven plays — drafted for your approval, smarter every week, your LinkedIn run hands-off."
+        />
+      )}
 
-      {siteHost && (
+      {inviteDead && (
+        <div className="-mt-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-[13px] leading-snug text-amber-800">
+          That invite link is no longer valid — ask your teammate to send a fresh one. You can
+          still create your own workspace below.
+        </div>
+      )}
+
+      {siteHost && !invite && (
         <div className="-mt-3 flex items-start gap-2.5 rounded-xl border border-[var(--hairline)] bg-[var(--tint)] px-4 py-3 text-[13px] leading-snug text-[var(--ink-2)]">
           <Sparkles className="mt-0.5 size-4 shrink-0 text-[var(--cyan-strong)]" aria-hidden />
           <span>
@@ -56,13 +80,33 @@ export function SignupForm({ initialSite }: { initialSite?: string }) {
 
       <form action={action} className="flex flex-col gap-5">
         <input type="hidden" name="site" value={site} />
+        {invite && <input type="hidden" name="inviteToken" value={invite.token} />}
+        {!invite && (
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="companyName" className="text-[13px] font-medium text-[var(--ink-2)]">Company name</Label>
+            <Input id="companyName" name="companyName" autoComplete="organization" placeholder="Acme Inc" className={FIELD} required />
+          </div>
+        )}
         <div className="flex flex-col gap-2">
-          <Label htmlFor="companyName" className="text-[13px] font-medium text-[var(--ink-2)]">Company name</Label>
-          <Input id="companyName" name="companyName" autoComplete="organization" placeholder="Acme Inc" className={FIELD} required />
-        </div>
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="email" className="text-[13px] font-medium text-[var(--ink-2)]">Business email</Label>
-          <Input id="email" name="email" type="email" autoComplete="email" placeholder="you@company.com" className={FIELD} required />
+          <Label htmlFor="email" className="text-[13px] font-medium text-[var(--ink-2)]">
+            {invite ? "Email" : "Business email"}
+          </Label>
+          <Input
+            id="email"
+            name="email"
+            type="email"
+            autoComplete="email"
+            placeholder="you@company.com"
+            className={FIELD}
+            required
+            defaultValue={invite?.email}
+            readOnly={Boolean(invite)}
+          />
+          {invite && (
+            <p className="text-[12px] text-[var(--ink-4)]">
+              The invite was sent to this address — it&apos;s your sign-in email.
+            </p>
+          )}
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="password" className="text-[13px] font-medium text-[var(--ink-2)]">Password</Label>

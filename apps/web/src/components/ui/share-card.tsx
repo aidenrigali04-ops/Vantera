@@ -5,6 +5,7 @@ import { Loader2, X } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   inviteMember,
+  resendInvite,
   revokeInvite,
   removeMember,
   changeMemberRole,
@@ -21,7 +22,7 @@ export type ShareMember = {
   isYou: boolean;
   removable: boolean;
 };
-export type ShareInvite = { id: string; email: string; role: string };
+export type ShareInvite = { id: string; email: string; role: string; expired?: boolean };
 
 function initials(s: string): string {
   const parts = s.replace(/@.*/, "").split(/[.\s_-]+/).filter(Boolean);
@@ -152,10 +153,15 @@ export function ShareCard({
             <Avatar label={inv.email} />
             <div className="min-w-0">
               <p className="truncate text-[14px] font-medium text-foreground">{inv.email}</p>
-              <p className="text-[12.5px] text-[var(--ink-4)]">Invited · awaiting acceptance</p>
+              {inv.expired ? (
+                <p className="text-[12.5px] font-medium text-amber-700">Invite expired — resend it</p>
+              ) : (
+                <p className="text-[12.5px] text-[var(--ink-4)]">Invited · awaiting acceptance</p>
+              )}
             </div>
             <div className="ml-auto flex items-center gap-2">
               <RoleBadge role={inv.role} />
+              {canManage && <ResendButton inviteId={inv.id} />}
               {canManage && <RevokeButton inviteId={inv.id} />}
             </div>
           </li>
@@ -194,6 +200,27 @@ function RemoveButton({ userId }: { userId: string }) {
           </button>
         )}
       />
+    </form>
+  );
+}
+
+/** R3: resend a pending invite — fresh 7-day window + the email goes out again. */
+function ResendButton({ inviteId }: { inviteId: string }) {
+  const [state, action, pending] = useActionState<TeamActionState, FormData>(resendInvite, {});
+  return (
+    <form action={action} className="flex items-center gap-2" title="Resend invite">
+      <input type="hidden" name="inviteId" value={inviteId} />
+      {state.error && (
+        <p role="alert" className="text-[12px] text-destructive">{state.error}</p>
+      )}
+      {state.success && <p className="text-[12px] text-[var(--cyan-strong)]">Sent</p>}
+      <button
+        type="submit"
+        disabled={pending}
+        className="rounded-full px-2.5 py-1 text-[12px] font-medium text-[var(--ink-3)] transition-colors hover:bg-[var(--tint)] hover:text-foreground focus-visible:ring-2 focus-visible:ring-[rgba(11,87,171,0.35)] focus-visible:outline-none disabled:opacity-50"
+      >
+        {pending ? "Sending…" : "Resend"}
+      </button>
     </form>
   );
 }

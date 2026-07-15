@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { FormError } from "@/components/form-error";
 import { AuthHeading, CtaArrow, FIELD, SubmitButton } from "../auth-ui";
 
-export function LoginForm({ linkExpired }: { linkExpired: boolean }) {
+export function LoginForm({ linkExpired, next }: { linkExpired: boolean; next?: string }) {
   const [state, action, pending] = useActionState<AuthFormState, FormData>(login, {});
   return (
     <div className="flex flex-col gap-8">
@@ -18,6 +18,8 @@ export function LoginForm({ linkExpired }: { linkExpired: boolean }) {
       />
 
       <form action={action} className="flex flex-col gap-5">
+        {/* R3: deep-link continuation (validated server-side) — invite links survive login. */}
+        {next && <input type="hidden" name="next" value={next} />}
         {linkExpired && (
           <FormError message="That link expired or was already used. Sign in or request a new one." />
         )}

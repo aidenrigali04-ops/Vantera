@@ -4,6 +4,7 @@ import {
   dollarsToCents,
   normalizeWebsiteUrl,
   optionalDollarsToCents,
+  validateMemberSignup,
   validateOnboarding,
   validateSignup,
   validateWorkspace,
@@ -184,5 +185,36 @@ describe("confirmAccountName", () => {
     expect(confirmAccountName("Acme Inc", " Acme Inc ")).toBe(true);
     expect(confirmAccountName("Acme Inc", "acme inc")).toBe(false);
     expect(confirmAccountName("Acme Inc", "")).toBe(false);
+  });
+});
+
+describe("validateMemberSignup", () => {
+  it("accepts a matching email (case-insensitive) with a valid password", () => {
+    const r = validateMemberSignup({
+      email: "Jane@Company.com",
+      password: "longenough",
+      inviteEmail: "jane@company.com",
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.values.email).toBe("Jane@Company.com");
+  });
+
+  it("rejects a different address than the invite was issued to", () => {
+    const r = validateMemberSignup({
+      email: "other@company.com",
+      password: "longenough",
+      inviteEmail: "jane@company.com",
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain("jane@company.com");
+  });
+
+  it("enforces the password floor and email shape", () => {
+    expect(
+      validateMemberSignup({ email: "jane@company.com", password: "short", inviteEmail: "jane@company.com" }).ok
+    ).toBe(false);
+    expect(
+      validateMemberSignup({ email: "not-an-email", password: "longenough", inviteEmail: "jane@company.com" }).ok
+    ).toBe(false);
   });
 });

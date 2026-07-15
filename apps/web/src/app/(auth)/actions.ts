@@ -5,7 +5,8 @@ import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { friendlyAuthError } from "@/lib/auth/errors";
-import { validateSignup } from "@/lib/validation";
+import { safeNext } from "@/lib/auth/safe-next";
+import { validateMemberSignup, validateSignup } from "@/lib/validation";
 import { siteUrl } from "@/lib/site-url";
 import { recordSecurityEvent } from "@/lib/security/audit";
 
@@ -31,10 +32,63 @@ export async function login(_prev: AuthFormState, formData: FormData): Promise<A
     });
     return { error: friendlyAuthError(error.message) };
   }
-  redirect("/dashboard"); // app gate forwards to /onboarding if incomplete
+  // R3: honor a validated same-origin ?next= (deep links, invite acceptance) — the login
+  // action swallowing `next` was silently dead-ending every logged-out invite click.
+  redirect(safeNext(formData.get("next")) ?? "/dashboard"); // app gate forwards to /onboarding if incomplete
+}
+
+/** R3: signup THROUGH a team invite — the invitee joins the inviting workspace instead of
+ *  minting their own (the old flow silently stranded every brand-new invitee in a fresh,
+ *  empty account). No company field, no onboarding: the workspace already exists. */
+async function signupWithInvite(inviteToken: string, formData: FormData): Promise<AuthFormState> {
+  const service = createServiceClient();
+  const { data: invite } = await service
+    .from("account_invites")
+    .select("email, status, expires_at")
+    .eq("token", inviteToken)
+    .maybeSingle<{ email: string; status: string; expires_at: string }>();
+  if (!invite || invite.status !== "pending" || new Date(invite.expires_at).getTime() < Date.now()) {
+    return { error: "This invite is no longer valid — ask your teammate to send a fresh one." };
+  }
+
+  const result = validateMemberSignup({
+    email: String(formData.get("email") ?? ""),
+    password: String(formData.get("password") ?? ""),
+    inviteEmail: invite.email,
+  });
+  if (!result.ok) return { error: result.error };
+
+  // Same confirmation-free creation as the normal path — but NO company metadata and no
+  // workspace: membership comes from the invite.
+  const { error: createError } = await service.auth.admin.createUser({
+    email: result.values.email,
+    password: result.values.password,
+    email_confirm: true,
+  });
+  if (createError) return { error: friendlyAuthError(createError.message) };
+
+  const supabase = await createClient();
+  const { error: signInError } = await supabase.auth.signInWithPassword({
+    email: result.values.email,
+    password: result.values.password,
+  });
+  if (signInError) return { error: friendlyAuthError(signInError.message) };
+
+  // accept_invite (security definer RPC) re-validates token/expiry/email binding and
+  // inserts the membership — the same sanctioned path the logged-in accept uses.
+  const { error: acceptError } = await supabase.rpc("accept_invite", { invite_token: inviteToken });
+  if (acceptError) {
+    return {
+      error: "Your account was created, but the invite could not be accepted — open the invite link again.",
+    };
+  }
+  redirect("/dashboard");
 }
 
 export async function signup(_prev: AuthFormState, formData: FormData): Promise<AuthFormState> {
+  const inviteToken = String(formData.get("inviteToken") ?? "").trim();
+  if (inviteToken) return signupWithInvite(inviteToken, formData);
+
   const result = validateSignup({
     email: String(formData.get("email") ?? ""),
     password: String(formData.get("password") ?? ""),

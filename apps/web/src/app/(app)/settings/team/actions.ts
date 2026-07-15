@@ -82,6 +82,39 @@ export async function revokeInvite(_prev: TeamActionState, formData: FormData): 
   return { success: "Invite revoked." };
 }
 
+/** R3: resend a pending invite — fresh 7-day window, same token/link, email re-sent.
+ *  The old UI literally told users to "resend it" with no control to do so. */
+export async function resendInvite(_prev: TeamActionState, formData: FormData): Promise<TeamActionState> {
+  const inviteId = String(formData.get("inviteId") ?? "");
+  const { supabase, account, role } = await callerContext();
+  if (!account) return { error: "Your session expired. Sign in again." };
+  if (!canManageTeam(role ?? "")) return { error: "Only owners and admins can manage invites." };
+
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  const { data: invite, error } = await supabase
+    .from("account_invites")
+    .update({ expires_at: expiresAt })
+    .eq("id", inviteId)
+    .eq("account_id", account.id)
+    .eq("status", "pending")
+    .select("email, token")
+    .maybeSingle<{ email: string; token: string }>();
+  if (error || !invite) return { error: "Could not resend the invite." };
+
+  try {
+    await sendInviteEmail({
+      to: invite.email,
+      inviteUrl: `${process.env.APP_URL ?? "http://localhost:3000"}/invite/${invite.token}`,
+      workspaceName: (account as { name?: string }).name ?? "your team",
+    });
+  } catch {
+    return { error: "The invite window was renewed, but the email failed to send — try again." };
+  }
+
+  revalidatePath("/settings/team");
+  return { success: `Invitation re-sent to ${invite.email}.` };
+}
+
 export async function removeMember(_prev: TeamActionState, formData: FormData): Promise<TeamActionState> {
   const userId = String(formData.get("userId") ?? "");
   const { supabase, account, role } = await callerContext();
