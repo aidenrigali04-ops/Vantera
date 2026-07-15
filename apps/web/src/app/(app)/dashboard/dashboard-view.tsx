@@ -279,7 +279,8 @@ function WorkingDashboard(props: DashboardViewProps) {
             </p>
           </div>
           <Button asChild size="sm" className="shrink-0">
-            <Link href="/agents/copy/edit">
+            {/* R6: the link now lives in Settings (one source of truth with the agent config). */}
+            <Link href="/settings#booking-link">
               Add booking link <ArrowRight className="size-4" />
             </Link>
           </Button>

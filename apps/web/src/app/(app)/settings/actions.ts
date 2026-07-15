@@ -116,6 +116,64 @@ export async function setLifecycleEmails(
   return { saved: true };
 }
 
+/**
+ * R6: the booking link, editable where people look for it. Same source of truth as the agent
+ * wizard — agents.config.bookingUrl on the Outreach (kind='copy') row — so drafts, replies,
+ * and the dashboard nag all read one value.
+ */
+export async function updateBookingLink(
+  _prev: SettingsState,
+  formData: FormData
+): Promise<SettingsState> {
+  const raw = String(formData.get("bookingUrl") ?? "").trim();
+  if (raw && !/^https?:\/\/\S+$/.test(raw)) {
+    return { error: "Enter a full link starting with https:// (or clear the field)." };
+  }
+
+  const supabase = await createClient();
+  const { data: agent } = await supabase
+    .from("agents")
+    .select("id, config")
+    .eq("kind", "copy")
+    .limit(1)
+    .maybeSingle<{ id: string; config: Record<string, unknown> | null }>();
+  if (!agent) return { error: "Deploy your Outreach agent first — the booking link rides with it." };
+
+  const { error } = await supabase
+    .from("agents")
+    .update({ config: { ...(agent.config ?? {}), bookingUrl: raw || null } })
+    .eq("id", agent.id); // RLS: admins only
+  if (error) return { error: "Could not save. Only workspace admins can change this." };
+  revalidatePath("/settings");
+  revalidatePath("/dashboard");
+  return { saved: true };
+}
+
+/**
+ * R6: in-app email change. Supabase sends confirmation links to BOTH addresses (secure email
+ * change); the switch completes only after they're clicked — the form copy says so.
+ */
+export async function changeEmail(
+  _prev: SettingsState,
+  formData: FormData
+): Promise<SettingsState> {
+  const email = String(formData.get("newEmail") ?? "").trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: "Enter a valid email address." };
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Your session expired. Sign in again." };
+  if (email.toLowerCase() === (user.email ?? "").toLowerCase()) {
+    return { error: "That's already your sign-in email." };
+  }
+
+  const { error } = await supabase.auth.updateUser({ email });
+  if (error) return { error: "Could not start the email change. Try again shortly." };
+  return { saved: true };
+}
+
 // P1 (2026-07-15): in-app password change — the only path used to be the forgot-password email.
 export async function changePassword(
   _prev: SettingsState,

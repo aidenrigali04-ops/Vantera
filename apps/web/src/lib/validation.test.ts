@@ -4,6 +4,7 @@ import {
   dollarsToCents,
   normalizeWebsiteUrl,
   optionalDollarsToCents,
+  validateManualLead,
   validateMemberSignup,
   validateOnboarding,
   validateSignup,
@@ -216,5 +217,37 @@ describe("validateMemberSignup", () => {
     expect(
       validateMemberSignup({ email: "not-an-email", password: "longenough", inviteEmail: "jane@company.com" }).ok
     ).toBe(false);
+  });
+});
+
+describe("validateManualLead", () => {
+  const base = { firstName: "Ada", lastName: "", title: "", companyName: "", linkedinUrl: "linkedin.com/in/ada" };
+
+  it("accepts name + profile URL, normalizes the URL, nulls empty optionals", () => {
+    const r = validateManualLead({ ...base, lastName: "  Lovelace ", title: "CTO", companyName: "" });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.values).toEqual({
+        firstName: "Ada",
+        lastName: "Lovelace",
+        title: "CTO",
+        companyName: null,
+        linkedinUrl: "https://linkedin.com/in/ada",
+      });
+    }
+  });
+
+  it("requires a first name", () => {
+    expect(validateManualLead({ ...base, firstName: "  " }).ok).toBe(false);
+  });
+
+  it("requires a PROFILE url — company pages and non-LinkedIn hosts are rejected", () => {
+    expect(validateManualLead({ ...base, linkedinUrl: "linkedin.com/company/acme" }).ok).toBe(false);
+    expect(validateManualLead({ ...base, linkedinUrl: "https://example.com/in/ada" }).ok).toBe(false);
+    expect(validateManualLead({ ...base, linkedinUrl: "" }).ok).toBe(false);
+  });
+
+  it("caps field lengths", () => {
+    expect(validateManualLead({ ...base, companyName: "x".repeat(121) }).ok).toBe(false);
   });
 });

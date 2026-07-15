@@ -18,6 +18,8 @@ import {
 import { ConversationPanel } from "@/components/conversation-panel";
 import { loadThread } from "@/lib/conversations";
 import { EraseControl } from "./erase-control";
+import { LeadIdentity } from "./edit-lead";
+import { LeadNotes, type LeadNote } from "./lead-notes";
 
 const LEAD_SELECT =
   "id, first_name, last_name, title, company_name, company_size, industry, location, tech_stack, status, source, ai_score, ai_rationale, ai_insights, rules_gate_reasons, scored_at, email, email_status, phone, phone_status, linkedin_url, created_at, meeting_booked_at, meeting_source, replies(channel, classification, classification_rationale, body, received_at), lead_signals(kind, label, detail, observed_at)";
@@ -82,10 +84,6 @@ const STATUS_LABELS: Record<string, string> = {
 const dateFmt = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" });
 const ms = (iso: string | null | undefined) => (iso ? new Date(iso).getTime() || 0 : 0);
 const fmt = (iso: string | null | undefined) => (iso ? dateFmt.format(new Date(iso)) : "");
-
-function fullName(l: Lead): string {
-  return [l.first_name, l.last_name].filter(Boolean).join(" ") || "Unknown prospect";
-}
 
 const CLASS_LABEL: Record<string, string> = {
   positive: "Positive",
@@ -230,7 +228,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 export default async function LeadProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createClient();
-  const [{ data }, { account }, { data: queuedSend }, { data: pausedRun }] = await Promise.all([
+  const [{ data }, { user, account }, { data: queuedSend }, { data: pausedRun }, { data: noteRows }] = await Promise.all([
     supabase.from("leads").select(LEAD_SELECT).eq("id", id).maybeSingle(),
     getGateData(),
     // A reply already queued/in-flight for this lead — the compose box must show it instead of
@@ -253,6 +251,13 @@ export default async function LeadProfilePage({ params }: { params: Promise<{ id
       .eq("status", "paused_reply")
       .limit(1)
       .maybeSingle(),
+    // R6: the user's own notes on this prospect, newest first.
+    supabase
+      .from("lead_notes")
+      .select("id, body, author_user_id, created_at")
+      .eq("lead_id", id)
+      .order("created_at", { ascending: false })
+      .returns<LeadNote[]>(),
   ]);
   const lead = data as unknown as Lead | null;
   if (!lead) notFound();
@@ -290,10 +295,14 @@ export default async function LeadProfilePage({ params }: { params: Promise<{ id
 
         <div className="mt-3 flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
           <div className="min-w-0">
-            <h1 className="text-2xl font-semibold tracking-tight">{fullName(lead)}</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {[lead.title, lead.company_name].filter(Boolean).join(" · ") || "—"}
-            </p>
+            {/* R6: identity is correctable in place — the same columns ground the next draft. */}
+            <LeadIdentity
+              leadId={lead.id}
+              firstName={lead.first_name}
+              lastName={lead.last_name}
+              title={lead.title}
+              companyName={lead.company_name}
+            />
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <Badge>{STATUS_LABELS[lead.status] ?? lead.status}</Badge>
               {lead.source === "intent" && (
@@ -476,8 +485,10 @@ export default async function LeadProfilePage({ params }: { params: Promise<{ id
           </div>
         </div>
 
-        {/* Journey — next step pinned on top, history behind it; only the history scrolls. */}
-        <section className={cn(PANEL_SURFACE, "flex min-h-0 flex-col p-5")}>
+        {/* Journey — next step pinned on top, history behind it; only the history scrolls.
+            R6 adds the user's own notes below the timeline — knowledge flows back in. */}
+        <div className="flex min-h-0 flex-col gap-4">
+        <section className={cn(PANEL_SURFACE, "flex min-h-0 flex-1 flex-col p-5")}>
           <Eyebrow>Activity</Eyebrow>
           {next && (
             <div
@@ -506,6 +517,14 @@ export default async function LeadProfilePage({ params }: { params: Promise<{ id
             )}
           </div>
         </section>
+
+        <section className={cn(PANEL_SURFACE, "shrink-0 p-5 lg:max-h-72 lg:overflow-y-auto")}>
+          <Eyebrow>Notes</Eyebrow>
+          <div className="mt-3">
+            <LeadNotes leadId={lead.id} currentUserId={user?.id ?? ""} notes={noteRows ?? []} />
+          </div>
+        </section>
+        </div>
       </div>
     </div>
   );

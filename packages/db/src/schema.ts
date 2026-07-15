@@ -239,6 +239,8 @@ export const leads = pgTable(
     // ('agent' = reply-classification detector, 'manual' = the user's control, authoritative)
     meetingAt: timestamp("meeting_at", { withTimezone: true }),
     meetingSource: text("meeting_source", { enum: ["agent", "manual"] }),
+    // 0056 R6: last user correction to identity fields — corrected values feed drafts directly
+    editedByUserAt: timestamp("edited_by_user_at", { withTimezone: true }),
     // 0040: self-optimizing experiment attribution — stamped by copy-draft when a lead is drafted
     // under a running experiment. Null for non-experiment leads; service-role write only.
     experimentId: uuid("experiment_id").references(() => optimizationExperiments.id, {
@@ -317,6 +319,25 @@ export const leadSignals = pgTable(
     index("lead_signals_account_kind_idx").on(t.accountId, t.kind),
     uniqueIndex("lead_signals_unique").on(t.leadId, t.kind, t.label),
   ]
+);
+
+// 0056 R6: plain-text annotations on the lead brief — the user's own knowledge about a
+// prospect, kept with the lead (cascades on erasure). Immutable; delete = author or admin.
+export const leadNotes = pgTable(
+  "lead_notes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    leadId: uuid("lead_id")
+      .notNull()
+      .references(() => leads.id, { onDelete: "cascade" }),
+    authorUserId: uuid("author_user_id"),
+    body: text("body").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("lead_notes_lead_idx").on(t.leadId, t.createdAt)]
 );
 
 // ── 0003 campaigns, scheduler, suppression ───────────────────────────────────

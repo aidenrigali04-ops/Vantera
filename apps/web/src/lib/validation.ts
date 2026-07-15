@@ -218,3 +218,53 @@ export function validateWorkspace(input: {
 export function confirmAccountName(accountName: string, typed: string): boolean {
   return typed.trim() === accountName;
 }
+
+const FIELD_MAX = 120;
+
+/**
+ * R6 manual add-lead: first name + a LinkedIn profile URL are required (LinkedIn is the only
+ * outreach channel, so a lead without a profile can never be contacted); everything else is
+ * optional context that helps the qualification rank judge fit.
+ */
+export function validateManualLead(input: {
+  firstName: string;
+  lastName: string;
+  title: string;
+  companyName: string;
+  linkedinUrl: string;
+}):
+  | Valid<{
+      firstName: string;
+      lastName: string | null;
+      title: string | null;
+      companyName: string | null;
+      linkedinUrl: string;
+    }>
+  | Invalid {
+  const firstName = input.firstName.trim();
+  if (!firstName) return { ok: false, error: "Enter the prospect's first name." };
+  for (const [label, v] of [
+    ["First name", firstName],
+    ["Last name", input.lastName],
+    ["Title", input.title],
+    ["Company", input.companyName],
+  ] as const) {
+    if (v.trim().length > FIELD_MAX) return { ok: false, error: `${label} is too long.` };
+  }
+  const linkedin = normalizeLinkedinUrl(input.linkedinUrl);
+  if (!linkedin.ok) return linkedin;
+  if (!linkedin.url || !/linkedin\.com\/in\//i.test(linkedin.url)) {
+    return { ok: false, error: "Enter their LinkedIn profile URL (linkedin.com/in/…)." };
+  }
+  const opt = (v: string) => (v.trim() ? v.trim() : null);
+  return {
+    ok: true,
+    values: {
+      firstName,
+      lastName: opt(input.lastName),
+      title: opt(input.title),
+      companyName: opt(input.companyName),
+      linkedinUrl: linkedin.url,
+    },
+  };
+}

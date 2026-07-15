@@ -6,10 +6,18 @@ routes: /settings
 
 # Account settings
 
-- **Profile** — your display name, visible to your team.
+- **Profile** — your sign-in email, display name, and password.
 - **Workspace** — workspace name plus the industry, ICP, and revenue goal that seed your default campaign targeting. Only workspace admins can change these.
 - **Average value per client** — the recurring monthly revenue one closed client is worth. Optional, but setting it powers the Revenue snapshot on your dashboard (closed and projected MRR against your goal). Leave it blank to track client counts only.
 - **Team** — who's in your workspace. Invites are coming soon.
+
+## Changing your email
+
+In the Profile card, **Change email** starts the switch: confirmation links go to both your current and your new address, and the change completes only after they're clicked — that double-confirmation is what keeps an account from being hijacked by a single stray click. You stay signed in the whole time, and the Profile card shows your active address.
+
+## Booking link
+
+The **Booking link** card holds the calendar link Vera offers the moment a prospect shows interest in talking — it's how conversations become meetings. It's the same value your Outreach agent carries (saving here updates the agent, and vice versa), so there's exactly one place a stale link can hide: nowhere. Admins only.
 
 ## Weekly summary email
 

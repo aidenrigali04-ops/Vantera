@@ -7,6 +7,7 @@ import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { LeadsTable, type LeadRow } from "./leads-table";
 import { leadsHref, type LeadsFilters, type LeadsSort } from "./leads-params";
+import { AddLead } from "./add-lead";
 import { HOT_MIN_SCORE } from "./lead-value";
 import { cn } from "@/lib/utils";
 
@@ -169,13 +170,17 @@ export default async function LeadsPage({
             Every prospect your agents sourced, with the reasoning behind each score.
           </p>
         </div>
-        {/* P1: CSV export — the user's own data, one click. */}
-        <a
-          href="/api/export/leads"
-          className="inline-flex items-center rounded-lg border border-[var(--hairline)] px-3.5 py-2 text-sm font-medium transition-colors hover:bg-[var(--tint)]"
-        >
-          Export CSV
-        </a>
+        <div className="flex items-center gap-2">
+          {/* P1: CSV export — the user's own data, one click. */}
+          <a
+            href="/api/export/leads"
+            className="inline-flex items-center rounded-lg border border-[var(--hairline)] px-3.5 py-2 text-sm font-medium transition-colors hover:bg-[var(--tint)]"
+          >
+            Export CSV
+          </a>
+          {/* R6: bring your own prospect — same qualification bar as discovery. */}
+          <AddLead />
+        </div>
       </div>
 
       {/* Segmented control (matches the Results tabs) — one bordered track, active is a raised

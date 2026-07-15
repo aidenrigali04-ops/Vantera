@@ -208,6 +208,12 @@ export default async function ChannelsPage({
                     (5→10→15→20/day over four weeks) — these ceilings protect your account and can&apos;t
                     be raised past the safe line.
                   </p>
+                  {/* R6: send-window visibility — why outreach looks "quiet" at night/weekends
+                      (source of truth: send-window.ts, enforced on sequence sends only). */}
+                  <p className="text-xs text-muted-foreground">
+                    Proactive outreach only goes out Mon–Fri, 8am–5pm in each prospect&apos;s local
+                    time — replies in a live conversation send any time.
+                  </p>
                 </div>
               );
             })}

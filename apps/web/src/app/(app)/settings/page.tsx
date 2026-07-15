@@ -5,8 +5,9 @@ import { Panel } from "@/components/ui/panel";
 import { createClient } from "@/lib/supabase/server";
 import { getGateData } from "@/lib/auth/context";
 import { matchMemberEmails } from "./team/validation";
-import { PasswordForm, ProfileForm } from "./profile-form";
+import { EmailForm, PasswordForm, ProfileForm } from "./profile-form";
 import { WorkspaceForm } from "./workspace-form";
+import { BookingLinkForm } from "./booking-link-form";
 import { LeadEventEmailsToggle, LifecycleEmailsToggle, WeeklySummaryToggle } from "./notifications-form";
 import { DangerZone } from "./danger-zone";
 
@@ -35,6 +36,7 @@ export default async function SettingsPage() {
     { data: deletionRequest },
     { data: acceptedInvites },
     { data: prefs },
+    { data: copyAgent },
   ] = await Promise.all([
       supabase.from("user_profiles").select("display_name").maybeSingle(),
       supabase.from("account_members").select("user_id, role, created_at").eq("account_id", account.id),
@@ -61,6 +63,14 @@ export default async function SettingsPage() {
           lead_event_emails_enabled: boolean;
           lifecycle_emails_enabled: boolean;
         }>(),
+      // R6: the booking link lives on the Outreach agent's config — one source of truth
+      // shared with the wizard, drafts, and the dashboard nag.
+      supabase
+        .from("agents")
+        .select("id, config")
+        .eq("kind", "copy")
+        .limit(1)
+        .maybeSingle<{ id: string; config: { bookingUrl?: string | null } | null }>(),
     ]);
   const emailById = matchMemberEmails(members ?? [], acceptedInvites ?? []);
 
@@ -75,7 +85,10 @@ export default async function SettingsPage() {
 
       <Panel className="flex flex-col gap-4">
         <h2 className="font-heading text-base font-semibold">Profile</h2>
-        <ProfileForm displayName={profile?.display_name ?? ""} email={user.email ?? ""} />
+        <EmailForm email={user.email ?? ""} />
+        <div className="border-t border-[var(--hairline)] pt-5">
+          <ProfileForm displayName={profile?.display_name ?? ""} />
+        </div>
         <div className="border-t border-[var(--hairline)] pt-5"><PasswordForm /></div>
       </Panel>
 
@@ -110,6 +123,16 @@ export default async function SettingsPage() {
         <Button asChild variant="outline" size="sm" className="w-fit">
           <Link href="/settings/team">Manage team</Link>
         </Button>
+      </Panel>
+
+      {/* R6: the conversion-critical config, editable where people look for it. The dashboard
+          "Action needed" nag deep-links to this anchor. */}
+      <Panel id="booking-link" className="flex flex-col gap-4 scroll-mt-6">
+        <h2 className="font-heading text-base font-semibold">Booking link</h2>
+        <BookingLinkForm
+          bookingUrl={copyAgent?.config?.bookingUrl ?? ""}
+          hasAgent={copyAgent != null}
+        />
       </Panel>
 
       <Panel className="flex flex-col gap-4">

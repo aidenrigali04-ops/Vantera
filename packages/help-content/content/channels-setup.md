@@ -24,6 +24,8 @@ Your agents draft outreach as soon as qualified leads arrive, but nothing actual
 
 To protect your account, Vantera paces sending with human-like timing and a weekly invite ceiling, and ramps a newly connected account up gradually. These limits aren't configurable below their safety thresholds — they keep your own LinkedIn account healthy.
 
+Proactive outreach (first touches and follow-ups) only goes out Monday–Friday, roughly 8am–5pm in each prospect's local time — that's why sending can look quiet overnight and on weekends. Replies in a live conversation are exempt and send any time, because answering promptly is the human thing to do.
+
 ## Pause all sending
 
 The **Pause all sending** toggle instantly stops every outbound LinkedIn action for your entire workspace. Use it if you need to step back — for example, while updating your ICP or reviewing a large batch of drafts. Toggling it back on resumes the queue from where it left off.

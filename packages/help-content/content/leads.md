@@ -20,4 +20,16 @@ Click any lead to open a **quick side panel** — the score and rationale, why-n
 
 When a newly qualified lead carries a fresh, high-value signal — a funding round, an executive hire, an acquisition, or active buying intent — you'll get a **hot-signal notification** in the bell, so you can pounce while the timing is right.
 
+## Adding a lead yourself
+
+**Add lead** (top right) lets you bring your own prospect: first name and their LinkedIn profile URL are required; title and company are optional but help the scoring judge fit. The lead enters the exact same funnel as sourced prospects — Vera researches and scores them against your ICP, and only a qualifying score moves them into outreach drafting. Adding someone by hand is never a shortcut past the quality bar, so a hand-added lead can still land in "Filtered out" with the reasons. Profiles on your suppression list can't be added, and a profile that's already a lead won't be duplicated. Adding leads is an admin action.
+
+## Correcting a lead
+
+On a lead's full profile, the pencil next to their name lets you **edit** their first/last name, title, and company — useful when research got something wrong or a prospect changed roles. Corrected details feed the next drafted message directly. Editing is admin-only.
+
+## Notes
+
+The **Notes** panel on the full profile keeps your own knowledge with the prospect — context from a call, a mutual connection, a reason to wait. Any teammate can read and add notes; each note shows its author and date, and you can remove your own. Notes are for your team — they're never sent to the prospect.
+
 Only high-quality leads (score 70+ by default) move on to outreach drafting. Prospects that never qualify are automatically removed after 90 days.

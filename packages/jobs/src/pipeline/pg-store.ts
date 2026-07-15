@@ -110,6 +110,7 @@ import {
 import { normalizeLinkedInUrl } from "./copy-draft";
 import { resolveSequenceConfig } from "./sequence-config";
 import type { RefreshLeadLoad, RefreshLeadStore } from "./refresh-lead";
+import type { QualifyLeadLoad, QualifyLeadStore } from "./qualify-lead";
 
 /**
  * Map a provider signal to a lead_signals row (0031). label falls back to detail, and the provider's
@@ -302,7 +303,7 @@ async function loadProofPoints(db: Db, accountId: string): Promise<ProofPoint[]>
 }
 
 /** Drizzle-backed store used by the Trigger.dev tasks (service-role DATABASE_URL). */
-export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerStore & RetentionStore & TrialStore & SendDispatchStore & OutreachSendStore & InboundStore & SequenceStore & SequenceTouchStore & ConversionStore & RefreshLeadStore & IntentScanStore & ConnectionSyncStore & OptimizeStore {
+export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerStore & RetentionStore & TrialStore & SendDispatchStore & OutreachSendStore & InboundStore & SequenceStore & SequenceTouchStore & ConversionStore & RefreshLeadStore & QualifyLeadStore & IntentScanStore & ConnectionSyncStore & OptimizeStore {
   return {
     async getScoutContext(agentId: string): Promise<ScoutContext | null> {
       const [agent] = await db.select().from(agents).where(eq(agents.id, agentId));
@@ -2193,6 +2194,55 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         icpDescription: row.icpName
           ? `${row.icpName}: ${JSON.stringify(row.icpCriteria ?? {})}`
           : "",
+        candidate: {
+          companyName: row.companyName,
+          companySize: row.companySize,
+          industry: row.industry,
+          location: row.location,
+          title: row.title,
+        },
+      };
+    },
+
+    // ── QualifyLeadStore (R6 manual-add) ─────────────────────────────────────
+
+    async loadLeadForQualify(accountId: string, leadId: string): Promise<QualifyLeadLoad | null> {
+      const [row] = await db
+        .select({
+          scoredAt: leads.scoredAt,
+          companyName: leads.companyName,
+          companySize: leads.companySize,
+          industry: leads.industry,
+          location: leads.location,
+          title: leads.title,
+          icpName: icps.name,
+          icpCriteria: icps.criteria,
+          accountIndustry: accounts.onboardingIndustry,
+        })
+        .from(leads)
+        .leftJoin(icps, eq(leads.icpId, icps.id))
+        .innerJoin(accounts, eq(leads.accountId, accounts.id))
+        .where(and(eq(leads.id, leadId), eq(leads.accountId, accountId)))
+        .limit(1);
+      if (!row) return null;
+
+      // Same min_score source as every other qualification path (rule 06).
+      const [scoutAgent] = await db
+        .select({ config: agents.config })
+        .from(agents)
+        .where(and(eq(agents.accountId, accountId), eq(agents.kind, "scout"), eq(agents.status, "live")))
+        .limit(1);
+      const scoutConfig = (scoutAgent?.config ?? {}) as { min_score?: number; minScore?: number };
+      const minScore = scoutConfig.min_score ?? scoutConfig.minScore ?? SCOUT_DEFAULTS.minScore;
+
+      return {
+        alreadyScored: row.scoredAt != null,
+        minScore,
+        accountIndustry: row.accountIndustry,
+        icpDescription: row.icpName
+          ? `${row.icpName}: ${JSON.stringify(row.icpCriteria ?? {})}`
+          : "",
+        icpCriteria: (row.icpCriteria ?? {}) as IcpCriteria,
         candidate: {
           companyName: row.companyName,
           companySize: row.companySize,
