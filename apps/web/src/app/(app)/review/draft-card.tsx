@@ -136,12 +136,12 @@ export function DraftCard({ draft, compact = false }: { draft: DraftRow; compact
               {busy === "approve" ? "Approving…" : "Approve"}
             </Button>
           </form>
-          <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
+          <Button size="sm" variant="outline" onClick={() => setEditing(true)} data-hotkey="edit-draft">
             Edit
           </Button>
           <form action={(fd) => run("decline", declineDraft, fd, "Declined — it won't send.")}>
             <input type="hidden" name="sendId" value={draft.id} />
-            <Button type="submit" size="sm" variant="ghost" disabled={busy !== null}>
+            <Button type="submit" size="sm" variant="ghost" disabled={busy !== null} data-hotkey="decline-draft">
               {busy === "decline" ? "Declining…" : "Decline"}
             </Button>
           </form>

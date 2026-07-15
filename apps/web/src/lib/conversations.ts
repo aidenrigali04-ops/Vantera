@@ -88,10 +88,19 @@ export type InboxItem = {
   /** interested reply with no delivered message after it (truthful "waiting on you") */
   waiting: boolean;
   status: string;
+  /** the most recent inbound classification, for inbox filter chips (R4) */
+  lastClassification: string | null;
 };
 
-/** Every conversation, newest activity first, unanswered-interested pinned. */
-export async function loadInbox(db: SupabaseClient): Promise<InboxItem[]> {
+/** Every conversation, newest activity first, unanswered-interested pinned.
+ *  R4: fetch caps are parameterized — the inbox "Show older" control raises them, so old
+ *  threads paginate in instead of silently vanishing behind a fixed cap. */
+export async function loadInbox(
+  db: SupabaseClient,
+  opts: { sentLimit?: number; replyLimit?: number } = {}
+): Promise<InboxItem[]> {
+  const sentLimit = Math.min(opts.sentLimit ?? 600, 3000);
+  const replyLimit = Math.min(opts.replyLimit ?? 400, 2000);
   // R1c: a failed read must hit the route's error boundary, never render an empty inbox.
   const [sentRes, gotRes] = await Promise.all([
     db
@@ -99,20 +108,28 @@ export async function loadInbox(db: SupabaseClient): Promise<InboxItem[]> {
       .select("lead_id, body, updated_at, origin, recipe, linkedin_stage")
       .eq("status", "sent")
       .order("updated_at", { ascending: false })
-      .limit(600)
+      .limit(sentLimit)
       .returns<SentRow[]>(),
     db
       .from("replies")
       .select("lead_id, body, received_at, classification")
       .order("received_at", { ascending: false })
-      .limit(400)
+      .limit(replyLimit)
       .returns<ReplyRow[]>(),
   ]);
   const sent = orThrow(sentRes, "your sent messages");
   const got = orThrow(gotRes, "replies");
   const byLead = new Map<
     string,
-    { lastAt: string; lastSnippet: string; lastRole: "agent" | "lead"; lastSentAt: string; lastInterestedAt: string }
+    {
+      lastAt: string;
+      lastSnippet: string;
+      lastRole: "agent" | "lead";
+      lastSentAt: string;
+      lastInterestedAt: string;
+      lastReplyAt: string;
+      lastClassification: string | null;
+    }
   >();
   const touch = (
     leadId: string,
@@ -126,6 +143,8 @@ export async function loadInbox(db: SupabaseClient): Promise<InboxItem[]> {
       lastRole: role,
       lastSentAt: "",
       lastInterestedAt: "",
+      lastReplyAt: "",
+      lastClassification: null as string | null,
     };
     if (at > cur.lastAt) {
       cur.lastAt = at;
@@ -145,6 +164,10 @@ export async function loadInbox(db: SupabaseClient): Promise<InboxItem[]> {
     const cur = touch(r.lead_id, r.received_at, r.body ?? "", "lead");
     if (r.classification === "interested" && r.received_at > cur.lastInterestedAt) {
       cur.lastInterestedAt = r.received_at;
+    }
+    if (r.received_at > cur.lastReplyAt) {
+      cur.lastReplyAt = r.received_at;
+      cur.lastClassification = r.classification;
     }
   }
   const ids = [...byLead.keys()];
@@ -168,6 +191,7 @@ export async function loadInbox(db: SupabaseClient): Promise<InboxItem[]> {
         c.lastInterestedAt !== "" &&
         c.lastInterestedAt > c.lastSentAt,
       status: l.status,
+      lastClassification: c.lastClassification,
     };
   });
   return items.sort((a, b) =>

@@ -5,15 +5,11 @@ import { orThrow } from "@/lib/supabase/guard";
 import { getGateData } from "@/lib/auth/context";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { LeadsTable, type LeadRow, type LeadsSort } from "./leads-table";
+import { LeadsTable, leadsHref, type LeadRow, type LeadsFilters, type LeadsSort } from "./leads-table";
 import { HOT_MIN_SCORE } from "./lead-value";
 import { cn } from "@/lib/utils";
 
 export const metadata = { title: "Leads" };
-
-// Sized so a full page fits ON SCREEN inside the one-screen shell (no inner scrollbar on a
-// typical desktop) — more leads = more pages, never a scrolling table.
-const PAGE_SIZE = 10;
 
 // Shared column set so the paginated table and the "Hot right now" spotlight return the same shape.
 // lead_signals (0031) are the REAL "why now" — events + intent captured at enrichment.
@@ -40,33 +36,63 @@ function sanitizeSearch(raw: string | undefined): string {
   return (raw ?? "").replace(/[,%()]/g, "").trim().slice(0, 80);
 }
 
-/** One place to build /leads URLs so every link (tabs, sort, pages) preserves the others' state. */
-function leadsHref(opts: { tab: string; q: string; sort: LeadsSort; page?: number }): string {
-  const params = new URLSearchParams();
-  if (opts.tab !== "all") params.set("tab", opts.tab);
-  if (opts.q) params.set("q", opts.q);
-  if (opts.sort !== "newest") params.set("sort", opts.sort);
-  if (opts.page && opts.page > 1) params.set("page", String(opts.page));
-  const query = params.toString();
-  return query ? `/leads?${query}` : "/leads";
+// R4: page size is a URL param (10/25/50). 25 default — the old fixed 10 meant 50+ pages
+// at prod's real volume. Module scope for the date filter (react purity lint bars Date.now
+// in render).
+const PER_OPTIONS = [10, 25, 50] as const;
+const SCORE_FLOORS = [50, 70, 85] as const;
+const DAY_WINDOWS = [7, 30, 90] as const;
+function sourcedSinceIso(days: number): string {
+  return new Date(Date.now() - days * 86_400_000).toISOString();
 }
 
 export default async function LeadsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string; page?: string; q?: string; sort?: string }>;
+  searchParams: Promise<{
+    tab?: string;
+    page?: string;
+    q?: string;
+    sort?: string;
+    per?: string;
+    industry?: string;
+    min?: string;
+    days?: string;
+    intent?: string;
+  }>;
 }) {
   const params = await searchParams;
   const tab = TABS.find((t) => t.key === params.tab) ?? TABS[0];
   const page = Math.max(1, Number(params.page) || 1);
   const q = sanitizeSearch(params.q);
-  const sort: LeadsSort = params.sort === "score" ? "score" : "newest";
-  const from = (page - 1) * PAGE_SIZE;
+  const SORTS: LeadsSort[] = ["newest", "score", "company", "activity"];
+  const sort: LeadsSort = SORTS.includes(params.sort as LeadsSort)
+    ? (params.sort as LeadsSort)
+    : "newest";
+  const per = PER_OPTIONS.includes(Number(params.per) as (typeof PER_OPTIONS)[number])
+    ? Number(params.per)
+    : 25;
+  const filters: LeadsFilters = {
+    industry: (params.industry ?? "").slice(0, 80),
+    min: SCORE_FLOORS.includes(Number(params.min) as (typeof SCORE_FLOORS)[number])
+      ? Number(params.min)
+      : null,
+    days: DAY_WINDOWS.includes(Number(params.days) as (typeof DAY_WINDOWS)[number])
+      ? Number(params.days)
+      : null,
+    intent: params.intent === "1",
+  };
+  const from = (page - 1) * per;
 
   const supabase = await createClient();
   let query = supabase.from("leads").select(LEAD_SELECT, { count: "exact" });
   if (tab.statuses) query = query.in("status", tab.statuses);
   if (tab.source) query = query.eq("source", tab.source);
+  // R4 filters — compose with tabs and search; each is URL state, shareable and back-safe.
+  if (filters.industry) query = query.eq("industry", filters.industry);
+  if (filters.min) query = query.gte("ai_score", filters.min);
+  if (filters.days) query = query.gte("created_at", sourcedSinceIso(filters.days));
+  if (filters.intent && !tab.source) query = query.eq("source", "intent");
   if (q)
     query = query.or(
       `first_name.ilike.%${q}%,last_name.ilike.%${q}%,company_name.ilike.%${q}%,title.ilike.%${q}%`
@@ -76,8 +102,16 @@ export default async function LeadsPage({
       ? query
           .order("ai_score", { ascending: false, nullsFirst: false })
           .order("created_at", { ascending: false })
-      : query.order("created_at", { ascending: false });
-  query = query.range(from, from + PAGE_SIZE - 1);
+      : sort === "company"
+        ? query
+            .order("company_name", { ascending: true, nullsFirst: false })
+            .order("created_at", { ascending: false })
+        : sort === "activity"
+          ? query
+              .order("scored_at", { ascending: false, nullsFirst: false })
+              .order("created_at", { ascending: false })
+          : query.order("created_at", { ascending: false });
+  query = query.range(from, from + per - 1);
 
   // "Hot right now" spotlight — account-wide top-fit leads ready to work, independent of the
   // current tab/page. RLS scopes it to this account (rule 02); no account id is passed.
@@ -90,14 +124,36 @@ export default async function LeadsPage({
     .order("scored_at", { ascending: false, nullsFirst: false })
     .limit(3);
 
+  // R4 filter options: the account's real industries (deduped) for the filter popover.
+  const industriesQuery = supabase
+    .from("leads")
+    .select("industry")
+    .not("industry", "is", null)
+    .limit(1000);
+
   // Account carries the revenue numbers that turn each lead into "≈ $X to your goal".
-  const [leadsRes, hotRes, { account }] = await Promise.all([query, hotQuery, getGateData()]);
+  const [leadsRes, hotRes, industriesRes, { account }] = await Promise.all([
+    query,
+    hotQuery,
+    industriesQuery,
+    getGateData(),
+  ]);
   // R1c: a failed read hits the error boundary — never renders as "0 leads".
-  const leads = orThrow(leadsRes, "your leads");
+  const leadsRaw = orThrow(leadsRes, "your leads");
   const count = leadsRes.count;
   const hotLeads = orThrow(hotRes, "hot leads");
+  const industries = [
+    ...new Set(((industriesRes.data ?? []) as { industry: string | null }[]).map((r) => r.industry).filter(Boolean) as string[]),
+  ].sort();
 
-  const totalPages = Math.max(1, Math.ceil((count ?? 0) / PAGE_SIZE));
+  // R4: on the default view, filtered-out rows sink below live ones within the page — the
+  // first screen must never read as a wall of rejects (stable partition, order kept).
+  const leads =
+    tab.key === "all" && sort === "newest" && leadsRaw
+      ? [...leadsRaw.filter((l: { status: string }) => l.status !== "rejected"), ...leadsRaw.filter((l: { status: string }) => l.status === "rejected")]
+      : leadsRaw;
+
+  const totalPages = Math.max(1, Math.ceil((count ?? 0) / per));
 
   return (
     // Data surface: fluid width (rule 07 width doctrine) — the table gets the screen,
@@ -130,7 +186,7 @@ export default async function LeadsPage({
             return (
               <Link
                 key={t.key}
-                href={leadsHref({ tab: t.key, q, sort })}
+                href={leadsHref({ tab: t.key, q, sort, per, filters })}
                 aria-current={isActive ? "page" : undefined}
                 className={cn(
                   "inline-flex items-center rounded-lg px-3 py-1.5 font-medium transition-colors",
@@ -195,29 +251,76 @@ export default async function LeadsPage({
             tab={tab.key}
             q={q}
             sort={sort}
+            per={per}
+            filters={filters}
+            industries={industries}
           />
-          {totalPages > 1 && (
-            <div className="mt-4 flex shrink-0 items-center justify-between text-sm text-muted-foreground">
-              <span>
-                Page {page} of {totalPages} · {count} leads
+          {(totalPages > 1 || per !== 25) && (
+            <div className="mt-4 flex shrink-0 flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
+              <span className="flex items-center gap-3">
+                <span>
+                  Page {page} of {totalPages} · {count} leads
+                </span>
+                {/* R4: page size — URL state like everything else. */}
+                <span className="flex items-center gap-1">
+                  {PER_OPTIONS.map((n) => (
+                    <Link
+                      key={n}
+                      href={leadsHref({ tab: tab.key, q, sort, per: n, filters })}
+                      aria-current={per === n ? "true" : undefined}
+                      className={cn(
+                        "rounded-md px-1.5 py-0.5",
+                        per === n ? "bg-foreground/10 font-medium text-foreground" : "hover:text-foreground"
+                      )}
+                    >
+                      {n}
+                    </Link>
+                  ))}
+                  <span className="ml-0.5">/ page</span>
+                </span>
               </span>
-              <span className="flex gap-2">
-                {page > 1 && (
-                  <Link
-                    className="underline underline-offset-2"
-                    href={leadsHref({ tab: tab.key, q, sort, page: page - 1 })}
-                  >
-                    Previous
-                  </Link>
+              <span className="flex items-center gap-3">
+                {/* R4: jump-to-page — 49 Next-clicks was the audit's poster child. */}
+                {totalPages > 3 && (
+                  <form action="/leads" method="get" className="flex items-center gap-1.5">
+                    {tab.key !== "all" && <input type="hidden" name="tab" value={tab.key} />}
+                    {q && <input type="hidden" name="q" value={q} />}
+                    {sort !== "newest" && <input type="hidden" name="sort" value={sort} />}
+                    {per !== 25 && <input type="hidden" name="per" value={per} />}
+                    {filters.industry && <input type="hidden" name="industry" value={filters.industry} />}
+                    {filters.min && <input type="hidden" name="min" value={filters.min} />}
+                    {filters.days && <input type="hidden" name="days" value={filters.days} />}
+                    {filters.intent && <input type="hidden" name="intent" value="1" />}
+                    <label htmlFor="page-jump">Go to</label>
+                    <input
+                      id="page-jump"
+                      type="number"
+                      name="page"
+                      min={1}
+                      max={totalPages}
+                      defaultValue={page}
+                      className="h-7 w-14 rounded-md border border-[var(--hairline)] bg-white px-1.5 text-center text-sm focus-visible:border-[var(--cyan-line)] focus-visible:outline-none"
+                    />
+                  </form>
                 )}
-                {page < totalPages && (
-                  <Link
-                    className="underline underline-offset-2"
-                    href={leadsHref({ tab: tab.key, q, sort, page: page + 1 })}
-                  >
-                    Next
-                  </Link>
-                )}
+                <span className="flex gap-2">
+                  {page > 1 && (
+                    <Link
+                      className="underline underline-offset-2"
+                      href={leadsHref({ tab: tab.key, q, sort, page: page - 1, per, filters })}
+                    >
+                      Previous
+                    </Link>
+                  )}
+                  {page < totalPages && (
+                    <Link
+                      className="underline underline-offset-2"
+                      href={leadsHref({ tab: tab.key, q, sort, page: page + 1, per, filters })}
+                    >
+                      Next
+                    </Link>
+                  )}
+                </span>
               </span>
             </div>
           )}

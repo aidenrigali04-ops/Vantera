@@ -475,7 +475,10 @@ function KpiStrip({
     <RevealItem className="grid grid-cols-2 gap-3 sm:grid-cols-4">
       <KpiTile href="/dashboard?view=pipeline" label="Closed" value={closed} sub={closedSub} hero />
       <KpiTile href="/dashboard?view=pipeline" label="In pipeline" value={pipeline} sub={pipelineSub} />
-      <KpiTile href="/leads?tab=replied" label="Warm replies" value={String(repliesThisWeek)} sub="this week" />
+      {/* R4: "Interested replies" — the KPI counts every interested reply in 7 days, which is
+          a different number than the needs-you panel's "waiting on you". Same-name tiles with
+          different denominators read as the dashboard contradicting itself. */}
+      <KpiTile href="/leads?tab=replied" label="Interested replies" value={String(repliesThisWeek)} sub="this week" />
       <KpiTile
         href="/review"
         label="To review"

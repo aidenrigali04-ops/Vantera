@@ -9,6 +9,7 @@ import { BulkApprove } from "./bulk-approve";
 import { LEAD_PROFILE_FIELDS } from "@/components/lead-profile-fields";
 import { type DraftRow } from "./draft-card";
 import { ProspectReviewCard, type ProspectGroup } from "./prospect-review-card";
+import { ReviewHotkeys } from "./review-hotkeys";
 import {
   ProcessedConversation,
   type ProcessedConversationGroup,
@@ -97,12 +98,17 @@ type ProcessedSendRow = {
 export default async function ReviewPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string }>;
+  searchParams: Promise<{ view?: string; page?: string }>;
 }) {
-  const { view: rawView } = await searchParams;
+  const { view: rawView, page: rawPage } = await searchParams;
   const view = VIEWS.includes(rawView as (typeof VIEWS)[number])
     ? (rawView as (typeof VIEWS)[number])
     : "queue";
+  // R4: real pagination — the old hard .limit(50) made drafts 51+ unreachable while the
+  // header still counted them.
+  const PER = 50;
+  const page = Math.max(1, Number(rawPage) || 1);
+  const from = (page - 1) * PER;
   const supabase = await createClient();
 
   const select = `id, channel, subject, body, style_flags, linkedin_stage, status, error, created_at, leads(${LEAD_PROFILE_FIELDS})`;
@@ -111,7 +117,7 @@ export default async function ReviewPage({
     .from("scheduled_sends")
     .select(select, { count: "exact" })
     .order("created_at", { ascending: view === "queue" })
-    .limit(50);
+    .range(from, from + PER - 1);
   query =
     view === "queue"
       ? query.eq("status", "pending_review")
@@ -119,6 +125,7 @@ export default async function ReviewPage({
   const res = await query;
   const rows = orThrow(res, "the review queue");
   const count = res.count;
+  const totalPages = Math.max(1, Math.ceil((count ?? 0) / PER));
 
   const groups = view === "queue" ? groupByProspect((rows ?? []) as unknown as DraftRow[]) : [];
 
@@ -224,11 +231,9 @@ export default async function ReviewPage({
       ) : view === "queue" ? (
         <div className="space-y-3">
           {groups.map((g) => (
-            <ProspectReviewCard
-              key={g.lead?.id ?? g.drafts[0]!.id}
-              group={g}
-              defaultOpen={groups.length === 1}
-            />
+            <div key={g.lead?.id ?? g.drafts[0]!.id} data-review-group>
+              <ProspectReviewCard group={g} defaultOpen={groups.length === 1} />
+            </div>
           ))}
         </div>
       ) : (
@@ -242,7 +247,37 @@ export default async function ReviewPage({
           ))}
         </div>
       )}
+
+      {totalPages > 1 && (
+        <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
+          <span>
+            Page {page} of {totalPages} · {count} {view === "queue" ? "drafts" : "messages"}
+          </span>
+          <span className="flex gap-2">
+            {page > 1 && (
+              <Link className="underline underline-offset-2" href={pageHref(view, page - 1)}>
+                Previous
+              </Link>
+            )}
+            {page < totalPages && (
+              <Link className="underline underline-offset-2" href={pageHref(view, page + 1)}>
+                Next
+              </Link>
+            )}
+          </span>
+        </div>
+      )}
       </div>
+      {view === "queue" && <ReviewHotkeys />}
     </div>
   );
+}
+
+/** R4: /review URLs with view + page preserved. */
+function pageHref(view: string, page: number): string {
+  const sp = new URLSearchParams();
+  if (view !== "queue") sp.set("view", view);
+  if (page > 1) sp.set("page", String(page));
+  const s = sp.toString();
+  return s ? `/review?${s}` : "/review";
 }

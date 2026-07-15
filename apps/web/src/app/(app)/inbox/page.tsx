@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { MessagesSquare } from "lucide-react";
+import { ArrowLeft, MessagesSquare, Search } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { loadInbox, loadThread } from "@/lib/conversations";
 import { ConversationPanel } from "@/components/conversation-panel";
@@ -12,15 +12,57 @@ export const metadata = { title: "Inbox" };
  * two-way thread, unanswered-interested pinned, composer pre-drafted. The surface the
  * "100% reply visibility" promise always needed.
  */
+const FILTERS = [
+  { key: "all", label: "All" },
+  { key: "waiting", label: "Waiting" },
+  { key: "not_interested", label: "Not interested" },
+] as const;
+type FilterKey = (typeof FILTERS)[number]["key"];
+
+function inboxHref(opts: { filter?: FilterKey; q?: string; show?: number; lead?: string }): string {
+  const sp = new URLSearchParams();
+  if (opts.filter && opts.filter !== "all") sp.set("filter", opts.filter);
+  if (opts.q) sp.set("q", opts.q);
+  if (opts.show && opts.show !== 30) sp.set("show", String(opts.show));
+  if (opts.lead) sp.set("lead", opts.lead);
+  const s = sp.toString();
+  return s ? `/inbox?${s}` : "/inbox";
+}
+
 export default async function InboxPage({
   searchParams,
 }: {
-  searchParams: Promise<{ lead?: string }>;
+  searchParams: Promise<{ lead?: string; q?: string; filter?: string; show?: string }>;
 }) {
+  const params = await searchParams;
+  const q = (params.q ?? "").trim().slice(0, 80).toLowerCase();
+  const filter: FilterKey = FILTERS.some((f) => f.key === params.filter)
+    ? (params.filter as FilterKey)
+    : "all";
+  // R4: "Show older" raises both the visible count and the fetch caps — no silent horizon.
+  const show = Math.min(Math.max(Number(params.show) || 30, 30), 480);
+
   const supabase = await createClient();
-  const items = await loadInbox(supabase);
-  const selectedId = (await searchParams).lead ?? items[0]?.leadId ?? null;
-  const selected = items.find((i) => i.leadId === selectedId) ?? null;
+  const allItems = await loadInbox(supabase, {
+    sentLimit: Math.max(600, show * 15),
+    replyLimit: Math.max(400, show * 10),
+  });
+
+  const filtered = allItems.filter((i) => {
+    if (filter === "waiting" && !i.waiting) return false;
+    if (filter === "not_interested" && i.lastClassification !== "not_interested") return false;
+    if (q && !`${i.name} ${i.company ?? ""}`.toLowerCase().includes(q)) return false;
+    return true;
+  });
+  const items = filtered.slice(0, show);
+  const hasMore = filtered.length > show;
+
+  // R4 mobile master/detail: with no explicit ?lead= the phone shows the LIST; a tapped
+  // thread shows only the thread with a back affordance. Desktop keeps auto-selecting.
+  const hasLeadParam = Boolean(params.lead);
+  const selectedId = params.lead ?? items[0]?.leadId ?? null;
+  const selected =
+    items.find((i) => i.leadId === selectedId) ?? allItems.find((i) => i.leadId === selectedId) ?? null;
   const turns = selectedId ? await loadThread(supabase, selectedId) : [];
 
   // Pre-draft: a queued agent draft for this lead opens in the composer ("one click to send").
@@ -47,25 +89,75 @@ export default async function InboxPage({
         </p>
       </header>
 
+      {/* R4 toolbar: search + filter chips — all URL state. */}
+      <div className={cn("flex shrink-0 flex-wrap items-center gap-2", hasLeadParam && "hidden lg:flex")}>
+        <form action="/inbox" method="get" role="search" className="relative">
+          {filter !== "all" && <input type="hidden" name="filter" value={filter} />}
+          <Search
+            className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground/60"
+            aria-hidden
+          />
+          <input
+            type="search"
+            name="q"
+            defaultValue={params.q ?? ""}
+            placeholder="Search conversations…"
+            aria-label="Search conversations"
+            className="h-9 w-56 rounded-lg border border-[var(--hairline)] bg-white pl-9 pr-3 text-sm shadow-[var(--shadow-sm)] placeholder:text-muted-foreground/60 focus-visible:border-[var(--cyan-line)] focus-visible:outline-none sm:w-72"
+          />
+        </form>
+        <div className="inline-flex items-center gap-1 rounded-xl border border-[var(--hairline)] bg-[var(--tint)] p-1 text-sm">
+          {FILTERS.map((f) => (
+            <Link
+              key={f.key}
+              href={inboxHref({ filter: f.key, q: params.q })}
+              aria-current={filter === f.key ? "page" : undefined}
+              className={cn(
+                "inline-flex items-center rounded-lg px-3 py-1 font-medium transition-colors",
+                filter === f.key
+                  ? "bg-white text-foreground shadow-[var(--shadow-sm)] ring-1 ring-[var(--hairline)]"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {f.label}
+            </Link>
+          ))}
+        </div>
+      </div>
+
       {items.length === 0 ? (
         <div className="flex flex-col items-center gap-3 rounded-xl border border-[var(--hairline)] bg-white/60 py-16 text-center">
           <MessagesSquare className="size-7 text-muted-foreground" />
           <p className="max-w-sm text-sm text-muted-foreground">
-            Conversations land here as soon as your outreach starts talking to real people.
+            {q || filter !== "all"
+              ? "No conversations match — clear the search or filter to see everything."
+              : "Conversations land here as soon as your outreach starts talking to real people."}
           </p>
+          {(q || filter !== "all") && (
+            <Link href="/inbox" className="text-sm font-medium text-[var(--cyan-strong)] hover:underline">
+              Clear
+            </Link>
+          )}
         </div>
       ) : (
         <div className="grid min-h-0 flex-1 gap-5 lg:grid-cols-[340px_1fr]">
-          {/* Thread list */}
-          <div className="min-h-0 overflow-y-auto rounded-xl border border-[var(--hairline)] bg-white/60">
+          {/* Thread list — on phones it hides once a thread is explicitly open. */}
+          <div
+            className={cn(
+              "min-h-0 overflow-y-auto rounded-xl border border-[var(--hairline)] bg-white/60",
+              hasLeadParam && "hidden lg:block"
+            )}
+          >
             <ul>
               {items.map((i) => (
                 <li key={i.leadId}>
                   <Link
-                    href={`/inbox?lead=${i.leadId}`}
+                    href={inboxHref({ filter, q: params.q, show: show !== 30 ? show : undefined, lead: i.leadId })}
                     className={cn(
                       "flex flex-col gap-0.5 border-b border-[var(--hairline)] px-4 py-3 transition-colors hover:bg-[var(--cyan-tint)]/40",
-                      i.leadId === selectedId && "bg-[var(--cyan-tint)]/60"
+                      i.leadId === selectedId && "bg-[var(--cyan-tint)]/60",
+                      // R4: settled threads recede — waiting/unanswered stay full-strength.
+                      !i.waiting && i.lastRole === "agent" && "opacity-60"
                     )}
                   >
                     <span className="flex items-center gap-2">
@@ -86,15 +178,38 @@ export default async function InboxPage({
                   </Link>
                 </li>
               ))}
+              {hasMore && (
+                <li>
+                  <Link
+                    href={inboxHref({ filter, q: params.q, show: show * 2 })}
+                    className="block px-4 py-3 text-center text-sm font-medium text-[var(--cyan-strong)] hover:underline"
+                  >
+                    Show older conversations
+                  </Link>
+                </li>
+              )}
             </ul>
           </div>
 
-          {/* Thread + composer */}
-          <div className="flex min-h-0 flex-col rounded-xl border border-[var(--hairline)] bg-white/60">
+          {/* Thread + composer — on phones it renders only when a thread is explicitly open. */}
+          <div
+            className={cn(
+              "flex min-h-0 flex-col rounded-xl border border-[var(--hairline)] bg-white/60",
+              !hasLeadParam && "hidden lg:flex"
+            )}
+          >
             {selected ? (
               <>
-                <div className="flex shrink-0 items-center justify-between border-b border-[var(--hairline)] px-5 py-3">
-                  <div className="min-w-0">
+                <div className="flex shrink-0 items-center justify-between gap-2 border-b border-[var(--hairline)] px-5 py-3">
+                  {/* R4 mobile back affordance — the list is hidden while a thread is open. */}
+                  <Link
+                    href={inboxHref({ filter, q: params.q, show: show !== 30 ? show : undefined })}
+                    aria-label="Back to all conversations"
+                    className="shrink-0 rounded-lg border border-[var(--hairline)] p-1.5 text-muted-foreground transition-colors hover:text-foreground lg:hidden"
+                  >
+                    <ArrowLeft className="size-4" />
+                  </Link>
+                  <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold text-foreground">{selected.name}</p>
                     {selected.company && (
                       <p className="truncate text-xs text-muted-foreground">{selected.company}</p>

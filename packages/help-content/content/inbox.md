@@ -31,3 +31,7 @@ back anytime with "Let Vera handle it."
 
 You can also message any lead directly from their profile page — even before they've replied.
 Prospects who opted out can never be messaged again.
+
+## Finding a conversation
+
+Search threads by name or company, or use the filter chips — **Waiting** shows only the people waiting on you, **Not interested** collects the closed doors. Older conversations load with **Show older conversations**; nothing ever silently drops off the list. Conversations you've already answered sit dimmed so the ones needing you stand out. On a phone, the inbox opens as a list — tap a conversation to read it full-screen and use the back arrow to return.

@@ -1,11 +1,14 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore, useTransition } from "react";
 import Link from "next/link";
-import { ArrowDown, Flame, Rows3, Search, Snowflake, Zap } from "lucide-react";
+import { toast } from "sonner";
+import { ArrowDown, Flame, Rows3, Search, SlidersHorizontal, Snowflake, Zap } from "lucide-react";
 import { PANEL_SURFACE, Eyebrow } from "@/components/ui/panel";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ScoreBadge, SourceBadge, WhyNowLine } from "@/components/lead-why-now";
 import { LeadProfileSheet } from "@/components/lead-profile";
+import { bulkArchiveLeads, bulkSuppressLeads, type BulkResult } from "./bulk-actions";
 import { cn } from "@/lib/utils";
 import {
   coolingState,
@@ -61,7 +64,40 @@ export interface ReplyView {
   received_at: string;
 }
 
-export type LeadsSort = "newest" | "score";
+export type LeadsSort = "newest" | "score" | "company" | "activity";
+
+export type LeadsFilters = {
+  industry: string;
+  min: number | null;
+  days: number | null;
+  intent: boolean;
+};
+
+export const EMPTY_FILTERS: LeadsFilters = { industry: "", min: null, days: null, intent: false };
+
+/** One place to build /leads URLs so every link (tabs, sort, filters, pages) preserves the rest. */
+export function leadsHref(opts: {
+  tab: string;
+  q: string;
+  sort: LeadsSort;
+  page?: number;
+  per?: number;
+  filters?: LeadsFilters;
+}): string {
+  const params = new URLSearchParams();
+  if (opts.tab !== "all") params.set("tab", opts.tab);
+  if (opts.q) params.set("q", opts.q);
+  if (opts.sort !== "newest") params.set("sort", opts.sort);
+  if (opts.page && opts.page > 1) params.set("page", String(opts.page));
+  if (opts.per && opts.per !== 25) params.set("per", String(opts.per));
+  const f = opts.filters;
+  if (f?.industry) params.set("industry", f.industry);
+  if (f?.min) params.set("min", String(f.min));
+  if (f?.days) params.set("days", String(f.days));
+  if (f?.intent) params.set("intent", "1");
+  const query = params.toString();
+  return query ? `/leads?${query}` : "/leads";
+}
 
 function latestReply(lead: LeadRow): ReplyView | null {
   const replies = lead.replies ?? [];
@@ -226,6 +262,31 @@ function writeDensity(next: Density) {
   for (const l of densityListeners) l();
 }
 
+/** R4: sortable column header — module scope (components created during render trip the
+ *  react-hooks lint). Active column shows a solid arrow; clicking again returns to newest. */
+function SortHeaderLink({
+  active,
+  href,
+  children,
+}: {
+  active: boolean;
+  href: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      className={cn(
+        "inline-flex items-center gap-1 transition-colors hover:text-foreground",
+        active && "text-foreground"
+      )}
+    >
+      {children}
+      <ArrowDown className={cn("size-3", !active && "opacity-30")} aria-hidden />
+    </Link>
+  );
+}
+
 /** Column header cell — the table's one place for th styling so the row reads as one system. */
 function Th({
   children,
@@ -260,6 +321,9 @@ export function LeadsTable({
   tab = "all",
   q = "",
   sort = "newest",
+  per = 25,
+  filters = EMPTY_FILTERS,
+  industries = [],
 }: {
   leads: LeadRow[];
   hotLeads?: LeadRow[];
@@ -268,46 +332,179 @@ export function LeadsTable({
   tab?: string;
   q?: string;
   sort?: LeadsSort;
+  per?: number;
+  filters?: LeadsFilters;
+  industries?: string[];
 }) {
   const [peek, setPeek] = useState<LeadRow | null>(null);
+  // R4 bulk selection — page-scoped; every bulk op confirms and toasts its outcome.
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkPending, startBulk] = useTransition();
   const density = useSyncExternalStore(subscribeDensity, readDensity, () => "comfortable" as const);
   const toggleDensity = writeDensity;
 
   const open = (lead: LeadRow) => setPeek(lead);
   const cellY = density === "compact" ? "py-1.5" : "py-3";
 
-  // Sort toggles ride the URL (server-ordered), preserving the active tab + search.
-  const sortHref = (next: LeadsSort) => {
-    const params = new URLSearchParams();
-    if (tab !== "all") params.set("tab", tab);
-    if (q) params.set("q", q);
-    if (next !== "newest") params.set("sort", next);
-    const query = params.toString();
-    return query ? `/leads?${query}` : "/leads";
+  const pageIds = leads.map((l) => l.id);
+  const allSelected = pageIds.length > 0 && pageIds.every((id) => selected.has(id));
+  const toggleAll = () =>
+    setSelected(allSelected ? new Set() : new Set(pageIds));
+  const toggleOne = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const runBulk = (
+    action: (ids: string[]) => Promise<BulkResult>,
+    verb: string
+  ) => {
+    const ids = [...selected];
+    startBulk(async () => {
+      const res = await action(ids);
+      if (res.error) toast.error(res.error);
+      else {
+        toast.success(
+          `${verb} ${res.done} lead${res.done === 1 ? "" : "s"}${
+            res.skipped ? ` · ${res.skipped} skipped` : ""
+          }.`
+        );
+        setSelected(new Set());
+      }
+    });
   };
+
+  // Sort toggles ride the URL (server-ordered), preserving tab + search + filters + page size.
+  const sortHref = (field: LeadsSort) =>
+    leadsHref({ tab, q, sort: sort === field ? "newest" : field, per, filters });
+
+  const activeFilterCount =
+    (filters.industry ? 1 : 0) + (filters.min ? 1 : 0) + (filters.days ? 1 : 0) + (filters.intent ? 1 : 0);
 
   return (
     // Fills the page's one-screen column: toolbar pinned, the region below scrolls
     // internally (the Hot strip scrolls away with it; the thead sticks to the region top).
     <div className="flex min-h-0 flex-1 flex-col">
-      {/* Toolbar — search on the left, density on the right; one quiet row, no panel chrome. */}
+      {/* Toolbar — search + filters on the left, density on the right. */}
       <div className="mb-3 flex shrink-0 flex-wrap items-center justify-between gap-3">
-        <form action="/leads" method="get" role="search" className="relative">
-          {tab !== "all" && <input type="hidden" name="tab" value={tab} />}
-          {sort !== "newest" && <input type="hidden" name="sort" value={sort} />}
-          <Search
-            className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground/60"
-            aria-hidden
-          />
-          <input
-            type="search"
-            name="q"
-            defaultValue={q}
-            placeholder="Search name, company, title…"
-            aria-label="Search leads"
-            className="h-9 w-64 rounded-lg border border-[var(--hairline)] bg-white pl-9 pr-3 text-sm shadow-[var(--shadow-sm)] placeholder:text-muted-foreground/60 focus-visible:border-[var(--cyan-line)] focus-visible:outline-none sm:w-80"
-          />
-        </form>
+        <div className="flex flex-wrap items-center gap-2">
+          <form action="/leads" method="get" role="search" className="relative">
+            {tab !== "all" && <input type="hidden" name="tab" value={tab} />}
+            {sort !== "newest" && <input type="hidden" name="sort" value={sort} />}
+            {per !== 25 && <input type="hidden" name="per" value={per} />}
+            {filters.industry && <input type="hidden" name="industry" value={filters.industry} />}
+            {filters.min && <input type="hidden" name="min" value={filters.min} />}
+            {filters.days && <input type="hidden" name="days" value={filters.days} />}
+            {filters.intent && <input type="hidden" name="intent" value="1" />}
+            <Search
+              className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground/60"
+              aria-hidden
+            />
+            <input
+              type="search"
+              name="q"
+              defaultValue={q}
+              placeholder="Search name, company, title…"
+              aria-label="Search leads"
+              className="h-9 w-64 rounded-lg border border-[var(--hairline)] bg-white pl-9 pr-3 text-sm shadow-[var(--shadow-sm)] placeholder:text-muted-foreground/60 focus-visible:border-[var(--cyan-line)] focus-visible:outline-none sm:w-80"
+            />
+          </form>
+
+          {/* R4 filters — a GET form: every filter is URL state, shareable and back-safe. */}
+          <details className="relative">
+            <summary
+              className={cn(
+                "inline-flex h-9 cursor-pointer list-none items-center gap-1.5 rounded-lg border border-[var(--hairline)] bg-white px-3 text-sm font-medium shadow-[var(--shadow-sm)] transition-colors hover:bg-[var(--tint)] [&::-webkit-details-marker]:hidden",
+                activeFilterCount > 0 && "border-[var(--cyan-line)] text-[var(--cyan-strong)]"
+              )}
+            >
+              <SlidersHorizontal className="size-4" aria-hidden />
+              Filters
+              {activeFilterCount > 0 && (
+                <span className="rounded-full bg-[var(--cyan-tint)] px-1.5 text-xs font-semibold">
+                  {activeFilterCount}
+                </span>
+              )}
+            </summary>
+            <form
+              action="/leads"
+              method="get"
+              className="absolute left-0 top-11 z-20 w-72 rounded-xl border border-[var(--hairline)] bg-white p-4 shadow-lg"
+            >
+              {tab !== "all" && <input type="hidden" name="tab" value={tab} />}
+              {q && <input type="hidden" name="q" value={q} />}
+              {sort !== "newest" && <input type="hidden" name="sort" value={sort} />}
+              {per !== 25 && <input type="hidden" name="per" value={per} />}
+              <div className="flex flex-col gap-3 text-sm">
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs font-medium text-muted-foreground">Industry</span>
+                  <select
+                    name="industry"
+                    defaultValue={filters.industry}
+                    className="h-9 rounded-lg border border-[var(--hairline)] bg-white px-2 focus-visible:border-[var(--cyan-line)] focus-visible:outline-none"
+                  >
+                    <option value="">Any industry</option>
+                    {industries.map((ind) => (
+                      <option key={ind} value={ind}>
+                        {ind}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs font-medium text-muted-foreground">Minimum score</span>
+                  <select
+                    name="min"
+                    defaultValue={filters.min ?? ""}
+                    className="h-9 rounded-lg border border-[var(--hairline)] bg-white px-2 focus-visible:border-[var(--cyan-line)] focus-visible:outline-none"
+                  >
+                    <option value="">Any score</option>
+                    <option value="50">50+</option>
+                    <option value="70">70+ (qualified)</option>
+                    <option value="85">85+ (hot)</option>
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs font-medium text-muted-foreground">Sourced</span>
+                  <select
+                    name="days"
+                    defaultValue={filters.days ?? ""}
+                    className="h-9 rounded-lg border border-[var(--hairline)] bg-white px-2 focus-visible:border-[var(--cyan-line)] focus-visible:outline-none"
+                  >
+                    <option value="">Any time</option>
+                    <option value="7">Last 7 days</option>
+                    <option value="30">Last 30 days</option>
+                    <option value="90">Last 90 days</option>
+                  </select>
+                </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    name="intent"
+                    value="1"
+                    defaultChecked={filters.intent}
+                    className="size-4 accent-[var(--cyan-strong)]"
+                  />
+                  <span>In-market only</span>
+                </label>
+                <div className="flex items-center justify-between pt-1">
+                  <Link href={leadsHref({ tab, q, sort, per })} className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground">
+                    Clear filters
+                  </Link>
+                  <button
+                    type="submit"
+                    className="rounded-lg bg-foreground px-3.5 py-1.5 text-sm font-medium text-background transition-opacity hover:opacity-90"
+                  >
+                    Apply
+                  </button>
+                </div>
+              </div>
+            </form>
+          </details>
+        </div>
         <div
           className="inline-flex items-center gap-0.5 rounded-lg border border-[var(--hairline)] bg-[var(--tint)] p-0.5"
           role="group"
@@ -333,6 +530,55 @@ export function LeadsTable({
         </div>
       </div>
 
+      {/* R4 bulk bar — appears with a selection; suppress is permanent so it confirms hard. */}
+      {selected.size > 0 && (
+        <div className="mb-3 flex shrink-0 flex-wrap items-center gap-3 rounded-xl border border-[var(--cyan-line)] bg-[var(--cyan-tint)]/40 px-4 py-2.5 text-sm">
+          <span className="font-medium">
+            {selected.size} selected
+          </span>
+          <ConfirmDialog
+            title={`Archive ${selected.size} lead${selected.size === 1 ? "" : "s"}?`}
+            description="Outreach to them stops (queued drafts are canceled) and they move to Archived. Their history is kept, and converted leads are skipped."
+            confirmLabel="Archive"
+            onConfirm={() => runBulk(bulkArchiveLeads, "Archived")}
+            trigger={(openDialog) => (
+              <button
+                type="button"
+                onClick={openDialog}
+                disabled={bulkPending}
+                className="rounded-lg border border-[var(--hairline)] bg-white px-3 py-1.5 font-medium transition-colors hover:bg-[var(--tint)] disabled:opacity-50"
+              >
+                {bulkPending ? "Working…" : "Archive"}
+              </button>
+            )}
+          />
+          <ConfirmDialog
+            title={`Never contact ${selected.size} prospect${selected.size === 1 ? "" : "s"}?`}
+            description="Adds each prospect's LinkedIn profile to your suppression list permanently and cancels their queued drafts. No agent or teammate can ever message them again. This cannot be undone."
+            confirmLabel="Suppress"
+            destructive
+            onConfirm={() => runBulk(bulkSuppressLeads, "Suppressed")}
+            trigger={(openDialog) => (
+              <button
+                type="button"
+                onClick={openDialog}
+                disabled={bulkPending}
+                className="rounded-lg border border-transparent px-3 py-1.5 font-medium text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-50"
+              >
+                Suppress
+              </button>
+            )}
+          />
+          <button
+            type="button"
+            onClick={() => setSelected(new Set())}
+            className="ml-auto text-muted-foreground underline underline-offset-2 hover:text-foreground"
+          >
+            Clear
+          </button>
+        </div>
+      )}
+
       {/* Content region. overflow-x-hidden is the hard guarantee against sideways scroll;
           the fixed-layout table below cannot exceed its container anyway. Vertical overflow
           only ever happens on very short windows (page size fits a normal screen). */}
@@ -353,27 +599,27 @@ export function LeadsTable({
         <table className="w-full table-fixed text-sm">
           <thead className="sticky top-0 z-10 text-left text-[11px] uppercase tracking-wide text-muted-foreground">
             <tr>
-              <Th first className="w-[24%]">
-                Prospect
+              <Th first className="w-[4%]">
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  onChange={toggleAll}
+                  aria-label="Select all on this page"
+                  className="size-4 accent-[var(--cyan-strong)]"
+                />
               </Th>
-              <Th className="hidden w-[15%] sm:table-cell">Company</Th>
-              <Th className="hidden w-[23%] md:table-cell">Why now</Th>
+              <Th className="w-[21%]">Prospect</Th>
+              <Th className="hidden w-[14%] sm:table-cell">
+                <SortHeaderLink active={sort === "company"} href={sortHref("company")}>Company</SortHeaderLink>
+              </Th>
+              <Th className="hidden w-[22%] md:table-cell">Why now</Th>
               <Th className="w-[11%]">Status</Th>
               <Th className="w-[8%]">
-                <Link
-                  href={sortHref(sort === "score" ? "newest" : "score")}
-                  className={cn(
-                    "inline-flex items-center gap-1 transition-colors hover:text-foreground",
-                    sort === "score" && "text-foreground"
-                  )}
-                >
-                  Score
-                  <ArrowDown className={cn("size-3", sort !== "score" && "opacity-30")} aria-hidden />
-                </Link>
+                <SortHeaderLink active={sort === "score"} href={sortHref("score")}>Score</SortHeaderLink>
               </Th>
               <Th className="hidden w-[8%] xl:table-cell">Worth</Th>
               <Th last className="hidden w-[11%] lg:table-cell">
-                Last activity
+                <SortHeaderLink active={sort === "activity"} href={sortHref("activity")}>Last activity</SortHeaderLink>
               </Th>
             </tr>
           </thead>
@@ -389,8 +635,20 @@ export function LeadsTable({
                 <tr
                   key={lead.id}
                   onClick={() => open(lead)}
-                  className="cursor-pointer border-t border-[var(--hairline)] transition-colors hover:bg-[var(--cyan-tint)]/50"
+                  className={cn(
+                    "cursor-pointer border-t border-[var(--hairline)] transition-colors hover:bg-[var(--cyan-tint)]/50",
+                    selected.has(lead.id) && "bg-[var(--cyan-tint)]/30"
+                  )}
                 >
+                  <td className={cn("px-4", cellY)} onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      checked={selected.has(lead.id)}
+                      onChange={() => toggleOne(lead.id)}
+                      aria-label={`Select ${leadName(lead)}`}
+                      className="size-4 accent-[var(--cyan-strong)]"
+                    />
+                  </td>
                   <td className={cn("overflow-hidden px-4", cellY)}>
                     <div className="flex min-w-0 items-center gap-2">
                       <p className="truncate font-medium">{leadName(lead)}</p>

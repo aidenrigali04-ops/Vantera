@@ -34,3 +34,7 @@ Each prospect appears once, with their full conversation underneath — the exac
 - **Suppressed** → the contact was added to your suppression list, so the message was held back.
 
 If your Outreach Agent is set to **automatic** sending, clean drafts skip the queue and send for you. A style-flagged draft gets one automatic fix pass first — the same rewrite the **Fix** button runs — and if the corrected copy passes the style check it sends on its own. Anything that still carries a flag after the fix comes to you in the queue instead; flagged copy is never sent without your eyes on it. The **Processed** tab is where you see exactly what went out: the full copy of every message and the replies it earned, so automatic never means invisible.
+
+## Working the queue faster
+
+The queue is fully keyboard-driven: press **j**/**k** to move between prospects, **Enter** to open one, **a** to approve, **d** to decline, and **e** to edit — press **?** anytime for the map. Large backlogs paginate 50 drafts at a time, so every draft is always reachable.
