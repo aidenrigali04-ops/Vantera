@@ -185,6 +185,17 @@ export function OutreachDiagnosis({ vm }: { vm: OutreachDiagnosisVM }) {
         </div>
       )}
 
+      {/* Stage 2: the buyer segment being prioritized — shown only once a segment has real
+          sample behind it, with the actual counts (never an invented focus). */}
+      {vm.targetingFocus && (
+        <p className="mt-4 rounded-lg bg-[var(--cyan-tint)]/50 px-3.5 py-2.5 text-sm text-muted-foreground">
+          Prioritizing <span className="font-medium text-foreground">{vm.targetingFocus.label}</span>:{" "}
+          {vm.targetingFocus.deep} of {vm.targetingFocus.n} replied interested or booked, ahead of{" "}
+          {vm.targetingFocus.baselineDeep} in {vm.targetingFocus.baselineN} overall. Vera sources
+          more of them and moves them to the front of the queue.
+        </p>
+      )}
+
       <div className="mt-5 space-y-2.5">
         {funnel.map((s) => (
           <StageRow key={s.key} stage={s} highlight={diagnosis.stageKey === s.key} />

@@ -5,11 +5,14 @@ import {
   recommendForDiagnosis,
   describeStrategy,
   proposeChallengerStrategy,
+  buildTargetingProfile,
+  topTiltSegment,
   type OutreachDiagnosis,
   type OutreachFunnelStage,
   type OutreachRecommendation,
   type FunnelStageKey,
   type CopyStrategy,
+  type TargetingRow,
 } from "@vantera/agent-brains";
 
 // Phase 1 of the self-optimizing loop (docs/superpowers/specs/2026-06-29-self-optimizing-outreach-
@@ -42,6 +45,15 @@ export type OutreachDiagnosisVM = {
     /** real message-level receipts (Stage 1): sends stamped with the CURRENT playbook version.
      *  null until at least one stamped send exists — numbers are never invented. */
     receipts: { sent: number; interested: number } | null;
+  } | null;
+  /** Stage 2: the buyer segment Vera is prioritizing, with the real numbers behind it.
+   *  Null until a segment passes the sample floor — never an invented focus. */
+  targetingFocus: {
+    label: string;
+    deep: number;
+    n: number;
+    baselineDeep: number;
+    baselineN: number;
   } | null;
 };
 
@@ -168,6 +180,49 @@ export async function loadOutreachDiagnosis(db: SupabaseClient): Promise<Outreac
         }
       : null;
 
+  // Stage 2 targeting focus: the account's own invited-lead outcomes, bucketed by segment.
+  // Rendered only when a segment passes the sample floor — the numbers are always real.
+  let targetingFocus: OutreachDiagnosisVM["targetingFocus"] = null;
+  if (invited > 0) {
+    const { data: invitedLeads } = await db
+      .from("leads")
+      .select("id, title, industry, linkedin_connected_at, meeting_booked_at")
+      .not("linkedin_invited_at", "is", null);
+    const interestedIds = new Set(
+      ((interestedRes.data ?? []) as { lead_id: string }[]).map((r) => r.lead_id)
+    );
+    const rows: TargetingRow[] = (
+      (invitedLeads ?? []) as {
+        id: string;
+        title: string | null;
+        industry: string | null;
+        linkedin_connected_at: string | null;
+        meeting_booked_at: string | null;
+      }[]
+    ).map((l) => ({
+      title: l.title,
+      industry: l.industry,
+      flags: {
+        invited: true,
+        accepted: l.linkedin_connected_at != null,
+        interested: interestedIds.has(l.id),
+        negative: false,
+        booked: l.meeting_booked_at != null,
+        converted: false,
+      },
+    }));
+    const top = topTiltSegment(buildTargetingProfile(rows));
+    if (top) {
+      targetingFocus = {
+        label: top.label,
+        deep: top.stat.deep,
+        n: top.stat.n,
+        baselineDeep: top.baseline.deep,
+        baselineN: top.baseline.n,
+      };
+    }
+  }
+
   return {
     funnel,
     diagnosis,
@@ -176,5 +231,6 @@ export async function loadOutreachDiagnosis(db: SupabaseClient): Promise<Outreac
     experiment,
     experimentOffer,
     lastAdoption,
+    targetingFocus,
   };
 }

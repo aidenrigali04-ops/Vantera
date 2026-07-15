@@ -58,6 +58,15 @@ the panel shows the real numbers behind it: how many messages have gone out unde
 approach and how many earned an interested reply. The numbers are always your real results —
 never estimates, and never shown before at least one message has actually been sent.
 
+## Vera learns who your real buyers are
+
+Every outcome also teaches Vera who to go after. When certain kinds of buyers — a seniority, an
+industry — keep accepting, replying, and booking, Vera sources more of them and moves them to the
+front of the queue. The quality bar never changes: every lead still has to pass the same
+qualification score, and totals never increase. Vera just spends your outreach where your real
+buyers are. This only kicks in once there's enough of your own data to trust (a handful of real
+outcomes per group), and the panel shows you exactly which group is being prioritized and why.
+
 ## Vera remembers what wins
 
 Openers from your own account that earned interested replies become part of Vera's memory. When
