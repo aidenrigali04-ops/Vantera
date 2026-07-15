@@ -40,6 +40,12 @@ Batched/deduped per lead-event, quiet-hours aware, honest copy. Owner action: ve
 3. **Conversion-token path**: delete the dead route + store methods (tokens are never minted) OR mint tokens on booking-link sends — decision: DELETE for now (YAGNI; manual close + CRM push is the real path), keep the migration table dormant.
 4. **Intent gate**: enforce `features.intent` at deploy + onboarding provisioning (Starter/trial keep Scout signals; Intent agent becomes the real Growth differentiator it's priced as). Existing prod intent agents are grandfathered (no retroactive pausing).
 
+### L5 — Pricing restructure (owner decision 2026-07-15): two plans
+1. **All Access — $79/mo**: everything (Scout + Outreach + Intent, self-optimizing engine, CRM push). Limits inherit the old Growth shape (3 seats, 5 LinkedIn senders, 10 campaigns) with the existing add-ons for more; 7-day trial unchanged. **Reuses the existing Growth $79 Stripe price** (no new Stripe product needed for launch; annual variant follows the existing annual mechanics).
+2. **Enterprise — book a meeting**: custom volume/seats/senders, dedicated success; CTA = the demo/booking path, no self-serve checkout.
+3. Existing accounts: grandfathered (starter stays functional; no forced migration). `PLAN_DISPLAY`/`PLAN_DISPLAY_ORDER` become the single source again → landing teaser, /pricing, /ai-info, llms.txt, FAQ all follow.
+4. **Supersedes the L4 intent-gate item**: under all-access the Intent Agent is legitimately included for every paying/trialing account — the unenforced gate stops being a lie by pricing design rather than by new enforcement code.
+
 ## P1 backlog (next after L1–L4; not in scope here)
 Revenue actuals (sum real `deal_value_cents`), safety/pacing visibility panel, invite withdrawal hygiene, bulk approve, trial-starts-on-activation, calendar-provider webhooks, role management, password change, CSV export.
 
