@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { Bell, CheckCircle2, Flame, MessageSquare, Snowflake, UserRound, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -13,6 +14,7 @@ export type AppNotification = {
   verb: string;
   at: string;
   href: string;
+  unread: boolean;
 };
 
 const KIND_ICON: Record<AppNotification["kind"], LucideIcon> = {
@@ -40,19 +42,28 @@ function initials(name: string): string {
 }
 
 /**
- * Dock-rail notification bell — avatar notifications for unread lead events (a reply
- * paused the sequence, a lead converted, a lead went cold, a fresh buying signal).
- * Opening marks them read, so the badge is a true "needs your attention" count.
+ * Dock-rail notification bell — avatar notifications for lead events (a reply landed, a
+ * lead converted, a lead went cold, a fresh buying signal, a thread needs the human).
+ *
+ * The overlay renders through a PORTAL with fixed positioning: the dock rail scrolls
+ * (overflow-y-auto), and an overflow container clips absolutely-positioned children —
+ * the old in-place popover opened invisibly behind it (the "clicking does nothing" bug).
+ * Each item deep-links to the exact lead/page the event lives on. Opening marks only the
+ * unread items read; the feed keeps recent history so the click is always rewarded.
  */
 export function NotificationsBell({ notifications }: { notifications: AppNotification[] }) {
   const [open, setOpen] = useState(false);
-  const [unread, setUnread] = useState(notifications.length);
-  const ref = useRef<HTMLDivElement>(null);
+  const [unread, setUnread] = useState(notifications.filter((n) => n.unread).length);
+  const [seen, setSeen] = useState<Set<string>>(new Set());
+  const [anchor, setAnchor] = useState<{ top: number; left: number } | null>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
     function onDown(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      const t = e.target as Node;
+      if (!panelRef.current?.contains(t) && !buttonRef.current?.contains(t)) setOpen(false);
     }
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") setOpen(false);
@@ -67,16 +78,26 @@ export function NotificationsBell({ notifications }: { notifications: AppNotific
 
   function toggle() {
     const next = !open;
+    if (next && buttonRef.current) {
+      const r = buttonRef.current.getBoundingClientRect();
+      // clamp so a bell low in the rail never pushes the panel off-screen
+      setAnchor({ top: Math.min(r.top, window.innerHeight - 420), left: r.right + 12 });
+    }
     setOpen(next);
-    if (next && notifications.length > 0) {
+    const unreadIds = notifications.filter((n) => n.unread && !seen.has(n.id)).map((n) => n.id);
+    if (next && unreadIds.length > 0) {
       setUnread(0);
-      void markNotificationsRead(notifications.map((n) => n.id));
+      setSeen((s) => new Set([...s, ...unreadIds]));
+      void markNotificationsRead(unreadIds);
     }
   }
 
+  const isUnread = (n: AppNotification) => n.unread && !seen.has(n.id);
+
   return (
-    <div ref={ref} className="relative">
+    <>
       <button
+        ref={buttonRef}
         type="button"
         onClick={toggle}
         aria-label="Notifications"
@@ -94,52 +115,67 @@ export function NotificationsBell({ notifications }: { notifications: AppNotific
         )}
       </button>
 
-      {open && (
-        <div className="absolute left-full top-0 z-50 ml-3 w-80 rounded-2xl border border-[var(--hairline)] bg-white p-2 shadow-[var(--shadow-lift)]">
-          <p className="px-2 py-1.5 text-[11px] uppercase tracking-[0.18em] text-[var(--ink-4)]">
-            Notifications
-          </p>
-          {notifications.length === 0 ? (
-            <p className="px-2 py-6 text-center text-sm text-muted-foreground">You&apos;re all caught up.</p>
-          ) : (
-            <ul className="max-h-80 overflow-y-auto">
-              {notifications.map((n) => {
-                const Icon = KIND_ICON[n.kind];
-                return (
-                  <li key={n.id}>
-                    <Link
-                      href={n.href}
-                      onClick={() => setOpen(false)}
-                      className="flex items-center gap-3 rounded-xl px-2 py-2 transition-colors hover:bg-[var(--cyan-tint)]/50"
-                    >
-                      <span className="relative shrink-0">
-                        <span className="grid size-9 place-items-center rounded-full bg-foreground/[0.06] text-[12px] font-semibold text-[var(--ink-2)]">
-                          {initials(n.who)}
+      {open &&
+        anchor &&
+        createPortal(
+          <div
+            ref={panelRef}
+            style={{ top: anchor.top, left: anchor.left }}
+            className="fixed z-50 w-80 rounded-2xl border border-[var(--hairline)] bg-white p-2 shadow-[var(--shadow-lift)]"
+          >
+            <p className="px-2 py-1.5 text-[11px] uppercase tracking-[0.18em] text-[var(--ink-4)]">
+              Notifications
+            </p>
+            {notifications.length === 0 ? (
+              <p className="px-2 py-6 text-center text-sm text-muted-foreground">
+                Nothing yet — lead events show up here as they happen.
+              </p>
+            ) : (
+              <ul className="max-h-96 overflow-y-auto">
+                {notifications.map((n) => {
+                  const Icon = KIND_ICON[n.kind];
+                  return (
+                    <li key={n.id}>
+                      <Link
+                        href={n.href}
+                        onClick={() => setOpen(false)}
+                        className={cn(
+                          "flex items-center gap-3 rounded-xl px-2 py-2 transition-colors hover:bg-[var(--cyan-tint)]/50",
+                          isUnread(n) && "bg-[var(--cyan-tint)]/35"
+                        )}
+                      >
+                        <span className="relative shrink-0">
+                          <span className="grid size-9 place-items-center rounded-full bg-foreground/[0.06] text-[12px] font-semibold text-[var(--ink-2)]">
+                            {initials(n.who)}
+                          </span>
+                          <span
+                            className={cn(
+                              "absolute -bottom-0.5 -right-0.5 grid size-4 place-items-center rounded-full ring-2 ring-white",
+                              KIND_BADGE[n.kind]
+                            )}
+                          >
+                            <Icon className="size-2.5" />
+                          </span>
                         </span>
-                        <span
-                          className={cn(
-                            "absolute -bottom-0.5 -right-0.5 grid size-4 place-items-center rounded-full ring-2 ring-white",
-                            KIND_BADGE[n.kind]
-                          )}
-                        >
-                          <Icon className="size-2.5" />
+                        <span className="min-w-0 flex-1">
+                          <span className="flex items-center gap-2">
+                            <span className="truncate text-sm font-medium text-foreground">{n.who}</span>
+                            {isUnread(n) && (
+                              <span aria-label="unread" className="size-1.5 shrink-0 rounded-full bg-[var(--cyan-strong)]" />
+                            )}
+                            <span className="ml-auto shrink-0 text-[10px] text-[var(--ink-4)]">{n.at}</span>
+                          </span>
+                          <span className="line-clamp-1 text-xs text-muted-foreground">{n.verb}</span>
                         </span>
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="flex items-center gap-2">
-                          <span className="truncate text-sm font-medium text-foreground">{n.who}</span>
-                          <span className="ml-auto shrink-0 text-[10px] text-[var(--ink-4)]">{n.at}</span>
-                        </span>
-                        <span className="line-clamp-1 text-xs text-muted-foreground">{n.verb}</span>
-                      </span>
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </div>
-      )}
-    </div>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>,
+          document.body
+        )}
+    </>
   );
 }

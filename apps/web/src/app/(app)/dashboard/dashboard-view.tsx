@@ -7,6 +7,8 @@ import {
   ArrowRight,
   CheckCircle2,
   Circle,
+  Crosshair,
+  FlaskConical,
   Inbox,
   MessageSquare,
   PartyPopper,
@@ -89,15 +91,33 @@ export interface DashboardViewProps {
   conversionWin: { id: string; leadName: string } | null;
   replyWin: { id: string; leadName: string } | null;
   prospects: Prospect[];
+  /** interested replies still WAITING on the user (answered ones are filtered server-side) */
   recentReplies: ReplyRow[];
-  interested: number;
+  repliesWaiting: number;
   channels: { liStatus: string | null };
   week: { sends: number; li: number; replies: number };
   attribution: SignalAttribution[];
-  /** Vera's visible heartbeat (Stage 0): the current test + the latest adoption */
-  whatsWorking: { testingLabel: string | null; adoptedLabel: string | null };
+  /** Vera's learning log — the self-optimizing loop's visible heartbeat, all real data */
+  learning: LearningProps;
   /** matched starter plays — fill the waiting states with proven competence, honestly labeled */
   plays: { slug: string; name: string; description: string; sourceLabel: string }[];
+}
+
+export interface LearningProps {
+  playbookVersion: number | null;
+  testing: {
+    label: string;
+    stageLabel: string;
+    startedAgo: string;
+    enrolled: number;
+    targetEnrolled: number;
+  } | null;
+  adopted: {
+    label: string;
+    whenAgo: string;
+    receipts: { sent: number; interested: number } | null;
+  } | null;
+  focus: { label: string; deep: number; n: number } | null;
 }
 
 export function DashboardView(props: DashboardViewProps) {
@@ -188,7 +208,7 @@ function WorkingDashboard(props: DashboardViewProps) {
     agents,
     week,
     recentReplies,
-    interested,
+    repliesWaiting,
   } = props;
 
   return (
@@ -231,57 +251,118 @@ function WorkingDashboard(props: DashboardViewProps) {
         goalCents={goalCents}
       />
 
-      {/* Vera's heartbeat (Stage 0) — the current test and the latest adoption, one glance. */}
-      <WhatsWorkingStrip whatsWorking={props.whatsWorking} />
+      {/* Vera's learning log — the self-optimizing loop's visible heartbeat, one glance. */}
+      <LearningLog learning={props.learning} />
 
       {/* Reassure — the agent heartbeat + the warm replies that reward the daily check-in. Paired
           in a balanced two-up row so neither one's height drags a gap into the primary content. */}
       <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
         <AgentsPanel agents={agents} scoutLive={scoutLive} scoutLastRunLabel={scoutLastRunLabel} />
-        <WarmReplies recentReplies={recentReplies} interested={interested} />
+        <WarmReplies recentReplies={recentReplies} repliesWaiting={repliesWaiting} />
       </div>
     </Reveal>
   );
 }
 
-/** Vera's visible loop on the Overview (Stage 0): the current test and the latest adoption,
- *  linking into the full What's-working panel on Analytics. Hidden until either exists. */
-function WhatsWorkingStrip({
-  whatsWorking,
-}: {
-  whatsWorking: DashboardViewProps["whatsWorking"];
-}) {
-  const { testingLabel, adoptedLabel } = whatsWorking;
-  if (!testingLabel && !adoptedLabel) return null;
+/**
+ * Vera's learning log — the self-optimizing loop made visible (retention brief: variable
+ * reward + goal-gradient against the silent-wait cliff). Every row is a real, timestamped
+ * fact: the live test with enrollment progress toward its decision sample, the latest
+ * adoption with its real receipts, and the buyer segment being prioritized. Hidden only
+ * when the loop has nothing yet (pre-onboarding).
+ */
+function LearningLog({ learning }: { learning: LearningProps }) {
+  const { playbookVersion, testing, adopted, focus } = learning;
+  if (!testing && !adopted && !focus) return null;
+  const pct = testing
+    ? Math.min(100, Math.round((testing.enrolled / Math.max(1, testing.targetEnrolled)) * 100))
+    : 0;
   return (
     <RevealItem className={cn(PANEL_SURFACE, "p-5")} data-copilot="dashboard-whats-working">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="min-w-0">
-          <Eyebrow>What&apos;s working</Eyebrow>
-          <p className="mt-2 text-sm text-muted-foreground">
-            {adoptedLabel && (
-              <>
-                Vera adopted <span className="font-medium text-foreground">{adoptedLabel}</span>{" "}
-                after it won its test.{" "}
-              </>
-            )}
-            {testingLabel ? (
-              <>
-                Right now Vera is testing{" "}
-                <span className="font-medium text-foreground">{testingLabel}</span> on a small
-                slice of new drafts — kept only if it genuinely wins.
-              </>
-            ) : (
-              <>Vera is watching the results and lines up the next test on its own.</>
-            )}
-          </p>
+        <div className="flex items-center gap-2.5">
+          <Eyebrow>Vera is learning</Eyebrow>
+          {playbookVersion !== null && (
+            <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">
+              Playbook v{playbookVersion}
+            </Badge>
+          )}
         </div>
         <Button asChild variant="outline" size="sm" className="shrink-0">
           <Link href="/dashboard?view=analytics">
-            See the numbers <ArrowRight className="size-4" />
+            See the full loop <ArrowRight className="size-4" />
           </Link>
         </Button>
       </div>
+
+      <ul className="mt-4 flex flex-col gap-3">
+        {testing && (
+          <li className="flex items-start gap-3">
+            <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-full bg-[var(--cyan-tint)] text-[var(--cyan-strong)]">
+              <FlaskConical className="size-3.5" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm text-foreground">
+                Testing <span className="font-medium">{testing.label}</span>
+                <span className="text-muted-foreground"> — measured on {testing.stageLabel}</span>
+              </p>
+              <div className="mt-1.5 flex items-center gap-3">
+                <span className="h-1.5 w-40 overflow-hidden rounded-full bg-foreground/[0.08]">
+                  <span
+                    className="block h-full rounded-full bg-[var(--cyan-strong)] transition-[width]"
+                    style={{ width: `${pct}%` }}
+                  />
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  {testing.enrolled} of ~{testing.targetEnrolled} prospects enrolled · decides on
+                  real outcomes · started {testing.startedAgo}
+                </span>
+              </div>
+            </div>
+          </li>
+        )}
+
+        {adopted && (
+          <li className="flex items-start gap-3">
+            <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-full bg-[var(--positive)]/12 text-[var(--positive)]">
+              <CheckCircle2 className="size-3.5" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm text-foreground">
+                Adopted <span className="font-medium">{adopted.label}</span>
+                <span className="text-muted-foreground">
+                  {" "}
+                  — won its test {adopted.whenAgo}, now your default
+                </span>
+              </p>
+              {adopted.receipts && (
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Since the change: {adopted.receipts.sent}{" "}
+                  {adopted.receipts.sent === 1 ? "message" : "messages"} sent
+                  {adopted.receipts.interested > 0 && (
+                    <> · {adopted.receipts.interested} interested</>
+                  )}
+                </p>
+              )}
+            </div>
+          </li>
+        )}
+
+        {focus && (
+          <li className="flex items-start gap-3">
+            <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-full bg-[var(--cyan-tint)] text-[var(--cyan-strong)]">
+              <Crosshair className="size-3.5" />
+            </span>
+            <p className="min-w-0 flex-1 text-sm text-foreground">
+              Prioritizing <span className="font-medium">{focus.label}</span>
+              <span className="text-muted-foreground">
+                {" "}
+                — {focus.deep} of {focus.n} went interested or booked, your strongest segment
+              </span>
+            </p>
+          </li>
+        )}
+      </ul>
     </RevealItem>
   );
 }
@@ -359,7 +440,7 @@ function KpiStrip({
     <RevealItem className="grid grid-cols-2 gap-3 sm:grid-cols-4">
       <KpiTile href="/dashboard?view=pipeline" label="Closed" value={closed} sub={closedSub} hero />
       <KpiTile href="/dashboard?view=pipeline" label="In pipeline" value={pipeline} sub={pipelineSub} />
-      <KpiTile href="/leads?tab=replied" label="Replies" value={String(repliesThisWeek)} sub="this week" />
+      <KpiTile href="/leads?tab=replied" label="Warm replies" value={String(repliesThisWeek)} sub="this week" />
       <KpiTile
         href="/review"
         label="To review"
@@ -593,26 +674,33 @@ function AgentsPanel({
 }
 
 /** Warm replies — the variable reward that anchors the daily habit loop. */
+/** Interested replies WAITING ON YOU — answered ones are filtered server-side, so this list
+ *  and its badge always match real activity (a handled reply disappears immediately). */
 function WarmReplies({
   recentReplies,
-  interested,
+  repliesWaiting,
 }: {
   recentReplies: ReplyRow[];
-  interested: number;
+  repliesWaiting: number;
 }) {
   return (
     <RevealItem className={cn(PANEL_SURFACE, "p-5")}>
       <div className="flex items-center justify-between gap-2">
-        <Eyebrow>Warm replies</Eyebrow>
-        {interested > 0 && <Badge variant="secondary">{interested}</Badge>}
+        <div className="flex items-center gap-2">
+          <Eyebrow>Warm replies</Eyebrow>
+          {repliesWaiting > 0 && (
+            <span className="text-[11px] text-muted-foreground">waiting on you</span>
+          )}
+        </div>
+        {repliesWaiting > 0 && <Badge variant="secondary">{repliesWaiting}</Badge>}
       </div>
       <div className="mt-4">
         {!recentReplies || recentReplies.length === 0 ? (
           <div className="flex flex-col items-center gap-2 py-6 text-center">
             <MessageSquare className="size-6 text-muted-foreground" />
             <p className="max-w-xs text-sm text-muted-foreground">
-              Interested replies show up here the moment they land. This is the number that matters
-              most.
+              You&apos;re all caught up — interested replies land here the moment they arrive,
+              and disappear once you&apos;ve answered.
             </p>
           </div>
         ) : (

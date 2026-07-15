@@ -16,20 +16,29 @@ import { Suspense } from "react";
 import { TrialBanner, type TrialBannerProps } from "@/components/billing/trial-banner";
 import { trialDaysLeft, isTrialExpired } from "@vantera/billing";
 
-const NOTE_VERB: Record<AppNotification["kind"], string> = {
-  reply: "replied — the sequence paused for you",
-  converted: "booked a meeting",
-  exhausted: "went cold after the full sequence",
-  hot_signal: "is heating up — a fresh buying signal, worth reaching out now",
-  needs_human: "needs YOU — the agent hit its conversation limit, take the thread over",
-};
-const NOTE_HREF: Record<AppNotification["kind"], string> = {
-  reply: "/leads?tab=replied",
-  converted: "/dashboard?view=pipeline",
-  exhausted: "/leads?tab=rejected",
-  hot_signal: "/leads?tab=qualified",
-  needs_human: "/leads?tab=replied",
-};
+/** Honest per-event copy. A reply's body carries its classification (inbound pipeline), so an
+ *  interested reply and a not-interested one read as the different events they are. */
+function noteVerb(kind: AppNotification["kind"], body: string): string {
+  if (kind === "reply") {
+    if (body.includes("not_interested") || body.includes("not interested")) {
+      return "replied — not interested, the sequence stopped";
+    }
+    if (body.includes("interested")) return "replied interested — read it and jump in";
+    return "replied — read it and jump in";
+  }
+  return {
+    converted: "booked a meeting",
+    exhausted: "went cold after the full sequence",
+    hot_signal: "is heating up — a fresh buying signal, worth reaching out now",
+    needs_human: "needs YOU — the agent hit its conversation limit, take the thread over",
+  }[kind];
+}
+
+/** Pin-point navigation: lead-scoped events land on THAT lead's page, not a generic tab. */
+function noteHref(kind: AppNotification["kind"], leadId: string): string {
+  if (kind === "converted") return "/dashboard?view=pipeline";
+  return `/leads/${leadId}`;
+}
 
 // Relative time on the server → passed as a static string (no client Date.now()).
 function noteTimeAgo(iso: string): string {
@@ -55,32 +64,55 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     .eq("status", "pending_review");
   const badges = count && count > 0 ? { review: count } : undefined;
 
-  // Unread lead events for the dock bell (reply paused / converted / exhausted).
+  // Recent lead events for the dock bell — read AND unread, so opening the bell always
+  // rewards the click with the recent history (an unread-only feed goes permanently empty
+  // the moment it's opened once). Unread stays visually distinct; only unread gets marked.
   const { data: notes } = await supabase
     .from("lead_notifications")
-    .select("id, kind, lead_id, created_at")
-    .is("read_at", null)
+    .select("id, kind, lead_id, body, created_at, read_at")
     .order("created_at", { ascending: false })
-    .limit(8)
-    .returns<{ id: string; kind: AppNotification["kind"]; lead_id: string; created_at: string }[]>();
+    .limit(20)
+    .returns<
+      {
+        id: string;
+        kind: AppNotification["kind"];
+        lead_id: string;
+        body: string;
+        created_at: string;
+        read_at: string | null;
+      }[]
+    >();
   const noteLeadIds = [...new Set((notes ?? []).map((n) => n.lead_id))];
   const { data: noteLeads } = noteLeadIds.length
     ? await supabase
         .from("leads")
-        .select("id, first_name, company_name")
+        .select("id, first_name, last_name, company_name")
         .in("id", noteLeadIds)
-        .returns<{ id: string; first_name: string | null; company_name: string | null }[]>()
-    : { data: [] as { id: string; first_name: string | null; company_name: string | null }[] };
+        .returns<
+          { id: string; first_name: string | null; last_name: string | null; company_name: string | null }[]
+        >()
+    : {
+        data: [] as {
+          id: string;
+          first_name: string | null;
+          last_name: string | null;
+          company_name: string | null;
+        }[],
+      };
   const noteName = new Map(
-    (noteLeads ?? []).map((l) => [l.id, l.company_name || l.first_name || "A lead"])
+    (noteLeads ?? []).map((l) => [
+      l.id,
+      [l.first_name, l.last_name].filter(Boolean).join(" ") || l.company_name || "A lead",
+    ])
   );
   const notifications: AppNotification[] = (notes ?? []).map((n) => ({
     id: n.id,
     kind: n.kind,
     who: noteName.get(n.lead_id) ?? "A lead",
-    verb: NOTE_VERB[n.kind],
+    verb: noteVerb(n.kind, n.body ?? ""),
     at: noteTimeAgo(n.created_at),
-    href: NOTE_HREF[n.kind],
+    href: noteHref(n.kind, n.lead_id),
+    unread: n.read_at === null,
   }));
 
   // Soft-lock trial strip: a live countdown while trialing, a clear "paused" state once

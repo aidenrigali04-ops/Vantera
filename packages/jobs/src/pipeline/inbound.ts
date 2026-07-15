@@ -57,11 +57,13 @@ async function applyGenuineReply(
     // LinkedIn-native writer for the funnel's Meetings stage (the removed caller used to do this).
     await store.markMeetingBooked(lead.id, now);
   }
+  // body carries the machine-readable classification — the app layer maps it to honest
+  // human copy (an interested reply and a not-interested one are different events).
   await store.insertLeadNotification({
     accountId,
     leadId: lead.id,
     kind: "reply",
-    body: `${lead.id} replied${verdict.classification === "not_interested" ? " (not interested)" : ""}.`,
+    body: verdict.classification,
   });
 }
 
