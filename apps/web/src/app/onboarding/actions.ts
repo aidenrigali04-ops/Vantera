@@ -191,9 +191,9 @@ export async function findFirstLeads(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
-  if (!user.email_confirmed_at) {
-    return { error: "Confirm your email to start — check your inbox for the verification link." };
-  }
+  // Email-verification gate removed (P2 trap, 2026-07-15): signup auto-confirms via the
+  // admin API, so this branch could only ever dead-end a user waiting for an email that is
+  // never sent. Re-add only if signup switches to real email confirmation.
 
   const { data: account } = await supabase
     .from("accounts")

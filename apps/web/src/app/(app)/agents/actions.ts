@@ -196,9 +196,9 @@ export async function deployIntentAgent(
 
   const { supabase, user, account } = await sessionAccount();
   if (!user || !account) return { error: "Your session expired. Sign in again." };
-  if (!user.email_confirmed_at) {
-    return { error: "Confirm your email to deploy your agent — check your inbox for the verification link." };
-  }
+  // Email-verification gate removed (P2 trap, 2026-07-15): signup auto-confirms via the
+  // admin API, so this branch could only ever dead-end a user waiting for an email that is
+  // never sent. Re-add only if signup switches to real email confirmation.
 
   const billingRow = await loadBillingRow(supabase);
   if (!hasActivePlan(billingRow)) redirect("/settings/billing?reason=deploy");
