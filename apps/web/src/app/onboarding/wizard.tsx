@@ -34,6 +34,7 @@ export type WizardInit = {
     icp: string;
     revenueGoal: string;
     avgDealValue: string;
+    bookingUrl: string;
   };
 };
 
@@ -453,6 +454,25 @@ export function Wizard({ init }: { init: WizardInit }) {
                             <Input name="avgDealValue" value={values.avgDealValue} onChange={(e) => setValues({ ...values, avgDealValue: e.target.value })} placeholder="5,000" inputMode="decimal" required className={FIELD} />
                           </Field>
                         </div>
+                        {/* L1 meeting layer: the conversion-critical fact. Required with an
+                            honest escape hatch — skipping creates a dashboard task, not silence. */}
+                        <Field
+                          label="Where should interested buyers book you?"
+                          hint="Your Calendly, cal.com, or any scheduling link. Vera offers it the moment a prospect shows interest — it's how conversations become meetings."
+                        >
+                          <Input
+                            name="bookingUrl"
+                            value={values.bookingUrl}
+                            onChange={(e) => setValues({ ...values, bookingUrl: e.target.value })}
+                            placeholder="https://cal.com/you/intro"
+                            inputMode="url"
+                            className={FIELD}
+                          />
+                          <label className="mt-2 flex items-center gap-2 text-[12.5px] text-[var(--ink-3)]">
+                            <input type="checkbox" name="noBookingUrl" className="size-3.5" />
+                            I don&apos;t have one yet — remind me on the dashboard
+                          </label>
+                        </Field>
                         <FormError message={findState.error} />
                         <p className="rounded-xl bg-[var(--tint)] px-4 py-3 text-[12.5px] leading-relaxed text-[var(--ink-3)]">
                           This is the last step — it puts Vera to work: your Prospect, Outreach, and Intent

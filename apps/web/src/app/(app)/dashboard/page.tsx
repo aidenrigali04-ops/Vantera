@@ -544,6 +544,19 @@ async function OverviewTab() {
   // of silence (honest source labels; server-computed).
   const plays = playCards({ industry: account.onboarding_industry, icp: account.onboarding_icp });
 
+  // L1 meeting layer: interested buyers need somewhere to book. A live Outreach agent with no
+  // bookingUrl is the single most conversion-critical config gap (prod 2026-07-15: 0/3 set,
+  // 10 interested replies, 0 meetings ever) — nag until it's set.
+  const { data: copyAgentRow } = await supabase
+    .from("agents")
+    .select("config")
+    .eq("kind", "copy")
+    .eq("status", "live")
+    .limit(1)
+    .maybeSingle<{ config: { bookingUrl?: string | null } | null }>();
+  const needsBookingUrl =
+    copyAgentRow != null && !(copyAgentRow.config?.bookingUrl ?? "").trim();
+
   return (
     <DashboardView
       firstName={firstName}
@@ -580,6 +593,7 @@ async function OverviewTab() {
       week={{ sends: sendsWeek, li: liWeek, replies: repliesWeek }}
       attribution={signalAttribution}
       learning={learning}
+      needsBookingUrl={needsBookingUrl}
       plays={plays}
     />
   );

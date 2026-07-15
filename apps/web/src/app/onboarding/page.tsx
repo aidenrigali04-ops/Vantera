@@ -88,6 +88,7 @@ export default async function OnboardingPage({
       icp,
       revenueGoal: centsToDollars(account?.revenue_goal_cents ?? null),
       avgDealValue: centsToDollars(account?.avg_deal_value_cents ?? null),
+      bookingUrl: "",
     },
   };
 

@@ -174,6 +174,18 @@ export async function findFirstLeads(
   });
   if (!result.ok) return { error: result.error };
 
+  // L1 meeting layer: where interested buyers book. Required unless the user takes the
+  // honest escape hatch ("I don't have one yet") — then a dashboard task card nags until set.
+  const bookingUrlRaw = String(formData.get("bookingUrl") ?? "").trim();
+  const noBookingUrl = String(formData.get("noBookingUrl") ?? "") === "on";
+  if (!noBookingUrl) {
+    if (!bookingUrlRaw) return { error: "Add your booking link — or tick “I don't have one yet.”" };
+    if (!/^https:\/\/\S+\.\S+/.test(bookingUrlRaw)) {
+      return { error: "The booking link must be a full https:// URL." };
+    }
+  }
+  const bookingUrl = noBookingUrl ? null : bookingUrlRaw;
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -264,7 +276,7 @@ export async function findFirstLeads(
       kind: "copy",
       name: "Outreach",
       status: "live",
-      config: { cta: DEFAULT_CTA, channels: { linkedin: true } },
+      config: { cta: DEFAULT_CTA, channels: { linkedin: true }, bookingUrl },
       campaign_id: campaign.id,
       deployed_at: new Date().toISOString(),
       created_by: user.id,

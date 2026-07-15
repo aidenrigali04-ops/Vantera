@@ -99,6 +99,8 @@ export interface DashboardViewProps {
   attribution: SignalAttribution[];
   /** Vera's learning log — the self-optimizing loop's visible heartbeat, all real data */
   learning: LearningProps;
+  /** L1: a live Outreach agent has no booking link — interested buyers have nowhere to book */
+  needsBookingUrl: boolean;
   /** matched starter plays — fill the waiting states with proven competence, honestly labeled */
   plays: { slug: string; name: string; description: string; sourceLabel: string }[];
 }
@@ -250,6 +252,27 @@ function WorkingDashboard(props: DashboardViewProps) {
         avgDealValueCents={avgDealValueCents}
         goalCents={goalCents}
       />
+
+      {/* L1: the conversion-critical config gap — interested buyers with nowhere to book. */}
+      {props.needsBookingUrl && (
+        <RevealItem className={cn(PANEL_SURFACE, "flex flex-wrap items-center justify-between gap-3 border-amber-500/30 p-5")}>
+          <div className="min-w-0">
+            <Eyebrow>Action needed</Eyebrow>
+            <p className="mt-2 text-sm text-foreground">
+              Interested buyers have nowhere to book you.{" "}
+              <span className="text-muted-foreground">
+                Add your booking link and Vera offers it the moment a prospect shows interest —
+                it&apos;s how conversations become meetings.
+              </span>
+            </p>
+          </div>
+          <Button asChild size="sm" className="shrink-0">
+            <Link href="/agents/copy/edit">
+              Add booking link <ArrowRight className="size-4" />
+            </Link>
+          </Button>
+        </RevealItem>
+      )}
 
       {/* Vera's learning log — the self-optimizing loop's visible heartbeat, one glance. */}
       <LearningLog learning={props.learning} />
