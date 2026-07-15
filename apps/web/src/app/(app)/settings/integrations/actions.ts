@@ -87,23 +87,12 @@ export async function connectDestination(
     return { url };
   }
 
-  // Stub path (no OAuth client configured): create a usable connection directly so the
-  // target/mapping/auto-push/test/disconnect controls are all live against real DB state.
-  const { error } = await supabase.from("crm_connections").upsert(
-    {
-      account_id: accountId,
-      provider,
-      kind: meta.kind,
-      status: "active",
-      external_account_ref: "stub",
-      last_sync_at: new Date().toISOString(),
-      config: defaultConfig,
-    },
-    { onConflict: "account_id,provider" }
-  );
-  if (error) return { error: "Could not connect this destination. Try again shortly." };
-  revalidatePath(PATH);
-  return { success: `${meta.label} connected.` };
+  // No OAuth client configured: say so honestly (L4 trust integrity, spec 2026-07-15).
+  // The old behavior wrote a fake "active"/"stub" row that showed "Connected · healthy"
+  // while pushing nothing — a hollow success is worse than a clear not-yet.
+  return {
+    error: `${meta.label} is finishing certification — the connection opens here the moment it's live.`,
+  };
 }
 
 // ── Disconnect ──────────────────────────────────────────────────────────────────
@@ -244,7 +233,17 @@ export async function testConnection(
   const id = String(formData.get("connectionId") ?? "");
   if (!id) return { error: "Missing connection." };
 
+  // L4: never fabricate health. Stub rows (pre-honesty connects) report the truth.
   const supabase = await createClient();
+  const { data: conn } = await supabase
+    .from("crm_connections")
+    .select("external_account_ref")
+    .eq("id", id)
+    .maybeSingle<{ external_account_ref: string | null }>();
+  if (!conn) return { error: "Missing connection." };
+  if (conn.external_account_ref === "stub") {
+    return { error: "This connection was never completed — the provider link is still being certified. Disconnect it and reconnect once it opens." };
+  }
   const { error } = await supabase
     .from("crm_connections")
     .update({ status: "active", last_error: null, last_sync_at: new Date().toISOString() })

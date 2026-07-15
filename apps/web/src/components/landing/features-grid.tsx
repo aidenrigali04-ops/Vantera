@@ -68,7 +68,7 @@ const FEATURES: Feature[] = [
     label: "CRM",
     title: "Clean CRM handoff",
     line: "Qualified conversations flow straight into your CRM — no copy-paste, no lost context. Vantera fills the pipeline; your CRM keeps it.",
-    chips: ["HubSpot", "Pipedrive", "syncs automatically"],
+    chips: ["HubSpot", "Salesforce", "syncs automatically"],
     icon: CrmSyncIcon,
   },
 ];

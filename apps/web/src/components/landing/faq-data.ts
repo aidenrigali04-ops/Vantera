@@ -31,7 +31,7 @@ export const FAQ_ITEMS: FaqItem[] = [
   },
   {
     q: "Does it sync with my CRM?",
-    a: "Yes. Closed and qualified leads are pushed straight into your CRM, with native connections for HubSpot and Pipedrive so your pipeline stays current without manual data entry. Vantera isn't a CRM itself — it does the finding, qualifying, and outreach, then hands the won conversations to the system your team already runs on.",
+    a: "Yes. Closed and qualified leads are pushed straight into your CRM, with native connections for HubSpot, Salesforce, and more so your pipeline stays current without manual data entry. Vantera isn't a CRM itself — it does the finding, qualifying, and outreach, then hands the won conversations to the system your team already runs on.",
   },
   {
     q: "How fast will I see results?",
