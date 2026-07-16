@@ -52,15 +52,27 @@ export async function addProofPoint(
   return { added: true };
 }
 
-/** Remove one proof fact. RLS admin-manage gates the delete; a stale/foreign id simply matches nothing. */
-export async function removeProofPoint(formData: FormData): Promise<void> {
+/**
+ * Remove one proof fact. RLS admin-manage gates the delete — T5: a 0-row match (member,
+ * stale id) now RETURNS an error instead of silently no-oping and leaving the row on screen.
+ */
+export async function removeProofPoint(formData: FormData): Promise<{ error?: string }> {
   const id = String(formData.get("id") ?? "");
-  if (!id) return;
+  if (!id) return { error: "Missing proof point." };
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return;
-  await supabase.from("proof_points").delete().eq("id", id);
+  if (!user) return { error: "Your session expired. Sign in again." };
+  const { data: deleted, error } = await supabase
+    .from("proof_points")
+    .delete()
+    .eq("id", id)
+    .select("id")
+    .maybeSingle();
+  if (error || !deleted) {
+    return { error: "Could not remove it. Only workspace admins can manage proof points." };
+  }
   revalidatePath("/settings/proof");
+  return {};
 }

@@ -2,10 +2,9 @@ import Link from "next/link";
 import { Quote, ShieldCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AddProofForm } from "./proof-editor";
-import { removeProofPoint } from "./actions";
+import { RemoveProofButton } from "./remove-button";
 
 export const metadata = { title: "Proof & pricing" };
 
@@ -85,12 +84,7 @@ export default async function ProofPointsPage() {
                   )}
                   <p className="text-sm text-pretty">{p.text}</p>
                 </div>
-                <form action={removeProofPoint}>
-                  <input type="hidden" name="id" value={p.id} />
-                  <Button type="submit" variant="ghost" size="sm" className="text-muted-foreground">
-                    Remove
-                  </Button>
-                </form>
+                <RemoveProofButton id={p.id} />
               </div>
             ))}
           </CardContent>

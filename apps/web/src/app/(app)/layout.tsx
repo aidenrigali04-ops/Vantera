@@ -6,6 +6,7 @@ import { resolveGate } from "@/lib/auth/gate";
 import { createClient } from "@/lib/supabase/server";
 import { signOut } from "./actions";
 import { DockNav, DockTooltip, MobileNav } from "@/components/dock-nav";
+import { AccountMenu } from "@/components/account-menu";
 import { VanteraLogo } from "@/components/landing/vantera-logo";
 import { NotificationsBell, type AppNotification } from "@/components/notifications/notifications-bell";
 import CopilotOverlay from "@/components/copilot/copilot-overlay";
@@ -73,6 +74,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { data: notes },
     { data: billing },
     { count: unhealthyConnections },
+    { data: profile },
   ] = await Promise.all([
     supabase
       .from("scheduled_sends")
@@ -110,6 +112,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       .from("linkedin_accounts")
       .select("id", { count: "exact", head: true })
       .in("status", ["disconnected", "restricted"]),
+    // T5: the display name finally shows up where the user lives (account menu) —
+    // it was written in Settings and then never read by any in-app surface.
+    supabase.from("user_profiles").select("display_name").maybeSingle<{ display_name: string | null }>(),
   ]);
   const badges = count && count > 0 ? { review: count } : undefined;
   const noteLeadIds = [...new Set((notes ?? []).map((n) => n.lead_id))];
@@ -232,12 +237,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
         <DockNav badges={badges} />
 
-        {/* Account + sign out, kept in the dock idiom — pinned to the bottom. */}
+        {/* Account menu, kept in the dock idiom — pinned to the bottom. T5: the chip
+            opens a real menu (name, email, Settings, sign out) instead of being a dead
+            span; the display name set in Settings is finally visible in-product. */}
         <div className="mt-auto flex flex-col items-center gap-3 rounded-2xl border border-[var(--nav-line)] bg-white/[0.06] px-2 py-3 backdrop-blur-lg">
-          <span className="group relative grid size-10 place-items-center rounded-full bg-[var(--nav-tile)] text-xs font-semibold text-[var(--nav-fg-strong)] ring-1 ring-[var(--nav-line)]">
-            {initial}
-            <DockTooltip>{email}</DockTooltip>
-          </span>
+          <AccountMenu
+            initial={initial}
+            displayName={profile?.display_name ?? null}
+            email={email}
+            signOut={signOut}
+          />
           <form action={signOut}>
             <button
               type="submit"

@@ -6,6 +6,8 @@ routes: /settings
 
 # Account settings
 
+Your **account menu** (your initial at the bottom of the left rail — or the top bar on mobile) shows your name and email and holds Settings and Sign out. If you're a **member** rather than an admin, the workspace-level cards on this page (Workspace, Booking link, Notifications, the danger zone) show as read-only — only owners and admins can change them.
+
 - **Profile** — your sign-in email, display name, and password.
 - **Workspace** — workspace name plus the industry, ICP, and revenue goal that seed your default campaign targeting. Only workspace admins can change these.
 - **Average value per client** — the recurring monthly revenue one closed client is worth. Optional, but setting it powers the Revenue snapshot on your dashboard (closed and projected MRR against your goal). Leave it blank to track client counts only.

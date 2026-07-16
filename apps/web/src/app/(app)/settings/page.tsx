@@ -73,6 +73,10 @@ export default async function SettingsPage() {
         .maybeSingle<{ id: string; config: { bookingUrl?: string | null } | null }>(),
     ]);
   const emailById = matchMemberEmails(members ?? [], acceptedInvites ?? []);
+  // T5: role-aware surface — members used to see fully-editable admin forms that only
+  // failed on submit (or silently). Admin-only cards now render read-only for members.
+  const myRole = (members ?? []).find((m) => m.user_id === user.id)?.role ?? "member";
+  const canManage = myRole === "owner" || myRole === "admin";
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-6">
@@ -94,17 +98,30 @@ export default async function SettingsPage() {
 
       <Panel className="flex flex-col gap-4">
         <h2 className="font-heading text-base font-semibold">Workspace</h2>
-        <WorkspaceForm
-          name={account.name}
-          industry={account.onboarding_industry ?? ""}
-          icp={account.onboarding_icp ?? ""}
-          revenueGoalDollars={
-            account.revenue_goal_cents ? String(account.revenue_goal_cents / 100) : ""
-          }
-          avgDealValueDollars={
-            account.avg_deal_value_cents ? String(account.avg_deal_value_cents / 100) : ""
-          }
-        />
+        {canManage ? (
+          <WorkspaceForm
+            name={account.name}
+            industry={account.onboarding_industry ?? ""}
+            icp={account.onboarding_icp ?? ""}
+            revenueGoalDollars={
+              account.revenue_goal_cents ? String(account.revenue_goal_cents / 100) : ""
+            }
+            avgDealValueDollars={
+              account.avg_deal_value_cents ? String(account.avg_deal_value_cents / 100) : ""
+            }
+          />
+        ) : (
+          <div className="flex flex-col gap-1.5 text-sm">
+            <p><span className="text-muted-foreground">Name:</span> {account.name}</p>
+            {account.onboarding_industry && (
+              <p><span className="text-muted-foreground">Industry:</span> {account.onboarding_industry}</p>
+            )}
+            {account.onboarding_icp && (
+              <p><span className="text-muted-foreground">ICP:</span> {account.onboarding_icp}</p>
+            )}
+            <p className="mt-1 text-xs text-muted-foreground">Workspace admins manage these settings.</p>
+          </div>
+        )}
       </Panel>
 
       <Panel className="flex flex-col gap-3">
@@ -129,17 +146,34 @@ export default async function SettingsPage() {
           "Action needed" nag deep-links to this anchor. */}
       <Panel id="booking-link" className="flex flex-col gap-4 scroll-mt-6">
         <h2 className="font-heading text-base font-semibold">Booking link</h2>
-        <BookingLinkForm
-          bookingUrl={copyAgent?.config?.bookingUrl ?? ""}
-          hasAgent={copyAgent != null}
-        />
+        {canManage ? (
+          <BookingLinkForm
+            bookingUrl={copyAgent?.config?.bookingUrl ?? ""}
+            hasAgent={copyAgent != null}
+          />
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            {copyAgent?.config?.bookingUrl
+              ? `Vera offers ${copyAgent.config.bookingUrl} once a prospect wants to talk.`
+              : "Not set yet — a workspace admin can add it here."}
+          </p>
+        )}
       </Panel>
 
       <Panel className="flex flex-col gap-4">
         <h2 className="font-heading text-base font-semibold">Notifications</h2>
-        <LeadEventEmailsToggle enabled={prefs?.lead_event_emails_enabled ?? true} />
-        <WeeklySummaryToggle enabled={prefs?.weekly_summary_enabled ?? true} />
-        <LifecycleEmailsToggle enabled={prefs?.lifecycle_emails_enabled ?? true} />
+        {canManage ? (
+          <>
+            <LeadEventEmailsToggle enabled={prefs?.lead_event_emails_enabled ?? true} />
+            <WeeklySummaryToggle enabled={prefs?.weekly_summary_enabled ?? true} />
+            <LifecycleEmailsToggle enabled={prefs?.lifecycle_emails_enabled ?? true} />
+          </>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            Workspace emails (lead events, the weekly summary, account notices) go to owners
+            and admins — an admin manages the toggles here.
+          </p>
+        )}
       </Panel>
 
       <SettingsLink
@@ -173,14 +207,16 @@ export default async function SettingsPage() {
         cta="Manage suppression"
       />
 
-      <DangerZone
-        accountName={account.name}
-        pendingRequest={
-          deletionRequest
-            ? { id: deletionRequest.id, createdAt: deletionRequest.created_at }
-            : null
-        }
-      />
+      {canManage && (
+        <DangerZone
+          accountName={account.name}
+          pendingRequest={
+            deletionRequest
+              ? { id: deletionRequest.id, createdAt: deletionRequest.created_at }
+              : null
+          }
+        />
+      )}
     </div>
   );
 }

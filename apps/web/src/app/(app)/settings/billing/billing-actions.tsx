@@ -1,33 +1,13 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import type { PlanTier } from "@vantera/billing";
-import { startCheckout, openBillingPortal } from "./actions";
-import { trackEvent } from "@/lib/analytics/clarity";
+import { openBillingPortal } from "./actions";
 
-export function CheckoutButtons({ tiers }: { tiers: PlanTier[] }) {
-  return (
-    <div className="flex gap-2">
-      {tiers.map((tier) => (
-        <form
-          key={tier}
-          action={startCheckout}
-          onSubmit={() => trackEvent("checkout_started", { plan: tier })}
-        >
-          <input type="hidden" name="tier" value={tier} />
-          <Button type="submit" variant={tier === "growth" ? "default" : "outline"} size="sm">
-            Choose {tier}
-          </Button>
-        </form>
-      ))}
-    </div>
-  );
-}
-
-export function ManageBillingButton() {
+/** Opens the Stripe portal — plan changes, payment method, invoices & receipts. */
+export function ManageBillingButton({ label = "Manage billing" }: { label?: string }) {
   return (
     <form action={openBillingPortal}>
-      <Button type="submit" variant="outline" size="sm">Manage billing</Button>
+      <Button type="submit" variant="outline" size="sm">{label}</Button>
     </form>
   );
 }

@@ -34,8 +34,8 @@ export async function toggleSendingPause(
   const { error } = await supabase
     .from("accounts")
     .update({ outreach_paused: paused })
-    .eq("id", account.id);
-  if (error) return { error: "Could not update sending state. Try again shortly." };
+    .eq("id", account.id); // RLS: admins only
+  if (error) return { error: "Could not update sending. Only workspace admins can pause or resume it." };
 
   revalidatePath("/settings/channels");
   return { success: paused ? "All sending paused." : "Sending resumed." };

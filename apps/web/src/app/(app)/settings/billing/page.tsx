@@ -177,7 +177,25 @@ export default async function BillingPage({
               <li>LinkedIn accounts: {liCount ?? 0} / {limits.maxLinkedinAccounts}</li>
               <li>Outreach agents: {campaignCount ?? 0} / {limits.maxCampaigns}</li>
             </ul>
-            <ManageBillingButton />
+            <div className="flex flex-wrap items-center gap-2">
+              <ManageBillingButton />
+              {/* T5: receipts are a first-class need, not a hidden portal feature. */}
+              <ManageBillingButton label="Invoices & receipts" />
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* T5: a canceled subscriber previously LOST the portal entirely — no path to their
+          own invoices. History stays reachable for any account that ever had a sub. */}
+      {!hasPaidSubscription && snap?.subscriptionStatus === "canceled" && (
+        <Card className="max-w-2xl">
+          <CardHeader>
+            <CardTitle>Billing history</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3 text-sm text-muted-foreground">
+            <p>Your subscription is canceled. Your invoices and receipts stay available.</p>
+            <ManageBillingButton label="Invoices & receipts" />
           </CardContent>
         </Card>
       )}
