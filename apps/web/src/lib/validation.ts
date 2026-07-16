@@ -41,6 +41,17 @@ export function normalizeWebsiteUrl(input: string): { ok: true; url: string | nu
   return { ok: false, error: "Enter a valid website address, or leave it blank." };
 }
 
+/**
+ * T6: structural-garbage guard. The first real external signup pasted their LinkedIn
+ * profile URL into a name field and their surname into industry — a URL in any of these
+ * fields poisons every downstream surface (workspace title, emails, ICP derivation),
+ * so it's rejected at the door with a field-specific hint.
+ */
+export function looksLikeUrl(value: string): boolean {
+  const v = value.trim().toLowerCase();
+  return /^https?:\/\//.test(v) || /^www\./.test(v) || /(linkedin\.com|\.com\/|\.dev\/|\.io\/|\.net\/)/.test(v);
+}
+
 function validateTargeting(input: {
   industry: string;
   icp: string;
@@ -49,7 +60,13 @@ function validateTargeting(input: {
   const industry = input.industry.trim();
   const icp = input.icp.trim();
   if (!industry) return { ok: false, error: "Enter your industry." };
+  if (looksLikeUrl(industry)) {
+    return { ok: false, error: "Industry should be a market, not a link — e.g. “B2B SaaS” or “Marketing agencies”." };
+  }
   if (!icp) return { ok: false, error: "Describe your target audience." };
+  if (looksLikeUrl(icp)) {
+    return { ok: false, error: "Describe your target audience in words (who they are), not a link." };
+  }
   const revenueGoalCents = dollarsToCents(input.revenueGoal);
   if (revenueGoalCents === null) {
     return { ok: false, error: "Enter a monthly revenue goal greater than zero." };
@@ -125,6 +142,9 @@ export function validatePersonalize(input: {
   | Invalid {
   const companyName = input.companyName.trim();
   if (!companyName) return { ok: false, error: "Enter your company name." };
+  if (looksLikeUrl(companyName)) {
+    return { ok: false, error: "That looks like a link — the website and LinkedIn fields are below. Enter your company's name here." };
+  }
   const role = input.role.trim();
   if (!role) return { ok: false, error: "Select your role." };
   const website = normalizeWebsiteUrl(input.websiteUrl);
@@ -167,6 +187,14 @@ export function validateSignup(input: {
     return { ok: false, error: "Password must be at least 8 characters." };
   }
   if (!companyName) return { ok: false, error: "Enter your company name." };
+  if (looksLikeUrl(companyName)) {
+    return {
+      ok: false,
+      error: /linkedin\.com/i.test(companyName)
+        ? "That's a LinkedIn link — you'll connect LinkedIn right after signup. Enter your company or business name here."
+        : "That looks like a link — enter your company or business name (e.g. “Acme Marketing”).",
+    };
+  }
   return { ok: true, values: { email, password: input.password, companyName } };
 }
 

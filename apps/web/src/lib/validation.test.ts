@@ -4,6 +4,7 @@ import {
   dollarsToCents,
   normalizeWebsiteUrl,
   optionalDollarsToCents,
+  looksLikeUrl,
   validateManualLead,
   validateMemberSignup,
   validateOnboarding,
@@ -249,5 +250,31 @@ describe("validateManualLead", () => {
 
   it("caps field lengths", () => {
     expect(validateManualLead({ ...base, companyName: "x".repeat(121) }).ok).toBe(false);
+  });
+});
+
+describe("looksLikeUrl guards (T6 — the first external signup pasted a LinkedIn URL as a name)", () => {
+  it("detects URL-shaped values", () => {
+    expect(looksLikeUrl("https://www.linkedin.com/in/someone?utm_source=share")).toBe(true);
+    expect(looksLikeUrl("www.acme.com")).toBe(true);
+    expect(looksLikeUrl("Acme Marketing")).toBe(false);
+    expect(looksLikeUrl("B2B SaaS")).toBe(false);
+  });
+
+  it("signup rejects a LinkedIn URL as company name with the specific hint", () => {
+    const r = validateSignup({
+      email: "a@b.com",
+      password: "longenough",
+      companyName: "https://www.linkedin.com/in/someone-123?utm_source=share_via",
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain("connect LinkedIn");
+  });
+
+  it("workspace targeting rejects links in industry and ICP", () => {
+    const base = { name: "Acme", revenueGoal: "1000" };
+    expect(validateWorkspace({ ...base, industry: "https://acme.com", icp: "founders" }).ok).toBe(false);
+    expect(validateWorkspace({ ...base, industry: "B2B SaaS", icp: "linkedin.com/in/x" }).ok).toBe(false);
+    expect(validateWorkspace({ ...base, industry: "B2B SaaS", icp: "SaaS founders" }).ok).toBe(true);
   });
 });
