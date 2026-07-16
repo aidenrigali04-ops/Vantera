@@ -1,0 +1,69 @@
+name: Migration drift check
+
+# Read-only prod drift detector (enterprise-grade-brain spec, WS-4.1). Replays the committed
+# migrations onto a scratch postgres and diffs the resulting public schema against prod's.
+# Catches both unapplied migrations and out-of-repo prod edits (the applied-via-MCP class).
+#
+# Strictly read-only against prod: only `pg_dump --schema-only` runs against PROD_DB_URL. Nothing
+# ever writes to prod from this workflow. Auto-apply is intentionally out of scope (Phase 2, once
+# the diff has run clean for a while) — this is signal only.
+on:
+  schedule: [{ cron: "17 5 * * *" }]
+  push: { paths: ["packages/db/migrations/**"] }
+  workflow_dispatch:
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env: { POSTGRES_HOST_AUTH_METHOD: trust }
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v6
+
+      # `if: ${{ !secrets.PROD_DB_URL }}` is NOT valid GitHub Actions expression syntax — secrets
+      # can't be referenced directly in a job/step `if:` outside an `env:`/`with:` context. Route
+      # the secret through env first, then export a plain step output every later step can gate
+      # on, so an absent secret is a loud, visible skip rather than a silently-green no-op.
+      - name: Check for prod credentials
+        id: check
+        env:
+          PROD_DB_URL: ${{ secrets.PROD_DB_URL }}
+        run: |
+          if [ -n "$PROD_DB_URL" ]; then
+            echo "has_prod=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_prod=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::PROD_DB_URL secret not set — drift check SKIPPED. The spec's WS-4.1 owner dependency is open."
+          fi
+
+      - name: Replay migrations onto scratch DB
+        if: steps.check.outputs.has_prod == 'true'
+        env: { DATABASE_URL: "postgresql://postgres@localhost:5432/postgres" }
+        run: ./scripts/replay-migrations.sh
+
+      - name: Diff schemas
+        if: steps.check.outputs.has_prod == 'true'
+        env:
+          SCRATCH: "postgresql://postgres@localhost:5432/postgres"
+          PROD: ${{ secrets.PROD_DB_URL }}
+        run: |
+          # Strip comment lines, SET statements, and pg_catalog SELECTs (non-deterministic
+          # server-version chatter) plus the \restrict/\unrestrict meta-command lines that recent
+          # pg_dump builds bracket every dump with — each carries a random per-invocation token,
+          # so without stripping them a scratch-vs-scratch dump never diffs clean either.
+          dump() { pg_dump "$1" --schema-only --schema=public --no-owner --no-privileges \
+            | grep -vE '^(--|SET |SELECT pg_catalog|\\restrict|\\unrestrict)' | sed -e 's/[[:space:]]*$//' ; }
+          dump "$SCRATCH" > /tmp/expected.sql
+          dump "$PROD"    > /tmp/actual.sql
+          if ! diff -u /tmp/expected.sql /tmp/actual.sql > /tmp/drift.diff; then
+            echo "::error::schema drift between committed migrations and prod:"
+            head -200 /tmp/drift.diff
+            exit 1
+          fi
+          echo "no drift ✓"
