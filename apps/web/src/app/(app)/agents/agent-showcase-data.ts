@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { agentAttention, runLine, type AgentRunRow } from "./agent-health";
 
 export type ShowcaseKind = "scout" | "copy" | "intent";
 
@@ -24,6 +25,10 @@ export type ShowcaseAgent = {
   stats: ShowcaseStat[];
   /** Hero progress bar — only where a true 0–100 ratio exists (scout). */
   progress: { label: string; value: number; caption: string } | null;
+  /** T4: why a LIVE agent needs the owner (null = healthy) — agent-health.ts */
+  attention: string | null;
+  /** T4: the last few recorded runs, newest first, server-formatted */
+  runHistory: { agoLabel: string; line: string }[];
 };
 
 type AgentDbRow = {
@@ -81,9 +86,19 @@ function copySummary(status: string, channels: string[]): string {
   return `Not deployed yet. Deploy it and qualified leads turn into personalized drafts on ${where}.`;
 }
 
+function agoLabel(iso: string): string {
+  const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60_000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.round(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.round(hrs / 24)}d ago`;
+}
+
 function toShowcaseAgent(
   row: AgentDbRow,
-  counts: { sourced: number; qualified: number; drafts: number }
+  counts: { sourced: number; qualified: number; drafts: number },
+  health: { attention: string | null; runHistory: { agoLabel: string; line: string }[] }
 ): ShowcaseAgent {
   const icpNames = (row.agent_icps ?? [])
     .sort((a, b) => a.position - b.position)
@@ -95,6 +110,7 @@ function toShowcaseAgent(
   if (row.kind === "scout") {
     const { sourced, qualified } = counts;
     return {
+      ...health,
       id: row.id,
       kind: "scout",
       roleLabel: "Prospect sourcing",
@@ -133,6 +149,7 @@ function toShowcaseAgent(
       0
     );
     return {
+      ...health,
       id: row.id,
       kind: "intent",
       roleLabel: "Intent detection",
@@ -162,6 +179,7 @@ function toShowcaseAgent(
   const cta = typeof (config as { cta?: unknown }).cta === "string" ? (config as { cta: string }).cta : null;
 
   return {
+    ...health,
     id: row.id,
     kind: "copy",
     roleLabel: "Outreach & conversations",
@@ -187,7 +205,7 @@ function toShowcaseAgent(
 export async function loadAgentShowcase(): Promise<ShowcaseAgent[]> {
   const supabase = await createClient();
 
-  const [{ data: agents }, { count: sourced }, { count: qualified }, { count: drafts }] =
+  const [{ data: agents }, { count: sourced }, { count: qualified }, { count: drafts }, { data: runRows }, { count: liActive }] =
     await Promise.all([
       supabase
         .from("agents")
@@ -208,9 +226,38 @@ export async function loadAgentShowcase(): Promise<ShowcaseAgent[]> {
         .from("scheduled_sends")
         .select("id", { count: "exact", head: true })
         .eq("status", "pending_review"),
+      // T4 operate path: recorded runs → the what-happened history + honest statuses.
+      supabase
+        .from("agent_runs")
+        .select("agent_id, kind, status, summary, note, started_at")
+        .order("started_at", { ascending: false })
+        .limit(20)
+        .returns<AgentRunRow[]>(),
+      supabase
+        .from("linkedin_accounts")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "active"),
     ]);
 
   const counts = { sourced: sourced ?? 0, qualified: qualified ?? 0, drafts: drafts ?? 0 };
+  const runsByAgent = new Map<string, AgentRunRow[]>();
+  for (const r of runRows ?? []) {
+    const list = runsByAgent.get(r.agent_id) ?? [];
+    if (list.length < 5) list.push(r);
+    runsByAgent.set(r.agent_id, list);
+  }
 
-  return ((agents as AgentDbRow[] | null) ?? []).map((row) => toShowcaseAgent(row, counts));
+  return ((agents as AgentDbRow[] | null) ?? []).map((row) => {
+    const runs = runsByAgent.get(row.id) ?? [];
+    return toShowcaseAgent(row, counts, {
+      attention: agentAttention({
+        kind: row.kind,
+        status: row.status,
+        sendMode: row.campaigns?.send_mode ?? null,
+        linkedinActive: liActive ?? 0,
+        lastRun: runs[0] ?? null,
+      }),
+      runHistory: runs.map((r) => ({ agoLabel: agoLabel(r.started_at), line: runLine(r) })),
+    });
+  });
 }

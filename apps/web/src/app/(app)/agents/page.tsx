@@ -1,11 +1,23 @@
 import Link from "next/link";
-import { PenLine, Radar, Search } from "lucide-react";
+import { ArrowRight, PenLine, Radar, Search } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
 import { AgentCard, type AgentRow } from "./agent-card";
+import { agentAttention, type AgentRunRow } from "./agent-health";
 
 export const metadata = { title: "Brain" };
+
+// Server-formatted relative label (no client Date.now(); mirrors the dashboard convention).
+function agoLabel(iso: string | null): string | null {
+  if (!iso) return null;
+  const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60_000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.round(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.round(hrs / 24)}d ago`;
+}
 
 export default async function AgentsPage({
   searchParams,
@@ -31,7 +43,7 @@ export default async function AgentsPage({
   // only the waiting pool made a healthy 40+ look like "3 qualified" the instant the
   // pipeline drained them into outreach.
   const QUALIFIED_PLUS = ["qualified", "enriched", "in_campaign", "replied", "converted"];
-  const [{ count: qualified }, { count: sourced }, { count: drafts }, { count: intentLeads }] =
+  const [{ count: qualified }, { count: sourced }, { count: drafts }, { count: intentLeads }, { data: runRows }, { count: liActive }] =
     await Promise.all([
       supabase.from("leads").select("id", { count: "exact", head: true }).in("status", QUALIFIED_PLUS),
       supabase.from("leads").select("id", { count: "exact", head: true }),
@@ -40,7 +52,36 @@ export default async function AgentsPage({
         .select("id", { count: "exact", head: true })
         .eq("status", "pending_review"),
       supabase.from("leads").select("id", { count: "exact", head: true }).eq("source", "intent"),
+      // T4 operate path: the latest recorded runs → what-happened lines + honest statuses.
+      supabase
+        .from("agent_runs")
+        .select("agent_id, kind, status, summary, note, started_at")
+        .order("started_at", { ascending: false })
+        .limit(12)
+        .returns<AgentRunRow[]>(),
+      supabase
+        .from("linkedin_accounts")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "active"),
     ]);
+
+  const latestRunByAgent = new Map<string, AgentRunRow>();
+  for (const r of runRows ?? []) if (!latestRunByAgent.has(r.agent_id)) latestRunByAgent.set(r.agent_id, r);
+  const linkedinActive = liActive ?? 0;
+  const health = (a: AgentRow | null) =>
+    a
+      ? {
+          lastRun: latestRunByAgent.get(a.id) ?? null,
+          lastRunAgo: agoLabel(latestRunByAgent.get(a.id)?.started_at ?? null),
+          attention: agentAttention({
+            kind: a.kind,
+            status: a.status,
+            sendMode: a.campaigns?.send_mode ?? null,
+            linkedinActive,
+            lastRun: latestRunByAgent.get(a.id) ?? null,
+          }),
+        }
+      : { lastRun: null, lastRunAgo: null, attention: null };
 
   return (
     // One-screen on desktop: the page never scrolls — content scrolls in its own region.
@@ -50,7 +91,14 @@ export default async function AgentsPage({
         <p className="mt-1.5 text-sm text-muted-foreground">
           Set it up once. Vera finds and qualifies the right people on LinkedIn, turns every
           qualified prospect into a conversation — and gets smarter every week, starting from
-          proven plays.
+          proven plays.{" "}
+          {/* T4: the page that makes the learning claim now links to its proof. */}
+          <Link
+            href="/dashboard?view=analytics"
+            className="inline-flex items-center gap-1 font-medium text-[var(--cyan-strong)] underline-offset-4 hover:underline"
+          >
+            See what Vera&apos;s learning <ArrowRight className="size-3.5" />
+          </Link>
         </p>
       </div>
 
@@ -128,6 +176,7 @@ export default async function AgentsPage({
                 { label: "Leads sourced", value: sourced ?? 0 },
                 { label: "Qualified", value: qualified ?? 0 },
               ]}
+              {...health(scout)}
             />
           ) : (
             <AddAgentPanel
@@ -145,6 +194,7 @@ export default async function AgentsPage({
               roleLabel="Intent detection"
               index={1}
               stats={[{ label: "Intent leads", value: intentLeads ?? 0 }]}
+              {...health(intent)}
             />
           ) : (
             <AddAgentPanel
@@ -162,6 +212,7 @@ export default async function AgentsPage({
               roleLabel="Outreach & conversations"
               index={2}
               stats={[{ label: "Drafts awaiting review", value: drafts ?? 0 }]}
+              {...health(copy)}
             />
           ) : (
             <AddAgentPanel

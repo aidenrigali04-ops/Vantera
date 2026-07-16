@@ -14,16 +14,30 @@ export const scoutRun = task({
   maxDuration: 1800,
   run: async (payload: { agentId: string; accountId: string }) => {
     const store = createPgStore(createDb());
-    const summary = await runScout(payload.agentId, {
-      store,
-      prospectData: createProspectData(),
-      companySignals: createCompanySignals(),
-      scanFn: (url) => scanWebsite(url),
-      rankFn: (candidates, ctx) => rankLeads(candidates, ctx),
-      deriveCriteriaFn: (icpText, ctx) => deriveIcpCriteria(icpText, ctx),
-      triggerCopyDraft: async (p) => {
-        await tasks.trigger("copy-draft", p, { concurrencyKey: p.accountId });
-      },
+    let summary;
+    try {
+      summary = await runScout(payload.agentId, {
+        store,
+        prospectData: createProspectData(),
+        companySignals: createCompanySignals(),
+        scanFn: (url) => scanWebsite(url),
+        rankFn: (candidates, ctx) => rankLeads(candidates, ctx),
+        deriveCriteriaFn: (icpText, ctx) => deriveIcpCriteria(icpText, ctx),
+        triggerCopyDraft: async (p) => {
+          await tasks.trigger("copy-draft", p, { concurrencyKey: p.accountId });
+        },
+      });
+    } catch (err) {
+      // T4 operate path: a crashed run must be visible in-product, not just in ops logs.
+      await store.recordAgentRun({ ...payload, kind: "scout", status: "failed", summary: {}, note: String(err).slice(0, 300) });
+      throw err;
+    }
+    await store.recordAgentRun({
+      ...payload,
+      kind: "scout",
+      status: summary.status,
+      summary: { ...summary },
+      note: summary.reason ?? null,
     });
     if (summary.reason === "low_credits") {
       // Ops alert: the shared prospect-data credit pool can't cover this run. The run skipped

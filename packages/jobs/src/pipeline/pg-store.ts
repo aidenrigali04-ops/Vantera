@@ -5,6 +5,7 @@ import {
   accounts,
   agentAssets,
   agentIcps,
+  agentRuns,
   agents,
   campaignLeads,
   campaigns,
@@ -76,6 +77,8 @@ import {
   type OptimizeStore,
   type CopyConfig,
   type CopyContext,
+  type AgentRunRecord,
+  type AgentRunStore,
   type CopyDraftStore,
   type DispatchSender,
   type DispatchableSend,
@@ -303,7 +306,7 @@ async function loadProofPoints(db: Db, accountId: string): Promise<ProofPoint[]>
 }
 
 /** Drizzle-backed store used by the Trigger.dev tasks (service-role DATABASE_URL). */
-export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerStore & RetentionStore & TrialStore & SendDispatchStore & OutreachSendStore & InboundStore & SequenceStore & SequenceTouchStore & ConversionStore & RefreshLeadStore & QualifyLeadStore & IntentScanStore & ConnectionSyncStore & OptimizeStore {
+export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerStore & RetentionStore & TrialStore & SendDispatchStore & OutreachSendStore & InboundStore & SequenceStore & SequenceTouchStore & ConversionStore & RefreshLeadStore & QualifyLeadStore & IntentScanStore & ConnectionSyncStore & OptimizeStore & AgentRunStore {
   return {
     async getScoutContext(agentId: string): Promise<ScoutContext | null> {
       const [agent] = await db.select().from(agents).where(eq(agents.id, agentId));
@@ -2202,6 +2205,28 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           title: row.title,
         },
       };
+    },
+
+    // ── AgentRunStore (T4 operate path) ──────────────────────────────────────
+
+    async recordAgentRun(run: AgentRunRecord) {
+      await db.insert(agentRuns).values({
+        accountId: run.accountId,
+        agentId: run.agentId,
+        kind: run.kind,
+        status: run.status,
+        summary: run.summary,
+        note: run.note ?? null,
+      });
+      // Retention (rule 11): telemetry, not tenant data — keep 90 days per agent.
+      await db
+        .delete(agentRuns)
+        .where(
+          and(
+            eq(agentRuns.agentId, run.agentId),
+            lt(agentRuns.startedAt, new Date(Date.now() - 90 * 86_400_000))
+          )
+        );
     },
 
     // ── QualifyLeadStore (R6 manual-add) ─────────────────────────────────────

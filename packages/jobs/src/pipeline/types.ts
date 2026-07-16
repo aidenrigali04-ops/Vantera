@@ -156,6 +156,20 @@ export interface ScoutDeps {
   rand?: () => number;
 }
 
+/** T4: one row per scheduled agent run — recorded by the trigger wrappers (service role). */
+export interface AgentRunRecord {
+  accountId: string;
+  agentId: string;
+  kind: "scout" | "intent";
+  status: "completed" | "skipped" | "failed";
+  summary: Record<string, unknown>;
+  note?: string | null;
+}
+
+export interface AgentRunStore {
+  recordAgentRun(run: AgentRunRecord): Promise<void>;
+}
+
 export interface ScoutRunSummary {
   status: "completed" | "skipped";
   /** present only on a "skipped" run when the shared credit pool can't cover this run's worst case */

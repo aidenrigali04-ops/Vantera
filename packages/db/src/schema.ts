@@ -321,6 +321,27 @@ export const leadSignals = pgTable(
   ]
 );
 
+// 0057 T4: one row per scheduled agent run — the operate-path record behind the run
+// history + needs-attention states. Service-role writes only; pruned at 90 days.
+export const agentRuns = pgTable(
+  "agent_runs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    agentId: uuid("agent_id")
+      .notNull()
+      .references(() => agents.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: ["scout", "intent"] }).notNull(),
+    status: text("status", { enum: ["completed", "skipped", "failed"] }).notNull(),
+    summary: jsonb("summary").notNull().default({}),
+    note: text("note"),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("agent_runs_agent_idx").on(t.agentId, t.startedAt)]
+);
+
 // 0056 R6: plain-text annotations on the lead brief — the user's own knowledge about a
 // prospect, kept with the lead (cascades on erasure). Immutable; delete = author or admin.
 export const leadNotes = pgTable(

@@ -13,6 +13,7 @@ import { Eyebrow, PANEL_SURFACE } from "@/components/ui/panel";
 import { FormError } from "@/components/form-error";
 import { cn } from "@/lib/utils";
 import { setAgentStatus, type AgentActionState } from "./actions";
+import { RunNowButton } from "./run-now";
 import type { ShowcaseAgent, ShowcaseKind } from "./agent-showcase-data";
 
 // ── time helpers (shared convention with the dashboard/agent-card) ───────────
@@ -203,6 +204,28 @@ function AgentDetails({ agent }: { agent: ShowcaseAgent }) {
         <p className="border-t border-[var(--hairline)] pt-4 text-xs text-muted-foreground">
           {runLine}
         </p>
+
+        {/* T4 operate path: the agent's actual work, run by run — never config-only again. */}
+        {agent.attention && (
+          <p className="rounded-xl bg-amber-500/10 px-3 py-2 text-xs leading-relaxed text-amber-800 ring-1 ring-inset ring-amber-500/25">
+            {agent.attention}
+          </p>
+        )}
+        {agent.runHistory.length > 0 && (
+          <div className="border-t border-[var(--hairline)] pt-4">
+            <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+              Recent runs
+            </p>
+            <ul className="mt-2 space-y-1.5">
+              {agent.runHistory.map((r, i) => (
+                <li key={i} className="flex items-baseline gap-3 text-xs">
+                  <span className="w-16 shrink-0 tabular-nums text-muted-foreground">{r.agoLabel}</span>
+                  <span className="text-[var(--ink-2)]">{r.line}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
 
       {/* actions */}
@@ -213,6 +236,9 @@ function AgentDetails({ agent }: { agent: ShowcaseAgent }) {
               <Settings2 className="size-4" /> Edit config
             </Link>
           </Button>
+        )}
+        {live && (agent.kind === "scout" || agent.kind === "intent") && (
+          <RunNowButton agentId={agent.id} />
         )}
         <form action={statusAction}>
           <input type="hidden" name="agentId" value={agent.id} />
