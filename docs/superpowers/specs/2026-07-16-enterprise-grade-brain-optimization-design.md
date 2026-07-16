@@ -1,7 +1,7 @@
 # Enterprise-Grade Brain — the 10/10 optimization spec
 
-**Status: DRAFT v1.0 (2026-07-16, pending owner green-light). Revisit by name:
-"enterprise-grade-brain".**
+**Status: GREEN-LIT v1.0 (2026-07-16, owner approval — "proceed and start spec
+implementation"). Revisit by name: "enterprise-grade-brain".**
 
 Method: YC-head-executive comparison/optimization (standing directive). Grounded in the
 2026-07-16 dual code audit (brain/statistics audit + engineering-quality audit); every
