@@ -16,11 +16,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Wait for production to serve the new SHA
+        # www is the canonical live host — the apex 308-redirects to it at the Vercel domain
+        # level, and curl without -L never follows, so polling apex is permanently red.
+        # -L stays as belt-and-braces in case the redirect direction ever flips.
         run: |
           SHA="${{ github.event.workflow_run.head_sha }}"
-          echo "expecting $SHA on https://vanterasystem.dev/api/version"
+          echo "expecting $SHA on https://www.vanterasystem.dev/api/version"
           for i in $(seq 1 40); do
-            live=$(curl -fsS --max-time 10 https://vanterasystem.dev/api/version | jq -r .sha || echo "")
+            live=$(curl -fsSL --max-time 10 https://www.vanterasystem.dev/api/version | jq -r .sha || echo "")
             if [ "$live" = "$SHA" ]; then echo "live ✓"; exit 0; fi
             echo "attempt $i: live=$live — waiting 30s"; sleep 30
           done
@@ -32,7 +35,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-        with: { fetch-depth: 2 }
       - name: Assert Trigger deploy succeeded when packages/jobs changed
         env: { GH_TOKEN: "${{ github.token }}" }
         # Note: `gh run list --commit` requires gh CLI >= 2.40; ubuntu-latest runners ship newer.
