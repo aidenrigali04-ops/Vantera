@@ -267,6 +267,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             >
               <span className="text-sm font-semibold">{initial}</span>
             </Link>
+            {/* T3: sign-out existed only in the desktop rail — phones had no way out. */}
+            <form action={signOut}>
+              <button
+                type="submit"
+                aria-label="Sign out"
+                className="grid size-10 place-items-center rounded-xl border border-[var(--hairline)] text-muted-foreground"
+              >
+                <LogOut className="size-4" strokeWidth={2.1} />
+              </button>
+            </form>
           </div>
         </div>
         {connectionBanner && <TrialBanner {...connectionBanner} />}

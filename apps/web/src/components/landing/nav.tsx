@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { trackEvent } from "@/lib/analytics/clarity";
 import { VanteraLogo } from "./vantera-logo";
@@ -123,6 +123,10 @@ function ProductsMenu() {
 
 export function LandingNav() {
   const [scrolled, setScrolled] = useState(false);
+  // T3: below md the header had NO navigation at all (no hamburger) — phones couldn't
+  // reach Pricing, FAQ, Blog, or any product page from the top bar. Every menu link
+  // closes on click (no route-change effect needed), plus Escape.
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);
@@ -130,6 +134,15 @@ export function LandingNav() {
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMenuOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [menuOpen]);
 
   return (
     <>
@@ -179,8 +192,65 @@ export function LandingNav() {
             >
               Start free
             </Link>
+            <button
+              type="button"
+              onClick={() => setMenuOpen((v) => !v)}
+              aria-expanded={menuOpen}
+              aria-label={menuOpen ? "Close menu" : "Open menu"}
+              className="grid size-10 place-items-center rounded-lg text-[var(--ink-2)] transition-colors hover:text-foreground md:hidden"
+            >
+              {menuOpen ? <X className="size-5" /> : <Menu className="size-5" />}
+            </button>
           </div>
         </div>
+
+        {/* Mobile menu — a plain disclosure panel under the bar (closes on route/Esc). */}
+        {menuOpen && (
+          <div className="border-t border-[var(--hairline)] bg-white/95 backdrop-blur-xl md:hidden">
+            <div className="mx-auto max-w-6xl px-6 py-4">
+              <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--ink-4)]">
+                Product
+              </p>
+              <ul className="mt-2 grid grid-cols-2 gap-x-4">
+                {PRODUCTS.map((p) => (
+                  <li key={p.href}>
+                    <Link
+                      href={p.href}
+                      onClick={() => setMenuOpen(false)}
+                      className="block rounded-lg py-2 text-[14px] font-medium text-[var(--ink-2)] transition-colors hover:text-foreground"
+                    >
+                      {p.title}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-3 border-t border-[var(--hairline)] pt-3">
+                <ul className="flex flex-col">
+                  {FLAT_LINKS.map((l) => (
+                    <li key={l.href}>
+                      <Link
+                        href={l.href}
+                        onClick={() => setMenuOpen(false)}
+                        className="block rounded-lg py-2 text-[14px] font-medium text-[var(--ink-2)] transition-colors hover:text-foreground"
+                      >
+                        {l.label}
+                      </Link>
+                    </li>
+                  ))}
+                  <li>
+                    <Link
+                      href="/login"
+                      onClick={() => setMenuOpen(false)}
+                      className="block rounded-lg py-2 text-[14px] font-medium text-[var(--ink-2)] transition-colors hover:text-foreground"
+                    >
+                      Sign in
+                    </Link>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        )}
         </nav>
       </header>
     </>
