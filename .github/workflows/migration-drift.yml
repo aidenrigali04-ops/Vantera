@@ -17,7 +17,8 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:15
+        # pgvector/pgvector:pg15, NOT postgres:15 — migration 0011 creates the vector extension, which vanilla postgres:15 lacks.
+        image: pgvector/pgvector:pg15
         env: { POSTGRES_HOST_AUTH_METHOD: trust }
         ports: ["5432:5432"]
         options: >-
