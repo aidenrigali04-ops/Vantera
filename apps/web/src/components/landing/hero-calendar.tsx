@@ -4,20 +4,21 @@ import { memo, useEffect, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { ChevronLeft, ChevronRight, TrendingUp } from "lucide-react";
 
-/* ── Brand hues ──────────────────────────────────────────────────────────────
-   Official brand primaries; each event pill derives a calm tint + accent bar from
-   its hue. Monochrome brands render as deep slate so they read as a colour, not a
-   disabled state. */
+/* ── Event hues ──────────────────────────────────────────────────────────────
+   FICTIONAL companies only (honesty contract: real brands as fake booked meetings
+   read as false endorsement — the exact thing /how-we-prove-it swears off). Each
+   pill derives a calm tint + accent bar from a generic hue; slate reads as a
+   colour, not a disabled state. */
 const SLATE = "#334155";
 const HUE: Record<string, string> = {
-  Stripe: "#635BFF", Linear: "#5E6AD2", Webflow: "#4353FF", Figma: "#A259FF",
-  Datadog: "#632CA6", Atlassian: "#0052CC", Dropbox: "#0061FF", Okta: "#007DC1",
-  Intuit: "#0077C5", Amplitude: "#1E61F0", Intercom: "#1F8DED", Snowflake: "#29B5E8",
-  Canva: "#00C4CC", Twilio: "#F22F46", DoorDash: "#FF3008", Airbnb: "#FF5A5F",
-  Asana: "#FC636B", Brex: "#FF5C00", HubSpot: "#FF7A59", Ramp: "#C8A951",
-  Shopify: "#95BF47", Naver: "#03C75A", Segment: "#52BD94", Scribd: "#1E7B85",
-  Zendesk: "#03363D",
-  Notion: SLATE, Vercel: SLATE, Uber: SLATE, Plaid: SLATE, Retool: SLATE,
+  Meridian: "#635BFF", Fernbrook: "#5E6AD2", Copperline: "#4353FF", Halstead: "#A259FF",
+  Quillon: "#632CA6", Bluecrest: "#0052CC", Northgale: "#0061FF", Ashbury: "#007DC1",
+  Lakemont: "#0077C5", Silverfen: "#1E61F0", Oakhurst: "#1F8DED", Driftline: "#29B5E8",
+  Stonehaven: "#00C4CC", Claybourne: "#F22F46", Westmark: "#FF3008", Harborlight: "#FF5A5F",
+  Redfern: "#FC636B", Glenrose: "#FF5C00", Brightfen: "#FF7A59", Cordovan: "#C8A951",
+  Torvale: "#95BF47", Windrow: "#03C75A", Saltgrove: "#52BD94", Kestrel: "#1E7B85",
+  Elmswift: "#03363D",
+  Marlowe: SLATE, Pembry: SLATE, Aldenwood: SLATE, Foxwell: SLATE, Tarrow: SLATE,
 };
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -27,28 +28,28 @@ const TODAY = 17; // Wed, June 17 2026
 // grid. Weekends stay open so the month reads calm, not packed. Only a couple of
 // pills show per day (+N more), so density is implied rather than overwhelming.
 const MONTH_EVENTS: Record<number, string[]> = {
-  1: ["Stripe", "Notion", "Figma"],
-  2: ["Shopify", "Twilio"],
-  3: ["Okta", "Intuit", "Dropbox", "Webflow"],
-  4: ["Linear", "Segment"],
-  5: ["Atlassian", "Canva", "Ramp"],
-  8: ["Datadog", "Brex"],
-  9: ["HubSpot", "Naver", "Scribd"],
-  10: ["Amplitude", "Intercom"],
-  11: ["Airbnb", "Uber", "Plaid"],
-  12: ["Snowflake", "Vercel"],
-  15: ["Stripe", "Shopify", "Retool"],
-  16: ["Linear", "Figma"],
-  17: ["Okta", "Intuit", "Naver", "Dropbox", "Stripe"],
-  18: ["Notion", "Figma", "Datadog"],
-  19: ["Twilio", "Atlassian", "Canva"],
-  22: ["Brex", "Ramp"],
-  23: ["Segment", "Airbnb", "Intercom"],
-  24: ["Amplitude", "Plaid"],
-  25: ["Snowflake", "Uber", "Vercel"],
-  26: ["HubSpot", "Scribd"],
-  29: ["Stripe", "Linear", "Figma"],
-  30: ["Datadog", "Shopify"],
+  1: ["Meridian", "Marlowe", "Halstead"],
+  2: ["Torvale", "Claybourne"],
+  3: ["Ashbury", "Lakemont", "Northgale", "Copperline"],
+  4: ["Fernbrook", "Saltgrove"],
+  5: ["Bluecrest", "Stonehaven", "Cordovan"],
+  8: ["Quillon", "Glenrose"],
+  9: ["Brightfen", "Windrow", "Kestrel"],
+  10: ["Silverfen", "Oakhurst"],
+  11: ["Harborlight", "Pembry", "Foxwell"],
+  12: ["Driftline", "Aldenwood"],
+  15: ["Meridian", "Torvale", "Tarrow"],
+  16: ["Fernbrook", "Halstead"],
+  17: ["Ashbury", "Lakemont", "Windrow", "Northgale", "Meridian"],
+  18: ["Marlowe", "Halstead", "Quillon"],
+  19: ["Claybourne", "Bluecrest", "Stonehaven"],
+  22: ["Glenrose", "Cordovan"],
+  23: ["Saltgrove", "Harborlight", "Oakhurst"],
+  24: ["Silverfen", "Foxwell"],
+  25: ["Driftline", "Pembry", "Aldenwood"],
+  26: ["Brightfen", "Kestrel"],
+  29: ["Meridian", "Fernbrook", "Halstead"],
+  30: ["Quillon", "Torvale"],
 };
 
 const TOTAL = Object.values(MONTH_EVENTS).reduce((n, a) => n + a.length, 0); // 59
@@ -253,12 +254,14 @@ export const HeroCalendar = memo(function HeroCalendar({
             </div>
           </div>
           <PlayTicker />
+          {/* T2 honesty: the "+38% vs last month" chip was a fabricated results claim —
+              the mock now states the product promise instead of an invented stat. */}
           <div className="flex flex-col items-end gap-1">
-            <span className="inline-flex items-center gap-1 rounded-full bg-[rgba(24,119,242,0.1)] px-2 py-[3px] text-[11px] font-semibold tabular-nums text-[#1461d1]">
+            <span className="inline-flex items-center gap-1 rounded-full bg-[rgba(24,119,242,0.1)] px-2 py-[3px] text-[11px] font-semibold text-[#1461d1]">
               <TrendingUp className="size-3" strokeWidth={2.6} />
-              38%
+              Approved by you
             </span>
-            <span className="text-[10px] text-[#6B7480]">vs. last month</span>
+            <span className="text-[10px] text-[#6B7480]">every send, every time</span>
           </div>
         </div>
       </div>

@@ -11,7 +11,8 @@ import { Hero } from "@/components/landing/hero";
 import { TrustStrip } from "@/components/landing/trust-strip";
 import { type LandingPlan } from "@/components/landing/pricing";
 import type { Metadata } from "next";
-import { JsonLd, softwareApplicationLd } from "@/lib/seo";
+import { JsonLd, faqPageLd, softwareApplicationLd } from "@/lib/seo";
+import { FAQ_ITEMS } from "@/components/landing/faq-data";
 
 // Below-the-fold sections are code-split so their (animation-heavy) client JS lands in
 // separate chunks instead of the initial bundle — the above-the-fold hero hydrates first
@@ -26,6 +27,7 @@ const FeaturesGrid = dynamic(() => import("@/components/landing/features-grid").
 const Consolidation = dynamic(() => import("@/components/landing/consolidation").then((m) => m.Consolidation));
 const Integrations = dynamic(() => import("@/components/landing/integrations").then((m) => m.Integrations));
 const Pricing = dynamic(() => import("@/components/landing/pricing").then((m) => m.Pricing));
+const Faq = dynamic(() => import("@/components/landing/faq").then((m) => m.Faq));
 const FinalCta = dynamic(() => import("@/components/landing/final-cta").then((m) => m.FinalCta));
 const LandingFooter = dynamic(() => import("@/components/landing/footer").then((m) => m.LandingFooter));
 
@@ -53,8 +55,8 @@ export default function Home() {
     // `.landing` scopes the 2026 premium light system (white + cyan + Poppins + dark
     // product panels) so the dark dashboard/auth surfaces are untouched (globals.css).
     <div className="landing relative min-h-screen w-full overflow-x-clip">
-      {/* Homepage entity + offer content for Google rich results and AI engines. */}
-      <JsonLd data={[softwareApplicationLd(plans)]} />
+      {/* Homepage entity + offer + FAQ content for Google rich results and AI engines. */}
+      <JsonLd data={[softwareApplicationLd(plans), faqPageLd(FAQ_ITEMS)]} />
       <ScrollDepthTracker />
       <LandingNav />
       <main>
@@ -71,6 +73,9 @@ export default function Home() {
         <Consolidation />
         <Integrations />
         <Pricing plans={plans} />
+        {/* T2: objection-handling on the highest-traffic page (faq-data always claimed
+            it rendered here; now it actually does, schema included). */}
+        <Faq />
         <FinalCta />
       </main>
       <LandingFooter />

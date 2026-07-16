@@ -23,11 +23,11 @@ function LinkedinMark({ className }: { className?: string }) {
   );
 }
 
-/** Pipedrive brand glyph — the rounded "p" mark. */
-function PipedriveMark({ className }: { className?: string }) {
+/** Salesforce cloud glyph — simplified cloud silhouette, lit to brand blue on hover. */
+function SalesforceMark({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className={className} role="img" aria-label="Pipedrive">
-      <path d="M13.02 3.2c-2.02 0-3.32.94-4.02 1.86-.05-.6-.45-1.53-2.05-1.53H3.4v3.13h1.36c.27 0 .34.07.34.34v13.8h3.52v-6.02c0-.24-.01-.46-.03-.62.7.82 1.93 1.55 3.66 1.55 3.32 0 5.72-2.66 5.72-6.35 0-3.74-2.32-6.29-5.68-6.29zm-.85 9.55c-1.75 0-2.98-1.4-2.98-3.4 0-2.09 1.42-3.27 2.94-3.27 1.9 0 3.02 1.51 3.02 3.32 0 2.32-1.42 3.35-2.98 3.35z" />
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} role="img" aria-label="Salesforce">
+      <path d="M19.35 10.04A7.49 7.49 0 0 0 12 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 0 0 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z" />
     </svg>
   );
 }
@@ -62,6 +62,9 @@ type Tile = {
   metric: string; // decorative sync-status readout (aria-hidden)
 };
 
+// T2 honesty: tiles list only integrations the product actually ships (the CRM provider
+// set is HubSpot / Salesforce / GoHighLevel — Pipedrive was a claim we couldn't honor),
+// and the "Synced 2m ago"-style readouts are gone: no simulated telemetry.
 const TILES: Tile[] = [
   {
     name: "HubSpot",
@@ -70,16 +73,16 @@ const TILES: Tile[] = [
     status: "Native",
     brand: "#FF7A59",
     logoClass: "h-4 w-auto",
-    metric: "Synced 2m ago",
+    metric: "Closed-won push",
   },
   {
-    name: "Pipedrive",
-    desc: "Won leads land in the right pipeline stage.",
-    logo: PipedriveMark,
+    name: "Salesforce",
+    desc: "Won leads land in your pipeline — GoHighLevel too.",
+    logo: SalesforceMark,
     status: "Native",
-    brand: "#0B1B33",
+    brand: "#00A1E0",
     logoClass: "size-[26px]",
-    metric: "Synced 5m ago",
+    metric: "Closed-won push",
   },
   {
     name: "Claude & MCP",
@@ -89,7 +92,7 @@ const TILES: Tile[] = [
     brand: "#D97757",
     href: "/claude-linkedin-mcp",
     logoClass: "h-[22px] w-auto",
-    metric: "6 tools · v1.2",
+    metric: "MCP tools",
   },
   {
     name: "LinkedIn",
@@ -98,7 +101,7 @@ const TILES: Tile[] = [
     status: "Connected",
     brand: "#0A66C2",
     logoClass: "size-[26px]",
-    metric: "Live · 1 account",
+    metric: "Secure OAuth",
   },
 ];
 

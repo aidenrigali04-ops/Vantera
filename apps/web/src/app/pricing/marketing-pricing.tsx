@@ -19,7 +19,7 @@ export function MarketingPricing({
       plans={plans}
       addons={addons}
       title="Pricing built around your revenue goal"
-      subtitle="Autonomous agents that find in-market buyers, qualify them, and reach out on LinkedIn. Start free — choose a plan when you deploy your first agent."
+      subtitle="Autonomous agents that find in-market buyers, qualify them, and reach out on LinkedIn. Free 7-day trial, no card — and the clock only starts when you connect LinkedIn."
       renderCta={({ plan }) => (
         <Button
           asChild

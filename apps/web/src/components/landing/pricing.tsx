@@ -1,18 +1,17 @@
 "use client";
 
-import { Check, Sparkles, Zap, Building2 } from "lucide-react";
+import { Check, Sparkles, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LandingHeading } from "./heading";
 import { PrimaryCta, SecondaryCta } from "./cta";
 import { Reveal, RevealItem, CARD_INTERACTIVE } from "./surface";
 
 /**
- * Landing pricing — renders the REAL three-tier structure (Starter / Growth / Scale)
- * straight from the billing source of truth (`@vantera/billing` PLAN_DISPLAY, passed in
- * by `page.tsx` as the `plans` prop): names, prices, taglines, and feature bullets all
- * come from that data so this teaser can never drift from Stripe or from /pricing.
- * Growth carries `highlight: true` in billing and gets the accent treatment here for the
- * same reason it does on /pricing. When no billing data is supplied we render a
+ * Landing pricing — renders the REAL two-plan structure (All Access + the enterprise
+ * lane) straight from the billing source of truth (`@vantera/billing` PLAN_DISPLAY /
+ * PLAN_DISPLAY_ORDER, passed in by `page.tsx` as the `plans` prop): names, prices,
+ * taglines, and feature bullets all come from that data so this teaser can never drift
+ * from Stripe or from /pricing. When no billing data is supplied we render a
  * clearly-placeholder `$[X]/mo` — never a fabricated marketing price. Enterprise and the
  * annual toggle live on /pricing; this section links there.
  */
@@ -27,10 +26,9 @@ export interface LandingPlan {
   features: string[];
 }
 
+// Two-plan reality: only `growth` (All Access) renders self-serve; Sparkles is the fallback.
 const TIER_ICONS: Record<string, typeof Sparkles> = {
-  starter: Sparkles,
   growth: Zap,
-  scale: Building2,
 };
 
 /** A blue-accented plan chip that mirrors the hero-calendar light-card recipe. */

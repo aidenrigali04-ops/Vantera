@@ -171,8 +171,10 @@ export function FinalCta() {
               {/* the real funnel those numbers took — no invented trend */}
               <div className="mt-6 border-t border-[var(--hairline)] pt-5">
                 <p className="text-[12.5px] leading-relaxed text-[var(--ink-3)]">
+                  {/* "(9 interested)" ties this line to the stat rail's 9 — the two
+                      numbers must visibly be the same story, not a mismatch. */}
                   <span className="font-medium text-foreground">
-                    467 buyers sourced → 133 qualified → 90 contacted → 24 replies.
+                    467 buyers sourced → 133 qualified → 90 contacted → 24 replies (9 interested).
                   </span>{" "}
                   The same system you get, run on our own pipeline. Yours starts within ~15
                   minutes.{" "}
