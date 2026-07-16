@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { proposeChallengerStrategy, type FunnelStageKey } from "@vantera/agent-brains";
+import { proposeNextChallenger, strategySignature, type CopyStrategy, type FunnelStageKey } from "@vantera/agent-brains";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 // Owner controls for the self-optimizing loop (Phase 3, suggest-only). Every write is RLS-scoped:
@@ -14,12 +14,21 @@ async function sessionAccountId(db: SupabaseClient): Promise<string | null> {
   return data?.id ?? null;
 }
 
-/** Start a copy-strategy experiment for the diagnosed leak. The one-live unique index prevents a
- *  second concurrent experiment; a non-copy leak has no challenger and is a no-op. */
+/**
+ * Start a copy-strategy experiment for the diagnosed leak. The one-live unique index prevents a
+ * second concurrent experiment; a non-copy leak has no challenger and is a no-op.
+ *
+ * Champion-aware challenger (review-round fix): the champion-BLIND `proposeChallengerStrategy`
+ * used to return the same fixed challenger for a stage regardless of what's already adopted. Once
+ * an owner adopted that fixed challenger as the new champion, clicking "start the test" again
+ * inserted a SIGNATURE-EQUAL experiment (identical champion and challenger) on a real customer
+ * account — under the decide pipeline's canary semantics that's an accidental, permanent A/A test
+ * that never concludes and alerts the customer. `proposeNextChallenger` builds the challenger
+ * relative to the actual current champion instead, and this action still no-ops defensively if it
+ * ever yields null or a signature-equal challenger.
+ */
 export async function startExperiment(formData: FormData): Promise<void> {
   const stageKey = String(formData.get("stageKey") ?? "") as FunnelStageKey;
-  const challenger = proposeChallengerStrategy(stageKey);
-  if (!challenger) return;
 
   const db = await createClient();
   const accountId = await sessionAccountId(db);
@@ -29,12 +38,16 @@ export async function startExperiment(formData: FormData): Promise<void> {
     .from("optimization_playbook")
     .select("champion_strategy")
     .eq("account_id", accountId)
-    .maybeSingle<{ champion_strategy: unknown }>();
+    .maybeSingle<{ champion_strategy: CopyStrategy }>();
+  const champion = pb?.champion_strategy ?? {};
+
+  const challenger = proposeNextChallenger(stageKey, champion);
+  if (!challenger || strategySignature(challenger) === strategySignature(champion)) return;
 
   await db.from("optimization_experiments").insert({
     account_id: accountId,
     stage_key: stageKey,
-    champion_strategy: pb?.champion_strategy ?? {},
+    champion_strategy: champion,
     challenger_strategy: challenger,
     allocation_pct: 25,
     min_sample: 30,

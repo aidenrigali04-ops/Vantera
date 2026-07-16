@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { runMonteCarlo, simulateDecisionPath, mulberry32 } from "./harness";
+import { runMonteCarlo } from "./harness";
 
 describe("optimize sim harness", () => {
   it("is deterministic under a fixed seed", () => {

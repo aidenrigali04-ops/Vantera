@@ -463,6 +463,15 @@ export interface OptimizeDeps {
     decision: string;
     reason: string;
   }) => Promise<void>;
+  /**
+   * The app-setting-pinned account the live A/A canary is seeded on (the same value the trigger
+   * task reads via `getCanaryAccountId()`). Canary semantics (exempt from every action branch,
+   * alert-only) apply ONLY when a signature-equal experiment's `accountId` matches this value.
+   * null/undefined ⇒ no account is exempt — a signature-equal experiment anywhere is treated as
+   * an accidental identical-arm experiment (see the discard-and-free-the-slot path below), never
+   * as the canary.
+   */
+  canaryAccountId?: string | null;
 }
 
 export interface OptimizeSummary {

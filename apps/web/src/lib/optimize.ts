@@ -4,7 +4,8 @@ import {
   diagnoseOutreach,
   recommendForDiagnosis,
   describeStrategy,
-  proposeChallengerStrategy,
+  proposeNextChallenger,
+  strategySignature,
   buildTargetingProfile,
   topTiltSegment,
   type OutreachDiagnosis,
@@ -56,6 +57,22 @@ export type OutreachDiagnosisVM = {
     baselineN: number;
   } | null;
 };
+
+/**
+ * The auto-test offer for a diagnosed leak, built champion-aware — never re-offering a challenger
+ * that's a no-op against the account's actual current champion (review-round fix; matches the
+ * champion-aware construction now used by the manual "start the test" action). Null when the
+ * stage has no copy-controllable challenger (`close`) or when the proposed challenger would be
+ * signature-equal to the champion (nothing testable). Pure.
+ */
+export function computeExperimentOffer(
+  stageKey: FunnelStageKey,
+  champion: CopyStrategy
+): { stageKey: FunnelStageKey; label: string } | null {
+  const challenger = proposeNextChallenger(stageKey, champion);
+  if (!challenger || strategySignature(challenger) === strategySignature(champion)) return null;
+  return { stageKey, label: describeStrategy(challenger) };
+}
 
 /** Distinct stamped leads with an interested reply after the adoption moment (Stage 1 receipts). Pure. */
 export function countInterestedSince(
@@ -120,10 +137,15 @@ export async function loadOutreachDiagnosis(db: SupabaseClient): Promise<Outreac
     : null;
 
   // Offer to auto-test only when there's a copy-controllable leak and nothing is already running.
+  // Champion-aware (review-round fix): fetch the actual current champion so the offer is never a
+  // no-op re-test of what's already adopted.
   let experimentOffer: OutreachDiagnosisVM["experimentOffer"] = null;
   if (!experiment && diagnosis.status === "leak" && diagnosis.stageKey) {
-    const challenger = proposeChallengerStrategy(diagnosis.stageKey);
-    if (challenger) experimentOffer = { stageKey: diagnosis.stageKey, label: describeStrategy(challenger) };
+    const { data: pb } = await db
+      .from("optimization_playbook")
+      .select("champion_strategy")
+      .maybeSingle<{ champion_strategy: CopyStrategy }>();
+    experimentOffer = computeExperimentOffer(diagnosis.stageKey, pb?.champion_strategy ?? {});
   }
 
   // The most recent autonomous adoption (Stage 0) — shown with a Revert control. Reverted

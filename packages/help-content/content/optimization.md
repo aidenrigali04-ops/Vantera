@@ -47,8 +47,9 @@ always: a controlled test on real outcomes, with the do-no-harm circuit breaker.
 - **If it genuinely wins** — with statistical confidence, not vibes — Vera surfaces it in the
   panel as a **ready-to-adopt suggestion**, with the real numbers behind it. Nothing changes
   until you approve it: click **Adopt as default** to make it your new approach, or **Keep
-  current** to stay put. Vera holds that slot until you decide — the next test doesn't start
-  until you've acted on this one.
+  current** to stay put. Vera holds that slot until you decide. Once you act, Vera doesn't
+  automatically start another test on your behalf — you'll see a new one offered when a leak is
+  diagnosed, ready for you to start.
 - **If it loses**, it's dropped automatically and your current approach stands — the next test
   is lined up right away.
 - **If it ever does harm** — more negative replies — a circuit breaker stops it immediately and

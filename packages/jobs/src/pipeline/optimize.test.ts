@@ -292,8 +292,10 @@ describe("runOptimize (decide pipeline — GATE 0 suggest-only adopt, enterprise
 
   // ── A/A canary (enterprise-grade-brain spec, WS-1.8) ──────────────────────
   // A canary experiment has an IDENTICAL challenger (deep-equal to the champion via
-  // strategySignature). Any decisive verdict on it is a false signal from the decide gate
-  // itself — it must alert and count, but never act (no conclude/adopt/mark-ready/chain).
+  // strategySignature) AND lives on the pinned canary account (review-round fix: canary
+  // semantics are scoped to `canaryAccountId`, never any identical-arm experiment anywhere).
+  // Any decisive verdict on it is a false signal from the decide gate itself — it must alert and
+  // count, but never act (no conclude/adopt/mark-ready/chain).
   describe("A/A canary", () => {
     it("a non-keep verdict alerts and does NOT conclude, adopt, or mark ready", async () => {
       const store = new FakeOptimizeStore();
@@ -313,6 +315,7 @@ describe("runOptimize (decide pipeline — GATE 0 suggest-only adopt, enterprise
 
       const summary = await runOptimize({
         store,
+        canaryAccountId: "acct-1", // exp()'s default accountId — this experiment IS the canary
         notifyCanaryAlert: async (i) => {
           alerts.push(i.decision);
         },
@@ -345,6 +348,7 @@ describe("runOptimize (decide pipeline — GATE 0 suggest-only adopt, enterprise
 
       const summary = await runOptimize({
         store,
+        canaryAccountId: "acct-1",
         notifyCanaryAlert: async (i) => {
           alerts.push(i.decision);
         },
@@ -370,10 +374,65 @@ describe("runOptimize (decide pipeline — GATE 0 suggest-only adopt, enterprise
         flags(40, { accepted: true }).map((f, i) => ({ ...f, interested: i < 16 }))
       );
 
-      const summary = await runOptimize({ store });
+      const summary = await runOptimize({ store, canaryAccountId: "acct-1" });
 
       expect(summary.canaryAlerts).toBe(1);
       expect(store.readyToAdopt).toHaveLength(0);
+    });
+  });
+
+  // ── Identical-arm experiment on a NON-canary account (review-round fix) ───────────────────
+  // The manual "start the test" web action used to build its challenger champion-blind: once an
+  // owner adopted a stage's fixed challenger as the new champion, clicking start again produced a
+  // signature-equal experiment on a real CUSTOMER account. Under canary semantics that would have
+  // been an accidental, permanent A/A test occupying the one-live slot forever and alerting the
+  // customer. The fix: identical arms on any account OTHER than the pinned canary are concluded
+  // discarded immediately (regardless of sample size — there's nothing to learn), freeing the
+  // slot, with the chain continuing exactly like any other discard. Never alerted.
+  describe("identical-arm experiment on a non-canary account", () => {
+    it("concludes discarded with the exact reason, chains, and never alerts — even below minSample", async () => {
+      const store = new FakeOptimizeStore();
+      const same: CopyStrategy = { followupLength: "tight" };
+      // accountId "acct-1" (exp()'s default) is NOT the pinned canary account below, and the
+      // arms are deliberately kept tiny so decideExperiment alone would return keep_running —
+      // proving the identical-arm conclusion fires independent of sample size / verdict.
+      store.experiments = [exp("e1", { championStrategy: same, challengerStrategy: same })];
+      store.arms.set("e1:champion", flags(2, { accepted: true }));
+      store.arms.set("e1:challenger", flags(2, { accepted: true }));
+      const alerts: string[] = [];
+
+      const summary = await runOptimize({
+        store,
+        canaryAccountId: "some-other-account", // acct-1 is NOT this — no canary exemption
+        notifyCanaryAlert: async (i) => {
+          alerts.push(i.decision);
+        },
+      });
+
+      expect(alerts).toEqual([]); // never a calibration alert — this is a duplicate-arm mistake
+      expect(store.concluded).toEqual([
+        { id: "e1", status: "discarded", reason: "identical champion and challenger — no testable difference" },
+      ]);
+      expect(store.readyToAdopt).toHaveLength(0);
+      expect(store.adopted).toHaveLength(0);
+      // frees the slot AND chains the next test, same as any other discard conclusion
+      expect(store.started).toHaveLength(1);
+      expect(summary).toEqual({ evaluated: 1, concluded: 1, adopted: 0, chained: 1, readied: 0, canaryAlerts: 0 });
+    });
+
+    it("also fires with no canaryAccountId configured at all (null/undefined default)", async () => {
+      const store = new FakeOptimizeStore();
+      const same: CopyStrategy = { openWith: "trigger" };
+      store.experiments = [exp("e1", { championStrategy: same, challengerStrategy: same })];
+      store.arms.set("e1:champion", flags(50, { accepted: true }).map((f, i) => ({ ...f, interested: i < 10 })));
+      store.arms.set("e1:challenger", flags(50, { accepted: true }).map((f, i) => ({ ...f, interested: i < 10 })));
+
+      // no canaryAccountId passed at all — deps.canaryAccountId is undefined
+      const summary = await runOptimize({ store });
+
+      expect(store.concluded[0]).toMatchObject({ status: "discarded" });
+      expect(summary.canaryAlerts).toBe(0);
+      expect(summary.concluded).toBe(1);
     });
   });
 });

@@ -78,11 +78,14 @@ export async function runOptimize(deps: OptimizeDeps): Promise<OptimizeSummary> 
       { minSample: exp.minSample }
     );
 
-    // Live A/A canary (enterprise-grade-brain spec, WS-1.8): identical arms mean ANY decisive
-    // verdict is a false signal from the gate itself. Alert, count, change nothing — the canary
-    // keeps collecting. It is exempt from every action branch below.
-    const isCanary =
+    // Live A/A canary (enterprise-grade-brain spec, WS-1.8) — SCOPED to the pinned canary account
+    // (review-round fix): identical arms mean ANY decisive verdict is a false signal from the gate
+    // itself, but that's only true on the account the canary was deliberately seeded on. Alert,
+    // count, change nothing — the canary keeps collecting. It is exempt from every action branch
+    // below.
+    const identicalArms =
       strategySignature(exp.championStrategy) === strategySignature(exp.challengerStrategy);
+    const isCanary = identicalArms && exp.accountId === deps.canaryAccountId;
     if (isCanary) {
       if (verdict.decision !== "keep_running") {
         canaryAlerts++;
@@ -93,6 +96,24 @@ export async function runOptimize(deps: OptimizeDeps): Promise<OptimizeSummary> 
           reason: verdict.reason,
         });
       }
+      continue;
+    }
+
+    // A signature-equal experiment that ISN'T the pinned canary is an accident, not a deliberate
+    // A/A test — most likely the manual "start the test" action re-proposing a challenger the
+    // owner already adopted as champion (review-round fix). There's nothing to learn from
+    // identical arms, so it's concluded immediately regardless of sample size: this frees the
+    // account's one-live slot instead of it sitting there forever never reaching a verdict. Never
+    // alerted (it's not a calibration failure — it's a duplicate-arm mistake) and never marked
+    // ready. The next test still chains, same as any other discard.
+    if (identicalArms) {
+      await deps.store.concludeExperiment(
+        exp.id,
+        "discarded",
+        "identical champion and challenger — no testable difference"
+      );
+      concluded++;
+      if (await chainNext(deps, exp, exp.championStrategy)) chained++;
       continue;
     }
 
