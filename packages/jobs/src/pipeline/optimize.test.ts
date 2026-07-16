@@ -61,6 +61,15 @@ class FakeOptimizeStore implements OptimizeStore {
     this.recentConclusionsCalls++;
     return this.conclusionsHistory;
   }
+  // A/A canary (enterprise-grade-brain spec, WS-1.8) — seeding methods; not exercised by the
+  // decide-pipeline tests below (those construct RunningExperiment rows directly), only present
+  // to satisfy the OptimizeStore interface.
+  async getCanaryAccountId(): Promise<string | null> {
+    return null;
+  }
+  async ensureCanaryExperiment(_accountId: string): Promise<boolean> {
+    return false;
+  }
 }
 
 const exp = (id: string, over: Partial<RunningExperiment> = {}): RunningExperiment => ({
@@ -69,7 +78,9 @@ const exp = (id: string, over: Partial<RunningExperiment> = {}): RunningExperime
   stageKey: "reply",
   minSample: 30,
   championStrategy: {},
-  challengerStrategy: {},
+  // NOT `{}` — an A/A canary is champion === challenger (strategySignature), and every test in
+  // this file below the canary describe block exercises a REAL (non-canary) experiment.
+  challengerStrategy: { openWith: "trigger" },
   ...over,
 });
 
@@ -127,7 +138,7 @@ describe("runOptimize (decide pipeline — GATE 0 suggest-only adopt, enterprise
     expect(store.adopted).toHaveLength(0);
     // both conservative paths still chain the next test — GATE 0 only touches the adopt branch
     expect(store.started).toHaveLength(2);
-    expect(summary).toEqual({ evaluated: 2, concluded: 2, adopted: 0, chained: 2, readied: 0 });
+    expect(summary).toEqual({ evaluated: 2, concluded: 2, adopted: 0, chained: 2, readied: 0, canaryAlerts: 0 });
   });
 
   it("halts a harmful challenger and still chains the next test from the standing champion", async () => {
@@ -147,7 +158,7 @@ describe("runOptimize (decide pipeline — GATE 0 suggest-only adopt, enterprise
 
     expect(store.concluded[0]?.status).toBe("halted");
     expect(store.adopted).toHaveLength(0);
-    expect(summary).toEqual({ evaluated: 1, concluded: 1, adopted: 0, chained: 1, readied: 0 });
+    expect(summary).toEqual({ evaluated: 1, concluded: 1, adopted: 0, chained: 1, readied: 0, canaryAlerts: 0 });
     expect(store.started[0]).toMatchObject({
       stageKey: "booking",
       champion: { followupLength: "standard" },
@@ -187,7 +198,7 @@ describe("runOptimize (decide pipeline — GATE 0 suggest-only adopt, enterprise
 
     const summary = await runOptimize({ store });
 
-    expect(summary).toEqual({ evaluated: 1, concluded: 0, adopted: 0, chained: 0, readied: 0 });
+    expect(summary).toEqual({ evaluated: 1, concluded: 0, adopted: 0, chained: 0, readied: 0, canaryAlerts: 0 });
     expect(store.concluded).toHaveLength(0);
     expect(store.started).toHaveLength(0);
   });
@@ -276,6 +287,93 @@ describe("runOptimize (decide pipeline — GATE 0 suggest-only adopt, enterprise
 
     const summary = await runOptimize({ store });
 
-    expect(summary).toEqual({ evaluated: 1, concluded: 1, adopted: 0, chained: 0, readied: 0 });
+    expect(summary).toEqual({ evaluated: 1, concluded: 1, adopted: 0, chained: 0, readied: 0, canaryAlerts: 0 });
+  });
+
+  // ── A/A canary (enterprise-grade-brain spec, WS-1.8) ──────────────────────
+  // A canary experiment has an IDENTICAL challenger (deep-equal to the champion via
+  // strategySignature). Any decisive verdict on it is a false signal from the decide gate
+  // itself — it must alert and count, but never act (no conclude/adopt/mark-ready/chain).
+  describe("A/A canary", () => {
+    it("a non-keep verdict alerts and does NOT conclude, adopt, or mark ready", async () => {
+      const store = new FakeOptimizeStore();
+      const same: CopyStrategy = { openWith: "pain" };
+      store.experiments = [exp("c1", { championStrategy: same, challengerStrategy: same })];
+      // rig flags so decideExperiment returns adopt_challenger (clear win at n>=30, reply stage:
+      // denominator = accepted, success = interested)
+      store.arms.set(
+        "c1:champion",
+        flags(40, { accepted: true }).map((f, i) => ({ ...f, interested: i < 4 }))
+      );
+      store.arms.set(
+        "c1:challenger",
+        flags(40, { accepted: true }).map((f, i) => ({ ...f, interested: i < 16 }))
+      );
+      const alerts: string[] = [];
+
+      const summary = await runOptimize({
+        store,
+        notifyCanaryAlert: async (i) => {
+          alerts.push(i.decision);
+        },
+      });
+
+      expect(summary.canaryAlerts).toBe(1);
+      expect(alerts).toEqual(["adopt_challenger"]);
+      // no state change on the canary:
+      expect(store.readyToAdopt).toHaveLength(0);
+      expect(store.concluded).toHaveLength(0);
+      expect(store.adopted).toHaveLength(0);
+      expect(store.started).toHaveLength(0);
+      expect(summary).toEqual({ evaluated: 1, concluded: 0, adopted: 0, chained: 0, readied: 0, canaryAlerts: 1 });
+    });
+
+    it("a keep_running verdict does nothing (no alert)", async () => {
+      const store = new FakeOptimizeStore();
+      const same: CopyStrategy = { openWith: "pain" };
+      store.experiments = [exp("c1", { championStrategy: same, challengerStrategy: same })];
+      // low n both arms -> keep_running (below minSample 30)
+      store.arms.set(
+        "c1:champion",
+        flags(10, { accepted: true }).map((f, i) => ({ ...f, interested: i < 2 }))
+      );
+      store.arms.set(
+        "c1:challenger",
+        flags(10, { accepted: true }).map((f, i) => ({ ...f, interested: i < 3 }))
+      );
+      const alerts: string[] = [];
+
+      const summary = await runOptimize({
+        store,
+        notifyCanaryAlert: async (i) => {
+          alerts.push(i.decision);
+        },
+      });
+
+      expect(alerts).toEqual([]);
+      expect(summary).toEqual({ evaluated: 1, concluded: 0, adopted: 0, chained: 0, readied: 0, canaryAlerts: 0 });
+      expect(store.readyToAdopt).toHaveLength(0);
+      expect(store.concluded).toHaveLength(0);
+      expect(store.adopted).toHaveLength(0);
+    });
+
+    it("without a notifyCanaryAlert callback, a decisive verdict still counts but never throws", async () => {
+      const store = new FakeOptimizeStore();
+      const same: CopyStrategy = { openWith: "pain" };
+      store.experiments = [exp("c1", { championStrategy: same, challengerStrategy: same })];
+      store.arms.set(
+        "c1:champion",
+        flags(40, { accepted: true }).map((f, i) => ({ ...f, interested: i < 4 }))
+      );
+      store.arms.set(
+        "c1:challenger",
+        flags(40, { accepted: true }).map((f, i) => ({ ...f, interested: i < 16 }))
+      );
+
+      const summary = await runOptimize({ store });
+
+      expect(summary.canaryAlerts).toBe(1);
+      expect(store.readyToAdopt).toHaveLength(0);
+    });
   });
 });

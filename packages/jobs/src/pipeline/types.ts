@@ -428,6 +428,18 @@ export interface OptimizeStore {
   /** recently concluded experiments for one account (label + status) — generation context so
    *  the recipe generator doesn't re-propose already-tested ideas */
   getRecentConclusions(accountId: string, limit: number): Promise<{ label: string; status: string }[]>;
+  /**
+   * Live A/A canary (enterprise-grade-brain spec, WS-1.8): the app-setting-pinned account the
+   * canary experiment runs on. null when unset — the seeding step is then a no-op.
+   */
+  getCanaryAccountId(): Promise<string | null>;
+  /**
+   * Idempotently ensure a running A/A experiment (challenger deep-equal to champion) exists for
+   * this account — 50/50 allocation for maximum power. Returns true if it created one, false if
+   * the account already has a live experiment (one-live unique index, 23505 swallowed — never
+   * throws). The canary occupies the account's single experiment slot by design.
+   */
+  ensureCanaryExperiment(accountId: string): Promise<boolean>;
 }
 
 export interface OptimizeDeps {
@@ -440,6 +452,17 @@ export interface OptimizeDeps {
   proposeCandidatesFn?: (input: GenerateRecipesInput) => Promise<CopyStrategy[]>;
   /** RNG for Thompson sampling (injectable for deterministic tests); defaults to Math.random */
   rand?: () => number;
+  /**
+   * Live A/A canary (WS-1.8): fired when the canary experiment produces a non-`keep_running`
+   * verdict — a false signal from the decide gate itself (the arms are identical). Best-effort;
+   * absent = no alert (tests, dev). The pure core never touches email — this is the only hook.
+   */
+  notifyCanaryAlert?: (info: {
+    experimentId: string;
+    accountId: string;
+    decision: string;
+    reason: string;
+  }) => Promise<void>;
 }
 
 export interface OptimizeSummary {
@@ -454,6 +477,11 @@ export interface OptimizeSummary {
   chained: number;
   /** winning challengers marked ready_to_adopt this tick — suggestions surfaced for the owner */
   readied: number;
+  /**
+   * A/A canary: decisive verdicts fired on an identical-arm experiment this tick — a calibration
+   * failure in the decide gate itself. Alerted, not acted on; never counted in concluded/readied.
+   */
+  canaryAlerts: number;
 }
 
 export interface CopyDraftDeps {

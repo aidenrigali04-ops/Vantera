@@ -5,6 +5,7 @@ import {
   decideExperiment,
   nextExperimentStage,
   proposeNextChallenger,
+  strategySignature,
 } from "@vantera/agent-brains";
 import type { CopyStrategy } from "@vantera/agent-brains";
 import type { OptimizeDeps, OptimizeSummary, RunningExperiment } from "./types";
@@ -64,6 +65,7 @@ export async function runOptimize(deps: OptimizeDeps): Promise<OptimizeSummary> 
   const adopted = 0; // GATE 0: the loop never adopts autonomously — stays 0 until GATE 1
   let chained = 0;
   let readied = 0;
+  let canaryAlerts = 0;
 
   for (const exp of experiments) {
     const [championFlags, challengerFlags] = await Promise.all([
@@ -75,6 +77,24 @@ export async function runOptimize(deps: OptimizeDeps): Promise<OptimizeSummary> 
       aggregateArm(exp.stageKey, challengerFlags),
       { minSample: exp.minSample }
     );
+
+    // Live A/A canary (enterprise-grade-brain spec, WS-1.8): identical arms mean ANY decisive
+    // verdict is a false signal from the gate itself. Alert, count, change nothing — the canary
+    // keeps collecting. It is exempt from every action branch below.
+    const isCanary =
+      strategySignature(exp.championStrategy) === strategySignature(exp.challengerStrategy);
+    if (isCanary) {
+      if (verdict.decision !== "keep_running") {
+        canaryAlerts++;
+        await deps.notifyCanaryAlert?.({
+          experimentId: exp.id,
+          accountId: exp.accountId,
+          decision: verdict.decision,
+          reason: verdict.reason,
+        });
+      }
+      continue;
+    }
 
     switch (verdict.decision) {
       case "adopt_challenger": {
@@ -101,5 +121,5 @@ export async function runOptimize(deps: OptimizeDeps): Promise<OptimizeSummary> 
     }
   }
 
-  return { evaluated: experiments.length, concluded, adopted, chained, readied };
+  return { evaluated: experiments.length, concluded, adopted, chained, readied, canaryAlerts };
 }

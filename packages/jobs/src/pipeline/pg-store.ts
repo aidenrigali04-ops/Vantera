@@ -1134,6 +1134,41 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
       }
     },
 
+    // ── Live A/A canary (enterprise-grade-brain spec, WS-1.8) ─────────────────
+
+    async getCanaryAccountId(): Promise<string | null> {
+      const [row] = await db.select().from(appSettings).where(eq(appSettings.key, "aa_canary_account_id"));
+      const v = row?.value;
+      return typeof v === "string" && v.length > 0 ? v : null;
+    },
+
+    async ensureCanaryExperiment(accountId): Promise<boolean> {
+      // Champion vs an IDENTICAL challenger — zero user-facing difference; 50/50 split for power.
+      // Idempotent via the one-live unique index (23505 → already live, skip). Occupies the
+      // account's single experiment slot by design (runs GATE 0 → GATE 1 on the pilot account).
+      const [pb] = await db
+        .select({ championStrategy: optimizationPlaybook.championStrategy })
+        .from(optimizationPlaybook)
+        .where(eq(optimizationPlaybook.accountId, accountId))
+        .limit(1);
+      const champion = ((pb?.championStrategy as CopyStrategy | null) ?? {}) as CopyStrategy;
+      try {
+        await db.insert(optimizationExperiments).values({
+          accountId,
+          stageKey: "reply",
+          championStrategy: champion,
+          challengerStrategy: champion,
+          allocationPct: 50,
+          minSample: 30,
+          status: "running",
+        });
+        return true;
+      } catch (err) {
+        if ((err as { code?: string }).code === "23505") return false;
+        throw err;
+      }
+    },
+
     // ── SchedulerStore ───────────────────────────────────────────────────────
 
     async getDueAgents(now: Date) {
