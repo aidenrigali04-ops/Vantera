@@ -1,6 +1,6 @@
 import { generateObject, type LanguageModel } from "ai";
 import { z } from "zod";
-import { getModel } from "@vantera/ai";
+import { getModel, registerPrompt } from "@vantera/ai";
 import type { StoredInsights } from "../prospect/schema";
 import {
   validateHumanity,
@@ -63,7 +63,7 @@ export const conversationReplySchema = z.object({
 // brain (copy/linkedin), but conversational: it must FOLLOW the thread — never restart it or repeat
 // what's already been said. It reads what the prospect actually said and matches it; the CTA is the
 // eventual destination, NOT something every message pushes toward. Grounding + humanizer shared.
-const RESPOND_SYSTEM = `You are the seller, continuing a 1:1 LinkedIn conversation you already started. Write ONLY your next message, the raw DM text, nothing else.
+const RESPOND_SYSTEM = registerPrompt("reply/respond", `You are the seller, continuing a 1:1 LinkedIn conversation you already started. Write ONLY your next message, the raw DM text, nothing else.
 
 You are mid-conversation, NOT introducing yourself. The thread so far is given; build on it. NEVER restart, NEVER re-introduce yourself ("Wanted to connect", "Saw you reacted to…"), NEVER repeat a point you already made.
 
@@ -94,7 +94,7 @@ Rules for every message:
 
 ${PROSPECT_ACCURACY_RULE}
 
-${VOICE_RULES}`;
+${VOICE_RULES}`);
 
 export function renderThread(thread: ConversationTurn[]): string {
   if (thread.length === 0) return "(no earlier messages yet)";
@@ -163,7 +163,7 @@ export async function draftConversationMessage(
         await generateObject({
           model,
           schema: conversationReplySchema,
-          system: RESPOND_SYSTEM,
+          system: RESPOND_SYSTEM.text,
           prompt: fixNote ? `${prompt}\n\n${fixNote}` : prompt,
           maxOutputTokens: 300,
         })

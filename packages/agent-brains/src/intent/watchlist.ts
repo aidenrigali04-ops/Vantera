@@ -1,6 +1,6 @@
 import { generateObject, type LanguageModel } from "ai";
 import { z } from "zod";
-import { getModel } from "@vantera/ai";
+import { getModel, registerPrompt } from "@vantera/ai";
 
 // Permissive schema (validate loose, normalize strict in code — same pattern as rank/classify).
 export const watchlistSchema = z.object({
@@ -23,14 +23,14 @@ const MAX = { keywords: 8, hashtags: 6, competitors: 6 } as const;
 const FIELD_MAX = 80;
 
 // Stable system prompt so Anthropic prompt caching hits; per-account context rides in the user message.
-const WATCHLIST_SYSTEM = `You set up a LinkedIn buying-intent radar for a B2B seller. Given the seller's business, produce the watch targets that surface people showing they're in-market for THIS seller's offer — so the seller never has to go hunt for profiles or URLs.
+const WATCHLIST_SYSTEM = registerPrompt("intent/watchlist", `You set up a LinkedIn buying-intent radar for a B2B seller. Given the seller's business, produce the watch targets that surface people showing they're in-market for THIS seller's offer — so the seller never has to go hunt for profiles or URLs.
 
 Return three lists, each specific to this seller (never generic):
 - keywords: 4-8 short phrases people post or comment when they have the problem this seller solves or are shopping for it — pains and buying signals ("looking for a tool to …", "switching from …", "anyone recommend …", "frustrated with …"). Plain phrases; no quotes, no hashtags.
 - hashtags: 3-6 LinkedIn hashtags where this seller's buyers and their problem space live. No leading "#".
 - competitors: 3-6 company NAMES whose customers would plausibly switch to this seller (direct competitors or the tools they'd replace). Names only — never URLs.
 
-Ground every entry in the seller's actual offering and industry. If you can't ground a competitor, return fewer rather than invent one.`;
+Ground every entry in the seller's actual offering and industry. If you can't ground a competitor, return fewer rather than invent one.`);
 
 function contextBlock(ctx: WatchlistContext): string {
   return [
@@ -73,7 +73,7 @@ export async function deriveIntentWatchlist(
       await generateObject({
         model,
         schema: watchlistSchema,
-        system: WATCHLIST_SYSTEM,
+        system: WATCHLIST_SYSTEM.text,
         prompt: contextBlock(ctx),
         maxOutputTokens: 1000,
       })

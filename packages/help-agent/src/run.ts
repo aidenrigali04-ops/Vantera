@@ -71,7 +71,7 @@ export async function runCopilotTurn(args: RunArgs): Promise<void> {
 
   const result = streamText({
     model: args.model,
-    system: SYSTEM_PROMPT,
+    system: SYSTEM_PROMPT.text,
     messages: args.messages,
     tools: aiTools,
     stopWhen: stepCountIs(4),

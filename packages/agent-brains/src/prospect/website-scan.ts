@@ -1,6 +1,6 @@
 import { generateObject, type LanguageModel } from "ai";
 import { z } from "zod";
-import { getModel } from "@vantera/ai";
+import { getModel, registerPrompt } from "@vantera/ai";
 import { assertPublicHttpUrl, createGuardedFetch } from "./url-guard";
 
 // Shape only — NO hard length/count caps here. Anthropic structured output treats
@@ -74,14 +74,14 @@ export function htmlToText(html: string): string {
     .trim();
 }
 
-const SCAN_SYSTEM = `You analyze a company's homepage text and extract what they sell. Output:
+const SCAN_SYSTEM = registerPrompt("prospect/website-scan", `You analyze a company's homepage text and extract what they sell. Output:
 - headline: ONE plain, glanceable sentence the owner will instantly recognize — who they are, what they sell, and to whom. Under 16 words, no marketing fluff. e.g. "You sell AI onboarding software to RevOps teams at B2B SaaS companies."
 - summary: what the company does, for whom — 1-2 sentences.
 - offerings: the most important concrete products/services, up to 5.
 - value_props: the most important outcomes they promise, up to 5.
 - scope_of_industry: the industry segments this business serves and operates in.
 - suggested_icp: the single best-fit buyer this company should prospect — a crisp persona of role + company type, one phrase. e.g. "VP of Sales at mid-market logistics companies".
-Ground everything in the page text; never invent.`;
+Ground everything in the page text; never invent.`);
 
 /** Scan the customer's website so the Scout brain knows what the seller offers (config: "scope of industry"). */
 export async function scanWebsite(
@@ -118,7 +118,7 @@ export async function scanWebsite(
   const { object } = await generateObject({
     model: options.model ?? getModel(),
     schema: websiteScanSchema,
-    system: SCAN_SYSTEM,
+    system: SCAN_SYSTEM.text,
     prompt: `Homepage text of ${url}:\n\n${text}`,
     maxOutputTokens: 1200,
   });

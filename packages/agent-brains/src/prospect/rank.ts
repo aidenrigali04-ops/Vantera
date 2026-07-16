@@ -1,5 +1,5 @@
 import { generateObject, type LanguageModel } from "ai";
-import { getModel } from "@vantera/ai";
+import { getModel, registerPrompt } from "@vantera/ai";
 import type { ProspectSignal } from "@vantera/prospect-data";
 import { normalizeInsights, rankBatchSchema, type LeadInsights } from "./schema";
 import { stripLoneSurrogates } from "../text";
@@ -87,7 +87,7 @@ export function compactLead(c: RankCandidate, now: Date = new Date()): string {
 
 // Stable system prompt (rubric + output contract) — identical across batches and runs
 // so Anthropic prompt caching hits; per-batch content goes in the user message only.
-const RANK_SYSTEM = `You are the prospect-quality brain of an SDR platform. You receive a seller context block and a batch of lead lines (format: id|company|size|industry|geo|title|tech|signals). Score how strongly each lead fits the seller's ICP right now.
+const RANK_SYSTEM = registerPrompt("prospect/rank", `You are the prospect-quality brain of an SDR platform. You receive a seller context block and a batch of lead lines (format: id|company|size|industry|geo|title|tech|signals). Score how strongly each lead fits the seller's ICP right now.
 
 Rubric:
 - 85-100: precise ICP fit AND an active timing signal (hiring, funding, tech change, intent).
@@ -103,7 +103,7 @@ prospect_offering — what THIS prospect's own company or role does, in THEIR te
 
 value_angle — how the SELLER's offer could specifically help this prospect. Keep the seller's offer and the prospect's own business DISTINCT: describe the benefit to them without restating their business as if it were the seller's.
 
-Ground every field in the data given. If signals are absent, say so in reasoning and score accordingly — never invent facts. Never alter a prospect's stated numbers or flip the direction of what they do; use their own words. Misrepresenting a prospect's business is a worse error than saying less about it.`;
+Ground every field in the data given. If signals are absent, say so in reasoning and score accordingly — never invent facts. Never alter a prospect's stated numbers or flip the direction of what they do; use their own words. Misrepresenting a prospect's business is a worse error than saying less about it.`);
 
 function contextBlock(ctx: RankContext): string {
   return [
@@ -124,7 +124,7 @@ async function rankBatch(
     generateObject({
       model,
       schema: rankBatchSchema,
-      system: RANK_SYSTEM,
+      system: RANK_SYSTEM.text,
       prompt,
       maxOutputTokens: MAX_OUTPUT_TOKENS,
     });

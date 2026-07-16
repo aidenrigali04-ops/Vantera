@@ -1,6 +1,6 @@
 import { generateObject, type LanguageModel } from "ai";
 import { z } from "zod";
-import { getModel } from "@vantera/ai";
+import { getModel, registerPrompt } from "@vantera/ai";
 import { validateHumanity, findUngroundedClaims, normalizeDashes, type Violation } from "./humanizer";
 import { avoidBlock, exemplarBlock, generateHumanized, leadBlock, strategyDirectives, PROSPECT_ACCURACY_RULE, VOICE_RULES, type DraftInput } from "./shared";
 
@@ -34,7 +34,7 @@ export interface LinkedInDraft {
 // ignored or reported — the note only references the trigger/commonality; the pitch waits
 // for the follow-up after acceptance, and even that stays soft. Conversational register,
 // no formal sign-offs (it's chat, not email).
-const LINKEDIN_SYSTEM = `You write LinkedIn outreach for a B2B seller: a connection note and one follow-up message (sent only after the prospect accepts).
+const LINKEDIN_SYSTEM = registerPrompt("copy/linkedin", `You write LinkedIn outreach for a B2B seller: a connection note and one follow-up message (sent only after the prospect accepts).
 
 Connection note, under ${CONNECTION_NOTE_MAX_CHARS} characters:
 - Reference the prospect's trigger, work, or a genuine commonality. That's all. One short line lands better than two.
@@ -50,7 +50,7 @@ ${PROSPECT_ACCURACY_RULE}
 
 ${VOICE_RULES}
 
-If you ever reference the seller, use ONLY the "Seller company" value from the block, never any other brand name from the offer description.`;
+If you ever reference the seller, use ONLY the "Seller company" value from the block, never any other brand name from the offer description.`);
 
 // `grounding` is the per-lead facts (leadBlock). When provided, both messages are checked for
 // fabricated metric claims (rule 11 / anti-hallucination); unresolved ones surface in review.
@@ -113,7 +113,7 @@ export async function draftLinkedIn(
         await generateObject({
           model,
           schema: linkedinDraftSchema,
-          system: LINKEDIN_SYSTEM,
+          system: LINKEDIN_SYSTEM.text,
           prompt: fixNote ? `${basePrompt}\n\n${fixNote}` : basePrompt,
           maxOutputTokens: 600,
         })

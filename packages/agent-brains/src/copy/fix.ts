@@ -1,6 +1,6 @@
 import { generateObject, type LanguageModel } from "ai";
 import { z } from "zod";
-import { getModel } from "@vantera/ai";
+import { getModel, registerPrompt } from "@vantera/ai";
 import { validateHumanity, type Violation } from "./humanizer";
 import { generateHumanized, leadBlock, type DraftInput } from "./shared";
 import {
@@ -31,14 +31,14 @@ import {
  * numbers, claims, or links, which is what makes a grounding-blind fix safe.
  */
 
-const FIX_SYSTEM = `You EDIT B2B outreach copy that failed a style check. Rewrite it to fix EVERY listed violation while preserving the message's meaning, personalization, and intent.
+const FIX_SYSTEM = registerPrompt("copy/fix", `You EDIT B2B outreach copy that failed a style check. Rewrite it to fix EVERY listed violation while preserving the message's meaning, personalization, and intent.
 
 Rules:
 - Do NOT add any new facts, numbers, metrics, claims, customer names, or links. You may only rephrase or remove.
 - Keep the same conversational chat register. Do not make the message longer; shorter is better.
 - Never use a dash of any kind as punctuation. Use a comma or start a new sentence. No semicolons, no bullet points.
 - No greetings/sign-offs that weren't there, at most one exclamation mark, minimal hedging. Plain everyday words, never business-speak (utilize, leverage, streamline).
-- Return only the corrected text.`;
+- Return only the corrected text.`);
 
 function violationList(violations: Violation[]): string {
   return violations.map((v) => `- ${v.rule}: ${v.detail}`).join("\n");
@@ -72,7 +72,7 @@ export async function fixLinkedInDraft(
         await generateObject({
           model,
           schema: linkedinDraftSchema,
-          system: FIX_SYSTEM,
+          system: FIX_SYSTEM.text,
           prompt: fixNote ? `${prompt}\n\n${fixNote}` : prompt,
           maxOutputTokens: 600,
         })
@@ -117,7 +117,7 @@ export async function fixConversationMessage(
         await generateObject({
           model,
           schema: fixedMessageSchema,
-          system: FIX_SYSTEM,
+          system: FIX_SYSTEM.text,
           prompt: fixNote ? `${prompt}\n\n${fixNote}` : prompt,
           maxOutputTokens: 300,
         })
@@ -164,7 +164,7 @@ export async function fixDraftText(
         await generateObject({
           model,
           schema: fixedMessageSchema,
-          system: FIX_SYSTEM,
+          system: FIX_SYSTEM.text,
           prompt: fixNote ? `${prompt}\n\n${fixNote}` : prompt,
           maxOutputTokens: 300,
         })
