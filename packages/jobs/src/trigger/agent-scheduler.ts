@@ -8,8 +8,9 @@ import { computeNextRunAt } from "../pipeline/schedule";
  * (agents.next_run_at) — pausing an agent is a status flip, no provider sync. Each kind
  * dispatches its own run task.
  *
- * Also fires the account-health reconcile, the reply-backlog safeguard, and the lifecycle-outreach
- * tick each run (plain tasks piggybacking this cron: the plan's schedule quota is at 10/10).
+ * Also fires the account-health reconcile, the reply-backlog safeguard, the lifecycle-outreach
+ * tick, and the trial-ending heads-up each run (plain tasks piggybacking this cron: the plan's
+ * schedule quota is at 10/10 — an 11th schedule fails every deploy).
  */
 export const agentScheduler = schedules.task({
   id: "agent-scheduler",
@@ -29,6 +30,7 @@ export const agentScheduler = schedules.task({
     await tasks.trigger("account-health", {});
     await tasks.trigger("reply-backlog", {});
     await tasks.trigger("lifecycle-outreach", {});
+    await tasks.trigger("trial-ending", {});
     logger.info("agent scheduler tick", { due: due.length });
     return { triggered: due.length };
   },
