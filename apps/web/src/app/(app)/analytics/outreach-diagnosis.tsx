@@ -147,8 +147,9 @@ export function OutreachDiagnosis({ vm }: { vm: OutreachDiagnosisVM }) {
         </form>
       ) : null}
 
-      {/* Stage 0: the most recent autonomous adoption — evidence the loop is really improving,
-          with the owner's Revert control. Filtered out once reverted. */}
+      {/* The most recent adoption — evidence the loop is really improving, with the owner's
+          Revert control. Filtered out once reverted. GATE 0: every new adoption is produced by
+          the owner's "Adopt as default" click, so the copy credits the owner, not automation. */}
       {vm.lastAdoption && (
         <div className="mt-4 rounded-xl border border-[var(--positive-line)] bg-[var(--positive-tint)] p-4">
           <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-[var(--positive)]">
@@ -158,8 +159,8 @@ export function OutreachDiagnosis({ vm }: { vm: OutreachDiagnosisVM }) {
             {vm.lastAdoption.label} won its test and is now your default
           </p>
           <p className="mt-1 text-sm text-muted-foreground">
-            {vm.lastAdoption.reason ? `${vm.lastAdoption.reason}. ` : ""}Vera adopted it
-            automatically — and rolls back anything that ever makes results worse.
+            {vm.lastAdoption.reason ? `${vm.lastAdoption.reason}. ` : ""}You adopted it as the new
+            default — Vera keeps watching and flags anything that makes results worse.
           </p>
           {/* Stage 1 receipts: real message-level counts under the adopted approach — never
               shown until at least one stamped message has actually been sent. */}
