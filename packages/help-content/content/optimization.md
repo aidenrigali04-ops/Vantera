@@ -44,11 +44,15 @@ results of every approach tried so far. Approaches that keep winning get tested 
 ideas still get their fair shot. What actually becomes your default is decided the same way as
 always: a controlled test on real outcomes, with the do-no-harm circuit breaker.
 
-- **If it genuinely wins** — with statistical confidence, not vibes — Vera adopts it as your new
-  default automatically, and the panel shows what changed and why. Then the next test is lined up.
-- **If it loses**, it's dropped and your current approach stands.
-- **If it ever does harm** — more negative replies — a circuit breaker stops it immediately.
-  A variant that gets more replies but angrier ones loses.
+- **If it genuinely wins** — with statistical confidence, not vibes — Vera surfaces it in the
+  panel as a **ready-to-adopt suggestion**, with the real numbers behind it. Nothing changes
+  until you approve it: click **Adopt as default** to make it your new approach, or **Keep
+  current** to stay put. Vera holds that slot until you decide — the next test doesn't start
+  until you've acted on this one.
+- **If it loses**, it's dropped automatically and your current approach stands — the next test
+  is lined up right away.
+- **If it ever does harm** — more negative replies — a circuit breaker stops it immediately and
+  the next test is lined up. A variant that gets more replies but angrier ones loses.
 
 ## Every message keeps its receipt
 

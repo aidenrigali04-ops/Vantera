@@ -936,6 +936,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           stageKey: optimizationExperiments.stageKey,
           minSample: optimizationExperiments.minSample,
           championStrategy: optimizationExperiments.championStrategy,
+          challengerStrategy: optimizationExperiments.challengerStrategy,
         })
         .from(optimizationExperiments)
         .where(eq(optimizationExperiments.status, "running"));
@@ -945,6 +946,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         stageKey: r.stageKey as FunnelStageKey,
         minSample: r.minSample,
         championStrategy: (r.championStrategy ?? {}) as CopyStrategy,
+        challengerStrategy: (r.challengerStrategy ?? {}) as CopyStrategy,
       }));
     },
 
@@ -1058,6 +1060,16 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         .update(optimizationExperiments)
         .set({ status, decisionReason: reason, concludedAt: new Date() })
         .where(eq(optimizationExperiments.id, id));
+    },
+
+    async markReadyToAdopt(experimentId, reason) {
+      // GATE 0 (enterprise-grade-brain spec, 2026-07-16): mark only — no concludedAt, so the
+      // one-live-experiment unique index (which counts ready_to_adopt as live) keeps the slot
+      // occupied until the owner's manual adopt action applies the win.
+      await db
+        .update(optimizationExperiments)
+        .set({ status: "ready_to_adopt", decisionReason: reason })
+        .where(eq(optimizationExperiments.id, experimentId));
     },
 
     async adoptChallenger(experimentId, reason): Promise<CopyStrategy> {

@@ -370,7 +370,7 @@ export interface ActiveExperiment {
   challengerStrategy: CopyStrategy;
 }
 
-// ── OptimizeStore: the decide pipeline (Phase 3 → autonomous, spec 2026-07-14) ─
+// ── OptimizeStore: the decide pipeline (GATE 0 suggest-only, enterprise-grade-brain spec 2026-07-16) ─
 /** A running experiment as the decide pipeline needs it. */
 export interface RunningExperiment {
   id: string;
@@ -379,6 +379,8 @@ export interface RunningExperiment {
   minSample: number;
   /** the champion strategy this experiment tested against (jsonb on the row) */
   championStrategy: CopyStrategy;
+  /** the challenger strategy under test (jsonb on the row) — canary detection compares it to the champion */
+  challengerStrategy: CopyStrategy;
 }
 
 /** A new experiment the autonomous loop chains after a conclusion. */
@@ -400,8 +402,19 @@ export interface OptimizeStore {
    * Adopt a proven challenger autonomously: playbook champion ← challenger_strategy
    * (version-bumped), experiment → 'adopted' with the decision reason. Returns the NEW
    * champion strategy so the loop can chain the next test against it.
+   *
+   * GATE 0 (enterprise-grade-brain spec, 2026-07-16): the decide loop no longer calls this — a
+   * winning challenger only gets `markReadyToAdopt` below, and the owner's manual adopt action
+   * (`apps/web` `adoptExperiment`) applies the win with its own writes. Kept on the interface for
+   * GATE 1, when the anytime-valid decision core resumes autonomous adoption.
    */
   adoptChallenger(experimentId: string, reason: string): Promise<CopyStrategy>;
+  /**
+   * GATE 0 (enterprise-grade-brain spec, 2026-07-16): a winning challenger is only MARKED
+   * ready_to_adopt (suggest-only) — the owner's adopt action applies it. No concluded_at: the
+   * experiment still occupies the account's one-live slot until the owner acts.
+   */
+  markReadyToAdopt(experimentId: string, reason: string): Promise<void>;
   /**
    * Start the chained experiment. Returns false (never throws) when the account already has a
    * live experiment (the one-live unique index) — the loop simply skips chaining then.
@@ -431,9 +444,16 @@ export interface OptimizeDeps {
 
 export interface OptimizeSummary {
   evaluated: number;
+  /** discarded + halted this tick — conservative conclusions only (GATE 0: adopt no longer concludes) */
   concluded: number;
+  /**
+   * GATE 0 (enterprise-grade-brain spec, 2026-07-16): stays 0 during the suggest-only window — the
+   * decide loop no longer adopts on its own. Returns to counting real adoptions at GATE 1.
+   */
   adopted: number;
   chained: number;
+  /** winning challengers marked ready_to_adopt this tick — suggestions surfaced for the owner */
+  readied: number;
 }
 
 export interface CopyDraftDeps {

@@ -10,17 +10,22 @@ import type { CopyStrategy } from "@vantera/agent-brains";
 import type { OptimizeDeps, OptimizeSummary, RunningExperiment } from "./types";
 
 /**
- * The decide pipeline of the self-optimizing loop — autonomous within the envelope
- * (spec 2026-07-14; supersedes the Phase-3 suggest-only posture).
+ * The decide pipeline of the self-optimizing loop — GATE 0: suggest-only adopt
+ * (enterprise-grade-brain spec, 2026-07-16; supersedes the 2026-07-14 fully-autonomous posture).
  *
  * Evaluates every running experiment: aggregate each arm's outcomes on the target stage, run the
  * decision gate + do-no-harm circuit breaker (UNCHANGED — the envelope is not tunable by this
  * loop), and act on a decisive verdict:
- *   - a proven winner is ADOPTED on the spot (playbook champion ← challenger, version-bumped);
- *   - a loser is discarded, a harmful challenger is halted (both revert to the champion);
- *   - after ANY conclusion the loop CHAINS the next test on the rotated stage, so the account is
- *     always either testing or between tests for at most one cron tick. Stage 1b: the next
- *     challenger comes from generate→gate→bandit (LLM candidates incl. the linted openerAngle
+ *   - a proven winner is only MARKED ready_to_adopt — a suggestion the owner approves from the
+ *     What's-working panel (the existing manual adopt action applies it). No chaining and no
+ *     conclusion here: the one-live-experiment unique index counts ready_to_adopt as live, so the
+ *     slot stays intentionally occupied until the owner acts. (GATE 1's anytime-valid decision
+ *     core brings autonomous adoption back.)
+ *   - a loser is discarded, a harmful challenger is halted (both revert to the champion) — these
+ *     conservative, safety-preserving actions stay fully autonomous;
+ *   - after a discard/halt conclusion the loop CHAINS the next test on the rotated stage, so the
+ *     account is always either testing or between tests for at most one cron tick. Stage 1b: the
+ *     next challenger comes from generate→gate→bandit (LLM candidates incl. the linted openerAngle
  *     knob, Thompson-sampled against collective recipe aggregates) with the deterministic
  *     knob-flip as the ever-present fallback.
  * Strategies remain bounded CopyStrategy knobs (openerAngle is linted style-only); every draft
@@ -56,8 +61,9 @@ async function chainNext(
 export async function runOptimize(deps: OptimizeDeps): Promise<OptimizeSummary> {
   const experiments = await deps.store.getRunningExperiments();
   let concluded = 0;
-  let adopted = 0;
+  const adopted = 0; // GATE 0: the loop never adopts autonomously — stays 0 until GATE 1
   let chained = 0;
+  let readied = 0;
 
   for (const exp of experiments) {
     const [championFlags, challengerFlags] = await Promise.all([
@@ -72,10 +78,10 @@ export async function runOptimize(deps: OptimizeDeps): Promise<OptimizeSummary> 
 
     switch (verdict.decision) {
       case "adopt_challenger": {
-        const newChampion = await deps.store.adoptChallenger(exp.id, verdict.reason);
-        concluded++;
-        adopted++;
-        if (await chainNext(deps, exp, newChampion)) chained++;
+        // GATE 0 (enterprise-grade-brain spec): suggest-only until the anytime-valid decision
+        // core lands (GATE 1). The owner's Adopt button (ready_to_adopt) applies the win.
+        await deps.store.markReadyToAdopt(exp.id, verdict.reason);
+        readied++;
         break;
       }
       case "discard_challenger": {
@@ -95,5 +101,5 @@ export async function runOptimize(deps: OptimizeDeps): Promise<OptimizeSummary> 
     }
   }
 
-  return { evaluated: experiments.length, concluded, adopted, chained };
+  return { evaluated: experiments.length, concluded, adopted, chained, readied };
 }

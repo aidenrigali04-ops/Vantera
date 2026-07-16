@@ -10,8 +10,9 @@ import { RevertAdoptionButton } from "./revert-adoption-button";
 // "What's working" — the visible face of Vera's self-improving loop (Stage 0, spec 2026-07-14).
 // Shows the invite→accept→reply→book→close funnel with each stage's rate against a typical band,
 // what Vera is testing right now, and the latest adoption (with an owner Revert control).
-// Adoption is autonomous inside the envelope; the legacy ready_to_adopt approve UI stays for any
-// experiment parked before the autonomy flip.
+// GATE 0 (enterprise-grade-brain spec, 2026-07-16): adoption is suggest-only again — every winning
+// challenger lands in ready_to_adopt and waits here for the owner's Adopt/Keep-current decision.
+// Discard/halt stay autonomous and never reach this branch.
 
 const STATUS_LABEL: Record<StageStatus, string> = {
   below: "below typical",

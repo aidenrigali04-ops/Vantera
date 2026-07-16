@@ -19,6 +19,8 @@ class FakeOptimizeStore implements OptimizeStore {
   arms = new Map<string, LeadOutcomeFlags[]>(); // key `${id}:${variant}`
   concluded: { id: string; status: ExperimentStatus; reason: string }[] = [];
   adopted: { id: string; reason: string }[] = [];
+  /** GATE 0 (enterprise-grade-brain spec, 2026-07-16): winning challengers land here, not `adopted` */
+  readyToAdopt: { id: string; reason: string }[] = [];
   started: StartExperimentInput[] = [];
   /** what adoptChallenger returns as the new champion */
   adoptedChampion: CopyStrategy = { followupLength: "tight" };
@@ -43,6 +45,9 @@ class FakeOptimizeStore implements OptimizeStore {
     this.adopted.push({ id, reason });
     return this.adoptedChampion;
   }
+  async markReadyToAdopt(id: string, reason: string) {
+    this.readyToAdopt.push({ id, reason });
+  }
   async startExperiment(input: StartExperimentInput) {
     if (this.startConflicts) return false;
     this.started.push(input);
@@ -64,38 +69,65 @@ const exp = (id: string, over: Partial<RunningExperiment> = {}): RunningExperime
   stageKey: "reply",
   minSample: 30,
   championStrategy: {},
+  challengerStrategy: {},
   ...over,
 });
 
-describe("runOptimize (decide pipeline — autonomous within the envelope, spec 2026-07-14)", () => {
-  it("adopts a proven winner on its own and chains the next test on the rotated stage", async () => {
+describe("runOptimize (decide pipeline — GATE 0 suggest-only adopt, enterprise-grade-brain spec 2026-07-16)", () => {
+  it("marks a winning challenger ready_to_adopt instead of adopting (GATE 0 suggest-only)", async () => {
     const store = new FakeOptimizeStore();
-    store.experiments = [exp("e1")];
     // reply stage: champion 20% (100 accepted), challenger 40% (100 accepted), no negatives
+    winningArms(store);
+
+    const summary = await runOptimize({ store });
+
+    expect(store.readyToAdopt).toHaveLength(1);
+    expect(store.readyToAdopt[0]?.id).toBe("e1");
+    // never autonomously adopts anymore
+    expect(store.adopted).toHaveLength(0);
+    // no chaining off a suggestion — the one-live unique index counts ready_to_adopt as live, so
+    // the slot stays intentionally occupied until the owner acts
+    expect(store.started).toHaveLength(0);
+    expect(summary.readied).toBe(1);
+    expect(summary.adopted).toBe(0);
+    // not concluded either — the experiment isn't terminal, it's parked awaiting the owner
+    expect(summary.concluded).toBe(0);
+    expect(summary.chained).toBe(0);
+  });
+
+  it("still discards and halts autonomously (conservative actions keep their autonomy)", async () => {
+    const store = new FakeOptimizeStore();
+    store.experiments = [
+      exp("e1"), // champion clearly better -> discard path unchanged
+      exp("e2", { championStrategy: { followupLength: "standard" } }), // challenger harmful -> halt path unchanged
+    ];
+    // e1: champion 40% vs challenger 5%, no negatives -> discard
     store.arms.set(
       "e1:champion",
-      flags(100, { accepted: true }).map((f, i) => ({ ...f, interested: i < 20 }))
+      flags(100, { accepted: true }).map((f, i) => ({ ...f, interested: i < 40 }))
     );
     store.arms.set(
       "e1:challenger",
-      flags(100, { accepted: true }).map((f, i) => ({ ...f, interested: i < 40 }))
+      flags(100, { accepted: true }).map((f, i) => ({ ...f, interested: i < 5 }))
+    );
+    // e2: challenger has higher interest but 20% negatives -> halt (do-no-harm circuit breaker)
+    store.arms.set(
+      "e2:champion",
+      flags(100, { accepted: true }).map((f, i) => ({ ...f, interested: i < 20, negative: i >= 97 }))
+    );
+    store.arms.set(
+      "e2:challenger",
+      flags(100, { accepted: true }).map((f, i) => ({ ...f, interested: i < 40, negative: i >= 80 }))
     );
 
     const summary = await runOptimize({ store });
 
-    expect(summary).toEqual({ evaluated: 1, concluded: 1, adopted: 1, chained: 1 });
-    expect(store.adopted).toHaveLength(1);
-    expect(store.adopted[0]?.id).toBe("e1");
-    // never parks at ready_to_adopt anymore
-    expect(store.concluded).toHaveLength(0);
-    // chained: reply → booking, challenger flips the askStyle knob vs the NEW champion
-    expect(store.started).toHaveLength(1);
-    expect(store.started[0]).toMatchObject({
-      accountId: "acct-1",
-      stageKey: "booking",
-      champion: store.adoptedChampion,
-    });
-    expect(store.started[0]?.challenger.askStyle).toBeDefined();
+    expect(store.concluded.map((c) => c.status).sort()).toEqual(["discarded", "halted"]);
+    expect(store.readyToAdopt).toHaveLength(0);
+    expect(store.adopted).toHaveLength(0);
+    // both conservative paths still chain the next test — GATE 0 only touches the adopt branch
+    expect(store.started).toHaveLength(2);
+    expect(summary).toEqual({ evaluated: 2, concluded: 2, adopted: 0, chained: 2, readied: 0 });
   });
 
   it("halts a harmful challenger and still chains the next test from the standing champion", async () => {
@@ -115,7 +147,7 @@ describe("runOptimize (decide pipeline — autonomous within the envelope, spec 
 
     expect(store.concluded[0]?.status).toBe("halted");
     expect(store.adopted).toHaveLength(0);
-    expect(summary).toEqual({ evaluated: 1, concluded: 1, adopted: 0, chained: 1 });
+    expect(summary).toEqual({ evaluated: 1, concluded: 1, adopted: 0, chained: 1, readied: 0 });
     expect(store.started[0]).toMatchObject({
       stageKey: "booking",
       champion: { followupLength: "standard" },
@@ -155,12 +187,15 @@ describe("runOptimize (decide pipeline — autonomous within the envelope, spec 
 
     const summary = await runOptimize({ store });
 
-    expect(summary).toEqual({ evaluated: 1, concluded: 0, adopted: 0, chained: 0 });
+    expect(summary).toEqual({ evaluated: 1, concluded: 0, adopted: 0, chained: 0, readied: 0 });
     expect(store.concluded).toHaveLength(0);
     expect(store.started).toHaveLength(0);
   });
 
   // ── Stage 1b: generate → gate → bandit challenger chaining ────────────────
+  // GATE 0 note: chaining only happens off the discard/halt (conservative) branches now — the
+  // adopt_challenger branch never calls chainNext (see the ready_to_adopt test above). These
+  // fixtures exercise chaining through the still-autonomous discard path.
   const winningArms = (store: FakeOptimizeStore) => {
     store.experiments = [exp("e1")];
     store.arms.set(
@@ -173,17 +208,30 @@ describe("runOptimize (decide pipeline — autonomous within the envelope, spec 
     );
   };
 
+  const losingArms = (store: FakeOptimizeStore) => {
+    store.experiments = [exp("e1")];
+    // champion clearly better: 40% vs 5% -> discard path (still chains autonomously)
+    store.arms.set(
+      "e1:champion",
+      flags(100, { accepted: true }).map((f, i) => ({ ...f, interested: i < 40 }))
+    );
+    store.arms.set(
+      "e1:challenger",
+      flags(100, { accepted: true }).map((f, i) => ({ ...f, interested: i < 5 }))
+    );
+  };
+
   it("without a generator, chains exactly the deterministic knob-flip (pre-1b behavior)", async () => {
     const store = new FakeOptimizeStore();
-    winningArms(store);
+    losingArms(store);
     await runOptimize({ store });
-    expect(store.started[0]?.challenger).toEqual({ askStyle: "specific" }); // booking flip vs {followupLength:"tight"} champion
+    expect(store.started[0]?.challenger).toEqual({ askStyle: "specific" }); // booking flip vs {} champion (discard path)
     expect(store.stampedOutcomesCalls).toBe(0);
   });
 
   it("with a generator, starts the bandit's choice — collective stats steer the pick", async () => {
     const store = new FakeOptimizeStore();
-    winningArms(store);
+    losingArms(store);
     const angleCandidate: CopyStrategy = { openerAngle: "a peer just solved this pain" };
     // Collective aggregates massively favor the angle candidate on the booking stage
     store.stampedOutcomes = [
@@ -202,7 +250,7 @@ describe("runOptimize (decide pipeline — autonomous within the envelope, spec 
       store,
       proposeCandidatesFn: async (input) => {
         expect(input.stageKey).toBe("booking"); // rotated from reply
-        expect(input.champion).toEqual(store.adoptedChampion);
+        expect(input.champion).toEqual({}); // discard path chains off exp.championStrategy
         return [{ askStyle: "specific" }, angleCandidate];
       },
       rand,
@@ -215,7 +263,7 @@ describe("runOptimize (decide pipeline — autonomous within the envelope, spec 
 
   it("falls back to the knob-flip when generation returns no candidates", async () => {
     const store = new FakeOptimizeStore();
-    winningArms(store);
+    losingArms(store);
     await runOptimize({ store, proposeCandidatesFn: async () => [], rand: () => 0.5 });
     expect(store.started[0]?.challenger).toEqual({ askStyle: "specific" });
   });
@@ -223,18 +271,11 @@ describe("runOptimize (decide pipeline — autonomous within the envelope, spec 
   it("tolerates a chain-start conflict (another experiment already live) without throwing", async () => {
     const store = new FakeOptimizeStore();
     store.startConflicts = true;
-    store.experiments = [exp("e1")];
-    store.arms.set(
-      "e1:champion",
-      flags(100, { accepted: true }).map((f, i) => ({ ...f, interested: i < 20 }))
-    );
-    store.arms.set(
-      "e1:challenger",
-      flags(100, { accepted: true }).map((f, i) => ({ ...f, interested: i < 40 }))
-    );
+    // discard path — the only path that still chains under GATE 0
+    losingArms(store);
 
     const summary = await runOptimize({ store });
 
-    expect(summary).toEqual({ evaluated: 1, concluded: 1, adopted: 1, chained: 0 });
+    expect(summary).toEqual({ evaluated: 1, concluded: 1, adopted: 0, chained: 0, readied: 0 });
   });
 });
