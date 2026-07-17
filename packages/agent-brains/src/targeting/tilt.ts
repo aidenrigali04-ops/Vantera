@@ -27,6 +27,17 @@ const DEEP_POINTS = 15;
 const ACCEPT_CAP = 2;
 const DEEP_CAP = 3;
 
+/**
+ * Empirical-Bayes shrinkage strength (pseudo-observations) pulling a segment's accept/deep rate
+ * toward the ACCOUNT baseline before the delta math — same M as the bandit prior (bandit.ts),
+ * targeted at the account's own baseline rather than a pooled-across-accounts one. Evidence
+ * (tilt.test.ts): an 8-lead segment (n = SEGMENT_FLOOR, the minimum that isn't zeroed outright)
+ * with a single lucky accept swung to ~1.8 points pre-shrinkage off one coin-flip observation; at
+ * M = 25 that drops to 0.4 — the segment's 8 real observations are properly outweighed by 25
+ * pseudo-observations at the account's real baseline rate.
+ */
+const SHRINK_M = 25;
+
 const BUCKETS: [RegExp, "founder" | "exec" | "vp" | "director" | "manager"][] = [
   [/founder|co-?founder|\bceo\b|owner/i, "founder"],
   [/chief|\bc[a-z]o\b|president/i, "exec"],
@@ -74,7 +85,32 @@ function clamp(v: number, lo: number, hi: number): number {
   return Math.min(hi, Math.max(lo, v));
 }
 
-/** Bounded ordering adjustment for one candidate — 0 whenever the evidence is thin. */
+/** A segment's observed rate shrunk toward the account `baseline` with SHRINK_M pseudo-observations. */
+function shrinkRate(observed: number, n: number, baseline: number): number {
+  return (observed + SHRINK_M * baseline) / (n + SHRINK_M);
+}
+
+/**
+ * One segment's shrunk accept+deep contribution against the account baseline — shared by
+ * targetingTilt (which takes the MAX across a lead's qualifying segments, never the sum) and
+ * topTiltSegment (so the UI's "top segment" pick is scored on the same math the ranker used).
+ */
+function segmentContribution(s: SegmentStat, baseAccept: number, baseDeep: number): number {
+  const acceptRate = shrinkRate(s.accepted, s.n, baseAccept);
+  const deepRate = shrinkRate(s.deep, s.n, baseDeep);
+  return (
+    clamp((acceptRate - baseAccept) * ACCEPT_POINTS, -ACCEPT_CAP, ACCEPT_CAP) +
+    clamp((deepRate - baseDeep) * DEEP_POINTS, -DEEP_CAP, DEEP_CAP)
+  );
+}
+
+/**
+ * Bounded ordering adjustment for one candidate — 0 whenever the evidence is thin. A lead's
+ * qualifying segments (seniority + industry) contribute the MAX of their shrunk deltas, not the
+ * sum: the same lead is being measured twice by correlated evidence (a founder who's also in
+ * fintech is one signal, not two), and summing let a single lead's segments double-count and
+ * saturate the cap (see tilt.test.ts's max-not-sum fixture).
+ */
 export function targetingTilt(
   lead: { title: string | null; industry: string | null },
   profile: TargetingProfile
@@ -82,13 +118,14 @@ export function targetingTilt(
   if (profile.baseline.n < SEGMENT_FLOOR) return 0;
   const baseAccept = profile.baseline.accepted / profile.baseline.n;
   const baseDeep = profile.baseline.deep / profile.baseline.n;
-  let tilt = 0;
+  const contributions: number[] = [];
   for (const key of segmentKeys(lead)) {
     const s = profile.segments.get(key);
     if (!s || s.n < SEGMENT_FLOOR) continue;
-    tilt += clamp((s.accepted / s.n - baseAccept) * ACCEPT_POINTS, -ACCEPT_CAP, ACCEPT_CAP);
-    tilt += clamp((s.deep / s.n - baseDeep) * DEEP_POINTS, -DEEP_CAP, DEEP_CAP);
+    contributions.push(segmentContribution(s, baseAccept, baseDeep));
   }
+  if (contributions.length === 0) return 0;
+  const tilt = Math.max(...contributions);
   return clamp(Math.round(tilt * 10) / 10, -TILT_CAP, TILT_CAP);
 }
 
@@ -127,8 +164,12 @@ export function topTiltSegment(profile: TargetingProfile): {
     // "other" = titles we couldn't classify — real for the tilt math, meaningless as a UI focus
     // ("prioritizing other roles" tells the user nothing actionable).
     if (key === "seniority:other") continue;
-    // prefer deep-conversion evidence; fall back to acceptance when deep rates tie
-    const score = stat.deep / stat.n - baseDeep || stat.accepted / stat.n - baseAccept;
+    // prefer deep-conversion evidence; fall back to acceptance when deep rates tie — both computed
+    // on the SAME shrunk math targetingTilt uses (shrinkRate), so the panel's "top segment" is
+    // honest about what the ranker actually favored, not a raw-rate figure the ranker never sees.
+    const shrunkDeepDelta = shrinkRate(stat.deep, stat.n, baseDeep) - baseDeep;
+    const shrunkAcceptDelta = shrinkRate(stat.accepted, stat.n, baseAccept) - baseAccept;
+    const score = shrunkDeepDelta || shrunkAcceptDelta;
     if (score > 0 && (!best || score > best.score)) best = { key, stat, score };
   }
   if (!best) return null;

@@ -75,6 +75,68 @@ describe("buildTargetingProfile / targetingTilt", () => {
   });
 });
 
+// ── EB shrinkage + max-not-sum (WS-1.4): SHRINK_M = 25, same pseudo-observation count as the ────
+// bandit prior (bandit.ts), targeted at the ACCOUNT baseline instead of a pooled global rate.
+describe("EB shrinkage toward the account baseline", () => {
+  it("a 1-lucky-accept-in-8 segment (account baseline ~10%, n=40) earns < 1 point of tilt post-shrinkage", () => {
+    const rows = [
+      // segment under test: 8 invited "Ops Manager" leads (n = SEGMENT_FLOOR exactly) — only 1
+      // lucky accept, which also happened to go deep. Pure small-sample noise, not real signal.
+      ...Array.from({ length: 8 }, (_, i) =>
+        row("Ops Manager", null, { accepted: i < 1, interested: i < 1 })
+      ),
+      // 32 filler leads hold the account baseline at accept=10%, deep=2.5% over n=40 total —
+      // the "account baseline ~10%, n=40" fixture named in the task brief.
+      ...Array.from({ length: 32 }, (_, i) => row("Staff Engineer", null, { accepted: i < 3 })),
+    ];
+    const profile = buildTargetingProfile(rows);
+    expect(profile.baseline).toEqual({ n: 40, accepted: 4, deep: 1 });
+
+    const tilt = targetingTilt({ title: "Ops Manager", industry: null }, profile);
+    // MEASURED (this exact fixture, hand-computed against the pre-shrinkage sum-math): raw
+    // accept delta clamp(0.25) + raw deep delta clamp(1.5) -> rounds to 1.8 pre-shrinkage — an
+    // 8-sample segment swinging most of the way to the caps off a single coin-flip observation.
+    // Post-shrinkage (M=25 toward the 10%/2.5% baseline) it earns 0.4 — under 1 point.
+    expect(tilt).toBeLessThan(1);
+    expect(tilt).toBe(0.4);
+  });
+
+  it("max-not-sum: a lead in two above-baseline segments gets the max contribution, not the sum", () => {
+    const rows = [
+      // seniority:founder segment — real, moderately above-baseline signal (n=10)
+      ...Array.from({ length: 10 }, (_, i) =>
+        row("Founder", "saas", { accepted: i < 5, interested: i < 4 })
+      ),
+      // industry:fintech segment — a real but WEAKER signal, different population (n=10)
+      ...Array.from({ length: 10 }, (_, i) =>
+        row("Ops Manager", "fintech", { accepted: i < 4, interested: i < 3 })
+      ),
+      // filler holding the account baseline (accept 40%, deep 25%, n=40 total) — a seniority
+      // bucket absent from the assertions below, and chosen so NEITHER real segment's own
+      // contribution saturates the ±5 outer cap (that would mask sum-vs-max under old code too).
+      ...Array.from({ length: 20 }, (_, i) =>
+        row("Director", null, { accepted: i < 7, interested: i < 3 })
+      ),
+    ];
+    const profile = buildTargetingProfile(rows);
+    expect(profile.baseline).toEqual({ n: 40, accepted: 16, deep: 10 }); // 40% / 25%
+
+    // isolate each segment's own contribution via a candidate that only matches ONE key
+    const founderOnly = targetingTilt({ title: "Founder", industry: null }, profile);
+    const fintechOnly = targetingTilt({ title: "VP of Sales", industry: "fintech" }, profile);
+    expect(founderOnly).toBeGreaterThan(0); // both are real, above-baseline segments —
+    expect(fintechOnly).toBeGreaterThan(0); // the correlated-evidence case this guards against
+    // MEASURED (this fixture, hand-computed pre-shrinkage sum-math): founderOnly=3.3,
+    // fintechOnly=0.8, and the old sum path gave combined=4.0 (≠ max) — genuine double-counting,
+    // not masked by outer-cap saturation.
+
+    // a lead matching BOTH segments (founder in fintech) must take the max, never the sum
+    const combined = targetingTilt({ title: "Founder", industry: "fintech" }, profile);
+    expect(combined).toBe(Math.max(founderOnly, fintechOnly));
+    expect(combined).toBeLessThan(founderOnly + fintechOnly); // the old (buggy) sum behavior
+  });
+});
+
 describe("rankByTilt", () => {
   const profile = buildTargetingProfile(ROWS);
 
