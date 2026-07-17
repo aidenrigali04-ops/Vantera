@@ -1,9 +1,21 @@
 import type { CopyStrategy } from "../copy/shared";
 
 /**
- * Message-level recipe attribution (Vera Stage 1, spec 2026-07-14). Every agent-drafted
- * message is stamped at draft time with the recipe that produced it, so outcomes can be
- * joined to the exact approach — the data spine the bandit loop will stand on. Pure.
+ * Message-level recipe attribution (Vera Stage 1, spec 2026-07-14; v2 promptHash/modelId,
+ * enterprise-grade-brain Phase 2A WS-3.4). Every agent-drafted message is stamped at draft time
+ * with the recipe that produced it, so outcomes can be joined to the exact approach — the data
+ * spine the bandit loop will stand on. Pure.
+ *
+ * v2 adds `promptHash` (the registry hash of the exact system-prompt revision that drafted the
+ * message, from `registerPrompt` in `@vantera/ai` — see `LINKEDIN_SYSTEM`/`RESPOND_SYSTEM`) and
+ * `modelId` (the resolved model id at draft time, from `getModelId()` in `@vantera/ai`). Both are
+ * `null` on a v1 stamp — a stamp is written once, at draft time, from what was actually true
+ * then; there is no honest way to reconstruct a prompt hash or model id for a message drafted
+ * before this field existed, so v1 rows are NEVER backfilled. Readers that only need `strategy`/
+ * `brain` (e.g. `getStampedOutcomes`, which reads `recipe->'strategy'` and `recipe->>'brain'` via
+ * jsonb path ops) stay v1-compatible automatically — those keys are unchanged and v1 rows keep
+ * reading fine. Only code that dereferences `promptHash`/`modelId` needs to treat a v1 row's
+ * nulls as "unknown", not "no prompt/model was used".
  */
 
 /** Which drafting brain produced the message. `origin` on the row says which LANE queued it;
@@ -12,7 +24,7 @@ export type RecipeBrain = "first_touch" | "conversation_reply" | "sequence_follo
 
 export type SendRecipe = {
   /** stamp schema version — bump when the shape changes so old stamps stay parseable */
-  v: 1;
+  v: 2;
   brain: RecipeBrain;
   /** the copy knobs that shaped THIS draft ({} = no strategy directives were applied) */
   strategy: CopyStrategy;
@@ -23,6 +35,10 @@ export type SendRecipe = {
   playbookVersion: number | null;
   /** how many winning exemplars were injected into the prompt (Stage 0.5 memory) */
   exemplars: number;
+  /** registry hash of the system prompt that drafted this message (null = pre-v2 stamp — never backfilled) */
+  promptHash: string | null;
+  /** resolved model id at draft time (null = pre-v2 stamp — never backfilled) */
+  modelId: string | null;
 };
 
 /** Normalizing constructor: absent facts become honest nulls — never invented. */
@@ -33,14 +49,18 @@ export function buildSendRecipe(input: {
   variant?: "champion" | "challenger" | null;
   playbookVersion?: number | null;
   exemplars?: number;
+  promptHash?: string | null;
+  modelId?: string | null;
 }): SendRecipe {
   return {
-    v: 1,
+    v: 2,
     brain: input.brain,
     strategy: input.strategy ?? {},
     experimentId: input.experimentId ?? null,
     variant: input.variant ?? null,
     playbookVersion: input.playbookVersion ?? null,
     exemplars: Math.max(0, Math.floor(input.exemplars ?? 0)),
+    promptHash: input.promptHash ?? null,
+    modelId: input.modelId ?? null,
   };
 }

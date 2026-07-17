@@ -8,7 +8,8 @@ import type {
   DraftableLead,
   NewScheduledSend,
 } from "./types";
-import type { CopyStrategy, DraftInput } from "@vantera/agent-brains";
+import { LINKEDIN_SYSTEM, type CopyStrategy, type DraftInput } from "@vantera/agent-brains";
+import { getModelId } from "@vantera/ai";
 
 function lead(id: string, overrides: Partial<DraftableLead> = {}): DraftableLead {
   return {
@@ -435,13 +436,15 @@ describe("runCopyDraft — recipe stamp (Stage 1)", () => {
     expect(store.sends).toHaveLength(2);
     for (const row of store.sends) {
       expect(row.recipe).toEqual({
-        v: 1,
+        v: 2,
         brain: "first_touch",
         strategy: { openWith: "pain" },
         experimentId: "exp-1",
         variant: "challenger",
         playbookVersion: 2,
         exemplars: 1,
+        promptHash: LINKEDIN_SYSTEM.hash,
+        modelId: getModelId(),
       });
     }
   });
@@ -452,13 +455,15 @@ describe("runCopyDraft — recipe stamp (Stage 1)", () => {
     await runCopyDraft(PAYLOAD, makeDeps(store));
     expect(store.sends).toHaveLength(2);
     expect(store.sends[0]!.recipe).toEqual({
-      v: 1,
+      v: 2,
       brain: "first_touch",
       strategy: {},
       experimentId: null,
       variant: null,
       playbookVersion: null,
       exemplars: 0,
+      promptHash: LINKEDIN_SYSTEM.hash,
+      modelId: getModelId(),
     });
   });
 });

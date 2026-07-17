@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
+import { RESPOND_SYSTEM } from "@vantera/agent-brains";
+import { getModelId } from "@vantera/ai";
 import { MIN_TOUCH_GAP_HOURS, runSequenceTouch } from "./sequence-touch";
 import type { ResponderBundle, SequenceTouchDeps, SequenceTouchDispatch } from "./types";
 
@@ -120,13 +122,15 @@ describe("runSequenceTouch", () => {
     expect(insert).toHaveBeenCalledWith(
       expect.objectContaining({
         recipe: {
-          v: 1,
+          v: 2,
           brain: "sequence_followup",
           strategy: {},
           experimentId: "exp-3",
           variant: "challenger",
           playbookVersion: null,
           exemplars: 0,
+          promptHash: RESPOND_SYSTEM.hash,
+          modelId: getModelId(),
         },
       })
     );

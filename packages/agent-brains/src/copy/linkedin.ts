@@ -34,7 +34,10 @@ export interface LinkedInDraft {
 // ignored or reported — the note only references the trigger/commonality; the pitch waits
 // for the follow-up after acceptance, and even that stays soft. Conversational register,
 // no formal sign-offs (it's chat, not email).
-const LINKEDIN_SYSTEM = registerPrompt("copy/linkedin", `You write LinkedIn outreach for a B2B seller: a connection note and one follow-up message (sent only after the prospect accepts).
+// Exported (not just module-local) so the jobs pipeline can stamp SendRecipe.promptHash with
+// the EXACT registry hash of the prompt that drafted a first-touch message — it imports this
+// handle rather than re-registering, so the two can never drift (recipe.ts v2, WS-3.4).
+export const LINKEDIN_SYSTEM = registerPrompt("copy/linkedin", `You write LinkedIn outreach for a B2B seller: a connection note and one follow-up message (sent only after the prospect accepts).
 
 Connection note, under ${CONNECTION_NOTE_MAX_CHARS} characters:
 - Reference the prospect's trigger, work, or a genuine commonality. That's all. One short line lands better than two.

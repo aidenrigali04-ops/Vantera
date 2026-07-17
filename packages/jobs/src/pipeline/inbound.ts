@@ -1,4 +1,5 @@
-import { describeViolations, buildSendRecipe, type ReplyVerdict } from "@vantera/agent-brains";
+import { describeViolations, buildSendRecipe, RESPOND_SYSTEM, type ReplyVerdict } from "@vantera/agent-brains";
+import { getModelId } from "@vantera/ai";
 import { normalizeLinkedInUrl } from "./copy-draft";
 import type { InboundDeps, InboundPayload, InboundStore, InboundSummary } from "./types";
 
@@ -177,6 +178,10 @@ async function maybeRespond(
       variant: bundle.attribution.variant,
       strategy: bundle.attribution.strategy,
       playbookVersion: bundle.attribution.playbookVersion,
+      // WS-3.4: the EXACT registry hash/model id that drafted this reply, threaded from the
+      // brain's own prompt handle — never re-registered, so the hash can never drift.
+      promptHash: RESPOND_SYSTEM.hash,
+      modelId: getModelId(),
     }),
   });
   return true;

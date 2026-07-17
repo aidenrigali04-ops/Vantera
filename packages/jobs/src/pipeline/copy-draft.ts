@@ -1,5 +1,6 @@
-import { describeViolations, assignVariant, buildSendRecipe } from "@vantera/agent-brains";
+import { describeViolations, assignVariant, buildSendRecipe, LINKEDIN_SYSTEM } from "@vantera/agent-brains";
 import type { DraftInput, CopyStrategy } from "@vantera/agent-brains";
+import { getModelId } from "@vantera/ai";
 import type {
   CopyDraftDeps,
   CopyDraftPayload,
@@ -134,6 +135,10 @@ export async function runCopyDraft(
           variant,
           playbookVersion: champion.version,
           exemplars: (ctx.winningOpeners ?? []).length,
+          // WS-3.4: the EXACT registry hash/model id that drafted this pair, threaded from the
+          // brain's own prompt handle — never re-registered, so the hash can never drift.
+          promptHash: LINKEDIN_SYSTEM.hash,
+          modelId: getModelId(),
         });
         const common = {
           accountId,

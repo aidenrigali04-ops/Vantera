@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { InMemoryLinkedInInfra } from "@vantera/linkedin-infra";
-import type { ReplyVerdict } from "@vantera/agent-brains";
+import { RESPOND_SYSTEM, type ReplyVerdict } from "@vantera/agent-brains";
+import { getModelId } from "@vantera/ai";
 import { runInbound } from "./inbound";
 import type { InboundDeps, InboundStore, NewScheduledSend, ResponderBundle } from "./types";
 
@@ -558,13 +559,15 @@ describe("runInbound — active responder (converse to close)", () => {
     );
 
     expect(store.scheduledSends[0]!.recipe).toEqual({
-      v: 1,
+      v: 2,
       brain: "conversation_reply",
       strategy: {},
       experimentId: "exp-9",
       variant: "champion",
       playbookVersion: null,
       exemplars: 0,
+      promptHash: RESPOND_SYSTEM.hash,
+      modelId: getModelId(),
     });
   });
 

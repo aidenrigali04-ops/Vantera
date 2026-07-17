@@ -63,7 +63,10 @@ export const conversationReplySchema = z.object({
 // brain (copy/linkedin), but conversational: it must FOLLOW the thread — never restart it or repeat
 // what's already been said. It reads what the prospect actually said and matches it; the CTA is the
 // eventual destination, NOT something every message pushes toward. Grounding + humanizer shared.
-const RESPOND_SYSTEM = registerPrompt("reply/respond", `You are the seller, continuing a 1:1 LinkedIn conversation you already started. Write ONLY your next message, the raw DM text, nothing else.
+// Exported (not just module-local) so the jobs pipeline can stamp SendRecipe.promptHash with the
+// EXACT registry hash of the prompt that drafted a conversation reply or proactive follow-up — it
+// imports this handle rather than re-registering, so the two can never drift (recipe.ts v2, WS-3.4).
+export const RESPOND_SYSTEM = registerPrompt("reply/respond", `You are the seller, continuing a 1:1 LinkedIn conversation you already started. Write ONLY your next message, the raw DM text, nothing else.
 
 You are mid-conversation, NOT introducing yourself. The thread so far is given; build on it. NEVER restart, NEVER re-introduce yourself ("Wanted to connect", "Saw you reacted to…"), NEVER repeat a point you already made.
 

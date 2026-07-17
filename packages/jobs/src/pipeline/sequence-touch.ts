@@ -1,4 +1,5 @@
-import { describeViolations, buildSendRecipe } from "@vantera/agent-brains";
+import { describeViolations, buildSendRecipe, RESPOND_SYSTEM } from "@vantera/agent-brains";
+import { getModelId } from "@vantera/ai";
 import { normalizeLinkedInUrl } from "./copy-draft";
 import { MAX_AGENT_TURNS } from "./inbound";
 import { needsRefresh, FRESHNESS_WINDOW_DAYS } from "./freshness";
@@ -128,6 +129,10 @@ export async function runSequenceTouch(
       variant: bundle.attribution.variant,
       strategy: bundle.attribution.strategy,
       playbookVersion: bundle.attribution.playbookVersion,
+      // WS-3.4: the EXACT registry hash/model id that drafted this follow-up, threaded from the
+      // brain's own prompt handle — never re-registered, so the hash can never drift.
+      promptHash: RESPOND_SYSTEM.hash,
+      modelId: getModelId(),
     }),
   };
   await deps.store.insertScheduledSend(send);

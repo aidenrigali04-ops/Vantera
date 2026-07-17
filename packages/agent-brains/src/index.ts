@@ -32,6 +32,7 @@ export {
 export {
   draftLinkedIn,
   validateLinkedInDraft,
+  LINKEDIN_SYSTEM,
   CONNECTION_NOTE_MAX_CHARS,
   FOLLOWUP_MAX_CHARS,
   FOLLOWUP_MAX_WORDS,
@@ -57,6 +58,7 @@ export { classifyReply, preClassify, replyVerdictSchema, type ReplyVerdict } fro
 export {
   draftConversationMessage,
   conversationReplySchema,
+  RESPOND_SYSTEM,
   CONVERSATION_REPLY_MAX_CHARS,
   CONVERSATION_REPLY_MAX_WORDS,
   type ConversationDraft,
