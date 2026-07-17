@@ -7,7 +7,8 @@ import { eValueTwoProportions, posteriorSummary } from "./eprocess";
  * read — decide.ts stays untouched and in production use until this is proven out (Task 6's sim
  * calibration is the gate to actually switching consumers over).
  *
- * Decision order is locked:
+ * All config is routed through clampDecideV2Options on every call (self-clamping — see that
+ * function's doc), then the decision order is locked:
  *   1. Do-no-harm circuit breaker — FIRST, verbatim legacy semantics (shared with decideExperiment
  *      via checkCircuitBreaker in decide.ts — never re-implemented).
  *   2. e = eValueTwoProportions(champion, challenger); e < 1/alpha → keep_running. No minimum-n
@@ -52,14 +53,13 @@ function clampNum(value: number | undefined, fallback: number, min: number, max?
 }
 
 /**
- * Hard safety envelope for V2 config (WS-3.3): this config may come from a DB row later (a
- * stored experiment/recipe config, once Task 6+ wires that up) — clamping happens HERE, in code,
- * so a bad or stale stored value can never produce a reckless gate. Never throws.
+ * Hard safety envelope for V2 config (WS-3.3): this config comes from a DB row (Task 7 passes
+ * DB-persisted alphaSpent straight in) — clamping happens HERE, in code, so a bad or stale
+ * stored value can never produce a reckless gate. Never throws.
  *
- * `decideExperimentV2` itself does NOT call this — it trusts its typed `options` directly, the
- * same posture `decideExperiment` already takes. Any call site that loads config from an
- * untrusted source (a DB row) must run it through `clampDecideV2Options` before constructing the
- * options object passed to `decideExperimentV2`.
+ * `decideExperimentV2` routes its own options through this on every call — the envelope lives
+ * in the gate itself rather than relying on every call site remembering the sanitizer. Exported
+ * separately so call sites that need to display or persist the effective config can compute it.
  */
 export function clampDecideV2Options(raw: Partial<DecideV2Options>): Required<Omit<DecideV2Options, "rng">> {
   return {
@@ -80,7 +80,11 @@ export function decideExperimentV2(
   challenger: VariantOutcome,
   options?: DecideV2Options
 ): ExperimentVerdict {
-  const o = { ...DECIDE_V2_DEFAULTS, ...options };
+  // Self-clamp: Task 7 passes DB-persisted alphaSpent straight in — the safety envelope must
+  // live in the gate itself, not rely on every call site remembering clampDecideV2Options.
+  // (rng is not config; it stays outside the clamp.)
+  const o = clampDecideV2Options(options ?? {});
+  const rng = options?.rng;
 
   // 1. Do-no-harm circuit breaker — FIRST, independent of any e-value or lift.
   const breakerVerdict = checkCircuitBreaker(champion, challenger, o);
@@ -99,7 +103,7 @@ export function decideExperimentV2(
 
   // 3. Posterior read of size + direction: a practical win must also clear the expected-loss
   //    ceiling before it's recommended for adoption.
-  const { medianLiftPp, expectedAdoptionLossPp } = posteriorSummary(champion, challenger, o.rng);
+  const { medianLiftPp, expectedAdoptionLossPp } = posteriorSummary(champion, challenger, rng);
 
   if (medianLiftPp >= o.minEffectPp && expectedAdoptionLossPp <= o.maxAdoptionLossPp) {
     return {

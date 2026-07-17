@@ -56,13 +56,33 @@ describe("decideExperimentV2", () => {
     expect(verdict.decision).toBe("discard_challenger");
   });
 
-  it("the loss cap blocks adoption despite a qualifying e-value and a large median lift", () => {
-    // champ 0/3 vs chal 5/5: e=21.0 (clears the default threshold of 20), medianLiftPp≈68.8
-    // (clears minEffectPp=3 by a wide margin) — but expectedAdoptionLossPp≈0.021 at this seed,
-    // which exceeds a deliberately tight maxAdoptionLossPp of 0.01. Measured across 16 seeds
-    // (range ~0.02-0.07) before picking seed 7 and the 0.01 cap for a robust margin.
+  it("self-clamps an out-of-bounds loss cap: 0.01 in -> the 0.1 floor is what actually gates", () => {
+    // champ 0/3 vs chal 5/5: e=21.0 (clears threshold 20), medianLiftPp≈68.8,
+    // expectedAdoptionLossPp≈0.021 at this seed (measured across 16 seeds: ~0.02-0.07).
+    // An UNclamped 0.01 cap would block adoption (0.021 > 0.01); the clamped 0.1 floor does
+    // not (0.021 <= 0.1) — so adoption here proves decideExperimentV2 clamps its own config.
+    // NOTE: real e>=20 pairs top out around ~0.09pp expected loss in this Beta(1,1) math, just
+    // under the 0.1 floor — whether that floor is reachable/right is Task 6's sim-calibration
+    // adjudication item, not this gate's.
     const options: DecideV2Options = { maxAdoptionLossPp: 0.01, rng: mulberry32(7) };
     const verdict = decideExperimentV2(O(3, 0), O(5, 5), options);
+    expect(verdict.decision).toBe("adopt_challenger");
+  });
+
+  it("self-clamps an out-of-bounds alpha: 0.5 in -> threshold stays 20, not 2", () => {
+    // THE case that motivates self-clamping: Task 7 passes DB-persisted alphaSpent straight in.
+    // champ 6/40 vs chal 16/40 measures e=5.41 — above an unclamped alpha=0.5 threshold (1/.5=2,
+    // which would wrongly wave it through to the posterior stage and adopt), but far below the
+    // clamped alpha=0.05 threshold of 20 -> keep_running, reason carries the REAL threshold.
+    const verdict = decideExperimentV2(O(40, 6), O(40, 16), { alpha: 0.5, rng: mulberry32(7) });
+    expect(verdict.decision).toBe("keep_running");
+    expect(verdict.reason).toMatch(/of 20 needed/);
+  });
+
+  it("keeps running on a confirmed but impractically small difference (e >= threshold, |lift| < minEffectPp)", () => {
+    // champ 3000/15000 (20%) vs chal 3300/15000 (22%): e=99.73 clears the gate decisively, but
+    // medianLiftPp≈1.99 sits inside (-3, 3) — evidence of a difference, not a practical winner.
+    const verdict = decideExperimentV2(O(15000, 3000), O(15000, 3300), { rng: mulberry32(7) });
     expect(verdict.decision).toBe("keep_running");
     expect(verdict.reason).toMatch(/not a practical winner/);
   });
