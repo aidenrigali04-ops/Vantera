@@ -23,4 +23,37 @@ describe("strategyDirectives", () => {
     expect(d).toContain('Angle the opener around: "their recent post as the doorway"');
     expect(d).toContain("never add facts or numbers");
   });
+
+  // ── touch-shape awareness (WS-3.1 fix): opener knobs are first-touch-only wording — rendered
+  // mid-thread they contradict the conversation brain's own anti-restart rule.
+  describe("conversation shape", () => {
+    it("suppresses openWith and openerAngle but keeps askStyle and followupLength", () => {
+      const d = strategyDirectives(
+        {
+          openWith: "trigger",
+          openerAngle: "their recent post as the doorway",
+          askStyle: "specific",
+          followupLength: "tight",
+        },
+        "conversation"
+      );
+      expect(d).not.toContain("Open by naming");
+      expect(d).not.toContain("Angle the opener around");
+      expect(d).toContain("concrete next step");
+      expect(d).toContain("single, ruthlessly tight");
+    });
+
+    it("returns empty when only opener knobs are set — the conversation prompt stays untouched", () => {
+      expect(strategyDirectives({ openWith: "pain" }, "conversation")).toBe("");
+      expect(strategyDirectives({ openerAngle: "any angle" }, "conversation")).toBe("");
+      expect(strategyDirectives({ openWith: "trigger", openerAngle: "x" }, "conversation")).toBe("");
+    });
+
+    it("first_touch is the default and still renders everything (existing callers byte-identical)", () => {
+      const full = { openWith: "trigger" as const, askStyle: "soft" as const };
+      expect(strategyDirectives(full)).toBe(strategyDirectives(full, "first_touch"));
+      expect(strategyDirectives(full)).toContain("Open by naming");
+      expect(strategyDirectives(full)).toContain("soft, low-pressure interest check");
+    });
+  });
 });

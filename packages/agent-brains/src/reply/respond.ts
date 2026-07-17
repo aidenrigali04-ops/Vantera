@@ -156,8 +156,11 @@ export async function draftConversationMessage(
   // Optional experiment strategy (self-optimizing loop, Phase 3): appended right after the lead
   // block, same placement as the outreach copy brain (copy/linkedin.ts). Empty/absent strategy ⇒
   // strategyDirectives returns "" ⇒ this prompt is byte-identical to before conversation drafting
-  // became strategy-aware.
-  const strategyBlock = strategyDirectives(input.context.strategy);
+  // became strategy-aware. The "conversation" shape suppresses the first-touch-only opener knobs
+  // (openWith/openerAngle) — mid-thread those directives contradict the anti-restart rule above.
+  // The recipe stamps on the resulting sends still record the arm's FULL strategy (arm identity
+  // for attribution), not the subset of lines that rendered here.
+  const strategyBlock = strategyDirectives(input.context.strategy, "conversation");
   const avoid = avoidBlock(input.context.avoidPhrases);
   const prompt = [
     block,

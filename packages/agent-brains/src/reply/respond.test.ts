@@ -135,6 +135,24 @@ describe("draftConversationMessage — strategy-aware drafting (WS-3.1)", () => 
     expect(seen).toContain("Strategy for this message");
   });
 
+  it("suppresses first-touch-only opener knobs mid-conversation (shape-aware, WS-3.1 fix)", async () => {
+    let seen = "";
+    const model = new MockLanguageModelV3({
+      doGenerate: capturing({ message: "No rush at all, happy to keep it light." }, (p) => (seen = p)),
+    });
+    await draftConversationMessage(
+      input({
+        context: { ...input().context, strategy: { openWith: "trigger", askStyle: "soft" } },
+      }),
+      model
+    );
+    // openWith is first-touch wording ("Open by naming...") — rendered mid-thread it contradicts
+    // the anti-restart rule, so the conversation shape must drop it...
+    expect(seen).not.toContain("Open by naming");
+    // ...while conversation-safe knobs still render
+    expect(seen).toContain("Keep the ask a soft, low-pressure interest check");
+  });
+
   it("prompt is byte-identical to before when strategy is absent", async () => {
     let withNoStrategyKey = "";
     let withUndefinedStrategy = "";

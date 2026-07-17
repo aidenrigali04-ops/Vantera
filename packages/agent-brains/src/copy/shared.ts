@@ -80,16 +80,29 @@ const STRATEGY_LINES: Record<string, string> = {
   "askStyle:specific": "Make the ask one concrete next step: propose a specific short call.",
 };
 
+/** Which kind of touch a strategy is being rendered for. Opener knobs (openWith, openerAngle)
+ *  are FIRST-TOUCH-ONLY wording ("Open by naming...", "Angle the opener around...") — rendered
+ *  mid-thread they contradict the conversation brain's anti-restart rule, so the conversation
+ *  shape suppresses them and keeps only the knobs that make sense anywhere in a thread. */
+export type TouchShape = "first_touch" | "conversation";
+
+/** Knobs whose directive text only makes sense in a message that OPENS a thread. */
+const FIRST_TOUCH_ONLY_KNOBS = new Set<string>(["openWith", "openerAngle"]);
+
 /**
  * Render a strategy as extra prompt directives, appended AFTER the base rules so it never overrides
  * compliance/humanity. Returns "" for an absent or no-op strategy, so a champion draft is prompted
- * byte-for-byte the same as before the optimizer existed.
+ * byte-for-byte the same as before the optimizer existed. `shape` defaults to "first_touch" so
+ * existing callers are unchanged; "conversation" suppresses the opener knobs (see TouchShape).
  */
-export function strategyDirectives(strategy?: CopyStrategy): string {
+export function strategyDirectives(strategy?: CopyStrategy, shape: TouchShape = "first_touch"): string {
   if (!strategy) return "";
   const lines: string[] = [];
   for (const [key, value] of Object.entries(strategy)) {
     if (!value) continue;
+    // Opener knobs instruct how to OPEN a thread — mid-conversation that's a restart directive,
+    // the exact thing the reply brain's own rules forbid. Skip them for the conversation shape.
+    if (shape === "conversation" && FIRST_TOUCH_ONLY_KNOBS.has(key)) continue;
     // Stage 1b open-ended knob: the angle is interpolated as a style directive. Values reach
     // here only through validateRecipeAngle (generation gate), so no claim can ride along.
     if (key === "openerAngle") {
