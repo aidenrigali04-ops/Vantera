@@ -312,3 +312,43 @@ describe("proof grounding (0047)", () => {
     expect(sql).not.toContain("retention(proof_points)");
   });
 });
+
+describe("stage-scoped attribution + alpha wealth (0058)", () => {
+  const sql = fileContents.get("0058_stage_attribution_alpha.sql") ?? "";
+
+  it("0058 migration exists", () => {
+    expect(sql).not.toBe("");
+  });
+
+  it("adds optimization_playbook.alpha_wealth as not-null with the 0.05 default", () => {
+    expect(sql).toMatch(/alter table public\.optimization_playbook\s+add column alpha_wealth numeric not null default 0\.05/);
+  });
+
+  it("adds optimization_experiments.alpha_spent as a bare nullable numeric (honest pre-2A null)", () => {
+    expect(sql).toMatch(/alter table public\.optimization_experiments\s+add column alpha_spent numeric;/);
+  });
+
+  it("creates the recipe_stage_outcomes view", () => {
+    expect(sql).toMatch(/create view public\.recipe_stage_outcomes as/);
+  });
+
+  it("is service-role read only: no grant to anon/authenticated, and an explicit revoke", () => {
+    expect(sql).toMatch(/revoke all on public\.recipe_stage_outcomes from authenticated, anon/i);
+    // strip comment lines first — prose discussing "grant" (e.g. explaining WHY one is dangerous)
+    // must not be mistaken for an actual SQL grant statement
+    const codeOnly = sql
+      .split("\n")
+      .filter((line) => !line.trimStart().startsWith("--"))
+      .join("\n");
+    expect(codeOnly).not.toMatch(/grant\s+[\s\S]*?on public\.recipe_stage_outcomes/i);
+  });
+
+  it("excludes the paired first-touch MESSAGE row from the acceptance denominator", () => {
+    // the view's final WHERE must keep first_touch rows ONLY when linkedin_stage = 'invite'
+    expect(sql).toMatch(/where m\.brain <> 'first_touch' or m\.linkedin_stage = 'invite'/);
+  });
+
+  it("the view is not a drizzle table export (views are exempt from the RLS-table guardrails)", () => {
+    expect(allTables).not.toContain("recipe_stage_outcomes");
+  });
+});

@@ -5,6 +5,7 @@ import {
   index,
   integer,
   jsonb,
+  numeric,
   pgTable,
   primaryKey,
   smallint,
@@ -1179,6 +1180,9 @@ export const optimizationExperiments = pgTable(
     concludedAt: timestamp("concluded_at", { withTimezone: true }),
     createdBy: uuid("created_by"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    // 0058: alpha drawn from the account's alpha-investing wealth to run THIS experiment.
+    // Null = pre-2A experiment (honest unknown, never backfilled) or not yet decided.
+    alphaSpent: numeric("alpha_spent", { mode: "number" }),
   },
   (t) => [index("optimization_experiments_account_status_idx").on(t.accountId, t.status)]
 );
@@ -1191,6 +1195,10 @@ export const optimizationPlaybook = pgTable("optimization_playbook", {
   championStrategy: jsonb("champion_strategy").notNull().default({}),
   version: integer("version").notNull().default(1),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  // 0058: alpha-investing wealth (enterprise-grade-brain 2A) — the significance budget available
+  // for the account's next sequential test. Starts at 0.05 (classical single-test alpha); drawn
+  // down/replenished by the e-process decide pipeline.
+  alphaWealth: numeric("alpha_wealth", { mode: "number" }).notNull().default(0.05),
 });
 
 // ── 0018 conversion tokens ────────────────────────────────────────────────────
