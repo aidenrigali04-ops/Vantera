@@ -830,7 +830,15 @@ export interface ResponderBundle {
   humanHandled: boolean;
   /** the lead's experiment-arm stamp (0040, lead-level) — carried onto every conversation
    *  send's recipe so message-level attribution never loses the arm (Stage 1) */
-  attribution: { experimentId: string | null; variant: "champion" | "challenger" | null };
+  attribution: {
+    experimentId: string | null;
+    variant: "champion" | "challenger" | null;
+    /** the strategy that shaped THIS message: the challenger strategy only while the lead's own
+     *  experiment is still the account's LIVE one; otherwise the current champion (WS-3.1). */
+    strategy: CopyStrategy;
+    /** optimization_playbook.version at bundle-build time (null = no playbook adopted yet) */
+    playbookVersion: number | null;
+  };
 }
 
 export interface InboundDeps {

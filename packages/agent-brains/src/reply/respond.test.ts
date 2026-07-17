@@ -117,6 +117,51 @@ describe("draftConversationMessage — proactive follow-up mode (no incoming)", 
   });
 });
 
+describe("draftConversationMessage — strategy-aware drafting (WS-3.1)", () => {
+  it("renders strategy directives into the conversation prompt when context.strategy is set", async () => {
+    let seen = "";
+    const model = new MockLanguageModelV3({
+      doGenerate: capturing(
+        { message: "Happy to keep it low-key, no pressure at all." },
+        (p) => (seen = p)
+      ),
+    });
+    await draftConversationMessage(
+      input({ context: { ...input().context, strategy: { askStyle: "soft" } } }),
+      model
+    );
+    // the actual strategyDirectives line for askStyle:soft (copy/shared.ts STRATEGY_LINES)
+    expect(seen).toContain("Keep the ask a soft, low-pressure interest check");
+    expect(seen).toContain("Strategy for this message");
+  });
+
+  it("prompt is byte-identical to before when strategy is absent", async () => {
+    let withNoStrategyKey = "";
+    let withUndefinedStrategy = "";
+    const modelA = new MockLanguageModelV3({
+      doGenerate: capturing({ message: "ok" }, (p) => (withNoStrategyKey = p)),
+    });
+    const modelB = new MockLanguageModelV3({
+      doGenerate: capturing({ message: "ok" }, (p) => (withUndefinedStrategy = p)),
+    });
+    // context with no `strategy` key at all — the shape every prompt used before the optimizer
+    const contextSansStrategy = {
+      cta: "a quick 15-min intro",
+      accountName: "Vantera",
+      accountIndustry: "sales tech",
+      valueProp: "qualifies leads before outreach",
+    };
+    await draftConversationMessage(input({ context: contextSansStrategy }), modelA);
+    // same context, `strategy` present but explicitly undefined — must produce the identical prompt
+    await draftConversationMessage(
+      input({ context: { ...contextSansStrategy, strategy: undefined } }),
+      modelB
+    );
+    expect(withNoStrategyKey).toBe(withUndefinedStrategy);
+    expect(withNoStrategyKey).not.toContain("Strategy for this message");
+  });
+});
+
 describe("draftConversationMessage — restart guard", () => {
   it("flags a reply that re-introduces / cold-opens mid-thread", async () => {
     const model = new MockLanguageModelV3({

@@ -37,7 +37,7 @@ const bundle = (over: Partial<ResponderBundle> = {}): ResponderBundle => ({
   newestUnsentMessageCreatedAt: null,
   lastAgentMessageAt: null,
   humanHandled: false,
-  attribution: { experimentId: null, variant: null },
+  attribution: { experimentId: null, variant: null, strategy: {}, playbookVersion: null },
   ...over,
 });
 
@@ -111,7 +111,9 @@ describe("runSequenceTouch", () => {
     const insert = vi.fn(async () => {});
     const d = deps({
       getResponderBundle: async () =>
-        bundle({ attribution: { experimentId: "exp-3", variant: "challenger" } }),
+        bundle({
+          attribution: { experimentId: "exp-3", variant: "challenger", strategy: {}, playbookVersion: null },
+        }),
       insertScheduledSend: insert,
     });
     await runSequenceTouch(dispatch, d);
@@ -126,6 +128,31 @@ describe("runSequenceTouch", () => {
           playbookVersion: null,
           exemplars: 0,
         },
+      })
+    );
+  });
+
+  it("stamps the proactive follow-up with the resolved strategy + playbook version (WS-3.1)", async () => {
+    const insert = vi.fn(async () => {});
+    const d = deps({
+      getResponderBundle: async () =>
+        bundle({
+          attribution: {
+            experimentId: "exp-3",
+            variant: "challenger",
+            strategy: { askStyle: "specific" },
+            playbookVersion: 3,
+          },
+        }),
+      insertScheduledSend: insert,
+    });
+    await runSequenceTouch(dispatch, d);
+    expect(insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        recipe: expect.objectContaining({
+          strategy: { askStyle: "specific" },
+          playbookVersion: 3,
+        }),
       })
     );
   });

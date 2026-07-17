@@ -72,6 +72,7 @@ import type { AccountHealthStore, LinkedInAccountRow } from "./account-health";
 import type { ReplyBacklogStore } from "./reply-backlog";
 import {
   SCOUT_DEFAULTS,
+  type ActiveExperiment,
   type ConversionStore,
   type ConnectionSyncStore,
   type OptimizeStore,
@@ -303,6 +304,52 @@ async function loadProofPoints(db: Db, accountId: string): Promise<ProofPoint[]>
     .where(eq(proofPoints.accountId, accountId))
     .orderBy(asc(proofPoints.sort), asc(proofPoints.createdAt));
   return rows.map((r) => ({ kind: r.kind, text: r.text, question: r.question }));
+}
+
+/** The account's running experiment (self-optimizing loop, Phase 3), or null. Extracted to a plain
+ *  function (rather than `this.getActiveExperiment`) so getResponderBundle can call it directly —
+ *  this file's object-literal store never references sibling methods via `this`. */
+async function fetchActiveExperiment(db: Db, accountId: string): Promise<ActiveExperiment | null> {
+  const [row] = await db
+    .select({
+      id: optimizationExperiments.id,
+      allocationPct: optimizationExperiments.allocationPct,
+      challengerStrategy: optimizationExperiments.challengerStrategy,
+    })
+    .from(optimizationExperiments)
+    .where(
+      and(
+        eq(optimizationExperiments.accountId, accountId),
+        eq(optimizationExperiments.status, "running")
+      )
+    )
+    .limit(1);
+  if (!row) return null;
+  return {
+    id: row.id,
+    allocationPct: row.allocationPct,
+    challengerStrategy: (row.challengerStrategy ?? {}) as CopyStrategy,
+  };
+}
+
+/** The account's adopted champion strategy + playbook version; {strategy:{}, version:null} when no
+ *  playbook exists yet. Same extraction reason as fetchActiveExperiment above. */
+async function fetchChampion(
+  db: Db,
+  accountId: string
+): Promise<{ strategy: CopyStrategy; version: number | null }> {
+  const [row] = await db
+    .select({
+      championStrategy: optimizationPlaybook.championStrategy,
+      version: optimizationPlaybook.version,
+    })
+    .from(optimizationPlaybook)
+    .where(eq(optimizationPlaybook.accountId, accountId))
+    .limit(1);
+  return {
+    strategy: (row?.championStrategy ?? {}) as CopyStrategy,
+    version: row?.version ?? null,
+  };
 }
 
 /** Drizzle-backed store used by the Trigger.dev tasks (service-role DATABASE_URL). */
@@ -882,41 +929,11 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
     },
 
     async getActiveExperiment(accountId) {
-      const [row] = await db
-        .select({
-          id: optimizationExperiments.id,
-          allocationPct: optimizationExperiments.allocationPct,
-          challengerStrategy: optimizationExperiments.challengerStrategy,
-        })
-        .from(optimizationExperiments)
-        .where(
-          and(
-            eq(optimizationExperiments.accountId, accountId),
-            eq(optimizationExperiments.status, "running")
-          )
-        )
-        .limit(1);
-      if (!row) return null;
-      return {
-        id: row.id,
-        allocationPct: row.allocationPct,
-        challengerStrategy: (row.challengerStrategy ?? {}) as CopyStrategy,
-      };
+      return fetchActiveExperiment(db, accountId);
     },
 
     async getChampion(accountId) {
-      const [row] = await db
-        .select({
-          championStrategy: optimizationPlaybook.championStrategy,
-          version: optimizationPlaybook.version,
-        })
-        .from(optimizationPlaybook)
-        .where(eq(optimizationPlaybook.accountId, accountId))
-        .limit(1);
-      return {
-        strategy: (row?.championStrategy ?? {}) as CopyStrategy,
-        version: row?.version ?? null,
-      };
+      return fetchChampion(db, accountId);
     },
 
     async stampLeadExperiment(leadId, experimentId, variant) {
@@ -1808,6 +1825,22 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         .limit(1);
       if (!lead?.aiInsights) return null;
 
+      // Self-optimizing loop (Phase 3 / WS-3.1): resolve once which strategy shapes THIS message.
+      // Locked rule: a lead drafts with the challenger strategy ONLY while its own experiment is
+      // still the account's LIVE (running) one; a lead from a concluded/superseded experiment
+      // falls back to the current champion — never a stale challenger. playbookVersion is always
+      // the champion's version (null when no playbook has been adopted yet).
+      const [experiment, champion] = await Promise.all([
+        fetchActiveExperiment(db, accountId),
+        fetchChampion(db, accountId),
+      ]);
+      const onLiveChallenger =
+        lead.strategyVariant === "challenger" &&
+        lead.experimentId != null &&
+        experiment != null &&
+        lead.experimentId === experiment.id;
+      const strategy = onLiveChallenger ? experiment.challengerStrategy : champion.strategy;
+
       const [account] = await db.select().from(accounts).where(eq(accounts.id, accountId)).limit(1);
       const [campaign] = await db
         .select({ sendMode: campaigns.sendMode })
@@ -1907,6 +1940,10 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           // Citable proof/pricing/FAQ facts — lets the responder answer evidence/price questions
           // truthfully instead of deflecting or getting flagged for a fabricated number (0046).
           proofPoints: await loadProofPoints(db, accountId),
+          // WS-3.1: conversation drafting (replies + follow-ups) becomes strategy-aware — same
+          // resolved strategy as the attribution stamp below, so the prompt and the recipe never
+          // disagree about what shaped the message.
+          strategy,
         },
         thread,
         agentTurns: sentMessages.length,
@@ -1916,6 +1953,8 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         attribution: {
           experimentId: lead.experimentId ?? null,
           variant: (lead.strategyVariant as "champion" | "challenger" | null) ?? null,
+          strategy,
+          playbookVersion: champion.version,
         },
       };
     },

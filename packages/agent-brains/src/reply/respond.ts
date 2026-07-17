@@ -11,7 +11,7 @@ import {
   normalizeDashes,
   type Violation,
 } from "../copy/humanizer";
-import { avoidBlock, generateHumanized, leadBlock, PROSPECT_ACCURACY_RULE, VOICE_RULES, type CopyContext, type CopyLead } from "../copy/shared";
+import { avoidBlock, generateHumanized, leadBlock, strategyDirectives, PROSPECT_ACCURACY_RULE, VOICE_RULES, type CopyContext, type CopyLead } from "../copy/shared";
 import type { ReplyVerdict } from "./classify";
 
 /** One message in the running 1:1 thread, oldest first. */
@@ -153,8 +153,22 @@ export async function draftConversationMessage(
         `The prospect hasn't replied to your last message yet.`,
         `Write a short, natural follow-up that CONTINUES the thread above: pick up from your own last message (deepen its angle, add one concrete detail, or ask the question it implied). Assume they read it. Never a repeat, never a re-introduction, never a fresh pitch that ignores what you already said.`,
       ];
+  // Optional experiment strategy (self-optimizing loop, Phase 3): appended right after the lead
+  // block, same placement as the outreach copy brain (copy/linkedin.ts). Empty/absent strategy ⇒
+  // strategyDirectives returns "" ⇒ this prompt is byte-identical to before conversation drafting
+  // became strategy-aware.
+  const strategyBlock = strategyDirectives(input.context.strategy);
   const avoid = avoidBlock(input.context.avoidPhrases);
-  const prompt = [block, ``, `Conversation so far:`, renderThread(input.thread), ``, ...situation, ...(avoid ? [``, avoid] : [])].join("\n");
+  const prompt = [
+    block,
+    ...(strategyBlock ? [``, strategyBlock] : []),
+    ``,
+    `Conversation so far:`,
+    renderThread(input.thread),
+    ``,
+    ...situation,
+    ...(avoid ? [``, avoid] : []),
+  ].join("\n");
   const allowed = allowedConversationLinks(input.context);
 
   const { output, violations } = await generateHumanized(

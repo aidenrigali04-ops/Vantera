@@ -506,7 +506,7 @@ describe("runInbound — active responder (converse to close)", () => {
     newestUnsentMessageCreatedAt: null,
     lastAgentMessageAt: null,
     humanHandled: false,
-    attribution: { experimentId: null, variant: null },
+    attribution: { experimentId: null, variant: null, strategy: {}, playbookVersion: null },
     ...over,
   });
 
@@ -549,7 +549,7 @@ describe("runInbound — active responder (converse to close)", () => {
 
   it("stamps the contextual reply with a conversation_reply recipe carrying the lead's arm (Stage 1)", async () => {
     const store = storeWithBundle(
-      bundle({ attribution: { experimentId: "exp-9", variant: "champion" } })
+      bundle({ attribution: { experimentId: "exp-9", variant: "champion", strategy: {}, playbookVersion: null } })
     );
 
     await runInbound(
@@ -565,6 +565,29 @@ describe("runInbound — active responder (converse to close)", () => {
       variant: "champion",
       playbookVersion: null,
       exemplars: 0,
+    });
+  });
+
+  it("stamps the contextual reply with the resolved strategy + playbook version (WS-3.1)", async () => {
+    const store = storeWithBundle(
+      bundle({
+        attribution: {
+          experimentId: "exp-9",
+          variant: "challenger",
+          strategy: { askStyle: "specific" },
+          playbookVersion: 3,
+        },
+      })
+    );
+
+    await runInbound(
+      { source: "linkedin", payload: LINKEDIN_REPLY_FIXTURE },
+      deps(store, { classifyFn: classify("interested"), respondFn: respond() })
+    );
+
+    expect(store.scheduledSends[0]!.recipe).toMatchObject({
+      strategy: { askStyle: "specific" },
+      playbookVersion: 3,
     });
   });
 
