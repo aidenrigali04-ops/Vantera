@@ -1,0 +1,23 @@
+{
+  "name": "@vantera/evals",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "type-check": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@vantera/agent-brains": "workspace:*",
+    "@vantera/ai": "workspace:*",
+    "ai": "^6.0.0",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.0",
+    "vitest": "^4.1.9"
+  }
+}

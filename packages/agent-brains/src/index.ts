@@ -27,6 +27,9 @@ export {
   describeViolations,
   findRestartPhrases,
   findUngroundedClaims,
+  findActionClaims,
+  findUnapprovedLinks,
+  normalizeDashes,
   type Violation,
 } from "./copy/humanizer";
 export {
@@ -65,6 +68,7 @@ export {
   type ConversationMessageInput,
   type ConversationTurn,
 } from "./reply/respond";
+export { validateConversationMessage, allowedConversationLinks } from "./reply/respond";
 export {
   classifyIntent,
   normalizeVerdict,
