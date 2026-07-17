@@ -147,10 +147,15 @@ export async function runOptimize(deps: OptimizeDeps): Promise<OptimizeSummary> 
     // alerted (it's not a calibration failure — it's a duplicate-arm mistake) and never marked
     // ready. The next test still chains, same as any other discard.
     if (identicalArms) {
+      // { credit: false }: this conclusion is ADMINISTRATIVE — freeing a stuck slot, not a
+      // decisive verdict — so it earns no alpha wealth back (Task 7 / WS-1.1 review fix). Heals
+      // typically close UNFUNDED manual experiments (the web "start test" action neither debits
+      // nor stamps alphaSpent), so crediting them would mint wealth that was never spent.
       await deps.store.concludeExperiment(
         exp.id,
         "discarded",
-        "identical champion and challenger — no testable difference"
+        "identical champion and challenger — no testable difference",
+        { credit: false }
       );
       concluded++;
       await tallyChain();

@@ -1135,14 +1135,19 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
       }));
     },
 
-    async concludeExperiment(id, status: ExperimentStatus, reason) {
+    async concludeExperiment(id, status: ExperimentStatus, reason, opts) {
       // Task 7 / WS-1.1: credit the account's alpha-investing wealth on a DECISIVE conclusion —
       // guarded by the UPDATE's own `returning()` so a repeat call on an already-terminal
-      // experiment (idempotency) credits nothing a second time. Halts do NOT earn: the calibrated
-      // family-wise evidence (calibration.test.ts's CHAINED FAMILY gate) defined "decisive" as
-      // the e-process actually reaching an adopt/discard conclusion — a breaker halt is a safety
-      // stop, not a statistical conclusion, and crediting it was measured to fund ~5.6-5.8 of 10
-      // chain experiments vs the calibrated ~4.0 (the guarantee would stop describing production).
+      // experiment (idempotency) credits nothing a second time. Two exclusions:
+      //   - Halts do NOT earn: the calibrated family-wise evidence (calibration.test.ts's CHAINED
+      //     FAMILY gate) defined "decisive" as the e-process actually reaching an adopt/discard
+      //     conclusion — a breaker halt is a safety stop, not a statistical conclusion, and
+      //     crediting it was measured to fund ~5.6-5.8 of 10 chain experiments vs the calibrated
+      //     ~4.0 (the guarantee would stop describing production).
+      //   - `opts.credit === false` (default true): the caller marks the conclusion
+      //     ADMINISTRATIVE — the identical-arm heal path discards as cleanup, not as a verdict,
+      //     and typically closes an unfunded manual experiment (crediting it would mint free
+      //     wealth). See OptimizeStore.concludeExperiment's doc in types.ts.
       await db.transaction(async (tx) => {
         const [row] = await tx
           .update(optimizationExperiments)
@@ -1154,7 +1159,9 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
             )
           )
           .returning({ accountId: optimizationExperiments.accountId });
-        if (row && status !== "halted") await creditAlphaWealth(tx, row.accountId);
+        if (row && status !== "halted" && opts?.credit !== false) {
+          await creditAlphaWealth(tx, row.accountId);
+        }
       });
     },
 

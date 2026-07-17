@@ -51,7 +51,8 @@ const V2_ARM_N = 60;
 class FakeOptimizeStore implements OptimizeStore {
   experiments: RunningExperiment[] = [];
   arms = new Map<string, LeadOutcomeFlags[]>(); // key `${id}:${variant}`
-  concluded: { id: string; status: ExperimentStatus; reason: string }[] = [];
+  /** `credit` records the resolved wealth-credit flag (opts.credit ?? true) per conclusion. */
+  concluded: { id: string; status: ExperimentStatus; reason: string; credit: boolean }[] = [];
   adopted: { id: string; reason: string }[] = [];
   /** GATE 0 (enterprise-grade-brain spec, 2026-07-16): winning challengers land here, not `adopted` */
   readyToAdopt: { id: string; reason: string }[] = [];
@@ -76,8 +77,13 @@ class FakeOptimizeStore implements OptimizeStore {
   async getArmFlags(experimentId: string, variant: "champion" | "challenger") {
     return this.arms.get(`${experimentId}:${variant}`) ?? [];
   }
-  async concludeExperiment(id: string, status: ExperimentStatus, reason: string) {
-    this.concluded.push({ id, status, reason });
+  async concludeExperiment(
+    id: string,
+    status: ExperimentStatus,
+    reason: string,
+    opts?: { credit?: boolean }
+  ) {
+    this.concluded.push({ id, status, reason, credit: opts?.credit ?? true });
   }
   async adoptChallenger(id: string, reason: string) {
     this.adopted.push({ id, reason });
@@ -275,6 +281,8 @@ describe("runOptimize (decide pipeline — GATE 0 suggest-only adopt, enterprise
     const summary = await runOptimize({ store, rand: mulberry32(7) });
 
     expect(store.concluded[0]?.status).toBe("discarded");
+    // a verdict-driven discard is a DECISIVE conclusion — it earns wealth back (default credit)
+    expect(store.concluded[0]?.credit).toBe(true);
     expect(summary.chained).toBe(1);
     // Task 7 / WS-1.1: the chained experiment's alphaSpent is nextAlphaSpend of the account's
     // wealth (default ALPHA_WEALTH_START here — see FakeOptimizeStore.alphaWealth).
@@ -575,7 +583,14 @@ describe("runOptimize (decide pipeline — GATE 0 suggest-only adopt, enterprise
 
       expect(alerts).toEqual([]); // never a calibration alert — this is a duplicate-arm mistake
       expect(store.concluded).toEqual([
-        { id: "e1", status: "discarded", reason: "identical champion and challenger — no testable difference" },
+        {
+          id: "e1",
+          status: "discarded",
+          reason: "identical champion and challenger — no testable difference",
+          // administrative cleanup, NOT a decisive conclusion — earns no alpha wealth back (a heal
+          // typically closes an unfunded manual experiment; crediting it would mint free wealth)
+          credit: false,
+        },
       ]);
       expect(store.readyToAdopt).toHaveLength(0);
       expect(store.adopted).toHaveLength(0);

@@ -410,8 +410,22 @@ export interface OptimizeStore {
   getRunningExperiments(): Promise<RunningExperiment[]>;
   /** per-lead outcome flags for one arm of an experiment */
   getArmFlags(experimentId: string, variant: "champion" | "challenger"): Promise<LeadOutcomeFlags[]>;
-  /** conclude an experiment (discarded / halted) with the decision reason */
-  concludeExperiment(id: string, status: ExperimentStatus, reason: string): Promise<void>;
+  /**
+   * Conclude an experiment (discarded / halted) with the decision reason.
+   *
+   * Task 7 / WS-1.1: a decisive conclusion credits alpha-investing wealth back (see pg-store.ts).
+   * `opts.credit` (default true) lets a caller mark the conclusion ADMINISTRATIVE — the
+   * identical-arm heal path passes `{ credit: false }` because freeing a stuck slot is cleanup,
+   * not a statistical conclusion (and heals typically close UNFUNDED manual experiments, so
+   * crediting them would mint wealth that was never spent). Halts never credit regardless of this
+   * flag (the status guard in pg-store.ts).
+   */
+  concludeExperiment(
+    id: string,
+    status: ExperimentStatus,
+    reason: string,
+    opts?: { credit?: boolean }
+  ): Promise<void>;
   /**
    * Adopt a proven challenger autonomously: playbook champion ← challenger_strategy
    * (version-bumped), experiment → 'adopted' with the decision reason. Returns the NEW

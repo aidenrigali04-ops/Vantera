@@ -163,6 +163,18 @@ describe("concludeExperiment wealth credit", () => {
     await createPgStore(db).concludeExperiment("e1", "discarded", "again");
     expect(inserts).toHaveLength(0);
   });
+
+  it("does NOT credit an administrative conclusion ({ credit: false } — the identical-arm heal)", async () => {
+    // The heal path concludes as "discarded" but is a slot-freeing cleanup, not a decisive
+    // verdict — and it typically closes an UNFUNDED manual experiment, so crediting it would
+    // mint alpha wealth that was never spent. The caller opts out; the status flip still runs.
+    const { db, inserts, updateCount } = fakeTransactionDb([{ accountId: "acct-1" }]);
+    await createPgStore(db).concludeExperiment("e1", "discarded", "identical arms — heal", {
+      credit: false,
+    });
+    expect(updateCount()).toBe(1);
+    expect(inserts).toHaveLength(0);
+  });
 });
 
 // Regression: a prospect with no email/phone/tech enrichment must not trigger an empty UPDATE.
