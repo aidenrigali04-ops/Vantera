@@ -1,0 +1,51 @@
+{
+  "id": "li-accounting-partner-reconciliation",
+  "input": {
+    "lead": {
+      "firstName": "Ravi",
+      "lastName": "Deshmukh",
+      "title": "Partner",
+      "companyName": "Quill & Ledger Accounting",
+      "industry": "Accounting Services"
+    },
+    "insights": {
+      "pain_points": [
+        "Reconciliation is done manually line by line each month",
+        "Month end close routinely runs late"
+      ],
+      "triggers": [
+        "Took on a batch of new small business clients this quarter"
+      ],
+      "motivations": [
+        "Close the books on time without adding staff"
+      ],
+      "value_angle": "Automated matching clears the routine lines so staff only handle exceptions",
+      "aha_moment": "Realizing most reconciliation lines matched cleanly and never needed a human look",
+      "prospect_offering": "Quill & Ledger Accounting handles bookkeeping and tax for small business clients",
+      "summary": "Partner adding clients while reconciliation stays a manual, line by line process"
+    },
+    "context": {
+      "cta": "offer a short walkthrough of automated reconciliation",
+      "accountName": "Reconcile IQ",
+      "accountIndustry": "Accounting automation software",
+      "valueProp": "Reconcile IQ closes routine reconciliation lines 3x faster than manual review",
+      "bookingUrl": "https://reconcileiq.example/book",
+      "proofPoints": [
+        {
+          "kind": "metric",
+          "text": "Closes routine reconciliation lines 3x faster than manual review"
+        }
+      ],
+      "strategy": {
+        "openWith": "pain",
+        "askStyle": "specific"
+      }
+    }
+  },
+  "grounding": "Seller offer: Reconcile IQ closes routine reconciliation lines 3x faster than manual review Proof: Closes routine reconciliation lines 3x faster than manual review Prospect: Ravi Deshmukh, Partner at Quill & Ledger Accounting (Accounting Services). Pain points: Reconciliation is done manually line by line each month; Month end close routinely runs late. Value angle: Automated matching clears the routine lines so staff only handle exceptions",
+  "frozenDraft": {
+    "connectionNote": "Saw Quill and Ledger took on a batch of new clients this quarter, nice growth for the firm.",
+    "followupMessage": "Thanks for connecting. New clients are great, though reconciliation adds up fast. How's month end close going these days?",
+    "violations": []
+  }
+}

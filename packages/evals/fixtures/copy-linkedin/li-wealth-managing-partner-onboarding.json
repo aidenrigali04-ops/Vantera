@@ -1,0 +1,40 @@
+{
+  "id": "li-wealth-managing-partner-onboarding",
+  "input": {
+    "lead": {
+      "firstName": "Adaeze",
+      "lastName": "Umeh",
+      "title": "Managing Partner",
+      "companyName": "Meridian Crest Wealth Partners",
+      "industry": "Wealth Management"
+    },
+    "insights": {
+      "pain_points": [
+        "New client onboarding takes weeks of back and forth paperwork",
+        "Advisors chase missing documents by hand"
+      ],
+      "triggers": [
+        "Onboarded a wave of new clients after a referral push"
+      ],
+      "motivations": [
+        "Get new clients onboarded without weeks of paperwork chasing"
+      ],
+      "value_angle": "A guided document checklist cuts the back and forth that stretches onboarding",
+      "aha_moment": "Realizing most onboarding delay was one missing document, not a complex case",
+      "prospect_offering": "Meridian Crest Wealth Partners manages portfolios for high net worth families",
+      "summary": "Managing partner absorbing new clients while onboarding paperwork drags on for weeks"
+    },
+    "context": {
+      "cta": "offer a short look at guided client onboarding",
+      "accountName": "IntakeFlow",
+      "accountIndustry": "Wealth management onboarding software",
+      "valueProp": "IntakeFlow guides new clients through document collection so onboarding stops stalling"
+    }
+  },
+  "grounding": "Seller offer: IntakeFlow guides new clients through document collection so onboarding stops stalling Prospect: Adaeze Umeh, Managing Partner at Meridian Crest Wealth Partners (Wealth Management). Pain points: New client onboarding takes weeks of back and forth paperwork; Advisors chase missing documents by hand. Value angle: A guided document checklist cuts the back and forth that stretches onboarding",
+  "frozenDraft": {
+    "connectionNote": "Saw Meridian Crest picked up a wave of new clients after a referral push, great problem to have.",
+    "followupMessage": "Thanks for connecting. New clients are great, though onboarding paperwork can drag on. How's that process going these days?",
+    "violations": []
+  }
+}

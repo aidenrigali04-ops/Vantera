@@ -1,0 +1,40 @@
+{
+  "id": "li-realestate-broker-followup",
+  "input": {
+    "lead": {
+      "firstName": "Sofia",
+      "lastName": "Lindqvist",
+      "title": "Broker/Owner",
+      "companyName": "Cobblestone Realty Group",
+      "industry": "Residential Real Estate"
+    },
+    "insights": {
+      "pain_points": [
+        "New leads go quiet after the first showing",
+        "Agents forget to follow up once things get busy"
+      ],
+      "triggers": [
+        "Brought on three new agents this spring"
+      ],
+      "motivations": [
+        "Keep every lead followed up without relying on memory"
+      ],
+      "value_angle": "A simple follow up cadence catches the leads busy agents forget",
+      "aha_moment": "Realizing most lost leads just never got a second message, not a real no",
+      "prospect_offering": "Cobblestone Realty Group is a residential brokerage serving first time buyers",
+      "summary": "Broker growing the agent roster while lead follow up still depends on memory"
+    },
+    "context": {
+      "cta": "offer a short look at automated follow up reminders",
+      "accountName": "FollowUp Loop",
+      "accountIndustry": "Real estate CRM software",
+      "valueProp": "FollowUp Loop reminds agents to follow up before a lead goes cold"
+    }
+  },
+  "grounding": "Seller offer: FollowUp Loop reminds agents to follow up before a lead goes cold Prospect: Sofia Lindqvist, Broker/Owner at Cobblestone Realty Group (Residential Real Estate). Pain points: New leads go quiet after the first showing; Agents forget to follow up once things get busy. Value angle: A simple follow up cadence catches the leads busy agents forget",
+  "frozenDraft": {
+    "connectionNote": "Saw Cobblestone brought on three new agents this spring, good sign for the brokerage.",
+    "followupMessage": "Thanks for connecting. New agents are great, though follow up can slip once things get busy. How do you track that today?",
+    "violations": []
+  }
+}

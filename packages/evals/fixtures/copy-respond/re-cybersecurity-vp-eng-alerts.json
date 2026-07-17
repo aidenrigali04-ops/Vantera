@@ -1,0 +1,52 @@
+{
+  "id": "re-cybersecurity-vp-eng-alerts",
+  "input": {
+    "lead": {
+      "firstName": "Callum",
+      "lastName": "Dunmore",
+      "title": "VP of Engineering",
+      "companyName": "Graywatch Security",
+      "industry": "Cybersecurity"
+    },
+    "insights": {
+      "pain_points": [
+        "The team gets paged for alerts that turn out to be routine noise",
+        "Real incidents get buried under low priority alerts"
+      ],
+      "triggers": [
+        "Alert volume roughly doubled after a recent platform migration"
+      ],
+      "motivations": [
+        "Cut alert noise so the team can focus on real incidents"
+      ],
+      "value_angle": "Filtering routine noise surfaces the alerts that actually need a human",
+      "aha_moment": "Realizing most pages were the same handful of low risk alerts repeating",
+      "prospect_offering": "Graywatch Security runs a managed detection and response practice for mid-market clients",
+      "summary": "VP of Engineering fighting alert fatigue after a platform migration doubled volume"
+    },
+    "context": {
+      "cta": "offer a short walkthrough of alert triage",
+      "accountName": "SignalCalm",
+      "accountIndustry": "Security alert triage software",
+      "valueProp": "SignalCalm filters routine noise so the team only sees alerts that need a human",
+      "guardrails": "Never claim SOC 2 or compliance certification we don't have."
+    },
+    "thread": [
+      {
+        "role": "agent",
+        "text": "Thanks for connecting. Doubled alert volume is rough on a team. How are you separating real incidents from the noise?"
+      },
+      {
+        "role": "lead",
+        "text": "Mostly gut feel and tribal knowledge at this point, which doesn't scale."
+      }
+    ],
+    "incoming": "Does this help with compliance reporting too, or just the alert noise side?",
+    "classification": "neutral"
+  },
+  "grounding": "Seller offer: SignalCalm filters routine noise so the team only sees alerts that need a human Prospect: Callum Dunmore, VP of Engineering at Graywatch Security (Cybersecurity). Pain points: The team gets paged for alerts that turn out to be routine noise; Real incidents get buried under low priority alerts. Value angle: Filtering routine noise surfaces the alerts that actually need a human",
+  "frozenDraft": {
+    "message": "Right now it's focused on cutting the noise so real incidents surface faster, compliance reporting isn't part of what it does today.",
+    "violations": []
+  }
+}

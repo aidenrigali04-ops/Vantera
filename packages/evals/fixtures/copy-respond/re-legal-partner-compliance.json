@@ -1,0 +1,52 @@
+{
+  "id": "re-legal-partner-compliance",
+  "input": {
+    "lead": {
+      "firstName": "Tomás",
+      "lastName": "Ibarra",
+      "title": "Partner",
+      "companyName": "Porter & Vale Legal",
+      "industry": "Legal Services"
+    },
+    "insights": {
+      "pain_points": [
+        "Compliance sign-off is tracked across emails and spreadsheets",
+        "Associates rework filings that miss a step"
+      ],
+      "triggers": [
+        "Firm added two new associates this quarter"
+      ],
+      "motivations": [
+        "Standardize sign-off so growth doesn't add risk"
+      ],
+      "value_angle": "One tracked workflow catches a missed step before it becomes rework",
+      "aha_moment": "Seeing that most rework traced back to one skipped sign-off step, not associate error",
+      "prospect_offering": "Porter & Vale Legal is a mid-size firm handling corporate compliance filings",
+      "summary": "Partner growing the associate bench while compliance tracking stays manual"
+    },
+    "context": {
+      "cta": "offer a short walkthrough of the compliance workflow",
+      "accountName": "Ledgersafe",
+      "accountIndustry": "Legal compliance workflow software",
+      "valueProp": "Ledgersafe tracks every compliance sign-off in one place so nothing slips",
+      "bookingUrl": "https://ledgersafe.example/schedule"
+    },
+    "thread": [
+      {
+        "role": "agent",
+        "text": "Thanks for connecting. Growing the associate bench usually means more sign offs to track. How's compliance tracking holding up?"
+      },
+      {
+        "role": "lead",
+        "text": "It's manageable for now, might look at cleaning it up more seriously next quarter."
+      }
+    ],
+    "incoming": "Let's revisit this again once we're through the current caseload.",
+    "classification": "neutral"
+  },
+  "grounding": "Seller offer: Ledgersafe tracks every compliance sign-off in one place so nothing slips Prospect: Tomás Ibarra, Partner at Porter & Vale Legal (Legal Services). Pain points: Compliance sign-off is tracked across emails and spreadsheets; Associates rework filings that miss a step. Value angle: One tracked workflow catches a missed step before it becomes rework",
+  "frozenDraft": {
+    "message": "Next quarter works well on my end too, I'll follow up with you again then.",
+    "violations": []
+  }
+}

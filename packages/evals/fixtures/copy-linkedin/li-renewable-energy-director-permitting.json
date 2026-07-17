@@ -1,0 +1,46 @@
+{
+  "id": "li-renewable-energy-director-permitting",
+  "input": {
+    "lead": {
+      "firstName": "Freya",
+      "lastName": "Bjornstad",
+      "title": "Director of Development",
+      "companyName": "Solace Ridge Energy",
+      "industry": "Renewable Energy"
+    },
+    "insights": {
+      "pain_points": [
+        "Permit applications sit in review with no visibility into status",
+        "Projects stall waiting on one missing approval step"
+      ],
+      "triggers": [
+        "Filed permits for three new project sites this year"
+      ],
+      "motivations": [
+        "Keep projects moving without permit stalls"
+      ],
+      "value_angle": "Clear status tracking catches a stalled permit before it delays a project",
+      "aha_moment": "Realizing one stalled permit had cost the project nearly $900K in delay",
+      "prospect_offering": "Solace Ridge Energy develops utility scale solar projects for regional utilities",
+      "summary": "Development director filing permits across new sites with no visibility into delays"
+    },
+    "context": {
+      "cta": "offer a short look at permit status tracking",
+      "accountName": "PermitTrack",
+      "accountIndustry": "Permitting workflow software",
+      "valueProp": "PermitTrack caught a stalled permit that was costing a similar project $900K in delay",
+      "proofPoints": [
+        {
+          "kind": "metric",
+          "text": "Caught a stalled permit that was costing a similar project $900K in delay"
+        }
+      ]
+    }
+  },
+  "grounding": "Seller offer: PermitTrack caught a stalled permit that was costing a similar project $900K in delay Proof: Caught a stalled permit that was costing a similar project $900K in delay Prospect: Freya Bjornstad, Director of Development at Solace Ridge Energy (Renewable Energy). Pain points: Permit applications sit in review with no visibility into status; Projects stall waiting on one missing approval step. Value angle: Clear status tracking catches a stalled permit before it delays a project",
+  "frozenDraft": {
+    "connectionNote": "Saw Solace Ridge filed permits for three new sites this year, exciting pipeline for the team.",
+    "followupMessage": "Thanks for connecting. Three sites at once means a lot of permits to track. How's visibility into their status today?",
+    "violations": []
+  }
+}

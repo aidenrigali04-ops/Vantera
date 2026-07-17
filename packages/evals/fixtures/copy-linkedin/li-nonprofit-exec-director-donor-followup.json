@@ -1,0 +1,44 @@
+{
+  "id": "li-nonprofit-exec-director-donor-followup",
+  "input": {
+    "lead": {
+      "firstName": "Wesley",
+      "lastName": "Okonkwo",
+      "title": "Executive Director",
+      "companyName": "Wellspring Community Fund",
+      "industry": "Nonprofit"
+    },
+    "insights": {
+      "pain_points": [
+        "Donor follow up happens whenever staff find time between programs",
+        "Repeat donors slip through without a personal thank you"
+      ],
+      "triggers": [
+        "Ran a year end campaign that brought in many first time donors"
+      ],
+      "motivations": [
+        "Turn first time donors into repeat donors with timely follow up"
+      ],
+      "value_angle": "Timely, personal follow up turns a one time gift into a repeat one",
+      "aha_moment": "Realizing most lapsed donors just never heard back after their first gift",
+      "prospect_offering": "Wellspring Community Fund runs local family support programs",
+      "summary": "Executive director managing a wave of new donors with follow up still ad hoc"
+    },
+    "context": {
+      "cta": "share a short look at donor follow up scheduling",
+      "accountName": "DonorLoop",
+      "accountIndustry": "Donor relationship software",
+      "valueProp": "DonorLoop makes sure every new donor gets a timely, personal follow up",
+      "websiteUrl": "https://donorloop.example",
+      "contentLinks": [
+        "https://donorloop.example/case-study"
+      ]
+    }
+  },
+  "grounding": "Seller offer: DonorLoop makes sure every new donor gets a timely, personal follow up Prospect: Wesley Okonkwo, Executive Director at Wellspring Community Fund (Nonprofit). Pain points: Donor follow up happens whenever staff find time between programs; Repeat donors slip through without a personal thank you. Value angle: Timely, personal follow up turns a one time gift into a repeat one",
+  "frozenDraft": {
+    "connectionNote": "Saw Wellspring's year end campaign brought in a wave of first time donors, wonderful result for the fund.",
+    "followupMessage": "Thanks for connecting. A wave of new donors is wonderful, though follow up can slip between programs. How's that handled today?",
+    "violations": []
+  }
+}

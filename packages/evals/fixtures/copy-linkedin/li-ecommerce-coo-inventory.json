@@ -1,0 +1,40 @@
+{
+  "id": "li-ecommerce-coo-inventory",
+  "input": {
+    "lead": {
+      "firstName": "Jordan",
+      "lastName": "Vance",
+      "title": "COO",
+      "companyName": "Driftwood Mercantile",
+      "industry": "Ecommerce Retail"
+    },
+    "insights": {
+      "pain_points": [
+        "Stock counts differ across three warehouses",
+        "Orders get promised on inventory that's already gone"
+      ],
+      "triggers": [
+        "Added a third fulfillment warehouse this year"
+      ],
+      "motivations": [
+        "Stop overselling stock that isn't really there"
+      ],
+      "value_angle": "One shared inventory view stops orders from promising stock that's already gone",
+      "aha_moment": "Realizing oversells traced to one warehouse's count being a day behind the others",
+      "prospect_offering": "Driftwood Mercantile sells home goods direct to consumers online",
+      "summary": "COO running three warehouses with inventory counts that don't agree"
+    },
+    "context": {
+      "cta": "offer a short look at unified inventory visibility",
+      "accountName": "StockSync",
+      "accountIndustry": "Multi warehouse inventory software",
+      "valueProp": "StockSync keeps stock counts in sync across every warehouse in real time"
+    }
+  },
+  "grounding": "Seller offer: StockSync keeps stock counts in sync across every warehouse in real time Prospect: Jordan Vance, COO at Driftwood Mercantile (Ecommerce Retail). Pain points: Stock counts differ across three warehouses; Orders get promised on inventory that's already gone. Value angle: One shared inventory view stops orders from promising stock that's already gone",
+  "frozenDraft": {
+    "connectionNote": "Saw Driftwood added a third fulfillment warehouse this year, big step for the operation.",
+    "followupMessage": "Thanks for connecting. A third warehouse is great, though stock counts can drift apart fast. How do you track inventory today?",
+    "violations": []
+  }
+}

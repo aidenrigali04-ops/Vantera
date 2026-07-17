@@ -1,0 +1,60 @@
+{
+  "id": "re-logistics-ops-director-dispatch",
+  "input": {
+    "lead": {
+      "firstName": "Marcus",
+      "lastName": "Feldt",
+      "title": "Director of Operations",
+      "companyName": "Halcyon Freightlines",
+      "industry": "Freight & Logistics"
+    },
+    "insights": {
+      "pain_points": [
+        "Dispatchers manually match every load to an available driver",
+        "Late assignments cause missed pickup windows"
+      ],
+      "triggers": [
+        "Freight volume up sharply the last two quarters"
+      ],
+      "motivations": [
+        "Cut missed pickups without adding headcount"
+      ],
+      "value_angle": "Automating load matching frees dispatchers to handle the exceptions instead of every routine assignment",
+      "aha_moment": "Seeing that most of a dispatcher's day went to assignments a simple rule could handle",
+      "prospect_offering": "Halcyon Freightlines runs regional trucking routes for manufacturing shippers",
+      "summary": "Ops director under pressure from rising volume and a fully manual dispatch process"
+    },
+    "context": {
+      "cta": "offer a short walkthrough of automated load matching",
+      "accountName": "Dispatch Grid",
+      "accountIndustry": "Freight dispatch software",
+      "valueProp": "Dispatch Grid automates load to driver matching and cuts missed pickup windows by 40%",
+      "proofPoints": [
+        {
+          "kind": "metric",
+          "text": "Cuts missed pickup windows by 40% within the first quarter of use"
+        }
+      ],
+      "avoidPhrases": [
+        "always great to see"
+      ]
+    },
+    "thread": [
+      {
+        "role": "agent",
+        "text": "Thanks for connecting. Rising volume usually means more manual load matching too. How's your dispatch team keeping pace?"
+      },
+      {
+        "role": "lead",
+        "text": "Barely keeping up honestly, we're doing everything by phone and spreadsheet still."
+      }
+    ],
+    "incoming": "How would something like this actually plug into what we're already running?",
+    "classification": "neutral"
+  },
+  "grounding": "Seller offer: Dispatch Grid automates load to driver matching and cuts missed pickup windows by 40% Proof: Cuts missed pickup windows by 40% within the first quarter of use Prospect: Marcus Feldt, Director of Operations at Halcyon Freightlines (Freight & Logistics). Pain points: Dispatchers manually match every load to an available driver; Late assignments cause missed pickup windows. Value angle: Automating load matching frees dispatchers to handle the exceptions instead of every routine assignment",
+  "frozenDraft": {
+    "message": "It sits alongside your current setup and just handles the load matching step, no need to rip out what you're already running.",
+    "violations": []
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "id": "re-hr-director-time-to-fill",
+  "input": {
+    "lead": {
+      "firstName": "Anaya",
+      "lastName": "Shah",
+      "title": "Director of Talent",
+      "companyName": "Harborline Talent Partners",
+      "industry": "Recruiting & Staffing"
+    },
+    "insights": {
+      "pain_points": [
+        "Time to fill keeps creeping up across open roles",
+        "Recruiters lose track of where each candidate stands"
+      ],
+      "triggers": [
+        "Opened twelve new roles at once for a client ramp"
+      ],
+      "motivations": [
+        "Bring time to fill back down without adding recruiters"
+      ],
+      "value_angle": "One shared pipeline view keeps every candidate's stage visible without extra headcount",
+      "aha_moment": "Realizing candidates weren't lost to competitors, they were lost to an untracked stage",
+      "prospect_offering": "Harborline Talent Partners staffs operations and technical roles for growing companies",
+      "summary": "Talent director managing a hiring surge while time to fill keeps climbing"
+    },
+    "context": {
+      "cta": "offer a short walkthrough of pipeline visibility",
+      "accountName": "FillFast",
+      "accountIndustry": "Recruiting pipeline software",
+      "valueProp": "FillFast keeps every candidate's stage visible so nothing stalls untracked",
+      "bookingUrl": "https://fillfast.example/schedule"
+    },
+    "thread": [
+      {
+        "role": "agent",
+        "text": "Thanks for connecting. Twelve roles at once is a lot to track. How's time to fill trending on that batch?"
+      },
+      {
+        "role": "lead",
+        "text": "Creeping up fast, we're starting to lose good candidates to slower stages."
+      }
+    ],
+    "incoming": "Let's just find twenty minutes this week, Thursday afternoon works if that's open.",
+    "classification": "interested"
+  },
+  "grounding": "Seller offer: FillFast keeps every candidate's stage visible so nothing stalls untracked Prospect: Anaya Shah, Director of Talent at Harborline Talent Partners (Recruiting & Staffing). Pain points: Time to fill keeps creeping up across open roles; Recruiters lose track of where each candidate stands. Value angle: One shared pipeline view keeps every candidate's stage visible without extra headcount",
+  "frozenDraft": {
+    "message": "Thursday afternoon works well, grab whichever slot suits you here: https://fillfast.example/schedule",
+    "violations": []
+  }
+}

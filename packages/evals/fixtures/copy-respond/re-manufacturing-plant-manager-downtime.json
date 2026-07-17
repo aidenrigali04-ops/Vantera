@@ -1,0 +1,58 @@
+{
+  "id": "re-manufacturing-plant-manager-downtime",
+  "input": {
+    "lead": {
+      "firstName": "Grace",
+      "lastName": "Okafor",
+      "title": "Plant Manager",
+      "companyName": "Ironwood Manufacturing",
+      "industry": "Industrial Manufacturing"
+    },
+    "insights": {
+      "pain_points": [
+        "Downtime causes get logged on paper after the fact",
+        "Same machine issues keep recurring unnoticed"
+      ],
+      "triggers": [
+        "Added a second production shift this year"
+      ],
+      "motivations": [
+        "Cut unplanned downtime across both shifts"
+      ],
+      "value_angle": "Real time downtime logging surfaces the repeat issues paper logs hide",
+      "aha_moment": "Realizing the same three machines caused most downtime, but paper logs never showed the pattern",
+      "prospect_offering": "Ironwood Manufacturing runs precision metal parts production for industrial clients",
+      "summary": "Plant manager running two shifts with downtime tracking still stuck on paper"
+    },
+    "context": {
+      "cta": "offer a short look at real time downtime tracking",
+      "accountName": "Uptime Metrics",
+      "accountIndustry": "Manufacturing operations software",
+      "valueProp": "Uptime Metrics helped a similar plant recover $1.2M in lost production time last year",
+      "proofPoints": [
+        {
+          "kind": "metric",
+          "text": "Helped a similar plant recover $1.2M in lost production time last year"
+        }
+      ],
+      "strategy": {
+        "followupLength": "tight"
+      }
+    },
+    "thread": [
+      {
+        "role": "agent",
+        "text": "Thanks for connecting. Two shifts usually means twice the downtime causes to track down. How are you logging issues today?"
+      },
+      {
+        "role": "lead",
+        "text": "Still mostly on paper, we just haven't had time to fix that yet."
+      }
+    ]
+  },
+  "grounding": "Seller offer: Uptime Metrics helped a similar plant recover $1.2M in lost production time last year Proof: Helped a similar plant recover $1.2M in lost production time last year Prospect: Grace Okafor, Plant Manager at Ironwood Manufacturing (Industrial Manufacturing). Pain points: Downtime causes get logged on paper after the fact; Same machine issues keep recurring unnoticed. Value angle: Real time downtime logging surfaces the repeat issues paper logs hide",
+  "frozenDraft": {
+    "message": "One thing that surprised a similar plant, most of their downtime traced back to just three machines once they started logging it properly.",
+    "violations": []
+  }
+}

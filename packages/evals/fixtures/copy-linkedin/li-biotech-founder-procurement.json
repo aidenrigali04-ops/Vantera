@@ -1,0 +1,40 @@
+{
+  "id": "li-biotech-founder-procurement",
+  "input": {
+    "lead": {
+      "firstName": "Naledi",
+      "lastName": "Mokoena",
+      "title": "Founder & CEO",
+      "companyName": "Thistlewood Biotech",
+      "industry": "Biotechnology"
+    },
+    "insights": {
+      "pain_points": [
+        "Lab supply orders route through three separate approval steps",
+        "Experiments stall waiting on backordered reagents"
+      ],
+      "triggers": [
+        "Lab expanded to a second research bay this year"
+      ],
+      "motivations": [
+        "Keep experiments moving without supply delays"
+      ],
+      "value_angle": "One clear approval path keeps reagents arriving before an experiment stalls",
+      "aha_moment": "Realizing most delays were approval routing, not the supplier",
+      "prospect_offering": "Thistlewood Biotech researches early stage compounds for university partners",
+      "summary": "Founder scaling lab capacity while procurement approval stays a bottleneck"
+    },
+    "context": {
+      "cta": "offer a short walkthrough of simpler procurement approval",
+      "accountName": "ProcureFast",
+      "accountIndustry": "Lab procurement software",
+      "valueProp": "ProcureFast gives lab teams one clear approval path so orders stop stalling in review"
+    }
+  },
+  "grounding": "Seller offer: ProcureFast gives lab teams one clear approval path so orders stop stalling in review Prospect: Naledi Mokoena, Founder & CEO at Thistlewood Biotech (Biotechnology). Pain points: Lab supply orders route through three separate approval steps; Experiments stall waiting on backordered reagents. Value angle: One clear approval path keeps reagents arriving before an experiment stalls",
+  "frozenDraft": {
+    "connectionNote": "Saw Thistlewood expanded to a second research bay this year, exciting growth for a young biotech.",
+    "followupMessage": "Thanks for connecting. A second bay usually means more supply orders to route. How's procurement approval keeping up?",
+    "violations": []
+  }
+}
