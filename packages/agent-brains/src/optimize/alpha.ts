@@ -23,13 +23,14 @@
  *     pause check into its own return value (null ⇒ caller must not launch) — the arithmetic for
  *     the non-null case is identical, only which side owns the pause-floor branch differs.
  *   - `applyEarn` in the test only credits on a "decisive" conclusion, defined there as
- *     adopt_challenger/discard_challenger specifically (a breaker halt or a 90-day keep_running
- *     timeout does NOT earn in that test's narrower definition). The production wiring (Task 7,
- *     `packages/jobs/src/pipeline/pg-store.ts`) credits on ANY status transition out of
- *     running/ready_to_adopt — discarded, halted, or adopted alike — since all three free the
- *     account's one-live experiment slot ("leaving the live pool"). `wealthAfterConclusion` below
- *     is therefore unconditional arithmetic only; which conclusions actually call it is a
- *     call-site decision, not something this module encodes.
+ *     adopt_challenger/discard_challenger specifically — a breaker halt is a safety stop, not a
+ *     statistical conclusion, and does NOT earn (neither does a 90-day keep_running timeout). The
+ *     production wiring (Task 7, `packages/jobs/src/pipeline/pg-store.ts`) applies the SAME rule:
+ *     `concludeExperiment` credits only non-halt transitions and `adoptChallenger` credits on
+ *     adoption, so the calibrated family-wise guarantee describes production (crediting halts was
+ *     measured to fund ~5.6-5.8 of 10 chain experiments vs the calibrated ~4.0).
+ *     `wealthAfterConclusion` below is unconditional arithmetic only; gating which conclusions
+ *     actually call it is a call-site decision, not something this module encodes.
  */
 
 /** Starting wealth for an account that has never adopted anything — also

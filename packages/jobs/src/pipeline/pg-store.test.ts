@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { sql } from "drizzle-orm";
-import { type Db, createDb, sequenceRuns, campaignLeads } from "@vantera/db";
+import { type Db, createDb, sequenceRuns, campaignLeads, optimizationPlaybook } from "@vantera/db";
 import { createPgStore, toLeadSignalRow } from "./pg-store";
 
 describe("toLeadSignalRow", () => {
@@ -98,6 +98,70 @@ describe("enrollPendingLeads enrolment query shape", () => {
           .from(campaignLeads)
       )
     ).toThrow(/selected fields are not the same/);
+  });
+});
+
+// ── concludeExperiment wealth credit (Task 7 / WS-1.1 review fix) ─────────────────────────────
+// The alpha-investing EARN rule was calibrated (calibration.test.ts's CHAINED FAMILY gate) with
+// halts explicitly EXCLUDED from earning ("a safety stop, not a statistical conclusion") — the
+// production ledger must match that family-wise evidence, or the measured guarantee doesn't
+// describe production (reviewer measured crediting halts launches ~5.6-5.8 of 10 chain
+// experiments vs the calibrated ~4.0). No DB harness exists in this repo, so this drives
+// concludeExperiment through a minimal fake transaction that records which tables get written:
+// the credit is an INSERT..ON CONFLICT upsert into optimization_playbook, so "did the playbook
+// get an insert" is exactly "did the credit fire".
+describe("concludeExperiment wealth credit", () => {
+  type RecordedInsert = { table: unknown; values: Record<string, unknown> };
+
+  function fakeTransactionDb(updateReturns: { accountId: string }[]) {
+    const inserts: RecordedInsert[] = [];
+    let updates = 0;
+    const tx = {
+      update: (_table: unknown) => ({
+        set: (_vals: unknown) => ({
+          where: (_cond: unknown) => ({
+            returning: (_sel: unknown) => {
+              updates++;
+              return Promise.resolve(updateReturns);
+            },
+          }),
+        }),
+      }),
+      insert: (table: unknown) => ({
+        values: (values: Record<string, unknown>) => ({
+          onConflictDoUpdate: (_cfg: unknown) => {
+            inserts.push({ table, values });
+            return Promise.resolve();
+          },
+        }),
+      }),
+    };
+    const db = {
+      transaction: async <T>(fn: (t: typeof tx) => Promise<T>): Promise<T> => fn(tx),
+    };
+    return { db: db as unknown as Db, inserts, updateCount: () => updates };
+  }
+
+  it("credits the playbook on a discard transition (decisive conclusion earns)", async () => {
+    const { db, inserts } = fakeTransactionDb([{ accountId: "acct-1" }]);
+    await createPgStore(db).concludeExperiment("e1", "discarded", "champion holds");
+    expect(inserts).toHaveLength(1);
+    expect(inserts[0]?.table).toBe(optimizationPlaybook);
+  });
+
+  it("does NOT credit on a halt transition — a safety stop is not a statistical conclusion", async () => {
+    // Matches calibration.test.ts's applyEarn: only adopt/discard earn; a breaker halt does not.
+    const { db, inserts, updateCount } = fakeTransactionDb([{ accountId: "acct-1" }]);
+    await createPgStore(db).concludeExperiment("e1", "halted", "harmful challenger");
+    expect(updateCount()).toBe(1); // the experiment still concludes (status flip happens)
+    expect(inserts).toHaveLength(0); // ...but earns nothing back
+  });
+
+  it("does NOT credit when the row was already terminal (no transition happened)", async () => {
+    // The status-guarded UPDATE returned no row — a repeat call must stay a no-op credit-wise.
+    const { db, inserts } = fakeTransactionDb([]);
+    await createPgStore(db).concludeExperiment("e1", "discarded", "again");
+    expect(inserts).toHaveLength(0);
   });
 });
 

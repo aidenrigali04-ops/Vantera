@@ -387,13 +387,15 @@ async function debitAlphaWealth(tx: OptimizeTx, accountId: string, spend: number
 }
 
 /**
- * Credit `ALPHA_EARN_ON_CONCLUSION` back to the account's alpha-investing wealth on a decisive
- * conclusion (Task 7 / WS-1.1), capped at `ALPHA_WEALTH_CAP`. Called from `concludeExperiment` and
- * `adoptChallenger` ONLY when the caller's own status-guarded UPDATE actually returned a row (the
- * experiment really did transition out of running/ready_to_adopt) — a repeat call on an
- * already-terminal experiment never reaches here, which is what keeps the credit to exactly once
- * per experiment. Upserts the playbook row for the rare case an experiment was started outside
- * this pipeline's debit path (e.g. the manual web "start test" action) with no playbook row yet.
+ * Credit `ALPHA_EARN_ON_CONCLUSION` back to the account's alpha-investing wealth on a DECISIVE
+ * conclusion (Task 7 / WS-1.1), capped at `ALPHA_WEALTH_CAP`. Called from `concludeExperiment`
+ * (discard only — halts are safety stops, not statistical conclusions, and do NOT earn; matching
+ * calibration.test.ts's calibrated applyEarn rule) and `adoptChallenger`, and ONLY when the
+ * caller's own status-guarded UPDATE actually returned a row (the experiment really did
+ * transition out of running/ready_to_adopt) — a repeat call on an already-terminal experiment
+ * never reaches here, which is what keeps the credit to exactly once per experiment. Upserts the
+ * playbook row for the rare case an experiment was started outside this pipeline's debit path
+ * (e.g. the manual web "start test" action) with no playbook row yet.
  */
 async function creditAlphaWealth(tx: OptimizeTx, accountId: string): Promise<void> {
   await tx
@@ -1134,9 +1136,13 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
     },
 
     async concludeExperiment(id, status: ExperimentStatus, reason) {
-      // Task 7 / WS-1.1: credit the account's alpha-investing wealth on a decisive conclusion —
+      // Task 7 / WS-1.1: credit the account's alpha-investing wealth on a DECISIVE conclusion —
       // guarded by the UPDATE's own `returning()` so a repeat call on an already-terminal
-      // experiment (idempotency) credits nothing a second time.
+      // experiment (idempotency) credits nothing a second time. Halts do NOT earn: the calibrated
+      // family-wise evidence (calibration.test.ts's CHAINED FAMILY gate) defined "decisive" as
+      // the e-process actually reaching an adopt/discard conclusion — a breaker halt is a safety
+      // stop, not a statistical conclusion, and crediting it was measured to fund ~5.6-5.8 of 10
+      // chain experiments vs the calibrated ~4.0 (the guarantee would stop describing production).
       await db.transaction(async (tx) => {
         const [row] = await tx
           .update(optimizationExperiments)
@@ -1148,7 +1154,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
             )
           )
           .returning({ accountId: optimizationExperiments.accountId });
-        if (row) await creditAlphaWealth(tx, row.accountId);
+        if (row && status !== "halted") await creditAlphaWealth(tx, row.accountId);
       });
     },
 

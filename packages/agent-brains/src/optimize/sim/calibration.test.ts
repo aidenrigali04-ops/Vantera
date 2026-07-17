@@ -23,6 +23,23 @@ import { mulberry32, runMonteCarlo, simulateDecisionPath } from "./harness";
  */
 
 describe("GATE 1 calibration", () => {
+  it("is deterministic under a fixed seed with the injected V2 decideFn", () => {
+    // Mirrors harness.test.ts's legacy determinism test for the decideFn-injected path: the
+    // per-path decideRng derivation (pathSeed → one continuously-advancing stream per path) must
+    // be stable across identical calls, or every rate this file gates on is unstable. The power
+    // config is used (not A/A) so real e-threshold crossings exercise the posterior read's rng
+    // on most paths — an A/A config would rarely touch decideRng at all.
+    const cfg = {
+      championRate: 0.15,
+      challengerRate: 0.27,
+      negativeRate: 0.05,
+      perDayPerArm: 8,
+      horizonDays: 90,
+      decideFn: (c, t, rng) => decideExperimentV2(c, t, { rng }),
+    } satisfies Parameters<typeof runMonteCarlo>[2];
+    expect(runMonteCarlo(100, 42, cfg)).toEqual(runMonteCarlo(100, 42, cfg));
+  });
+
   it("NULL CALIBRATION: V2 false-adoption ≤ 5% under daily peeking", () => {
     // Identical scenario to the OLD gate's CHARACTERIZATION test (harness.test.ts): true A/A
     // (championRate === challengerRate === 0.15), negativeRate 0.05 both arms, 8/day/arm, 90-day
@@ -53,12 +70,13 @@ describe("GATE 1 calibration", () => {
     //
     // Root cause (investigated, not a V2 defect): the shared do-no-harm circuit breaker
     // (`checkCircuitBreaker` in decide.ts -- UNCHANGED, reused verbatim by both decideExperiment
-    // and decideExperimentV2) trips on early-sample noise in ~18-19% of runs REGARDLESS of the
-    // true lift, because it compares negative-reply rates that are identical in expectation on
+    // and decideExperimentV2) trips on early-sample noise in roughly 16-19% of runs REGARDLESS of
+    // the true lift, because it compares negative-reply rates that are identical in expectation on
     // both arms in every scenario tested here (negativeRate 0.05 on both champion and
     // challenger). Confirmed by running the SAME configs through the legacy `decideExperiment`:
-    // haltRate ~18.45% under the null and ~19.4% at a 15pp lift -- statistically the same as V2's
-    // ~18-19% at every lift tried. That ~19% breaker-halt rate is therefore a hard ceiling on
+    // breaker-halt rates land in the same ~16-19% band across seeds/configs (e.g. 18.45% under
+    // the null at seed 1234 / 2000 runs on the legacy gate) -- statistically the same band V2
+    // shows at every lift tried. That ~16-19% breaker-halt rate is therefore a hard ceiling on
     // achievable power at this daily volume for EITHER gate, entirely independent of the e-value/
     // posterior ADOPT logic this task calibrates -- fixing it (if it should be fixed at all) is a
     // decide.ts/breaker change outside this task's scope (harness.ts + this file only).
