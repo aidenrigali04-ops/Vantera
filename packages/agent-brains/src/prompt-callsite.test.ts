@@ -41,7 +41,9 @@ const REGISTRY_SYSTEM_REF = /\bsystem:\s*[A-Z][A-Z0-9_]*\.text\b/;
  * no parser dependency, cheap, and precise enough for this shape of violation.
  */
 export function hasInlineSystem(sourceText: string): boolean {
-  return /system:\s*[`"']/.test(sourceText);
+  // `\b` on the left so `subsystem:`/`filesystem:` (and other `*system:` substrings) don't
+  // false-trip the guardrail — mirrors REGISTRY_SYSTEM_REF's `\bsystem:`.
+  return /\bsystem:\s*[`"']/.test(sourceText);
 }
 
 describe("hasInlineSystem predicate (synthetic evidence the scanner actually detects violations)", () => {
@@ -62,6 +64,11 @@ describe("hasInlineSystem predicate (synthetic evidence the scanner actually det
 
   it("does not flag files with no system prop at all", () => {
     const good = `const y = someOtherFunctionCall({ model, prompt });`;
+    expect(hasInlineSystem(good)).toBe(false);
+  });
+
+  it("does not flag a *system: substring like subsystem: (left word boundary)", () => {
+    const good = `const cfg = { subsystem: "x", filesystem: "y" };`;
     expect(hasInlineSystem(good)).toBe(false);
   });
 });
