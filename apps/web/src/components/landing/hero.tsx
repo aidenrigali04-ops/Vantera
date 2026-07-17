@@ -40,13 +40,14 @@ export function Hero() {
           <div className="max-w-2xl">
             {/* h1 is the LCP element: no opacity gate, painted in SSR so it renders at
                 first paint instead of waiting on hydration. */}
-            {/* Two deliberate lines ("Adaptive prospecting system" / "for LinkedIn lead gen") —
-                uncontrolled wrapping orphaned "gen" on its own line. Sized so line 1 fits the
-                column at every breakpoint; mobile keeps natural flow with "lead gen" kept whole. */}
-            <h1 className="text-[1.95rem] font-semibold leading-[1.16] tracking-[-0.04em] text-foreground sm:text-[2.5rem]">
-              <span className="sm:block sm:whitespace-nowrap">Adaptive prospecting system</span>{" "}
+            {/* Two deliberate lines ("Smarter Lead Gen" / "On LinkedIn") — uncontrolled
+                wrapping orphans words. Scale matches the final CTA (the page's other bookend)
+                so the h1 is never smaller than a section h2; line 1 fits the column at every
+                breakpoint, and mobile keeps natural flow with the LinkedIn group kept whole. */}
+            <h1 className="text-[2.3rem] font-semibold leading-[1.06] tracking-[-0.035em] text-foreground sm:text-[3rem] lg:text-[3.35rem]">
+              <span className="sm:block sm:whitespace-nowrap">Smarter Lead Gen</span>{" "}
               <span className="sm:block">
-                for{" "}
+                On{" "}
                 <span className="whitespace-nowrap">
                   <span
                     role="img"
@@ -57,8 +58,7 @@ export function Hero() {
                     <span className="sr-only">LinkedIn</span>
                   </span>{" "}
                   LinkedIn
-                </span>{" "}
-                <span className="whitespace-nowrap">lead gen</span>
+                </span>
               </span>
             </h1>
 
