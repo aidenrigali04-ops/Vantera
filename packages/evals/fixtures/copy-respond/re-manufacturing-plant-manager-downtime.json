@@ -52,7 +52,8 @@
   },
   "grounding": "Seller offer: Uptime Metrics helped a similar plant recover $1.2M in lost production time last year Proof: Helped a similar plant recover $1.2M in lost production time last year Prospect: Grace Okafor, Plant Manager at Ironwood Manufacturing (Industrial Manufacturing). Pain points: Downtime causes get logged on paper after the fact; Same machine issues keep recurring unnoticed. Value angle: Real time downtime logging surfaces the repeat issues paper logs hide",
   "frozenDraft": {
-    "message": "One thing that surprised a similar plant, most of their downtime traced back to just three machines once they started logging it properly.",
+    "message": "One thing that surprised a similar plant, they recovered $1.2M in lost production time once they started logging downtime properly.",
     "violations": []
-  }
+  },
+  "notes": "positive-grounding: cites the $1.2M present in grounding"
 }
