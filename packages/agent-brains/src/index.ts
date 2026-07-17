@@ -112,12 +112,20 @@ export {
 } from "./optimize/allocate";
 export {
   decideExperiment,
+  checkCircuitBreaker,
   DECIDE_DEFAULTS,
   type VariantOutcome,
   type ExperimentVerdict,
   type ExperimentDecision,
   type DecideOptions,
+  type BreakerOptions,
 } from "./optimize/decide";
+export {
+  decideExperimentV2,
+  clampDecideV2Options,
+  DECIDE_V2_DEFAULTS,
+  type DecideV2Options,
+} from "./optimize/decide-v2";
 export {
   proposeChallengerStrategy,
   proposeNextChallenger,

@@ -49,6 +49,49 @@ export const DECIDE_DEFAULTS: Required<DecideOptions> = {
 const ratePct = (num: number, den: number) => (den > 0 ? (num / den) * 100 : 0);
 const round1 = (x: number) => Math.round(x * 10) / 10;
 
+/** The subset of DecideOptions the circuit breaker reads — shared with DecideV2Options. */
+export type BreakerOptions = {
+  breakerMinSample?: number;
+  harmMarginPp?: number;
+  hardNegCeilingPct?: number;
+};
+
+/**
+ * Do-no-harm circuit breaker — FIRST and independent of any reply lift, in BOTH decideExperiment
+ * and decideExperimentV2 (extracted here so the two gates share one implementation, never two).
+ * Needs a floor sample so it can't trip on noise; halts on an unacceptable absolute rate, or a
+ * confident, meaningful excess over the champion. Returns null when the breaker doesn't trip.
+ */
+export function checkCircuitBreaker(
+  champion: VariantOutcome,
+  challenger: VariantOutcome,
+  options?: BreakerOptions
+): ExperimentVerdict | null {
+  const breakerMinSample = options?.breakerMinSample ?? DECIDE_DEFAULTS.breakerMinSample;
+  const harmMarginPp = options?.harmMarginPp ?? DECIDE_DEFAULTS.harmMarginPp;
+  const hardNegCeilingPct = options?.hardNegCeilingPct ?? DECIDE_DEFAULTS.hardNegCeilingPct;
+
+  const champNeg = ratePct(champion.negatives, champion.denominator);
+  const chalNeg = ratePct(challenger.negatives, challenger.denominator);
+
+  if (challenger.denominator >= breakerMinSample) {
+    if (chalNeg >= hardNegCeilingPct) {
+      return {
+        decision: "halt",
+        reason: `challenger negative-reply rate ${round1(chalNeg)}% is unacceptably high`,
+      };
+    }
+    const chalNegLow = wilsonInterval(challenger.negatives, challenger.denominator).low;
+    if (chalNeg - champNeg >= harmMarginPp && chalNegLow > champNeg) {
+      return {
+        decision: "halt",
+        reason: `challenger is generating materially more negative replies (${round1(chalNeg)}% vs ${round1(champNeg)}%)`,
+      };
+    }
+  }
+  return null;
+}
+
 export function decideExperiment(
   champion: VariantOutcome,
   challenger: VariantOutcome,
@@ -56,27 +99,9 @@ export function decideExperiment(
 ): ExperimentVerdict {
   const o = { ...DECIDE_DEFAULTS, ...options };
 
-  const champNeg = ratePct(champion.negatives, champion.denominator);
-  const chalNeg = ratePct(challenger.negatives, challenger.denominator);
-
-  // 1. Do-no-harm circuit breaker — FIRST and independent of any reply lift. Needs a floor sample so
-  //    it can't trip on noise; halts on an unacceptable absolute rate, or a confident, meaningful
-  //    excess over the champion.
-  if (challenger.denominator >= o.breakerMinSample) {
-    if (chalNeg >= o.hardNegCeilingPct) {
-      return {
-        decision: "halt",
-        reason: `challenger negative-reply rate ${round1(chalNeg)}% is unacceptably high`,
-      };
-    }
-    const chalNegLow = wilsonInterval(challenger.negatives, challenger.denominator).low;
-    if (chalNeg - champNeg >= o.harmMarginPp && chalNegLow > champNeg) {
-      return {
-        decision: "halt",
-        reason: `challenger is generating materially more negative replies (${round1(chalNeg)}% vs ${round1(champNeg)}%)`,
-      };
-    }
-  }
+  // 1. Do-no-harm circuit breaker — FIRST and independent of any reply lift.
+  const breakerVerdict = checkCircuitBreaker(champion, challenger, o);
+  if (breakerVerdict) return breakerVerdict;
 
   // 2. Enough completed touches on BOTH arms to judge the win?
   if (champion.denominator < o.minSample || challenger.denominator < o.minSample) {
