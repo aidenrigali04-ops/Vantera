@@ -381,6 +381,13 @@ export interface RunningExperiment {
   championStrategy: CopyStrategy;
   /** the challenger strategy under test (jsonb on the row) — canary detection compares it to the champion */
   challengerStrategy: CopyStrategy;
+  /**
+   * Alpha-investing wealth spent to run THIS experiment (Task 7 / WS-1.1, migration 0058's
+   * `alpha_spent`). Null = a pre-2A row (honest unknown, never backfilled) — `decideExperimentV2`
+   * self-clamps an `undefined` alpha option to its own default (0.05), so the pipeline passes
+   * `exp.alphaSpent ?? undefined` straight through rather than special-casing null itself.
+   */
+  alphaSpent: number | null;
 }
 
 /** A new experiment the autonomous loop chains after a conclusion. */
@@ -389,6 +396,13 @@ export interface StartExperimentInput {
   stageKey: FunnelStageKey;
   champion: CopyStrategy;
   challenger: CopyStrategy;
+  /**
+   * Alpha-investing spend for this experiment (Task 7 / WS-1.1) — always a concrete number here:
+   * the caller (chainNext) only reaches `startExperiment` after `nextAlphaSpend` returned non-null
+   * (a null spend means the chain PAUSES and never calls this at all). Debited from the account's
+   * `optimization_playbook.alpha_wealth` in the same transaction as the insert (pg-store.ts).
+   */
+  alphaSpent: number;
 }
 
 export interface OptimizeStore {
@@ -407,6 +421,11 @@ export interface OptimizeStore {
    * winning challenger only gets `markReadyToAdopt` below, and the owner's manual adopt action
    * (`apps/web` `adoptExperiment`) applies the win with its own writes. Kept on the interface for
    * GATE 1, when the anytime-valid decision core resumes autonomous adoption.
+   *
+   * Task 7 / WS-1.1: also credits alpha-investing wealth on adoption (see pg-store.ts). Since
+   * `apps/web`'s `adoptExperiment` bypasses this method entirely (per the note above), that credit
+   * is dormant in production today, same as the rest of this method — it activates once GATE 1
+   * (or a wiring of the manual action) actually calls it.
    */
   adoptChallenger(experimentId: string, reason: string): Promise<CopyStrategy>;
   /**
@@ -440,6 +459,12 @@ export interface OptimizeStore {
    * throws). The canary occupies the account's single experiment slot by design.
    */
   ensureCanaryExperiment(accountId: string): Promise<boolean>;
+  /**
+   * The account's alpha-investing wealth (Task 7 / WS-1.1, `optimization_playbook.alpha_wealth`).
+   * A missing playbook row means the account has never adopted anything — returns
+   * `ALPHA_WEALTH_START` (0.05) in that case rather than throwing or returning null.
+   */
+  getAlphaWealth(accountId: string): Promise<number>;
 }
 
 export interface OptimizeDeps {
@@ -491,6 +516,14 @@ export interface OptimizeSummary {
    * failure in the decide gate itself. Alerted, not acted on; never counted in concluded/readied.
    */
   canaryAlerts: number;
+  /**
+   * Task 7 / WS-1.1: a discard/halt conclusion left the account's alpha-investing wealth below
+   * `ALPHA_MIN_SPEND` — the chain paused (no next experiment launched) rather than spend a
+   * de-minimis alpha. Distinct from `chained` (which only counts an experiment actually started)
+   * and from a `startExperiment` one-live conflict (neither chained nor chainPaused — a real
+   * experiment is already occupying the slot, nothing to pause).
+   */
+  chainPaused: number;
 }
 
 export interface CopyDraftDeps {

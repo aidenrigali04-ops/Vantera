@@ -48,10 +48,15 @@ import type {
   ExperimentStatus,
 } from "@vantera/agent-brains";
 import {
+  ALPHA_EARN_ON_CONCLUSION,
+  ALPHA_WEALTH_CAP,
+  ALPHA_WEALTH_START,
   buildTargetingProfile,
   describeStrategy,
   rankByTilt,
   toStoredInsights,
+  wealthAfterConclusion,
+  wealthAfterLaunch,
   type LeadInsights,
   type ProofPoint,
   type TargetingRow,
@@ -350,6 +355,60 @@ async function fetchChampion(
     strategy: (row?.championStrategy ?? {}) as CopyStrategy,
     version: row?.version ?? null,
   };
+}
+
+/** The callback-argument type of `Db["transaction"]` — a `PgTransaction`, structurally close to
+ *  `Db` but NOT assignable to it (it lacks `$client`). `debitAlphaWealth`/`creditAlphaWealth` are
+ *  only ever called with the `tx` handed to a `db.transaction(...)` callback, never with plain
+ *  `db`, so they're typed against this instead of `Db`. */
+type OptimizeTx = Parameters<Parameters<Db["transaction"]>[0]>[0];
+
+/**
+ * Debit `spend` from the account's alpha-investing wealth (Task 7 / WS-1.1). Upserts the playbook
+ * row when this is the account's first-ever experiment (starting from `ALPHA_WEALTH_START` BEFORE
+ * the debit — `wealthAfterLaunch`, mirroring `startExperiment`'s "never risked past what a fresh
+ * account has" semantics); otherwise decrements the existing balance in SQL so the debit reads and
+ * writes atomically against a concurrent credit. Callers always run this inside the SAME
+ * transaction as the experiment insert (`startExperiment`) — a rolled-back insert (the one-live
+ * 23505 conflict) rolls this debit back too, never leaving a spend with no experiment to show for it.
+ */
+async function debitAlphaWealth(tx: OptimizeTx, accountId: string, spend: number): Promise<void> {
+  await tx
+    .insert(optimizationPlaybook)
+    .values({
+      accountId,
+      championStrategy: {},
+      alphaWealth: wealthAfterLaunch(ALPHA_WEALTH_START, spend),
+    })
+    .onConflictDoUpdate({
+      target: optimizationPlaybook.accountId,
+      set: { alphaWealth: sql`${optimizationPlaybook.alphaWealth} - ${spend}` },
+    });
+}
+
+/**
+ * Credit `ALPHA_EARN_ON_CONCLUSION` back to the account's alpha-investing wealth on a decisive
+ * conclusion (Task 7 / WS-1.1), capped at `ALPHA_WEALTH_CAP`. Called from `concludeExperiment` and
+ * `adoptChallenger` ONLY when the caller's own status-guarded UPDATE actually returned a row (the
+ * experiment really did transition out of running/ready_to_adopt) — a repeat call on an
+ * already-terminal experiment never reaches here, which is what keeps the credit to exactly once
+ * per experiment. Upserts the playbook row for the rare case an experiment was started outside
+ * this pipeline's debit path (e.g. the manual web "start test" action) with no playbook row yet.
+ */
+async function creditAlphaWealth(tx: OptimizeTx, accountId: string): Promise<void> {
+  await tx
+    .insert(optimizationPlaybook)
+    .values({
+      accountId,
+      championStrategy: {},
+      alphaWealth: wealthAfterConclusion(ALPHA_WEALTH_START),
+    })
+    .onConflictDoUpdate({
+      target: optimizationPlaybook.accountId,
+      set: {
+        alphaWealth: sql`least(${ALPHA_WEALTH_CAP}, ${optimizationPlaybook.alphaWealth} + ${ALPHA_EARN_ON_CONCLUSION})`,
+      },
+    });
 }
 
 /** Drizzle-backed store used by the Trigger.dev tasks (service-role DATABASE_URL). */
@@ -954,6 +1013,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           minSample: optimizationExperiments.minSample,
           championStrategy: optimizationExperiments.championStrategy,
           challengerStrategy: optimizationExperiments.challengerStrategy,
+          alphaSpent: optimizationExperiments.alphaSpent,
         })
         .from(optimizationExperiments)
         .where(eq(optimizationExperiments.status, "running"));
@@ -964,6 +1024,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         minSample: r.minSample,
         championStrategy: (r.championStrategy ?? {}) as CopyStrategy,
         challengerStrategy: (r.challengerStrategy ?? {}) as CopyStrategy,
+        alphaSpent: r.alphaSpent,
       }));
     },
 
@@ -1073,10 +1134,22 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
     },
 
     async concludeExperiment(id, status: ExperimentStatus, reason) {
-      await db
-        .update(optimizationExperiments)
-        .set({ status, decisionReason: reason, concludedAt: new Date() })
-        .where(eq(optimizationExperiments.id, id));
+      // Task 7 / WS-1.1: credit the account's alpha-investing wealth on a decisive conclusion —
+      // guarded by the UPDATE's own `returning()` so a repeat call on an already-terminal
+      // experiment (idempotency) credits nothing a second time.
+      await db.transaction(async (tx) => {
+        const [row] = await tx
+          .update(optimizationExperiments)
+          .set({ status, decisionReason: reason, concludedAt: new Date() })
+          .where(
+            and(
+              eq(optimizationExperiments.id, id),
+              inArray(optimizationExperiments.status, ["running", "ready_to_adopt"])
+            )
+          )
+          .returning({ accountId: optimizationExperiments.accountId });
+        if (row) await creditAlphaWealth(tx, row.accountId);
+      });
     },
 
     async markReadyToAdopt(experimentId, reason) {
@@ -1092,63 +1165,92 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
     async adoptChallenger(experimentId, reason): Promise<CopyStrategy> {
       // Autonomous adoption (spec 2026-07-14): playbook champion ← challenger, version-bumped;
       // experiment → 'adopted'. Mirrors the manual adopt action's writes, run by the service role.
-      const [exp] = await db
-        .select({
-          accountId: optimizationExperiments.accountId,
-          challengerStrategy: optimizationExperiments.challengerStrategy,
-        })
-        .from(optimizationExperiments)
-        .where(eq(optimizationExperiments.id, experimentId))
-        .limit(1);
-      const newChampion = ((exp?.challengerStrategy as CopyStrategy | null) ?? {}) as CopyStrategy;
-      if (exp) {
-        const [cur] = await db
-          .select({ version: optimizationPlaybook.version })
-          .from(optimizationPlaybook)
-          .where(eq(optimizationPlaybook.accountId, exp.accountId))
-          .limit(1);
-        await db
-          .insert(optimizationPlaybook)
-          .values({
-            accountId: exp.accountId,
-            championStrategy: newChampion,
-            version: (cur?.version ?? 0) + 1,
-            updatedAt: new Date(),
+      // Task 7 / WS-1.1: also credits alpha-investing wealth — guarded the same way as
+      // concludeExperiment (only when the status-guarded UPDATE actually transitioned the row).
+      return db.transaction(async (tx) => {
+        const [exp] = await tx
+          .select({
+            accountId: optimizationExperiments.accountId,
+            challengerStrategy: optimizationExperiments.challengerStrategy,
           })
-          .onConflictDoUpdate({
-            target: optimizationPlaybook.accountId,
-            set: {
+          .from(optimizationExperiments)
+          .where(eq(optimizationExperiments.id, experimentId))
+          .limit(1);
+        const newChampion = ((exp?.challengerStrategy as CopyStrategy | null) ?? {}) as CopyStrategy;
+        if (exp) {
+          const [cur] = await tx
+            .select({ version: optimizationPlaybook.version })
+            .from(optimizationPlaybook)
+            .where(eq(optimizationPlaybook.accountId, exp.accountId))
+            .limit(1);
+          await tx
+            .insert(optimizationPlaybook)
+            .values({
+              accountId: exp.accountId,
               championStrategy: newChampion,
               version: (cur?.version ?? 0) + 1,
               updatedAt: new Date(),
-            },
-          });
-      }
-      await db
-        .update(optimizationExperiments)
-        .set({ status: "adopted", decisionReason: reason, concludedAt: new Date() })
-        .where(eq(optimizationExperiments.id, experimentId));
-      return newChampion;
+            })
+            .onConflictDoUpdate({
+              target: optimizationPlaybook.accountId,
+              set: {
+                championStrategy: newChampion,
+                version: (cur?.version ?? 0) + 1,
+                updatedAt: new Date(),
+              },
+            });
+        }
+        const [row] = await tx
+          .update(optimizationExperiments)
+          .set({ status: "adopted", decisionReason: reason, concludedAt: new Date() })
+          .where(
+            and(
+              eq(optimizationExperiments.id, experimentId),
+              inArray(optimizationExperiments.status, ["running", "ready_to_adopt"])
+            )
+          )
+          .returning({ id: optimizationExperiments.id });
+        if (row && exp) await creditAlphaWealth(tx, exp.accountId);
+        return newChampion;
+      });
     },
 
     async startExperiment(input): Promise<boolean> {
       // The chained next test. The one-live-experiment partial unique index guards double-starts;
       // a conflict means another experiment is already live for the account — skip, never throw.
+      // Task 7 / WS-1.1: debits alpha-investing wealth in the SAME transaction as the insert, so a
+      // 23505 conflict (caught below) rolls the debit back too — never a spend with no experiment.
       try {
-        await db.insert(optimizationExperiments).values({
-          accountId: input.accountId,
-          stageKey: input.stageKey,
-          championStrategy: input.champion,
-          challengerStrategy: input.challenger,
-          allocationPct: 25,
-          minSample: 30,
-          status: "running",
+        await db.transaction(async (tx) => {
+          await tx.insert(optimizationExperiments).values({
+            accountId: input.accountId,
+            stageKey: input.stageKey,
+            championStrategy: input.champion,
+            challengerStrategy: input.challenger,
+            allocationPct: 25,
+            minSample: 30,
+            status: "running",
+            alphaSpent: input.alphaSpent,
+          });
+          await debitAlphaWealth(tx, input.accountId, input.alphaSpent);
         });
         return true;
       } catch (err) {
         if ((err as { code?: string }).code === "23505") return false;
         throw err;
       }
+    },
+
+    async getAlphaWealth(accountId: string): Promise<number> {
+      // Task 7 / WS-1.1: a missing playbook row means the account has never adopted anything —
+      // that's the same "never tested before" state as a fresh account, so it gets the classical
+      // single-test alpha rather than null/zero (which would look exhausted and pause forever).
+      const [row] = await db
+        .select({ alphaWealth: optimizationPlaybook.alphaWealth })
+        .from(optimizationPlaybook)
+        .where(eq(optimizationPlaybook.accountId, accountId))
+        .limit(1);
+      return row?.alphaWealth ?? ALPHA_WEALTH_START;
     },
 
     // ── Live A/A canary (enterprise-grade-brain spec, WS-1.8) ─────────────────

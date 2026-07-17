@@ -2,7 +2,8 @@ import {
   aggregateArm,
   aggregateBySignature,
   chooseChallenger,
-  decideExperiment,
+  decideExperimentV2,
+  nextAlphaSpend,
   nextExperimentStage,
   proposeNextChallenger,
   strategySignature,
@@ -13,6 +14,13 @@ import type { OptimizeDeps, OptimizeSummary, RunningExperiment } from "./types";
 /**
  * The decide pipeline of the self-optimizing loop — GATE 0: suggest-only adopt
  * (enterprise-grade-brain spec, 2026-07-16; supersedes the 2026-07-14 fully-autonomous posture).
+ *
+ * Task 7 / WS-1.1 (2A stats core): the decision gate is `decideExperimentV2` (the e-process +
+ * expected-loss gate) wired with the account's alpha-investing wealth — `exp.alphaSpent` (a
+ * per-experiment DB column, migration 0058) drives the e-value threshold for THAT experiment, and
+ * a fresh spend is drawn from the account's `optimization_playbook.alpha_wealth` ledger every time
+ * the loop chains a next test (`chainNext` below). GATE 0's suggest-only/canary/heal posture is
+ * otherwise UNCHANGED by this — same action branches, same exemptions.
  *
  * Evaluates every running experiment: aggregate each arm's outcomes on the target stage, run the
  * decision gate + do-no-harm circuit breaker (UNCHANGED — the envelope is not tunable by this
@@ -34,11 +42,23 @@ import type { OptimizeDeps, OptimizeSummary, RunningExperiment } from "./types";
  * Pure core; deps injected + the real store wired in the thin trigger.
  */
 
+/** Result of a chain attempt: distinguishes an alpha-wealth pause from an ordinary launch (or a
+ *  swallowed one-live conflict / no-candidate skip) so the caller can count each correctly. */
+type ChainResult = "started" | "paused" | "skipped";
+
 async function chainNext(
   deps: OptimizeDeps,
   exp: RunningExperiment,
   champion: CopyStrategy
-): Promise<boolean> {
+): Promise<ChainResult> {
+  // Alpha-investing (Task 7 / WS-1.1): draw the next test's spend from the account's wealth
+  // BEFORE doing any candidate-generation work — a paused chain (wealth exhausted) has nothing to
+  // launch, so there's no reason to spend an LLM call or a bandit read finding out what it would
+  // have tested next.
+  const wealth = await deps.store.getAlphaWealth(exp.accountId);
+  const spend = nextAlphaSpend(wealth);
+  if (spend === null) return "paused";
+
   const stageKey = nextExperimentStage(exp.stageKey);
   // Stage 1b: generate → gate → bandit. Without a generator the loop is byte-identical to the
   // deterministic knob-flip it shipped with; with one, Thompson sampling over the collective
@@ -55,8 +75,15 @@ async function chainNext(
     challenger = chooseChallenger(candidates, stats, deps.rand ?? Math.random);
   }
   challenger ??= proposeNextChallenger(stageKey, champion);
-  if (!challenger) return false;
-  return deps.store.startExperiment({ accountId: exp.accountId, stageKey, champion, challenger });
+  if (!challenger) return "skipped";
+  const started = await deps.store.startExperiment({
+    accountId: exp.accountId,
+    stageKey,
+    champion,
+    challenger,
+    alphaSpent: spend,
+  });
+  return started ? "started" : "skipped";
 }
 
 export async function runOptimize(deps: OptimizeDeps): Promise<OptimizeSummary> {
@@ -64,6 +91,7 @@ export async function runOptimize(deps: OptimizeDeps): Promise<OptimizeSummary> 
   let concluded = 0;
   const adopted = 0; // GATE 0: the loop never adopts autonomously — stays 0 until GATE 1
   let chained = 0;
+  let chainPaused = 0;
   let readied = 0;
   let canaryAlerts = 0;
 
@@ -72,10 +100,14 @@ export async function runOptimize(deps: OptimizeDeps): Promise<OptimizeSummary> 
       deps.store.getArmFlags(exp.id, "champion"),
       deps.store.getArmFlags(exp.id, "challenger"),
     ]);
-    const verdict = decideExperiment(
+    // Task 7 / WS-1.1: decideExperimentV2 (the e-process + expected-loss gate) replaces the
+    // Wilson-interval decideExperiment. `exp.alphaSpent` (null on pre-2A rows) is passed straight
+    // through as `undefined` — V2 self-clamps that to its own default alpha (0.05), so this call
+    // site never needs to special-case a legacy row itself (see decide-v2.ts's clamping doc).
+    const verdict = decideExperimentV2(
       aggregateArm(exp.stageKey, championFlags),
       aggregateArm(exp.stageKey, challengerFlags),
-      { minSample: exp.minSample }
+      { alpha: exp.alphaSpent ?? undefined, rng: deps.rand }
     );
 
     // Live A/A canary (enterprise-grade-brain spec, WS-1.8) — SCOPED to the pinned canary account
@@ -99,6 +131,14 @@ export async function runOptimize(deps: OptimizeDeps): Promise<OptimizeSummary> 
       continue;
     }
 
+    // Tallies a chain attempt's result into the right summary counter — `started` and `paused` are
+    // mutually exclusive outcomes of the SAME attempt, never both counted (see ChainResult).
+    const tallyChain = async () => {
+      const result = await chainNext(deps, exp, exp.championStrategy);
+      if (result === "started") chained++;
+      else if (result === "paused") chainPaused++;
+    };
+
     // A signature-equal experiment that ISN'T the pinned canary is an accident, not a deliberate
     // A/A test — most likely the manual "start the test" action re-proposing a challenger the
     // owner already adopted as champion (review-round fix). There's nothing to learn from
@@ -113,7 +153,7 @@ export async function runOptimize(deps: OptimizeDeps): Promise<OptimizeSummary> 
         "identical champion and challenger — no testable difference"
       );
       concluded++;
-      if (await chainNext(deps, exp, exp.championStrategy)) chained++;
+      await tallyChain();
       continue;
     }
 
@@ -128,13 +168,13 @@ export async function runOptimize(deps: OptimizeDeps): Promise<OptimizeSummary> 
       case "discard_challenger": {
         await deps.store.concludeExperiment(exp.id, "discarded", verdict.reason);
         concluded++;
-        if (await chainNext(deps, exp, exp.championStrategy)) chained++;
+        await tallyChain();
         break;
       }
       case "halt": {
         await deps.store.concludeExperiment(exp.id, "halted", verdict.reason);
         concluded++;
-        if (await chainNext(deps, exp, exp.championStrategy)) chained++;
+        await tallyChain();
         break;
       }
       case "keep_running":
@@ -142,5 +182,5 @@ export async function runOptimize(deps: OptimizeDeps): Promise<OptimizeSummary> 
     }
   }
 
-  return { evaluated: experiments.length, concluded, adopted, chained, readied, canaryAlerts };
+  return { evaluated: experiments.length, concluded, adopted, chained, chainPaused, readied, canaryAlerts };
 }

@@ -127,6 +127,15 @@ export {
   type DecideV2Options,
 } from "./optimize/decide-v2";
 export {
+  ALPHA_WEALTH_START,
+  ALPHA_WEALTH_CAP,
+  ALPHA_EARN_ON_CONCLUSION,
+  ALPHA_MIN_SPEND,
+  nextAlphaSpend,
+  wealthAfterLaunch,
+  wealthAfterConclusion,
+} from "./optimize/alpha";
+export {
   proposeChallengerStrategy,
   proposeNextChallenger,
   nextExperimentStage,
