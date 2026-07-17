@@ -1,5 +1,5 @@
 import { DECIDE_DEFAULTS, decideExperiment } from "../decide";
-import type { DecideOptions, ExperimentDecision, VariantOutcome } from "../decide";
+import type { DecideOptions, ExperimentDecision, ExperimentVerdict, VariantOutcome } from "../decide";
 
 /**
  * Seeded monte-carlo testbed for the decide gate (enterprise-grade-brain spec, WS-1.7).
@@ -31,6 +31,30 @@ export type SimConfig = {
   perDayPerArm: number;
   horizonDays: number;
   decideOptions?: DecideOptions;
+  /**
+   * Injectable decision function (enterprise-grade-brain Phase 2A, WS-1.7). Defaults to the
+   * legacy `decideExperiment` when omitted — every pre-existing Phase-1 characterization test
+   * passes this field as `undefined`, so it hits the exact same branch as before and stays
+   * byte-identical. Pass `decideExperimentV2` (or any other pure decide fn) to calibrate a
+   * replacement gate against the same daily-peeking simulation.
+   *
+   * The optional third param is `decideRng` (see below) — a stochastic decide fn (V2's posterior
+   * Monte-Carlo read) takes it and forwards it as its own `{ rng }` option; a deterministic decide
+   * fn (legacy `decideExperiment`) simply ignores it.
+   */
+  decideFn?: (c: VariantOutcome, t: VariantOutcome, decideRng?: () => number) => ExperimentVerdict;
+  /**
+   * Per-PATH rng stream for `decideFn`'s own randomness, supplied by `runMonteCarlo` (never by a
+   * caller directly — see `Omit<SimConfig, "rng" | "decideRng">` on that signature). One rng
+   * instance is created per simulated experiment path and threaded through EVERY day of that
+   * path's horizon unchanged — never reconstructed inside the day loop. Reconstructing a fresh
+   * `mulberry32(fixedSeed)` on every call (a real trap: the naive `decideFn: (c, t) =>
+   * decideExperimentV2(c, t, { rng: mulberry32(99) })` shape) replays the IDENTICAL posterior-noise
+   * sequence on every day of every run, silently correlating and biasing the calibration. Threading
+   * one continuously-advancing stream per path avoids that while staying fully deterministic (same
+   * seed + path index always reproduces the same path).
+   */
+  decideRng?: () => number;
   rng: () => number;
 };
 export type SimResult = { decision: ExperimentDecision; day: number };
@@ -45,21 +69,38 @@ export function simulateDecisionPath(c: SimConfig): SimResult {
     chal.denominator += c.perDayPerArm;
     chal.successes += binomial(c.perDayPerArm, c.challengerRate, c.rng);
     chal.negatives += binomial(c.perDayPerArm, c.negativeRate, c.rng);
-    const verdict = decideExperiment(champ, chal, c.decideOptions ?? DECIDE_DEFAULTS);
+    const verdict = c.decideFn
+      ? c.decideFn(champ, chal, c.decideRng)
+      : decideExperiment(champ, chal, c.decideOptions ?? DECIDE_DEFAULTS);
     if (verdict.decision !== "keep_running") return { decision: verdict.decision, day };
   }
   return { decision: "keep_running", day: c.horizonDays };
 }
 
+/**
+ * Derives a per-path seed from the batch seed + path index so every simulated path gets its own
+ * independent-looking, fully deterministic rng stream (see `SimConfig.decideRng`). The golden-
+ * ratio multiplier (`0x9e3779b9`, the same Fibonacci-hashing constant used by e.g. Boost's
+ * `hash_combine`) spreads adjacent path indices apart so they don't produce visually-correlated
+ * seeds; `mulberry32`'s own mixing then does the rest. Not cryptographic — just decorrelated
+ * enough for Monte-Carlo path independence.
+ */
+function pathSeed(seed: number, pathIndex: number): number {
+  return ((seed ^ 0x9e3779b9) + pathIndex * 2654435761) >>> 0;
+}
+
 export function runMonteCarlo(
   runs: number,
   seed: number,
-  config: Omit<SimConfig, "rng">
+  config: Omit<SimConfig, "rng" | "decideRng">
 ): { adoptRate: number; discardRate: number; haltRate: number; inconclusiveRate: number; meanDecisionDay: number } {
   const rng = mulberry32(seed);
   let adopt = 0, discard = 0, halt = 0, inconclusive = 0, daySum = 0, decided = 0;
   for (let i = 0; i < runs; i++) {
-    const r = simulateDecisionPath({ ...config, rng });
+    // One dedicated decideRng stream per path (see SimConfig.decideRng) — undefined when there's
+    // no decideFn, so the legacy branch (which never reads decideRng) is completely unaffected.
+    const decideRng = config.decideFn ? mulberry32(pathSeed(seed, i)) : undefined;
+    const r = simulateDecisionPath({ ...config, rng, decideRng });
     if (r.decision === "adopt_challenger") adopt++;
     else if (r.decision === "discard_challenger") discard++;
     else if (r.decision === "halt") halt++;
