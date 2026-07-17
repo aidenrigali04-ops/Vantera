@@ -1,0 +1,338 @@
+[
+  {
+    "id": "intent-saas-true-01",
+    "obs": {
+      "ref": "https://profiles.example/jordan-vale",
+      "name": "Jordan Vale",
+      "headline": "VP Customer Success, subscription software",
+      "signalKind": "engagement",
+      "action": "commented",
+      "text": "We're bleeding customers every renewal cycle and I don't know why — does anyone have a tool that actually predicts churn before it happens?",
+      "watchTarget": "customer retention"
+    },
+    "ctx": { "accountIndustry": "B2B SaaS", "valueProp": "reduces customer churn for subscription businesses" },
+    "expectedIsIntent": true
+  },
+  {
+    "id": "intent-saas-true-02",
+    "obs": {
+      "ref": "https://profiles.example/priya-nandan",
+      "name": "Priya Nandan",
+      "headline": "Founder, subscription analytics platform",
+      "signalKind": "content",
+      "action": "posted",
+      "text": "Our board asked me point blank why churn keeps climbing. If anyone's found a system that flags at-risk accounts early, I want to hear about it.",
+      "watchTarget": "SaaS retention"
+    },
+    "ctx": { "accountIndustry": "B2B SaaS", "valueProp": "reduces customer churn for subscription businesses" },
+    "expectedIsIntent": true
+  },
+  {
+    "id": "intent-saas-true-03",
+    "obs": {
+      "ref": "https://profiles.example/martin-oyelaran",
+      "name": "Martin Oyelaran",
+      "headline": "Head of Revenue Operations",
+      "signalKind": "engagement",
+      "action": "commented",
+      "text": "Every quarter we lose accounts we swore were happy. Looking for a real fix, not another dashboard nobody checks.",
+      "watchTarget": "churn management"
+    },
+    "ctx": { "accountIndustry": "B2B SaaS", "valueProp": "reduces customer churn for subscription businesses" },
+    "expectedIsIntent": true
+  },
+  {
+    "id": "intent-saas-none-01",
+    "obs": {
+      "ref": "https://profiles.example/dana-whitfield",
+      "name": "Dana Whitfield",
+      "headline": "People Ops Manager",
+      "signalKind": "engagement",
+      "action": "reacted",
+      "text": "Loved this piece on building a remote-first culture — so many good ideas here.",
+      "watchTarget": "remote work"
+    },
+    "ctx": { "accountIndustry": "B2B SaaS", "valueProp": "reduces customer churn for subscription businesses" },
+    "expectedIsIntent": false
+  },
+  {
+    "id": "intent-saas-none-02",
+    "obs": {
+      "ref": "https://profiles.example/felix-arroyo",
+      "name": "Felix Arroyo",
+      "headline": "Account Executive",
+      "signalKind": "engagement",
+      "action": "commented",
+      "text": "Congrats on 10 years with the company, well deserved!",
+      "watchTarget": "team culture"
+    },
+    "ctx": { "accountIndustry": "B2B SaaS", "valueProp": "reduces customer churn for subscription businesses" },
+    "expectedIsIntent": false
+  },
+  {
+    "id": "intent-saas-none-03",
+    "obs": {
+      "ref": "https://profiles.example/renee-kowalczyk",
+      "name": "Renee Kowalczyk",
+      "headline": "Product Marketing Lead",
+      "signalKind": "content",
+      "action": "posted",
+      "text": "Great turnout at the conference this week — so many good conversations in the hallway track.",
+      "watchTarget": "industry events"
+    },
+    "ctx": { "accountIndustry": "B2B SaaS", "valueProp": "reduces customer churn for subscription businesses" },
+    "expectedIsIntent": false
+  },
+  {
+    "id": "intent-saas-none-04",
+    "obs": {
+      "ref": "https://profiles.example/tobias-lindqvist",
+      "name": "Tobias Lindqvist",
+      "headline": "Customer Support Rep",
+      "signalKind": "engagement",
+      "action": "reacted",
+      "text": "Ha, this Monday-morning meme is way too accurate.",
+      "watchTarget": "workplace humor"
+    },
+    "ctx": { "accountIndustry": "B2B SaaS", "valueProp": "reduces customer churn for subscription businesses" },
+    "expectedIsIntent": false
+  },
+  {
+    "id": "intent-saas-none-05",
+    "obs": {
+      "ref": "https://profiles.example/carmen-diallo",
+      "name": "Carmen Diallo",
+      "headline": "Talent Acquisition Partner",
+      "signalKind": "engagement",
+      "action": "commented",
+      "text": "Is this hiring event still happening on Thursday? Trying to get my team registered.",
+      "watchTarget": "hiring events"
+    },
+    "ctx": { "accountIndustry": "B2B SaaS", "valueProp": "reduces customer churn for subscription businesses" },
+    "expectedIsIntent": false
+  },
+  {
+    "id": "intent-saas-none-06",
+    "obs": {
+      "ref": "https://profiles.example/hugo-benitez",
+      "name": "Hugo Benitez",
+      "headline": "Growth Marketer",
+      "signalKind": "content",
+      "action": "posted",
+      "text": "My top productivity tip: block your calendar for deep work before 10am. Game changer.",
+      "watchTarget": "productivity"
+    },
+    "ctx": { "accountIndustry": "B2B SaaS", "valueProp": "reduces customer churn for subscription businesses" },
+    "expectedIsIntent": false
+  },
+  {
+    "id": "intent-saas-none-07",
+    "obs": {
+      "ref": "https://profiles.example/ingrid-solberg",
+      "name": "Ingrid Solberg",
+      "headline": "Engineering Manager",
+      "signalKind": "engagement",
+      "action": "reacted",
+      "text": "So happy for you on the new role — well earned promotion!",
+      "watchTarget": "career milestones"
+    },
+    "ctx": { "accountIndustry": "B2B SaaS", "valueProp": "reduces customer churn for subscription businesses" },
+    "expectedIsIntent": false
+  },
+  {
+    "id": "intent-saas-none-08",
+    "obs": {
+      "ref": "https://profiles.example/quentin-marsh",
+      "name": "Quentin Marsh",
+      "headline": "Sales Development Rep",
+      "signalKind": "engagement",
+      "action": "commented",
+      "text": "What a comeback in last night's game, still can't believe that finish.",
+      "watchTarget": "sports"
+    },
+    "ctx": { "accountIndustry": "B2B SaaS", "valueProp": "reduces customer churn for subscription businesses" },
+    "expectedIsIntent": false
+  },
+  {
+    "id": "intent-saas-none-09",
+    "obs": {
+      "ref": "https://profiles.example/naomi-fitzgerald",
+      "name": "Naomi Fitzgerald",
+      "headline": "Community Manager",
+      "signalKind": "content",
+      "action": "posted",
+      "text": "Made a big pot of soup this weekend — sharing the recipe for anyone who wants it.",
+      "watchTarget": "off-topic"
+    },
+    "ctx": { "accountIndustry": "B2B SaaS", "valueProp": "reduces customer churn for subscription businesses" },
+    "expectedIsIntent": false
+  },
+  {
+    "id": "intent-construction-true-01",
+    "obs": {
+      "ref": "https://profiles.example/rosalind-achterberg",
+      "name": "Rosalind Achterberg",
+      "headline": "Project Executive, commercial builder",
+      "signalKind": "engagement",
+      "action": "commented",
+      "text": "Change orders are killing our margins on every job — is there a system that actually gets these approved and signed before work stops?",
+      "watchTarget": "job cost control"
+    },
+    "ctx": { "accountIndustry": "Commercial Construction", "valueProp": "prevents costly change-order disputes on job sites" },
+    "expectedIsIntent": true
+  },
+  {
+    "id": "intent-construction-true-02",
+    "obs": {
+      "ref": "https://profiles.example/desmond-okafor",
+      "name": "Desmond Okafor",
+      "headline": "Superintendent",
+      "signalKind": "content",
+      "action": "posted",
+      "text": "Tired of chasing GCs for change-order sign-off while my crew sits idle. If there's a better way to track and approve these, I need it.",
+      "watchTarget": "field productivity"
+    },
+    "ctx": { "accountIndustry": "Commercial Construction", "valueProp": "prevents costly change-order disputes on job sites" },
+    "expectedIsIntent": true
+  },
+  {
+    "id": "intent-construction-true-03",
+    "obs": {
+      "ref": "https://profiles.example/celeste-bramante",
+      "name": "Celeste Bramante",
+      "headline": "VP Preconstruction",
+      "signalKind": "engagement",
+      "action": "commented",
+      "text": "We just ate a $40k loss because a change order sat unsigned for three weeks. Anyone actually solved this?",
+      "watchTarget": "change order management"
+    },
+    "ctx": { "accountIndustry": "Commercial Construction", "valueProp": "prevents costly change-order disputes on job sites" },
+    "expectedIsIntent": true
+  },
+  {
+    "id": "intent-construction-none-01",
+    "obs": {
+      "ref": "https://profiles.example/walter-huisman",
+      "name": "Walter Huisman",
+      "headline": "Site Safety Officer",
+      "signalKind": "engagement",
+      "action": "reacted",
+      "text": "Great turnout for the company picnic this year, good seeing everyone outside the office.",
+      "watchTarget": "company culture"
+    },
+    "ctx": { "accountIndustry": "Commercial Construction", "valueProp": "prevents costly change-order disputes on job sites" },
+    "expectedIsIntent": false
+  },
+  {
+    "id": "intent-construction-none-02",
+    "obs": {
+      "ref": "https://profiles.example/beatrix-conlon",
+      "name": "Beatrix Conlon",
+      "headline": "HR Generalist",
+      "signalKind": "engagement",
+      "action": "commented",
+      "text": "Congratulations on the retirement, thirty years is an incredible run!",
+      "watchTarget": "career milestones"
+    },
+    "ctx": { "accountIndustry": "Commercial Construction", "valueProp": "prevents costly change-order disputes on job sites" },
+    "expectedIsIntent": false
+  },
+  {
+    "id": "intent-construction-none-03",
+    "obs": {
+      "ref": "https://profiles.example/gideon-marchetti",
+      "name": "Gideon Marchetti",
+      "headline": "Project Coordinator",
+      "signalKind": "content",
+      "action": "posted",
+      "text": "Proud of the crew for finishing this build ahead of schedule — great photo from the topping-out celebration.",
+      "watchTarget": "project milestones"
+    },
+    "ctx": { "accountIndustry": "Commercial Construction", "valueProp": "prevents costly change-order disputes on job sites" },
+    "expectedIsIntent": false
+  },
+  {
+    "id": "intent-construction-none-04",
+    "obs": {
+      "ref": "https://profiles.example/simone-vukovic",
+      "name": "Simone Vukovic",
+      "headline": "Estimator",
+      "signalKind": "engagement",
+      "action": "reacted",
+      "text": "Wild that it's supposed to snow this weekend after last week's heat wave.",
+      "watchTarget": "weather"
+    },
+    "ctx": { "accountIndustry": "Commercial Construction", "valueProp": "prevents costly change-order disputes on job sites" },
+    "expectedIsIntent": false
+  },
+  {
+    "id": "intent-construction-none-05",
+    "obs": {
+      "ref": "https://profiles.example/roland-bexley",
+      "name": "Roland Bexley",
+      "headline": "Foreman",
+      "signalKind": "engagement",
+      "action": "commented",
+      "text": "That was an incredible finish to the game last night, couldn't believe it.",
+      "watchTarget": "sports"
+    },
+    "ctx": { "accountIndustry": "Commercial Construction", "valueProp": "prevents costly change-order disputes on job sites" },
+    "expectedIsIntent": false
+  },
+  {
+    "id": "intent-construction-none-06",
+    "obs": {
+      "ref": "https://profiles.example/harriet-pemberton",
+      "name": "Harriet Pemberton",
+      "headline": "Office Administrator",
+      "signalKind": "content",
+      "action": "posted",
+      "text": "So proud of the team that ran the charity 5k this weekend, raised a great amount for a good cause.",
+      "watchTarget": "community events"
+    },
+    "ctx": { "accountIndustry": "Commercial Construction", "valueProp": "prevents costly change-order disputes on job sites" },
+    "expectedIsIntent": false
+  },
+  {
+    "id": "intent-construction-none-07",
+    "obs": {
+      "ref": "https://profiles.example/anton-ferreira",
+      "name": "Anton Ferreira",
+      "headline": "Assistant Project Manager",
+      "signalKind": "engagement",
+      "action": "reacted",
+      "text": "This meme about Monday jobsite meetings is way too real.",
+      "watchTarget": "workplace humor"
+    },
+    "ctx": { "accountIndustry": "Commercial Construction", "valueProp": "prevents costly change-order disputes on job sites" },
+    "expectedIsIntent": false
+  },
+  {
+    "id": "intent-construction-none-08",
+    "obs": {
+      "ref": "https://profiles.example/wilhelmina-strand",
+      "name": "Wilhelmina Strand",
+      "headline": "Procurement Assistant",
+      "signalKind": "engagement",
+      "action": "commented",
+      "text": "Anyone know a good lunch spot near the downtown jobsite? Open to recommendations.",
+      "watchTarget": "local recommendations"
+    },
+    "ctx": { "accountIndustry": "Commercial Construction", "valueProp": "prevents costly change-order disputes on job sites" },
+    "expectedIsIntent": false
+  },
+  {
+    "id": "intent-construction-none-09",
+    "obs": {
+      "ref": "https://profiles.example/norbert-kaczmarek",
+      "name": "Norbert Kaczmarek",
+      "headline": "Field Engineer",
+      "signalKind": "content",
+      "action": "posted",
+      "text": "Monday motivation: small consistent progress beats waiting for the perfect plan.",
+      "watchTarget": "motivation"
+    },
+    "ctx": { "accountIndustry": "Commercial Construction", "valueProp": "prevents costly change-order disputes on job sites" },
+    "expectedIsIntent": false
+  }
+]
