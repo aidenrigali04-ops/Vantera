@@ -152,6 +152,134 @@ This calibration step (either path) is one of the four **owner arm-steps** block
 Task 8 brief / the PR body): add the `ANTHROPIC_API_KEY` secret, sign off the anonymized fixtures,
 run this calibration and flip the flag, and set the ~$50-100/mo eval budget for nightly cadence.
 
+## Copy Quality Loop (Phase 2C)
+
+Phase 2C built one owner-driven loop on top of the eval harness above: **calibrate → best-of-N →
+prompt-AB → decide.** This section is the operator map of that loop — what each stage does, the
+trust boundary that gates all of it, and how to choose the next lever once it's running.
+
+### The sequence and the trust boundary
+
+1. **Calibrate** (Task 1, documented above) — the owner labels a packet of real drafts and runs
+   `evals:calibration-score` to get Cohen's κ between the judge and a human rater.
+2. **Best-of-N** (Task 3) — `bestOfN()` in `@vantera/agent-brains` drafts N candidates per lead
+   and has the judge (`copy/judge`, `claude-opus-4-8`) rank them; the top-scored candidate is the
+   one that flows onward. Wired today at exactly one call site: the LinkedIn first-touch path in
+   `packages/jobs/src/pipeline/copy-draft.ts`.
+3. **Prompt-AB** (Task 4) — `evals:prompt-ab` / `promptAB(candidateSystem, brain, model?)` runs a
+   candidate system-prompt rewrite through the same position-swapped pairwise machinery as CI,
+   producing win-rate proposals against the frozen baseline. See
+   `docs/prompt-experiments/2026-07-18-copy-v1.md` for the four variants written up so far
+   (sharper hook, harder them-focus, tighter anti-slop, a respond-brain them-focus mirror) — all
+   proposals, none merged.
+4. **Decide** — pick the next lever to invest in. See "The decide framework" below.
+
+**The trust boundary is κ ≥ 0.7, full stop.** Nothing judge-driven gates a build or auto-ships
+copy until calibration clears that bar (`EVALS_JUDGE_GATING=1` is the flip — see above). That
+boundary also governs how much to trust the OTHER two levers built on top of the same judge:
+
+- **Best-of-N ranking is only *trusted* post-calibration.** Pre-calibration, an uncalibrated judge
+  picking the "best" of N candidates is a **likely-but-unproven lift** — it's plausible that a
+  stronger, different-family model (Opus) ranking candidates on the same rubric humans intuitively
+  use tends to pick better copy, but nothing has measured that the judge's ranking correlates with
+  what a human — or a real prospect — would actually prefer. Treat any quality gain from turning
+  best-of-N on before calibration as a hypothesis, not a result.
+- **Prompt-AB win-rates are advisory for the same reason.** A variant "winning" pairwise against
+  the baseline means "an unvalidated judge preferred it" until κ ≥ 0.7 — see Task 4's findings doc
+  for the full reasoning. A prompt swap into `LINKEDIN_SYSTEM`/`RESPOND_SYSTEM` is always an
+  owner-reviewed, deliberate change, never an automatic promotion off a win-rate number.
+
+### Enabling best-of-N
+
+Best-of-N is a **global** `app_settings` row, `key = 'best_of_n'`, read once per `copy-draft`
+trigger run (`pg-store.ts`'s `getBestOfN()`) — the same shape as `outreach_kill_switch`, not a
+per-account setting, and there is no UI toggle for it (see the knowledge-sync note below). Default
+is `1` (unset, non-numeric, or ≤ 0 all resolve to `1`) — at `n=1` the pipeline drafts exactly once
+and the judge never runs, so **the feature is fully OFF by default and byte-identical to
+pre-Phase-2C behavior** until someone raises the setting. To enable, set the row to a value up to
+5 (e.g. `5`) — `MAX_BEST_OF_N` in `copy-draft.ts` code-enforces that ceiling regardless of what the
+setting says, so a config typo can't blow up spend.
+
+**Recommend enabling only AFTER calibration clears κ ≥ 0.7** — see the trust-boundary note above.
+
+**Cost — read this before enabling.** Best-of-N is n× draft generations **and** n× Opus judge
+calls, **per first-touch LinkedIn lead**, not per run. At `best_of_n=5`: 5 draft calls + 5 judge
+calls per qualified lead that reaches the copy-draft step. `copy-draft.ts`'s `DRAFT_CONCURRENCY`
+(4 leads in flight at once) × `MAX_BEST_OF_N` (5) means the pipeline can have **up to 20
+concurrent Opus judge calls in flight** at once when best-of-N is maxed out — a real
+rate-limit/cost consideration on top of the raw per-lead multiplier, not just a linear cost
+increase. Size the setting (and watch for 429s) accordingly; there is no built-in backoff beyond
+`mapWithConcurrency`'s concurrency cap.
+
+### The anti-Goodhart invariant
+
+The judge **ranks candidates that would all be drafted anyway** — it never gates, never blocks a
+send, and never bypasses the humanizer. The winner of a best-of-N round still flows through the
+UNCHANGED humanizer/`fixLinkedInFn` gate exactly like a single draft always has: a judge-preferred
+candidate that's lint-dirty still gets one fix pass or routes to review, same as before this
+feature existed. **The real gates are the humanizer (deterministic, hard) and live outcomes**
+(acceptance → reply → booking), never the judge's opinion of itself. Never tune copy, prompts, or
+the judge to raise the judge's own score in isolation — a rising judge average with no
+corresponding rise in reply/booking rate is a signal something is being optimized for the wrong
+target, not a win.
+
+### Two responder paths remain unwired (named fast-follows)
+
+Best-of-N is wired at exactly one call site. Two other production draft call sites use the same
+`buildSendRecipe`/humanizer shape but do **not** run through `bestOfN()` yet:
+
+- **`packages/jobs/src/pipeline/sequence-touch.ts`** (`SequenceTouchDeps.draftFollowupFn`, the
+  mid-conversation proactive-touch path) — materially more complex than the first-touch path
+  (thread-aware grounding, `MAX_AGENT_TURNS` caps, freshness/refresh branching) and needs its own
+  grounding-string helper before best-of-N can wire in safely.
+- **`packages/jobs/src/pipeline/inbound.ts`** (`maybeRespond`/`InboundDeps.respondFn` — the ACTIVE
+  responder that replies to inbound LinkedIn messages) — same `MAX_AGENT_TURNS` gate and
+  thread-grounding shape as `sequence-touch.ts`.
+
+Both are scoped fast-follow work, not silently dropped — flagged here so best-of-N's coverage
+(first touch only) isn't mistaken for "all drafting paths."
+
+### The decide framework (post-calibration)
+
+Once calibration is trusted, best-of-N is live, and at least one prompt-AB proposal has been
+measured, the next question is which lever to invest in next. Three candidates, framed honestly
+against the conversion/activation audit:
+
+1. **More knobs / a bigger bandit strategy space** — extend the self-optimizing loop's strategy
+   directives (more levers for the champion/challenger bandit to explore) or extend best-of-N
+   coverage to the two unwired responder paths above. Incremental, compounds with what's already
+   built.
+2. **Richer grounding** — better `ai_insights`/proof points feeding the drafting prompt. This is
+   the actual **ceiling** on specificity and them-focus: no prompt rewrite or best-of-N ranking can
+   make an opener more specific than the grounding data it's given. If the grounding is thin,
+   copy-quality work above this line is polishing a ceiling that's already been hit.
+3. **The conversation-to-booking funnel** — the audit's flagged **realized-value gap**: 10
+   interested replies → 0 meetings booked. This is very likely the **highest-revenue lever** of the
+   three. Copy greatness on the opener does not book a meeting if the booking handoff itself is
+   broken downstream (the stalled review-queue approval from the first external activation,
+   0-of-3 owner booking URLs set). A perfect judge score on an opener is worthless if the person who
+   replies "interested" never gets a meeting on the calendar.
+
+**Recommendation: measure each lever's lift via the eval harness (judge score, pairwise win-rate)
+AND the live funnel (reply rate, meeting-booked rate) before picking — decide by realized-value
+impact, not by judge score alone.** A lever that raises the judge average but does nothing for
+replies-to-meetings is not the next investment; the funnel gap in particular should be measured
+directly against booking outcomes, since no eval-harness judge score can observe it at all (it's
+downstream of copy entirely). This mirrors the anti-Goodhart invariant above: the judge accelerates
+*within* a lever, it does not choose *which* lever to fund.
+
+### Knowledge-sync judgment (rule 09)
+
+Best-of-N is a subtle, behind-the-scenes quality mechanism inside the existing copy-draft
+pipeline — it changes nothing a customer sees or configures (no new page, no new setting they can
+toggle, no new concept in the product's mental model). The `best_of_n` app-setting is a global,
+operator-only row with no `accountId` and no UI, set directly the same way
+`outreach_kill_switch` is. Per rule 09's own framing ("any PR that adds or changes **user-facing**
+behavior"), this does not qualify: **no help-content article is being added for this task.** If a
+future task adds an account-level settings toggle for best-of-N (making it user-visible and
+user-controlled), that PR must ship the matching help-content article at that time — this doc
+states the judgment explicitly so that obligation isn't lost.
+
 ## The model-upgrade shadow protocol
 
 Any change to the model an `ANTHROPIC_MODEL`-style config resolves to (drafting model, judge model,
