@@ -38,14 +38,18 @@ import { shouldSkipLiveEvals } from "./ci";
  * production prompt anyway). So this module instead calls `generateObject` DIRECTLY — the same
  * single-AI-entry primitive the brains themselves use — passing `system: candidateSystem` and a
  * user prompt built from the SAME exported, pure prompt-assembly helpers the brains call
- * (`leadBlock`, `strategyDirectives`). The two small per-context blocks that aren't exported from
- * `@vantera/agent-brains` (the "avoid these recent phrasings" / "winning exemplar" blocks in
- * `copy/shared.ts`, and `reply/respond.ts`'s thread renderer) are reproduced verbatim below as
- * tiny local pure functions — eval tooling duplicating a few lines of STRING FORMATTING is a far
- * smaller risk than importing brain internals that aren't part of the package's public surface,
- * and it keeps this file's only editable-surface-adjacent dependency on production code to
- * read-only, already-exported helpers. This keeps the rig honest: every candidate draft answers
- * to the EXACT context a real drafting call would see, with only the system prompt swapped.
+ * (`leadBlock`, `strategyDirectives`). The "avoid these recent phrasings" / "winning exemplar"
+ * blocks (`copy/shared.ts`'s `avoidBlock`/`exemplarBlock`) and `reply/respond.ts`'s thread
+ * renderer (`renderThread`) are reproduced verbatim below as tiny local pure functions rather than
+ * imported, even though the barrel now re-exports all three (widened specifically so
+ * `prompt-ab-drift.test.ts` has a read-only way to check them) — eval tooling duplicating a few
+ * lines of STRING FORMATTING is a far smaller risk than adding a runtime dependency on brain
+ * internals to this rig, and the drift test is the enforcement that keeps this safe: if any of
+ * these three helpers (or `copy/linkedin.ts`'s `linkedinDraftSchema`, mirrored below as
+ * `linkedinDraftEvalSchema`) is ever edited in `@vantera/agent-brains` without a matching edit
+ * here, `prompt-ab-drift.test.ts` fails loudly instead of the rig silently measuring candidates
+ * against a stale prompt assembly. This keeps the rig honest: every candidate draft answers to the
+ * EXACT context a real drafting call would see, with only the system prompt swapped.
  *
  * Also intentionally NOT reproduced: the brains' generate -> validate -> one bounded regenerate
  * humanizer retry loop (`generateHumanized`). The rig takes the single raw draft a candidate
@@ -56,17 +60,24 @@ import { shouldSkipLiveEvals } from "./ci";
  */
 
 /**
- * Minimal local re-statement of `copy/linkedin.ts`'s (module-private) `linkedinDraftSchema` — not
- * exported from `@vantera/agent-brains`, so the rig defines its own copy of the same shape. Kept
- * byte-for-byte identical on purpose (`connection_note` <= 300 chars, `followup_message` <= 600).
+ * Minimal local re-statement of `copy/linkedin.ts`'s `linkedinDraftSchema`. Kept byte-for-byte
+ * identical on purpose (`connection_note` <= 300 chars, `followup_message` <= 600). Exported (not
+ * just module-local) so `prompt-ab-drift.test.ts` can assert it stays in sync with the real
+ * `linkedinDraftSchema` (now re-exported from `@vantera/agent-brains`'s barrel) — see that test
+ * and the module docstring above for why this rig keeps its own copy rather than importing it.
  */
-const linkedinDraftEvalSchema = z.object({
+export const linkedinDraftEvalSchema = z.object({
   connection_note: z.string().max(300),
   followup_message: z.string().max(600),
 });
 
-/** Mirrors `copy/shared.ts`'s (module-private) `avoidBlock` — see the module docstring above. */
-function avoidBlock(avoidPhrases?: string[]): string {
+/**
+ * Mirrors `copy/shared.ts`'s `avoidBlock` — see the module docstring above. Exported so
+ * `prompt-ab-drift.test.ts` can assert this copy stays byte-identical to the real helper
+ * (re-exported from `@vantera/agent-brains`'s barrel alongside `exemplarBlock`/`renderThread`
+ * specifically so this test rig has a read-only, package-surface way to check for drift).
+ */
+export function avoidBlock(avoidPhrases?: string[]): string {
   const phrases = (avoidPhrases ?? []).map((p) => p.trim()).filter(Boolean);
   if (phrases.length === 0) return "";
   return [
@@ -75,8 +86,8 @@ function avoidBlock(avoidPhrases?: string[]): string {
   ].join("\n");
 }
 
-/** Mirrors `copy/shared.ts`'s (module-private) `exemplarBlock` — see the module docstring above. */
-function exemplarBlock(winningExemplars?: string[]): string {
+/** Mirrors `copy/shared.ts`'s `exemplarBlock` — see the module docstring above and `avoidBlock`'s. */
+export function exemplarBlock(winningExemplars?: string[]): string {
   const exemplars = (winningExemplars ?? []).map((e) => e.trim()).filter(Boolean);
   if (exemplars.length === 0) return "";
   return [
@@ -85,8 +96,8 @@ function exemplarBlock(winningExemplars?: string[]): string {
   ].join("\n");
 }
 
-/** Mirrors `reply/respond.ts`'s (module-private) `renderThread` — see the module docstring above. */
-function renderThread(thread: ConversationTurn[]): string {
+/** Mirrors `reply/respond.ts`'s `renderThread` — see the module docstring above and `avoidBlock`'s. */
+export function renderThread(thread: ConversationTurn[]): string {
   if (thread.length === 0) return "(no earlier messages yet)";
   return thread.map((t) => `${t.role === "agent" ? "You" : "Prospect"}: ${t.text}`).join("\n");
 }

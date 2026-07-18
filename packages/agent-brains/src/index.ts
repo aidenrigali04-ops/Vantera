@@ -35,6 +35,7 @@ export {
 export {
   draftLinkedIn,
   validateLinkedInDraft,
+  linkedinDraftSchema,
   LINKEDIN_SYSTEM,
   CONNECTION_NOTE_MAX_CHARS,
   FOLLOWUP_MAX_CHARS,
@@ -45,6 +46,8 @@ export {
   leadBlock,
   strategyDirectives,
   proofSection,
+  avoidBlock,
+  exemplarBlock,
   type CopyLead,
   type CopyContext,
   type DraftInput,
@@ -68,6 +71,7 @@ export { classifyReply, preClassify, replyVerdictSchema, type ReplyVerdict } fro
 export {
   draftConversationMessage,
   conversationReplySchema,
+  renderThread,
   RESPOND_SYSTEM,
   CONVERSATION_REPLY_MAX_CHARS,
   CONVERSATION_REPLY_MAX_WORDS,
