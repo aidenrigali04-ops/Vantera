@@ -131,6 +131,10 @@ export async function runIntentFloors(model: LanguageModel = getModel()): Promis
   const preds = labels.map((l) => isIntentByRef.get(l.obs.ref) ?? false);
   const expected = labels.map((l) => l.expectedIsIntent);
 
+  // recall is the generic string-class metric; here the "class" is the boolean is-intent domain,
+  // so we stringify each boolean and treat "true" as the positive class — deliberate reuse of the
+  // one recall implementation rather than a second boolean-only variant. precision already takes
+  // booleans directly, so no coercion there.
   const recallValue = recall(
     preds.map((p) => String(p)),
     expected.map((e) => String(e)),

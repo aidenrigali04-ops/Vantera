@@ -1,7 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { MockLanguageModelV3 } from "ai/test";
 import { recall, precision } from "./classifier";
-import { runReplyFloors, runIntentFloors, loadReplyLabels, loadIntentLabels } from "../run-classifier";
+import {
+  runReplyFloors,
+  runIntentFloors,
+  loadReplyLabels,
+  loadIntentLabels,
+  REPLY_INTERESTED_RECALL_FLOOR,
+  INTENT_RECALL_FLOOR,
+  INTENT_PRECISION_FLOOR,
+} from "../run-classifier";
 
 function textResponse(json: unknown) {
   return {
@@ -80,7 +88,7 @@ describe("runReplyFloors (mock model)", () => {
     const report = reports.find((r) => r.metric === "reply.interested_recall");
     expect(report).toBeDefined();
     expect(report!.value).toBe(1);
-    expect(report!.floor).toBe(0.9);
+    expect(report!.floor).toBe(REPLY_INTERESTED_RECALL_FLOOR);
     expect(report!.pass).toBe(true);
     expect(report!.n).toBe(labels.length);
 
@@ -112,7 +120,7 @@ describe("runReplyFloors (mock model)", () => {
     const expectedRecall = (interestedLabels.length - 1) / interestedLabels.length;
 
     expect(report.value).toBeCloseTo(expectedRecall);
-    expect(report.pass).toBe(expectedRecall >= 0.9);
+    expect(report.pass).toBe(expectedRecall >= REPLY_INTERESTED_RECALL_FLOOR);
   });
 });
 
@@ -139,10 +147,10 @@ describe("runIntentFloors (mock model)", () => {
     const precisionReport = reports.find((r) => r.metric === "intent.precision")!;
 
     expect(recallReport.value).toBe(1);
-    expect(recallReport.floor).toBe(0.85);
+    expect(recallReport.floor).toBe(INTENT_RECALL_FLOOR);
     expect(recallReport.pass).toBe(true);
     expect(precisionReport.value).toBe(1);
-    expect(precisionReport.floor).toBe(0.8);
+    expect(precisionReport.floor).toBe(INTENT_PRECISION_FLOOR);
     expect(precisionReport.pass).toBe(true);
     expect(recallReport.n).toBe(labels.length);
 
@@ -182,7 +190,7 @@ describe("runIntentFloors (mock model)", () => {
     const expectedRecall = (positiveLabels.length - 1) / positiveLabels.length;
 
     expect(recallReport.value).toBeCloseTo(expectedRecall);
-    expect(recallReport.pass).toBe(expectedRecall >= 0.85);
+    expect(recallReport.pass).toBe(expectedRecall >= INTENT_RECALL_FLOOR);
   });
 
   it("drops intent-precision below the 0.80 floor on hand-verified false positives", async () => {
@@ -215,6 +223,6 @@ describe("runIntentFloors (mock model)", () => {
     const expectedPrecision = positiveCount / (positiveCount + falsePositiveRefs.size);
 
     expect(precisionReport.value).toBeCloseTo(expectedPrecision);
-    expect(precisionReport.pass).toBe(expectedPrecision >= 0.8);
+    expect(precisionReport.pass).toBe(expectedPrecision >= INTENT_PRECISION_FLOOR);
   });
 });
