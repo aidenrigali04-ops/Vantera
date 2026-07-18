@@ -21,9 +21,13 @@ import { shouldSkipLiveEvals } from "./ci";
  * system prompt (a proposed rewrite the owner is considering, never `LINKEDIN_SYSTEM`/
  * `RESPOND_SYSTEM` themselves — this module never imports or edits either), then runs the
  * existing position-swapped pairwise harness (`./judge/pairwise.ts`, Phase 2B Task 7) with those
- * candidate drafts against each case's `frozenDraft` baseline (the accepted, lint-clean draft that
- * represents current-prompt output — the same baseline `runPairwise` already uses everywhere
- * else, so a prompt-AB run is directly comparable to the CI pairwise number in `ci.ts`).
+ * candidate drafts against each case's `frozenDraft` baseline (a HAND-CURATED, hand-verified gold
+ * draft — see `corpus.ts`/`run-deterministic.ts` — NOT a live sample of current-prompt output; the
+ * same baseline `runPairwise` already uses everywhere else, so a prompt-AB run is directly
+ * comparable to the CI pairwise number in `ci.ts`). A pairwise "win" here means "beats the
+ * hand-curated gold baseline," a HIGHER bar than beating today's live production prompt in some
+ * respects — it is NOT equivalent to "better than production" (see the honest interpretation bar
+ * above the Results table in `docs/prompt-experiments/2026-07-18-copy-v1.md`).
  *
  * DRAFTING-UNDER-AN-OVERRIDDEN-SYSTEM-PROMPT APPROACH: `draftLinkedIn`/`draftConversationMessage`
  * (`@vantera/agent-brains`) each bake their OWN registered system prompt (`LINKEDIN_SYSTEM` /
