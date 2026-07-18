@@ -127,9 +127,10 @@ function sampleUnits(n: number, linkedinCases: CopyLinkedinCase[], respondCases:
 /**
  * Builds a fresh calibration labeling packet: samples ~`n` (case, brain) units across both copy
  * corpora (see module doc), drafts each via the real production brain, scores each draft with the
- * judge, and writes the result to `PACKET_PATH` (`fixtures/judge-calibration/packet.json`) —
- * overwriting whatever was there before, since this is a machine-regenerable artifact, never a
- * hand-curated one (that's `human-labels.json`'s job). Returns the same entries it wrote.
+ * judge, and RETURNS the resulting entries. Deliberately PURE of file I/O — it never touches disk;
+ * `main()` (the `evals:calibration-prep` entry point) owns writing the returned array to
+ * `PACKET_PATH`. Keeping the write out of the builder means the mock-model tests can exercise the
+ * full sampling/drafting/judging path without mutating any tracked file under `fixtures/`.
  *
  * `humanOverall` is HARDCODED to `null` on every entry, unconditionally — there is no code path in
  * this function that can set it to anything else. That is deliberate: the owner fills this column
@@ -167,8 +168,6 @@ export async function buildCalibrationPacket(
     });
   }
 
-  mkdirSync(dirname(PACKET_PATH), { recursive: true });
-  writeFileSync(PACKET_PATH, `${JSON.stringify(entries, null, 2)}\n`, "utf8");
   return entries;
 }
 
@@ -222,6 +221,10 @@ export async function main(): Promise<number> {
 
   try {
     const entries = await buildCalibrationPacket();
+    // main() owns the file write — buildCalibrationPacket stays pure (no disk I/O) so the
+    // mock-model tests never mutate a tracked file under fixtures/.
+    mkdirSync(dirname(PACKET_PATH), { recursive: true });
+    writeFileSync(PACKET_PATH, `${JSON.stringify(entries, null, 2)}\n`, "utf8");
     console.log(`Wrote ${entries.length} entries to ${PACKET_PATH}`);
     console.log(
       "Next: download packet.json (the calibration-prep workflow artifact), fill each humanOverall (1-5), then run `pnpm --filter @vantera/evals evals:calibration-score <path>`."

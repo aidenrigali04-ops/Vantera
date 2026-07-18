@@ -1,15 +1,9 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import { MockLanguageModelV3 } from "ai/test";
-import {
-  buildCalibrationPacket,
-  scoreCalibration,
-  MIN_LABELED_FOR_SCORE,
-  PACKET_PATH,
-  type CalibrationPacketEntry,
-} from "./calibration-prep";
+import { buildCalibrationPacket, scoreCalibration, MIN_LABELED_FOR_SCORE } from "./calibration-prep";
 
 function textResponse(json: unknown) {
   return {
@@ -88,9 +82,11 @@ describe("buildCalibrationPacket (mock models)", () => {
       expect(typeof entry.grounding).toBe("string");
     }
 
-    // Persisted verbatim to the fixed packet path (fixtures/judge-calibration/packet.json).
-    const written = JSON.parse(readFileSync(PACKET_PATH, "utf8")) as CalibrationPacketEntry[];
-    expect(written).toEqual(entries);
+    // The corpus interleaves linkedin/respond, so a 6-entry packet must carry both brains — this
+    // also proves the sampleUnits interleaving actually ran (not a single-brain packet).
+    const brains = new Set(entries.map((e) => e.brain));
+    expect(brains.has("linkedin")).toBe(true);
+    expect(brains.has("respond")).toBe(true);
   });
 
   it("never lets a non-null humanOverall through even across a larger, cycled sample", async () => {
