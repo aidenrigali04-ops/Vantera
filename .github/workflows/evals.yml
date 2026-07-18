@@ -43,9 +43,13 @@ jobs:
 
       # Live evals: real Anthropic calls against the fixture corpus. Cost is bounded to the
       # fixture-set size (currently ~34 copy cases + the labeled classifier sets) — roughly
-      # $2-5/run at current fixture volume; the nightly cron is the fuller sweep since every
-      # trigger runs the same full suite (there's no separate "quick" mode). API-key-gated: absent
-      # secret is a LOUD skip (a visible ::warning), never a silent green — see docs/evals.md.
+      # $2-5/run at current fixture volume. NOTE: each case is generated ~2x per run (the
+      # deterministic gate drafts internally, then judge+pairwise need a second full-corpus
+      # generation pass since the gate doesn't expose draft text) — the doubling is the dominant
+      # cost driver; factor it into the ~$50-100/mo budget. See docs/evals.md ("Cost") for the
+      # single-shared-pass follow-up. The nightly cron is the fuller sweep since every trigger runs
+      # the same full suite (there's no separate "quick" mode). API-key-gated: absent secret is a
+      # LOUD skip (a visible ::warning), never a silent green — see docs/evals.md.
       - name: Live evals (API-gated)
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}

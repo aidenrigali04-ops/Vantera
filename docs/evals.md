@@ -39,6 +39,24 @@ script, pinned here to the same `^4.0.0`) — the simplest path to running one s
 entry file without adding a build step, consistent with the one other place in the monorepo that
 already does this.
 
+### Cost — live drafts are generated ~2x per `evals:ci` run
+
+A live run generates every corpus case **twice**, not once: the deterministic gate
+(`runDeterministic("live")`) generates a fresh draft per case internally (it only returns pass/fail
+`GradeResult`s, never the draft text), and the judge + pairwise layers need the actual draft text,
+so `ci.ts`'s `generateLiveCandidates` does a **second full-corpus generation pass** to produce
+candidates for them. Net: each case is drafted ~2x per invocation. At the current fixture volume
+(~34 copy cases + the labeled classifier sets) this still lands around $2-5 per run, but budget for
+the doubling — it is the dominant cost driver at nightly cadence (factor it into the ~$50-100/mo
+eval budget; the classifier floors and the judge scoring calls are on top of the generation cost).
+
+**Named follow-up (not built): the single-shared-pass optimization.** Have `runDeterministic`
+optionally return the draft text (or add a `generateAndGrade` variant) so the judge + pairwise
+layers reuse the deterministic gate's drafts instead of regenerating — collapsing the ~2x back to
+~1x. Deferred here to keep this task's edit surface to the assigned files; `run-deterministic.ts` is
+a committed, frozen file from Task 4 and changing its public return shape is out of scope for the CI
+wiring task.
+
 ## `ci.ts`'s decision logic
 
 `decide()` is a **pure function** — no I/O, no `process.exit` — that takes already-computed results

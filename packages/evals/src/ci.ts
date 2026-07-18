@@ -60,9 +60,10 @@ export type CiDecision = {
   exitCode: 0 | 1;
   /** Non-empty iff `exitCode === 1` — these are what actually failed the build. */
   hardFailures: string[];
-  /** Judge/pairwise misses that would have failed the build had `judgeGating` been on. Always
-   *  populated when the underlying metric misses, regardless of gating — printed for visibility
-   *  so a miss is never silently invisible pre-calibration. */
+  /** Judge/pairwise misses reported for visibility but NOT gating. Populated only when
+   *  `judgeGating` is false — when gating is on, the same misses route into `hardFailures`
+   *  instead (never both). So pre-calibration a judge/pairwise miss is always visible here;
+   *  post-flip it becomes a hard failure and this list stays empty for that metric. */
   advisoryFlags: string[];
 };
 
@@ -246,7 +247,16 @@ export async function main(): Promise<number> {
     scoreJudge: (candidates) => scoreJudge(candidates, judgeModel),
   };
 
-  const result = await orchestrate(deps, judgeGating);
+  // Fail SAFE on any throw from the run (e.g. a future fixture missing its frozenDraft, a
+  // provider/network error mid-run) — a clean `::error::` message and exit 1, never an unhandled
+  // rejection that surfaces as an opaque stack trace with an ambiguous exit status.
+  let result: OrchestrationResult;
+  try {
+    result = await orchestrate(deps, judgeGating);
+  } catch (err) {
+    console.log(`::error::evals:ci failed: ${err instanceof Error ? err.message : String(err)}`);
+    return 1;
+  }
   printSummary(result, judgeGating);
   return result.decision.exitCode;
 }
