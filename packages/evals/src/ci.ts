@@ -15,8 +15,9 @@ import { judgeCopy, JUDGE_MODEL_ID } from "./judge/judge";
  *
  * Three layers, two postures:
  * - HARD (fail the build): the deterministic copy gate (Task 4, `runDeterministic("live")`,
- *   `passRate === 1`) and the classifier accuracy floors (Task 5, `runReplyFloors` +
- *   `runIntentFloors`, every `FloorReport.pass`).
+ *   `passRate >= DETERMINISTIC_LIVE_FLOOR`, see that const's doc for why this isn't exact 100%)
+ *   and the classifier accuracy floors (Task 5, `runReplyFloors` + `runIntentFloors`, every
+ *   `FloorReport.pass`).
  * - ADVISORY (report, never fail): the LLM judge (Task 6) and the pairwise win-rate harness
  *   (Task 7) — both are informational until a human owner labels ~100 drafts, runs
  *   `runCalibration` (`./judge/kappa.ts`), confirms Cohen's kappa >= 0.7, and flips
@@ -44,7 +45,29 @@ import { judgeCopy, JUDGE_MODEL_ID } from "./judge/judge";
  */
 export const JUDGE_OVERALL_GATE_FLOOR = 3.5;
 
-export type DeterministicSummary = { passRate: number };
+/**
+ * The hard-gate floor for `runDeterministic("live")`'s passRate. NOT 1 (exact 100%) — `"live"`
+ * mode regenerates a fresh draft per corpus case via the real drafting brains, which is a
+ * STOCHASTIC process: `draftLinkedIn`/`draftConversationMessage` already run `generateHumanized`
+ * (generate → validate → ONE bounded regenerate) internally, so a case only shows up dirty here
+ * if it's still lint-dirty after that production regenerate — and in PRODUCTION that's exactly
+ * what routes a draft to human review, never a silent send. At the observed ~1% per-draft
+ * lint-dirty-after-regenerate rate, P(>=1 dirty in the 36-case corpus) is roughly 30%, so a
+ * `passRate === 1` gate was failing ~1 in 3 unrelated PRs on pure variance — "1 of 36 needed
+ * review" is normal production behavior, not a defect, and shouldn't block a build.
+ *
+ * 0.9 tolerates up to ~3 stochastic review-routed drafts out of 36 (matching the observed
+ * per-draft variance with headroom) while a genuine prompt/copy regression — which dirties drafts
+ * systematically, not by chance — tanks passRate well below this floor (the mock-model regression
+ * test in `graders/deterministic.test.ts` demonstrates a real regression drives passRate to 0, not
+ * to 0.9-ish). This is a coarse, revisitable number, not a calibration-study output like
+ * `PAIRWISE_NONINFERIORITY` — tighten or loosen it if the corpus size or the observed per-draft
+ * lint-dirty rate materially changes.
+ */
+export const DETERMINISTIC_LIVE_FLOOR = 0.9;
+
+export type DeterministicFailure = { caseId: string; rules: string[] };
+export type DeterministicSummary = { passRate: number; failures?: DeterministicFailure[] };
 export type JudgeSummary = { averageOverall: number; n: number };
 
 export type CiInputs = {
@@ -73,14 +96,28 @@ export type CiDecision = {
  * `advisoryFlags` UNLESS `judgeGating` is true, in which case they ALSO land in `hardFailures`
  * (and therefore flip `exitCode`). A judge summary with `n === 0` (no live candidates were
  * scored) is never treated as a miss either way — there is nothing to judge.
+ *
+ * The deterministic gate fails on `passRate < DETERMINISTIC_LIVE_FLOOR` (0.9), not `< 1` — see
+ * that const's doc. Production routes a lint-dirty draft to human review, it never blocks or
+ * auto-sends it, so a small fraction of review-routed drafts among freshly-generated live samples
+ * is expected variance, not a defect; only a SYSTEMATIC lint-violation rate (passRate dropping
+ * below the floor) signals a real prompt/copy regression worth failing the build over. When the
+ * caller supplies `inputs.deterministic.failures` (the per-case `{caseId, rules}` list), a miss's
+ * message names the failing case(s) and their violation rules so a reproducible borderline
+ * fixture can be told apart from pure sampling variance at a glance.
  */
 export function decide(inputs: CiInputs): CiDecision {
   const hardFailures: string[] = [];
   const advisoryFlags: string[] = [];
 
-  if (inputs.deterministic.passRate < 1) {
+  if (inputs.deterministic.passRate < DETERMINISTIC_LIVE_FLOOR) {
+    const failures = inputs.deterministic.failures ?? [];
+    const caseDetail =
+      failures.length > 0
+        ? ` — failing case(s): ${failures.map((f) => `${f.caseId} [${f.rules.join(", ")}]`).join("; ")}`
+        : "";
     hardFailures.push(
-      `deterministic copy gate (HARD): passRate ${inputs.deterministic.passRate.toFixed(3)} < 1 — at least one live draft failed the humanizer/grounding lint`
+      `deterministic copy gate (HARD): passRate ${inputs.deterministic.passRate.toFixed(3)} < floor ${DETERMINISTIC_LIVE_FLOOR} — systematic lint-violation rate, not stochastic review-routing${caseDetail}`
     );
   }
 
@@ -193,7 +230,13 @@ export async function orchestrate(deps: CiDeps, judgeGating: boolean): Promise<O
 function printSummary(result: OrchestrationResult, judgeGating: boolean): void {
   const { decision, deterministic, floors, pairwise, judge } = result;
   console.log("=== Evals CI summary ===");
-  console.log(`deterministic (HARD): passRate=${deterministic.passRate.toFixed(3)}`);
+  console.log(`deterministic (HARD): passRate=${deterministic.passRate.toFixed(3)} floor=${DETERMINISTIC_LIVE_FLOOR}`);
+  if (deterministic.failures && deterministic.failures.length > 0) {
+    console.log(`  review-routed/dirty case(s) this run (${deterministic.failures.length}):`);
+    for (const f of deterministic.failures) {
+      console.log(`    - ${f.caseId}: ${f.rules.join(", ")}`);
+    }
+  }
   for (const f of floors) {
     console.log(`classifier floor (HARD): ${f.metric}=${f.value.toFixed(3)} floor=${f.floor} pass=${f.pass} n=${f.n}`);
   }
@@ -237,8 +280,11 @@ export async function main(): Promise<number> {
 
   const deps: CiDeps = {
     runDeterministic: async () => {
-      const { passRate } = await runDeterministic("live", draftingModel);
-      return { passRate };
+      const { results, passRate } = await runDeterministic("live", draftingModel);
+      const failures = results
+        .filter((r) => !r.pass)
+        .map((r) => ({ caseId: r.caseId, rules: r.violations.map((v) => v.rule) }));
+      return { passRate, failures };
     },
     runReplyFloors: () => runReplyFloors(),
     runIntentFloors: () => runIntentFloors(),

@@ -10,7 +10,7 @@ for the conventions this suite inherits.
 
 | Layer | Modules | Posture | Why |
 |---|---|---|---|
-| **Deterministic copy gate** | `run-deterministic.ts` (`runDeterministic("frozen" \| "live")`) | **HARD** | Relints every generated draft with the EXACT production graders (`@vantera/agent-brains`'s humanizer/grounding checks) the drafting brains already run internally. `passRate === 1` — one dirty draft anywhere in the corpus fails the whole suite. No partial credit for copy that reaches a real prospect. |
+| **Deterministic copy gate** | `run-deterministic.ts` (`runDeterministic("frozen" \| "live")`) | **HARD** | Relints every generated draft with the EXACT production graders (`@vantera/agent-brains`'s humanizer/grounding checks) the drafting brains already run internally. `"frozen"` mode (the unit-test path, `graders/deterministic.test.ts`) asserts exact `passRate === 1` over the 36 hand-verified corpus baselines — a frozen-baseline lint failure is always a real grader/fixture regression, never variance, so it stays 100%-hard. `"live"` mode (`ci.ts`'s CI gate) asserts `passRate >= DETERMINISTIC_LIVE_FLOOR` (**0.9**, not exact 100%): it regenerates a fresh draft per case via the real (stochastic) drafting brains, and production already routes a still-lint-dirty draft (after `draftLinkedIn`/`draftConversationMessage`'s internal `generateHumanized` regenerate) to human review rather than blocking or auto-sending it — so a small, review-routed fraction among 36 freshly-generated live samples is expected sampling variance, not a defect. Only a passRate that drops *below* the floor — a systematic lint-violation rate — signals a real prompt/copy regression worth failing the build over. See `DETERMINISTIC_LIVE_FLOOR`'s doc comment in `ci.ts` for the full rationale (why 0.9, not 1). |
 | **Classifier accuracy floors** | `run-classifier.ts` (`runReplyFloors`, `runIntentFloors`) | **HARD** | Bounds the two classifiers that gate the funnel before anything reaches a human or costs enrichment spend: reply-interested recall (≥ 0.90), intent recall (≥ 0.85), intent precision (≥ 0.80). Any `FloorReport.pass === false` fails the build. |
 | **LLM judge + pairwise win-rate** | `judge/judge.ts` (`judgeCopy`), `judge/pairwise.ts` (`runPairwise`) | **ADVISORY** (until calibrated — see below) | A stronger, different-family model (Opus) rates specificity/them-focus/posture/naturalness/overall, and separately does position-swapped A/B against each case's frozen baseline. Reported every run for visibility and trend-tracking, but nothing gates on it until the judge itself is proven trustworthy. |
 
@@ -63,7 +63,7 @@ wiring task.
 (deterministic pass rate, the floor reports, the pairwise report, a judge summary, and the
 `judgeGating` boolean) and returns an exit code plus human-readable reasons. `orchestrate()` sequences
 the actual run-fns (real in `main()`, injected fakes in `ci.test.ts`) and folds their output through
-`decide()`. This split means the orchestration logic — "does a passRate < 1 fail the build," "does an
+`decide()`. This split means the orchestration logic — "does a passRate below `DETERMINISTIC_LIVE_FLOOR` fail the build," "does an
 advisory judge/pairwise miss ever flip the exit code before `EVALS_JUDGE_GATING=1`" — is covered by
 `packages/evals/src/ci.test.ts` with zero network calls, running in the same fast suite as everything
 else in this package.
@@ -286,8 +286,8 @@ Any change to the model an `ANTHROPIC_MODEL`-style config resolves to (drafting 
 or both) is a **change to production behavior**, not a routine dependency bump — it must go through
 this protocol before it ships to real prospects:
 
-1. **Full eval suite green first.** Both hard layers (deterministic `passRate === 1`, every
-   classifier floor) must pass against the NEW model before anything else happens. A model swap
+1. **Full eval suite green first.** Both hard layers (deterministic `passRate >= DETERMINISTIC_LIVE_FLOOR`,
+   every classifier floor) must pass against the NEW model before anything else happens. A model swap
    that fails either gate does not proceed — fix the prompt/config for the new model, or don't swap.
 2. **48-hour shadow-generation window.** After the eval suite is green, the new model runs in
    **shadow** — generating drafts alongside (never instead of) the current production model, on

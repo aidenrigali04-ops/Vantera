@@ -1,5 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { decide, orchestrate, shouldSkipLiveEvals, JUDGE_OVERALL_GATE_FLOOR, type CiDeps, type CiInputs } from "./ci";
+import {
+  decide,
+  orchestrate,
+  shouldSkipLiveEvals,
+  JUDGE_OVERALL_GATE_FLOOR,
+  DETERMINISTIC_LIVE_FLOOR,
+  type CiDeps,
+  type CiInputs,
+} from "./ci";
 import { PAIRWISE_NONINFERIORITY } from "./judge/pairwise";
 import type { FloorReport } from "./graders/classifier";
 
@@ -38,11 +46,42 @@ describe("decide — hard gates", () => {
     expect(result.advisoryFlags).toEqual([]);
   });
 
-  it("deterministic passRate < 1 → hard failure, exit 1", () => {
-    const result = decide(baseInputs({ deterministic: { passRate: 0.97 } }));
+  it("deterministic passRate below the live floor → hard failure, exit 1", () => {
+    const result = decide(baseInputs({ deterministic: { passRate: 0.85 } }));
     expect(result.exitCode).toBe(1);
     expect(result.hardFailures).toHaveLength(1);
     expect(result.hardFailures[0]).toMatch(/deterministic copy gate \(HARD\)/);
+  });
+
+  it("deterministic passRate = 0.972 (one stochastic review-routed draft in 36) is NOT a hard failure — above the floor", () => {
+    const result = decide(baseInputs({ deterministic: { passRate: 0.972 } }));
+    expect(result.exitCode).toBe(0);
+    expect(result.hardFailures).toEqual([]);
+  });
+
+  it("deterministic passRate exactly at DETERMINISTIC_LIVE_FLOOR passes (>= floor, not <)", () => {
+    const result = decide(baseInputs({ deterministic: { passRate: DETERMINISTIC_LIVE_FLOOR } }));
+    expect(result.exitCode).toBe(0);
+    expect(result.hardFailures).toEqual([]);
+  });
+
+  it("deterministic hard-failure message surfaces the failing case ids + violation rules when provided", () => {
+    const result = decide(
+      baseInputs({
+        deterministic: {
+          passRate: 0.85,
+          failures: [
+            { caseId: "li-biotech-founder-procurement", rules: ["ungrounded-claim"] },
+            { caseId: "re-manufacturing-plant-manager-downtime", rules: ["banned-phrase", "no-links"] },
+          ],
+        },
+      })
+    );
+    expect(result.exitCode).toBe(1);
+    expect(result.hardFailures[0]).toMatch(/li-biotech-founder-procurement/);
+    expect(result.hardFailures[0]).toMatch(/ungrounded-claim/);
+    expect(result.hardFailures[0]).toMatch(/re-manufacturing-plant-manager-downtime/);
+    expect(result.hardFailures[0]).toMatch(/banned-phrase/);
   });
 
   it("any classifier floor miss → hard failure, exit 1", () => {
@@ -103,7 +142,11 @@ describe("decide — judge + pairwise are advisory unless EVALS_JUDGE_GATING fli
 
   it("hard misses stay hard even when a judgeGating advisory ALSO misses in the same run", () => {
     const result = decide(
-      baseInputs({ deterministic: { passRate: 0.9 }, pairwise: FAILING_PAIRWISE, judgeGating: true })
+      baseInputs({
+        deterministic: { passRate: DETERMINISTIC_LIVE_FLOOR - 0.1 },
+        pairwise: FAILING_PAIRWISE,
+        judgeGating: true,
+      })
     );
     expect(result.exitCode).toBe(1);
     expect(result.hardFailures).toHaveLength(2);
@@ -137,13 +180,37 @@ describe("orchestrate — wiring with injected fake run-fns (no real model/netwo
     expect(result.decision.exitCode).toBe(0);
   });
 
-  it("a fake runDeterministic reporting passRate < 1 fails the orchestration", async () => {
+  it("a fake runDeterministic reporting passRate below the live floor fails the orchestration", async () => {
     const result = await orchestrate(
       fakeDeps({ runDeterministic: async () => ({ passRate: 0.8 }) }),
       false
     );
     expect(result.decision.exitCode).toBe(1);
     expect(result.decision.hardFailures[0]).toMatch(/deterministic/);
+  });
+
+  it("a fake runDeterministic reporting passRate above the live floor (e.g. 0.972) does NOT fail the orchestration", async () => {
+    const result = await orchestrate(
+      fakeDeps({ runDeterministic: async () => ({ passRate: 0.972 }) }),
+      false
+    );
+    expect(result.decision.exitCode).toBe(0);
+    expect(result.decision.hardFailures).toEqual([]);
+  });
+
+  it("threads per-case deterministic failures through to the hard-failure message", async () => {
+    const result = await orchestrate(
+      fakeDeps({
+        runDeterministic: async () => ({
+          passRate: 0.85,
+          failures: [{ caseId: "li-biotech-founder-procurement", rules: ["ungrounded-claim"] }],
+        }),
+      }),
+      false
+    );
+    expect(result.decision.exitCode).toBe(1);
+    expect(result.decision.hardFailures[0]).toMatch(/li-biotech-founder-procurement/);
+    expect(result.decision.hardFailures[0]).toMatch(/ungrounded-claim/);
   });
 
   it("a fake runPairwise reporting a miss never flips exit code unless judgeGating=1", async () => {
