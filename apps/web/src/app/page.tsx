@@ -65,13 +65,15 @@ export default function Home() {
           <Hero />
           <TrustStrip />
         </div>
-        {/* 3 → 12 */}
+        {/* Below-the-fold arc: overview → proof → moat → capability index → fit → replace → price.
+            One full telling of the loop (Showcase); How It Works is the fast overview ahead of it;
+            System Pillars owns the differentiation; FeaturesGrid is the compact capability index. */}
+        <HowItWorks />
         <Showcase />
         <SystemPillars />
-        <HowItWorks />
         <FeaturesGrid />
-        <Consolidation />
         <Integrations />
+        <Consolidation />
         <Pricing plans={plans} />
         {/* T2: objection-handling on the highest-traffic page (faq-data always claimed
             it rendered here; now it actually does, schema included). */}

@@ -538,7 +538,7 @@ export function Showcase() {
         <LandingHeading
           eyebrow="Meet Vera"
           title="From in-market buyer to booked call"
-          subtitle="Vera sources your buyers, qualifies them, and writes from proven plays — learning from every reply. You approve every send."
+          subtitle="Follow one buyer through every stage Vera runs — sourced, qualified, personalized, booked."
         />
 
         <div className="mt-20 flex flex-col gap-20 lg:mt-24 lg:gap-24">

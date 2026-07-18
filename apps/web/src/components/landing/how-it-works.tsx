@@ -64,9 +64,9 @@ export function HowItWorks() {
     <section id="how-it-works" className="relative border-t border-[var(--hairline)] bg-[var(--tint)] py-24 sm:py-28">
       <div className="relative mx-auto max-w-6xl px-6 lg:px-8">
         <LandingHeading
-          eyebrow="Getting started"
+          eyebrow="How it works"
           title="Live in minutes. Good from the first message."
-          subtitle="Connect once. Three agents run the whole motion — sourcing, qualifying, and drafting — while you stay in control of every send."
+          subtitle="Connect once, then it runs — sourcing, qualifying, and drafting for you, with every message yours to approve first."
         />
 
         {/* ── The flow: three numbered steps, joined by a subtle line ────────── */}

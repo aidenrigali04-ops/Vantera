@@ -30,7 +30,6 @@ import { cn } from "@/lib/utils";
 type Feature = {
   label: string;
   title: string;
-  line: string;
   chips: string[];
   icon: ProductIcon;
 };
@@ -39,35 +38,30 @@ const FEATURES: Feature[] = [
   {
     label: "Prospecting",
     title: "Finds and prioritizes your best buyers",
-    line: "Agents watch LinkedIn for in-market behavior, then rank every match against your ICP so effort lands on the accounts most likely to close.",
     chips: ["intent signals", "lookalikes", "lead scoring", "ICP filtering"],
     icon: ProspectingIcon,
   },
   {
     label: "Outreach",
     title: "Human-quality LinkedIn messages at scale",
-    line: "Every message starts from a play that's proven, then is written from the prospect's real activity — never a template — so it reads like you sat down and wrote it yourself.",
     chips: ["starts from proven plays", "context-aware", "personalized"],
     icon: OutreachIcon,
   },
   {
     label: "Control",
     title: "Full auto or approve before it sends",
-    line: "Run hands-off, or keep a human in the loop and sign off on each message. No rigid sequences you have to fight — you set the level of control.",
     chips: ["human-in-the-loop default", "no rigid workflows"],
     icon: ControlIcon,
   },
   {
     label: "Replies",
     title: "100% reply visibility",
-    line: "Every response is captured and surfaced in one place, with a suggested reply already drafted — one click to send, nothing slips through.",
     chips: ["every reply captured", "responses pre-drafted", "one click to send"],
     icon: RepliesIcon,
   },
   {
     label: "CRM",
     title: "Clean CRM handoff",
-    line: "Qualified conversations flow straight into your CRM — no copy-paste, no lost context. Vantera fills the pipeline; your CRM keeps it.",
     chips: ["HubSpot", "Salesforce", "syncs automatically"],
     icon: CrmSyncIcon,
   },
@@ -90,61 +84,38 @@ function Chip({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** Shared icon well — rounded blue-tint square with a blue glyph and a soft inner highlight. */
-function IconWell({ icon: Icon }: { icon: ProductIcon }) {
+/**
+ * Compact capability tile — the at-a-glance index of what Vantera does, in the same card
+ * language as the rest of the page (CARD_INTERACTIVE + cyan icon well + mono label + Chip)
+ * but denser: label + title + keyword chips, no re-narration. The two "Vantera only" cards
+ * above carry the differentiation and the prose; this row is the reference set. The long-form
+ * descriptions live in the SoftwareApplication `featureList` (lib/seo.tsx) for AEO/LLM extraction.
+ */
+function CompactCapability({ f, wide = false }: { f: Feature; wide?: boolean }) {
+  const Icon = f.icon;
   return (
-    <span className="grid size-11 place-items-center rounded-xl bg-[var(--cyan-tint)] text-[var(--cyan-strong)] shadow-[inset_0_1px_0_rgba(255,255,255,0.6)] ring-1 ring-inset ring-[rgba(24,119,242,0.2)] transition-transform duration-300 group-hover:scale-105">
-      <Icon className="size-5" />
-    </span>
-  );
-}
-
-function FeatureCard({ f, wide = false }: { f: Feature; wide?: boolean }) {
-  // The wide close spans both columns and lays out horizontally on ≥sm so a single
-  // full-width tile still reads dense — pitch on the left, chips gathered on the right.
-  if (wide) {
-    return (
-      <RevealItem
-        className={cn(CARD_INTERACTIVE, "group flex flex-col p-7 sm:col-span-2 sm:flex-row sm:items-center sm:gap-8")}
-      >
-        <div className="flex min-w-0 flex-1 flex-col">
-          <div className="flex items-center gap-3">
-            <IconWell icon={f.icon} />
-            <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ink-4)]">
-              {f.label}
-            </span>
-          </div>
-          <h3 className="mt-6 text-[18px] font-semibold leading-snug tracking-[-0.015em] text-foreground">
+    <RevealItem
+      className={cn(
+        CARD_INTERACTIVE,
+        "group flex flex-col gap-4 p-5",
+        wide && "sm:col-span-2 sm:flex-row sm:items-center sm:justify-between sm:gap-6",
+      )}
+    >
+      <div className="flex items-center gap-3">
+        <span className="grid size-9 flex-none place-items-center rounded-lg bg-[var(--cyan-tint)] text-[var(--cyan-strong)] shadow-[inset_0_1px_0_rgba(255,255,255,0.6)] ring-1 ring-inset ring-[rgba(24,119,242,0.2)] transition-transform duration-300 group-hover:scale-105">
+          <Icon className="size-[18px]" />
+        </span>
+        <div className="flex min-w-0 flex-col">
+          <span className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.16em] text-[var(--ink-4)]">
+            {f.label}
+          </span>
+          <h3 className="mt-1 text-[15px] font-semibold leading-snug tracking-[-0.015em] text-foreground">
             {f.title}
           </h3>
-          <p className="mt-2.5 max-w-md text-[14.5px] leading-relaxed text-[var(--ink-3)]">{f.line}</p>
         </div>
-
-        <div className="mt-6 flex flex-wrap gap-1.5 sm:mt-0 sm:max-w-[280px] sm:flex-none sm:justify-end">
-          {f.chips.map((c) => (
-            <Chip key={c}>{c}</Chip>
-          ))}
-        </div>
-      </RevealItem>
-    );
-  }
-
-  return (
-    <RevealItem className={cn(CARD_INTERACTIVE, "group flex flex-col p-7")}>
-      <div className="flex items-center justify-between">
-        <IconWell icon={f.icon} />
-        <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ink-4)]">
-          {f.label}
-        </span>
       </div>
 
-      <h3 className="mt-6 text-[18px] font-semibold leading-snug tracking-[-0.015em] text-foreground">
-        {f.title}
-      </h3>
-      <p className="mt-2.5 text-[14.5px] leading-relaxed text-[var(--ink-3)]">{f.line}</p>
-
-      {/* mt-auto floats the chip row to a shared baseline so cards in a row align */}
-      <div className="mt-auto flex flex-wrap gap-1.5 pt-6">
+      <div className={cn("flex flex-wrap gap-1.5", wide ? "sm:flex-none sm:justify-end" : "mt-auto")}>
         {f.chips.map((c) => (
           <Chip key={c}>{c}</Chip>
         ))}
@@ -404,27 +375,25 @@ export function FeaturesGrid() {
       <div className="mx-auto max-w-6xl px-6 lg:px-8">
         <LandingHeading
           eyebrow="Capabilities"
-          title="Built to run outbound end to end"
-          subtitle="From finding the right buyer to a clean CRM handoff — every part of the motion, working as one system that keeps getting smarter, with you in control."
+          title="Everything it does, in one system"
+          subtitle="Two things no sequencer can claim — safe pacing and a system that learns — plus every capability the motion needs, from first touch to a clean CRM handoff."
         />
 
-        <Reveal className="mt-14 grid gap-5 sm:grid-cols-2">
-          {/* PROSPECTING + OUTREACH */}
-          <FeatureCard f={FEATURES[0]} />
-          <FeatureCard f={FEATURES[1]} />
-
-          {/* SAFETY — differentiator #1, full-width */}
+        <Reveal className="mt-14 flex flex-col gap-5">
+          {/* The two differentiators lead — the "Vantera only" pair no sequencer can match. */}
           <SafetyCard />
-
-          {/* CONTROL + REPLIES */}
-          <FeatureCard f={FEATURES[2]} />
-          <FeatureCard f={FEATURES[3]} />
-
-          {/* LEARNING — differentiator #2, full-width, mirrors the Safety card */}
           <LearningCard />
 
-          {/* CRM — full-width close so the grid ends balanced (no dangling half-row) */}
-          <FeatureCard f={FEATURES[4]} wide />
+          {/* The full capability set as a compact at-a-glance index (label + title + keyword chips;
+              long-form copy lives in the SoftwareApplication featureList for AEO). CRM closes wide so
+              the row stays balanced — preserves the prior no-dangling-half-row intent. */}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <CompactCapability f={FEATURES[0]} />
+            <CompactCapability f={FEATURES[1]} />
+            <CompactCapability f={FEATURES[2]} />
+            <CompactCapability f={FEATURES[3]} />
+            <CompactCapability f={FEATURES[4]} wide />
+          </div>
         </Reveal>
       </div>
     </section>

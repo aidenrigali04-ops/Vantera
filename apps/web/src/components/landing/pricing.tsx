@@ -161,7 +161,7 @@ export function Pricing({ plans }: { plans?: LandingPlan[] }) {
       <div className="mx-auto max-w-6xl px-6 lg:px-8">
         <LandingHeading
           eyebrow="Pricing"
-          title="Simple, transparent pricing"
+          title="Start free. Pay when it's paying off."
           subtitle="Start free. One plan with everything in it, and an enterprise lane when you outgrow it. No contracts, no surprises."
         />
 

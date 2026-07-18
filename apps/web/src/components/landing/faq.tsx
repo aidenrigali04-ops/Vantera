@@ -12,7 +12,11 @@ export function Faq() {
   return (
     <section id="faq" className="relative py-24 sm:py-28 lg:py-32">
       <div className="mx-auto max-w-3xl px-6 lg:px-8">
-        <LandingHeading eyebrow="FAQ" title="Frequently asked questions" />
+        <LandingHeading
+          eyebrow="FAQ"
+          title="Questions, answered"
+          subtitle="The questions people ask before they start — straight answers, no asterisks."
+        />
 
         <div className="mt-12 flex flex-col gap-3">
           {QA.map((item, i) => {

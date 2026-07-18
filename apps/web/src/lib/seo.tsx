@@ -60,6 +60,18 @@ export function softwareApplicationLd(plans: { name: string; monthlyUsd: number 
     operatingSystem: "Web",
     url: SITE_URL,
     description: SITE_DESCRIPTION,
+    // Capability surface for AI engines / LLM extraction — the full "what it does" set carried
+    // in structured data so it survives independent of how densely the page renders it visually.
+    // (The visible capability index keeps titles + keyword chips; the long-form descriptions live here.)
+    featureList: [
+      "Finds and prioritizes your best buyers — agents watch LinkedIn for in-market behavior and rank every match against your ICP (intent signals, lookalikes, lead scoring, ICP filtering).",
+      "Human-quality LinkedIn messages at scale — every message starts from a proven play and is written from the prospect's real activity, never a template (context-aware, personalized).",
+      "Full auto or approve before it sends — run hands-off or keep a human in the loop and sign off on each message; no rigid sequences (human-in-the-loop by default).",
+      "100% reply visibility — every response captured in one place with a suggested reply pre-drafted, one click to send.",
+      "Clean CRM handoff — qualified conversations sync straight into your CRM with no copy-paste (HubSpot, Salesforce, GoHighLevel).",
+      "LinkedIn-safe, anti-ban pacing — human-like limits, realistic timing, and multi-sender distribution protect your account.",
+      "Self-optimizing learning loop — starts from proven plays, tests careful improvements on live conversations, keeps winners, drops losers, and rolls back anything that hurts results.",
+    ],
     offers: plans.map((p) => ({
       "@type": "Offer",
       name: p.name,

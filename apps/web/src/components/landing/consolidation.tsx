@@ -56,8 +56,8 @@ export function Consolidation() {
       <div className="mx-auto max-w-6xl px-6 lg:px-8">
         <LandingHeading
           eyebrow="One platform"
-          title="Replace your entire outbound stack"
-          subtitle="No more stitching a lead-list tool to a sequencer to a separate inbox to safety tooling that all half-talk to each other. Vantera runs the whole motion, end to end — and unlike the stack it replaces, it keeps getting smarter."
+          title="Replaces your entire outbound stack"
+          subtitle="No more stitching a lead-list tool to a sequencer to a separate inbox to warmup tooling that barely talk to each other. One system runs all of it, as one."
         />
 
         <div className="mt-16 grid items-center gap-14 lg:mt-20 lg:grid-cols-[1.05fr_1fr] lg:gap-20">

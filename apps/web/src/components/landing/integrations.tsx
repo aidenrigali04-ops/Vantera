@@ -192,7 +192,7 @@ export function Integrations() {
       <div className="relative mx-auto max-w-6xl px-6 lg:px-8">
         <LandingHeading
           eyebrow="Integrations"
-          title="Works with the tools you already use"
+          title="Closed deals flow straight to your CRM"
           subtitle="Native connections to your CRM, to Claude over MCP, and to the LinkedIn account you already run."
         />
 

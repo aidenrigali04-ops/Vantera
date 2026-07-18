@@ -66,7 +66,7 @@ export function Hero() {
               className="landing-rise mt-6 max-w-lg text-[17px] font-normal leading-relaxed text-[var(--ink-3)] sm:text-[19px]"
               style={{ animationDelay: "90ms" }}
             >
-              A self-optimizing engine that tracks prospect intent and action — and turns
+              A self-optimizing engine that reads real buyer intent on LinkedIn — and turns
               your target audience into qualified pipeline.
             </p>
 

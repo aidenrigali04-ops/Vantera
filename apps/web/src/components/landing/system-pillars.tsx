@@ -66,9 +66,9 @@ export function SystemPillars() {
     <section id="system" className="relative border-t border-[var(--hairline)] py-24 sm:py-28">
       <div className="mx-auto max-w-6xl px-6 lg:px-8">
         <LandingHeading
-          eyebrow="The self-optimizing system"
-          title="A system that optimizes itself"
-          subtitle="Under every campaign, three learning loops run on your real results — refining who you target, what you say, and what gets kept. Always inside hard safety limits, always with you in control."
+          eyebrow="Self-optimizing"
+          title="Outbound that compounds instead of burning out"
+          subtitle="Three learning loops run on your real results — refining who you target, what you say, and what's worth keeping. Every sequencer is frozen the day you set it up."
         />
 
         <Reveal className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
