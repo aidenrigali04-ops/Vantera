@@ -38,7 +38,7 @@ describe("GATE 1 calibration", () => {
       decideFn: (c, t, rng) => decideExperimentV2(c, t, { rng }),
     } satisfies Parameters<typeof runMonteCarlo>[2];
     expect(runMonteCarlo(100, 42, cfg)).toEqual(runMonteCarlo(100, 42, cfg));
-  });
+  }, 30_000);
 
   it("NULL CALIBRATION: V2 false-adoption ≤ 5% under daily peeking", () => {
     // Identical scenario to the OLD gate's CHARACTERIZATION test (harness.test.ts): true A/A

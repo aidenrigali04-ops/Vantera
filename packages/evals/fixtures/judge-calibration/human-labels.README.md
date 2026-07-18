@@ -36,3 +36,11 @@ Pull ~100 real drafts (a mix of frozen corpus drafts and live-generated ones cov
 than one source alone), have a human rate each 1-5 on the same rubric the judge uses
 (`JUDGE_PROMPT` in `judge.ts`), and append one `HumanLabel` object per rated draft to the array in
 `human-labels.json`. Re-run `runCalibration` against the filled file once it has enough entries.
+
+**Anonymize before committing — no exceptions.** This file is committed to git, so it is subject
+to the SAME fictional-names rule as the corpora (rules 03-05, and `corpus.test.ts`'s vendor-denylist
+guardrail): every `draftText` and `grounding` block must have real prospect/company identities
+replaced with fictional names and any real URL replaced with a `.example` domain BEFORE the entry
+is appended — never paste a real prospect's name, company, or contact details into this file, live-
+generated or frozen-corpus-sourced alike. `judge-calibration.test.ts` scans this file for known
+vendor names and non-`.example` URLs and will fail CI if un-anonymized text lands here.

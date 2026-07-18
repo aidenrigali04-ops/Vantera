@@ -10,6 +10,7 @@ on:
       - "packages/agent-brains/src/copy/**"
       - "packages/agent-brains/src/reply/**"
       - "packages/agent-brains/src/optimize/**"
+      - "packages/agent-brains/src/intent/**"
       - "packages/ai/**"
       - "packages/evals/**"
   push:
@@ -25,9 +26,14 @@ on:
     - cron: "23 6 * * *"
   workflow_dispatch:
 
+concurrency:
+  group: evals-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   evals:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v4
@@ -42,7 +48,7 @@ jobs:
       - run: pnpm --filter @vantera/evals test
 
       # Live evals: real Anthropic calls against the fixture corpus. Cost is bounded to the
-      # fixture-set size (currently ~34 copy cases + the labeled classifier sets) — roughly
+      # fixture-set size (currently 36 copy cases + the labeled classifier sets) — roughly
       # $2-5/run at current fixture volume. NOTE: each case is generated ~2x per run (the
       # deterministic gate drafts internally, then judge+pairwise need a second full-corpus
       # generation pass since the gate doesn't expose draft text) — the doubling is the dominant

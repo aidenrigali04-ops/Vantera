@@ -46,7 +46,7 @@ A live run generates every corpus case **twice**, not once: the deterministic ga
 `GradeResult`s, never the draft text), and the judge + pairwise layers need the actual draft text,
 so `ci.ts`'s `generateLiveCandidates` does a **second full-corpus generation pass** to produce
 candidates for them. Net: each case is drafted ~2x per invocation. At the current fixture volume
-(~34 copy cases + the labeled classifier sets) this still lands around $2-5 per run, but budget for
+(36 copy cases + the labeled classifier sets) this still lands around $2-5 per run, but budget for
 the doubling — it is the dominant cost driver at nightly cadence (factor it into the ~$50-100/mo
 eval budget; the classifier floors and the judge scoring calls are on top of the generation cost).
 
