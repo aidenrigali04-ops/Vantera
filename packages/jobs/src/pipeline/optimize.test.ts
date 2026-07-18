@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { runOptimize } from "./optimize";
+import { GRACE_MS, runOptimize } from "./optimize";
 import type { OptimizeStore, RunningExperiment, StartExperimentInput } from "./types";
 import { ALPHA_MIN_SPEND, ALPHA_WEALTH_START, nextAlphaSpend } from "@vantera/agent-brains";
 import type { CopyStrategy, ExperimentStatus, LeadOutcomeFlags } from "@vantera/agent-brains";
@@ -70,11 +70,23 @@ class FakeOptimizeStore implements OptimizeStore {
    *  starting balance so existing chaining behavior is unaffected unless a test overrides it. */
   alphaWealth = ALPHA_WEALTH_START;
   getAlphaWealthCalls = 0;
+  /** GATE 1 / WS-3.2: the global `adoption_mode` app-setting — 'manual' is the real store's
+   *  default (byte-identical to GATE 0 until a test explicitly opts into 'auto'). */
+  adoptionMode: "auto" | "manual" = "manual";
+  /** GATE 1 / WS-3.2: experiments the fake considers "mature" (readied_at ≥ graceMs ago) this
+   *  tick — tests set this directly rather than simulating a real clock. */
+  matureReadyToAdopt: RunningExperiment[] = [];
+  getMatureReadyToAdoptCalls = 0;
+  lastGraceMs: number | null = null;
+  /** every getArmFlags call, in order — lets a test prove a canary was skipped BEFORE any
+   *  re-verification read was attempted (design point (a): skip precedes re-verify). */
+  armFlagsCalls: { id: string; variant: "champion" | "challenger" }[] = [];
 
   async getRunningExperiments() {
     return this.experiments;
   }
   async getArmFlags(experimentId: string, variant: "champion" | "challenger") {
+    this.armFlagsCalls.push({ id: experimentId, variant });
     return this.arms.get(`${experimentId}:${variant}`) ?? [];
   }
   async concludeExperiment(
@@ -117,6 +129,14 @@ class FakeOptimizeStore implements OptimizeStore {
   async getAlphaWealth(_accountId: string): Promise<number> {
     this.getAlphaWealthCalls++;
     return this.alphaWealth;
+  }
+  async getAdoptionMode(): Promise<"auto" | "manual"> {
+    return this.adoptionMode;
+  }
+  async getMatureReadyToAdopt(graceMs: number): Promise<RunningExperiment[]> {
+    this.getMatureReadyToAdoptCalls++;
+    this.lastGraceMs = graceMs;
+    return this.matureReadyToAdopt;
   }
 }
 
@@ -185,6 +205,7 @@ describe("runOptimize (decide pipeline — GATE 0 suggest-only adopt, enterprise
       chainPaused: 0,
       readied: 0,
       canaryAlerts: 0,
+      autoAdopted: 0,
     });
   });
 
@@ -230,6 +251,7 @@ describe("runOptimize (decide pipeline — GATE 0 suggest-only adopt, enterprise
       chainPaused: 0,
       readied: 0,
       canaryAlerts: 0,
+      autoAdopted: 0,
     });
   });
 
@@ -258,6 +280,7 @@ describe("runOptimize (decide pipeline — GATE 0 suggest-only adopt, enterprise
       chainPaused: 0,
       readied: 0,
       canaryAlerts: 0,
+      autoAdopted: 0,
     });
     expect(store.started[0]).toMatchObject({
       stageKey: "booking",
@@ -311,6 +334,7 @@ describe("runOptimize (decide pipeline — GATE 0 suggest-only adopt, enterprise
       chainPaused: 0,
       readied: 0,
       canaryAlerts: 0,
+      autoAdopted: 0,
     });
     expect(store.concluded).toHaveLength(0);
     expect(store.started).toHaveLength(0);
@@ -413,6 +437,7 @@ describe("runOptimize (decide pipeline — GATE 0 suggest-only adopt, enterprise
       chainPaused: 0,
       readied: 0,
       canaryAlerts: 0,
+      autoAdopted: 0,
     });
   });
 
@@ -442,6 +467,7 @@ describe("runOptimize (decide pipeline — GATE 0 suggest-only adopt, enterprise
       chainPaused: 1,
       readied: 0,
       canaryAlerts: 0,
+      autoAdopted: 0,
     });
   });
 
@@ -492,6 +518,7 @@ describe("runOptimize (decide pipeline — GATE 0 suggest-only adopt, enterprise
         chainPaused: 0,
         readied: 0,
         canaryAlerts: 1,
+        autoAdopted: 0,
       });
     });
 
@@ -527,6 +554,7 @@ describe("runOptimize (decide pipeline — GATE 0 suggest-only adopt, enterprise
         chainPaused: 0,
         readied: 0,
         canaryAlerts: 0,
+        autoAdopted: 0,
       });
       expect(store.readyToAdopt).toHaveLength(0);
       expect(store.concluded).toHaveLength(0);
@@ -604,6 +632,7 @@ describe("runOptimize (decide pipeline — GATE 0 suggest-only adopt, enterprise
         chainPaused: 0,
         readied: 0,
         canaryAlerts: 0,
+        autoAdopted: 0,
       });
     });
 
@@ -620,6 +649,141 @@ describe("runOptimize (decide pipeline — GATE 0 suggest-only adopt, enterprise
       expect(store.concluded[0]).toMatchObject({ status: "discarded" });
       expect(summary.canaryAlerts).toBe(0);
       expect(summary.concluded).toBe(1);
+    });
+  });
+
+  // ── GATE 1 (enterprise-grade-brain spec, WS-3.2): config-gated auto-adopt after grace ────────
+  // Everything above this block exercises the per-tick decide loop, unchanged. This block
+  // exercises the NEW pass that runs after it: config-gated (`adoption_mode`, default 'manual'),
+  // acting only on experiments `getMatureReadyToAdopt` already filtered to "readied_at at least
+  // GRACE_MS ago" — the fake simulates that filter directly (tests set `matureReadyToAdopt`
+  // rather than a real clock) since the real WHERE-clause filtering is pg-store's job, not the
+  // pure core's.
+  describe("auto-adopt after grace + re-verify (GATE 1, WS-3.2)", () => {
+    it("adoption_mode='manual' (the default) never runs the auto-adopt pass — byte-identical to GATE 0", async () => {
+      const store = new FakeOptimizeStore();
+      winningArms(store); // still marks ready_to_adopt via the ordinary per-tick loop
+      // Even a mature row sitting in the store must never be looked at in manual mode.
+      const wouldBeMature = exp("would-be-mature", { accountId: "acct-9" });
+      store.matureReadyToAdopt = [wouldBeMature];
+      store.arms.set(
+        "would-be-mature:champion",
+        flags(V2_ARM_N, { accepted: true }).map((f, i) => ({ ...f, interested: i < ADOPT_CHAMP_SUCCESSES }))
+      );
+      store.arms.set(
+        "would-be-mature:challenger",
+        flags(V2_ARM_N, { accepted: true }).map((f, i) => ({ ...f, interested: i < ADOPT_CHAL_SUCCESSES }))
+      );
+
+      const summary = await runOptimize({ store, rand: mulberry32(7) });
+
+      // manual mode short-circuits BEFORE even asking what's mature — proves the flip is truly a
+      // no-op, not "asks but ignores the answer"
+      expect(store.getMatureReadyToAdoptCalls).toBe(0);
+      expect(store.adopted).toHaveLength(0);
+      expect(summary.autoAdopted).toBe(0);
+      // the pre-existing suggest-only behavior is completely untouched
+      expect(store.readyToAdopt).toHaveLength(1);
+      expect(summary.readied).toBe(1);
+    });
+
+    it("adoption_mode='auto' + a mature win that STILL clears re-verification → adopts + chains", async () => {
+      const store = new FakeOptimizeStore();
+      store.adoptionMode = "auto";
+      const mature = exp("m1", { accountId: "acct-2" });
+      store.matureReadyToAdopt = [mature];
+      // same V2-clearing rig as winningArms — the 24h-later data still says adopt
+      store.arms.set(
+        "m1:champion",
+        flags(V2_ARM_N, { accepted: true }).map((f, i) => ({ ...f, interested: i < ADOPT_CHAMP_SUCCESSES }))
+      );
+      store.arms.set(
+        "m1:challenger",
+        flags(V2_ARM_N, { accepted: true }).map((f, i) => ({ ...f, interested: i < ADOPT_CHAL_SUCCESSES }))
+      );
+
+      const summary = await runOptimize({ store, rand: mulberry32(7) });
+
+      expect(store.getMatureReadyToAdoptCalls).toBe(1);
+      expect(store.lastGraceMs).toBe(GRACE_MS);
+      expect(store.adopted).toEqual([{ id: "m1", reason: expect.any(String) }]);
+      expect(summary.autoAdopted).toBe(1);
+      // chains the next test off the NEW champion (adoptChallenger's return value), same as the
+      // pre-GATE-0 fully-autonomous adopt path
+      expect(store.started).toHaveLength(1);
+      expect(store.started[0]).toMatchObject({ accountId: "acct-2", champion: store.adoptedChampion });
+      expect(summary.chained).toBe(1);
+    });
+
+    it("adoption_mode='auto' + a mature win that regressed on re-verify → NOT adopted, concluded discarded", async () => {
+      const store = new FakeOptimizeStore();
+      store.adoptionMode = "auto";
+      const mature = exp("m2", { accountId: "acct-3", championStrategy: { followupLength: "standard" } });
+      store.matureReadyToAdopt = [mature];
+      // mirrored rig: champion now clearly AHEAD of the challenger — the win didn't hold up
+      store.arms.set(
+        "m2:champion",
+        flags(V2_ARM_N, { accepted: true }).map((f, i) => ({ ...f, interested: i < ADOPT_CHAL_SUCCESSES }))
+      );
+      store.arms.set(
+        "m2:challenger",
+        flags(V2_ARM_N, { accepted: true }).map((f, i) => ({ ...f, interested: i < ADOPT_CHAMP_SUCCESSES }))
+      );
+
+      const summary = await runOptimize({ store, rand: mulberry32(7) });
+
+      expect(store.adopted).toHaveLength(0);
+      expect(summary.autoAdopted).toBe(0);
+      expect(store.concluded).toEqual([
+        {
+          id: "m2",
+          status: "discarded",
+          reason: expect.stringContaining("grace re-check failed"),
+          credit: true,
+        },
+      ]);
+      // still chains the next test off the STANDING champion — an account never sits idle just
+      // because a 24h-old suggestion didn't pan out (same invariant every other discard keeps)
+      expect(store.started).toHaveLength(1);
+      expect(store.started[0]).toMatchObject({ champion: { followupLength: "standard" } });
+    });
+
+    it("adoption_mode='auto' + ready_to_adopt but under 24h old — not yet adopted", async () => {
+      const store = new FakeOptimizeStore();
+      store.adoptionMode = "auto";
+      winningArms(store); // marks a FRESH winner ready_to_adopt this very tick
+      store.matureReadyToAdopt = []; // nothing crosses the grace threshold yet — simulates <24h
+
+      const summary = await runOptimize({ store, rand: mulberry32(7) });
+
+      expect(store.getMatureReadyToAdoptCalls).toBe(1); // the auto pass DID run (mode is 'auto')
+      expect(store.adopted).toHaveLength(0);
+      expect(summary.autoAdopted).toBe(0);
+      // the fresh mark from the ordinary per-tick loop is untouched
+      expect(store.readyToAdopt).toHaveLength(1);
+      expect(summary.readied).toBe(1);
+    });
+
+    it("never auto-adopts a canary-account experiment even in auto mode (belt-and-suspenders)", async () => {
+      const store = new FakeOptimizeStore();
+      store.adoptionMode = "auto";
+      const canaryMature = exp("c-mature", { accountId: "canary-acct" });
+      store.matureReadyToAdopt = [canaryMature];
+      // deliberately no arms configured for "c-mature" — if the pass ever tried to re-verify it,
+      // armFlagsCalls would record the attempt. Canaries never actually reach ready_to_adopt in
+      // production (the interception in the main loop exempts them from every action branch,
+      // including markReadyToAdopt), so this is pure belt-and-suspenders.
+      const summary = await runOptimize({
+        store,
+        canaryAccountId: "canary-acct",
+        rand: mulberry32(7),
+      });
+
+      expect(store.adopted).toHaveLength(0);
+      expect(store.concluded).toHaveLength(0);
+      expect(summary.autoAdopted).toBe(0);
+      // proves the skip happens BEFORE any re-verification read is attempted
+      expect(store.armFlagsCalls).toHaveLength(0);
     });
   });
 });

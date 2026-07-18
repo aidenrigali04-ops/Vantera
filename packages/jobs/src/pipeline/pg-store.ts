@@ -1173,12 +1173,16 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
     },
 
     async markReadyToAdopt(experimentId, reason) {
-      // GATE 0 (enterprise-grade-brain spec, 2026-07-16): mark only — no concludedAt, so the
-      // one-live-experiment unique index (which counts ready_to_adopt as live) keeps the slot
-      // occupied until the owner's manual adopt action applies the win.
+      // Mark only — no concludedAt, so the one-live-experiment unique index (which counts
+      // ready_to_adopt as live) keeps the slot occupied until the owner's manual adopt action
+      // applies the win. GATE 1 / WS-3.2: also stamps `readiedAt = now()` (migration 0059) — the
+      // moment this mark happened, which starts the 24h auto-adopt grace clock
+      // `getMatureReadyToAdopt` reads. A repeat mark (shouldn't happen in practice — an experiment
+      // only ever gets one decisive verdict) would reset the clock, which is the correct behavior
+      // if it ever did: the grace window is about time-since-suggested, not time-since-first-mark.
       await db
         .update(optimizationExperiments)
-        .set({ status: "ready_to_adopt", decisionReason: reason })
+        .set({ status: "ready_to_adopt", decisionReason: reason, readiedAt: new Date() })
         .where(eq(optimizationExperiments.id, experimentId));
     },
 
@@ -1271,6 +1275,48 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         .where(eq(optimizationPlaybook.accountId, accountId))
         .limit(1);
       return row?.alphaWealth ?? ALPHA_WEALTH_START;
+    },
+
+    // ── GATE 1 auto-adopt (enterprise-grade-brain spec, WS-3.2) ───────────────
+
+    async getAdoptionMode(): Promise<"auto" | "manual"> {
+      // Global rollout knob — same appSettings/eq-by-key pattern as getBestOfN/isKillSwitchOn
+      // above/below. 'manual' (suggest-only-forever, GATE 0's posture) is the default whenever
+      // the row is absent OR holds anything other than the literal string 'auto' — an owner must
+      // explicitly opt in for the auto-adopt pass to ever run.
+      const [row] = await db.select().from(appSettings).where(eq(appSettings.key, "adoption_mode"));
+      return row?.value === "auto" ? "auto" : "manual";
+    },
+
+    async getMatureReadyToAdopt(graceMs: number) {
+      const cutoff = new Date(Date.now() - graceMs);
+      const rows = await db
+        .select({
+          id: optimizationExperiments.id,
+          accountId: optimizationExperiments.accountId,
+          stageKey: optimizationExperiments.stageKey,
+          minSample: optimizationExperiments.minSample,
+          championStrategy: optimizationExperiments.championStrategy,
+          challengerStrategy: optimizationExperiments.challengerStrategy,
+          alphaSpent: optimizationExperiments.alphaSpent,
+        })
+        .from(optimizationExperiments)
+        .where(
+          and(
+            eq(optimizationExperiments.status, "ready_to_adopt"),
+            isNotNull(optimizationExperiments.readiedAt),
+            lte(optimizationExperiments.readiedAt, cutoff)
+          )
+        );
+      return rows.map((r) => ({
+        id: r.id,
+        accountId: r.accountId,
+        stageKey: r.stageKey as FunnelStageKey,
+        minSample: r.minSample,
+        championStrategy: (r.championStrategy ?? {}) as CopyStrategy,
+        challengerStrategy: (r.challengerStrategy ?? {}) as CopyStrategy,
+        alphaSpent: r.alphaSpent,
+      }));
     },
 
     // ── Live A/A canary (enterprise-grade-brain spec, WS-1.8) ─────────────────

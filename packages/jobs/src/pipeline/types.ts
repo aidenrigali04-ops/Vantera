@@ -451,11 +451,27 @@ export interface OptimizeStore {
    */
   adoptChallenger(experimentId: string, reason: string): Promise<CopyStrategy>;
   /**
-   * GATE 0 (enterprise-grade-brain spec, 2026-07-16): a winning challenger is only MARKED
-   * ready_to_adopt (suggest-only) — the owner's adopt action applies it. No concluded_at: the
-   * experiment still occupies the account's one-live slot until the owner acts.
+   * A winning challenger is MARKED ready_to_adopt (suggest-only surface — the owner's manual
+   * adopt action can still apply it any time). No concluded_at: the experiment still occupies the
+   * account's one-live slot. GATE 1 / WS-3.2: also stamps `readied_at = now()` — the moment this
+   * mark happened — which starts the 24h auto-adopt grace clock `getMatureReadyToAdopt` reads.
    */
   markReadyToAdopt(experimentId: string, reason: string): Promise<void>;
+  /**
+   * GATE 1 (enterprise-grade-brain spec, WS-3.2): the global `adoption_mode` app-setting —
+   * 'auto' enables the grace-period auto-adopt pass in the decide pipeline; 'manual' (the
+   * default) keeps today's suggest-only-forever behavior byte-identical. Same
+   * appSettings/eq-by-key pattern as `getBestOfN`/`isKillSwitchOn` (pg-store.ts).
+   */
+  getAdoptionMode(): Promise<"auto" | "manual">;
+  /**
+   * GATE 1 (enterprise-grade-brain spec, WS-3.2): experiments sitting in `ready_to_adopt` whose
+   * `readied_at` is at least `graceMs` in the past — mature enough for the auto-adopt pass to
+   * re-verify and (if the verdict still holds) adopt autonomously. Returns the same shape
+   * `getRunningExperiments` does; a row with a null `readied_at` (pre-0059, or never marked) is
+   * never considered mature.
+   */
+  getMatureReadyToAdopt(graceMs: number): Promise<RunningExperiment[]>;
   /**
    * Start the chained experiment. Returns false (never throws) when the account already has a
    * live experiment (the one-live unique index) — the loop simply skips chaining then.
@@ -546,6 +562,14 @@ export interface OptimizeSummary {
    * experiment is already occupying the slot, nothing to pause).
    */
   chainPaused: number;
+  /**
+   * GATE 1 (enterprise-grade-brain spec, WS-3.2): mature `ready_to_adopt` experiments (readied_at
+   * at least `GRACE_MS` in the past) that STILL cleared re-verification and were adopted
+   * autonomously this tick. Config-gated: stays 0 whenever `adoption_mode` is 'manual' (the
+   * default) — the auto-adopt pass never even runs then. Distinct from `adopted` (which GATE 0
+   * hardwired to 0 and GATE 1 leaves untouched — the ordinary per-tick loop still only suggests).
+   */
+  autoAdopted: number;
 }
 
 export interface CopyDraftDeps {

@@ -1183,6 +1183,9 @@ export const optimizationExperiments = pgTable(
     // 0058: alpha drawn from the account's alpha-investing wealth to run THIS experiment.
     // Null = pre-2A experiment (honest unknown, never backfilled) or not yet decided.
     alphaSpent: numeric("alpha_spent", { mode: "number" }),
+    // 0059: the moment this experiment was marked ready_to_adopt (GATE 1 / WS-3.2) — drives the
+    // 24h auto-adopt grace clock. Null = never marked ready, or marked before this column existed.
+    readiedAt: timestamp("readied_at", { withTimezone: true }),
   },
   (t) => [index("optimization_experiments_account_status_idx").on(t.accountId, t.status)]
 );

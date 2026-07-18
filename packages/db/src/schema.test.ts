@@ -352,3 +352,25 @@ describe("stage-scoped attribution + alpha wealth (0058)", () => {
     expect(allTables).not.toContain("recipe_stage_outcomes");
   });
 });
+
+describe("autonomous-adoption grace clock (0059, GATE 1 / WS-3.2)", () => {
+  const sql = fileContents.get("0059_adoption_grace.sql") ?? "";
+
+  it("0059 migration exists", () => {
+    expect(sql).not.toBe("");
+  });
+
+  it("adds optimization_experiments.readied_at as a bare nullable timestamptz", () => {
+    expect(sql).toMatch(/alter table public\.optimization_experiments\s+add column readied_at timestamptz;/);
+  });
+
+  it("rides the existing manage policy — no new RLS/grant statements for this column", () => {
+    expect(sql).not.toMatch(/create policy/i);
+    expect(sql).not.toMatch(/enable row level security/i);
+    const codeOnly = sql
+      .split("\n")
+      .filter((line) => !line.trimStart().startsWith("--"))
+      .join("\n");
+    expect(codeOnly).not.toMatch(/\bgrant\b/i);
+  });
+});

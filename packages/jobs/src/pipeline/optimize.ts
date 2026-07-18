@@ -12,8 +12,8 @@ import type { CopyStrategy } from "@vantera/agent-brains";
 import type { OptimizeDeps, OptimizeSummary, RunningExperiment } from "./types";
 
 /**
- * The decide pipeline of the self-optimizing loop — GATE 0: suggest-only adopt
- * (enterprise-grade-brain spec, 2026-07-16; supersedes the 2026-07-14 fully-autonomous posture).
+ * The decide pipeline of the self-optimizing loop — GATE 1: config-gated autonomous adoption
+ * (enterprise-grade-brain spec, WS-3.2; supersedes GATE 0's suggest-only-forever posture).
  *
  * Task 7 / WS-1.1 (2A stats core): the decision gate is `decideExperimentV2` (the e-process +
  * expected-loss gate) wired with the account's alpha-investing wealth — `exp.alphaSpent` (a
@@ -25,11 +25,11 @@ import type { OptimizeDeps, OptimizeSummary, RunningExperiment } from "./types";
  * Evaluates every running experiment: aggregate each arm's outcomes on the target stage, run the
  * decision gate + do-no-harm circuit breaker (UNCHANGED — the envelope is not tunable by this
  * loop), and act on a decisive verdict:
- *   - a proven winner is only MARKED ready_to_adopt — a suggestion the owner approves from the
- *     What's-working panel (the existing manual adopt action applies it). No chaining and no
- *     conclusion here: the one-live-experiment unique index counts ready_to_adopt as live, so the
- *     slot stays intentionally occupied until the owner acts. (GATE 1's anytime-valid decision
- *     core brings autonomous adoption back.)
+ *   - a proven winner is only MARKED ready_to_adopt (with `readied_at = now()`, migration 0059) —
+ *     a suggestion the owner can approve any time from the What's-working panel (the existing
+ *     manual adopt action). No chaining and no conclusion here: the one-live-experiment unique
+ *     index counts ready_to_adopt as live, so the slot stays occupied until the owner acts OR the
+ *     grace window below elapses;
  *   - a loser is discarded, a harmful challenger is halted (both revert to the champion) — these
  *     conservative, safety-preserving actions stay fully autonomous;
  *   - after a discard/halt conclusion the loop CHAINS the next test on the rotated stage, so the
@@ -37,10 +37,27 @@ import type { OptimizeDeps, OptimizeSummary, RunningExperiment } from "./types";
  *     next challenger comes from generate→gate→bandit (LLM candidates incl. the linted openerAngle
  *     knob, Thompson-sampled against collective recipe aggregates) with the deterministic
  *     knob-flip as the ever-present fallback.
+ *
+ * GATE 1 / WS-3.2 adds a SECOND pass after the per-experiment loop above: `ready_to_adopt`
+ * experiments that have sat for at least `GRACE_MS` (24h) are RE-VERIFIED against fresh data — a
+ * win that regressed in the interim (more data landed, or an anomaly resolved) must never be
+ * adopted on stale evidence — and only adopted autonomously if the verdict still clears. This
+ * pass is CONFIG-GATED behind the `adoption_mode` app-setting (default 'manual'): with no owner
+ * opt-in it never even runs, so the flip is a no-op and the loop stays byte-identical to GATE 0
+ * until an owner explicitly sets 'auto'.
+ *
  * Strategies remain bounded CopyStrategy knobs (openerAngle is linted style-only); every draft
  * still passes the humanizer. The owner keeps a Revert control in the What's-working panel.
  * Pure core; deps injected + the real store wired in the thin trigger.
  */
+
+/**
+ * The auto-adopt grace window (GATE 1 / WS-3.2): a `ready_to_adopt` verdict must hold for at
+ * least this long before the loop will adopt it autonomously — long enough for a day's worth of
+ * fresh outcome data to either confirm or overturn the suggestion. 24 hours, matching the daily
+ * cron cadence (one grace-eligible re-check per day, same tick that evaluates running experiments).
+ */
+export const GRACE_MS = 24 * 60 * 60 * 1000;
 
 /** Result of a chain attempt: distinguishes an alpha-wealth pause from an ordinary launch (or a
  *  swallowed one-live conflict / no-candidate skip) so the caller can count each correctly. */
@@ -164,8 +181,9 @@ export async function runOptimize(deps: OptimizeDeps): Promise<OptimizeSummary> 
 
     switch (verdict.decision) {
       case "adopt_challenger": {
-        // GATE 0 (enterprise-grade-brain spec): suggest-only until the anytime-valid decision
-        // core lands (GATE 1). The owner's Adopt button (ready_to_adopt) applies the win.
+        // Suggest-only on this very first mark: the owner's Adopt button (ready_to_adopt) can
+        // apply the win any time, and — if `adoption_mode` is 'auto' — the pass below will also
+        // adopt it autonomously once it's held for GRACE_MS with no owner action.
         await deps.store.markReadyToAdopt(exp.id, verdict.reason);
         readied++;
         break;
@@ -187,5 +205,66 @@ export async function runOptimize(deps: OptimizeDeps): Promise<OptimizeSummary> 
     }
   }
 
-  return { evaluated: experiments.length, concluded, adopted, chained, chainPaused, readied, canaryAlerts };
+  // GATE 1 / WS-3.2: the auto-adopt pass. Config-gated behind `adoption_mode` (default 'manual') —
+  // an owner who has never touched the setting gets NOTHING beyond the loop above: this whole
+  // block is skipped, and the summary's `autoAdopted` stays 0. Only an explicit 'auto' opt-in
+  // reaches any of the code below.
+  let autoAdopted = 0;
+  if ((await deps.store.getAdoptionMode()) === "auto") {
+    const mature = await deps.store.getMatureReadyToAdopt(GRACE_MS);
+    for (const exp of mature) {
+      // (a) Belt-and-suspenders: canaries never reach ready_to_adopt in production (the
+      // interception above exempts them from every action branch, including markReadyToAdopt),
+      // but never auto-adopt one even if that invariant were ever violated upstream. Skipped
+      // BEFORE any re-verification read — a canary's arms are never touched by this pass.
+      if (exp.accountId === deps.canaryAccountId) continue;
+
+      // (b) Re-verify against FRESH data — the ready_to_adopt mark reflects the arms' state at
+      // the time it was made; a win that regressed since (more data landed, or an anomaly
+      // resolved) must not be adopted on stale evidence. Same gate, same options as the main loop.
+      const [championFlags, challengerFlags] = await Promise.all([
+        deps.store.getArmFlags(exp.id, "champion"),
+        deps.store.getArmFlags(exp.id, "challenger"),
+      ]);
+      const recheck = decideExperimentV2(
+        aggregateArm(exp.stageKey, championFlags),
+        aggregateArm(exp.stageKey, challengerFlags),
+        { alpha: exp.alphaSpent ?? undefined, rng: deps.rand }
+      );
+
+      if (recheck.decision === "adopt_challenger") {
+        // (c) Still a win at the grace mark — adopt autonomously and chain the next test off the
+        // NEW champion, mirroring the pre-GATE-0 fully-autonomous adopt path.
+        const newChampion = await deps.store.adoptChallenger(exp.id, recheck.reason);
+        autoAdopted++;
+        const result = await chainNext(deps, exp, newChampion);
+        if (result === "started") chained++;
+        else if (result === "paused") chainPaused++;
+      } else {
+        // The suggestion didn't hold up 24h later — conclude it discarded (never silently adopt
+        // stale evidence) and chain the next test off the STANDING champion, same as any other
+        // discard: an account never sits idle just because a suggestion didn't pan out.
+        await deps.store.concludeExperiment(
+          exp.id,
+          "discarded",
+          "grace re-check failed — no longer a decisive win 24h after the initial suggestion"
+        );
+        concluded++;
+        const result = await chainNext(deps, exp, exp.championStrategy);
+        if (result === "started") chained++;
+        else if (result === "paused") chainPaused++;
+      }
+    }
+  }
+
+  return {
+    evaluated: experiments.length,
+    concluded,
+    adopted,
+    chained,
+    chainPaused,
+    readied,
+    canaryAlerts,
+    autoAdopted,
+  };
 }
