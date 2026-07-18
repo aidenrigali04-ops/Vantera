@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { MockLanguageModelV3 } from "ai/test";
-import { listPrompts } from "@vantera/ai";
-import { judgeCopy, JUDGE_MODEL_ID, JUDGE_PROMPT } from "./judge";
+import { judgeCopy, JUDGE_MODEL_ID } from "./judge";
+
+/**
+ * Re-export smoke test (Phase 2C, Task 2). The substantive judge tests — verdict shape/bounds,
+ * schema validation, prompt registration under `copy/judge` — now live in
+ * `@vantera/agent-brains`'s `copy/judge.test.ts`, next to the implementation. This file only
+ * proves the re-export in `./judge.ts` is wired correctly and behaves identically from an evals
+ * call site's point of view.
+ */
 
 function textResponse(json: unknown) {
   return {
@@ -15,23 +22,12 @@ function textResponse(json: unknown) {
   };
 }
 
-describe("JUDGE_MODEL_ID / JUDGE_PROMPT", () => {
-  it("is claude-opus-4-8 — deliberately stronger + different from the Sonnet-4.6 draft model, to avoid self-preference bias", () => {
+describe("./judge re-export (thin wrapper around @vantera/agent-brains)", () => {
+  it("re-exports JUDGE_MODEL_ID unchanged", () => {
     expect(JUDGE_MODEL_ID).toBe("claude-opus-4-8");
   });
 
-  it("registers the judge system prompt under evals/judge so generations are attributable", () => {
-    expect(JUDGE_PROMPT.name).toBe("evals/judge");
-    expect(JUDGE_PROMPT.text.length).toBeGreaterThan(0);
-
-    const registered = listPrompts().find((p) => p.name === "evals/judge");
-    expect(registered).toBeDefined();
-    expect(registered!.hash).toBe(JUDGE_PROMPT.hash);
-  });
-});
-
-describe("judgeCopy (mock model)", () => {
-  it("parses a canned verdict JSON into a JudgeVerdict with the right shape and 1-5 int bounds", async () => {
+  it("re-exports a working judgeCopy that returns a JudgeVerdict", async () => {
     const canned = {
       specificity: 4,
       themFocus: 5,
@@ -51,59 +47,5 @@ describe("judgeCopy (mock model)", () => {
     );
 
     expect(verdict).toEqual(canned);
-    for (const dim of ["specificity", "themFocus", "posture", "naturalness", "overall"] as const) {
-      expect(Number.isInteger(verdict[dim])).toBe(true);
-      expect(verdict[dim]).toBeGreaterThanOrEqual(1);
-      expect(verdict[dim]).toBeLessThanOrEqual(5);
-    }
-    expect(typeof verdict.rationale).toBe("string");
-  });
-
-  it("passes the draft text, grounding, and cta into the model prompt (grounded scoring, not vibes)", async () => {
-    let capturedPrompt = "";
-    const model = new MockLanguageModelV3({
-      doGenerate: async (opts) => {
-        capturedPrompt = JSON.stringify(opts.prompt);
-        return textResponse({
-          specificity: 3,
-          themFocus: 3,
-          posture: 3,
-          naturalness: 3,
-          overall: 3,
-          rationale: "ok",
-        });
-      },
-    });
-
-    await judgeCopy(
-      { text: "UNIQUE_DRAFT_TEXT_MARKER" },
-      { grounding: "UNIQUE_GROUNDING_MARKER", cta: "UNIQUE_CTA_MARKER" },
-      model
-    );
-
-    expect(capturedPrompt).toContain("UNIQUE_DRAFT_TEXT_MARKER");
-    expect(capturedPrompt).toContain("UNIQUE_GROUNDING_MARKER");
-    expect(capturedPrompt).toContain("UNIQUE_CTA_MARKER");
-  });
-
-  it("omits the cta line entirely when no cta is given (no 'undefined' leaking into the prompt)", async () => {
-    let capturedPrompt = "";
-    const model = new MockLanguageModelV3({
-      doGenerate: async (opts) => {
-        capturedPrompt = JSON.stringify(opts.prompt);
-        return textResponse({
-          specificity: 3,
-          themFocus: 3,
-          posture: 3,
-          naturalness: 3,
-          overall: 3,
-          rationale: "ok",
-        });
-      },
-    });
-
-    await judgeCopy({ text: "draft text" }, { grounding: "grounding text" }, model);
-
-    expect(capturedPrompt).not.toContain("undefined");
   });
 });

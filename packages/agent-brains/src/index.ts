@@ -57,6 +57,12 @@ export {
   fixLinkedInDraft,
   type DraftTextFix,
 } from "./copy/fix";
+export {
+  judgeCopy,
+  JUDGE_MODEL_ID,
+  JUDGE_PROMPT,
+  type JudgeVerdict,
+} from "./copy/judge";
 export { classifyReply, preClassify, replyVerdictSchema, type ReplyVerdict } from "./reply/classify";
 export {
   draftConversationMessage,
