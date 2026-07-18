@@ -11,7 +11,8 @@
     "test": "vitest run",
     "evals:ci": "tsx src/ci.ts",
     "evals:calibration-prep": "tsx src/calibration-prep.ts",
-    "evals:calibration-score": "tsx src/calibration-score.ts"
+    "evals:calibration-score": "tsx src/calibration-score.ts",
+    "evals:prompt-ab": "tsx src/prompt-ab.ts"
   },
   "dependencies": {
     "@vantera/agent-brains": "workspace:*",
