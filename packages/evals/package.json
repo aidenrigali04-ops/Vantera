@@ -9,7 +9,9 @@
   "scripts": {
     "type-check": "tsc --noEmit",
     "test": "vitest run",
-    "evals:ci": "tsx src/ci.ts"
+    "evals:ci": "tsx src/ci.ts",
+    "evals:calibration-prep": "tsx src/calibration-prep.ts",
+    "evals:calibration-score": "tsx src/calibration-score.ts"
   },
   "dependencies": {
     "@vantera/agent-brains": "workspace:*",

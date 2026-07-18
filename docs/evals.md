@@ -88,8 +88,52 @@ unconditional in both states.
 
 ## Judge calibration procedure (owner-run, not part of routine CI)
 
-`runCalibration` (`packages/evals/src/judge/kappa.ts`) is a **manual, local** step — `ci.ts` never
-calls it as part of a normal run, because it needs a human-labeled fixture the owner fills once:
+Judge calibration turns the advisory judge into a gate. It needs ~100 drafts hand-rated by a human
+and compared against the judge's own scores via Cohen's kappa. Two ways to assemble that label set
+— the packet tool (Phase 2C, Task 1) is the recommended path since it removes the "how do I even
+get 100 drafts to label" friction that blocked this step; the original manual `human-labels.json`
+path (Phase 2B, Task 6) still works and is still guarded by its own fixture-integrity test.
+
+### The recommended path: `calibration-prep` + `evals:calibration-score`
+
+`packages/evals/src/calibration-prep.ts` is the unblocker tool:
+
+1. **Run the `calibration-prep` GitHub Actions workflow** (`.github/workflows/evals.yml`,
+   `workflow_dispatch` only — Actions tab → Evals → Run workflow). API-key-gated with the same
+   loud-skip contract as the main `evals` job: no `ANTHROPIC_API_KEY` secret → a visible
+   `::warning::` and the job exits clean without spending anything.
+2. It runs `pnpm --filter @vantera/evals evals:calibration-prep`
+   (`buildCalibrationPacket()`), which drafts ~100 real copy samples across BOTH copy corpora
+   (interleaved, cycling back once the 36-case combined corpus is exhausted — see the sampling
+   note in `calibration-prep.ts`'s module doc), scores every draft with the judge, and writes
+   `packages/evals/fixtures/judge-calibration/packet.json`. **Every entry's `humanOverall` is
+   hardcoded to `null`** — the machine never fills the human column; `calibration-prep.test.ts`
+   asserts this on every entry, every run. The judge's own `judgeOverall` (1-5) is already filled
+   in, so the owner is rating blind to nothing but also spending no extra judge calls at score time.
+3. **Download the `calibration-packet` artifact** from the completed workflow run and open
+   `packet.json`. For each entry, replace `"humanOverall": null` with an integer 1-5 (same rubric
+   the judge uses, `JUDGE_PROMPT` in `judge/judge.ts` — or a quick good/bad call mapped to 5/1).
+   You do not need to label every entry to score — `scoreCalibration` only uses entries you've
+   filled in, and refuses to compute anything below `MIN_LABELED_FOR_SCORE` (20) labeled entries.
+4. Run `pnpm --filter @vantera/evals evals:calibration-score /path/to/filled-packet.json` — this
+   pairs each labeled entry's (already-computed) `judgeOverall` against your `humanOverall`, bins
+   both to good/bad (`overall >= 4`, the same `binOverall` convention `runCalibration` uses), and
+   prints Cohen's kappa + whether it clears `KAPPA_TRUST_THRESHOLD` (0.7).
+5. **On `trusted: true`** (κ ≥ 0.7): set the `EVALS_JUDGE_GATING=1` repo variable, AND replace the
+   provisional `JUDGE_OVERALL_GATE_FLOOR = 3.5` in `ci.ts` with a calibration-derived value (e.g.
+   the median `humanOverall` from the filled packet) — the provisional 3.5 was a placeholder with
+   no study behind it (see its doc comment in `ci.ts`); this is the moment it gets replaced with a
+   real number.
+6. **Anonymize before committing anything derived from this packet.** The filled `packet.json`
+   itself is a generated, gitignored artifact (never committed as-is), but if you fold any of its
+   labeled entries into `human-labels.json` for a permanent record, they're subject to the SAME
+   fictional-names rule as every other fixture (rules 03-05) — `human-labels.test.ts` scans that
+   file for vendor names / non-`.example` URLs and fails CI on a leak.
+
+### The original manual path: `runCalibration` + `human-labels.json`
+
+Still valid if you'd rather assemble labels by hand outside the packet workflow (e.g. rating drafts
+gathered from some other source):
 
 1. Pull ~100 real drafts — a mix of frozen corpus baselines and live-generated ones covers more
    ground than either source alone (see `packages/evals/fixtures/judge-calibration/human-labels.README.md`).
@@ -99,13 +143,14 @@ calls it as part of a normal run, because it needs a human-labeled fixture the o
 3. Run `runCalibration(humanLabels)` (e.g. from a scratch script or a REPL against the package) —
    it calls `judgeCopy` for every label, bins both scores to good/bad (`overall >= 4`), and computes
    Cohen's kappa between the judge's calls and the human's.
-4. `kappa >= 0.7` (`KAPPA_TRUST_THRESHOLD`) → `trusted: true`. Only then set `EVALS_JUDGE_GATING=1`.
-   Below 0.7, the judge disagrees with a human often enough that it isn't safe to gate on yet —
-   iterate on `JUDGE_PROMPT` or gather more labels, don't flip the flag.
+4. `kappa >= 0.7` (`KAPPA_TRUST_THRESHOLD`) → `trusted: true`. Only then set `EVALS_JUDGE_GATING=1`
+   and update `JUDGE_OVERALL_GATE_FLOOR` (same step 5 above). Below 0.7, the judge disagrees with a
+   human often enough that it isn't safe to gate on yet — iterate on `JUDGE_PROMPT` or gather more
+   labels, don't flip the flag.
 
-This is one of the four **owner arm-steps** blocking GATE 1 (see the Task 8 brief / the PR body):
-add the `ANTHROPIC_API_KEY` secret, sign off the anonymized fixtures, run this calibration and flip
-the flag, and set the ~$50-100/mo eval budget for nightly cadence.
+This calibration step (either path) is one of the four **owner arm-steps** blocking GATE 1 (see the
+Task 8 brief / the PR body): add the `ANTHROPIC_API_KEY` secret, sign off the anonymized fixtures,
+run this calibration and flip the flag, and set the ~$50-100/mo eval budget for nightly cadence.
 
 ## The model-upgrade shadow protocol
 

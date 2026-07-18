@@ -65,3 +65,39 @@ jobs:
             exit 0
           fi
           pnpm --filter @vantera/evals evals:ci
+
+  # Judge calibration labeling packet (Phase 2C, Task 1 — "the unblocker"). workflow_dispatch ONLY:
+  # this is the owner's on-demand tool to generate a fresh ~100-draft packet for a labeling
+  # session, never something that should run on every push/PR/nightly sweep like the `evals` job
+  # above. API-key-gated with the same loud-skip contract (see `packages/evals/src/calibration-prep.ts`'s
+  # `main()`, which reuses `ci.ts`'s `shouldSkipLiveEvals`). See docs/evals.md for the full
+  # calibration procedure (download the artifact, fill humanOverall, run evals:calibration-score).
+  calibration-prep:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build calibration packet (API-gated)
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "::warning::ANTHROPIC_API_KEY not set — calibration packet build SKIPPED. Add the secret to run the owner labeling session (WS-2.3)."
+            exit 0
+          fi
+          pnpm --filter @vantera/evals evals:calibration-prep
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: calibration-packet
+          path: packages/evals/fixtures/judge-calibration/packet.json
+          if-no-files-found: warn

@@ -28,6 +28,9 @@ CLAUDE.local.md
 # Playwright MCP browser artifacts
 .playwright-mcp/
 
+# Generated eval artifacts — machine-regenerable, never hand-curated (unlike human-labels.json)
+packages/evals/fixtures/judge-calibration/packet.json
+
 # HubSpot CLI (may contain tokens)
 hubspot.config.yml
 .vercel
