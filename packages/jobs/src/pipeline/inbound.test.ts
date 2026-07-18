@@ -1,8 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
 import { InMemoryLinkedInInfra } from "@vantera/linkedin-infra";
-import { RESPOND_SYSTEM, type ReplyVerdict } from "@vantera/agent-brains";
+import {
+  RESPOND_SYSTEM,
+  leadBlock,
+  type ConversationMessageInput,
+  type JudgeFn,
+  type ReplyVerdict,
+} from "@vantera/agent-brains";
 import { getModelId } from "@vantera/ai";
 import { runInbound } from "./inbound";
+import { MAX_BEST_OF_N } from "./copy-draft";
 import type { InboundDeps, InboundStore, NewScheduledSend, ResponderBundle } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -790,6 +797,204 @@ describe("runInbound — active responder (converse to close)", () => {
       expect(store.scheduledSends).toHaveLength(0);
     });
   }
+});
+
+// ── Phase 2C fast-follow: best-of-N judge-ranked reply selection ─────────────
+describe("runInbound — active responder — best-of-N (off by default)", () => {
+  const bundle = (over: Partial<ResponderBundle> = {}): ResponderBundle => ({
+    campaignId: "camp1",
+    sendMode: "automatic",
+    lead: { firstName: "Ryan", lastName: "C", title: "VP Sales", companyName: "Northwind", industry: "SaaS" },
+    insights: {
+      pain_points: ["unqualified leads"],
+      triggers: ["Series A"],
+      motivations: ["pipeline"],
+      value_angle: "qualify first",
+      aha_moment: "first booked meeting",
+      summary: "good fit",
+    },
+    context: { cta: "a quick intro" },
+    thread: [],
+    agentTurns: 0,
+    newestUnsentMessageCreatedAt: null,
+    lastAgentMessageAt: null,
+    humanHandled: false,
+    attribution: { experimentId: null, variant: null, strategy: {}, playbookVersion: null },
+    ...over,
+  });
+
+  function storeWithBundle(b: ResponderBundle | null) {
+    return makeStore({
+      findLinkedInAccountByProviderRef: async () => ({ id: "li", accountId: "acc1" }),
+      findLeadByLinkedInUrl: async () => ({ id: "lead1", campaignId: "camp1" }),
+      getResponderBundle: async () => b,
+    });
+  }
+
+  it("no bestOfN config, no judgeFn: byte-identical to today — one respondFn call, no bestOfN key on the recipe", async () => {
+    const store = storeWithBundle(bundle());
+    const respondFn: InboundDeps["respondFn"] = vi.fn(async () => ({ message: "single reply", violations: [] }));
+
+    await runInbound(
+      { source: "linkedin", payload: LINKEDIN_REPLY_FIXTURE },
+      deps(store, { classifyFn: classify("interested"), respondFn })
+    );
+
+    expect(respondFn).toHaveBeenCalledTimes(1);
+    expect(store.scheduledSends[0]!.body).toBe("single reply");
+    expect(store.scheduledSends[0]!.recipe).not.toHaveProperty("bestOfN");
+  });
+
+  it("bestOfN=5 configured but judgeFn absent: forced to n=1 — one respondFn call, no bestOfN stamp", async () => {
+    const store = storeWithBundle(bundle());
+    const respondFn: InboundDeps["respondFn"] = vi.fn(async () => ({ message: "single reply", violations: [] }));
+
+    await runInbound(
+      { source: "linkedin", payload: LINKEDIN_REPLY_FIXTURE },
+      deps(store, { classifyFn: classify("interested"), respondFn, bestOfN: 5 })
+    );
+
+    expect(respondFn).toHaveBeenCalledTimes(1);
+    expect(store.scheduledSends[0]!.recipe).not.toHaveProperty("bestOfN");
+  });
+
+  it("bestOfN=1 with a judgeFn wired: still exactly one respondFn call and zero judge calls", async () => {
+    const store = storeWithBundle(bundle());
+    const respondFn: InboundDeps["respondFn"] = vi.fn(async () => ({ message: "single reply", violations: [] }));
+    const judgeFn = vi.fn<JudgeFn>();
+
+    await runInbound(
+      { source: "linkedin", payload: LINKEDIN_REPLY_FIXTURE },
+      deps(store, { classifyFn: classify("interested"), respondFn, bestOfN: 1, judgeFn })
+    );
+
+    expect(respondFn).toHaveBeenCalledTimes(1);
+    expect(judgeFn).not.toHaveBeenCalled();
+    expect(store.scheduledSends[0]!.recipe).not.toHaveProperty("bestOfN");
+  });
+
+  it("bestOfN=3 + a judge: drafts 3 candidates, judges each on the SAME grounding/cta the humanizer uses, and stamps + queues the highest-scored one", async () => {
+    const store = storeWithBundle(bundle());
+    let call = 0;
+    let capturedInput: ConversationMessageInput | undefined;
+    const respondFn: InboundDeps["respondFn"] = vi.fn(async (input) => {
+      capturedInput = input;
+      call += 1;
+      return { message: `reply-${call}`, violations: [] };
+    });
+    const scoreByMessage: Record<string, number> = { "reply-1": 2, "reply-2": 4, "reply-3": 3 };
+    const seenContexts: { grounding: string; cta?: string }[] = [];
+    const judgeFn: JudgeFn = vi.fn(async (draft, ctx) => {
+      seenContexts.push(ctx);
+      return { overall: scoreByMessage[draft.text]! };
+    });
+
+    await runInbound(
+      { source: "linkedin", payload: LINKEDIN_REPLY_FIXTURE },
+      deps(store, { classifyFn: classify("interested"), respondFn, bestOfN: 3, judgeFn })
+    );
+
+    expect(respondFn).toHaveBeenCalledTimes(3);
+    expect(judgeFn).toHaveBeenCalledTimes(3);
+    // reply-2 scored highest (4) — it's the one queued.
+    expect(store.scheduledSends[0]!.body).toBe("reply-2");
+    expect(store.scheduledSends[0]!.recipe).toMatchObject({ bestOfN: 3 });
+    // the judge saw the exact same grounding block the humanizer/respond brain builds from this input.
+    expect(capturedInput).toBeDefined();
+    const expectedGrounding = leadBlock(capturedInput!);
+    for (const ctx of seenContexts) {
+      expect(ctx.grounding).toBe(expectedGrounding);
+      expect(ctx.cta).toBe("a quick intro");
+    }
+  });
+
+  it("caps the effective n at MAX_BEST_OF_N regardless of a larger configured value", async () => {
+    const store = storeWithBundle(bundle());
+    const respondFn: InboundDeps["respondFn"] = vi.fn(async () => ({ message: "reply", violations: [] }));
+    const judgeFn: JudgeFn = vi.fn(async () => ({ overall: 3 }));
+
+    await runInbound(
+      { source: "linkedin", payload: LINKEDIN_REPLY_FIXTURE },
+      deps(store, { classifyFn: classify("interested"), respondFn, bestOfN: 999, judgeFn })
+    );
+
+    expect(respondFn).toHaveBeenCalledTimes(MAX_BEST_OF_N);
+    expect(judgeFn).toHaveBeenCalledTimes(MAX_BEST_OF_N);
+    expect(store.scheduledSends[0]!.recipe).toMatchObject({ bestOfN: MAX_BEST_OF_N });
+  });
+
+  it("hard-negative replies never call respondFn/judgeFn even with best-of-N configured", async () => {
+    const store = storeWithBundle(bundle());
+    const respondFn: InboundDeps["respondFn"] = vi.fn(async () => ({ message: "unused", violations: [] }));
+    const judgeFn: JudgeFn = vi.fn(async () => ({ overall: 5 }));
+
+    await runInbound(
+      { source: "linkedin", payload: LINKEDIN_REPLY_FIXTURE },
+      deps(store, { classifyFn: classify("not_interested"), respondFn, bestOfN: 3, judgeFn })
+    );
+
+    expect(respondFn).not.toHaveBeenCalled();
+    expect(judgeFn).not.toHaveBeenCalled();
+    expect(store.scheduledSends).toHaveLength(0);
+  });
+
+  it("a judge-preferred candidate that's lint-dirty still gets ONE fix pass and routes to review if still dirty — the humanizer stays the hard floor", async () => {
+    const store = storeWithBundle(bundle({ sendMode: "automatic" }));
+    let call = 0;
+    const respondFn: InboundDeps["respondFn"] = vi.fn(async () => {
+      call += 1;
+      return call === 2
+        ? { message: "dirty reply", violations: [{ rule: "banned-phrase", detail: 'remove "game-changer"' }] }
+        : { message: `clean reply ${call}`, violations: [] };
+    });
+    const judgeFn: JudgeFn = vi.fn(async (draft) => ({ overall: draft.text === "dirty reply" ? 5 : 1 }));
+    const fixFn = vi.fn(async () => ({
+      message: "still dirty",
+      violations: [{ rule: "banned-phrase", detail: 'remove "seamless"' }],
+    }));
+
+    await runInbound(
+      { source: "linkedin", payload: LINKEDIN_REPLY_FIXTURE },
+      {
+        ...deps(store, { classifyFn: classify("interested"), respondFn, bestOfN: 3, judgeFn }),
+        fixReplyFn: fixFn,
+      }
+    );
+
+    // the fix pass ran exactly once, on the CHOSEN (dirty) candidate — never on the clean ones.
+    expect(fixFn).toHaveBeenCalledOnce();
+    expect(fixFn).toHaveBeenCalledWith(expect.objectContaining({ message: "dirty reply" }), expect.anything());
+    // still flagged after the fix ⇒ never silently approved, exactly like today's single-draft path.
+    expect(store.scheduledSends[0]!.status).toBe("pending_review");
+    expect(store.scheduledSends[0]!.body).toBe("still dirty");
+    expect(store.scheduledSends[0]!.styleFlags).toBeTruthy();
+  });
+
+  it("a judge-preferred candidate that's lint-dirty auto-approves once the fix pass cleans it (automatic mode)", async () => {
+    const store = storeWithBundle(bundle({ sendMode: "automatic" }));
+    let call = 0;
+    const respondFn: InboundDeps["respondFn"] = vi.fn(async () => {
+      call += 1;
+      return call === 2
+        ? { message: "dirty reply", violations: [{ rule: "banned-phrase", detail: 'remove "game-changer"' }] }
+        : { message: `clean reply ${call}`, violations: [] };
+    });
+    const judgeFn: JudgeFn = vi.fn(async (draft) => ({ overall: draft.text === "dirty reply" ? 5 : 1 }));
+    const fixFn = vi.fn(async () => ({ message: "fixed reply", violations: [] }));
+
+    await runInbound(
+      { source: "linkedin", payload: LINKEDIN_REPLY_FIXTURE },
+      {
+        ...deps(store, { classifyFn: classify("interested"), respondFn, bestOfN: 3, judgeFn }),
+        fixReplyFn: fixFn,
+      }
+    );
+
+    expect(fixFn).toHaveBeenCalledOnce();
+    expect(store.scheduledSends[0]!.status).toBe("approved");
+    expect(store.scheduledSends[0]!.body).toBe("fixed reply");
+    expect(store.scheduledSends[0]!.styleFlags).toBeNull();
+  });
 });
 
 describe("runInbound — junk payloads", () => {

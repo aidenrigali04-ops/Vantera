@@ -1,6 +1,13 @@
-import { describeViolations, buildSendRecipe, RESPOND_SYSTEM, type ReplyVerdict } from "@vantera/agent-brains";
+import {
+  describeViolations,
+  buildSendRecipe,
+  RESPOND_SYSTEM,
+  bestOfN,
+  leadBlock,
+  type ReplyVerdict,
+} from "@vantera/agent-brains";
 import { getModelId } from "@vantera/ai";
-import { normalizeLinkedInUrl } from "./copy-draft";
+import { normalizeLinkedInUrl, MAX_BEST_OF_N } from "./copy-draft";
 import type { InboundDeps, InboundPayload, InboundStore, InboundSummary } from "./types";
 
 /**
@@ -100,7 +107,8 @@ async function maybeRespond(
   receivedAt: Date,
   now: Date
 ): Promise<boolean> {
-  if (!deps.respondFn) return false;
+  const respondFn = deps.respondFn;
+  if (!respondFn) return false;
   if (!RESPONDABLE.has(verdict.classification) || verdict.booked) return false;
   // Stale reply (replay/backfill artifact) — never auto-answer days later.
   if (now.getTime() - receivedAt.getTime() > RESPOND_MAX_REPLY_AGE_MS) return false;
@@ -148,7 +156,24 @@ async function maybeRespond(
     incoming,
     classification: verdict.classification,
   };
-  let reply = await deps.respondFn(respondInput);
+  // Best-of-N (Phase 2C fast-follow, extending Task 3 to the responder path): absent judgeFn
+  // forces n=1 regardless of config — no point drafting N candidates with nothing to rank them.
+  // n<=1 is byte-identical to today (respondFn runs exactly once, the judge never runs), which
+  // is how the feature stays fully OFF by default. The winner — chosen or not — flows through
+  // the UNCHANGED humanizer/fixReplyFn gate below; the judge only ranks among candidates, it
+  // never bypasses that gate (anti-Goodhart: the humanizer stays the hard floor). Grounding is
+  // the SAME leadBlock the respond brain builds from this input (and the humanizer lints
+  // against) — the judge never scores against an invented grounding string.
+  const configuredN = Math.min(Math.max(1, Math.floor(deps.bestOfN ?? 1)), MAX_BEST_OF_N);
+  const n = deps.judgeFn ? configuredN : 1;
+  const { chosen } = await bestOfN(
+    n,
+    () => respondFn(respondInput),
+    (d) => d.message,
+    { grounding: leadBlock(respondInput), cta: respondInput.context.cta },
+    deps.judgeFn
+  );
+  let reply = chosen;
   // Automatic senders get ONE targeted fix of a flagged reply before it may auto-send; the fix is
   // re-linted with the same bar, so a still-flagged result falls through to review below.
   if (bundle.sendMode === "automatic" && reply.violations.length > 0 && deps.fixReplyFn) {
@@ -182,6 +207,10 @@ async function maybeRespond(
       // brain's own prompt handle — never re-registered, so the hash can never drift.
       promptHash: RESPOND_SYSTEM.hash,
       modelId: getModelId(),
+      // Phase 2C fast-follow: only stamped when best-of-N actually ran (n>1) — n<=1 keeps the
+      // exact pre-existing recipe shape, so every existing recipe-equality test and every
+      // off-by-default run stays byte-identical.
+      ...(n > 1 ? { bestOfN: n } : {}),
     }),
   });
   return true;

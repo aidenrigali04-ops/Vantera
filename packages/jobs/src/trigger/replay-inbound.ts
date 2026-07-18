@@ -1,7 +1,12 @@
 import { asc, eq, gt, and } from "drizzle-orm";
 import { logger, task } from "@trigger.dev/sdk";
 import { createDb, webhookEvents } from "@vantera/db";
-import { classifyReply, draftConversationMessage, fixConversationMessage } from "@vantera/agent-brains";
+import {
+  classifyReply,
+  draftConversationMessage,
+  fixConversationMessage,
+  judgeCopy,
+} from "@vantera/agent-brains";
 import { createLinkedInInfraFromEnv } from "@vantera/linkedin-infra";
 import { runInbound } from "../pipeline/inbound";
 import { createPgStore } from "../pipeline/pg-store";
@@ -22,12 +27,17 @@ export const replayInbound = task({
   run: async (payload: { since?: string; limit?: number }) => {
     const db = createDb();
     const store = createPgStore(db);
+    // Phase 2C fast-follow (best-of-N on the responder paths): mirrors process-inbound.ts —
+    // same pipeline, same config knob, so a replay behaves identically to live processing.
+    const bestOfN = await store.getBestOfN();
     const deps = {
       store,
       linkedinInfra: createLinkedInInfraFromEnv(),
       classifyFn: (body: string) => classifyReply(body),
       respondFn: draftConversationMessage,
       fixReplyFn: fixConversationMessage,
+      judgeFn: judgeCopy,
+      bestOfN,
     };
 
     const rows = await db

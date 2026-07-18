@@ -1,6 +1,6 @@
 import { logger, task, tasks } from "@trigger.dev/sdk";
 import { createDb } from "@vantera/db";
-import { classifyReply, draftConversationMessage, fixConversationMessage } from "@vantera/agent-brains";
+import { classifyReply, draftConversationMessage, fixConversationMessage, judgeCopy } from "@vantera/agent-brains";
 import { createLinkedInInfraFromEnv } from "@vantera/linkedin-infra";
 import { createTransactionalEmailFromEnv, sendLeadEventEmail } from "@vantera/transactional-email";
 import { runInbound } from "../pipeline/inbound";
@@ -30,12 +30,16 @@ export const processInbound = task({
     });
     const senderRef = lifecycleConfig?.senderRef ?? null;
     const notifyEmail = lifecycleConfig?.notifyEmail ?? null;
+    // Best-of-N (Phase 2C fast-follow): the global rollout knob — mirrors trigger/copy-draft.ts.
+    const bestOfN = await store.getBestOfN();
     const summary = await runInbound(payload, {
       store,
       linkedinInfra: createLinkedInInfraFromEnv(),
       classifyFn: (body) => classifyReply(body),
       respondFn: (input) => draftConversationMessage(input),
       fixReplyFn: (original, input) => fixConversationMessage(original, input),
+      judgeFn: (d, c) => judgeCopy(d, c),
+      bestOfN,
       // L3: interested-reply / booked / needs-you emails — the trial's pull-back channel
       notifyLeadEvent: (e) =>
         createLeadEventNotifier({

@@ -939,6 +939,20 @@ export interface InboundDeps {
     snippet: string;
   }) => Promise<void>;
   now?: () => Date;
+  /**
+   * Best-of-N judge (Phase 2C fast-follow, extending Task 3 to the responder path). Absent ⇒
+   * best-of-N is forced OFF (n=1) regardless of `bestOfN` config below — same rule as
+   * copy-draft's judgeFn: no point drafting N candidates with nothing to rank them. Advisory
+   * ranking only: the judge picks among candidates that already exist, it never bypasses the
+   * humanizer/fixReplyFn gate that runs on whichever candidate it picks.
+   */
+  judgeFn?: JudgeFn;
+  /**
+   * Desired best-of-N candidate count, resolved from the `best_of_n` app-setting by the thin
+   * trigger (default 1 = today's single-draft behavior). The pipeline core re-caps this at
+   * MAX_BEST_OF_N regardless of what's configured, and forces it to 1 when `judgeFn` is absent.
+   */
+  bestOfN?: number;
 }
 
 export interface InboundSummary {
@@ -1080,6 +1094,20 @@ export interface SequenceTouchDeps {
    * the caller exits the sequence; NOT suppression).
    */
   refreshLead: (accountId: string, leadId: string) => Promise<"ok" | "dropped">;
+  /**
+   * Best-of-N judge (Phase 2C fast-follow, extending Task 3 to the responder path). Absent ⇒
+   * best-of-N is forced OFF (n=1) regardless of `bestOfN` config below — no point drafting N
+   * candidates with nothing to rank them. Advisory ranking only: the judge picks among
+   * candidates that already exist, it never bypasses the humanizer/fixFollowupFn gate that
+   * runs on whichever candidate it picks.
+   */
+  judgeFn?: JudgeFn;
+  /**
+   * Desired best-of-N candidate count, resolved from the `best_of_n` app-setting by the thin
+   * trigger (default 1 = today's single-draft behavior). The pipeline core re-caps this at
+   * MAX_BEST_OF_N regardless of what's configured, and forces it to 1 when `judgeFn` is absent.
+   */
+  bestOfN?: number;
 }
 
 export type SequenceTouchOutcome = "drafted" | "suppressed" | "skipped" | "dropped" | "handed_off";
