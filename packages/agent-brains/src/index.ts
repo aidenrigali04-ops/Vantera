@@ -63,6 +63,7 @@ export {
   JUDGE_PROMPT,
   type JudgeVerdict,
 } from "./copy/judge";
+export { bestOfN, type JudgeFn } from "./copy/best-of-n";
 export { classifyReply, preClassify, replyVerdictSchema, type ReplyVerdict } from "./reply/classify";
 export {
   draftConversationMessage,

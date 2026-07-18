@@ -1,4 +1,4 @@
-import { describeViolations, assignVariant, buildSendRecipe, LINKEDIN_SYSTEM } from "@vantera/agent-brains";
+import { describeViolations, assignVariant, buildSendRecipe, LINKEDIN_SYSTEM, bestOfN, leadBlock } from "@vantera/agent-brains";
 import type { DraftInput, CopyStrategy } from "@vantera/agent-brains";
 import { getModelId } from "@vantera/ai";
 import type {
@@ -12,6 +12,12 @@ import { mapWithConcurrency } from "./concurrency";
 
 /** In-flight LLM drafts per copy-draft run — bounds model + DB-pool pressure while parallelizing. */
 const DRAFT_CONCURRENCY = 4;
+
+/**
+ * Best-of-N budget ceiling (Task 3) — code-enforced regardless of what the `best_of_n`
+ * app-setting says, so a config typo can't blow up per-lead LLM spend.
+ */
+export const MAX_BEST_OF_N = 5;
 
 /** linkedin suppression values are normalized profile URLs (rule 11: value = lower(value)) */
 export function normalizeLinkedInUrl(url: string): string {
@@ -118,8 +124,23 @@ export async function runCopyDraft(
       ) {
         leadSuppressed += 1;
       } else {
-        // suppression checked above; one draft call yields both the invite note and follow-up
-        let draft = await deps.draftLinkedInFn(input);
+        // suppression checked above; one draft call yields both the invite note and follow-up.
+        // Best-of-N (Task 3, quality lever 2): absent judgeFn forces n=1 regardless of config —
+        // no point drafting N candidates with nothing to rank them. n<=1 is byte-identical to
+        // today (draftLinkedInFn runs exactly once, the judge never runs), which is how the
+        // feature stays fully OFF by default. The winner — chosen or not — flows through the
+        // UNCHANGED humanizer/fixLinkedInFn gate below; the judge only ranks among candidates,
+        // it never bypasses that gate (anti-Goodhart: the humanizer stays the hard floor).
+        const configuredN = Math.min(Math.max(1, Math.floor(deps.bestOfN ?? 1)), MAX_BEST_OF_N);
+        const n = deps.judgeFn ? configuredN : 1;
+        const { chosen } = await bestOfN(
+          n,
+          () => deps.draftLinkedInFn(input),
+          (d) => d.followupMessage,
+          { grounding: leadBlock(input), cta: input.context.cta },
+          deps.judgeFn
+        );
+        let draft = chosen;
         // Automatic senders get ONE targeted fix of a flagged pair before it may auto-approve; the
         // fix is re-linted with the same validator, so a still-flagged pair waits in review.
         if (ctx.agent.sendMode === "automatic" && draft.violations.length > 0 && deps.fixLinkedInFn) {
@@ -139,6 +160,10 @@ export async function runCopyDraft(
           // brain's own prompt handle — never re-registered, so the hash can never drift.
           promptHash: LINKEDIN_SYSTEM.hash,
           modelId: getModelId(),
+          // Task 3: only stamped when best-of-N actually ran (n>1) — n<=1 keeps the exact
+          // pre-Task-3 recipe shape (see buildSendRecipe's bestOfN doc), so every existing
+          // recipe-equality test and every off-by-default run stays byte-identical.
+          ...(n > 1 ? { bestOfN: n } : {}),
         });
         const common = {
           accountId,

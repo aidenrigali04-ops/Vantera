@@ -30,6 +30,7 @@ import type {
   LeadOutcomeFlags,
   ExperimentStatus,
   SendRecipe,
+  JudgeFn,
 } from "@vantera/agent-brains";
 import type { OutreachCapacity } from "./capacity";
 import type { SenderCandidate } from "./sender-assignment";
@@ -361,6 +362,13 @@ export interface CopyDraftStore {
     experimentId: string,
     variant: "champion" | "challenger"
   ): Promise<void>;
+  /**
+   * The `best_of_n` app-setting (Task 3, quality lever 2) — a GLOBAL rollout knob (app_settings
+   * has no accountId), not per-account config. Default 1 (today's single-draft behavior) when
+   * unset or not a positive number; the pipeline core re-caps whatever this returns at
+   * MAX_BEST_OF_N regardless.
+   */
+  getBestOfN(): Promise<number>;
 }
 
 /** A running experiment as the copy-draft pipeline needs it: id, split, and the challenger strategy. */
@@ -549,6 +557,19 @@ export interface CopyDraftDeps {
    * The fix is re-linted with the same validator; still-flagged output waits in review (rule 06/11).
    */
   fixLinkedInFn?: (draft: LinkedInDraft, input: DraftInput) => Promise<LinkedInDraft>;
+  /**
+   * Best-of-N judge (Task 3, quality lever 2). Absent ⇒ best-of-N is forced OFF (n=1) regardless
+   * of `bestOfN` config below — there's no point drafting N candidates with nothing to rank them.
+   * Advisory ranking only: the judge picks among candidates that already exist, it never bypasses
+   * the humanizer/fixLinkedInFn gate that runs on whichever candidate it picks.
+   */
+  judgeFn?: JudgeFn;
+  /**
+   * Desired best-of-N candidate count, resolved from the `best_of_n` app-setting by the thin
+   * trigger (default 1 = today's single-draft behavior). The pipeline core re-caps this at
+   * MAX_BEST_OF_N regardless of what's configured, and forces it to 1 when `judgeFn` is absent.
+   */
+  bestOfN?: number;
 }
 
 export interface CopyDraftSummary {

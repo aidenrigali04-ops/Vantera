@@ -39,6 +39,15 @@ export type SendRecipe = {
   promptHash: string | null;
   /** resolved model id at draft time (null = pre-v2 stamp — never backfilled) */
   modelId: string | null;
+  /**
+   * Task 3 (best-of-N judge-ranked selection, enterprise-grade-brain Phase 2C): how many
+   * candidates were drafted and judge-ranked to produce this message. ABSENT (not `null`) —
+   * not `strategy`/`promptHash`-style honest-null — because the key is only ever written when
+   * best-of-N actually ran (n>1 with a judge wired). Every stamp from before Task 3, and every
+   * n<=1 stamp after it, keeps the exact shape it always had: the feature is off by default, so
+   * its own absence proves nothing ran, rather than needing a sentinel value to say so.
+   */
+  bestOfN?: number;
 };
 
 /** Normalizing constructor: absent facts become honest nulls — never invented. */
@@ -51,8 +60,9 @@ export function buildSendRecipe(input: {
   exemplars?: number;
   promptHash?: string | null;
   modelId?: string | null;
+  bestOfN?: number;
 }): SendRecipe {
-  return {
+  const recipe: SendRecipe = {
     v: 2,
     brain: input.brain,
     strategy: input.strategy ?? {},
@@ -63,4 +73,9 @@ export function buildSendRecipe(input: {
     promptHash: input.promptHash ?? null,
     modelId: input.modelId ?? null,
   };
+  // Only ever set the key when the caller actually passed it (best-of-N ran) — omitted
+  // entirely otherwise, so every non-best-of-N caller's stamp shape is untouched (see the
+  // `bestOfN` doc comment on SendRecipe above).
+  if (input.bestOfN !== undefined) recipe.bestOfN = input.bestOfN;
+  return recipe;
 }

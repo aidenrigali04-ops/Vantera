@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { normalizeLinkedInUrl, runCopyDraft } from "./copy-draft";
+import { normalizeLinkedInUrl, runCopyDraft, MAX_BEST_OF_N } from "./copy-draft";
 import type {
   ActiveExperiment,
   CopyContext,
@@ -8,7 +8,7 @@ import type {
   DraftableLead,
   NewScheduledSend,
 } from "./types";
-import { LINKEDIN_SYSTEM, type CopyStrategy, type DraftInput } from "@vantera/agent-brains";
+import { LINKEDIN_SYSTEM, leadBlock, type CopyStrategy, type DraftInput, type JudgeFn } from "@vantera/agent-brains";
 import { getModelId } from "@vantera/ai";
 
 function lead(id: string, overrides: Partial<DraftableLead> = {}): DraftableLead {
@@ -109,6 +109,11 @@ class FakeCopyStore implements CopyDraftStore {
     variant: "champion" | "challenger"
   ) {
     this.stamps.push({ leadId, experimentId, variant });
+  }
+  // Task 3: only the thin trigger reads this (the core reads deps.bestOfN directly) — present
+  // solely to satisfy CopyDraftStore; no test below depends on its value.
+  async getBestOfN() {
+    return 1;
   }
 }
 
@@ -506,5 +511,210 @@ describe("runCopyDraft — Vera's winning-opener memory (Stage 0.5)", () => {
     await runCopyDraft(PAYLOAD, deps);
 
     expect(captured[0]?.context.winningExemplars ?? []).toEqual([]);
+  });
+});
+
+// ── Task 3: best-of-N judge-ranked draft selection ───────────────────────────
+describe("runCopyDraft — best-of-N (Task 3, off by default)", () => {
+  it("no bestOfN config, no judgeFn: byte-identical to pre-Task-3 — one draft call, no bestOfN key on the recipe", async () => {
+    const store = new FakeCopyStore();
+    store.leads = [lead("l1")];
+    const draftLinkedInFn = vi.fn(async () => ({
+      connectionNote: "note",
+      followupMessage: "follow",
+      violations: [],
+    }));
+    const deps: CopyDraftDeps = { store, draftLinkedInFn };
+
+    await runCopyDraft(PAYLOAD, deps);
+
+    expect(draftLinkedInFn).toHaveBeenCalledTimes(1);
+    expect(store.sends[0]!.recipe).not.toHaveProperty("bestOfN");
+  });
+
+  it("bestOfN=5 configured but judgeFn absent: forced to n=1 — one draft call, judge never wired, no bestOfN stamp", async () => {
+    const store = new FakeCopyStore();
+    store.leads = [lead("l1")];
+    const draftLinkedInFn = vi.fn(async () => ({
+      connectionNote: "note",
+      followupMessage: "follow",
+      violations: [],
+    }));
+    const deps: CopyDraftDeps = { store, draftLinkedInFn, bestOfN: 5 };
+
+    await runCopyDraft(PAYLOAD, deps);
+
+    expect(draftLinkedInFn).toHaveBeenCalledTimes(1);
+    expect(store.sends[0]!.recipe).not.toHaveProperty("bestOfN");
+  });
+
+  it("bestOfN=1 with a judgeFn wired: still exactly one draft call and zero judge calls", async () => {
+    const store = new FakeCopyStore();
+    store.leads = [lead("l1")];
+    const draftLinkedInFn = vi.fn(async () => ({
+      connectionNote: "note",
+      followupMessage: "follow",
+      violations: [],
+    }));
+    const judgeFn = vi.fn<JudgeFn>();
+    const deps: CopyDraftDeps = { store, draftLinkedInFn, bestOfN: 1, judgeFn };
+
+    await runCopyDraft(PAYLOAD, deps);
+
+    expect(draftLinkedInFn).toHaveBeenCalledTimes(1);
+    expect(judgeFn).not.toHaveBeenCalled();
+    expect(store.sends[0]!.recipe).not.toHaveProperty("bestOfN");
+  });
+
+  it("bestOfN=3 + a judge: drafts 3 candidates, judges each on the SAME grounding/cta the humanizer uses, and stamps + lints the highest-scored one", async () => {
+    const store = new FakeCopyStore();
+    store.leads = [lead("l1")];
+    let call = 0;
+    const draftLinkedInFn = vi.fn(async () => {
+      call += 1;
+      return { connectionNote: `note-${call}`, followupMessage: `follow-${call}`, violations: [] };
+    });
+    const scoreByFollowup: Record<string, number> = { "follow-1": 2, "follow-2": 4, "follow-3": 3 };
+    const seenContexts: { grounding: string; cta?: string }[] = [];
+    const judgeFn: JudgeFn = vi.fn(async (draft, ctx) => {
+      seenContexts.push(ctx);
+      return { overall: scoreByFollowup[draft.text]! };
+    });
+    let capturedInput: DraftInput | undefined;
+    const wrappedDraftFn: CopyDraftDeps["draftLinkedInFn"] = async (input) => {
+      capturedInput = input;
+      return draftLinkedInFn();
+    };
+    const deps: CopyDraftDeps = { store, draftLinkedInFn: wrappedDraftFn, bestOfN: 3, judgeFn };
+
+    await runCopyDraft(PAYLOAD, deps);
+
+    expect(draftLinkedInFn).toHaveBeenCalledTimes(3);
+    expect(judgeFn).toHaveBeenCalledTimes(3);
+    // follow-2 scored highest (4) — its pair is what gets stored/linted/stamped.
+    expect(store.sends.find((s) => s.linkedinStage === "invite")?.body).toBe("note-2");
+    expect(store.sends.find((s) => s.linkedinStage === "message")?.body).toBe("follow-2");
+    for (const row of store.sends) {
+      expect(row.recipe).toMatchObject({ bestOfN: 3 });
+    }
+    // the judge saw the exact same grounding block the humanizer/draft brain builds from this input.
+    expect(capturedInput).toBeDefined();
+    const expectedGrounding = leadBlock(capturedInput!);
+    for (const ctx of seenContexts) {
+      expect(ctx.grounding).toBe(expectedGrounding);
+      expect(ctx.cta).toBe("book a 15-min intro");
+    }
+  });
+
+  it("caps the effective n at MAX_BEST_OF_N regardless of a larger configured value", async () => {
+    const store = new FakeCopyStore();
+    store.leads = [lead("l1")];
+    const draftLinkedInFn = vi.fn(async () => ({
+      connectionNote: "note",
+      followupMessage: "follow",
+      violations: [],
+    }));
+    const judgeFn: JudgeFn = vi.fn(async () => ({ overall: 3 }));
+    const deps: CopyDraftDeps = { store, draftLinkedInFn, bestOfN: 999, judgeFn };
+
+    await runCopyDraft(PAYLOAD, deps);
+
+    expect(draftLinkedInFn).toHaveBeenCalledTimes(MAX_BEST_OF_N);
+    expect(judgeFn).toHaveBeenCalledTimes(MAX_BEST_OF_N);
+    expect(store.sends[0]!.recipe).toMatchObject({ bestOfN: MAX_BEST_OF_N });
+  });
+
+  it("suppression still runs BEFORE any draft, even with best-of-N configured — the brain is never called", async () => {
+    const store = new FakeCopyStore();
+    store.leads = [lead("l1")];
+    store.suppressedValues.add("linkedin:https://linkedin.com/in/l1");
+    const draftLinkedInFn = vi.fn(async () => ({
+      connectionNote: "note",
+      followupMessage: "follow",
+      violations: [],
+    }));
+    const judgeFn: JudgeFn = vi.fn(async () => ({ overall: 5 }));
+    const deps: CopyDraftDeps = { store, draftLinkedInFn, bestOfN: 3, judgeFn };
+
+    const summary = await runCopyDraft(PAYLOAD, deps);
+
+    expect(draftLinkedInFn).not.toHaveBeenCalled();
+    expect(judgeFn).not.toHaveBeenCalled();
+    expect(store.sends).toHaveLength(0);
+    expect(summary).toMatchObject({ drafted: 0, suppressed: 1 });
+  });
+
+  it("a judge-preferred candidate that's lint-dirty still gets ONE fix pass and routes to review if still dirty — the humanizer stays the hard floor", async () => {
+    const store = new FakeCopyStore({ linkedin: true }, "automatic");
+    store.leads = [lead("l1")];
+    let call = 0;
+    const draftLinkedInFn = vi.fn(async () => {
+      call += 1;
+      // candidate 2 is the one the judge will prefer, and it's the lint-dirty one.
+      return call === 2
+        ? {
+            connectionNote: "dirty note",
+            followupMessage: "dirty follow",
+            violations: [{ rule: "banned-phrase", detail: 'remove "game-changer"' }],
+          }
+        : { connectionNote: `clean note ${call}`, followupMessage: `clean follow ${call}`, violations: [] };
+    });
+    const judgeFn: JudgeFn = vi.fn(async (draft) => ({
+      overall: draft.text === "dirty follow" ? 5 : 1,
+    }));
+    const fixLinkedInFn = vi.fn(async () => ({
+      connectionNote: "still dirty note",
+      followupMessage: "still dirty follow",
+      violations: [{ rule: "banned-phrase", detail: 'remove "seamless"' }],
+    }));
+    const deps: CopyDraftDeps = { store, draftLinkedInFn, bestOfN: 3, judgeFn, fixLinkedInFn };
+
+    await runCopyDraft(PAYLOAD, deps);
+
+    // the fix pass ran exactly once, on the CHOSEN (dirty) candidate — never on the clean ones.
+    expect(fixLinkedInFn).toHaveBeenCalledOnce();
+    expect(fixLinkedInFn).toHaveBeenCalledWith(
+      expect.objectContaining({ followupMessage: "dirty follow" }),
+      expect.anything()
+    );
+    // still flagged after the fix ⇒ never silently approved, exactly like today's single-draft path.
+    for (const send of store.sends) {
+      expect(send.status).toBe("pending_review");
+      expect(send.styleFlags).toContain("banned-phrase");
+    }
+  });
+
+  it("a judge-preferred candidate that's lint-dirty auto-approves once the fix pass cleans it (automatic mode)", async () => {
+    const store = new FakeCopyStore({ linkedin: true }, "automatic");
+    store.leads = [lead("l1")];
+    let call = 0;
+    const draftLinkedInFn = vi.fn(async () => {
+      call += 1;
+      return call === 2
+        ? {
+            connectionNote: "dirty note",
+            followupMessage: "dirty follow",
+            violations: [{ rule: "banned-phrase", detail: 'remove "game-changer"' }],
+          }
+        : { connectionNote: `clean note ${call}`, followupMessage: `clean follow ${call}`, violations: [] };
+    });
+    const judgeFn: JudgeFn = vi.fn(async (draft) => ({
+      overall: draft.text === "dirty follow" ? 5 : 1,
+    }));
+    const fixLinkedInFn = vi.fn(async () => ({
+      connectionNote: "fixed note",
+      followupMessage: "fixed follow",
+      violations: [],
+    }));
+    const deps: CopyDraftDeps = { store, draftLinkedInFn, bestOfN: 3, judgeFn, fixLinkedInFn };
+
+    await runCopyDraft(PAYLOAD, deps);
+
+    expect(fixLinkedInFn).toHaveBeenCalledOnce();
+    for (const send of store.sends) {
+      expect(send.status).toBe("approved");
+      expect(send.styleFlags).toBeNull();
+    }
+    expect(store.sends.find((s) => s.linkedinStage === "message")?.body).toBe("fixed follow");
   });
 });

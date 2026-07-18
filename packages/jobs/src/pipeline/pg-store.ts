@@ -997,6 +997,13 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
       return fetchChampion(db, accountId);
     },
 
+    async getBestOfN() {
+      // Global rollout knob (Task 3) — same appSettings/eq pattern as isKillSwitchOn below.
+      const [row] = await db.select().from(appSettings).where(eq(appSettings.key, "best_of_n"));
+      const v = row?.value;
+      return typeof v === "number" && Number.isFinite(v) && v > 0 ? v : 1;
+    },
+
     async stampLeadExperiment(leadId, experimentId, variant) {
       await db
         .update(leads)
