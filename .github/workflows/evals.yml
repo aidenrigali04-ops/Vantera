@@ -1,0 +1,57 @@
+name: Evals
+
+# Path-triggered — this workflow only runs when the copy/reply/optimize brains, the AI client, or
+# the evals package itself change, plus a nightly full sweep and manual dispatch. See
+# docs/evals.md for the full design (three layers: deterministic + classifier = hard gates, judge
+# + pairwise = advisory until the owner's kappa-calibration flips EVALS_JUDGE_GATING=1).
+on:
+  pull_request:
+    paths:
+      - "packages/agent-brains/src/copy/**"
+      - "packages/agent-brains/src/reply/**"
+      - "packages/agent-brains/src/optimize/**"
+      - "packages/ai/**"
+      - "packages/evals/**"
+  push:
+    branches: [main]
+    paths:
+      - "packages/agent-brains/src/**"
+      - "packages/ai/**"
+      - "packages/evals/**"
+  schedule:
+    # Nightly full sweep at 06:23 UTC — a GITHUB Actions schedule trigger, NOT a Trigger.dev
+    # schedule (Trigger's cron scheduler is already at its 10/10 quota, see the prod-ops notes;
+    # this cron lives entirely in GitHub Actions and never touches that quota).
+    - cron: "23 6 * * *"
+  workflow_dispatch:
+
+jobs:
+  evals:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # Pure-logic layer (mock models, no network) — ALWAYS hard, runs on every trigger including
+      # a PR from a fork with no access to secrets. This is the fast, free layer.
+      - run: pnpm --filter @vantera/evals test
+
+      # Live evals: real Anthropic calls against the fixture corpus. Cost is bounded to the
+      # fixture-set size (currently ~34 copy cases + the labeled classifier sets) — roughly
+      # $2-5/run at current fixture volume; the nightly cron is the fuller sweep since every
+      # trigger runs the same full suite (there's no separate "quick" mode). API-key-gated: absent
+      # secret is a LOUD skip (a visible ::warning), never a silent green — see docs/evals.md.
+      - name: Live evals (API-gated)
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "::warning::ANTHROPIC_API_KEY not set — live evals (deterministic gate, classifier floors, judge, pairwise) SKIPPED. GATE 1 requires them; add the secret to unlock."
+            exit 0
+          fi
+          pnpm --filter @vantera/evals evals:ci
