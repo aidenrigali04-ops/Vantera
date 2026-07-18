@@ -235,7 +235,15 @@ export async function runOptimize(deps: OptimizeDeps): Promise<OptimizeSummary> 
       if (recheck.decision === "adopt_challenger") {
         // (c) Still a win at the grace mark — adopt autonomously and chain the next test off the
         // NEW champion, mirroring the pre-GATE-0 fully-autonomous adopt path.
+        //
+        // Claim-first race guard (WS-3.2 review fix): `adoptChallenger` now claims the row with
+        // its own status-guarded UPDATE before writing anything, and returns null when that claim
+        // fails — the owner already discarded/adopted this exact experiment in the race window
+        // between `getMatureReadyToAdopt` reading it and this tick reaching it. The owner's action
+        // is authoritative: skip silently, don't count it, don't chain off a champion that was
+        // never actually written.
         const newChampion = await deps.store.adoptChallenger(exp.id, recheck.reason);
+        if (newChampion === null) continue;
         autoAdopted++;
         const result = await chainNext(deps, exp, newChampion);
         if (result === "started") chained++;

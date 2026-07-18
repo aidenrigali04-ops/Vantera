@@ -177,6 +177,101 @@ describe("concludeExperiment wealth credit", () => {
   });
 });
 
+// ── adoptChallenger claim-first ordering (WS-3.2 review fix) ────────────────────────────────
+// GATE 1's auto-adopt tick is the first concurrent actor racing the owner's manual dashboard
+// buttons (discard/adopt), which also transition this same experiment row. adoptChallenger's
+// status-guarded claim (UPDATE ... WHERE status IN (running, ready_to_adopt) RETURNING) must run
+// FIRST and gate EVERY subsequent write — a claim that returns no row means someone else already
+// transitioned the experiment, and the playbook must be left untouched. The original ordering
+// wrote the playbook unconditionally (guarded only by "does a row with this id exist", true
+// regardless of status) and gated only the wealth credit on the claim, so a lost race could still
+// commit a rejected challenger as the account's champion. No DB harness exists in this repo (see
+// the concludeExperiment suite above) — this drives adoptChallenger through a minimal fake
+// transaction that records every select/insert, so "did the playbook get written" is directly
+// observable.
+describe("adoptChallenger claim-first ordering", () => {
+  type RecordedInsert = { table: unknown; values: Record<string, unknown> };
+
+  function fakeAdoptTx(
+    claimReturns: { accountId: string; challengerStrategy: unknown }[],
+    playbookVersionRow?: { version: number }
+  ) {
+    const inserts: RecordedInsert[] = [];
+    let updates = 0;
+    let selects = 0;
+    const tx = {
+      update: (_table: unknown) => ({
+        set: (_vals: unknown) => ({
+          where: (_cond: unknown) => ({
+            returning: (_sel: unknown) => {
+              updates++;
+              return Promise.resolve(claimReturns);
+            },
+          }),
+        }),
+      }),
+      select: (_sel: unknown) => ({
+        from: (_table: unknown) => ({
+          where: (_cond: unknown) => ({
+            limit: (_n: number) => {
+              selects++;
+              return Promise.resolve(playbookVersionRow ? [playbookVersionRow] : []);
+            },
+          }),
+        }),
+      }),
+      insert: (table: unknown) => ({
+        values: (values: Record<string, unknown>) => ({
+          onConflictDoUpdate: (_cfg: unknown) => {
+            inserts.push({ table, values });
+            return Promise.resolve();
+          },
+        }),
+      }),
+    };
+    const db = {
+      transaction: async <T>(fn: (t: typeof tx) => Promise<T>): Promise<T> => fn(tx),
+    };
+    return {
+      db: db as unknown as Db,
+      inserts,
+      updateCount: () => updates,
+      selectCount: () => selects,
+    };
+  }
+
+  it("returns null and leaves the playbook untouched when the claim fails (row already terminal)", async () => {
+    // Simulates the exact race: the owner's own discard/adopt action already transitioned this
+    // row out of running/ready_to_adopt, so the status-guarded UPDATE...RETURNING matches zero
+    // rows before this call ever gets a chance to write anything.
+    const { db, inserts, updateCount, selectCount } = fakeAdoptTx([]);
+
+    const result = await createPgStore(db).adoptChallenger("e1", "grace re-check still wins");
+
+    expect(result).toBeNull();
+    expect(updateCount()).toBe(1); // the claim was attempted
+    expect(selectCount()).toBe(0); // never even reads the playbook version
+    expect(inserts).toHaveLength(0); // — and never writes it
+  });
+
+  it("adopts on a successful claim: writes the playbook, credits wealth, returns the champion", async () => {
+    const challengerStrategy = { openWith: "trigger" };
+    const { db, inserts } = fakeAdoptTx([{ accountId: "acct-1", challengerStrategy }], { version: 2 });
+
+    const result = await createPgStore(db).adoptChallenger("e1", "grace re-check still wins");
+
+    expect(result).toEqual(challengerStrategy);
+    expect(inserts).toHaveLength(2); // champion write + wealth credit, both playbook upserts
+    expect(inserts[0]?.table).toBe(optimizationPlaybook);
+    expect(inserts[0]?.values).toMatchObject({
+      accountId: "acct-1",
+      championStrategy: challengerStrategy,
+      version: 3, // cur.version (2) + 1
+    });
+    expect(inserts[1]?.table).toBe(optimizationPlaybook); // creditAlphaWealth's own upsert
+  });
+});
+
 // Regression: a prospect with no email/phone/tech enrichment must not trigger an empty UPDATE.
 describe("saveEnrichment with no persistable fields", () => {
   const store = createPgStore(createDb("postgresql://localhost:5432/db"));

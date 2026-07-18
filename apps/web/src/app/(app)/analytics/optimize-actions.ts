@@ -133,7 +133,18 @@ export async function revertAdoption(formData: FormData): Promise<void> {
   revalidatePath("/dashboard");
 }
 
-/** Keep the current champion: discard the challenger. */
+/** Keep the current champion: discard the challenger.
+ *
+ * Status-guarded (WS-3.2 race-condition fix): the daily auto-adopt tick is the first concurrent
+ * actor that can transition this row between the moment the owner's dashboard rendered the
+ * "Keep current" button and the moment they click it. An unconditional update here would clobber
+ * an already-`adopted` row back to `discarded` — the playbook would still carry the challenger
+ * (the tick's write already committed) while the experiment row falsely claims it was discarded,
+ * so the What's-working adoption query (`.eq("status","adopted")`, `lib/optimize.ts`) stops
+ * finding it and no Revert control ever surfaces. Restricting the update to rows still live
+ * (`running`/`ready_to_adopt`) makes a late discard a no-op instead: `revalidatePath("/dashboard")`
+ * below re-renders the real adopted-with-Revert state, which is the recoverable path. Mirrors the
+ * same guard `concludeExperiment` uses in `pg-store.ts`. */
 export async function discardExperiment(formData: FormData): Promise<void> {
   const id = String(formData.get("id") ?? "");
   if (!id) return;
@@ -141,6 +152,7 @@ export async function discardExperiment(formData: FormData): Promise<void> {
   await db
     .from("optimization_experiments")
     .update({ status: "discarded", concluded_at: new Date().toISOString() })
-    .eq("id", id);
+    .eq("id", id)
+    .in("status", ["running", "ready_to_adopt"]);
   revalidatePath("/dashboard");
 }

@@ -57,8 +57,10 @@ class FakeOptimizeStore implements OptimizeStore {
   /** GATE 0 (enterprise-grade-brain spec, 2026-07-16): winning challengers land here, not `adopted` */
   readyToAdopt: { id: string; reason: string }[] = [];
   started: StartExperimentInput[] = [];
-  /** what adoptChallenger returns as the new champion */
-  adoptedChampion: CopyStrategy = { followupLength: "tight" };
+  /** what adoptChallenger returns as the new champion — null simulates a lost claim (WS-3.2:
+   *  the owner already discarded/adopted the row in the race window, so the status-guarded
+   *  claim inside the real store's adoptChallenger returned no row). */
+  adoptedChampion: CopyStrategy | null = { followupLength: "tight" };
   /** simulate the one-live-experiment unique index */
   startConflicts = false;
   // Stage 1b: collective aggregates + generation context
@@ -101,6 +103,10 @@ class FakeOptimizeStore implements OptimizeStore {
     this.adopted.push({ id, reason });
     return this.adoptedChampion;
   }
+  // ^ NOTE: this fake records every call regardless of the configured return value — it doesn't
+  // simulate the real store's claim internally. `adoptedChampion = null` is how a test simulates
+  // the real store's status-guarded claim losing the race (see the WS-3.2 test below); `store.adopted`
+  // still reflects "the pipeline attempted this claim," which is what these tests assert on.
   async markReadyToAdopt(id: string, reason: string) {
     this.readyToAdopt.push({ id, reason });
   }
@@ -713,6 +719,40 @@ describe("runOptimize (decide pipeline — GATE 0 suggest-only adopt, enterprise
       expect(store.started).toHaveLength(1);
       expect(store.started[0]).toMatchObject({ accountId: "acct-2", champion: store.adoptedChampion });
       expect(summary.chained).toBe(1);
+    });
+
+    // Review-round fix (WS-3.2): the daily auto-adopt tick is the first concurrent actor racing
+    // the owner's manual dashboard buttons. If the owner discarded/adopted this exact experiment
+    // in the window between `getMatureReadyToAdopt` reading it and this tick reaching it, the real
+    // store's status-guarded claim inside `adoptChallenger` finds the row already transitioned and
+    // returns null — simulated here via `adoptedChampion = null`. The pipeline must treat that as
+    // "someone else already decided" and skip silently: no autoAdopted count, no chain off a
+    // champion that was never actually written to the playbook.
+    it("adoption_mode='auto' + adoptChallenger loses the claim (owner acted in the race window) → not counted, no chain", async () => {
+      const store = new FakeOptimizeStore();
+      store.adoptionMode = "auto";
+      const mature = exp("m-race", { accountId: "acct-5" });
+      store.matureReadyToAdopt = [mature];
+      // same V2-clearing rig — the re-verify itself still says adopt; only the claim is lost
+      store.arms.set(
+        "m-race:champion",
+        flags(V2_ARM_N, { accepted: true }).map((f, i) => ({ ...f, interested: i < ADOPT_CHAMP_SUCCESSES }))
+      );
+      store.arms.set(
+        "m-race:challenger",
+        flags(V2_ARM_N, { accepted: true }).map((f, i) => ({ ...f, interested: i < ADOPT_CHAL_SUCCESSES }))
+      );
+      store.adoptedChampion = null;
+
+      const summary = await runOptimize({ store, rand: mulberry32(7) });
+
+      expect(store.adopted).toEqual([{ id: "m-race", reason: expect.any(String) }]); // the claim was attempted
+      expect(summary.autoAdopted).toBe(0);
+      expect(store.started).toHaveLength(0); // no chain off a null champion
+      expect(summary.chained).toBe(0);
+      // not re-conceded as a discard either — a lost claim is neither an adoption nor a discard,
+      // it's a silent no-op deferring to whatever the owner's own action already did
+      expect(store.concluded).toHaveLength(0);
     });
 
     it("adoption_mode='auto' + a mature win that regressed on re-verify → NOT adopted, concluded discarded", async () => {

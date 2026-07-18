@@ -1186,45 +1186,24 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         .where(eq(optimizationExperiments.id, experimentId));
     },
 
-    async adoptChallenger(experimentId, reason): Promise<CopyStrategy> {
+    async adoptChallenger(experimentId, reason): Promise<CopyStrategy | null> {
       // Autonomous adoption (spec 2026-07-14): playbook champion ← challenger, version-bumped;
       // experiment → 'adopted'. Mirrors the manual adopt action's writes, run by the service role.
+      //
+      // Claim-first ordering (WS-3.2 race-condition fix, 2026-07-18): the status-guarded UPDATE
+      // runs FIRST and is the only thing that decides whether this call writes anything at all.
+      // The original ordering wrote the playbook unconditionally (guarded only by `if (exp)`,
+      // true for ANY existing row regardless of status) and gated only the wealth credit on the
+      // claim — so a race against the owner's manual dashboard actions (which also race this same
+      // tick) could commit the playbook write (challenger becomes champion — real outreach copy
+      // changes) even though the claim itself failed. Returning null means someone else already
+      // transitioned the row in the exact tick window; the caller must treat the owner's action as
+      // authoritative and write nothing.
+      //
       // Task 7 / WS-1.1: also credits alpha-investing wealth — guarded the same way as
-      // concludeExperiment (only when the status-guarded UPDATE actually transitioned the row).
+      // concludeExperiment (only reached once the claim above actually transitioned the row).
       return db.transaction(async (tx) => {
-        const [exp] = await tx
-          .select({
-            accountId: optimizationExperiments.accountId,
-            challengerStrategy: optimizationExperiments.challengerStrategy,
-          })
-          .from(optimizationExperiments)
-          .where(eq(optimizationExperiments.id, experimentId))
-          .limit(1);
-        const newChampion = ((exp?.challengerStrategy as CopyStrategy | null) ?? {}) as CopyStrategy;
-        if (exp) {
-          const [cur] = await tx
-            .select({ version: optimizationPlaybook.version })
-            .from(optimizationPlaybook)
-            .where(eq(optimizationPlaybook.accountId, exp.accountId))
-            .limit(1);
-          await tx
-            .insert(optimizationPlaybook)
-            .values({
-              accountId: exp.accountId,
-              championStrategy: newChampion,
-              version: (cur?.version ?? 0) + 1,
-              updatedAt: new Date(),
-            })
-            .onConflictDoUpdate({
-              target: optimizationPlaybook.accountId,
-              set: {
-                championStrategy: newChampion,
-                version: (cur?.version ?? 0) + 1,
-                updatedAt: new Date(),
-              },
-            });
-        }
-        const [row] = await tx
+        const [claimed] = await tx
           .update(optimizationExperiments)
           .set({ status: "adopted", decisionReason: reason, concludedAt: new Date() })
           .where(
@@ -1233,8 +1212,35 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
               inArray(optimizationExperiments.status, ["running", "ready_to_adopt"])
             )
           )
-          .returning({ id: optimizationExperiments.id });
-        if (row && exp) await creditAlphaWealth(tx, exp.accountId);
+          .returning({
+            accountId: optimizationExperiments.accountId,
+            challengerStrategy: optimizationExperiments.challengerStrategy,
+          });
+        if (!claimed) return null;
+
+        const newChampion = ((claimed.challengerStrategy as CopyStrategy | null) ?? {}) as CopyStrategy;
+        const [cur] = await tx
+          .select({ version: optimizationPlaybook.version })
+          .from(optimizationPlaybook)
+          .where(eq(optimizationPlaybook.accountId, claimed.accountId))
+          .limit(1);
+        await tx
+          .insert(optimizationPlaybook)
+          .values({
+            accountId: claimed.accountId,
+            championStrategy: newChampion,
+            version: (cur?.version ?? 0) + 1,
+            updatedAt: new Date(),
+          })
+          .onConflictDoUpdate({
+            target: optimizationPlaybook.accountId,
+            set: {
+              championStrategy: newChampion,
+              version: (cur?.version ?? 0) + 1,
+              updatedAt: new Date(),
+            },
+          });
+        await creditAlphaWealth(tx, claimed.accountId);
         return newChampion;
       });
     },

@@ -437,19 +437,30 @@ export interface OptimizeStore {
   /**
    * Adopt a proven challenger autonomously: playbook champion ← challenger_strategy
    * (version-bumped), experiment → 'adopted' with the decision reason. Returns the NEW
-   * champion strategy so the loop can chain the next test against it.
+   * champion strategy so the loop can chain the next test against it — or `null` if the claim
+   * failed (see below), in which case the caller must write nothing and skip chaining for this
+   * experiment.
    *
    * GATE 0 (enterprise-grade-brain spec, 2026-07-16): the decide loop no longer calls this — a
    * winning challenger only gets `markReadyToAdopt` below, and the owner's manual adopt action
    * (`apps/web` `adoptExperiment`) applies the win with its own writes. Kept on the interface for
    * GATE 1, when the anytime-valid decision core resumes autonomous adoption.
    *
-   * Task 7 / WS-1.1: also credits alpha-investing wealth on adoption (see pg-store.ts). Since
-   * `apps/web`'s `adoptExperiment` bypasses this method entirely (per the note above), that credit
-   * is dormant in production today, same as the rest of this method — it activates once GATE 1
-   * (or a wiring of the manual action) actually calls it.
+   * Claim-first ordering (WS-3.2 race-condition fix, 2026-07-18): GATE 1's auto-adopt tick is the
+   * first concurrent actor racing the owner's manual dashboard buttons (adopt/discard/revert), all
+   * of which act on the same experiment row. The implementation MUST run its status-guarded claim
+   * (`ready_to_adopt`/`running` → `adopted`) FIRST, before writing anything else, and only proceed
+   * to the playbook write + wealth credit if that claim actually transitioned the row — never write
+   * the playbook unconditionally and gate only the credit, or a lost race can still commit the
+   * challenger as champion under a row that says something else happened.
+   *
+   * Task 7 / WS-1.1: also credits alpha-investing wealth on adoption (see pg-store.ts) — reached
+   * only on a successful claim, which naturally limits the credit to real adoptions. Since
+   * `apps/web`'s `adoptExperiment` bypasses this method entirely (per the GATE 0 note above), that
+   * credit is dormant in production today, same as the rest of this method — it activates once
+   * GATE 1 (or a wiring of the manual action) actually calls it.
    */
-  adoptChallenger(experimentId: string, reason: string): Promise<CopyStrategy>;
+  adoptChallenger(experimentId: string, reason: string): Promise<CopyStrategy | null>;
   /**
    * A winning challenger is MARKED ready_to_adopt (suggest-only surface — the owner's manual
    * adopt action can still apply it any time). No concluded_at: the experiment still occupies the
