@@ -27,7 +27,9 @@ export function signUnsubscribeToken(userId: string): string {
 }
 
 export function verifyUnsubscribeToken(token: string): string | null {
-  const [payload, signature] = token.split(".");
+  const parts = token.split(".");
+  if (parts.length !== 2) return null; // reject extra segments (`${token}.GARBAGE`), not just missing ones
+  const [payload, signature] = parts;
   if (!payload || !signature) return null;
   const expected = sign(payload);
   const a = Buffer.from(signature);
