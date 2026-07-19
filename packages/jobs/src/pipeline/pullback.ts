@@ -162,16 +162,35 @@ export async function runPullback(deps: PullbackDeps): Promise<PullbackSummary> 
     }
     if (sent === 0) continue;
 
+    // The email has already reached the recipient(s) at this point — count the row as
+    // touched/sent regardless of what happens to the ledger writes below. The summary
+    // reports what actually landed in inboxes, not what was successfully bookkept.
     emailsSent += sent;
     touched += 1;
-    await deps.store.recordTouch({
-      userId: row.userId,
-      accountId: row.accountId,
-      segment: row.segment,
-      touchNumber: row.touchNumber,
-      messageBody: composed.lines.join("\n"),
-    });
-    await deps.store.stampLifecycleEmail(row.accountId, now);
+
+    // Ledger writes are best-effort and isolated per row, same idiom as the per-recipient
+    // send loop above: a DB blip on one row must not abandon every other unrelated row
+    // still queued in this batch. The trade-off is a small duplicate-send window — if
+    // either write throws, this row still looks eligible (undertouched / unstamped) on the
+    // next tick and may email this account again. That is the correct trade versus
+    // rejecting the whole runPullback promise, and it is bounded: a persistently failing
+    // store also fails getPullbackCandidates above, so nothing sends at all.
+    try {
+      await deps.store.recordTouch({
+        userId: row.userId,
+        accountId: row.accountId,
+        segment: row.segment,
+        touchNumber: row.touchNumber,
+        messageBody: composed.lines.join("\n"),
+      });
+    } catch {
+      // contained — see comment above
+    }
+    try {
+      await deps.store.stampLifecycleEmail(row.accountId, now);
+    } catch {
+      // contained — see comment above
+    }
   }
 
   return { status: "completed", touched, emailsSent };

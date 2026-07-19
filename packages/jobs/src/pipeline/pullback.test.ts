@@ -228,4 +228,34 @@ describe("runPullback", () => {
 
     expect(seen).toEqual(["user-1"]);
   });
+
+  it("a recordTouch failure on one row is contained — the next row still sends and the promise resolves", async () => {
+    let recordTouchCalls = 0;
+    const sent: string[] = [];
+    const d = deps(
+      [row({ accountId: "acc-1", userId: "user-1" }), row({ accountId: "acc-2", userId: "user-2" })],
+      { send: async (m) => { sent.push(m.to); } }
+    );
+    d.store.recordTouch = async () => {
+      recordTouchCalls += 1;
+      if (recordTouchCalls === 1) throw new Error("db blip");
+    };
+
+    const summary = await runPullback(d);
+
+    // Both rows' emails went out; the first row's ledger write threw but did not stop the second.
+    expect(sent).toEqual(["founder@example.com", "founder@example.com"]);
+    expect(summary).toEqual({ status: "completed", touched: 2, emailsSent: 2 });
+  });
+
+  it("a stampLifecycleEmail failure is contained and the row still counts as sent", async () => {
+    const d = deps([row()]);
+    d.store.stampLifecycleEmail = async () => {
+      throw new Error("db blip");
+    };
+
+    const summary = await runPullback(d);
+
+    expect(summary).toEqual({ status: "completed", touched: 1, emailsSent: 1 });
+  });
 });
