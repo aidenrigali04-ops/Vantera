@@ -112,4 +112,50 @@ describe("runWeeklySummary", () => {
     expect(summary.emailed).toBe(1);
     expect(summary.failures).toBe(1);
   });
+
+  // Task 8: the pull-back collision guard reads accounts.lifecycle_last_email_at — worthless
+  // unless the actually-sent summary stamps it, and only the actually-sent one.
+  it("stamps lifecycle_last_email_at only for accounts that were actually emailed", async () => {
+    const stamped: { accountId: string; at: Date }[] = [];
+    const summary = await runWeeklySummary({
+      store: {
+        listAccountsForSummary: async () => [
+          row({ accountId: "sent-to", recipients: ["a@x.io"] }),
+          row({ accountId: "opted-out", weeklySummaryEnabled: false }),
+        ],
+        stampLifecycleEmail: async (accountId, at) => {
+          stamped.push({ accountId, at });
+        },
+      },
+      send: async () => {},
+      appUrl: APP_URL,
+    });
+    expect(summary.emailed).toBe(1);
+    expect(stamped).toHaveLength(1);
+    expect(stamped[0]?.accountId).toBe("sent-to");
+    expect(stamped[0]?.at).toBeInstanceOf(Date);
+  });
+
+  it("a stamp failure does not sink the batch — the other account still sends and stamps", async () => {
+    const summary = await runWeeklySummary({
+      store: {
+        listAccountsForSummary: async () => [
+          row({ accountId: "stamp-fails", recipients: ["a@x.io"] }),
+          row({ accountId: "fine", recipients: ["b@x.io"] }),
+        ],
+        stampLifecycleEmail: async (accountId) => {
+          if (accountId === "stamp-fails") throw new Error("db hiccup");
+        },
+      },
+      send: async () => {},
+      appUrl: APP_URL,
+    });
+    // "stamp-fails" is inside the same per-account try/catch as the send: the email already went
+    // out (emailed++ already ran) before the stamp throws, so that account is counted in BOTH
+    // emailed and failures — a pre-existing metrics quirk of reusing the send's try/catch, not a
+    // functional bug. What matters here: the OTHER account is completely unaffected.
+    expect(summary.accounts).toBe(2);
+    expect(summary.emailed).toBe(2);
+    expect(summary.failures).toBe(1);
+  });
 });

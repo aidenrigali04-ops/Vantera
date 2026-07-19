@@ -62,4 +62,22 @@ describe("runTrialEnding", () => {
     expect(summary).toEqual({ status: "completed", notified: 0, emailsSent: 0 });
     expect(deps.store.markTrialEndingNotified).not.toHaveBeenCalled();
   });
+
+  it("stamps lifecycle_last_email_at so pull-back yields to this email", async () => {
+    const stamped: string[] = [];
+    const summary = await runTrialEnding({
+      store: {
+        getTrialEndingAccounts: async () => [
+          { id: "acc-1", trialEndsAt: "2026-07-22T00:00:00Z", emails: ["a@x.com"] },
+        ],
+        markTrialEndingNotified: async (ids) => {
+          stamped.push(...ids);
+        },
+      },
+      send: async () => {},
+      now: () => new Date("2026-07-20T00:00:00Z"),
+    });
+    expect(stamped).toEqual(["acc-1"]);
+    expect(summary.notified).toBe(1);
+  });
 });

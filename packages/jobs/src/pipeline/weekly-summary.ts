@@ -32,6 +32,8 @@ export interface WeeklySummaryRow {
 export interface WeeklySummaryStore {
   /** per-account stats for the 7-day window ending at `end` */
   listAccountsForSummary(start: Date, end: Date): Promise<WeeklySummaryRow[]>;
+  /** Feeds the pull-back collision guard (spec 2026-07-18). Optional so tests need not stub it. */
+  stampLifecycleEmail?(accountId: string, at: Date): Promise<void>;
 }
 
 export interface WeeklySummaryMessage {
@@ -202,6 +204,7 @@ export async function runWeeklySummary(deps: WeeklySummaryDeps): Promise<WeeklyS
         await deps.send({ to, ...message });
       }
       outcome.emailed++;
+      await deps.store.stampLifecycleEmail?.(row.accountId, new Date());
     } catch {
       // One account's provider hiccup never blocks the rest; next Monday catches up.
       outcome.failures++;

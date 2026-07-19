@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { sql } from "drizzle-orm";
 import { type Db, createDb, sequenceRuns, campaignLeads, optimizationPlaybook } from "@vantera/db";
-import { createPgStore, toLeadSignalRow } from "./pg-store";
+import { createPgStore, createTrialEndingStore, createWeeklySummaryStore, toLeadSignalRow } from "./pg-store";
 
 describe("toLeadSignalRow", () => {
   it("maps a provider signal to a lead_signals row with an ISO→Date observed_at", () => {
@@ -285,6 +285,64 @@ describe("saveEnrichment with no persistable fields", () => {
         { externalRef: "r1", companyName: "Acme" }
       )
     ).resolves.toBeUndefined();
+  });
+});
+
+// ── lifecycle_last_email_at stamping (Task 8) ─────────────────────────────────────────────────
+// The pull-back collision guard reads accounts.lifecycle_last_email_at and yields for 48h after
+// ANY other lifecycle email. trial-ending.test.ts's own coverage stubs the store entirely, so it
+// cannot catch a regression in what the REAL store writes — these tests drive the real
+// createTrialEndingStore/createWeeklySummaryStore through a minimal fake `db` that records the
+// UPDATE's .set() payload, same fake-db idiom as the concludeExperiment/adoptChallenger suites
+// above (no DB harness exists in this repo).
+describe("createTrialEndingStore.markTrialEndingNotified stamps lifecycle_last_email_at", () => {
+  function fakeUpdateDb() {
+    const sets: Record<string, unknown>[] = [];
+    let updateCalls = 0;
+    const db = {
+      update: (_table: unknown) => {
+        updateCalls++;
+        return {
+          set: (vals: Record<string, unknown>) => {
+            sets.push(vals);
+            return { where: (_cond: unknown) => Promise.resolve() };
+          },
+        };
+      },
+    };
+    return { db: db as unknown as Db, sets, updateCalls: () => updateCalls };
+  }
+
+  it("sets trialEndingNotifiedAt AND lifecycleLastEmailAt to the same instant in one UPDATE", async () => {
+    const { db, sets } = fakeUpdateDb();
+    await createTrialEndingStore(db).markTrialEndingNotified(["acc-1"]);
+    expect(sets).toHaveLength(1);
+    expect(sets[0]?.trialEndingNotifiedAt).toBeInstanceOf(Date);
+    expect(sets[0]?.lifecycleLastEmailAt).toBeInstanceOf(Date);
+    expect(sets[0]?.trialEndingNotifiedAt).toBe(sets[0]?.lifecycleLastEmailAt);
+  });
+
+  it("is a no-op with an empty id list — no UPDATE attempted", async () => {
+    const { db, updateCalls } = fakeUpdateDb();
+    await createTrialEndingStore(db).markTrialEndingNotified([]);
+    expect(updateCalls()).toBe(0);
+  });
+});
+
+describe("createWeeklySummaryStore.stampLifecycleEmail", () => {
+  it("UPDATEs only lifecycle_last_email_at for the given account", async () => {
+    const sets: Record<string, unknown>[] = [];
+    const db = {
+      update: (_table: unknown) => ({
+        set: (vals: Record<string, unknown>) => {
+          sets.push(vals);
+          return { where: (_cond: unknown) => Promise.resolve() };
+        },
+      }),
+    } as unknown as Db;
+    const at = new Date("2026-07-19T00:00:00Z");
+    await createWeeklySummaryStore(db).stampLifecycleEmail!("acc-1", at);
+    expect(sets).toEqual([{ lifecycleLastEmailAt: at }]);
   });
 });
 

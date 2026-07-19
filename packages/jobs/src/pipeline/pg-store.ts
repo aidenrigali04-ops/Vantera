@@ -3013,6 +3013,10 @@ export function createWeeklySummaryStore(db: Db): WeeklySummaryStore {
         recipients: recipientMap.get(a.id) ?? [],
       }));
     },
+
+    async stampLifecycleEmail(accountId: string, at: Date): Promise<void> {
+      await db.update(accounts).set({ lifecycleLastEmailAt: at }).where(eq(accounts.id, accountId));
+    },
   };
 }
 
@@ -3564,9 +3568,12 @@ export function createTrialEndingStore(db: Db) {
     },
     async markTrialEndingNotified(ids: string[]): Promise<void> {
       if (ids.length === 0) return;
+      const now = new Date();
       await db
         .update(accounts)
-        .set({ trialEndingNotifiedAt: new Date() })
+        // lifecycle_last_email_at feeds the pull-back collision guard (spec 2026-07-18):
+        // pull-back yields to this email for 48h.
+        .set({ trialEndingNotifiedAt: now, lifecycleLastEmailAt: now })
         .where(inArray(accounts.id, ids));
     },
   };

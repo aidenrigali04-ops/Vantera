@@ -43,9 +43,15 @@ export async function applyDunning(
         }
       }
       if (sent > 0) {
+        // lifecycle_last_email_at feeds the pull-back collision guard (spec 2026-07-18):
+        // pull-back yields to this email for 48h — a stalled + past_due account must not
+        // get both a payment-failed email and a pull-back email within days of each other.
         await supabase
           .from("accounts")
-          .update({ payment_failed_notified_at: new Date().toISOString() })
+          .update({
+            payment_failed_notified_at: new Date().toISOString(),
+            lifecycle_last_email_at: new Date().toISOString(),
+          })
           .eq("id", accountId);
       }
     } else if (subscriptionStatus === "active") {
