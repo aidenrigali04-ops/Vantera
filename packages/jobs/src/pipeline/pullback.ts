@@ -137,6 +137,14 @@ export interface PullbackSummary {
   status: "completed";
   touched: number;
   emailsSent: number;
+  /**
+   * recordTouch/stampLifecycleEmail failures, contained per row (see the comment below) so one
+   * bad write never aborts the batch. Counted rather than swallowed: this job ticks every 15
+   * minutes with no other alerting, so a persistently failing store would otherwise be invisible
+   * until "two touches, ever" silently broke. The trigger wrapper logs this summary — a nonzero
+   * count is the operator's signal to look at the store, not the compose core.
+   */
+  ledgerWriteFailures: number;
 }
 
 export async function runPullback(deps: PullbackDeps): Promise<PullbackSummary> {
@@ -145,6 +153,7 @@ export async function runPullback(deps: PullbackDeps): Promise<PullbackSummary> 
 
   let emailsSent = 0;
   let touched = 0;
+  let ledgerWriteFailures = 0;
 
   for (const row of rows) {
     const composed = composePullback(row, deps.appUrl, now);
@@ -184,14 +193,16 @@ export async function runPullback(deps: PullbackDeps): Promise<PullbackSummary> 
         messageBody: composed.lines.join("\n"),
       });
     } catch {
-      // contained — see comment above
+      // contained — see comment above; counted in ledgerWriteFailures below
+      ledgerWriteFailures += 1;
     }
     try {
       await deps.store.stampLifecycleEmail(row.accountId, now);
     } catch {
-      // contained — see comment above
+      // contained — see comment above; counted in ledgerWriteFailures below
+      ledgerWriteFailures += 1;
     }
   }
 
-  return { status: "completed", touched, emailsSent };
+  return { status: "completed", touched, emailsSent, ledgerWriteFailures };
 }

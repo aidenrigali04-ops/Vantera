@@ -33,4 +33,25 @@ describe("lifecycle unsubscribe tokens", () => {
   it("produces a URL-safe token", () => {
     expect(signUnsubscribeToken("user-123")).toMatch(/^[A-Za-z0-9._-]+$/);
   });
+
+  it("round-trips through the exact unsubscribe URL shape the pullback-email trigger task builds", () => {
+    // Mirrors packages/jobs/src/trigger/pullback-email.ts verbatim:
+    //   `${appUrl}/api/lifecycle-unsubscribe/${signUnsubscribeToken(message.userId)}`
+    // signed from message.userId (the user, never message.to, the recipient address) — proves
+    // the end-to-end wiring produces a link apps/web's [token] route can actually resolve.
+    const appUrl = "https://www.vanterasystem.dev";
+    const userId = "user-42";
+    const prefix = `${appUrl}/api/lifecycle-unsubscribe/`;
+    const unsubscribeUrl = `${prefix}${signUnsubscribeToken(userId)}`;
+
+    // Extract the [token] dynamic segment the way Next.js routing would hand it to the route.
+    const token = unsubscribeUrl.slice(prefix.length);
+    expect(verifyUnsubscribeToken(token)).toBe(userId);
+
+    // Signing the email address instead (the bug this wiring must not reintroduce) would NOT
+    // verify back to the user id the route looks up.
+    const wrongUrl = `${prefix}${signUnsubscribeToken("founder@example.com")}`;
+    const wrongToken = wrongUrl.slice(prefix.length);
+    expect(verifyUnsubscribeToken(wrongToken)).not.toBe(userId);
+  });
 });

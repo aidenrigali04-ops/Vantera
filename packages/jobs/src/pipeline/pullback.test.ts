@@ -177,7 +177,12 @@ describe("runPullback", () => {
 
     expect(sent).toEqual(["a@x.com", "b@x.com"]);
     expect(touches).toEqual([{ segment: "drafts_waiting", touchNumber: 1 }]);
-    expect(summary).toEqual({ status: "completed", touched: 1, emailsSent: 2 });
+    expect(summary).toEqual({
+      status: "completed",
+      touched: 1,
+      emailsSent: 2,
+      ledgerWriteFailures: 0,
+    });
   });
 
   it("writes NO ledger row when compose declines, so the touch retries later", async () => {
@@ -245,7 +250,12 @@ describe("runPullback", () => {
 
     // Both rows' emails went out; the first row's ledger write threw but did not stop the second.
     expect(sent).toEqual(["founder@example.com", "founder@example.com"]);
-    expect(summary).toEqual({ status: "completed", touched: 2, emailsSent: 2 });
+    expect(summary).toEqual({
+      status: "completed",
+      touched: 2,
+      emailsSent: 2,
+      ledgerWriteFailures: 1,
+    });
   });
 
   it("a stampLifecycleEmail failure is contained and the row still counts as sent", async () => {
@@ -256,6 +266,30 @@ describe("runPullback", () => {
 
     const summary = await runPullback(d);
 
-    expect(summary).toEqual({ status: "completed", touched: 1, emailsSent: 1 });
+    expect(summary).toEqual({
+      status: "completed",
+      touched: 1,
+      emailsSent: 1,
+      ledgerWriteFailures: 1,
+    });
+  });
+
+  it("counts both a recordTouch and a stampLifecycleEmail failure on the same row", async () => {
+    const d = deps([row()]);
+    d.store.recordTouch = async () => {
+      throw new Error("db blip");
+    };
+    d.store.stampLifecycleEmail = async () => {
+      throw new Error("db blip");
+    };
+
+    const summary = await runPullback(d);
+
+    expect(summary).toEqual({
+      status: "completed",
+      touched: 1,
+      emailsSent: 1,
+      ledgerWriteFailures: 2,
+    });
   });
 });
