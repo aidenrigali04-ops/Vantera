@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   composePullback,
+  runPullback,
   COLLISION_WINDOW_MS,
   MIN_ARTIFACT_AGE_MS,
+  type PullbackDeps,
   type PullbackRow,
 } from "./pullback";
 
@@ -145,5 +147,85 @@ describe("composePullback", () => {
     expect(text).toContain("Person 1");
     expect(text).toContain("Person 2");
     expect(text).not.toContain("Person 3");
+  });
+});
+
+function deps(rows: PullbackRow[], over: Partial<PullbackDeps> = {}): PullbackDeps {
+  return {
+    store: {
+      getPullbackCandidates: async () => rows,
+      recordTouch: async () => {},
+      stampLifecycleEmail: async () => {},
+    },
+    send: async () => {},
+    appUrl: APP,
+    now: () => NOW,
+    ...over,
+  };
+}
+
+describe("runPullback", () => {
+  it("sends to every recipient and records one ledger row", async () => {
+    const sent: string[] = [];
+    const touches: Array<{ segment: string; touchNumber: number }> = [];
+    const d = deps([row({ emails: ["a@x.com", "b@x.com"] })], {
+      send: async (m) => { sent.push(m.to); },
+    });
+    d.store.recordTouch = async (t) => { touches.push({ segment: t.segment, touchNumber: t.touchNumber }); };
+
+    const summary = await runPullback(d);
+
+    expect(sent).toEqual(["a@x.com", "b@x.com"]);
+    expect(touches).toEqual([{ segment: "drafts_waiting", touchNumber: 1 }]);
+    expect(summary).toEqual({ status: "completed", touched: 1, emailsSent: 2 });
+  });
+
+  it("writes NO ledger row when compose declines, so the touch retries later", async () => {
+    let recorded = 0;
+    const d = deps([row({ lifecycleLastEmailAt: hoursAgo(1) })]);
+    d.store.recordTouch = async () => { recorded += 1; };
+
+    const summary = await runPullback(d);
+
+    expect(recorded).toBe(0);
+    expect(summary.emailsSent).toBe(0);
+  });
+
+  it("stamps lifecycle_last_email_at so the next lifecycle email yields to this one", async () => {
+    const stamped: string[] = [];
+    const d = deps([row()]);
+    d.store.stampLifecycleEmail = async (id) => { stamped.push(id); };
+
+    await runPullback(d);
+
+    expect(stamped).toEqual(["acc-1"]);
+  });
+
+  it("one failing recipient never blocks the rest of the batch", async () => {
+    let call = 0;
+    const d = deps(
+      [row({ accountId: "acc-1" }), row({ accountId: "acc-2", userId: "user-2" })],
+      {
+        send: async () => {
+          call += 1;
+          if (call === 1) throw new Error("provider 500");
+        },
+      }
+    );
+
+    const summary = await runPullback(d);
+
+    // acc-1's only recipient threw, so it is neither counted nor ledgered; acc-2 still sends.
+    expect(summary.touched).toBe(1);
+    expect(summary.emailsSent).toBe(1);
+  });
+
+  it("passes userId through so the unsubscribe token identifies the user", async () => {
+    const seen: string[] = [];
+    const d = deps([row()], { send: async (m) => { seen.push(m.userId); } });
+
+    await runPullback(d);
+
+    expect(seen).toEqual(["user-1"]);
   });
 });

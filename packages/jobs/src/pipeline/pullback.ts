@@ -112,3 +112,67 @@ export function composePullback(
     ctaUrl: `${appUrl}/leads`,
   };
 }
+
+export interface PullbackTouch {
+  userId: string;
+  accountId: string;
+  segment: PullbackSegment;
+  touchNumber: 1 | 2;
+  messageBody: string;
+}
+
+export interface PullbackDeps {
+  store: {
+    /** Candidates already filtered for ledger dedupe + the never-returned predicate. */
+    getPullbackCandidates(now: Date): Promise<PullbackRow[]>;
+    recordTouch(touch: PullbackTouch): Promise<void>;
+    stampLifecycleEmail(accountId: string, at: Date): Promise<void>;
+  };
+  send(message: PullbackMessage): Promise<void>;
+  appUrl: string;
+  now?: () => Date;
+}
+
+export interface PullbackSummary {
+  status: "completed";
+  touched: number;
+  emailsSent: number;
+}
+
+export async function runPullback(deps: PullbackDeps): Promise<PullbackSummary> {
+  const now = deps.now ? deps.now() : new Date();
+  const rows = await deps.store.getPullbackCandidates(now);
+
+  let emailsSent = 0;
+  let touched = 0;
+
+  for (const row of rows) {
+    const composed = composePullback(row, deps.appUrl, now);
+    // No ledger row on a skip: the touch is retried once the blocking condition clears.
+    if (!composed) continue;
+
+    let sent = 0;
+    for (const to of row.emails) {
+      try {
+        await deps.send({ ...composed, to, userId: row.userId });
+        sent += 1;
+      } catch {
+        // best-effort per recipient — one bad address must not block the rest
+      }
+    }
+    if (sent === 0) continue;
+
+    emailsSent += sent;
+    touched += 1;
+    await deps.store.recordTouch({
+      userId: row.userId,
+      accountId: row.accountId,
+      segment: row.segment,
+      touchNumber: row.touchNumber,
+      messageBody: composed.lines.join("\n"),
+    });
+    await deps.store.stampLifecycleEmail(row.accountId, now);
+  }
+
+  return { status: "completed", touched, emailsSent };
+}
