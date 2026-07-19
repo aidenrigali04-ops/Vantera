@@ -91,6 +91,8 @@ export const accounts = pgTable("accounts", {
   lifecycleEmailsEnabled: boolean("lifecycle_emails_enabled").notNull().default(true),
   trialEndingNotifiedAt: timestamp("trial_ending_notified_at", { withTimezone: true }),
   paymentFailedNotifiedAt: timestamp("payment_failed_notified_at", { withTimezone: true }),
+  // 0060 (pull-back email): when ANY lifecycle email last went to this account — collision guard
+  lifecycleLastEmailAt: timestamp("lifecycle_last_email_at", { withTimezone: true }),
 });
 
 export const accountMembers = pgTable(
@@ -1329,7 +1331,14 @@ export const lifecycleTouches = pgTable(
     userId: uuid("user_id").notNull(),
     accountId: uuid("account_id").references(() => accounts.id, { onDelete: "set null" }),
     segment: text("segment", {
-      enum: ["stalled_onboarding", "idle_after_onboarding", "trial_lapsed"],
+      // 0060 (pull-back email): widened with the two email segments
+      enum: [
+        "stalled_onboarding",
+        "idle_after_onboarding",
+        "trial_lapsed",
+        "drafts_waiting",
+        "leads_waiting",
+      ],
     }).notNull(),
     touchNumber: integer("touch_number").notNull(),
     status: text("status", {
@@ -1337,6 +1346,9 @@ export const lifecycleTouches = pgTable(
     })
       .notNull()
       .default("pending"),
+    // 0060 (pull-back email): which lane delivered this touch; default linkedin keeps every
+    // 0045 row and the DM path unchanged
+    channel: text("channel", { enum: ["linkedin", "email"] }).notNull().default("linkedin"),
     attempts: integer("attempts").notNull().default(0),
     linkedinUrl: text("linkedin_url"),
     targetProviderRef: text("target_provider_ref"),
@@ -1352,7 +1364,13 @@ export const lifecycleTouches = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
-    uniqueIndex("lifecycle_touches_user_segment_touch_idx").on(t.userId, t.segment, t.touchNumber),
+    // 0060 (pull-back email): idempotence key now includes channel, replacing the 0045 index
+    uniqueIndex("lifecycle_touches_user_segment_touch_channel_idx").on(
+      t.userId,
+      t.segment,
+      t.touchNumber,
+      t.channel
+    ),
     index("lifecycle_touches_status_idx").on(t.status),
     index("lifecycle_touches_target_ref_idx").on(t.targetProviderRef),
   ]

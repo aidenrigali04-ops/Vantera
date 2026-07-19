@@ -374,3 +374,29 @@ describe("autonomous-adoption grace clock (0059, GATE 1 / WS-3.2)", () => {
     expect(codeOnly).not.toMatch(/\bgrant\b/i);
   });
 });
+
+describe("0060 pull-back email", () => {
+  const sqlText = readFileSync(
+    join(migrationsDir, "0060_pullback_email.sql"),
+    "utf8"
+  );
+
+  it("adds channel with a linkedin default so existing rows and the DM path are unchanged", () => {
+    expect(sqlText).toMatch(/add column if not exists channel text not null default 'linkedin'/);
+  });
+
+  it("puts channel in the idempotence key — an email touch must not collide with a LinkedIn one", () => {
+    expect(sqlText).toMatch(
+      /create unique index if not exists lifecycle_touches_user_segment_touch_channel_idx\s+on lifecycle_touches \(user_id, segment, touch_number, channel\)/
+    );
+  });
+
+  it("widens segments for the two email segments", () => {
+    expect(sqlText).toContain("'drafts_waiting'");
+    expect(sqlText).toContain("'leads_waiting'");
+  });
+
+  it("does NOT grant lifecycle_last_email_at to authenticated — service-written only", () => {
+    expect(sqlText).not.toMatch(/grant update \(lifecycle_last_email_at\)/);
+  });
+});
