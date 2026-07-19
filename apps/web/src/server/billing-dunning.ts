@@ -43,16 +43,28 @@ export async function applyDunning(
         }
       }
       if (sent > 0) {
-        // lifecycle_last_email_at feeds the pull-back collision guard (spec 2026-07-18):
-        // pull-back yields to this email for 48h — a stalled + past_due account must not
-        // get both a payment-failed email and a pull-back email within days of each other.
+        const at = new Date().toISOString();
+        // The idempotence write, alone in its own statement. The email has already gone out, so if
+        // this fails the account looks un-notified and the next past_due webhook emails again.
+        // The collision-guard stamp below used to ride in this same UPDATE — with migration 0060
+        // unapplied, Postgres rejects the whole statement (`column "lifecycle_last_email_at" does
+        // not exist`) and payment_failed_notified_at never lands. A new feature's bookkeeping must
+        // never be able to break a pre-existing idempotence write.
         await supabase
           .from("accounts")
-          .update({
-            payment_failed_notified_at: new Date().toISOString(),
-            lifecycle_last_email_at: new Date().toISOString(),
-          })
+          .update({ payment_failed_notified_at: at })
           .eq("id", accountId);
+        try {
+          // lifecycle_last_email_at feeds the pull-back collision guard (spec 2026-07-18):
+          // pull-back yields to this email for 48h — a stalled + past_due account must not get
+          // both a payment-failed email and a pull-back email within days of each other.
+          // Best-effort in its own try/catch as well as its own statement: postgrest returns
+          // column errors in `error` rather than throwing, but a transport-level throw here must
+          // not skip past a completed idempotence write. Worst case: one extra pull-back email.
+          await supabase.from("accounts").update({ lifecycle_last_email_at: at }).eq("id", accountId);
+        } catch {
+          // contained — the write that mattered already landed above
+        }
       }
     } else if (subscriptionStatus === "active") {
       // Recovery: clear the spell stamp so a future failure notifies again.

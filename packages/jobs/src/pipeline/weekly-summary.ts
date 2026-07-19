@@ -178,7 +178,14 @@ export interface WeeklySummaryOutcome {
   accounts: number;
   emailed: number;
   skipped: number;
+  /** send failures only — the collision-guard stamp is counted separately below */
   failures: number;
+  /**
+   * Failures of the best-effort collision-guard stamp, kept out of `failures` because the email
+   * already landed. Counted rather than swallowed: the stamp is the one write here that can fail
+   * on a schema the rest of the job doesn't need (0060), and the trigger wrapper logs this outcome.
+   */
+  stampFailures: number;
 }
 
 export async function runWeeklySummary(deps: WeeklySummaryDeps): Promise<WeeklySummaryOutcome> {
@@ -191,6 +198,7 @@ export async function runWeeklySummary(deps: WeeklySummaryDeps): Promise<WeeklyS
     emailed: 0,
     skipped: 0,
     failures: 0,
+    stampFailures: 0,
   };
 
   for (const row of rows) {
@@ -199,15 +207,27 @@ export async function runWeeklySummary(deps: WeeklySummaryDeps): Promise<WeeklyS
       outcome.skipped++;
       continue;
     }
+    let emailed = false;
     try {
       for (const to of row.recipients) {
         await deps.send({ to, ...message });
       }
       outcome.emailed++;
-      await deps.store.stampLifecycleEmail?.(row.accountId, now);
+      emailed = true;
     } catch {
       // One account's provider hiccup never blocks the rest; next Monday catches up.
       outcome.failures++;
+    }
+    if (!emailed) continue;
+    // The collision-guard stamp (spec 2026-07-18) is a bookkeeping write for a DIFFERENT feature
+    // (pull-back email), so it gets its own try/catch outside the send block. Inside, a stamp
+    // failure would be miscounted as a send failure on an account that was in fact emailed — and
+    // on any sender that carries an idempotence write, the same shape would let a new feature's
+    // write break a pre-existing one (see runTrialEnding). Worst case here is one extra pull-back.
+    try {
+      await deps.store.stampLifecycleEmail?.(row.accountId, now);
+    } catch {
+      outcome.stampFailures++;
     }
   }
 

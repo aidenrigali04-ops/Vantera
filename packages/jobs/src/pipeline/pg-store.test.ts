@@ -301,7 +301,7 @@ describe("saveEnrichment with no persistable fields", () => {
 // createTrialEndingStore/createWeeklySummaryStore through a minimal fake `db` that records the
 // UPDATE's .set() payload, same fake-db idiom as the concludeExperiment/adoptChallenger suites
 // above (no DB harness exists in this repo).
-describe("createTrialEndingStore.markTrialEndingNotified stamps lifecycle_last_email_at", () => {
+describe("createTrialEndingStore separates the idempotence write from the lifecycle stamp", () => {
   function fakeUpdateDb() {
     const sets: Record<string, unknown>[] = [];
     let updateCalls = 0;
@@ -319,18 +319,31 @@ describe("createTrialEndingStore.markTrialEndingNotified stamps lifecycle_last_e
     return { db: db as unknown as Db, sets, updateCalls: () => updateCalls };
   }
 
-  it("sets trialEndingNotifiedAt AND lifecycleLastEmailAt to the same instant in one UPDATE", async () => {
+  // The whole point of the split: markTrialEndingNotified is the write that stops the 15-minute
+  // agent-scheduler tick re-sending, and it runs AFTER the emails are out. If lifecycle_last_email_at
+  // (migration 0060) rode in this same UPDATE, an unapplied migration would reject the statement
+  // and trial_ending_notified_at would never land. Nothing else may be in this .set() payload.
+  it("markTrialEndingNotified writes ONLY trialEndingNotifiedAt", async () => {
     const { db, sets } = fakeUpdateDb();
     await createTrialEndingStore(db).markTrialEndingNotified(["acc-1"]);
     expect(sets).toHaveLength(1);
+    expect(Object.keys(sets[0]!)).toEqual(["trialEndingNotifiedAt"]);
     expect(sets[0]?.trialEndingNotifiedAt).toBeInstanceOf(Date);
-    expect(sets[0]?.lifecycleLastEmailAt).toBeInstanceOf(Date);
-    expect(sets[0]?.trialEndingNotifiedAt).toBe(sets[0]?.lifecycleLastEmailAt);
+  });
+
+  it("stampLifecycleEmails writes ONLY lifecycleLastEmailAt, in its own UPDATE", async () => {
+    const { db, sets, updateCalls } = fakeUpdateDb();
+    const at = new Date("2026-07-19T00:00:00Z");
+    await createTrialEndingStore(db).stampLifecycleEmails(["acc-1", "acc-2"], at);
+    expect(updateCalls()).toBe(1);
+    expect(sets).toEqual([{ lifecycleLastEmailAt: at }]);
   });
 
   it("is a no-op with an empty id list — no UPDATE attempted", async () => {
     const { db, updateCalls } = fakeUpdateDb();
-    await createTrialEndingStore(db).markTrialEndingNotified([]);
+    const store = createTrialEndingStore(db);
+    await store.markTrialEndingNotified([]);
+    await store.stampLifecycleEmails([], new Date());
     expect(updateCalls()).toBe(0);
   });
 });

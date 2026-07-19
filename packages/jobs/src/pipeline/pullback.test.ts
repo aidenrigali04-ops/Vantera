@@ -38,7 +38,16 @@ describe("composePullback", () => {
     expect(msg).not.toBeNull();
     expect(msg!.subject).toBe("Vera wrote 20 messages for you");
     expect(msg!.lines.join(" ")).toContain("Antonino Ingoglia");
-    expect(msg!.ctaUrl).toBe(`${APP}/inbox`);
+    // /review, not /inbox: the email's one desired action is "return and approve one message",
+    // and /review is the only surface with an approve affordance (draft cards, bulk approve).
+    expect(msg!.ctaUrl).toBe(`${APP}/review`);
+  });
+
+  it("points drafts_waiting at the approval queue, never at the read-only inbox", () => {
+    const msg = composePullback(row({ segment: "drafts_waiting" }), APP, NOW)!;
+    expect(msg.ctaLabel).toBe("Review the messages");
+    expect(msg.ctaUrl).toBe(`${APP}/review`);
+    expect(msg.ctaUrl).not.toContain("/inbox");
   });
 
   it("names real buyers for leads_waiting and links to leads", () => {

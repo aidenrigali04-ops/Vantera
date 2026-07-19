@@ -3573,15 +3573,31 @@ export function createTrialEndingStore(db: Db) {
       }
       return [...byId.values()];
     },
+    /**
+     * The idempotence write, and ONLY the idempotence write. Nothing else may ride along in this
+     * UPDATE: runTrialEnding calls it after the emails have already gone out, so if this statement
+     * throws, trial_ending_notified_at never lands and the agent-scheduler tick re-sends the same
+     * trial-ending email every 15 minutes, forever. The pull-back collision-guard stamp used to be
+     * folded in here — one unapplied migration (0060) away from turning `column
+     * "lifecycle_last_email_at" does not exist` into exactly that outage. It now lives in its own
+     * statement below.
+     */
     async markTrialEndingNotified(ids: string[]): Promise<void> {
       if (ids.length === 0) return;
-      const now = new Date();
       await db
         .update(accounts)
-        // lifecycle_last_email_at feeds the pull-back collision guard (spec 2026-07-18):
-        // pull-back yields to this email for 48h.
-        .set({ trialEndingNotifiedAt: now, lifecycleLastEmailAt: now })
+        .set({ trialEndingNotifiedAt: new Date() })
         .where(inArray(accounts.id, ids));
+    },
+    /**
+     * Collision-guard bookkeeping for the pull-back email (spec 2026-07-18): pull-back yields to
+     * this email for 48h. A separate statement from the idempotence write above, and best-effort
+     * at the call site — a failure here costs at worst one extra pull-back email, versus an
+     * infinite re-send loop if it could take markTrialEndingNotified down with it.
+     */
+    async stampLifecycleEmails(ids: string[], at: Date): Promise<void> {
+      if (ids.length === 0) return;
+      await db.update(accounts).set({ lifecycleLastEmailAt: at }).where(inArray(accounts.id, ids));
     },
   };
 }

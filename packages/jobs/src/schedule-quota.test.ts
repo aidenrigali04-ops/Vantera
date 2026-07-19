@@ -1,4 +1,5 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -13,6 +14,13 @@ import { afterEach, describe, expect, it } from "vitest";
  * and break every production deploy while a non-recursive scan here stayed green. No
  * subdirectories exist today; the recursion is proven live below rather than left as an assertion
  * about code that doesn't exist yet.
+ *
+ * The recursion proof builds its fixture tree in a MKDTEMP DIRECTORY, never inside src/trigger/.
+ * An earlier version wrote a real `schedules.task(` file into the scanned tree and deleted it in
+ * afterEach — but a test run killed between the write and the cleanup (Ctrl-C, CI timeout, OOM)
+ * leaves an 11th schedule committed-adjacent in the deploy path, i.e. it could cause the exact
+ * outage this file exists to prevent. The scan root is a parameter precisely so the proof can run
+ * somewhere harmless.
  */
 const QUOTA = 10;
 const triggerDir = join(__dirname, "trigger");
@@ -55,25 +63,35 @@ describe("trigger schedule quota", () => {
   });
 
   describe("recursion (non-vacuity)", () => {
-    const nestedDir = join(triggerDir, "__schedule_quota_test_tmp__");
-    const nestedFile = join(nestedDir, "throwaway-schedule.ts");
+    let sandbox: string | null = null;
 
     afterEach(() => {
-      if (existsSync(nestedDir)) rmSync(nestedDir, { recursive: true, force: true });
+      if (sandbox) rmSync(sandbox, { recursive: true, force: true });
+      sandbox = null;
     });
 
     it("a schedules.task() added in a nested subdirectory is counted, not missed", () => {
-      const before = scanForScheduleRegistrations(triggerDir).length;
+      // Fixture tree lives outside the repo entirely — see the file header.
+      sandbox = mkdtempSync(join(tmpdir(), "vantera-schedule-quota-"));
+      writeFileSync(join(sandbox, "top-level.ts"), "export const nothing = 1;\n");
+      expect(scanForScheduleRegistrations(sandbox)).toEqual([]);
 
-      mkdirSync(nestedDir, { recursive: true });
+      const nested = join(sandbox, "nested");
+      mkdirSync(nested, { recursive: true });
       writeFileSync(
-        nestedFile,
+        join(nested, "throwaway-schedule.ts"),
         'import { schedules } from "@trigger.dev/sdk";\n' +
           'export const throwaway = schedules.task({ id: "throwaway", cron: "0 0 * * *", run: async () => {} });\n'
       );
 
-      const after = scanForScheduleRegistrations(triggerDir).length;
-      expect(after).toBe(before + 1);
+      expect(scanForScheduleRegistrations(sandbox)).toEqual([join("nested", "throwaway-schedule.ts")]);
+    });
+
+    it("never writes into the scanned trigger tree", () => {
+      // Guards the fix itself: the recursion proof above must not leave (or ever create) a file
+      // under src/trigger/. Any leftover fixture from a killed run would show up here.
+      const entries = readdirSync(triggerDir, { recursive: true }) as string[];
+      expect(entries.filter((e) => e.includes("throwaway") || e.includes("__schedule_quota"))).toEqual([]);
     });
   });
 });

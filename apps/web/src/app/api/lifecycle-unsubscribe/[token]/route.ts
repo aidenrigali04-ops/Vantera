@@ -92,7 +92,10 @@ function confirmHtml(token: string): string {
 </head>
 <body>
   <main>
-    <p>Stop receiving Vantera lifecycle emails (trial and billing updates)?</p>
+    <!-- The most likely reader arrived from a pull-back email ("the leads or drafts waiting for
+         you"), which is what this route is built for — describing the lane as "trial and billing
+         updates" understated what the button actually turns off. -->
+    <p>Stop receiving Vantera lifecycle emails — reminders about leads or drafts waiting for you, plus trial and billing notices?</p>
     <form method="POST" action="${action}">
       <button type="submit">Unsubscribe</button>
     </form>

@@ -91,7 +91,7 @@ describe("runWeeklySummary", () => {
     });
     expect(sent).toHaveLength(2);
     expect(sent.map((s) => s.to)).toEqual(["a@x.io", "b@x.io"]);
-    expect(summary).toEqual({ accounts: 3, emailed: 1, skipped: 2, failures: 0 });
+    expect(summary).toEqual({ accounts: 3, emailed: 1, skipped: 2, failures: 0, stampFailures: 0 });
   });
 
   it("a failing send never blocks the other accounts", async () => {
@@ -159,7 +159,15 @@ describe("runWeeklySummary", () => {
     expect(stamped[0]?.at).toBe(FIXED_NOW);
   });
 
-  it("a stamp failure does not sink the batch — the other account still sends and stamps", async () => {
+  /**
+   * The collision-guard stamp is bookkeeping for a DIFFERENT feature (the pull-back email). It
+   * used to share the send loop's try/catch, so a stamp throw — e.g. `column
+   * "lifecycle_last_email_at" does not exist` with migration 0060 unapplied — was recorded as a
+   * send failure on an account that had in fact been emailed. It now has its own try/catch and
+   * its own counter; the send accounting must be completely untouched by a throwing stamp.
+   */
+  it("a throwing stamp is not counted as a send failure and does not sink the batch", async () => {
+    const sent: string[] = [];
     const summary = await runWeeklySummary({
       store: {
         listAccountsForSummary: async () => [
@@ -167,18 +175,46 @@ describe("runWeeklySummary", () => {
           row({ accountId: "fine", recipients: ["b@x.io"] }),
         ],
         stampLifecycleEmail: async (accountId) => {
-          if (accountId === "stamp-fails") throw new Error("db hiccup");
+          if (accountId === "stamp-fails") {
+            throw new Error('column "lifecycle_last_email_at" does not exist');
+          }
         },
       },
-      send: async () => {},
+      send: async ({ to }) => {
+        sent.push(to);
+      },
       appUrl: APP_URL,
     });
-    // "stamp-fails" is inside the same per-account try/catch as the send: the email already went
-    // out (emailed++ already ran) before the stamp throws, so that account is counted in BOTH
-    // emailed and failures — a pre-existing metrics quirk of reusing the send's try/catch, not a
-    // functional bug. What matters here: the OTHER account is completely unaffected.
-    expect(summary.accounts).toBe(2);
+    expect(sent).toEqual(["a@x.io", "b@x.io"]);
+    expect(summary).toEqual({
+      accounts: 2,
+      emailed: 2,
+      skipped: 0,
+      failures: 0,
+      stampFailures: 1,
+    });
+  });
+
+  it("a stamp that throws for EVERY account still emails every account", async () => {
+    const sent: string[] = [];
+    const summary = await runWeeklySummary({
+      store: {
+        listAccountsForSummary: async () => [
+          row({ accountId: "a", recipients: ["a@x.io"] }),
+          row({ accountId: "b", recipients: ["b@x.io"] }),
+        ],
+        stampLifecycleEmail: async () => {
+          throw new Error("0060 not applied");
+        },
+      },
+      send: async ({ to }) => {
+        sent.push(to);
+      },
+      appUrl: APP_URL,
+    });
+    expect(sent).toEqual(["a@x.io", "b@x.io"]);
     expect(summary.emailed).toBe(2);
-    expect(summary.failures).toBe(1);
+    expect(summary.failures).toBe(0);
+    expect(summary.stampFailures).toBe(2);
   });
 });

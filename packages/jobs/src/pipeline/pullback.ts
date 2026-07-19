@@ -92,7 +92,11 @@ export function composePullback(
       touchNumber: row.touchNumber,
       lines,
       ctaLabel: "Review the messages",
-      ctaUrl: `${appUrl}/inbox`,
+      // /review, not /inbox. The spec's one desired action is "return and approve one message",
+      // and /review is the approval queue (draft cards, bulk approve, hotkeys — see dock-nav.tsx).
+      // /inbox is the conversation cockpit: it lists statuses and has no approve affordance, so a
+      // user who followed it landed one click short of the only thing this email asks for.
+      ctaUrl: `${appUrl}/review`,
     };
   }
 
@@ -193,9 +197,13 @@ export async function runPullback(deps: PullbackDeps): Promise<PullbackSummary> 
     // send loop above: a DB blip on one row must not abandon every other unrelated row
     // still queued in this batch. The trade-off is a small duplicate-send window — if
     // either write throws, this row still looks eligible (undertouched / unstamped) on the
-    // next tick and may email this account again. That is the correct trade versus
-    // rejecting the whole runPullback promise, and it is bounded: a persistently failing
-    // store also fails getPullbackCandidates above, so nothing sends at all.
+    // next tick and may email this account again. That is the correct trade versus rejecting
+    // the whole runPullback promise, and the window is bounded by the two writes being
+    // independent: whichever one succeeds still throttles the retry. In particular a
+    // succeeding stampLifecycleEmail sets lifecycle_last_email_at, which composePullback's
+    // 48h collision guard reads — so a row whose recordTouch keeps failing re-sends at most
+    // once every 48h, not once every 15-minute tick. (It is NOT bounded by "a failing store
+    // also fails getPullbackCandidates": an INSERT can fail while a SELECT succeeds.)
     try {
       await deps.store.recordTouch({
         userId: row.userId,

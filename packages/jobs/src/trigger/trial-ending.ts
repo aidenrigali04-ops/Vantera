@@ -6,8 +6,10 @@ import { runTrialEnding } from "../pipeline/trial-ending";
 
 /**
  * R5: one honest heads-up ~2 days before a trial lapses — idempotence-stamped
- * (trial_ending_notified_at), so an account is emailed once per trial. No-ops silently
- * until RESEND creds exist in this env.
+ * (trial_ending_notified_at), so an account is emailed once per trial. It does NOT no-op silently
+ * when RESEND creds are missing from this env: sendTrialEndingEmail throws, and runTrialEnding
+ * catches that per recipient, so a totally unconfigured env produces `notified: 0, emailsSent: 0`
+ * — indistinguishable in this log from "nothing was due".
  *
  * A plain task fired from the agent-scheduler tick (every 15 min), NOT its own cron: the
  * Trigger plan's schedule quota is fully used (10/10 — shipping this as an 11th schedule

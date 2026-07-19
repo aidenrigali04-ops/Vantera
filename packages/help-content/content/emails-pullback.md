@@ -1,7 +1,7 @@
 ---
 title: The email about leads and drafts waiting for you
 surface: settings
-routes: /settings, /inbox, /leads
+routes: /settings, /review, /leads
 ---
 
 # The email about leads and drafts waiting for you
