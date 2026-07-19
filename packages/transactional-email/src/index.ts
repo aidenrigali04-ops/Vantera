@@ -11,3 +11,4 @@ export type {
   TrialEndingEmailOptions,
   PaymentFailedEmailOptions,
 } from "./lifecycle";
+export { signUnsubscribeToken, verifyUnsubscribeToken } from "./unsubscribe-token";
