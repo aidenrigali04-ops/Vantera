@@ -385,6 +385,10 @@ describe("0060 pull-back email", () => {
     expect(sqlText).toMatch(/add column if not exists channel text not null default 'linkedin'/);
   });
 
+  it("drops the old 3-column index — leaving it would silently no-op email touches", () => {
+    expect(sqlText).toContain("drop index if exists lifecycle_touches_user_segment_touch_idx");
+  });
+
   it("puts channel in the idempotence key — an email touch must not collide with a LinkedIn one", () => {
     expect(sqlText).toMatch(
       /create unique index if not exists lifecycle_touches_user_segment_touch_channel_idx\s+on lifecycle_touches \(user_id, segment, touch_number, channel\)/
