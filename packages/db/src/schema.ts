@@ -1364,13 +1364,17 @@ export const lifecycleTouches = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
-    // 0060 (pull-back email): idempotence key now includes channel, replacing the 0045 index
-    uniqueIndex("lifecycle_touches_user_segment_touch_channel_idx").on(
-      t.userId,
-      t.segment,
-      t.touchNumber,
-      t.channel
-    ),
+    // 0060 (pull-back email): the 0045 index is split per channel. LinkedIn keeps the exact 0045
+    // key, scoped to its own rows; email adds account_id because the pull-back audience is built
+    // per account (one user, two accounts = two independent stalls). Not one combined index:
+    // account_id is nullable (ON DELETE SET NULL) and NULLs never conflict, which would disarm
+    // dedupe for deleted-account LinkedIn rows. See 0060_pullback_email.sql for the full rationale.
+    uniqueIndex("lifecycle_touches_linkedin_touch_idx")
+      .on(t.userId, t.segment, t.touchNumber)
+      .where(sql`${t.channel} = 'linkedin'`),
+    uniqueIndex("lifecycle_touches_email_touch_idx")
+      .on(t.userId, t.accountId, t.segment, t.touchNumber)
+      .where(sql`${t.channel} = 'email'`),
     index("lifecycle_touches_status_idx").on(t.status),
     index("lifecycle_touches_target_ref_idx").on(t.targetProviderRef),
   ]

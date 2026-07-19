@@ -3600,6 +3600,15 @@ export function createTrialEndingStore(db: Db) {
  *   - `owner_users.last_sign_in_at` is coalesced against `-infinity` before the never-returned
  *     comparison — a NULL (no recorded sign-in) must count as "never returned", not silently
  *     drop the row via NULL < timestamp.
+ *
+ * Fix round 1 (2026-07-18) — two defects that both broke "two touches, ever" on multi-seat or
+ * multi-account setups (latent in prod today: 0 accounts have a second owner/admin, but team seats
+ * are a shipped feature). Full rationale at each site below:
+ *   - `owner_users` now picks ONE canonical user per account (`distinct on` + a total order:
+ *     owner > admin, then earliest joined, then user_id). It previously returned every owner/admin
+ *     and let the grouping loop take user_id from whichever row the plan emitted first.
+ *   - `touch_state` now scopes the ledger join by `account_id`, matching migration 0060's
+ *     email-lane index `(user_id, account_id, segment, touch_number) where channel = 'email'`.
  */
 export function createPullbackStore(db: Db) {
   async function getPullbackCandidates(now: Date): Promise<PullbackRow[]> {
@@ -3620,10 +3629,40 @@ export function createPullbackStore(db: Db) {
       preview_company: string | null;
     }>(sql`
       with owner_users as (
-        select m.account_id, m.user_id, u.email, u.last_sign_in_at
+        -- CANONICAL RECIPIENT (fix, 2026-07-18). This used to return EVERY owner/admin, and the
+        -- grouping loop below then keyed rows by account+segment while taking user_id from
+        -- whichever row Postgres happened to emit first. On a two-seat account that meant: both
+        -- people got emailed, one ledger row got written, and the OTHER user still read as
+        -- "no touch 1" on the next tick — so the account was re-sent touch 1, breaking the spec's
+        -- "two touches, ever". It also stamped every recipient's unsubscribe token with the
+        -- incidental winner's user_id.
+        --
+        -- distinct on collapses each account to exactly ONE user, so recipient, ledger row, and
+        -- unsubscribe identity are the same person by construction. The order is total and
+        -- plan-independent:
+        --   1. owner before admin  — the account's actual principal
+        --   2. earliest joined     — the founding seat when there are two owners
+        --   3. user_id ascending   — the final tiebreak; two members can share a created_at
+        --                            (same-transaction seeding), and (account_id, user_id) is the
+        --                            account_members PK, so this can never tie.
+        --
+        -- Users with no email address are excluded here rather than downstream: they can never be
+        -- a pull-back recipient, and letting one win the distinct-on would silence an account that
+        -- has a perfectly reachable second admin.
+        --
+        -- Collapsing BEFORE the never-returned predicate is deliberate: "has the account's
+        -- principal come back to look" is the question the spec asks. An admin who never returned
+        -- while the owner did means the value WAS seen — no pull-back is owed.
+        select distinct on (m.account_id)
+               m.account_id, m.user_id, u.email, u.last_sign_in_at
         from public.account_members m
         join auth.users u on u.id = m.user_id
         where m.role in ('owner','admin')
+          and u.email is not null
+        order by m.account_id,
+                 (case when m.role = 'owner' then 0 else 1 end),
+                 m.created_at asc,
+                 m.user_id asc
       ),
       drafts as (
         select s.account_id, count(*)::int as item_count, min(s.created_at) as oldest_at
@@ -3658,6 +3697,13 @@ export function createPullbackStore(db: Db) {
           and not exists (select 1 from drafts d where d.account_id = a.id)
       ),
       touch_state as (
+        -- ACCOUNT-SCOPED LEDGER (fix, 2026-07-18). The join used to match on user+segment+channel
+        -- only, while everything around it is keyed per ACCOUNT. A user who owns two accounts
+        -- therefore shared one ledger state across both: both accounts emailed on the same tick,
+        -- recordTouch fired twice, and the second insert was silently discarded by
+        -- onConflictDoNothing against a user-only unique index — leaving account B un-ledgered and
+        -- eligible forever. Migration 0060's email-lane index is (user_id, account_id, segment,
+        -- touch_number) so the write survives; this predicate is the read side of the same fix.
         select o.account_id, o.user_id, seg.segment,
           case
             when not coalesce(bool_or(lt.touch_number = 1), false) then 1
@@ -3669,7 +3715,10 @@ export function createPullbackStore(db: Db) {
         from owner_users o
         cross join (values ('drafts_waiting'), ('leads_waiting')) as seg(segment)
         left join public.lifecycle_touches lt
-          on lt.user_id = o.user_id and lt.segment = seg.segment and lt.channel = 'email'
+          on lt.user_id = o.user_id
+         and lt.account_id = o.account_id
+         and lt.segment = seg.segment
+         and lt.channel = 'email'
         group by o.account_id, o.user_id, seg.segment
       )
       select b.account_id, b.user_id, b.email, b.segment,
@@ -3689,7 +3738,7 @@ export function createPullbackStore(db: Db) {
         on ts.account_id = b.account_id and ts.user_id = b.user_id and ts.segment = b.segment
       left join lateral (
         select nullif(trim(concat(l.first_name, ' ', l.last_name)), '') as name,
-               l.title, l.company_name as company
+               l.title, l.company_name as company, min(s.created_at) as sort_at
         from public.scheduled_sends s
         join public.leads l on l.id = s.lead_id
         where s.account_id = b.account_id and s.status = 'pending_review' and b.segment = 'drafts_waiting'
@@ -3699,13 +3748,22 @@ export function createPullbackStore(db: Db) {
       ) p on true
       left join lateral (
         select nullif(trim(concat(l.first_name, ' ', l.last_name)), '') as name,
-               l.title, l.company_name as company
+               l.title, l.company_name as company, l.scored_at as sort_at
         from public.leads l
         where l.account_id = b.account_id and l.status = 'qualified' and b.segment = 'leads_waiting'
         order by l.scored_at asc
         limit 3
       ) p2 on true
       where ts.touch_number is not null
+      -- A lateral's internal ORDER BY does not survive the join, so the previews array was built in
+      -- whatever order the plan emitted — the same email could name the same three people in a
+      -- different order on touch 1 and touch 2. Ordering by the lateral's own sort key (oldest
+      -- artifact first, the order each lateral already picked its 3 rows in) makes the composed
+      -- copy reproducible. Not a correctness bug like the two above, but the same class of
+      -- "incidental plan order leaked into output".
+      order by b.account_id, b.segment,
+               coalesce(p.sort_at, p2.sort_at) asc nulls last,
+               coalesce(p.name, p2.name) asc nulls last
     `);
 
     const byKey = new Map<string, PullbackRow>();

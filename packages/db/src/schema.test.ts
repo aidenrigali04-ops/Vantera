@@ -389,10 +389,35 @@ describe("0060 pull-back email", () => {
     expect(sqlText).toContain("drop index if exists lifecycle_touches_user_segment_touch_idx");
   });
 
-  it("puts channel in the idempotence key — an email touch must not collide with a LinkedIn one", () => {
+  it("keeps the LinkedIn lane on the EXACT 0045 key, scoped to its own rows", () => {
+    // byte-identical dedupe for the DM path: same three columns, just partial on channel
     expect(sqlText).toMatch(
-      /create unique index if not exists lifecycle_touches_user_segment_touch_channel_idx\s+on lifecycle_touches \(user_id, segment, touch_number, channel\)/
+      /create unique index if not exists lifecycle_touches_linkedin_touch_idx\s+on lifecycle_touches \(user_id, segment, touch_number\)\s+where channel = 'linkedin'/
     );
+  });
+
+  it("scopes the email lane's idempotence key by account — one user can stall two accounts", () => {
+    expect(sqlText).toMatch(
+      /create unique index if not exists lifecycle_touches_email_touch_idx\s+on lifecycle_touches \(user_id, account_id, segment, touch_number\)\s+where channel = 'email'/
+    );
+  });
+
+  it("does NOT put nullable account_id in the LinkedIn key — NULLs never conflict, which would disarm dedupe", () => {
+    const linkedinIdx = sqlText.match(
+      /create unique index if not exists lifecycle_touches_linkedin_touch_idx[\s\S]*?;/
+    );
+    expect(linkedinIdx, "expected the LinkedIn partial unique index").toBeTruthy();
+    expect(linkedinIdx![0]).not.toMatch(/account_id/);
+  });
+
+  it("does NOT use NULLS NOT DISTINCT — ON DELETE SET NULL would then make account deletion collide", () => {
+    // strip comment lines first — the migration's prose explains WHY this is avoided (same guard
+    // as the 0058 grant test above)
+    const codeOnly = sqlText
+      .split("\n")
+      .filter((line) => !line.trimStart().startsWith("--"))
+      .join("\n");
+    expect(codeOnly).not.toMatch(/nulls not distinct/i);
   });
 
   it("widens segments for the two email segments", () => {

@@ -28,10 +28,37 @@ alter table lifecycle_touches
     'drafts_waiting', 'leads_waiting'
   ));
 
--- Idempotence key now includes channel.
+-- Idempotence key, split per channel.
+--
+-- The LinkedIn lane keeps the 0045 key EXACTLY — (user_id, segment, touch_number) — just scoped to
+-- its own rows with a partial predicate. Every 0045 row defaults to channel='linkedin' and the DM
+-- path never writes any other value, so this index covers precisely the same rows the dropped one
+-- did and dedupes them identically. Its onConflictDoNothing() (enqueueTouch, no conflict target)
+-- keeps matching it: a bare ON CONFLICT DO NOTHING catches partial unique indexes too.
+--
+-- The email lane needs account_id in the key. lifecycle_touches groups per user, but the pull-back
+-- audience is built per ACCOUNT — one user who owns two accounts is two independent stalls, and a
+-- user-only key made the second account's recordTouch collide with the first and vanish under
+-- onConflictDoNothing(), leaving that account permanently un-ledgered and re-sendable forever
+-- (breaking the spec's "two touches, ever").
+--
+-- Why not one 5-column index over both lanes: account_id is nullable (ON DELETE SET NULL) and NULLs
+-- never conflict in a unique index, so adding it globally would silently disarm dedupe for every
+-- 0045 LinkedIn row whose account was deleted. Splitting keeps the LinkedIn lane on the exact key
+-- it already had while the email lane — which always writes a real account_id (recordTouch takes a
+-- non-null accountId) — gets the account scope it needs.
+--
+-- NULLS NOT DISTINCT is deliberately NOT used here: on account deletion the FK sets account_id to
+-- NULL, and two email touches for the same user from two deleted accounts would then collide and
+-- make the cascade itself fail. NULLs staying distinct means deleted-account history just goes
+-- inert, which is the correct failure direction.
 drop index if exists lifecycle_touches_user_segment_touch_idx;
-create unique index if not exists lifecycle_touches_user_segment_touch_channel_idx
-  on lifecycle_touches (user_id, segment, touch_number, channel);
+create unique index if not exists lifecycle_touches_linkedin_touch_idx
+  on lifecycle_touches (user_id, segment, touch_number)
+  where channel = 'linkedin';
+create unique index if not exists lifecycle_touches_email_touch_idx
+  on lifecycle_touches (user_id, account_id, segment, touch_number)
+  where channel = 'email';
 
 -- Collision guard: pull-back yields to any other lifecycle email within 48h.
 alter table accounts add column if not exists lifecycle_last_email_at timestamptz;
