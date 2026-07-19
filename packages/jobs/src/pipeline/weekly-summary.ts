@@ -204,7 +204,7 @@ export async function runWeeklySummary(deps: WeeklySummaryDeps): Promise<WeeklyS
         await deps.send({ to, ...message });
       }
       outcome.emailed++;
-      await deps.store.stampLifecycleEmail?.(row.accountId, new Date());
+      await deps.store.stampLifecycleEmail?.(row.accountId, now);
     } catch {
       // One account's provider hiccup never blocks the rest; next Monday catches up.
       outcome.failures++;

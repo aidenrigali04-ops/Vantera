@@ -3537,6 +3537,13 @@ export function createLeadEventEmailStore(db: Db) {
         emails: [...new Set(list.map((r) => r.email).filter((e): e is string => Boolean(e)))],
       };
     },
+    async stampLifecycleEmail(accountId: string, at: Date): Promise<void> {
+      // Same idiom as createTrialEndingStore.markTrialEndingNotified / createWeeklySummaryStore /
+      // createPullbackStore.stampLifecycleEmail — feeds the pull-back collision guard (spec
+      // 2026-07-18): a "meeting booked" email must block a "buyers matched your ICP" pull-back for
+      // the next 48h, same as every other lifecycle sender.
+      await db.update(accounts).set({ lifecycleLastEmailAt: at }).where(eq(accounts.id, accountId));
+    },
   };
 }
 

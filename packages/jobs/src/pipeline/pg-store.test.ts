@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { sql } from "drizzle-orm";
 import { type Db, createDb, sequenceRuns, campaignLeads, optimizationPlaybook } from "@vantera/db";
-import { createPgStore, createTrialEndingStore, createWeeklySummaryStore, toLeadSignalRow } from "./pg-store";
+import {
+  createLeadEventEmailStore,
+  createPgStore,
+  createTrialEndingStore,
+  createWeeklySummaryStore,
+  toLeadSignalRow,
+} from "./pg-store";
 
 describe("toLeadSignalRow", () => {
   it("maps a provider signal to a lead_signals row with an ISO→Date observed_at", () => {
@@ -342,6 +348,27 @@ describe("createWeeklySummaryStore.stampLifecycleEmail", () => {
     } as unknown as Db;
     const at = new Date("2026-07-19T00:00:00Z");
     await createWeeklySummaryStore(db).stampLifecycleEmail!("acc-1", at);
+    expect(sets).toEqual([{ lifecycleLastEmailAt: at }]);
+  });
+});
+
+// Fix round 1: the lead-event sender (interested_reply/meeting_booked/needs_human) was the one
+// sender Task 8 missed — same regression-coverage reasoning as the two describe blocks above:
+// createLeadEventNotifier's own tests stub stampLifecycleEmail entirely, so they cannot catch a
+// bug in what the REAL store writes.
+describe("createLeadEventEmailStore.stampLifecycleEmail", () => {
+  it("UPDATEs only lifecycle_last_email_at for the given account", async () => {
+    const sets: Record<string, unknown>[] = [];
+    const db = {
+      update: (_table: unknown) => ({
+        set: (vals: Record<string, unknown>) => {
+          sets.push(vals);
+          return { where: (_cond: unknown) => Promise.resolve() };
+        },
+      }),
+    } as unknown as Db;
+    const at = new Date("2026-07-19T00:00:00Z");
+    await createLeadEventEmailStore(db).stampLifecycleEmail("acc-1", at);
     expect(sets).toEqual([{ lifecycleLastEmailAt: at }]);
   });
 });

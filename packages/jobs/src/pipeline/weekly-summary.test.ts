@@ -136,6 +136,29 @@ describe("runWeeklySummary", () => {
     expect(stamped[0]?.at).toBeInstanceOf(Date);
   });
 
+  // Fix round 1 (MINOR): the stamp call used `new Date()` instead of the already-in-scope `now`
+  // (computed from `deps.now?.()` above), breaking the injected-clock convention every sibling
+  // sender follows and making the stamp non-deterministic under test. `toBe` (referential
+  // equality) proves the code passes the SAME Date instance through, not just "a" Date — a
+  // regression back to `new Date()` would fail this even though `toBeInstanceOf(Date)` above
+  // would still pass.
+  it("stamps with the injected now, not a fresh wall-clock Date", async () => {
+    const FIXED_NOW = new Date("2026-07-20T00:00:00Z");
+    const stamped: { accountId: string; at: Date }[] = [];
+    await runWeeklySummary({
+      store: {
+        listAccountsForSummary: async () => [row({ accountId: "sent-to", recipients: ["a@x.io"] })],
+        stampLifecycleEmail: async (accountId, at) => {
+          stamped.push({ accountId, at });
+        },
+      },
+      send: async () => {},
+      appUrl: APP_URL,
+      now: () => FIXED_NOW,
+    });
+    expect(stamped[0]?.at).toBe(FIXED_NOW);
+  });
+
   it("a stamp failure does not sink the batch — the other account still sends and stamps", async () => {
     const summary = await runWeeklySummary({
       store: {
