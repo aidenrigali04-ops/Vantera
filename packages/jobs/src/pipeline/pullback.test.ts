@@ -182,6 +182,7 @@ describe("runPullback", () => {
       touched: 1,
       emailsSent: 2,
       ledgerWriteFailures: 0,
+      sendFailures: 0,
     });
   });
 
@@ -223,6 +224,46 @@ describe("runPullback", () => {
     // acc-1's only recipient threw, so it is neither counted nor ledgered; acc-2 still sends.
     expect(summary.touched).toBe(1);
     expect(summary.emailsSent).toBe(1);
+    expect(summary.sendFailures).toBe(1);
+  });
+
+  it("counts a sendFailures for every recipient whose send() throws, even split across rows", async () => {
+    const d = deps(
+      [
+        row({ accountId: "acc-1", emails: ["a@x.com", "b@x.com"] }),
+        row({ accountId: "acc-2", userId: "user-2", emails: ["c@x.com"] }),
+      ],
+      {
+        send: async (m) => {
+          if (m.to !== "c@x.com") throw new Error("provider 500");
+        },
+      }
+    );
+
+    const summary = await runPullback(d);
+
+    // a@x.com and b@x.com both throw (2 failures); c@x.com succeeds.
+    expect(summary.sendFailures).toBe(2);
+    expect(summary.emailsSent).toBe(1);
+  });
+
+  it("non-vacuity: when EVERY send() throws (the total-env-misconfiguration signature), " +
+    "sendFailures is nonzero even though touched/emailsSent read exactly like 'no candidates found'", async () => {
+    const d = deps([row({ emails: ["a@x.com", "b@x.com"] })], {
+      send: async () => {
+        throw new Error("transactional email env vars missing");
+      },
+    });
+
+    const summary = await runPullback(d);
+
+    expect(summary).toEqual({
+      status: "completed",
+      touched: 0,
+      emailsSent: 0,
+      ledgerWriteFailures: 0,
+      sendFailures: 2,
+    });
   });
 
   it("passes userId through so the unsubscribe token identifies the user", async () => {
@@ -255,6 +296,7 @@ describe("runPullback", () => {
       touched: 2,
       emailsSent: 2,
       ledgerWriteFailures: 1,
+      sendFailures: 0,
     });
   });
 
@@ -271,6 +313,7 @@ describe("runPullback", () => {
       touched: 1,
       emailsSent: 1,
       ledgerWriteFailures: 1,
+      sendFailures: 0,
     });
   });
 
@@ -290,6 +333,7 @@ describe("runPullback", () => {
       touched: 1,
       emailsSent: 1,
       ledgerWriteFailures: 2,
+      sendFailures: 0,
     });
   });
 });

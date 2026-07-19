@@ -145,6 +145,16 @@ export interface PullbackSummary {
    * count is the operator's signal to look at the store, not the compose core.
    */
   ledgerWriteFailures: number;
+  /**
+   * send() failures, one per failing recipient, contained per recipient so one bad address never
+   * blocks the rest of the batch (same idiom as ledgerWriteFailures). Counted rather than
+   * swallowed: a total env misconfiguration (missing RESEND creds, missing
+   * LIFECYCLE_UNSUBSCRIBE_SECRET) throws inside send() for EVERY recipient, which — without this
+   * counter — is byte-identical to "no candidates found" (touched:0, emailsSent:0) in the tick log,
+   * forever. The trigger wrapper uses sendFailures alongside emailsSent to tell "nothing to do"
+   * apart from "everything is broken".
+   */
+  sendFailures: number;
 }
 
 export async function runPullback(deps: PullbackDeps): Promise<PullbackSummary> {
@@ -154,6 +164,7 @@ export async function runPullback(deps: PullbackDeps): Promise<PullbackSummary> 
   let emailsSent = 0;
   let touched = 0;
   let ledgerWriteFailures = 0;
+  let sendFailures = 0;
 
   for (const row of rows) {
     const composed = composePullback(row, deps.appUrl, now);
@@ -166,7 +177,8 @@ export async function runPullback(deps: PullbackDeps): Promise<PullbackSummary> 
         await deps.send({ ...composed, to, userId: row.userId });
         sent += 1;
       } catch {
-        // best-effort per recipient — one bad address must not block the rest
+        // best-effort per recipient — one bad address must not block the rest; counted below
+        sendFailures += 1;
       }
     }
     if (sent === 0) continue;
@@ -204,5 +216,5 @@ export async function runPullback(deps: PullbackDeps): Promise<PullbackSummary> 
     }
   }
 
-  return { status: "completed", touched, emailsSent, ledgerWriteFailures };
+  return { status: "completed", touched, emailsSent, ledgerWriteFailures, sendFailures };
 }
