@@ -3597,18 +3597,29 @@ export function createTrialEndingStore(db: Db) {
  *     segments — could name a rejected lead as a qualified "buyer", or a lead with no relation to
  *     the actual pending drafts. Split into two segment-scoped laterals (drafts: leads with a
  *     pending_review send, oldest first; leads: qualified leads, oldest-scored first).
- *   - `owner_users.last_sign_in_at` is coalesced against `-infinity` before the never-returned
- *     comparison — a NULL (no recorded sign-in) must count as "never returned", not silently
- *     drop the row via NULL < timestamp.
+ *   - `last_sign_in_at` is coalesced against `-infinity` before the never-returned comparison (now
+ *     inside `account_return`) — a NULL (no recorded sign-in) must count as "never returned", not
+ *     silently drop the row via NULL < timestamp.
  *
  * Fix round 1 (2026-07-18) — two defects that both broke "two touches, ever" on multi-seat or
  * multi-account setups (latent in prod today: 0 accounts have a second owner/admin, but team seats
  * are a shipped feature). Full rationale at each site below:
- *   - `owner_users` now picks ONE canonical user per account (`distinct on` + a total order:
- *     owner > admin, then earliest joined, then user_id). It previously returned every owner/admin
- *     and let the grouping loop take user_id from whichever row the plan emitted first.
+ *   - ledger identity per account was non-deterministic (the grouping loop took user_id from
+ *     whichever owner/admin row the plan emitted first) — now pinned by `canonical_user`.
  *   - `touch_state` now scopes the ledger join by `account_id`, matching migration 0060's
  *     email-lane index `(user_id, account_id, segment, touch_number) where channel = 'email'`.
+ *
+ * Fix round 2 (2026-07-18) — round 1 fixed ledger identity by collapsing `owner_users` to
+ * `distinct on (account_id)`, which was never required and cost real reach. RESTORED: `owner_users`
+ * is again ALL owner/admin members with an email, per the spec's "recipient selection follows
+ * createTrialEndingStore / createLeadEventEmailStore" (and matching that sibling store, which never
+ * collapsed). Determinism is now carried by a SEPARATE `canonical_user` CTE used for ledger
+ * identity only — same total order round 1 established. Two admins therefore receive 2 emails while
+ * the account still spends exactly 1 of its 2 touches: every guard in the spec (24h artifact floor,
+ * 48h collision window, "two touches, ever") is account-scoped, not recipient-scoped. This matters
+ * because `deps.send` is Resend-shaped — a dead address is accepted and bounces asynchronously
+ * rather than throwing, so a single-recipient query burns a touch on mail nobody reads while a
+ * reachable admin sits right there. See `account_return` for the matching never-returned decision.
  */
 export function createPullbackStore(db: Db) {
   async function getPullbackCandidates(now: Date): Promise<PullbackRow[]> {
@@ -3629,40 +3640,68 @@ export function createPullbackStore(db: Db) {
       preview_company: string | null;
     }>(sql`
       with owner_users as (
-        -- CANONICAL RECIPIENT (fix, 2026-07-18). This used to return EVERY owner/admin, and the
-        -- grouping loop below then keyed rows by account+segment while taking user_id from
-        -- whichever row Postgres happened to emit first. On a two-seat account that meant: both
-        -- people got emailed, one ledger row got written, and the OTHER user still read as
-        -- "no touch 1" on the next tick — so the account was re-sent touch 1, breaking the spec's
-        -- "two touches, ever". It also stamped every recipient's unsubscribe token with the
-        -- incidental winner's user_id.
+        -- RECIPIENTS: every owner/admin of the account, per the spec ("recipient selection follows
+        -- createTrialEndingStore / createLeadEventEmailStore: join account_members.role IN
+        -- ('owner','admin') and auth.users.email"). Round 1 collapsed this to one user per account
+        -- to make ledger identity deterministic; that goal is real but is met by canonical_user
+        -- below, and collapsing here cost reach for nothing. deps.send is Resend-shaped — a dead
+        -- address is ACCEPTED and bounces asynchronously instead of throwing — so a single-recipient
+        -- query silently burns one of the account's only two touches on mail nobody reads, while a
+        -- reachable second admin is right there. Emailing both costs the account nothing: the 24h
+        -- artifact floor, the 48h collision window and the two-touch ceiling are all ACCOUNT-scoped.
         --
-        -- distinct on collapses each account to exactly ONE user, so recipient, ledger row, and
-        -- unsubscribe identity are the same person by construction. The order is total and
+        -- Users with no email address are excluded here rather than downstream — they can never be
+        -- a recipient, and (still true) one must never be able to win the canonical pick and
+        -- silence an account that has a perfectly reachable second admin.
+        --
+        -- role_rank/joined_at are carried so canonical_user can order without re-reading the table.
+        select m.account_id, m.user_id, u.email, u.last_sign_in_at,
+               (case when m.role = 'owner' then 0 else 1 end) as role_rank,
+               m.created_at as joined_at
+        from public.account_members m
+        join auth.users u on u.id = m.user_id
+        where m.role in ('owner','admin')
+          and u.email is not null
+      ),
+      canonical_user as (
+        -- LEDGER IDENTITY ONLY — never recipient selection. The original Critical: the grouping
+        -- loop keyed rows by account+segment but took user_id from whichever owner/admin row the
+        -- plan emitted first, so on a two-seat account one ledger row was written under an
+        -- arbitrary user and the OTHER user still read as "no touch 1" on the next tick — the
+        -- account was re-sent touch 1, breaking "two touches, ever".
+        --
+        -- Pinning exactly one user per account closes that with no product change: it is the row
+        -- key for touch_state, the lifecycle_touches write, and the unsubscribe token's signed
+        -- userId (opt-out is account-scoped via accounts.lifecycle_emails_enabled, so a single
+        -- signed identity is correct however many people were emailed). The order is total and
         -- plan-independent:
         --   1. owner before admin  — the account's actual principal
         --   2. earliest joined     — the founding seat when there are two owners
         --   3. user_id ascending   — the final tiebreak; two members can share a created_at
         --                            (same-transaction seeding), and (account_id, user_id) is the
         --                            account_members PK, so this can never tie.
+        select distinct on (o.account_id) o.account_id, o.user_id
+        from owner_users o
+        order by o.account_id, o.role_rank, o.joined_at asc, o.user_id asc
+      ),
+      account_return as (
+        -- NEVER-RETURNED PREDICATE, evaluated per ACCOUNT across ALL owner/admins (fix round 2).
+        -- Round 1 evaluated it against the canonical user alone, which silently narrowed the
+        -- product: an account whose owner returned but whose admin did not stopped being emailed.
+        -- Both narrowings are wrong, but in opposite directions, so the question has to be answered
+        -- deliberately rather than inherited from whichever row survived a distinct-on.
         --
-        -- Users with no email address are excluded here rather than downstream: they can never be
-        -- a pull-back recipient, and letting one win the distinct-on would silence an account that
-        -- has a perfectly reachable second admin.
-        --
-        -- Collapsing BEFORE the never-returned predicate is deliberate: "has the account's
-        -- principal come back to look" is the question the spec asks. An admin who never returned
-        -- while the owner did means the value WAS seen — no pull-back is owed.
-        select distinct on (m.account_id)
-               m.account_id, m.user_id, u.email, u.last_sign_in_at
-        from public.account_members m
-        join auth.users u on u.id = m.user_id
-        where m.role in ('owner','admin')
-          and u.email is not null
-        order by m.account_id,
-                 (case when m.role = 'owner' then 0 else 1 end),
-                 m.created_at asc,
-                 m.user_id asc
+        -- DECISION: "nobody came back" means NO owner/admin came back — max(last_sign_in_at) across
+        -- the account's owner/admins. If ANY of them signed in after the artifact appeared, the
+        -- value WAS seen inside the account and no pull-back is owed; emailing the other seats then
+        -- would be telling people about something a colleague has already looked at. That is the
+        -- least-spammy correct reading and matches the spec's premise ("the value already exists
+        -- and was never shown"). max() over the coalesced value keeps NULL = never signed in =
+        -- '-infinity' rather than letting a NULL swallow the aggregate.
+        select o.account_id,
+               max(coalesce(o.last_sign_in_at, '-infinity'::timestamptz)) as last_return_at
+        from owner_users o
+        group by o.account_id
       ),
       drafts as (
         select s.account_id, count(*)::int as item_count, min(s.created_at) as oldest_at
@@ -3677,23 +3716,30 @@ export function createPullbackStore(db: Db) {
         group by l.account_id
       ),
       base as (
-        select a.id as account_id, o.user_id, o.email,
+        -- One row per (account, segment, RECIPIENT). user_id is the canonical user, so every row
+        -- of a group carries the same ledger identity while email varies — that is exactly what
+        -- lets the grouping loop below build a multi-address emails array off a stable userId.
+        select a.id as account_id, c.user_id, o.email,
                'drafts_waiting'::text as segment,
                d.item_count, d.oldest_at,
                a.lifecycle_emails_enabled, a.lifecycle_last_email_at
         from public.accounts a
         join owner_users o on o.account_id = a.id
+        join canonical_user c on c.account_id = a.id
+        join account_return r on r.account_id = a.id
         join drafts d on d.account_id = a.id
-        where coalesce(o.last_sign_in_at, '-infinity'::timestamptz) < d.oldest_at
+        where r.last_return_at < d.oldest_at
         union all
-        select a.id, o.user_id, o.email,
+        select a.id, c.user_id, o.email,
                'leads_waiting'::text,
                g.item_count, g.oldest_at,
                a.lifecycle_emails_enabled, a.lifecycle_last_email_at
         from public.accounts a
         join owner_users o on o.account_id = a.id
+        join canonical_user c on c.account_id = a.id
+        join account_return r on r.account_id = a.id
         join leads_agg g on g.account_id = a.id
-        where coalesce(o.last_sign_in_at, '-infinity'::timestamptz) < g.oldest_at
+        where r.last_return_at < g.oldest_at
           and not exists (select 1 from drafts d where d.account_id = a.id)
       ),
       touch_state as (
@@ -3704,7 +3750,9 @@ export function createPullbackStore(db: Db) {
         -- onConflictDoNothing against a user-only unique index — leaving account B un-ledgered and
         -- eligible forever. Migration 0060's email-lane index is (user_id, account_id, segment,
         -- touch_number) so the write survives; this predicate is the read side of the same fix.
-        select o.account_id, o.user_id, seg.segment,
+        -- Keyed off canonical_user (one row per account/segment), NOT owner_users: the ledger is
+        -- account state, so a second admin must not get his own independent touch-1 allowance.
+        select c.account_id, c.user_id, seg.segment,
           case
             when not coalesce(bool_or(lt.touch_number = 1), false) then 1
             when not coalesce(bool_or(lt.touch_number = 2), false)
@@ -3712,14 +3760,14 @@ export function createPullbackStore(db: Db) {
               then 2
             else null
           end::int as touch_number
-        from owner_users o
+        from canonical_user c
         cross join (values ('drafts_waiting'), ('leads_waiting')) as seg(segment)
         left join public.lifecycle_touches lt
-          on lt.user_id = o.user_id
-         and lt.account_id = o.account_id
+          on lt.user_id = c.user_id
+         and lt.account_id = c.account_id
          and lt.segment = seg.segment
          and lt.channel = 'email'
-        group by o.account_id, o.user_id, seg.segment
+        group by c.account_id, c.user_id, seg.segment
       )
       select b.account_id, b.user_id, b.email, b.segment,
              ts.touch_number,
@@ -3761,9 +3809,16 @@ export function createPullbackStore(db: Db) {
       -- artifact first, the order each lateral already picked its 3 rows in) makes the composed
       -- copy reproducible. Not a correctness bug like the two above, but the same class of
       -- "incidental plan order leaked into output".
+      --
+      -- b.email is the final tiebreak (fix round 2). With recipients restored, each (account,
+      -- segment) group emits one row per recipient PER preview; both laterals are recipient-
+      -- independent, so without this the N recipient rows sharing a preview key came back in plain
+      -- plan order and the emails array was assembled non-deterministically. (account_id,
+      -- segment, preview name, email) is unique, so the full key is now total.
       order by b.account_id, b.segment,
                coalesce(p.sort_at, p2.sort_at) asc nulls last,
-               coalesce(p.name, p2.name) asc nulls last
+               coalesce(p.name, p2.name) asc nulls last,
+               b.email asc
     `);
 
     const byKey = new Map<string, PullbackRow>();
