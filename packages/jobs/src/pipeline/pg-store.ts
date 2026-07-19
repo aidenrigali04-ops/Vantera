@@ -75,6 +75,7 @@ import type {
 import type { WeeklySummaryRow, WeeklySummaryStore } from "./weekly-summary";
 import type { AccountHealthStore, LinkedInAccountRow } from "./account-health";
 import type { ReplyBacklogStore } from "./reply-backlog";
+import type { PullbackRow, PullbackSegment, PullbackTouch } from "./pullback";
 import {
   SCOUT_DEFAULTS,
   type ActiveExperiment,
@@ -3567,6 +3568,199 @@ export function createTrialEndingStore(db: Db) {
         .update(accounts)
         .set({ trialEndingNotifiedAt: new Date() })
         .where(inArray(accounts.id, ids));
+    },
+  };
+}
+
+/**
+ * Pull-back email (spec 2026-07-18): stalled owners/admins with real drafts or leads waiting.
+ * `drafts_waiting` outranks `leads_waiting` — a `leads_agg` account with any pending_review
+ * scheduled_send is excluded from the leads branch. Ledger dedupe filters on
+ * `channel = 'email'` so an armed LinkedIn lifecycle DM (0045) never blocks this email, and vice
+ * versa. Same execute+group-into-Map idiom as getTrialEndingAccounts/getTargets above.
+ *
+ * Deviations from the task-4 brief's draft SQL (verified against the live schema, prod project
+ * `batyjchztbrqzkcvhkmk`, and packages/db/src/schema.ts — see task-4-report.md for the full list):
+ *   - `leads` has no `name`/`company` columns — built from `first_name`/`last_name` (matching
+ *     getTargets' `concat` idiom above) and `company_name`.
+ *   - The touch-number lateral was structurally wrong: it dropped a user's touch-1 row from its
+ *     own WHERE clause once >72h old (neither `touch_number = 2` nor "recent"), which made
+ *     `coalesce(next_touch, 1)` re-select touch 1 forever instead of ever advancing to touch 2.
+ *     Rewritten as `touch_state`: derives touch_number directly from what's actually been sent
+ *     (bool_or per touch_number) rather than filtering rows out of the aggregate first.
+ *   - `leads_agg` was unfiltered by status — it would have counted rejected/in_campaign leads as
+ *     "buyers that matched your ICP" (rule 06). Filtered to `status = 'qualified'`, keyed off
+ *     `scored_at` (the moment a lead actually became "matched"); a drafted lead's status has
+ *     already flipped to `in_campaign` by copy-draft, so this excludes it without needing to
+ *     reference scheduled_sends directly.
+ *   - Previews were a single generic "any 3 leads in the account" lateral shared by both
+ *     segments — could name a rejected lead as a qualified "buyer", or a lead with no relation to
+ *     the actual pending drafts. Split into two segment-scoped laterals (drafts: leads with a
+ *     pending_review send, oldest first; leads: qualified leads, oldest-scored first).
+ *   - `owner_users.last_sign_in_at` is coalesced against `-infinity` before the never-returned
+ *     comparison — a NULL (no recorded sign-in) must count as "never returned", not silently
+ *     drop the row via NULL < timestamp.
+ */
+export function createPullbackStore(db: Db) {
+  async function getPullbackCandidates(now: Date): Promise<PullbackRow[]> {
+    const touch2Cutoff = new Date(now.getTime() - 72 * 3_600_000).toISOString();
+    const rows = await db.execute<{
+      account_id: string;
+      user_id: string;
+      email: string | null;
+      segment: PullbackSegment;
+      touch_number: number;
+      item_count: number;
+      oldest_at: string;
+      draft_excerpt: string | null;
+      lifecycle_emails_enabled: boolean;
+      lifecycle_last_email_at: string | null;
+      preview_name: string | null;
+      preview_title: string | null;
+      preview_company: string | null;
+    }>(sql`
+      with owner_users as (
+        select m.account_id, m.user_id, u.email, u.last_sign_in_at
+        from public.account_members m
+        join auth.users u on u.id = m.user_id
+        where m.role in ('owner','admin')
+      ),
+      drafts as (
+        select s.account_id, count(*)::int as item_count, min(s.created_at) as oldest_at
+        from public.scheduled_sends s
+        where s.status = 'pending_review'
+        group by s.account_id
+      ),
+      leads_agg as (
+        select l.account_id, count(*)::int as item_count, min(l.scored_at) as oldest_at
+        from public.leads l
+        where l.status = 'qualified'
+        group by l.account_id
+      ),
+      base as (
+        select a.id as account_id, o.user_id, o.email,
+               'drafts_waiting'::text as segment,
+               d.item_count, d.oldest_at,
+               a.lifecycle_emails_enabled, a.lifecycle_last_email_at
+        from public.accounts a
+        join owner_users o on o.account_id = a.id
+        join drafts d on d.account_id = a.id
+        where coalesce(o.last_sign_in_at, '-infinity'::timestamptz) < d.oldest_at
+        union all
+        select a.id, o.user_id, o.email,
+               'leads_waiting'::text,
+               g.item_count, g.oldest_at,
+               a.lifecycle_emails_enabled, a.lifecycle_last_email_at
+        from public.accounts a
+        join owner_users o on o.account_id = a.id
+        join leads_agg g on g.account_id = a.id
+        where coalesce(o.last_sign_in_at, '-infinity'::timestamptz) < g.oldest_at
+          and not exists (select 1 from drafts d where d.account_id = a.id)
+      ),
+      touch_state as (
+        select o.account_id, o.user_id, seg.segment,
+          case
+            when not coalesce(bool_or(lt.touch_number = 1), false) then 1
+            when not coalesce(bool_or(lt.touch_number = 2), false)
+                 and max(lt.sent_at) filter (where lt.touch_number = 1) < ${touch2Cutoff}
+              then 2
+            else null
+          end::int as touch_number
+        from owner_users o
+        cross join (values ('drafts_waiting'), ('leads_waiting')) as seg(segment)
+        left join public.lifecycle_touches lt
+          on lt.user_id = o.user_id and lt.segment = seg.segment and lt.channel = 'email'
+        group by o.account_id, o.user_id, seg.segment
+      )
+      select b.account_id, b.user_id, b.email, b.segment,
+             ts.touch_number,
+             b.item_count, b.oldest_at,
+             b.lifecycle_emails_enabled, b.lifecycle_last_email_at,
+             (select s.body
+                from public.scheduled_sends s
+                where s.account_id = b.account_id and s.status = 'pending_review'
+                order by (case when s.linkedin_stage = 'message' then 0 else 1 end), s.created_at asc
+                limit 1) as draft_excerpt,
+             coalesce(p.name, p2.name) as preview_name,
+             coalesce(p.title, p2.title) as preview_title,
+             coalesce(p.company, p2.company) as preview_company
+      from base b
+      join touch_state ts
+        on ts.account_id = b.account_id and ts.user_id = b.user_id and ts.segment = b.segment
+      left join lateral (
+        select nullif(trim(concat(l.first_name, ' ', l.last_name)), '') as name,
+               l.title, l.company_name as company
+        from public.scheduled_sends s
+        join public.leads l on l.id = s.lead_id
+        where s.account_id = b.account_id and s.status = 'pending_review' and b.segment = 'drafts_waiting'
+        group by l.id, l.first_name, l.last_name, l.title, l.company_name
+        order by min(s.created_at) asc
+        limit 3
+      ) p on true
+      left join lateral (
+        select nullif(trim(concat(l.first_name, ' ', l.last_name)), '') as name,
+               l.title, l.company_name as company
+        from public.leads l
+        where l.account_id = b.account_id and l.status = 'qualified' and b.segment = 'leads_waiting'
+        order by l.scored_at asc
+        limit 3
+      ) p2 on true
+      where ts.touch_number is not null
+    `);
+
+    const byKey = new Map<string, PullbackRow>();
+    for (const r of [...rows]) {
+      const key = `${r.account_id}:${r.segment}`;
+      const cur =
+        byKey.get(key) ??
+        ({
+          accountId: r.account_id,
+          userId: r.user_id,
+          emails: [],
+          segment: r.segment,
+          touchNumber: (r.touch_number === 2 ? 2 : 1) as 1 | 2,
+          itemCount: r.item_count,
+          previews: [],
+          draftExcerpt: r.draft_excerpt,
+          oldestArtifactAt: r.oldest_at,
+          lifecycleEmailsEnabled: r.lifecycle_emails_enabled,
+          lifecycleLastEmailAt: r.lifecycle_last_email_at,
+        } satisfies PullbackRow);
+      if (r.email && !cur.emails.includes(r.email)) cur.emails.push(r.email);
+      if (r.preview_name && !cur.previews.some((p) => p.name === r.preview_name)) {
+        cur.previews.push({
+          name: r.preview_name,
+          title: r.preview_title,
+          company: r.preview_company,
+        });
+      }
+      byKey.set(key, cur);
+    }
+    return [...byKey.values()];
+  }
+
+  return {
+    getPullbackCandidates,
+    async recordTouch(touch: PullbackTouch): Promise<void> {
+      await db
+        .insert(lifecycleTouches)
+        .values({
+          userId: touch.userId,
+          accountId: touch.accountId,
+          segment: touch.segment,
+          touchNumber: touch.touchNumber,
+          channel: "email",
+          status: "sent",
+          messageBody: touch.messageBody,
+          sentAt: new Date(),
+        })
+        .onConflictDoNothing();
+    },
+    async stampLifecycleEmail(accountId: string, at: Date): Promise<void> {
+      await db
+        .update(accounts)
+        .set({ lifecycleLastEmailAt: at })
+        .where(eq(accounts.id, accountId));
     },
   };
 }
