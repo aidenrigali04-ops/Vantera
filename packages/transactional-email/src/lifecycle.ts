@@ -96,3 +96,32 @@ export async function sendPaymentFailedEmail(opts: PaymentFailedEmailOptions): P
   );
   await mailer.send({ to: opts.to, subject, html, text });
 }
+
+export interface PullbackEmailOptions {
+  to: string;
+  subject: string;
+  lines: string[];
+  ctaLabel: string;
+  ctaUrl: string;
+  /** RFC 8058 one-click opt-out URL — a lapsed user cannot be asked to log in. */
+  unsubscribeUrl: string;
+}
+
+/**
+ * Pull-back email (spec 2026-07-18): the leads or drafts already waiting, named. Copy is composed
+ * upstream by composePullback so every claim is grounded in the user's real data.
+ */
+export async function sendPullbackEmail(opts: PullbackEmailOptions): Promise<void> {
+  const mailer = createTransactionalEmailFromEnv();
+  const { html, text } = shell(opts.subject, opts.lines, opts.ctaLabel, opts.ctaUrl);
+  await mailer.send({
+    to: opts.to,
+    subject: opts.subject,
+    html,
+    text,
+    headers: {
+      "List-Unsubscribe": `<${opts.unsubscribeUrl}>`,
+      "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+    },
+  });
+}

@@ -129,6 +129,7 @@ export async function signup(_prev: AuthFormState, formData: FormData): Promise<
   // R5: the welcome email — the first thing the product ever says off-screen (the email
   // channel used to be silent until the weekly summary, 7 days in). Best-effort: a mail
   // hiccup must never break signup. Invite signups skip it (they got the invite email).
+  // No lifecycle_last_email_at stamp: the accounts row is created later, in onboarding step 0.
   try {
     await sendWelcomeEmail({ to: result.values.email, appUrl: siteUrl() });
   } catch {

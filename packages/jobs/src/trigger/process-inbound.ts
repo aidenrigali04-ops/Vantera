@@ -41,14 +41,17 @@ export const processInbound = task({
       judgeFn: (d, c) => judgeCopy(d, c),
       bestOfN,
       // L3: interested-reply / booked / needs-you emails — the trial's pull-back channel
-      notifyLeadEvent: (e) =>
-        createLeadEventNotifier({
-          getTargets: createLeadEventEmailStore(db).getTargets,
+      notifyLeadEvent: (e) => {
+        const leadEventStore = createLeadEventEmailStore(db);
+        return createLeadEventNotifier({
+          getTargets: leadEventStore.getTargets,
+          stampLifecycleEmail: leadEventStore.stampLifecycleEmail,
           send: sendLeadEventEmail,
           appUrl: process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.vanterasystem.dev",
         })(e).catch((err) => {
           logger.warn("lead-event email failed", { err: String(err) });
-        }),
+        });
+      },
       // 0045: intercept events on the founder identity (stop-on-reply + invite acceptance)
       lifecycle: senderRef
         ? {

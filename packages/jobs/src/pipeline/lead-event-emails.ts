@@ -21,7 +21,10 @@ export interface LeadEventEmailDeps {
     snippet: string;
     url: string;
   }): Promise<void>;
+  /** Feeds the pull-back collision guard (spec 2026-07-18). Optional so tests need not stub it. */
+  stampLifecycleEmail?(accountId: string, at: Date): Promise<void>;
   appUrl: string;
+  now?: () => Date;
 }
 
 const EVENT_PATH: Record<LeadEventKind, (leadId: string) => string> = {
@@ -47,6 +50,15 @@ export function createLeadEventNotifier(deps: LeadEventEmailDeps) {
         snippet: e.snippet.slice(0, 400),
         url: `${deps.appUrl}${EVENT_PATH[e.kind](e.leadId)}`,
       });
+    }
+    if (t.emails.length > 0) {
+      // lifecycle_last_email_at feeds the pull-back collision guard (spec 2026-07-18): pull-back
+      // yields to this email for 48h. Only reached once every send above has resolved without
+      // throwing — this module's existing best-effort contract means a throw mid-loop propagates
+      // to the caller (trigger/process-inbound.ts, which swallows it), so a failed send never
+      // stamps. Never reached on the opted-out (`!t.enabled`, returned above) or zero-recipient
+      // path.
+      await deps.stampLifecycleEmail?.(e.accountId, deps.now?.() ?? new Date());
     }
   };
 }

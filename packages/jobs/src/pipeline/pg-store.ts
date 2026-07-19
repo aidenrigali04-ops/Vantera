@@ -75,6 +75,7 @@ import type {
 import type { WeeklySummaryRow, WeeklySummaryStore } from "./weekly-summary";
 import type { AccountHealthStore, LinkedInAccountRow } from "./account-health";
 import type { ReplyBacklogStore } from "./reply-backlog";
+import type { PullbackRow, PullbackSegment, PullbackTouch } from "./pullback";
 import {
   SCOUT_DEFAULTS,
   type ActiveExperiment,
@@ -3012,6 +3013,10 @@ export function createWeeklySummaryStore(db: Db): WeeklySummaryStore {
         recipients: recipientMap.get(a.id) ?? [],
       }));
     },
+
+    async stampLifecycleEmail(accountId: string, at: Date): Promise<void> {
+      await db.update(accounts).set({ lifecycleLastEmailAt: at }).where(eq(accounts.id, accountId));
+    },
   };
 }
 
@@ -3532,6 +3537,13 @@ export function createLeadEventEmailStore(db: Db) {
         emails: [...new Set(list.map((r) => r.email).filter((e): e is string => Boolean(e)))],
       };
     },
+    async stampLifecycleEmail(accountId: string, at: Date): Promise<void> {
+      // Same idiom as createTrialEndingStore.markTrialEndingNotified / createWeeklySummaryStore /
+      // createPullbackStore.stampLifecycleEmail — feeds the pull-back collision guard (spec
+      // 2026-07-18): a "meeting booked" email must block a "buyers matched your ICP" pull-back for
+      // the next 48h, same as every other lifecycle sender.
+      await db.update(accounts).set({ lifecycleLastEmailAt: at }).where(eq(accounts.id, accountId));
+    },
   };
 }
 
@@ -3561,12 +3573,337 @@ export function createTrialEndingStore(db: Db) {
       }
       return [...byId.values()];
     },
+    /**
+     * The idempotence write, and ONLY the idempotence write. Nothing else may ride along in this
+     * UPDATE: runTrialEnding calls it after the emails have already gone out, so if this statement
+     * throws, trial_ending_notified_at never lands and the agent-scheduler tick re-sends the same
+     * trial-ending email every 15 minutes, forever. The pull-back collision-guard stamp used to be
+     * folded in here — one unapplied migration (0060) away from turning `column
+     * "lifecycle_last_email_at" does not exist` into exactly that outage. It now lives in its own
+     * statement below.
+     */
     async markTrialEndingNotified(ids: string[]): Promise<void> {
       if (ids.length === 0) return;
       await db
         .update(accounts)
         .set({ trialEndingNotifiedAt: new Date() })
         .where(inArray(accounts.id, ids));
+    },
+    /**
+     * Collision-guard bookkeeping for the pull-back email (spec 2026-07-18): pull-back yields to
+     * this email for 48h. A separate statement from the idempotence write above, and best-effort
+     * at the call site — a failure here costs at worst one extra pull-back email, versus an
+     * infinite re-send loop if it could take markTrialEndingNotified down with it.
+     */
+    async stampLifecycleEmails(ids: string[], at: Date): Promise<void> {
+      if (ids.length === 0) return;
+      await db.update(accounts).set({ lifecycleLastEmailAt: at }).where(inArray(accounts.id, ids));
+    },
+  };
+}
+
+/**
+ * Pull-back email (spec 2026-07-18): stalled owners/admins with real drafts or leads waiting.
+ * `drafts_waiting` outranks `leads_waiting` — a `leads_agg` account with any pending_review
+ * scheduled_send is excluded from the leads branch. Ledger dedupe filters on
+ * `channel = 'email'` so an armed LinkedIn lifecycle DM (0045) never blocks this email, and vice
+ * versa. Same execute+group-into-Map idiom as getTrialEndingAccounts/getTargets above.
+ *
+ * Deviations from the task-4 brief's draft SQL (verified against the live schema, prod project
+ * `batyjchztbrqzkcvhkmk`, and packages/db/src/schema.ts — see task-4-report.md for the full list):
+ *   - `leads` has no `name`/`company` columns — built from `first_name`/`last_name` (matching
+ *     getTargets' `concat` idiom above) and `company_name`.
+ *   - The touch-number lateral was structurally wrong: it dropped a user's touch-1 row from its
+ *     own WHERE clause once >72h old (neither `touch_number = 2` nor "recent"), which made
+ *     `coalesce(next_touch, 1)` re-select touch 1 forever instead of ever advancing to touch 2.
+ *     Rewritten as `touch_state`: derives touch_number directly from what's actually been sent
+ *     (bool_or per touch_number) rather than filtering rows out of the aggregate first.
+ *   - `leads_agg` was unfiltered by status — it would have counted rejected/in_campaign leads as
+ *     "buyers that matched your ICP" (rule 06). Filtered to `status = 'qualified'`, keyed off
+ *     `scored_at` (the moment a lead actually became "matched"); a drafted lead's status has
+ *     already flipped to `in_campaign` by copy-draft, so this excludes it without needing to
+ *     reference scheduled_sends directly.
+ *   - Previews were a single generic "any 3 leads in the account" lateral shared by both
+ *     segments — could name a rejected lead as a qualified "buyer", or a lead with no relation to
+ *     the actual pending drafts. Split into two segment-scoped laterals (drafts: leads with a
+ *     pending_review send, oldest first; leads: qualified leads, oldest-scored first).
+ *   - `last_sign_in_at` is coalesced against `-infinity` before the never-returned comparison (now
+ *     inside `account_return`) — a NULL (no recorded sign-in) must count as "never returned", not
+ *     silently drop the row via NULL < timestamp.
+ *
+ * Fix round 1 (2026-07-18) — two defects that both broke "two touches, ever" on multi-seat or
+ * multi-account setups (latent in prod today: 0 accounts have a second owner/admin, but team seats
+ * are a shipped feature). Full rationale at each site below:
+ *   - ledger identity per account was non-deterministic (the grouping loop took user_id from
+ *     whichever owner/admin row the plan emitted first) — now pinned by `canonical_user`.
+ *   - `touch_state` now scopes the ledger join by `account_id`, matching migration 0060's
+ *     email-lane index `(user_id, account_id, segment, touch_number) where channel = 'email'`.
+ *
+ * Fix round 2 (2026-07-18) — round 1 fixed ledger identity by collapsing `owner_users` to
+ * `distinct on (account_id)`, which was never required and cost real reach. RESTORED: `owner_users`
+ * is again ALL owner/admin members with an email, per the spec's "recipient selection follows
+ * createTrialEndingStore / createLeadEventEmailStore" (and matching that sibling store, which never
+ * collapsed). Determinism is now carried by a SEPARATE `canonical_user` CTE used for ledger
+ * identity only — same total order round 1 established. Two admins therefore receive 2 emails while
+ * the account still spends exactly 1 of its 2 touches: every guard in the spec (24h artifact floor,
+ * 48h collision window, "two touches, ever") is account-scoped, not recipient-scoped. This matters
+ * because `deps.send` is Resend-shaped — a dead address is accepted and bounces asynchronously
+ * rather than throwing, so a single-recipient query burns a touch on mail nobody reads while a
+ * reachable admin sits right there. See `account_return` for the matching never-returned decision.
+ */
+export function createPullbackStore(db: Db) {
+  async function getPullbackCandidates(now: Date): Promise<PullbackRow[]> {
+    const touch2Cutoff = new Date(now.getTime() - 72 * 3_600_000).toISOString();
+    const rows = await db.execute<{
+      account_id: string;
+      user_id: string;
+      email: string | null;
+      segment: PullbackSegment;
+      touch_number: number;
+      item_count: number;
+      oldest_at: string;
+      draft_excerpt: string | null;
+      lifecycle_emails_enabled: boolean;
+      lifecycle_last_email_at: string | null;
+      preview_name: string | null;
+      preview_title: string | null;
+      preview_company: string | null;
+    }>(sql`
+      with owner_users as (
+        -- RECIPIENTS: every owner/admin of the account, per the spec ("recipient selection follows
+        -- createTrialEndingStore / createLeadEventEmailStore: join account_members.role IN
+        -- ('owner','admin') and auth.users.email"). Round 1 collapsed this to one user per account
+        -- to make ledger identity deterministic; that goal is real but is met by canonical_user
+        -- below, and collapsing here cost reach for nothing. deps.send is Resend-shaped — a dead
+        -- address is ACCEPTED and bounces asynchronously instead of throwing — so a single-recipient
+        -- query silently burns one of the account's only two touches on mail nobody reads, while a
+        -- reachable second admin is right there. Emailing both costs the account nothing: the 24h
+        -- artifact floor, the 48h collision window and the two-touch ceiling are all ACCOUNT-scoped.
+        --
+        -- Users with no email address are excluded here rather than downstream — they can never be
+        -- a recipient, and (still true) one must never be able to win the canonical pick and
+        -- silence an account that has a perfectly reachable second admin.
+        --
+        -- role_rank/joined_at are carried so canonical_user can order without re-reading the table.
+        select m.account_id, m.user_id, u.email, u.last_sign_in_at,
+               (case when m.role = 'owner' then 0 else 1 end) as role_rank,
+               m.created_at as joined_at
+        from public.account_members m
+        join auth.users u on u.id = m.user_id
+        where m.role in ('owner','admin')
+          and u.email is not null
+      ),
+      canonical_user as (
+        -- LEDGER IDENTITY ONLY — never recipient selection. The original Critical: the grouping
+        -- loop keyed rows by account+segment but took user_id from whichever owner/admin row the
+        -- plan emitted first, so on a two-seat account one ledger row was written under an
+        -- arbitrary user and the OTHER user still read as "no touch 1" on the next tick — the
+        -- account was re-sent touch 1, breaking "two touches, ever".
+        --
+        -- Pinning exactly one user per account closes that with no product change: it is the row
+        -- key for touch_state, the lifecycle_touches write, and the unsubscribe token's signed
+        -- userId (opt-out is account-scoped via accounts.lifecycle_emails_enabled, so a single
+        -- signed identity is correct however many people were emailed). The order is total and
+        -- plan-independent:
+        --   1. owner before admin  — the account's actual principal
+        --   2. earliest joined     — the founding seat when there are two owners
+        --   3. user_id ascending   — the final tiebreak; two members can share a created_at
+        --                            (same-transaction seeding), and (account_id, user_id) is the
+        --                            account_members PK, so this can never tie.
+        select distinct on (o.account_id) o.account_id, o.user_id
+        from owner_users o
+        order by o.account_id, o.role_rank, o.joined_at asc, o.user_id asc
+      ),
+      account_return as (
+        -- NEVER-RETURNED PREDICATE, evaluated per ACCOUNT across ALL owner/admins (fix round 2).
+        -- Round 1 evaluated it against the canonical user alone, which silently narrowed the
+        -- product: an account whose owner returned but whose admin did not stopped being emailed.
+        -- Both narrowings are wrong, but in opposite directions, so the question has to be answered
+        -- deliberately rather than inherited from whichever row survived a distinct-on.
+        --
+        -- DECISION: "nobody came back" means NO owner/admin came back — max(last_sign_in_at) across
+        -- the account's owner/admins. If ANY of them signed in after the artifact appeared, the
+        -- value WAS seen inside the account and no pull-back is owed; emailing the other seats then
+        -- would be telling people about something a colleague has already looked at. That is the
+        -- least-spammy correct reading and matches the spec's premise ("the value already exists
+        -- and was never shown"). max() over the coalesced value keeps NULL = never signed in =
+        -- '-infinity' rather than letting a NULL swallow the aggregate.
+        select o.account_id,
+               max(coalesce(o.last_sign_in_at, '-infinity'::timestamptz)) as last_return_at
+        from owner_users o
+        group by o.account_id
+      ),
+      drafts as (
+        select s.account_id, count(*)::int as item_count, min(s.created_at) as oldest_at
+        from public.scheduled_sends s
+        where s.status = 'pending_review'
+        group by s.account_id
+      ),
+      leads_agg as (
+        select l.account_id, count(*)::int as item_count, min(l.scored_at) as oldest_at
+        from public.leads l
+        where l.status = 'qualified'
+        group by l.account_id
+      ),
+      base as (
+        -- One row per (account, segment, RECIPIENT). user_id is the canonical user, so every row
+        -- of a group carries the same ledger identity while email varies — that is exactly what
+        -- lets the grouping loop below build a multi-address emails array off a stable userId.
+        select a.id as account_id, c.user_id, o.email,
+               'drafts_waiting'::text as segment,
+               d.item_count, d.oldest_at,
+               a.lifecycle_emails_enabled, a.lifecycle_last_email_at
+        from public.accounts a
+        join owner_users o on o.account_id = a.id
+        join canonical_user c on c.account_id = a.id
+        join account_return r on r.account_id = a.id
+        join drafts d on d.account_id = a.id
+        where r.last_return_at < d.oldest_at
+        union all
+        select a.id, c.user_id, o.email,
+               'leads_waiting'::text,
+               g.item_count, g.oldest_at,
+               a.lifecycle_emails_enabled, a.lifecycle_last_email_at
+        from public.accounts a
+        join owner_users o on o.account_id = a.id
+        join canonical_user c on c.account_id = a.id
+        join account_return r on r.account_id = a.id
+        join leads_agg g on g.account_id = a.id
+        where r.last_return_at < g.oldest_at
+          and not exists (select 1 from drafts d where d.account_id = a.id)
+      ),
+      touch_state as (
+        -- ACCOUNT-SCOPED LEDGER (fix, 2026-07-18). The join used to match on user+segment+channel
+        -- only, while everything around it is keyed per ACCOUNT. A user who owns two accounts
+        -- therefore shared one ledger state across both: both accounts emailed on the same tick,
+        -- recordTouch fired twice, and the second insert was silently discarded by
+        -- onConflictDoNothing against a user-only unique index — leaving account B un-ledgered and
+        -- eligible forever. Migration 0060's email-lane index is (user_id, account_id, segment,
+        -- touch_number) so the write survives; this predicate is the read side of the same fix.
+        -- Keyed off canonical_user (one row per account/segment), NOT owner_users: the ledger is
+        -- account state, so a second admin must not get his own independent touch-1 allowance.
+        select c.account_id, c.user_id, seg.segment,
+          case
+            when not coalesce(bool_or(lt.touch_number = 1), false) then 1
+            when not coalesce(bool_or(lt.touch_number = 2), false)
+                 and max(lt.sent_at) filter (where lt.touch_number = 1) < ${touch2Cutoff}
+              then 2
+            else null
+          end::int as touch_number
+        from canonical_user c
+        cross join (values ('drafts_waiting'), ('leads_waiting')) as seg(segment)
+        left join public.lifecycle_touches lt
+          on lt.user_id = c.user_id
+         and lt.account_id = c.account_id
+         and lt.segment = seg.segment
+         and lt.channel = 'email'
+        group by c.account_id, c.user_id, seg.segment
+      )
+      select b.account_id, b.user_id, b.email, b.segment,
+             ts.touch_number,
+             b.item_count, b.oldest_at,
+             b.lifecycle_emails_enabled, b.lifecycle_last_email_at,
+             (select s.body
+                from public.scheduled_sends s
+                where s.account_id = b.account_id and s.status = 'pending_review'
+                order by (case when s.linkedin_stage = 'message' then 0 else 1 end), s.created_at asc
+                limit 1) as draft_excerpt,
+             coalesce(p.name, p2.name) as preview_name,
+             coalesce(p.title, p2.title) as preview_title,
+             coalesce(p.company, p2.company) as preview_company
+      from base b
+      join touch_state ts
+        on ts.account_id = b.account_id and ts.user_id = b.user_id and ts.segment = b.segment
+      left join lateral (
+        select nullif(trim(concat(l.first_name, ' ', l.last_name)), '') as name,
+               l.title, l.company_name as company, min(s.created_at) as sort_at
+        from public.scheduled_sends s
+        join public.leads l on l.id = s.lead_id
+        where s.account_id = b.account_id and s.status = 'pending_review' and b.segment = 'drafts_waiting'
+        group by l.id, l.first_name, l.last_name, l.title, l.company_name
+        order by min(s.created_at) asc
+        limit 3
+      ) p on true
+      left join lateral (
+        select nullif(trim(concat(l.first_name, ' ', l.last_name)), '') as name,
+               l.title, l.company_name as company, l.scored_at as sort_at
+        from public.leads l
+        where l.account_id = b.account_id and l.status = 'qualified' and b.segment = 'leads_waiting'
+        order by l.scored_at asc
+        limit 3
+      ) p2 on true
+      where ts.touch_number is not null
+      -- A lateral's internal ORDER BY does not survive the join, so the previews array was built in
+      -- whatever order the plan emitted — the same email could name the same three people in a
+      -- different order on touch 1 and touch 2. Ordering by the lateral's own sort key (oldest
+      -- artifact first, the order each lateral already picked its 3 rows in) makes the composed
+      -- copy reproducible. Not a correctness bug like the two above, but the same class of
+      -- "incidental plan order leaked into output".
+      --
+      -- b.email is the final tiebreak (fix round 2). With recipients restored, each (account,
+      -- segment) group emits one row per recipient PER preview; both laterals are recipient-
+      -- independent, so without this the N recipient rows sharing a preview key came back in plain
+      -- plan order and the emails array was assembled non-deterministically. (account_id,
+      -- segment, preview name, email) is unique, so the full key is now total.
+      order by b.account_id, b.segment,
+               coalesce(p.sort_at, p2.sort_at) asc nulls last,
+               coalesce(p.name, p2.name) asc nulls last,
+               b.email asc
+    `);
+
+    const byKey = new Map<string, PullbackRow>();
+    for (const r of [...rows]) {
+      const key = `${r.account_id}:${r.segment}`;
+      const cur =
+        byKey.get(key) ??
+        ({
+          accountId: r.account_id,
+          userId: r.user_id,
+          emails: [],
+          segment: r.segment,
+          touchNumber: (r.touch_number === 2 ? 2 : 1) as 1 | 2,
+          itemCount: r.item_count,
+          previews: [],
+          draftExcerpt: r.draft_excerpt,
+          oldestArtifactAt: r.oldest_at,
+          lifecycleEmailsEnabled: r.lifecycle_emails_enabled,
+          lifecycleLastEmailAt: r.lifecycle_last_email_at,
+        } satisfies PullbackRow);
+      if (r.email && !cur.emails.includes(r.email)) cur.emails.push(r.email);
+      if (r.preview_name && !cur.previews.some((p) => p.name === r.preview_name)) {
+        cur.previews.push({
+          name: r.preview_name,
+          title: r.preview_title,
+          company: r.preview_company,
+        });
+      }
+      byKey.set(key, cur);
+    }
+    return [...byKey.values()];
+  }
+
+  return {
+    getPullbackCandidates,
+    async recordTouch(touch: PullbackTouch): Promise<void> {
+      await db
+        .insert(lifecycleTouches)
+        .values({
+          userId: touch.userId,
+          accountId: touch.accountId,
+          segment: touch.segment,
+          touchNumber: touch.touchNumber,
+          channel: "email",
+          status: "sent",
+          messageBody: touch.messageBody,
+          sentAt: new Date(),
+        })
+        .onConflictDoNothing();
+    },
+    async stampLifecycleEmail(accountId: string, at: Date): Promise<void> {
+      await db
+        .update(accounts)
+        .set({ lifecycleLastEmailAt: at })
+        .where(eq(accounts.id, accountId));
     },
   };
 }

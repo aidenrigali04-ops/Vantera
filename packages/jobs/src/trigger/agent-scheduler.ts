@@ -9,8 +9,8 @@ import { computeNextRunAt } from "../pipeline/schedule";
  * dispatches its own run task.
  *
  * Also fires the account-health reconcile, the reply-backlog safeguard, the lifecycle-outreach
- * tick, and the trial-ending heads-up each run (plain tasks piggybacking this cron: the plan's
- * schedule quota is at 10/10 — an 11th schedule fails every deploy).
+ * tick, the trial-ending heads-up, and the pull-back email each run (plain tasks piggybacking
+ * this cron: the plan's schedule quota is at 10/10 — an 11th schedule fails every deploy).
  */
 export const agentScheduler = schedules.task({
   id: "agent-scheduler",
@@ -31,6 +31,7 @@ export const agentScheduler = schedules.task({
     await tasks.trigger("reply-backlog", {});
     await tasks.trigger("lifecycle-outreach", {});
     await tasks.trigger("trial-ending", {});
+    await tasks.trigger("pullback-email", {});
     logger.info("agent scheduler tick", { due: due.length });
     return { triggered: due.length };
   },
