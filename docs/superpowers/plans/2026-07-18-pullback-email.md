@@ -859,26 +859,29 @@ git commit -m "feat(email): optional provider headers — unblocks List-Unsubscr
 ### Task 6: One-click unsubscribe token + route
 
 **Files:**
-- Create: `apps/web/src/lib/lifecycle-unsubscribe.ts`
-- Create: `apps/web/src/lib/lifecycle-unsubscribe.test.ts`
+- Create: `packages/transactional-email/src/unsubscribe-token.ts`
+- Create: `packages/transactional-email/src/unsubscribe-token.test.ts`
+- Modify: `packages/transactional-email/src/index.ts`
 - Create: `apps/web/src/app/api/lifecycle-unsubscribe/[token]/route.ts`
 
 **Interfaces:**
 - Consumes: nothing.
-- Produces: `signUnsubscribeToken(userId): string`, `verifyUnsubscribeToken(token): string | null`, and a route accepting GET + POST.
+- Produces: `signUnsubscribeToken(userId): string`, `verifyUnsubscribeToken(token): string | null` exported from `@vantera/transactional-email`, and a route accepting GET + POST.
 
-> Signing key: `UNIPILE_WEBHOOK_SECRET` already exists in every environment that sends email. Reuse it rather than adding an env var (spec: "reuse the existing webhook-secret convention"). Verification is `timingSafeEqual`, matching `packages/linkedin-infra/src/unipile.ts`.
+> **Amended 2026-07-18 (owner call).** The original plan put this in `apps/web` and duplicated it into `packages/jobs`, because `apps/web` modules are `server-only`. Instead it lives in `packages/transactional-email`, which **both** `apps/web` and `packages/jobs` already depend on — one implementation, no duplication, no drift guardrail. Task 9's duplicate-and-guard steps are deleted.
+>
+> **Signing key: `LIFECYCLE_UNSUBSCRIBE_SECRET`, a new required env var.** The spec said reuse the existing webhook secret, but that no longer holds once the helper leaves `apps/web`: reading `UNIPILE_WEBHOOK_SECRET` inside the transactional-email package drags a vendor name across a package boundary (rules 03/04/05). Deriving the key from `RESEND_API_KEY` was considered and rejected — rotating that key would silently invalidate every unsubscribe link already sitting in people's inboxes, and an unsubscribe link that stops working is a compliance failure. A dedicated secret is stable across rotations. **Owner step: set it in Vercel and Trigger production.** Verification uses `timingSafeEqual`, matching `packages/linkedin-infra/src/unipile.ts`.
 
 - [ ] **Step 1: Write the failing test**
 
-Create `apps/web/src/lib/lifecycle-unsubscribe.test.ts`:
+Create `packages/transactional-email/src/unsubscribe-token.test.ts`:
 
 ```ts
 import { beforeAll, describe, expect, it } from "vitest";
-import { signUnsubscribeToken, verifyUnsubscribeToken } from "./lifecycle-unsubscribe";
+import { signUnsubscribeToken, verifyUnsubscribeToken } from "./unsubscribe-token";
 
 beforeAll(() => {
-  process.env.UNIPILE_WEBHOOK_SECRET = "test-secret";
+  process.env.LIFECYCLE_UNSUBSCRIBE_SECRET = "test-secret";
 });
 
 describe("lifecycle unsubscribe tokens", () => {
@@ -907,25 +910,30 @@ describe("lifecycle unsubscribe tokens", () => {
 
 - [ ] **Step 2: Run the test to verify it fails**
 
-Run: `pnpm --filter web test -- lifecycle-unsubscribe`
+Run: `pnpm --filter @vantera/transactional-email test`
 Expected: FAIL — module not found.
 
 - [ ] **Step 3: Write the token module**
 
-Create `apps/web/src/lib/lifecycle-unsubscribe.ts`:
+Create `packages/transactional-email/src/unsubscribe-token.ts`:
 
 ```ts
-import "server-only";
 import { createHmac, timingSafeEqual } from "node:crypto";
 
 /**
  * One-click unsubscribe for the lifecycle lane. A lapsed user cannot be asked to log in to opt
  * out, so the token carries its own proof — HMAC over the user id, no table, no expiry sweep.
- * Signed with the existing webhook secret rather than a new env var.
+ *
+ * Lives here rather than in apps/web because packages/jobs signs these links and apps/web
+ * verifies them; this package is the only thing both already depend on.
+ *
+ * Its own secret, deliberately: deriving from RESEND_API_KEY would invalidate every link already
+ * sitting in an inbox the moment that key rotates, and a dead unsubscribe link is a compliance
+ * failure.
  */
 function secret(): string {
-  const s = process.env.UNIPILE_WEBHOOK_SECRET;
-  if (!s) throw new Error("lifecycle unsubscribe secret missing");
+  const s = process.env.LIFECYCLE_UNSUBSCRIBE_SECRET;
+  if (!s) throw new Error("LIFECYCLE_UNSUBSCRIBE_SECRET missing");
   return s;
 }
 
@@ -950,9 +958,18 @@ export function verifyUnsubscribeToken(token: string): string | null {
 }
 ```
 
-- [ ] **Step 4: Run the test to verify it passes**
+- [ ] **Step 4: Export it and run the test**
 
-Run: `pnpm --filter web test -- lifecycle-unsubscribe`
+In `packages/transactional-email/src/index.ts`, add:
+
+```ts
+export { signUnsubscribeToken, verifyUnsubscribeToken } from "./unsubscribe-token";
+```
+
+Add `LIFECYCLE_UNSUBSCRIBE_SECRET=` to `.env.example` under the Resend block, with the comment:
+`# HMAC key for one-click lifecycle unsubscribe links. Its own secret so key rotation elsewhere never kills a link already in an inbox.`
+
+Run: `pnpm --filter @vantera/transactional-email test`
 Expected: PASS, 4 tests.
 
 - [ ] **Step 5: Write the route**
@@ -961,8 +978,8 @@ Create `apps/web/src/app/api/lifecycle-unsubscribe/[token]/route.ts`:
 
 ```ts
 import { NextResponse } from "next/server";
+import { verifyUnsubscribeToken } from "@vantera/transactional-email";
 import { createServiceClient } from "@/lib/supabase/service";
-import { verifyUnsubscribeToken } from "@/lib/lifecycle-unsubscribe";
 
 /**
  * RFC 8058 one-click unsubscribe for lifecycle emails. Must work with no session — the whole
@@ -1016,8 +1033,8 @@ If the proxy's matcher protects `/api/*`, add `/api/lifecycle-unsubscribe` to th
 - [ ] **Step 7: Commit**
 
 ```bash
-git add apps/web/src/lib/lifecycle-unsubscribe.ts apps/web/src/lib/lifecycle-unsubscribe.test.ts apps/web/src/app/api/lifecycle-unsubscribe
-git commit -m "feat(web): one-click lifecycle unsubscribe — no login required"
+git add packages/transactional-email/src/unsubscribe-token.ts packages/transactional-email/src/unsubscribe-token.test.ts packages/transactional-email/src/index.ts .env.example apps/web/src/app/api/lifecycle-unsubscribe
+git commit -m "feat(email): shared unsubscribe-token helper + one-click opt-out route"
 ```
 
 ---
@@ -1218,78 +1235,18 @@ git commit -m "feat(jobs): stamp lifecycle_last_email_at on trial-ending + weekl
 - Consumes: `runPullback` (Task 3), `createPullbackStore` (Task 4), `sendPullbackEmail` (Task 7), `signUnsubscribeToken` (Task 6).
 - Produces: task id `pullback-email`.
 
-> `signUnsubscribeToken` lives in `apps/web` and is `server-only`. Do **not** import it into `packages/jobs`. Duplicate the 12-line HMAC helper as `packages/jobs/src/pipeline/unsubscribe-token.ts` with the same algorithm, and add a test asserting both produce identical tokens for the same input — a drift guardrail, matching the `prompt-ab-drift` precedent.
+> `signUnsubscribeToken` is imported from `@vantera/transactional-email` (Task 6) — one implementation, shared by `apps/web` and `packages/jobs`. The original duplicate-and-guard steps were deleted when the helper was hoisted; do not recreate a jobs-local copy.
 
-- [ ] **Step 1: Create the shared token helper for jobs**
-
-Create `packages/jobs/src/pipeline/unsubscribe-token.ts` with the exact body of `signUnsubscribeToken` from Task 6 (the `createHmac`/base64url/`secret()` trio), minus the `server-only` import and minus `verifyUnsubscribeToken` (jobs only signs).
-
-- [ ] **Step 2: Write the drift guardrail test**
-
-The guardrail recomputes the expected token from first principles instead of hardcoding a literal, so there is nothing to fill in and nothing to go stale.
-
-Create `packages/jobs/src/pipeline/unsubscribe-token.test.ts`:
-
-```ts
-import { createHmac } from "node:crypto";
-import { beforeAll, describe, expect, it } from "vitest";
-import { signUnsubscribeToken } from "./unsubscribe-token";
-
-beforeAll(() => {
-  process.env.UNIPILE_WEBHOOK_SECRET = "test-secret";
-});
-
-/**
- * The algorithm is duplicated in apps/web/src/lib/lifecycle-unsubscribe.ts because jobs cannot
- * import a `server-only` web module. If these drift, every emitted unsubscribe link becomes
- * unverifiable — silently. This pins the algorithm on the jobs side.
- */
-function expectedToken(userId: string, secret: string): string {
-  const payload = Buffer.from(userId).toString("base64url");
-  const sig = createHmac("sha256", secret).update(payload).digest("base64url");
-  return `${payload}.${sig}`;
-}
-
-describe("unsubscribe token (jobs copy)", () => {
-  it("is HMAC-SHA256 over base64url(userId), joined by a dot", () => {
-    expect(signUnsubscribeToken("user-123")).toBe(expectedToken("user-123", "test-secret"));
-  });
-
-  it("changes when the user changes", () => {
-    expect(signUnsubscribeToken("user-123")).not.toBe(signUnsubscribeToken("user-124"));
-  });
-
-  it("is URL-safe", () => {
-    expect(signUnsubscribeToken("user-123")).toMatch(/^[A-Za-z0-9._-]+$/);
-  });
-});
-```
-
-- [ ] **Step 2b: Prove the two implementations actually agree**
-
-The test above pins the jobs side only. Run this once to confirm the web helper produces the identical string; if it does not, reconcile before continuing:
-
-```bash
-cd /Users/aidenrigali/Vantera && UNIPILE_WEBHOOK_SECRET=test-secret node -e "
-const {createHmac}=require('node:crypto');
-const p=Buffer.from('user-123').toString('base64url');
-console.log(p+'.'+createHmac('sha256','test-secret').update(p).digest('base64url'));
-"
-```
-
-Expected: the same value `signUnsubscribeToken('user-123')` returns in the test run above.
-
-- [ ] **Step 3: Write the trigger task**
+- [ ] **Step 1: Write the trigger task**
 
 Create `packages/jobs/src/trigger/pullback-email.ts`:
 
 ```ts
 import { logger, task } from "@trigger.dev/sdk";
 import { createDb } from "@vantera/db";
-import { sendPullbackEmail } from "@vantera/transactional-email";
+import { sendPullbackEmail, signUnsubscribeToken } from "@vantera/transactional-email";
 import { createPullbackStore } from "../pipeline/pg-store";
 import { runPullback } from "../pipeline/pullback";
-import { signUnsubscribeToken } from "../pipeline/unsubscribe-token";
 
 /**
  * Pull-back email (spec 2026-07-18): the leads or drafts already waiting, named, at most twice.
@@ -1326,7 +1283,7 @@ export const pullbackEmail = task({
 });
 ```
 
-- [ ] **Step 4: Wire it into the tick**
+- [ ] **Step 2: Wire it into the tick**
 
 In `packages/jobs/src/trigger/agent-scheduler.ts`, add after the `trial-ending` line:
 
@@ -1342,7 +1299,7 @@ And update the doc comment (lines 11-13) to read:
  * this cron: the plan's schedule quota is at 10/10 — an 11th schedule fails every deploy).
 ```
 
-- [ ] **Step 5: Write the schedule-quota guardrail**
+- [ ] **Step 3: Write the schedule-quota guardrail**
 
 Create `packages/jobs/src/trigger/schedule-quota.test.ts`:
 
@@ -1375,15 +1332,15 @@ describe("Trigger schedule quota", () => {
 });
 ```
 
-- [ ] **Step 6: Run the full gate**
+- [ ] **Step 4: Run the full gate**
 
 Run: `pnpm lint && pnpm type-check && pnpm test && pnpm build`
 Expected: all green.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
-git add packages/jobs/src/trigger packages/jobs/src/pipeline/unsubscribe-token.ts packages/jobs/src/pipeline/unsubscribe-token.test.ts
+git add packages/jobs/src/trigger
 git commit -m "feat(jobs): pullback-email task on the scheduler tick + schedule-quota guardrail"
 ```
 
