@@ -1,8 +1,9 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { LogOut } from "lucide-react";
 import { getGateData, toGateContext } from "@/lib/auth/context";
-import { resolveGate } from "@/lib/auth/gate";
+import { loginRedirect, resolveGate } from "@/lib/auth/gate";
 import { createClient } from "@/lib/supabase/server";
 import { signOut } from "./actions";
 import { DockNav, DockTooltip, MobileNav } from "@/components/dock-nav";
@@ -62,7 +63,9 @@ function noteTimeAgo(iso: string): string {
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const data = await getGateData();
   const dest = resolveGate("app", toGateContext(data));
-  if (dest) redirect(dest);
+  // Preserve the requested path through the login bounce so email/deep-link CTAs land on the
+  // surface they promised (e.g. /review) instead of dead-ending on /dashboard after sign-in.
+  if (dest) redirect(loginRedirect(dest, (await headers()).get("x-pathname")));
 
   // Shell data — four independent reads, fired concurrently (R1a): every app navigation
   // pays this layout's latency, so it must be one round-trip, not a waterfall. All reads
