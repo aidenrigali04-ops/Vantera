@@ -50,7 +50,11 @@ export function normalizeInsights(i: LeadInsights): LeadInsights {
     score: Math.max(0, Math.min(100, Math.round(i.score))),
     rationale: clamp(i.rationale, 280),
     pain_points: i.pain_points.slice(0, 3),
-    triggers: i.triggers.slice(0, 3),
+    // Drop empty/whitespace triggers before persisting (review I3): an empty entry renders as a
+    // stray "; " in the leadBlock ("Triggers: ; x") that a downstream signal check could misread as
+    // real content. Ranker "no signal" filler tokens ("none", "No specific trigger found") are left
+    // to the selector + grounding guard, which both treat them as absent (shape.ts isNoSignalToken).
+    triggers: i.triggers.filter((t) => t.trim().length > 0).slice(0, 3),
     motivations: i.motivations.slice(0, 3),
     prospect_offering: clamp(i.prospect_offering, 220),
     value_angle: clamp(i.value_angle, 200),

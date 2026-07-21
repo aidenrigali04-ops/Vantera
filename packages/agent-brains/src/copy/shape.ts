@@ -115,9 +115,34 @@ export function isMessageShape(x: unknown): x is MessageShape {
   return typeof x === "string" && (MESSAGE_SHAPES as readonly string[]).includes(x);
 }
 
-/** A real trigger signal is present when the insights carry at least one non-empty trigger. */
+/**
+ * A ranker "no signal" placeholder, not a real trigger (spec 2026-07-20, review I3). The AI rank
+ * can emit a filler token when it finds nothing ("none", "n/a", "unknown", "No specific hiring or
+ * funding trigger found", "No recent trigger"). Treating those as a real trigger would license the
+ * fact-asserting trigger_consequence shape on a lead with NO trigger — the exact false premise this
+ * feature must never assert. Case-insensitive on the trimmed value.
+ *
+ * Two shapes of placeholder are caught, and ONLY these — a genuine trigger that happens to start
+ * with "no" ("no longer using Salesforce", "now hiring") must NEVER be dropped, so the negation
+ * branch is scoped to sentences that explicitly say there is no trigger/signal:
+ *   1. bare null tokens: none / nothing / n/a / na / unknown / tbd / not sure|applicable|available|found|known
+ *   2. an explicit negation that names a trigger/signal: "no ... trigger/signal ..."
+ */
+export function isNoSignalToken(value: string): boolean {
+  const v = value.trim().toLowerCase();
+  if (v.length === 0) return true;
+  if (/^(none|nothing|n\/?a|na|unknown|tbd)\b/.test(v)) return true;
+  if (/^not (sure|applicable|available|found|known)\b/.test(v)) return true;
+  // "no"/"not" as a standalone word (the \b guards "now"/"none"/"notable") followed later by the
+  // word trigger(s)/signal(s) — e.g. "No specific hiring or funding trigger found", "No recent trigger".
+  if (/^no(t)?\b.*\b(triggers?|signals?)\b/.test(v)) return true;
+  return false;
+}
+
+/** A real trigger signal is present when the insights carry at least one trigger that is not a
+ *  ranker "no signal" placeholder (empty, "none", "n/a", "No specific trigger found", …). */
 function hasTriggerSignal(insights: StoredInsights): boolean {
-  return insights.triggers.some((t) => t.trim().length > 0);
+  return insights.triggers.some((t) => !isNoSignalToken(t));
 }
 
 export interface SelectShapeInput {
@@ -164,9 +189,16 @@ export function selectMessageShape(input: SelectShapeInput): MessageShape {
  */
 export function groundingHasShapeSignal(block: string, shape: MessageShape): boolean {
   switch (shape) {
-    case "trigger_consequence":
-      // leadBlock renders "Triggers: none observed" when empty; anything else is a real trigger.
-      return /(^|\n)Triggers: (?!none observed)\S/.test(block);
+    case "trigger_consequence": {
+      // Pull the rendered "Triggers: …" line and require at least one REAL token in it — aligned
+      // with the selector's hasTriggerSignal (review I3). This rejects the empty render ("none
+      // observed"), ranker placeholders ("none" / "n/a" / "No specific trigger found"), AND the
+      // stray-"; " punctuation an empty array entry renders (triggers ["", "x"] → "Triggers: ; x"):
+      // the guard keys on real content, never on a semicolon. No line ⇒ no signal.
+      const line = /(?:^|\n)Triggers: (.*)$/m.exec(block);
+      if (!line) return false;
+      return line[1]!.split(";").some((t) => !isNoSignalToken(t));
+    }
     case "gift":
       // a giftable artifact = the account's supporting content, or a citable proof fact.
       return /(^|\n)Supporting content:/.test(block) || /Proof you may cite/.test(block);

@@ -8,6 +8,7 @@ import {
   SHAPE_DIRECTIVE,
   groundingHasShapeSignal,
   isMessageShape,
+  isNoSignalToken,
   selectMessageShape,
   shapeBudget,
   validateProposedShape,
@@ -40,6 +41,36 @@ describe("selectMessageShape — signal-gated champion default", () => {
     expect(selectMessageShape({ insights: insights({ triggers: ["  ", ""] }) })).toBe(
       "observation_question"
     );
+  });
+
+  it("treats ranker 'no signal' placeholders as NO trigger (review I3): they never license trigger_consequence", () => {
+    // The AI rank can emit a filler token when it finds nothing — a placeholder must NOT be read as
+    // a real trigger, or trigger_consequence asserts a premise that was never there.
+    const placeholders = [
+      ["none"],
+      ["n/a"],
+      ["N/A"],
+      ["unknown"],
+      ["No recent trigger"],
+      ["No specific hiring or funding trigger found"],
+    ];
+    for (const triggers of placeholders) {
+      expect(
+        selectMessageShape({ insights: insights({ triggers }) }),
+        `placeholder ${JSON.stringify(triggers)}`
+      ).toBe("observation_question");
+    }
+  });
+
+  it("still selects trigger_consequence for a REAL trigger that happens to start with 'no'/'now' (no false-drop)", () => {
+    // isNoSignalToken must not swallow genuine triggers — "now hiring" and "no longer using X" are
+    // real signals, not placeholders (the negation branch is scoped to sentences that name a trigger).
+    expect(selectMessageShape({ insights: insights({ triggers: ["now hiring 5 reps"] }) })).toBe(
+      "trigger_consequence"
+    );
+    expect(
+      selectMessageShape({ insights: insights({ triggers: ["no longer using Salesforce"] }) })
+    ).toBe("trigger_consequence");
   });
 
   it("returns gift only when a real artifact is available AND there is no stronger trigger signal", () => {
@@ -82,6 +113,25 @@ describe("groundingHasShapeSignal — guard on the leadBlock", () => {
     expect(groundingHasShapeSignal(withTrigger, "trigger_consequence")).toBe(true);
     // empty triggers render "Triggers: none observed" — NOT a real signal.
     expect(groundingHasShapeSignal(noTrigger, "trigger_consequence")).toBe(false);
+  });
+
+  it("flags trigger_consequence when the block's trigger line is a ranker placeholder (review I3)", () => {
+    // A placeholder that survived into the block ("No specific trigger found" / "n/a") is NOT a real
+    // signal — the guard must catch it just like the selector does, keeping the two consistent.
+    for (const t of ["No specific hiring or funding trigger found", "n/a", "none", "No recent trigger"]) {
+      const block = leadBlock({ ...base, insights: insights({ triggers: [t] }) });
+      expect(groundingHasShapeSignal(block, "trigger_consequence"), `placeholder "${t}"`).toBe(false);
+    }
+  });
+
+  it("keys on real content, not stray '; ' punctuation from empty array entries (review weakness)", () => {
+    // triggers: ["", ""] renders "Triggers: ; " (join keeps the semicolon) — the OLD regex saw the
+    // ';' as non-space and false-passed. The guard now splits and requires a real token.
+    const strayOnly = leadBlock({ ...base, insights: insights({ triggers: ["", ""] }) });
+    expect(groundingHasShapeSignal(strayOnly, "trigger_consequence")).toBe(false);
+    // but a real token alongside an empty one still passes ("Triggers: ; hiring 3 SDRs").
+    const strayPlusReal = leadBlock({ ...base, insights: insights({ triggers: ["", "hiring 3 SDRs"] }) });
+    expect(groundingHasShapeSignal(strayPlusReal, "trigger_consequence")).toBe(true);
   });
 
   it("passes gift only when the block carries a supporting-content artifact", () => {
@@ -167,5 +217,42 @@ describe("SHAPE_DIRECTIVE / SHAPE_BUDGET catalog", () => {
     expect(isMessageShape("gift")).toBe(true);
     expect(isMessageShape("nope")).toBe(false);
     expect(isMessageShape(null)).toBe(false);
+  });
+});
+
+describe("isNoSignalToken — placeholder trigger predicate (review I3)", () => {
+  it("flags empties and ranker filler tokens", () => {
+    for (const v of [
+      "",
+      "   ",
+      "none",
+      "None",
+      "nothing",
+      "n/a",
+      "N/A",
+      "na",
+      "unknown",
+      "tbd",
+      "not sure",
+      "not applicable",
+      "No recent trigger",
+      "No specific hiring or funding trigger found",
+      "no notable signals",
+    ]) {
+      expect(isNoSignalToken(v), `"${v}"`).toBe(true);
+    }
+  });
+
+  it("does NOT flag genuine triggers, including ones that start with 'no'/'now' (no false-drop)", () => {
+    for (const v of [
+      "hiring 3 SDRs",
+      "closed a Series B",
+      "now hiring",
+      "no longer using Salesforce",
+      "notable expansion into EMEA",
+      "nonprofit arm launched",
+    ]) {
+      expect(isNoSignalToken(v), `"${v}"`).toBe(false);
+    }
   });
 });
