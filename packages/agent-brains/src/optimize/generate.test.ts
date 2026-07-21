@@ -148,6 +148,36 @@ describe("proposeRecipeCandidates", () => {
       expect(safe.some((c) => c.messageShape === "gift")).toBe(true);
     });
 
+    it("ON + high-trust: never proposes provocation/disqualifier even when bold-pinned; own_cold + safe shapes still allowed (config-aware eligibility, spec 2026-07-21)", async () => {
+      const HT = { ...ON, boldShapesAllowed: true, highTrust: true };
+      const out = await proposeRecipeCandidates(
+        HT,
+        modelReturning([
+          { messageShape: "provocation" },
+          { messageShape: "disqualifier" },
+          { messageShape: "own_cold" },
+          { messageShape: "gift" },
+        ])
+      );
+      // the two aggressive shapes are excluded for a regulated seller's brand, pin or not
+      expect(out.some((c) => c.messageShape === "provocation")).toBe(false);
+      expect(out.some((c) => c.messageShape === "disqualifier")).toBe(false);
+      // own_cold (the honest cold-open) and the safe gift shape survive
+      expect(out.some((c) => c.messageShape === "own_cold")).toBe(true);
+      expect(out.some((c) => c.messageShape === "gift")).toBe(true);
+    });
+
+    it("ON + standard trust: a self_serve-friendly gift is proposable; a bold shape still needs the pin", async () => {
+      // gift is a SAFE shape → in-play for any account (a self_serve/traffic profile is its natural
+      // fit). Bold shapes remain founder-account-pinned regardless of trust.
+      const out = await proposeRecipeCandidates(
+        ON, // standard trust (highTrust unset), not bold-pinned
+        modelReturning([{ messageShape: "gift" }, { messageShape: "provocation" }])
+      );
+      expect(out.some((c) => c.messageShape === "gift")).toBe(true);
+      expect(out.some((c) => c.messageShape === "provocation")).toBe(false);
+    });
+
     it("ON: a shape makes the candidate signature distinct so the bandit aggregates it separately", async () => {
       const out = await proposeRecipeCandidates(
         ON,

@@ -50,6 +50,14 @@ export interface GenerateRecipesInput {
    *  explore the bold shapes (provocation/disqualifier/own_cold). Default false ⇒ safe subset only.
    *  Only consulted when `messageShapeAuto` is on (the master switch gates generation entirely). */
   boldShapesAllowed?: boolean;
+  /**
+   * Config-aware eligibility (spec 2026-07-21): whether the account's derived profile is `trust:
+   * high` (a regulated/high-trust seller). When true, provocation and disqualifier are NEVER
+   * proposed — even if the account is bold-pinned — so a regulated seller's brand only ever explores
+   * the calmer shapes. Derived in the JOBS layer (`deriveAccountProfile`) and passed in; the brain
+   * stays pure. Only consulted when `messageShapeAuto` is on. Default false ⇒ standard trust.
+   */
+  highTrust?: boolean;
 }
 
 const MAX_CANDIDATES = 6;
@@ -88,6 +96,9 @@ export async function proposeRecipeCandidates(
           `Current champion strategy: ${JSON.stringify(input.champion)}`,
           `Seller industry: ${input.accountIndustry ?? "unknown"}`,
           `Bold message shapes allowed for this account: ${input.boldShapesAllowed ? "yes" : "no"}`,
+          `Regulated or high-trust seller (prefer calmer shapes, no provocation or disqualifier): ${
+            input.highTrust ? "yes" : "no"
+          }`,
           `Already tested (do not re-propose): ${
             input.recentConclusions.map((c) => `${c.label} (${c.status})`).join("; ") || "none"
           }`,
@@ -114,10 +125,15 @@ export async function proposeRecipeCandidates(
     // app-setting is on. OFF ⇒ the knob is never mapped, so no challenger carries a shape and the
     // feature is fully dormant end-to-end (champion default is gated the same way in copy-draft).
     if (raw.messageShape !== undefined && input.messageShapeAuto) {
-      // Closed-set gate (spec §6/§7): unknown value dropped, observation_question (the default)
-      // dropped, bold shapes dropped unless this account is pinned. A dropped shape simply doesn't
-      // set the knob — the candidate can still carry its other knobs.
-      const shape = validateProposedShape(raw.messageShape, { allowBold: input.boldShapesAllowed ?? false });
+      // Closed-set gate (spec §6/§7 + config-aware §2026-07-21): unknown value dropped,
+      // observation_question (the default) dropped, bold shapes dropped unless this account is
+      // pinned, and provocation/disqualifier ALSO dropped for a high-trust (regulated) account even
+      // when pinned. A dropped shape simply doesn't set the knob — the candidate can still carry its
+      // other knobs.
+      const shape = validateProposedShape(raw.messageShape, {
+        allowBold: input.boldShapesAllowed ?? false,
+        highTrust: input.highTrust ?? false,
+      });
       if (shape) c.messageShape = shape;
     }
     if (Object.keys(c).length === 0) continue;
