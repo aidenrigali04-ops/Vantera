@@ -77,7 +77,13 @@ export async function fixLinkedInDraft(
           maxOutputTokens: 600,
         })
       ).object,
-    (fixed) => validateLinkedInDraft(fixed, block, input.context.accountName)
+    // The re-validation MUST carry the same shape the draft was generated under (spec 2026-07-20,
+    // review CRITICAL fix): a fact-asserting shape (trigger_consequence / gift / peer_insider) is
+    // grounding-gated by validateLinkedInDraft's shape-signal-missing guard. Omitting the shape here
+    // would let the humanizer fix pass LAUNDER that guard away — a de-slopped draft would re-lint
+    // clean and, in automatic send mode, auto-send a fabricated-premise message. The shape comes
+    // from the SAME source draftLinkedIn reads (input.context.strategy?.messageShape).
+    (fixed) => validateLinkedInDraft(fixed, block, input.context.accountName, input.context.strategy?.messageShape)
   );
   return {
     connectionNote: output.connection_note,

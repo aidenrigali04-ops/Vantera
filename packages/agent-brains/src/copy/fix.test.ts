@@ -152,4 +152,34 @@ describe("fixLinkedInDraft — automatic-send first-touch fix", () => {
     );
     expect(out.violations.length).toBeGreaterThan(0);
   });
+
+  // ── review CRITICAL: the fix pass must NOT launder away the grounding guard (spec 2026-07-20) ──
+  it("re-checks the shape grounding guard: a trigger_consequence draft on a NO-trigger lead STILL flags shape-signal-missing after the fix", async () => {
+    // No-trigger lead: leadBlock renders "Triggers: none observed", so the trigger_consequence
+    // shape has no real premise. The model returns humanizer-clean text both times — the ONLY
+    // reason this must stay flagged is the grounding guard, which the fix pass re-runs WITH the shape.
+    const noTriggerInput: DraftInput = {
+      ...draftInput,
+      insights: { ...insights, triggers: [] },
+      context: { ...draftInput.context, strategy: { messageShape: "trigger_consequence" } },
+    };
+    const model = new MockLanguageModelV3({
+      doGenerate: textResponse({
+        connection_note: "Ryan, glad to connect from the builder side.",
+        followup_message: "Thanks for connecting. Curious how you keep sourcing ahead of the team as it grows, no worries if the timing is off.",
+      }),
+    });
+    const out = await fixLinkedInDraft(
+      {
+        connectionNote: "orig note",
+        followupMessage: "orig follow-up",
+        violations: [{ rule: "banned-phrase", detail: "quick question" }],
+      },
+      noTriggerInput,
+      model
+    );
+    // the de-slopped copy re-lints clean on humanity BUT the shape guard still fires — the fix pass
+    // cannot buy a fact-asserting shape past its missing grounding signal.
+    expect(out.violations.some((v) => v.rule === "shape-signal-missing")).toBe(true);
+  });
 });
