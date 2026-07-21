@@ -3,6 +3,7 @@ import {
   aggregateBySignature,
   chooseChallenger,
   decideExperimentV2,
+  deriveAccountProfile,
   nextAlphaSpend,
   nextExperimentStage,
   proposeNextChallenger,
@@ -90,8 +91,16 @@ async function chainNext(
     // shapes; everyone else generates from the safe subset. Both resolved from trigger-read state.
     const messageShapeAuto = deps.messageShapeAuto ?? false;
     const boldShapesAllowed = (deps.boldShapesAccountIds ?? []).includes(exp.accountId);
+    // Config-aware eligibility (spec 2026-07-21): a regulated/high-trust seller never explores the
+    // aggressive shapes (provocation/disqualifier), even if bold-pinned. Derived from the account's
+    // REAL config through the PURE deriveAccountProfile, and ONLY when the master switch is on — off
+    // ⇒ no profile read and no eligibility change, so the generator path stays byte-identical.
+    let highTrust = false;
+    if (messageShapeAuto) {
+      highTrust = deriveAccountProfile(await deps.store.getAccountProfileConfig(exp.accountId)).trust === "high";
+    }
     const [candidates, stamped] = await Promise.all([
-      deps.proposeCandidatesFn({ stageKey, champion, recentConclusions, messageShapeAuto, boldShapesAllowed }),
+      deps.proposeCandidatesFn({ stageKey, champion, recentConclusions, messageShapeAuto, boldShapesAllowed, highTrust }),
       deps.store.getStampedOutcomes(),
     ]);
     const stats = aggregateBySignature(stageKey, stamped);

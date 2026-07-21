@@ -31,6 +31,7 @@ import type {
   ExperimentStatus,
   SendRecipe,
   JudgeFn,
+  AccountProfileConfig,
 } from "@vantera/agent-brains";
 import type { OutreachCapacity } from "./capacity";
 import type { SenderCandidate } from "./sender-assignment";
@@ -298,6 +299,12 @@ export interface CopyContext {
   /** openers from THIS account that earned interested replies — Vera's positive memory,
    *  injected as guide-for-angle exemplars (Stage 0.5). Derived at read time, never stored. */
   winningOpeners: string[];
+  /**
+   * Count of the account's citable proof points (config-aware selection, spec 2026-07-21) — feeds
+   * `deriveAccountProfile`'s proofDepth. A COUNT only (never the proof text) so the profile stays a
+   * config-derived approach prior, never a fact source. Optional/absent ⇒ 0 (proofDepth "none").
+   */
+  proofCount?: number;
 }
 
 export interface DraftableLead {
@@ -529,6 +536,14 @@ export interface OptimizeStore {
    * when unset or malformed ⇒ no account may propose a bold shape (safe subset only, everywhere).
    */
   getBoldShapesAccountIds(): Promise<string[]>;
+  /**
+   * Config-aware selection (spec 2026-07-21): the plain config subset needed to derive the account's
+   * profile for GENERATOR eligibility (`deriveAccountProfile` → `highTrust`). Read once per chained
+   * experiment, and ONLY when `messageShapeAuto` is on (byte-identical + no extra read when off).
+   * Returns config values only (cta, url presence, industry, valueProp, artifact presence, proof
+   * count) — never message text, keeping the brain's profile a pure approach prior.
+   */
+  getAccountProfileConfig(accountId: string): Promise<AccountProfileConfig>;
 }
 
 export interface OptimizeDeps {

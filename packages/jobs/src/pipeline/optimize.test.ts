@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest";
 import { GRACE_MS, runOptimize } from "./optimize";
 import type { OptimizeStore, RunningExperiment, StartExperimentInput } from "./types";
 import { ALPHA_MIN_SPEND, ALPHA_WEALTH_START, nextAlphaSpend } from "@vantera/agent-brains";
-import type { CopyStrategy, ExperimentStatus, LeadOutcomeFlags } from "@vantera/agent-brains";
+import type {
+  AccountProfileConfig,
+  CopyStrategy,
+  ExperimentStatus,
+  LeadOutcomeFlags,
+} from "@vantera/agent-brains";
 
 /**
  * Deterministic RNG for `decideExperimentV2`'s posterior Monte-Carlo read (Task 7 / WS-1.1's V2
@@ -136,6 +141,16 @@ class FakeOptimizeStore implements OptimizeStore {
   // empty); the trigger reads it and passes it via deps.boldShapesAccountIds.
   async getBoldShapesAccountIds(): Promise<string[]> {
     return [];
+  }
+  // Config-aware selection (spec 2026-07-21): the account's profile config for generator eligibility.
+  // Default is the safe/standard profile (empty config → trust "standard"); a test overrides
+  // `accountProfileConfig` to exercise the high-trust path. Records calls so a test can prove the
+  // read only happens when message_shape_auto is on.
+  accountProfileConfig: AccountProfileConfig = {};
+  getAccountProfileConfigCalls = 0;
+  async getAccountProfileConfig(_accountId: string): Promise<AccountProfileConfig> {
+    this.getAccountProfileConfigCalls++;
+    return this.accountProfileConfig;
   }
   async getAlphaWealth(_accountId: string): Promise<number> {
     this.getAlphaWealthCalls++;
@@ -482,6 +497,57 @@ describe("runOptimize (decide pipeline — GATE 0 suggest-only adopt, enterprise
       rand: mulberry32(7),
     });
     expect(seenOn).toBe(true);
+  });
+
+  it("derives highTrust from the account config and threads it to the generator — ONLY when the master switch is on (config-aware, spec 2026-07-21)", async () => {
+    // OFF (default): no profile read at all, and the generator is told standard trust (byte-identical).
+    const off = new FakeOptimizeStore();
+    losingArms(off);
+    off.accountProfileConfig = { industry: "wealth management" }; // would be high-trust IF read
+    let seenOff: boolean | undefined;
+    await runOptimize({
+      store: off,
+      proposeCandidatesFn: async (input) => {
+        seenOff = input.highTrust;
+        return [{ askStyle: "specific" }];
+      },
+      rand: mulberry32(7),
+    });
+    expect(off.getAccountProfileConfigCalls).toBe(0); // no read when the feature is off
+    expect(seenOff).toBe(false);
+
+    // ON + a regulated account → highTrust true reaches the generator (excludes provocation/disqualifier)
+    const on = new FakeOptimizeStore();
+    losingArms(on);
+    on.accountProfileConfig = { industry: "wealth management" };
+    let seenOn: boolean | undefined;
+    await runOptimize({
+      store: on,
+      messageShapeAuto: true,
+      proposeCandidatesFn: async (input) => {
+        seenOn = input.highTrust;
+        return [{ askStyle: "specific" }];
+      },
+      rand: mulberry32(7),
+    });
+    expect(on.getAccountProfileConfigCalls).toBe(1);
+    expect(seenOn).toBe(true);
+
+    // ON + a standard account → highTrust false
+    const std = new FakeOptimizeStore();
+    losingArms(std);
+    std.accountProfileConfig = { industry: "devtools", cta: "book a call" };
+    let seenStd: boolean | undefined;
+    await runOptimize({
+      store: std,
+      messageShapeAuto: true,
+      proposeCandidatesFn: async (input) => {
+        seenStd = input.highTrust;
+        return [{ askStyle: "specific" }];
+      },
+      rand: mulberry32(7),
+    });
+    expect(seenStd).toBe(false);
   });
 
   it("falls back to the knob-flip when generation returns no candidates", async () => {

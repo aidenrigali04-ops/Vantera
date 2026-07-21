@@ -584,6 +584,35 @@ describe("runCopyDraft — message-shape champion default (config-gated, OFF by 
     await runCopyDraft(PAYLOAD, deps);
     expect(inputs[0]!.context.strategy).toEqual({ messageShape: "peer_insider" });
   });
+
+  // ── config-aware approach selection (spec 2026-07-21): the profile derived from the account's
+  //    real config biases the champion default (APPROACH only, never facts) ──
+  it("ON + self_serve cta + an artifact + no trigger → the champion default becomes gift", async () => {
+    const store = new FakeCopyStore();
+    store.context.agent.config.cta = "start a free trial"; // self_serve arc
+    store.context.assets = [{ kind: "link", url: "https://acme.com/teardown.pdf", filename: null }];
+    store.leads = [lead("l1", { aiInsights: { ...lead("l1").aiInsights!, triggers: [] } })];
+    const { deps, inputs } = makeCapturingDeps(store);
+    deps.messageShapeAuto = true;
+    await runCopyDraft(PAYLOAD, deps);
+    expect(inputs[0]!.context.strategy).toEqual({ messageShape: "gift" });
+    for (const row of store.sends) expect(row.recipe!.strategy).toEqual({ messageShape: "gift" });
+  });
+
+  it("ON + a regulated (high-trust) industry + no trigger → observation_question, NOT stamped, even with an artifact", async () => {
+    const store = new FakeCopyStore();
+    store.context.account.industry = "wealth management"; // regulated → trust high
+    store.context.agent.config.cta = "start a free trial"; // would be self_serve, but trust wins
+    store.context.assets = [{ kind: "link", url: "https://acme.com/teardown.pdf", filename: null }];
+    store.leads = [lead("l1", { aiInsights: { ...lead("l1").aiInsights!, triggers: [] } })];
+    const { deps, inputs } = makeCapturingDeps(store);
+    deps.messageShapeAuto = true;
+    await runCopyDraft(PAYLOAD, deps);
+    // high-trust sellers get the calm shape; observation_question is the default so it is left OFF
+    // the strategy (byte-identical to a no-shape champion — the safe floor is a no-op).
+    expect(inputs[0]!.context.strategy).toEqual({});
+    for (const row of store.sends) expect(row.recipe!.strategy).toEqual({});
+  });
 });
 
 // ── Task 3: best-of-N judge-ranked draft selection ───────────────────────────

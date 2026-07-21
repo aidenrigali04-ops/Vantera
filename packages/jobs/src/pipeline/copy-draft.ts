@@ -1,4 +1,4 @@
-import { describeViolations, assignVariant, buildSendRecipe, LINKEDIN_SYSTEM, bestOfN, leadBlock, selectMessageShape } from "@vantera/agent-brains";
+import { describeViolations, assignVariant, buildSendRecipe, LINKEDIN_SYSTEM, bestOfN, leadBlock, selectMessageShape, deriveAccountProfile } from "@vantera/agent-brains";
 import type { DraftInput, CopyStrategy } from "@vantera/agent-brains";
 import { getModelId } from "@vantera/ai";
 import type {
@@ -126,8 +126,23 @@ export async function runCopyDraft(
       !strategy.messageShape &&
       lead.aiInsights
     ) {
-      const artifactAvailable = (ctx.assets ?? []).some((a) => Boolean((a.url ?? a.filename)?.trim()));
-      const shape = selectMessageShape({ insights: lead.aiInsights, artifactAvailable });
+      // Config-aware approach selection (spec 2026-07-21): the account's derived PROFILE sets the
+      // approach prior for the champion default. Assembled here in the JOBS layer from the FULL ctx
+      // (cta, booking/website url presence, industry, website-scan valueProp, assets, proof count) —
+      // NEVER from message text — and passed into the PURE brain selector. The profile biases
+      // APPROACH only; facts still come from grounding and every anti-hallucination layer stays in
+      // force. This whole block only runs when message_shape_auto is ON, so the OFF path derives no
+      // profile and the champion prompt/recipe stay byte-identical.
+      const profile = deriveAccountProfile({
+        cta: ctx.agent.config.cta,
+        hasBookingUrl: Boolean(ctx.agent.config.bookingUrl),
+        hasWebsiteUrl: Boolean(ctx.agent.config.websiteUrl),
+        industry: ctx.account.industry,
+        valueProp: ctx.account.websiteScan?.summary ?? null,
+        hasArtifact: (ctx.assets ?? []).some((a) => Boolean((a.url ?? a.filename)?.trim())),
+        proofCount: ctx.proofCount ?? 0,
+      });
+      const shape = selectMessageShape(lead.aiInsights, profile);
       if (shape !== "observation_question") strategy = { ...strategy, messageShape: shape };
     }
     const input = toDraftInput(lead, ctx, strategy);

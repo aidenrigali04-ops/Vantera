@@ -851,6 +851,12 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         },
         avoidPhrases: await recentSendOpeners(db, agent.accountId),
         winningOpeners: await winningOpeners(db, agent.accountId),
+        // Config-aware selection (spec 2026-07-21): a COUNT of the account's proof points feeds
+        // deriveAccountProfile's proofDepth. A count only, never the proof text — the profile is a
+        // config-derived approach prior, never a fact source.
+        proofCount: (
+          await db.select({ n: count() }).from(proofPoints).where(eq(proofPoints.accountId, agent.accountId))
+        )[0]?.n ?? 0,
       };
     },
 
@@ -1349,6 +1355,46 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
       const [row] = await db.select().from(appSettings).where(eq(appSettings.key, "bold_shapes_account_ids"));
       const v = row?.value;
       return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string" && x.length > 0) : [];
+    },
+
+    async getAccountProfileConfig(accountId: string) {
+      // Config-aware selection (spec 2026-07-21): the plain CONFIG subset deriveAccountProfile reads
+      // for GENERATOR eligibility (→ highTrust). Config values only — never message text. Called
+      // once per chained experiment, and only when message_shape_auto is on (see optimize.ts).
+      const [copy] = await db
+        .select({ id: agents.id, config: agents.config })
+        .from(agents)
+        .where(and(eq(agents.accountId, accountId), eq(agents.kind, "copy")))
+        .limit(1);
+      const [account] = await db
+        .select({ industry: accounts.onboardingIndustry, websiteScan: accounts.websiteScan })
+        .from(accounts)
+        .where(eq(accounts.id, accountId))
+        .limit(1);
+      const config = (copy?.config ?? {}) as Partial<CopyConfig>;
+      const scan = account?.websiteScan as (WebsiteScan & { url?: string }) | null;
+      let hasArtifact = false;
+      if (copy) {
+        const [asset] = await db
+          .select({ url: agentAssets.url, filename: agentAssets.filename })
+          .from(agentAssets)
+          .where(eq(agentAssets.agentId, copy.id))
+          .limit(1);
+        hasArtifact = Boolean((asset?.url ?? asset?.filename)?.trim());
+      }
+      const [proofRow] = await db
+        .select({ n: count() })
+        .from(proofPoints)
+        .where(eq(proofPoints.accountId, accountId));
+      return {
+        cta: config.cta ?? null,
+        hasBookingUrl: Boolean(config.bookingUrl),
+        hasWebsiteUrl: Boolean(config.websiteUrl),
+        industry: account?.industry ?? null,
+        valueProp: scan?.summary ?? null,
+        hasArtifact,
+        proofCount: proofRow?.n ?? 0,
+      };
     },
 
     async ensureCanaryExperiment(accountId): Promise<boolean> {
