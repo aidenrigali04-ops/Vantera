@@ -565,9 +565,17 @@ export interface OptimizeDeps {
    * Message-shape selector (spec §7): the accounts pinned into `bold_shapes_account_ids`, read once
    * by the thin trigger. Only a pinned account's generation may propose the bold shapes
    * (provocation/disqualifier/own_cold); everyone else stays on the safe subset. Absent/empty ⇒ no
-   * account may propose a bold shape.
+   * account may propose a bold shape. Only consulted when `messageShapeAuto` is on.
    */
   boldShapesAccountIds?: string[];
+  /**
+   * Message-shape selector MASTER enable (review M-gate): the `message_shape_auto` app-setting,
+   * read once by the thin trigger via `getMessageShapeAuto`. Absent/false (default) ⇒ generation
+   * proposes NO messageShape on any candidate for any account, so the feature is dormant in the
+   * challenger arms too (mirrors the champion-default gate in copy-draft). true ⇒ safe shapes for
+   * all accounts, bold shapes only for pinned ones (`boldShapesAccountIds`).
+   */
+  messageShapeAuto?: boolean;
 }
 
 export interface OptimizeSummary {

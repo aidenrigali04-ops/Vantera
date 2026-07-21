@@ -26,15 +26,19 @@ export const optimize = schedules.task({
     const store = createPgStore(db);
     const healthStore = createAccountHealthStore(db);
 
-    const [canaryAccountId, boldShapesAccountIds] = await Promise.all([
+    const [canaryAccountId, boldShapesAccountIds, messageShapeAuto] = await Promise.all([
       store.getCanaryAccountId(),
       store.getBoldShapesAccountIds(),
+      store.getMessageShapeAuto(),
     ]);
     if (canaryAccountId) await store.ensureCanaryExperiment(canaryAccountId);
 
     const summary = await runOptimize({
       store,
       canaryAccountId,
+      // Master gate (review M-gate): message_shape_auto enables shape PROPOSALS in generation, not
+      // just the champion default in copy-draft — so the feature is truly OFF end-to-end by default.
+      messageShapeAuto,
       boldShapesAccountIds,
       proposeCandidatesFn: (input) => proposeRecipeCandidates(input),
       notifyCanaryAlert: createCanaryAlertNotifier(healthStore),

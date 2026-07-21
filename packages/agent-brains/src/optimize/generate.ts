@@ -39,8 +39,16 @@ export interface GenerateRecipesInput {
   /** recent concluded tests (label + adopted/discarded/halted) so ideas aren't re-proposed */
   recentConclusions: { label: string; status: string }[];
   accountIndustry?: string | null;
+  /**
+   * The `message_shape_auto` app-setting — the MASTER enable for the whole message-shape feature
+   * (spec 2026-07-20, review M-gate). OFF (default) ⇒ generation proposes NO messageShape on ANY
+   * candidate, so the feature is dormant in the challenger arms too, not just the champion default.
+   * Read in the jobs layer (`getMessageShapeAuto`) and passed in — the brain never touches the DB.
+   */
+  messageShapeAuto?: boolean;
   /** whether this account is pinned into `bold_shapes_account_ids` — only pinned accounts may
-   *  explore the bold shapes (provocation/disqualifier/own_cold). Default false ⇒ safe subset only. */
+   *  explore the bold shapes (provocation/disqualifier/own_cold). Default false ⇒ safe subset only.
+   *  Only consulted when `messageShapeAuto` is on (the master switch gates generation entirely). */
   boldShapesAllowed?: boolean;
 }
 
@@ -102,7 +110,10 @@ export async function proposeRecipeCandidates(
       if (validateRecipeAngle(angle) !== null) continue; // gated: claim-risk angles never enter
       c.openerAngle = angle;
     }
-    if (raw.messageShape !== undefined) {
+    // Master gate (review M-gate): messageShape is proposed ONLY when the `message_shape_auto`
+    // app-setting is on. OFF ⇒ the knob is never mapped, so no challenger carries a shape and the
+    // feature is fully dormant end-to-end (champion default is gated the same way in copy-draft).
+    if (raw.messageShape !== undefined && input.messageShapeAuto) {
       // Closed-set gate (spec §6/§7): unknown value dropped, observation_question (the default)
       // dropped, bold shapes dropped unless this account is pinned. A dropped shape simply doesn't
       // set the knob — the candidate can still carry its other knobs.

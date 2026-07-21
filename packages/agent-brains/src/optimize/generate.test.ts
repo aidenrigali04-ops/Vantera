@@ -75,50 +75,82 @@ describe("proposeRecipeCandidates", () => {
     expect(out).toEqual([{ openWith: "trigger" }]);
   });
 
-  // ── message-shape selector (spec §6/§7) ──
+  // ── message-shape selector (spec §6/§7 + review M-gate: master switch on generation) ──
   describe("messageShape proposals", () => {
-    it("maps a valid safe shape onto the candidate", async () => {
+    // The `message_shape_auto` master switch must be ON for ANY shape to be proposed. Every
+    // shape-mechanics test below sets it; the OFF test proves the dormant end-to-end path.
+    const ON = { ...INPUT, messageShapeAuto: true };
+
+    it("MASTER GATE OFF (default): proposes ZERO messageShape on any candidate, even a valid safe one", async () => {
+      // Feature dormant: the challenger arms carry no shape, mirroring the champion-default gate in
+      // copy-draft. Combined with the byte-identical champion, the whole feature is OFF end-to-end.
       const out = await proposeRecipeCandidates(
-        INPUT,
+        INPUT, // messageShapeAuto undefined = OFF
+        modelReturning([
+          { messageShape: "trigger_consequence" },
+          { messageShape: "gift", askStyle: "soft" },
+          { messageShape: "peer_insider" },
+        ])
+      );
+      expect(out.some((c) => c.messageShape !== undefined)).toBe(false);
+      // the non-shape knobs on a candidate still survive the dropped shape
+      expect(out.some((c) => c.askStyle === "soft")).toBe(true);
+    });
+
+    it("OFF does not let even a pinned account propose a shape (master gate beats the bold pin)", async () => {
+      const out = await proposeRecipeCandidates(
+        { ...INPUT, boldShapesAllowed: true }, // pinned, but master switch OFF
+        modelReturning([{ messageShape: "provocation" }, { messageShape: "trigger_consequence" }])
+      );
+      expect(out.some((c) => c.messageShape !== undefined)).toBe(false);
+    });
+
+    it("ON: maps a valid safe shape onto the candidate", async () => {
+      const out = await proposeRecipeCandidates(
+        ON,
         modelReturning([{ messageShape: "trigger_consequence" }])
       );
       expect(out.some((c) => c.messageShape === "trigger_consequence")).toBe(true);
     });
 
-    it("drops an unknown shape but keeps the candidate's other knobs (schema drops the bad value)", async () => {
+    it("ON: drops an unknown shape but keeps the candidate's other knobs (schema drops the bad value)", async () => {
       // z.enum rejects the unknown value; the object still parses, so askStyle survives.
       const out = await proposeRecipeCandidates(
-        INPUT,
+        ON,
         modelReturning([{ messageShape: "banter", askStyle: "soft" }])
       );
       expect(out.some((c) => c.messageShape !== undefined)).toBe(false);
       expect(out.some((c) => c.askStyle === "soft")).toBe(true);
     });
 
-    it("drops observation_question (proposing the default is a no-op challenger)", async () => {
+    it("ON: drops observation_question (proposing the default is a no-op challenger)", async () => {
       const out = await proposeRecipeCandidates(
-        INPUT,
+        ON,
         modelReturning([{ messageShape: "observation_question", followupLength: "tight" }])
       );
       expect(out.some((c) => c.messageShape !== undefined)).toBe(false);
       expect(out.some((c) => c.followupLength === "tight")).toBe(true);
     });
 
-    it("bold-shape pinning: a non-pinned account never gets a bold shape; a pinned account can explore it", async () => {
+    it("ON: bold-shape pinning — safe shapes for all, bold only for a pinned account", async () => {
       const boldCandidate = [{ messageShape: "provocation" as const }];
-      const notPinned = await proposeRecipeCandidates(INPUT, modelReturning(boldCandidate));
+      const notPinned = await proposeRecipeCandidates(ON, modelReturning(boldCandidate));
       expect(notPinned.some((c) => c.messageShape === "provocation")).toBe(false);
 
       const pinned = await proposeRecipeCandidates(
-        { ...INPUT, boldShapesAllowed: true },
+        { ...ON, boldShapesAllowed: true },
         modelReturning(boldCandidate)
       );
       expect(pinned.some((c) => c.messageShape === "provocation")).toBe(true);
+
+      // and a SAFE shape is proposed for the non-pinned account when the master switch is on
+      const safe = await proposeRecipeCandidates(ON, modelReturning([{ messageShape: "gift" as const }]));
+      expect(safe.some((c) => c.messageShape === "gift")).toBe(true);
     });
 
-    it("a shape makes the candidate signature distinct so the bandit aggregates it separately", async () => {
+    it("ON: a shape makes the candidate signature distinct so the bandit aggregates it separately", async () => {
       const out = await proposeRecipeCandidates(
-        INPUT,
+        ON,
         modelReturning([{ openWith: "trigger", messageShape: "gift" }])
       );
       // the knob-flip baseline is {openWith:trigger}; the shaped one must not collide with it.

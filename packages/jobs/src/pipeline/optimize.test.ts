@@ -453,6 +453,37 @@ describe("runOptimize (decide pipeline — GATE 0 suggest-only adopt, enterprise
     expect(seenNotPinned).toBe(false);
   });
 
+  it("threads messageShapeAuto (the master gate) into the generator — OFF by default, ON when set (review M-gate)", async () => {
+    // default: deps.messageShapeAuto absent ⇒ the generator is told the feature is OFF
+    const off = new FakeOptimizeStore();
+    losingArms(off);
+    let seenOff: boolean | undefined;
+    await runOptimize({
+      store: off,
+      proposeCandidatesFn: async (input) => {
+        seenOff = input.messageShapeAuto;
+        return [{ askStyle: "specific" }];
+      },
+      rand: mulberry32(7),
+    });
+    expect(seenOff).toBe(false);
+
+    // ON: the trigger read message_shape_auto=true and passed it through
+    const on = new FakeOptimizeStore();
+    losingArms(on);
+    let seenOn: boolean | undefined;
+    await runOptimize({
+      store: on,
+      messageShapeAuto: true,
+      proposeCandidatesFn: async (input) => {
+        seenOn = input.messageShapeAuto;
+        return [{ askStyle: "specific" }];
+      },
+      rand: mulberry32(7),
+    });
+    expect(seenOn).toBe(true);
+  });
+
   it("falls back to the knob-flip when generation returns no candidates", async () => {
     const store = new FakeOptimizeStore();
     losingArms(store);

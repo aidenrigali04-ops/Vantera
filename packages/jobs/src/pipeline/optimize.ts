@@ -84,11 +84,14 @@ async function chainNext(
   let challenger: CopyStrategy | null = null;
   if (deps.proposeCandidatesFn) {
     const recentConclusions = await deps.store.getRecentConclusions(exp.accountId, 8);
-    // Message-shape selector (spec §7): only a pinned account may explore the bold shapes; everyone
-    // else generates from the safe subset. Resolved from the trigger-read pin list.
+    // Message-shape selector: the `message_shape_auto` app-setting is the MASTER enable for
+    // generation (review M-gate) — OFF ⇒ NO messageShape is proposed for any account. Only when it
+    // is on does the bold-shape pin matter, and even then only a pinned account may explore the bold
+    // shapes; everyone else generates from the safe subset. Both resolved from trigger-read state.
+    const messageShapeAuto = deps.messageShapeAuto ?? false;
     const boldShapesAllowed = (deps.boldShapesAccountIds ?? []).includes(exp.accountId);
     const [candidates, stamped] = await Promise.all([
-      deps.proposeCandidatesFn({ stageKey, champion, recentConclusions, boldShapesAllowed }),
+      deps.proposeCandidatesFn({ stageKey, champion, recentConclusions, messageShapeAuto, boldShapesAllowed }),
       deps.store.getStampedOutcomes(),
     ]);
     const stats = aggregateBySignature(stageKey, stamped);
