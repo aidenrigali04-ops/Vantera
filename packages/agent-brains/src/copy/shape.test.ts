@@ -15,6 +15,7 @@ import {
   type MessageShape,
 } from "./shape";
 import { leadBlock } from "./shared";
+import { SAFE_PROFILE, type AccountConfigProfile } from "./profile";
 import type { StoredInsights } from "../prospect/schema";
 
 const insights = (over: Partial<StoredInsights> = {}): StoredInsights => ({
@@ -27,25 +28,39 @@ const insights = (over: Partial<StoredInsights> = {}): StoredInsights => ({
   ...over,
 });
 
-// ── selectMessageShape — signal-gated, safe subset only (spec §5a, never-hallucinate layer 1) ──
-describe("selectMessageShape — signal-gated champion default", () => {
-  it("returns trigger_consequence ONLY when a real trigger is present", () => {
-    expect(selectMessageShape({ insights: insights({ triggers: ["closed a Series B"] }) })).toBe(
+// ── selectMessageShape — signal-gated + config-aware, safe subset only (spec 2026-07-21,
+//    never-hallucinate layer 1) ──
+const profile = (over: Partial<AccountConfigProfile> = {}): AccountConfigProfile => ({
+  ...SAFE_PROFILE,
+  ...over,
+});
+
+describe("selectMessageShape — signal-gated, config-aware champion default", () => {
+  it("returns trigger_consequence when a real trigger is present, REGARDLESS of profile", () => {
+    // a genuine why-now is the strongest opener and it is fully grounded, so no config overrides it.
+    expect(selectMessageShape(insights({ triggers: ["closed a Series B"] }))).toBe(
       "trigger_consequence"
     );
+    expect(
+      selectMessageShape(insights({ triggers: ["closed a Series B"] }), profile({ trust: "high" }))
+    ).toBe("trigger_consequence");
+    expect(
+      selectMessageShape(
+        insights({ triggers: ["closed a Series B"] }),
+        profile({ conversionStyle: "self_serve", hasArtifact: true })
+      )
+    ).toBe("trigger_consequence");
   });
 
-  it("falls to the safe observation_question floor on thin signal (no trigger, no artifact)", () => {
-    expect(selectMessageShape({ insights: insights({ triggers: [] }) })).toBe("observation_question");
+  it("falls to the safe observation_question floor on thin signal (safe/default profile)", () => {
+    expect(selectMessageShape(insights({ triggers: [] }))).toBe("observation_question");
     // whitespace-only triggers are not a signal
-    expect(selectMessageShape({ insights: insights({ triggers: ["  ", ""] }) })).toBe(
-      "observation_question"
-    );
+    expect(selectMessageShape(insights({ triggers: ["  ", ""] }))).toBe("observation_question");
   });
 
-  it("treats ranker 'no signal' placeholders as NO trigger (review I3): they never license trigger_consequence", () => {
+  it("treats ranker 'no signal' placeholders as NO trigger — config NEVER licenses a fact-asserting shape without its signal (spec invariant 3)", () => {
     // The AI rank can emit a filler token when it finds nothing — a placeholder must NOT be read as
-    // a real trigger, or trigger_consequence asserts a premise that was never there.
+    // a real trigger, even on a booking/self-serve profile that would otherwise prefer a strong opener.
     const placeholders = [
       ["none"],
       ["n/a"],
@@ -54,9 +69,12 @@ describe("selectMessageShape — signal-gated champion default", () => {
       ["No recent trigger"],
       ["No specific hiring or funding trigger found"],
     ];
+    // a booking profile whose no-trigger default is observation_question — so if the placeholder
+    // were (wrongly) read as a real trigger it would show up as trigger_consequence. It must not.
+    const booking = profile({ conversionStyle: "booking", hasArtifact: true });
     for (const triggers of placeholders) {
       expect(
-        selectMessageShape({ insights: insights({ triggers }) }),
+        selectMessageShape(insights({ triggers }), booking),
         `placeholder ${JSON.stringify(triggers)}`
       ).toBe("observation_question");
     }
@@ -65,38 +83,86 @@ describe("selectMessageShape — signal-gated champion default", () => {
   it("still selects trigger_consequence for a REAL trigger that happens to start with 'no'/'now' (no false-drop)", () => {
     // isNoSignalToken must not swallow genuine triggers — "now hiring" and "no longer using X" are
     // real signals, not placeholders (the negation branch is scoped to sentences that name a trigger).
-    expect(selectMessageShape({ insights: insights({ triggers: ["now hiring 5 reps"] }) })).toBe(
+    expect(selectMessageShape(insights({ triggers: ["now hiring 5 reps"] }))).toBe(
       "trigger_consequence"
     );
-    expect(
-      selectMessageShape({ insights: insights({ triggers: ["no longer using Salesforce"] }) })
-    ).toBe("trigger_consequence");
+    expect(selectMessageShape(insights({ triggers: ["no longer using Salesforce"] }))).toBe(
+      "trigger_consequence"
+    );
   });
 
-  it("returns gift only when a real artifact is available AND there is no stronger trigger signal", () => {
+  it("trust: high (no trigger) → observation_question and NEVER a gift/bold shape, even with an artifact", () => {
+    // regulated sellers get the calm shape even with an artifact and a self-serve-ish arc.
+    const high = profile({ trust: "high", conversionStyle: "self_serve", hasArtifact: true });
+    expect(selectMessageShape(insights({ triggers: [] }), high)).toBe("observation_question");
+  });
+
+  it("self_serve + artifact (no trigger) → gift; self_serve without an artifact stays on the floor", () => {
     expect(
-      selectMessageShape({ insights: insights({ triggers: [] }), artifactAvailable: true })
+      selectMessageShape(
+        insights({ triggers: [] }),
+        profile({ conversionStyle: "self_serve", hasArtifact: true })
+      )
     ).toBe("gift");
-    // a trigger outranks a gift (a why-now beats a give)
-    expect(selectMessageShape({ insights: insights(), artifactAvailable: true })).toBe(
-      "trigger_consequence"
-    );
+    expect(
+      selectMessageShape(
+        insights({ triggers: [] }),
+        profile({ conversionStyle: "self_serve", hasArtifact: false })
+      )
+    ).toBe("observation_question");
   });
 
-  it("NEVER auto-selects a bold shape and NEVER auto-selects peer_insider (undferivable signal)", () => {
+  it("traffic → gift when there is an artifact, else observation_question", () => {
+    expect(
+      selectMessageShape(
+        insights({ triggers: [] }),
+        profile({ conversionStyle: "traffic", hasArtifact: true })
+      )
+    ).toBe("gift");
+    expect(
+      selectMessageShape(
+        insights({ triggers: [] }),
+        profile({ conversionStyle: "traffic", hasArtifact: false })
+      )
+    ).toBe("observation_question");
+  });
+
+  it("booking/standard/no-trigger → observation_question (start a real conversation)", () => {
+    expect(
+      selectMessageShape(
+        insights({ triggers: [] }),
+        profile({ conversionStyle: "booking", hasArtifact: true })
+      )
+    ).toBe("observation_question");
+  });
+
+  it("NEVER auto-selects a bold shape and NEVER peer_insider, across every profile (undferivable signal)", () => {
     const cases: StoredInsights[] = [
       insights(),
       insights({ triggers: [] }),
       insights({ triggers: [], pain_points: [] }),
     ];
+    const profiles: AccountConfigProfile[] = [
+      SAFE_PROFILE,
+      profile({ trust: "high" }),
+      profile({ conversionStyle: "self_serve", hasArtifact: true }),
+      profile({ conversionStyle: "traffic", hasArtifact: true }),
+      profile({ conversionStyle: "booking" }),
+      profile({ conversionStyle: "reply", hasArtifact: true }),
+    ];
     for (const i of cases) {
-      for (const artifactAvailable of [true, false]) {
-        const shape = selectMessageShape({ insights: i, artifactAvailable });
+      for (const p of profiles) {
+        const shape = selectMessageShape(i, p);
         expect(BOLD_SHAPES).not.toContain(shape);
         expect(shape).not.toBe("peer_insider");
         expect(SAFE_SHAPES).toContain(shape);
       }
     }
+  });
+
+  it("no profile arg → SAFE_PROFILE default (trigger-or-floor, matching the pre-config selector)", () => {
+    expect(selectMessageShape(insights())).toBe("trigger_consequence");
+    expect(selectMessageShape(insights({ triggers: [] }))).toBe("observation_question");
   });
 });
 
@@ -186,6 +252,25 @@ describe("validateProposedShape — generator enum gate", () => {
       expect(validateProposedShape(bold, { allowBold: false })).toBeNull();
       expect(validateProposedShape(bold, { allowBold: true })).toBe(bold);
     }
+  });
+
+  it("high-trust excludes provocation/disqualifier even when bold-pinned (config-aware eligibility)", () => {
+    expect(validateProposedShape("provocation", { allowBold: true, highTrust: true })).toBeNull();
+    expect(validateProposedShape("disqualifier", { allowBold: true, highTrust: true })).toBeNull();
+    // own_cold (an honest cold-open) is NOT excluded — a bold-pinned high-trust account can still get it
+    expect(validateProposedShape("own_cold", { allowBold: true, highTrust: true })).toBe("own_cold");
+    // safe shapes are unaffected by trust
+    expect(validateProposedShape("gift", { allowBold: false, highTrust: true })).toBe("gift");
+    expect(validateProposedShape("trigger_consequence", { allowBold: false, highTrust: true })).toBe(
+      "trigger_consequence"
+    );
+  });
+
+  it("standard trust with the bold pin still allows provocation/disqualifier", () => {
+    expect(validateProposedShape("provocation", { allowBold: true, highTrust: false })).toBe(
+      "provocation"
+    );
+    expect(validateProposedShape("disqualifier", { allowBold: true })).toBe("disqualifier");
   });
 });
 

@@ -1,4 +1,5 @@
 import type { StoredInsights } from "../prospect/schema";
+import { SAFE_PROFILE, type AccountConfigProfile } from "./profile";
 
 /**
  * Message-shape selector (spec 2026-07-20). The copy brain already personalizes CONTENT (pain,
@@ -145,32 +146,39 @@ function hasTriggerSignal(insights: StoredInsights): boolean {
   return insights.triggers.some((t) => !isNoSignalToken(t));
 }
 
-export interface SelectShapeInput {
-  insights: StoredInsights;
-  /**
-   * A genuinely shareable artifact or insight exists to give (the account's Add-Content assets, or
-   * a citable proof point). The ONLY signal that justifies the gift shape — without it, gift would
-   * be inventing something to hand over.
-   */
-  artifactAvailable?: boolean;
-}
-
 /**
- * Deterministic champion default — trigger-aware, SAFE subset only. Picks the shape the available
- * signal actually justifies:
- *   - a real recent trigger in the insights  → trigger_consequence
- *   - a real, shareable artifact to give      → gift
- *   - anything thinner                        → observation_question (the safe floor = byte-identical default)
+ * Deterministic champion default — trigger-aware AND config-aware (spec 2026-07-21), SAFE subset
+ * only. The lead's real signal still gates facts; within that, the account's derived PROFILE sets
+ * the approach prior. The policy, in order:
+ *   1. a real, non-placeholder trigger in the insights → trigger_consequence, REGARDLESS of profile
+ *      (a genuine why-now is the strongest opener and it is fully grounded, so config never overrides
+ *      it — and isNoSignalToken keeps a ranker placeholder from ever licensing it);
+ *   2. trust: high (regulated/high-trust seller) → observation_question (conservative, never a gimmick);
+ *   3. self_serve + hasArtifact → gift (show value, drive to try — but only with a real artifact);
+ *   4. traffic → gift when an artifact exists, else observation_question (traffic-first sellers
+ *      convert on seeing, not talking);
+ *   5. everything else (booking/standard/no-trigger, and the safe floor) → observation_question.
  *
  * NEVER returns a bold shape (those are exploration-only). NEVER returns peer_insider: a genuine
  * shared-domain "I do exactly what you do" signal is not reliably derivable from StoredInsights, and
  * faking peer intimacy is precisely the hallucination this feature must not commit — so peer_insider
  * stays exploration-only (proposed by the bandit, which learns from real outcomes) rather than
- * asserted by the default. This encodes the spec's core rule: no trigger, no trigger_consequence.
+ * asserted by the default.
+ *
+ * PURITY / ANTI-HALLUCINATION: `profile` is a bounded approach prior derived from CONFIG only
+ * (never message text — see deriveAccountProfile). The config biases APPROACH, never facts. Absent
+ * profile → SAFE_PROFILE, which reproduces the pre-config selector (trigger-or-floor) exactly.
  */
-export function selectMessageShape(input: SelectShapeInput): MessageShape {
-  if (hasTriggerSignal(input.insights)) return "trigger_consequence";
-  if (input.artifactAvailable) return "gift";
+export function selectMessageShape(
+  insights: StoredInsights,
+  profile: AccountConfigProfile = SAFE_PROFILE
+): MessageShape {
+  if (hasTriggerSignal(insights)) return "trigger_consequence";
+  if (profile.trust === "high") return "observation_question";
+  if (profile.conversionStyle === "self_serve" && profile.hasArtifact) return "gift";
+  if (profile.conversionStyle === "traffic") {
+    return profile.hasArtifact ? "gift" : "observation_question";
+  }
   return "observation_question";
 }
 
@@ -216,11 +224,19 @@ export function groundingHasShapeSignal(block: string, shape: MessageShape): boo
  *   - an unknown value is dropped (returns null),
  *   - observation_question is dropped (proposing the default is a no-op challenger),
  *   - a bold shape is dropped unless the account is pinned (allowBold),
+ *   - provocation/disqualifier are dropped for a high-trust (regulated) account even when pinned,
  *   - a safe non-default shape passes through.
  */
-export function validateProposedShape(raw: unknown, opts: { allowBold: boolean }): MessageShape | null {
+export function validateProposedShape(
+  raw: unknown,
+  opts: { allowBold: boolean; highTrust?: boolean }
+): MessageShape | null {
   if (!isMessageShape(raw)) return null;
   if (raw === "observation_question") return null;
   if (BOLD_SHAPES.includes(raw) && !opts.allowBold) return null;
+  // Config-aware eligibility (spec 2026-07-21): a regulated/high-trust seller never explores the
+  // aggressive shapes (a contrarian provocation, a take-away disqualifier), even when the account is
+  // bold-pinned — calmer shapes only for that brand. own_cold (an honest cold-open) is not excluded.
+  if (opts.highTrust && (raw === "provocation" || raw === "disqualifier")) return null;
   return raw;
 }

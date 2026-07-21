@@ -67,8 +67,16 @@ export {
   groundingHasShapeSignal,
   validateProposedShape,
   type MessageShape,
-  type SelectShapeInput,
 } from "./copy/shape";
+export {
+  deriveAccountProfile,
+  SAFE_PROFILE,
+  type AccountConfigProfile,
+  type AccountProfileConfig,
+  type ConversionStyle,
+  type Trust,
+  type ProofDepth,
+} from "./copy/profile";
 export {
   fixConversationMessage,
   fixDraftText,
