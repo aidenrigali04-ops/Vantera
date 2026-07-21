@@ -153,6 +153,25 @@ describe("draftConversationMessage — strategy-aware drafting (WS-3.1)", () => 
     expect(seen).toContain("Keep the ask a soft, low-pressure interest check");
   });
 
+  it("ignores messageShape mid-thread — opener STRUCTURES are first-touch only (spec out-of-scope)", async () => {
+    let seen = "";
+    const model = new MockLanguageModelV3({
+      doGenerate: capturing({ message: "It flags the leads worth your time before you write." }, (p) => (seen = p)),
+    });
+    await draftConversationMessage(
+      input({
+        context: { ...input().context, strategy: { messageShape: "trigger_consequence", askStyle: "soft" } },
+      }),
+      model
+    );
+    // the shape directive (a first-touch opener structure) must never reach a mid-thread reply —
+    // the conversation brain's own anti-restart rules govern here.
+    expect(seen).not.toContain("message shape");
+    expect(seen).not.toContain("easy to opt out");
+    // the conversation-legal knob alongside it still renders
+    expect(seen).toContain("Keep the ask a soft, low-pressure interest check");
+  });
+
   it("prompt is byte-identical to before when strategy is absent", async () => {
     let withNoStrategyKey = "";
     let withUndefinedStrategy = "";

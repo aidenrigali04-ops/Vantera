@@ -2,6 +2,7 @@ import { generateObject, type LanguageModel } from "ai";
 import { z } from "zod";
 import { getModel, registerPrompt } from "@vantera/ai";
 import type { CopyStrategy } from "../copy/shared";
+import { MESSAGE_SHAPES, validateProposedShape } from "../copy/shape";
 import type { FunnelStageKey } from "./funnel";
 import { proposeNextChallenger } from "./experiment";
 import { validateRecipeAngle } from "./angle";
@@ -22,6 +23,12 @@ const candidateSchema = z.object({
       followupLength: z.enum(["tight", "standard"]).optional(),
       askStyle: z.enum(["soft", "specific"]).optional(),
       openerAngle: z.string().optional(),
+      // message-shape selector (spec §6): the opener STRUCTURE. z.enum is the closed set;
+      // `.catch(undefined)` makes an out-of-set value fall back to undefined (dropped) instead of
+      // sinking the WHOLE candidate batch (validate loosely, dispose at the mapping gate — same
+      // robustness the openerAngle free-text field relies on). validateProposedShape below then
+      // drops the default + gates bold shapes by account pin.
+      messageShape: z.enum(MESSAGE_SHAPES).optional().catch(undefined),
     })
   ),
 });
@@ -32,16 +39,22 @@ export interface GenerateRecipesInput {
   /** recent concluded tests (label + adopted/discarded/halted) so ideas aren't re-proposed */
   recentConclusions: { label: string; status: string }[];
   accountIndustry?: string | null;
+  /** whether this account is pinned into `bold_shapes_account_ids` — only pinned accounts may
+   *  explore the bold shapes (provocation/disqualifier/own_cold). Default false ⇒ safe subset only. */
+  boldShapesAllowed?: boolean;
 }
 
 const MAX_CANDIDATES = 6;
 const MAX_OUTPUT_TOKENS = 900;
 
 // Stable system prompt (identical across runs → Anthropic prompt caching hits).
-const GENERATE_SYSTEM = registerPrompt("optimize/generate", `You propose the next outreach copy experiments for a LinkedIn lead-gen system. Each candidate is a small strategy: optional knobs openWith (trigger|pain), followupLength (tight|standard), askStyle (soft|specific), and openerAngle, a SHORT style-only phrase (8-80 chars) describing what to angle the opener around (e.g. "a peer in their niche facing the same pain", "their recent post topic as the doorway").
+const GENERATE_SYSTEM = registerPrompt("optimize/generate", `You propose the next outreach copy experiments for a LinkedIn lead-gen system. Each candidate is a small strategy: optional knobs openWith (trigger|pain), followupLength (tight|standard), askStyle (soft|specific), openerAngle, a SHORT style-only phrase (8-80 chars) describing what to angle the opener around (e.g. "a peer in their niche facing the same pain", "their recent post topic as the doorway"), and messageShape, the STRUCTURE of the opener.
+
+messageShape options: observation_question (the default: thanks, one observation, one question), trigger_consequence (open on a real recent trigger and its downstream consequence), gift (lead with something useful and no ask), peer_insider (the one thing only someone who does their exact job would notice). Bold options provocation, disqualifier, own_cold exist but only propose them if you are told bold shapes are allowed for this account.
 
 Hard rules:
 - openerAngle is STYLE ONLY: no numbers, no percentages, no prices, no promises or guarantees, no invented facts. It steers the angle of the first sentence, never what is claimed.
+- messageShape is a STRUCTURE, not a claim. Propose a shape ONLY when the lead's signal supports it: do not propose trigger_consequence when there is no trigger, or peer_insider when there is no shared-domain signal. A shape never licenses inventing a fact.
 - Propose 3-5 candidates meaningfully different from the current champion and from each other.
 - Do not re-propose ideas that were already tested (listed with their outcomes).
 - Emit reasoning first (one dense sentence), then the candidates.`);
@@ -66,6 +79,7 @@ export async function proposeRecipeCandidates(
           `Funnel stage being tested: ${input.stageKey}`,
           `Current champion strategy: ${JSON.stringify(input.champion)}`,
           `Seller industry: ${input.accountIndustry ?? "unknown"}`,
+          `Bold message shapes allowed for this account: ${input.boldShapesAllowed ? "yes" : "no"}`,
           `Already tested (do not re-propose): ${
             input.recentConclusions.map((c) => `${c.label} (${c.status})`).join("; ") || "none"
           }`,
@@ -87,6 +101,13 @@ export async function proposeRecipeCandidates(
       const angle = raw.openerAngle.trim();
       if (validateRecipeAngle(angle) !== null) continue; // gated: claim-risk angles never enter
       c.openerAngle = angle;
+    }
+    if (raw.messageShape !== undefined) {
+      // Closed-set gate (spec §6/§7): unknown value dropped, observation_question (the default)
+      // dropped, bold shapes dropped unless this account is pinned. A dropped shape simply doesn't
+      // set the knob — the candidate can still carry its other knobs.
+      const shape = validateProposedShape(raw.messageShape, { allowBold: input.boldShapesAllowed ?? false });
+      if (shape) c.messageShape = shape;
     }
     if (Object.keys(c).length === 0) continue;
     const sig = strategySignature(c);

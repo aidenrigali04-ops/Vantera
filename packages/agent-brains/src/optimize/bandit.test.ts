@@ -32,6 +32,16 @@ describe("strategySignature", () => {
       strategySignature({ openerAngle: "post topic" })
     );
   });
+
+  it("distinguishes two recipes differing ONLY in messageShape (the bandit learns per shape)", () => {
+    // strategySignature already sorts keys + drops empties, so messageShape aggregates for free
+    // with zero bandit changes (spec §5b / task requirement 8).
+    expect(strategySignature({ openWith: "trigger", messageShape: "trigger_consequence" })).not.toBe(
+      strategySignature({ openWith: "trigger", messageShape: "gift" })
+    );
+    // and a set shape is distinct from no shape (the champion default)
+    expect(strategySignature({ messageShape: "gift" })).not.toBe(strategySignature({}));
+  });
 });
 
 describe("aggregateBySignature", () => {

@@ -1,5 +1,6 @@
 import type { StoredInsights } from "../prospect/schema";
 import { describeViolations, type Violation } from "./humanizer";
+import { SHAPE_DIRECTIVE, type MessageShape } from "./shape";
 
 export interface CopyLead {
   firstName?: string | null;
@@ -69,6 +70,12 @@ export type CopyStrategy = {
    *  value passes validateRecipeAngle before it can enter an experiment, so an angle can never
    *  instruct a number, price, or promise. */
   openerAngle?: string;
+  /** Message-shape selector (spec 2026-07-20): which STRUCTURE the first touch takes. Unset OR
+   *  "observation_question" is the byte-identical default (today's thanks/observation/question).
+   *  A shape rewrites structure only — it can never override compliance (de-pitch + humanizer),
+   *  which is enforced after generation regardless of shape. First-touch only (see
+   *  FIRST_TOUCH_ONLY_KNOBS). */
+  messageShape?: MessageShape;
 };
 
 const STRATEGY_LINES: Record<string, string> = {
@@ -86,8 +93,10 @@ const STRATEGY_LINES: Record<string, string> = {
  *  shape suppresses them and keeps only the knobs that make sense anywhere in a thread. */
 export type TouchShape = "first_touch" | "conversation";
 
-/** Knobs whose directive text only makes sense in a message that OPENS a thread. */
-const FIRST_TOUCH_ONLY_KNOBS = new Set<string>(["openWith", "openerAngle"]);
+/** Knobs whose directive text only makes sense in a message that OPENS a thread. `messageShape`
+ *  joins them: shapes are opener structures, and mid-thread the conversation brain's own
+ *  anti-restart rules govern (spec §out-of-scope), so the conversation shape suppresses it. */
+const FIRST_TOUCH_ONLY_KNOBS = new Set<string>(["openWith", "openerAngle", "messageShape"]);
 
 /**
  * Render a strategy as extra prompt directives, appended AFTER the base rules so it never overrides
@@ -109,6 +118,19 @@ export function strategyDirectives(strategy?: CopyStrategy, shape: TouchShape = 
       lines.push(
         `- Angle the opener around: "${String(value).trim()}". This shapes the angle only, never add facts or numbers because of it.`
       );
+      continue;
+    }
+    // Message-shape selector (spec §2/§3): the ONE directive allowed to REPLACE the default
+    // thanks/observation/question structure — precisely because compliance (de-pitch + humanizer)
+    // is enforced deterministically after generation, so a structural override can never buy past
+    // it. "observation_question" IS the default, so it emits nothing (byte-identical to unset).
+    if (key === "messageShape") {
+      const directive = SHAPE_DIRECTIVE[value as MessageShape];
+      if (directive && value !== "observation_question") {
+        lines.push(
+          `- Use this message shape instead of the default thanks, observation and question structure: ${directive}`
+        );
+      }
       continue;
     }
     const line = STRATEGY_LINES[`${key}:${value}`];

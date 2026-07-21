@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getModel, registerPrompt } from "@vantera/ai";
 import { validateHumanity, findUngroundedClaims, normalizeDashes, type Violation } from "./humanizer";
 import { avoidBlock, exemplarBlock, generateHumanized, leadBlock, strategyDirectives, PROSPECT_ACCURACY_RULE, VOICE_RULES, type DraftInput } from "./shared";
+import { FACT_ASSERTING_SHAPES, groundingHasShapeSignal, shapeBudget, type MessageShape } from "./shape";
 
 /**
  * LinkedIn's hard cap on a connection-request note is 300 chars, but free-tier
@@ -45,7 +46,8 @@ Connection note, under ${CONNECTION_NOTE_MAX_CHARS} characters:
 
 Follow-up message: one or two short sentences, aim for about 120 characters and never exceed ${FOLLOWUP_MAX_CHARS} (about ${FOLLOWUP_MAX_WORDS} words). Shorter always wins. This is the FIRST real exchange, and buyers delete anything long or anything that opens with a pitch, so:
 - Do NOT name the seller's company or product. Do NOT list features or describe what the seller does. Do NOT ask for a call, meeting, or demo. All of that comes later, after they engage.
-- Shape: a brief thanks (3 to 6 words, not gushing), then ONE sharp observation about THEIR situation and ONE genuinely curious question about how they handle it today. The question is the whole CTA, so make it easy and interesting to answer.
+- Default shape, UNLESS a message shape directive in the prompt below replaces it: a brief thanks (3 to 6 words, not gushing), then ONE sharp observation about THEIR situation and ONE genuinely curious question about how they handle it today. The question is the whole CTA, so make it easy and interesting to answer.
+- Whatever the shape, the de-pitch rules above (no product name, no link, no meeting ask) and the voice rules below ALWAYS apply. A shape may only change the STRUCTURE of the message, never what it is allowed to say or claim.
 - The "CTA goal" in the block only tells you where the conversation should eventually head. It must NOT appear as an ask in this message.
 - If the prospect's location strongly implies a primary language other than English, writing in that language is welcome.
 
@@ -59,6 +61,12 @@ If you ever reference the seller, use ONLY the "Seller company" value from the b
 // fabricated metric claims (rule 11 / anti-hallucination); unresolved ones surface in review.
 // `sellerName` enforces the de-pitched first touch: naming the product in message 1 is the
 // "pitch slap" buyers cite as the top delete trigger (2026-07-08 copy analysis).
+//
+// `shape` (message-shape selector, spec 2026-07-20) governs ONLY the follow-up length budget and
+// the grounding guard below. It is STRUCTURE, not a compliance escape: the de-pitch rules
+// (no link, no product name, no meeting ask) and the full humanizer run on EVERY shape unchanged —
+// a shape can never buy its way past them. Unset OR "observation_question" ⇒ the exact 180/28
+// follow-up budget as before the selector existed (byte-identical default).
 export function validateLinkedInDraft(
   draft: {
     connection_note: string;
@@ -66,10 +74,12 @@ export function validateLinkedInDraft(
   },
   grounding?: string,
   sellerName?: string | null,
+  shape?: MessageShape | null,
 ): Violation[] {
+  const budget = shapeBudget(shape);
   const violations = [
     ...validateHumanity(draft.connection_note, { maxChars: CONNECTION_NOTE_MAX_CHARS }),
-    ...validateHumanity(draft.followup_message, { maxChars: FOLLOWUP_MAX_CHARS, maxWords: FOLLOWUP_MAX_WORDS }),
+    ...validateHumanity(draft.followup_message, { maxChars: budget.maxChars, maxWords: budget.maxWords }),
   ];
   if (/https?:\/\//i.test(draft.connection_note)) {
     violations.push({ rule: "no-links", detail: "no links in a connection note" });
@@ -91,6 +101,18 @@ export function validateLinkedInDraft(
     violations.push(
       ...findUngroundedClaims(`${draft.connection_note}\n${draft.followup_message}`, grounding),
     );
+    // Deterministic grounding guard (spec §5c, anti-hallucination layer 3): a fact-asserting shape
+    // (trigger_consequence / gift / peer_insider) leans its whole framing on a specific prospect
+    // fact. If the shape was applied but the grounding block does NOT carry that signal, the premise
+    // was never real — route to review rather than trust it. Belt-and-suspenders on selectMessageShape.
+    // This is NOT a claim to catch all hallucination: an INVENTED fact shaped like the signal is
+    // defended by selection + the directive + PROSPECT_ACCURACY_RULE and ultimately the review queue.
+    if (shape && FACT_ASSERTING_SHAPES.includes(shape) && !groundingHasShapeSignal(grounding, shape)) {
+      violations.push({
+        rule: "shape-signal-missing",
+        detail: `the ${shape} shape asserts a specific fact, but the grounding has no matching signal — do not use this framing without it`,
+      });
+    }
   }
   return violations;
 }
@@ -110,6 +132,9 @@ export async function draftLinkedIn(
   const avoid = avoidBlock(input.context.avoidPhrases);
   const exemplars = exemplarBlock(input.context.winningExemplars);
   const basePrompt = [block, strat, avoid, exemplars].filter(Boolean).join("\n\n");
+  // The chosen shape governs the follow-up length budget + the grounding guard in the validator.
+  // Unset ⇒ shapeBudget falls back to the exact 180/28 default (byte-identical).
+  const shape = input.context.strategy?.messageShape;
   const { output, violations } = await generateHumanized(
     async (fixNote) => {
       const obj = (
@@ -128,7 +153,7 @@ export async function draftLinkedIn(
         followup_message: normalizeDashes(obj.followup_message),
       };
     },
-    (draft) => validateLinkedInDraft(draft, block, input.context.accountName)
+    (draft) => validateLinkedInDraft(draft, block, input.context.accountName, shape)
   );
   return {
     connectionNote: output.connection_note,

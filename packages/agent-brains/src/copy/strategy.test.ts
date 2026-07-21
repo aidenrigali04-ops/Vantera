@@ -24,6 +24,36 @@ describe("strategyDirectives", () => {
     expect(d).toContain("never add facts or numbers");
   });
 
+  // ── message-shape selector (spec 2026-07-20) ──
+  describe("messageShape", () => {
+    it("emits a structure-override directive for a non-default shape", () => {
+      const d = strategyDirectives({ messageShape: "trigger_consequence" });
+      expect(d).toContain("Use this message shape instead of the default");
+      expect(d).toContain("real, recent trigger");
+      // the fact-asserting shapes forbid inventing the premise, right there in the directive
+      expect(d.toLowerCase()).toContain("never invent");
+    });
+
+    it("is byte-identical to unset when the shape is the observation_question default", () => {
+      // The whole feature is OFF by default: the safe floor adds NO directive, so the prompt is
+      // identical to a strategy that never set the knob at all.
+      expect(strategyDirectives({ messageShape: "observation_question" })).toBe(strategyDirectives({}));
+      expect(strategyDirectives({ messageShape: "observation_question" })).toBe("");
+      // and it does not disturb the other knobs' rendering
+      expect(strategyDirectives({ messageShape: "observation_question", askStyle: "soft" })).toBe(
+        strategyDirectives({ askStyle: "soft" })
+      );
+    });
+
+    it("is suppressed in the conversation shape (a first-touch-only opener structure)", () => {
+      expect(strategyDirectives({ messageShape: "trigger_consequence" }, "conversation")).toBe("");
+      // but a conversation-legal knob alongside it still renders
+      const d = strategyDirectives({ messageShape: "gift", askStyle: "specific" }, "conversation");
+      expect(d).not.toContain("message shape");
+      expect(d).toContain("concrete next step");
+    });
+  });
+
   // ── touch-shape awareness (WS-3.1 fix): opener knobs are first-touch-only wording — rendered
   // mid-thread they contradict the conversation brain's own anti-restart rule.
   describe("conversation shape", () => {

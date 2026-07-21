@@ -55,6 +55,21 @@ export {
   type ProofPoint,
 } from "./copy/shared";
 export {
+  MESSAGE_SHAPES,
+  SAFE_SHAPES,
+  BOLD_SHAPES,
+  FACT_ASSERTING_SHAPES,
+  SHAPE_DIRECTIVE,
+  SHAPE_BUDGET,
+  shapeBudget,
+  isMessageShape,
+  selectMessageShape,
+  groundingHasShapeSignal,
+  validateProposedShape,
+  type MessageShape,
+  type SelectShapeInput,
+} from "./copy/shape";
+export {
   fixConversationMessage,
   fixDraftText,
   fixLinkedInDraft,

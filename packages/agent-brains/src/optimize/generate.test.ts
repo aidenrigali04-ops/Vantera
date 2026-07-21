@@ -74,4 +74,57 @@ describe("proposeRecipeCandidates", () => {
     const out = await proposeRecipeCandidates(INPUT, modelReturning([{}, {}]));
     expect(out).toEqual([{ openWith: "trigger" }]);
   });
+
+  // ── message-shape selector (spec §6/§7) ──
+  describe("messageShape proposals", () => {
+    it("maps a valid safe shape onto the candidate", async () => {
+      const out = await proposeRecipeCandidates(
+        INPUT,
+        modelReturning([{ messageShape: "trigger_consequence" }])
+      );
+      expect(out.some((c) => c.messageShape === "trigger_consequence")).toBe(true);
+    });
+
+    it("drops an unknown shape but keeps the candidate's other knobs (schema drops the bad value)", async () => {
+      // z.enum rejects the unknown value; the object still parses, so askStyle survives.
+      const out = await proposeRecipeCandidates(
+        INPUT,
+        modelReturning([{ messageShape: "banter", askStyle: "soft" }])
+      );
+      expect(out.some((c) => c.messageShape !== undefined)).toBe(false);
+      expect(out.some((c) => c.askStyle === "soft")).toBe(true);
+    });
+
+    it("drops observation_question (proposing the default is a no-op challenger)", async () => {
+      const out = await proposeRecipeCandidates(
+        INPUT,
+        modelReturning([{ messageShape: "observation_question", followupLength: "tight" }])
+      );
+      expect(out.some((c) => c.messageShape !== undefined)).toBe(false);
+      expect(out.some((c) => c.followupLength === "tight")).toBe(true);
+    });
+
+    it("bold-shape pinning: a non-pinned account never gets a bold shape; a pinned account can explore it", async () => {
+      const boldCandidate = [{ messageShape: "provocation" as const }];
+      const notPinned = await proposeRecipeCandidates(INPUT, modelReturning(boldCandidate));
+      expect(notPinned.some((c) => c.messageShape === "provocation")).toBe(false);
+
+      const pinned = await proposeRecipeCandidates(
+        { ...INPUT, boldShapesAllowed: true },
+        modelReturning(boldCandidate)
+      );
+      expect(pinned.some((c) => c.messageShape === "provocation")).toBe(true);
+    });
+
+    it("a shape makes the candidate signature distinct so the bandit aggregates it separately", async () => {
+      const out = await proposeRecipeCandidates(
+        INPUT,
+        modelReturning([{ openWith: "trigger", messageShape: "gift" }])
+      );
+      // the knob-flip baseline is {openWith:trigger}; the shaped one must not collide with it.
+      const shaped = out.find((c) => c.messageShape === "gift");
+      expect(shaped).toBeDefined();
+      expect(strategySignature(shaped!)).not.toBe(strategySignature({ openWith: "trigger" }));
+    });
+  });
 });
