@@ -127,8 +127,13 @@ export function strategyDirectives(strategy?: CopyStrategy, shape: TouchShape = 
     if (key === "messageShape") {
       const directive = SHAPE_DIRECTIVE[value as MessageShape];
       if (directive && value !== "observation_question") {
+        // The compliance guarantee travels WITH the directive (review I2): the escape-hatch
+        // language lives here, emitted ONLY when a non-default shape actually replaces the default
+        // structure, so the BASE LINKEDIN_SYSTEM prompt (and its hash) stay byte-identical when the
+        // feature is off. A shape reshapes STRUCTURE only, never what may be claimed. Dash-free on
+        // purpose (prompt prose primes output style).
         lines.push(
-          `- Use this message shape instead of the default thanks, observation and question structure: ${directive}`
+          `- Use this message shape instead of the default thanks, observation and question structure: ${directive} This changes the STRUCTURE of the message only, never what you may claim. The de-pitch rules (no product name, no link, no meeting ask) and the voice rules still apply in full.`
         );
       }
       continue;

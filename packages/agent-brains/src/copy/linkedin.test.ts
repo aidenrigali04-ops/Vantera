@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { MockLanguageModelV3 } from "ai/test";
-import { draftLinkedIn, validateLinkedInDraft, CONNECTION_NOTE_MAX_CHARS } from "./linkedin";
-import { leadBlock, type DraftInput } from "./shared";
+import { fnv1a64 } from "@vantera/ai";
+import { draftLinkedIn, validateLinkedInDraft, LINKEDIN_SYSTEM, CONNECTION_NOTE_MAX_CHARS } from "./linkedin";
+import { leadBlock, strategyDirectives, type DraftInput } from "./shared";
 import { validateHumanity } from "./humanizer";
 import { MESSAGE_SHAPES, SHAPE_BUDGET, shapeBudget, type MessageShape } from "./shape";
 
@@ -236,6 +237,65 @@ describe("draftLinkedIn — byte-identical default (feature OFF by default)", ()
     // exactly one generation each — no shape directive was appended, so nothing to fix/regenerate
     expect(unset.seen).toHaveLength(1);
     expect(oq.seen).toHaveLength(1);
+  });
+});
+
+// ── review I2: the LINKEDIN_SYSTEM base prompt is SHAPE-CONDITIONAL, so the OFF path is truly
+//    byte-identical (base prompt + hash) to before the message-shape feature existed. ──
+describe("LINKEDIN_SYSTEM — byte-identical base prompt when the feature is off (review I2)", () => {
+  // The FNV-1a 64-bit hash of the assembled LINKEDIN_SYSTEM text at commit c4261053~2 — the last
+  // revision BEFORE the message-shape feature added its two lines to the base prompt. Recovered from
+  // git and pinned here: if any shape/escape-hatch language leaks back into the BASE prompt, this
+  // hash shifts and this test fails (and every champion's stamped promptHash would silently drift).
+  const PRE_FEATURE_LINKEDIN_HASH = "85072182e5f97d23";
+
+  it("LINKEDIN_SYSTEM.hash equals the pre-feature hash (true old == new)", () => {
+    expect(LINKEDIN_SYSTEM.hash).toBe(PRE_FEATURE_LINKEDIN_HASH);
+    // and the hash is genuinely the hash of the live text (guards against a stale pin)
+    expect(fnv1a64(LINKEDIN_SYSTEM.text)).toBe(PRE_FEATURE_LINKEDIN_HASH);
+  });
+
+  it("the base prompt carries the ORIGINAL default-shape line and NONE of the feature escape-hatch language", () => {
+    expect(LINKEDIN_SYSTEM.text).toContain(
+      "- Shape: a brief thanks (3 to 6 words, not gushing), then ONE sharp observation"
+    );
+    // the two lines the feature had added to the base prompt must be gone from the base
+    expect(LINKEDIN_SYSTEM.text).not.toContain("Default shape, UNLESS");
+    expect(LINKEDIN_SYSTEM.text).not.toContain("Whatever the shape");
+    expect(LINKEDIN_SYSTEM.text).not.toContain("message shape directive");
+  });
+});
+
+// ── review I2: the compliance escape-hatch appears ONLY when a non-default shape is applied ──
+describe("strategyDirectives / draftLinkedIn — shape-conditional escape hatch (review I2)", () => {
+  const OVERRIDE_MARK = "This changes the STRUCTURE of the message only, never what you may claim.";
+
+  it("no shape / observation_question ⇒ the override language is NOT emitted", () => {
+    expect(strategyDirectives()).not.toContain(OVERRIDE_MARK);
+    expect(strategyDirectives({})).not.toContain(OVERRIDE_MARK);
+    expect(strategyDirectives({ messageShape: "observation_question" })).not.toContain(OVERRIDE_MARK);
+  });
+
+  it("a non-default shape ⇒ the override language + de-pitch/voice guarantee appears", () => {
+    const d = strategyDirectives({ messageShape: "trigger_consequence" });
+    expect(d).toContain(OVERRIDE_MARK);
+    expect(d).toContain("de-pitch rules (no product name, no link, no meeting ask)");
+    // dash-free ADDED sentence (the "- " bullet prefix is legitimate list syntax, so check only the
+    // override sentence itself — prompt prose primes output style; the humanizer bans dashes downstream)
+    expect(OVERRIDE_MARK).not.toMatch(/[—–]|--|\s-\s/);
+  });
+
+  it("draftLinkedIn injects the override into the model prompt only for a non-default shape", async () => {
+    const off = capturingModel();
+    await draftLinkedIn(INPUT, off.model);
+    expect(off.seen[0]).not.toContain(OVERRIDE_MARK);
+
+    const on = capturingModel();
+    await draftLinkedIn(
+      { ...INPUT, context: { ...INPUT.context, strategy: { messageShape: "trigger_consequence" } } },
+      on.model
+    );
+    expect(on.seen[0]).toContain(OVERRIDE_MARK);
   });
 });
 

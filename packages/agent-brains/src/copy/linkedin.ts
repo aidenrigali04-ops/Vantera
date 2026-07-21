@@ -46,8 +46,7 @@ Connection note, under ${CONNECTION_NOTE_MAX_CHARS} characters:
 
 Follow-up message: one or two short sentences, aim for about 120 characters and never exceed ${FOLLOWUP_MAX_CHARS} (about ${FOLLOWUP_MAX_WORDS} words). Shorter always wins. This is the FIRST real exchange, and buyers delete anything long or anything that opens with a pitch, so:
 - Do NOT name the seller's company or product. Do NOT list features or describe what the seller does. Do NOT ask for a call, meeting, or demo. All of that comes later, after they engage.
-- Default shape, UNLESS a message shape directive in the prompt below replaces it: a brief thanks (3 to 6 words, not gushing), then ONE sharp observation about THEIR situation and ONE genuinely curious question about how they handle it today. The question is the whole CTA, so make it easy and interesting to answer.
-- Whatever the shape, the de-pitch rules above (no product name, no link, no meeting ask) and the voice rules below ALWAYS apply. A shape may only change the STRUCTURE of the message, never what it is allowed to say or claim.
+- Shape: a brief thanks (3 to 6 words, not gushing), then ONE sharp observation about THEIR situation and ONE genuinely curious question about how they handle it today. The question is the whole CTA, so make it easy and interesting to answer.
 - The "CTA goal" in the block only tells you where the conversation should eventually head. It must NOT appear as an ask in this message.
 - If the prospect's location strongly implies a primary language other than English, writing in that language is welcome.
 
