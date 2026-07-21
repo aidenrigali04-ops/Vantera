@@ -132,6 +132,11 @@ class FakeOptimizeStore implements OptimizeStore {
   async ensureCanaryExperiment(_accountId: string): Promise<boolean> {
     return false;
   }
+  // Message-shape selector (spec §7): bold-shape pin list. Not exercised by most tests (default
+  // empty); the trigger reads it and passes it via deps.boldShapesAccountIds.
+  async getBoldShapesAccountIds(): Promise<string[]> {
+    return [];
+  }
   async getAlphaWealth(_accountId: string): Promise<number> {
     this.getAlphaWealthCalls++;
     return this.alphaWealth;
@@ -414,6 +419,38 @@ describe("runOptimize (decide pipeline — GATE 0 suggest-only adopt, enterprise
     expect(store.started[0]?.challenger).toEqual(angleCandidate);
     expect(store.stampedOutcomesCalls).toBe(1);
     expect(store.recentConclusionsCalls).toBe(1);
+  });
+
+  it("passes boldShapesAllowed to the generator ONLY for a pinned account (spec §7)", async () => {
+    // pinned: exp.accountId ("acct-1") is in the deps pin list → the generator may explore bold shapes
+    const pinned = new FakeOptimizeStore();
+    losingArms(pinned);
+    let seenPinned: boolean | undefined;
+    await runOptimize({
+      store: pinned,
+      boldShapesAccountIds: ["acct-1", "other"],
+      proposeCandidatesFn: async (input) => {
+        seenPinned = input.boldShapesAllowed;
+        return [{ askStyle: "specific" }];
+      },
+      rand: mulberry32(7),
+    });
+    expect(seenPinned).toBe(true);
+
+    // not pinned: the same account is absent from the list → safe subset only
+    const notPinned = new FakeOptimizeStore();
+    losingArms(notPinned);
+    let seenNotPinned: boolean | undefined;
+    await runOptimize({
+      store: notPinned,
+      boldShapesAccountIds: ["some-other-account"],
+      proposeCandidatesFn: async (input) => {
+        seenNotPinned = input.boldShapesAllowed;
+        return [{ askStyle: "specific" }];
+      },
+      rand: mulberry32(7),
+    });
+    expect(seenNotPinned).toBe(false);
   });
 
   it("falls back to the knob-flip when generation returns no candidates", async () => {

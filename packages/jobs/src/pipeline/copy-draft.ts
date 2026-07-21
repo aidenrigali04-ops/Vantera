@@ -1,4 +1,4 @@
-import { describeViolations, assignVariant, buildSendRecipe, LINKEDIN_SYSTEM, bestOfN, leadBlock } from "@vantera/agent-brains";
+import { describeViolations, assignVariant, buildSendRecipe, LINKEDIN_SYSTEM, bestOfN, leadBlock, selectMessageShape } from "@vantera/agent-brains";
 import type { DraftInput, CopyStrategy } from "@vantera/agent-brains";
 import { getModelId } from "@vantera/ai";
 import type {
@@ -110,7 +110,26 @@ export async function runCopyDraft(
     if (alreadyDrafted.has(lead.id)) return ZERO;
     // Deterministic, sticky per-lead arm assignment; strategy is the challenger's or the champion.
     const variant = experiment ? assignVariant(experiment, lead.id) : null;
-    const strategy = variant === "challenger" ? experiment!.challengerStrategy : champion.strategy;
+    let strategy = variant === "challenger" ? experiment!.challengerStrategy : champion.strategy;
+    // Message-shape selector (spec 2026-07-20) — CONFIG-GATED champion default. When the global
+    // `message_shape_auto` app-setting is OFF (default), this whole block is skipped and the
+    // champion behaves EXACTLY as before (byte-identical). When ON, the champion's opener structure
+    // becomes the signal-justified SAFE shape for this lead. Applied ONLY on the champion arm (never
+    // a challenger's chosen shape) and ONLY when the champion doesn't already pin a shape. A thin
+    // signal resolves to observation_question, which we deliberately do NOT stamp — leaving strategy
+    // untouched keeps the recipe/signature byte-identical to the no-shape champion (the safe floor
+    // is a no-op, preserving the optimizer's null hypothesis). Never mutates the shared champion
+    // object (a fresh object is spread).
+    if (
+      deps.messageShapeAuto &&
+      variant !== "challenger" &&
+      !strategy.messageShape &&
+      lead.aiInsights
+    ) {
+      const artifactAvailable = (ctx.assets ?? []).some((a) => Boolean((a.url ?? a.filename)?.trim()));
+      const shape = selectMessageShape({ insights: lead.aiInsights, artifactAvailable });
+      if (shape !== "observation_question") strategy = { ...strategy, messageShape: shape };
+    }
     const input = toDraftInput(lead, ctx, strategy);
     if (!input) return { drafted: 0, suppressed: 0, skipped: 1 };
     await deps.store.ensureCampaignLead(campaignId, lead.id, accountId);

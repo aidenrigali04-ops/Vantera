@@ -115,6 +115,11 @@ class FakeCopyStore implements CopyDraftStore {
   async getBestOfN() {
     return 1;
   }
+  // Message-shape selector: only the thin trigger reads this (the core reads deps.messageShapeAuto
+  // directly) — present solely to satisfy CopyDraftStore.
+  async getMessageShapeAuto() {
+    return false;
+  }
 }
 
 function makeDeps(store: FakeCopyStore): CopyDraftDeps {
@@ -511,6 +516,73 @@ describe("runCopyDraft — Vera's winning-opener memory (Stage 0.5)", () => {
     await runCopyDraft(PAYLOAD, deps);
 
     expect(captured[0]?.context.winningExemplars ?? []).toEqual([]);
+  });
+});
+
+// ── message-shape selector: config-gated champion default (spec 2026-07-20) ──
+describe("runCopyDraft — message-shape champion default (config-gated, OFF by default)", () => {
+  it("OFF (default): the champion strategy is byte-identical — no messageShape reaches the brain or the recipe", async () => {
+    const store = new FakeCopyStore();
+    store.leads = [lead("l1")]; // has triggers: ["hiring"]
+    const { deps, inputs } = makeCapturingDeps(store); // deps.messageShapeAuto is undefined = OFF
+    await runCopyDraft(PAYLOAD, deps);
+    expect(inputs[0]!.context.strategy).toEqual({});
+    for (const row of store.sends) {
+      expect(row.recipe!.strategy).toEqual({});
+      expect(row.recipe!.strategy).not.toHaveProperty("messageShape");
+    }
+  });
+
+  it("ON + a real trigger: the champion opener structure becomes trigger_consequence and rides the recipe", async () => {
+    const store = new FakeCopyStore();
+    store.leads = [lead("l1")]; // triggers: ["hiring"] → signal present
+    const { deps, inputs } = makeCapturingDeps(store);
+    deps.messageShapeAuto = true;
+    await runCopyDraft(PAYLOAD, deps);
+    expect(inputs[0]!.context.strategy).toEqual({ messageShape: "trigger_consequence" });
+    // attribution: messageShape rides buildSendRecipe → scheduled_sends.recipe with no new plumbing
+    for (const row of store.sends) {
+      expect(row.recipe!.strategy).toEqual({ messageShape: "trigger_consequence" });
+    }
+  });
+
+  it("ON + thin signal (no trigger, no artifact): resolves to the safe floor and is NOT stamped (byte-identical)", async () => {
+    const store = new FakeCopyStore();
+    store.context.assets = []; // no giftable artifact
+    store.leads = [lead("l1", { aiInsights: { ...lead("l1").aiInsights!, triggers: [] } })];
+    const { deps, inputs } = makeCapturingDeps(store);
+    deps.messageShapeAuto = true;
+    await runCopyDraft(PAYLOAD, deps);
+    // observation_question is the default → left OFF the strategy so the recipe/signature is
+    // identical to a no-shape champion (the safe floor is a no-op).
+    expect(inputs[0]!.context.strategy).toEqual({});
+    for (const row of store.sends) expect(row.recipe!.strategy).toEqual({});
+  });
+
+  it("ON never overrides the challenger arm's own strategy", async () => {
+    const store = new FakeCopyStore();
+    store.leads = [lead("l1")];
+    store.activeExperiment = {
+      id: "exp1",
+      allocationPct: 100,
+      challengerStrategy: { followupLength: "tight" },
+    };
+    const { deps, inputs } = makeCapturingDeps(store);
+    deps.messageShapeAuto = true;
+    await runCopyDraft(PAYLOAD, deps);
+    // challenger strategy is applied verbatim — the champion default never touches a challenger.
+    expect(inputs[0]!.context.strategy).toEqual({ followupLength: "tight" });
+    expect(inputs[0]!.context.strategy).not.toHaveProperty("messageShape");
+  });
+
+  it("ON never overrides a champion that already pins a shape", async () => {
+    const store = new FakeCopyStore();
+    store.champion = { strategy: { messageShape: "peer_insider" }, version: 3 };
+    store.leads = [lead("l1")]; // has a trigger, but the champion's explicit shape wins
+    const { deps, inputs } = makeCapturingDeps(store);
+    deps.messageShapeAuto = true;
+    await runCopyDraft(PAYLOAD, deps);
+    expect(inputs[0]!.context.strategy).toEqual({ messageShape: "peer_insider" });
   });
 });
 

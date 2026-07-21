@@ -26,12 +26,16 @@ export const optimize = schedules.task({
     const store = createPgStore(db);
     const healthStore = createAccountHealthStore(db);
 
-    const canaryAccountId = await store.getCanaryAccountId();
+    const [canaryAccountId, boldShapesAccountIds] = await Promise.all([
+      store.getCanaryAccountId(),
+      store.getBoldShapesAccountIds(),
+    ]);
     if (canaryAccountId) await store.ensureCanaryExperiment(canaryAccountId);
 
     const summary = await runOptimize({
       store,
       canaryAccountId,
+      boldShapesAccountIds,
       proposeCandidatesFn: (input) => proposeRecipeCandidates(input),
       notifyCanaryAlert: createCanaryAlertNotifier(healthStore),
     });

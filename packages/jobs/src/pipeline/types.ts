@@ -369,6 +369,14 @@ export interface CopyDraftStore {
    * MAX_BEST_OF_N regardless.
    */
   getBestOfN(): Promise<number>;
+  /**
+   * The `message_shape_auto` app-setting (message-shape selector, spec 2026-07-20) — a GLOBAL
+   * rollout knob. false (default, whenever the row is absent or not exactly `true`) keeps the
+   * champion's opener structure byte-identical to today. true lets the champion default become the
+   * signal-justified SAFE shape per lead (`selectMessageShape`). Same appSettings/eq-by-key pattern
+   * as getBestOfN/getAdoptionMode.
+   */
+  getMessageShapeAuto(): Promise<boolean>;
 }
 
 /** A running experiment as the copy-draft pipeline needs it: id, split, and the challenger strategy. */
@@ -514,6 +522,13 @@ export interface OptimizeStore {
    * `ALPHA_WEALTH_START` (0.05) in that case rather than throwing or returning null.
    */
   getAlphaWealth(accountId: string): Promise<number>;
+  /**
+   * Message-shape selector (spec §7): the `bold_shapes_account_ids` app-setting — the accounts
+   * pinned to explore the bold shapes (provocation/disqualifier/own_cold) in generation. Same
+   * admin-pin pattern as `aa_canary_account_id`, but a LIST (jsonb array of account ids). Empty
+   * when unset or malformed ⇒ no account may propose a bold shape (safe subset only, everywhere).
+   */
+  getBoldShapesAccountIds(): Promise<string[]>;
 }
 
 export interface OptimizeDeps {
@@ -546,6 +561,13 @@ export interface OptimizeDeps {
    * as the canary.
    */
   canaryAccountId?: string | null;
+  /**
+   * Message-shape selector (spec §7): the accounts pinned into `bold_shapes_account_ids`, read once
+   * by the thin trigger. Only a pinned account's generation may propose the bold shapes
+   * (provocation/disqualifier/own_cold); everyone else stays on the safe subset. Absent/empty ⇒ no
+   * account may propose a bold shape.
+   */
+  boldShapesAccountIds?: string[];
 }
 
 export interface OptimizeSummary {
@@ -605,6 +627,13 @@ export interface CopyDraftDeps {
    * MAX_BEST_OF_N regardless of what's configured, and forces it to 1 when `judgeFn` is absent.
    */
   bestOfN?: number;
+  /**
+   * Message-shape selector champion default (spec 2026-07-20) — resolved from the
+   * `message_shape_auto` app-setting by the thin trigger. Absent/false (default) ⇒ the champion's
+   * opener structure is byte-identical to today; true ⇒ the champion default becomes the
+   * signal-justified SAFE shape per lead. Never affects the challenger arm.
+   */
+  messageShapeAuto?: boolean;
 }
 
 export interface CopyDraftSummary {

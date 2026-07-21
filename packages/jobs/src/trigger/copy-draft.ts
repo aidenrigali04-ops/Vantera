@@ -19,13 +19,19 @@ export const copyDraft = task({
     const store = createPgStore(createDb());
     // Task 3 (best-of-N): the global `best_of_n` rollout knob, read once per run; the pipeline
     // core re-caps it and forces it to 1 whenever a judge isn't wired.
-    const bestOfN = await store.getBestOfN();
+    // Message-shape selector: the global `message_shape_auto` rollout knob (default OFF =
+    // byte-identical champion), read once per run alongside it.
+    const [bestOfN, messageShapeAuto] = await Promise.all([
+      store.getBestOfN(),
+      store.getMessageShapeAuto(),
+    ]);
     const summary = await runCopyDraft(payload, {
       store,
       draftLinkedInFn: (input) => draftLinkedIn(input),
       fixLinkedInFn: (draft, input) => fixLinkedInDraft(draft, input),
       judgeFn: (draft, ctx) => judgeCopy(draft, ctx),
       bestOfN,
+      messageShapeAuto,
     });
     logger.info("copy draft finished", { ...summary, copyAgentId: payload.copyAgentId });
     return summary;

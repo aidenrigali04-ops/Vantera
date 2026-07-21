@@ -84,8 +84,11 @@ async function chainNext(
   let challenger: CopyStrategy | null = null;
   if (deps.proposeCandidatesFn) {
     const recentConclusions = await deps.store.getRecentConclusions(exp.accountId, 8);
+    // Message-shape selector (spec §7): only a pinned account may explore the bold shapes; everyone
+    // else generates from the safe subset. Resolved from the trigger-read pin list.
+    const boldShapesAllowed = (deps.boldShapesAccountIds ?? []).includes(exp.accountId);
     const [candidates, stamped] = await Promise.all([
-      deps.proposeCandidatesFn({ stageKey, champion, recentConclusions }),
+      deps.proposeCandidatesFn({ stageKey, champion, recentConclusions, boldShapesAllowed }),
       deps.store.getStampedOutcomes(),
     ]);
     const stats = aggregateBySignature(stageKey, stamped);

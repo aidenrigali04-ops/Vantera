@@ -1005,6 +1005,14 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
       return typeof v === "number" && Number.isFinite(v) && v > 0 ? v : 1;
     },
 
+    async getMessageShapeAuto() {
+      // Global rollout knob (message-shape selector, spec 2026-07-20) — same appSettings/eq pattern
+      // as getBestOfN/getAdoptionMode. OFF (byte-identical champion) whenever the row is absent OR
+      // holds anything other than the literal boolean `true`; an owner must explicitly opt in.
+      const [row] = await db.select().from(appSettings).where(eq(appSettings.key, "message_shape_auto"));
+      return row?.value === true;
+    },
+
     async stampLeadExperiment(leadId, experimentId, variant) {
       await db
         .update(leads)
@@ -1332,6 +1340,15 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
       const [row] = await db.select().from(appSettings).where(eq(appSettings.key, "aa_canary_account_id"));
       const v = row?.value;
       return typeof v === "string" && v.length > 0 ? v : null;
+    },
+
+    async getBoldShapesAccountIds(): Promise<string[]> {
+      // Message-shape selector (spec §7) — admin-pin LIST (same appSettings pattern as
+      // aa_canary_account_id, but a jsonb array). Empty whenever unset or malformed, so a bad value
+      // can never silently open the bold shapes to every account.
+      const [row] = await db.select().from(appSettings).where(eq(appSettings.key, "bold_shapes_account_ids"));
+      const v = row?.value;
+      return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string" && x.length > 0) : [];
     },
 
     async ensureCanaryExperiment(accountId): Promise<boolean> {
