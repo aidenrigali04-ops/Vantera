@@ -6,7 +6,7 @@ import { PrimaryCta } from "@/components/landing/cta";
 export const metadata: Metadata = {
   title: "Opt Out — Vantera",
   description:
-    "Received a LinkedIn message sent through Vantera and don't want to hear from that sender again? Opt out here — suppression is permanent and honored before every send.",
+    "Got a LinkedIn message sent through Vantera and don't want to hear from that sender again? Opt out here — it's permanent and honored before every send.",
   alternates: { canonical: "/opt-out" },
 };
 

@@ -51,11 +51,11 @@ const poppins = Poppins({
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
-  title: "Adaptive Prospecting System for LinkedIn Lead Gen | Vantera",
+  title: "#1 LinkedIn Lead Gen — Adaptive Prospecting | Vantera",
   description: SITE_DESCRIPTION,
   applicationName: "Vantera",
   openGraph: {
-    title: "Adaptive Prospecting System for LinkedIn Lead Gen",
+    title: "#1 LinkedIn Lead Gen — Adaptive Prospecting",
     description: SITE_DESCRIPTION,
     url: "/",
     siteName: "Vantera",
@@ -63,7 +63,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Adaptive Prospecting System for LinkedIn Lead Gen",
+    title: "#1 LinkedIn Lead Gen — Adaptive Prospecting",
     description: SITE_DESCRIPTION,
   },
   // app/icon.svg → favicon; app/opengraph-image.tsx + app/twitter-image.tsx → the social card.

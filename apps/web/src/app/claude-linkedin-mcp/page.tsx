@@ -7,7 +7,7 @@ import { PrimaryCta, SecondaryCta } from "@/components/landing/cta";
 export const metadata: Metadata = {
   title: "Claude & MCP — Vantera",
   description:
-    "Drive Vantera from Claude over the Model Context Protocol: ask about your pipeline, review drafted outreach, and check on your agents without opening the dashboard. Early access.",
+    "Drive Vantera from Claude over MCP: check your pipeline, review drafted outreach, and manage your agents without opening the dashboard. Early access.",
   alternates: { canonical: "/claude-linkedin-mcp" },
 };
 

@@ -16,7 +16,7 @@ import { MarketingHeader } from "@/components/landing/marketing-header";
 export const metadata: Metadata = {
   title: "Account Safety — Vantera",
   description:
-    "Your LinkedIn account is the asset. Here's exactly how Vantera protects it: human-like pacing, hard limits that can't be pushed past, and a system that stops itself before it ever risks you.",
+    "Your LinkedIn account is the asset. See how Vantera protects it — human-like pacing, hard limits you can't override, a system that stops before it risks you.",
   alternates: { canonical: "/safety" },
 };
 
