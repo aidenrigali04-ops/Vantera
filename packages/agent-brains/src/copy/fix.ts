@@ -128,7 +128,7 @@ export async function fixConversationMessage(
           maxOutputTokens: 300,
         })
       ).object,
-    (fixed) => validateConversationMessage(fixed.message, block, allowedConversationLinks(input.context))
+    (fixed) => validateConversationMessage(fixed.message, block, allowedConversationLinks(input.context), input.incoming)
   );
   return { message: output.message, violations };
 }

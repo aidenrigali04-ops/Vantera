@@ -78,6 +78,35 @@ describe("draftConversationMessage — reply mode", () => {
   });
 });
 
+describe("draftConversationMessage — earned acknowledgment floor", () => {
+  it("flags a mind-reading opener (never-hallucinate)", async () => {
+    const model = new MockLanguageModelV3({
+      doGenerate: textResponse({ message: "Makes sense, you're probably swamped with unqualified leads." }),
+    });
+    const out = await draftConversationMessage(input(), model);
+    expect(out.violations.some((v) => v.rule === "speculative-claim")).toBe(true);
+  });
+
+  it("flags a parrot opener that restates the prospect's message", async () => {
+    const model = new MockLanguageModelV3({
+      doGenerate: textResponse({ message: "That makes sense, Vantera helping actually do the qualifying matters." }),
+    });
+    const out = await draftConversationMessage(
+      input({ incoming: "So Vantera does the qualifying part? That's the piece that matters to us." }),
+      model
+    );
+    expect(out.violations.some((v) => v.rule === "parrot-opener")).toBe(true);
+  });
+
+  it("passes a substantive answer with no acknowledgment preamble", async () => {
+    const model = new MockLanguageModelV3({
+      doGenerate: textResponse({ message: "It flags the leads worth a rep's time before you reach out. Want a look?" }),
+    });
+    const out = await draftConversationMessage(input(), model);
+    expect(out.violations).toEqual([]);
+  });
+});
+
 describe("draftConversationMessage — conversational posture (not every message pitches)", () => {
   it("carries the small-talk message + its classification to the brain, with a no-pitch-on-rapport rule", async () => {
     let seen = "";

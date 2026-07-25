@@ -8,6 +8,8 @@ import {
   findRestartPhrases,
   findActionClaims,
   findUnapprovedLinks,
+  findSpeculativeClaims,
+  findParrotOpener,
   normalizeDashes,
   type Violation,
 } from "../copy/humanizer";
@@ -118,13 +120,18 @@ export function allowedConversationLinks(context: CopyContext): string[] {
 export function validateConversationMessage(
   message: string,
   block: string,
-  allowedLinks: string[] = []
+  allowedLinks: string[] = [],
+  incoming?: string
 ): Violation[] {
   return [
     ...validateHumanity(message, { maxChars: CONVERSATION_REPLY_MAX_CHARS, maxWords: CONVERSATION_REPLY_MAX_WORDS }),
     // mid-conversation must never restart/re-introduce (rule enforced, not just prompted)
     ...findRestartPhrases(message),
     ...findUngroundedClaims(message, block),
+    // never-hallucinate: no mind-reading the prospect's unstated state ("you're probably swamped")
+    ...findSpeculativeClaims(message),
+    // anti-slop: no reflexive opener that restates their own message back to them
+    ...findParrotOpener(message, incoming),
     // the agent can only send messages — claiming to have joined/signed up is fabrication
     ...findActionClaims(message),
     // only the booking link + supporting content may ever be linked
@@ -192,7 +199,7 @@ export async function draftConversationMessage(
       // review over the one punctuation slip the model reliably makes.
       return { message: normalizeDashes(obj.message) };
     },
-    (draft) => validateConversationMessage(draft.message, block, allowed)
+    (draft) => validateConversationMessage(draft.message, block, allowed, input.incoming)
   );
 
   return { message: output.message, violations };
