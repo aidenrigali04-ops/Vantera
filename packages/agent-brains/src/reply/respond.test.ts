@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { MockLanguageModelV3 } from "ai/test";
-import { draftConversationMessage, type ConversationMessageInput , allowedConversationLinks, validateConversationMessage } from "./respond";
+import { draftConversationMessage, type ConversationMessageInput , allowedConversationLinks, validateConversationMessage, RESPOND_SYSTEM } from "./respond";
 import type { StoredInsights } from "../prospect/schema";
 
 const insights: StoredInsights = {
@@ -75,6 +75,18 @@ describe("draftConversationMessage — reply mode", () => {
     });
     await draftConversationMessage(input({ incoming: "We already use Apollo for this." }), model);
     expect(seen).toContain("We already use Apollo");
+  });
+});
+
+describe("RESPOND_SYSTEM — acknowledgment discipline", () => {
+  const t = RESPOND_SYSTEM.text;
+  it("teaches the shape to avoid, not a phrase blocklist", () => {
+    expect(t).toMatch(/lead with the substance/i);
+    expect(t).toMatch(/restat/i); // "never open by restating their point back"
+  });
+  it("carries the never-hallucinate mind-reading rule", () => {
+    expect(t).toMatch(/how they feel|what they'?re dealing with|why, unless they said/i);
+    expect(t).toMatch(/only what.*they.*typed|only what.*facts block/i);
   });
 });
 
