@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { validateHumanity, findRestartPhrases, findActionClaims, findUnapprovedLinks, normalizeDashes } from "./humanizer";
+import { validateHumanity, findRestartPhrases, findActionClaims, findUnapprovedLinks, findSpeculativeClaims, findParrotOpener, normalizeDashes } from "./humanizer";
 
 const CLEAN_EMAIL = `Saw you're hiring three SDRs while running outbound yourself. That usually means pipeline is outgrowing the team.
 
@@ -139,6 +139,46 @@ describe("findUnapprovedLinks", () => {
 
   it("flags every link when nothing is whitelisted", () => {
     expect(findUnapprovedLinks("https://cal.com/x", [])).toHaveLength(1);
+  });
+});
+
+describe("findSpeculativeClaims", () => {
+  it("flags mind-reading about the prospect's state", () => {
+    expect(findSpeculativeClaims("Makes sense, you're probably swamped with hiring right now.")).toHaveLength(1);
+    expect(findSpeculativeClaims("You must be dealing with a lot of unqualified leads.")).toHaveLength(1);
+    expect(findSpeculativeClaims("I imagine your team is stretched thin.")).toHaveLength(1);
+    expect(findSpeculativeClaims("Sounds like you're buried in outreach.")).toHaveLength(1);
+    expect(findSpeculativeClaims("I bet you're seeing low reply rates.")).toHaveLength(1);
+  });
+
+  it("does not flag grounded statements, conditionals, or plain concessions", () => {
+    expect(findSpeculativeClaims("If you're seeing low reply rates, that's the qualify gap.")).toHaveLength(0);
+    expect(findSpeculativeClaims("You're probably right about that.")).toHaveLength(0);
+    expect(findSpeculativeClaims("It flags the leads worth a rep's time before you reach out.")).toHaveLength(0);
+    expect(findSpeculativeClaims("You might want to check the pipeline view.")).toHaveLength(0);
+  });
+});
+
+describe("findParrotOpener", () => {
+  const incoming = "Honestly our reps waste hours chasing unqualified leads every week.";
+
+  it("flags a validation opener that restates the prospect's own point", () => {
+    expect(findParrotOpener("That makes sense, chasing unqualified leads wastes so many hours.", incoming)).toHaveLength(1);
+    expect(findParrotOpener("Totally fair, unqualified leads really do waste rep hours.", incoming)).toHaveLength(1);
+  });
+
+  it("does not flag a substantive answer, a bare ack, or a keyword-reuse answer", () => {
+    // substantive, no validation frame:
+    expect(findParrotOpener("We flag the leads worth a rep's time before you ever reach out.", incoming)).toHaveLength(0);
+    // validation frame but no echo of their content words:
+    expect(findParrotOpener("Totally fair. Want a quick look at how it works?", incoming)).toHaveLength(0);
+    // answers using one shared keyword, no validation frame:
+    expect(findParrotOpener("The qualify step is exactly what stops reps chasing bad leads.", incoming)).toHaveLength(0);
+  });
+
+  it("is a no-op in follow-up mode (no incoming message)", () => {
+    expect(findParrotOpener("That makes sense, unqualified leads waste hours.", undefined)).toHaveLength(0);
+    expect(findParrotOpener("That makes sense, unqualified leads waste hours.", "")).toHaveLength(0);
   });
 });
 

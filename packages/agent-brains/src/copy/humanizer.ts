@@ -293,3 +293,74 @@ export function findUnapprovedLinks(text: string, allowed: string[]): Violation[
   }
   return violations;
 }
+
+// Speculative second-person assertions about the prospect's internal state or situation —
+// "you're probably swamped", "you must be frustrated", "I imagine you're...". The agent knows
+// only what's in the facts block and what the prospect actually typed; asserting how they feel or
+// why is a hallucination even dressed as empathy (the "never hallucinate" floor for the
+// conversation responder — the prose-level counterpart to findUngroundedClaims, which only
+// catches numeric fabrication). Concessions ("you're probably right") and conditionals ("if
+// you're seeing X") are deliberately excluded to stay high-precision.
+const SPECULATIVE_PATTERNS: readonly RegExp[] = [
+  /\byou'?re (?:probably|likely|definitely|surely|clearly|obviously|no doubt|certainly)\b(?!\s+(?:right|correct|onto))/gi,
+  /\byou (?:must|gotta|probably|likely) be\b/gi,
+  /\bi (?:bet|imagine|assume|figure|'m sure|am sure|'d guess|would guess) (?:you|your)\b/gi,
+  /\b(?:sounds|seems) like you'?re\b/gi,
+];
+
+/**
+ * Flags speculative mind-reading of the prospect's state. Conversation-responder only. Each
+ * distinct matched phrase is reported once, `rule: "speculative-claim"`.
+ */
+export function findSpeculativeClaims(text: string): Violation[] {
+  const seen = new Set<string>();
+  const violations: Violation[] = [];
+  for (const pattern of SPECULATIVE_PATTERNS) {
+    for (const match of text.match(pattern) ?? []) {
+      const key = match.trim().toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      violations.push({
+        rule: "speculative-claim",
+        detail: `"${match.trim()}" asserts an unstated prospect state (mind-reading); say only what they told you`,
+      });
+    }
+  }
+  return violations;
+}
+
+// A validation-frame opener ("that makes sense", "totally fair", "I hear you"…). The FLOOR's
+// high-precision net for the reflexive-preamble shape — paired with an echo check so a bare ack
+// without a restate does NOT trip it (that judgment stays with the brain/prompt).
+const VALIDATION_FRAME =
+  /^\s*(?:oh\s+|ah\s+|yeah,?\s+|yep,?\s+|right,?\s+|ok,?\s+|okay,?\s+)?(?:that (?:really )?makes sense|makes sense|that'?s (?:a )?(?:fair|great|good|valid|solid) (?:point|question|call|one)|totally (?:fair|understandable|get it|makes sense)|completely (?:fair|understandable)|i (?:totally |completely |really )?(?:get|understand|hear|feel) (?:that|you|where you)|i can (?:see|understand) why|fair (?:enough|point|call)|good (?:point|question|call)|i hear you|you'?re (?:absolutely )?right)/i;
+
+const PARROT_STOPWORDS = new Set([
+  "the","and","that","this","with","your","have","been","they","them","what","when","from","will",
+  "would","could","about","just","like","really","actually","thing","things","some","more","much",
+  "very","into","then","than","their","there","here","does","doing","every","week","weeks","also",
+  "still","only","even","because","chasing","waste","wastes","wasting",
+]);
+
+const contentWords = (s: string): string[] =>
+  (s.toLowerCase().match(/[a-z']+/g) ?? []).filter((w) => w.length > 3 && !PARROT_STOPWORDS.has(w));
+
+/**
+ * Flags an opener that is predominantly a restate of the prospect's message — the parrot tell.
+ * Two-key: the first sentence matches a validation frame AND shares >= 2 content words with the
+ * incoming message. Absent/empty `incoming` (follow-up mode) => []. Conversation-responder only.
+ */
+export function findParrotOpener(text: string, incoming?: string): Violation[] {
+  if (!incoming || !incoming.trim()) return [];
+  const opener = text.split(/[.!?]/)[0] ?? "";
+  if (!VALIDATION_FRAME.test(opener)) return [];
+  const incomingSet = new Set(contentWords(incoming));
+  const shared = contentWords(opener).filter((w) => incomingSet.has(w));
+  if (shared.length < 2) return [];
+  return [
+    {
+      rule: "parrot-opener",
+      detail: `opener restates the prospect's own point ("${opener.trim()}"); lead with the substance instead`,
+    },
+  ];
+}
