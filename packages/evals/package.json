@@ -17,7 +17,7 @@
   "dependencies": {
     "@vantera/agent-brains": "workspace:*",
     "@vantera/ai": "workspace:*",
-    "ai": "^6.0.0",
+    "ai": "^7.0.37",
     "zod": "^4.0.0"
   },
   "devDependencies": {
