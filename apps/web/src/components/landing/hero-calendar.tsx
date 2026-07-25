@@ -24,6 +24,12 @@ const HUE: Record<string, string> = {
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const TODAY = 17; // Wed, June 17 2026
 
+// Mobile (< sm) shows a readable AGENDA of today's booked week (Mon 15 – Fri 19; the
+// weekends are empty) instead of the dense 7-col month grid — full brand names, not
+// truncated initials, so the card reads clean at phone width. June 1 2026 is a Monday,
+// so the weekday of date d is WEEKDAYS[(d - 1) % 7].
+const WEEK = [15, 16, 17, 18, 19];
+
 // June 2026 begins on a Monday (no leading blanks) and has 30 days → one clean 5×7
 // grid. Weekends stay open so the month reads calm, not packed. Only a couple of
 // pills show per day (+N more), so density is implied rather than overwhelming.
@@ -172,8 +178,8 @@ export const HeroCalendar = memo(function HeroCalendar({
           </div>
         </div>
 
-        {/* ── Weekday header ─────────────────────────────────────────────── */}
-        <div className="grid grid-cols-7 border-b border-[#EFF2F5] px-2 pb-2 pt-0.5">
+        {/* ── Weekday header (desktop month grid only) ───────────────────── */}
+        <div className="hidden grid-cols-7 border-b border-[#EFF2F5] px-2 pb-2 pt-0.5 sm:grid">
           {WEEKDAYS.map((w, i) => (
             <div
               key={w}
@@ -187,8 +193,8 @@ export const HeroCalendar = memo(function HeroCalendar({
           ))}
         </div>
 
-        {/* ── Month grid ─────────────────────────────────────────────────── */}
-        <div className="px-2 pt-1.5 pb-2">
+        {/* ── Month grid (desktop, ≥sm) ──────────────────────────────────── */}
+        <div className="hidden px-2 pt-1.5 pb-2 sm:block">
           <motion.div
             className="grid grid-cols-7 overflow-hidden rounded-[10px] border-l border-t border-[#F1F4F6]"
             initial="hidden"
@@ -243,6 +249,52 @@ export const HeroCalendar = memo(function HeroCalendar({
           </motion.div>
         </div>
 
+        {/* ── Mobile agenda (< sm) — a readable week of booked days, so the card
+              never crams a 7-col grid into a phone. Same data + brand pills, full
+              names, today marked. ────────────────────────────────────────────── */}
+        <div className="px-2.5 pb-2 pt-1 sm:hidden">
+          <div className="flex flex-col gap-1">
+            {WEEK.map((date) => {
+              const events = MONTH_EVENTS[date] ?? [];
+              const isToday = date === TODAY;
+              const shown = events.slice(0, 3);
+              const extra = events.length - shown.length;
+              return (
+                <div
+                  key={date}
+                  className={
+                    "flex items-center gap-3 rounded-[10px] px-2 py-2 " +
+                    (isToday ? "bg-[rgba(24,119,242,0.06)] ring-1 ring-[rgba(24,119,242,0.14)]" : "")
+                  }
+                >
+                  <div className="flex w-8 flex-none flex-col items-center">
+                    <span className="text-[9px] font-semibold uppercase tracking-[0.08em] text-[#8A929B]">
+                      {WEEKDAYS[(date - 1) % 7]}
+                    </span>
+                    <span
+                      className={
+                        isToday
+                          ? "mt-1 grid size-[22px] place-items-center rounded-full bg-[var(--fb)] text-[12px] font-semibold leading-none tabular-nums text-white shadow-[0_3px_8px_-2px_rgba(24,119,242,0.55)]"
+                          : "mt-1 text-[15px] font-semibold leading-none tabular-nums text-[#0C1620]"
+                      }
+                    >
+                      {date}
+                    </span>
+                  </div>
+                  <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+                    {shown.map((brand, i) => (
+                      <EventPill key={`${brand}-${i}`} brand={brand} big />
+                    ))}
+                    {extra > 0 && (
+                      <span className="text-[10px] font-semibold text-[#6B7480]">+{extra} more</span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
         {/* ── Footer — booking-pace trend + the play behind the bookings ──── */}
         <div className="flex items-center justify-between gap-4 border-t border-[#EFF2F5] px-4 pb-3.5 pt-3">
           <div>
@@ -270,15 +322,25 @@ export const HeroCalendar = memo(function HeroCalendar({
 });
 
 /* ── One brand-tinted meeting pill in a day cell ─────────────────────────────── */
-function EventPill({ brand }: { brand: string }) {
+function EventPill({ brand, big }: { brand: string; big?: boolean }) {
   const hue = HUE[brand] ?? SLATE;
+  // `big` = the mobile agenda variant (more room → larger, fully readable). Default is the
+  // compact grid pill, byte-identical to before so the desktop month grid is unchanged.
   return (
     <span
-      className="flex items-center gap-1.5 overflow-hidden rounded-[4px] py-[2.5px] pl-1 pr-1.5"
+      className={
+        "flex items-center gap-1.5 overflow-hidden rounded-[4px] " +
+        (big ? "py-[3px] pl-1.5 pr-2" : "py-[2.5px] pl-1 pr-1.5")
+      }
       style={{ background: `${hue}1f`, boxShadow: `inset 2px 0 0 ${hue}` }}
     >
       <span className="size-1.5 flex-none rounded-full" style={{ background: hue }} />
-      <span className="truncate text-[9.5px] font-semibold leading-none tracking-[-0.01em] text-[#334155]">
+      <span
+        className={
+          "truncate font-semibold leading-none tracking-[-0.01em] text-[#334155] " +
+          (big ? "text-[11px]" : "text-[9.5px]")
+        }
+      >
         {brand}
       </span>
     </span>
