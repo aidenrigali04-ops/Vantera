@@ -7,7 +7,7 @@ import { PrimaryCta, SecondaryCta } from "@/components/landing/cta";
 export const metadata: Metadata = {
   title: "Book a Demo — Vantera",
   description:
-    "See Vantera on your own pipeline: how the agents find in-market buyers, qualify them against your ICP, and draft outreach you approve. Book a walkthrough with the team.",
+    "See Vantera on your own pipeline: how its agents find in-market buyers, qualify them to your ICP, and draft outreach you approve. Book a live walkthrough.",
   alternates: { canonical: "/demo" },
 };
 

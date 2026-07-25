@@ -13,7 +13,9 @@ import { MarketingPricing } from "./marketing-pricing";
 
 export const metadata: Metadata = {
   title: "Pricing — Vantera",
-  description: "Autonomous agents that find in-market buyers, qualify them, and reach out on LinkedIn — you approve every send.",
+  description:
+    "Self-optimizing agents that find in-market buyers, qualify them, and reach out on LinkedIn — you approve every send.",
+  alternates: { canonical: "/pricing" },
 };
 
 export default function PricingPage() {

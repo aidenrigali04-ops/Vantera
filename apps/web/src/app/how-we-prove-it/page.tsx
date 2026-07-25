@@ -7,7 +7,7 @@ import { MarketingHeader } from "@/components/landing/marketing-header";
 export const metadata: Metadata = {
   title: "How We Prove It — Vantera",
   description:
-    "Our standard for every claim on this site and inside the product: real numbers or nothing. What we show, what we refuse to show, and how you can check it yourself.",
+    "Our standard for every claim on this site and in the product: real numbers or nothing. What we show, what we won't, and how you can check it yourself.",
   alternates: { canonical: "/how-we-prove-it" },
 };
 
