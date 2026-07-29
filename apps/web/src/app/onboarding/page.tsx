@@ -16,6 +16,7 @@ type AccountRow = {
   onboarding_icp: string | null;
   revenue_goal_cents: number | null;
   avg_deal_value_cents: number | null;
+  value_prop: string | null;
   onboarding_completed_at: string | null;
 };
 
@@ -39,7 +40,7 @@ export default async function OnboardingPage({
   const { data: account } = await supabase
     .from("accounts")
     .select(
-      "id, name, onboarding_role, onboarding_linkedin_url, website_url, website_scan, onboarding_industry, onboarding_icp, revenue_goal_cents, avg_deal_value_cents, onboarding_completed_at"
+      "id, name, onboarding_role, onboarding_linkedin_url, website_url, website_scan, onboarding_industry, onboarding_icp, revenue_goal_cents, avg_deal_value_cents, value_prop, onboarding_completed_at"
     )
     .limit(1)
     .maybeSingle<AccountRow>();
@@ -88,6 +89,7 @@ export default async function OnboardingPage({
       icp,
       revenueGoal: centsToDollars(account?.revenue_goal_cents ?? null),
       avgDealValue: centsToDollars(account?.avg_deal_value_cents ?? null),
+      valueProp: account?.value_prop ?? scan?.summary ?? "",
       bookingUrl: "",
     },
   };

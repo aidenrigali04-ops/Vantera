@@ -13,6 +13,7 @@ import {
 } from "./actions";
 import type { PlayCard } from "@/lib/plays";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { FormError } from "@/components/form-error";
 import { VanteraLogo } from "@/components/landing/vantera-logo";
@@ -34,6 +35,7 @@ export type WizardInit = {
     icp: string;
     revenueGoal: string;
     avgDealValue: string;
+    valueProp: string;
     bookingUrl: string;
   };
 };
@@ -176,6 +178,7 @@ export function Wizard({ init }: { init: WizardInit }) {
           ...v,
           industry: v.industry || scan.scope_of_industry,
           icp: v.icp || scan.suggested_icp,
+          valueProp: v.valueProp || scan.summary,
         }));
       }
       if (res.plays?.length) setPlays(res.plays);
@@ -439,6 +442,19 @@ export function Wizard({ init }: { init: WizardInit }) {
                           hint={derivedFromSite ? "Pulled from your site — edit if it’s off." : "In a few words, what does your company do?"}
                         >
                           <Input name="industry" value={values.industry} onChange={(e) => setValues({ ...values, industry: e.target.value })} placeholder="e.g. B2B SaaS" required className={FIELD} />
+                        </Field>
+                        <Field
+                          label="How should the agent describe what you do?"
+                          hint={derivedFromSite ? "Pulled from your site — edit if it’s off. This is your positioning in conversations." : "One or two sentences: what you do, for whom, and why it matters."}
+                        >
+                          <Textarea
+                            name="valueProp"
+                            value={values.valueProp}
+                            onChange={(e) => setValues({ ...values, valueProp: e.target.value })}
+                            rows={3}
+                            placeholder="e.g. We book qualified sales calls for B2B SaaS teams without the SDR overhead."
+                            className={FIELD + " h-auto py-3"}
+                          />
                         </Field>
                         <Field
                           label="Who to target"

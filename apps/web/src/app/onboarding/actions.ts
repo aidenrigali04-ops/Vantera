@@ -23,7 +23,7 @@ export type PersonalizeState = {
   saved?: boolean;
   scanned?: boolean;
   /** the derived positioning, returned so the analysis tracker can pay off live */
-  scan?: { headline: string; suggested_icp: string; scope_of_industry: string };
+  scan?: { headline: string; summary: string; suggested_icp: string; scope_of_industry: string };
   /** Vera's matched starter plays for the derived buyer — the proven-play payoff (Stage 0) */
   plays?: PlayCard[];
 };
@@ -103,6 +103,7 @@ export async function savePersonalize(
         scanned: true,
         scan: {
           headline: scan.headline,
+          summary: scan.summary,
           suggested_icp: scan.suggested_icp,
           scope_of_industry: scan.scope_of_industry,
         },
@@ -212,6 +213,9 @@ export async function findFirstLeads(
       onboarding_icp: result.values.icp,
       revenue_goal_cents: result.values.revenueGoalCents,
       avg_deal_value_cents: result.values.avgDealValueCents,
+      // 0061: the seller's own positioning, confirmed/edited from the scan-prefilled field.
+      // Optional and lenient — a blank never blocks onboarding; editable later in Settings.
+      value_prop: String(formData.get("valueProp") ?? "").trim() || null,
       onboarding_completed_at: new Date().toISOString(),
     })
     .eq("id", account.id);
