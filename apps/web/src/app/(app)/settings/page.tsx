@@ -201,6 +201,12 @@ export default async function SettingsPage() {
         cta="Manage proof points"
       />
       <SettingsLink
+        title="Positioning"
+        body="Your value proposition, brand voice, and the guardrails your agent must never cross."
+        href="/settings/positioning"
+        cta="Manage positioning"
+      />
+      <SettingsLink
         title="Suppression list"
         body="Contacts your agents must never message — unsubscribes, bounces, and manual adds."
         href="/settings/suppression"
