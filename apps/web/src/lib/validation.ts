@@ -175,6 +175,37 @@ export function validateConfirmation(input: {
   return { ok: true, values: { ...targeting.values, avgDealValueCents } };
 }
 
+const VALUE_PROP_MAX = 800;
+const BRAND_VOICE_MAX = 300;
+const GUARDRAILS_MAX = 800;
+
+/**
+ * Seller-authored positioning (0061): value proposition, brand voice, guardrails. All optional —
+ * empty trims to null so the loaders fall back to the website-scan summary / omit the field.
+ */
+export function validatePositioning(input: {
+  valueProp: string;
+  brandVoice: string;
+  guardrails: string;
+}):
+  | Valid<{ valueProp: string | null; brandVoice: string | null; guardrails: string | null }>
+  | Invalid {
+  const valueProp = input.valueProp.trim();
+  const brandVoice = input.brandVoice.trim();
+  const guardrails = input.guardrails.trim();
+  if (valueProp.length > VALUE_PROP_MAX) return { ok: false, error: `Keep your value proposition under ${VALUE_PROP_MAX} characters.` };
+  if (brandVoice.length > BRAND_VOICE_MAX) return { ok: false, error: `Keep the brand voice under ${BRAND_VOICE_MAX} characters.` };
+  if (guardrails.length > GUARDRAILS_MAX) return { ok: false, error: `Keep guardrails under ${GUARDRAILS_MAX} characters.` };
+  return {
+    ok: true,
+    values: {
+      valueProp: valueProp || null,
+      brandVoice: brandVoice || null,
+      guardrails: guardrails || null,
+    },
+  };
+}
+
 export function validateSignup(input: {
   email: string;
   password: string;

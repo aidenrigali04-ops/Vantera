@@ -8,6 +8,7 @@ import {
   validateManualLead,
   validateMemberSignup,
   validateOnboarding,
+  validatePositioning,
   validateSignup,
   validateWorkspace,
 } from "./validation";
@@ -179,6 +180,27 @@ describe("validateWorkspace", () => {
         avgDealValue: "-5",
       }).ok
     ).toBe(false);
+  });
+});
+
+describe("validatePositioning", () => {
+  it("trims and passes all three, empty → null", () => {
+    const r = validatePositioning({ valueProp: "  We book qualified calls.  ", brandVoice: "", guardrails: "" });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.values.valueProp).toBe("We book qualified calls.");
+      expect(r.values.brandVoice).toBeNull();
+      expect(r.values.guardrails).toBeNull();
+    }
+  });
+  it("rejects an over-long value prop", () => {
+    const r = validatePositioning({ valueProp: "x".repeat(801), brandVoice: "", guardrails: "" });
+    expect(r.ok).toBe(false);
+  });
+  it("accepts all three when provided", () => {
+    const r = validatePositioning({ valueProp: "V", brandVoice: "warm, direct", guardrails: "never claim SOC 2" });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.values.guardrails).toBe("never claim SOC 2");
   });
 });
 
