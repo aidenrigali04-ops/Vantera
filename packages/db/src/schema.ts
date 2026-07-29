@@ -64,6 +64,11 @@ export const accounts = pgTable("accounts", {
   senderAddress: jsonb("sender_address"),
   // 0019: human sender name for the email sign-off ({{sender_name}}); client-settable in Settings
   senderName: text("sender_name"),
+  // 0061: seller-authored positioning — client-settable (Settings › Positioning + onboarding value
+  // prop). Fed to the copy/reply brains via leadBlock; null falls back to the website-scan summary.
+  valueProp: text("value_prop"),
+  brandVoice: text("brand_voice"),
+  guardrails: text("guardrails"),
   // 0013: subscription entitlement snapshot (server-managed; Stripe webhook only)
   // No-card free trial (0020; shortened to 3 days in 0037; lengthened to 5 days in 0046):
   // new accounts default to a Starter trial. Defaults are applied by the DB on create_account

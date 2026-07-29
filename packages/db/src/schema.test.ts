@@ -189,6 +189,22 @@ describe("account sender name (0019)", () => {
   });
 });
 
+describe("seller positioning (0061)", () => {
+  const sql = readFileSync(join(migrationsDir, "0061_seller_positioning.sql"), "utf8");
+  it("adds the three nullable positioning columns", () => {
+    expect(sql).toMatch(/add column if not exists value_prop text/i);
+    expect(sql).toMatch(/add column if not exists brand_voice text/i);
+    expect(sql).toMatch(/add column if not exists guardrails text/i);
+  });
+  it("grants client UPDATE on the positioning columns (else onboarding/Settings save fails)", () => {
+    const grantMatch = sql.match(/grant update \(([^)]*)\)\s+on (?:table )?public\.accounts/i);
+    expect(grantMatch, "expected a column-scoped accounts UPDATE grant").toBeTruthy();
+    expect(grantMatch![1]).toContain("value_prop");
+    expect(grantMatch![1]).toContain("brand_voice");
+    expect(grantMatch![1]).toContain("guardrails");
+  });
+});
+
 describe("mailbox SMTP secret columns (0021)", () => {
   it("0021 revokes mailbox SMTP secret columns from clients", () => {
     const sql = readFileSync(join(migrationsDir, "0021_mailbox_smtp_secret.sql"), "utf8");
