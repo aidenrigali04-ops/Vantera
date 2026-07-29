@@ -848,6 +848,10 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         account: {
           industry: account.onboardingIndustry,
           websiteScan: account.websiteScan as CopyContext["account"]["websiteScan"],
+          // 0061 seller-authored positioning; null → toDraftInput falls back to the scan summary.
+          valueProp: account.valueProp,
+          brandVoice: account.brandVoice,
+          guardrails: account.guardrails,
         },
         avoidPhrases: await recentSendOpeners(db, agent.accountId),
         winningOpeners: await winningOpeners(db, agent.accountId),
@@ -1367,7 +1371,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         .where(and(eq(agents.accountId, accountId), eq(agents.kind, "copy")))
         .limit(1);
       const [account] = await db
-        .select({ industry: accounts.onboardingIndustry, websiteScan: accounts.websiteScan })
+        .select({ industry: accounts.onboardingIndustry, websiteScan: accounts.websiteScan, valueProp: accounts.valueProp })
         .from(accounts)
         .where(eq(accounts.id, accountId))
         .limit(1);
@@ -1391,7 +1395,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         hasBookingUrl: Boolean(config.bookingUrl),
         hasWebsiteUrl: Boolean(config.websiteUrl),
         industry: account?.industry ?? null,
-        valueProp: scan?.summary ?? null,
+        valueProp: account?.valueProp ?? scan?.summary ?? null,
         hasArtifact,
         proofCount: proofRow?.n ?? 0,
       };
@@ -2173,7 +2177,11 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
             .filter((v): v is string => Boolean(v)),
           accountName: account?.name ?? null,
           accountIndustry: account?.onboardingIndustry ?? null,
-          valueProp: scan?.summary ?? null,
+          // 0061: seller-authored positioning wins; scan summary is the fallback. Voice +
+          // guardrails feed the responder tone/limits (leadBlock renders them).
+          valueProp: account?.valueProp ?? scan?.summary ?? null,
+          brandVoice: account?.brandVoice ?? null,
+          guardrails: account?.guardrails ?? null,
           avoidPhrases: await recentSendOpeners(db, accountId),
           // Citable proof/pricing/FAQ facts — lets the responder answer evidence/price questions
           // truthfully instead of deflecting or getting flagged for a fabricated number (0046).

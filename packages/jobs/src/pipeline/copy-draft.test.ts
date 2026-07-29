@@ -62,7 +62,7 @@ class FakeCopyStore implements CopyDraftStore {
         sendMode,
       },
       assets: [{ kind: "link", url: "https://acme.com/case-study", filename: null }],
-      account: { industry: "devtools", websiteScan: null },
+      account: { industry: "devtools", websiteScan: null, valueProp: null, brandVoice: null, guardrails: null },
       avoidPhrases: [],
       winningOpeners: [],
     };
@@ -134,6 +134,53 @@ function makeDeps(store: FakeCopyStore): CopyDraftDeps {
 }
 
 const PAYLOAD = { copyAgentId: "copy1", accountId: "acc1", leadIds: ["l1"] };
+
+describe("runCopyDraft — seller positioning (0061)", () => {
+  const fullScan = {
+    headline: "",
+    summary: "Scanned.",
+    offerings: [],
+    value_props: [],
+    scope_of_industry: "",
+    suggested_icp: "",
+  };
+
+  async function captureContext(store: FakeCopyStore): Promise<DraftInput["context"] | null> {
+    const deps = makeDeps(store);
+    let seen: DraftInput["context"] | null = null;
+    deps.draftLinkedInFn = async (input) => {
+      seen = input.context;
+      return { connectionNote: "note", followupMessage: "follow", violations: [] };
+    };
+    await runCopyDraft(PAYLOAD, deps);
+    return seen;
+  }
+
+  it("prefers the seller's authored value prop over the scan summary", async () => {
+    const store = new FakeCopyStore();
+    store.context.account = { industry: "devtools", websiteScan: fullScan, valueProp: "Authored offer.", brandVoice: null, guardrails: null };
+    store.leads = [lead("l1")];
+    const ctx = await captureContext(store);
+    expect(ctx?.valueProp).toBe("Authored offer.");
+  });
+
+  it("falls back to the scan summary when value_prop is null (no regression)", async () => {
+    const store = new FakeCopyStore();
+    store.context.account = { industry: "devtools", websiteScan: fullScan, valueProp: null, brandVoice: null, guardrails: null };
+    store.leads = [lead("l1")];
+    const ctx = await captureContext(store);
+    expect(ctx?.valueProp).toBe("Scanned.");
+  });
+
+  it("passes brand voice + guardrails through to the draft context", async () => {
+    const store = new FakeCopyStore();
+    store.context.account = { industry: "devtools", websiteScan: null, valueProp: null, brandVoice: "warm, direct", guardrails: "never claim SOC 2" };
+    store.leads = [lead("l1")];
+    const ctx = await captureContext(store);
+    expect(ctx?.brandVoice).toBe("warm, direct");
+    expect(ctx?.guardrails).toBe("never claim SOC 2");
+  });
+});
 
 describe("runCopyDraft — suppression gate (rule 11)", () => {
   it("a suppressed linkedin profile is matched on the normalized URL and gets ZERO rows", async () => {

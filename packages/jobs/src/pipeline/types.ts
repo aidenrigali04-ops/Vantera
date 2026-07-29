@@ -293,7 +293,14 @@ export interface CopyConfig {
 export interface CopyContext {
   agent: { id: string; accountId: string; status: string; campaignId: string | null; config: CopyConfig; sendMode: "review" | "automatic" };
   assets: { kind: string; url: string | null; filename: string | null }[];
-  account: { industry: string | null; websiteScan: (WebsiteScan & { url?: string }) | null };
+  account: {
+    industry: string | null;
+    websiteScan: (WebsiteScan & { url?: string }) | null;
+    /** 0061 seller-authored positioning (null → falls back to the website-scan summary / omitted). */
+    valueProp: string | null;
+    brandVoice: string | null;
+    guardrails: string | null;
+  };
   /** recent sent openers — anti-template "do not reuse" list for the draft prompt (0044) */
   avoidPhrases: string[];
   /** openers from THIS account that earned interested replies — Vera's positive memory,

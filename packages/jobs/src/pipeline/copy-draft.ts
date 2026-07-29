@@ -48,7 +48,12 @@ function toDraftInput(lead: DraftableLead, ctx: CopyContext, strategy?: CopyStra
         .map((a) => a.url ?? a.filename)
         .filter((v): v is string => Boolean(v)),
       accountIndustry: ctx.account.industry,
-      valueProp: ctx.account.websiteScan?.summary ?? null,
+      // 0061: seller-authored positioning wins; the website-scan summary is the fallback. Voice +
+      // guardrails apply everywhere (leadBlock renders them); the opener stays de-pitched via the
+      // first-touch prompt rules, so the value-prop substance still doesn't leak into message one.
+      valueProp: ctx.account.valueProp ?? ctx.account.websiteScan?.summary ?? null,
+      brandVoice: ctx.account.brandVoice ?? null,
+      guardrails: ctx.account.guardrails ?? null,
       avoidPhrases,
       winningExemplars: winners,
       // Empty / absent → strategyDirectives("") → prompt unchanged from before the optimizer.
@@ -138,7 +143,7 @@ export async function runCopyDraft(
         hasBookingUrl: Boolean(ctx.agent.config.bookingUrl),
         hasWebsiteUrl: Boolean(ctx.agent.config.websiteUrl),
         industry: ctx.account.industry,
-        valueProp: ctx.account.websiteScan?.summary ?? null,
+        valueProp: ctx.account.valueProp ?? ctx.account.websiteScan?.summary ?? null,
         hasArtifact: (ctx.assets ?? []).some((a) => Boolean((a.url ?? a.filename)?.trim())),
         proofCount: ctx.proofCount ?? 0,
       });
