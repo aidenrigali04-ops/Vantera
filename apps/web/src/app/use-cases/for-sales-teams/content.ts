@@ -23,7 +23,7 @@ export const SALES_TEAMS_CONTENT: UseCaseContent = {
     sub: "Vantera runs a team of AI SDRs on your reps' LinkedIn — surfacing in-market buyers, qualifying them against your ICP, and drafting every message from real activity. Your reps approve and close. No spray, no bans, no busywork.",
     primaryCta: { label: "Start free", href: "/signup" },
     secondaryCta: { label: "See how it works", href: "#how-it-works" },
-    trust: ["3-day free trial", "Cancel anytime", "You approve every send"],
+    trust: ["7-day free trial", "Cancel anytime", "You approve every send"],
     visual: {
       title: "Team pipeline",
       period: "This week",
@@ -369,6 +369,6 @@ export const SALES_TEAMS_CONTENT: UseCaseContent = {
       "Every week you wait, a competitor is booking the meetings your reps could have. Deploy your AI SDR team today — live in minutes, first replies this week.",
     primaryCta: { label: "Start free", href: "/signup" },
     secondaryCta: { label: "Talk to sales", href: "/pricing" },
-    reassurance: ["3-day free trial", "Live in minutes", "You approve every send"],
+    reassurance: ["7-day free trial", "Live in minutes", "You approve every send"],
   },
 };

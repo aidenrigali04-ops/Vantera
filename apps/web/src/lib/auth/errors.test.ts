@@ -12,6 +12,12 @@ describe("friendlyAuthError", () => {
     );
   });
 
+  it("maps the admin-API duplicate-signup error by substring", () => {
+    expect(friendlyAuthError("A user with this email address has already been registered")).toBe(
+      "An account with this email already exists. Try signing in."
+    );
+  });
+
   it("maps rate-limit errors by substring", () => {
     expect(friendlyAuthError("email rate limit exceeded")).toBe(
       "Too many attempts right now — please wait a few minutes and try again."

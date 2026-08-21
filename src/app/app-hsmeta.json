@@ -2,15 +2,21 @@
   "uid": "get_started_app",
   "type": "app",
   "config": {
-    "description": "A basic static token app for testing",
-    "name": "My Get Started app",
+    "description": "Vantera pushes closed-won deals into HubSpot and (opt-in) logs LinkedIn outreach, replies, and booked meetings as notes on the contact timeline.",
+    "name": "Vantera",
     "distribution": "private",
     "auth": {
-      "type": "static",
+      "type": "oauth",
+      "redirectUrls": [
+        "https://www.vanterasystem.dev/api/crm/hubspot/callback",
+        "https://vanterasystem.dev/api/crm/hubspot/callback",
+        "http://localhost:3000/api/crm/hubspot/callback"
+      ],
       "requiredScopes": [
         "oauth",
         "crm.objects.contacts.read",
-        "crm.objects.contacts.write"
+        "crm.objects.contacts.write",
+        "crm.objects.deals.write"
       ],
       "optionalScopes": [],
       "conditionallyRequiredScopes": []
@@ -21,9 +27,9 @@
       "img": []
     },
     "support": {
-      "supportEmail": "support@example.com",
-      "documentationUrl": "https://example.com/docs",
-      "supportUrl": "https://example.com/support",
+      "supportEmail": "aiden@vanterasystem.com",
+      "documentationUrl": "https://www.vanterasystem.dev",
+      "supportUrl": "https://www.vanterasystem.dev",
       "supportPhone": "+18005555555"
     }
   }

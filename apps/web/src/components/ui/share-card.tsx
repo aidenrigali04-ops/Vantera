@@ -1,11 +1,14 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useRef } from "react";
 import { Loader2, X } from "lucide-react";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   inviteMember,
+  resendInvite,
   revokeInvite,
   removeMember,
+  changeMemberRole,
   type TeamActionState,
 } from "@/app/(app)/settings/team/actions";
 import { cn } from "@/lib/utils";
@@ -19,7 +22,7 @@ export type ShareMember = {
   isYou: boolean;
   removable: boolean;
 };
-export type ShareInvite = { id: string; email: string; role: string };
+export type ShareInvite = { id: string; email: string; role: string; expired?: boolean };
 
 function initials(s: string): string {
   const parts = s.replace(/@.*/, "").split(/[.\s_-]+/).filter(Boolean);
@@ -45,7 +48,7 @@ function RoleBadge({ role }: { role: string }) {
 /**
  * Workspace share card — invite teammates + see who has access. Wired to the real
  * team model (owner/admin/member). Roles are shown as badges, not editable dropdowns,
- * because there's no change-role action — we never ship a control that does nothing.
+ * P1 2026-07-15: RoleSelect now switches admin/member for manageable members.
  */
 export function ShareCard({
   workspaceName,
@@ -92,12 +95,12 @@ export function ShareCard({
               required
               placeholder="colleague@company.com"
               autoComplete="off"
-              className="h-11 flex-1 rounded-xl border border-[rgba(12,16,26,0.12)] bg-white px-4 text-[14px] text-foreground placeholder:text-[var(--ink-4)] transition-colors focus-visible:border-[var(--cyan-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(48,207,255,0.2)]"
+              className="h-11 flex-1 rounded-xl border border-[rgba(12,16,26,0.12)] bg-white px-4 text-[14px] text-foreground placeholder:text-[var(--ink-4)] transition-colors focus-visible:border-[var(--cyan-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(11,87,171,0.2)]"
             />
             <select
               name="role"
               defaultValue="member"
-              className="h-11 rounded-xl border border-[rgba(12,16,26,0.12)] bg-white px-3 text-[14px] text-foreground transition-colors focus-visible:border-[var(--cyan-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(48,207,255,0.2)]"
+              className="h-11 rounded-xl border border-[rgba(12,16,26,0.12)] bg-white px-3 text-[14px] text-foreground transition-colors focus-visible:border-[var(--cyan-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(11,87,171,0.2)]"
             >
               <option value="member">Member</option>
               <option value="admin">Admin</option>
@@ -105,7 +108,7 @@ export function ShareCard({
             <button
               type="submit"
               disabled={inviting || seatsLeft === 0}
-              className="inline-flex h-11 items-center justify-center gap-1.5 rounded-xl bg-[#0a0c12] px-5 text-[14px] font-semibold text-white transition-all hover:-translate-y-0.5 hover:shadow-[0_10px_30px_-8px_rgba(48,207,255,0.55)] disabled:opacity-50 disabled:hover:translate-y-0"
+              className="inline-flex h-11 items-center justify-center gap-1.5 rounded-xl bg-[#0a0c12] px-5 text-[14px] font-semibold text-white transition-all hover:-translate-y-0.5 hover:shadow-[0_10px_30px_-8px_rgba(11,87,171,0.55)] disabled:opacity-50 disabled:hover:translate-y-0"
             >
               {inviting ? <Loader2 className="size-4 animate-spin" /> : "Send invite"}
             </button>
@@ -134,6 +137,9 @@ export function ShareCard({
             <div className="ml-auto flex items-center gap-2">
               {m.isOwner ? (
                 <span className="text-[13px] font-medium text-[var(--ink-3)]">Owner</span>
+              ) : m.removable ? (
+                // P1: role is a control, not a label, for members you can manage
+                <RoleSelect userId={m.id} role={m.role} />
               ) : (
                 <RoleBadge role={m.role} />
               )}
@@ -147,10 +153,15 @@ export function ShareCard({
             <Avatar label={inv.email} />
             <div className="min-w-0">
               <p className="truncate text-[14px] font-medium text-foreground">{inv.email}</p>
-              <p className="text-[12.5px] text-[var(--ink-4)]">Invited · awaiting acceptance</p>
+              {inv.expired ? (
+                <p className="text-[12.5px] font-medium text-amber-700">Invite expired — resend it</p>
+              ) : (
+                <p className="text-[12.5px] text-[var(--ink-4)]">Invited · awaiting acceptance</p>
+              )}
             </div>
             <div className="ml-auto flex items-center gap-2">
               <RoleBadge role={inv.role} />
+              {canManage && <ResendButton inviteId={inv.id} />}
               {canManage && <RevokeButton inviteId={inv.id} />}
             </div>
           </li>
@@ -162,18 +173,53 @@ export function ShareCard({
 
 function RemoveButton({ userId }: { userId: string }) {
   const [state, action, pending] = useActionState<TeamActionState, FormData>(removeMember, {});
+  const formRef = useRef<HTMLFormElement>(null);
   return (
-    <form action={action} title={state.error ?? "Remove member"}>
+    <form ref={formRef} action={action} className="flex items-center gap-2" title="Remove member">
       <input type="hidden" name="userId" value={userId} />
+      {state.error && (
+        <p role="alert" className="text-[12px] text-destructive">{state.error}</p>
+      )}
+      <ConfirmDialog
+        title="Remove this teammate?"
+        description="They lose access to this workspace immediately. Their past work stays; you can invite them again later."
+        confirmLabel="Remove teammate"
+        destructive
+        onConfirm={() => formRef.current?.requestSubmit()}
+        trigger={(open) => (
+          <button
+            type="button"
+            onClick={open}
+            disabled={pending}
+            aria-label="Remove member"
+            className={cn(
+              "grid size-7 place-items-center rounded-full text-[var(--ink-4)] transition-colors hover:bg-[var(--tint)] hover:text-destructive focus-visible:ring-2 focus-visible:ring-[rgba(11,87,171,0.35)] focus-visible:outline-none disabled:opacity-50",
+            )}
+          >
+            {pending ? <Loader2 className="size-3.5 animate-spin" /> : <X className="size-4" />}
+          </button>
+        )}
+      />
+    </form>
+  );
+}
+
+/** R3: resend a pending invite — fresh 7-day window + the email goes out again. */
+function ResendButton({ inviteId }: { inviteId: string }) {
+  const [state, action, pending] = useActionState<TeamActionState, FormData>(resendInvite, {});
+  return (
+    <form action={action} className="flex items-center gap-2" title="Resend invite">
+      <input type="hidden" name="inviteId" value={inviteId} />
+      {state.error && (
+        <p role="alert" className="text-[12px] text-destructive">{state.error}</p>
+      )}
+      {state.success && <p className="text-[12px] text-[var(--cyan-strong)]">Sent</p>}
       <button
         type="submit"
         disabled={pending}
-        aria-label="Remove member"
-        className={cn(
-          "grid size-7 place-items-center rounded-full text-[var(--ink-4)] transition-colors hover:bg-[var(--tint)] hover:text-destructive disabled:opacity-50",
-        )}
+        className="rounded-full px-2.5 py-1 text-[12px] font-medium text-[var(--ink-3)] transition-colors hover:bg-[var(--tint)] hover:text-foreground focus-visible:ring-2 focus-visible:ring-[rgba(11,87,171,0.35)] focus-visible:outline-none disabled:opacity-50"
       >
-        {pending ? <Loader2 className="size-3.5 animate-spin" /> : <X className="size-4" />}
+        {pending ? "Sending…" : "Resend"}
       </button>
     </form>
   );
@@ -181,16 +227,53 @@ function RemoveButton({ userId }: { userId: string }) {
 
 function RevokeButton({ inviteId }: { inviteId: string }) {
   const [state, action, pending] = useActionState<TeamActionState, FormData>(revokeInvite, {});
+  const formRef = useRef<HTMLFormElement>(null);
   return (
-    <form action={action} title={state.error ?? "Revoke invite"}>
+    <form ref={formRef} action={action} className="flex items-center gap-2" title="Revoke invite">
       <input type="hidden" name="inviteId" value={inviteId} />
-      <button
-        type="submit"
+      {state.error && (
+        <p role="alert" className="text-[12px] text-destructive">{state.error}</p>
+      )}
+      <ConfirmDialog
+        title="Revoke this invite?"
+        description="The invite link stops working immediately. You can send a fresh invite anytime."
+        confirmLabel="Revoke invite"
+        destructive
+        onConfirm={() => formRef.current?.requestSubmit()}
+        trigger={(open) => (
+          <button
+            type="button"
+            onClick={open}
+            disabled={pending}
+            className="rounded-full px-2.5 py-1 text-[12px] font-medium text-[var(--ink-3)] transition-colors hover:bg-[var(--tint)] hover:text-destructive focus-visible:ring-2 focus-visible:ring-[rgba(11,87,171,0.35)] focus-visible:outline-none disabled:opacity-50"
+          >
+            {pending ? "Revoking…" : "Revoke"}
+          </button>
+        )}
+      />
+    </form>
+  );
+}
+
+/** P1: admin↔member switcher — submits on change; the owner role never changes here. */
+function RoleSelect({ userId, role }: { userId: string; role: string }) {
+  const [state, action, pending] = useActionState<TeamActionState, FormData>(changeMemberRole, {});
+  return (
+    <form action={action} className="flex items-center gap-2" title="Change role">
+      <input type="hidden" name="userId" value={userId} />
+      {state.error && (
+        <p role="alert" className="text-[12px] text-destructive">{state.error}</p>
+      )}
+      <select
+        name="role"
+        defaultValue={role}
         disabled={pending}
-        className="rounded-full px-2.5 py-1 text-[12px] font-medium text-[var(--ink-3)] transition-colors hover:bg-[var(--tint)] hover:text-destructive disabled:opacity-50"
+        onChange={(e) => e.currentTarget.form?.requestSubmit()}
+        className="rounded-lg border border-[var(--hairline)] bg-transparent px-2 py-1 text-[13px] font-medium text-[var(--ink-2)] focus-visible:ring-2 focus-visible:ring-[rgba(11,87,171,0.35)] focus-visible:outline-none"
       >
-        {pending ? "Revoking…" : "Revoke"}
-      </button>
+        <option value="admin">admin</option>
+        <option value="member">member</option>
+      </select>
     </form>
   );
 }

@@ -25,6 +25,12 @@ The Prospect Agent is your prospecting teammate. Once deployed, it hunts for peo
 
 If you've added your website URL in settings, the agent reads your homepage so its scoring understands exactly what you sell.
 
+## Seeing what your agent actually did
+
+Every scheduled run leaves a record. The agent's card shows what the **last run** did ("25 sourced → 20 passed gate → 5 qualified"), and the agent's page keeps the **recent runs** list — so a quiet week is never a mystery. If a live agent hits something that needs you — a search that came back empty, an ICP it couldn't turn into a search, a LinkedIn connection that's dropped — its status turns amber (**Needs attention**) with the reason and the fix, instead of showing a green "Live" that hides the problem.
+
+**Run now** starts a run immediately instead of waiting for the next scheduled one — handy right after you change your targeting, so you can verify the change worked. It's the exact same run the schedule fires.
+
 ## Pausing and resuming
 
 Use **Pause** on the agent card to stop runs at any time; **Resume** picks the schedule back up. Pausing never deletes anything.

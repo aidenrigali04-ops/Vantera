@@ -1,4 +1,5 @@
 import { dailyAllowance, paceWithJitter } from "./safety-limits";
+import { isWithinSendWindow } from "./send-window";
 import { assignSender, inviteBudget } from "./sender-assignment";
 import {
   TRIAL_SEND_CAP,
@@ -11,6 +12,16 @@ import {
 export const INVITE_EXPIRY_DAYS = 30;
 export const STALE_TASK_MINUTES = 30;
 const BASE_GAP_MS = 15 * 60_000; // ~human pacing between sends per sender account
+/** Speed-to-lead lane (0044): a reply-response goes out within seconds-to-90s of dispatch
+ *  instead of queueing behind the day's proactive sends. Responding to a live prospect fast
+ *  is the highest-leverage conversion move measured anywhere (<5 min ≈ 21x qualification);
+ *  it consumes the same per-sender message budget and passes every per-lead guard. */
+const REPLY_LANE_MIN_DELAY_MS = 15_000;
+const REPLY_LANE_JITTER_MS = 75_000;
+/** Per-LEAD floor between proactive messages (rule 04): after a hold drains, a prospect must
+ *  never get two nudges in the same sitting. A reply from the lead AFTER our last message
+ *  exempts the gap — answering promptly is human; a second unprompted nudge minutes later is not. */
+export const MIN_LEAD_MESSAGE_GAP_MS = 24 * 3_600_000;
 
 function seedFrom(id: string): number {
   let h = 0;
@@ -94,13 +105,31 @@ export async function runSendDispatch(deps: SendDispatchDeps): Promise<SendDispa
     }
 
     const schedule = async (row: DispatchableSend, st: SenderState) => {
-      st.offsetMs += paceWithJitter(BASE_GAP_MS, seedFrom(row.id));
-      const runAt = new Date(now.getTime() + st.offsetMs);
+      let runAt: Date;
+      if (row.origin === "reply_response") {
+        // priority lane — never pays the accumulated human-pacing offset
+        runAt = new Date(now.getTime() + REPLY_LANE_MIN_DELAY_MS + ((seedFrom(row.id) >>> 0) % REPLY_LANE_JITTER_MS));
+      } else {
+        st.offsetMs += paceWithJitter(BASE_GAP_MS, seedFrom(row.id));
+        runAt = new Date(now.getTime() + st.offsetMs);
+      }
       await deps.store.markScheduled(row.id, runAt);
       await deps.enqueue(row.id, runAt);
       scheduled += 1;
       trialRemaining -= 1;
     };
+
+    // Per-lead message gating (rule 04 pacing survives a drained backlog):
+    // if the queue holds several message rows for one lead (stacked while sends were held),
+    // only the NEWEST is real — older ones were drafted blind to it and read as duplicate
+    // cold intros, so they cancel rather than linger and fire later.
+    const newestMessageByLead = new Map<string, DispatchableSend>();
+    for (const row of lis) {
+      if (row.linkedinStage !== "message") continue;
+      const cur = newestMessageByLead.get(row.leadId);
+      if (!cur || row.createdAt > cur.createdAt) newestMessageByLead.set(row.leadId, row);
+    }
+    const messagedLeads = new Set<string>(); // one message per lead per run, belt-and-braces
 
     for (const row of lis) {
       if (trialRemaining <= 0) {
@@ -108,7 +137,45 @@ export async function runSendDispatch(deps: SendDispatchDeps): Promise<SendDispa
         continue;
       }
 
+      // Proactive sends wait for the prospect's business hours (0044): 62% of sends had gone
+      // out on weekends, and reply data + account-safety both favor weekday working hours.
+      // Reply-responses and human-typed sends are exempt — answering promptly is human.
+      if (row.origin === "sequence" && !isWithinSendWindow(now, row.leadLocation)) {
+        skipped += 1; // outside the prospect's window — re-evaluated next tick
+        continue;
+      }
+
       if (row.linkedinStage === "message") {
+        if (newestMessageByLead.get(row.leadId)?.id !== row.id) {
+          await deps.store.cancelSend(row.id, "superseded by a newer queued message for this lead");
+          canceled += 1;
+          continue;
+        }
+        if (messagedLeads.has(row.leadId)) {
+          skipped += 1; // a message for this lead is already going out this run
+          continue;
+        }
+        // A claimed message (scheduled/sending) is already flying to this lead from an earlier
+        // run. The gap + reply checks below only see DELIVERIES, so they'd wave this row through
+        // and it would land minutes behind the claimed one. Wait — once that delivery lands,
+        // the next run re-evaluates this row against real facts.
+        if (row.leadHasInFlightMessage) {
+          skipped += 1;
+          continue;
+        }
+        // Proactive gap: the last delivered message must be MIN_LEAD_MESSAGE_GAP_MS old —
+        // unless the lead replied after it (their reply resets the conversation clock).
+        const repliedSince =
+          row.leadRepliedAt !== null &&
+          (row.leadLastMessageSentAt === null || row.leadRepliedAt > row.leadLastMessageSentAt);
+        if (
+          !repliedSince &&
+          row.leadLastMessageSentAt !== null &&
+          now.getTime() - row.leadLastMessageSentAt.getTime() < MIN_LEAD_MESSAGE_GAP_MS
+        ) {
+          skipped += 1; // too soon after the last delivered message — wait for the gap
+          continue;
+        }
         if (!row.leadConnectedAt) {
           const invitedMs = row.leadInvitedAt ? now.getTime() - row.leadInvitedAt.getTime() : 0;
           if (row.leadInvitedAt && invitedMs > INVITE_EXPIRY_DAYS * 86_400_000) {
@@ -126,6 +193,7 @@ export async function runSendDispatch(deps: SendDispatchDeps): Promise<SendDispa
           continue;
         }
         st.messageBudget -= 1;
+        messagedLeads.add(row.leadId);
         await schedule(row, st);
         continue;
       }

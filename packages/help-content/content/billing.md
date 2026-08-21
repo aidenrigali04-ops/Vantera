@@ -20,7 +20,7 @@ For custom volume, SSO, or dedicated support, contact us about an Enterprise pla
 
 ## Your free trial
 
-Every new workspace starts on a **3-day free trial** of the plan you choose during setup. A card is required to start, but nothing is charged until the trial ends — cancel before then and you pay nothing. The trial lets your agents reach your first replies before you pay. The Billing page shows how many days are left.
+Every new workspace starts on a **7-day free trial** of the plan you choose during setup. A card is required to start, but nothing is charged until the trial ends — cancel before then and you pay nothing. The trial lets your agents reach your first replies before you pay. The Billing page shows how many days are left.
 
 To keep things fair, a trial sources a capped number of leads — plenty to prove the motion and reach your first replies. Choosing a plan lifts the cap and prospecting continues at your plan's full capacity.
 

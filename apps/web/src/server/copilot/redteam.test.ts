@@ -5,8 +5,8 @@ const banned = /smartlead|unipile|explorium|voyage|anthropic|claude|supabase|hig
 
 describe("copilot restriction posture (red-team)", () => {
   it("system prompt carries the refusal lane", () => {
-    expect(SYSTEM_PROMPT).toMatch(/only help with using Vantera/i);
-    expect(SYSTEM_PROMPT).toMatch(/do not know how Vantera is built/i);
+    expect(SYSTEM_PROMPT.text).toMatch(/only help with using Vantera/i);
+    expect(SYSTEM_PROMPT.text).toMatch(/do not know how Vantera is built/i);
   });
   it("sanitizer redacts a vendor name that slips into a retrieved chunk", () => {
     const out = sanitizeKnowledge([{ slug: "x", heading: null, content: "We send via Smartlead and connect LinkedIn via Unipile.", similarity: 1 }]);

@@ -1,0 +1,80 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { sendPaymentFailedEmail } from "@vantera/transactional-email";
+import { siteUrl } from "@/lib/site-url";
+
+/**
+ * R5 dunning (spec 2026-07-15): a failed renewal used to pause outreach with only an
+ * in-app banner as the signal. One email per past_due spell — the stamp clears when the
+ * subscription recovers, so the NEXT failure emails again. Best-effort by contract: this
+ * must never make the Stripe webhook fail (it has to 200).
+ */
+export async function applyDunning(
+  supabase: SupabaseClient,
+  accountId: string,
+  subscriptionStatus: string
+): Promise<void> {
+  try {
+    if (subscriptionStatus === "past_due") {
+      const { data: account } = await supabase
+        .from("accounts")
+        .select("lifecycle_emails_enabled, payment_failed_notified_at")
+        .eq("id", accountId)
+        .maybeSingle<{ lifecycle_emails_enabled: boolean; payment_failed_notified_at: string | null }>();
+      if (!account || !account.lifecycle_emails_enabled || account.payment_failed_notified_at) return;
+
+      const { data: members } = await supabase
+        .from("account_members")
+        .select("user_id")
+        .eq("account_id", accountId)
+        .in("role", ["owner", "admin"]);
+      const emails = new Set<string>();
+      for (const m of members ?? []) {
+        const { data } = await supabase.auth.admin.getUserById(m.user_id as string);
+        if (data.user?.email) emails.add(data.user.email);
+      }
+
+      let sent = 0;
+      for (const to of emails) {
+        try {
+          await sendPaymentFailedEmail({ to, appUrl: siteUrl() });
+          sent += 1;
+        } catch {
+          // per-recipient best-effort
+        }
+      }
+      if (sent > 0) {
+        const at = new Date().toISOString();
+        // The idempotence write, alone in its own statement. The email has already gone out, so if
+        // this fails the account looks un-notified and the next past_due webhook emails again.
+        // The collision-guard stamp below used to ride in this same UPDATE — with migration 0060
+        // unapplied, Postgres rejects the whole statement (`column "lifecycle_last_email_at" does
+        // not exist`) and payment_failed_notified_at never lands. A new feature's bookkeeping must
+        // never be able to break a pre-existing idempotence write.
+        await supabase
+          .from("accounts")
+          .update({ payment_failed_notified_at: at })
+          .eq("id", accountId);
+        try {
+          // lifecycle_last_email_at feeds the pull-back collision guard (spec 2026-07-18):
+          // pull-back yields to this email for 48h — a stalled + past_due account must not get
+          // both a payment-failed email and a pull-back email within days of each other.
+          // Best-effort in its own try/catch as well as its own statement: postgrest returns
+          // column errors in `error` rather than throwing, but a transport-level throw here must
+          // not skip past a completed idempotence write. Worst case: one extra pull-back email.
+          await supabase.from("accounts").update({ lifecycle_last_email_at: at }).eq("id", accountId);
+        } catch {
+          // contained — the write that mattered already landed above
+        }
+      }
+    } else if (subscriptionStatus === "active") {
+      // Recovery: clear the spell stamp so a future failure notifies again.
+      await supabase
+        .from("accounts")
+        .update({ payment_failed_notified_at: null })
+        .eq("id", accountId)
+        .not("payment_failed_notified_at", "is", null);
+    }
+  } catch {
+    // dunning is an add-on — the webhook's entitlement write already succeeded
+  }
+}

@@ -1,5 +1,6 @@
 import { createBillingFromEnv } from "@vantera/billing";
 import { createServiceClient } from "@/lib/supabase/service";
+import { applyDunning } from "@/server/billing-dunning";
 import { handleStripeWebhook } from "@/server/billing-webhook";
 
 export async function POST(req: Request) {
@@ -41,6 +42,8 @@ export async function POST(req: Request) {
         .eq("stripe_customer_id", snap.stripeCustomerId)
         .select("id");
       if ((byCustomer?.length ?? 0) > 0) {
+        // R5 dunning: one email per past_due spell; the stamp clears on recovery. Best-effort.
+        await applyDunning(supabase, byCustomer![0]!.id as string, snap.subscriptionStatus);
         return;
       }
       // First subscription: the row has no customer id yet — link by account id from metadata.
@@ -60,6 +63,7 @@ export async function POST(req: Request) {
           console.warn("billing webhook: first-subscription link skipped (account already has a customer)");
           return;
         }
+        await applyDunning(supabase, linked![0]!.id as string, snap.subscriptionStatus);
         return;
       }
       // Nothing matched and no account id to fall back on — surface for retry.

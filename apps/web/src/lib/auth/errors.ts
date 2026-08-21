@@ -10,6 +10,12 @@ const PARTIAL: [needle: string, friendly: string][] = [
     "rate limit",
     "Too many attempts right now — please wait a few minutes and try again.",
   ],
+  // The admin createUser path (confirmation-free signup) words duplicates differently
+  // from the public signUp endpoint.
+  [
+    "already been registered",
+    "An account with this email already exists. Try signing in.",
+  ],
 ];
 
 export function friendlyAuthError(message: string): string {

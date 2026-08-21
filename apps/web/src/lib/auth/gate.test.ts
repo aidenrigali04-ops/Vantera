@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveGate, type GateContext } from "./gate";
+import { loginRedirect, resolveGate, type GateContext } from "./gate";
 
 const ctx = (over: Partial<GateContext>): GateContext => ({
   isAuthenticated: false,
@@ -49,5 +49,32 @@ describe("resolveGate", () => {
     expect(
       resolveGate("app", ctx({ isAuthenticated: true, hasAccount: true, onboardingComplete: true }))
     ).toBeNull();
+  });
+});
+
+describe("loginRedirect (deep-link preservation)", () => {
+  it("carries the requested path as ?next= so login can forward back", () => {
+    // The bug this fixes: a logged-out pull-back-email recipient clicking "Review the
+    // messages" (/review) bounced to a bare /login and, after signing in, dead-ended on
+    // /dashboard instead of the review queue.
+    expect(loginRedirect("/login", "/review")).toBe("/login?next=%2Freview");
+    expect(loginRedirect("/login", "/leads")).toBe("/login?next=%2Fleads");
+  });
+
+  it("encodes a query string so it survives the outer ?next=", () => {
+    expect(loginRedirect("/login", "/leads?view=compact")).toBe(
+      "/login?next=%2Fleads%3Fview%3Dcompact"
+    );
+  });
+
+  it("drops an open-redirect target — never trusts the path blindly", () => {
+    expect(loginRedirect("/login", "https://evil.com")).toBe("/login");
+    expect(loginRedirect("/login", "//evil.com")).toBe("/login");
+    expect(loginRedirect("/login", null)).toBe("/login");
+  });
+
+  it("leaves a non-/login destination untouched (onboarding, dashboard)", () => {
+    expect(loginRedirect("/onboarding", "/review")).toBe("/onboarding");
+    expect(loginRedirect("/dashboard", "/review")).toBe("/dashboard");
   });
 });

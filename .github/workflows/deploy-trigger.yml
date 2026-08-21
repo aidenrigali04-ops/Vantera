@@ -21,8 +21,11 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       # trigger.config.ts lives in packages/jobs; deploy targets the prod environment by default.
+      # CLI pinned to the installed @trigger.dev/sdk version — `@latest` aborts the deploy the
+      # moment trigger.dev ships a newer CLI than the SDK in the lockfile ("Version mismatch
+      # detected while running in CI"). Bump BOTH together.
       - name: Deploy Trigger.dev tasks (prod)
         working-directory: packages/jobs
-        run: npx trigger.dev@latest deploy
+        run: npx trigger.dev@4.4.6 deploy
         env:
           TRIGGER_ACCESS_TOKEN: ${{ secrets.TRIGGER_ACCESS_TOKEN }}

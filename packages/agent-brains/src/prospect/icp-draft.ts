@@ -1,6 +1,6 @@
 import { generateObject, type LanguageModel } from "ai";
 import { z } from "zod";
-import { getModel } from "@vantera/ai";
+import { getModel, registerPrompt } from "@vantera/ai";
 import type { WebsiteScan } from "./website-scan";
 
 // Permissive schema (validate loose, normalize strict in code — same pattern as watchlist/rank).
@@ -29,8 +29,9 @@ const MAX = { titles: 6, industries: 4, companySizes: 4, geos: 3, signals: 5 } a
 const FIELD_MAX = 60;
 const NAME_MAX = 80;
 
-// Stable system prompt so Anthropic prompt caching hits; per-account context rides in the user message.
-const ICP_DRAFT_SYSTEM = `You are a B2B sales strategist drafting the ideal customer profile for a seller, from nothing but what their website says. The profile feeds a deterministic targeting filter, so every entry must be concrete and searchable on LinkedIn — never a vague persona.
+// Stable system prompt so prompt caching hits; per-account context rides in the user message.
+// Registered (WS-2.1) so the prompt registry can version and audit it like every other brain.
+const ICP_DRAFT_PROMPT = registerPrompt("prospect/icp-draft", `You are a B2B sales strategist drafting the ideal customer profile for a seller, from nothing but what their website says. The profile feeds a deterministic targeting filter, so every entry must be concrete and searchable on LinkedIn — never a vague persona.
 
 Return:
 - name: a 2-6 word label for the buyer, "<role family> · <market>" (e.g. "Heads of Sales · B2B SaaS").
@@ -40,7 +41,7 @@ Return:
 - geos: 0-3 countries or regions if the site clearly targets one; otherwise an empty list.
 - signals: 2-5 short buying signals that make a company in-market for THIS offer ("hiring SDRs", "just raised a seed round", "switching CRMs").
 
-Ground every entry in the seller's actual offer. Prefer fewer, sharper entries over generic coverage. If the site is too thin to decide something, return an empty list for that field rather than guessing.`;
+Ground every entry in the seller's actual offer. Prefer fewer, sharper entries over generic coverage. If the site is too thin to decide something, return an empty list for that field rather than guessing.`);
 
 function contextBlock(ctx: IcpDraftContext): string {
   const s = ctx.scan;
@@ -110,7 +111,7 @@ export async function draftIcp(
       await generateObject({
         model,
         schema: icpDraftSchema,
-        system: ICP_DRAFT_SYSTEM,
+        system: ICP_DRAFT_PROMPT.text,
         prompt: contextBlock(ctx),
         maxOutputTokens: 800,
       })

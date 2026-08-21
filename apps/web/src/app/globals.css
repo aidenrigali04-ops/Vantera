@@ -151,7 +151,7 @@
 
 /* ----------------------------------------------------------------------------
    Landing surface — 2026 premium SaaS system (rebuilt 2026-06-26).
-   Clean light canvas, Poppins type, ONE electric-cyan signature (#30cfff) used as
+   Clean light canvas, Poppins type, ONE electric-cyan signature (#0b57ab) used as
    accent + subtle glow, premium multi-layer soft shadows, and DARK glassy product
    panels (the sleek mockups) where cyan glows. Scoped to `.landing` so the dark
    dashboard, auth, and onboarding surfaces are untouched.
@@ -171,12 +171,12 @@
   --secondary-foreground: #0a0c12;
   --muted: #f4f6f9;
   --muted-foreground: #5e636c;
-  --accent: #30cfff;
+  --accent: #0b57ab;
   --accent-foreground: #0a0c12;
   --destructive: #e5484d;
   --border: rgba(12, 16, 26, 0.07);
   --input: rgba(12, 16, 26, 0.1);
-  --ring: rgba(48, 207, 255, 0.5);
+  --ring: rgba(11, 87, 171, 0.5);
   --radius: 0.85rem;
 
   /* ink ramp — rich near-black → mid-grey → caption grey */
@@ -185,10 +185,10 @@
   --ink-4: #9aa0a8;
 
   /* electric-cyan signature system */
-  --cyan: #30cfff;
-  --cyan-strong: #0c9fce; /* legible cyan for text / links / icons on white */
-  --cyan-tint: #e7faff; /* soft cyan surface */
-  --cyan-line: rgba(48, 207, 255, 0.28);
+  --cyan: #0b57ab;
+  --cyan-strong: #0a4685; /* legible cyan for text / links / icons on white */
+  --cyan-tint: #eaf1fb; /* soft cyan surface */
+  --cyan-line: rgba(11, 87, 171, 0.28);
   --hairline: rgba(12, 16, 26, 0.07);
   --tint: #f6f8fb;
 
@@ -199,17 +199,16 @@
   --fb-strong: #166fe5;
   --fb-tint: rgba(24, 119, 242, 0.12);
 
-  /* Elevation — Framer/Figma-restrained: crisp hairline + a tight, near-invisible
-     shadow. Depth reads from the border and precision, not a big floaty drop. */
-  --shadow-sm: 0 1px 1px rgba(12, 16, 26, 0.04);
-  --shadow-card: 0 1px 1px rgba(12, 16, 26, 0.03), 0 4px 12px -4px rgba(12, 16, 26, 0.06);
-  --shadow-lift: 0 1px 2px rgba(12, 16, 26, 0.04), 0 10px 24px -10px rgba(12, 16, 26, 0.09);
+  /* premium soft elevation — multi-layer, neutral */
+  --shadow-sm: 0 1px 2px rgba(12, 16, 26, 0.05);
+  --shadow-card: 0 1px 2px rgba(12, 16, 26, 0.04), 0 12px 32px -14px rgba(12, 16, 26, 0.16);
+  --shadow-lift: 0 2px 6px rgba(12, 16, 26, 0.05), 0 36px 70px -24px rgba(12, 16, 26, 0.26);
 
   /* dark glassy product-panel surface (the sleek 2026 mockups) */
   --panel: #0b0d13;
   --panel-2: #14171f;
   --panel-line: rgba(255, 255, 255, 0.09);
-  --panel-glow: 0 40px 120px -40px rgba(48, 207, 255, 0.32), 0 30px 70px -34px rgba(12, 16, 26, 0.55);
+  --panel-glow: 0 40px 120px -40px rgba(11, 87, 171, 0.32), 0 30px 70px -34px rgba(12, 16, 26, 0.55);
 
   /* nav chrome */
   --glass-fill: rgba(255, 255, 255, 0.78);
@@ -226,8 +225,9 @@
 
 /* Landing/marketing accent unified to Facebook blue (was electric cyan). Scoped to
    `.landing` — later in source than the shared block above, same specificity, so it
-   wins for `.landing` while auth (.auth-surface) and dashboard (.app-surface) keep cyan.
-   The `--cyan*` token names are kept (used across many components) but now carry blue. */
+   wins for `.landing` while auth (.auth-surface) and dashboard (.app-surface) keep
+   their own accent system. The `--cyan*` token names are kept (used across many
+   components) but now carry blue. */
 .landing {
   --cyan: #1877f2;
   --cyan-strong: #1461d1; /* legible blue for text / links / icons on white */
@@ -235,6 +235,13 @@
   --cyan-line: rgba(24, 119, 242, 0.28);
   --ring: rgba(24, 119, 242, 0.5);
   --panel-glow: 0 40px 120px -40px rgba(24, 119, 242, 0.32), 0 30px 70px -34px rgba(12, 16, 26, 0.55);
+
+  /* Elevation — Framer/Figma-restrained: crisp hairline + a tight, near-invisible
+     shadow. Depth reads from the border and precision, not a big floaty drop.
+     (Auth + dashboard keep the shared elevation defined in the block above.) */
+  --shadow-sm: 0 1px 1px rgba(12, 16, 26, 0.04);
+  --shadow-card: 0 1px 1px rgba(12, 16, 26, 0.03), 0 4px 12px -4px rgba(12, 16, 26, 0.06);
+  --shadow-lift: 0 1px 2px rgba(12, 16, 26, 0.04), 0 10px 24px -10px rgba(12, 16, 26, 0.09);
 
   /* Hero blue slab (homepage hero only). --hero-blue is the brand identity color;
      the slab deepens toward --hero-blue-deep so pure-white body copy clears WCAG AA
@@ -251,6 +258,53 @@
 .app-surface {
   --accent: #eef2f7;
   --accent-foreground: #0a0c12;
+  /* Crisper corners than the landing's softer 0.85rem. Because every radius-* token is
+     calc(var(--radius) * k), overriding --radius here cascades to the whole dashboard
+     subtree — ~8px controls, ~14px cards — while landing/auth keep their own radius. */
+  --radius: 0.5rem;
+  /* Border-led elevation: app cards read as crisp hairline panels, not floating cards.
+     (Landing keeps the dramatic --shadow-card lift defined in the shared block above.) */
+  --shadow-card: 0 1px 2px rgba(12, 16, 26, 0.04), 0 1px 3px rgba(12, 16, 26, 0.05);
+  /* One success/positive hue across the app (won deals, connected status, win attribution) —
+     replaces the scattered emerald-400 / #0f9d58 / #13b07a greens so "good" reads as a single,
+     deliberate color rather than three near-misses. */
+  --positive: #0f9d58;
+  --positive-tint: #e9f9f0;
+  --positive-line: rgba(15, 157, 88, 0.28);
+}
+
+/* Machine layer — Geist Mono for numeric/data display (money, scores, counts, deltas): the
+   precise, tabular counterpart to Poppins and the core Stripe/Vercel "data reads as data" cue.
+   Reintroduced deliberately on app surfaces; the global --font-mono stays Poppins for eyebrows. */
+.font-data {
+  font-family: var(--font-geist-mono), ui-monospace, "SF Mono", Menlo, monospace;
+  font-feature-settings: "tnum" 1, "ss01" 1;
+  letter-spacing: -0.012em;
+}
+
+/* Every existing `font-mono` inside the app shell (eyebrows, stat numbers, scores, labels) is a
+   machine/label usage, so route them all to the same Geist-Mono data layer — one rule keeps the
+   dashboard's data typeface consistent across leads, agents, pipeline, analytics, settings, etc.
+   Scoped to `.app-surface`, so landing/auth keep Poppins for their own `font-mono`. */
+.app-surface .font-mono {
+  font-family: var(--font-geist-mono), ui-monospace, "SF Mono", Menlo, monospace;
+  font-feature-settings: "tnum" 1, "ss01" 1;
+  letter-spacing: -0.012em;
+}
+
+/* Navigation rail — a deep brand-blue sidebar against the white content canvas (the Stripe
+   colored-sidebar idiom). The whole palette hangs off these tokens, so re-hueing the rail is a
+   one-line change. Icons/logo go white; the active tile inverts to a white chip with a deep-blue
+   glyph; electric-cyan stays the live/alert accent. */
+.app-rail {
+  background: linear-gradient(180deg, #0b57ab 0%, #093c74 100%);
+  --nav-fg: rgba(255, 255, 255, 0.72);
+  --nav-fg-strong: #ffffff;
+  --nav-ink: #0a3f7d; /* deep blue for a glyph sitting on a white active chip */
+  --nav-tile: rgba(255, 255, 255, 0.1);
+  --nav-tile-hover: rgba(255, 255, 255, 0.18);
+  --nav-line: rgba(255, 255, 255, 0.16);
+  --nav-bg-solid: #0a4685; /* solid mid-tone for rings/badges that must match the rail */
 }
 
 .landing ::selection {
@@ -258,7 +312,7 @@
   color: #0a0c12;
 }
 .auth-surface ::selection {
-  background: rgba(48, 207, 255, 0.24);
+  background: rgba(11, 87, 171, 0.24);
   color: #0a0c12;
 }
 
@@ -421,5 +475,69 @@
 @media (prefers-reduced-motion: reduce) {
   .landing .vc-flow-line {
     animation: none;
+  }
+}
+
+/* Above-the-fold entrance — CSS-driven so the hero paints on server render and animates
+   on first paint, never gated on JS hydration. Framer's initial:{opacity:0} left the
+   headline (the LCP element) invisible until hydration, pushing mobile LCP to ~7s. These
+   elements are visible in SSR; the animation is a pure enhancement, and the LCP headline
+   itself carries no opacity gate at all. Reduced motion shows the final state instantly. */
+@keyframes landing-rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.landing .landing-rise {
+  animation: landing-rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .landing .landing-rise {
+    animation: none;
+  }
+}
+
+/* Scroll reveal (Reveal / RevealItem in surface.tsx) — CSS + IntersectionObserver,
+   replacing Framer Motion so the animation runtime stays off the hydration path. Content
+   is VISIBLE BY DEFAULT: the hidden state applies only after JS arms the container
+   ([data-reveal="armed"]), so SSR / no-JS always shows everything. The transition is
+   declared on the "shown" state alone, so arming is instant (no fade-out) and only the
+   reveal-in animates. Stagger via nth-child on direct children. */
+.landing [data-reveal="armed"] .landing-reveal-item {
+  opacity: 0;
+  transform: translateY(22px);
+}
+.landing [data-reveal="shown"] .landing-reveal-item {
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.landing [data-reveal="shown"] > .landing-reveal-item:nth-child(2) {
+  transition-delay: 0.08s;
+}
+.landing [data-reveal="shown"] > .landing-reveal-item:nth-child(3) {
+  transition-delay: 0.16s;
+}
+.landing [data-reveal="shown"] > .landing-reveal-item:nth-child(4) {
+  transition-delay: 0.24s;
+}
+.landing [data-reveal="shown"] > .landing-reveal-item:nth-child(5) {
+  transition-delay: 0.32s;
+}
+.landing [data-reveal="shown"] > .landing-reveal-item:nth-child(n + 6) {
+  transition-delay: 0.4s;
+}
+@media (prefers-reduced-motion: reduce) {
+  .landing [data-reveal] .landing-reveal-item {
+    opacity: 1;
+    transform: none;
+    transition: none;
   }
 }

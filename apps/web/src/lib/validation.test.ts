@@ -4,8 +4,13 @@ import {
   dollarsToCents,
   normalizeWebsiteUrl,
   optionalDollarsToCents,
+  looksLikeUrl,
+  validateManualLead,
+  validateMemberSignup,
   validateOnboarding,
   validateOnboardingDetails,
+
+  validatePositioning,
   validateSignup,
   validateWorkspace,
 } from "./validation";
@@ -202,10 +207,120 @@ describe("validateWorkspace", () => {
   });
 });
 
+describe("validatePositioning", () => {
+  it("trims and passes all three, empty → null", () => {
+    const r = validatePositioning({ valueProp: "  We book qualified calls.  ", brandVoice: "", guardrails: "" });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.values.valueProp).toBe("We book qualified calls.");
+      expect(r.values.brandVoice).toBeNull();
+      expect(r.values.guardrails).toBeNull();
+    }
+  });
+  it("rejects an over-long value prop", () => {
+    const r = validatePositioning({ valueProp: "x".repeat(801), brandVoice: "", guardrails: "" });
+    expect(r.ok).toBe(false);
+  });
+  it("accepts all three when provided", () => {
+    const r = validatePositioning({ valueProp: "V", brandVoice: "warm, direct", guardrails: "never claim SOC 2" });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.values.guardrails).toBe("never claim SOC 2");
+  });
+});
+
 describe("confirmAccountName", () => {
   it("requires an exact (trimmed) match", () => {
     expect(confirmAccountName("Acme Inc", " Acme Inc ")).toBe(true);
     expect(confirmAccountName("Acme Inc", "acme inc")).toBe(false);
     expect(confirmAccountName("Acme Inc", "")).toBe(false);
+  });
+});
+
+describe("validateMemberSignup", () => {
+  it("accepts a matching email (case-insensitive) with a valid password", () => {
+    const r = validateMemberSignup({
+      email: "Jane@Company.com",
+      password: "longenough",
+      inviteEmail: "jane@company.com",
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.values.email).toBe("Jane@Company.com");
+  });
+
+  it("rejects a different address than the invite was issued to", () => {
+    const r = validateMemberSignup({
+      email: "other@company.com",
+      password: "longenough",
+      inviteEmail: "jane@company.com",
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain("jane@company.com");
+  });
+
+  it("enforces the password floor and email shape", () => {
+    expect(
+      validateMemberSignup({ email: "jane@company.com", password: "short", inviteEmail: "jane@company.com" }).ok
+    ).toBe(false);
+    expect(
+      validateMemberSignup({ email: "not-an-email", password: "longenough", inviteEmail: "jane@company.com" }).ok
+    ).toBe(false);
+  });
+});
+
+describe("validateManualLead", () => {
+  const base = { firstName: "Ada", lastName: "", title: "", companyName: "", linkedinUrl: "linkedin.com/in/ada" };
+
+  it("accepts name + profile URL, normalizes the URL, nulls empty optionals", () => {
+    const r = validateManualLead({ ...base, lastName: "  Lovelace ", title: "CTO", companyName: "" });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.values).toEqual({
+        firstName: "Ada",
+        lastName: "Lovelace",
+        title: "CTO",
+        companyName: null,
+        linkedinUrl: "https://linkedin.com/in/ada",
+      });
+    }
+  });
+
+  it("requires a first name", () => {
+    expect(validateManualLead({ ...base, firstName: "  " }).ok).toBe(false);
+  });
+
+  it("requires a PROFILE url — company pages and non-LinkedIn hosts are rejected", () => {
+    expect(validateManualLead({ ...base, linkedinUrl: "linkedin.com/company/acme" }).ok).toBe(false);
+    expect(validateManualLead({ ...base, linkedinUrl: "https://example.com/in/ada" }).ok).toBe(false);
+    expect(validateManualLead({ ...base, linkedinUrl: "" }).ok).toBe(false);
+  });
+
+  it("caps field lengths", () => {
+    expect(validateManualLead({ ...base, companyName: "x".repeat(121) }).ok).toBe(false);
+  });
+});
+
+describe("looksLikeUrl guards (T6 — the first external signup pasted a LinkedIn URL as a name)", () => {
+  it("detects URL-shaped values", () => {
+    expect(looksLikeUrl("https://www.linkedin.com/in/someone?utm_source=share")).toBe(true);
+    expect(looksLikeUrl("www.acme.com")).toBe(true);
+    expect(looksLikeUrl("Acme Marketing")).toBe(false);
+    expect(looksLikeUrl("B2B SaaS")).toBe(false);
+  });
+
+  it("signup rejects a LinkedIn URL as company name with the specific hint", () => {
+    const r = validateSignup({
+      email: "a@b.com",
+      password: "longenough",
+      companyName: "https://www.linkedin.com/in/someone-123?utm_source=share_via",
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain("connect LinkedIn");
+  });
+
+  it("workspace targeting rejects links in industry and ICP", () => {
+    const base = { name: "Acme", revenueGoal: "1000" };
+    expect(validateWorkspace({ ...base, industry: "https://acme.com", icp: "founders" }).ok).toBe(false);
+    expect(validateWorkspace({ ...base, industry: "B2B SaaS", icp: "linkedin.com/in/x" }).ok).toBe(false);
+    expect(validateWorkspace({ ...base, industry: "B2B SaaS", icp: "SaaS founders" }).ok).toBe(true);
   });
 });

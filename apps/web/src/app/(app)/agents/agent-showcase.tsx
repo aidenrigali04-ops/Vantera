@@ -9,9 +9,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { AnimatedProgress } from "@/components/ui/animated-progress";
 import { CardGlass } from "@/components/ui/card";
+import { Eyebrow, PANEL_SURFACE } from "@/components/ui/panel";
 import { FormError } from "@/components/form-error";
 import { cn } from "@/lib/utils";
 import { setAgentStatus, type AgentActionState } from "./actions";
+import { RunNowButton } from "./run-now";
 import type { ShowcaseAgent, ShowcaseKind } from "./agent-showcase-data";
 
 // ── time helpers (shared convention with the dashboard/agent-card) ───────────
@@ -119,9 +121,7 @@ function AgentOrb({ agent }: { agent: ShowcaseAgent }) {
           <span
             className={cn(
               "size-1.5 rounded-full",
-              live
-                ? "animate-pulse bg-[var(--cyan)] shadow-[0_0_8px_rgba(48,207,255,0.9)]"
-                : "bg-muted-foreground/40",
+              live ? "bg-[var(--fb)]" : "bg-muted-foreground/40",
             )}
           />
           {statusLabel(agent.status)}
@@ -152,9 +152,7 @@ function AgentDetails({ agent }: { agent: ShowcaseAgent }) {
 
   return (
     <div className="flex flex-col items-start text-left">
-      <p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-        {agent.roleLabel}
-      </p>
+      <Eyebrow className="mb-2">{agent.roleLabel}</Eyebrow>
       <h1 className="font-heading mb-3 text-3xl font-semibold tracking-tight md:text-4xl">
         {agent.name}
       </h1>
@@ -171,12 +169,12 @@ function AgentDetails({ agent }: { agent: ShowcaseAgent }) {
       )}
 
       {/* run-summary panel */}
-      <div className="relative isolate w-full space-y-5 overflow-hidden rounded-2xl border border-[var(--hairline)] bg-white p-6 text-left shadow-[var(--shadow-card)]">
+      <div className={cn(PANEL_SURFACE, "relative isolate w-full space-y-5 overflow-hidden p-6 text-left")}>
         <CardGlass />
         <div className="flex gap-8">
           {agent.stats.map((s) => (
             <div key={s.label}>
-              <p className="font-mono text-3xl font-semibold tabular-nums">{s.value}</p>
+              <p className="font-data text-3xl font-semibold tabular-nums">{s.value}</p>
               <p className="mt-1 text-xs text-muted-foreground">{s.label}</p>
             </div>
           ))}
@@ -186,7 +184,7 @@ function AgentDetails({ agent }: { agent: ShowcaseAgent }) {
           <div className="space-y-2">
             <div className="flex items-center justify-between text-xs">
               <span className="font-medium text-foreground">{agent.progress.label}</span>
-              <span className="font-mono text-muted-foreground">{agent.progress.value}%</span>
+              <span className="font-data text-muted-foreground">{agent.progress.value}%</span>
             </div>
             <AnimatedProgress value={agent.progress.value} label={agent.progress.label} />
             <p className="text-xs text-muted-foreground">{agent.progress.caption}</p>
@@ -206,6 +204,28 @@ function AgentDetails({ agent }: { agent: ShowcaseAgent }) {
         <p className="border-t border-[var(--hairline)] pt-4 text-xs text-muted-foreground">
           {runLine}
         </p>
+
+        {/* T4 operate path: the agent's actual work, run by run — never config-only again. */}
+        {agent.attention && (
+          <p className="rounded-xl bg-amber-500/10 px-3 py-2 text-xs leading-relaxed text-amber-800 ring-1 ring-inset ring-amber-500/25">
+            {agent.attention}
+          </p>
+        )}
+        {agent.runHistory.length > 0 && (
+          <div className="border-t border-[var(--hairline)] pt-4">
+            <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+              Recent runs
+            </p>
+            <ul className="mt-2 space-y-1.5">
+              {agent.runHistory.map((r, i) => (
+                <li key={i} className="flex items-baseline gap-3 text-xs">
+                  <span className="w-16 shrink-0 tabular-nums text-muted-foreground">{r.agoLabel}</span>
+                  <span className="text-[var(--ink-2)]">{r.line}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
 
       {/* actions */}
@@ -216,6 +236,9 @@ function AgentDetails({ agent }: { agent: ShowcaseAgent }) {
               <Settings2 className="size-4" /> Edit config
             </Link>
           </Button>
+        )}
+        {live && (agent.kind === "scout" || agent.kind === "intent") && (
+          <RunNowButton agentId={agent.id} />
         )}
         <form action={statusAction}>
           <input type="hidden" name="agentId" value={agent.id} />

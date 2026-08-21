@@ -9,8 +9,8 @@ import {
   type Interval,
 } from "@/components/pricing/pricing-grid";
 import { startCheckout, openBillingPortal } from "./actions";
+import { trackEvent } from "@/lib/analytics/clarity";
 
-const SALES_EMAIL = "sales@vanterasystem.com";
 
 interface Props {
   plans: PlanCard[];
@@ -30,11 +30,6 @@ export function PricingPlans({ plans, addons, currentTier, hasActivePlan, dealVa
       dealValueUsd={dealValueUsd}
       title="Choose the plan that matches your goal"
       subtitle="Every plan runs the same agents on your ICP. Move up as your team grows — more seats and connected LinkedIn accounts; your enrichment and scoring never change."
-      enterpriseCta={
-        <Button asChild variant="outline" size="sm">
-          <a href={`mailto:${SALES_EMAIL}`}>Talk to us</a>
-        </Button>
-      }
       renderCta={({ plan, interval, isCurrent }) => (
         <PlanCta
           plan={plan}
@@ -79,7 +74,12 @@ function PlanCta({
   }
 
   return (
-    <form action={startCheckout}>
+    // onSubmit (not the action) carries the analytics fire: it runs immediately on
+    // click, before the server action redirects the browser to Stripe.
+    <form
+      action={startCheckout}
+      onSubmit={() => trackEvent("checkout_started", { plan: plan.tier, interval })}
+    >
       <input type="hidden" name="tier" value={plan.tier} />
       <input type="hidden" name="interval" value={interval} />
       <Button

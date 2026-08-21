@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Check, Rocket, Settings2 } from "lucide-react";
+import { ArrowRight, Rocket, Settings2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { Panel, Eyebrow } from "@/components/ui/panel";
+import { KpiTile, KpiGrid } from "@/components/ui/kpi";
 import { AnimatedProgress } from "@/components/ui/animated-progress";
 import { cn } from "@/lib/utils";
 import type { PipelineViewModel } from "./queries";
@@ -22,28 +23,32 @@ export function PipelineBoard({
   activity,
   goalLabel,
   pipelineValueLabel,
+  closedValueLabel,
   livePipeline,
 }: {
   vm: PipelineViewModel;
   activity: ActivityItem[];
   goalLabel: string | null;
+  /** stage-weighted EXPECTED pipeline — same meaning as the Overview's "In pipeline" */
   pipelineValueLabel: string;
+  /** closed-won revenue (actuals-first) — same meaning as the Overview's "Closed" */
+  closedValueLabel: string;
   livePipeline: LivePipelineData;
 }) {
   const empty = vm.activeTotal === 0 && vm.convertedClients === 0 && vm.pausedTotal === 0;
 
   return (
-    <div className="mx-auto max-w-5xl">
-      <div className="mb-8 flex flex-wrap items-start justify-between gap-3">
+    <div className="mx-auto w-full max-w-[1400px]">
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-3 border-b border-[var(--hairline)] pb-5">
         <div>
-          <h1 className="font-heading text-3xl font-semibold tracking-tight">Pipeline</h1>
+          <h1 className="font-heading text-2xl font-semibold tracking-tight">Pipeline</h1>
           <p className="mt-1.5 text-sm text-muted-foreground">
             Every validated lead, moving through the sequence — and stopping the instant they convert.
           </p>
         </div>
         <Link
           href="/sequence"
-          className="mt-1 inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[var(--hairline)] bg-white px-4 py-2 text-sm transition-colors hover:border-[var(--cyan-line)]"
+          className="mt-1 inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-[var(--hairline)] bg-white px-4 py-2 text-sm transition-colors hover:border-[var(--cyan-line)] hover:bg-[var(--tint)]"
         >
           <Settings2 className="size-4" aria-hidden /> Configure sequence
         </Link>
@@ -52,17 +57,39 @@ export function PipelineBoard({
       {empty ? (
         <EmptyState />
       ) : (
-        // Grounded two-column layout: the live funnel + its activity on the left, the
-        // revenue proof + the win count on the right — balanced, complementary panels.
-        <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr] lg:items-start">
-          <div className="flex flex-col gap-6">
+        <div className="space-y-6">
+          {/* Scan — top-line pipeline health. */}
+          <KpiGrid>
+            <KpiTile
+              hero
+              label="In pipeline"
+              value={pipelineValueLabel}
+              sub="expected value · not yet won"
+            />
+            <KpiTile label="In motion" value={String(vm.activeTotal)} sub="active in sequence" />
+            <KpiTile
+              label="Replied"
+              value={String(vm.pausedTotal)}
+              sub={vm.pausedTotal > 0 ? "waiting on you" : "none waiting"}
+              actionable={vm.pausedTotal > 0}
+              href={vm.pausedTotal > 0 ? "/leads?tab=replied" : undefined}
+            />
+            <KpiTile
+              label="Won"
+              value={String(vm.convertedClients)}
+              sub={vm.convertedClients === 1 ? "client closed" : "clients closed"}
+            />
+          </KpiGrid>
+
+          {vm.pausedTotal > 0 && <PausedCallout count={vm.pausedTotal} />}
+
+          {/* The live funnel gets the width; the goal proof + activity ride alongside. */}
+          <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr] lg:items-start">
             <LivePipeline {...livePipeline} />
-            <ActivityFeed activity={activity} />
-          </div>
-          <div className="flex flex-col gap-6">
-            <GoalPanel vm={vm} goalLabel={goalLabel} pipelineValueLabel={pipelineValueLabel} />
-            <WonTile count={vm.convertedClients} />
-            {vm.pausedTotal > 0 && <PausedCallout count={vm.pausedTotal} />}
+            <div className="flex flex-col gap-6">
+              <GoalPanel vm={vm} goalLabel={goalLabel} closedValueLabel={closedValueLabel} />
+              <ActivityFeed activity={activity} />
+            </div>
           </div>
         </div>
       )}
@@ -70,14 +97,16 @@ export function PipelineBoard({
   );
 }
 
+// T1: revenue progress is CLOSED revenue vs. the goal — the same semantics as the
+// Overview's revenue card (expected pipeline is shown separately, in the KPI strip).
 function GoalPanel({
   vm,
   goalLabel,
-  pipelineValueLabel,
+  closedValueLabel,
 }: {
   vm: PipelineViewModel;
   goalLabel: string | null;
-  pipelineValueLabel: string;
+  closedValueLabel: string;
 }) {
   return (
     <Panel className="p-6">
@@ -98,9 +127,9 @@ function GoalPanel({
       </div>
 
       <div className="mt-4 flex items-end gap-2">
-        <span className="font-mono text-3xl font-semibold tabular-nums">{pipelineValueLabel}</span>
+        <span className="font-data text-3xl font-semibold tabular-nums">{closedValueLabel}</span>
         {goalLabel && (
-          <span className="pb-1 font-mono text-sm text-muted-foreground">/ {goalLabel} mo</span>
+          <span className="pb-1 font-data text-sm text-muted-foreground">/ {goalLabel} mo</span>
         )}
       </div>
 
@@ -110,23 +139,6 @@ function GoalPanel({
         <span className="text-foreground tabular-nums">{vm.convertedClients}</span> won ·{" "}
         <span className="text-foreground tabular-nums">{vm.activeTotal}</span> in motion
       </p>
-    </Panel>
-  );
-}
-
-function WonTile({ count }: { count: number }) {
-  return (
-    <Panel className="p-5">
-      <div className="flex items-center justify-between">
-        <Eyebrow>Won</Eyebrow>
-        <span className="grid size-6 place-items-center rounded-full bg-[#e9f9f0] text-[#0f9d58]">
-          <Check className="size-3.5" aria-hidden />
-        </span>
-      </div>
-      <div className="mt-3 text-3xl font-semibold tabular-nums">{count}</div>
-      <div className="mt-0.5 text-xs text-muted-foreground">
-        {count === 1 ? "meeting booked" : "meetings booked"}
-      </div>
     </Panel>
   );
 }
@@ -141,7 +153,7 @@ function PausedCallout({ count }: { count: number }) {
             <span className="relative inline-flex size-2 rounded-full bg-[var(--cyan)]" />
           </span>
           <p className="text-sm">
-            <span className="font-mono font-semibold tabular-nums">{count}</span>{" "}
+            <span className="font-data font-semibold tabular-nums">{count}</span>{" "}
             {count === 1 ? "lead replied" : "leads replied"} — the sequence paused for you
           </p>
         </div>
@@ -168,7 +180,7 @@ function ActivityFeed({ activity }: { activity: ActivityItem[] }) {
                 className={cn(
                   "size-1.5 shrink-0 rounded-full",
                   a.kind === "converted"
-                    ? "bg-[#13b07a]"
+                    ? "bg-[var(--positive)]"
                     : a.kind === "reply"
                       ? "bg-[var(--cyan)]"
                       : "bg-foreground/40"
@@ -176,7 +188,7 @@ function ActivityFeed({ activity }: { activity: ActivityItem[] }) {
               />
               <span className="text-foreground">{a.who}</span>
               <span className="text-muted-foreground">{a.verb}</span>
-              <span className="ml-auto font-mono text-xs text-muted-foreground/70">{a.at}</span>
+              <span className="ml-auto font-data text-xs text-muted-foreground/70">{a.at}</span>
             </li>
           ))}
         </ul>
@@ -198,14 +210,14 @@ function EmptyState() {
         </div>
         <h2 className="mt-5 font-heading text-lg font-semibold">Your pipeline is ready to run</h2>
         <p className="mt-2 max-w-sm text-sm text-muted-foreground">
-          Launch a campaign and every qualified lead flows through your LinkedIn sequence
+          Once your agents are live, every qualified lead flows through your LinkedIn sequence
           automatically — pausing the instant someone replies.
         </p>
         <Link
           href="/agents"
-          className="mt-6 inline-flex items-center gap-2 rounded-full bg-[#0a0c12] px-5 py-2.5 text-sm font-medium text-white transition-all hover:-translate-y-0.5 hover:shadow-[0_10px_30px_-8px_rgba(48,207,255,0.55)]"
+          className="mt-6 inline-flex items-center gap-2 rounded-lg bg-[#0a0c12] px-5 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90"
         >
-          Launch a campaign
+          Check your agents
           <ArrowRight className="size-4" aria-hidden />
         </Link>
       </Panel>

@@ -143,7 +143,9 @@ export function MorphPanel({ surface }: MorphPanelProps) {
       {walkthrough && (
         <Walkthrough steps={walkthrough} onClose={() => setWalkthrough(null)} />
       )}
-    <div className="fixed bottom-6 right-6 z-50" ref={panelRef}>
+    {/* R2: below lg the pill sits ABOVE the MobileNav bar (bottom-0 z-40) — it must never
+        cover the Inbox/Meetings tabs (2026-07-15 audit, screenshot-confirmed). */}
+    <div className="fixed bottom-20 right-4 z-50 lg:bottom-6 lg:right-6" ref={panelRef}>
       <AnimatePresence>
         {open && (
             <motion.div
@@ -153,7 +155,7 @@ export function MorphPanel({ surface }: MorphPanelProps) {
               exit={{ opacity: 0, scale: 0.96, y: 8 }}
               transition={{ type: "spring", stiffness: 460, damping: 36, mass: 0.7 }}
               style={{ originX: 1, originY: 1 }}
-              className="absolute bottom-0 right-0 flex h-[560px] w-[400px] flex-col overflow-hidden rounded-3xl border border-border bg-background shadow-2xl"
+              className="absolute bottom-0 right-0 flex h-[min(560px,70dvh)] w-[min(400px,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-border bg-background shadow-2xl"
             >
               {/* Header */}
               <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
@@ -336,7 +338,7 @@ function ThumbButtons({
         onClick={() => void handleRate("up")}
         className={cn(
           "text-xs rounded px-1 py-0.5 transition-colors",
-          rated === "up" ? "text-green-600" : "text-muted-foreground hover:text-foreground"
+          rated === "up" ? "text-[var(--positive)]" : "text-muted-foreground hover:text-foreground"
         )}
         aria-label="Helpful"
         disabled={rated !== null}

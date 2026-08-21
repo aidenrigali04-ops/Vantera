@@ -41,6 +41,17 @@ export function normalizeWebsiteUrl(input: string): { ok: true; url: string | nu
   return { ok: false, error: "Enter a valid website address, or leave it blank." };
 }
 
+/**
+ * T6: structural-garbage guard. The first real external signup pasted their LinkedIn
+ * profile URL into a name field and their surname into industry — a URL in any of these
+ * fields poisons every downstream surface (workspace title, emails, ICP derivation),
+ * so it's rejected at the door with a field-specific hint.
+ */
+export function looksLikeUrl(value: string): boolean {
+  const v = value.trim().toLowerCase();
+  return /^https?:\/\//.test(v) || /^www\./.test(v) || /(linkedin\.com|\.com\/|\.dev\/|\.io\/|\.net\/)/.test(v);
+}
+
 function validateTargeting(input: {
   industry: string;
   icp: string;
@@ -49,7 +60,13 @@ function validateTargeting(input: {
   const industry = input.industry.trim();
   const icp = input.icp.trim();
   if (!industry) return { ok: false, error: "Enter your industry." };
+  if (looksLikeUrl(industry)) {
+    return { ok: false, error: "Industry should be a market, not a link — e.g. “B2B SaaS” or “Marketing agencies”." };
+  }
   if (!icp) return { ok: false, error: "Describe your target audience." };
+  if (looksLikeUrl(icp)) {
+    return { ok: false, error: "Describe your target audience in words (who they are), not a link." };
+  }
   const revenueGoalCents = dollarsToCents(input.revenueGoal);
   if (revenueGoalCents === null) {
     return { ok: false, error: "Enter a monthly revenue goal greater than zero." };
@@ -114,6 +131,103 @@ export function validateOnboardingDetails(input: {
   return { ok: true, values: { fullName, brandName, websiteUrl: website.url } };
 }
 
+/** Blank means "not provided"; otherwise require a linkedin.com URL, defaulting the scheme to https. */
+export function normalizeLinkedinUrl(input: string): { ok: true; url: string | null } | Invalid {
+  const trimmed = input.trim();
+  if (!trimmed) return { ok: true, url: null };
+  const candidate = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  try {
+    const parsed = new URL(candidate);
+    if (
+      (parsed.protocol === "http:" || parsed.protocol === "https:") &&
+      /(^|\.)linkedin\.com$/i.test(parsed.hostname)
+    ) {
+      return { ok: true, url: candidate };
+    }
+  } catch {
+    // fall through
+  }
+  return { ok: false, error: "Enter a valid LinkedIn URL (linkedin.com/in/…), or leave it blank." };
+}
+
+/**
+ * Step 1 "Personalize": identity only — what we can't derive. Industry/ICP/goals are derived from
+ * the website/LinkedIn pull and confirmed later, so they're NOT collected here (B=MAP: cut fields).
+ */
+export function validatePersonalize(input: {
+  companyName: string;
+  role: string;
+  websiteUrl: string;
+  linkedinUrl: string;
+}):
+  | Valid<{ companyName: string; role: string; websiteUrl: string | null; linkedinUrl: string | null }>
+  | Invalid {
+  const companyName = input.companyName.trim();
+  if (!companyName) return { ok: false, error: "Enter your company name." };
+  if (looksLikeUrl(companyName)) {
+    return { ok: false, error: "That looks like a link — the website and LinkedIn fields are below. Enter your company's name here." };
+  }
+  const role = input.role.trim();
+  if (!role) return { ok: false, error: "Select your role." };
+  const website = normalizeWebsiteUrl(input.websiteUrl);
+  if (!website.ok) return website;
+  const linkedin = normalizeLinkedinUrl(input.linkedinUrl);
+  if (!linkedin.ok) return linkedin;
+  return { ok: true, values: { companyName, role, websiteUrl: website.url, linkedinUrl: linkedin.url } };
+}
+
+/**
+ * Step 3 "Confirmation": the derived targeting + goal, confirmed/edited by the user. Same fields the
+ * Scout (targeting) and dashboard (dollar tracking) depend on — required before "Find my first leads".
+ */
+export function validateConfirmation(input: {
+  industry: string;
+  icp: string;
+  revenueGoal: string;
+  avgDealValue: string;
+}):
+  | Valid<{ industry: string; icp: string; revenueGoalCents: number; avgDealValueCents: number }>
+  | Invalid {
+  const targeting = validateTargeting(input);
+  if (!targeting.ok) return targeting;
+  const avgDealValueCents = dollarsToCents(input.avgDealValue);
+  if (avgDealValueCents === null) {
+    return { ok: false, error: "Enter your average deal value (what one new client is worth)." };
+  }
+  return { ok: true, values: { ...targeting.values, avgDealValueCents } };
+}
+
+const VALUE_PROP_MAX = 800;
+const BRAND_VOICE_MAX = 300;
+const GUARDRAILS_MAX = 800;
+
+/**
+ * Seller-authored positioning (0061): value proposition, brand voice, guardrails. All optional —
+ * empty trims to null so the loaders fall back to the website-scan summary / omit the field.
+ */
+export function validatePositioning(input: {
+  valueProp: string;
+  brandVoice: string;
+  guardrails: string;
+}):
+  | Valid<{ valueProp: string | null; brandVoice: string | null; guardrails: string | null }>
+  | Invalid {
+  const valueProp = input.valueProp.trim();
+  const brandVoice = input.brandVoice.trim();
+  const guardrails = input.guardrails.trim();
+  if (valueProp.length > VALUE_PROP_MAX) return { ok: false, error: `Keep your value proposition under ${VALUE_PROP_MAX} characters.` };
+  if (brandVoice.length > BRAND_VOICE_MAX) return { ok: false, error: `Keep the brand voice under ${BRAND_VOICE_MAX} characters.` };
+  if (guardrails.length > GUARDRAILS_MAX) return { ok: false, error: `Keep guardrails under ${GUARDRAILS_MAX} characters.` };
+  return {
+    ok: true,
+    values: {
+      valueProp: valueProp || null,
+      brandVoice: brandVoice || null,
+      guardrails: guardrails || null,
+    },
+  };
+}
+
 export function validateSignup(input: {
   email: string;
   password: string;
@@ -126,7 +240,36 @@ export function validateSignup(input: {
     return { ok: false, error: "Password must be at least 8 characters." };
   }
   if (!companyName) return { ok: false, error: "Enter your company name." };
+  if (looksLikeUrl(companyName)) {
+    return {
+      ok: false,
+      error: /linkedin\.com/i.test(companyName)
+        ? "That's a LinkedIn link — you'll connect LinkedIn right after signup. Enter your company or business name here."
+        : "That looks like a link — enter your company or business name (e.g. “Acme Marketing”).",
+    };
+  }
   return { ok: true, values: { email, password: input.password, companyName } };
+}
+
+/** R3: signup via a team invite — the member joins an existing workspace, so there is
+ *  no company field; the email must match the one the invite was issued to. */
+export function validateMemberSignup(input: {
+  email: string;
+  password: string;
+  inviteEmail: string;
+}): Valid<{ email: string; password: string }> | Invalid {
+  const email = input.email.trim();
+  if (!email || !email.includes("@")) return { ok: false, error: "Enter a valid email address." };
+  if (input.password.length < 8) {
+    return { ok: false, error: "Password must be at least 8 characters." };
+  }
+  if (email.toLowerCase() !== input.inviteEmail.trim().toLowerCase()) {
+    return {
+      ok: false,
+      error: `This invite was sent to ${input.inviteEmail} — sign up with that address, or ask for a new invite.`,
+    };
+  }
+  return { ok: true, values: { email, password: input.password } };
 }
 
 export function validateWorkspace(input: {
@@ -164,4 +307,54 @@ export function validateEmail(raw: FormDataEntryValue | null): { email?: string;
     return { error: "Enter a valid email address." };
   }
   return { email };
+}
+
+const FIELD_MAX = 120;
+
+/**
+ * R6 manual add-lead: first name + a LinkedIn profile URL are required (LinkedIn is the only
+ * outreach channel, so a lead without a profile can never be contacted); everything else is
+ * optional context that helps the qualification rank judge fit.
+ */
+export function validateManualLead(input: {
+  firstName: string;
+  lastName: string;
+  title: string;
+  companyName: string;
+  linkedinUrl: string;
+}):
+  | Valid<{
+      firstName: string;
+      lastName: string | null;
+      title: string | null;
+      companyName: string | null;
+      linkedinUrl: string;
+    }>
+  | Invalid {
+  const firstName = input.firstName.trim();
+  if (!firstName) return { ok: false, error: "Enter the prospect's first name." };
+  for (const [label, v] of [
+    ["First name", firstName],
+    ["Last name", input.lastName],
+    ["Title", input.title],
+    ["Company", input.companyName],
+  ] as const) {
+    if (v.trim().length > FIELD_MAX) return { ok: false, error: `${label} is too long.` };
+  }
+  const linkedin = normalizeLinkedinUrl(input.linkedinUrl);
+  if (!linkedin.ok) return linkedin;
+  if (!linkedin.url || !/linkedin\.com\/in\//i.test(linkedin.url)) {
+    return { ok: false, error: "Enter their LinkedIn profile URL (linkedin.com/in/…)." };
+  }
+  const opt = (v: string) => (v.trim() ? v.trim() : null);
+  return {
+    ok: true,
+    values: {
+      firstName,
+      lastName: opt(input.lastName),
+      title: opt(input.title),
+      companyName: opt(input.companyName),
+      linkedinUrl: linkedin.url,
+    },
+  };
 }

@@ -2,6 +2,8 @@ import { createClient } from "@/lib/supabase/server";
 import { resolveSequenceConfig } from "@vantera/jobs/pipeline/sequence-config";
 import { SequenceBuilder } from "./sequence-builder";
 
+export const metadata = { title: "Sequence" };
+
 export default async function SequencePage() {
   const supabase = await createClient();
   // RLS scopes to the session's account; one campaign per account in v1.

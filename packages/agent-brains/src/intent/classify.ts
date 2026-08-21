@@ -1,6 +1,6 @@
 import { generateObject, type LanguageModel } from "ai";
 import { z } from "zod";
-import { getModel } from "@vantera/ai";
+import { getModel, registerPrompt } from "@vantera/ai";
 import { stripLoneSurrogates } from "../text";
 
 // Permissive schema (validate loose, normalize strict — see prospect/rank). The model returns
@@ -44,7 +44,7 @@ const trunc = (s: string, max: number) => (s.length > max ? `${s.slice(0, max - 
 
 // Stable system prompt (rubric + output contract) so Anthropic prompt caching hits across
 // batches; per-batch content rides in the user message only.
-const INTENT_SYSTEM = `You are the buying-intent brain of a LinkedIn SDR platform. You receive a seller context block and a batch of LinkedIn observations (someone engaged with or published a post). Decide whether each person is showing genuine buying intent FOR THE SELLER'S OFFER right now — not generic engagement.
+const INTENT_SYSTEM = registerPrompt("intent/classify", `You are the buying-intent brain of a LinkedIn SDR platform. You receive a seller context block and a batch of LinkedIn observations (someone engaged with or published a post). Decide whether each person is showing genuine buying intent FOR THE SELLER'S OFFER right now — not generic engagement.
 
 Rubric:
 - high: explicitly seeking, asking for, or describing the exact problem the seller solves (e.g. "anyone recommend a tool for X", "we keep struggling with X").
@@ -52,7 +52,7 @@ Rubric:
 - low: tangential — same broad topic but no signal they're in-market.
 - none: unrelated, off-topic, or pure social noise. Most bare reactions are none.
 
-For each observation emit: ref (copy it exactly), reasoning (one sentence weighing the text against the seller's offer — think here before deciding), is_intent (true ONLY for high/medium), level, why_now (one plain-English line a rep reads — paraphrase what THIS person actually did, e.g. "commented asking for a churn tool on a RevOps post"). Ground why_now in the observed text; never invent a detail that isn't there.`;
+For each observation emit: ref (copy it exactly), reasoning (one sentence weighing the text against the seller's offer — think here before deciding), is_intent (true ONLY for high/medium), level, why_now (one plain-English line a rep reads — paraphrase what THIS person actually did, e.g. "commented asking for a churn tool on a RevOps post"). Ground why_now in the observed text; never invent a detail that isn't there.`);
 
 function contextBlock(ctx: IntentContext): string {
   return [
@@ -95,7 +95,7 @@ async function classifyBatch(
       .join("\n")}`
   );
   const run = () =>
-    generateObject({ model, schema: intentBatchSchema, system: INTENT_SYSTEM, prompt, maxOutputTokens: MAX_OUTPUT_TOKENS });
+    generateObject({ model, schema: intentBatchSchema, system: INTENT_SYSTEM.text, prompt, maxOutputTokens: MAX_OUTPUT_TOKENS });
 
   let verdicts: IntentVerdict[];
   try {

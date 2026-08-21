@@ -1,0 +1,142 @@
+[
+  {
+    "id": "reply-interested-01",
+    "body": "Yes, let's find time this week — I'm interested, can you send a few slots?",
+    "expected": "interested"
+  },
+  {
+    "id": "reply-interested-02",
+    "body": "This looks useful. Can you send more information?",
+    "expected": "interested"
+  },
+  {
+    "id": "reply-interested-03",
+    "body": "I'd like to see a quick demo — what times work on your end?",
+    "expected": "interested"
+  },
+  {
+    "id": "reply-interested-04",
+    "body": "Sounds great, count me in. Send over some times to connect.",
+    "expected": "interested"
+  },
+  {
+    "id": "reply-interested-05",
+    "body": "Yes please, we've been looking for exactly this. Let's talk.",
+    "expected": "interested"
+  },
+  {
+    "id": "reply-interested-06",
+    "body": "Interested — can we set up a short call next week?",
+    "expected": "interested"
+  },
+  {
+    "id": "reply-interested-07",
+    "body": "This is exactly the problem we're dealing with right now. Let's schedule time to discuss.",
+    "expected": "interested"
+  },
+  {
+    "id": "reply-interested-08",
+    "body": "Absolutely, go ahead and send me a link to book a call.",
+    "expected": "interested"
+  },
+  {
+    "id": "reply-not-interested-01",
+    "body": "Not interested, but thanks for reaching out.",
+    "expected": "not_interested"
+  },
+  {
+    "id": "reply-not-interested-02",
+    "body": "We're all set with our current process, no thanks.",
+    "expected": "not_interested"
+  },
+  {
+    "id": "reply-not-interested-03",
+    "body": "This isn't a fit for us right now, but appreciate you thinking of us.",
+    "expected": "not_interested"
+  },
+  {
+    "id": "reply-not-interested-04",
+    "body": "No thank you, we're not looking for anything like this.",
+    "expected": "not_interested"
+  },
+  {
+    "id": "reply-not-interested-05",
+    "body": "Not for us — please don't reach out again about this topic.",
+    "expected": "not_interested"
+  },
+  {
+    "id": "reply-not-interested-06",
+    "body": "Thanks but no — we already have something in place that works fine.",
+    "expected": "not_interested"
+  },
+  {
+    "id": "reply-neutral-01",
+    "body": "What's the pricing look like for something like this?",
+    "expected": "neutral"
+  },
+  {
+    "id": "reply-neutral-02",
+    "body": "Can you tell me more about how this actually works before I commit to anything?",
+    "expected": "neutral"
+  },
+  {
+    "id": "reply-neutral-03",
+    "body": "We're not prioritizing this right now, but maybe reach back out next quarter.",
+    "expected": "neutral"
+  },
+  {
+    "id": "reply-neutral-04",
+    "body": "Interesting, but I'd need to check with my team before saying anything more.",
+    "expected": "neutral"
+  },
+  {
+    "id": "reply-neutral-05",
+    "body": "Not sure yet — what other companies like ours have used this?",
+    "expected": "neutral"
+  },
+  {
+    "id": "reply-ooo-01",
+    "body": "I am currently out of office until next Monday and will respond when I return.",
+    "expected": "out_of_office"
+  },
+  {
+    "id": "reply-ooo-02",
+    "body": "Automatic reply: I'm on parental leave through the end of the quarter.",
+    "expected": "out_of_office"
+  },
+  {
+    "id": "reply-ooo-03",
+    "body": "Out of the office this week at a conference, will reply when I'm back.",
+    "expected": "out_of_office"
+  },
+  {
+    "id": "reply-ooo-04",
+    "body": "Auto-reply: currently on sick leave, will respond upon return.",
+    "expected": "out_of_office"
+  },
+  {
+    "id": "reply-unsubscribe-01",
+    "body": "Please unsubscribe me from all future messages.",
+    "expected": "unsubscribe"
+  },
+  {
+    "id": "reply-unsubscribe-02",
+    "body": "Take me off your list — not interested in hearing from this account again.",
+    "expected": "unsubscribe"
+  },
+  {
+    "id": "reply-unsubscribe-03",
+    "body": "Please stop emailing me, I've asked before.",
+    "expected": "unsubscribe"
+  },
+  {
+    "id": "reply-other-01",
+    "body": "You've got the wrong person — I think you meant to reach my colleague in procurement.",
+    "expected": "other"
+  },
+  {
+    "id": "reply-other-02",
+    "body": "Forwarding this to our operations lead, she handles vendor conversations.",
+    "expected": "other"
+  }
+]

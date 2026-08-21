@@ -5,6 +5,12 @@ useDefault = true
 
 [allowlist]
 description = "Placeholders and intentional fake values that are not real secrets"
+regexes = [
+  # Code identifier from the copy fix pass (agent-brains export). It is exactly 16 chars
+  # in "LinkedIn…" context, which the default linkedin-client-secret rule mistakes for a
+  # credential when it appears in an import statement.
+  '''fixLinkedInDraft''',
+]
 paths = [
   # The env manifest ships only empty keys (KEY=) — no real values (rule 10).
   '''\.env\.example$''',

@@ -16,11 +16,15 @@ const CTA_EXAMPLES = [
   "book a 15-minute intro call",
   "reply to set up a quick chat",
   "try a free demo",
+  "check out our work",
+  "visit the site and take a look",
 ] as const;
 
 export type CopyEditValues = {
   name: string;
   cta: string;
+  bookingUrl: string;
+  websiteUrl: string;
   links: string;
   channels: { linkedin: boolean };
   sendMode: "review" | "automatic";
@@ -42,6 +46,8 @@ export function CopyWizard({
   const [step, setStep] = useState(0);
   const [name, setName] = useState(edit?.name ?? "");
   const [cta, setCta] = useState(edit?.cta ?? "");
+  const [bookingUrl, setBookingUrl] = useState(edit?.bookingUrl ?? "");
+  const [websiteUrl, setWebsiteUrl] = useState(edit?.websiteUrl ?? "");
   const [links, setLinks] = useState(edit?.links ?? "");
   const [fileCount, setFileCount] = useState(0);
   const [sendMode, setSendMode] = useState<"review" | "automatic">(edit?.sendMode ?? "review");
@@ -89,6 +95,8 @@ export function CopyWizard({
       <form action={action} className="flex flex-col gap-5">
         <input type="hidden" name="name" value={name} />
         <input type="hidden" name="cta" value={cta} />
+        <input type="hidden" name="bookingUrl" value={bookingUrl} />
+        <input type="hidden" name="websiteUrl" value={websiteUrl} />
         <input type="hidden" name="links" value={links} />
         <input type="hidden" name="sendMode" value={sendMode} />
 
@@ -141,6 +149,34 @@ export function CopyWizard({
                   {example}
                 </button>
               ))}
+            </div>
+            <div className="flex flex-col gap-2 pt-4">
+              <Label>Where should interested prospects go?</Label>
+              <p className="text-xs text-muted-foreground">
+                Give the agent one or both. It offers whichever matches what the prospect asks
+                for — a call gets the booking link; &ldquo;show me&rdquo; gets your website. Traffic-first
+                businesses can run on the website link alone.
+              </p>
+              <Label htmlFor="copy-booking" className="pt-2 text-xs text-muted-foreground">
+                Booking link — for prospects who want to talk
+              </Label>
+              <Input
+                id="copy-booking"
+                value={bookingUrl}
+                onChange={(e) => setBookingUrl(e.target.value)}
+                placeholder="e.g. https://cal.com/you/15min"
+                inputMode="url"
+              />
+              <Label htmlFor="copy-website" className="pt-1 text-xs text-muted-foreground">
+                Website link — for prospects who want to see your work, product, or offer
+              </Label>
+              <Input
+                id="copy-website"
+                value={websiteUrl}
+                onChange={(e) => setWebsiteUrl(e.target.value)}
+                placeholder="e.g. https://yoursite.com/portfolio"
+                inputMode="url"
+              />
             </div>
           </div>
         )}

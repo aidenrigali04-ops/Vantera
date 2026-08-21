@@ -1,5 +1,14 @@
+import {
+  buildTargetingProfile,
+  describeStrategy,
+  topTiltSegment,
+  type CopyStrategy,
+} from "@vantera/agent-brains";
 import { createClient } from "@/lib/supabase/server";
+import { orThrow } from "@/lib/supabase/guard";
 import { getGateData } from "@/lib/auth/context";
+import { countInterestedSince } from "@/lib/optimize";
+import { playCards } from "@/lib/plays";
 import { shapePipeline } from "../pipeline/queries";
 import {
   buildRevenueSeries,
@@ -9,11 +18,13 @@ import {
 import { loadSignalAttribution } from "@/lib/analytics";
 import { LEAD_PROFILE_FIELDS } from "@/components/lead-profile-fields";
 import type { LeadProfile } from "@/components/lead-profile";
-import { DashboardView, type AgentRow, type ReplyRow } from "./dashboard-view";
+import { DashboardView, type AgentRow, type LearningProps, type ReplyRow } from "./dashboard-view";
 import type { Prospect } from "./prospect-panel";
 import { ResultsTabsBar, resolveView } from "./results-tabs";
 import { AnalyticsSection } from "../analytics/analytics-section";
 import { PipelineSection } from "../pipeline/pipeline-section";
+
+export const metadata = { title: "Results" };
 
 // The Results surface (Surface B). One destination, three views (Overview / Analytics / Pipeline)
 // selected by ?view= so each is server-rendered and deep-linkable. Only the active view loads its
@@ -26,16 +37,20 @@ export default async function DashboardPage({
 }) {
   const view = resolveView((await searchParams).view);
   return (
-    <>
+    // One-screen on desktop: the tabs bar stays pinned and the PAGE never scrolls —
+    // the active view scrolls inside its own region only when its content overflows.
+    <div className="flex flex-col lg:h-[calc(100dvh-3rem)]">
       <ResultsTabsBar active={view} />
-      {view === "analytics" ? (
-        <AnalyticsSection />
-      ) : view === "pipeline" ? (
-        <PipelineSection />
-      ) : (
-        <OverviewTab />
-      )}
-    </>
+      <div className="min-h-0 flex-1 lg:overflow-y-auto">
+        {view === "analytics" ? (
+          <AnalyticsSection />
+        ) : view === "pipeline" ? (
+          <PipelineSection />
+        ) : (
+          <OverviewTab />
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -111,10 +126,9 @@ async function OverviewTab() {
 
   // RLS scopes every query to this account (rule 02) — no account id is passed.
   const [
-    { data: agents },
-    { data: leadCountRows },
+    agentsRes,
+    leadCountsRes,
     draftsRes,
-    interestedRes,
     { data: recentReplies },
     { data: linkedinAccounts },
     { data: weekSends },
@@ -122,6 +136,9 @@ async function OverviewTab() {
     { data: prospects },
     { data: convertedDates },
     crmActiveRes,
+    sendsEverRes,
+    warmEverRes,
+    meetingsEverRes,
   ] = await Promise.all([
     supabase
       .from("agents")
@@ -136,43 +153,57 @@ async function OverviewTab() {
       .eq("status", "pending_review"),
     supabase
       .from("replies")
-      .select("id", { count: "exact", head: true })
-      .eq("classification", "interested"),
-    supabase
-      .from("replies")
       .select(`id, channel, body, received_at, lead_id, leads(${LEAD_PROFILE_FIELDS})`)
       .eq("classification", "interested")
       .order("received_at", { ascending: false })
-      .limit(4)
+      .limit(24)
       .returns<ReplyRowRaw[]>(),
     supabase.from("linkedin_accounts").select("status"),
     supabase.from("outreach_sends").select("channel").gte("sent_at", weekAgo),
+    // Warm replies this week — interested only. Counting every classification here made the
+    // tile disagree with real activity (a not-interested reply is not a warm reply).
     supabase
       .from("replies")
       .select("id", { count: "exact", head: true })
+      .eq("classification", "interested")
       .gte("received_at", weekAgo),
     supabase
       .from("leads")
       .select(
-        "id, first_name, last_name, title, company_name, company_domain, company_size, industry, location, tech_stack, status, ai_score, ai_rationale, ai_insights, scored_at, email, email_status, phone, phone_status, linkedin_url, lead_signals(kind, label, detail, observed_at)"
+        "id, first_name, last_name, title, company_name, company_domain, company_size, industry, location, tech_stack, status, source, ai_score, ai_rationale, ai_insights, scored_at, email, email_status, phone, phone_status, linkedin_url, lead_signals(kind, label, detail, observed_at)"
       )
       .in("status", ["qualified", "enriched", "in_campaign", "replied", "converted"])
       .order("ai_score", { ascending: false, nullsFirst: false })
       .limit(6)
       .returns<Prospect[]>(),
-    // Closed-revenue history: conversion dates (updated_at) of converted leads.
+    // Closed-revenue history + REAL per-deal values (P1: actuals over estimates).
     supabase
       .from("leads")
-      .select("updated_at")
+      .select("updated_at, deal_value_cents")
       .eq("status", "converted")
       .order("updated_at", { ascending: true })
-      .returns<{ updated_at: string }[]>(),
+      .returns<{ updated_at: string; deal_value_cents: number | null }[]>(),
     // Active CRM connections — drives the just-in-time "connect your CRM" nudge.
     supabase
       .from("crm_connections")
       .select("id", { count: "exact", head: true })
       .eq("status", "active"),
+    // R2 milestone regime — the account's real firsts (ever, not windowed).
+    supabase.from("outreach_sends").select("id", { count: "exact", head: true }),
+    supabase
+      .from("replies")
+      .select("id", { count: "exact", head: true })
+      .eq("classification", "interested"),
+    supabase
+      .from("leads")
+      .select("id", { count: "exact", head: true })
+      .not("meeting_booked_at", "is", null),
   ]);
+
+  // R1c: these two reads drive the dashboard's state machine — a failed read must hit the
+  // error boundary, or an outage would show a working account the new-user checklist.
+  const agents = orThrow(agentsRes, "your agents");
+  const leadCountRows = orThrow(leadCountsRes, "lead counts");
 
   // status is single-valued per lead, so the multi-status figures are exact sums
   // of the per-status counts returned by the aggregate (no double counting).
@@ -182,19 +213,23 @@ async function OverviewTab() {
   const total = [...leadCounts.values()].reduce((a, b) => a + b, 0);
   const qualified = countOf("qualified", "enriched");
   const inOutreach = countOf("in_campaign");
-  const replied = countOf("replied", "converted");
   const repliedOnly = countOf("replied");
   const converted = countOf("converted");
   const drafts = draftsRes.count ?? 0;
-  const interested = interestedRes.count ?? 0;
 
   // Revenue snapshot: real counts × the account's value per client (Settings).
   const pipelineLeads = qualified + inOutreach + repliedOnly;
+  // Actuals where actuals exist: real typed deal values beat the avg×count estimate.
+  const closedActualCents = (convertedDates ?? []).reduce(
+    (sum, r) => sum + (r.deal_value_cents ?? account.avg_deal_value_cents ?? 0),
+    0
+  );
   const revenue = computeRevenueSnapshot({
     convertedClients: converted,
     pipeline: { qualified, inOutreach, replied: repliedOnly },
     avgDealValueCents: account.avg_deal_value_cents,
     goalCents: account.revenue_goal_cents,
+    closedActualCents,
   });
   const revenueSeries = buildRevenueSeries({
     conversionDates: (convertedDates ?? []).map((r) => r.updated_at),
@@ -214,7 +249,31 @@ async function OverviewTab() {
     status: a.status,
     nextRunLabel: timeUntil(a.next_run_at),
   }));
-  const replyRows: ReplyRow[] = (recentReplies ?? []).map((r) => ({
+  // Warm replies WAITING ON YOU — an interested reply counts only until it's answered.
+  // Answered = any message DELIVERED to that lead after the reply landed (agent or manual;
+  // markSent stamps updated_at) — or the lead already converted. Without this, handled
+  // replies lingered as "waiting" and the queue read a step behind real activity.
+  const interestedRows = (recentReplies ?? []).filter((r) => r.leads?.status !== "converted");
+  const replyLeadIds = [...new Set(interestedRows.map((r) => r.lead_id))];
+  const { data: sentAfter } = replyLeadIds.length
+    ? await supabase
+        .from("scheduled_sends")
+        .select("lead_id, updated_at")
+        .in("lead_id", replyLeadIds)
+        .eq("status", "sent")
+        .eq("linkedin_stage", "message")
+        .returns<{ lead_id: string; updated_at: string }[]>()
+    : { data: [] as { lead_id: string; updated_at: string }[] };
+  const lastSentByLead = new Map<string, number>();
+  for (const s of sentAfter ?? []) {
+    const t = new Date(s.updated_at).getTime();
+    if (t > (lastSentByLead.get(s.lead_id) ?? 0)) lastSentByLead.set(s.lead_id, t);
+  }
+  const waitingRows = interestedRows.filter(
+    (r) => (lastSentByLead.get(r.lead_id) ?? 0) <= new Date(r.received_at).getTime()
+  );
+  const repliesWaiting = new Set(waitingRows.map((r) => r.lead_id)).size;
+  const replyRows: ReplyRow[] = waitingRows.slice(0, 4).map((r) => ({
     id: r.id,
     channel: r.channel,
     body: r.body,
@@ -249,7 +308,10 @@ async function OverviewTab() {
     .returns<{ current_stage: string; status: string }[]>();
   const pipeline = shapePipeline({
     runs: seqRuns ?? [],
+    // T1: same buckets + actuals as the revenue snapshot above — one meaning per metric.
+    counts: { qualified, inOutreach, replied: repliedOnly },
     convertedClients: converted,
+    closedActualCents,
     avgDealValueCents: account.avg_deal_value_cents,
     revenueGoalCents: account.revenue_goal_cents,
   });
@@ -257,7 +319,10 @@ async function OverviewTab() {
   // Loss-aversion + variable-reward metrics for the retention panels.
   const dayAgo = isoDaysAgo(1);
   const coldCutoff = isoDaysAgo(3);
-  const [coldRes, sent24Res, replies24Res, sourced24Res] = await Promise.all([
+  // Hot-leads next-action chip: which of the (≤6) surfaced prospects have a draft
+  // waiting in Review. Bounded to the surfaced ids; RLS scopes the rest (rule 02).
+  const prospectIds = (prospects ?? []).map((p) => p.id).filter((id): id is string => Boolean(id));
+  const [coldRes, sent24Res, replies24Res, sourced24Res, pendingDraftRes] = await Promise.all([
     // warm leads cooling: replied (not converted) and untouched 3+ days
     supabase
       .from("leads")
@@ -267,7 +332,16 @@ async function OverviewTab() {
     supabase.from("outreach_sends").select("id", { count: "exact", head: true }).gte("sent_at", dayAgo),
     supabase.from("replies").select("id", { count: "exact", head: true }).gte("received_at", dayAgo),
     supabase.from("leads").select("id", { count: "exact", head: true }).gte("created_at", dayAgo),
+    prospectIds.length
+      ? supabase
+          .from("scheduled_sends")
+          .select("lead_id")
+          .eq("status", "pending_review")
+          .in("lead_id", prospectIds)
+          .returns<{ lead_id: string }[]>()
+      : Promise.resolve({ data: [] as { lead_id: string }[] }),
   ]);
+  const pendingDraftLeadIds = [...new Set((pendingDraftRes.data ?? []).map((r) => r.lead_id))];
   const cold = coldRes.count ?? 0;
   const today = {
     sourced: sourced24Res.count ?? 0,
@@ -358,6 +432,161 @@ async function OverviewTab() {
   // proof). Surfaced as a one-liner on Overview when there's at least one attributed win.
   const signalAttribution = await loadSignalAttribution(supabase);
 
+  // Vera's learning log — the self-optimizing loop's visible heartbeat on the Overview
+  // (retention brief: variable reward + goal-gradient against the silent-wait churn cliff).
+  // Every line is a real, RLS-scoped fact: the live test with its enrollment progress, the
+  // latest adoption with real receipts, and the targeting focus. Never a placeholder.
+  const STAGE_LABEL: Record<string, string> = {
+    acceptance: "connection accepts",
+    reply: "interested replies",
+    booking: "booked meetings",
+    close: "closed deals",
+  };
+  const [{ data: runningExp }, { data: adoptedExp }, { data: playbook }] = await Promise.all([
+    supabase
+      .from("optimization_experiments")
+      .select("id, stage_key, challenger_strategy, started_at, min_sample")
+      .eq("status", "running")
+      .order("started_at", { ascending: false })
+      .limit(1)
+      .maybeSingle<{
+        id: string;
+        stage_key: string;
+        challenger_strategy: CopyStrategy;
+        started_at: string;
+        min_sample: number;
+      }>(),
+    supabase
+      .from("optimization_experiments")
+      .select("challenger_strategy, decision_reason, concluded_at")
+      .eq("status", "adopted")
+      .order("concluded_at", { ascending: false })
+      .limit(1)
+      .maybeSingle<{
+        challenger_strategy: CopyStrategy;
+        decision_reason: string | null;
+        concluded_at: string | null;
+      }>(),
+    supabase.from("optimization_playbook").select("version").maybeSingle<{ version: number }>(),
+  ]);
+
+  let testing: LearningProps["testing"] = null;
+  if (runningExp) {
+    const { count: enrolled } = await supabase
+      .from("leads")
+      .select("id", { count: "exact", head: true })
+      .eq("experiment_id", runningExp.id);
+    testing = {
+      label: describeStrategy(runningExp.challenger_strategy ?? {}),
+      stageLabel: STAGE_LABEL[runningExp.stage_key] ?? runningExp.stage_key,
+      startedAgo: timeAgo(runningExp.started_at),
+      enrolled: enrolled ?? 0,
+      // decision needs min_sample RESULTS per side; enrollment is the honest leading proxy
+      targetEnrolled: runningExp.min_sample * 2,
+    };
+  }
+
+  let adopted: LearningProps["adopted"] = null;
+  if (adoptedExp && !(adoptedExp.decision_reason ?? "").includes("· reverted")) {
+    // Stage-1 receipts under the adopted play: sends stamped with the CURRENT playbook
+    // version + distinct leads among them that replied interested since the adoption.
+    let receipts: { sent: number; interested: number } | null = null;
+    if (playbook?.version) {
+      const { data: stamped } = await supabase
+        .from("scheduled_sends")
+        .select("lead_id")
+        .eq("status", "sent")
+        .eq("recipe->>playbookVersion", String(playbook.version))
+        .returns<{ lead_id: string }[]>();
+      if ((stamped ?? []).length > 0) {
+        const { data: interestedAll } = await supabase
+          .from("replies")
+          .select("lead_id, received_at")
+          .eq("classification", "interested")
+          .returns<{ lead_id: string; received_at: string }[]>();
+        receipts = {
+          sent: (stamped ?? []).length,
+          interested: countInterestedSince(
+            new Set((stamped ?? []).map((r) => r.lead_id)),
+            interestedAll ?? [],
+            adoptedExp.concluded_at
+          ),
+        };
+      }
+    }
+    adopted = {
+      label: describeStrategy(adoptedExp.challenger_strategy ?? {}),
+      whenAgo: timeAgo(adoptedExp.concluded_at),
+      receipts,
+    };
+  }
+
+  // Targeting focus (Stage 2): the buyer segment being prioritized, from real outcomes.
+  let focus: LearningProps["focus"] = null;
+  {
+    const [{ data: invitedLeads }, { data: interestedIdRows }] = await Promise.all([
+      supabase
+        .from("leads")
+        .select("id, title, industry, linkedin_connected_at, meeting_booked_at")
+        .not("linkedin_invited_at", "is", null)
+        .returns<
+          {
+            id: string;
+            title: string | null;
+            industry: string | null;
+            linkedin_connected_at: string | null;
+            meeting_booked_at: string | null;
+          }[]
+        >(),
+      supabase
+        .from("replies")
+        .select("lead_id")
+        .eq("classification", "interested")
+        .returns<{ lead_id: string }[]>(),
+    ]);
+    const interestedIds = new Set((interestedIdRows ?? []).map((r) => r.lead_id));
+    const profile = buildTargetingProfile(
+      (invitedLeads ?? []).map((l) => ({
+        title: l.title,
+        industry: l.industry,
+        flags: {
+          invited: true,
+          accepted: l.linkedin_connected_at != null,
+          interested: interestedIds.has(l.id),
+          negative: false,
+          booked: l.meeting_booked_at != null,
+          converted: false,
+        },
+      }))
+    );
+    const top = topTiltSegment(profile);
+    if (top) focus = { label: top.label, deep: top.stat.deep, n: top.stat.n };
+  }
+
+  const learning: LearningProps = {
+    playbookVersion: playbook?.version ?? null,
+    testing,
+    adopted,
+    focus,
+  };
+
+  // Vera's matched starter plays — fill the waiting states with proven competence instead
+  // of silence (honest source labels; server-computed).
+  const plays = playCards({ industry: account.onboarding_industry, icp: account.onboarding_icp });
+
+  // L1 meeting layer: interested buyers need somewhere to book. A live Outreach agent with no
+  // bookingUrl is the single most conversion-critical config gap (prod 2026-07-15: 0/3 set,
+  // 10 interested replies, 0 meetings ever) — nag until it's set.
+  const { data: copyAgentRow } = await supabase
+    .from("agents")
+    .select("config")
+    .eq("kind", "copy")
+    .eq("status", "live")
+    .limit(1)
+    .maybeSingle<{ config: { bookingUrl?: string | null } | null }>();
+  const needsBookingUrl =
+    copyAgentRow != null && !(copyAgentRow.config?.bookingUrl ?? "").trim();
+
   return (
     <DashboardView
       firstName={firstName}
@@ -377,7 +606,15 @@ async function OverviewTab() {
       scoutLive={scout?.status === "live"}
       revenue={revenue}
       convertedClients={converted}
+      milestones={{
+        sent: (sendsEverRes.count ?? 0) > 0,
+        replied: (warmEverRes.count ?? 0) > 0,
+        met: (meetingsEverRes.count ?? 0) > 0,
+        closed: converted > 0,
+      }}
       pipelineLeads={pipelineLeads}
+      avgDealValueCents={account.avg_deal_value_cents}
+      pendingDraftLeadIds={pendingDraftLeadIds}
       series={revenueSeries}
       pipeline={pipeline}
       cold={cold}
@@ -387,10 +624,13 @@ async function OverviewTab() {
       replyWin={replyWin}
       prospects={prospects ?? []}
       recentReplies={replyRows}
-      interested={interested}
+      repliesWaiting={repliesWaiting}
       channels={{ liStatus }}
       week={{ sends: sendsWeek, li: liWeek, replies: repliesWeek }}
       attribution={signalAttribution}
+      learning={learning}
+      needsBookingUrl={needsBookingUrl}
+      plays={plays}
     />
   );
 }

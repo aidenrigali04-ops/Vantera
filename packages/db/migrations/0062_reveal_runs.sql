@@ -1,4 +1,4 @@
--- Migration #39: reveal_runs — progress ledger for the pre-payment fast-pass scan
+-- Migration #62 (renumbered from local #39 at the 2026-08-21 sync): reveal_runs — progress ledger for the pre-payment fast-pass scan
 -- (journey v2 Phase 16, blueprint §6.2). One row per account, written stage-by-stage by
 -- the fast-pass pipeline and polled by /api/reveal/status to drive the Reveal screen.
 -- The UNIQUE(account_id) index doubles as the enqueue-exactly-once guard: the connect

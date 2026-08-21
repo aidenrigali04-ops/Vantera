@@ -16,16 +16,45 @@ export const intentScan = task({
   maxDuration: 1800,
   run: async (payload: { agentId: string; accountId: string }) => {
     const store = createPgStore(createDb());
-    const summary = await runIntentScan(payload.agentId, {
-      store,
-      linkedin: createLinkedInInfraFromEnv(),
-      classifyFn: (obs, ctx) => classifyIntent(obs, ctx),
-      rankFn: (candidates, ctx) => rankLeads(candidates, ctx),
-      triggerCopyDraft: async (p) => {
-        await tasks.trigger("copy-draft", p, { concurrencyKey: p.accountId });
-      },
+    let summary;
+    try {
+      summary = await runIntentScan(payload.agentId, {
+        store,
+        linkedin: createLinkedInInfraFromEnv(),
+        classifyFn: (obs, ctx) => classifyIntent(obs, ctx),
+        rankFn: (candidates, ctx) => rankLeads(candidates, ctx),
+        triggerCopyDraft: async (p) => {
+          await tasks.trigger("copy-draft", p, { concurrencyKey: p.accountId });
+        },
+      });
+    } catch (err) {
+      // T4 operate path: a crashed run must be visible in-product, not just in ops logs.
+      await store.recordAgentRun({ ...payload, kind: "intent", status: "failed", summary: {}, note: String(err).slice(0, 300) });
+      throw err;
+    }
+    await store.recordAgentRun({
+      ...payload,
+      kind: "intent",
+      status: summary.status,
+      summary: { ...summary },
+      note: summary.reason ?? null,
     });
-    logger.info("intent scan finished", { ...summary, agentId: payload.agentId });
+    if (summary.targets > 0 && summary.sourcingErrors === summary.targets) {
+      // Ops alert: EVERY watch-target read failed — the LinkedIn connection is dead or rate
+      // limited, not quiet. This once passed as "observed 0" for 2 days (2026-07-08 incident).
+      logger.error("intent scan: every watch-target read failed — check the LinkedIn connection", {
+        ...summary,
+        agentId: payload.agentId,
+        accountId: payload.accountId,
+      });
+      // Reconcile NOW: if the connection is dead this flips the status, shows the banner,
+      // and emails the admins within minutes instead of waiting for the next cron tick.
+      await tasks.trigger("account-health", {});
+    } else if (summary.sourcingErrors > 0) {
+      logger.warn("intent scan finished with partial sourcing failures", { ...summary, agentId: payload.agentId });
+    } else {
+      logger.info("intent scan finished", { ...summary, agentId: payload.agentId });
+    }
     return summary;
   },
 });

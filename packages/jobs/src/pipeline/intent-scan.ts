@@ -73,7 +73,9 @@ function toRankCandidate(leadId: string, c: ProspectCandidate, v: IntentVerdict,
  */
 export async function runIntentScan(agentId: string, deps: IntentScanDeps): Promise<IntentScanSummary> {
   const now = deps.now ?? (() => new Date());
-  const skipped: IntentScanSummary = { status: "skipped", observed: 0, intent: 0, qualified: 0, chained: false };
+  const skipped: IntentScanSummary = {
+    status: "skipped", targets: 0, sourcingErrors: 0, observed: 0, intent: 0, qualified: 0, chained: false,
+  };
 
   const ctx = await deps.store.getIntentContext(agentId);
   if (!ctx || ctx.agent.status !== "live") return skipped;
@@ -106,6 +108,7 @@ export async function runIntentScan(agentId: string, deps: IntentScanDeps): Prom
 
   // 1. gather posts per watch target (account-safety: capped reads, rule 04)
   const sourced: { post: LinkedInPost; watchTarget: string }[] = [];
+  let sourcingErrors = 0;
   for (const t of targets) {
     try {
       const found =
@@ -114,7 +117,9 @@ export async function runIntentScan(agentId: string, deps: IntentScanDeps): Prom
           : await deps.linkedin.listProfilePosts({ connectedAccountId: acct, profileUrl: t.value, limit: perTarget });
       for (const post of found) sourced.push({ post, watchTarget: t.value });
     } catch {
-      // a broken target never sinks the whole run
+      // a broken target never sinks the whole run — but the COUNT surfaces in the summary,
+      // because every target failing (dead connection) must never read as a quiet day
+      sourcingErrors += 1;
     }
   }
 
@@ -153,7 +158,10 @@ export async function runIntentScan(agentId: string, deps: IntentScanDeps): Prom
   const fresh = candidates.filter((o) => !seen.has(obsKey(o.profileUrl, o.postRef)));
   if (fresh.length === 0) {
     await deps.store.completeRun(agentId, now());
-    return { status: "completed", observed: 0, intent: 0, qualified: 0, chained: false };
+    return {
+      status: "completed", targets: targets.length, sourcingErrors,
+      observed: 0, intent: 0, qualified: 0, chained: false,
+    };
   }
 
   // 3. classify buying intent (the filter before any enrichment/qualification spend)
@@ -250,5 +258,8 @@ export async function runIntentScan(agentId: string, deps: IntentScanDeps): Prom
     }
   }
 
-  return { status: "completed", observed: fresh.length, intent: primary.size, qualified: qualifiedLeadIds.length, chained };
+  return {
+    status: "completed", targets: targets.length, sourcingErrors,
+    observed: fresh.length, intent: primary.size, qualified: qualifiedLeadIds.length, chained,
+  };
 }

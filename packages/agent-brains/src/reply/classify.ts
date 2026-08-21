@@ -1,6 +1,6 @@
 import { generateObject, type LanguageModel } from "ai";
 import { z } from "zod";
-import { getModel } from "@vantera/ai";
+import { getModel, registerPrompt } from "@vantera/ai";
 
 export const replyVerdictSchema = z.object({
   classification: z.enum(["interested", "not_interested", "neutral", "out_of_office", "unsubscribe", "other"]),
@@ -40,13 +40,16 @@ export function preClassify(body: string): ReplyVerdict | null {
   return null;
 }
 
-const SYSTEM = `You classify a prospect's reply to B2B outreach.
-interested = wants to learn more or accepts the ask. not_interested = a clear no, polite or hard.
-neutral = ambiguous, or a question without commitment. out_of_office = auto-responder.
-unsubscribe = asks to stop contact. other = wrong person, forwarded, anything else.
+const CLASSIFY_SYSTEM = registerPrompt("reply/classify", `You classify a prospect's reply to B2B outreach.
+interested = wants to learn more, asks to see more / get a deck / "send info", or accepts the ask.
+not_interested = a clear no, polite or hard ("not for us", "we're all set", "no thanks").
+neutral = ambiguous, a question without commitment, OR a soft/timing deferral ("not right now",
+"reach back next quarter", "maybe later") — treat a "later" as neutral, never as a no.
+out_of_office = auto-responder. unsubscribe = asks to stop contact.
+other = wrong person, a referral to someone else ("you want X, not me"), forwarded, or anything else.
 Set booked=true ONLY when the prospect confirms a specific meeting or call is scheduled — a time
 agreed, an invite accepted, or "see you then". Mere interest, "let's find a time", or asking for a
-link is NOT booked. Rationale: one short sentence.`;
+link is NOT booked. Rationale: one short sentence.`);
 
 export async function classifyReply(
   body: string,
@@ -57,7 +60,7 @@ export async function classifyReply(
   const { object } = await generateObject({
     model,
     schema: replyVerdictSchema,
-    system: SYSTEM,
+    system: CLASSIFY_SYSTEM.text,
     prompt: `Reply:\n${body.slice(0, 2000)}`,
     maxOutputTokens: 200,
   });

@@ -13,6 +13,8 @@ function fakeDb(rows: Record<string, unknown>) {
         eq: () => builder,
         in: () => builder,
         not: () => builder,
+        or: () => builder,
+        returns: () => builder,
         limit: () => builder,
         order: () => builder,
         ilike: () => builder,

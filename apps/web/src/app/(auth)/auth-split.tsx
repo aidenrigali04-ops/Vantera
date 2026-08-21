@@ -42,7 +42,7 @@ export function AuthSplit({ children }: { children: React.ReactNode }) {
         </div>
 
         <p className="relative text-[12.5px] text-white/70">
-          Free 3-day trial · Cancel anytime · You approve every send
+          Free 7-day trial · Cancel anytime · You approve every send
         </p>
       </div>
     </main>

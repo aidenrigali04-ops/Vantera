@@ -20,11 +20,11 @@ Go to **Settings → Team** and enter your teammate's email address. Choose a ro
 - **Member** — can view and operate campaigns but cannot change workspace settings, manage billing, or invite or remove other team members.
 - **Admin** — has full access: all member permissions plus the ability to manage team members, billing, and workspace settings.
 
-An invitation email is sent to the address you entered. The invite remains pending until your teammate accepts it by clicking the link and completing sign-in. Pending invites appear in the team list and can be revoked before they are accepted.
+An invitation email is sent to the address you entered. The invite remains pending until your teammate accepts it by clicking the link and completing sign-in. Pending invites appear in the team list and can be revoked before they are accepted. Invites expire after 7 days — an expired invite is marked in the list, and **Resend** gives it a fresh 7-day window and sends the email again.
 
 ## Accepting an invitation
 
-When you receive a team invitation, click the link in the email and sign in (or create an account). You'll be added to the workspace automatically and land on the dashboard.
+Click the link in the email — the invite page shows which workspace you're joining and the address the invite was sent to. If you already have a Vantera account, sign in and you'll return to the invite automatically. If you're new, choose **Create your account & join**: you'll sign up with the invited email (no company setup — the workspace already exists) and land directly on your team's dashboard.
 
 ## Revoking access
 

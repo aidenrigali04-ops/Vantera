@@ -1,0 +1,61 @@
+{
+  "id": "re-edtech-head-growth-enrollment",
+  "input": {
+    "lead": {
+      "firstName": "Lena",
+      "lastName": "Vogel",
+      "title": "Head of Growth",
+      "companyName": "Lumenwell Learning",
+      "industry": "EdTech"
+    },
+    "insights": {
+      "pain_points": [
+        "Most signups drop off before finishing enrollment",
+        "The enrollment form asks for too much up front"
+      ],
+      "triggers": [
+        "Launched a new course track this month"
+      ],
+      "motivations": [
+        "Get more signups across the finish line"
+      ],
+      "value_angle": "Trimming the enrollment form to the essentials keeps momentum through signup",
+      "aha_moment": "Realizing most drop off happened on one long form step, not lack of interest",
+      "prospect_offering": "Lumenwell Learning builds online course tracks for working professionals",
+      "summary": "Growth lead launching a new track while enrollment drop off eats the gains"
+    },
+    "context": {
+      "cta": "share a short look at the enrollment flow",
+      "accountName": "EnrollWell",
+      "accountIndustry": "Enrollment funnel software",
+      "valueProp": "EnrollWell doubles course enrollment completion by trimming the signup form",
+      "websiteUrl": "https://enrollwell.example",
+      "proofPoints": [
+        {
+          "kind": "metric",
+          "text": "Doubles enrollment completion (2x) by trimming the signup form to the essentials"
+        }
+      ],
+      "strategy": {
+        "openerAngle": "the hidden cost of a long enrollment form"
+      }
+    },
+    "thread": [
+      {
+        "role": "agent",
+        "text": "Thanks for connecting. A new track is exciting, though enrollment drop off can eat the gains. Where do most signups stall?"
+      },
+      {
+        "role": "lead",
+        "text": "Right at the profile details step, we lose a lot of people there."
+      }
+    ],
+    "incoming": "Do you have something I could actually look at?",
+    "classification": "interested"
+  },
+  "grounding": "Seller offer: EnrollWell doubles course enrollment completion by trimming the signup form Proof: Doubles enrollment completion (2x) by trimming the signup form to the essentials Prospect: Lena Vogel, Head of Growth at Lumenwell Learning (EdTech). Pain points: Most signups drop off before finishing enrollment; The enrollment form asks for too much up front. Value angle: Trimming the enrollment form to the essentials keeps momentum through signup",
+  "frozenDraft": {
+    "message": "Easiest is to just see it, take a look here: https://enrollwell.example",
+    "violations": []
+  }
+}

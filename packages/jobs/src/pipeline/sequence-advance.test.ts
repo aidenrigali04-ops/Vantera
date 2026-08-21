@@ -15,13 +15,14 @@ function ctx(run: Partial<SequenceRun>, over: Partial<SequenceTickContext> = {})
     run: {
       id: "r1", accountId: "a1", campaignId: "c1", leadId: "l1",
       status: "active", currentStage: "linkedin", touchesDone: 0,
-      nextActionAt: NOW, enteredStageAt: NOW, ...run,
+      nextActionAt: NOW, enteredStageAt: NOW, revivedAt: null, ...run,
     },
     config: SEQUENCE_DEFAULTS,
     channels: fullChannels,
     suppressed: { linkedin: false },
     accountPaused: false,
     killSwitch: false,
+    leadReplied: false,
     now: NOW,
     ...over,
   };
@@ -66,6 +67,37 @@ describe("advanceSequence", () => {
   it("exhausts when the lead has no LinkedIn identifier", () => {
     const channels = { linkedinUrl: null };
     const d = advanceSequence(ctx({ currentStage: "linkedin", touchesDone: 0 }, { channels }));
+    expect(d).toMatchObject({ kind: "exhaust" });
+  });
+});
+
+describe("advanceSequence — soft-no revival (0044)", () => {
+  it("a run exhausting on a REPLIED lead parks once for the revival window instead of dying", async () => {
+    const { SOFT_NO_REVIVAL_DAYS } = await import("./sequence-advance");
+    const d = advanceSequence(ctx({ currentStage: "linkedin", touchesDone: 2 }, { leadReplied: true }));
+    expect(d.kind).toBe("park");
+    if (d.kind !== "park") return;
+    expect(d.patch.touchesDone).toBe(1); // exactly one touch of headroom
+    expect(d.patch.revivedAt).toEqual(NOW); // the one-shot is spent
+    expect(d.patch.nextActionAt?.getTime()).toBe(NOW.getTime() + SOFT_NO_REVIVAL_DAYS * DAY);
+  });
+
+  it("the revival never repeats — a revived run exhausts normally", () => {
+    const d = advanceSequence(
+      ctx({ currentStage: "linkedin", touchesDone: 2, revivedAt: NOW }, { leadReplied: true })
+    );
+    expect(d).toMatchObject({ kind: "exhaust" });
+  });
+
+  it("a lead who never replied gets no revival", () => {
+    const d = advanceSequence(ctx({ currentStage: "linkedin", touchesDone: 2 }, { leadReplied: false }));
+    expect(d).toMatchObject({ kind: "exhaust" });
+  });
+
+  it("a suppressed lead never revives — the skip path exhausts as before", () => {
+    const d = advanceSequence(
+      ctx({ currentStage: "linkedin", touchesDone: 0 }, { suppressed: { linkedin: true }, leadReplied: true })
+    );
     expect(d).toMatchObject({ kind: "exhaust" });
   });
 });

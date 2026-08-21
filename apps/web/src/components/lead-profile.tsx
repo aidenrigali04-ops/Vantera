@@ -1,10 +1,16 @@
 "use client";
 
-import { useState } from "react";
-import { Clock, ExternalLink, Mail, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { motion } from "framer-motion";
+import { ArrowRight, Clock, ExternalLink, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { LeadCrmControls } from "@/components/lead-crm-controls";
+import { SourceBadge, WhyNowLine } from "@/components/lead-why-now";
+import { projectedRevenue } from "@/app/(app)/leads/lead-value";
+
+const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 
 // Shared "lead profiler" — the full prospect-enrichment slide-over used
 // everywhere a lead surfaces (Leads, Dashboard prospects, Warm replies, Review).
@@ -39,6 +45,8 @@ export interface LeadProfile {
   phone: string | null;
   phone_status: string | null;
   linkedin_url: string | null;
+  /** where the lead entered the funnel — "intent" drives the In-market badge */
+  source?: string | null;
   /** real captured buying signals (lead_signals, 0031) — the "why now" line, when present */
   lead_signals?: { kind: string; label: string | null; detail?: string | null; observed_at?: string | null }[] | null;
 }
@@ -97,18 +105,56 @@ function InsightList({ label, items }: { label: string; items?: string[] }) {
 }
 
 /** Controlled slide-over. Render when you own the open/selected state. */
-export function LeadProfileSheet({ lead, onClose }: { lead: LeadProfile; onClose: () => void }) {
+export function LeadProfileSheet({
+  lead,
+  onClose,
+  avgDealValueCents = null,
+  goalCents = null,
+  fullProfileHref,
+}: {
+  lead: LeadProfile;
+  onClose: () => void;
+  /** enables the "Worth" line under the fit score (uses the account's real avg deal value) */
+  avgDealValueCents?: number | null;
+  goalCents?: number | null;
+  /** when set, a pinned footer links through to the full-page brief */
+  fullProfileHref?: string;
+}) {
   const insights = lead.ai_insights;
+  const proj = projectedRevenue(avgDealValueCents, goalCents, lead.ai_score);
+
+  // A slide-over is a dialog: Escape must close it (keyboard parity with the overlay click).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
   return (
     <>
       <div className="fixed inset-0 z-40 bg-black/30" onClick={onClose} aria-hidden />
-      <aside className="fixed inset-y-0 right-0 z-50 w-full max-w-md overflow-y-auto border-l bg-background p-6 shadow-xl">
+      <motion.aside
+        role="dialog"
+        aria-modal="true"
+        aria-label={leadName(lead)}
+        initial={{ x: 32, opacity: 0 }}
+        animate={{ x: 0, opacity: 1 }}
+        transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+        className="fixed inset-y-0 right-0 z-50 flex w-full max-w-lg flex-col border-l bg-background shadow-xl"
+      >
+      <div className="flex-1 overflow-y-auto p-6">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h2 className="text-lg font-semibold">{leadName(lead)}</h2>
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-lg font-semibold">{leadName(lead)}</h2>
+              <SourceBadge source={lead.source} />
+            </div>
             <p className="text-sm text-muted-foreground">
               {[lead.title, lead.company_name].filter(Boolean).join(" · ")}
             </p>
+            <WhyNowLine lead={lead} />
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <Badge>{STATUS_LABELS[lead.status] ?? lead.status}</Badge>
               {(() => {
@@ -140,6 +186,13 @@ export function LeadProfileSheet({ lead, onClose }: { lead: LeadProfile; onClose
               <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Fit score</p>
               <p className="font-mono text-3xl font-semibold tabular-nums">{lead.ai_score ?? "—"}</p>
             </div>
+            {/* Value framing — same worth-toward-goal line as the table and Hot strip. */}
+            {proj && (
+              <p className="mt-1 text-right text-xs text-muted-foreground">
+                Worth <span className="font-data font-semibold text-foreground">{usd.format(proj.valueCents / 100)}</span>
+                {proj.dealsToGoal != null && <> · 1 of ~{proj.dealsToGoal} to your goal</>}
+              </p>
+            )}
             {lead.ai_rationale && (
               <p className="mt-2 text-sm text-muted-foreground">{lead.ai_rationale}</p>
             )}
@@ -177,46 +230,38 @@ export function LeadProfileSheet({ lead, onClose }: { lead: LeadProfile; onClose
             </section>
           )}
 
-          <section className="space-y-2">
-            <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Verified contact</p>
-            {lead.email ? (
-              <p className="flex items-center gap-2 text-sm">
-                <Mail className="size-4 text-muted-foreground" />
-                <span className="truncate">{lead.email}</span>
-                {lead.email_status && (
-                  <Badge variant={lead.email_status === "valid" ? "default" : "secondary"}>
-                    {lead.email_status}
-                  </Badge>
-                )}
-              </p>
-            ) : (
-              <p className="text-sm text-muted-foreground">No email yet</p>
-            )}
-            {lead.phone && (
-              <p className="flex items-center gap-2 text-sm">
-                <span>{lead.phone}</span>
-                {lead.phone_status && (
-                  <Badge variant={lead.phone_status === "valid" ? "default" : "secondary"}>
-                    {lead.phone_status}
-                  </Badge>
-                )}
-              </p>
-            )}
-            {lead.linkedin_url && (
+          {/* LinkedIn-only platform: the prospect's profile link is the contact surface —
+              email/phone stay internal (CRM-push dedupe data), never product UI. */}
+          {lead.linkedin_url && (
+            <section>
+              <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">LinkedIn</p>
               <a
                 href={lead.linkedin_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-1 text-sm underline underline-offset-2"
+                className="mt-2 flex items-center gap-1 text-sm underline underline-offset-2"
               >
                 LinkedIn profile <ExternalLink className="size-3" />
               </a>
-            )}
-          </section>
+            </section>
+          )}
 
           {lead.id && <LeadCrmControls leadId={lead.id} status={lead.status} />}
         </div>
-      </aside>
+      </div>
+
+      {/* Pinned footer — the peek is for working the lead in place; the full brief is one click. */}
+      {fullProfileHref && (
+        <div className="shrink-0 border-t border-[var(--hairline)] bg-background p-4">
+          <Link
+            href={fullProfileHref}
+            className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-[var(--hairline)] bg-white px-4 py-2 text-sm font-medium transition-colors hover:border-[var(--cyan-line)] hover:bg-[var(--cyan-tint)]"
+          >
+            Open full profile <ArrowRight className="size-4" aria-hidden />
+          </Link>
+        </div>
+      )}
+      </motion.aside>
     </>
   );
 }

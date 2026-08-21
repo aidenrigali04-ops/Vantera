@@ -35,6 +35,9 @@ export class ResendTransactionalEmail implements TransactionalEmail {
     };
     if (message.text) body.text = message.text;
     if (message.replyTo) body.reply_to = message.replyTo;
+    if (message.headers && Object.keys(message.headers).length > 0) {
+      body.headers = message.headers;
+    }
 
     const res = await this.fetchFn(`${this.baseUrl}/emails`, {
       method: "POST",

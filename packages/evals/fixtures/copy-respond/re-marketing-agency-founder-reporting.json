@@ -1,0 +1,61 @@
+{
+  "id": "re-marketing-agency-founder-reporting",
+  "input": {
+    "lead": {
+      "firstName": "Felix",
+      "lastName": "Marchetti",
+      "title": "Founder",
+      "companyName": "Northfield Growth Studio",
+      "industry": "Marketing Agency"
+    },
+    "insights": {
+      "pain_points": [
+        "Client reports get built by hand in spreadsheets every month",
+        "Reporting takes a day away from client work"
+      ],
+      "triggers": [
+        "Took on several new retainer clients this quarter"
+      ],
+      "motivations": [
+        "Free up reporting time for actual client work"
+      ],
+      "value_angle": "Automated reporting gives back the day a month spent building spreadsheets",
+      "aha_moment": "Realizing most of the reporting day was just copying the same numbers into a new template",
+      "prospect_offering": "Northfield Growth Studio runs paid media and content for small business clients",
+      "summary": "Founder adding retainer clients while monthly reporting still eats a full day"
+    },
+    "context": {
+      "cta": "offer a short look at automated client reporting",
+      "accountName": "ReportLoop",
+      "accountIndustry": "Agency reporting software",
+      "valueProp": "ReportLoop cuts monthly client reporting time by 35%",
+      "bookingUrl": "https://reportloop.example/book",
+      "proofPoints": [
+        {
+          "kind": "metric",
+          "text": "Cuts monthly client reporting time by 35%"
+        }
+      ],
+      "avoidPhrases": [
+        "excited to help you scale"
+      ]
+    },
+    "thread": [
+      {
+        "role": "agent",
+        "text": "Thanks for connecting. More clients usually means more monthly reports to build. How's reporting fitting into the schedule?"
+      },
+      {
+        "role": "lead",
+        "text": "It's a lot honestly, we just squeeze it in wherever we can."
+      }
+    ],
+    "incoming": "We'll see, not sure this is the right time to add anything new.",
+    "classification": "neutral"
+  },
+  "grounding": "Seller offer: ReportLoop cuts monthly client reporting time by 35% Proof: Cuts monthly client reporting time by 35% Prospect: Felix Marchetti, Founder at Northfield Growth Studio (Marketing Agency). Pain points: Client reports get built by hand in spreadsheets every month; Reporting takes a day away from client work. Value angle: Automated reporting gives back the day a month spent building spreadsheets",
+  "frozenDraft": {
+    "message": "No rush at all, makes sense given everything else on your plate. Happy to check back in whenever timing feels better.",
+    "violations": []
+  }
+}

@@ -25,6 +25,23 @@ export interface MessageRequest {
 export interface SendOutcome {
   id: string;
   sentAt: string;
+  /**
+   * The PROSPECT's member provider_id (ACoAA…) the send resolved. Persisted on the lead so
+   * inbound webhooks — which identify people by provider_id, not vanity URL — can match a
+   * reply back to the lead. Null when the adapter had no resolution step.
+   */
+  prospectProviderRef?: string | null;
+}
+
+/** Who an inbound event is from — every identity handle the payload carries, so the
+ *  pipeline can match a lead by provider id, by URL, or (last resort) by unique name. */
+export interface InboundIdentity {
+  /** member provider_id (ACoAA…) — the ONLY identifier Unipile reliably sends */
+  fromProviderRef: string | null;
+  /** public vanity slug when the payload happens to carry it */
+  fromPublicIdentifier: string | null;
+  /** display name — unique-match fallback only, never a primary key */
+  fromName: string | null;
 }
 
 /** A LinkedIn account currently connected in the provider workspace. */
@@ -37,8 +54,8 @@ export interface ConnectedAccount {
 }
 
 export type LinkedInEvent =
-  | { type: "reply"; providerEventId: string; connectedAccountRef: string; fromProfileUrl: string; body: string; receivedAt: string }
-  | { type: "relationship_accepted"; providerEventId: string; connectedAccountRef: string; profileUrl: string }
+  | ({ type: "reply"; providerEventId: string; connectedAccountRef: string; fromProfileUrl: string; body: string; receivedAt: string } & InboundIdentity)
+  | ({ type: "relationship_accepted"; providerEventId: string; connectedAccountRef: string; profileUrl: string } & InboundIdentity)
   | { type: "account_status"; providerEventId: string; connectedAccountRef: string; status: "active" | "restricted" | "disconnected"; profileUrl: string | null; displayName: string | null; vanteraAccountId: string | null };
 
 // ── Read surface (Intent Agent, Phase 13) ────────────────────────────────────
@@ -111,8 +128,17 @@ export interface LinkedInInfra {
    * accountId rides through the provider as hosted-auth metadata and comes back
    * as vanteraAccountId on account_status events — that round-trip is how a
    * connected identity is attributed to a tenant.
+   *
+   * `reconnect` re-authenticates an EXISTING connected identity in place (same
+   * provider ref, same billable seat) — the flow for an expired session. Without
+   * it a "reconnect" mints a brand-new provider account: a duplicate seat and a
+   * second row for the same human (the 2026-07-08 triple-seat incident).
    */
-  createHostedAuthLink(accountId: string, redirects?: HostedAuthRedirects): Promise<HostedAuthLink>;
+  createHostedAuthLink(
+    accountId: string,
+    redirects?: HostedAuthRedirects,
+    reconnect?: { providerRef: string }
+  ): Promise<HostedAuthLink>;
   /**
    * The LinkedIn accounts connected in the provider workspace. Used to reconcile
    * connected identities into our store when a hosted-auth status webhook is
@@ -135,6 +161,21 @@ export interface LinkedInInfra {
    */
   verifyWebhook(headers: Record<string, string>, rawBody: string): boolean;
   parseEventWebhook(payload: unknown): LinkedInEvent | null;
+  /**
+   * (Re)register the provider webhook(s) that deliver inbound events to `requestUrl`, configured
+   * with the shared-secret header our route verifies. Removes any webhook already pointing at
+   * `requestUrl` (a stale/misconfigured one whose secret no longer matches) and recreates it with
+   * the correct header, covering the sources we parse (messages, new relations, account status).
+   * Idempotent — safe to run repeatedly.
+   */
+  setupWebhook(requestUrl: string): Promise<WebhookSetupResult>;
+  /**
+   * Self-test the inbound route: POST a no-op (empty) event to `requestUrl` with the shared-secret
+   * header. The route verifies the header, finds no event id, and returns 200 "ignored" — so a 200
+   * proves the secret we register webhooks with matches what the route verifies, WITHOUT depending
+   * on the provider actually delivering an event. A 401 means the secret is still mismatched.
+   */
+  probeWebhook(requestUrl: string): Promise<{ status: number; verified: boolean }>;
 
   // ── Reads (Intent Agent) — paced + ceilinged by the scheduler (rule 04) ──────
   /** Posts matching a keyword or #hashtag — content-intent + a source of posts to read engagers of. */
@@ -145,4 +186,23 @@ export interface LinkedInInfra {
   listPostEngagers(req: PostEngagersRequest): Promise<LinkedInEngager[]>;
   /** Resolve a profile URL into a contact candidate; null when the profile can't be read. */
   getProfile(req: GetProfileRequest): Promise<LinkedInProfile | null>;
+  /**
+   * Whether `profileUrl` is now a 1st-degree connection of the connected account — i.e. an invite
+   * we sent was accepted. Used to backfill acceptances missed while the webhook was down. Returns
+   * the raw provider `network_distance` for diagnostics. Conservative: only an explicit 1st-degree
+   * signal counts as connected (a false positive would try to message a non-connection).
+   */
+  getConnectionState(req: GetProfileRequest): Promise<{ connected: boolean; distance: string | null }>;
+}
+
+/** Outcome of {@link LinkedInInfra.setupWebhook} — a diagnostic the setup task logs. */
+export interface WebhookSetupResult {
+  requestUrl: string;
+  /** false ⇒ the webhook secret env var is empty, so verification can never pass (a real misconfig). */
+  secretConfigured: boolean;
+  existing: number;
+  /** Every webhook the provider currently has — logged so the URL/source config is visible. */
+  existingHooks: { requestUrl: string | null; source: string | null }[];
+  deleted: number;
+  created: { source: string; ok: boolean; detail: string }[];
 }

@@ -5,13 +5,26 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   markClosedWon,
+  markMeetingBookedAction,
   pushLeadToCrm,
   type LeadCrmActionState,
 } from "@/app/(app)/leads/crm-actions";
 
 // Close-tracking + CRM push controls on the lead profile. Marking closed-won auto-pushes to
 // any destination with auto-push on; once closed, a manual "Push to CRM" re-pushes on demand.
-export function LeadCrmControls({ leadId, status }: { leadId: string; status: string }) {
+// L1 meeting layer: a distinct "Mark meeting booked" records the meeting (not the deal) and
+// stands outreach down — the manual, authoritative counterpart of the reply-detector.
+export function LeadCrmControls({
+  leadId,
+  status,
+  meetingBooked = false,
+  meetingSource = null,
+}: {
+  leadId: string;
+  status: string;
+  meetingBooked?: boolean;
+  meetingSource?: string | null;
+}) {
   const converted = status === "converted";
   const [closeState, closeAction, closing] = useActionState<LeadCrmActionState, FormData>(
     markClosedWon,
@@ -21,10 +34,40 @@ export function LeadCrmControls({ leadId, status }: { leadId: string; status: st
     pushLeadToCrm,
     {}
   );
+  const [meetState, meetAction, meeting] = useActionState<LeadCrmActionState, FormData>(
+    markMeetingBookedAction,
+    {}
+  );
 
   return (
     <section className="space-y-2">
       <p className="text-xs font-medium uppercase text-muted-foreground">Deal &amp; CRM</p>
+      {!converted && !meetingBooked && (
+        <form action={meetAction} className="space-y-2">
+          <input type="hidden" name="leadId" value={leadId} />
+          <div className="flex gap-2">
+            <Input
+              name="meetingAt"
+              type="datetime-local"
+              className="h-9"
+              aria-label="Meeting time (optional)"
+            />
+            <Button type="submit" size="sm" variant="outline" disabled={meeting} className="shrink-0">
+              {meeting ? "Saving…" : "Mark meeting booked"}
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Records the meeting and stands outreach down. Time is optional.
+          </p>
+          {meetState.success && <p className="text-xs text-muted-foreground">{meetState.success}</p>}
+          {meetState.error && <p className="text-xs text-destructive">{meetState.error}</p>}
+        </form>
+      )}
+      {meetingBooked && !converted && (
+        <p className="text-xs text-muted-foreground">
+          Meeting booked{meetingSource === "agent" ? " — detected from the reply" : " — marked by you"}.
+        </p>
+      )}
       {!converted ? (
         <form action={closeAction} className="space-y-2">
           <input type="hidden" name="leadId" value={leadId} />

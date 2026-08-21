@@ -90,3 +90,48 @@ describe("createTransactionalEmailFromEnv", () => {
     expect(() => createTransactionalEmailFromEnv()).not.toThrow();
   });
 });
+
+describe("ResendTransactionalEmail headers", () => {
+  it("forwards custom headers so List-Unsubscribe reaches the provider", async () => {
+    let body: Record<string, unknown> = {};
+    const mailer = new ResendTransactionalEmail({
+      apiKey: "k",
+      from: "noreply@example.com",
+      fetchFn: (async (_url: string, init: RequestInit) => {
+        body = JSON.parse(String(init.body));
+        return new Response(JSON.stringify({ id: "msg_1" }), { status: 200 });
+      }) as unknown as typeof fetch,
+    });
+
+    await mailer.send({
+      to: "a@x.com",
+      subject: "s",
+      html: "<p>h</p>",
+      headers: {
+        "List-Unsubscribe": "<https://app/api/lifecycle-unsubscribe/tok>",
+        "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+      },
+    });
+
+    expect(body.headers).toEqual({
+      "List-Unsubscribe": "<https://app/api/lifecycle-unsubscribe/tok>",
+      "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+    });
+  });
+
+  it("omits headers entirely when none are supplied", async () => {
+    let body: Record<string, unknown> = {};
+    const mailer = new ResendTransactionalEmail({
+      apiKey: "k",
+      from: "noreply@example.com",
+      fetchFn: (async (_url: string, init: RequestInit) => {
+        body = JSON.parse(String(init.body));
+        return new Response(JSON.stringify({ id: "msg_1" }), { status: 200 });
+      }) as unknown as typeof fetch,
+    });
+
+    await mailer.send({ to: "a@x.com", subject: "s", html: "<p>h</p>" });
+
+    expect(body).not.toHaveProperty("headers");
+  });
+});

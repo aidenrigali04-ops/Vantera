@@ -1,7 +1,7 @@
-import { applyRulesGate, isScanStale } from "@vantera/agent-brains";
+import { applyRulesGate, isScanStale, allocateDiscovery } from "@vantera/agent-brains";
 import { computeRunTarget, computeDiscoveryTarget, dailyOutreachCapacity } from "./capacity";
-import type { RankCandidate } from "@vantera/agent-brains";
-import { companyKey, icpCriteriaToFilters, type CompanyRef, type EnrichedProspect, type ProspectSignal } from "@vantera/prospect-data";
+import type { RankCandidate, LeadOutcomeFlags } from "@vantera/agent-brains";
+import { companyKey, icpCriteriaToFilters, type CompanyRef, type EnrichedProspect, type IcpCriteria, type ProspectSignal } from "@vantera/prospect-data";
 import {
   SCOUT_DEFAULTS,
   TRIAL_LEAD_CAP,
@@ -32,11 +32,24 @@ export function pickHotSignal(signals: ProspectSignal[] | undefined): string | n
  *  2. DRAFT (paced, best-first): hand the top-scored qualified leads to the Copy agent up to the
  *     send-paced budget, so the review queue never runs ahead of what the account can actually send.
  */
+const EMPTY_SUMMARY = {
+  discoveryTarget: 0,
+  criteriaDerived: 0,
+  criteriaPending: 0,
+  discovered: 0,
+  gatePassed: 0,
+  qualified: 0,
+  chained: false,
+} as const;
+
+/** An ICP has usable discovery filters (the wizard stores free text with empty criteria). */
+const hasFilters = (criteria: IcpCriteria) => Object.keys(icpCriteriaToFilters(criteria)).length > 0;
+
 export async function runScout(agentId: string, deps: ScoutDeps): Promise<ScoutRunSummary> {
   const now = deps.now ?? (() => new Date());
   const ctx = await deps.store.getScoutContext(agentId);
   if (!ctx || ctx.agent.status !== "live" || ctx.icps.length === 0) {
-    return { status: "skipped", discovered: 0, gatePassed: 0, qualified: 0, chained: false };
+    return { status: "skipped", ...EMPTY_SUMMARY };
   }
   const { accountId } = ctx.agent;
   const config = { ...SCOUT_DEFAULTS, ...ctx.agent.config };
@@ -74,6 +87,10 @@ export async function runScout(agentId: string, deps: ScoutDeps): Promise<ScoutR
   let discovered = 0;
   let gatePassed = 0;
   let qualifiedThisRun = 0;
+  let criteriaDerived = 0;
+  let criteriaPending = 0;
+  // Healed working set: ICPs whose criteria are usable this run (see the self-heal below).
+  let icps = ctx.icps;
 
   if (discoveryTarget > 0) {
     // Platform COGS guard: the prospect-data credit pool is shared across tenants. Confirm it can
@@ -82,19 +99,66 @@ export async function runScout(agentId: string, deps: ScoutDeps): Promise<ScoutR
     // the scheduler already advanced next_run_at, so the agent retries on its normal cadence.
     const balance = await deps.prospectData.getCreditBalance();
     if (balance && balance.remaining < discoveryTarget * WORST_CASE_CREDITS_PER_PROSPECT) {
-      return { status: "skipped", reason: "low_credits", discovered: 0, gatePassed: 0, qualified: 0, chained: false };
+      return { status: "skipped", reason: "low_credits", ...EMPTY_SUMMARY };
     }
 
-    const perIcp = Math.max(1, Math.floor(discoveryTarget / ctx.icps.length));
-    const fresh: FreshLead[] = [];
+    // Criteria self-heal: the wizard stores the ICP as free text with EMPTY criteria, and an
+    // empty-criteria ICP searches with an empty input — zero results, reported as a healthy
+    // "completed" run (the 2026-07-08 dead-scout incident). Derive the filters from the text
+    // once and persist them; a failed or empty derivation parks that ICP for this run
+    // (criteriaPending in the summary) and retries on the next cadence tick.
+    const usable: typeof ctx.icps = [];
     for (const icp of ctx.icps) {
-      const candidates = await deps.prospectData.discoverProspects(icpCriteriaToFilters(icp.criteria), perIcp);
-      discovered += candidates.length;
-      fresh.push(...(await deps.store.upsertLeads(accountId, icp.id, candidates)));
+      if (hasFilters(icp.criteria)) {
+        usable.push(icp);
+        continue;
+      }
+      try {
+        const derived = await deps.deriveCriteriaFn(icp.name, {
+          accountIndustry: ctx.account.industry,
+          valueProp: scan?.summary ?? null,
+        });
+        if (!hasFilters(derived)) {
+          criteriaPending += 1;
+          continue;
+        }
+        await deps.store.saveIcpCriteria(icp.id, derived);
+        usable.push({ ...icp, criteria: derived });
+        criteriaDerived += 1;
+      } catch {
+        criteriaPending += 1;
+      }
+    }
+    icps = usable;
+
+    const fresh: FreshLead[] = [];
+    if (icps.length > 0) {
+      // Stage 2: the split learns from outcomes — Thompson on deep conversion (interested/booked
+      // among invited) with a 40% equal exploration floor so no ICP is ever starved. No outcome
+      // data ⇒ identical to the old equal split. The TOTAL discovery target is never raised.
+      const outcomeRows = await deps.store.getIcpOutcomeRows(accountId);
+      const flagsByIcp = new Map<string, LeadOutcomeFlags[]>();
+      for (const r of outcomeRows) {
+        const list = flagsByIcp.get(r.icpId) ?? [];
+        list.push(r.flags);
+        flagsByIcp.set(r.icpId, list);
+      }
+      const quotas = allocateDiscovery(
+        discoveryTarget,
+        icps.map((icp) => ({ id: icp.id, flags: flagsByIcp.get(icp.id) ?? [] })),
+        deps.rand ?? Math.random
+      );
+      for (const icp of icps) {
+        const quota = quotas.get(icp.id) ?? 0;
+        if (quota <= 0) continue;
+        const candidates = await deps.prospectData.discoverProspects(icpCriteriaToFilters(icp.criteria), quota);
+        discovered += candidates.length;
+        fresh.push(...(await deps.store.upsertLeads(accountId, icp.id, candidates)));
+      }
     }
 
     // stage 1: deterministic rules gate — before any enrichment or AI spend
-    const criteriaById = new Map(ctx.icps.map((i) => [i.id, i.criteria]));
+    const criteriaById = new Map(icps.map((i) => [i.id, i.criteria]));
     // pure gate decisions first (deterministic order), then persist them concurrently
     const gated = fresh.map((lead) => ({
       lead,
@@ -177,7 +241,7 @@ export async function runScout(agentId: string, deps: ScoutDeps): Promise<ScoutR
       const insights = await deps.rankFn(rankCandidates, {
         accountIndustry: ctx.account.industry,
         valueProp: scan ? `${scan.summary} Value props: ${scan.value_props.join("; ")}` : null,
-        icpDescription: ctx.icps.map((i) => `${i.name}: ${JSON.stringify(i.criteria)}`).join(" | "),
+        icpDescription: icps.map((i) => `${i.name}: ${JSON.stringify(i.criteria)}`).join(" | "),
       });
       const scored = insights.map((insight) => ({ insight, qualified: insight.score >= config.minScore }));
       await mapWithConcurrency(scored, WRITE_CONCURRENCY, ({ insight, qualified }) =>
@@ -226,5 +290,14 @@ export async function runScout(agentId: string, deps: ScoutDeps): Promise<ScoutR
 
   await deps.store.completeRun(agentId, now());
 
-  return { status: "completed", discovered, gatePassed, qualified: qualifiedThisRun, chained };
+  return {
+    status: "completed",
+    discoveryTarget,
+    criteriaDerived,
+    criteriaPending,
+    discovered,
+    gatePassed,
+    qualified: qualifiedThisRun,
+    chained,
+  };
 }

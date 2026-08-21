@@ -22,7 +22,7 @@ export const FOUNDERS_CONTENT: UseCaseContent = {
     sub: "You don't have time to prospect and can't afford an SDR yet. Vantera runs founder-led outreach on your LinkedIn — surfacing in-market buyers, qualifying them against your ICP, and drafting every message in your voice. You approve a few minutes a day. Pipeline builds while you build the product.",
     primaryCta: { label: "Start free", href: "/signup" },
     secondaryCta: { label: "See how it works", href: "#how-it-works" },
-    trust: ["3-day free trial", "Live in ~15 minutes", "You approve every message"],
+    trust: ["7-day free trial", "Live in ~15 minutes", "You approve every message"],
     visual: {
       title: "Your pipeline",
       period: "This week",
@@ -376,6 +376,6 @@ export const FOUNDERS_CONTENT: UseCaseContent = {
       "Every week without outbound is pipeline a competitor is booking instead. Deploy your AI SDR team today — live in about fifteen minutes, first replies this week.",
     primaryCta: { label: "Start free", href: "/signup" },
     secondaryCta: { label: "See pricing", href: "/#pricing" },
-    reassurance: ["3-day free trial", "Live in ~15 min", "You approve every message"],
+    reassurance: ["7-day free trial", "Live in ~15 min", "You approve every message"],
   },
 };

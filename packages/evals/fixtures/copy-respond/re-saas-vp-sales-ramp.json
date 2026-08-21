@@ -1,0 +1,60 @@
+{
+  "id": "re-saas-vp-sales-ramp",
+  "input": {
+    "lead": {
+      "firstName": "Priya",
+      "lastName": "Nandan",
+      "title": "VP of Sales",
+      "companyName": "Wrenfield Software",
+      "industry": "B2B SaaS"
+    },
+    "insights": {
+      "pain_points": [
+        "New account executives take months to hit full quota",
+        "Deal context lives in scattered notes instead of one place"
+      ],
+      "triggers": [
+        "Hired four new account executives last month"
+      ],
+      "motivations": [
+        "Get the new hires productive before end of quarter"
+      ],
+      "value_angle": "Faster ramp protects the pipeline this new class of reps is supposed to build",
+      "aha_moment": "Realizing most of ramp time goes to hunting for the right talk track, not learning the product",
+      "prospect_offering": "Wrenfield Software sells project-tracking tools to mid-market operations teams",
+      "summary": "VP of Sales scaling a team fast and feeling the ramp-time drag"
+    },
+    "context": {
+      "cta": "offer a short walkthrough of ramp benchmarks for a team their size",
+      "accountName": "Rampline",
+      "accountIndustry": "Sales enablement software",
+      "valueProp": "Rampline gets new sales reps to full quota in about half the usual time",
+      "bookingUrl": "https://rampline.example/book",
+      "strategy": {
+        "openWith": "trigger",
+        "askStyle": "soft"
+      }
+    },
+    "thread": [
+      {
+        "role": "agent",
+        "text": "Thanks for connecting. Ramping four reps at once is its own project. What's slowing new hires down most right now?"
+      },
+      {
+        "role": "lead",
+        "text": "Mostly getting them comfortable with our own tools before they even talk to prospects."
+      },
+      {
+        "role": "agent",
+        "text": "That stretch of learning your own tools is usually the biggest chunk of ramp time we see too."
+      }
+    ],
+    "incoming": "This actually sounds relevant. What would it take to get a quick look at pricing?",
+    "classification": "interested"
+  },
+  "grounding": "Seller offer: Rampline gets new sales reps to full quota in about half the usual time Prospect: Priya Nandan, VP of Sales at Wrenfield Software (B2B SaaS). Pain points: New account executives take months to hit full quota; Deal context lives in scattered notes instead of one place. Value angle: Faster ramp protects the pipeline this new class of reps is supposed to build",
+  "frozenDraft": {
+    "message": "Happy to walk you through pricing, grab any time here: https://rampline.example/book",
+    "violations": []
+  }
+}

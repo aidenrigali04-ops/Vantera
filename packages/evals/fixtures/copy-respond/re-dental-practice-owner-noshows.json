@@ -1,0 +1,51 @@
+{
+  "id": "re-dental-practice-owner-noshows",
+  "input": {
+    "lead": {
+      "firstName": "Elena",
+      "lastName": "Castell",
+      "title": "Practice Owner",
+      "companyName": "Cedarbrook Family Dental",
+      "industry": "Dental Care"
+    },
+    "insights": {
+      "pain_points": [
+        "Front desk spends hours a week chasing no-show patients",
+        "Reminder calls get skipped on busy days"
+      ],
+      "triggers": [
+        "Opened a second treatment room this year"
+      ],
+      "motivations": [
+        "Keep the new chair booked without adding front-desk hours"
+      ],
+      "value_angle": "Automated reminders fill the schedule without more manual calling",
+      "aha_moment": "Realizing most no-shows just needed one well-timed reminder",
+      "prospect_offering": "Cedarbrook Family Dental runs a two-location family dental practice",
+      "summary": "Practice owner expanding capacity but still losing hours to manual reminder calls"
+    },
+    "context": {
+      "cta": "offer a short look at automated reminder scheduling",
+      "accountName": "Recall Health",
+      "accountIndustry": "Patient scheduling software",
+      "valueProp": "Recall Health automates appointment reminders so practices see fewer no-shows"
+    },
+    "thread": [
+      {
+        "role": "agent",
+        "text": "Thanks for connecting. Filling a new chair is its own challenge. How's the front desk handling reminder calls these days?"
+      },
+      {
+        "role": "lead",
+        "text": "Honestly they're stretched thin, but we're not really looking to add another tool right now."
+      }
+    ],
+    "incoming": "We're all set for now, but appreciate you reaching out.",
+    "classification": "not_interested"
+  },
+  "grounding": "Seller offer: Recall Health automates appointment reminders so practices see fewer no-shows Prospect: Elena Castell, Practice Owner at Cedarbrook Family Dental (Dental Care). Pain points: Front desk spends hours a week chasing no-show patients; Reminder calls get skipped on busy days. Value angle: Automated reminders fill the schedule without more manual calling",
+  "frozenDraft": {
+    "message": "No worries at all, appreciate you letting me know. I'm happy to pick this back up if that changes.",
+    "violations": []
+  }
+}

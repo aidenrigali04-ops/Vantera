@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { CONNECTION_NOTE_MAX_CHARS } from "@vantera/agent-brains";
 import { InMemoryLinkedInInfra } from "@vantera/linkedin-infra";
 import { LINKEDIN_NOTE_MAX, runOutreachSend, sanitizeSendError } from "./outreach-send";
+import { MIN_LEAD_MESSAGE_GAP_MS } from "./send-dispatch";
 import type { OutreachSendDeps, OutreachSendStore, SendContext } from "./types";
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
@@ -91,8 +92,26 @@ class FakeOutreachStore implements OutreachSendStore {
   async setLeadInvited(leadId: string, at: Date) {
     this.leadInvited.push({ leadId, at });
   }
+  savedProviderRefs: { leadId: string; providerRef: string }[] = [];
+  async saveLeadProviderRef(leadId: string, providerRef: string) {
+    this.savedProviderRefs.push({ leadId, providerRef });
+  }
   async setCampaignLeadStatus(campaignId: string, leadId: string, status: string) {
     this.campaignLeadStatuses.set(`${campaignId}:${leadId}`, status);
+  }
+  guardFacts: {
+    lastMessageDeliveredAt: Date | null;
+    lastReplyAt: Date | null;
+    duplicateBodyDelivered: boolean;
+  } = { lastMessageDeliveredAt: null, lastReplyAt: null, duplicateBodyDelivered: false };
+  guardFactsCalls: { leadId: string; body: string | null }[] = [];
+  async getLeadMessageGuardFacts(leadId: string, body: string | null) {
+    this.guardFactsCalls.push({ leadId, body });
+    return this.guardFacts;
+  }
+  canceled: { id: string; error: string }[] = [];
+  async cancelSend(sendId: string, error: string) {
+    this.canceled.push({ id: sendId, error });
   }
 }
 
@@ -118,6 +137,112 @@ describe("runOutreachSend — rule 11: suppression gate", () => {
     expect(deps.linkedinInfra.sentInvites).toHaveLength(0);
     expect(store.suppressed).toContain("send1");
     expect(store.campaignLeadStatuses.get("camp1:lead1")).toBe("suppressed");
+  });
+});
+
+describe("runOutreachSend — send-boundary per-lead re-check (fresh facts, not the claim's)", () => {
+  const NOW = new Date("2026-07-07T22:06:00Z");
+  const msgCtx = () =>
+    makeCtx({ linkedinStage: "message", body: "Thanks for the reply — happy to share more." });
+
+  it("cancels (never sends) a message whose exact body was already delivered to the lead", async () => {
+    const store = new FakeOutreachStore();
+    store.ctx = msgCtx();
+    store.guardFacts = {
+      lastMessageDeliveredAt: new Date(NOW.getTime() - 60_000),
+      lastReplyAt: null,
+      duplicateBodyDelivered: true,
+    };
+    const deps = { ...makeDeps(store), now: () => NOW };
+
+    const outcome = await runOutreachSend({ sendId: "send1" }, deps);
+
+    expect(outcome).toBe("canceled");
+    expect(deps.linkedinInfra.sentMessages).toHaveLength(0);
+    expect(store.canceled.map((c) => c.id)).toContain("send1");
+    expect(store.canceled[0]?.error).toMatch(/duplicate/);
+  });
+
+  it("parks a message when another message delivered inside the per-lead gap (no fresher reply)", async () => {
+    const store = new FakeOutreachStore();
+    store.ctx = msgCtx();
+    store.guardFacts = {
+      lastMessageDeliveredAt: new Date(NOW.getTime() - MIN_LEAD_MESSAGE_GAP_MS / 2),
+      lastReplyAt: new Date(NOW.getTime() - MIN_LEAD_MESSAGE_GAP_MS), // replied BEFORE that delivery
+      duplicateBodyDelivered: false,
+    };
+    const deps = { ...makeDeps(store), now: () => NOW };
+
+    const outcome = await runOutreachSend({ sendId: "send1" }, deps);
+
+    expect(outcome).toBe("parked");
+    expect(deps.linkedinInfra.sentMessages).toHaveLength(0);
+    expect(store.reverted).toContain("send1");
+  });
+
+  it("sends when the lead replied after our last delivery (answering promptly is human)", async () => {
+    const store = new FakeOutreachStore();
+    store.ctx = msgCtx();
+    const lastDelivered = new Date(NOW.getTime() - 30 * 60_000);
+    store.guardFacts = {
+      lastMessageDeliveredAt: lastDelivered,
+      lastReplyAt: new Date(lastDelivered.getTime() + 5 * 60_000),
+      duplicateBodyDelivered: false,
+    };
+    const deps = { ...makeDeps(store), now: () => NOW };
+
+    const outcome = await runOutreachSend({ sendId: "send1" }, deps);
+
+    expect(outcome).toBe("sent");
+    expect(deps.linkedinInfra.sentMessages).toHaveLength(1);
+  });
+
+  it("sends normally once the delivered gap has elapsed", async () => {
+    const store = new FakeOutreachStore();
+    store.ctx = msgCtx();
+    store.guardFacts = {
+      lastMessageDeliveredAt: new Date(NOW.getTime() - MIN_LEAD_MESSAGE_GAP_MS - 60_000),
+      lastReplyAt: null,
+      duplicateBodyDelivered: false,
+    };
+    const deps = { ...makeDeps(store), now: () => NOW };
+
+    const outcome = await runOutreachSend({ sendId: "send1" }, deps);
+
+    expect(outcome).toBe("sent");
+  });
+
+  it("invite sends never consult the message guard (first touch has no thread to pace against)", async () => {
+    const store = new FakeOutreachStore();
+    store.ctx = makeCtx({ linkedinStage: "invite" });
+    store.guardFacts = {
+      lastMessageDeliveredAt: new Date(NOW.getTime() - 60_000),
+      lastReplyAt: null,
+      duplicateBodyDelivered: true,
+    };
+    const deps = { ...makeDeps(store), now: () => NOW };
+
+    const outcome = await runOutreachSend({ sendId: "send1" }, deps);
+
+    expect(outcome).toBe("sent");
+    expect(store.guardFactsCalls).toHaveLength(0);
+  });
+});
+
+describe("runOutreachSend — dead sender connection", () => {
+  it("a provider disconnected_account error PARKS the send (never a red failure) and reports it", async () => {
+    const store = new FakeOutreachStore();
+    store.ctx = makeCtx({ linkedinStage: "message", body: "hello" });
+    const deps = makeDeps(store);
+    deps.linkedinInfra.sendMessage = async () => {
+      throw new Error("provider message failed (401): errors/disconnected_account");
+    };
+
+    const outcome = await runOutreachSend({ sendId: "send1" }, deps);
+
+    expect(outcome).toBe("sender_disconnected");
+    expect(store.reverted).toContain("send1"); // parked — retries after reconnect
+    expect(store.failed).toHaveLength(0); // never shown to the user as a failed send
   });
 });
 
@@ -227,6 +352,44 @@ describe("runOutreachSend — linkedin stages", () => {
     expect(deps.linkedinInfra.sentInvites).toHaveLength(0);
     expect(store.leadInvited).toHaveLength(0); // message, not invite
   });
+
+  it("linkedin invite: an 'already_invited_recently' response is treated as SENT, never failed", async () => {
+    // The connection request is already pending (a prior send whose bookkeeping we lost, or a
+    // duplicate). The invite IS out, so the lead must progress to the follow-up — never a red failure.
+    const store = new FakeOutreachStore();
+    store.ctx = makeCtx({ channel: "linkedin", linkedinStage: "invite" });
+    const deps = makeDeps(store);
+    deps.linkedinInfra.sendInvite = async () => {
+      throw new Error(
+        'linkedin provider error 422 on /api/v1/users/invite: {"status":422,"type":"errors/already_invited_recently","title":"Should delay new invitation to this recipient"}'
+      );
+    };
+
+    const outcome = await runOutreachSend({ sendId: "send1" }, deps);
+
+    expect(outcome).toBe("sent");
+    expect(store.failed).toHaveLength(0); // NOT a failure
+    expect(store.leadInvited).toHaveLength(1); // lead progresses to follow-up
+    expect(store.outreachRecords[0]?.channel).toBe("linkedin");
+    expect(store.outreachRecords[0]?.messageRef).toBeNull(); // original id was never captured
+    expect(store.campaignLeadStatuses.get("camp1:lead1")).toBe("sent");
+    expect(store.sent).toContain("send1");
+  });
+
+  it("linkedin invite: a genuine provider error (e.g. 403) still fails — guard not over-broadened", async () => {
+    const store = new FakeOutreachStore();
+    store.ctx = makeCtx({ channel: "linkedin", linkedinStage: "invite" });
+    const deps = makeDeps(store);
+    deps.linkedinInfra.sendInvite = async () => {
+      throw new Error("linkedin provider error 403 on /api/v1/users/invite: free account restriction");
+    };
+
+    const outcome = await runOutreachSend({ sendId: "send1" }, deps);
+
+    expect(outcome).toBe("failed");
+    expect(store.failed).toHaveLength(1);
+    expect(store.leadInvited).toHaveLength(0);
+  });
 });
 
 describe("runOutreachSend — failure and skip paths", () => {
@@ -328,5 +491,28 @@ describe("runOutreachSend — state integrity: bookkeeping isolation", () => {
     expect(auditIdx).toBeGreaterThanOrEqual(0);
     expect(sentIdx).toBeGreaterThanOrEqual(0);
     expect(auditIdx).toBeLessThan(sentIdx);
+  });
+});
+
+describe("runOutreachSend — reply-attribution key (0043)", () => {
+  it("persists the prospect provider_id the send resolved, so inbound webhooks can match", async () => {
+    const store = new FakeOutreachStore();
+    store.ctx = makeCtx({ channel: "linkedin", linkedinStage: "invite", body: "Hi" });
+    const deps = makeDeps(store);
+    deps.linkedinInfra.providerRefsByUrl[store.ctx!.lead.linkedinUrl as string] = "ACoAA_TARGET";
+
+    await runOutreachSend({ sendId: "send1" }, deps);
+
+    expect(store.savedProviderRefs).toEqual([{ leadId: "lead1", providerRef: "ACoAA_TARGET" }]);
+  });
+
+  it("skips the ref write when the adapter resolved none (fake default)", async () => {
+    const store = new FakeOutreachStore();
+    store.ctx = makeCtx({ channel: "linkedin", linkedinStage: "message", body: "hello" });
+    const deps = makeDeps(store);
+
+    await runOutreachSend({ sendId: "send1" }, deps);
+
+    expect(store.savedProviderRefs).toHaveLength(0);
   });
 });

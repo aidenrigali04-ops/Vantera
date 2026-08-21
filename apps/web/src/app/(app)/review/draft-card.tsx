@@ -1,18 +1,20 @@
 "use client";
 
-import { useActionState, useState } from "react";
-import { AlertTriangle, MessageSquare } from "lucide-react";
+import { useRef, useState } from "react";
+import { toast } from "sonner";
+import { AlertTriangle, MessageSquare, Wand2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Panel } from "@/components/ui/panel";
 import { Textarea } from "@/components/ui/textarea";
 import { LeadProfileLink, type LeadProfile } from "@/components/lead-profile";
-import { approveDraft, declineDraft, declineAndSuppress, saveDraftEdit } from "./actions";
+import { approveDraft, declineDraft, declineAndSuppress, fixDraft, saveDraftEdit } from "./actions";
 import type { ReviewActionState } from "./actions";
 
 export interface DraftRow {
   id: string;
-  channel: "email" | "linkedin";
+  channel: "linkedin";
   subject: string | null;
   body: string;
   style_flags: string | null;
@@ -21,52 +23,88 @@ export interface DraftRow {
   leads: LeadProfile | null;
 }
 
+type BusyKey = "approve" | "decline" | "suppress" | "save" | "fix";
+
 /**
  * A single draft's review controls. Two modes:
  * - default: standalone card (Panel) with the lead header + channel badge.
  * - compact: rendered inside a ProspectReviewCard's channel group, so it drops the
  *   repeated lead identity + channel badge (the prospect card + section header carry
  *   those) and shows only the LinkedIn stage label. Keeps body + edit + actions.
+ *
+ * R1b: every action toasts its outcome — the card vanishing on revalidate is no longer
+ * the only success signal, and errors surface both inline and as a toast.
  */
 export function DraftCard({ draft, compact = false }: { draft: DraftRow; compact?: boolean }) {
   const [editing, setEditing] = useState(false);
-  const [approveState, approve, approving] = useActionState<ReviewActionState, FormData>(
-    approveDraft,
-    {}
-  );
-  const [declineState, decline, declining] = useActionState<ReviewActionState, FormData>(
-    declineDraft,
-    {}
-  );
-  const [suppressState, suppress, suppressing] = useActionState<ReviewActionState, FormData>(
-    declineAndSuppress,
-    {}
-  );
-  const [editState, saveEdit, saving] = useActionState<ReviewActionState, FormData>(
-    saveDraftEdit,
-    {}
-  );
+  const suppressFormRef = useRef<HTMLFormElement>(null);
+  const [busy, setBusy] = useState<BusyKey | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  const run = (
+    key: BusyKey,
+    action: (prev: ReviewActionState, fd: FormData) => Promise<ReviewActionState>,
+    fd: FormData,
+    success: string
+  ) => {
+    setBusy(key);
+    setError(null);
+    setNotice(null);
+    void action({}, fd)
+      .then((res) => {
+        if (res.error) {
+          setError(res.error);
+          toast.error(res.error);
+        } else {
+          if (res.notice) setNotice(res.notice);
+          toast.success(res.notice ?? success);
+        }
+      })
+      .finally(() => setBusy(null));
+  };
 
   const lead = draft.leads;
   const name = [lead?.first_name, lead?.last_name].filter(Boolean).join(" ") || "Unknown prospect";
   const context = [lead?.title, lead?.company_name].filter(Boolean).join(" · ");
-  const error = approveState.error ?? declineState.error ?? suppressState.error ?? editState.error;
   const stageLabel = draft.linkedin_stage === "invite" ? "Invite" : draft.linkedin_stage === "message" ? "Follow-up" : null;
 
   // Shared body + actions — identical in both modes.
   const content = (
     <div className="space-y-3">
       {draft.style_flags && (
-        <p className="flex items-start gap-1.5 rounded-md bg-amber-500/10 px-2.5 py-1.5 text-xs text-amber-700 dark:text-amber-400">
-          <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
-          Style check: {draft.style_flags}
-        </p>
+        <div className="flex items-start justify-between gap-3 rounded-md bg-amber-500/10 px-2.5 py-1.5">
+          <p className="flex items-start gap-1.5 text-xs text-amber-700 dark:text-amber-400">
+            <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
+            Style check: {draft.style_flags}
+          </p>
+          {!editing && (
+            <form
+              action={(fd) => run("fix", fixDraft, fd, "Fix pass done.")}
+              className="shrink-0"
+            >
+              <input type="hidden" name="sendId" value={draft.id} />
+              <Button
+                type="submit"
+                size="sm"
+                variant="outline"
+                disabled={busy !== null}
+                data-copilot="fix-draft"
+                className="h-6 gap-1 border-amber-500/40 bg-transparent px-2 text-xs text-amber-700 hover:bg-amber-500/15 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300"
+              >
+                <Wand2 className="size-3" />
+                {busy === "fix" ? "Fixing…" : "Fix"}
+              </Button>
+            </form>
+          )}
+        </div>
       )}
+      {notice && <p className="text-xs text-amber-700 dark:text-amber-400">{notice}</p>}
 
       {editing ? (
         <form
           action={(fd) => {
-            saveEdit(fd);
+            run("save", saveDraftEdit, fd, "Draft updated.");
             setEditing(false);
           }}
           className="space-y-2"
@@ -75,8 +113,8 @@ export function DraftCard({ draft, compact = false }: { draft: DraftRow; compact
           <input type="hidden" name="channel" value={draft.channel} />
           <Textarea name="body" defaultValue={draft.body} rows={6} />
           <div className="flex gap-2">
-            <Button type="submit" size="sm" disabled={saving}>
-              {saving ? "Saving…" : "Save"}
+            <Button type="submit" size="sm" disabled={busy === "save"}>
+              {busy === "save" ? "Saving…" : "Save"}
             </Button>
             <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(false)}>
               Cancel
@@ -92,32 +130,48 @@ export function DraftCard({ draft, compact = false }: { draft: DraftRow; compact
 
       {!editing && (
         <div className="flex flex-wrap items-center gap-2">
-          <form action={approve}>
+          <form action={(fd) => run("approve", approveDraft, fd, "Approved — queued to send.")}>
             <input type="hidden" name="sendId" value={draft.id} />
-            <Button type="submit" size="sm" disabled={approving} data-copilot="approve-draft">
-              {approving ? "Approving…" : "Approve"}
+            <Button type="submit" size="sm" disabled={busy !== null} data-copilot="approve-draft">
+              {busy === "approve" ? "Approving…" : "Approve"}
             </Button>
           </form>
-          <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
+          <Button size="sm" variant="outline" onClick={() => setEditing(true)} data-hotkey="edit-draft">
             Edit
           </Button>
-          <form action={decline}>
+          <form action={(fd) => run("decline", declineDraft, fd, "Declined — it won't send.")}>
             <input type="hidden" name="sendId" value={draft.id} />
-            <Button type="submit" size="sm" variant="ghost" disabled={declining}>
-              Decline
+            <Button type="submit" size="sm" variant="ghost" disabled={busy !== null} data-hotkey="decline-draft">
+              {busy === "decline" ? "Declining…" : "Decline"}
             </Button>
           </form>
-          <form action={suppress}>
+          <form
+            ref={suppressFormRef}
+            action={(fd) =>
+              run("suppress", declineAndSuppress, fd, "Declined — this prospect will never be contacted.")
+            }
+          >
             <input type="hidden" name="sendId" value={draft.id} />
-            <Button
-              type="submit"
-              size="sm"
-              variant="ghost"
-              className="text-destructive"
-              disabled={suppressing}
-            >
-              Decline &amp; never contact
-            </Button>
+            {/* R2: suppression is permanent (rule 11 — entries never expire), so it confirms. */}
+            <ConfirmDialog
+              title="Never contact this prospect?"
+              description="This declines the draft and adds the prospect to your suppression list permanently — no agent or teammate can ever message them again. This cannot be undone."
+              confirmLabel="Never contact"
+              destructive
+              onConfirm={() => suppressFormRef.current?.requestSubmit()}
+              trigger={(open) => (
+                <Button
+                  type="button"
+                  onClick={open}
+                  size="sm"
+                  variant="ghost"
+                  className="text-destructive"
+                  disabled={busy !== null}
+                >
+                  Decline &amp; never contact
+                </Button>
+              )}
+            />
           </form>
         </div>
       )}

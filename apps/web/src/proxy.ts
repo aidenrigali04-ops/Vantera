@@ -13,6 +13,10 @@ export async function proxy(request: NextRequest) {
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-nonce", nonce);
   requestHeaders.set("Content-Security-Policy", csp);
+  // Forward the requested path (+ query) so a server component that redirects a logged-out
+  // visitor to /login can carry it as ?next= (see loginRedirect). Next does not otherwise expose
+  // the current path to a layout; this is the same request-header channel the nonce rides.
+  requestHeaders.set("x-pathname", request.nextUrl.pathname + request.nextUrl.search);
 
   const response = await updateSession(request, requestHeaders);
   response.headers.set("Content-Security-Policy-Report-Only", csp);

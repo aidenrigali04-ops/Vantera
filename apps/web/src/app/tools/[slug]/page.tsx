@@ -201,7 +201,7 @@ export default async function ToolPage({ params }: { params: Promise<{ slug: str
             Start free
             <ArrowRight className="size-4" />
           </Link>
-          <p className="mt-5 text-[13px] text-[var(--ink-4)]">Free 3-day trial · Live in minutes</p>
+          <p className="mt-5 text-[13px] text-[var(--ink-4)]">Free 7-day trial · Live in minutes</p>
         </div>
       </section>
     </MarketingShell>

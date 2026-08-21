@@ -1,6 +1,6 @@
 import { logger, task } from "@trigger.dev/sdk";
 import { createDb } from "@vantera/db";
-import { draftLinkedIn } from "@vantera/agent-brains";
+import { draftLinkedIn, fixLinkedInDraft, judgeCopy } from "@vantera/agent-brains";
 import { runCopyDraft } from "../pipeline/copy-draft";
 import { createPgStore } from "../pipeline/pg-store";
 import type { CopyDraftPayload } from "../pipeline/types";
@@ -17,9 +17,21 @@ export const copyDraft = task({
   maxDuration: 1800,
   run: async (payload: CopyDraftPayload) => {
     const store = createPgStore(createDb());
+    // Task 3 (best-of-N): the global `best_of_n` rollout knob, read once per run; the pipeline
+    // core re-caps it and forces it to 1 whenever a judge isn't wired.
+    // Message-shape selector: the global `message_shape_auto` rollout knob (default OFF =
+    // byte-identical champion), read once per run alongside it.
+    const [bestOfN, messageShapeAuto] = await Promise.all([
+      store.getBestOfN(),
+      store.getMessageShapeAuto(),
+    ]);
     const summary = await runCopyDraft(payload, {
       store,
       draftLinkedInFn: (input) => draftLinkedIn(input),
+      fixLinkedInFn: (draft, input) => fixLinkedInDraft(draft, input),
+      judgeFn: (draft, ctx) => judgeCopy(draft, ctx),
+      bestOfN,
+      messageShapeAuto,
     });
     logger.info("copy draft finished", { ...summary, copyAgentId: payload.copyAgentId });
     return summary;

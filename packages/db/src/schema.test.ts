@@ -31,6 +31,9 @@ const tenantExempt = new Set([
   // security audit log — account_id is nullable so system/global events (no resolvable account)
   // can be recorded; account-scoped rows still cascade (0027).
   "security_events",
+  // operator-side lifecycle ledger about OUR OWN users (0045) — platform data, not tenant
+  // data; service-role only (RLS on, no policies)
+  "lifecycle_touches",
 ]);
 
 // returns the create-table DDL block for a table from the concatenated migrations
@@ -186,6 +189,22 @@ describe("account sender name (0019)", () => {
   });
 });
 
+describe("seller positioning (0061)", () => {
+  const sql = readFileSync(join(migrationsDir, "0061_seller_positioning.sql"), "utf8");
+  it("adds the three nullable positioning columns", () => {
+    expect(sql).toMatch(/add column if not exists value_prop text/i);
+    expect(sql).toMatch(/add column if not exists brand_voice text/i);
+    expect(sql).toMatch(/add column if not exists guardrails text/i);
+  });
+  it("grants client UPDATE on the positioning columns (else onboarding/Settings save fails)", () => {
+    const grantMatch = sql.match(/grant update \(([^)]*)\)\s+on (?:table )?public\.accounts/i);
+    expect(grantMatch, "expected a column-scoped accounts UPDATE grant").toBeTruthy();
+    expect(grantMatch![1]).toContain("value_prop");
+    expect(grantMatch![1]).toContain("brand_voice");
+    expect(grantMatch![1]).toContain("guardrails");
+  });
+});
+
 describe("mailbox SMTP secret columns (0021)", () => {
   it("0021 revokes mailbox SMTP secret columns from clients", () => {
     const sql = readFileSync(join(migrationsDir, "0021_mailbox_smtp_secret.sql"), "utf8");
@@ -278,5 +297,151 @@ describe("column-grant lockdown (0026 — crm_connections tokens)", () => {
     expect(grant, "expected a column-scoped crm_connections SELECT grant").toBeTruthy();
     expect(grant![1]).not.toMatch(/access_token_enc/);
     expect(grant![1]).not.toMatch(/refresh_token_enc/);
+  });
+});
+
+describe("lifecycle touches (0045)", () => {
+  const sql = fileContents.get("0045_lifecycle_touches.sql") ?? "";
+  it("is service-role only: RLS on, no policies, no client grants", () => {
+    expect(sql).toContain("alter table public.lifecycle_touches enable row level security");
+    expect(sql).not.toContain("create policy");
+    expect(sql).not.toContain("grant ");
+  });
+  it("deletes with the auth user (GDPR deletion path, rule 11)", () => {
+    expect(tableDdl("lifecycle_touches")).toContain("references auth.users(id) on delete cascade");
+  });
+  it("enforces one touch per (user, segment, touch_number)", () => {
+    expect(sql).toContain("create unique index lifecycle_touches_user_segment_touch_idx");
+  });
+});
+
+describe("proof grounding (0047)", () => {
+  const sql = fileContents.get("0047_proof_points.sql") ?? "";
+  it("is member-read + admin-manage client-editable config (rule 02)", () => {
+    expect(sql).toContain("alter table public.proof_points enable row level security");
+    expect(sql).toMatch(/create policy proof_points_select on public\.proof_points\s+for select/i);
+    expect(sql).toMatch(/create policy proof_points_manage on public\.proof_points\s+for all/i);
+    expect(sql).toMatch(/is_account_admin\(account_id\)/);
+  });
+  it("cascades with the account (seller config, not prospect data — no retention window)", () => {
+    expect(tableDdl("proof_points")).toContain("references public.accounts(id) on delete cascade");
+    expect(sql).not.toContain("retention(proof_points)");
+  });
+});
+
+describe("stage-scoped attribution + alpha wealth (0058)", () => {
+  const sql = fileContents.get("0058_stage_attribution_alpha.sql") ?? "";
+
+  it("0058 migration exists", () => {
+    expect(sql).not.toBe("");
+  });
+
+  it("adds optimization_playbook.alpha_wealth as not-null with the 0.05 default", () => {
+    expect(sql).toMatch(/alter table public\.optimization_playbook\s+add column alpha_wealth numeric not null default 0\.05/);
+  });
+
+  it("adds optimization_experiments.alpha_spent as a bare nullable numeric (honest pre-2A null)", () => {
+    expect(sql).toMatch(/alter table public\.optimization_experiments\s+add column alpha_spent numeric;/);
+  });
+
+  it("creates the recipe_stage_outcomes view", () => {
+    expect(sql).toMatch(/create view public\.recipe_stage_outcomes as/);
+  });
+
+  it("is service-role read only: no grant to anon/authenticated, and an explicit revoke", () => {
+    expect(sql).toMatch(/revoke all on public\.recipe_stage_outcomes from authenticated, anon/i);
+    // strip comment lines first — prose discussing "grant" (e.g. explaining WHY one is dangerous)
+    // must not be mistaken for an actual SQL grant statement
+    const codeOnly = sql
+      .split("\n")
+      .filter((line) => !line.trimStart().startsWith("--"))
+      .join("\n");
+    expect(codeOnly).not.toMatch(/grant\s+[\s\S]*?on public\.recipe_stage_outcomes/i);
+  });
+
+  it("excludes the paired first-touch MESSAGE row from the acceptance denominator", () => {
+    // the view's final WHERE must keep first_touch rows ONLY when linkedin_stage = 'invite'
+    expect(sql).toMatch(/where m\.brain <> 'first_touch' or m\.linkedin_stage = 'invite'/);
+  });
+
+  it("the view is not a drizzle table export (views are exempt from the RLS-table guardrails)", () => {
+    expect(allTables).not.toContain("recipe_stage_outcomes");
+  });
+});
+
+describe("autonomous-adoption grace clock (0059, GATE 1 / WS-3.2)", () => {
+  const sql = fileContents.get("0059_adoption_grace.sql") ?? "";
+
+  it("0059 migration exists", () => {
+    expect(sql).not.toBe("");
+  });
+
+  it("adds optimization_experiments.readied_at as a bare nullable timestamptz", () => {
+    expect(sql).toMatch(/alter table public\.optimization_experiments\s+add column readied_at timestamptz;/);
+  });
+
+  it("rides the existing manage policy — no new RLS/grant statements for this column", () => {
+    expect(sql).not.toMatch(/create policy/i);
+    expect(sql).not.toMatch(/enable row level security/i);
+    const codeOnly = sql
+      .split("\n")
+      .filter((line) => !line.trimStart().startsWith("--"))
+      .join("\n");
+    expect(codeOnly).not.toMatch(/\bgrant\b/i);
+  });
+});
+
+describe("0060 pull-back email", () => {
+  const sqlText = readFileSync(
+    join(migrationsDir, "0060_pullback_email.sql"),
+    "utf8"
+  );
+
+  it("adds channel with a linkedin default so existing rows and the DM path are unchanged", () => {
+    expect(sqlText).toMatch(/add column if not exists channel text not null default 'linkedin'/);
+  });
+
+  it("drops the old 3-column index — leaving it would silently no-op email touches", () => {
+    expect(sqlText).toContain("drop index if exists lifecycle_touches_user_segment_touch_idx");
+  });
+
+  it("keeps the LinkedIn lane on the EXACT 0045 key, scoped to its own rows", () => {
+    // byte-identical dedupe for the DM path: same three columns, just partial on channel
+    expect(sqlText).toMatch(
+      /create unique index if not exists lifecycle_touches_linkedin_touch_idx\s+on lifecycle_touches \(user_id, segment, touch_number\)\s+where channel = 'linkedin'/
+    );
+  });
+
+  it("scopes the email lane's idempotence key by account — one user can stall two accounts", () => {
+    expect(sqlText).toMatch(
+      /create unique index if not exists lifecycle_touches_email_touch_idx\s+on lifecycle_touches \(user_id, account_id, segment, touch_number\)\s+where channel = 'email'/
+    );
+  });
+
+  it("does NOT put nullable account_id in the LinkedIn key — NULLs never conflict, which would disarm dedupe", () => {
+    const linkedinIdx = sqlText.match(
+      /create unique index if not exists lifecycle_touches_linkedin_touch_idx[\s\S]*?;/
+    );
+    expect(linkedinIdx, "expected the LinkedIn partial unique index").toBeTruthy();
+    expect(linkedinIdx![0]).not.toMatch(/account_id/);
+  });
+
+  it("does NOT use NULLS NOT DISTINCT — ON DELETE SET NULL would then make account deletion collide", () => {
+    // strip comment lines first — the migration's prose explains WHY this is avoided (same guard
+    // as the 0058 grant test above)
+    const codeOnly = sqlText
+      .split("\n")
+      .filter((line) => !line.trimStart().startsWith("--"))
+      .join("\n");
+    expect(codeOnly).not.toMatch(/nulls not distinct/i);
+  });
+
+  it("widens segments for the two email segments", () => {
+    expect(sqlText).toContain("'drafts_waiting'");
+    expect(sqlText).toContain("'leads_waiting'");
+  });
+
+  it("does NOT grant lifecycle_last_email_at to authenticated — service-written only", () => {
+    expect(sqlText).not.toMatch(/grant update \(lifecycle_last_email_at\)/);
   });
 });

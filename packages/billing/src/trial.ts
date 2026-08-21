@@ -2,13 +2,14 @@ import type { PlanTier } from "./plans";
 
 /**
  * No-card free trial. New accounts start here (granted by DB column defaults in
- * migration 0020, shortened in 0037). The first-deploy gate passes because
- * `subscriptionStatus` is 'trialing' (isActive) on a real tier — see entitlements.isActive.
+ * migration 0020, shortened in 0037, lengthened in 0046, then to 7 days in 0048).
+ * The first-deploy gate passes because `subscriptionStatus` is 'trialing' (isActive)
+ * on a real tier — see entitlements.isActive.
  */
 export const TRIAL_TIER: PlanTier = "starter";
 
-/** Trial length in days. Must match the `now() + interval '3 days'` default in 0037. */
-export const TRIAL_DAYS = 3;
+/** Trial length in days. Must match the `now() + interval '7 days'` default in 0048. */
+export const TRIAL_DAYS = 7;
 
 /**
  * Whole days remaining in the trial (rounded up), floored at 0. Null when the

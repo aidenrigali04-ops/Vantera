@@ -116,6 +116,104 @@ describe("HubSpot adapter", () => {
     expect(res.ok).toBe(true);
     expect(calls[1]!.url).toContain("/contacts/search");
   });
+
+  it("writes a journey note after the deal when context rides the payload — and never fails the push on a note error", async () => {
+    const calls = mockFetch([
+      { json: { id: "contact-1" } }, // create contact
+      { json: { id: "deal-9" } }, // create deal
+      { ok: false, status: 403, json: {} }, // note rejected (missing scope) — swallowed
+    ]);
+    const res = await getConnector("hubspot").pushClosedDeal(ctx({ stageId: "won" }), {
+      ...deal,
+      context: { score: 91, whyNow: "Raised a Series B", origin: "intent" },
+    });
+    expect(res.ok).toBe(true);
+    if (res.ok) expect(res.data.externalRef).toBe("deal-9");
+    expect(calls[2]!.url).toContain("/crm/v3/objects/notes");
+    const note = JSON.parse(String(calls[2]!.init.body));
+    expect(note.properties.hs_note_body).toContain("fit score 91");
+    expect(note.properties.hs_note_body).toContain("Raised a Series B");
+    expect(note.associations[0].to.id).toBe("contact-1");
+    expect(note.associations[0].types[0].associationTypeId).toBe(202);
+  });
+
+  it("skips the note entirely when the payload carries no context", async () => {
+    const calls = mockFetch([{ json: { id: "contact-1" } }, { json: { id: "deal-9" } }]);
+    await getConnector("hubspot").pushClosedDeal(ctx({ stageId: "won" }), deal);
+    expect(calls).toHaveLength(2);
+  });
+
+  it("ensureContact finds an existing contact by email before creating", async () => {
+    const calls = mockFetch([{ json: { results: [{ id: "c-77" }] } }]);
+    const res = await getConnector("hubspot").ensureContact!(ctx({}), {
+      firstName: "Ada",
+      email: "ada@analytical.io",
+    });
+    expect(res.ok).toBe(true);
+    if (res.ok) expect(res.data.contactId).toBe("c-77");
+    expect(calls[0]!.url).toContain("/contacts/search");
+  });
+
+  it("ensureContact creates the contact when the search misses", async () => {
+    const calls = mockFetch([
+      { json: { results: [] } }, // search miss
+      { json: { id: "c-new" } }, // create
+    ]);
+    const res = await getConnector("hubspot").ensureContact!(ctx({}), {
+      firstName: "Ada",
+      lastName: "Lovelace",
+      email: "ada@analytical.io",
+      company: "Analytical",
+    });
+    expect(res.ok).toBe(true);
+    if (res.ok) expect(res.data.contactId).toBe("c-new");
+    const body = JSON.parse(String(calls[1]!.init.body));
+    expect(body.properties.email).toBe("ada@analytical.io");
+    expect(body.properties.company).toBe("Analytical");
+  });
+
+  it("ensureContact creates directly when the lead has no email (our stored ref dedupes after)", async () => {
+    const calls = mockFetch([{ json: { id: "c-no-email" } }]);
+    const res = await getConnector("hubspot").ensureContact!(ctx({}), { firstName: "Ada" });
+    expect(res.ok).toBe(true);
+    if (res.ok) expect(res.data.contactId).toBe("c-no-email");
+    expect(calls[0]!.url).toContain("/crm/v3/objects/contacts");
+    expect(calls[0]!.url).not.toContain("search");
+  });
+
+  it("logActivity posts a note associated to the contact (typeId 202) and maps 5xx/429 to retryable", async () => {
+    const calls = mockFetch([{ json: { id: "note-1" } }]);
+    const res = await getConnector("hubspot").logActivity!(ctx({}), {
+      contactId: "c-77",
+      body: "LinkedIn reply from Ada",
+      occurredAt: "2026-07-01T12:00:00.000Z",
+    });
+    expect(res.ok).toBe(true);
+    const body = JSON.parse(String(calls[0]!.init.body));
+    expect(body.properties.hs_note_body).toBe("LinkedIn reply from Ada");
+    expect(body.properties.hs_timestamp).toBe("2026-07-01T12:00:00.000Z");
+    expect(body.associations[0].to.id).toBe("c-77");
+
+    mockFetch([{ ok: false, status: 429, json: {} }]);
+    const limited = await getConnector("hubspot").logActivity!(ctx({}), {
+      contactId: "c-77",
+      body: "x",
+      occurredAt: "2026-07-01T12:00:00.000Z",
+    });
+    expect(limited.ok).toBe(false);
+    if (!limited.ok) expect(limited.retryable).toBe(true);
+  });
+
+  it("declares activity-sync support in the registry (flag + the scopes the wire calls need)", async () => {
+    const meta = getConnector("hubspot").meta;
+    expect(meta.supportsActivitySync).toBe(true);
+    // the dedupe search + testConnection are READ calls — without this scope HubSpot 403s
+    expect(meta.oauthScopes).toContain("crm.objects.contacts.read");
+    // contact-associated notes are covered by contacts.write (no granular notes scope
+    // exists in HubSpot OAuth — requesting one fails app validation)
+    expect(meta.oauthScopes).toContain("crm.objects.contacts.write");
+    expect(meta.oauthScopes.join(" ")).not.toContain("notes");
+  });
 });
 
 describe("Monday adapter", () => {

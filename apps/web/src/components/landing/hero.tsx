@@ -193,7 +193,7 @@ export function Hero() {
               {...rise(0.27)}
               className="mt-4 text-[11px] font-semibold uppercase tracking-[0.16em] text-white"
             >
-              Free 3-day trial · Cancel anytime
+              Free 7-day trial · Cancel anytime
             </motion.p>
           </div>
 

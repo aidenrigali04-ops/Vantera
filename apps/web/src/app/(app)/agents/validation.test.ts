@@ -62,10 +62,28 @@ function copyForm(overrides: Record<string, string> = {}): FormData {
 }
 
 describe("parseCopyForm", () => {
+  it("accepts a valid booking link and rejects a malformed one", () => {
+    const ok = parseCopyForm(copyForm({ bookingUrl: "https://cal.com/aiden/15min" }));
+    expect(ok.ok && ok.ok === true && ok.values.bookingUrl).toBe("https://cal.com/aiden/15min");
+    const bad = parseCopyForm(copyForm({ bookingUrl: "cal.com/aiden" }));
+    expect(bad.ok).toBe(false);
+  });
+
+  it("accepts a website destination on its own — traffic-first businesses need no booking link", () => {
+    const ok = parseCopyForm(copyForm({ websiteUrl: "https://cityscale.example/portfolio" }));
+    expect(ok.ok && ok.ok === true && ok.values.websiteUrl).toBe("https://cityscale.example/portfolio");
+    expect(ok.ok && ok.ok === true && ok.values.bookingUrl).toBeNull();
+    const bad = parseCopyForm(copyForm({ websiteUrl: "not-a-url" }));
+    expect(bad.ok).toBe(false);
+  });
+
+
   it("accepts a complete form — LinkedIn is the only channel, always enabled", () => {
     expect(parseCopyForm(copyForm())).toEqual({
       ok: true,
       values: {
+        bookingUrl: null,
+        websiteUrl: null,
         name: "Penn",
         cta: "book a 15-min intro",
         links: ["https://acme.com/case-study"],

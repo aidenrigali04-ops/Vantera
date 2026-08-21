@@ -155,6 +155,49 @@ export function coolingState(
   return { daysWaiting: days, label: `Reply waiting ${days}d` };
 }
 
+/** Shared relative-day label: "today", "3d ago", "4w ago", "2mo ago". Null on a bad date. */
+function relativeDays(iso: string, now: Date): string | null {
+  const t = new Date(iso).getTime();
+  if (!Number.isFinite(t)) return null;
+  const days = Math.floor((now.getTime() - t) / 86_400_000);
+  if (days <= 0) return "today";
+  if (days < 14) return `${days}d ago`;
+  if (days < 60) return `${Math.round(days / 7)}w ago`;
+  return `${Math.round(days / 30)}mo ago`;
+}
+
+export interface LastActivity {
+  kind: "reply" | "scored" | "sourced";
+  /** e.g. "Replied 2d ago", "Researched today", "Sourced 4w ago" */
+  label: string;
+}
+
+/**
+ * The most recent thing that happened to a lead, for the table's Last-activity column — a reply
+ * beats a research pass beats sourcing. Null when nothing is dated: an honest blank, never a
+ * fabricated timestamp.
+ */
+export function lastActivity(
+  latestReplyIso: string | null | undefined,
+  scoredAtIso: string | null | undefined,
+  createdAtIso: string | null | undefined,
+  now: Date = new Date()
+): LastActivity | null {
+  if (latestReplyIso) {
+    const rel = relativeDays(latestReplyIso, now);
+    if (rel) return { kind: "reply", label: `Replied ${rel === "today" ? "today" : rel}` };
+  }
+  if (scoredAtIso) {
+    const rel = relativeDays(scoredAtIso, now);
+    if (rel) return { kind: "scored", label: `Researched ${rel}` };
+  }
+  if (createdAtIso) {
+    const rel = relativeDays(createdAtIso, now);
+    if (rel) return { kind: "sourced", label: `Sourced ${rel}` };
+  }
+  return null;
+}
+
 const EMAIL_STATUS: Record<string, string> = {
   unverified: "Unverified",
   valid: "Verified",

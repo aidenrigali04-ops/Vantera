@@ -7,6 +7,8 @@ import {
   icpDraftIsEmpty,
   peekFavicon,
   deriveIntentWatchlist,
+  matchStarterPlays,
+  proposeNextChallenger,
   type WebsiteScan,
 } from "@vantera/agent-brains";
 import { createLinkedInInfraFromEnv, isLinkedInInfraConfigured } from "@vantera/linkedin-infra";
@@ -46,13 +48,14 @@ export async function saveDetails(_prev: DetailsState, formData: FormData): Prom
   // first save creates the workspace under the brand name
   let { data: account } = await supabase
     .from("accounts")
-    .select("id, website_url, website_scan, website_scanned_at")
+    .select("id, website_url, website_scan, website_scanned_at, value_prop")
     .limit(1)
     .maybeSingle<{
       id: string;
       website_url: string | null;
       website_scan: (WebsiteScan & { url?: string }) | null;
       website_scanned_at: string | null;
+      value_prop: string | null;
     }>();
   if (!account) {
     const { data: accountId, error: rpcError } = await supabase.rpc("create_account", {
@@ -61,7 +64,13 @@ export async function saveDetails(_prev: DetailsState, formData: FormData): Prom
     if (rpcError || !accountId) {
       return { error: "Could not create your workspace. Please try again." };
     }
-    account = { id: accountId as string, website_url: null, website_scan: null, website_scanned_at: null };
+    account = {
+      id: accountId as string,
+      website_url: null,
+      website_scan: null,
+      website_scanned_at: null,
+      value_prop: null,
+    };
   }
 
   const { error: profileError } = await supabase
@@ -105,7 +114,13 @@ export async function saveDetails(_prev: DetailsState, formData: FormData): Prom
       onboarding_icp: icpName,
       onboarding_industry: draft?.industries[0] ?? scan?.scope_of_industry?.slice(0, 120) ?? null,
       ...(scan
-        ? { website_scan: { ...scan, url: websiteUrl }, website_scanned_at: new Date().toISOString() }
+        ? {
+            website_scan: { ...scan, url: websiteUrl },
+            website_scanned_at: new Date().toISOString(),
+            // 0061: the seller's own positioning. Prefilled from the scan; editable later in
+            // Settings → Positioning. Never overwrites a value they already edited.
+            ...(account.value_prop ? {} : { value_prop: scan.summary.slice(0, 600) }),
+          }
         : {}),
     })
     .eq("id", account.id);
@@ -184,7 +199,10 @@ export async function createOnboardingConnectLink(): Promise<{ url?: string; err
   }
 
   try {
-    const base = (process.env.APP_URL ?? "http://localhost:3000").replace(/\/+$/, "");
+    // Canonical https for the registered return URLs (mirrors the webhook URL fix); local
+    // dev keeps http, since https://localhost would just fail.
+    const raw = (process.env.APP_URL ?? "http://localhost:3000").replace(/\/+$/, "");
+    const base = /^http:\/\/(localhost|127\.0\.0\.1)(:|$)/i.test(raw) ? raw : raw.replace(/^http:\/\//i, "https://");
     const { url } = await createLinkedInInfraFromEnv().createHostedAuthLink(account.id, {
       success: `${base}/onboarding?connected=1`,
       failure: `${base}/onboarding?connected=failed`,
@@ -352,6 +370,40 @@ export async function finishOnboarding(): Promise<{ error?: string } | never> {
     } catch (err) {
       console.error("onboarding: intent provisioning failed (non-blocking)", err);
     }
+  }
+
+  // ── Vera's playbook (Stage 0) — seed the matched starter play as the champion strategy and
+  //    start the first live test. Best-effort: never blocks finishing; the one-live-experiment
+  //    index makes a duplicate start a caught no-op. ──
+  try {
+    const [play] = matchStarterPlays({ industry: account.onboarding_industry ?? "", icp: icp.name });
+    if (play) {
+      const { data: existingPb } = await supabase
+        .from("optimization_playbook")
+        .select("account_id")
+        .eq("account_id", account.id)
+        .maybeSingle<{ account_id: string }>();
+      if (!existingPb) {
+        await supabase
+          .from("optimization_playbook")
+          .insert({ account_id: account.id, champion_strategy: play.strategy, version: 1 });
+      }
+      const challenger = proposeNextChallenger("acceptance", play.strategy);
+      if (challenger) {
+        await supabase.from("optimization_experiments").insert({
+          account_id: account.id,
+          stage_key: "acceptance",
+          champion_strategy: play.strategy,
+          challenger_strategy: challenger,
+          allocation_pct: 25,
+          min_sample: 30,
+          status: "running",
+          created_by: user.id,
+        });
+      }
+    }
+  } catch (err) {
+    console.error("onboarding: playbook seeding failed (non-blocking)", err);
   }
 
   const { error } = await supabase

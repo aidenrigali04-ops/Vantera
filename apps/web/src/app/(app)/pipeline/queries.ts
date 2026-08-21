@@ -1,66 +1,62 @@
-import type { SequenceStage } from "@vantera/jobs/pipeline/types";
-
-export type { SequenceStage };
-
-const STAGE_LABELS: Record<SequenceStage, string> = {
-  linkedin: "LinkedIn",
-};
-const STAGE_ORDER: SequenceStage[] = ["linkedin"];
+import { computeRevenueSnapshot } from "@/lib/revenue";
 
 export interface PipelineInput {
-  /** rows from sequence_runs (only current_stage + status are needed) */
+  /** rows from sequence_runs (only status is needed) */
   runs: { current_stage: string; status: string }[];
+  /** non-cumulative lead-stage counts, same buckets the Overview snapshot uses */
+  counts: { qualified: number; inOutreach: number; replied: number };
   convertedClients: number;
+  /** sum of REAL per-deal values at close (avg fallback per deal) — actuals beat estimates */
+  closedActualCents: number;
   avgDealValueCents: number | null;
   revenueGoalCents: number | null;
 }
 
-export interface PipelineStage {
-  stage: SequenceStage;
-  label: string;
-  count: number;
-}
-
 export interface PipelineViewModel {
-  stages: PipelineStage[];
   activeTotal: number;
   pausedTotal: number;
   convertedClients: number;
-  pipelineValueCents: number;
+  /** closed-won revenue, actuals-first — the same "Closed" the Overview shows */
+  closedCents: number;
+  /** stage-weighted expected pipeline — the same "In pipeline" the Overview shows */
+  expectedCents: number;
+  /** closed revenue vs. the monthly goal (matches the Overview revenue card) */
   goalProgressPct: number | null;
 }
 
 /**
- * Shape raw sequence-run rows + the account's revenue numbers into the board's
- * view model. Pure so it is unit-testable without a DB. Goal progress is the
- * stage-weighted win value (converted × avg deal value) against the MRR goal.
+ * Shape raw sequence-run rows + lead-stage counts into the board's view model, using
+ * the SAME revenue snapshot the Overview uses (T1 truth layer: one metric, one meaning —
+ * "In pipeline" is always stage-weighted expected value, "Revenue progress" is always
+ * closed-won). Pure so it is unit-testable without a DB.
  */
 export function shapePipeline(input: PipelineInput): PipelineViewModel {
-  const counts = new Map<SequenceStage, number>(STAGE_ORDER.map((s) => [s, 0]));
+  let activeTotal = 0;
   let pausedTotal = 0;
   for (const r of input.runs) {
     if (r.status === "paused_reply") pausedTotal += 1;
-    if (r.status === "active" && (STAGE_ORDER as string[]).includes(r.current_stage)) {
-      const s = r.current_stage as SequenceStage;
-      counts.set(s, (counts.get(s) ?? 0) + 1);
-    }
+    if (r.status === "active") activeTotal += 1;
   }
-  const stages = STAGE_ORDER.map((stage) => ({
-    stage,
-    label: STAGE_LABELS[stage],
-    count: counts.get(stage) ?? 0,
-  }));
-  const activeTotal = stages.reduce((n, s) => n + s.count, 0);
-  const pipelineValueCents = input.convertedClients * (input.avgDealValueCents ?? 0);
-  const goalProgressPct = input.revenueGoalCents
-    ? Math.min(100, Math.round((pipelineValueCents / input.revenueGoalCents) * 100))
-    : null;
+
+  const snapshot = computeRevenueSnapshot({
+    convertedClients: input.convertedClients,
+    pipeline: input.counts,
+    avgDealValueCents: input.avgDealValueCents,
+    goalCents: input.revenueGoalCents,
+    closedActualCents: input.closedActualCents,
+  });
+
+  const goalProgressPct =
+    input.revenueGoalCents && input.revenueGoalCents > 0
+      ? Math.min(100, Math.round((snapshot.closedCents / input.revenueGoalCents) * 100))
+      : null;
+
   return {
-    stages,
     activeTotal,
     pausedTotal,
     convertedClients: input.convertedClients,
-    pipelineValueCents,
+    closedCents: snapshot.closedCents,
+    expectedCents: snapshot.expectedCents,
     goalProgressPct,
   };
 }

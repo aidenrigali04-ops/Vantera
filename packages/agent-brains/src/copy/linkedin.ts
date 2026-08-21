@@ -1,8 +1,9 @@
 import { generateObject, type LanguageModel } from "ai";
 import { z } from "zod";
-import { getModel } from "@vantera/ai";
-import { validateHumanity, findUngroundedClaims, type Violation } from "./humanizer";
-import { generateHumanized, leadBlock, type DraftInput } from "./shared";
+import { getModel, registerPrompt } from "@vantera/ai";
+import { validateHumanity, findUngroundedClaims, normalizeDashes, type Violation } from "./humanizer";
+import { avoidBlock, exemplarBlock, generateHumanized, leadBlock, strategyDirectives, PROSPECT_ACCURACY_RULE, VOICE_RULES, type DraftInput } from "./shared";
+import { FACT_ASSERTING_SHAPES, groundingHasShapeSignal, shapeBudget, type MessageShape } from "./shape";
 
 /**
  * LinkedIn's hard cap on a connection-request note is 300 chars, but free-tier
@@ -11,7 +12,12 @@ import { generateHumanized, leadBlock, type DraftInput } from "./shared";
  * (the send path enforces the same cap; see LINKEDIN_NOTE_MAX in jobs).
  */
 export const CONNECTION_NOTE_MAX_CHARS = 200;
-export const FOLLOWUP_MAX_CHARS = 500;
+// First message after acceptance. Kept short on purpose — a long DM reads like a pitch and gets
+// ignored; 1–2 tight sentences earn a reply (500 → 300 on 2026-06-29, → 250 on 2026-07-08, → 180
+// on 2026-07-10 owner feedback "the initial outreach message is too long"). Paired with a word cap
+// so a draft can't pack length into short words and still read like a wall of text.
+export const FOLLOWUP_MAX_CHARS = 180;
+export const FOLLOWUP_MAX_WORDS = 28;
 
 export const linkedinDraftSchema = z.object({
   connection_note: z.string().max(300),
@@ -29,38 +35,83 @@ export interface LinkedInDraft {
 // ignored or reported — the note only references the trigger/commonality; the pitch waits
 // for the follow-up after acceptance, and even that stays soft. Conversational register,
 // no formal sign-offs (it's chat, not email).
-const LINKEDIN_SYSTEM = `You write LinkedIn outreach for a B2B seller: a connection note and one follow-up message (sent only after the prospect accepts).
+// Exported (not just module-local) so the jobs pipeline can stamp SendRecipe.promptHash with
+// the EXACT registry hash of the prompt that drafted a first-touch message — it imports this
+// handle rather than re-registering, so the two can never drift (recipe.ts v2, WS-3.4).
+export const LINKEDIN_SYSTEM = registerPrompt("copy/linkedin", `You write LinkedIn outreach for a B2B seller: a connection note and one follow-up message (sent only after the prospect accepts).
 
-Connection note — under ${CONNECTION_NOTE_MAX_CHARS} characters:
-- Reference the prospect's trigger, work, or a genuine commonality. That's all.
+Connection note, under ${CONNECTION_NOTE_MAX_CHARS} characters:
+- Reference the prospect's trigger, work, or a genuine commonality. That's all. One short line lands better than two.
 - NO pitch, no CTA, no links, no "I'd love to connect about our product". The only goal is an accepted request from a real-sounding peer.
 
-Follow-up message — under ${FOLLOWUP_MAX_CHARS} characters:
-- Thank them briefly (3-6 words, not gushing), then one observation tying their pain/trigger to the aha moment as a concrete outcome.
-- End with ONE soft, interest-based ask aligned to the CTA goal. No meeting demands, no calendar links.
+Follow-up message: one or two short sentences, aim for about 120 characters and never exceed ${FOLLOWUP_MAX_CHARS} (about ${FOLLOWUP_MAX_WORDS} words). Shorter always wins. This is the FIRST real exchange, and buyers delete anything long or anything that opens with a pitch, so:
+- Do NOT name the seller's company or product. Do NOT list features or describe what the seller does. Do NOT ask for a call, meeting, or demo. All of that comes later, after they engage.
+- Shape: a brief thanks (3 to 6 words, not gushing), then ONE sharp observation about THEIR situation and ONE genuinely curious question about how they handle it today. The question is the whole CTA, so make it easy and interesting to answer.
+- The "CTA goal" in the block only tells you where the conversation should eventually head. It must NOT appear as an ask in this message.
+- If the prospect's location strongly implies a primary language other than English, writing in that language is welcome.
 
-Both: conversational chat register, no "Dear", no "Best regards", no signature. Plain human voice: no "I hope this finds you well", no buzzwords ("game-changer", "cutting-edge", "seamless"), no generic flattery ("big fan of", "love what you're doing"), no "As a …" openers, at most one em-dash, at most one exclamation mark, minimal hedging. Name the seller ONLY by the "Seller company" value from the block — ignore any other brand name that appears in the offer description.`;
+${PROSPECT_ACCURACY_RULE}
+
+${VOICE_RULES}
+
+If you ever reference the seller, use ONLY the "Seller company" value from the block, never any other brand name from the offer description.`);
 
 // `grounding` is the per-lead facts (leadBlock). When provided, both messages are checked for
 // fabricated metric claims (rule 11 / anti-hallucination); unresolved ones surface in review.
+// `sellerName` enforces the de-pitched first touch: naming the product in message 1 is the
+// "pitch slap" buyers cite as the top delete trigger (2026-07-08 copy analysis).
+//
+// `shape` (message-shape selector, spec 2026-07-20) governs ONLY the follow-up length budget and
+// the grounding guard below. It is STRUCTURE, not a compliance escape: the de-pitch rules
+// (no link, no product name, no meeting ask) and the full humanizer run on EVERY shape unchanged —
+// a shape can never buy its way past them. Unset OR "observation_question" ⇒ the exact 180/28
+// follow-up budget as before the selector existed (byte-identical default).
 export function validateLinkedInDraft(
   draft: {
     connection_note: string;
     followup_message: string;
   },
   grounding?: string,
+  sellerName?: string | null,
+  shape?: MessageShape | null,
 ): Violation[] {
+  const budget = shapeBudget(shape);
   const violations = [
     ...validateHumanity(draft.connection_note, { maxChars: CONNECTION_NOTE_MAX_CHARS }),
-    ...validateHumanity(draft.followup_message, { maxChars: FOLLOWUP_MAX_CHARS }),
+    ...validateHumanity(draft.followup_message, { maxChars: budget.maxChars, maxWords: budget.maxWords }),
   ];
   if (/https?:\/\//i.test(draft.connection_note)) {
     violations.push({ rule: "no-links", detail: "no links in a connection note" });
+  }
+  // The first follow-up is a soft, human ask — a raw link makes it read like a pitch (content is
+  // referenced, never pasted in the first touch). Same anti-pitch discipline as the note.
+  if (/https?:\/\//i.test(draft.followup_message)) {
+    violations.push({ rule: "no-links", detail: "no links in the first follow-up — keep it a soft ask" });
+  }
+  // Touch 1 earns a conversation; it never sells. Product name or a meeting ask here is the
+  // classic pitch-slap — enforced, not just prompted.
+  if (sellerName && sellerName.trim().length > 2 && draft.followup_message.toLowerCase().includes(sellerName.trim().toLowerCase())) {
+    violations.push({ rule: "no-product-pitch", detail: `the first message must not name ${sellerName.trim()} — earn the conversation first` });
+  }
+  if (/\b(?:a\s+(?:quick\s+)?call|meeting|demo|calendar|15\s*-?\s*min)\b/i.test(draft.followup_message)) {
+    violations.push({ rule: "no-meeting-ask", detail: "no call/meeting ask in the first message — the question IS the CTA" });
   }
   if (grounding) {
     violations.push(
       ...findUngroundedClaims(`${draft.connection_note}\n${draft.followup_message}`, grounding),
     );
+    // Deterministic grounding guard (spec §5c, anti-hallucination layer 3): a fact-asserting shape
+    // (trigger_consequence / gift / peer_insider) leans its whole framing on a specific prospect
+    // fact. If the shape was applied but the grounding block does NOT carry that signal, the premise
+    // was never real — route to review rather than trust it. Belt-and-suspenders on selectMessageShape.
+    // This is NOT a claim to catch all hallucination: an INVENTED fact shaped like the signal is
+    // defended by selection + the directive + PROSPECT_ACCURACY_RULE and ultimately the review queue.
+    if (shape && FACT_ASSERTING_SHAPES.includes(shape) && !groundingHasShapeSignal(grounding, shape)) {
+      violations.push({
+        rule: "shape-signal-missing",
+        detail: `the ${shape} shape asserts a specific fact, but the grounding has no matching signal — do not use this framing without it`,
+      });
+    }
   }
   return violations;
 }
@@ -71,18 +122,37 @@ export async function draftLinkedIn(
   model: LanguageModel = getModel()
 ): Promise<LinkedInDraft> {
   const block = leadBlock(input);
+  // Optional experiment strategy + recent-phrasing avoidance + winning-opener exemplars are
+  // appended after the block; all are empty by default, so the prompt is unchanged when none
+  // applies. Grounding stays the BLOCK alone (none of them adds facts), so the humanizer /
+  // anti-hallucination checks are identical — an exemplar's old metric can never whitelist a
+  // new claim (Stage 0.5).
+  const strat = strategyDirectives(input.context.strategy);
+  const avoid = avoidBlock(input.context.avoidPhrases);
+  const exemplars = exemplarBlock(input.context.winningExemplars);
+  const basePrompt = [block, strat, avoid, exemplars].filter(Boolean).join("\n\n");
+  // The chosen shape governs the follow-up length budget + the grounding guard in the validator.
+  // Unset ⇒ shapeBudget falls back to the exact 180/28 default (byte-identical).
+  const shape = input.context.strategy?.messageShape;
   const { output, violations } = await generateHumanized(
-    async (fixNote) =>
-      (
+    async (fixNote) => {
+      const obj = (
         await generateObject({
           model,
           schema: linkedinDraftSchema,
-          system: LINKEDIN_SYSTEM,
-          prompt: fixNote ? `${block}\n\n${fixNote}` : block,
+          system: LINKEDIN_SYSTEM.text,
+          prompt: fixNote ? `${basePrompt}\n\n${fixNote}` : basePrompt,
           maxOutputTokens: 600,
         })
-      ).object,
-    (draft) => validateLinkedInDraft(draft, block)
+      ).object;
+      // Fix stray em-dashes deterministically before linting (both fields), same reason as the
+      // conversation brain — a clean note shouldn't wait in review over one dash.
+      return {
+        connection_note: normalizeDashes(obj.connection_note),
+        followup_message: normalizeDashes(obj.followup_message),
+      };
+    },
+    (draft) => validateLinkedInDraft(draft, block, input.context.accountName, shape)
   );
   return {
     connectionNote: output.connection_note,

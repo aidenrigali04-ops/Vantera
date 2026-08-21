@@ -14,6 +14,7 @@ import type {
   ProfilePostsRequest,
   SearchPostsRequest,
   SendOutcome,
+  WebhookSetupResult,
 } from "./types";
 
 /** Test/dev double. Also the reference behavior for real adapters. */
@@ -30,9 +31,15 @@ export class InMemoryLinkedInInfra implements LinkedInInfra {
 
   constructor(private readonly webhookSecret = "in-memory-secret") {}
 
-  async createHostedAuthLink(accountId: string, _redirects?: HostedAuthRedirects): Promise<HostedAuthLink> {
+  readonly hostedAuthCalls: { accountId: string; reconnectRef: string | null }[] = [];
+  async createHostedAuthLink(
+    accountId: string,
+    _redirects?: HostedAuthRedirects,
+    reconnect?: { providerRef: string }
+  ): Promise<HostedAuthLink> {
+    this.hostedAuthCalls.push({ accountId, reconnectRef: reconnect?.providerRef ?? null });
     return {
-      url: `https://auth.example.com/connect/${accountId}`,
+      url: `https://auth.example.com/${reconnect ? "reconnect" : "connect"}/${accountId}`,
       expiresAt: new Date(Date.now() + 3_600_000).toISOString(),
     };
   }
@@ -49,14 +56,25 @@ export class InMemoryLinkedInInfra implements LinkedInInfra {
     if (i >= 0) this.accounts.splice(i, 1);
   }
 
+  /** provider ids the fake "resolves" per profile URL — seed to test ref persistence */
+  providerRefsByUrl: Record<string, string> = {};
+
   async sendInvite(req: InviteRequest): Promise<SendOutcome> {
     this.sentInvites.push(req);
-    return { id: `inv_${++this.counter}`, sentAt: new Date().toISOString() };
+    return {
+      id: `inv_${++this.counter}`,
+      sentAt: new Date().toISOString(),
+      prospectProviderRef: this.providerRefsByUrl[req.profileUrl] ?? null,
+    };
   }
 
   async sendMessage(req: MessageRequest): Promise<SendOutcome> {
     this.sentMessages.push(req);
-    return { id: `msg_${++this.counter}`, sentAt: new Date().toISOString() };
+    return {
+      id: `msg_${++this.counter}`,
+      sentAt: new Date().toISOString(),
+      prospectProviderRef: this.providerRefsByUrl[req.profileUrl] ?? null,
+    };
   }
 
   // ── Reads (Intent Agent) ──────────────────────────────────────────────────
@@ -88,13 +106,18 @@ export class InMemoryLinkedInInfra implements LinkedInInfra {
     const p = payload as Record<string, unknown>;
     if (typeof p.event_id !== "string" || typeof p.connected_account !== "string") return null;
     const base = { providerEventId: p.event_id, connectedAccountRef: p.connected_account };
+    const identity = {
+      fromProviderRef: typeof p.from_provider_ref === "string" ? p.from_provider_ref : null,
+      fromPublicIdentifier: typeof p.from_public_identifier === "string" ? p.from_public_identifier : null,
+      fromName: typeof p.from_name === "string" ? p.from_name : null,
+    };
     switch (p.event_type) {
       case "reply":
         if (typeof p.from_profile_url !== "string" || typeof p.body !== "string" || typeof p.received_at !== "string") return null;
-        return { type: "reply", ...base, fromProfileUrl: p.from_profile_url, body: p.body, receivedAt: p.received_at };
+        return { type: "reply", ...base, ...identity, fromProfileUrl: p.from_profile_url, body: p.body, receivedAt: p.received_at };
       case "relationship_accepted":
         if (typeof p.profile_url !== "string") return null;
-        return { type: "relationship_accepted", ...base, profileUrl: p.profile_url };
+        return { type: "relationship_accepted", ...base, ...identity, profileUrl: p.profile_url };
       case "account_status":
         if ((p.status !== "active" && p.status !== "restricted" && p.status !== "disconnected")) return null;
         return {
@@ -107,4 +130,25 @@ export class InMemoryLinkedInInfra implements LinkedInInfra {
         return null;
     }
   }
+
+  async getConnectionState(_req: GetProfileRequest): Promise<{ connected: boolean; distance: string | null }> {
+    return { connected: false, distance: null };
+  }
+
+  async probeWebhook(_requestUrl: string): Promise<{ status: number; verified: boolean }> {
+    return { status: 200, verified: true };
+  }
+
+  async setupWebhook(requestUrl: string): Promise<WebhookSetupResult> {
+    return {
+      requestUrl,
+      secretConfigured: this.webhookSecret.length > 0,
+      existing: 0,
+      existingHooks: [],
+      deleted: 0,
+      created: WEBHOOK_SOURCES_FAKE.map((source) => ({ source, ok: true, detail: "fake" })),
+    };
+  }
 }
+
+const WEBHOOK_SOURCES_FAKE = ["messaging", "users", "account_status"];

@@ -82,6 +82,39 @@ export async function revokeInvite(_prev: TeamActionState, formData: FormData): 
   return { success: "Invite revoked." };
 }
 
+/** R3: resend a pending invite — fresh 7-day window, same token/link, email re-sent.
+ *  The old UI literally told users to "resend it" with no control to do so. */
+export async function resendInvite(_prev: TeamActionState, formData: FormData): Promise<TeamActionState> {
+  const inviteId = String(formData.get("inviteId") ?? "");
+  const { supabase, account, role } = await callerContext();
+  if (!account) return { error: "Your session expired. Sign in again." };
+  if (!canManageTeam(role ?? "")) return { error: "Only owners and admins can manage invites." };
+
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  const { data: invite, error } = await supabase
+    .from("account_invites")
+    .update({ expires_at: expiresAt })
+    .eq("id", inviteId)
+    .eq("account_id", account.id)
+    .eq("status", "pending")
+    .select("email, token")
+    .maybeSingle<{ email: string; token: string }>();
+  if (error || !invite) return { error: "Could not resend the invite." };
+
+  try {
+    await sendInviteEmail({
+      to: invite.email,
+      inviteUrl: `${process.env.APP_URL ?? "http://localhost:3000"}/invite/${invite.token}`,
+      workspaceName: (account as { name?: string }).name ?? "your team",
+    });
+  } catch {
+    return { error: "The invite window was renewed, but the email failed to send — try again." };
+  }
+
+  revalidatePath("/settings/team");
+  return { success: `Invitation re-sent to ${invite.email}.` };
+}
+
 export async function removeMember(_prev: TeamActionState, formData: FormData): Promise<TeamActionState> {
   const userId = String(formData.get("userId") ?? "");
   const { supabase, account, role } = await callerContext();
@@ -102,4 +135,34 @@ export async function removeMember(_prev: TeamActionState, formData: FormData): 
   if (error) return { error: "Could not remove the member." };
   revalidatePath("/settings/team");
   return { success: "Member removed." };
+}
+
+/**
+ * P1 (2026-07-15): change an existing member's role — invite/remove used to be the only
+ * controls. Admin↔member only; the owner role never changes hands here (ownership transfer
+ * is a deliberate, separate operation).
+ */
+export async function changeMemberRole(_prev: TeamActionState, formData: FormData): Promise<TeamActionState> {
+  const userId = String(formData.get("userId") ?? "");
+  const nextRole = String(formData.get("role") ?? "");
+  if (!["admin", "member"].includes(nextRole)) return { error: "Pick admin or member." };
+  const { supabase, account, role } = await callerContext();
+  if (!account) return { error: "Your session expired. Sign in again." };
+  if (!canManageTeam(role ?? "")) return { error: "Only owners and admins can change roles." };
+  const { data: target } = await supabase
+    .from("account_members")
+    .select("role")
+    .eq("account_id", account.id)
+    .eq("user_id", userId)
+    .maybeSingle<{ role: string }>();
+  if (!target) return { error: "Member not found." };
+  if (target.role === "owner") return { error: "The workspace owner's role can't be changed here." };
+  const { error } = await supabase
+    .from("account_members")
+    .update({ role: nextRole })
+    .eq("account_id", account.id)
+    .eq("user_id", userId);
+  if (error) return { error: "Could not change the role." };
+  revalidatePath("/settings/team");
+  return { success: "Role updated." };
 }

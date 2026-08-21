@@ -1,0 +1,306 @@
+<title>Vantera — LinkedIn Restriction Risk (Day 4 carousel)</title>
+<style>
+  :root{
+    --ink:#0A1120; --card:#101A2E; --card-2:#16233D;
+    --line:rgba(255,255,255,.10); --line-2:rgba(255,255,255,.16);
+    --paper:#EAF1FF; --mute:#8494B3; --mute-2:#5E6E8F;
+    --brand:#1877F2; --brand-2:#3D93FF; --brand-glow:rgba(24,119,242,.35);
+    --danger:#FF5B67; --amber:#FFB23E; --good:#35D0A5;
+    --font-display:"Poppins","Segoe UI",system-ui,-apple-system,Roboto,sans-serif;
+    --font-mono:ui-monospace,"SF Mono","Cascadia Code","Roboto Mono",monospace;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;}
+  .page{
+    background:
+      radial-gradient(120% 80% at 50% -10%, rgba(24,119,242,.10), transparent 60%),
+      var(--ink);
+    min-height:100vh; color:var(--paper);
+    font-family:var(--font-display);
+    padding:40px 18px 72px;
+    display:flex; flex-direction:column; align-items:center; gap:30px;
+  }
+  /* ---- page chrome ---- */
+  .chrome{max-width:460px; width:100%; text-align:center;}
+  .chrome .kicker{font-family:var(--font-mono); font-size:11px; letter-spacing:.22em;
+    text-transform:uppercase; color:var(--brand-2); margin:0 0 10px;}
+  .chrome h1{font-size:22px; line-height:1.25; font-weight:700; margin:0 0 10px; text-wrap:balance;}
+  .chrome p{font-size:13px; line-height:1.6; color:var(--mute); margin:0;}
+  .chrome .tag{display:inline-block; margin-top:14px; font-family:var(--font-mono);
+    font-size:10.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--mute-2);
+    border:1px solid var(--line); border-radius:999px; padding:6px 12px;}
+
+  /* ---- the deck ---- */
+  .deck{display:flex; flex-direction:column; gap:26px; width:100%; align-items:center;}
+  .slide{
+    container-type:inline-size;
+    position:relative; width:min(452px,94vw); aspect-ratio:4/5;
+    border-radius:24px; overflow:hidden;
+    background:var(--card); border:1px solid var(--line);
+    box-shadow:0 24px 60px -28px rgba(0,0,0,.8), inset 0 1px 0 rgba(255,255,255,.04);
+    transition:transform .3s ease, box-shadow .3s ease;
+  }
+  @media (hover:hover){ .slide:hover{transform:translateY(-4px);
+    box-shadow:0 34px 70px -30px rgba(0,0,0,.85), inset 0 1px 0 rgba(255,255,255,.06);} }
+  /* faint scanline console texture */
+  .slide::after{content:""; position:absolute; inset:0; pointer-events:none;
+    background:repeating-linear-gradient(180deg, rgba(255,255,255,.014) 0 1px, transparent 1px 4px);
+    mix-blend-mode:overlay;}
+  .inner{position:relative; z-index:2; height:100%; padding:8.5cqw; display:flex; flex-direction:column;}
+
+  /* header row on every slide */
+  .top{display:flex; align-items:center; justify-content:space-between;}
+  .brand{display:flex; align-items:center; gap:2.2cqw; font-weight:700; font-size:4.2cqw; letter-spacing:-.01em;}
+  .brand .dot{width:3.4cqw; height:3.4cqw; border-radius:50%;
+    background:conic-gradient(from 220deg,var(--brand),var(--brand-2)); box-shadow:0 0 0 1px rgba(255,255,255,.14);}
+  .count{font-family:var(--font-mono); font-size:3.3cqw; letter-spacing:.12em; color:var(--mute);}
+  .count b{color:var(--paper); font-weight:600;}
+
+  .eyebrow{font-family:var(--font-mono); font-size:3.1cqw; letter-spacing:.24em;
+    text-transform:uppercase; color:var(--brand-2); margin:0;}
+
+  /* ghost index numeral */
+  .ghost{position:absolute; z-index:1; right:-2cqw; top:8cqw;
+    font-size:52cqw; line-height:.8; font-weight:800; letter-spacing:-.04em;
+    color:transparent; -webkit-text-stroke:.4cqw rgba(255,91,103,.16); user-select:none;}
+
+  /* severity meter */
+  .sev{display:flex; align-items:center; gap:2.4cqw; margin-top:1.5cqw;}
+  .sev .label{font-family:var(--font-mono); font-size:2.7cqw; letter-spacing:.2em;
+    text-transform:uppercase; color:var(--mute-2);}
+  .bars{display:flex; gap:1.2cqw;}
+  .bars i{width:6cqw; height:2.2cqw; border-radius:2px; background:rgba(255,255,255,.10);}
+  .bars i.on{background:var(--amber);}
+  .bars i.hot{background:var(--danger); box-shadow:0 0 10px -1px rgba(255,91,103,.7);}
+
+  .body-wrap{margin-top:auto;}
+  h2.sign{font-size:9.2cqw; line-height:1.02; font-weight:700; letter-spacing:-.02em;
+    margin:0 0 3.4cqw; text-wrap:balance;}
+  p.desc{font-size:4.1cqw; line-height:1.5; color:#C4D0E6; margin:0;}
+
+  .why{margin-top:5.5cqw; padding-top:4cqw; border-top:1px solid var(--line);
+    display:flex; gap:2.6cqw; align-items:flex-start;}
+  .why .flag{flex:none; width:2.6cqw; height:2.6cqw; border-radius:50%; margin-top:1.1cqw;
+    background:var(--danger); box-shadow:0 0 0 4px rgba(255,91,103,.14);}
+  .why .txt{font-size:3.3cqw; line-height:1.45; color:var(--mute);}
+  .why .txt b{display:block; font-family:var(--font-mono); font-size:2.7cqw; letter-spacing:.18em;
+    text-transform:uppercase; color:var(--danger); margin-bottom:1cqw; font-weight:600;}
+
+  /* ---- cover slide ---- */
+  .cover .inner{justify-content:space-between;}
+  .cover .lead{margin-top:9cqw;}
+  .cover .warn-badge{display:inline-flex; align-items:center; gap:2cqw; margin-bottom:6cqw;
+    font-family:var(--font-mono); font-size:3cqw; letter-spacing:.2em; text-transform:uppercase;
+    color:var(--danger); border:1px solid rgba(255,91,103,.4); border-radius:999px; padding:2.2cqw 3.6cqw;
+    background:rgba(255,91,103,.08);}
+  .warn-badge span{width:2.4cqw; height:2.4cqw; border-radius:50%; background:var(--danger);
+    box-shadow:0 0 12px 1px rgba(255,91,103,.8);}
+  .cover h2{font-size:11.5cqw; line-height:1.0; font-weight:800; letter-spacing:-.03em; margin:0; text-wrap:balance;}
+  .cover h2 em{font-style:normal; color:var(--danger);}
+  .cover .sub{font-size:4.1cqw; line-height:1.5; color:var(--mute); margin:5cqw 0 0;}
+  .swipe{display:flex; align-items:center; justify-content:space-between;}
+  .swipe .go{display:inline-flex; align-items:center; gap:2.4cqw; font-family:var(--font-mono);
+    font-size:3.3cqw; letter-spacing:.16em; text-transform:uppercase; color:var(--brand-2);}
+  .swipe .go .arrow{font-size:5cqw; line-height:1; animation:nudge 1.6s ease-in-out infinite;}
+  @keyframes nudge{0%,100%{transform:translateX(0)} 50%{transform:translateX(4px)}}
+  @media (prefers-reduced-motion:reduce){ .swipe .go .arrow{animation:none} }
+
+  /* ---- fix slide (the flip to safe) ---- */
+  .fix{background:
+      radial-gradient(130% 90% at 50% 0%, rgba(24,119,242,.22), transparent 62%), var(--card-2);
+    border-color:rgba(61,147,255,.28);}
+  .fix .ghost{-webkit-text-stroke:.4cqw rgba(24,119,242,.18);}
+  .fix h2.turn{font-size:8.6cqw; line-height:1.05; font-weight:700; letter-spacing:-.02em;
+    margin:5cqw 0 6cqw; text-wrap:balance;}
+  .fix h2.turn em{font-style:normal; color:var(--brand-2);}
+  .rules{display:flex; flex-direction:column; gap:3.6cqw; margin:0;}
+  .rule{display:flex; gap:3.2cqw; align-items:flex-start;}
+  .rule .tick{flex:none; width:6.4cqw; height:6.4cqw; border-radius:8px; display:grid; place-items:center;
+    background:rgba(24,119,242,.16); border:1px solid rgba(61,147,255,.4); color:var(--brand-2);
+    font-size:3.6cqw; font-weight:800;}
+  .rule .rt b{display:block; font-size:4.2cqw; font-weight:700; letter-spacing:-.01em;}
+  .rule .rt span{font-size:3.4cqw; line-height:1.4; color:var(--mute);}
+  .fix .close{margin-top:auto; padding-top:5cqw; border-top:1px solid var(--line);
+    font-size:4cqw; line-height:1.45; color:#C4D0E6;}
+  .fix .close b{color:var(--paper);}
+
+  /* ---- cta slide ---- */
+  .cta{background:
+      radial-gradient(120% 90% at 50% 120%, rgba(24,119,242,.30), transparent 60%),
+      var(--card-2);
+    border-color:rgba(61,147,255,.3);}
+  .cta .inner{justify-content:space-between;}
+  .cta h2{font-size:9.6cqw; line-height:1.04; font-weight:800; letter-spacing:-.02em; margin:8cqw 0 0; text-wrap:balance;}
+  .cta p{font-size:4cqw; line-height:1.55; color:#C4D0E6; margin:5cqw 0 0;}
+  .cta .foot{display:flex; flex-direction:column; gap:4cqw;}
+  .cta .pill{align-self:flex-start; display:inline-flex; align-items:center; gap:2.6cqw;
+    background:var(--brand); color:#fff; font-weight:700; font-size:4cqw; letter-spacing:-.01em;
+    padding:3.4cqw 5cqw; border-radius:999px; box-shadow:0 12px 30px -10px var(--brand-glow);}
+  .cta .pill .a{font-family:var(--font-mono); font-size:4cqw;}
+  .cta .sign-off{display:flex; align-items:center; justify-content:space-between;
+    font-family:var(--font-mono); font-size:3cqw; letter-spacing:.14em; text-transform:uppercase; color:var(--mute);}
+</style>
+
+<div class="page">
+  <div class="chrome">
+    <p class="kicker">Day 4 · Carousel · Ready to post</p>
+    <h1>5 signs your LinkedIn tool is about to get you restricted</h1>
+    <p>Screenshot each card (they're 4:5, LinkedIn's best carousel ratio) and upload as a document post, or hand this to a designer as the exact spec. Swap in Poppins on export for the brand face.</p>
+    <span class="tag">8 slides · single-theme by design</span>
+  </div>
+
+  <div class="deck">
+
+    <!-- 1 · COVER -->
+    <section class="slide cover" aria-label="Slide 1, cover">
+      <div class="inner">
+        <div class="top">
+          <div class="brand"><span class="dot"></span>Vantera</div>
+          <div class="count"><b>01</b> / 08</div>
+        </div>
+        <div class="lead">
+          <div class="warn-badge"><span></span>Restriction risk</div>
+          <h2>5 signs your LinkedIn tool is about to get you <em>restricted</em></h2>
+          <p class="sub">Before your next campaign, run this check.</p>
+        </div>
+        <div class="swipe">
+          <div class="go">Swipe <span class="arrow">→</span></div>
+          <div class="count">field guide</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2 · SIGN 01 -->
+    <section class="slide" aria-label="Slide 2, sign one">
+      <div class="ghost">1</div>
+      <div class="inner">
+        <div class="top">
+          <div class="brand"><span class="dot"></span>Vantera</div>
+          <div class="count"><b>02</b> / 08</div>
+        </div>
+        <div class="sev"><span class="label">Restriction risk</span>
+          <div class="bars"><i class="on"></i><i></i><i></i><i></i><i></i></div></div>
+        <div class="body-wrap">
+          <h2 class="sign">It brags about volume</h2>
+          <p class="desc">"500 invites a week" is a selling point for the tool and a red flag for LinkedIn. High volume is the exact pattern that gets accounts flagged.</p>
+          <div class="why"><span class="flag"></span>
+            <div class="txt"><b>Why it flags you</b>Send velocity is the first thing LinkedIn watches for.</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3 · SIGN 02 -->
+    <section class="slide" aria-label="Slide 3, sign two">
+      <div class="ghost">2</div>
+      <div class="inner">
+        <div class="top">
+          <div class="brand"><span class="dot"></span>Vantera</div>
+          <div class="count"><b>03</b> / 08</div>
+        </div>
+        <div class="sev"><span class="label">Restriction risk</span>
+          <div class="bars"><i class="on"></i><i class="on"></i><i></i><i></i><i></i></div></div>
+        <div class="body-wrap">
+          <h2 class="sign">One message, everyone</h2>
+          <p class="desc">If the same template hits 300 people, reply rates crater and spam reports climb. Both are signals LinkedIn reads as automation.</p>
+          <div class="why"><span class="flag"></span>
+            <div class="txt"><b>Why it flags you</b>Identical text at scale looks like a bot, because it is one.</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4 · SIGN 03 -->
+    <section class="slide" aria-label="Slide 4, sign three">
+      <div class="ghost">3</div>
+      <div class="inner">
+        <div class="top">
+          <div class="brand"><span class="dot"></span>Vantera</div>
+          <div class="count"><b>04</b> / 08</div>
+        </div>
+        <div class="sev"><span class="label">Restriction risk</span>
+          <div class="bars"><i class="on"></i><i class="on"></i><i class="hot"></i><i></i><i></i></div></div>
+        <div class="body-wrap">
+          <h2 class="sign">No ramp, no warm-up</h2>
+          <p class="desc">A new account that starts blasting on day one looks nothing like a real person. Trust is built slowly, then spent slowly.</p>
+          <div class="why"><span class="flag"></span>
+            <div class="txt"><b>Why it flags you</b>A cold account at full volume is the classic restriction trigger.</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5 · SIGN 04 -->
+    <section class="slide" aria-label="Slide 5, sign four">
+      <div class="ghost">4</div>
+      <div class="inner">
+        <div class="top">
+          <div class="brand"><span class="dot"></span>Vantera</div>
+          <div class="count"><b>05</b> / 08</div>
+        </div>
+        <div class="sev"><span class="label">Restriction risk</span>
+          <div class="bars"><i class="on"></i><i class="on"></i><i class="hot"></i><i class="hot"></i><i></i></div></div>
+        <div class="body-wrap">
+          <h2 class="sign">Robotic timing</h2>
+          <p class="desc">Perfectly even intervals, all day, never sleeping. Humans don't send like a metronome, and LinkedIn knows the difference.</p>
+          <div class="why"><span class="flag"></span>
+            <div class="txt"><b>Why it flags you</b>An inhuman rhythm is a fingerprint.</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 6 · SIGN 05 -->
+    <section class="slide" aria-label="Slide 6, sign five">
+      <div class="ghost">5</div>
+      <div class="inner">
+        <div class="top">
+          <div class="brand"><span class="dot"></span>Vantera</div>
+          <div class="count"><b>06</b> / 08</div>
+        </div>
+        <div class="sev"><span class="label">Restriction risk</span>
+          <div class="bars"><i class="on"></i><i class="on"></i><i class="hot"></i><i class="hot"></i><i class="hot"></i></div></div>
+        <div class="body-wrap">
+          <h2 class="sign">You can't see what it sends</h2>
+          <p class="desc">If a tool sends before you approve, you're trusting a machine with your name and your network. One bad message is all it takes.</p>
+          <div class="why"><span class="flag"></span>
+            <div class="txt"><b>Why it flags you</b>No approval step means no brakes.</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 7 · THE FIX -->
+    <section class="slide fix" aria-label="Slide 7, the fix">
+      <div class="ghost">✓</div>
+      <div class="inner">
+        <div class="top">
+          <div class="brand"><span class="dot"></span>Vantera</div>
+          <div class="count"><b>07</b> / 08</div>
+        </div>
+        <p class="eyebrow">The fix</p>
+        <h2 class="turn">It's not a better tool. It's a <em>different rule.</em></h2>
+        <div class="rules">
+          <div class="rule"><div class="tick">1</div><div class="rt"><b>Qualify first</b><span>Contact fewer, better people. Skip the rest.</span></div></div>
+          <div class="rule"><div class="tick">2</div><div class="rt"><b>Cap the sends</b><span>Stay inside safe limits, always, even when you could push.</span></div></div>
+          <div class="rule"><div class="tick">3</div><div class="rt"><b>Approve every message</b><span>Nothing goes out that isn't yours.</span></div></div>
+        </div>
+        <p class="close"><b>Safety isn't the tradeoff for growth.</b> It's how the growth lasts.</p>
+      </div>
+    </section>
+
+    <!-- 8 · CTA -->
+    <section class="slide cta" aria-label="Slide 8, call to action">
+      <div class="inner">
+        <div class="top">
+          <div class="brand"><span class="dot"></span>Vantera</div>
+          <div class="count"><b>08</b> / 08</div>
+        </div>
+        <div>
+          <h2>Save this before your next campaign.</h2>
+          <p>I build outreach that qualifies before it contacts and never crosses a safe limit. If your tool trips two or more of these, it's worth a look.</p>
+        </div>
+        <div class="foot">
+          <div class="pill">Follow, or DM me <span class="a">"safe"</span></div>
+          <div class="sign-off"><span>Vantera</span><span>LinkedIn, run right</span></div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</div>

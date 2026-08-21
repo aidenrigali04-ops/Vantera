@@ -11,6 +11,10 @@ export type ScoutFormValues = {
 export type CopyFormValues = {
   name: string;
   cta: string;
+  /** optional meeting-booking URL the agent may offer once a prospect shows interest */
+  bookingUrl: string | null;
+  /** optional destination page (site/portfolio/product) for prospects who'd rather look than book */
+  websiteUrl: string | null;
   links: string[];
   channels: { linkedin: boolean };
   sendMode: "review" | "automatic";
@@ -66,6 +70,18 @@ export function parseCopyForm(form: FormData): Result<CopyFormValues> {
     return { ok: false, error: "Describe your call to action (3–200 characters)." };
   }
 
+  // Interest destinations (both optional): the agent offers the one matching what the
+  // prospect wants — booking when they want to talk, the website when they'd rather look.
+  // Traffic-first businesses can run on the website link alone (0044).
+  const bookingUrl = String(form.get("bookingUrl") ?? "").trim();
+  if (bookingUrl && !/^https?:\/\/\S+$/.test(bookingUrl)) {
+    return { ok: false, error: "The booking link must start with http(s)://" };
+  }
+  const websiteUrl = String(form.get("websiteUrl") ?? "").trim();
+  if (websiteUrl && !/^https?:\/\/\S+$/.test(websiteUrl)) {
+    return { ok: false, error: "The website link must start with http(s)://" };
+  }
+
   const links = String(form.get("links") ?? "")
     .split("\n")
     .map((l) => l.trim())
@@ -86,7 +102,10 @@ export function parseCopyForm(form: FormData): Result<CopyFormValues> {
     return { ok: false, error: "Pick how this agent sends." };
   }
 
-  return { ok: true, values: { name, cta, links, channels, sendMode } };
+  return {
+    ok: true,
+    values: { name, cta, bookingUrl: bookingUrl || null, websiteUrl: websiteUrl || null, links, channels, sendMode },
+  };
 }
 
 // ─── Intent agent validation (Phase 13) ───────────────────────────────────────

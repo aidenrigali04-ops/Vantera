@@ -36,7 +36,18 @@ export const CONNECTOR_REGISTRY: Record<CrmProvider, ConnectorMeta> = {
     kind: "crm",
     label: "HubSpot",
     blurb: "Creates the contact and a won deal in your HubSpot pipeline on close.",
-    oauthScopes: ["oauth", "crm.objects.contacts.write", "crm.objects.deals.write"],
+    // Requested scopes must EXACTLY match the app's requiredScopes (src/app/app-hsmeta.json)
+    // or HubSpot rejects authorization with "error validating the app authorization".
+    // contacts.read backs the dedupe/search + testConnection calls. There is NO granular
+    // notes scope in HubSpot OAuth — contact-associated notes (activity sync + the journey
+    // note) are covered by crm.objects.contacts.write. Connections authorized before
+    // contacts.read was requested need a one-click reconnect.
+    oauthScopes: [
+      "oauth",
+      "crm.objects.contacts.read",
+      "crm.objects.contacts.write",
+      "crm.objects.deals.write",
+    ],
     authorizeEndpoint: "https://app.hubspot.com/oauth/authorize",
     tokenEndpoint: "https://api.hubapi.com/oauth/v1/token",
     apiBase: "https://api.hubapi.com",
@@ -46,6 +57,7 @@ export const CONNECTOR_REGISTRY: Record<CrmProvider, ConnectorMeta> = {
       { key: "pipelineId", label: "Deal pipeline", required: true },
       { key: "stageId", label: "Won stage", required: true },
     ],
+    supportsActivitySync: true,
   },
   salesforce: {
     provider: "salesforce",
@@ -154,6 +166,13 @@ export function getConnector(provider: CrmProvider, creds?: OAuthCreds): CrmConn
     refreshToken: (rt) => refreshAccessToken(meta, creds ?? envCreds(provider), rt),
     testConnection: (ctx) => adapter.testConnection(ctx),
     pushClosedDeal: (ctx, deal) => adapter.pushClosedDeal(ctx, deal),
+    // activity-sync pair — present only when the adapter implements it (HubSpot today)
+    ensureContact: adapter.ensureContact
+      ? (ctx, contact) => adapter.ensureContact!(ctx, contact)
+      : undefined,
+    logActivity: adapter.logActivity
+      ? (ctx, input) => adapter.logActivity!(ctx, input)
+      : undefined,
   };
 }
 

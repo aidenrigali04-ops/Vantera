@@ -5,12 +5,16 @@ import { useState, useSyncExternalStore } from "react";
 import { motion, MotionConfig } from "framer-motion";
 import {
   ArrowRight,
+  Check,
   CheckCircle2,
   Circle,
+  Crosshair,
+  FlaskConical,
   Inbox,
+  MessageSquare,
   PartyPopper,
   Snowflake,
-  Sparkles,
+  Star,
   TrendingUp,
   UserPlus,
   Workflow,
@@ -22,6 +26,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { AnimatedProgress } from "@/components/ui/animated-progress";
 import { Reveal, RevealItem, Eyebrow, PANEL_SURFACE } from "@/components/ui/panel";
+import { KpiTile } from "@/components/ui/kpi";
 import { cn } from "@/lib/utils";
 import { RevenueChart } from "./revenue-chart";
 import { ProspectPanel, type Prospect } from "./prospect-panel";
@@ -77,6 +82,8 @@ export interface DashboardViewProps {
   revenue: RevenueSnapshot;
   convertedClients: number;
   pipelineLeads: number;
+  avgDealValueCents: number | null;
+  pendingDraftLeadIds: string[];
   series: RevenuePoint[];
   pipeline: PipelineViewModel;
   cold: number;
@@ -85,11 +92,44 @@ export interface DashboardViewProps {
   conversionWin: { id: string; leadName: string } | null;
   replyWin: { id: string; leadName: string } | null;
   prospects: Prospect[];
+  /** interested replies still WAITING on the user (answered ones are filtered server-side) */
   recentReplies: ReplyRow[];
-  interested: number;
+  repliesWaiting: number;
   channels: { liStatus: string | null };
   week: { sends: number; li: number; replies: number };
   attribution: SignalAttribution[];
+  /** Vera's learning log — the self-optimizing loop's visible heartbeat, all real data */
+  learning: LearningProps;
+  /** L1: a live Outreach agent has no booking link — interested buyers have nowhere to book */
+  needsBookingUrl: boolean;
+  /** matched starter plays — fill the waiting states with proven competence, honestly labeled */
+  plays: { slug: string; name: string; description: string; sourceLabel: string }[];
+  /** R2 early-days regime: real firsts, so a $0 chart under a $45k goal never reads as failure */
+  milestones: Milestones;
+}
+
+export interface Milestones {
+  sent: boolean;
+  replied: boolean;
+  met: boolean;
+  closed: boolean;
+}
+
+export interface LearningProps {
+  playbookVersion: number | null;
+  testing: {
+    label: string;
+    stageLabel: string;
+    startedAgo: string;
+    enrolled: number;
+    targetEnrolled: number;
+  } | null;
+  adopted: {
+    label: string;
+    whenAgo: string;
+    receipts: { sent: number; interested: number } | null;
+  } | null;
+  focus: { label: string; deep: number; n: number } | null;
 }
 
 export function DashboardView(props: DashboardViewProps) {
@@ -98,20 +138,19 @@ export function DashboardView(props: DashboardViewProps) {
 
   return (
     <MotionConfig reducedMotion="user">
-    <div className="mx-auto flex max-w-5xl flex-col gap-6">
+    <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-6">
       {/* Header — eyebrow + display heading in the landing idiom */}
       <motion.header
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
-        className="flex flex-wrap items-end justify-between gap-3"
+        className="flex flex-wrap items-end justify-between gap-3 border-b border-[var(--hairline)] pb-5"
       >
         <div>
-          <Eyebrow>Command center</Eyebrow>
-          <h1 className="font-heading mt-3 text-3xl font-semibold tracking-tight text-foreground">
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
             Good to see you, {firstName}
           </h1>
-          <p className="mt-2 text-sm text-muted-foreground">
+          <p className="mt-1.5 text-sm text-muted-foreground">
             Targeting <span className="font-medium text-foreground">{icp}</span> in{" "}
             <span className="font-medium text-foreground">{industry}</span>
             {goal && (
@@ -140,12 +179,16 @@ export function DashboardView(props: DashboardViewProps) {
           scoutDeployed={props.scoutDeployed}
           goal={goal}
           channels={props.channels}
+          plays={props.plays}
+          icp={icp}
         />
       ) : isWorkingEmpty ? (
         <FirstRunInProgress
           scoutNextRunLabel={props.scoutNextRunLabel}
           goal={goal}
           channels={props.channels}
+          plays={props.plays}
+          icp={icp}
         />
       ) : (
         <WorkingDashboard {...props} />
@@ -160,6 +203,8 @@ function WorkingDashboard(props: DashboardViewProps) {
     drafts,
     liveAgentsCount,
     scoutNextRunLabel,
+    scoutLastRunLabel,
+    scoutLive,
     revenue,
     convertedClients,
     pipelineLeads,
@@ -169,12 +214,29 @@ function WorkingDashboard(props: DashboardViewProps) {
     cold,
     revenuePace,
     prospects,
+    avgDealValueCents,
+    pendingDraftLeadIds,
     attribution,
+    agents,
+    week,
+    recentReplies,
+    repliesWaiting,
+    milestones,
   } = props;
 
   return (
     <Reveal className="flex flex-col gap-6">
-      {/* 1 — Needs you: the single action surface (drafts to review + warm leads cooling). */}
+      {/* Scan — the four numbers that answer "are we winning?": closed + pipeline value, weekly
+          replies, and what's waiting on you. Each tile drills into the surface that explains it. */}
+      <KpiStrip
+        revenue={revenue}
+        convertedClients={convertedClients}
+        pipelineLeads={pipelineLeads}
+        repliesThisWeek={week.replies}
+        drafts={drafts}
+      />
+
+      {/* Act — the single action surface (drafts to review + warm leads cooling). */}
       <NeedsYou
         drafts={drafts}
         cold={cold}
@@ -182,7 +244,7 @@ function WorkingDashboard(props: DashboardViewProps) {
         scoutNextRunLabel={scoutNextRunLabel}
       />
 
-      {/* 2 — Revenue vs goal (the value proof) with the wins→signal attribution folded into it. */}
+      {/* Prove — revenue vs goal, the value proof, at the full width a chart wants. */}
       <RevenueCard
         revenue={revenue}
         convertedClients={convertedClients}
@@ -192,11 +254,291 @@ function WorkingDashboard(props: DashboardViewProps) {
         series={series}
         paceLabel={revenuePace}
         attribution={attribution}
+        milestones={milestones}
       />
 
-      {/* 3 — Hot leads: the anticipation surface, each row led by its real why-now signal. */}
-      <HotLeads prospects={prospects} />
+      {/* Explore — hot leads: the top prospect spotlighted with its why-now + next action. */}
+      <HotLeads
+        prospects={prospects}
+        pendingDraftLeadIds={pendingDraftLeadIds}
+        avgDealValueCents={avgDealValueCents}
+        goalCents={goalCents}
+      />
+
+      {/* L1: the conversion-critical config gap — interested buyers with nowhere to book. */}
+      {props.needsBookingUrl && (
+        <RevealItem className={cn(PANEL_SURFACE, "flex flex-wrap items-center justify-between gap-3 border-amber-500/30 p-5")}>
+          <div className="min-w-0">
+            <Eyebrow>Action needed</Eyebrow>
+            <p className="mt-2 text-sm text-foreground">
+              Interested buyers have nowhere to book you.{" "}
+              <span className="text-muted-foreground">
+                Add your booking link and Vera offers it the moment a prospect shows interest —
+                it&apos;s how conversations become meetings.
+              </span>
+            </p>
+          </div>
+          <Button asChild size="sm" className="shrink-0">
+            {/* R6: the link now lives in Settings (one source of truth with the agent config). */}
+            <Link href="/settings#booking-link">
+              Add booking link <ArrowRight className="size-4" />
+            </Link>
+          </Button>
+        </RevealItem>
+      )}
+
+      {/* Vera's learning log — the self-optimizing loop's visible heartbeat, one glance. */}
+      <LearningLog learning={props.learning} />
+
+      {/* Reassure — the agent heartbeat + the warm replies that reward the daily check-in. Paired
+          in a balanced two-up row so neither one's height drags a gap into the primary content. */}
+      <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
+        <AgentsPanel agents={agents} scoutLive={scoutLive} scoutLastRunLabel={scoutLastRunLabel} />
+        <WarmReplies recentReplies={recentReplies} repliesWaiting={repliesWaiting} />
+      </div>
     </Reveal>
+  );
+}
+
+/**
+ * Vera's learning log — the self-optimizing loop made visible (retention brief: variable
+ * reward + goal-gradient against the silent-wait cliff). Every row is a real, timestamped
+ * fact: the live test with enrollment progress toward its decision sample, the latest
+ * adoption with its real receipts, and the buyer segment being prioritized. Hidden only
+ * when the loop has nothing yet (pre-onboarding).
+ */
+function LearningLog({ learning }: { learning: LearningProps }) {
+  const { playbookVersion, testing, adopted, focus } = learning;
+  if (!testing && !adopted && !focus) return null;
+  const pct = testing
+    ? Math.min(100, Math.round((testing.enrolled / Math.max(1, testing.targetEnrolled)) * 100))
+    : 0;
+  return (
+    <RevealItem className={cn(PANEL_SURFACE, "p-5")} data-copilot="dashboard-whats-working">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          <Eyebrow>Vera is learning</Eyebrow>
+          {playbookVersion !== null && (
+            <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">
+              Playbook v{playbookVersion}
+            </Badge>
+          )}
+        </div>
+        <Button asChild variant="outline" size="sm" className="shrink-0">
+          <Link href="/dashboard?view=analytics">
+            See the full loop <ArrowRight className="size-4" />
+          </Link>
+        </Button>
+      </div>
+
+      <ul className="mt-4 flex flex-col gap-3">
+        {testing && (
+          <li className="flex items-start gap-3">
+            <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-full bg-[var(--cyan-tint)] text-[var(--cyan-strong)]">
+              <FlaskConical className="size-3.5" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm text-foreground">
+                Testing <span className="font-medium">{testing.label}</span>
+                <span className="text-muted-foreground"> — measured on {testing.stageLabel}</span>
+              </p>
+              <div className="mt-1.5 flex items-center gap-3">
+                <span className="h-1.5 w-40 overflow-hidden rounded-full bg-foreground/[0.08]">
+                  <span
+                    className="block h-full rounded-full bg-[var(--cyan-strong)] transition-[width]"
+                    style={{ width: `${pct}%` }}
+                  />
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  {testing.enrolled} of ~{testing.targetEnrolled} prospects enrolled · decides on
+                  real outcomes · started {testing.startedAgo}
+                </span>
+              </div>
+            </div>
+          </li>
+        )}
+
+        {adopted && (
+          <li className="flex items-start gap-3">
+            <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-full bg-[var(--positive)]/12 text-[var(--positive)]">
+              <CheckCircle2 className="size-3.5" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm text-foreground">
+                Adopted <span className="font-medium">{adopted.label}</span>
+                <span className="text-muted-foreground">
+                  {" "}
+                  — won its test {adopted.whenAgo}, now your default
+                </span>
+              </p>
+              {adopted.receipts && (
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Since the change: {adopted.receipts.sent}{" "}
+                  {adopted.receipts.sent === 1 ? "message" : "messages"} sent
+                  {adopted.receipts.interested > 0 && (
+                    <> · {adopted.receipts.interested} interested</>
+                  )}
+                </p>
+              )}
+            </div>
+          </li>
+        )}
+
+        {focus && (
+          <li className="flex items-start gap-3">
+            <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-full bg-[var(--cyan-tint)] text-[var(--cyan-strong)]">
+              <Crosshair className="size-3.5" />
+            </span>
+            <p className="min-w-0 flex-1 text-sm text-foreground">
+              Prioritizing <span className="font-medium">{focus.label}</span>
+              <span className="text-muted-foreground">
+                {" "}
+                — {focus.deep} of {focus.n} went interested or booked, your strongest segment
+              </span>
+            </p>
+          </li>
+        )}
+      </ul>
+    </RevealItem>
+  );
+}
+
+/** The proven plays Vera runs, shown while the first results are still landing — competence in
+ *  the waiting room instead of silence. Honest source labels, never network claims (Stage 0). */
+function ProvenPlaysPanel({
+  plays,
+  icp,
+}: {
+  plays: DashboardViewProps["plays"];
+  icp: string | null;
+}) {
+  if (plays.length === 0) return null;
+  return (
+    <RevealItem className={cn(PANEL_SURFACE, "p-5")} data-copilot="dashboard-proven-plays">
+      <Eyebrow>Vera&apos;s plays</Eyebrow>
+      <p className="mt-2 text-sm text-muted-foreground">
+        While the first results land, here&apos;s what Vera is running
+        {icp ? (
+          <>
+            {" "}
+            for <span className="font-medium text-foreground">{icp}</span>
+          </>
+        ) : null}
+        :
+      </p>
+      <ul className="mt-3 flex flex-col gap-2.5">
+        {plays.map((p) => (
+          <li key={p.slug} className="rounded-xl border border-[var(--hairline)] p-3">
+            <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+              <span className="text-sm font-medium text-foreground">{p.name}</span>
+              <span className="text-[11px] text-muted-foreground/80">{p.sourceLabel}</span>
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">{p.description}</p>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-3 border-t border-border/60 pt-3 text-xs text-muted-foreground">
+        Vera tests improvements against these on real conversations and keeps what wins — you
+        approve every send.
+      </p>
+    </RevealItem>
+  );
+}
+
+/**
+ * Top-of-page KPI strip — four mono metrics for an at-a-glance read of the business. Color is
+ * placed, not sprinkled: a cyan dot marks the hero (closed) and the value turns cyan only when a
+ * tile needs action (drafts waiting); every other number stays neutral ink so color carries meaning.
+ */
+function KpiStrip({
+  revenue,
+  convertedClients,
+  pipelineLeads,
+  repliesThisWeek,
+  drafts,
+}: {
+  revenue: RevenueSnapshot;
+  convertedClients: number;
+  pipelineLeads: number;
+  repliesThisWeek: number;
+  drafts: number;
+}) {
+  const closed = revenue.hasValue ? usd.format(revenue.closedCents / 100) : String(convertedClients);
+  const closedSub = revenue.hasValue
+    ? `${convertedClients} ${convertedClients === 1 ? "client" : "clients"} won`
+    : convertedClients === 1
+      ? "client won"
+      : "clients won";
+  const pipeline = revenue.hasValue ? usd.format(revenue.expectedCents / 100) : String(pipelineLeads);
+  const pipelineSub = `${pipelineLeads} ${pipelineLeads === 1 ? "lead" : "leads"} in motion`;
+
+  return (
+    <RevealItem className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <KpiTile href="/dashboard?view=pipeline" label="Closed" value={closed} sub={closedSub} hero />
+      <KpiTile href="/dashboard?view=pipeline" label="In pipeline" value={pipeline} sub={pipelineSub} />
+      {/* R4: "Interested replies" — the KPI counts every interested reply in 7 days, which is
+          a different number than the needs-you panel's "waiting on you". Same-name tiles with
+          different denominators read as the dashboard contradicting itself. */}
+      <KpiTile href="/leads?tab=replied" label="Interested replies" value={String(repliesThisWeek)} sub="this week" />
+      <KpiTile
+        href="/review"
+        label="To review"
+        value={String(drafts)}
+        sub={drafts > 0 ? "awaiting you" : "all clear"}
+        actionable={drafts > 0}
+      />
+    </RevealItem>
+  );
+}
+
+/** R2: the early-days revenue framing — the four real firsts on the way to the goal.
+ *  Every boolean comes from the account's own activity; nothing is invented. */
+function MilestoneLadder({ milestones, goal }: { milestones: Milestones; goal: string | null }) {
+  const steps: { label: string; done: boolean }[] = [
+    { label: "First message sent", done: milestones.sent },
+    { label: "First warm reply", done: milestones.replied },
+    { label: "First meeting booked", done: milestones.met },
+    { label: "First client closed", done: milestones.closed },
+  ];
+  const nextIdx = steps.findIndex((s) => !s.done);
+  return (
+    <div className="mt-3 rounded-lg border border-border/60 p-4">
+      <p className="text-xs font-medium text-foreground">
+        {goal ? `The path to ${goal}/mo starts with four firsts.` : "Four firsts on the way to revenue."}
+      </p>
+      <ul className="mt-3 grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
+        {steps.map((s, i) => (
+          <li key={s.label} className="flex items-center gap-2 text-xs">
+            <span
+              className={cn(
+                "grid size-4 shrink-0 place-items-center rounded-full",
+                s.done
+                  ? "bg-[var(--positive)] text-white"
+                  : "ring-1 ring-inset ring-border text-transparent"
+              )}
+              aria-hidden
+            >
+              <Check className="size-3" strokeWidth={3} />
+            </span>
+            <span
+              className={cn(
+                s.done
+                  ? "text-foreground"
+                  : i === nextIdx
+                    ? "font-medium text-foreground"
+                    : "text-muted-foreground"
+              )}
+            >
+              {s.label}
+              {i === nextIdx && <span className="ml-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--cyan-strong)]">next</span>}
+            </span>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-2.5 text-xs text-muted-foreground">
+        The goal chart takes over as pipeline builds — every step here is your own real activity.
+      </p>
+    </div>
   );
 }
 
@@ -212,7 +554,7 @@ function WinsAttributionLine({ attribution }: { attribution: SignalAttribution[]
       href="/dashboard?view=analytics"
       className="group flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
     >
-      <span className="flex items-center gap-1.5 font-mono uppercase tracking-[0.14em] text-foreground/70">
+      <span className="flex items-center gap-1.5 font-data uppercase tracking-[0.14em] text-foreground/70">
         <Zap className="size-3.5" aria-hidden /> Wins from
       </span>
       {top.map((row, i) => (
@@ -286,7 +628,7 @@ function NeedsYou({
 }) {
   const hasWork = drafts > 0 || cold > 0;
   return (
-    <RevealItem className={cn(PANEL_SURFACE, "p-5", hasWork && "dark:bg-white/[0.06]")}>
+    <RevealItem className={cn(PANEL_SURFACE, "p-5", hasWork && "border-[var(--cyan-line)] bg-[var(--cyan-tint)]/40")}>
       <Eyebrow>Needs you</Eyebrow>
       {hasWork ? (
         <div className="mt-4 flex flex-col gap-4">
@@ -331,8 +673,19 @@ function NeedsYou({
   );
 }
 
-/** Hot leads — the anticipation surface; each row leads with its real "why now" buying signal. */
-function HotLeads({ prospects }: { prospects: Prospect[] }) {
+/** Hot leads — the anticipation surface: the top prospect spotlighted with its "why now"
+ *  buying signal, value framing, and next action; the rest as a scannable queue. */
+function HotLeads({
+  prospects,
+  pendingDraftLeadIds,
+  avgDealValueCents,
+  goalCents,
+}: {
+  prospects: Prospect[];
+  pendingDraftLeadIds: string[];
+  avgDealValueCents: number | null;
+  goalCents: number | null;
+}) {
   return (
     <RevealItem className={cn(PANEL_SURFACE, "p-5")}>
       <div className="flex items-center justify-between gap-3">
@@ -344,7 +697,12 @@ function HotLeads({ prospects }: { prospects: Prospect[] }) {
         </Button>
       </div>
       <div className="mt-4">
-        <ProspectPanel prospects={prospects} />
+        <ProspectPanel
+          prospects={prospects}
+          pendingDraftLeadIds={pendingDraftLeadIds}
+          avgDealValueCents={avgDealValueCents}
+          goalCents={goalCents}
+        />
       </div>
     </RevealItem>
   );
@@ -371,15 +729,13 @@ function AgentsPanel({
             <div className="flex items-center gap-2">
               <span
                 className={`size-2 rounded-full ${
-                  a.status === "live"
-                    ? "animate-pulse bg-[var(--cyan)] shadow-[0_0_8px_rgba(48,207,255,0.9)]"
-                    : "bg-muted-foreground/40"
+                  a.status === "live" ? "bg-[var(--fb)]" : "bg-muted-foreground/40"
                 }`}
                 aria-hidden
               />
               <span className="text-sm font-medium">{a.name}</span>
               <Badge variant="secondary" className="capitalize">
-                {a.kind === "scout" ? "Prospect" : "Outreach"}
+                {a.kind === "scout" ? "Prospect" : a.kind === "intent" ? "Intent" : "Outreach"}
               </Badge>
             </div>
             <span className="text-xs text-muted-foreground">
@@ -407,56 +763,34 @@ function AgentsPanel({
   );
 }
 
-/** LinkedIn connect nudge — rendered only while LinkedIn isn't connected (the activation gate). */
-function ChannelsPanel({ channels }: { channels: DashboardViewProps["channels"] }) {
-  return (
-    <RevealItem className={cn(PANEL_SURFACE, "flex flex-col gap-3 p-5")}>
-      <Eyebrow>Finish setup</Eyebrow>
-      <ChannelRow
-        icon={<UserPlus className="size-4" />}
-        label="LinkedIn"
-        ready={channels.liStatus === "active"}
-        detail={
-          channels.liStatus === "active"
-            ? "Connected"
-            : channels.liStatus === "restricted"
-              ? "Restricted — reconnect"
-              : channels.liStatus
-                ? "Connecting"
-                : "Not connected"
-        }
-      />
-      <Button asChild variant="ghost" size="sm" className="-mx-2 mt-1 justify-start">
-        <Link href="/settings/channels">
-          Connect LinkedIn <ArrowRight className="size-4" />
-        </Link>
-      </Button>
-    </RevealItem>
-  );
-}
-
-
 /** Warm replies — the variable reward that anchors the daily habit loop. */
+/** Interested replies WAITING ON YOU — answered ones are filtered server-side, so this list
+ *  and its badge always match real activity (a handled reply disappears immediately). */
 function WarmReplies({
   recentReplies,
-  interested,
+  repliesWaiting,
 }: {
   recentReplies: ReplyRow[];
-  interested: number;
+  repliesWaiting: number;
 }) {
   return (
     <RevealItem className={cn(PANEL_SURFACE, "p-5")}>
       <div className="flex items-center justify-between gap-2">
-        <Eyebrow>Warm replies</Eyebrow>
-        {interested > 0 && <Badge variant="secondary">{interested}</Badge>}
+        <div className="flex items-center gap-2">
+          <Eyebrow>Warm replies</Eyebrow>
+          {repliesWaiting > 0 && (
+            <span className="text-[11px] text-muted-foreground">waiting on you</span>
+          )}
+        </div>
+        {repliesWaiting > 0 && <Badge variant="secondary">{repliesWaiting}</Badge>}
       </div>
       <div className="mt-4">
         {!recentReplies || recentReplies.length === 0 ? (
           <div className="flex flex-col items-center gap-2 py-6 text-center">
-            <Sparkles className="size-6 text-muted-foreground" />
+            <MessageSquare className="size-6 text-muted-foreground" />
             <p className="max-w-xs text-sm text-muted-foreground">
-              Interested replies show up here the moment they land. This is the number that matters
-              most.
+              You&apos;re all caught up — interested replies land here the moment they arrive,
+              and disappear once you&apos;ve answered.
             </p>
           </div>
         ) : (
@@ -510,34 +844,6 @@ function WarmReplies({
   );
 }
 
-function ChannelRow({
-  icon,
-  label,
-  detail,
-  ready,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  detail: string;
-  ready: boolean;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-2">
-      <span className="flex items-center gap-2 text-sm font-medium">
-        <span className="text-muted-foreground">{icon}</span>
-        {label}
-      </span>
-      <span className="flex items-center gap-2 text-xs text-muted-foreground">
-        {detail}
-        <span
-          className={`size-2 rounded-full ${ready ? "bg-emerald-400" : "bg-muted-foreground/40"}`}
-          aria-hidden
-        />
-      </span>
-    </div>
-  );
-}
-
 function RevenueCard({
   revenue,
   convertedClients,
@@ -547,6 +853,7 @@ function RevenueCard({
   series,
   paceLabel,
   attribution,
+  milestones,
 }: {
   revenue: RevenueSnapshot;
   convertedClients: number;
@@ -556,13 +863,19 @@ function RevenueCard({
   series: RevenuePoint[];
   paceLabel: string | null;
   attribution: SignalAttribution[];
+  milestones: Milestones;
 }) {
   const projectedTotalCents = revenue.closedCents + revenue.expectedCents;
+  // R2 early-days regime: nothing closed and pipeline under 5% of goal — a flat $0 line
+  // under a distant dashed goal reads as failure during exactly the weeks the surface must
+  // sustain belief. Same truth, staged as the real firsts instead.
+  const earlyDays =
+    revenue.closedCents === 0 && goalCents !== null && projectedTotalCents < goalCents * 0.05;
   return (
     <RevealItem className={cn(PANEL_SURFACE, "p-5")} data-copilot="dashboard-revenue">
       <div className="flex items-center justify-between gap-2">
         <Eyebrow>Revenue</Eyebrow>
-        <span className="flex items-center gap-1 font-mono text-[11px] uppercase tracking-wide text-muted-foreground">
+        <span className="flex items-center gap-1 font-data text-[11px] uppercase tracking-wide text-muted-foreground">
           <TrendingUp className="size-3.5" /> {goal ? `goal ${goal}/mo` : "vs goal"}
         </span>
       </div>
@@ -575,36 +888,43 @@ function RevenueCard({
                   <span className="size-2 rounded-full bg-foreground" /> Closed ·{" "}
                   {convertedClients} {convertedClients === 1 ? "client" : "clients"}
                 </span>
-                <span className="font-mono text-2xl font-semibold tabular-nums">
+                <span className="font-data text-2xl font-semibold tabular-nums">
                   {usd.format(revenue.closedCents / 100)}
                 </span>
               </div>
               <div>
                 <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <span className="size-2 rounded-full bg-foreground/40" /> Projected ·{" "}
-                  {pipelineLeads} in pipeline
+                  {/* T1: closed + today's expected pipeline — "projected" overclaimed. */}
+                  <span className="size-2 rounded-full bg-foreground/40" /> With pipeline ·{" "}
+                  {pipelineLeads} in motion
                 </span>
-                <span className="font-mono text-2xl font-semibold tabular-nums text-muted-foreground">
+                <span className="font-data text-2xl font-semibold tabular-nums text-muted-foreground">
                   {usd.format(projectedTotalCents / 100)}
                 </span>
               </div>
             </div>
-            <div className="mt-3">
-              <RevenueChart data={series} goalCents={goalCents} />
-            </div>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {revenue.closedPctOfGoal !== null ? (
-                <>
-                  <span className="font-medium text-foreground">{revenue.closedPctOfGoal}%</span> of
-                  your {goal}/mo goal closed
-                  {revenue.projectedPctOfGoal !== null &&
-                    ` — projected ${revenue.projectedPctOfGoal}% as your pipeline closes`}
-                  .
-                </>
-              ) : (
-                "Set a monthly revenue goal in Settings to track progress."
-              )}
-            </p>
+            {earlyDays ? (
+              <MilestoneLadder milestones={milestones} goal={goal} />
+            ) : (
+              <>
+                <div className="mt-3">
+                  <RevenueChart data={series} goalCents={goalCents} />
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {revenue.closedPctOfGoal !== null ? (
+                    <>
+                      <span className="font-medium text-foreground">{revenue.closedPctOfGoal}%</span> of
+                      your {goal}/mo goal closed
+                      {revenue.projectedPctOfGoal !== null &&
+                        ` — projected ${revenue.projectedPctOfGoal}% as your pipeline closes`}
+                      .
+                    </>
+                  ) : (
+                    "Set a monthly revenue goal in Settings to track progress."
+                  )}
+                </p>
+              </>
+            )}
             {paceLabel && (
               <p className="mt-1.5 flex items-center gap-1.5 text-xs font-medium text-foreground">
                 <TrendingUp className="size-3.5 text-muted-foreground" aria-hidden />
@@ -616,7 +936,7 @@ function RevenueCard({
           <div className="flex flex-col gap-3">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <span className="font-mono text-2xl font-semibold tabular-nums">
+                <span className="font-data text-2xl font-semibold tabular-nums">
                   {convertedClients}
                 </span>
                 <p className="text-xs text-muted-foreground">
@@ -624,7 +944,7 @@ function RevenueCard({
                 </p>
               </div>
               <div>
-                <span className="font-mono text-2xl font-semibold tabular-nums text-muted-foreground">
+                <span className="font-data text-2xl font-semibold tabular-nums text-muted-foreground">
                   {pipelineLeads}
                 </span>
                 <p className="text-xs text-muted-foreground">In pipeline</p>
@@ -701,7 +1021,7 @@ function ConversionCelebration({
       initial={{ opacity: 0, y: 16, scale: 0.99 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-      className={cn(PANEL_SURFACE, "relative p-5 dark:bg-white/[0.07]")}
+      className={cn(PANEL_SURFACE, "relative p-5 ring-1 ring-[var(--cyan-line)]")}
     >
       <button
         type="button"
@@ -712,11 +1032,12 @@ function ConversionCelebration({
         <X className="size-4" />
       </button>
       <div className="flex flex-wrap items-center gap-4 pr-8">
-        <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-foreground text-background shadow-[0_0_20px_rgba(255,255,255,0.55)]">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-foreground text-background shadow-[var(--shadow-sm)]">
           <PartyPopper className="size-5" />
         </span>
         <div className="min-w-0">
-          <p className="text-sm font-medium">{win.leadName} just booked a meeting</p>
+          {/* T1: `converted` is closed-won, not a meeting — say what actually happened. */}
+          <p className="text-sm font-medium">{win.leadName} just closed — new client</p>
           <p className="text-sm text-muted-foreground">
             {convertedClients} {convertedClients === 1 ? "win" : "wins"}
             {goal && ` toward your ${goal}/mo goal`} — keep the pipeline full to stack the next one.
@@ -749,7 +1070,7 @@ function ReplyCelebration({ win }: { win: { id: string; leadName: string } }) {
       initial={{ opacity: 0, y: 16, scale: 0.99 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-      className={cn(PANEL_SURFACE, "relative p-5 dark:bg-white/[0.07]")}
+      className={cn(PANEL_SURFACE, "relative p-5 ring-1 ring-[var(--cyan-line)]")}
     >
       <button
         type="button"
@@ -760,13 +1081,14 @@ function ReplyCelebration({ win }: { win: { id: string; leadName: string } }) {
         <X className="size-4" />
       </button>
       <div className="flex flex-wrap items-center gap-4 pr-8">
-        <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-foreground text-background shadow-[0_0_20px_rgba(255,255,255,0.55)]">
-          <Sparkles className="size-5" />
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-foreground text-background shadow-[var(--shadow-sm)]">
+          <Star className="size-5" />
         </span>
         <div className="min-w-0">
           <p className="text-sm font-medium">{win.leadName} is interested</p>
           <p className="text-sm text-muted-foreground">
-            A reply landed in your favor — keep the thread warm and move it toward a meeting.
+            A reply landed in your favor, from a play Vera is running — keep the thread warm and
+            move it toward a meeting.
           </p>
         </div>
         <Button asChild size="sm" variant="outline" className="ml-auto shrink-0">
@@ -805,7 +1127,7 @@ function CrmNudge({ convertedClients }: { convertedClients: number }) {
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-      className={cn(PANEL_SURFACE, "relative p-5 dark:bg-white/[0.06]")}
+      className={cn(PANEL_SURFACE, "relative p-5")}
     >
       <button
         type="button"
@@ -850,17 +1172,25 @@ function ActivationRamp({
   scoutDeployed,
   goal,
   channels,
+  plays,
+  icp,
 }: {
   scoutDeployed: boolean;
   goal: string | null;
   channels: DashboardViewProps["channels"];
+  plays: DashboardViewProps["plays"];
+  icp: string | null;
 }) {
+  // Onboarding auto-provisions the whole agent stack, so this ramp only appears for the
+  // rare account without a live Scout — and the checklist reflects the real remaining
+  // dependency: LinkedIn is what gates sending, not more agent setup.
+  const liConnected = channels.liStatus === "active";
   const steps = [
     { label: "Create your account", done: true },
-    { label: "Set your industry, ICP, and revenue goal", done: true },
-    { label: "Deploy your Prospect Agent", done: scoutDeployed, current: !scoutDeployed },
-    { label: "Add an Outreach Agent to draft your first messages", done: false },
-    { label: "Get your first reply", done: false },
+    { label: "Set your targeting and revenue goal", done: true },
+    { label: "Deploy your agents", done: scoutDeployed, current: !scoutDeployed },
+    { label: "Connect LinkedIn so outreach can send", done: liConnected, current: scoutDeployed && !liConnected },
+    { label: "Approve your first outreach — then the replies start", done: false },
   ];
   const doneCount = steps.filter((s) => s.done).length;
 
@@ -891,9 +1221,15 @@ function ActivationRamp({
               ))}
             </ul>
             <Button asChild className="mt-1 w-fit">
-              <Link href="/agents/new/scout">
-                Deploy your Prospect Agent <ArrowRight className="size-4" />
-              </Link>
+              {scoutDeployed && !liConnected ? (
+                <Link href="/settings/channels">
+                  Connect LinkedIn <ArrowRight className="size-4" />
+                </Link>
+              ) : (
+                <Link href="/agents/new/scout">
+                  Deploy your agents <ArrowRight className="size-4" />
+                </Link>
+              )}
             </Button>
             <p className="border-t border-border/60 pt-3 text-xs text-muted-foreground">
               Its first run starts within ~15 minutes. Nothing ever sends until you approve it
@@ -911,6 +1247,9 @@ function ActivationRamp({
 
         <ChannelSetupPanel channels={channels} />
       </div>
+
+      {/* Competence in the waiting room (Stage 0): the proven plays Vera starts on. */}
+      <ProvenPlaysPanel plays={plays} icp={icp} />
     </Reveal>
   );
 }
@@ -922,22 +1261,29 @@ function FirstRunInProgress({
   scoutNextRunLabel,
   goal,
   channels,
+  plays,
+  icp,
 }: {
   scoutNextRunLabel: string;
   goal: string | null;
   channels: DashboardViewProps["channels"];
+  plays: DashboardViewProps["plays"];
+  icp: string | null;
 }) {
   const steps = [
-    { label: "Prospect Agent deployed", done: true, current: false },
+    { label: "Agents deployed — Prospect, Outreach & Intent", done: true, current: false },
     { label: "Sourcing & scoring your first leads", done: false, current: true },
     { label: "Your first qualified leads land here", done: false, current: false },
   ];
+  // Onboarding offers a "skip for now" on the LinkedIn connect, so this panel is the
+  // skipper's home for the one real dependency: sourcing runs either way, sending doesn't.
+  const liConnected = channels.liStatus === "active";
   return (
     <Reveal className="flex flex-col gap-6">
-      <div className="grid gap-6 md:grid-cols-[1.2fr_1fr]">
+      <div className={cn("grid gap-6", !liConnected && "md:grid-cols-[1.2fr_1fr]")}>
         <RevealItem className={cn(PANEL_SURFACE, "p-5")} data-copilot="dashboard-first-run">
           <div className="flex items-center justify-between gap-3">
-            <Eyebrow>Your agents are working</Eyebrow>
+            <Eyebrow>Vera is working</Eyebrow>
             <span className="flex items-center gap-1.5 text-xs font-medium text-foreground">
               <span className="relative flex size-2" aria-hidden>
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-foreground/60" />
@@ -947,10 +1293,10 @@ function FirstRunInProgress({
             </span>
           </div>
           <h2 className="font-heading mt-3 text-xl font-semibold tracking-tight">
-            Sourcing your first leads now
+            Finding your first prospects
           </h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            Your Prospect Agent is scanning your market and scoring fits against your ICP. The
+            Vera is scanning your market and scoring fits against your ICP. The
             first qualified leads land here{" "}
             {scoutNextRunLabel ? (
               <>
@@ -990,20 +1336,26 @@ function FirstRunInProgress({
               ))}
             </ul>
             <div className="flex flex-wrap gap-2">
-              <Button asChild variant="outline" size="sm">
-                <Link href="/agents">
-                  Add an Outreach Agent <ArrowRight className="size-4" />
-                </Link>
-              </Button>
-              <Button asChild variant="ghost" size="sm">
+              {/* Outreach is already provisioned — the only setup left is the send gate. */}
+              {!liConnected && (
+                <Button asChild size="sm">
+                  <Link href="/settings/channels">
+                    Connect LinkedIn <ArrowRight className="size-4" />
+                  </Link>
+                </Button>
+              )}
+              <Button asChild variant={liConnected ? "outline" : "ghost"} size="sm">
                 <Link href="/leads">Watch leads arrive</Link>
               </Button>
             </div>
           </div>
         </RevealItem>
 
-        <ChannelSetupPanel channels={channels} />
+        {!liConnected && <ChannelSetupPanel channels={channels} />}
       </div>
+
+      {/* Competence in the waiting room (Stage 0): the proven plays Vera is running right now. */}
+      <ProvenPlaysPanel plays={plays} icp={icp} />
     </Reveal>
   );
 }
@@ -1020,8 +1372,8 @@ function ChannelSetupPanel({ channels }: { channels: DashboardViewProps["channel
     <RevealItem className={cn(PANEL_SURFACE, "flex flex-col p-5")}>
       <Eyebrow>Connect LinkedIn</Eyebrow>
       <p className="mt-2 text-xs text-muted-foreground">
-        One click — sign in on LinkedIn&apos;s own page and your agents can start reaching out. It
-        doesn&apos;t block deploying an agent, but nothing sends until it&apos;s connected.
+        One click — sign in on LinkedIn&apos;s own page. Your agents keep sourcing and qualifying
+        either way, but no outreach sends until it&apos;s connected.
       </p>
       <div className="mt-4 flex flex-col divide-y divide-border/60">
         <ChannelSetupRow

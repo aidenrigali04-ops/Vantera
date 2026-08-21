@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { tasks } from "@trigger.dev/sdk";
 import { createClient } from "@/lib/supabase/server";
 import { deriveIntentWatchlist } from "@vantera/agent-brains";
 import {
@@ -196,9 +197,9 @@ export async function deployIntentAgent(
 
   const { supabase, user, account } = await sessionAccount();
   if (!user || !account) return { error: "Your session expired. Sign in again." };
-  if (!user.email_confirmed_at) {
-    return { error: "Confirm your email to deploy your agent — check your inbox for the verification link." };
-  }
+  // Email-verification gate removed (P2 trap, 2026-07-15): signup auto-confirms via the
+  // admin API, so this branch could only ever dead-end a user waiting for an email that is
+  // never sent. Re-add only if signup switches to real email confirmation.
 
   const billingRow = await loadBillingRow(supabase);
   if (!hasActivePlan(billingRow)) redirect("/settings/billing?reason=deploy");
@@ -294,7 +295,7 @@ export async function deployCopyAgent(
 ): Promise<AgentActionState> {
   const parsed = parseCopyForm(formData);
   if (!parsed.ok) return { error: parsed.error };
-  const { name, cta, links, channels, sendMode } = parsed.values;
+  const { name, cta, bookingUrl, websiteUrl, links, channels, sendMode } = parsed.values;
 
   const { supabase, user, account } = await sessionAccount();
   if (!user || !account) return { error: "Your session expired. Sign in again." };
@@ -355,7 +356,7 @@ export async function deployCopyAgent(
       kind: "copy",
       name,
       status: "live",
-      config: { cta, channels },
+      config: { cta, bookingUrl, websiteUrl, channels },
       campaign_id: campaign.id,
       deployed_at: new Date().toISOString(),
       created_by: user.id,
@@ -438,7 +439,7 @@ export async function updateCopyAgent(
 ): Promise<AgentActionState> {
   const parsed = parseCopyForm(formData);
   if (!parsed.ok) return { error: parsed.error };
-  const { name, cta, links, channels, sendMode } = parsed.values;
+  const { name, cta, bookingUrl, websiteUrl, links, channels, sendMode } = parsed.values;
 
   const { supabase, user, account } = await sessionAccount();
   if (!user || !account) return { error: "Your session expired. Sign in again." };
@@ -456,7 +457,7 @@ export async function updateCopyAgent(
 
   const { error: updateError } = await supabase
     .from("agents")
-    .update({ name, config: { ...(agent.config ?? {}), cta, channels } })
+    .update({ name, config: { ...(agent.config ?? {}), cta, bookingUrl, websiteUrl, channels } })
     .eq("id", agent.id); // RLS scopes to the admin's account (rule 02)
   if (updateError) return { error: "Could not save changes. Only workspace admins can do this." };
 
@@ -509,6 +510,40 @@ export async function setAgentStatus(
     .update({ status }) // RLS scopes to the admin's account (rule 02)
     .eq("id", agentId);
   if (error) return { error: "Could not update the agent. Only workspace admins can do this." };
+  revalidatePath("/agents");
+  return {};
+}
+
+/**
+ * T4 operate path: "Run now" — trigger one scout/intent run out-of-band instead of
+ * waiting a full cadence cycle to verify a config change. The agent is resolved through
+ * RLS (members of the workspace only); the run itself is identical to the scheduled one
+ * (same task, same per-account serialization), so this can never do anything the cron
+ * wouldn't.
+ */
+export async function runAgentNow(formData: FormData): Promise<AgentActionState> {
+  const agentId = String(formData.get("agentId") ?? "");
+  if (!agentId) return { error: "Invalid request." };
+
+  const supabase = await createClient();
+  const { data: agent } = await supabase
+    .from("agents")
+    .select("id, kind, status, account_id")
+    .eq("id", agentId)
+    .maybeSingle<{ id: string; kind: string; status: string; account_id: string }>();
+  if (!agent) return { error: "Agent not found." };
+  if (agent.status !== "live") return { error: "Resume the agent first — paused agents don't run." };
+  if (agent.kind !== "scout" && agent.kind !== "intent") return { error: "This agent runs on demand already." };
+
+  try {
+    await tasks.trigger(
+      agent.kind === "scout" ? "scout-run" : "intent-scan",
+      { agentId: agent.id, accountId: agent.account_id },
+      { concurrencyKey: agent.account_id }
+    );
+  } catch {
+    return { error: "Couldn't start the run — try again in a minute." };
+  }
   revalidatePath("/agents");
   return {};
 }

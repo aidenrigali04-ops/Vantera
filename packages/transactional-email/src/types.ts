@@ -8,6 +8,11 @@ export interface TransactionalMessage {
   text?: string;
   /** Optional Reply-To override. */
   replyTo?: string;
+  /**
+   * Optional provider headers. Used for List-Unsubscribe on the lifecycle lane, where the
+   * recipient is a lapsed user who cannot reasonably be asked to log in to opt out.
+   */
+  headers?: Record<string, string>;
 }
 
 export interface TransactionalSendResult {

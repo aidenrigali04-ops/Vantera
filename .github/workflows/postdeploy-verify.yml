@@ -1,0 +1,56 @@
+name: Post-deploy verify
+
+# The ship-isn't-live-until-proven rule, automated (enterprise-grade-brain spec, WS-4.2).
+# After CI succeeds on main: (1) the production domain must serve the new SHA within 20 min
+# (a pinned Vercel alias fails here instead of silently serving stale code); (2) if the push
+# touched packages/jobs, the Trigger deploy workflow for the same SHA must succeed.
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+
+jobs:
+  verify-web:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for production to serve the new SHA
+        # www is the canonical live host — the apex 308-redirects to it at the Vercel domain
+        # level, and curl without -L never follows, so polling apex is permanently red.
+        # -L stays as belt-and-braces in case the redirect direction ever flips.
+        run: |
+          SHA="${{ github.event.workflow_run.head_sha }}"
+          echo "expecting $SHA on https://www.vanterasystem.dev/api/version"
+          for i in $(seq 1 40); do
+            live=$(curl -fsSL --max-time 10 https://www.vanterasystem.dev/api/version | jq -r .sha || echo "")
+            if [ "$live" = "$SHA" ]; then echo "live ✓"; exit 0; fi
+            echo "attempt $i: live=$live — waiting 30s"; sleep 30
+          done
+          echo "::error::production never served $SHA — Vercel alias likely pinned; run vercel promote"
+          exit 1
+
+  verify-jobs:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Assert Trigger deploy succeeded when packages/jobs changed
+        env: { GH_TOKEN: "${{ github.token }}" }
+        # Note: `gh run list --commit` requires gh CLI >= 2.40; ubuntu-latest runners ship newer.
+        run: |
+          SHA="${{ github.event.workflow_run.head_sha }}"
+          git fetch --depth=2 origin "$SHA"
+          if ! git diff --name-only "$SHA~1" "$SHA" | grep -q '^packages/jobs/'; then
+            echo "no jobs changes — skipping"; exit 0
+          fi
+          for i in $(seq 1 50); do
+            conclusion=$(gh run list --workflow "Deploy to Trigger.dev (prod)" \
+              --commit "$SHA" --json conclusion --jq '.[0].conclusion // ""')
+            case "$conclusion" in
+              success) echo "trigger deploy ✓"; exit 0 ;;
+              failure|cancelled) echo "::error::Trigger deploy $conclusion for $SHA"; exit 1 ;;
+              *) echo "attempt $i: conclusion='$conclusion' — waiting 30s"; sleep 30 ;;
+            esac
+          done
+          echo "::error::Trigger deploy for $SHA never concluded"; exit 1

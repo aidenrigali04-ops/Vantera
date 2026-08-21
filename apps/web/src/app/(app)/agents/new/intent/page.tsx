@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { IntentWizard } from "../../intent-wizard";
 
+export const metadata = { title: "Deploy intent detection" };
+
 export default async function NewIntentAgentPage() {
   const supabase = await createClient();
 

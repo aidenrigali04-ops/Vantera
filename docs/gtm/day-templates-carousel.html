@@ -1,0 +1,251 @@
+<title>Vantera — The Template Is Dead (carousel)</title>
+<style>
+  :root{
+    --paper:#EFF3FA; --card:#FFFFFF; --card-2:#F7F9FD;
+    --ink:#0E1524; --ink-2:#3A4761; --mute:#8B98AE; --mute-2:#AAB4C6;
+    --line:rgba(14,21,36,.09); --line-2:rgba(14,21,36,.14);
+    --dead:#EBEEF4; --strike:#E5484D; --strike-soft:#FCEBEC;
+    --brand:#1877F2; --brand-2:#0B63D6; --brand-soft:#E9F1FE; --brand-glow:rgba(24,119,242,.28);
+    --font-display:"Poppins","Segoe UI",system-ui,-apple-system,Roboto,sans-serif;
+    --font-ui:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;}
+  .page{
+    background:
+      radial-gradient(120% 70% at 50% -10%, rgba(24,119,242,.08), transparent 60%),
+      var(--paper);
+    min-height:100vh; color:var(--ink); font-family:var(--font-display);
+    padding:40px 18px 72px; display:flex; flex-direction:column; align-items:center; gap:30px;
+  }
+  .chrome{max-width:460px; width:100%; text-align:center;}
+  .chrome .kicker{font-family:var(--font-ui); font-size:11px; letter-spacing:.2em;
+    text-transform:uppercase; color:var(--brand-2); font-weight:600; margin:0 0 10px;}
+  .chrome h1{font-size:22px; line-height:1.25; font-weight:700; margin:0 0 10px; text-wrap:balance;}
+  .chrome p{font-size:13px; line-height:1.6; color:var(--ink-2); margin:0;}
+  .chrome .tag{display:inline-block; margin-top:14px; font-family:var(--font-ui);
+    font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--mute);
+    border:1px solid var(--line-2); border-radius:999px; padding:6px 12px;}
+
+  .deck{display:flex; flex-direction:column; gap:26px; width:100%; align-items:center;}
+  .slide{
+    container-type:inline-size; position:relative; width:min(452px,94vw); aspect-ratio:4/5;
+    border-radius:24px; overflow:hidden; background:var(--card);
+    border:1px solid var(--line); box-shadow:0 22px 50px -26px rgba(14,21,36,.35);
+    transition:transform .3s ease, box-shadow .3s ease;
+  }
+  @media (hover:hover){ .slide:hover{transform:translateY(-4px);
+    box-shadow:0 32px 60px -28px rgba(14,21,36,.42);} }
+  .inner{position:relative; z-index:2; height:100%; padding:8.5cqw; display:flex; flex-direction:column;}
+
+  .top{display:flex; align-items:center; justify-content:space-between;}
+  .brand{display:flex; align-items:center; gap:2.2cqw; font-weight:700; font-size:4.2cqw; letter-spacing:-.01em; color:var(--ink);}
+  .brand .dot{width:3.4cqw; height:3.4cqw; border-radius:50%;
+    background:conic-gradient(from 220deg,var(--brand),#5AA6FF); box-shadow:0 0 0 1px rgba(14,21,36,.08);}
+  .count{font-family:var(--font-ui); font-size:3.3cqw; letter-spacing:.1em; color:var(--mute); font-weight:500;}
+  .count b{color:var(--ink); font-weight:700;}
+  .eyebrow{font-family:var(--font-ui); font-size:3cqw; letter-spacing:.22em; text-transform:uppercase;
+    color:var(--brand-2); font-weight:700; margin:0;}
+
+  /* message bubbles — the signature device */
+  .thread{margin-top:6.5cqw; display:flex; flex-direction:column; gap:2.4cqw;}
+  .bubble{max-width:82%; padding:4cqw 4.6cqw; font-size:3.9cqw; line-height:1.4;
+    border-radius:5cqw; position:relative;}
+  .bubble.out{align-self:flex-end; border-bottom-right-radius:1.4cqw;}
+  .bubble.in{align-self:flex-start; border-bottom-left-radius:1.4cqw;}
+  .bubble.dead{background:var(--dead); color:#77839A;}
+  .bubble.live{background:linear-gradient(180deg,var(--brand),var(--brand-2)); color:#fff;
+    box-shadow:0 12px 26px -12px var(--brand-glow);}
+  .meta{align-self:flex-end; display:flex; align-items:center; gap:1.8cqw;
+    font-family:var(--font-ui); font-size:2.9cqw; color:var(--mute); margin-top:.4cqw;}
+  .meta.ignored{color:var(--strike);}
+  .meta .x{display:inline-grid; place-items:center; width:3.4cqw; height:3.4cqw; border-radius:50%;
+    background:var(--strike-soft); color:var(--strike); font-size:2.4cqw; font-weight:800;}
+  .meta.reply{align-self:flex-start; color:var(--brand-2);}
+  .typing{align-self:flex-start; display:flex; gap:1.2cqw; padding:3.4cqw 4cqw; background:var(--dead);
+    border-radius:5cqw; border-bottom-left-radius:1.4cqw; width:max-content;}
+  .typing i{width:2cqw; height:2cqw; border-radius:50%; background:var(--mute); animation:blink 1.4s infinite;}
+  .typing i:nth-child(2){animation-delay:.2s} .typing i:nth-child(3){animation-delay:.4s}
+  @keyframes blink{0%,60%,100%{opacity:.3} 30%{opacity:1}}
+  @media (prefers-reduced-motion:reduce){ .typing i{animation:none; opacity:.6} .arrow{animation:none!important} }
+
+  .body-wrap{margin-top:auto;}
+  h2.reason{font-size:9cqw; line-height:1.03; font-weight:700; letter-spacing:-.02em; margin:0 0 3.2cqw; text-wrap:balance;}
+  p.desc{font-size:3.9cqw; line-height:1.5; color:var(--ink-2); margin:0;}
+
+  /* cover */
+  .cover .inner{justify-content:space-between;}
+  .cover .lead{margin-top:8cqw;}
+  .cover .stamp{display:inline-block; margin-bottom:6cqw; font-family:var(--font-ui);
+    font-size:2.9cqw; letter-spacing:.18em; text-transform:uppercase; color:var(--strike); font-weight:700;
+    border:1px solid var(--strike); border-radius:999px; padding:2cqw 3.6cqw; background:var(--strike-soft);}
+  .cover h2{font-size:11cqw; line-height:1.0; font-weight:800; letter-spacing:-.03em; margin:0; text-wrap:balance;}
+  .cover h2 em{font-style:normal; color:var(--brand);}
+  .cover .sub{font-size:4.1cqw; line-height:1.5; color:var(--ink-2); margin:5cqw 0 0;}
+  .swipe{display:flex; align-items:center; justify-content:space-between;}
+  .swipe .go{display:inline-flex; align-items:center; gap:2.2cqw; font-family:var(--font-ui);
+    font-size:3.3cqw; letter-spacing:.12em; text-transform:uppercase; color:var(--brand-2); font-weight:600;}
+  .swipe .arrow{font-size:5cqw; line-height:1; animation:nudge 1.6s ease-in-out infinite;}
+  @keyframes nudge{0%,100%{transform:translateX(0)} 50%{transform:translateX(4px)}}
+
+  /* problem slide */
+  .problem h2{font-size:9.6cqw; line-height:1.04; font-weight:800; letter-spacing:-.025em; margin:5cqw 0 0; text-wrap:balance;}
+  .problem p{font-size:4cqw; line-height:1.5; color:var(--ink-2); margin:auto 0 0;}
+
+  /* fix slide */
+  .fix{background:radial-gradient(130% 90% at 50% 8%, var(--brand-soft), var(--card) 60%);}
+  .fix h2.turn{font-size:8.4cqw; line-height:1.06; font-weight:700; letter-spacing:-.02em; margin:5cqw 0 5cqw; text-wrap:balance;}
+  .fix h2.turn em{font-style:normal; color:var(--brand-2);}
+  .rules{display:flex; flex-direction:column; gap:3cqw; margin:0;}
+  .rule{display:flex; gap:3cqw; align-items:center;}
+  .rule .n{flex:none; width:6cqw; height:6cqw; border-radius:50%; display:grid; place-items:center;
+    background:var(--brand); color:#fff; font-size:3.4cqw; font-weight:800;}
+  .rule .rt{font-size:4.1cqw; font-weight:600; letter-spacing:-.01em;}
+  .fix .close{margin-top:auto; padding-top:4.4cqw; border-top:1px solid var(--line); font-size:3.9cqw; line-height:1.45; color:var(--ink-2);}
+  .fix .close b{color:var(--ink);}
+
+  /* cta */
+  .cta{background:linear-gradient(180deg,#0E1A31,#0B1424); color:#EAF1FF; border-color:rgba(61,147,255,.28);}
+  .cta .brand{color:#EAF1FF;} .cta .count{color:#7C8AA6;} .cta .count b{color:#EAF1FF;}
+  .cta .inner{justify-content:space-between;}
+  .cta h2{font-size:9.2cqw; line-height:1.05; font-weight:800; letter-spacing:-.025em; margin:8cqw 0 0; text-wrap:balance;}
+  .cta h2 em{font-style:normal; color:#5AA6FF;}
+  .cta p{font-size:3.9cqw; line-height:1.55; color:#B9C6DE; margin:5cqw 0 0;}
+  .cta .foot{display:flex; flex-direction:column; gap:4cqw;}
+  .cta .pill{align-self:flex-start; display:inline-flex; align-items:center; gap:2.4cqw;
+    background:var(--brand); color:#fff; font-weight:700; font-size:4cqw; padding:3.4cqw 5cqw; border-radius:999px;
+    box-shadow:0 12px 30px -10px var(--brand-glow);}
+  .cta .sign-off{display:flex; align-items:center; justify-content:space-between;
+    font-family:var(--font-ui); font-size:3cqw; letter-spacing:.12em; text-transform:uppercase; color:#7C8AA6;}
+</style>
+
+<div class="page">
+  <div class="chrome">
+    <p class="kicker">Carousel · Ready to post</p>
+    <h1>The outreach template is dead</h1>
+    <p>Same treatment as the restriction deck, its own visual world. Dead examples are pulled from real banned openers. Screenshot each 4:5 card and post as a document, or use as the design spec (swap in Poppins on export).</p>
+    <span class="tag">8 slides · single-theme by design</span>
+  </div>
+
+  <div class="deck">
+
+    <!-- 1 · COVER -->
+    <section class="slide cover" aria-label="Slide 1, cover">
+      <div class="inner">
+        <div class="top"><div class="brand"><span class="dot"></span>Vantera</div><div class="count"><b>01</b> / 08</div></div>
+        <div class="lead">
+          <span class="stamp">Left on read</span>
+          <h2>The outreach template is <em>dead.</em></h2>
+          <p class="sub">And it's not coming back. Here's what buyers actually reply to now.</p>
+        </div>
+        <div class="swipe"><div class="go">Swipe <span class="arrow">→</span></div><div class="count">outbound, 2026</div></div>
+      </div>
+    </section>
+
+    <!-- 2 · PROBLEM -->
+    <section class="slide problem" aria-label="Slide 2, the problem">
+      <div class="inner">
+        <div class="top"><div class="brand"><span class="dot"></span>Vantera</div><div class="count"><b>02</b> / 08</div></div>
+        <p class="eyebrow" style="margin-top:6cqw;">The problem</p>
+        <h2>Your buyer has read your opener before. Probably this morning.</h2>
+        <p>The same templates circulate everywhere, and AI made them infinite. Every inbox is full of the same "personalized" message. Buyers built a filter, and your template trips it in the first line.</p>
+      </div>
+    </section>
+
+    <!-- 3 · TELL 01 -->
+    <section class="slide" aria-label="Slide 3, tell one">
+      <div class="inner">
+        <div class="top"><div class="brand"><span class="dot"></span>Vantera</div><div class="count"><b>03</b> / 08</div></div>
+        <div class="thread">
+          <div class="bubble out dead">Hi Sarah, I came across your profile and wanted to reach out...</div>
+          <div class="meta ignored"><span class="x">&times;</span>Seen it a hundred times</div>
+        </div>
+        <div class="body-wrap">
+          <h2 class="reason">It opens like everyone else</h2>
+          <p class="desc">The moment your first line matches a thousand others, you stop being a person. You become noise the reader already knows how to skip.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4 · TELL 02 -->
+    <section class="slide" aria-label="Slide 4, tell two">
+      <div class="inner">
+        <div class="top"><div class="brand"><span class="dot"></span>Vantera</div><div class="count"><b>04</b> / 08</div></div>
+        <div class="thread">
+          <div class="bubble out dead">Big fan of what you're doing at {{Company}}!</div>
+          <div class="meta ignored"><span class="x">&times;</span>A variable isn't a reason to care</div>
+        </div>
+        <div class="body-wrap">
+          <h2 class="reason">The "personalization" is a merge tag</h2>
+          <p class="desc">Swapping in a name and a company doesn't prove you looked. Buyers feel the difference between a field and a fact instantly.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5 · TELL 03 -->
+    <section class="slide" aria-label="Slide 5, tell three">
+      <div class="inner">
+        <div class="top"><div class="brand"><span class="dot"></span>Vantera</div><div class="count"><b>05</b> / 08</div></div>
+        <div class="thread">
+          <div class="bubble out dead">I wanted to reach out because we help companies like yours...</div>
+          <div class="meta ignored"><span class="x">&times;</span>They stopped reading at "I"</div>
+        </div>
+        <div class="body-wrap">
+          <h2 class="reason">It's about you, not them</h2>
+          <p class="desc">The message leads with your pitch, not their world. The reader opened it as a favor, and you spent that favor talking about yourself.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 6 · TELL 04 -->
+    <section class="slide" aria-label="Slide 6, tell four">
+      <div class="inner">
+        <div class="top"><div class="brand"><span class="dot"></span>Vantera</div><div class="count"><b>06</b> / 08</div></div>
+        <div class="thread">
+          <div class="bubble out dead">Do you have 15 minutes to chat this week?</div>
+          <div class="meta ignored"><span class="x">&times;</span>Delete</div>
+        </div>
+        <div class="body-wrap">
+          <h2 class="reason">It asks before it earns</h2>
+          <p class="desc">You asked a stranger for their calendar before giving them one reason to care. The ask isn't the problem. The order is.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 7 · THE FIX -->
+    <section class="slide fix" aria-label="Slide 7, what works now">
+      <div class="inner">
+        <div class="top"><div class="brand"><span class="dot"></span>Vantera</div><div class="count"><b>07</b> / 08</div></div>
+        <p class="eyebrow" style="margin-top:5cqw;">What works now</p>
+        <div class="thread">
+          <div class="bubble out live">Saw your post on why cold outreach feels broken. How are you handling prospecting now, by hand or with a tool?</div>
+          <div class="typing"><i></i><i></i><i></i></div>
+          <div class="meta reply">Replying...</div>
+        </div>
+        <h2 class="turn">One message that could only have been written to <em>them.</em></h2>
+        <div class="rules">
+          <div class="rule"><span class="n">1</span><span class="rt">Say one true, specific thing about them</span></div>
+          <div class="rule"><span class="n">2</span><span class="rt">Ask one real question</span></div>
+          <div class="rule"><span class="n">3</span><span class="rt">Pitch nothing yet</span></div>
+        </div>
+        <p class="close"><b>Personalization was never a merge tag.</b> It's proof you actually looked.</p>
+      </div>
+    </section>
+
+    <!-- 8 · CTA -->
+    <section class="slide cta" aria-label="Slide 8, call to action">
+      <div class="inner">
+        <div class="top"><div class="brand"><span class="dot"></span>Vantera</div><div class="count"><b>08</b> / 08</div></div>
+        <div>
+          <h2>Templates scale your sending. They never scaled <em>replies.</em></h2>
+          <p>I build outreach that reads like a person wrote it, because the rules make sure it does. Qualify first, one real observation, no pitch until you've earned it.</p>
+        </div>
+        <div class="foot">
+          <div class="pill">Follow, or DM me "real"</div>
+          <div class="sign-off"><span>Vantera</span><span>LinkedIn, run right</span></div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</div>

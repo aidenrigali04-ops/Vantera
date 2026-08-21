@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { INVITE_EXPIRY_DAYS, runSendDispatch } from "./send-dispatch";
+import { INVITE_EXPIRY_DAYS, MIN_LEAD_MESSAGE_GAP_MS, runSendDispatch } from "./send-dispatch";
 import { TRIAL_SEND_CAP } from "./types";
 import type { DispatchSender, DispatchableSend, SendDispatchDeps, SendDispatchStore } from "./types";
 
@@ -14,12 +14,18 @@ function makeSend(overrides: Partial<DispatchableSend> = {}): DispatchableSend {
     channel: "linkedin",
     linkedinStage: "invite",
     status: "approved",
+    createdAt: new Date("2026-06-01T00:00:00Z"),
     accountPaused: false,
     campaignStatus: "active",
     leadInvitedAt: null,
     leadConnectedAt: null,
     leadAssignedSenderId: null,
     subscriptionStatus: "active",
+    leadLastMessageSentAt: null,
+    leadRepliedAt: null,
+    leadHasInFlightMessage: false,
+    origin: "sequence",
+    leadLocation: null,
     ...overrides,
   };
 }
@@ -507,6 +513,222 @@ describe("runSendDispatch — multi-sender distribution", () => {
       }),
     ];
     const deps = makeDeps(store);
+
+    const result = await runSendDispatch(deps);
+
+    expect(result.scheduled).toBe(0);
+    expect(result.skipped).toBe(1);
+  });
+});
+
+// ─── per-lead message gating (backlog can never burst a prospect) ────────────
+
+describe("runSendDispatch — per-lead message gating", () => {
+  const NOW = new Date("2026-07-07T12:00:00Z"); // a Tuesday — inside the proactive send window
+  const connected = new Date("2026-07-07T10:00:00Z");
+
+  it("cancels stale duplicate messages for a lead and schedules only the newest", async () => {
+    const store = new FakeDispatchStore();
+    store.sends = [
+      makeSend({
+        id: "old1", linkedinStage: "message", leadConnectedAt: connected,
+        leadAssignedSenderId: "li1", createdAt: new Date("2026-06-30T08:10:00Z"),
+      }),
+      makeSend({
+        id: "old2", linkedinStage: "message", leadConnectedAt: connected,
+        leadAssignedSenderId: "li1", createdAt: new Date("2026-06-30T08:15:00Z"),
+      }),
+      makeSend({
+        id: "newest", linkedinStage: "message", leadConnectedAt: connected,
+        leadAssignedSenderId: "li1", createdAt: new Date("2026-07-04T09:00:00Z"),
+      }),
+    ];
+    const deps = { ...makeDeps(store), now: () => NOW };
+
+    const result = await runSendDispatch(deps);
+
+    expect(result.scheduled).toBe(1);
+    expect(result.canceled).toBe(2);
+    expect(store.scheduled.map((s) => s.sendId)).toEqual(["newest"]);
+    expect(store.canceled.map((c) => c.sendId).sort()).toEqual(["old1", "old2"]);
+  });
+
+  it("parks a proactive message when the last delivered message is inside the per-lead gap", async () => {
+    const store = new FakeDispatchStore();
+    store.sends = [
+      makeSend({
+        id: "s1", linkedinStage: "message", leadConnectedAt: connected,
+        leadAssignedSenderId: "li1",
+        leadLastMessageSentAt: new Date(NOW.getTime() - MIN_LEAD_MESSAGE_GAP_MS / 2),
+      }),
+    ];
+    const deps = { ...makeDeps(store), now: () => NOW };
+
+    const result = await runSendDispatch(deps);
+
+    expect(result.scheduled).toBe(0);
+    expect(result.skipped).toBe(1);
+  });
+
+  it("lets a reply-answering message through the gap (the lead's reply resets the clock)", async () => {
+    const store = new FakeDispatchStore();
+    const lastSent = new Date(NOW.getTime() - 30 * 60_000);
+    store.sends = [
+      makeSend({
+        id: "reply1", linkedinStage: "message", leadConnectedAt: connected,
+        leadAssignedSenderId: "li1",
+        leadLastMessageSentAt: lastSent,
+        leadRepliedAt: new Date(lastSent.getTime() + 5 * 60_000), // they replied after our message
+      }),
+    ];
+    const deps = { ...makeDeps(store), now: () => NOW };
+
+    const result = await runSendDispatch(deps);
+
+    expect(result.scheduled).toBe(1);
+    expect(store.scheduled.map((s) => s.sendId)).toEqual(["reply1"]);
+  });
+
+  it("skips a message while another message for the lead is already claimed/in flight — even when the lead just replied", async () => {
+    const store = new FakeDispatchStore();
+    const lastSent = new Date(NOW.getTime() - 2 * 60 * 60_000);
+    store.sends = [
+      makeSend({
+        id: "second", linkedinStage: "message", leadConnectedAt: connected,
+        leadAssignedSenderId: "li1",
+        leadLastMessageSentAt: lastSent,
+        // the reply exemption would let this through — the in-flight claim must still block it
+        leadRepliedAt: new Date(lastSent.getTime() + 5 * 60_000),
+        leadHasInFlightMessage: true,
+      }),
+    ];
+    const deps = { ...makeDeps(store), now: () => NOW };
+
+    const result = await runSendDispatch(deps);
+
+    expect(result.scheduled).toBe(0);
+    expect(result.skipped).toBe(1);
+    expect(store.canceled).toHaveLength(0); // it waits for the delivery; nothing is destroyed
+  });
+
+  it("dispatches a proactive message once the delivered gap has fully elapsed", async () => {
+    const store = new FakeDispatchStore();
+    store.sends = [
+      makeSend({
+        id: "s1", linkedinStage: "message", leadConnectedAt: connected,
+        leadAssignedSenderId: "li1",
+        leadLastMessageSentAt: new Date(NOW.getTime() - MIN_LEAD_MESSAGE_GAP_MS - 60_000),
+      }),
+    ];
+    const deps = { ...makeDeps(store), now: () => NOW };
+
+    const result = await runSendDispatch(deps);
+
+    expect(result.scheduled).toBe(1);
+  });
+});
+
+// ─── speed lane + business-hours window (0044) ───────────────────────────────
+
+describe("runSendDispatch — reply-response speed lane", () => {
+  const NOW = new Date("2026-07-07T12:00:00Z"); // Tuesday
+  const connected = new Date("2026-07-07T10:00:00Z");
+
+  it("a reply-response schedules within ~90s while sequence sends pay the pacing queue", async () => {
+    const store = new FakeDispatchStore();
+    store.sends = [
+      makeSend({
+        id: "seq1", linkedinStage: "message", leadId: "lead-a", leadConnectedAt: connected,
+        leadAssignedSenderId: "li1",
+      }),
+      makeSend({
+        id: "hot1", linkedinStage: "message", leadId: "lead-b", leadConnectedAt: connected,
+        leadAssignedSenderId: "li1", origin: "reply_response",
+        leadRepliedAt: new Date(NOW.getTime() - 60_000),
+      }),
+    ];
+    const enqueued: { sendId: string; runAt: Date }[] = [];
+    const deps = { ...makeDeps(store, enqueued), now: () => NOW };
+
+    const result = await runSendDispatch(deps);
+
+    expect(result.scheduled).toBe(2);
+    const hot = enqueued.find((e) => e.sendId === "hot1")!;
+    const seq = enqueued.find((e) => e.sendId === "seq1")!;
+    expect(hot.runAt.getTime() - NOW.getTime()).toBeLessThanOrEqual(95_000);
+    expect(hot.runAt.getTime()).toBeLessThan(seq.runAt.getTime()); // never behind the queue
+  });
+
+  it("the speed lane still consumes the sender's message budget", async () => {
+    const store = new FakeDispatchStore();
+    store.senders = [makeSender({ sentTodayMessages: 25 })]; // budget 0
+    store.sends = [
+      makeSend({
+        id: "hot1", linkedinStage: "message", leadConnectedAt: connected,
+        leadAssignedSenderId: "li1", origin: "reply_response",
+        leadRepliedAt: new Date(NOW.getTime() - 60_000),
+      }),
+    ];
+    const deps = { ...makeDeps(store), now: () => NOW };
+
+    const result = await runSendDispatch(deps);
+
+    expect(result.scheduled).toBe(0); // rule 04 budget beats speed, always
+    expect(result.skipped).toBe(1);
+  });
+});
+
+describe("runSendDispatch — proactive business-hours window", () => {
+  const SATURDAY = new Date("2026-07-04T21:00:00Z");
+  const connected = new Date("2026-07-01T10:00:00Z");
+
+  it("sequence sends wait out the weekend (the Saturday-night burst can never recur)", async () => {
+    const store = new FakeDispatchStore();
+    store.sends = [
+      makeSend({ id: "inv1", linkedinStage: "invite" }),
+      makeSend({
+        id: "msg1", linkedinStage: "message", leadConnectedAt: connected, leadAssignedSenderId: "li1",
+      }),
+    ];
+    const deps = { ...makeDeps(store), now: () => SATURDAY };
+
+    const result = await runSendDispatch(deps);
+
+    expect(result.scheduled).toBe(0);
+    expect(result.skipped).toBe(2);
+    expect(store.canceled).toHaveLength(0); // waiting, not destroying
+  });
+
+  it("reply-responses and manual sends are exempt — answering promptly is human", async () => {
+    const store = new FakeDispatchStore();
+    store.sends = [
+      makeSend({
+        id: "hot1", leadId: "lead-a", linkedinStage: "message", leadConnectedAt: connected,
+        leadAssignedSenderId: "li1", origin: "reply_response",
+        leadRepliedAt: new Date(SATURDAY.getTime() - 60_000),
+      }),
+      makeSend({
+        id: "manual1", leadId: "lead-b", linkedinStage: "message", leadConnectedAt: connected,
+        leadAssignedSenderId: "li1", origin: "manual",
+        leadRepliedAt: new Date(SATURDAY.getTime() - 60_000),
+      }),
+    ];
+    const deps = { ...makeDeps(store), now: () => SATURDAY };
+
+    const result = await runSendDispatch(deps);
+
+    expect(result.scheduled).toBe(2);
+  });
+
+  it("respects the prospect's local time: Tuesday 04:00 UTC is night in California — waits", async () => {
+    const store = new FakeDispatchStore();
+    store.sends = [
+      makeSend({
+        id: "msg1", linkedinStage: "message", leadConnectedAt: connected,
+        leadAssignedSenderId: "li1", leadLocation: "San Francisco, California",
+      }),
+    ];
+    const deps = { ...makeDeps(store), now: () => new Date("2026-07-07T04:00:00Z") };
 
     const result = await runSendDispatch(deps);
 

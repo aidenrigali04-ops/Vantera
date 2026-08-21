@@ -1,8 +1,9 @@
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 
 /**
- * Service-role client for webhook/unsubscribe routes ONLY — bypasses RLS.
- * Never import from client code or user-session paths.
+ * Service-role client for webhook/unsubscribe routes and pre-session auth admin
+ * work (the confirmation-free signup) ONLY — bypasses RLS.
+ * Never import from client code or session-scoped data paths.
  */
 export function createServiceClient() {
   const url = process.env.SUPABASE_URL;

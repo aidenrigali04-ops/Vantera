@@ -32,7 +32,7 @@ export function ArticleBody({ blocks }: { blocks: Block[] }) {
               <ul key={i} className="mt-5 space-y-3">
                 {b.items.map((item, j) => (
                   <li key={j} className="flex gap-3 text-[16.5px] leading-relaxed text-[var(--ink-3)]">
-                    <span className="mt-[0.6em] size-1.5 shrink-0 rounded-full bg-[var(--cyan)] shadow-[0_0_8px_rgba(48,207,255,0.6)]" />
+                    <span className="mt-[0.6em] size-1.5 shrink-0 rounded-full bg-[var(--cyan)] shadow-[0_0_8px_rgba(11,87,171,0.6)]" />
                     <span>{item}</span>
                   </li>
                 ))}

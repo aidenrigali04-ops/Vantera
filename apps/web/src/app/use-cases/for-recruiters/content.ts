@@ -23,7 +23,7 @@ export const RECRUITERS_CONTENT: UseCaseContent = {
     sub: "Vantera runs candidate outreach on LinkedIn for you — surfacing people who fit the role, personalizing every message from their real activity, and pacing safely so your account stays clean. You approve every send. More replies from the right people, less time sourcing.",
     primaryCta: { label: "Start free", href: "/signup" },
     secondaryCta: { label: "See how it works", href: "#how-it-works" },
-    trust: ["3-day free trial", "Safe pacing built in", "You approve every message"],
+    trust: ["7-day free trial", "Safe pacing built in", "You approve every message"],
     visual: {
       title: "Requisitions",
       period: "This week",
@@ -379,6 +379,6 @@ export const RECRUITERS_CONTENT: UseCaseContent = {
       "Every day a role stays open, the best people get hired elsewhere. Deploy candidate outreach that actually gets replies — live in minutes, first replies this week.",
     primaryCta: { label: "Start free", href: "/signup" },
     secondaryCta: { label: "See pricing", href: "/#pricing" },
-    reassurance: ["3-day free trial", "Safe pacing built in", "You approve every message"],
+    reassurance: ["7-day free trial", "Safe pacing built in", "You approve every message"],
   },
 };

@@ -5,6 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AddSuppressionForm } from "./add-form";
 
+export const metadata = { title: "Suppression list" };
+
 const SOURCE_LABELS: Record<string, string> = {
   unsubscribe: "Unsubscribed",
   bounce: "Bounced",
@@ -24,11 +26,11 @@ export default async function SuppressionPage() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
-      <div>
+      <div className="border-b border-[var(--hairline)] pb-5">
         <h1 className="text-2xl font-semibold tracking-tight">Suppression list</h1>
-        <p className="text-sm text-muted-foreground">
-          Contacts here are never messaged by your agents on the channel they&apos;re suppressed
-          for. Entries are permanent — they protect you and your prospects.{" "}
+        <p className="mt-1.5 text-sm text-muted-foreground">
+          Contacts here are never messaged by your agents. Entries are permanent — they protect
+          you and your prospects.{" "}
           <Link href="/settings" className="underline underline-offset-2">
             Back to settings
           </Link>
@@ -50,8 +52,9 @@ export default async function SuppressionPage() {
             <ShieldBan className="mx-auto size-8 text-muted-foreground" />
             <CardTitle className="text-base">Nothing suppressed yet</CardTitle>
             <p className="mx-auto max-w-md text-pretty text-sm text-muted-foreground">
-              Unsubscribes, bounces, and &quot;not interested&quot; replies land here automatically
-              once sending goes live. You can add contacts manually any time.
+              &quot;Not interested&quot; replies and opt-outs land here automatically as your agents
+              work — no agent ever messages a suppressed contact. You can add contacts manually any
+              time.
             </p>
           </CardHeader>
         </Card>

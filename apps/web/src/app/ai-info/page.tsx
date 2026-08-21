@@ -42,7 +42,7 @@ export default function AiInfoPage() {
     {
       heading: "Pricing",
       lines: [
-        `Plans start at $${starter.monthlyUsd}/month (${starter.name}). There is a free 3-day trial; a card is required to start and nothing is charged until the trial ends.`,
+        `Plans start at $${starter.monthlyUsd}/month (${starter.name}). There is a free 7-day trial; a card is required to start and nothing is charged until the trial ends.`,
         "Larger plans add more LinkedIn senders running in parallel. Full details: vanterasystem.dev/pricing.",
       ],
     },

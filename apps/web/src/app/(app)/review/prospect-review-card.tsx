@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import { ChevronRight, MessageSquare } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { Panel } from "@/components/ui/panel";
 import { LeadProfileLink, type LeadProfile } from "@/components/lead-profile";
+import { ScoreBadge, SourceBadge, WhyNowLine } from "@/components/lead-why-now";
 import { DraftCard, type DraftRow } from "./draft-card";
 
 export interface ProspectGroup {
@@ -51,15 +51,14 @@ export function ProspectReviewCard({
           className={`size-4 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-90" : ""}`}
         />
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="truncate font-medium">{name}</span>
-            {score !== null && (
-              <Badge variant="secondary" className="shrink-0" title="AI fit score">
-                {score}
-              </Badge>
-            )}
+            <SourceBadge source={lead?.source} />
+            {score !== null && <ScoreBadge score={score} withVerdict />}
           </div>
           {context && <p className="truncate text-sm text-muted-foreground">{context}</p>}
+          {/* The "because" behind the draft — approve without expanding, informed. */}
+          {lead && <WhyNowLine lead={lead} />}
         </div>
         <div className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
           {linkedin.length > 0 && (

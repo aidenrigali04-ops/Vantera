@@ -34,8 +34,8 @@ export function TrialBanner({ tone, message, cta, href }: TrialBannerProps) {
         className={cn(
           "inline-flex shrink-0 items-center rounded-full px-4 py-2 text-xs font-medium transition-all",
           ended
-            ? "bg-[var(--cyan)] text-white hover:shadow-[0_8px_24px_-8px_rgba(48,207,255,0.7)]"
-            : "bg-[#0a0c12] text-white hover:shadow-[0_8px_24px_-8px_rgba(48,207,255,0.55)]",
+            ? "bg-[var(--cyan)] text-white hover:shadow-[0_8px_24px_-8px_rgba(11,87,171,0.7)]"
+            : "bg-[#0a0c12] text-white hover:shadow-[0_8px_24px_-8px_rgba(11,87,171,0.55)]",
         )}
       >
         {cta}

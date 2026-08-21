@@ -2,8 +2,15 @@ import { createClient } from "@/lib/supabase/server";
 import { getGateData } from "@/lib/auth/context";
 import { resolveEntitlements } from "@vantera/billing";
 import { snapshotFromRow, type AccountBillingRow } from "@/lib/billing/entitlement";
-import { canManageTeam } from "./validation";
+import { canManageTeam, matchMemberEmails } from "./validation";
 import { ShareCard, type ShareMember, type ShareInvite } from "@/components/ui/share-card";
+
+export const metadata = { title: "Team" };
+
+// Module scope (not render) — the react purity lint bars Date.now() inside components.
+function inviteExpired(expiresAt: string | null): boolean {
+  return Boolean(expiresAt) && new Date(expiresAt as string).getTime() < Date.now();
+}
 
 export default async function TeamPage() {
   const { user, account } = await getGateData();
@@ -11,19 +18,29 @@ export default async function TeamPage() {
 
   const supabase = await createClient();
 
-  const [{ data: members }, { data: invites }, { data: billingRow }] = await Promise.all([
-    supabase.from("account_members").select("user_id, role").eq("account_id", account.id),
-    supabase
-      .from("account_invites")
-      .select("id, email, role, created_at")
-      .eq("account_id", account.id)
-      .eq("status", "pending"),
-    supabase
-      .from("accounts")
-      .select("plan, subscription_status, seats_purchased, linkedin_accounts_purchased, current_period_end")
-      .eq("id", account.id)
-      .maybeSingle<AccountBillingRow>(),
-  ]);
+  const [{ data: members }, { data: invites }, { data: billingRow }, { data: acceptedInvites }] =
+    await Promise.all([
+      supabase.from("account_members").select("user_id, role, created_at").eq("account_id", account.id),
+      supabase
+        .from("account_invites")
+        .select("id, email, role, created_at, expires_at")
+        .eq("account_id", account.id)
+        .eq("status", "pending"),
+      supabase
+        .from("accounts")
+        .select("plan, subscription_status, seats_purchased, linkedin_accounts_purchased, current_period_end")
+        .eq("id", account.id)
+        .maybeSingle<AccountBillingRow>(),
+      // Real names on the roster: accepted-invite emails, zipped to members in join order
+      // (see matchMemberEmails — invites are email-verified at accept time).
+      supabase
+        .from("account_invites")
+        .select("email, accepted_at")
+        .eq("account_id", account.id)
+        .eq("status", "accepted")
+        .returns<{ email: string; accepted_at: string | null }[]>(),
+    ]);
+  const emailById = matchMemberEmails(members ?? [], acceptedInvites ?? []);
 
   const callerRole = (members ?? []).find((m) => m.user_id === user.id)?.role ?? "";
   const canManage = canManageTeam(callerRole);
@@ -36,7 +53,9 @@ export default async function TeamPage() {
     const isOwner = m.role === "owner";
     return {
       id: m.user_id,
-      label: isYou ? user.email ?? "You" : isOwner ? "Workspace owner" : "Team member",
+      label:
+        (isYou ? user.email : emailById.get(m.user_id)) ??
+        (isOwner ? "Workspace owner" : "Team member"),
       sublabel: null,
       role: m.role,
       isOwner,
@@ -44,14 +63,20 @@ export default async function TeamPage() {
       removable: canManage && !isYou && !isOwner,
     };
   });
-  const inviteRows: ShareInvite[] = (invites ?? []).map((i) => ({ id: i.id, email: i.email, role: i.role }));
+  // R3: expired invites are shown as expired (with a resend), never as still "awaiting".
+  const inviteRows: ShareInvite[] = (invites ?? []).map((i) => ({
+    id: i.id,
+    email: i.email,
+    role: i.role,
+    expired: inviteExpired(i.expires_at as string | null),
+  }));
   const workspaceName = (account as { name?: string | null }).name ?? "Your workspace";
 
   return (
     <div className="mx-auto max-w-2xl">
-      <div className="mb-6">
+      <div className="mb-6 border-b border-[var(--hairline)] pb-5">
         <h1 className="text-2xl font-semibold tracking-tight">Team</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <p className="mt-1.5 text-sm text-muted-foreground">
           Invite teammates into your workspace and manage who has access.
         </p>
       </div>

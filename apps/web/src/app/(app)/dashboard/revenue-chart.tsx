@@ -57,13 +57,16 @@ function RevenueTooltip({
         <span className="flex items-center gap-1.5 text-muted-foreground">
           <span className="size-2 rounded-full" style={{ background: BRAND }} /> Closed
         </span>
-        <span className="font-mono tabular-nums">{usdFull.format(closed / 100)}</span>
+        <span className="font-data tabular-nums">{usdFull.format(closed / 100)}</span>
       </div>
       <div className="flex items-center justify-between gap-6">
         <span className="flex items-center gap-1.5 text-muted-foreground">
-          <span className="size-2 rounded-full" style={{ background: BRAND_ACCENT }} /> Projected
+          {/* T1: this series is closed + TODAY'S expected pipeline (a constant offset),
+              not a modeled forecast — the label must not claim more than that. */}
+          <span className="size-2 rounded-full" style={{ background: BRAND_ACCENT }} /> With today&apos;s
+          pipeline
         </span>
-        <span className="font-mono tabular-nums">{usdFull.format(projected / 100)}</span>
+        <span className="font-data tabular-nums">{usdFull.format(projected / 100)}</span>
       </div>
     </div>
   );
@@ -89,7 +92,7 @@ export function RevenueChart({
         <AreaChart data={data} margin={{ top: 10, right: 6, bottom: 0, left: 0 }}>
           <defs>
             <linearGradient id="revClosedFill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={BRAND} stopOpacity={0.35} />
+              <stop offset="0%" stopColor={BRAND} stopOpacity={0.18} />
               <stop offset="100%" stopColor={BRAND} stopOpacity={0} />
             </linearGradient>
           </defs>

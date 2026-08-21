@@ -55,11 +55,12 @@ describe("InMemoryLinkedInInfra", () => {
         })
       ).toEqual({
         type: "reply", providerEventId: "le_1", connectedAccountRef: "li_acc_1",
+        fromProviderRef: null, fromPublicIdentifier: null, fromName: null,
         fromProfileUrl: "https://linkedin.com/in/jane", body: "sure", receivedAt: "2026-06-11T11:00:00Z",
       });
       expect(
         infra.parseEventWebhook({ event_id: "le_2", event_type: "relationship_accepted", connected_account: "li_acc_1", profile_url: "https://linkedin.com/in/jane" })
-      ).toEqual({ type: "relationship_accepted", providerEventId: "le_2", connectedAccountRef: "li_acc_1", profileUrl: "https://linkedin.com/in/jane" });
+      ).toEqual({ type: "relationship_accepted", providerEventId: "le_2", connectedAccountRef: "li_acc_1", profileUrl: "https://linkedin.com/in/jane", fromProviderRef: null, fromPublicIdentifier: null, fromName: null });
       expect(
         infra.parseEventWebhook({ event_id: "le_3", event_type: "account_status", connected_account: "li_acc_1", status: "active", profile_url: null, display_name: "Jane Doe", metadata_account_id: "acct-uuid" })
       ).toEqual({ type: "account_status", providerEventId: "le_3", connectedAccountRef: "li_acc_1", status: "active", profileUrl: null, displayName: "Jane Doe", vanteraAccountId: "acct-uuid" });

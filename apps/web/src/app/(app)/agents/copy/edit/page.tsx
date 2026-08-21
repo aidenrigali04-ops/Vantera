@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { CopyWizard } from "../../copy-wizard";
 
+export const metadata = { title: "Edit outreach" };
+
 export default async function EditCopyAgentPage() {
   const supabase = await createClient();
 
@@ -13,7 +15,7 @@ export default async function EditCopyAgentPage() {
     .maybeSingle<{
       id: string;
       name: string;
-      config: { cta?: string; channels?: { linkedin?: boolean } } | null;
+      config: { cta?: string; bookingUrl?: string | null; websiteUrl?: string | null; channels?: { linkedin?: boolean } } | null;
       campaigns: { send_mode: string | null } | null;
     }>();
   if (!agent) redirect("/agents");
@@ -52,6 +54,8 @@ export default async function EditCopyAgentPage() {
       edit={{
         name: agent.name,
         cta: agent.config?.cta ?? "",
+        bookingUrl: agent.config?.bookingUrl ?? "",
+        websiteUrl: agent.config?.websiteUrl ?? "",
         links,
         channels: {
           linkedin: agent.config?.channels?.linkedin ?? true,

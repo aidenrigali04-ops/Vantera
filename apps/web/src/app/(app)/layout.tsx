@@ -1,30 +1,54 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { LogOut } from "lucide-react";
 import { getGateData, toGateContext } from "@/lib/auth/context";
-import { resolveGate } from "@/lib/auth/gate";
+import { loginRedirect, resolveGate } from "@/lib/auth/gate";
 import { createClient } from "@/lib/supabase/server";
 import { signOut } from "./actions";
-import { DockNav, DockTooltip } from "@/components/dock-nav";
+import { DockNav, DockTooltip, MobileNav } from "@/components/dock-nav";
+import { AccountMenu } from "@/components/account-menu";
 import { VanteraLogo } from "@/components/landing/vantera-logo";
 import { NotificationsBell, type AppNotification } from "@/components/notifications/notifications-bell";
 import CopilotOverlay from "@/components/copilot/copilot-overlay";
 import { GlassFilter } from "@/components/ui/liquid-glass";
+import { ClarityIdentity } from "@/components/analytics/clarity-identity";
+import { RouteEvents } from "@/components/analytics/route-events";
+import { Suspense } from "react";
 import { TrialBanner, type TrialBannerProps } from "@/components/billing/trial-banner";
+import { Toaster } from "@/components/ui/sonner";
 import { trialDaysLeft, isTrialExpired } from "@vantera/billing";
 
-const NOTE_VERB: Record<AppNotification["kind"], string> = {
-  reply: "replied — the sequence paused for you",
-  converted: "booked a meeting",
-  exhausted: "went cold after the full sequence",
-  hot_signal: "is heating up — a fresh buying signal, worth reaching out now",
+/** R2: app tabs get real names — "Leads · Vantera", not five identical marketing titles.
+ *  Scoped here (not the root layout) so marketing pages keep their full SEO titles. */
+export const metadata = {
+  title: { template: "%s · Vantera", default: "Vantera" },
 };
-const NOTE_HREF: Record<AppNotification["kind"], string> = {
-  reply: "/leads?tab=replied",
-  converted: "/dashboard?view=pipeline",
-  exhausted: "/leads?tab=rejected",
-  hot_signal: "/leads?tab=qualified",
-};
+
+/** Honest per-event copy. A reply's body carries its classification (inbound pipeline), so an
+ *  interested reply and a not-interested one read as the different events they are. */
+function noteVerb(kind: AppNotification["kind"], body: string): string {
+  if (kind === "reply") {
+    if (body.includes("not_interested") || body.includes("not interested")) {
+      return "replied — not interested, the sequence stopped";
+    }
+    if (body.includes("interested")) return "replied interested — read it and jump in";
+    return "replied — read it and jump in";
+  }
+  return {
+    converted: "closed — a new client",
+    exhausted: "went cold after the full sequence",
+    hot_signal: "is heating up — a fresh buying signal, worth reaching out now",
+    needs_human: "needs YOU — the agent hit its conversation limit, take the thread over",
+    meeting_booked: "booked a meeting — it's on your meetings list",
+  }[kind];
+}
+
+/** Pin-point navigation: lead-scoped events land on THAT lead's page, not a generic tab. */
+function noteHref(kind: AppNotification["kind"], leadId: string): string {
+  if (kind === "converted") return "/dashboard?view=pipeline";
+  return `/leads/${leadId}`;
+}
 
 // Relative time on the server → passed as a static string (no client Date.now()).
 function noteTimeAgo(iso: string): string {
@@ -39,56 +63,107 @@ function noteTimeAgo(iso: string): string {
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const data = await getGateData();
   const dest = resolveGate("app", toGateContext(data));
-  if (dest) redirect(dest);
+  // Preserve the requested path through the login bounce so email/deep-link CTAs land on the
+  // surface they promised (e.g. /review) instead of dead-ending on /dashboard after sign-in.
+  if (dest) redirect(loginRedirect(dest, (await headers()).get("x-pathname")));
 
-  // Real data behind the dock's badge: drafts waiting in the review queue.
-  // RLS scopes this to the session's account (rule 02) — no account id passed.
+  // Shell data — four independent reads, fired concurrently (R1a): every app navigation
+  // pays this layout's latency, so it must be one round-trip, not a waterfall. All reads
+  // are RLS-scoped to the session's account (rule 02) — no account id passed. Shell reads
+  // stay non-fatal: a failed badge/bell/banner degrades to empty, never crashes the frame.
   const supabase = await createClient();
-  const { count } = await supabase
-    .from("scheduled_sends")
-    .select("id", { count: "exact", head: true })
-    .eq("status", "pending_review");
+  const [
+    { count },
+    { data: notes },
+    { data: billing },
+    { count: unhealthyConnections },
+    { data: profile },
+  ] = await Promise.all([
+    supabase
+      .from("scheduled_sends")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "pending_review"),
+    // Recent lead events for the dock bell — read AND unread, so opening the bell always
+    // rewards the click with the recent history (an unread-only feed goes permanently empty
+    // the moment it's opened once). Unread stays visually distinct; only unread gets marked.
+    supabase
+      .from("lead_notifications")
+      .select("id, kind, lead_id, body, created_at, read_at")
+      .order("created_at", { ascending: false })
+      .limit(20)
+      .returns<
+        {
+          id: string;
+          kind: AppNotification["kind"];
+          lead_id: string;
+          body: string;
+          created_at: string;
+          read_at: string | null;
+        }[]
+      >(),
+    // Soft-lock trial strip: a live countdown while trialing, a clear "paused" state once
+    // it lapses. Server-set billing columns only (RLS-scoped) — never a placeholder.
+    supabase
+      .from("accounts")
+      .select("plan, subscription_status, trial_ends_at")
+      .limit(1)
+      .maybeSingle<{ plan: string; subscription_status: string; trial_ends_at: string | null }>(),
+    // Dead LinkedIn connection = every agent silently stopped (no sourcing, no sends, no
+    // replies coming in) — the one state that must never be invisible (2026-07-08 incident).
+    // The account-health cron reconciles the status; this banner is its user-facing half.
+    supabase
+      .from("linkedin_accounts")
+      .select("id", { count: "exact", head: true })
+      .in("status", ["disconnected", "restricted"]),
+    // T5: the display name finally shows up where the user lives (account menu) —
+    // it was written in Settings and then never read by any in-app surface.
+    supabase.from("user_profiles").select("display_name").maybeSingle<{ display_name: string | null }>(),
+  ]);
   const badges = count && count > 0 ? { review: count } : undefined;
-
-  // Unread lead events for the dock bell (reply paused / converted / exhausted).
-  const { data: notes } = await supabase
-    .from("lead_notifications")
-    .select("id, kind, lead_id, created_at")
-    .is("read_at", null)
-    .order("created_at", { ascending: false })
-    .limit(8)
-    .returns<{ id: string; kind: AppNotification["kind"]; lead_id: string; created_at: string }[]>();
   const noteLeadIds = [...new Set((notes ?? []).map((n) => n.lead_id))];
   const { data: noteLeads } = noteLeadIds.length
     ? await supabase
         .from("leads")
-        .select("id, first_name, company_name")
+        .select("id, first_name, last_name, company_name")
         .in("id", noteLeadIds)
-        .returns<{ id: string; first_name: string | null; company_name: string | null }[]>()
-    : { data: [] as { id: string; first_name: string | null; company_name: string | null }[] };
+        .returns<
+          { id: string; first_name: string | null; last_name: string | null; company_name: string | null }[]
+        >()
+    : {
+        data: [] as {
+          id: string;
+          first_name: string | null;
+          last_name: string | null;
+          company_name: string | null;
+        }[],
+      };
   const noteName = new Map(
-    (noteLeads ?? []).map((l) => [l.id, l.company_name || l.first_name || "A lead"])
+    (noteLeads ?? []).map((l) => [
+      l.id,
+      [l.first_name, l.last_name].filter(Boolean).join(" ") || l.company_name || "A lead",
+    ])
   );
   const notifications: AppNotification[] = (notes ?? []).map((n) => ({
     id: n.id,
     kind: n.kind,
     who: noteName.get(n.lead_id) ?? "A lead",
-    verb: NOTE_VERB[n.kind],
+    verb: noteVerb(n.kind, n.body ?? ""),
     at: noteTimeAgo(n.created_at),
-    href: NOTE_HREF[n.kind],
+    href: noteHref(n.kind, n.lead_id),
+    unread: n.read_at === null,
   }));
-
-  // Soft-lock trial strip: a live countdown while trialing, a clear "paused" state once
-  // it lapses. Server-set billing columns only (RLS-scoped) — never a placeholder.
-  const { data: billing } = await supabase
-    .from("accounts")
-    .select("plan, subscription_status, trial_ends_at")
-    .limit(1)
-    .maybeSingle<{ plan: string; subscription_status: string; trial_ends_at: string | null }>();
 
   let trialBanner: TrialBannerProps | null = null;
   if (billing) {
-    if (billing.subscription_status === "trialing") {
+    if (billing.subscription_status === "trialing" && billing.trial_ends_at === null) {
+      // Trial-on-activation: the clock hasn't started — connecting LinkedIn starts it.
+      trialBanner = {
+        tone: "info",
+        message: "Your 7-day free trial starts the moment you connect LinkedIn — nothing is counting down yet.",
+        cta: "Connect LinkedIn",
+        href: "/settings/channels",
+      };
+    } else if (billing.subscription_status === "trialing") {
       const d = trialDaysLeft(billing.trial_ends_at) ?? 0;
       trialBanner = {
         tone: d <= 1 ? "urgent" : "info",
@@ -117,48 +192,111 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     }
   }
 
+  const connectionBanner: TrialBannerProps | null =
+    unhealthyConnections && unhealthyConnections > 0
+      ? {
+          tone: "urgent",
+          message:
+            "Your LinkedIn connection dropped — your agents are paused and replies aren't coming in. Reconnect to resume.",
+          cta: "Reconnect LinkedIn",
+          href: "/settings/channels",
+        }
+      : null;
+
   const email = data.user?.email ?? "";
   const initial = email.charAt(0).toUpperCase() || "?";
 
   return (
     <div className="app-surface flex min-h-screen bg-[var(--tint)]">
+      {/* Session-scoped analytics identity: recordings become filterable by user,
+          account, and plan. Values come from the validated session (rule 02). */}
+      {data.user && (
+        <ClarityIdentity
+          userId={data.user.id}
+          friendlyName={data.user.email ?? undefined}
+          tags={{
+            surface: "dashboard",
+            accountId: data.account?.id ?? "",
+            plan: billing?.plan ?? "",
+            subscriptionStatus: billing?.subscription_status ?? "",
+          }}
+        />
+      )}
+      <Suspense fallback={null}>
+        <RouteEvents />
+      </Suspense>
       <GlassFilter />
       {/* Sticky full-height rail: stays in view while main scrolls. */}
-      <aside className="sticky top-0 flex h-screen w-20 shrink-0 flex-col items-center gap-4 overflow-y-auto border-r border-[var(--hairline)] bg-white px-2 py-4">
+      <aside className="app-rail sticky top-0 hidden h-screen w-20 shrink-0 flex-col items-center gap-4 overflow-y-auto px-2 py-4 lg:flex">
         <Link
           href="/dashboard"
           aria-label="Vantera home"
-          className="grid size-11 shrink-0 place-items-center text-foreground"
+          className="grid size-11 shrink-0 place-items-center text-[var(--nav-fg-strong)]"
         >
-          <VanteraLogo className="size-8 text-foreground" />
+          <VanteraLogo className="size-8 text-[var(--nav-fg-strong)]" />
         </Link>
 
         <NotificationsBell notifications={notifications} />
 
         <DockNav badges={badges} />
 
-        {/* Account + sign out, kept in the dock idiom — pinned to the bottom. */}
-        <div className="mt-auto flex flex-col items-center gap-3 rounded-[28px] border border-[var(--hairline)] bg-white/80 px-2 py-3 ring-1 ring-black/5 backdrop-blur-lg">
-          <span className="group relative grid size-10 place-items-center rounded-full bg-foreground/[0.06] text-xs font-semibold text-[var(--ink-2)] ring-1 ring-[var(--hairline)]">
-            {initial}
-            <DockTooltip>{email}</DockTooltip>
-          </span>
+        {/* Account menu, kept in the dock idiom — pinned to the bottom. T5: the chip
+            opens a real menu (name, email, Settings, sign out) instead of being a dead
+            span; the display name set in Settings is finally visible in-product. */}
+        <div className="mt-auto flex flex-col items-center gap-3 rounded-2xl border border-[var(--nav-line)] bg-white/[0.06] px-2 py-3 backdrop-blur-lg">
+          <AccountMenu
+            initial={initial}
+            displayName={profile?.display_name ?? null}
+            email={email}
+            signOut={signOut}
+          />
           <form action={signOut}>
             <button
               type="submit"
               aria-label="Sign out"
-              className="dock-tile group relative grid size-12 place-items-center rounded-xl bg-white text-[var(--ink-3)] shadow-sm ring-1 ring-[var(--hairline)] transition-transform duration-200 hover:translate-x-0.5 hover:scale-[1.05] hover:text-foreground focus-visible:scale-[1.05] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none"
+              className="group relative grid size-12 place-items-center rounded-xl bg-[var(--nav-tile)] text-[var(--nav-fg)] ring-1 ring-[var(--nav-line)] transition-colors duration-200 hover:bg-[var(--nav-tile-hover)] hover:text-[var(--nav-fg-strong)] focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none"
             >
-              <LogOut className="size-5 transition-transform duration-200 group-hover:scale-110" strokeWidth={2.1} />
+              <LogOut className="size-5" strokeWidth={2.1} />
               <DockTooltip>Sign out</DockTooltip>
             </button>
           </form>
         </div>
       </aside>
-      <main className="glass-cards flex-1 px-8 py-6">
+      {/* min-w-0 + overflow-x-clip: a flex child never stretches past the viewport, so no
+          surface can ever produce a sideways-scrolling page — wide content clips instead. */}
+      <main className="glass-cards min-w-0 flex-1 overflow-x-clip px-4 py-4 pb-24 sm:px-8 sm:py-6 lg:pb-6">
+        {/* Mobile top bar: logo + bell + settings (the rail is desktop-only). */}
+        <div className="mb-4 flex items-center justify-between lg:hidden">
+          <Link href="/dashboard" aria-label="Vantera home" className="text-foreground">
+            <VanteraLogo className="size-7" />
+          </Link>
+          <div className="flex items-center gap-2">
+            <NotificationsBell notifications={notifications} />
+            <Link
+              href="/settings"
+              aria-label="Settings"
+              className="grid size-10 place-items-center rounded-xl border border-[var(--hairline)] text-muted-foreground"
+            >
+              <span className="text-sm font-semibold">{initial}</span>
+            </Link>
+            {/* T3: sign-out existed only in the desktop rail — phones had no way out. */}
+            <form action={signOut}>
+              <button
+                type="submit"
+                aria-label="Sign out"
+                className="grid size-10 place-items-center rounded-xl border border-[var(--hairline)] text-muted-foreground"
+              >
+                <LogOut className="size-4" strokeWidth={2.1} />
+              </button>
+            </form>
+          </div>
+        </div>
+        {connectionBanner && <TrialBanner {...connectionBanner} />}
         {trialBanner && <TrialBanner {...trialBanner} />}
         {children}
       </main>
+      <MobileNav badges={badges} />
+      <Toaster />
       <CopilotOverlay />
     </div>
   );

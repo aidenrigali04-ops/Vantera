@@ -52,3 +52,30 @@ export function validateConnectionConfig(
     values: { autoPush: input.autoPush === true || input.autoPush === "true", target, mapping },
   };
 }
+
+export interface ActivityConfig {
+  enabled: boolean;
+  events: { outreach: boolean; replies: boolean; meetings: boolean };
+  watermark?: string;
+}
+
+/**
+ * The next config.activity for a connection. The watermark is the no-history-dump guarantee:
+ * a FRESH enable stamps it at now (sync starts from this moment); staying enabled keeps the
+ * existing watermark; disabling drops it so a later re-enable starts fresh again — the gap
+ * is never back-filled into the customer's CRM.
+ */
+export function nextActivityConfig(
+  prev: Partial<ActivityConfig> | undefined,
+  input: { enabled: boolean; outreach: boolean; replies: boolean; meetings: boolean },
+  now: Date = new Date()
+): ActivityConfig {
+  const config: ActivityConfig = {
+    enabled: input.enabled,
+    events: { outreach: input.outreach, replies: input.replies, meetings: input.meetings },
+  };
+  if (input.enabled) {
+    config.watermark = prev?.enabled ? prev.watermark : now.toISOString();
+  }
+  return config;
+}

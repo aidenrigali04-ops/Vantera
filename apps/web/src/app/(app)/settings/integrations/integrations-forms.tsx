@@ -8,6 +8,7 @@ import { FormError } from "@/components/form-error";
 import {
   connectDestination,
   disconnectDestination,
+  saveActivitySync,
   saveConnectionConfig,
   toggleAutoPush,
   testConnection,
@@ -20,7 +21,16 @@ export interface CrmConnectionRow {
   provider: string;
   kind: "crm" | "notify";
   status: "connecting" | "active" | "error" | "disconnected";
-  config: { autoPush?: boolean; target?: Record<string, string>; mapping?: Record<string, string> };
+  config: {
+    autoPush?: boolean;
+    target?: Record<string, string>;
+    mapping?: Record<string, string>;
+    activity?: {
+      enabled?: boolean;
+      events?: { outreach?: boolean; replies?: boolean; meetings?: boolean };
+      watermark?: string;
+    };
+  };
   last_error: string | null;
   last_sync_at: string | null;
 }
@@ -144,6 +154,84 @@ function ConfigForm({ connection, meta }: { connection: CrmConnectionRow; meta: 
   );
 }
 
+// ── Activity sync (timeline notes) ─────────────────────────────────────────────────
+// Only rendered for destinations that support it (meta.supportsActivitySync — HubSpot
+// today). Opt-in: touches sync from the moment it's enabled, never historically.
+const ACTIVITY_EVENTS = [
+  { key: "outreach", label: "Outreach sent" },
+  { key: "replies", label: "Replies received" },
+  { key: "meetings", label: "Meetings booked" },
+] as const;
+
+function ActivitySyncPanel({
+  connection,
+  meta,
+}: {
+  connection: CrmConnectionRow;
+  meta: ConnectorMeta;
+}) {
+  const [state, action, pending] = useActionState<IntegrationActionState, FormData>(
+    saveActivitySync,
+    {}
+  );
+  const activity = connection.config.activity ?? {};
+  const events = activity.events ?? {};
+
+  return (
+    <form action={action} className="space-y-4 border-t border-border pt-4">
+      <input type="hidden" name="connectionId" value={connection.id} />
+      <div>
+        <label className="flex items-start gap-3">
+          <input
+            type="checkbox"
+            name="enabled"
+            defaultChecked={activity.enabled === true}
+            className="mt-0.5 size-4 accent-[var(--cyan)]"
+          />
+          <span>
+            <span className="block text-sm font-medium">
+              Log LinkedIn activity to the contact timeline
+            </span>
+            <span className="block text-sm text-muted-foreground">
+              Touches appear as notes on the {meta.label} contact as they happen — the contact is
+              created at the first synced touch, before the deal closes. Sync starts the moment you
+              turn this on; history is never imported.
+            </span>
+          </span>
+        </label>
+      </div>
+
+      <div className="flex flex-wrap gap-x-6 gap-y-2 pl-7">
+        {ACTIVITY_EVENTS.map((e) => (
+          <label key={e.key} className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              name={`events.${e.key}`}
+              defaultChecked={events[e.key] !== false}
+              className="size-4 accent-[var(--cyan)]"
+            />
+            {e.label}
+          </label>
+        ))}
+      </div>
+
+      <div className="flex items-center gap-3 pl-7">
+        <Button type="submit" size="sm" variant="outline" disabled={pending}>
+          {pending ? "Saving…" : "Save activity sync"}
+        </Button>
+        {state.success && <p className="text-sm text-muted-foreground">{state.success}</p>}
+      </div>
+      <FormError message={state.error} />
+      {activity.enabled && (
+        <p className="pl-7 text-xs text-muted-foreground">
+          Connected {meta.label} before activity sync existed? Reconnect once to grant the updated
+          permissions if syncing reports an authorization error.
+        </p>
+      )}
+    </form>
+  );
+}
+
 // ── Test + Disconnect row ─────────────────────────────────────────────────────────
 function ConnectionActions({ connection }: { connection: CrmConnectionRow }) {
   const [testState, testAction, testing] = useActionState<IntegrationActionState, FormData>(
@@ -190,6 +278,7 @@ export function ConnectionManager({
       <div className="border-t border-border pt-4">
         <ConfigForm connection={connection} meta={meta} />
       </div>
+      {meta.supportsActivitySync && <ActivitySyncPanel connection={connection} meta={meta} />}
       <ConnectionActions connection={connection} />
     </div>
   );

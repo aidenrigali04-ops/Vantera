@@ -1,0 +1,42 @@
+{
+  "id": "li-hospitality-gm-scheduling",
+  "input": {
+    "lead": {
+      "firstName": "Iris",
+      "lastName": "Halvorsen",
+      "title": "GM of Operations",
+      "companyName": "Amber Cascade Hospitality",
+      "industry": "Hospitality"
+    },
+    "insights": {
+      "pain_points": [
+        "Shift schedules get built in a spreadsheet every week",
+        "Last minute call outs leave shifts uncovered"
+      ],
+      "triggers": [
+        "Opened a third location this year"
+      ],
+      "motivations": [
+        "Keep every shift covered across three locations"
+      ],
+      "value_angle": "A shared schedule with open shift alerts fills gaps before a shift starts",
+      "aha_moment": "Realizing most uncovered shifts had someone available, they just never saw the opening",
+      "prospect_offering": "Amber Cascade Hospitality operates three full service restaurants",
+      "summary": "GM opening a third location while scheduling still runs through a spreadsheet"
+    },
+    "context": {
+      "cta": "offer a short walkthrough of shared shift scheduling",
+      "accountName": "ShiftEasy",
+      "accountIndustry": "Hospitality scheduling software",
+      "valueProp": "ShiftEasy fills open shifts fast by alerting available staff automatically",
+      "bookingUrl": "https://shifteasy.example/book",
+      "brandVoice": "Warm, upbeat, hospitality-industry insider tone."
+    }
+  },
+  "grounding": "Seller offer: ShiftEasy fills open shifts fast by alerting available staff automatically Prospect: Iris Halvorsen, GM of Operations at Amber Cascade Hospitality (Hospitality). Pain points: Shift schedules get built in a spreadsheet every week; Last minute call outs leave shifts uncovered. Value angle: A shared schedule with open shift alerts fills gaps before a shift starts",
+  "frozenDraft": {
+    "connectionNote": "Saw Amber Cascade opened a third location this year, exciting stage for the group.",
+    "followupMessage": "Thanks for connecting. A third location means a lot more shifts to cover. How are you building the schedule these days?",
+    "violations": []
+  }
+}

@@ -167,7 +167,28 @@ describe("runIntentScan", () => {
       seenObservationKeys: async (_a, refs) => new Set(refs.map((r) => `${r.profileUrl}|${r.postRef}`)),
     });
     const summary = await runIntentScan("intent-1", makeDeps(store));
-    expect(summary).toMatchObject({ status: "completed", observed: 0, qualified: 0, chained: false });
+    expect(summary).toMatchObject({ status: "completed", observed: 0, qualified: 0, chained: false, sourcingErrors: 0 });
     expect(calls.completed).toBe(true);
+  });
+
+  it("counts failed watch-target reads — a dead connection reports sourcingErrors, never a quiet day", async () => {
+    const { store } = makeStore();
+    const deps = makeDeps(store);
+    // every provider read 401s (the 2026-07-08 disconnected-account incident)
+    deps.linkedin = Object.assign(seededLinkedIn(), {
+      listProfilePosts: async () => {
+        throw new Error("401 disconnected_account");
+      },
+      searchPosts: async () => {
+        throw new Error("401 disconnected_account");
+      },
+    });
+
+    const summary = await runIntentScan("intent-1", deps);
+
+    expect(summary.status).toBe("completed"); // one bad target still never sinks the run
+    expect(summary.targets).toBe(1);
+    expect(summary.sourcingErrors).toBe(1); // ...but the failure is visible, not swallowed
+    expect(summary.observed).toBe(0);
   });
 });

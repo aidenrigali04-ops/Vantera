@@ -20,6 +20,10 @@ export const leadInsightsSchema = z.object({
   pain_points: z.array(z.string()),
   triggers: z.array(z.string()),
   motivations: z.array(z.string()),
+  /** what the PROSPECT's own company/role does, in their own terms — grounded strictly in their
+   *  title/company/signals, never the seller's offer. Separated from value_angle so the two
+   *  businesses can't fuse (the "we run lead gen for 10-20 founders" misread, 2026-07-09). */
+  prospect_offering: z.string(),
   value_angle: z.string(),
   aha_moment: z.string(),
   /** user-facing tailored enrichment summary (leads.ai_insights.summary) */
@@ -46,8 +50,13 @@ export function normalizeInsights(i: LeadInsights): LeadInsights {
     score: Math.max(0, Math.min(100, Math.round(i.score))),
     rationale: clamp(i.rationale, 280),
     pain_points: i.pain_points.slice(0, 3),
-    triggers: i.triggers.slice(0, 3),
+    // Drop empty/whitespace triggers before persisting (review I3): an empty entry renders as a
+    // stray "; " in the leadBlock ("Triggers: ; x") that a downstream signal check could misread as
+    // real content. Ranker "no signal" filler tokens ("none", "No specific trigger found") are left
+    // to the selector + grounding guard, which both treat them as absent (shape.ts isNoSignalToken).
+    triggers: i.triggers.filter((t) => t.trim().length > 0).slice(0, 3),
     motivations: i.motivations.slice(0, 3),
+    prospect_offering: clamp(i.prospect_offering, 220),
     value_angle: clamp(i.value_angle, 200),
     aha_moment: clamp(i.aha_moment, 200),
     summary: clamp(i.summary, 400),
@@ -55,15 +64,26 @@ export function normalizeInsights(i: LeadInsights): LeadInsights {
 }
 
 /** Shape persisted to leads.ai_insights (everything except score/rationale, which get columns). */
-export function toStoredInsights(insights: LeadInsights) {
+export function toStoredInsights(insights: LeadInsights): StoredInsights {
   return {
     pain_points: insights.pain_points,
     triggers: insights.triggers,
     motivations: insights.motivations,
+    prospect_offering: insights.prospect_offering,
     value_angle: insights.value_angle,
     aha_moment: insights.aha_moment,
     summary: insights.summary,
   };
 }
 
-export type StoredInsights = ReturnType<typeof toStoredInsights>;
+export interface StoredInsights {
+  pain_points: string[];
+  triggers: string[];
+  motivations: string[];
+  value_angle: string;
+  aha_moment: string;
+  summary: string;
+  /** what the prospect's OWN company/role does, in their terms (rank field added 2026-07-10).
+   *  Optional: leads ranked before this field predate it — consumers fall back to the raw title. */
+  prospect_offering?: string;
+}

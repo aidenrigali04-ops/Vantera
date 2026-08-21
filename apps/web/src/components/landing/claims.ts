@@ -29,7 +29,7 @@ export const CTA_LABEL = "Get started free";
 export const CTA_HREF = "/signup";
 
 /** Reassurance line under primary CTAs (two claims max, ` · ` separated). */
-export const CTA_REASSURANCE = "Free 3-day trial · Cancel anytime";
+export const CTA_REASSURANCE = "Free 7-day trial · Cancel anytime";
 
 /** LinkedIn disclaimer — every page's footer. */
 export const LINKEDIN_DISCLAIMER =

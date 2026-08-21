@@ -5,6 +5,7 @@ import {
   index,
   integer,
   jsonb,
+  numeric,
   pgTable,
   primaryKey,
   smallint,
@@ -43,6 +44,10 @@ export const accounts = pgTable("accounts", {
   // 0001: onboarding capture + billing refs + per-account kill switch
   onboardingIndustry: text("onboarding_industry"),
   onboardingIcp: text("onboarding_icp"),
+  // 0038: the user's role (Founder / Sales / Marketing / …) + their own LinkedIn URL captured on
+  // the personalize step — personalize how the agent represents them. Null pre-0038.
+  onboardingRole: text("onboarding_role"),
+  onboardingLinkedinUrl: text("onboarding_linkedin_url"),
   revenueGoalCents: bigint("revenue_goal_cents", { mode: "number" }),
   // 0012: estimated monthly recurring value per closed client — powers the dashboard
   // revenue snapshot (closed + expected MRR vs. the goal). Null until set in Settings.
@@ -59,13 +64,21 @@ export const accounts = pgTable("accounts", {
   senderAddress: jsonb("sender_address"),
   // 0019: human sender name for the email sign-off ({{sender_name}}); client-settable in Settings
   senderName: text("sender_name"),
+  // 0061: seller-authored positioning — client-settable (Settings › Positioning + onboarding value
+  // prop). Fed to the copy/reply brains via leadBlock; null falls back to the website-scan summary.
+  valueProp: text("value_prop"),
+  brandVoice: text("brand_voice"),
+  guardrails: text("guardrails"),
   // 0013: subscription entitlement snapshot (server-managed; Stripe webhook only)
-  // No-card free trial (0020; shortened to 3 days in 0037): new accounts default to a
-  // Starter trial. Defaults are applied by the DB on create_account insert; the
-  // trial_ends_at default expression (now() + 3 days) lives in the SQL migration (source of truth).
+  // No-card free trial (0020; shortened to 3 days in 0037; lengthened to 5 days in 0046):
+  // new accounts default to a Starter trial. Defaults are applied by the DB on create_account
+  // insert; the trial_ends_at default expression (now() + 7 days, migration 0048) lives in the SQL migration
+  // (source of truth).
   plan: text("plan", { enum: ["none", "starter", "growth", "scale"] })
     .notNull()
-    .default("starter"),
+    // 0052 (L5): new signups trial All Access (= growth tier). starter/scale remain for
+    // existing subscribers only.
+    .default("growth"),
   subscriptionStatus: text("subscription_status", {
     enum: ["none", "trialing", "active", "past_due", "canceled"],
   })
@@ -75,6 +88,16 @@ export const accounts = pgTable("accounts", {
   linkedinAccountsPurchased: integer("linkedin_accounts_purchased").notNull().default(0),
   currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }),
   trialEndsAt: timestamp("trial_ends_at", { withTimezone: true }),
+  // 0042: Monday recap email opt-out (default on); client-settable in Settings (column grant)
+  weeklySummaryEnabled: boolean("weekly_summary_enabled").notNull().default(true),
+  // 0051 (L3): interested-reply / meeting-booked / needs-you emails to the account owners
+  leadEventEmailsEnabled: boolean("lead_event_emails_enabled").notNull().default(true),
+  // 0055 (R5): lifecycle emails (trial-ending, payment-failed) + their idempotence stamps
+  lifecycleEmailsEnabled: boolean("lifecycle_emails_enabled").notNull().default(true),
+  trialEndingNotifiedAt: timestamp("trial_ending_notified_at", { withTimezone: true }),
+  paymentFailedNotifiedAt: timestamp("payment_failed_notified_at", { withTimezone: true }),
+  // 0060 (pull-back email): when ANY lifecycle email last went to this account — collision guard
+  lifecycleLastEmailAt: timestamp("lifecycle_last_email_at", { withTimezone: true }),
 });
 
 export const accountMembers = pgTable(
@@ -196,6 +219,10 @@ export const leads = pgTable(
     linkedinUrlNormalized: text("linkedin_url_normalized").generatedAlwaysAs(
       sql`regexp_replace(lower(btrim(linkedin_url)), '/+$', '')`
     ),
+    // 0043: the member provider_id (ACoAA…) — the identity inbound webhooks actually carry.
+    // Written at send time (resolved for the provider call anyway) and backfilled whenever a
+    // fallback match succeeds; the PRIMARY reply-attribution key from then on. Service-role only.
+    linkedinProviderRef: text("linkedin_provider_ref"),
     // 0034: sticky sender — the LinkedIn account assigned to send this lead's whole
     // sequence (multi-sender distribution, rule 04/13). Null until the first invite.
     linkedinAccountId: uuid("linkedin_account_id").references(() => linkedinAccounts.id, {
@@ -216,6 +243,18 @@ export const leads = pgTable(
     closedAt: timestamp("closed_at", { withTimezone: true }),
     // 0028: meeting-booked stage for the attribution funnel; server-set only (not client-writable)
     meetingBookedAt: timestamp("meeting_booked_at", { withTimezone: true }),
+    // 0050 meeting layer: scheduled time when known + which writer recorded the booking
+    // ('agent' = reply-classification detector, 'manual' = the user's control, authoritative)
+    meetingAt: timestamp("meeting_at", { withTimezone: true }),
+    meetingSource: text("meeting_source", { enum: ["agent", "manual"] }),
+    // 0056 R6: last user correction to identity fields — corrected values feed drafts directly
+    editedByUserAt: timestamp("edited_by_user_at", { withTimezone: true }),
+    // 0040: self-optimizing experiment attribution — stamped by copy-draft when a lead is drafted
+    // under a running experiment. Null for non-experiment leads; service-role write only.
+    experimentId: uuid("experiment_id").references(() => optimizationExperiments.id, {
+      onDelete: "set null",
+    }),
+    strategyVariant: text("strategy_variant", { enum: ["champion", "challenger"] }),
     status: text("status", {
       enum: [
         "sourced",
@@ -288,6 +327,46 @@ export const leadSignals = pgTable(
     index("lead_signals_account_kind_idx").on(t.accountId, t.kind),
     uniqueIndex("lead_signals_unique").on(t.leadId, t.kind, t.label),
   ]
+);
+
+// 0057 T4: one row per scheduled agent run — the operate-path record behind the run
+// history + needs-attention states. Service-role writes only; pruned at 90 days.
+export const agentRuns = pgTable(
+  "agent_runs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    agentId: uuid("agent_id")
+      .notNull()
+      .references(() => agents.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: ["scout", "intent"] }).notNull(),
+    status: text("status", { enum: ["completed", "skipped", "failed"] }).notNull(),
+    summary: jsonb("summary").notNull().default({}),
+    note: text("note"),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("agent_runs_agent_idx").on(t.agentId, t.startedAt)]
+);
+
+// 0056 R6: plain-text annotations on the lead brief — the user's own knowledge about a
+// prospect, kept with the lead (cascades on erasure). Immutable; delete = author or admin.
+export const leadNotes = pgTable(
+  "lead_notes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    leadId: uuid("lead_id")
+      .notNull()
+      .references(() => leads.id, { onDelete: "cascade" }),
+    authorUserId: uuid("author_user_id"),
+    body: text("body").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("lead_notes_lead_idx").on(t.leadId, t.createdAt)]
 );
 
 // ── 0003 campaigns, scheduler, suppression ───────────────────────────────────
@@ -386,6 +465,14 @@ export const scheduledSends = pgTable(
     styleFlags: text("style_flags"),
     // 0009: LinkedIn invite/message pair sequencing (null for email)
     linkedinStage: text("linkedin_stage", { enum: ["invite", "message"] }),
+    // 0044: which machine queued this send — 'reply_response' rides the dispatch priority
+    // lane (speed-to-lead), 'sequence' keeps full pacing + send windows, 'manual' = human-typed
+    origin: text("origin", { enum: ["sequence", "reply_response", "manual"] })
+      .notNull()
+      .default("sequence"),
+    // 0049: message-level recipe attribution (Vera Stage 1) — the SendRecipe stamp written at
+    // draft time by the drafting pipelines. Null = pre-Stage-1 row or human-typed message.
+    recipe: jsonb("recipe"),
     scheduledFor: timestamp("scheduled_for", { withTimezone: true }),
     approvedBy: uuid("approved_by"),
     approvedAt: timestamp("approved_at", { withTimezone: true }),
@@ -1009,6 +1096,9 @@ export const sequenceRuns = pgTable(
       .default("linkedin"),
     touchesDone: smallint("touches_done").notNull().default(0),
     callAttempts: smallint("call_attempts").notNull().default(0),
+    // 0044: one-shot soft-no revival — an exhausted run whose lead replied gets ONE
+    // respectful re-touch ~30 days later; a set timestamp means it's been spent
+    revivedAt: timestamp("revived_at", { withTimezone: true }),
     nextActionAt: timestamp("next_action_at", { withTimezone: true }).notNull().defaultNow(),
     enteredStageAt: timestamp("entered_stage_at", { withTimezone: true }).notNull().defaultNow(),
     lastTouchAt: timestamp("last_touch_at", { withTimezone: true }),
@@ -1035,7 +1125,9 @@ export const leadNotifications = pgTable(
       .notNull()
       .references(() => accounts.id, { onDelete: "cascade" }),
     leadId: uuid("lead_id").notNull(),
-    kind: text("kind", { enum: ["reply", "converted", "exhausted", "hot_signal"] }).notNull(),
+    kind: text("kind", {
+      enum: ["reply", "converted", "exhausted", "hot_signal", "needs_human", "meeting_booked"],
+    }).notNull(),
     body: text("body").notNull(),
     // no updated_at: read_at is the only mutable field
     readAt: timestamp("read_at", { withTimezone: true }),
@@ -1047,6 +1139,77 @@ export const leadNotifications = pgTable(
     index("lead_notifications_lead_idx").on(t.leadId),
   ]
 );
+
+// ── 0047 proof grounding ──────────────────────────────────────────────────────
+// Account-scoped, citable proof / pricing / FAQ facts the conversation brains may quote when a
+// prospect asks for evidence or price (injected into the leadBlock grounding). Member-read,
+// admin-manage. FK to auth.users(id) for created_by lives in the SQL migration.
+export const proofPoints = pgTable(
+  "proof_points",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: ["metric", "outcome", "pricing", "faq"] }).notNull(),
+    text: text("text").notNull(),
+    question: text("question"),
+    sort: integer("sort").notNull().default(0),
+    createdBy: uuid("created_by"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("proof_points_account_idx").on(t.accountId)]
+);
+
+// ── 0040 self-optimizing outreach (Phase 3) ───────────────────────────────────
+// The champion/challenger experiment engine's store. Inert until an owner starts an experiment.
+// Members read; admins start/adopt/discard; the decide pipeline updates status via service role.
+export const optimizationExperiments = pgTable(
+  "optimization_experiments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    stageKey: text("stage_key", { enum: ["acceptance", "reply", "booking", "close"] }).notNull(),
+    championStrategy: jsonb("champion_strategy").notNull().default({}),
+    challengerStrategy: jsonb("challenger_strategy").notNull().default({}),
+    allocationPct: integer("allocation_pct").notNull().default(25),
+    minSample: integer("min_sample").notNull().default(30),
+    status: text("status", {
+      enum: ["running", "ready_to_adopt", "adopted", "discarded", "halted"],
+    })
+      .notNull()
+      .default("running"),
+    decisionReason: text("decision_reason"),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+    concludedAt: timestamp("concluded_at", { withTimezone: true }),
+    createdBy: uuid("created_by"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    // 0058: alpha drawn from the account's alpha-investing wealth to run THIS experiment.
+    // Null = pre-2A experiment (honest unknown, never backfilled) or not yet decided.
+    alphaSpent: numeric("alpha_spent", { mode: "number" }),
+    // 0059: the moment this experiment was marked ready_to_adopt (GATE 1 / WS-3.2) — drives the
+    // 24h auto-adopt grace clock. Null = never marked ready, or marked before this column existed.
+    readiedAt: timestamp("readied_at", { withTimezone: true }),
+  },
+  (t) => [index("optimization_experiments_account_status_idx").on(t.accountId, t.status)]
+);
+
+// The account's adopted champion copy strategy (version-bumped each adoption). One row per account.
+export const optimizationPlaybook = pgTable("optimization_playbook", {
+  accountId: uuid("account_id")
+    .primaryKey()
+    .references(() => accounts.id, { onDelete: "cascade" }),
+  championStrategy: jsonb("champion_strategy").notNull().default({}),
+  version: integer("version").notNull().default(1),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  // 0058: alpha-investing wealth (enterprise-grade-brain 2A) — the significance budget available
+  // for the account's next sequential test. Starts at 0.05 (classical single-test alpha); drawn
+  // down/replenished by the e-process decide pipeline.
+  alphaWealth: numeric("alpha_wealth", { mode: "number" }).notNull().default(0.05),
+});
 
 // ── 0018 conversion tokens ────────────────────────────────────────────────────
 
@@ -1132,6 +1295,93 @@ export const intentObservations = pgTable(
     index("intent_observations_account_outcome_idx").on(t.accountId, t.outcome),
     index("intent_observations_agent_idx").on(t.agentId),
     index("intent_observations_lead_idx").on(t.leadId),
+  ]
+);
+
+
+// ── 0041 CRM activity sync ────────────────────────────────────────────────────
+
+// retention(crm_contact_refs): cascades with the lead (GDPR erasure), the connection
+// (disconnect), and the account. Service-role writes only — no client write policy.
+export const crmContactRefs = pgTable(
+  "crm_contact_refs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    connectionId: uuid("connection_id")
+      .notNull()
+      .references(() => crmConnections.id, { onDelete: "cascade" }),
+    leadId: uuid("lead_id")
+      .notNull()
+      .references(() => leads.id, { onDelete: "cascade" }),
+    externalRef: text("external_ref").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("crm_contact_refs_connection_lead_idx").on(t.connectionId, t.leadId),
+    index("crm_contact_refs_account_idx").on(t.accountId),
+  ]
+);
+
+// ── 0045 lifecycle touches — operator-side re-engagement ledger ─────────────
+// Service-role only (RLS on, no policies): platform data about OUR OWN users,
+// never tenant data. See migration 0045 for the full contract.
+export const lifecycleTouches = pgTable(
+  "lifecycle_touches",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    // FK to auth.users(id) ON DELETE CASCADE lives in SQL (auth schema isn't modeled in Drizzle)
+    userId: uuid("user_id").notNull(),
+    accountId: uuid("account_id").references(() => accounts.id, { onDelete: "set null" }),
+    segment: text("segment", {
+      // 0060 (pull-back email): widened with the two email segments
+      enum: [
+        "stalled_onboarding",
+        "idle_after_onboarding",
+        "trial_lapsed",
+        "drafts_waiting",
+        "leads_waiting",
+      ],
+    }).notNull(),
+    touchNumber: integer("touch_number").notNull(),
+    status: text("status", {
+      enum: ["pending", "invited", "sent", "failed", "skipped_no_linkedin", "canceled"],
+    })
+      .notNull()
+      .default("pending"),
+    // 0060 (pull-back email): which lane delivered this touch; default linkedin keeps every
+    // 0045 row and the DM path unchanged
+    channel: text("channel", { enum: ["linkedin", "email"] }).notNull().default("linkedin"),
+    attempts: integer("attempts").notNull().default(0),
+    linkedinUrl: text("linkedin_url"),
+    targetProviderRef: text("target_provider_ref"),
+    displayName: text("display_name"),
+    stalledStep: text("stalled_step"),
+    messageBody: text("message_body"),
+    messageRef: text("message_ref"),
+    error: text("error"),
+    inviteSentAt: timestamp("invite_sent_at", { withTimezone: true }),
+    connectedAt: timestamp("connected_at", { withTimezone: true }),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    repliedAt: timestamp("replied_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    // 0060 (pull-back email): the 0045 index is split per channel. LinkedIn keeps the exact 0045
+    // key, scoped to its own rows; email adds account_id because the pull-back audience is built
+    // per account (one user, two accounts = two independent stalls). Not one combined index:
+    // account_id is nullable (ON DELETE SET NULL) and NULLs never conflict, which would disarm
+    // dedupe for deleted-account LinkedIn rows. See 0060_pullback_email.sql for the full rationale.
+    uniqueIndex("lifecycle_touches_linkedin_touch_idx")
+      .on(t.userId, t.segment, t.touchNumber)
+      .where(sql`${t.channel} = 'linkedin'`),
+    uniqueIndex("lifecycle_touches_email_touch_idx")
+      .on(t.userId, t.accountId, t.segment, t.touchNumber)
+      .where(sql`${t.channel} = 'email'`),
+    index("lifecycle_touches_status_idx").on(t.status),
+    index("lifecycle_touches_target_ref_idx").on(t.targetProviderRef),
   ]
 );
 

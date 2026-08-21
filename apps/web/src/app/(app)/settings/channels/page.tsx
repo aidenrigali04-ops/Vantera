@@ -5,9 +5,18 @@ import { Badge } from "@/components/ui/badge";
 import {
   PauseSendingForm,
   LinkedInConnectButton,
+  LinkedInReconnectButton,
+  RemoveLinkedInButton,
   RefreshLinkedInButton,
 } from "./channels-forms";
 import { reconcileLinkedInAccounts } from "@/lib/linkedin/sync";
+
+export const metadata = { title: "LinkedIn accounts" };
+
+// Date.now() stays in a module helper (React purity lint) — same idiom as the dashboard.
+function isoDaysAgo(days: number): string {
+  return new Date(Date.now() - days * 86_400_000).toISOString();
+}
 
 export default async function ChannelsPage({
   searchParams,
@@ -41,11 +50,35 @@ export default async function ChannelsPage({
   const outreachPaused = accountRow?.outreach_paused ?? false;
   const linkedinAccounts = linkedinRows ?? [];
 
+  // P1 safety visibility: the pacing the Safety page promises, shown against real counts.
+  // Ceilings mirror packages/jobs/src/pipeline/safety-limits.ts (locked, rule 04).
+  const weekAgoIso = isoDaysAgo(7);
+  const dayAgoIso = isoDaysAgo(1);
+  const { data: weekSendRows } = await supabase
+    .from("outreach_sends")
+    .select("linkedin_account_id, sent_at, scheduled_sends(linkedin_stage)")
+    .gte("sent_at", weekAgoIso)
+    .returns<{ linkedin_account_id: string | null; sent_at: string; scheduled_sends: { linkedin_stage: string | null } | null }[]>();
+  const pacing = new Map<string, { invites7d: number; invitesToday: number; messagesToday: number }>();
+  for (const r of weekSendRows ?? []) {
+    if (!r.linkedin_account_id) continue;
+    const c = pacing.get(r.linkedin_account_id) ?? { invites7d: 0, invitesToday: 0, messagesToday: 0 };
+    const invite = r.scheduled_sends?.linkedin_stage === "invite";
+    if (invite) c.invites7d++;
+    if (r.sent_at >= dayAgoIso) {
+      if (invite) c.invitesToday++;
+      else c.messagesToday++;
+    }
+    pacing.set(r.linkedin_account_id, c);
+  }
+  const WEEKLY_INVITE_CEILING = 100;
+  const DAILY_MESSAGES = 25;
+
   return (
-    <div className="flex max-w-2xl flex-col gap-6">
-      <div>
+    <div className="mx-auto flex max-w-2xl flex-col gap-6">
+      <div className="border-b border-[var(--hairline)] pb-5">
         <h1 className="text-2xl font-semibold tracking-tight">LinkedIn</h1>
-        <p className="text-sm text-muted-foreground">
+        <p className="mt-1.5 text-sm text-muted-foreground">
           Connect the LinkedIn account your agents send from — it&apos;s the one step before
           outreach can go out.{" "}
           <Link href="/settings" className="underline underline-offset-2">
@@ -119,9 +152,17 @@ export default async function ChannelsPage({
                         </Badge>
                       </td>
                       <td className="py-2">
-                        {(la.status === "disconnected" || la.status === "restricted") && (
-                          <LinkedInConnectButton label="Reconnect" variant="outline" />
-                        )}
+                        <span className="flex items-center justify-end gap-1">
+                          {(la.status === "disconnected" || la.status === "restricted") && (
+                            // Reconnect IN PLACE — same seat, same row. A plain connect here
+                            // used to mint a duplicate billable seat for the same person.
+                            <LinkedInReconnectButton rowId={la.id} />
+                          )}
+                          <RemoveLinkedInButton
+                            rowId={la.id}
+                            name={la.display_name ?? la.profile_url ?? "this account"}
+                          />
+                        </span>
                       </td>
                     </tr>
                   ))}
@@ -143,6 +184,42 @@ export default async function ChannelsPage({
           )}
         </CardContent>
       </Card>
+
+      {/* P1 safety visibility: the ramp/ceiling/pacing the Safety page promises, with real
+          numbers per sender. Read-only by design — the limits are compliance, not settings. */}
+      {linkedinAccounts.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Account-safe pacing</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {linkedinAccounts.map((li) => {
+              const c = pacing.get(li.id) ?? { invites7d: 0, invitesToday: 0, messagesToday: 0 };
+              const pct = Math.min(100, Math.round((c.invites7d / WEEKLY_INVITE_CEILING) * 100));
+              return (
+                <div key={li.id} className="space-y-1.5">
+                  <p className="text-sm font-medium">{li.display_name ?? "LinkedIn account"}</p>
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-foreground/[0.08]">
+                    <span className="block h-full rounded-full bg-[var(--cyan-strong)]" style={{ width: `${pct}%` }} />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {c.invites7d} of {WEEKLY_INVITE_CEILING} invites this week · {c.invitesToday} today ·{" "}
+                    {c.messagesToday} of {DAILY_MESSAGES} messages today. New accounts ramp gradually
+                    (5→10→15→20/day over four weeks) — these ceilings protect your account and can&apos;t
+                    be raised past the safe line.
+                  </p>
+                  {/* R6: send-window visibility — why outreach looks "quiet" at night/weekends
+                      (source of truth: send-window.ts, enforced on sequence sends only). */}
+                  <p className="text-xs text-muted-foreground">
+                    Proactive outreach only goes out Mon–Fri, 8am–5pm in each prospect&apos;s local
+                    time — replies in a live conversation send any time.
+                  </p>
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Pause all sending card */}
       <Card>

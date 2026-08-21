@@ -50,7 +50,13 @@ export async function getOnboardingData(): Promise<OnboardingData> {
     };
   }
 
-  const meta = (user.user_metadata ?? {}) as { company_name?: string; website_url?: string };
+  // `website_url` is what our signup writes; `pending_site` is the key the earlier signup
+  // used for the same landing-page URL — honor both so no existing account loses its prefill.
+  const meta = (user.user_metadata ?? {}) as {
+    company_name?: string;
+    website_url?: string;
+    pending_site?: string;
+  };
 
   const [{ data: account }, { data: profile }] = await Promise.all([
     supabase
@@ -75,7 +81,7 @@ export async function getOnboardingData(): Promise<OnboardingData> {
   const prefill: OnboardingPrefill = {
     fullName: profile?.display_name?.trim() ?? "",
     brandName: account?.name?.trim() || meta.company_name?.trim() || "",
-    websiteUrl: account?.website_url ?? meta.website_url ?? "",
+    websiteUrl: account?.website_url ?? meta.website_url ?? meta.pending_site ?? "",
     faviconUrl: account?.website_scan?.faviconUrl ?? null,
     email: user.email ?? null,
   };

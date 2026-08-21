@@ -1,0 +1,44 @@
+{
+  "id": "li-construction-cfo-change-orders",
+  "input": {
+    "lead": {
+      "firstName": "Devon",
+      "lastName": "Achterberg",
+      "title": "CFO",
+      "companyName": "Vantage Peak Construction",
+      "industry": "Commercial Construction"
+    },
+    "insights": {
+      "pain_points": [
+        "Change orders get disputed over missing paperwork",
+        "Billing waits on paperwork that trails the actual work"
+      ],
+      "triggers": [
+        "Won two new commercial contracts this quarter"
+      ],
+      "motivations": [
+        "Get paid on time without change order disputes"
+      ],
+      "value_angle": "Tracking change orders as they happen removes the paperwork gap that causes disputes",
+      "aha_moment": "Realizing most disputes came from timing, not disagreement, paperwork just arrived late",
+      "prospect_offering": "Vantage Peak Construction builds commercial properties for regional developers",
+      "summary": "CFO managing new contract wins while change order paperwork lags the work"
+    },
+    "context": {
+      "cta": "offer a short walkthrough of change order tracking",
+      "accountName": "ChangeOrder Pro",
+      "accountIndustry": "Construction billing software",
+      "valueProp": "ChangeOrder Pro tracks change orders in real time so billing never waits on paperwork",
+      "bookingUrl": "https://changeorderpro.example/meet",
+      "winningExemplars": [
+        "New contract wins are exciting, though change orders can turn messy fast."
+      ]
+    }
+  },
+  "grounding": "Seller offer: ChangeOrder Pro tracks change orders in real time so billing never waits on paperwork Prospect: Devon Achterberg, CFO at Vantage Peak Construction (Commercial Construction). Pain points: Change orders get disputed over missing paperwork; Billing waits on paperwork that trails the actual work. Value angle: Tracking change orders as they happen removes the paperwork gap that causes disputes",
+  "frozenDraft": {
+    "connectionNote": "Congrats on the two new commercial contracts this quarter, strong quarter for Vantage Peak.",
+    "followupMessage": "Thanks for connecting. New contracts are great, though change orders can get messy fast. How do you track them today?",
+    "violations": []
+  }
+}

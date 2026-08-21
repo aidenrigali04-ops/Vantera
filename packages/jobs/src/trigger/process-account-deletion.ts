@@ -13,7 +13,9 @@ import { createAccountDeletionStore } from "../pipeline/pg-store";
  */
 export const processAccountDeletion = schedules.task({
   id: "process-account-deletion",
-  cron: "0 3 * * *",
+  // Hourly (was daily 03:00): orphaned accounts burn agent + provider credits until swept,
+  // so detection latency is a cost. The sweep is one cheap query when there's nothing to do.
+  cron: "0 * * * *",
   run: async () => {
     const store = createAccountDeletionStore(createDb());
     const linkedin = createLinkedInInfraFromEnv();

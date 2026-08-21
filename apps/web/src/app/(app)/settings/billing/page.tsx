@@ -19,12 +19,23 @@ import { snapshotFromRow, type AccountBillingRow } from "@/lib/billing/entitleme
 import { ManageBillingButton } from "./billing-actions";
 import { PricingPlans, type PlanCard } from "./pricing-plans";
 
+export const metadata = { title: "Billing" };
+
+// Human labels for raw Stripe subscription statuses — never show `past_due` to a user.
+const STATUS_LABELS: Record<string, string> = {
+  active: "Active",
+  trialing: "Trial",
+  past_due: "Past due",
+  canceled: "Canceled",
+  incomplete: "Incomplete",
+};
+
 export default async function BillingPage({
   searchParams,
 }: {
-  searchParams: Promise<{ reason?: string }>;
+  searchParams: Promise<{ reason?: string; portal?: string; checkout?: string }>;
 }) {
-  const { reason } = await searchParams;
+  const { reason, portal, checkout } = await searchParams;
   const { account } = await getGateData();
   if (!account) return null;
 
@@ -72,7 +83,42 @@ export default async function BillingPage({
   });
 
   return (
-    <div className="flex max-w-6xl flex-col gap-10">
+    <div className="mx-auto flex max-w-6xl flex-col gap-10">
+      {checkout === "success" &&
+        (hasEntitlement ? (
+          <div className={cn(PANEL_SURFACE, "p-5 text-sm")} role="status">
+            <span className="font-heading font-semibold">Payment confirmed — your plan is active.</span>{" "}
+            <span className="text-muted-foreground">
+              Your agents keep running without interruption. A receipt is on its way to your email.
+            </span>
+          </div>
+        ) : (
+          <div className={cn(PANEL_SURFACE, "p-5 text-sm")} role="status">
+            <span className="font-heading font-semibold">Payment received — activating your plan…</span>{" "}
+            <span className="text-muted-foreground">
+              This usually takes a few seconds. Refresh this page if it doesn&apos;t update shortly.
+            </span>
+          </div>
+        ))}
+
+      {checkout === "cancel" && (
+        <div className={cn(PANEL_SURFACE, "p-5 text-sm")} role="status">
+          <span className="font-heading font-semibold">Checkout canceled — nothing was charged.</span>{" "}
+          <span className="text-muted-foreground">
+            Your account is unchanged. Pick a plan whenever you&apos;re ready.
+          </span>
+        </div>
+      )}
+
+      {portal === "unavailable" && (
+        <div className={cn(PANEL_SURFACE, "p-5 text-sm")}>
+          <span className="font-heading font-semibold">The billing portal isn&apos;t available yet.</span>{" "}
+          <span className="text-muted-foreground">
+            It opens after your first payment — choose a plan below to get started.
+          </span>
+        </div>
+      )}
+
       {reason === "deploy" && !hasEntitlement && (
         <div className={cn(PANEL_SURFACE, "p-5 text-sm")}>
           <span className="font-heading font-semibold">Choose a plan to deploy your agent.</span>{" "}
@@ -92,7 +138,7 @@ export default async function BillingPage({
                   : `Your free trial ends in ${daysLeft} day${daysLeft === 1 ? "" : "s"}.`}
               </span>{" "}
               <span className="text-muted-foreground">
-                Choose a plan below to keep your agents running — your leads, campaigns, and history stay exactly as they are.
+                Choose a plan below to keep your agents running — your leads, agents, and history stay exactly as they are.
               </span>
             </p>
             <Badge variant="secondary" className="font-mono uppercase tracking-[0.14em]">
@@ -102,7 +148,7 @@ export default async function BillingPage({
           <ul className="text-sm text-muted-foreground">
             <li>Seats: {seatCount ?? 0} / {limits.maxSeats}</li>
             <li>LinkedIn accounts: {liCount ?? 0} / {limits.maxLinkedinAccounts}</li>
-            <li>Campaigns: {campaignCount ?? 0} / {limits.maxCampaigns}</li>
+            <li>Outreach agents: {campaignCount ?? 0} / {limits.maxCampaigns}</li>
           </ul>
         </div>
       )}
@@ -121,7 +167,7 @@ export default async function BillingPage({
             <CardTitle>Current plan</CardTitle>
             <CardAction>
               <Badge variant={snap?.subscriptionStatus === "active" ? "default" : "secondary"}>
-                {`${snap?.plan} · ${snap?.subscriptionStatus}`}
+                {`${(currentTier !== "none" && PLAN_DISPLAY[currentTier]?.name) || snap?.plan} · ${STATUS_LABELS[snap?.subscriptionStatus ?? ""] ?? snap?.subscriptionStatus}`}
               </Badge>
             </CardAction>
           </CardHeader>
@@ -129,9 +175,27 @@ export default async function BillingPage({
             <ul className="text-sm text-muted-foreground">
               <li>Seats: {seatCount ?? 0} / {limits.maxSeats}</li>
               <li>LinkedIn accounts: {liCount ?? 0} / {limits.maxLinkedinAccounts}</li>
-              <li>Campaigns: {campaignCount ?? 0} / {limits.maxCampaigns}</li>
+              <li>Outreach agents: {campaignCount ?? 0} / {limits.maxCampaigns}</li>
             </ul>
-            <ManageBillingButton />
+            <div className="flex flex-wrap items-center gap-2">
+              <ManageBillingButton />
+              {/* T5: receipts are a first-class need, not a hidden portal feature. */}
+              <ManageBillingButton label="Invoices & receipts" />
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* T5: a canceled subscriber previously LOST the portal entirely — no path to their
+          own invoices. History stays reachable for any account that ever had a sub. */}
+      {!hasPaidSubscription && snap?.subscriptionStatus === "canceled" && (
+        <Card className="max-w-2xl">
+          <CardHeader>
+            <CardTitle>Billing history</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3 text-sm text-muted-foreground">
+            <p>Your subscription is canceled. Your invoices and receipts stay available.</p>
+            <ManageBillingButton label="Invoices & receipts" />
           </CardContent>
         </Card>
       )}

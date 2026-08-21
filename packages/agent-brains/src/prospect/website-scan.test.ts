@@ -85,10 +85,12 @@ describe("peekFavicon", () => {
 
 describe("scanWebsite", () => {
   const scan = {
+    headline: "You sell revenue tools to B2B SaaS sales teams.",
     summary: "Acme sells revenue tools to B2B SaaS teams.",
     offerings: ["pipeline analytics"],
     value_props: ["close more deals"],
     scope_of_industry: "B2B SaaS sales tooling",
+    suggested_icp: "VP of Sales at mid-market B2B SaaS companies",
   };
 
   it("fetches the page and extracts a structured scan", async () => {
@@ -132,10 +134,12 @@ describe("scanWebsite", () => {
     // real content-rich sites make the model return many items; the schema must not
     // reject them (root cause of the onboarding scan silently failing) — clamp instead.
     const big = {
+      headline: "h".repeat(300),
       summary: "x".repeat(800),
       offerings: Array.from({ length: 16 }, (_, i) => `offering ${i}`),
       value_props: Array.from({ length: 12 }, (_, i) => `value ${i}`),
       scope_of_industry: "y".repeat(400),
+      suggested_icp: "z".repeat(400),
     };
     const fetchImpl = (async () =>
       new Response("<html><p>lots of real content here</p></html>", { status: 200 })) as unknown as typeof fetch;
@@ -153,6 +157,8 @@ describe("scanWebsite", () => {
     expect(result.value_props).toHaveLength(5);
     expect(result.summary.length).toBeLessThanOrEqual(500);
     expect(result.scope_of_industry.length).toBeLessThanOrEqual(200);
+    expect(result.headline.length).toBeLessThanOrEqual(140);
+    expect(result.suggested_icp.length).toBeLessThanOrEqual(140);
   });
 
   it("throws on fetch failure", async () => {

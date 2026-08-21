@@ -147,7 +147,7 @@ export function Pricing({ plans }: { plans?: LandingPlan[] }) {
                 <span className="mb-2 text-[15px] font-medium text-[var(--ink-4)]">/mo</span>
               </div>
               <p className="mt-2 text-[12.5px] text-[var(--ink-4)]">
-                Billed monthly · free 3-day trial · cancel anytime
+                Billed monthly · free 7-day trial · cancel anytime
               </p>
 
               <div className="my-7 h-px bg-[var(--hairline)]" />

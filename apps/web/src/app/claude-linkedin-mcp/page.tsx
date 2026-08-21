@@ -142,7 +142,7 @@ export default function ClaudeLinkedinMcpPage() {
         </div>
 
         <p className="mx-auto mt-5 max-w-2xl text-center text-[13px] text-[var(--ink-4)]">
-          Works with Claude&rsquo;s Model Context Protocol · Free 3-day trial
+          Works with Claude&rsquo;s Model Context Protocol · Free 7-day trial
         </p>
       </section>
 
@@ -299,7 +299,7 @@ export default function ClaudeLinkedinMcpPage() {
             </a>
           </div>
           <p className="mt-5 text-[13px] text-[var(--ink-4)]">
-            Free 3-day trial · Live in minutes · Cancel anytime
+            Free 7-day trial · Live in minutes · Cancel anytime
           </p>
         </div>
       </section>

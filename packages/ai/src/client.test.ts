@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { getModel } from "./client";
+import { getModel, getModelId } from "./client";
 
 describe("getModel", () => {
   const saved = { ...process.env };
@@ -25,5 +25,29 @@ describe("getModel", () => {
     process.env.ANTHROPIC_MODEL = "claude-opus-4-8";
     expect(getModel().modelId).toBe("claude-opus-4-8");
     expect(getModel("claude-haiku-4-5-20251001").modelId).toBe("claude-haiku-4-5-20251001");
+  });
+});
+
+describe("getModelId", () => {
+  const saved = { ...process.env };
+  beforeEach(() => {
+    delete process.env.ANTHROPIC_API_KEY;
+    delete process.env.ANTHROPIC_MODEL;
+  });
+  afterEach(() => {
+    process.env = { ...saved };
+  });
+
+  it("returns the same default the model factory uses, without needing an API key", () => {
+    expect(getModelId()).toBe("claude-sonnet-4-6");
+    process.env.ANTHROPIC_API_KEY = "test-key";
+    expect(getModelId()).toBe(getModel().modelId);
+  });
+
+  it("respects ANTHROPIC_MODEL", () => {
+    process.env.ANTHROPIC_MODEL = "claude-opus-4-8";
+    expect(getModelId()).toBe("claude-opus-4-8");
+    process.env.ANTHROPIC_API_KEY = "test-key";
+    expect(getModelId()).toBe(getModel().modelId);
   });
 });

@@ -12,7 +12,7 @@ A "make the channels functional" pass shipped email (Maildoso), LinkedIn, caller
 
 **Still required — mostly manual / needs the prod environment:**
 - Provision the Supabase **prod** project + per-env keys; Trigger.dev prod env; Vercel prod link + branch protection on `main`.
-- **Migration-apply + drift-check CI job** (needs prod DB creds as CI secrets) — workflow not added because it would be inert/broken without the secrets.
+- **Migration drift-check CI job** — shipped (`.github/workflows/migration-drift.yml`, nightly + on migration push + manual dispatch): replays `packages/db/migrations/` onto a scratch postgres via `scripts/replay-migrations.sh` and schema-diffs it against a **read-only** `pg_dump --schema-only` of prod. Secret-gated on the `PROD_DB_URL` GitHub secret (owner still needs to set it) — absent secret is a loud `::warning` skip, never a silent green. **Migration-apply to prod is still manual/out of scope** (auto-apply is deferred to Phase 2, once the diff has run clean for a while).
 - **Error tracking**: Vercel Observability covers basics with zero code; wiring `@sentry/nextjs` needs a Sentry DSN — say the word and I'll wire it.
 - **Rate limiting**: Supabase Auth rate-limits auth endpoints already; add Vercel WAF rate rules for app routes (dashboard).
 - Supabase Auth hardening (email confirmations, password policy, leaked-password protection), PITR/backups + restore drill, external uptime monitor, subprocessor DPAs — all dashboard/legal.
@@ -24,7 +24,8 @@ A "make the channels functional" pass shipped email (Maildoso), LinkedIn, caller
 **Environments & CI/CD**
 - [ ] Vercel project linked to the repo; preview deploy per PR; production deploys from `main` only.
 - [ ] Supabase **prod project separate from dev**; anon/service keys per env in the right vaults (Vercel / Trigger.dev / GitHub Actions secrets).
-- [ ] Migration discipline in CI: a job applies `packages/db/migrations/` to prod on merge (Supabase CLI or drizzle-kit), plus a drift check that fails if schema ≠ migrations.
+- [x] Drift check that fails if schema ≠ migrations — `.github/workflows/migration-drift.yml`, read-only against prod, secret-gated on `PROD_DB_URL` (owner dependency: set the secret, read-only role preferred).
+- [ ] A job that *applies* `packages/db/migrations/` to prod on merge (Supabase CLI or drizzle-kit) — auto-apply is intentionally out of scope until the drift check has run clean for a while.
 - [ ] Branch protection on `main`: CI green required, no force pushes (mirrors the local bash-guard hook).
 - [ ] Trigger.dev prod environment created; `trigger deploy` wired into the release flow.
 
@@ -99,3 +100,31 @@ This is the highest-risk surface: real emails and LinkedIn actions on customers'
 - >50 active accounts: dedicated staging environment + Supabase branching workflow.
 - First enterprise customer: SOC 2 readiness assessment, SSO (Supabase Auth supports SAML), audit-log export.
 - Multi-region demand: revisit Supabase region + Vercel regional functions.
+
+---
+
+## Lifecycle LinkedIn outreach (operator-side, 0045 — added 2026-07-09)
+
+Founder-voice DMs from the founder's own LinkedIn identity to our OWN users at three cliffs
+(stalled onboarding / idle after onboarding / trial lapsed). Admin-pinned: runs ONLY when the
+configured sender identity lives under the account owned by aiden@vanterasystem.com.
+
+**Config (app_settings keys, service-role written):** `lifecycle_outreach_enabled` (bool, absent=off),
+`lifecycle_sender_ref` (the founder identity's linkedin_accounts.provider_ref), `lifecycle_daily_cap`
+(default 10; 0 = paused), `lifecycle_sender_location` (business-hours window, default "New York"),
+`lifecycle_notify_email` (reply/sender-down alerts), `lifecycle_last_run_at` (run gate, self-managed).
+
+**Kill paths:** `lifecycle_outreach_enabled=false`, `lifecycle_daily_cap=0`, or the platform
+`outreach_kill_switch` (all honored before any send).
+
+**Operational notes / known v1 limits:**
+- Segment B uses the `auth.users.last_sign_in_at` proxy (no last-seen tracking exists); fast-follow
+  is `accounts.last_dashboard_seen_at`. Users who never started onboarding step 1 have no account
+  row and are unreachable by design (LinkedIn-only, no email fallback).
+- A/B scans are unbounded in age: first enable queues the full backlog oldest-first at the daily
+  cap. Trial-lapsed capture is chained off trial-expiry + a 60-day backfill sweep (the every-run
+  sweep is LOAD-BEARING for segment exclusivity — see pg-store comments).
+- Replies land in the founder's real LinkedIn inbox; the system only stops the sequence forever
+  and emails `lifecycle_notify_email`. Never auto-replies.
+- Accepted-risk edge: if a send succeeds but the sent-marking write fails, one retry can
+  double-message that user (tiny window, rated Minor in review).
