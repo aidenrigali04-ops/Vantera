@@ -94,6 +94,8 @@ export const accounts = pgTable("accounts", {
   leadEventEmailsEnabled: boolean("lead_event_emails_enabled").notNull().default(true),
   // 0055 (R5): lifecycle emails (trial-ending, payment-failed) + their idempotence stamps
   lifecycleEmailsEnabled: boolean("lifecycle_emails_enabled").notNull().default(true),
+  // 0063 — engine pause (v2 §16.4): set = sourcing + sending stop, approvals stay open
+  pausedAt: timestamp("paused_at", { withTimezone: true }),
   trialEndingNotifiedAt: timestamp("trial_ending_notified_at", { withTimezone: true }),
   paymentFailedNotifiedAt: timestamp("payment_failed_notified_at", { withTimezone: true }),
   // 0060 (pull-back email): when ANY lifecycle email last went to this account — collision guard
@@ -121,6 +123,10 @@ export const userProfiles = pgTable("user_profiles", {
   userId: uuid("user_id").primaryKey(),
   displayName: text("display_name"),
   avatarUrl: text("avatar_url"),
+  // 0063 — Today dashboard per-user state
+  lastTodayViewedAt: timestamp("last_today_viewed_at", { withTimezone: true }),
+  dismissedAsks: jsonb("dismissed_asks").notNull().default({}),
+  firstSessionDoneAt: timestamp("first_session_done_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

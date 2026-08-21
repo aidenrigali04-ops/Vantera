@@ -205,6 +205,33 @@ describe("seller positioning (0061)", () => {
   });
 });
 
+describe("today dashboard (0063)", () => {
+  const sql = readFileSync(join(migrationsDir, "0063_today_dashboard.sql"), "utf8");
+  it("adds the per-user Today state to user_profiles (user-scoped, no new grant needed)", () => {
+    expect(sql).toMatch(/alter table public\.user_profiles/i);
+    expect(sql).toMatch(/add column last_today_viewed_at timestamptz/i);
+    expect(sql).toMatch(/add column dismissed_asks jsonb not null default '\{\}'::jsonb/i);
+    expect(sql).toMatch(/add column first_session_done_at timestamptz/i);
+  });
+  it("adds accounts.paused_at with a column-scoped client grant (the pause is the user's call)", () => {
+    expect(sql).toMatch(/add column paused_at timestamptz/i);
+    const grantMatch = sql.match(/grant update \(([^)]*)\)\s+on (?:table )?public\.accounts/i);
+    expect(grantMatch, "expected a column-scoped accounts UPDATE grant").toBeTruthy();
+    expect(grantMatch![1].trim()).toBe("paused_at");
+  });
+  it("today_activity runs with invoker rights so every source table's RLS applies per caller", () => {
+    // A plain view executes as its owner and bypasses RLS (the 0058 footgun) — the grant
+    // below is only safe BECAUSE of security_invoker.
+    expect(sql).toMatch(/create view public\.today_activity\s+with \(security_invoker = true\)/i);
+    expect(sql).toMatch(/grant select on public\.today_activity to authenticated/i);
+  });
+  it("never unions a table without account scoping (every branch selects account_id first)", () => {
+    const branches = sql.split(/union all/i);
+    expect(branches.length).toBeGreaterThanOrEqual(6);
+    for (const b of branches) expect(b).toMatch(/\.account_id,/);
+  });
+});
+
 describe("mailbox SMTP secret columns (0021)", () => {
   it("0021 revokes mailbox SMTP secret columns from clients", () => {
     const sql = readFileSync(join(migrationsDir, "0021_mailbox_smtp_secret.sql"), "utf8");

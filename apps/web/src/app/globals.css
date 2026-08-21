@@ -273,20 +273,120 @@
   --positive-line: rgba(15, 157, 88, 0.28);
 }
 
+/* ----------------------------------------------------------------------------
+   Today design system (Dashboard blueprint v1.0 §5, 2026-08-21) — light-first.
+   Roles the app needs that the landing doesn't (--canvas, --surface, --ink-*), and a
+   single accent used only for MEANING (interactive / Interested / active tab). Primary
+   buttons are ink, never accent. Names that would collide with shadcn's own tokens
+   (--accent = hover surface, --ring = focus color) are kept distinct on purpose:
+   --acc / --acc-ink / --acc-tint and --focus-ring. Contrast ratios vs --surface noted.
+   The dark block below is the same roles with dark values — the app currently forces
+   light (root layout), so dark stays one token flip away (D2).
+---------------------------------------------------------------------------- */
+.app-surface {
+  --canvas: #f6f6f7; /* page */
+  --surface: #ffffff; /* cards, chrome tiles, pills */
+  --surface-2: #f1f1f3; /* hover rows, neutral chips, icon squares */
+  --line: #e8e8eb; /* hairlines */
+  --line-strong: #d2d2d8; /* inputs, pressed tiles */
+
+  --ink: #0b0b0d; /* text, primary button fill        19.7:1 */
+  --ink-mid: #5c5c66; /* secondary text                   6.6:1 */
+  --ink-dim: #70707b; /* meta, labels, table headers       4.9:1 (4.6 on canvas) */
+  --ink-fg: #ffffff; /* text on --ink */
+
+  --acc: #2563eb; /* links, active tab, focus, Interested   5.2:1 */
+  --acc-ink: #1d4ed8; /* accent text on --acc-tint             6.0:1 */
+  --acc-tint: #eef3fe;
+
+  --positive: #166534; /* sender Active        6.3:1 */
+  --positive-tint: #e6f5ec;
+  --attention: #9a4a0a; /* repair, held         5.6:1 */
+  --attention-tint: #fdf0dd;
+  --danger: #dc2626; /* engine stopped        4.8:1 */
+  --danger-tint: #fdecec;
+
+  /* the one decorative element: a white highlight on the gray canvas + ≤5% accent */
+  --wash:
+    radial-gradient(640px 320px at 78% 0%, #ffffff 0%, rgb(255 255 255 / 0) 70%),
+    radial-gradient(480px 240px at 94% 0%, rgb(37 99 235 / 0.05), transparent 70%);
+
+  --shadow-tile: 0 1px 2px rgb(11 11 13 / 0.04); /* + 1px --line ring */
+  --shadow-card: 0 1px 2px rgb(11 11 13 / 0.03), 0 8px 24px -16px rgb(11 11 13 / 0.12);
+  --focus-ring: 0 0 0 3px rgb(37 99 235 / 0.35);
+
+  --r-chip: 6px;
+  --r-btn: 8px;
+  --r-tile: 10px;
+  --r-square: 12px;
+  --r-card: 16px;
+  --r-pill: 999px;
+
+  /* Geist Sans for UI, Geist Mono for every number — one family, two roles (D3). The
+     @theme font tokens are remapped here so `font-sans` / `font-mono` / `font-heading`
+     utilities resolve to Geist inside the app shell only; landing/auth keep Poppins. */
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", Menlo, monospace;
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: 0;
+}
+
+/* Dark — same roles, the marketing-dark values (§5.1). Dormant while light is forced. */
+.dark .app-surface {
+  --canvas: #0a0a0b;
+  --surface: #141416;
+  --surface-2: #1a1a1d;
+  --line: #232326;
+  --line-strong: #2e2e32;
+  --ink: #ededef;
+  --ink-mid: #a1a1aa;
+  --ink-dim: #7c7c85;
+  --ink-fg: #0a0a0b;
+  --acc: #3b82f6;
+  --acc-ink: #93b4fd;
+  --acc-tint: rgb(59 130 246 / 0.12);
+  --positive: #3fb950;
+  --positive-tint: rgb(63 185 80 / 0.12);
+  --attention: #d29922;
+  --attention-tint: rgb(210 153 34 / 0.12);
+  --danger: #f85149;
+  --danger-tint: rgb(248 81 73 / 0.12);
+  --wash: radial-gradient(640px 320px at 78% 0%, rgb(255 255 255 / 0.035), transparent 70%);
+  --shadow-card: 0 1px 0 rgb(255 255 255 / 0.04) inset, 0 16px 40px -24px rgb(0 0 0 / 0.6);
+}
+
+/* Mono inside the app shell: tabular figures everywhere a number appears (§5.2). */
+.app-surface .font-mono,
+.app-surface .font-data {
+  font-family: var(--font-geist-mono), ui-monospace, "SF Mono", Menlo, monospace;
+  font-feature-settings: "tnum" 1, "ss01" 1;
+  letter-spacing: 0;
+}
+
+/* Engine dot — a 2s ease-in-out pulse in the Running state only (§5.4). */
+@keyframes engine-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+.app-surface .engine-pulse {
+  animation: engine-pulse 2s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-surface .engine-pulse {
+    animation: none;
+  }
+}
+
 /* Machine layer — Geist Mono for numeric/data display (money, scores, counts, deltas): the
    precise, tabular counterpart to Poppins and the core Stripe/Vercel "data reads as data" cue.
    Reintroduced deliberately on app surfaces; the global --font-mono stays Poppins for eyebrows. */
 .font-data {
-  font-family: var(--font-geist-mono), ui-monospace, "SF Mono", Menlo, monospace;
-  font-feature-settings: "tnum" 1, "ss01" 1;
-  letter-spacing: -0.012em;
-}
-
-/* Every existing `font-mono` inside the app shell (eyebrows, stat numbers, scores, labels) is a
-   machine/label usage, so route them all to the same Geist-Mono data layer — one rule keeps the
-   dashboard's data typeface consistent across leads, agents, pipeline, analytics, settings, etc.
-   Scoped to `.app-surface`, so landing/auth keep Poppins for their own `font-mono`. */
-.app-surface .font-mono {
   font-family: var(--font-geist-mono), ui-monospace, "SF Mono", Menlo, monospace;
   font-feature-settings: "tnum" 1, "ss01" 1;
   letter-spacing: -0.012em;
