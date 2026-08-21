@@ -36,7 +36,7 @@ export default function PricingPage() {
     // standalone pricing page matches the marketing landing exactly (globals.css).
     <div className="landing relative min-h-screen w-full overflow-x-clip">
       <LandingNav />
-      <main className="mx-auto w-full max-w-6xl px-6 pb-24 pt-28 sm:pt-32">
+      <main className="mx-auto w-full max-w-6xl px-6 pb-24 pt-36 sm:pt-40">
         <MarketingPricing
           plans={plans}
           addons={ADDON_DISPLAY.map((a) => ({ key: a.key, label: a.label, blurb: a.blurb }))}

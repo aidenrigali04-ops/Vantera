@@ -5,23 +5,22 @@ import {
   annualYearlyUsd,
 } from "@vantera/billing";
 import { LandingNav } from "@/components/landing/nav";
-import { LiveBanner } from "@/components/landing/live-banner";
 import { Hero } from "@/components/landing/hero";
 import { TrustStrip } from "@/components/landing/trust-strip";
-import { FeaturesGrid } from "@/components/landing/features-grid";
-import { Showcase } from "@/components/landing/showcase";
-import { Results } from "@/components/landing/results";
-import { Teams } from "@/components/landing/teams";
+import { HowItWorks } from "@/components/landing/how-it-works";
+import { ApprovalGate } from "@/components/landing/approval-gate";
+import { Safety } from "@/components/landing/safety";
+import { EvidenceScoring } from "@/components/landing/evidence-scoring";
+import { Replies } from "@/components/landing/replies";
+import { Compare } from "@/components/landing/compare";
+import { BuiltFor } from "@/components/landing/built-for";
 import { Pricing, type LandingPlan } from "@/components/landing/pricing";
-import { Testimonials } from "@/components/landing/testimonials";
-import { Capabilities } from "@/components/landing/capabilities";
-import { Integrations } from "@/components/landing/integrations";
-import { Faq } from "@/components/landing/faq";
+import { FaqHome } from "@/components/landing/faq-home";
 import { FinalCta } from "@/components/landing/final-cta";
 import { LandingFooter } from "@/components/landing/footer";
-import type { Metadata } from "next";
-import { JsonLd, softwareApplicationLd, faqPageLd } from "@/lib/seo";
 import { FAQ_ITEMS } from "@/components/landing/faq-data";
+import type { Metadata } from "next";
+import { JsonLd, faqPageLd, softwareApplicationLd } from "@/lib/seo";
 
 export const metadata: Metadata = {
   alternates: { canonical: "/" },
@@ -47,22 +46,27 @@ export default function Home() {
     // `.landing` scopes the 2026 premium light system (white + cyan + Poppins + dark
     // product panels) so the dark dashboard/auth surfaces are untouched (globals.css).
     <div className="landing relative min-h-screen w-full overflow-x-clip">
-      {/* Homepage entity + answer content for Google rich results and AI engines. */}
+      {/* Homepage entity + offer + FAQ content for Google rich results and AI engines.
+          The FAQ schema mirrors the visible S9 section (same FAQ_ITEMS source). */}
       <JsonLd data={[softwareApplicationLd(plans), faqPageLd(FAQ_ITEMS)]} />
-      <LandingNav />
-      <LiveBanner />
+      <LandingNav onDark />
       <main>
-        <Hero />
-        <TrustStrip />
-        <FeaturesGrid />
-        <Showcase />
-        <Results />
-        <Teams />
+        {/* Hero + social proof are one above-the-fold screen on lg+. */}
+        <div className="lg:flex lg:min-h-[100svh] lg:flex-col">
+          <Hero />
+          <TrustStrip />
+        </div>
+        {/* Below the fold: the blueprint's intent map — each section answers the
+            visitor's next question, in the order they ask it (S0 → S10). */}
+        <HowItWorks />
+        <ApprovalGate />
+        <Safety />
+        <EvidenceScoring />
+        <Replies />
+        <Compare starterPriceUsd={plans.find((p) => p.tier === "starter")?.monthlyUsd} />
+        <BuiltFor />
         <Pricing plans={plans} />
-        <Testimonials />
-        <Capabilities />
-        <Integrations />
-        <Faq />
+        <FaqHome />
         <FinalCta />
       </main>
       <LandingFooter />

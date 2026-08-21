@@ -199,10 +199,11 @@
   --fb-strong: #166fe5;
   --fb-tint: rgba(24, 119, 242, 0.12);
 
-  /* premium soft elevation — multi-layer, neutral */
-  --shadow-sm: 0 1px 2px rgba(12, 16, 26, 0.05);
-  --shadow-card: 0 1px 2px rgba(12, 16, 26, 0.04), 0 12px 32px -14px rgba(12, 16, 26, 0.16);
-  --shadow-lift: 0 2px 6px rgba(12, 16, 26, 0.05), 0 36px 70px -24px rgba(12, 16, 26, 0.26);
+  /* Elevation — Framer/Figma-restrained: crisp hairline + a tight, near-invisible
+     shadow. Depth reads from the border and precision, not a big floaty drop. */
+  --shadow-sm: 0 1px 1px rgba(12, 16, 26, 0.04);
+  --shadow-card: 0 1px 1px rgba(12, 16, 26, 0.03), 0 4px 12px -4px rgba(12, 16, 26, 0.06);
+  --shadow-lift: 0 1px 2px rgba(12, 16, 26, 0.04), 0 10px 24px -10px rgba(12, 16, 26, 0.09);
 
   /* dark glassy product-panel surface (the sleek 2026 mockups) */
   --panel: #0b0d13;
@@ -223,6 +224,27 @@
   letter-spacing: -0.014em;
 }
 
+/* Landing/marketing accent unified to Facebook blue (was electric cyan). Scoped to
+   `.landing` — later in source than the shared block above, same specificity, so it
+   wins for `.landing` while auth (.auth-surface) and dashboard (.app-surface) keep cyan.
+   The `--cyan*` token names are kept (used across many components) but now carry blue. */
+.landing {
+  --cyan: #1877f2;
+  --cyan-strong: #1461d1; /* legible blue for text / links / icons on white */
+  --cyan-tint: #e9f1fe; /* soft blue surface */
+  --cyan-line: rgba(24, 119, 242, 0.28);
+  --ring: rgba(24, 119, 242, 0.5);
+  --panel-glow: 0 40px 120px -40px rgba(24, 119, 242, 0.32), 0 30px 70px -34px rgba(12, 16, 26, 0.55);
+
+  /* Hero blue slab (homepage hero only). --hero-blue is the brand identity color;
+     the slab deepens toward --hero-blue-deep so pure-white body copy clears WCAG AA
+     (4.5:1) in the lower half where the small text lives. Ratios vs #fff noted. */
+  --hero-blue: #1877f2; /* 4.23:1 — display type only (AA-large) */
+  --hero-blue-mid: #1468da; /* 5.22:1 */
+  --hero-blue-deep: #1163d2; /* 5.50:1 */
+  --hero-scrim: rgba(4, 24, 64, 0.26);
+}
+
 /* Dashboard shell rides the premium-light system above, but keeps shadcn `accent`
    (hover surfaces, menu items, ghost-button hovers) a subtle neutral so electric-cyan
    stays an intentional accent (pipeline, dots, nav) rather than a loud hover color. */
@@ -231,7 +253,10 @@
   --accent-foreground: #0a0c12;
 }
 
-.landing ::selection,
+.landing ::selection {
+  background: rgba(24, 119, 242, 0.22);
+  color: #0a0c12;
+}
 .auth-surface ::selection {
   background: rgba(48, 207, 255, 0.24);
   color: #0a0c12;
@@ -317,7 +342,73 @@
   }
 }
 
-/* Hero pipeline conduit — the gradient stroke drifts LinkedIn → calendar. Dash period
+/* Hero "data pixels" — small white squares scattered on the blue slab, each fading
+   in and out on its own phase (per-pixel --pixel-* custom props set inline). Reduced
+   motion pins them to a faint static glint instead of blinking. */
+@keyframes hero-pixel {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  50% {
+    opacity: var(--pixel-max, 0.2);
+  }
+}
+.landing .hero-pixel {
+  opacity: 0;
+  animation: hero-pixel var(--pixel-dur, 4s) ease-in-out var(--pixel-delay, 0s) infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .landing .hero-pixel {
+    animation: none;
+    opacity: 0.1;
+  }
+}
+
+/* Nav mega-panel entrance — a short drop-and-fade from the bar's underside. */
+@keyframes nav-panel {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scaleY(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scaleY(1);
+  }
+}
+/* Page scrim behind an open mega-panel. */
+@keyframes nav-scrim {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .landing [data-nav-panel] {
+    animation: none !important;
+  }
+}
+
+/* Hero conversation ring — the white/blue conic gradient spinning inside the active
+   message card's 1.5px border frame (hero-conversations.tsx). The oversized square
+   rotates; the clipped frame turns it into a traveling borderline. */
+@keyframes hc-ring-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.landing .hc-ring-spin {
+  animation: hc-ring-spin 2.6s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .landing .hc-ring-spin {
+    animation: none;
+  }
+}
+
+/* Flowing-connector stroke drift (used by use-case/pipeline-viz.tsx). Dash period
    is 24 (10 + 14); -48 = two clean cycles, so the loop is seamless. */
 @keyframes vc-flow {
   to {

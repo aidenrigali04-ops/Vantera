@@ -5,6 +5,7 @@ import {
   normalizeWebsiteUrl,
   optionalDollarsToCents,
   validateOnboarding,
+  validateOnboardingDetails,
   validateSignup,
   validateWorkspace,
 } from "./validation";
@@ -52,6 +53,28 @@ describe("normalizeWebsiteUrl", () => {
       expect(normalizeWebsiteUrl(input).ok).toBe(false);
     }
   );
+});
+
+describe("validateOnboardingDetails", () => {
+  const good = { fullName: " Jane Doe ", brandName: "Acme ", websiteUrl: "acme.com" };
+
+  it("trims and normalizes the website to https", () => {
+    expect(validateOnboardingDetails(good)).toEqual({
+      ok: true,
+      values: { fullName: "Jane Doe", brandName: "Acme", websiteUrl: "https://acme.com" },
+    });
+  });
+
+  it.each([
+    [{ ...good, fullName: "  " }, "full name"],
+    [{ ...good, brandName: "" }, "brand name"],
+    [{ ...good, websiteUrl: "" }, "Add your website"],
+    [{ ...good, websiteUrl: "not a url" }, "valid website"],
+  ])("rejects %j", (input, field) => {
+    const result = validateOnboardingDetails(input);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.toLowerCase()).toContain(field.toLowerCase());
+  });
 });
 
 describe("validateOnboarding", () => {

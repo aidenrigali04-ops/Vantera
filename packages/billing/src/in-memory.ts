@@ -1,6 +1,7 @@
 import type {
   BillingProvider,
   CheckoutRequest,
+  CheckoutSessionResult,
   ParsedWebhookEvent,
   PortalRequest,
   SessionResult,
@@ -21,6 +22,13 @@ export class InMemoryBilling implements BillingProvider {
 
   async createPortalSession(req: PortalRequest): Promise<SessionResult> {
     return { url: `https://portal.test/${req.stripeCustomerId}` };
+  }
+
+  /** Sessions a test can hand back from retrieveCheckoutSession, keyed by id. */
+  readonly sessions = new Map<string, CheckoutSessionResult>();
+
+  async retrieveCheckoutSession(sessionId: string): Promise<CheckoutSessionResult | null> {
+    return this.sessions.get(sessionId) ?? null;
   }
 
   // fake: plain equality; the real adapter uses Stripe's HMAC verification

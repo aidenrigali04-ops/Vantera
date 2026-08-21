@@ -1135,3 +1135,35 @@ export const intentObservations = pgTable(
   ]
 );
 
+// ── 0038 reveal runs ─────────────────────────────────────────────────────────
+
+// Progress ledger for the pre-payment fast-pass scan (journey v2). One row per account
+// (unique index doubles as the enqueue-once guard); written stage-by-stage by the
+// fast-pass pipeline (service-role only — RLS on, member select policy) and polled by
+// /api/reveal/status. Retention: counters + timestamps only; cascades with the account.
+export const revealRuns = pgTable(
+  "reveal_runs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    status: text("status", {
+      enum: ["queued", "scanning", "ranking", "drafting", "done", "failed"],
+    })
+      .notNull()
+      .default("queued"),
+    scanned: integer("scanned").notNull().default(0),
+    gatePassed: integer("gate_passed").notNull().default(0),
+    matched: integer("matched").notNull().default(0),
+    drafted: integer("drafted").notNull().default(0),
+    error: text("error"),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    firstMatchAt: timestamp("first_match_at", { withTimezone: true }),
+    fullDraftAt: timestamp("full_draft_at", { withTimezone: true }),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("reveal_runs_account_unique").on(t.accountId)]
+);

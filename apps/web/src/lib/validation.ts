@@ -92,6 +92,28 @@ export function validateOnboarding(input: {
   };
 }
 
+/**
+ * Step 1 of onboarding — the only three things the product can't infer. The website is
+ * REQUIRED here (unlike the legacy wizard): the scan is what derives the ICP, so without
+ * it the agents would have nothing to target.
+ */
+export function validateOnboardingDetails(input: {
+  fullName: string;
+  brandName: string;
+  websiteUrl: string;
+}): Valid<{ fullName: string; brandName: string; websiteUrl: string }> | Invalid {
+  const fullName = input.fullName.trim();
+  if (!fullName) return { ok: false, error: "Enter your full name." };
+  if (fullName.length > 120) return { ok: false, error: "That name is too long." };
+  const brandName = input.brandName.trim();
+  if (!brandName) return { ok: false, error: "Enter your brand name." };
+  if (brandName.length > 120) return { ok: false, error: "That brand name is too long." };
+  const website = normalizeWebsiteUrl(input.websiteUrl);
+  if (!website.ok) return { ok: false, error: "Enter a valid website address — try acme.com." };
+  if (!website.url) return { ok: false, error: "Add your website — it's how we learn who you sell to." };
+  return { ok: true, values: { fullName, brandName, websiteUrl: website.url } };
+}
+
 export function validateSignup(input: {
   email: string;
   password: string;
@@ -133,4 +155,13 @@ export function validateWorkspace(input: {
 
 export function confirmAccountName(accountName: string, typed: string): boolean {
   return typed.trim() === accountName;
+}
+
+/** Claim-step email validation (journey v2) — same bar as validateSignup's email field. */
+export function validateEmail(raw: FormDataEntryValue | null): { email?: string; error?: string } {
+  const email = typeof raw === "string" ? raw.trim().toLowerCase() : "";
+  if (!email || !email.includes("@") || email.length < 5) {
+    return { error: "Enter a valid email address." };
+  }
+  return { email };
 }

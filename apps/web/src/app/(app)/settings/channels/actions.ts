@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { createLinkedInInfraFromEnv } from "@vantera/linkedin-infra";
+import { createLinkedInInfraFromEnv, isLinkedInInfraConfigured } from "@vantera/linkedin-infra";
 import { buildConnectRedirects } from "./redirects";
 import { gate, loadBillingRow } from "@/lib/billing/entitlement";
 import { reconcileLinkedInAccounts } from "@/lib/linkedin/sync";
@@ -63,6 +63,13 @@ export async function createLinkedInConnectLink(): Promise<{ url?: string; error
   if (!billingRow) return { error: "No active plan. Choose a plan in Billing first." };
   const planGate = gate(billingRow, "linkedinAccount", liCount ?? 0);
   if (!planGate.ok) return { error: planGate.error };
+
+  if (process.env.NODE_ENV === "development" && !isLinkedInInfraConfigured()) {
+    return {
+      error:
+        "LinkedIn isn't configured in this local environment — fill the LinkedIn section of .env.example into apps/web/.env.local and restart the dev server.",
+    };
+  }
 
   try {
     const redirects = buildConnectRedirects(process.env.APP_URL ?? "http://localhost:3000");

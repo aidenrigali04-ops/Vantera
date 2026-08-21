@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { friendlyAuthError } from "@/lib/auth/errors";
-import { validateSignup } from "@/lib/validation";
+import { normalizeWebsiteUrl, validateSignup } from "@/lib/validation";
 import { siteUrl } from "@/lib/site-url";
 import { recordSecurityEvent } from "@/lib/security/audit";
 
@@ -41,12 +41,19 @@ export async function signup(_prev: AuthFormState, formData: FormData): Promise<
   });
   if (!result.ok) return { error: result.error };
 
+  // The landing hero's URL field rides along as `?site=` → a hidden input here → user_metadata,
+  // so onboarding can open pre-filled. Invalid/blank values are dropped silently — it's a
+  // convenience, never a gate.
+  const siteRaw = String(formData.get("site") ?? "");
+  const site = siteRaw ? normalizeWebsiteUrl(siteRaw) : null;
+  const websiteUrl = site && site.ok && site.url ? site.url : undefined;
+
   const supabase = await createClient();
   const { error } = await supabase.auth.signUp({
     email: result.values.email,
     password: result.values.password,
     options: {
-      data: { company_name: result.values.companyName },
+      data: { company_name: result.values.companyName, ...(websiteUrl ? { website_url: websiteUrl } : {}) },
       emailRedirectTo: `${siteUrl()}/auth/confirm?next=/onboarding`,
     },
   });

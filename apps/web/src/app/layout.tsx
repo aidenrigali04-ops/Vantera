@@ -14,12 +14,13 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-// Poppins powers the 2026 marketing landing (weight hierarchy: 400 body → 700
-// display). Montserrat / Geist Mono stay the app + dashboard typefaces.
+// Poppins powers the 2026 marketing landing (weight hierarchy: 400 body → 800
+// display; 800 is the all-caps hero headline). Montserrat / Geist Mono stay the
+// app + dashboard typefaces.
 const poppins = Poppins({
   variable: "--font-poppins",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+  weight: ["400", "500", "600", "700", "800"],
 });
 
 export const metadata: Metadata = {

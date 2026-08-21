@@ -13,6 +13,9 @@ export const websiteScanSchema = z.object({
   offerings: z.array(z.string()),
   value_props: z.array(z.string()),
   scope_of_industry: z.string(),
+  /** Absolute URL of the site's icon (from <link rel="icon">, else /favicon.ico). Not produced
+      by the model — extracted from the fetched HTML; optional so historical scans stay valid. */
+  faviconUrl: z.string().optional(),
 });
 
 export type WebsiteScan = z.infer<typeof websiteScanSchema>;
@@ -57,6 +60,70 @@ export function isScanStale(
   return ageDays > SCAN_STALE_AFTER_DAYS;
 }
 
+/**
+ * The site's icon URL from raw HTML, resolved absolute against the page URL: prefers
+ * apple-touch-icon (largest, crispest), then any rel containing "icon"; falls back to
+ * /favicon.ico. Pure string work — no extra network — and never throws.
+ */
+export function extractFaviconUrl(html: string, pageUrl: string): string | null {
+  let base: URL;
+  try {
+    base = new URL(pageUrl);
+  } catch {
+    return null;
+  }
+  const links = html.match(/<link\b[^>]*>/gi) ?? [];
+  let best: { score: number; href: string } | null = null;
+  for (const tag of links) {
+    const rel = /\brel\s*=\s*["']([^"']+)["']/i.exec(tag)?.[1]?.toLowerCase() ?? "";
+    if (!rel.includes("icon")) continue;
+    const href = /\bhref\s*=\s*["']([^"']+)["']/i.exec(tag)?.[1];
+    if (!href || href.startsWith("data:")) continue;
+    const sizes = /\bsizes\s*=\s*["']([^"']+)["']/i.exec(tag)?.[1] ?? "";
+    const px = parseInt(sizes, 10) || 0;
+    // apple-touch-icon outranks plain icons; among plain icons prefer larger declared sizes
+    const score = (rel.includes("apple-touch-icon") ? 1000 : 0) + Math.min(px, 512);
+    if (!best || score > best.score) best = { score, href };
+  }
+  try {
+    const resolved = new URL(best?.href ?? "/favicon.ico", base);
+    if (resolved.protocol !== "http:" && resolved.protocol !== "https:") return null;
+    return resolved.toString();
+  } catch {
+    return null;
+  }
+}
+
+const PEEK_BYTES = 64_000; // <head> is all we need for the icon; never pull a whole page for a peek
+
+/**
+ * Cheap favicon lookup for a live preview (onboarding shows the brand's icon as the URL
+ * is typed): same SSRF guard + timeout as the full scan, but reads only the first 64 KB
+ * and never calls a model. Returns null on any failure — a preview never throws.
+ */
+export async function peekFavicon(
+  url: string,
+  options: { fetchImpl?: typeof fetch; validate?: (url: string) => Promise<unknown> } = {}
+): Promise<string | null> {
+  try {
+    const validate = options.validate ?? assertPublicHttpUrl;
+    const fetchImpl = options.fetchImpl ?? createGuardedFetch();
+    await validate(url);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+    let res: Response;
+    try {
+      res = await fetchImpl(url, { headers: { accept: "text/html" }, signal: controller.signal });
+    } finally {
+      clearTimeout(timer);
+    }
+    if (!res.ok) return null;
+    return extractFaviconUrl(await readCapped(res, PEEK_BYTES), url);
+  } catch {
+    return null;
+  }
+}
+
 /** Crude but dependency-free: drop scripts/styles/tags, collapse whitespace. */
 export function htmlToText(html: string): string {
   return html
@@ -98,7 +165,9 @@ export async function scanWebsite(
   if (!res.ok) {
     throw new Error(`website fetch failed (${res.status})`);
   }
-  const text = htmlToText(await readCapped(res, MAX_FETCH_BYTES)).slice(0, MAX_PAGE_CHARS);
+  const html = await readCapped(res, MAX_FETCH_BYTES);
+  const faviconUrl = extractFaviconUrl(html, url);
+  const text = htmlToText(html).slice(0, MAX_PAGE_CHARS);
   if (!text) {
     throw new Error("website returned no readable text");
   }
@@ -116,5 +185,6 @@ export async function scanWebsite(
     offerings: object.offerings.slice(0, MAX_LIST_ITEMS),
     value_props: object.value_props.slice(0, MAX_LIST_ITEMS),
     scope_of_industry: object.scope_of_industry.slice(0, MAX_SCOPE_CHARS),
+    ...(faviconUrl ? { faviconUrl } : {}),
   };
 }

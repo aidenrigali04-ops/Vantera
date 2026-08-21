@@ -4,9 +4,11 @@ import type { SubscriptionStatus } from "./entitlements";
 import type {
   BillingProvider,
   CheckoutRequest,
+  CheckoutSessionResult,
   ParsedWebhookEvent,
   PortalRequest,
   SessionResult,
+  SubscriptionUpdate,
 } from "./types";
 
 const STATUS_MAP: Record<string, SubscriptionStatus> = {
@@ -38,9 +40,17 @@ export class StripeBilling implements BillingProvider {
       customer: req.stripeCustomerId ?? undefined,
       customer_email: req.stripeCustomerId ? undefined : req.customerEmail,
       client_reference_id: req.accountId,
-      success_url: req.successUrl,
+      success_url: withSessionId(req.successUrl),
       cancel_url: req.cancelUrl,
-      subscription_data: { metadata: { accountId: req.accountId } },
+      // "card required, trial after": the payment method is always collected, even when
+      // the trial makes the first invoice $0 — so the trial can convert without a second visit.
+      payment_method_collection: "always",
+      subscription_data: {
+        metadata: { accountId: req.accountId },
+        ...(req.trialPeriodDays && req.trialPeriodDays > 0
+          ? { trial_period_days: req.trialPeriodDays }
+          : {}),
+      },
     });
     if (!session.url) throw new Error("stripe checkout: no url");
     return { url: session.url };
@@ -77,30 +87,60 @@ export class StripeBilling implements BillingProvider {
       event.type === "customer.subscription.created" ||
       event.type === "customer.subscription.updated"
     ) {
-      const sub = event.data.object as Stripe.Subscription;
-      const items = sub.items.data;
-      const planItem = items.find((i) => PLAN_PRICE_IDS.has(i.price.id));
-      const seatItem = items.find((i) => i.price.id === ADDON_PRICES.seat);
-      const liItem = items.find((i) => i.price.id === ADDON_PRICES.linkedinAccount);
-      // In Stripe API 18.x, current_period_end lives on SubscriptionItem, not Subscription.
-      // We read it from the plan-tier item which has the billing period anchor.
-      const periodEnd = planItem?.current_period_end;
-      return {
-        type: "subscription_updated",
-        stripeCustomerId: String(sub.customer),
-        stripeSubscriptionId: sub.id,
-        accountId: (sub.metadata?.accountId as string | undefined) ?? null,
-        status: STATUS_MAP[sub.status] ?? "canceled",
-        planPriceId: planItem?.price.id ?? null,
-        seatsPurchased: seatItem?.quantity ?? 0,
-        linkedinAccountsPurchased: liItem?.quantity ?? 0,
-        currentPeriodEnd: periodEnd != null
-          ? new Date(periodEnd * 1000).toISOString()
-          : null,
-      };
+      return mapSubscription(event.data.object as Stripe.Subscription);
     }
     return { type: "ignored" };
   }
+
+  async retrieveCheckoutSession(sessionId: string): Promise<CheckoutSessionResult | null> {
+    let session: Stripe.Checkout.Session;
+    try {
+      session = await this.stripe.checkout.sessions.retrieve(sessionId, {
+        expand: ["subscription"],
+      });
+    } catch {
+      return null; // unknown / malformed id — the caller treats this as "not confirmed"
+    }
+    const sub = session.subscription;
+    return {
+      accountId: session.client_reference_id ?? null,
+      // A trialing subscription is $0 today, so payment_status stays "no_payment_required";
+      // session.status === "complete" is the signal that the customer finished.
+      complete: session.status === "complete",
+      subscription: sub && typeof sub !== "string" ? mapSubscription(sub) : null,
+    };
+  }
+}
+
+/**
+ * Append Stripe's `{CHECKOUT_SESSION_ID}` template to the success URL (Stripe substitutes the
+ * real id on redirect) so the return can be verified without waiting for the webhook.
+ */
+function withSessionId(successUrl: string): string {
+  if (successUrl.includes("{CHECKOUT_SESSION_ID}")) return successUrl;
+  return successUrl + (successUrl.includes("?") ? "&" : "?") + "session_id={CHECKOUT_SESSION_ID}";
+}
+
+/** Stripe subscription → the vendor-neutral update shape (shared by webhook + checkout return). */
+function mapSubscription(sub: Stripe.Subscription): SubscriptionUpdate {
+  const items = sub.items.data;
+  const planItem = items.find((i) => PLAN_PRICE_IDS.has(i.price.id));
+  const seatItem = items.find((i) => i.price.id === ADDON_PRICES.seat);
+  const liItem = items.find((i) => i.price.id === ADDON_PRICES.linkedinAccount);
+  // In Stripe API 18.x, current_period_end lives on SubscriptionItem, not Subscription.
+  // We read it from the plan-tier item which has the billing period anchor.
+  const periodEnd = planItem?.current_period_end;
+  return {
+    type: "subscription_updated",
+    stripeCustomerId: String(sub.customer),
+    stripeSubscriptionId: sub.id,
+    accountId: (sub.metadata?.accountId as string | undefined) ?? null,
+    status: STATUS_MAP[sub.status] ?? "canceled",
+    planPriceId: planItem?.price.id ?? null,
+    seatsPurchased: seatItem?.quantity ?? 0,
+    linkedinAccountsPurchased: liItem?.quantity ?? 0,
+    currentPeriodEnd: periodEnd != null ? new Date(periodEnd * 1000).toISOString() : null,
+  };
 }
 
 export function createBillingFromEnv(): BillingProvider {

@@ -15,12 +15,23 @@ export {
   type StoredInsights,
 } from "./prospect/schema";
 export {
+  extractFaviconUrl,
   isScanStale,
+  peekFavicon,
   scanWebsite,
   websiteScanSchema,
   SCAN_STALE_AFTER_DAYS,
   type WebsiteScan,
 } from "./prospect/website-scan";
+export {
+  draftIcp,
+  icpDraftSchema,
+  icpDraftIsEmpty,
+  EMPTY_ICP_DRAFT,
+  ICP_SIZE_BUCKETS,
+  type IcpDraft,
+  type IcpDraftContext,
+} from "./prospect/icp-draft";
 export { validateHumanity, describeViolations, type Violation } from "./copy/humanizer";
 export {
   draftLinkedIn,

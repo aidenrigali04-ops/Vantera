@@ -539,3 +539,20 @@ describe("UnipileLinkedInInfra", () => {
     });
   });
 });
+
+describe("isLinkedInInfraConfigured", () => {
+  it("is false when any of the three provider vars is missing, true when all are set", async () => {
+    const { isLinkedInInfraConfigured } = await import("./unipile");
+    const saved = { ...process.env };
+    try {
+      delete process.env.UNIPILE_API_KEY;
+      process.env.UNIPILE_DSN = "api.test";
+      process.env.UNIPILE_WEBHOOK_SECRET = "s";
+      expect(isLinkedInInfraConfigured()).toBe(false);
+      process.env.UNIPILE_API_KEY = "k";
+      expect(isLinkedInInfraConfigured()).toBe(true);
+    } finally {
+      process.env = saved;
+    }
+  });
+});

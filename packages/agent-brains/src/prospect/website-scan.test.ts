@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { MockLanguageModelV3 } from "ai/test";
-import { htmlToText, isScanStale, scanWebsite } from "./website-scan";
+import { extractFaviconUrl, htmlToText, isScanStale, peekFavicon, scanWebsite } from "./website-scan";
 
 const NOW = new Date("2026-06-11T00:00:00Z");
 // Skip the network-resolving SSRF guard in unit tests that inject a mock fetch.
@@ -30,6 +30,59 @@ describe("htmlToText", () => {
   });
 });
 
+describe("extractFaviconUrl", () => {
+  it("resolves a relative <link rel=icon> against the page url", () => {
+    const html = `<html><head><link rel="icon" href="/static/fav.png"></head></html>`;
+    expect(extractFaviconUrl(html, "https://acme.com/about")).toBe("https://acme.com/static/fav.png");
+  });
+
+  it("prefers apple-touch-icon, then the largest declared size", () => {
+    const html = `
+      <link rel="icon" sizes="16x16" href="/16.png">
+      <link rel="icon" sizes="192x192" href="/192.png">
+      <link rel="shortcut icon" href="/favicon.ico">`;
+    expect(extractFaviconUrl(html, "https://acme.com")).toBe("https://acme.com/192.png");
+    const withTouch = html + `<link rel="apple-touch-icon" href="/touch.png">`;
+    expect(extractFaviconUrl(withTouch, "https://acme.com")).toBe("https://acme.com/touch.png");
+  });
+
+  it("falls back to /favicon.ico when no icon link exists", () => {
+    expect(extractFaviconUrl("<html><head></head></html>", "https://acme.com/x/y")).toBe(
+      "https://acme.com/favicon.ico"
+    );
+  });
+
+  it("ignores data: and non-http icon hrefs", () => {
+    expect(extractFaviconUrl(`<link rel="icon" href="data:image/png;base64,AAAA">`, "https://acme.com")).toBe(
+      "https://acme.com/favicon.ico"
+    );
+    expect(extractFaviconUrl(`<link rel="icon" href="javascript:alert(1)">`, "https://acme.com")).toBeNull();
+  });
+
+  it("returns null for an unparseable page url", () => {
+    expect(extractFaviconUrl("<html></html>", "not a url")).toBeNull();
+  });
+});
+
+describe("peekFavicon", () => {
+  it("returns the declared icon without a model call", async () => {
+    const fetchImpl = (async () =>
+      new Response(`<html><head><link rel="icon" href="/i.png"></head></html>`, { status: 200 })) as unknown as typeof fetch;
+    await expect(peekFavicon("https://acme.com", { fetchImpl, validate: noValidate })).resolves.toBe(
+      "https://acme.com/i.png"
+    );
+  });
+
+  it("never throws — a failed fetch or blocked url yields null", async () => {
+    const failing = (async () => new Response("nope", { status: 500 })) as unknown as typeof fetch;
+    await expect(peekFavicon("https://acme.com", { fetchImpl: failing, validate: noValidate })).resolves.toBeNull();
+    const blocked = async () => {
+      throw new Error("blocked");
+    };
+    await expect(peekFavicon("http://169.254.169.254", { validate: blocked })).resolves.toBeNull();
+  });
+});
+
 describe("scanWebsite", () => {
   const scan = {
     summary: "Acme sells revenue tools to B2B SaaS teams.",
@@ -50,7 +103,29 @@ describe("scanWebsite", () => {
       },
     });
 
-    await expect(scanWebsite("https://acme.com", { model, fetchImpl, validate: noValidate })).resolves.toEqual(scan);
+    await expect(scanWebsite("https://acme.com", { model, fetchImpl, validate: noValidate })).resolves.toEqual({
+      ...scan,
+      faviconUrl: "https://acme.com/favicon.ico",
+    });
+  });
+
+  it("carries the page's declared icon through as faviconUrl", async () => {
+    const fetchImpl = (async () =>
+      new Response(
+        `<html><head><link rel="icon" href="/brand/icon.svg"></head><body><p>Acme sells revenue tools.</p></body></html>`,
+        { status: 200 }
+      )) as unknown as typeof fetch;
+    const model = new MockLanguageModelV3({
+      doGenerate: {
+        finishReason: { unified: "stop" as const, raw: "stop" },
+        usage: { inputTokens: { total: 1, noCache: 1, cacheRead: 0, cacheWrite: 0 }, outputTokens: { total: 1, text: 1, reasoning: 0 } },
+        content: [{ type: "text", text: JSON.stringify(scan) }],
+        warnings: [],
+      },
+    });
+
+    const result = await scanWebsite("https://acme.com", { model, fetchImpl, validate: noValidate });
+    expect(result.faviconUrl).toBe("https://acme.com/brand/icon.svg");
   });
 
   it("clamps oversized model output to 5 list items instead of throwing", async () => {

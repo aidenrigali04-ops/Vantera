@@ -20,6 +20,7 @@ import {
   linkedinAccounts,
   outreachSends,
   replies,
+  revealRuns,
   scheduledSends,
   sequenceRuns,
   suppressionEntries,
@@ -72,6 +73,7 @@ import {
 import { normalizeLinkedInUrl } from "./copy-draft";
 import { resolveSequenceConfig } from "./sequence-config";
 import type { RefreshLeadLoad, RefreshLeadStore } from "./refresh-lead";
+import type { FastPassContext, FastPassStore, RevealRunPatch } from "./fast-pass";
 
 /**
  * Map a provider signal to a lead_signals row (0031). label falls back to detail, and the provider's
@@ -127,7 +129,7 @@ function toRow(send: NewScheduledSend) {
 }
 
 /** Drizzle-backed store used by the Trigger.dev tasks (service-role DATABASE_URL). */
-export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerStore & RetentionStore & TrialStore & SendDispatchStore & OutreachSendStore & InboundStore & SequenceStore & SequenceTouchStore & ConversionStore & RefreshLeadStore & IntentScanStore {
+export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerStore & RetentionStore & TrialStore & SendDispatchStore & OutreachSendStore & InboundStore & SequenceStore & SequenceTouchStore & ConversionStore & RefreshLeadStore & IntentScanStore & FastPassStore {
   return {
     async getScoutContext(agentId: string): Promise<ScoutContext | null> {
       const [agent] = await db.select().from(agents).where(eq(agents.id, agentId));
@@ -166,6 +168,35 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           }).features.intent,
         },
       };
+    },
+
+    // ── Fast pass (journey v2 — the pre-payment Reveal scan) ───────────────
+    async getFastPassContext(accountId: string): Promise<FastPassContext | null> {
+      const [account] = await db.select().from(accounts).where(eq(accounts.id, accountId));
+      if (!account) return null;
+      // agent-less: the onboarding ICP rows are the targeting source pre-payment
+      const icpRows = await db
+        .select({ id: icps.id, name: icps.name, criteria: icps.criteria })
+        .from(icps)
+        .where(and(eq(icps.accountId, accountId), eq(icps.source, "onboarding")));
+      return {
+        icps: icpRows.map((r) => ({ id: r.id, name: r.name, criteria: (r.criteria ?? {}) as IcpCriteria })),
+        account: {
+          industry: account.onboardingIndustry,
+          websiteUrl: account.websiteUrl,
+          websiteScan: account.websiteScan as ScoutContext["account"]["websiteScan"],
+          websiteScannedAt: account.websiteScannedAt,
+          subscriptionStatus: account.subscriptionStatus,
+          intentEnabled: false, // company-event signals never run in the fast pass
+        },
+      };
+    },
+
+    async updateRevealRun(revealRunId: string, patch: RevealRunPatch): Promise<void> {
+      await db
+        .update(revealRuns)
+        .set({ ...patch, updatedAt: new Date() })
+        .where(eq(revealRuns.id, revealRunId));
     },
 
     // ── Intent Agent (Phase 13) ────────────────────────────────────────────

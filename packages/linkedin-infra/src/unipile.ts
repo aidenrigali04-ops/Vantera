@@ -440,6 +440,16 @@ export class UnipileLinkedInInfra implements LinkedInInfra {
 }
 
 /** The only construction point product code may use (white-label, rule 04). */
+/**
+ * True when the provider env is complete enough to build the adapter. Lets callers give a
+ * developer an actionable local message instead of the generic "try again" — the vendor
+ * names stay inside this package (white-label, rule 04).
+ */
+export function isLinkedInInfraConfigured(): boolean {
+  const { UNIPILE_API_KEY, UNIPILE_DSN, UNIPILE_WEBHOOK_SECRET } = process.env;
+  return Boolean(UNIPILE_API_KEY && UNIPILE_DSN && UNIPILE_WEBHOOK_SECRET);
+}
+
 export function createLinkedInInfraFromEnv(): LinkedInInfra {
   const { UNIPILE_API_KEY, UNIPILE_DSN, UNIPILE_WEBHOOK_SECRET, HOSTED_AUTH_DOMAIN } = process.env;
   if (!UNIPILE_API_KEY || !UNIPILE_DSN || !UNIPILE_WEBHOOK_SECRET) {

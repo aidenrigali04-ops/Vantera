@@ -14,8 +14,8 @@ export const CARD = "rounded-2xl border border-[var(--hairline)] bg-white shadow
 
 export const CARD_INTERACTIVE = cn(
   CARD,
-  "transition-all duration-300 hover:-translate-y-1 hover:border-[var(--cyan-line)] " +
-    "hover:shadow-[0_2px_8px_rgba(12,16,26,0.05),0_24px_56px_-22px_rgba(48,207,255,0.32)]",
+  "transition-all duration-300 hover:-translate-y-0.5 hover:border-[var(--cyan-line)] " +
+    "hover:shadow-[0_1px_2px_rgba(12,16,26,0.04),0_10px_24px_-12px_rgba(24,119,242,0.16)]",
 );
 
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];

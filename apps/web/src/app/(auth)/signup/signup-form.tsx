@@ -7,9 +7,9 @@ import { signup, type AuthFormState } from "../actions";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FormError } from "@/components/form-error";
-import { AuthHeading, CtaArrow, FIELD, LinkedInMark, SubmitButton } from "../auth-ui";
+import { AuthHeading, CtaArrow, FIELD, SubmitButton } from "../auth-ui";
 
-export function SignupForm() {
+export function SignupForm({ site }: { site?: string }) {
   const [state, action, pending] = useActionState<AuthFormState, FormData>(signup, {});
 
   if (state.sent) {
@@ -35,20 +35,12 @@ export function SignupForm() {
   return (
     <div className="flex flex-col gap-8">
       <AuthHeading
-        title={
-          <>
-            Turn{" "}
-            <span className="whitespace-nowrap">
-              <LinkedInMark className="mr-[0.18em] inline-block size-[0.78em] align-[-0.1em]" />
-              LinkedIn
-            </span>{" "}
-            intent into booked revenue.
-          </>
-        }
-        sub="Vantera finds in-market buyers, qualifies them against your ICP, and drafts the outreach for your approval — your LinkedIn, run hands-off."
+        title="Create your account"
+        sub="Free 3-day trial. Your agents start finding in-market buyers the moment you're in — and you approve every send."
       />
 
       <form action={action} className="flex flex-col gap-5">
+        {site && <input type="hidden" name="site" value={site} />}
         <div className="flex flex-col gap-2">
           <Label htmlFor="companyName" className="text-[13px] font-medium text-[var(--ink-2)]">Company name</Label>
           <Input id="companyName" name="companyName" autoComplete="organization" placeholder="Acme Inc" className={FIELD} required />

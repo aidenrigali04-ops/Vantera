@@ -12,3 +12,12 @@ export function createServiceClient() {
   }
   return createSupabaseClient(url, key, { auth: { persistSession: false } });
 }
+
+/**
+ * Service-role client for the /start claim flow ONLY — the auth admin API
+ * (createUser / generateLink). Never returns data to the browser; the session the
+ * browser receives is minted by the SSR client via verifyOtp.
+ */
+export function createAuthAdminClient() {
+  return createServiceClient();
+}

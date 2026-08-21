@@ -1,59 +1,70 @@
 "use client";
 
-import Link from "next/link";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
+import { CTA_REASSURANCE } from "./claims";
+import { MarkOnBlue, PixelField } from "./section-intro";
 
+/**
+ * S10 · Final CTA — "Fine. Show me." The concept's closing band: a rounded brand-blue
+ * panel inside the container (not full-bleed), bookending the hero — same gradient,
+ * same pixels, same URL-capture form, so the page closes exactly the way it opened.
+ * No fabricated stats; the claims are the ones the page already made.
+ */
 export function FinalCta() {
+  const router = useRouter();
+  const [url, setUrl] = useState("");
+
   return (
-    <section className="px-6 py-20 lg:px-8 lg:py-28">
-      <motion.div
-        initial={{ opacity: 0, y: 24 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true, margin: "-80px" }}
-        transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-        className="relative mx-auto max-w-6xl overflow-hidden rounded-[28px] border border-white/[0.08] bg-[#0a0c12] px-6 py-16 text-center shadow-[var(--panel-glow)] sm:py-24"
-      >
-        {/* subtle cyan ambience + top rim */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0"
-          style={{ background: "radial-gradient(60% 70% at 50% -10%, rgba(48,207,255,0.2), transparent 60%)" }}
-        />
-        <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/15" />
+    <section className="relative bg-white py-10 sm:py-14">
+      <div className="mx-auto max-w-6xl px-6 lg:px-8">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-80px" }}
+          transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+          className="relative overflow-hidden rounded-[28px] px-6 py-16 sm:px-10 sm:py-20 lg:py-24 [background:linear-gradient(180deg,#1877f2_0%,#1468da_74%,#1163d2_100%)]"
+        >
+          <PixelField />
+          <div className="relative mx-auto flex max-w-2xl flex-col items-center text-center">
+            <h2 className="text-[2.2rem] font-semibold leading-[1.12] tracking-[-0.035em] text-white sm:text-[2.9rem]">
+              See who&rsquo;s waiting in <MarkOnBlue>your pipeline</MarkOnBlue>.
+            </h2>
+            <p className="mt-5 text-[16.5px] leading-relaxed text-white/80 sm:text-[18px]">
+              15 minutes to deploy. Nothing sends without you.
+            </p>
 
-        <div className="relative">
-          <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[12px] font-medium text-white/70">
-            <span className="size-1.5 rounded-full bg-[var(--cyan)] shadow-[0_0_8px_rgba(48,207,255,0.9)]" />
-            Get started
-          </span>
-          <h2 className="mx-auto mt-6 max-w-2xl text-[2.4rem] font-semibold leading-[1.04] tracking-[-0.035em] text-white sm:text-[3.2rem]">
-            Turn intent into <span className="text-[var(--cyan)]">revenue</span> on LinkedIn
-          </h2>
-          <p className="mx-auto mt-5 max-w-xl text-[16px] leading-relaxed text-white/55 sm:text-[18px]">
-            Deploy your agents in minutes. They find in-market buyers, qualify them, and draft every
-            message — you approve the sends and watch the meetings land.
-          </p>
+            {/* the hero's URL form, verbatim styling — one conversion pattern site-wide */}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const site = url.trim();
+                router.push(site ? `/signup?site=${encodeURIComponent(site)}` : "/signup");
+              }}
+              className="mt-9 flex w-full max-w-md items-center gap-2 rounded-full bg-white py-1.5 pl-5 pr-1.5 shadow-[0_16px_40px_-16px_rgba(3,22,58,0.55)] transition-shadow focus-within:shadow-[0_0_0_3px_rgba(255,255,255,0.35),0_16px_40px_-16px_rgba(3,22,58,0.55)]"
+            >
+              <input
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder="Enter your website URL"
+                aria-label="Your website URL"
+                className="min-w-0 flex-1 bg-transparent text-[15px] text-foreground outline-none placeholder:text-[var(--ink-4)]"
+              />
+              <button
+                type="submit"
+                className="group inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[var(--fb-strong)] px-5 py-2.5 text-[14px] font-semibold text-white transition-all hover:bg-[#1461d1] active:scale-[0.98]"
+              >
+                Get started free
+                <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
+              </button>
+            </form>
 
-          <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
-            <Link
-              href="/signup"
-              className="group inline-flex items-center gap-2 rounded-full bg-white px-7 py-3.5 text-[15px] font-medium text-[#0a0c12] transition-transform hover:-translate-y-0.5"
-            >
-              Start free
-              <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
-            </Link>
-            <a
-              href="mailto:sales@vanterasystem.com?subject=Vantera%20demo"
-              className="inline-flex items-center gap-2 rounded-full border border-white/20 px-7 py-3.5 text-[15px] font-medium text-white transition-colors hover:bg-white/[0.06]"
-            >
-              Book a demo
-            </a>
+            <p className="mt-4 text-[13px] font-medium text-white/70">{CTA_REASSURANCE}</p>
           </div>
-
-          <p className="mt-6 text-[13px] text-white/40">No credit card · You approve every message</p>
-        </div>
-      </motion.div>
+        </motion.div>
+      </div>
     </section>
   );
 }

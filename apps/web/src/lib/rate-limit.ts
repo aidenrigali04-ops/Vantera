@@ -27,6 +27,17 @@ const CONFIGS = {
   // Public token endpoints (unsubscribe, conversion) — per IP. Generous so a real human
   // (one click) never trips it; only a hammering scanner does. Tokens are UUIDs, so this is depth.
   publicToken: { tokens: 60, window: "60 s" as Window },
+  // Free public tools (unauthenticated AI generation) — per IP. Two tiers: a short burst
+  // window stops rapid-fire token burn, a daily window caps sustained abuse of the LLM.
+  tools: { tokens: 8, window: "60 s" as Window },
+  toolsDaily: { tokens: 60, window: "1 d" as Window },
+  // /start claim (journey v2) — account-creation vector; per-IP burst + per-email hourly.
+  startClaim: { tokens: 5, window: "10 m" as Window },
+  startClaimEmail: { tokens: 3, window: "1 h" as Window },
+  // Reveal poll — per user id; the screen polls ~every 2s.
+  revealStatus: { tokens: 60, window: "60 s" as Window },
+  // Onboarding favicon peek — per user id; one guarded fetch per URL blur.
+  faviconPeek: { tokens: 20, window: "60 s" as Window },
 } as const;
 
 export type LimitName = keyof typeof CONFIGS;

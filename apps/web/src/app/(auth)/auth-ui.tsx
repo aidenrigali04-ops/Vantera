@@ -1,18 +1,18 @@
 import { cn } from "@/lib/utils";
 
 /**
- * Shared auth/onboarding form bits (2026 premium light system): a roomy cyan-focus
- * field and a near-black pill submit that picks up a faint cyan halo on hover.
+ * Shared auth form bits — the brand system (blue + white): a roomy blue-focus field and
+ * a brand-blue submit, sized for the white card that sits on the blue left column.
  */
 
 /** Marketing-grade headline + subheadline block for the card-less auth left column. */
 export function AuthHeading({ title, sub }: { title: React.ReactNode; sub: React.ReactNode }) {
   return (
     <div>
-      <h1 className="text-[30px] font-bold leading-[1.08] tracking-[-0.03em] text-foreground sm:text-[34px]">
+      <h1 className="text-[26px] font-bold leading-[1.12] tracking-[-0.03em] text-foreground sm:text-[28px]">
         {title}
       </h1>
-      <p className="mt-3.5 max-w-[38ch] text-[15px] leading-relaxed text-[var(--ink-3)]">{sub}</p>
+      <p className="mt-3 max-w-[38ch] text-[14.5px] leading-relaxed text-[var(--ink-3)]">{sub}</p>
     </div>
   );
 }
@@ -31,11 +31,11 @@ export function LinkedInMark({ className }: { className?: string }) {
 
 /** Roomy, crisp white input — clean white fill, a defined hairline border, cyan focus. */
 export const FIELD =
-  "h-11 rounded-xl border border-[rgba(12,16,26,0.12)] bg-white px-4 text-[15px] text-foreground " +
+  "h-11 rounded-[12px] border border-[rgba(12,16,26,0.12)] bg-white px-4 text-[15px] text-foreground " +
   "placeholder:text-[var(--ink-4)] transition-colors " +
-  "focus-visible:border-[var(--cyan-strong)] focus-visible:ring-2 focus-visible:ring-[rgba(48,207,255,0.2)]";
+  "focus-visible:border-[var(--fb)] focus-visible:ring-2 focus-visible:ring-[rgba(24,119,242,0.18)]";
 
-/** Near-black rectangular submit (rankvolt-style) with a pending state + faint cyan hover glow. */
+/** Brand-blue submit with a pending state — the hero's button, verbatim. */
 export function SubmitButton({
   pending,
   idle,
@@ -52,8 +52,8 @@ export function SubmitButton({
       type="submit"
       disabled={pending}
       className={cn(
-        "group inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#0a0c12] px-6 py-3.5 text-[15px] font-semibold text-white",
-        "transition-all hover:-translate-y-0.5 hover:shadow-[0_12px_34px_-10px_rgba(48,207,255,0.6)] disabled:opacity-60 disabled:hover:translate-y-0",
+        "group inline-flex w-full items-center justify-center gap-2 rounded-[12px] bg-[var(--fb-strong)] px-6 py-3.5 text-[15px] font-semibold text-white",
+        "transition-all hover:bg-[#1461d1] hover:shadow-[0_10px_28px_-10px_rgba(24,119,242,0.6)] active:scale-[0.99] disabled:opacity-60",
         className,
       )}
     >
