@@ -1,4 +1,4 @@
-import { capUsage, fmtTime, weeklyCeilingReached } from "./metrics";
+import { capUsage, fmtTime, sendWindowLabel, sendWindowOpensLabel, weeklyCeilingReached } from "./metrics";
 import { downSenders, healthySenders } from "./state";
 import type { TodayInputs, TodayState } from "./types";
 
@@ -27,8 +27,6 @@ export interface EngineLineFacts {
   sentToday: number;
   allowedToday: number;
 }
-
-const WINDOW_LABEL = "window Mon–Fri ‹8:00am–5:00pm› prospect time";
 
 export function engineLineFor(state: TodayState, i: TodayInputs, f: EngineLineFacts): EngineLine {
   const tz = i.timeZone;
@@ -82,14 +80,14 @@ export function engineLineFor(state: TodayState, i: TodayInputs, f: EngineLineFa
         return {
           dot: "running",
           status: "Running",
-          facts: [`window closed until ‹8:00am› prospect time`, `‹${f.sentToday}› of ‹${f.allowedToday}› sent today`],
+          facts: [`window closed until ‹${sendWindowOpensLabel()}› prospect time`, `‹${f.sentToday}› of ‹${f.allowedToday}› sent today`],
           link: null,
         };
       }
       const facts: string[] = [];
       facts.push(`next send ‹${nextSend}›${sender ? ` via ${sender.name}` : ""}`);
       facts.push(`today ‹${f.sentToday}› of ‹${f.allowedToday}›`);
-      facts.push(WINDOW_LABEL);
+      facts.push(`window ${sendWindowLabel()} prospect time`);
       return { dot: "running", status: "Running", facts, link: null };
     }
   }

@@ -4,6 +4,7 @@ import type { TodayView } from "@/lib/today/rows";
 import { cn } from "@/lib/utils";
 
 import { InkButton } from "./buttons";
+import { MonoText } from "./mono-text";
 import type { GlyphName } from "./glyphs";
 
 /**
@@ -50,11 +51,11 @@ export function Greeting({ greeting, sentence, primary, glyph, onResume, classNa
           <div className="mt-3.5 md:col-start-2 md:row-start-2 md:mt-0 md:flex md:h-0 md:items-center md:self-center md:justify-self-end">
             {primary.inline === "resume" ? (
               <InkButton onClick={onResume} glyph={glyphName} count={primary.count} className="w-full md:w-auto">
-                {primary.label}
+                <MonoText text={primary.label} />
               </InkButton>
             ) : (
               <InkButton href={primary.href} glyph={glyphName} count={primary.count} className="w-full md:w-auto">
-                {primary.label}
+                <MonoText text={primary.label} />
               </InkButton>
             )}
           </div>

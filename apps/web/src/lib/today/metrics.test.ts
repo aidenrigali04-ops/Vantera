@@ -13,6 +13,7 @@ import {
   initials,
   nextSendWindow,
   replyRate,
+  sendWindowLabel,
   shortName,
 } from "./metrics";
 import { inputs, NOW } from "./state.test";
@@ -100,7 +101,13 @@ describe("engineLineFor", () => {
     const line = engineLineFor("steady", inputs(), { nextSendAt: "2026-08-21T21:10:00Z", sentToday: 31, allowedToday: 80 });
     expect(line.dot).toBe("running");
     expect(line.status).toBe("Running");
-    expect(line.facts).toEqual(["next send ‹2:10pm› via Anna K.", "today ‹31› of ‹80›", "window Mon–Fri ‹8:00am–5:00pm› prospect time"]);
+    // the window fact is derived from the sending layer, not typed in (D8)
+    expect(line.facts).toEqual([
+      "next send ‹2:10pm› via Anna K.",
+      "today ‹31› of ‹80›",
+      `window ${sendWindowLabel()} prospect time`,
+    ]);
+    expect(sendWindowLabel()).toBe("Mon–Fri ‹8:00am–5:00pm›");
     expect(line.link).toBeNull();
   });
   it("sender held → attention dot + reconnect link", () => {

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { ArrowLeft, ArrowRight, Check, ExternalLink, Loader2, PenLine, Sparkles, X } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { parseStyleFlags } from "./style-flags";
 import type { QueueRow } from "@/lib/today/rows";
 import { fixDraft, saveDraftEdit, type ReviewActionState } from "@/app/(app)/approvals/actions";
 import { approveFromToday, rejectDraftWithReason, undoApproveDraft, undoRejectDraft, type RejectReason } from "@/app/(app)/today/actions";
@@ -205,6 +206,7 @@ export function DraftPeek({
 
   const chars = body.length;
   const over = chars > row.charLimit;
+  const styleFlags = parseStyleFlags(row.styleFlags);
 
   return (
     <>
@@ -303,11 +305,15 @@ export function DraftPeek({
             ) : (
               <div className="rounded-[var(--r-square)] bg-[var(--surface-2)] p-4 text-[14px] leading-[1.55] whitespace-pre-wrap text-[var(--ink)]">{body}</div>
             )}
-            {row.styleFlags && (
+            {styleFlags.length > 0 && (
               <div className="mt-3 flex flex-wrap gap-1.5">
-                {row.styleFlags.split(/;\s*|,\s*/).filter(Boolean).map((f) => (
-                  <span key={f} className="inline-flex h-6 items-center rounded-[var(--r-chip)] bg-[var(--attention-tint)] px-2 font-mono text-[11px] text-[var(--attention)]">
-                    {f}
+                {styleFlags.map((f) => (
+                  <span
+                    key={f.label + (f.detail ?? "")}
+                    title={f.detail ?? undefined}
+                    className="inline-flex h-6 items-center rounded-[var(--r-chip)] bg-[var(--attention-tint)] px-2 text-[11px] font-medium text-[var(--attention)]"
+                  >
+                    {f.label}
                   </span>
                 ))}
               </div>

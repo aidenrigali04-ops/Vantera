@@ -175,6 +175,32 @@ function atHourInZone(base: Date, timeZone: string, hour: number): Date {
   return new Date(base.getTime() + diffMin * 60_000);
 }
 
+const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+
+/** `8:00am` / `5:00pm` from a 24h hour. */
+function hourLabel(hour: number): string {
+  const h12 = hour % 12 === 0 ? 12 : hour % 12;
+  return `${h12}:00${hour < 12 ? "am" : "pm"}`;
+}
+
+/**
+ * `Mon–Fri ‹8:00am–5:00pm›` — derived from the sending layer's SEND_WINDOW, never typed in
+ * (blueprint D8: the caps and windows on screen are the code's, so the UI can't promise a
+ * window the scheduler doesn't keep).
+ */
+export function sendWindowLabel(): string {
+  const days = SEND_WINDOW.days as readonly number[];
+  const first = DAY_NAMES[days[0] ?? 1];
+  const last = DAY_NAMES[days[days.length - 1] ?? 5];
+  const span = days.length === 1 ? first : `${first}–${last}`;
+  return `${span} ‹${hourLabel(SEND_WINDOW.startHour)}–${hourLabel(SEND_WINDOW.endHour)}›`;
+}
+
+/** `8:00am` — the window's opening hour, for the "window closed until …" line. */
+export function sendWindowOpensLabel(): string {
+  return hourLabel(SEND_WINDOW.startHour);
+}
+
 /**
  * The next proactive-send window for a prospect, from the sending layer's SEND_WINDOW
  * (Mon–Fri, 8:00–16:59 in the PROSPECT's local time; unknown location → UTC). This is
@@ -196,7 +222,12 @@ export function nextSendWindow(now: Date, location: string | null | undefined): 
   }
   // unreachable in practice (a 7-day scan always finds a weekday); fall back to tomorrow 8am UTC
   const t = new Date(now.getTime() + 86_400_000);
-  return { openNow: false, startsAt: atHourInZone(t, "UTC", 8), endsAt: atHourInZone(t, "UTC", 17), dayLabel: "tomorrow" };
+  return {
+    openNow: false,
+    startsAt: atHourInZone(t, "UTC", SEND_WINDOW.startHour),
+    endsAt: atHourInZone(t, "UTC", SEND_WINDOW.endHour),
+    dayLabel: "tomorrow",
+  };
 }
 
 /**
