@@ -201,7 +201,7 @@ const SENDERS: TodayView["senders"] = [
 /** The steady state — the one the blueprint's §4.1 wireframe draws. */
 export const STEADY: TodayView = {
   state: "steady",
-  greeting: "Morning, Aiden.",
+  greeting: "Morning, Aiden 👋",
   sentence: "Overnight the engine drafted 14 messages and 3 people replied. Both senders are inside their limits.",
   primary: { label: "Open queue", count: 14, href: "/approvals" },
   banner: null,

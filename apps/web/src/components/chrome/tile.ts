@@ -19,9 +19,14 @@ export const CHROME_TILE = [
   CHROME_FOCUS,
 ].join(" ");
 
-/** Height-40 pill container (workspace switcher, primary nav). */
+/**
+ * Height-40 pill container (workspace switcher, primary nav). Squared to the same
+ * `--r-tile` as every other element in the band: a fully-rounded container beside 10px
+ * tiles read as two different systems. The inner tab uses `--r-chip` so the curves are
+ * CONCENTRIC — outer 10 minus the 4px inset is 6.
+ */
 export const CHROME_PILL =
-  "flex h-10 items-center rounded-[var(--r-pill)] bg-[var(--surface)] shadow-[var(--shadow-tile)] ring-1 ring-[var(--line)]";
+  "flex h-10 items-center rounded-[var(--r-tile)] bg-[var(--surface)] shadow-[var(--shadow-tile)] ring-1 ring-[var(--line)]";
 
 /** Dropdown panel hanging below a tile or pill: --r-square corners, ring + --shadow-card. */
 export const CHROME_MENU =

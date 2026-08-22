@@ -25,7 +25,8 @@ export function NavTab({ href, label, active, badge }: NavTabProps) {
       href={href}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-[var(--r-btn)] px-3.5 text-sm font-medium text-[var(--ink-mid)]",
+        // --r-chip (6px), not --r-btn: concentric inside the 10px pill's 4px inset.
+        "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-[var(--r-chip)] px-3.5 text-sm font-medium text-[var(--ink-mid)]",
         CHROME_MOTION,
         CHROME_FOCUS,
         active ? "bg-[var(--acc-tint)] font-semibold text-[var(--acc-ink)]" : "hover:bg-[var(--surface-2)]"

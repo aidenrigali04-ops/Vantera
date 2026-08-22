@@ -618,7 +618,9 @@ export async function loadToday(supabase: SupabaseClient, userId: string, now = 
   const nextRunLabel = inputs.engine.nextRunAt ? fmtTime(new Date(inputs.engine.nextRunAt), tz) : null;
   const firstName = (prof?.display_name ?? "").trim().split(/\s+/)[0] ?? "";
   const hourNow = Number(new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "numeric", hour12: false }).format(now)) % 24;
-  const greeting = firstName ? `${greetingWord(hourNow)}, ${firstName}.` : `${greetingWord(hourNow)}.`;
+  // Owner's call (2026-08-22): a wave instead of the full stop. This deliberately overrides
+  // the blueprint's no-emoji line for the greeting — and only the greeting.
+  const greeting = firstName ? `${greetingWord(hourNow)}, ${firstName} 👋` : `${greetingWord(hourNow)} 👋`;
 
   const defaultTab: TodayView["defaultTab"] = draftsTotal > 0 ? "queue" : repliesWaiting > 0 ? "replies" : "activity";
 

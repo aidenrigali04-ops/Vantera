@@ -8,6 +8,7 @@ import { signOut } from "./actions";
 import { pauseEngine, resumeEngine } from "./engine-actions";
 import { TopChrome } from "@/components/chrome";
 import { Wash } from "@/components/today";
+import { workspaceIconUrl } from "@/lib/workspace-icon";
 import type { AppNotification } from "@/components/notifications/notifications-bell";
 import CopilotOverlay from "@/components/copilot/copilot-overlay";
 import { ClarityIdentity } from "@/components/analytics/clarity-identity";
@@ -100,7 +101,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       >(),
     supabase
       .from("accounts")
-      .select("name, plan, subscription_status, trial_ends_at, paused_at")
+      .select("name, plan, subscription_status, trial_ends_at, paused_at, stripe_subscription_id, website_scan, website_url")
       .limit(1)
       .maybeSingle<{
         name: string | null;
@@ -108,6 +109,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         subscription_status: string;
         trial_ends_at: string | null;
         paused_at: string | null;
+        stripe_subscription_id: string | null;
+        website_scan: { faviconUrl?: string } | null;
+        website_url: string | null;
       }>(),
     // Dead LinkedIn connection = every agent silently stopped (no sourcing, no sends, no
     // replies coming in) — the one state that must never be invisible (2026-07-08 incident).
@@ -172,9 +176,15 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     inbox: inboxCount > 0 ? inboxCount : undefined,
   };
 
+  // Onboarding now takes a card and a plan before the workspace opens, so an account with a
+  // subscription attached has ALREADY chosen — telling it to "choose a plan" is a nag for a
+  // decision it made. The prompts below are for accounts with nothing on file (legacy no-card
+  // trials) and for subscriptions that actually need attention.
+  const hasSubscription = Boolean(billing?.stripe_subscription_id);
+
   // Engine-stopping states only (blueprint §6.2 / D9): no trial countdown in this slot.
   let trialBanner: TrialBannerProps | null = null;
-  if (billing) {
+  if (billing && !hasSubscription) {
     if (billing.subscription_status === "trialing" && billing.trial_ends_at === null) {
       trialBanner = {
         tone: "info",
@@ -200,14 +210,17 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         cta: "Choose a plan",
         href: "/settings/billing",
       };
-    } else if (["past_due", "canceled"].includes(billing.subscription_status)) {
-      trialBanner = {
-        tone: "ended",
-        message: "Your subscription needs attention — new outreach is paused until it's active again.",
-        cta: "Manage billing",
-        href: "/settings/billing",
-      };
     }
+  }
+  // A payment that failed or a subscription that ended is not a nag — it stops the engine, so
+  // it shows whether or not a card is on file.
+  if (billing && ["past_due", "canceled"].includes(billing.subscription_status)) {
+    trialBanner = {
+      tone: "ended",
+      message: "Your subscription needs attention — new outreach is paused until it's active again.",
+      cta: "Manage billing",
+      href: "/settings/billing",
+    };
   }
 
   const connectionBanner: TrialBannerProps | null =
@@ -249,6 +262,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
       <TopChrome
         workspaceName={billing?.name?.trim() || data.account?.name || "Your workspace"}
+        workspaceIconUrl={workspaceIconUrl(billing?.website_scan?.faviconUrl, billing?.website_url)}
         paused={Boolean(billing?.paused_at)}
         badges={badges}
         notifications={notifications}
