@@ -103,3 +103,27 @@ content sits in ONE `min-h-0 flex-1 lg:overflow-y-auto` region — the PAGE neve
 the data region does (mobile keeps natural flow). Sticky table headers stick to that region's
 top. Settings/wizard forms are exempt (focused surfaces). Reference: `leads/page.tsx` +
 `dashboard/page.tsx` + the lead brief.
+
+
+## Today-era app shell (locked 2026-08-21 — Dashboard blueprint v1.0)
+
+Supersedes the lines above where they disagree; the landing/auth/onboarding sections stand.
+
+- **Theme**: the app is **light-first** (root layout forces light); the landing stays dark.
+  App tokens live under `.app-surface` with a complete dormant `.dark .app-surface` block.
+- **Type**: **Geist Sans + Geist Mono** inside `.app-surface` (the theme font tokens are
+  remapped there); landing/auth keep Poppins. Sentence case; numbers tabular mono.
+- **Accent**: blue (`--acc`) means *interactive / Interested / active tab* only; the
+  primary button is **ink**. Replaces the "interactive elements (cyan)" line of the
+  data-surface doctrine.
+- **Nav model**: the dock rail is retired. A 64px **top chrome band** carries the logo
+  tile, workspace pill, centered nav pill (Today · Approvals · Inbox · Prospects · Playbook),
+  utility tiles (search ⌘K · bell · settings) and the avatar. Mobile: 48px top bar +
+  bottom tab bar.
+- **Vocabulary**: Review → **Approvals**, Leads → **Prospects**, Brain/Agents → **Playbook**,
+  Results → **Today**, Channels → **Senders** — labels and routes agree (308 redirects from
+  the old paths).
+- **One-screen shells**: the doctrine applies to *data surfaces* (Approvals, Prospects).
+  **Today scrolls** — it is a launchpad, not a data surface.
+- **Caps on screen are the code's caps** (`packages/jobs/src/pipeline/safety-limits.ts`);
+  the UI never hardcodes a send limit.

@@ -66,7 +66,7 @@ const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replac
 
 /** The "your agents are paused" alert — white-label, action-first (no vendor names, rule 04). */
 export function buildDisconnectAlert(to: string, appUrl: string): HealthAlert {
-  const link = `${appUrl}/settings/channels`;
+  const link = `${appUrl}/settings/senders`;
   const text = [
     "Your LinkedIn connection needs attention.",
     "",

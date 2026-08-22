@@ -40,7 +40,7 @@ describe("sendPullbackEmail", () => {
         "They're addressed to people like Jane Doe — VP Sales at Acme.",
       ],
       ctaLabel: "Review the messages",
-      ctaUrl: "https://app.vanterasystem.com/review",
+      ctaUrl: "https://app.vanterasystem.com/approvals",
       unsubscribeUrl: "https://app.vanterasystem.com/api/lifecycle-unsubscribe/tok123",
     });
 
@@ -49,7 +49,7 @@ describe("sendPullbackEmail", () => {
     // subject/CTA reach the message unchanged — this sender renders, it never rewords.
     expect(body.subject).toBe("Vera wrote 2 messages for you");
     expect(String(body.html)).toContain("Review the messages");
-    expect(String(body.html)).toContain("https://app.vanterasystem.com/review");
+    expect(String(body.html)).toContain("https://app.vanterasystem.com/approvals");
     expect(String(body.text)).toContain("Review the messages");
     expect(String(body.html)).toContain("Jane Doe — VP Sales at Acme");
 

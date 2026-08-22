@@ -1,16 +1,16 @@
 ---
 title: "Send modes: review vs automatic"
 surface: agents
-routes: /agents
+routes: /playbook
 ---
 
 # Send modes: review vs automatic
 
-Your Outreach Agent has two send modes that control whether drafted messages go to a review queue before sending or send automatically. You can switch modes on the agent's settings page.
+Your Outreach Agent has two send modes that control whether drafted messages go to Approvals before sending or send automatically. You can switch modes on the agent's settings page.
 
 ## Review every draft (default)
 
-Every draft your Outreach Agent produces lands in the review queue before anything is sent. You read, edit if needed, and approve. This is the recommended mode when you're first getting started — it lets you see what the agent produces and build confidence before letting it run on its own.
+Every draft your Outreach Agent produces lands in Approvals before anything is sent. You read, edit if needed, and approve. This is the recommended mode when you're first getting started — it lets you see what the agent produces and build confidence before letting it run on its own.
 
 ## Automatic
 

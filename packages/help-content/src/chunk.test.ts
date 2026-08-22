@@ -5,7 +5,7 @@ const article = {
   slug: "review-queue",
   title: "Reviewing drafts",
   surface: "review",
-  routes: ["/review"],
+  routes: ["/approvals"],
   body: "Intro paragraph about the queue.\n\n## After you approve\n\nApproved messages schedule.\n\nThey send at a human pace.",
 };
 

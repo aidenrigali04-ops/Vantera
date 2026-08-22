@@ -26,6 +26,21 @@ const nextConfig: NextConfig = {
     "@vantera/ai",
     "@vantera/linkedin-infra",
   ],
+  // Dashboard blueprint §2.3 / D10 vocabulary + route migration (2026-08-21): the app surfaces
+  // were renamed (review → approvals, leads → prospects, agents → playbook,
+  // settings/channels → settings/senders). Old deep links live in sent emails, bookmarks, and
+  // notification CTAs, so every old path 308s to its new home (query strings pass through).
+  async redirects() {
+    return [
+      { source: "/review", destination: "/approvals", permanent: true },
+      { source: "/review/:path*", destination: "/approvals/:path*", permanent: true },
+      { source: "/leads", destination: "/prospects", permanent: true },
+      { source: "/leads/:path*", destination: "/prospects/:path*", permanent: true },
+      { source: "/agents", destination: "/playbook", permanent: true },
+      { source: "/agents/:path*", destination: "/playbook/:path*", permanent: true },
+      { source: "/settings/channels", destination: "/settings/senders", permanent: true },
+    ];
+  },
   async headers() {
     return [
       { source: "/:path*", headers: securityHeaders },

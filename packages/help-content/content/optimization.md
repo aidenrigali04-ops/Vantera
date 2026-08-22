@@ -67,7 +67,7 @@ never estimates, and never shown before at least one message has actually been s
 
 Every outcome also teaches Vera who to go after. When certain kinds of buyers — a seniority, an
 industry — keep accepting, replying, and booking, Vera sources more of them and moves them to the
-front of the queue. The quality bar never changes: every lead still has to pass the same
+front of the queue. The quality bar never changes: every prospect still has to pass the same
 qualification score, and totals never increase. Vera just spends your outreach where your real
 buyers are. This only kicks in once there's enough of your own data to trust (a handful of real
 outcomes per group), and the panel shows you exactly which group is being prioritized and why.

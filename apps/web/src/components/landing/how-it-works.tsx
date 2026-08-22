@@ -45,7 +45,7 @@ const STEPS: Step[] = [
   },
   {
     n: "03",
-    frameLabel: "Review queue",
+    frameLabel: "Approvals",
     title: "Approve, then watch replies land",
     body: "Every draft waits for you. Approve, edit, or skip — replies come back sorted.",
     kicker: "Your account, your words, your call.",

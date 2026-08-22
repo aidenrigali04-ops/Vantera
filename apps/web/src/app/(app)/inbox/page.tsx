@@ -216,7 +216,7 @@ export default async function InboxPage({
                     )}
                   </div>
                   <Link
-                    href={`/leads/${selected.leadId}`}
+                    href={`/prospects/${selected.leadId}`}
                     className="shrink-0 text-xs font-medium text-[var(--cyan-strong)] hover:underline"
                   >
                     Full profile

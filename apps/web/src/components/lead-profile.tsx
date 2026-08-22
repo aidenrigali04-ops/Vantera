@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { LeadCrmControls } from "@/components/lead-crm-controls";
 import { SourceBadge, WhyNowLine } from "@/components/lead-why-now";
-import { projectedRevenue } from "@/app/(app)/leads/lead-value";
+import { projectedRevenue } from "@/app/(app)/prospects/lead-value";
 
 const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 

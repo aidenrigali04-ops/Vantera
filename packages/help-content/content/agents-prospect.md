@@ -1,12 +1,12 @@
 ---
 title: Your Prospect Agent
 surface: agents
-routes: /agents, /agents/new/scout
+routes: /playbook, /playbook/new/scout
 ---
 
 # Your Prospect Agent
 
-The Prospect Agent is your prospecting teammate. Once deployed, it hunts for people matching your ideal customer profile on a schedule, scores every one of them, and keeps only the high-quality leads.
+The Prospect Agent is your prospecting teammate. Once deployed, it hunts for people matching your ideal customer profile on a schedule, scores every one of them, and keeps only the high-quality prospects.
 
 ## Setting it up
 
@@ -20,8 +20,8 @@ The Prospect Agent is your prospecting teammate. Once deployed, it hunts for peo
 - It searches for new prospects matching each ICP.
 - Every prospect passes a strict quality check first — industry, company size, role, and location fit.
 - Survivors are enriched with verified contact details and buying signals (hiring, funding, technology changes).
-- Each lead gets a score from 0–100 with a plain-English rationale, plus tailored insights: pain points, triggers, and the moment your offer clicks for them.
-- Only leads scoring 70+ move on to outreach.
+- Each prospect gets a score from 0–100 with a plain-English rationale, plus tailored insights: pain points, triggers, and the moment your offer clicks for them.
+- Only prospects scoring 70+ move on to outreach.
 
 If you've added your website URL in settings, the agent reads your homepage so its scoring understands exactly what you sell.
 

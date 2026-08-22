@@ -59,7 +59,7 @@ export function ReviewQueueShowcase({ content }: { content: ReviewShowcaseConten
             <span className="grid size-7 place-items-center rounded-[8px] bg-[var(--cyan-tint)] text-[var(--cyan-strong)] ring-1 ring-inset ring-[var(--cyan-line)]">
               <Sparkles className="size-[15px]" strokeWidth={2} />
             </span>
-            <span className="text-[14px] font-semibold tracking-[-0.01em] text-[#0C1620]">Review queue</span>
+            <span className="text-[14px] font-semibold tracking-[-0.01em] text-[#0C1620]">Approvals</span>
             <span className="ml-auto flex items-center gap-2">
               <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--fb-tint)] px-2.5 py-1 text-[11px] font-semibold tabular-nums text-[var(--cyan-strong)] ring-1 ring-inset ring-[var(--cyan-line)]">
                 <StatusDot size="sm" pulse />

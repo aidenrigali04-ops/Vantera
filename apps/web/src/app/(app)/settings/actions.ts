@@ -245,7 +245,7 @@ export async function cancelAccountDeletion(
   if (error) return { error: "Could not cancel the request." };
 
   // Un-freeze outreach so a canceled deletion leaves a usable workspace again. Agents stay paused
-  // (re-enable them deliberately from the Agents page) — we never auto-resume sourcing/sending.
+  // (re-enable them deliberately from the Playbook page) — we never auto-resume sourcing/sending.
   if (canceled?.account_id) {
     await supabase.from("accounts").update({ outreach_paused: false }).eq("id", canceled.account_id);
   }

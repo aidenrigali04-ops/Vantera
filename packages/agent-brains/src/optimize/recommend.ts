@@ -37,7 +37,7 @@ const CATALOG: Record<FunnelStageKey, Omit<OutreachRecommendation, "stageKey" | 
     rationale:
       "Connection requests get declined most when the person isn't a clear fit — the request doesn't feel relevant, so it's ignored. Sharpening your ICP so every invite lands with someone who recognizes why you're reaching out lifts acceptance more than any wording change.",
     expectedEffect: "should raise your connection-acceptance rate",
-    action: { label: "Refine your targeting", href: "/agents/scout/edit" },
+    action: { label: "Refine your targeting", href: "/playbook/scout/edit" },
   },
   reply: {
     lever: "content_cta",
@@ -45,7 +45,7 @@ const CATALOG: Record<FunnelStageKey, Omit<OutreachRecommendation, "stageKey" | 
     rationale:
       "People accept but go quiet when the first message's ask is vague or reads like a pitch. A single, low-friction ask — plus supporting content the agent can reference — earns more replies than a longer message.",
     expectedEffect: "should raise the reply rate on accepted connections",
-    action: { label: "Sharpen your CTA & content", href: "/agents/copy/edit" },
+    action: { label: "Sharpen your CTA & content", href: "/playbook/copy/edit" },
   },
   booking: {
     lever: "cta",
@@ -53,7 +53,7 @@ const CATALOG: Record<FunnelStageKey, Omit<OutreachRecommendation, "stageKey" | 
     rationale:
       'Interested replies stall when the ask is soft — "open to chatting?" farms interest that never lands on a calendar. Proposing a specific, small next step (a concrete 15-minute slot) converts more of that interest into booked meetings.',
     expectedEffect: "should raise the booking rate on interested replies",
-    action: { label: "Sharpen your CTA", href: "/agents/copy/edit" },
+    action: { label: "Sharpen your CTA", href: "/playbook/copy/edit" },
   },
   close: {
     lever: "sales_process",

@@ -23,15 +23,15 @@ describe("recommendForDiagnosis", () => {
   it("maps each leak stage to a single lever + a real owner control", () => {
     const acc = recommendForDiagnosis(leak("acceptance"))!;
     expect(acc.lever).toBe("targeting");
-    expect(acc.action?.href).toBe("/agents/scout/edit");
+    expect(acc.action?.href).toBe("/playbook/scout/edit");
 
     const reply = recommendForDiagnosis(leak("reply"))!;
     expect(reply.lever).toBe("content_cta");
-    expect(reply.action?.href).toBe("/agents/copy/edit");
+    expect(reply.action?.href).toBe("/playbook/copy/edit");
 
     const book = recommendForDiagnosis(leak("booking"))!;
     expect(book.lever).toBe("cta");
-    expect(book.action?.href).toBe("/agents/copy/edit");
+    expect(book.action?.href).toBe("/playbook/copy/edit");
   });
 
   it("returns an advisory (no action) recommendation for a close-stage leak", () => {

@@ -1,7 +1,7 @@
 ---
 title: Using the help copilot
 surface: dashboard
-routes: /dashboard, /agents, /leads, /review
+routes: /dashboard, /playbook, /prospects, /approvals
 ---
 
 # Using the help copilot

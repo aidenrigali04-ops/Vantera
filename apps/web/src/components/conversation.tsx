@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import type { ThreadTurn } from "@/lib/conversations";
-import { sendManualReply, draftWithVera, delegateToAgent } from "@/app/(app)/leads/reply-actions";
+import { sendManualReply, draftWithVera, delegateToAgent } from "@/app/(app)/prospects/reply-actions";
 
 /**
  * The conversation cockpit's shared surface (L2): the full two-way thread + a composer that

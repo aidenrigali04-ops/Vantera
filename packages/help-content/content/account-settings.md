@@ -23,7 +23,7 @@ The **Booking link** card holds the calendar link Vera offers the moment a prosp
 
 ## Weekly summary email
 
-Every Monday, workspace owners and admins get a one-screen recap of what the agents did that week: outreach sent, replies, meetings booked, in-market leads surfaced, leads qualified, and your pipeline value against the revenue goal.
+Every Monday, workspace owners and admins get a one-screen recap of what the agents did that week: outreach sent, replies, meetings booked, in-market prospects surfaced, prospects qualified, and your pipeline value against the revenue goal.
 
 - A **quiet week** (agents live, nothing landed yet) sends a short note so you know the system is running.
 - A **dead week** (no activity and no live agents) sends nothing at all.
@@ -40,6 +40,6 @@ covering how the trial starts. Turn the trial/payment emails off under
 
 ## Deleting your workspace
 
-In the danger zone, type your workspace name to confirm deletion. The workspace is then **scheduled for permanent deletion after a 7-day grace period** — during those 7 days an admin can cancel from the same screen. Requesting deletion **immediately pauses all your agents and freezes outreach**, so nothing keeps running (or using up your plan) while the workspace winds down; canceling un-freezes outreach, and you re-enable agents from the Agents page. After the grace period, all workspace data is permanently erased, your connected LinkedIn account is disconnected, and data held by our processing partners is removed.
+In the danger zone, type your workspace name to confirm deletion. The workspace is then **scheduled for permanent deletion after a 7-day grace period** — during those 7 days an admin can cancel from the same screen. Requesting deletion **immediately pauses all your agents and freezes outreach**, so nothing keeps running (or using up your plan) while the workspace winds down; canceling un-freezes outreach, and you re-enable agents from the Playbook page. After the grace period, all workspace data is permanently erased, your connected LinkedIn account is disconnected, and data held by our processing partners is removed.
 
 If a workspace is ever left with no members at all (for example, every login that belonged to it was deleted), the system detects that within the hour and winds it down automatically — agents stop, the LinkedIn connection is removed, and the workspace and its data are permanently erased. Nothing keeps running, and nothing keeps being spent, for a workspace no one can sign into.

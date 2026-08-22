@@ -165,7 +165,7 @@ export async function PipelineSection() {
         .returns<{ id: string; first_name: string | null; company_name: string | null }[]>()
     : { data: [] as { id: string; first_name: string | null; company_name: string | null }[] };
   const nameById = new Map(
-    (leadRows ?? []).map((l) => [l.id, l.company_name || l.first_name || "A lead"])
+    (leadRows ?? []).map((l) => [l.id, l.company_name || l.first_name || "A prospect"])
   );
 
   // T1: `converted` is closed-won (status set by Mark-closed-won) — never call it a meeting.

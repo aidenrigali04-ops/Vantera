@@ -2,7 +2,7 @@ import Link from "next/link";
 
 /**
  * R1c: branded 404 — replaces Next's bare default. Serves both marketing URLs and
- * app deep-links (a bad /leads/{id} lands here via notFound()).
+ * app deep-links (a bad /prospects/{id} lands here via notFound()).
  */
 export default function NotFound() {
   return (

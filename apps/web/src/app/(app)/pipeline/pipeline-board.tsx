@@ -43,7 +43,7 @@ export function PipelineBoard({
         <div>
           <h1 className="font-heading text-2xl font-semibold tracking-tight">Pipeline</h1>
           <p className="mt-1.5 text-sm text-muted-foreground">
-            Every validated lead, moving through the sequence — and stopping the instant they convert.
+            Every validated prospect, moving through the sequence — and stopping the instant they convert.
           </p>
         </div>
         <Link
@@ -72,7 +72,7 @@ export function PipelineBoard({
               value={String(vm.pausedTotal)}
               sub={vm.pausedTotal > 0 ? "waiting on you" : "none waiting"}
               actionable={vm.pausedTotal > 0}
-              href={vm.pausedTotal > 0 ? "/leads?tab=replied" : undefined}
+              href={vm.pausedTotal > 0 ? "/prospects?tab=replied" : undefined}
             />
             <KpiTile
               label="Won"
@@ -145,7 +145,7 @@ function GoalPanel({
 
 function PausedCallout({ count }: { count: number }) {
   return (
-    <Link href="/leads?tab=replied" className="block">
+    <Link href="/prospects?tab=replied" className="block">
       <Panel interactive className="flex items-center justify-between p-4">
         <div className="flex items-center gap-3">
           <span className="relative flex size-2">
@@ -154,7 +154,7 @@ function PausedCallout({ count }: { count: number }) {
           </span>
           <p className="text-sm">
             <span className="font-data font-semibold tabular-nums">{count}</span>{" "}
-            {count === 1 ? "lead replied" : "leads replied"} — the sequence paused for you
+            {count === 1 ? "prospect replied" : "prospects replied"} — the sequence paused for you
           </p>
         </div>
         <ArrowRight className="size-4 text-muted-foreground" aria-hidden />
@@ -169,7 +169,7 @@ function ActivityFeed({ activity }: { activity: ActivityItem[] }) {
       <Eyebrow>Live activity</Eyebrow>
       {activity.length === 0 ? (
         <p className="mt-4 text-sm text-muted-foreground">
-          No replies yet — the first touches are going out. Activity shows up here the moment a lead
+          No replies yet — the first touches are going out. Activity shows up here the moment a prospect
           responds.
         </p>
       ) : (
@@ -210,11 +210,11 @@ function EmptyState() {
         </div>
         <h2 className="mt-5 font-heading text-lg font-semibold">Your pipeline is ready to run</h2>
         <p className="mt-2 max-w-sm text-sm text-muted-foreground">
-          Once your agents are live, every qualified lead flows through your LinkedIn sequence
+          Once your agents are live, every qualified prospect flows through your LinkedIn sequence
           automatically — pausing the instant someone replies.
         </p>
         <Link
-          href="/agents"
+          href="/playbook"
           className="mt-6 inline-flex items-center gap-2 rounded-lg bg-[#0a0c12] px-5 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90"
         >
           Check your agents

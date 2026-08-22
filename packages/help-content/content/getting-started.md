@@ -41,7 +41,7 @@ Vantera provisions your whole system at once — no wizards, nothing to deploy b
   watchlist auto-filled from your business.
 
 Your dashboard opens as soon as that's done. The agents start working within about 15 minutes.
-**Nothing sends until you approve it** — every message waits in your review queue.
+**Nothing sends until you approve it** — every message waits in Approvals.
 
 ## Common questions
 

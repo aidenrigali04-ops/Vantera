@@ -482,6 +482,8 @@ export const scheduledSends = pgTable(
     scheduledFor: timestamp("scheduled_for", { withTimezone: true }),
     approvedBy: uuid("approved_by"),
     approvedAt: timestamp("approved_at", { withTimezone: true }),
+    // 0064: the inline-reject reason (Today queue) — feeds the rejection learning loop
+    rejectionReason: text("rejection_reason", { enum: ["wrong_person", "bad_timing", "weak_message", "other"] }),
     error: text("error"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

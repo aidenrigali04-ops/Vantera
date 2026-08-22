@@ -13,20 +13,20 @@ import { cn } from "@/lib/utils";
 // --- Suggestion chips by surface ---
 
 const SURFACE_CHIPS: Record<string, string[]> = {
-  "/review": [
-    "How does the review queue work?",
+  "/approvals": [
+    "How do Approvals work?",
     "Can I edit a draft before sending?",
     "How do I approve multiple drafts at once?",
   ],
-  "/agents": [
+  "/playbook": [
     "What's the difference between review and automatic?",
     "How do I pause my Scout Agent?",
     "What happens after I deploy an Outreach Agent?",
   ],
-  "/leads": [
-    "How are leads scored?",
-    "Why is a lead marked as not qualified?",
-    "Can I manually add a lead?",
+  "/prospects": [
+    "How are prospects scored?",
+    "Why is a prospect marked as not qualified?",
+    "Can I manually add a prospect?",
   ],
   "/dashboard": [
     "What do the dashboard metrics mean?",

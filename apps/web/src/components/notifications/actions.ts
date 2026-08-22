@@ -15,6 +15,6 @@ export async function markNotificationsRead(ids: string[]): Promise<{ ok: boolea
     .update({ read_at: new Date().toISOString() })
     .in("id", ids);
   revalidatePath("/dashboard");
-  revalidatePath("/leads");
+  revalidatePath("/prospects");
   return { ok: !error };
 }

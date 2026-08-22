@@ -130,7 +130,7 @@ export function NotificationsBell({ notifications }: { notifications: AppNotific
             </p>
             {notifications.length === 0 ? (
               <p className="px-2 py-6 text-center text-sm text-muted-foreground">
-                Nothing yet — lead events show up here as they happen.
+                Nothing yet — prospect events show up here as they happen.
               </p>
             ) : (
               <ul className="max-h-96 overflow-y-auto">

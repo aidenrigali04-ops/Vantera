@@ -55,15 +55,15 @@ describe("resolveGate", () => {
 describe("loginRedirect (deep-link preservation)", () => {
   it("carries the requested path as ?next= so login can forward back", () => {
     // The bug this fixes: a logged-out pull-back-email recipient clicking "Review the
-    // messages" (/review) bounced to a bare /login and, after signing in, dead-ended on
-    // /dashboard instead of the review queue.
-    expect(loginRedirect("/login", "/review")).toBe("/login?next=%2Freview");
-    expect(loginRedirect("/login", "/leads")).toBe("/login?next=%2Fleads");
+    // messages" (/approvals) bounced to a bare /login and, after signing in, dead-ended on
+    // /dashboard instead of Approvals.
+    expect(loginRedirect("/login", "/approvals")).toBe("/login?next=%2Fapprovals");
+    expect(loginRedirect("/login", "/prospects")).toBe("/login?next=%2Fprospects");
   });
 
   it("encodes a query string so it survives the outer ?next=", () => {
-    expect(loginRedirect("/login", "/leads?view=compact")).toBe(
-      "/login?next=%2Fleads%3Fview%3Dcompact"
+    expect(loginRedirect("/login", "/prospects?view=compact")).toBe(
+      "/login?next=%2Fprospects%3Fview%3Dcompact"
     );
   });
 
@@ -74,7 +74,7 @@ describe("loginRedirect (deep-link preservation)", () => {
   });
 
   it("leaves a non-/login destination untouched (onboarding, dashboard)", () => {
-    expect(loginRedirect("/onboarding", "/review")).toBe("/onboarding");
-    expect(loginRedirect("/dashboard", "/review")).toBe("/dashboard");
+    expect(loginRedirect("/onboarding", "/approvals")).toBe("/onboarding");
+    expect(loginRedirect("/dashboard", "/approvals")).toBe("/dashboard");
   });
 });

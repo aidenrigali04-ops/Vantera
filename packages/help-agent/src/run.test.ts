@@ -224,13 +224,13 @@ describe("runCopilotTurn", () => {
     };
 
     const model = new MockLanguageModelV3({
-      doStream: mutateToolCallStream("openPage", { route: "/review" }),
+      doStream: mutateToolCallStream("openPage", { route: "/approvals" }),
     });
 
     const events: CopilotEvent[] = [];
     await runCopilotTurn({
       model,
-      messages: [{ role: "user", content: "Take me to the review page." }],
+      messages: [{ role: "user", content: "Take me to the approvals page." }],
       tools: [fakeNavigateTool],
       ctx: makeCtx(vi.fn(async () => [])),
       onEvent: collectEvents(events),
@@ -245,7 +245,7 @@ describe("runCopilotTurn", () => {
 
     const nav = navigateEvents[0] as Extract<CopilotEvent, { type: "navigate" }>;
     expect(nav.action).toBe("openPage");
-    expect(nav.params).toEqual({ route: "/review" });
+    expect(nav.params).toEqual({ route: "/approvals" });
   });
 
   it("approvedAction resume path: runs the tool and emits an outcome event", async () => {

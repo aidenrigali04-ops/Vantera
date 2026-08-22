@@ -1,14 +1,14 @@
 ---
-title: Reviewing drafts before they send
+title: Approvals — approving drafts before they send
 surface: review
-routes: /review
+routes: /approvals
 ---
 
-# Reviewing drafts before they send
+# Approvals — approving drafts before they send
 
-Every message your Outreach Agent writes waits in the review queue — nothing sends without your approval.
+Every message your Outreach Agent writes waits in **Approvals** — nothing sends without your approval.
 
-Each prospect's row shows *why* they were chosen before you even expand it: their fit verdict (for example **Hot lead · 91**), an **In-market** badge when your Intent Agent caught them showing buying behavior on LinkedIn, and the buying signal behind the outreach — so you approve with the same context the agent had.
+Each prospect's row shows *why* they were chosen before you even expand it: their fit verdict (for example **Hot prospect · 91**), an **In-market** badge when your Intent Agent caught them showing buying behavior on LinkedIn, and the buying signal behind the outreach — so you approve with the same context the agent had.
 
 Each draft shows who it's for, the channel, and the message. If our style check spotted anything that could read as robotic, you'll see a flag on the card. You have two ways to clear it: press **Fix** on the flag and the draft is rewritten for you — the fix is re-checked against the same style rules, so a flag only disappears when the text genuinely passes — or edit the draft yourself and the flag clears once the text passes.
 

@@ -1,7 +1,7 @@
 ---
 title: Your Intent Agent
 surface: agents
-routes: /agents, /agents/new/intent, /agents/intent
+routes: /playbook, /playbook/new/intent, /playbook/intent
 ---
 
 # Your Intent Agent
@@ -28,18 +28,18 @@ Showing interest isn't enough on its own. Every person the agent surfaces is jud
 1. **Buying intent** — does what they did actually signal they're in-market for what you sell? A bare like on an unrelated post doesn't count.
 2. **Your ICP** — the same qualification bar your Prospect Agent uses (the Intent Agent inherits your Prospect Agent's targeting). Fast never means spray.
 
-Only people who clear both become leads, each tagged with the "why now" signal that surfaced them — visible on your Leads page.
+Only people who clear both become prospects, each tagged with the "why now" signal that surfaced them — visible on your Prospects page.
 
 ## Setting it up
 
 1. **Name your agent.**
 2. **Watch** — the keywords, competitors, and hashtags are already filled in from your business; edit them or add your own, then pick your signal types. You need a deployed Prospect Agent first, since the Intent Agent qualifies against its ICP.
 3. **Schedule** — pick a run time and a daily or weekly cadence.
-4. **Deploy** — its first run starts within about 15 minutes. Qualified intent leads flow straight into your Outreach Agent's review queue — nothing sends without you.
+4. **Deploy** — its first run starts within about 15 minutes. Qualified intent prospects flow straight into Approvals — nothing sends without you.
 
 ## Company events, too (Growth and Scale)
 
-On the Growth and Scale plans, Intent also watches for **company events** — funding rounds, acquisitions, executive hires, product launches, partnerships, and new offices — and treats a fresh one as a buying signal. A qualifying event lifts the lead and shows up as its "why now" on the Leads page, right alongside the LinkedIn-behavior signals. It's automatic — there's nothing to set up. (Starter doesn't include company events.)
+On the Growth and Scale plans, Intent also watches for **company events** — funding rounds, acquisitions, executive hires, product launches, partnerships, and new offices — and treats a fresh one as a buying signal. A qualifying event lifts the prospect and shows up as its "why now" on the Prospects page, right alongside the LinkedIn-behavior signals. It's automatic — there's nothing to set up. (Starter doesn't include company events.)
 
 ## Staying safe
 

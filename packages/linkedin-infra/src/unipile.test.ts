@@ -81,11 +81,11 @@ describe("UnipileLinkedInInfra", () => {
       const captured: { body?: any } = {};
       const infra = makeInfra(captured);
       await infra.createHostedAuthLink("acct-123", {
-        success: "https://app.test/settings/channels?connected=1",
-        failure: "https://app.test/settings/channels?connected=failed",
+        success: "https://app.test/settings/senders?connected=1",
+        failure: "https://app.test/settings/senders?connected=failed",
       });
-      expect(captured.body.success_redirect_url).toBe("https://app.test/settings/channels?connected=1");
-      expect(captured.body.failure_redirect_url).toBe("https://app.test/settings/channels?connected=failed");
+      expect(captured.body.success_redirect_url).toBe("https://app.test/settings/senders?connected=1");
+      expect(captured.body.failure_redirect_url).toBe("https://app.test/settings/senders?connected=failed");
       expect(captured.body.bypass_success_screen).toBe(true);
     });
 

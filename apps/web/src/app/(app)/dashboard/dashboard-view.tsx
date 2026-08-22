@@ -479,10 +479,10 @@ function KpiStrip({
       {/* R4: "Interested replies" — the KPI counts every interested reply in 7 days, which is
           a different number than the needs-you panel's "waiting on you". Same-name tiles with
           different denominators read as the dashboard contradicting itself. */}
-      <KpiTile href="/leads?tab=replied" label="Interested replies" value={String(repliesThisWeek)} sub="this week" />
+      <KpiTile href="/prospects?tab=replied" label="Interested replies" value={String(repliesThisWeek)} sub="this week" />
       <KpiTile
-        href="/review"
-        label="To review"
+        href="/approvals"
+        label="To approve"
         value={String(drafts)}
         sub={drafts > 0 ? "awaiting you" : "all clear"}
         actionable={drafts > 0}
@@ -638,8 +638,8 @@ function NeedsYou({
               icon={<Inbox className="size-4" />}
               title={`${drafts} ${drafts === 1 ? "draft is" : "drafts are"} waiting for your review`}
               detail="Nothing sends until you approve it — a few minutes keeps the pipeline moving."
-              href="/review"
-              label="Review"
+              href="/approvals"
+              label="Approve"
             />
           )}
           {cold > 0 && (
@@ -647,7 +647,7 @@ function NeedsYou({
               icon={<Snowflake className="size-4" />}
               title={`${cold} warm ${cold === 1 ? "lead is" : "leads are"} cooling off`}
               detail="Replied 3+ days ago and still open — a quick nudge keeps them warm."
-              href="/leads?tab=replied"
+              href="/prospects?tab=replied"
               label="Re-engage"
             />
           )}
@@ -664,7 +664,7 @@ function NeedsYou({
           </div>
           {liveAgentsCount === 0 && (
             <Button asChild size="sm" variant="outline">
-              <Link href="/agents">View agents</Link>
+              <Link href="/playbook">View playbook</Link>
             </Button>
           )}
         </div>
@@ -691,7 +691,7 @@ function HotLeads({
       <div className="flex items-center justify-between gap-3">
         <Eyebrow>Hot leads</Eyebrow>
         <Button asChild variant="ghost" size="sm" className="shrink-0">
-          <Link href="/leads">
+          <Link href="/prospects">
             View all <ArrowRight className="size-4" />
           </Link>
         </Button>
@@ -755,8 +755,8 @@ function AgentsPanel({
         </p>
       )}
       <Button asChild variant="ghost" size="sm" className="-mx-2 mt-1 justify-start">
-        <Link href="/agents">
-          Manage agents <ArrowRight className="size-4" />
+        <Link href="/playbook">
+          Open playbook <ArrowRight className="size-4" />
         </Link>
       </Button>
     </RevealItem>
@@ -1092,7 +1092,7 @@ function ReplyCelebration({ win }: { win: { id: string; leadName: string } }) {
           </p>
         </div>
         <Button asChild size="sm" variant="outline" className="ml-auto shrink-0">
-          <Link href="/leads?tab=replied">
+          <Link href="/prospects?tab=replied">
             See the reply <ArrowRight className="size-4" />
           </Link>
         </Button>
@@ -1222,11 +1222,11 @@ function ActivationRamp({
             </ul>
             <Button asChild className="mt-1 w-fit">
               {scoutDeployed && !liConnected ? (
-                <Link href="/settings/channels">
+                <Link href="/settings/senders">
                   Connect LinkedIn <ArrowRight className="size-4" />
                 </Link>
               ) : (
-                <Link href="/agents/new/scout">
+                <Link href="/playbook/new/scout">
                   Deploy your agents <ArrowRight className="size-4" />
                 </Link>
               )}
@@ -1339,13 +1339,13 @@ function FirstRunInProgress({
               {/* Outreach is already provisioned — the only setup left is the send gate. */}
               {!liConnected && (
                 <Button asChild size="sm">
-                  <Link href="/settings/channels">
+                  <Link href="/settings/senders">
                     Connect LinkedIn <ArrowRight className="size-4" />
                   </Link>
                 </Button>
               )}
               <Button asChild variant={liConnected ? "outline" : "ghost"} size="sm">
-                <Link href="/leads">Watch leads arrive</Link>
+                <Link href="/prospects">Watch prospects arrive</Link>
               </Button>
             </div>
           </div>
@@ -1392,7 +1392,7 @@ function ChannelSetupPanel({ channels }: { channels: DashboardViewProps["channel
           action={
             liConnected ? undefined : (
               <Button asChild size="sm" variant={liConnecting ? "ghost" : "default"}>
-                <Link href="/settings/channels">{liConnecting ? "Resume" : "Connect"}</Link>
+                <Link href="/settings/senders">{liConnecting ? "Resume" : "Connect"}</Link>
               </Button>
             )
           }

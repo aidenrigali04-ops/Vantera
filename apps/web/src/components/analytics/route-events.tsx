@@ -7,7 +7,7 @@ import { trackEvent } from "@/lib/analytics/clarity";
 /**
  * Fires funnel events from redirect landing params, so success moments that end
  * in a server-action redirect (which the client never sees resolve) still get
- * tracked: `/agents?deployed=<kind>` → agent_deployed, `?onboarded=1` →
+ * tracked: `/playbook?deployed=<kind>` → agent_deployed, `?onboarded=1` →
  * onboarding_completed, `/settings/billing?checkout=success&plan=…` →
  * subscription_started (Meta Subscribe with the plan's real value — Stripe's
  * return redirect is the only client-side moment checkout success is knowable).

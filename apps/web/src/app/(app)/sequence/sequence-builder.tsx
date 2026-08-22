@@ -33,10 +33,10 @@ export function SequenceBuilder({
     // One-screen on desktop: header pinned; the form scrolls in its own region if it overflows.
     <div className="mx-auto flex w-full max-w-3xl flex-col lg:h-[calc(100dvh-3rem)]">
       <div className="mb-6 shrink-0 border-b border-[var(--hairline)] pb-5">
-        <h1 className="text-2xl font-semibold tracking-tight">The flow every lead runs</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">The flow every prospect runs</h1>
         <p className="mt-1.5 text-sm text-muted-foreground">
           {config.stages.linkedin.touches} LinkedIn touches — a connection request, then personalized
-          follow-ups — and it stops the instant a lead books.
+          follow-ups — and it stops the instant a prospect books.
         </p>
       </div>
 
@@ -48,8 +48,8 @@ export function SequenceBuilder({
             Deploy your Outreach Agent to activate this sequence — you can still tune it here.
           </p>
           <Button asChild size="sm" variant="outline">
-            <Link href="/agents">
-              Go to agents <ArrowRight className="size-4" />
+            <Link href="/playbook">
+              Go to playbook <ArrowRight className="size-4" />
             </Link>
           </Button>
         </Panel>

@@ -46,7 +46,7 @@ describe("runCampaignSendState", () => {
       summary: expect.stringContaining("Paused"),
       undoable: true,
       undoTo: "resume",
-      deepLink: "/agents",
+      deepLink: "/playbook",
     });
   });
 

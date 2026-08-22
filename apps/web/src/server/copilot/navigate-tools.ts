@@ -10,7 +10,7 @@ export const navigateTools: CopilotTool[] = [
     parameters: z.object({
       route: z
         .string()
-        .describe("App route, e.g. /review, /agents, /leads, /settings/channels"),
+        .describe("App route, e.g. /approvals, /playbook, /prospects, /settings/senders"),
     }),
   },
   {

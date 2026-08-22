@@ -8,11 +8,11 @@ import {
   topLeadSignal,
   type LeadSignalView,
   type ScoreTier,
-} from "@/app/(app)/leads/lead-value";
+} from "@/app/(app)/prospects/lead-value";
 
 /**
  * The shared intent vocabulary — one place for how a lead's origin and "why now"
- * read everywhere a lead surfaces (Leads table, dashboard Hot leads, Review queue).
+ * read everywhere a lead surfaces (Prospects table, dashboard Hot leads, Approvals).
  * Extracted from leads-table.tsx so the treatments can never drift apart.
  */
 
@@ -68,7 +68,7 @@ const SCORE_BADGE_CLASS: Record<ScoreTier, string> = {
   unscored: "text-muted-foreground/60",
 };
 
-/** The fit chip. `withVerdict` spells the tier out ("Hot lead · 91") so the number needs no decoding. */
+/** The fit chip. `withVerdict` spells the tier out ("Hot prospect · 91") so the number needs no decoding. */
 export function ScoreBadge({ score, withVerdict = false }: { score: number | null; withVerdict?: boolean }) {
   if (score == null) return <span className="font-mono text-muted-foreground/50">—</span>;
   const { tier, label } = scoreVerdict(score);

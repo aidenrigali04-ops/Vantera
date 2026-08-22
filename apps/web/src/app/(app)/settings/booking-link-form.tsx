@@ -29,7 +29,7 @@ export function BookingLinkForm({
           Vera offers the moment a prospect wants to talk.
         </p>
         <Button asChild variant="outline" size="sm" className="w-fit">
-          <Link href="/agents">Go to Agents</Link>
+          <Link href="/playbook">Go to Playbook</Link>
         </Button>
       </div>
     );

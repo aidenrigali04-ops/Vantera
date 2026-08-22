@@ -8,7 +8,7 @@ import {
   markMeetingBookedAction,
   pushLeadToCrm,
   type LeadCrmActionState,
-} from "@/app/(app)/leads/crm-actions";
+} from "@/app/(app)/prospects/crm-actions";
 
 // Close-tracking + CRM push controls on the lead profile. Marking closed-won auto-pushes to
 // any destination with auto-push on; once closed, a manual "Push to CRM" re-pushes on demand.

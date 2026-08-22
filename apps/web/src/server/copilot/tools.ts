@@ -19,7 +19,7 @@ export function buildAccountTools(db: SupabaseClient, accountId: string): Copilo
     {
       name: "getDraftQueueSummary",
       tier: "read",
-      description: "How many drafts are waiting in the review queue.",
+      description: "How many drafts are waiting in Approvals (the approval queue).",
       parameters: z.object({}),
       run: async () => getDraftQueueSummary(db, accountId),
     },

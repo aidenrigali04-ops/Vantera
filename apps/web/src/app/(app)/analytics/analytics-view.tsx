@@ -95,11 +95,11 @@ function EmptyLeads() {
   return (
     <Panel className="py-12 text-center">
       <p className="mx-auto max-w-md text-sm text-muted-foreground">
-        No qualified leads yet. Once your agents source and score, your funnel and return-on-spend
+        No qualified prospects yet. Once your agents source and score, your funnel and return-on-spend
         land here — measured against the goal you set.
       </p>
       <Link
-        href="/agents"
+        href="/playbook"
         className="mt-5 inline-flex rounded-lg bg-foreground px-5 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90"
       >
         Set up your pipeline
@@ -173,7 +173,7 @@ function RenewalBar({ roi }: { roi: Roi }) {
 }
 
 // The dependency mechanism: closed wins traced back to the signal that opened the door, so the real
-// signals on Leads visibly produce the revenue here. Rendered only when wins carry signals.
+// signals on Prospects visibly produce the revenue here. Rendered only when wins carry signals.
 function AttributionCard({ attribution }: { attribution: SignalAttribution[] }) {
   const top = attribution[0]?.wins ?? 0;
   return (
@@ -251,7 +251,7 @@ function FunnelCard({ funnel, meetingsTracked }: { funnel: FunnelStage[]; meetin
               )}
               {isUntrackedMeetings && (
                 <p className="mt-1 text-xs text-muted-foreground/70">
-                  Tracked once a lead books a meeting from your outreach.
+                  Tracked once a prospect books a meeting from your outreach.
                 </p>
               )}
             </div>

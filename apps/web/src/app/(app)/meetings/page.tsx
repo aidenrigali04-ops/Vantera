@@ -55,7 +55,7 @@ export default async function MeetingsPage() {
           <CalendarCheck2 className="size-7 text-muted-foreground" />
           <p className="max-w-sm text-sm text-muted-foreground">
             Your first booked meeting lands here. Make sure your{" "}
-            <Link href="/agents/copy/edit" className="font-medium text-foreground underline underline-offset-4">
+            <Link href="/playbook/copy/edit" className="font-medium text-foreground underline underline-offset-4">
               booking link
             </Link>{" "}
             is set — Vera offers it the moment a prospect shows interest.

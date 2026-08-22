@@ -1,7 +1,7 @@
 ---
 title: Replies, unsubscribes & what happens next
 surface: review
-routes: /review, /leads
+routes: /approvals, /prospects
 ---
 
 # Replies, unsubscribes & what happens next
@@ -25,13 +25,13 @@ When a real reply is received (anything except out of office), any remaining dra
 
 ## Replying yourself — you're in control
 
-You can always answer a conversation yourself from the lead's page. The moment you send a reply, **automation pauses for that thread**: the agent stands down and won't message on top of you, so a prospect never gets a bot message right after your personal one. Any drafts the agent had queued for that person are pulled at the same time.
+You can always answer a conversation yourself from the prospect's page. The moment you send a reply, **automation pauses for that thread**: the agent stands down and won't message on top of you, so a prospect never gets a bot message right after your personal one. Any drafts the agent had queued for that person are pulled at the same time.
 
-When you're ready to hand the thread back, use **Resume automation** on the lead — the agent picks the conversation back up and will follow up if the prospect goes quiet. Until you do, the thread is yours.
+When you're ready to hand the thread back, use **Resume automation** on the prospect — the agent picks the conversation back up and will follow up if the prospect goes quiet. Until you do, the thread is yours.
 
 ## If a reply goes unanswered
 
-A reply should never quietly go cold. If a prospect's reply has been sitting with no answer — no agent response sent, no draft waiting in your review queue, and no one handling it personally — we raise a **needs attention** alert on that lead so you can jump in. This is a safety net for the rare case where automation is off or a draft was declined and forgotten.
+A reply should never quietly go cold. If a prospect's reply has been sitting with no answer — no agent response sent, no draft waiting in Approvals, and no one handling it personally — we raise a **needs attention** alert on that prospect so you can jump in. This is a safety net for the rare case where automation is off or a draft was declined and forgotten.
 
 ## Automatic suppression
 

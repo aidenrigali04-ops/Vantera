@@ -27,7 +27,7 @@ export async function runCampaignSendState(
     return {
       summary: "There's no outreach campaign to update yet.",
       undoable: false,
-      deepLink: "/agents",
+      deepLink: "/playbook",
     };
   }
 
@@ -41,7 +41,7 @@ export async function runCampaignSendState(
     return {
       summary: "Couldn't update the campaign. Only admins can do this.",
       undoable: false,
-      deepLink: "/agents",
+      deepLink: "/playbook",
     };
   }
 
@@ -55,6 +55,6 @@ export async function runCampaignSendState(
         : `Resumed outreach for ${name}.`,
     undoable: true,
     undoTo: op === "pause" ? "resume" : "pause",
-    deepLink: "/agents",
+    deepLink: "/playbook",
   };
 }

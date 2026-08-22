@@ -61,6 +61,6 @@ export async function addSuppressionEntry(
   }
 
   revalidatePath("/settings/suppression");
-  revalidatePath("/review");
+  revalidatePath("/approvals");
   return { added: value };
 }

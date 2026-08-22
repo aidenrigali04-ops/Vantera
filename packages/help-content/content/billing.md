@@ -6,7 +6,7 @@ routes: /settings/billing
 
 # Plans and billing
 
-Vantera offers three plans — **Starter**, **Growth**, and **Scale** — and the headline difference is how many **LinkedIn senders** each one runs in parallel. A sender is a connected LinkedIn account; running more of them spreads your outreach so no single account ever exceeds its safe daily pace, and your total capacity is the sum across all of them. Every plan runs the same prospecting, enrichment, and lead scoring; moving up a plan adds senders, seats, and capabilities.
+Vantera offers three plans — **Starter**, **Growth**, and **Scale** — and the headline difference is how many **LinkedIn senders** each one runs in parallel. A sender is a connected LinkedIn account; running more of them spreads your outreach so no single account ever exceeds its safe daily pace, and your total capacity is the sum across all of them. Every plan runs the same prospecting, enrichment, and prospect scoring; moving up a plan adds senders, seats, and capabilities.
 
 ## What each plan includes
 
@@ -22,9 +22,9 @@ For custom volume, SSO, or dedicated support, contact us about an Enterprise pla
 
 Every new workspace starts on a **7-day free trial** of the plan you choose during setup. A card is required to start, but nothing is charged until the trial ends — cancel before then and you pay nothing. The trial lets your agents reach your first replies before you pay. The Billing page shows how many days are left.
 
-To keep things fair, a trial sources a capped number of leads — plenty to prove the motion and reach your first replies. Choosing a plan lifts the cap and prospecting continues at your plan's full capacity.
+To keep things fair, a trial sources a capped number of prospects — plenty to prove the motion and reach your first replies. Choosing a plan lifts the cap and prospecting continues at your plan's full capacity.
 
-When the trial ends, your agents pause and you'll be asked to choose a plan. Your leads, campaigns, and history are kept exactly as they were — picking a plan resumes everything.
+When the trial ends, your agents pause and you'll be asked to choose a plan. Your prospects, campaigns, and history are kept exactly as they were — picking a plan resumes everything.
 
 ## Deploying agents needs an active plan
 

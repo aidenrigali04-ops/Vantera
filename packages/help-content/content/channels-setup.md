@@ -1,26 +1,26 @@
 ---
 title: Connecting your LinkedIn account
 surface: settings
-routes: /settings/channels, /settings
+routes: /settings/senders, /settings
 ---
 
 # Connecting your LinkedIn account
 
-LinkedIn is how Vantera reaches out. The Channels page is where you connect the LinkedIn account your agents send from — connect it before you deploy an Outreach Agent, since outreach won't start until an account is connected.
+LinkedIn is how Vantera reaches out. The Senders page is where you connect the LinkedIn account your agents send from — connect it before you deploy an Outreach Agent, since outreach won't start until an account is connected.
 
 ## LinkedIn account
 
-Connect your own existing LinkedIn account to turn on outreach. Click **Connect your LinkedIn account** — you'll sign in on LinkedIn's own secure page (we never see your password), then you're brought straight back to **Settings → Channels**, where your account appears as **Active**. Need more than one? Use **Connect another account** on the same card.
+Connect your own existing LinkedIn account to turn on outreach. Click **Connect your LinkedIn account** — you'll sign in on LinkedIn's own secure page (we never see your password), then you're brought straight back to **Settings → Senders**, where your account appears as **Active**. Need more than one? Use **Connect another account** on the same card.
 
 If you finish signing in but don't see your account listed yet, use **Refresh status** on the LinkedIn card to sync it immediately — no need to reconnect.
 
-If your connection drops (LinkedIn sessions expire periodically), Vantera notices within minutes: a banner appears across the dashboard, the account's workspace admins get an email, and your agents pause safely — no sourcing, no sending, and replies stop syncing until it's back. Use the **Reconnect** button next to the flagged account (the dashboard banner brings you here) — it re-authenticates the SAME account in place, so your seat count, lead assignments, and history all stay exactly as they were. Never use "Connect another account" to fix a dropped session.
+If your connection drops (LinkedIn sessions expire periodically), Vantera notices within minutes: a banner appears across the dashboard, the account's workspace admins get an email, and your agents pause safely — no sourcing, no sending, and replies stop syncing until it's back. Use the **Reconnect** button next to the flagged account (the dashboard banner brings you here) — it re-authenticates the SAME account in place, so your seat count, prospect assignments, and history all stay exactly as they were. Never use "Connect another account" to fix a dropped session.
 
-To remove a connected account entirely, use **Remove** next to it: outreach from that account stops immediately, its seat is freed, and your lead history is kept. Leads it was messaging pause until another account is connected.
+To remove a connected account entirely, use **Remove** next to it: outreach from that account stops immediately, its seat is freed, and your prospect history is kept. Prospects it was messaging pause until another account is connected.
 
 ## Connecting is the activation gate
 
-Your agents draft outreach as soon as qualified leads arrive, but nothing actually sends until a LinkedIn account is connected and active. Connecting is the one step between a drafted queue and live outreach — so do it early. Drafting still works in the meantime, and everything waits safely in your review queue.
+Your agents draft outreach as soon as qualified prospects arrive, but nothing actually sends until a LinkedIn account is connected and active. Connecting is the one step between a drafted queue and live outreach — so do it early. Drafting still works in the meantime, and everything waits safely in Approvals.
 
 To protect your account, Vantera paces sending with human-like timing and a weekly invite ceiling, and ramps a newly connected account up gradually. These limits aren't configurable below their safety thresholds — they keep your own LinkedIn account healthy.
 

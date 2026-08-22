@@ -101,11 +101,11 @@ export function LivePipeline(p: LivePipelineData) {
     {
       key: "review",
       icon: Inbox,
-      label: "In review",
+      label: "Awaiting approval",
       value: p.inReview,
       reached: p.inReview > 0 || downstreamFromReview,
       attention: p.inReview > 0,
-      href: "/review",
+      href: "/approvals",
       sub: p.inReview > 0 ? "awaiting your approval" : "nothing sends without you",
     },
     {

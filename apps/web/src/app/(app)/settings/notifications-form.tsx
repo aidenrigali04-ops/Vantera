@@ -56,7 +56,7 @@ export function LeadEventEmailsToggle({ enabled }: { enabled: boolean }) {
   return (
     <form action={action} className="flex items-center justify-between gap-3">
       <div>
-        <p className="text-sm font-medium">Lead event emails</p>
+        <p className="text-sm font-medium">Prospect event emails</p>
         <p className="text-sm text-muted-foreground">
           The moments worth interrupting you for: an interested reply, a booked meeting, or a
           thread Vera hands over. Sent to workspace owners and admins as they happen.

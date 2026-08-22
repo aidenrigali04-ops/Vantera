@@ -18,10 +18,10 @@ You don't have to wait for email. As soon as you connect your LinkedIn account a
 
 ## Your agent paces discovery to match what's ready
 
-The Prospect Agent doesn't pull a large backlog upfront. It discovers leads at a pace that matches your current outreach capacity — how many inboxes are ready, how many LinkedIn actions are available. That keeps your lead list current and actionable instead of letting a stale backlog pile up that was found weeks before it could be contacted.
+The Prospect Agent doesn't pull a large backlog upfront. It discovers prospects at a pace that matches your current outreach capacity — how many inboxes are ready, how many LinkedIn actions are available. That keeps your prospect list current and actionable instead of letting a stale backlog pile up that was found weeks before it could be contacted.
 
 ## Where to see warm-up status
 
 The dashboard shows your current channel status. While inboxes are warming you'll see a notice like **"Inboxes warming — email begins in ~N days"**. Once your inboxes are ready, the notice clears and email outreach begins automatically.
 
-If you need to check the exact status of each inbox, go to **Settings → Channels**.
+If you need to check the exact status of each inbox, go to **Settings → Senders**.

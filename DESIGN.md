@@ -13,16 +13,25 @@ dashboard. Distinctive = restraint, not ornament.
 
 ## Theme
 
-- App default is **dark** (`defaultTheme="dark"`, root layout). Dashboard keeps the
-  toggle (rule 07); panels are theme-aware so light mode still works, but the
-  **dark theme is the designed-for default** and is what must match the landing.
+- **The app is light-first** (Dashboard blueprint v1.0, 2026-08-21, D2). The root layout
+  forces light; the landing stays dark (category + demo). The app's tokens live under
+  `.app-surface` in `globals.css` — `--canvas #F6F6F7`, `--surface #FFF`, `--surface-2`,
+  `--line`, `--ink` / `--ink-mid` / `--ink-dim` — with a complete `.dark .app-surface`
+  block holding the same roles in dark values, so dark stays one token flip away.
+  "Dark is the designed-for default" now applies to the **landing only**.
 - **No animated particle background on the dashboard.** The `DottedSurface` canvas is
-  landing/auth/onboarding only. The dashboard is calm and static.
+  landing/auth/onboarding only. The dashboard is calm and static; Today's one decorative
+  element is the `--wash` highlight behind the greeting.
 
 ## Type
 
-- Families: **Montserrat** (`--font-montserrat`, `font-heading` + `font-sans`) +
-  **Geist Mono** (`--font-mono`). No Inter/Roboto/system stacks.
+- Families — **app (`.app-surface`): Geist Sans + Geist Mono** (D3, 2026-08-21): one
+  family, two roles. UI text is Geist Sans; every number, time, cap, score, count, and
+  keyboard hint is Geist Mono with tabular figures (`font-mono` / `.font-data`). The
+  `--font-sans` / `--font-heading` / `--font-mono` theme tokens are remapped to Geist on
+  `.app-surface` only. **Landing + auth keep Poppins.** No Inter/Roboto/system stacks.
+- App labels are **sentence case** — no uppercase tracked eyebrows on Today-era surfaces;
+  max weight 600.
 - Display / section titles: `font-heading text-3xl/4xl font-semibold tracking-tight`.
 - Card/panel titles: `font-heading text-base font-semibold`.
 - Eyebrows + numeric stats + small labels: `font-mono`, uppercase eyebrows at
@@ -47,7 +56,15 @@ rounded-2xl border shadow-lg
 
 ## Accent
 
-**One reserved gold, monochrome everything else (2026-06-15).** The brand accent is
+**App (2026-08-21): accent is blue, used only for meaning; the primary button is ink.**
+Inside `.app-surface`, `--acc #2563EB` (`--acc-ink`, `--acc-tint`) marks *interactive /
+Interested / active tab* and nothing else; `--positive` = a sender that is Active,
+`--attention` = a state that needs a repair or is holding work, `--danger` = the engine
+is stopped. Score chips use the neutral ramp, never traffic lights. The commit action
+(`InkButton`) is the darkest thing on the page, which is what keeps blue free to mean
+something. Gold and the dashboard's former cyan retire with the dark-first dashboard.
+
+**Landing (2026-06-15): one reserved gold, monochrome everything else.** The brand accent is
 a single gold-leaning amber, `--brand: #f5c518` (`--brand-foreground` near-black for
 text on it), defined in `globals.css` and exposed as Tailwind `bg-brand` /
 `text-brand-foreground` / `shadow-brand`. It is **reserved for the signup/commit

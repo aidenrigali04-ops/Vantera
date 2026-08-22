@@ -6,7 +6,7 @@ import { ArrowRight } from "lucide-react";
 import type { LeadProfile } from "@/components/lead-profile";
 import { ScoreBadge, SourceBadge, WhyNowLine } from "@/components/lead-why-now";
 import { cn } from "@/lib/utils";
-import { projectedRevenue } from "../leads/lead-value";
+import { projectedRevenue } from "../prospects/lead-value";
 
 export type Prospect = LeadProfile;
 
@@ -18,9 +18,9 @@ function name(p: Prospect): string {
 
 /** The one thing to do with this lead right now — draft waiting beats everything. */
 function nextAction(p: Prospect, hasDraft: boolean): { label: string; href: string } {
-  if (hasDraft) return { label: "Draft waiting — review", href: "/review" };
-  if (p.status === "replied") return { label: "Reply waiting", href: p.id ? `/leads/${p.id}` : "/leads" };
-  return { label: "View profile", href: p.id ? `/leads/${p.id}` : "/leads" };
+  if (hasDraft) return { label: "Draft waiting — approve", href: "/approvals" };
+  if (p.status === "replied") return { label: "Reply waiting", href: p.id ? `/prospects/${p.id}` : "/prospects" };
+  return { label: "View profile", href: p.id ? `/prospects/${p.id}` : "/prospects" };
 }
 
 /**
@@ -50,7 +50,7 @@ export function ProspectPanel({
   }
 
   const [top, ...rest] = prospects;
-  const open = (p: Prospect) => p.id && router.push(`/leads/${p.id}`);
+  const open = (p: Prospect) => p.id && router.push(`/prospects/${p.id}`);
   const topProj = projectedRevenue(avgDealValueCents, goalCents, top.ai_score);
   const topAction = nextAction(top, Boolean(top.id && pendingDraftLeadIds.includes(top.id)));
 

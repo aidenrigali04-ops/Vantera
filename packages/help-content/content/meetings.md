@@ -13,7 +13,7 @@ system works for.
 
 - **Detected from the reply** — when a prospect's message confirms a scheduled meeting, Vera
   records it automatically.
-- **Marked by you** — on any lead's page, use **Mark meeting booked** (with an optional time).
+- **Marked by you** — on any prospect's page, use **Mark meeting booked** (with an optional time).
   Your manual mark is always authoritative.
 
 Either way, booking is treated as a real event: queued outreach to that prospect is canceled and
@@ -28,5 +28,5 @@ missing, the dashboard shows an action card until it's set.
 
 ## From booked to closed
 
-A booked meeting isn't a closed deal. When the deal lands, use **Mark closed-won** on the lead's
+A booked meeting isn't a closed deal. When the deal lands, use **Mark closed-won** on the prospect's
 page (with the real deal value) — that's what moves revenue and pushes the win to your CRM.

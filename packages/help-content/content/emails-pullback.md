@@ -1,23 +1,23 @@
 ---
-title: The email about leads and drafts waiting for you
+title: The email about prospects and drafts waiting for you
 surface: settings
-routes: /settings, /review, /leads
+routes: /settings, /approvals, /prospects
 ---
 
-# The email about leads and drafts waiting for you
+# The email about prospects and drafts waiting for you
 
 If Vera has sourced buyers or written messages for you and nobody on your team has come back to
 look, you'll get an email naming what's waiting rather than letting it sit unseen.
 
 ## When it sends
 
-- The first email goes out about a day after the drafts or leads first appeared — Vera never
+- The first email goes out about a day after the drafts or prospects first appeared — Vera never
   emails about something that's minutes old. It only sends at all if no owner or admin on your
   workspace has signed in since.
 - A second email follows about three days after the first, only if the same batch is still
   sitting there untouched.
-- Never more than two emails for the same batch of drafts or leads.
-- If you have both messages waiting for approval and freshly matched leads, you'll hear about the
+- Never more than two emails for the same batch of drafts or prospects.
+- If you have both messages waiting for approval and freshly matched prospects, you'll hear about the
   drafts first — that's the one closer to going out.
 - It always waits at least two days behind any other account email (a trial or billing notice, the
   weekly summary) so you're never getting two emails from Vantera in the same stretch.
@@ -37,5 +37,5 @@ you can turn it back on per workspace from Settings → Notifications at any tim
 
 ## What it never does
 
-It never sends outreach on your behalf. Drafted messages still need your approval in the review
-queue before anything reaches a prospect — this email only tells you they're waiting.
+It never sends outreach on your behalf. Drafted messages still need your approval in Approvals
+before anything reaches a prospect — this email only tells you they're waiting.

@@ -34,10 +34,10 @@ For HubSpot, you can go further than closed deals: **Log LinkedIn activity to th
 - **Opt-in and forward-only.** Sync starts the moment you turn it on. Vantera never imports history into your CRM, and turning it off and back on does not back-fill the gap.
 - **The contact is created early.** With activity sync on, the HubSpot contact is created at the first synced touch — before the deal closes. If you prefer contacts to appear only when deals close, leave activity sync off; closed-won pushing works either way.
 - **Choose what syncs.** Three checkboxes — outreach sent, replies received, meetings booked — control which touches are logged.
-- **One contact per lead.** Vantera remembers which HubSpot contact belongs to each lead, so repeat touches never create duplicates.
+- **One contact per prospect.** Vantera remembers which HubSpot contact belongs to each prospect, so repeat touches never create duplicates.
 - Connected HubSpot before activity sync existed? **Reconnect once** to grant the updated permissions if syncing reports an authorization error.
 
-Closed-won pushes also carry a short **journey note** onto the contact — the fit score, the "why now" buying signal, and whether the lead came from LinkedIn buying intent — so your team sees why the deal happened, right in the CRM.
+Closed-won pushes also carry a short **journey note** onto the contact — the fit score, the "why now" buying signal, and whether the prospect came from LinkedIn buying intent — so your team sees why the deal happened, right in the CRM.
 
 ## Connection health
 
@@ -45,7 +45,7 @@ Each connected destination shows its status and when it was last checked. If a c
 
 ## Marking a deal closed-won
 
-Open a lead and use **Mark closed-won** (with the deal value) under *Deal & CRM*. This sets the lead to converted and — if a destination has **auto-push** on — sends it to your CRM right away. The deal value also feeds the Revenue snapshot on your dashboard.
+Open a prospect and use **Mark closed-won** (with the deal value) under *Deal & CRM*. This sets the prospect to converted and — if a destination has **auto-push** on — sends it to your CRM right away. The deal value also feeds the Revenue snapshot on your dashboard.
 
 ## Pushing on demand
 

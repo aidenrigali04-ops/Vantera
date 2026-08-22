@@ -252,7 +252,7 @@ describe("buildDisconnectAlert", () => {
     const alert = buildDisconnectAlert("a@b.c", "https://app.test");
     const all = `${alert.subject} ${alert.html} ${alert.text}`;
     expect(all).not.toMatch(/unipile/i);
-    expect(alert.text).toContain("https://app.test/settings/channels");
-    expect(alert.html).toContain("https://app.test/settings/channels");
+    expect(alert.text).toContain("https://app.test/settings/senders");
+    expect(alert.html).toContain("https://app.test/settings/senders");
   });
 });

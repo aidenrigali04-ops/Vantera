@@ -330,6 +330,13 @@
   --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", Menlo, monospace;
   font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   letter-spacing: 0;
+
+  /* The app page is the CANVAS, not white — every surface (chrome tiles, the work card,
+     shadcn Cards) is white ON it, which is what makes the geometry read. This must live in
+     the rule, not as a `bg-[var(--canvas)]` utility: the shared `.landing, .auth-surface,
+     .app-surface` block above sets `background-color: var(--background)` as UNLAYERED css,
+     and unlayered always beats Tailwind's layered utilities regardless of source order. */
+  background-color: var(--canvas);
 }
 
 /* Dark — same roles, the marketing-dark values (§5.1). Dormant while light is forced. */

@@ -101,7 +101,7 @@ export const MENUS: Menu[] = [
         items: [
           {
             icon: ControlIcon,
-            title: "Review queue",
+            title: "Approvals",
             desc: "You approve before anything sends",
             href: "/#approvals",
           },

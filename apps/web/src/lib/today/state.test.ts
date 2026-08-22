@@ -35,6 +35,10 @@ describe("resolveTodayState — every §8 row", () => {
   it("first session: /today is not the home yet", () => {
     expect(resolveTodayState(inputs({ firstSessionDone: false }))).toBe("first_session");
   });
+  it("never forwards a first-session user to an EMPTY queue — Today explains instead", () => {
+    expect(resolveTodayState(inputs({ firstSessionDone: false, drafts: 0, repliesWaiting: 0 }))).not.toBe("first_session");
+    expect(resolveTodayState(inputs({ firstSessionDone: false, drafts: 0 }))).toBe("steady");
+  });
   it("steady: drafts or replies waiting, senders OK", () => {
     expect(resolveTodayState(inputs())).toBe("steady");
     expect(resolveTodayState(inputs({ drafts: 0 }))).toBe("steady");

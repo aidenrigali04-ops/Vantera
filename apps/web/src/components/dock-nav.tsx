@@ -20,13 +20,13 @@ import { cn } from "@/lib/utils";
 type NavItem = { key: string; href: string; label: string; icon: LucideIcon };
 
 // Results (Surface B) consolidates the former Dashboard + Pipeline + Analytics into one
-// destination with in-page tabs; Leads (Surface A) is the daily opportunity feed. Pipeline and
+// destination with in-page tabs; Prospects (Surface A) is the daily opportunity feed. Pipeline and
 // Analytics tiles were removed — their routes redirect into Results' tabs.
 const MAIN: NavItem[] = [
   { key: "dashboard", href: "/dashboard", label: "Results", icon: LayoutDashboard },
-  { key: "agents", href: "/agents", label: "Brain", icon: Bot },
-  { key: "leads", href: "/leads", label: "Leads", icon: Users },
-  { key: "review", href: "/review", label: "Review", icon: Inbox },
+  { key: "agents", href: "/playbook", label: "Playbook", icon: Bot },
+  { key: "leads", href: "/prospects", label: "Prospects", icon: Users },
+  { key: "review", href: "/approvals", label: "Approvals", icon: Inbox },
   // L2 cockpit: every conversation, both sides, one place.
   { key: "inbox", href: "/inbox", label: "Inbox", icon: MessagesSquare },
   // L1 meeting layer: the destination the whole funnel points at — booked meetings, visible.

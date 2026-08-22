@@ -217,7 +217,7 @@ describe("today dashboard (0063)", () => {
     expect(sql).toMatch(/add column paused_at timestamptz/i);
     const grantMatch = sql.match(/grant update \(([^)]*)\)\s+on (?:table )?public\.accounts/i);
     expect(grantMatch, "expected a column-scoped accounts UPDATE grant").toBeTruthy();
-    expect(grantMatch![1].trim()).toBe("paused_at");
+    expect(grantMatch?.[1]?.trim()).toBe("paused_at");
   });
   it("today_activity runs with invoker rights so every source table's RLS applies per caller", () => {
     // A plain view executes as its owner and bypasses RLS (the 0058 footgun) — the grant
@@ -229,6 +229,15 @@ describe("today dashboard (0063)", () => {
     const branches = sql.split(/union all/i);
     expect(branches.length).toBeGreaterThanOrEqual(6);
     for (const b of branches) expect(b).toMatch(/\.account_id,/);
+  });
+});
+
+describe("rejection reason (0064)", () => {
+  const sql = readFileSync(join(migrationsDir, "0064_rejection_reason.sql"), "utf8");
+  it("adds a nullable, enum-checked rejection_reason to scheduled_sends", () => {
+    expect(sql).toMatch(/alter table public\.scheduled_sends/i);
+    expect(sql).toMatch(/add column rejection_reason text/i);
+    expect(sql).toMatch(/check \(rejection_reason in \('wrong_person', 'bad_timing', 'weak_message', 'other'\)\)/i);
   });
 });
 

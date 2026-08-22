@@ -170,7 +170,7 @@ export default async function SettingsPage() {
           </>
         ) : (
           <p className="text-sm text-muted-foreground">
-            Workspace emails (lead events, the weekly summary, account notices) go to owners
+            Workspace emails (prospect events, the weekly summary, account notices) go to owners
             and admins — an admin manages the toggles here.
           </p>
         )}
@@ -183,10 +183,10 @@ export default async function SettingsPage() {
         cta="Manage billing"
       />
       <SettingsLink
-        title="LinkedIn"
+        title="Senders"
         body="Connect the LinkedIn account your agents send from, plus global pause controls."
-        href="/settings/channels"
-        cta="Manage LinkedIn"
+        href="/settings/senders"
+        cta="Manage senders"
       />
       <SettingsLink
         title="CRM & integrations"

@@ -92,11 +92,11 @@ export function composePullback(
       touchNumber: row.touchNumber,
       lines,
       ctaLabel: "Review the messages",
-      // /review, not /inbox. The spec's one desired action is "return and approve one message",
-      // and /review is the approval queue (draft cards, bulk approve, hotkeys — see dock-nav.tsx).
+      // /approvals, not /inbox. The spec's one desired action is "return and approve one message",
+      // and /approvals is the approval queue (draft cards, bulk approve, hotkeys — see dock-nav.tsx).
       // /inbox is the conversation cockpit: it lists statuses and has no approve affordance, so a
       // user who followed it landed one click short of the only thing this email asks for.
-      ctaUrl: `${appUrl}/review`,
+      ctaUrl: `${appUrl}/approvals`,
     };
   }
 
@@ -112,8 +112,8 @@ export function composePullback(
     segment: row.segment,
     touchNumber: row.touchNumber,
     lines,
-    ctaLabel: "See your leads",
-    ctaUrl: `${appUrl}/leads`,
+    ctaLabel: "See your prospects",
+    ctaUrl: `${appUrl}/prospects`,
   };
 }
 
