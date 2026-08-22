@@ -10,7 +10,11 @@ export function Wash({ className }: { className?: string }) {
   return (
     <div
       aria-hidden="true"
-      className={cn("pointer-events-none absolute inset-x-0 top-0 z-0 h-[520px]", className)}
+      // Placed as the FIRST child of the app shell (a `relative` container), so it paints
+      // full-bleed under everything — including the translucent chrome band, which is what
+      // gives the band its tint. It stops well above the work card: colour belongs to the
+      // greeting, never behind data.
+      className={cn("pointer-events-none absolute inset-x-0 top-0 z-0 h-[560px]", className)}
       style={{ background: "var(--wash)" }}
     />
   );

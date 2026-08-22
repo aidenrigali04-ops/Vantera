@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import type { TodayView, QueueRow } from "@/lib/today/rows";
 import { resumeEngine } from "@/app/(app)/engine-actions";
 import { dismissAsk, markTodayViewed, rejectDraftWithReason, undoRejectDraft, type RejectReason } from "./actions";
-import { BannerSlot, Greeting, StatRow, ActionTileRow, Wash, TodayPageFrame } from "@/components/today";
+import { BannerSlot, Greeting, StatRow, ActionTileRow, TodayPageFrame } from "@/components/today";
 import { WorkCard } from "@/components/today/work-card";
 import { DraftPeek } from "@/components/today/draft-peek";
 
@@ -155,7 +155,6 @@ export function TodayClient({ view, tab, openDraftId }: { view: TodayView; tab: 
 
   return (
     <TodayPageFrame>
-      <Wash />
       <div className="relative">
         <BannerSlot banner={view.banner} className="mb-7" />
         <Greeting greeting={view.greeting} sentence={view.sentence} primary={view.primary} glyph={primaryGlyph(view.primary)} onResume={onResume} />

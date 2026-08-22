@@ -306,10 +306,16 @@
   --danger: #dc2626; /* engine stopped        4.8:1 */
   --danger-tint: #fdecec;
 
-  /* the one decorative element: a white highlight on the gray canvas + ≤5% accent */
+  /* The page's one decorative element: a brand-blue bloom falling from the top-right and
+     fading out before it reaches the work. Full-bleed and BEHIND the chrome band, so the
+     translucent band picks the colour up the way the reference does. Literal rgb() rather
+     than color-mix(): this paints across the whole top of the app and must render on every
+     engine, not just the ones with full color-mix support. 24 119 242 is --fb, the brand blue. */
   --wash:
-    radial-gradient(640px 320px at 78% 0%, #ffffff 0%, rgb(255 255 255 / 0) 70%),
-    radial-gradient(480px 240px at 94% 0%, rgb(37 99 235 / 0.05), transparent 70%);
+    radial-gradient(1320px 640px at 80% -20%, rgb(24 119 242 / 0.34), rgb(24 119 242 / 0) 64%),
+    radial-gradient(900px 480px at 44% -24%, rgb(24 119 242 / 0.15), rgb(24 119 242 / 0) 66%),
+    radial-gradient(560px 360px at 100% -2%, rgb(24 119 242 / 0.24), rgb(24 119 242 / 0) 60%),
+    linear-gradient(180deg, rgb(24 119 242 / 0.07), rgb(24 119 242 / 0) 48%);
 
   --shadow-tile: 0 1px 2px rgb(11 11 13 / 0.04); /* + 1px --line ring */
   --shadow-card: 0 1px 2px rgb(11 11 13 / 0.03), 0 8px 24px -16px rgb(11 11 13 / 0.12);
@@ -359,7 +365,9 @@
   --attention-tint: rgb(210 153 34 / 0.12);
   --danger: #f85149;
   --danger-tint: rgb(248 81 73 / 0.12);
-  --wash: radial-gradient(640px 320px at 78% 0%, rgb(255 255 255 / 0.035), transparent 70%);
+  --wash:
+    radial-gradient(1100px 520px at 84% -14%, rgb(59 130 246 / 0.22), rgb(59 130 246 / 0) 62%),
+    radial-gradient(720px 380px at 56% -18%, rgb(59 130 246 / 0.12), rgb(59 130 246 / 0) 64%);
   --shadow-card: 0 1px 0 rgb(255 255 255 / 0.04) inset, 0 16px 40px -24px rgb(0 0 0 / 0.6);
 }
 

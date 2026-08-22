@@ -45,7 +45,10 @@ export function TopChrome({
       <header
         className={[
           "sticky top-0 z-40 hidden h-16 w-full items-center justify-between px-6 lg:flex",
-          "bg-[color-mix(in_srgb,var(--canvas)_92%,transparent)] backdrop-blur-[12px]",
+          // Plain rgb() + alpha, not color-mix(): this is the one element every app page
+          // depends on, and it must paint identically on every engine. The lower alpha lets
+          // Today's wash read through the band instead of being masked by it.
+          "bg-[rgb(246_246_247_/_0.72)] backdrop-blur-[12px] backdrop-saturate-150",
         ].join(" ")}
       >
         <div className="flex items-center gap-3">

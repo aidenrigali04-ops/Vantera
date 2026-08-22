@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { signOut } from "./actions";
 import { pauseEngine, resumeEngine } from "./engine-actions";
 import { TopChrome } from "@/components/chrome";
+import { Wash } from "@/components/today";
 import type { AppNotification } from "@/components/notifications/notifications-bell";
 import CopilotOverlay from "@/components/copilot/copilot-overlay";
 import { ClarityIdentity } from "@/components/analytics/clarity-identity";
@@ -223,7 +224,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const initial = email.charAt(0).toUpperCase() || "?";
 
   return (
-    <div className="app-surface flex min-h-screen flex-col bg-[var(--canvas)]">
+    <div className="app-surface relative flex min-h-screen flex-col bg-[var(--canvas)]">
+      {/* Today's brand wash lives in the SHELL so it passes behind the chrome band (the band
+          is translucent and picks up the colour). Today only — it is a launchpad flourish,
+          never decoration on a data surface. */}
+      {onToday && <Wash />}
       {/* Session-scoped analytics identity: recordings become filterable by user,
           account, and plan. Values come from the validated session (rule 02). */}
       {data.user && (
