@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { workspaceIconUrl } from "./workspace-icon";
+import { workspaceIconCandidates, workspaceIconUrl } from "./workspace-icon";
 
 describe("workspaceIconUrl", () => {
   it("prefers the icon the scan actually found", () => {
@@ -26,5 +26,23 @@ describe("workspaceIconUrl", () => {
     expect(workspaceIconUrl("", "  ")).toBeNull();
     expect(workspaceIconUrl(null, "localhost")).toBeNull();
     expect(workspaceIconUrl(null, "javascript:alert(1)")).toBeNull();
+  });
+
+  it("offers more than .ico — a modern site often ships only svg/png, and an SPA answers a missing .ico with 200 HTML", () => {
+    const c = workspaceIconCandidates(null, "https://tryorin.xyz");
+    expect(c[0]).toBe("https://tryorin.xyz/favicon.ico");
+    expect(c).toContain("https://tryorin.xyz/favicon.svg");
+    expect(c).toContain("https://tryorin.xyz/apple-touch-icon.png");
+    expect(c.every((u) => u.startsWith("https://tryorin.xyz/"))).toBe(true);
+  });
+
+  it("a scanned icon is authoritative — no guessing behind it", () => {
+    expect(workspaceIconCandidates("https://acme.com/brand/icon.svg", "https://acme.com")).toEqual([
+      "https://acme.com/brand/icon.svg",
+    ]);
+  });
+
+  it("has no candidates at all when there is nothing to derive from", () => {
+    expect(workspaceIconCandidates(null, null)).toEqual([]);
   });
 });

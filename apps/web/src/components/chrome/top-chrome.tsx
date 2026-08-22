@@ -12,8 +12,8 @@ import { WorkspacePill, type EngineAction } from "./workspace-pill";
 
 export type TopChromeProps = {
   workspaceName: string;
-  /** The brand's favicon from the onboarding site scan; null falls back to the generic mark. */
-  workspaceIconUrl?: string | null;
+  /** Icon URLs to try for the workspace mark, in order; empty falls back to the glyph. */
+  workspaceIconCandidates?: string[];
   /** `accounts.paused_at` is set — sourcing and sending are stopped. */
   paused: boolean;
   badges: NavBadges;
@@ -34,7 +34,7 @@ export type TopChromeProps = {
  */
 export function TopChrome({
   workspaceName,
-  workspaceIconUrl,
+  workspaceIconCandidates,
   paused,
   badges,
   notifications,
@@ -56,7 +56,7 @@ export function TopChrome({
       >
         <div className="flex items-center gap-3">
           <LogoTile />
-          <WorkspacePill name={workspaceName} iconUrl={workspaceIconUrl} paused={paused} pauseEngine={pauseEngine} resumeEngine={resumeEngine} />
+          <WorkspacePill name={workspaceName} iconCandidates={workspaceIconCandidates} paused={paused} pauseEngine={pauseEngine} resumeEngine={resumeEngine} />
         </div>
 
         <div className="absolute left-1/2 top-3 -translate-x-1/2">

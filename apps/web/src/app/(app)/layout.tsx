@@ -8,7 +8,7 @@ import { signOut } from "./actions";
 import { pauseEngine, resumeEngine } from "./engine-actions";
 import { TopChrome } from "@/components/chrome";
 import { Wash } from "@/components/today";
-import { workspaceIconUrl } from "@/lib/workspace-icon";
+import { workspaceIconCandidates } from "@/lib/workspace-icon";
 import type { AppNotification } from "@/components/notifications/notifications-bell";
 import CopilotOverlay from "@/components/copilot/copilot-overlay";
 import { ClarityIdentity } from "@/components/analytics/clarity-identity";
@@ -262,7 +262,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
       <TopChrome
         workspaceName={billing?.name?.trim() || data.account?.name || "Your workspace"}
-        workspaceIconUrl={workspaceIconUrl(billing?.website_scan?.faviconUrl, billing?.website_url)}
+        workspaceIconCandidates={workspaceIconCandidates(billing?.website_scan?.faviconUrl, billing?.website_url)}
         paused={Boolean(billing?.paused_at)}
         badges={badges}
         notifications={notifications}

@@ -3,11 +3,11 @@
 import { useCallback, useEffect, useId, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState as useReactState } from "react";
-import { ChevronDown, LayoutGrid, Pause, Play, Settings } from "lucide-react";
+import { ChevronDown, Pause, Play, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CHROME_FOCUS, CHROME_MENU, CHROME_MENU_ITEM, CHROME_MOTION, CHROME_PILL } from "./tile";
 import { useDismiss, type DismissReason } from "./use-dismiss";
+import { WorkspaceIcon } from "./workspace-icon";
 
 /** A server action that flips the workspace engine; resolves to `{}` or a user-facing error. */
 export type EngineAction = () => Promise<{ error?: string }>;
@@ -15,8 +15,8 @@ export type EngineAction = () => Promise<{ error?: string }>;
 export type WorkspacePillProps = {
   name: string;
   paused: boolean;
-  /** The brand's own favicon, discovered by the onboarding site scan. Null → the generic mark. */
-  iconUrl?: string | null;
+  /** Icon URLs to try, in order (scanned icon, else the domain's conventional paths). */
+  iconCandidates?: string[];
   pauseEngine: EngineAction;
   resumeEngine: EngineAction;
 };
@@ -27,10 +27,7 @@ export type WorkspacePillProps = {
  * resuming the engine — plus the settings link. The pause stamp lives on the account
  * (`accounts.paused_at`); the actions are passed in from the server layout.
  */
-export function WorkspacePill({ name, paused, iconUrl, pauseEngine, resumeEngine }: WorkspacePillProps) {
-  // A favicon lives on the customer's own domain and can 404 or move; falling back keeps the
-  // pill intact instead of leaving a broken-image square in the chrome.
-  const [iconFailed, setIconFailed] = useReactState(false);
+export function WorkspacePill({ name, paused, iconCandidates = [], pauseEngine, resumeEngine }: WorkspacePillProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -123,14 +120,7 @@ export function WorkspacePill({ name, paused, iconUrl, pauseEngine, resumeEngine
         )}
       >
         <span className="grid size-8 shrink-0 place-items-center overflow-hidden rounded-[var(--r-btn)] bg-[var(--surface-2)] text-[var(--ink-mid)]">
-          {iconUrl && !iconFailed ? (
-            // The icon is on the customer's domain, not ours — a plain <img>, no remote-pattern
-            // config, and any failure falls back to the mark below.
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={iconUrl} alt="" className="size-4.5 object-contain" onError={() => setIconFailed(true)} />
-          ) : (
-            <LayoutGrid className="size-4" strokeWidth={1.75} aria-hidden="true" />
-          )}
+          <WorkspaceIcon candidates={iconCandidates} className="size-4.5 object-contain" />
         </span>
         <span className="ml-2 flex min-w-0 items-center gap-1.5">
           {paused && (

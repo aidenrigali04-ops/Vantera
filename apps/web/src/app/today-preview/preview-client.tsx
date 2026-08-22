@@ -22,7 +22,7 @@ export function PreviewClient({ state, tab }: { state: PreviewStateKey; tab: "qu
       <Wash />
       <TopChrome
         workspaceName="Vantera"
-        workspaceIconUrl="https://vanterasystem.com/favicon.ico"
+        workspaceIconCandidates={["https://tryorin.xyz/favicon.ico", "https://tryorin.xyz/favicon.svg"]}
         paused={view.paused}
         badges={{ approvals: view.queue.total || undefined, inbox: view.replies.total || undefined }}
         notifications={[]}
