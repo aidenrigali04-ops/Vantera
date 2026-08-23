@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import type { WebsiteScan } from "@vantera/agent-brains";
 import { createClient } from "@/lib/supabase/server";
 import { reconcileLinkedInAccounts } from "@/lib/linkedin/sync";
+import { hasActiveLinkedInConnection } from "@/lib/linkedin/connection-state";
 import { playCards } from "@/lib/plays";
 import { Wizard, type WizardInit } from "./wizard";
 
@@ -52,18 +53,13 @@ export default async function OnboardingPage({
   // just-connected account reads as connected and we can advance to Confirmation.
   if (connectedParam === "1" && account?.id) {
     try {
-      await reconcileLinkedInAccounts(account.id);
+      await reconcileLinkedInAccounts(account.id, { adoptNew: true });
     } catch {
       /* best-effort — the channels sync also backstops this */
     }
   }
 
-  const { data: li } = await supabase
-    .from("linkedin_accounts")
-    .select("status")
-    .limit(1)
-    .maybeSingle<{ status: string }>();
-  const connected = li?.status === "active";
+  const connected = await hasActiveLinkedInConnection(supabase);
 
   const personalizeDone = Boolean(account?.onboarding_role);
   const initialStep = !personalizeDone ? 0 : !connected ? 1 : 2;
@@ -77,6 +73,9 @@ export default async function OnboardingPage({
     initialStep,
     connected,
     connectFailed: connectedParam === "failed",
+    // Back from the hosted login. If the reconcile above didn't see the account yet, the
+    // wizard keeps checking rather than telling them to connect all over again.
+    justReturned: connectedParam === "1",
     scan: scan ? { headline: scan.headline ?? "", summary: scan.summary ?? "" } : null,
     // Vera's matched starter plays for this buyer (server-computed, honest source labels).
     plays: playCards({ industry, icp }),

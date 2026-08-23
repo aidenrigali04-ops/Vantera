@@ -10,6 +10,7 @@ import { validateMemberSignup, validateSignup } from "@/lib/validation";
 import { sendWelcomeEmail } from "@vantera/transactional-email";
 import { siteUrl } from "@/lib/site-url";
 import { recordSecurityEvent } from "@/lib/security/audit";
+import { recordFunnelEvent } from "@/lib/observability/funnel";
 
 export type AuthFormState = { error?: string; sent?: boolean };
 
@@ -66,19 +67,26 @@ async function signupWithInvite(inviteToken: string, formData: FormData): Promis
     password: result.values.password,
     email_confirm: true,
   });
-  if (createError) return { error: friendlyAuthError(createError.message) };
+  if (createError) {
+    await recordFunnelEvent("signup.invite_create_user_failed", { email: result.values.email, error: createError.message });
+    return { error: friendlyAuthError(createError.message) };
+  }
 
   const supabase = await createClient();
   const { error: signInError } = await supabase.auth.signInWithPassword({
     email: result.values.email,
     password: result.values.password,
   });
-  if (signInError) return { error: friendlyAuthError(signInError.message) };
+  if (signInError) {
+    await recordFunnelEvent("signup.invite_signin_failed", { email: result.values.email, error: signInError.message });
+    return { error: friendlyAuthError(signInError.message) };
+  }
 
   // accept_invite (security definer RPC) re-validates token/expiry/email binding and
   // inserts the membership — the same sanctioned path the logged-in accept uses.
   const { error: acceptError } = await supabase.rpc("accept_invite", { invite_token: inviteToken });
   if (acceptError) {
+    await recordFunnelEvent("signup.invite_accept_failed", { email: result.values.email, error: acceptError.message });
     return {
       error: "Your account was created, but the invite could not be accepted — open the invite link again.",
     };
@@ -117,14 +125,20 @@ export async function signup(_prev: AuthFormState, formData: FormData): Promise<
       ...(site ? { pending_site: site } : {}),
     },
   });
-  if (createError) return { error: friendlyAuthError(createError.message) };
+  if (createError) {
+    await recordFunnelEvent("signup.create_user_failed", { email: result.values.email, error: createError.message });
+    return { error: friendlyAuthError(createError.message) };
+  }
 
   const supabase = await createClient();
   const { error: signInError } = await supabase.auth.signInWithPassword({
     email: result.values.email,
     password: result.values.password,
   });
-  if (signInError) return { error: friendlyAuthError(signInError.message) };
+  if (signInError) {
+    await recordFunnelEvent("signup.signin_after_create_failed", { email: result.values.email, error: signInError.message });
+    return { error: friendlyAuthError(signInError.message) };
+  }
 
   // R5: the welcome email — the first thing the product ever says off-screen (the email
   // channel used to be silent until the weekly summary, 7 days in). Best-effort: a mail

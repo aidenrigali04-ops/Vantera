@@ -29,11 +29,17 @@ function makeStore(rows: LinkedInAccountRow[]) {
 
 function makeDeps(
   store: AccountHealthStore,
-  providerAccounts: { providerRef: string; status: "active" | "restricted" | "disconnected" }[]
+  providerAccounts: { providerRef: string; status: "connecting" | "active" | "restricted" | "disconnected" }[]
 ) {
   const linkedin = new InMemoryLinkedInInfra();
   for (const a of providerAccounts) {
-    linkedin.accounts.push({ providerRef: a.providerRef, displayName: null, profileUrl: null, status: a.status });
+    linkedin.accounts.push({
+      providerRef: a.providerRef,
+      displayName: null,
+      createdAt: null,
+      profileUrl: null,
+      status: a.status,
+    });
   }
   const sent: HealthAlert[] = [];
   const deps: AccountHealthDeps = {
@@ -110,6 +116,20 @@ describe("runAccountHealth — status reconcile", () => {
     await runAccountHealth(deps);
 
     expect(statusWrites).toHaveLength(0);
+  });
+
+  // The provider reports 'connecting' while it is still setting an account up. That is a
+  // transient state, not a verdict — writing it (or demoting off it) would fight the
+  // connect flow that is still in progress.
+  it("leaves a row untouched while the PROVIDER still reports it as connecting", async () => {
+    const { store, statusWrites } = makeStore([row({ status: "active" })]);
+    const { deps, sent } = makeDeps(store, [{ providerRef: "ref1", status: "connecting" }]);
+
+    const summary = await runAccountHealth(deps);
+
+    expect(statusWrites).toHaveLength(0);
+    expect(sent).toHaveLength(0);
+    expect(summary.reconciled).toBe(0);
   });
 
   it("an unreachable provider reconciles NOTHING — a transient outage must not pause healthy tenants", async () => {

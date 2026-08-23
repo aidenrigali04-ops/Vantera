@@ -99,6 +99,22 @@ describe("UnipileLinkedInInfra", () => {
     });
   });
 
+  describe("request deadline", () => {
+    it("attaches an abort signal so a hung provider can't hang the caller", async () => {
+      const fetchFn = vi.fn(async () => ({
+        ok: true,
+        json: async () => ({ items: [] }),
+        text: async () => "",
+      })) as unknown as typeof fetch;
+      const adapter = new UnipileLinkedInInfra({
+        apiKey: "k", dsn: "api.unipile.example.com:13000", webhookSecret: "s", fetchFn,
+      });
+      await adapter.listAccounts();
+      const [, init] = (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0] as [string, RequestInit];
+      expect(init.signal).toBeInstanceOf(AbortSignal);
+    });
+  });
+
   describe("listAccounts", () => {
     it("maps connected LinkedIn accounts (id→providerRef, name→displayName, publicIdentifier→profileUrl, sources→status) and filters non-LinkedIn", async () => {
       const adapter = infra({
@@ -120,8 +136,8 @@ describe("UnipileLinkedInInfra", () => {
         },
       });
       await expect(adapter.listAccounts()).resolves.toEqual([
-        { providerRef: "acc_1", displayName: "Jane Doe", profileUrl: "https://www.linkedin.com/in/jane-doe-123", status: "active" },
-        { providerRef: "acc_2", displayName: "Bob", profileUrl: "https://www.linkedin.com/in/bob-9", status: "restricted" },
+        { providerRef: "acc_1", displayName: "Jane Doe", createdAt: null, profileUrl: "https://www.linkedin.com/in/jane-doe-123", status: "active" },
+        { providerRef: "acc_2", displayName: "Bob", createdAt: null, profileUrl: "https://www.linkedin.com/in/bob-9", status: "restricted" },
       ]);
     });
 
@@ -137,8 +153,92 @@ describe("UnipileLinkedInInfra", () => {
         },
       });
       await expect(adapter.listAccounts()).resolves.toEqual([
-        { providerRef: "acc_3", displayName: "Zoe", profileUrl: null, status: "disconnected" },
+        { providerRef: "acc_3", displayName: "Zoe", createdAt: null, profileUrl: null, status: "disconnected" },
       ]);
+    });
+
+    // An account with no `sources` yet is one the provider is still setting up — the state
+    // right after hosted auth returns. Calling that "disconnected" made a fresh connect look
+    // dead, so the wizard told the user to connect again (and minted a second billable seat).
+    it("reports an account whose sources have not synced yet as connecting, not disconnected", async () => {
+      const adapter = infra({
+        "/api/v1/accounts": { items: [{ id: "acc_new", type: "LINKEDIN", name: "acct-1" }] },
+      });
+      await expect(adapter.listAccounts()).resolves.toMatchObject([{ status: "connecting" }]);
+    });
+
+    it("still reports an explicitly empty sources array as disconnected", async () => {
+      const adapter = infra({
+        "/api/v1/accounts": { items: [{ id: "acc_dead", type: "LINKEDIN", name: "x", sources: [] }] },
+      });
+      await expect(adapter.listAccounts()).resolves.toMatchObject([{ status: "disconnected" }]);
+    });
+
+    // Shape confirmed against the live API 2026-08-23: the accounts endpoint returns
+    // created_at, and `name` is the LinkedIn profile name (it equals connection_params.im
+    // .username) — the hosted-auth `name` metadata does NOT survive here. created_at is
+    // therefore the only signal for "which of these was just connected".
+    it("carries created_at through, since it is the only recency signal available", async () => {
+      const adapter = infra({
+        "/api/v1/accounts": {
+          items: [
+            {
+              id: "acc_9", type: "LINKEDIN", name: "Jane Doe",
+              created_at: "2026-08-23T10:00:00.000Z",
+              connection_params: { im: { publicIdentifier: "jane-doe-123", username: "Jane Doe" } },
+              sources: [{ status: "OK" }],
+            },
+          ],
+        },
+      });
+      await expect(adapter.listAccounts()).resolves.toEqual([
+        {
+          providerRef: "acc_9",
+          displayName: "Jane Doe",
+          createdAt: "2026-08-23T10:00:00.000Z",
+          profileUrl: "https://www.linkedin.com/in/jane-doe-123",
+          status: "active",
+        },
+      ]);
+    });
+
+    // The endpoint is cursor-paginated. Reading only page one meant that once the workspace
+    // outgrew a single page, a just-connected account could be invisible to the reconcile
+    // backstop — the user returned from a successful login still told to connect.
+    it("follows the cursor until the provider stops handing one back", async () => {
+      const pages: Record<string, unknown> = {
+        "": { items: [{ id: "a1", type: "LINKEDIN", name: "One", sources: [{ status: "OK" }] }], cursor: "c1" },
+        c1: { items: [{ id: "a2", type: "LINKEDIN", name: "Two", sources: [{ status: "OK" }] }], cursor: "c2" },
+        c2: { items: [{ id: "a3", type: "LINKEDIN", name: "Three", sources: [{ status: "OK" }] }], cursor: null },
+      };
+      const seen: string[] = [];
+      const fetchFn = vi.fn(async (url: string) => {
+        seen.push(url);
+        const cursor = new URL(`https://x${url.split("://")[1]!.split("/").slice(1).join("/")}`).searchParams;
+        return { ok: true, json: async () => pages[cursor.get("cursor") ?? ""], text: async () => "" };
+      }) as unknown as typeof fetch;
+      const adapter = new UnipileLinkedInInfra({
+        apiKey: "k", dsn: "api.unipile.example.com:13000", webhookSecret: "s", fetchFn,
+      });
+
+      const accounts = await adapter.listAccounts();
+      expect(accounts.map((a) => a.providerRef)).toEqual(["a1", "a2", "a3"]);
+      expect(seen).toHaveLength(3);
+      expect(seen[1]).toContain("cursor=c1");
+      expect(seen[2]).toContain("cursor=c2");
+    });
+
+    it("stops paging when a page repeats its cursor so a provider bug can't spin forever", async () => {
+      const fetchFn = vi.fn(async () => ({
+        ok: true,
+        json: async () => ({ items: [{ id: "a1", type: "LINKEDIN", name: "One", sources: [{ status: "OK" }] }], cursor: "same" }),
+        text: async () => "",
+      })) as unknown as typeof fetch;
+      const adapter = new UnipileLinkedInInfra({
+        apiKey: "k", dsn: "api.unipile.example.com:13000", webhookSecret: "s", fetchFn,
+      });
+      await expect(adapter.listAccounts()).resolves.toHaveLength(1);
+      expect((fetchFn as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(2);
     });
   });
 
@@ -442,6 +542,45 @@ describe("UnipileLinkedInInfra", () => {
         displayName: null,
         vanteraAccountId: null,
       });
+    });
+
+    // The account-status source does NOT use the flat `event` envelope the messaging and
+    // users sources do — it nests everything under `AccountStatus` and calls the state
+    // `message`. Every shape above was assumed rather than captured, and a payload the
+    // parser doesn't recognise is silently dropped by the route (200 "ignored"), which is
+    // why no status event has ever been stored despite the source being registered.
+    it("parses the nested AccountStatus envelope the status source actually sends", () => {
+      const event = adapter.parseEventWebhook({
+        AccountStatus: { account_id: "li_acct_7", account_type: "LINKEDIN", message: "OK" },
+      });
+      expect(event).toMatchObject({
+        type: "account_status",
+        connectedAccountRef: "li_acct_7",
+        status: "active",
+        providerEventId: "status:li_acct_7:OK",
+      });
+    });
+
+    it("maps a nested CREDENTIALS status to restricted", () => {
+      expect(
+        adapter.parseEventWebhook({
+          AccountStatus: { account_id: "li_acct_8", account_type: "LINKEDIN", message: "CREDENTIALS" },
+        })
+      ).toMatchObject({ type: "account_status", status: "restricted" });
+    });
+
+    it("accepts the snake_case envelope spelling too", () => {
+      expect(
+        adapter.parseEventWebhook({ account_status: { account_id: "li_acct_9", message: "DISCONNECTED" } })
+      ).toMatchObject({ type: "account_status", status: "disconnected" });
+    });
+
+    it("still carries hosted-auth metadata through the nested envelope when present", () => {
+      expect(
+        adapter.parseEventWebhook({
+          AccountStatus: { account_id: "li_acct_10", message: "CREATION_SUCCESS", name: "acct-uuid-77" },
+        })
+      ).toMatchObject({ status: "active", vanteraAccountId: "acct-uuid-77" });
     });
 
     it("maps account_id to connectedAccountRef as string", () => {

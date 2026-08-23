@@ -12,7 +12,7 @@ LinkedIn is how Vantera reaches out. The Channels page is where you connect the 
 
 Connect your own existing LinkedIn account to turn on outreach. Click **Connect your LinkedIn account** — you'll sign in on LinkedIn's own secure page (we never see your password), then you're brought straight back to **Settings → Channels**, where your account appears as **Active**. Need more than one? Use **Connect another account** on the same card.
 
-If you finish signing in but don't see your account listed yet, use **Refresh status** on the LinkedIn card to sync it immediately — no need to reconnect.
+If you finish signing in but don't see your account listed yet, use **Refresh status** on the LinkedIn card to sync it immediately — no need to reconnect. If it still doesn't appear, click **Connect your LinkedIn account** again and complete the sign-in: returning through the connect flow is what picks up a connection that didn't land the first time. Only a connection you've just made this way can be attached to your workspace, which is how we make sure an account is never attached to the wrong one.
 
 If your connection drops (LinkedIn sessions expire periodically), Vantera notices within minutes: a banner appears across the dashboard, the account's workspace admins get an email, and your agents pause safely — no sourcing, no sending, and replies stop syncing until it's back. Use the **Reconnect** button next to the flagged account (the dashboard banner brings you here) — it re-authenticates the SAME account in place, so your seat count, lead assignments, and history all stay exactly as they were. Never use "Connect another account" to fix a dropped session.
 

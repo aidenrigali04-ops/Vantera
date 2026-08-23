@@ -36,7 +36,7 @@ export default async function ChannelsPage({
   // shows immediately even if the hosted-auth status webhook was missed (best-effort).
   if (connected === "1" && accountRow?.id) {
     try {
-      await reconcileLinkedInAccounts(accountRow.id);
+      await reconcileLinkedInAccounts(accountRow.id, { adoptNew: true });
     } catch (err) {
       console.error("channels reconcile on connect failed:", err);
     }

@@ -49,8 +49,22 @@ export interface ConnectedAccount {
   /** Provider account id — persisted as linkedin_accounts.provider_ref. */
   providerRef: string;
   displayName: string | null;
+  /**
+   * When the provider created this connection (ISO-8601), or null if it didn't say.
+   *
+   * This is the only discriminator the accounts endpoint offers for "which of these did
+   * the user in front of me just connect?". The hosted-auth `name` metadata does NOT
+   * survive here — the provider overwrites it with the LinkedIn profile name (verified
+   * against the live API), so it identifies the person, never the tenant.
+   */
+  createdAt: string | null;
   profileUrl: string | null;
-  status: "active" | "restricted" | "disconnected";
+  /**
+   * 'connecting' means the provider has the account but hasn't reported its sources yet —
+   * the transient state right after hosted auth returns. It is explicitly not a failure,
+   * and must never overwrite a known-good status.
+   */
+  status: "connecting" | "active" | "restricted" | "disconnected";
 }
 
 export type LinkedInEvent =

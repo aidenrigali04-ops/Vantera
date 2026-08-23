@@ -14,6 +14,12 @@ import { validatePersonalize, validateConfirmation } from "@/lib/validation";
 import { loadBillingRow, hasActivePlan, gate } from "@/lib/billing/entitlement";
 import { createLinkedInInfraFromEnv } from "@vantera/linkedin-infra";
 import { reconcileLinkedInAccounts } from "@/lib/linkedin/sync";
+import { buildConnectRedirects } from "@/lib/linkedin/redirects";
+import {
+  countBillableLinkedInAccounts,
+  hasActiveLinkedInConnection,
+} from "@/lib/linkedin/connection-state";
+import { recordFunnelEvent } from "@/lib/observability/funnel";
 
 /** Default outreach CTA — sensible out of the box, refined later in Settings → Sharpen your results. */
 const DEFAULT_CTA = "a quick intro call to see if it's a fit";
@@ -74,7 +80,10 @@ export async function savePersonalize(
     const { data: accountId, error: rpcError } = await supabase.rpc("create_account", {
       account_name: result.values.companyName,
     });
-    if (rpcError || !accountId) return { error: "Could not create your workspace. Please try again." };
+    if (rpcError || !accountId) {
+      await recordFunnelEvent("onboarding.create_workspace_failed", { userId: user.id, email: user.email, error: rpcError?.message });
+      return { error: "Could not create your workspace. Please try again." };
+    }
     account = { id: accountId as string };
   }
 
@@ -87,7 +96,10 @@ export async function savePersonalize(
       onboarding_linkedin_url: result.values.linkedinUrl,
     })
     .eq("id", account.id);
-  if (error) return { error: "Could not save your answers. Please try again." };
+  if (error) {
+    await recordFunnelEvent("onboarding.personalize_save_failed", { userId: user.id, accountId: account.id, error: error.message });
+    return { error: "Could not save your answers. Please try again." };
+  }
 
   // Scan the site now so the derived Confirmation is ready when they return from connecting.
   // A broken/missing site never blocks onboarding — the next Scout run retries the scan.
@@ -111,6 +123,12 @@ export async function savePersonalize(
       };
     } catch (err) {
       console.error("onboarding website scan failed", err);
+      await recordFunnelEvent("onboarding.website_scan_failed", {
+        userId: user.id,
+        accountId: account.id,
+        error: err,
+        severity: "info", // non-blocking: the next Scout run retries the scan
+      });
       return { saved: true, scanned: false };
     }
   }
@@ -124,34 +142,44 @@ export async function createOnboardingConnectLink(): Promise<{ url?: string; err
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { error: "Your session expired. Sign in again." };
+  if (!user) {
+    await recordFunnelEvent("onboarding.connect_no_session", { severity: "info" });
+    return { error: "Your session expired. Sign in again." };
+  }
 
   const { data: account } = await supabase
     .from("accounts")
     .select("id")
     .limit(1)
     .maybeSingle<{ id: string }>();
-  if (!account) return { error: "Finish the first step, then connect." };
+  if (!account) {
+    await recordFunnelEvent("onboarding.connect_no_account", { userId: user.id });
+    return { error: "Finish the first step, then connect." };
+  }
 
-  const { count: liCount } = await supabase
-    .from("linkedin_accounts")
-    .select("id", { count: "exact", head: true });
+  const liCount = await countBillableLinkedInAccounts(supabase);
   const billingRow = await loadBillingRow(supabase);
-  if (!billingRow) return { error: "Start your trial in Billing first, then connect." };
-  const planGate = gate(billingRow, "linkedinAccount", liCount ?? 0);
-  if (!planGate.ok) return { error: planGate.error };
+  if (!billingRow) {
+    await recordFunnelEvent("onboarding.connect_no_billing", { userId: user.id, accountId: account.id });
+    return { error: "Start your trial in Billing first, then connect." };
+  }
+  const planGate = gate(billingRow, "linkedinAccount", liCount);
+  if (!planGate.ok) {
+    await recordFunnelEvent("onboarding.connect_plan_gate", { userId: user.id, accountId: account.id, extra: { reason: planGate.error } });
+    return { error: planGate.error };
+  }
 
   try {
-    // Force https — a 308 http→https redirect is fine for the GET return, but we register the
-    // canonical https URL to avoid any ambiguity (mirrors the webhook URL fix).
-    const base = (process.env.APP_URL ?? "http://localhost:3000").replace(/\/+$/, "").replace(/^http:\/\//i, "https://");
-    const { url } = await createLinkedInInfraFromEnv().createHostedAuthLink(account.id, {
-      success: `${base}/onboarding?connected=1`,
-      failure: `${base}/onboarding?connected=failed`,
-    });
+    const redirects = buildConnectRedirects(process.env.APP_URL, "/onboarding");
+    const { url } = await createLinkedInInfraFromEnv().createHostedAuthLink(account.id, redirects);
+    // Breadcrumb: the user got a hosted-auth link and is being sent off to connect. If
+    // onboarding still doesn't complete, the drop is at the hosted login / provider return —
+    // NOT here. This is what tells "hit an error" apart from "abandoned at the wall".
+    await recordFunnelEvent("onboarding.connect_link_issued", { userId: user.id, accountId: account.id, severity: "info" });
     return { url };
   } catch (err) {
     console.error("createOnboardingConnectLink failed:", err);
+    await recordFunnelEvent("onboarding.connect_link_failed", { userId: user.id, accountId: account.id, error: err });
     return { error: "Could not generate a connection link. Try again shortly." };
   }
 }
@@ -204,7 +232,10 @@ export async function findFirstLeads(
   if (!account) return { error: "Start over — your workspace wasn't found." };
 
   const billingRow = await loadBillingRow(supabase);
-  if (!hasActivePlan(billingRow)) redirect("/settings/billing?reason=deploy");
+  if (!hasActivePlan(billingRow)) {
+    await recordFunnelEvent("onboarding.deploy_no_active_plan", { userId: user.id, accountId: account.id, severity: "info" });
+    redirect("/settings/billing?reason=deploy");
+  }
 
   const { error: saveErr } = await supabase
     .from("accounts")
@@ -219,7 +250,10 @@ export async function findFirstLeads(
       onboarding_completed_at: new Date().toISOString(),
     })
     .eq("id", account.id);
-  if (saveErr) return { error: "Could not save your targeting. Please try again." };
+  if (saveErr) {
+    await recordFunnelEvent("onboarding.deploy_save_failed", { userId: user.id, accountId: account.id, error: saveErr.message });
+    return { error: "Could not save your targeting. Please try again." };
+  }
 
   // idempotent: already provisioned → straight to the dashboard
   const { data: existingScout } = await supabase
@@ -238,7 +272,10 @@ export async function findFirstLeads(
     .insert({ account_id: account.id, name: result.values.icp, criteria: {}, source: "onboarding" })
     .select("id")
     .single<{ id: string }>();
-  if (!icp) return { error: "Could not set up your system. Only workspace admins can do this." };
+  if (!icp) {
+    await recordFunnelEvent("onboarding.deploy_provision_failed", { userId: user.id, accountId: account.id, extra: { step: "icp" } });
+    return { error: "Could not set up your system. Only workspace admins can do this." };
+  }
 
   const { data: scout, error: scoutErr } = await supabase
     .from("agents")
@@ -256,7 +293,10 @@ export async function findFirstLeads(
     })
     .select("id")
     .single<{ id: string }>();
-  if (scoutErr || !scout) return { error: "Could not start. Only workspace admins can do this." };
+  if (scoutErr || !scout) {
+    await recordFunnelEvent("onboarding.deploy_provision_failed", { userId: user.id, accountId: account.id, error: scoutErr?.message, extra: { step: "scout" } });
+    return { error: "Could not start. Only workspace admins can do this." };
+  }
   await supabase.from("agent_icps").insert({ agent_id: scout.id, icp_id: icp.id, account_id: account.id, position: 0 });
 
   // ── Outreach (Copy) — drafts on a default CTA into the review queue (refine in Settings) ──
@@ -373,20 +413,28 @@ export async function findFirstLeads(
   redirect("/dashboard?onboarded=1");
 }
 
-/** Backstop a lagging hosted-auth status webhook so a just-connected account shows connected. */
+/**
+ * Backstop a lagging hosted-auth status webhook so a just-connected account shows connected.
+ *
+ * The wizard polls this after the connect redirect returns. Without it, a single missed
+ * reconcile on the return render left the user staring at "Connect your LinkedIn" with no
+ * way back — refreshing drops the `?connected=1` param, so the reconcile never ran again and
+ * the only apparent option was to connect a second time (minting a second billable seat).
+ */
 export async function syncOnboardingConnection(): Promise<{ connected: boolean }> {
   const acct = await currentAccountId();
   if (acct === "no-user" || !acct.id) return { connected: false };
   try {
-    await reconcileLinkedInAccounts(acct.id);
+    // Called only while the user waits on the connect step right after a hosted login.
+    await reconcileLinkedInAccounts(acct.id, { adoptNew: true });
   } catch (err) {
     console.error("syncOnboardingConnection failed:", err);
+    await recordFunnelEvent("onboarding.connect_sync_failed", {
+      accountId: acct.id,
+      error: err,
+      severity: "info", // the status webhook is still the primary path
+    });
   }
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("linkedin_accounts")
-    .select("status")
-    .limit(1)
-    .maybeSingle<{ status: string }>();
-  return { connected: data?.status === "active" };
+  return { connected: await hasActiveLinkedInConnection(supabase) };
 }

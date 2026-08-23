@@ -15,6 +15,12 @@ Onboarding is built to get you to your first prospects fast — most of what you
 
 Everything you enter is stored privately in your own workspace and is never shared with other customers. You can change any of it later in **Settings → Workspace**.
 
+## If your LinkedIn doesn't show as connected right away
+
+After you sign in, it can take a few seconds for the connection to be confirmed. The Connect step shows **Confirming your connection…** while that happens and switches itself to **LinkedIn connected** as soon as it's done — you don't need to do anything.
+
+If it's still not showing, use **Already connected? Check again** on that step. Don't connect a second time to fix it: that adds a second connection to your plan for the same person. If checking again doesn't work after a minute or so, continue through onboarding and connect from **Settings → Channels**, where **Refresh status** does the same thing.
+
 ## What "Find my first leads" sets up
 
 From your answers, Vantera provisions your whole system at once — no wizards, nothing to deploy by hand:

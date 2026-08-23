@@ -26,14 +26,28 @@ function sourceStatus(raw: unknown): "active" | "restricted" | "disconnected" {
   return "restricted"; // CREDENTIALS / CHECKPOINT / PERMISSIONS / ERROR / STOPPED / SYNC_ERROR / unknown
 }
 
-/** Reduce all of an account's sources to one status: active only if every source is. */
-function accountStatusFromSources(sources: unknown): "active" | "restricted" | "disconnected" {
+/**
+ * Reduce all of an account's sources to one status: active only if every source is.
+ *
+ * A MISSING `sources` field means the provider hasn't finished setting the account up — the
+ * state a brand-new connection is in the moment hosted auth returns. That is 'connecting',
+ * not 'disconnected': calling it disconnected made a successful connect read as dead and sent
+ * the user round the connect loop again. An explicitly EMPTY array is a real dead account.
+ */
+function accountStatusFromSources(sources: unknown): ConnectedAccount["status"] {
+  if (sources === undefined || sources === null) return "connecting";
   if (!Array.isArray(sources) || sources.length === 0) return "disconnected";
   const mapped = sources.map(sourceStatus);
   if (mapped.every((s) => s === "active")) return "active";
   if (mapped.some((s) => s === "disconnected")) return "disconnected";
   return "restricted";
 }
+
+/** Hard ceiling on account pages walked, so a provider paging bug can't hang a request. */
+const MAX_ACCOUNT_PAGES = 50;
+
+/** Per-request deadline. Comfortably above a healthy call, well under a function timeout. */
+const REQUEST_TIMEOUT_MS = 15_000;
 
 // ── read mappers (Intent Agent) ──────────────────────────────────────────────
 // Endpoint paths + response shapes below are best-effort and VERIFIED AT LIVE-WIRE
@@ -263,6 +277,11 @@ export class UnipileLinkedInInfra implements LinkedInInfra {
     const url = `https://${this.dsn}${path}`;
     const res = await this.fetchFn(url, {
       ...init,
+      // Without a deadline a hung provider call takes the whole request with it: the connect
+      // button sticks on "Opening secure login…", and the reconcile — which runs during the
+      // render of the page the user is redirected back to — hangs that page instead of
+      // degrading. Callers may pass their own signal to shorten it further.
+      signal: init?.signal ?? AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       headers: {
         "Content-Type": "application/json",
         ...(init?.headers as Record<string, string> | undefined),
@@ -318,24 +337,52 @@ export class UnipileLinkedInInfra implements LinkedInInfra {
     return { url, expiresAt: expiresOn };
   }
 
+  /**
+   * Every LinkedIn account in the provider workspace, across ALL pages.
+   *
+   * The endpoint is cursor-paginated; reading only the first page meant that once the
+   * workspace outgrew one page, a just-connected account could be invisible to the reconcile
+   * backstop, and the user came back from a successful hosted login still being asked to
+   * connect. Paging stops on a null/absent/repeated cursor, and at MAX_ACCOUNT_PAGES.
+   */
   async listAccounts(): Promise<ConnectedAccount[]> {
-    const data = await this.call<{ items?: unknown }>(PATH_ACCOUNTS, { method: "GET" });
-    const items = Array.isArray(data.items) ? data.items : [];
-    const out: ConnectedAccount[] = [];
-    for (const raw of items) {
-      if (typeof raw !== "object" || raw === null) continue;
-      const a = raw as Record<string, unknown>;
-      if (a.type !== "LINKEDIN" || typeof a.id !== "string") continue; // ignore non-LinkedIn / malformed
-      const im = (a.connection_params as Record<string, unknown> | undefined)?.im as Record<string, unknown> | undefined;
-      const publicId = typeof im?.publicIdentifier === "string" ? im.publicIdentifier : null;
-      out.push({
-        providerRef: a.id,
-        displayName: typeof a.name === "string" ? a.name : null,
-        profileUrl: publicId ? `https://www.linkedin.com/in/${publicId}` : null,
-        status: accountStatusFromSources(a.sources),
-      });
+    const byRef = new Map<string, ConnectedAccount>();
+    const seenCursors = new Set<string>();
+    let cursor: string | null = null;
+
+    for (let page = 0; page < MAX_ACCOUNT_PAGES; page++) {
+      const path: string = cursor
+        ? `${PATH_ACCOUNTS}?cursor=${encodeURIComponent(cursor)}`
+        : PATH_ACCOUNTS;
+      const data: { items?: unknown; cursor?: unknown } = await this.call<{
+        items?: unknown;
+        cursor?: unknown;
+      }>(path, { method: "GET" });
+
+      const items = Array.isArray(data.items) ? data.items : [];
+      for (const raw of items) {
+        if (typeof raw !== "object" || raw === null) continue;
+        const a = raw as Record<string, unknown>;
+        if (a.type !== "LINKEDIN" || typeof a.id !== "string") continue; // ignore non-LinkedIn / malformed
+        const im = (a.connection_params as Record<string, unknown> | undefined)?.im as Record<string, unknown> | undefined;
+        const publicId = typeof im?.publicIdentifier === "string" ? im.publicIdentifier : null;
+        // Keyed by ref: pages can overlap when accounts are created mid-walk, and one
+        // account must never reconcile twice.
+        byRef.set(a.id, {
+          providerRef: a.id,
+          displayName: str(a.name),
+          createdAt: str(a.created_at),
+          profileUrl: publicId ? `https://www.linkedin.com/in/${publicId}` : null,
+          status: accountStatusFromSources(a.sources),
+        });
+      }
+
+      const next = str(data.cursor);
+      if (!next || seenCursors.has(next)) break;
+      seenCursors.add(next);
+      cursor = next;
     }
-    return out;
+    return [...byRef.values()];
   }
 
   /**
@@ -442,7 +489,16 @@ export class UnipileLinkedInInfra implements LinkedInInfra {
    */
   parseEventWebhook(payload: unknown): LinkedInEvent | null {
     if (typeof payload !== "object" || payload === null) return null;
-    const p = payload as Record<string, unknown>;
+    let p = payload as Record<string, unknown>;
+
+    // The account-status source doesn't use the flat `event` envelope that messaging and
+    // users do: it nests the whole event under `AccountStatus` and names the state
+    // `message`. Flatten it into the common shape so one code path handles both.
+    const statusEnvelope = p.AccountStatus ?? p.account_status;
+    if (typeof statusEnvelope === "object" && statusEnvelope !== null) {
+      const inner = statusEnvelope as Record<string, unknown>;
+      p = { ...inner, event: "account_status", status: inner.status ?? inner.message };
+    }
 
     const event = p.event;
     if (typeof event !== "string") return null;

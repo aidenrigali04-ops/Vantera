@@ -7,6 +7,7 @@ import { ChevronLeft, ChevronRight, Check, Loader2, Link2, Search } from "lucide
 import {
   savePersonalize,
   createOnboardingConnectLink,
+  syncOnboardingConnection,
   findFirstLeads,
   type FindLeadsState,
   type PersonalizeState,
@@ -23,6 +24,8 @@ export type WizardInit = {
   initialStep: number; // 0 personalize · 1 connect · 2 confirmation
   connected: boolean;
   connectFailed: boolean;
+  /** Landed here from the hosted-auth success redirect. */
+  justReturned: boolean;
   scan: { headline: string; summary: string } | null;
   /** Vera's matched starter plays (server-computed, honest source labels) */
   plays: PlayCard[];
@@ -108,6 +111,11 @@ export function Wizard({ init }: { init: WizardInit }) {
   const [findState, findAction, finding] = useActionState<FindLeadsState, FormData>(findFirstLeads, {});
   const [connecting, startConnect] = useTransition();
   const [connectError, setConnectError] = useState(init.connectFailed ? "LinkedIn didn't connect — try again." : "");
+  // Connection state is live, not just whatever the server render happened to see: the
+  // provider can confirm the account a few seconds after the browser gets redirected back.
+  const [connected, setConnected] = useState(init.connected);
+  const [verifying, setVerifying] = useState(init.justReturned && !init.connected);
+  const [checking, startCheck] = useTransition();
   const [savingPersonalize, startSaving] = useTransition();
   const [personalizeError, setPersonalizeError] = useState("");
 
@@ -184,6 +192,44 @@ export function Wizard({ init }: { init: WizardInit }) {
       if (res.plays?.length) setPlays(res.plays);
       setStageIdx(4);
       setAnalysis((a) => (a ? { ...a, done: true, scan } : a));
+    });
+  }
+
+  // Back from the hosted login but the account hasn't landed yet. The status webhook and the
+  // return-render reconcile can both miss it, so poll for a while before giving up — telling
+  // someone who just connected to connect again is what mints a second billable seat.
+  useEffect(() => {
+    if (!verifying) return;
+    let cancelled = false;
+    const delays = [1200, 2000, 3000, 5000, 8000];
+    (async () => {
+      for (const delay of delays) {
+        await new Promise((r) => setTimeout(r, delay));
+        if (cancelled) return;
+        const res = await syncOnboardingConnection().catch(() => ({ connected: false }));
+        if (cancelled) return;
+        if (res.connected) {
+          setConnected(true);
+          setVerifying(false);
+          return;
+        }
+      }
+      setVerifying(false);
+      setConnectError(
+        "We haven't seen your LinkedIn account come through yet. Give it a moment and check again."
+      );
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [verifying]);
+
+  function checkConnection() {
+    setConnectError("");
+    startCheck(async () => {
+      const res = await syncOnboardingConnection().catch(() => ({ connected: false }));
+      if (res.connected) setConnected(true);
+      else setConnectError("Still not showing up. If you just connected, wait a few seconds and try again.");
     });
   }
 
@@ -314,21 +360,32 @@ export function Wizard({ init }: { init: WizardInit }) {
                           <Link2 className="size-5" strokeWidth={2.2} />
                         </div>
                         <h2 className="text-[21px] font-semibold tracking-[-0.02em] text-foreground">
-                          {init.connected ? "LinkedIn connected" : "Connect your LinkedIn"}
+                          {connected
+                            ? "LinkedIn connected"
+                            : verifying
+                              ? "Finishing your connection"
+                              : "Connect your LinkedIn"}
                         </h2>
                         <p className="mt-2 text-[14px] leading-relaxed text-[var(--ink-3)]">
-                          {init.connected
+                          {connected
                             ? "You're activated — Vera can now reach buyers from your own LinkedIn, and nothing sends until you approve it."
-                            : "This is the step that turns Vera loose — outreach runs from your own LinkedIn, securely, through our partner's hosted login."}
+                            : verifying
+                              ? "You're signed in. We're confirming the connection — this usually takes a few seconds."
+                              : "This is the step that turns Vera loose — outreach runs from your own LinkedIn, securely, through our partner's hosted login."}
                         </p>
                       </div>
                       <div className="space-y-4 px-8 pt-4 pb-8">
-                        {init.connected ? (
+                        {connected ? (
                           <div className="flex items-center gap-2.5 rounded-xl border border-[rgba(11,87,171,0.28)] bg-[var(--cyan-tint)] p-4 text-[13.5px] font-medium text-foreground">
                             <span className="grid size-6 shrink-0 place-items-center rounded-full bg-[var(--cyan)] text-white">
                               <Check className="size-3.5" strokeWidth={2.6} />
                             </span>
                             LinkedIn connected — you&apos;re ready to go.
+                          </div>
+                        ) : verifying ? (
+                          <div className="flex items-center gap-2.5 rounded-xl border border-[rgba(11,87,171,0.28)] bg-[var(--cyan-tint)] p-4 text-[13.5px] font-medium text-foreground">
+                            <Loader2 className="size-4 shrink-0 animate-spin text-[var(--cyan-strong)]" />
+                            Confirming your connection…
                           </div>
                         ) : (
                           <>
@@ -377,20 +434,40 @@ export function Wizard({ init }: { init: WizardInit }) {
 
                         {connectError && <FormError message={connectError} />}
 
-                        {init.connected ? (
+                        {connected ? (
                           <button type="button" onClick={() => setStep(2)} className={cn(DARK_BTN, "w-full")}>
                             Continue <ChevronRight className="size-4" />
                           </button>
                         ) : (
-                          <button type="button" onClick={connect} disabled={connecting} className={cn(DARK_BTN, "w-full")}>
-                            {connecting ? <Loader2 className="size-4 animate-spin" /> : <Link2 className="size-4" />}
-                            {connecting ? "Opening secure login…" : "Connect LinkedIn"}
+                          <button
+                            type="button"
+                            onClick={connect}
+                            disabled={connecting || verifying}
+                            className={cn(DARK_BTN, "w-full")}
+                          >
+                            {connecting || verifying ? <Loader2 className="size-4 animate-spin" /> : <Link2 className="size-4" />}
+                            {verifying ? "Confirming…" : connecting ? "Opening secure login…" : "Connect LinkedIn"}
+                          </button>
+                        )}
+
+                        {/* The recovery path for a connection the provider confirms late. Without
+                            it, the only apparent option was to connect again — which mints a
+                            second billable seat for the same person. */}
+                        {!connected && init.justReturned && !verifying && (
+                          <button
+                            type="button"
+                            onClick={checkConnection}
+                            disabled={checking}
+                            className="mx-auto flex items-center gap-1.5 text-center text-[12.5px] font-medium text-[var(--cyan-strong)] underline-offset-2 transition-colors hover:underline disabled:opacity-60"
+                          >
+                            {checking && <Loader2 className="size-3.5 animate-spin" />}
+                            {checking ? "Checking…" : "Already connected? Check again"}
                           </button>
                         )}
 
                         {/* deliberate, cost-stating opt-out — not a peer action, and it never
                             claims skipping is fine. Removed the old one-tap "Skip for now". */}
-                        {!init.connected && (
+                        {!connected && !verifying && (
                           <button
                             type="button"
                             onClick={() => setStep(2)}
@@ -418,7 +495,7 @@ export function Wizard({ init }: { init: WizardInit }) {
                         ) : (
                           <p className="mt-2 text-[14px] text-[var(--ink-3)]">Confirm who to target — tweak anything that&apos;s off.</p>
                         )}
-                        {init.connected ? (
+                        {connected ? (
                           <p className="mt-2 inline-flex items-center gap-1.5 text-[12.5px] text-[var(--ink-3)]">
                             <Check className="size-3.5 text-[var(--cyan-strong)]" /> LinkedIn connected
                           </p>

@@ -1,24 +1,7 @@
 import "server-only";
 import { createLinkedInInfraFromEnv, type ConnectedAccount } from "@vantera/linkedin-infra";
 import { createServiceClient } from "@/lib/supabase/service";
-
-/** Profile-identity key: the same human under any URL casing/trailing-slash variant. */
-function identityOf(url: string | null): string | null {
-  if (!url) return null;
-  try {
-    const u = new URL(url);
-    return `${u.hostname.replace(/^www\./, "")}${u.pathname}`.toLowerCase().replace(/\/+$/, "");
-  } catch {
-    return url.toLowerCase().replace(/\/+$/, "");
-  }
-}
-
-interface Row {
-  id: string;
-  account_id: string;
-  provider_ref: string;
-  profile_url: string | null;
-}
+import { planLinkedInReconcile, type ExistingRow } from "./reconcile-plan";
 
 /**
  * Reconcile the provider's connected LinkedIn accounts into `linkedin_accounts`
@@ -27,103 +10,95 @@ interface Row {
  * (e.g. immediately on return from the connect flow) — it is never the primary
  * attribution path, just a reliable backstop.
  *
- * Identity-safe (2026-07-08 triple-seat incident): a provider account whose
- * PROFILE matches a row this tenant already holds is a reconnect under a fresh
- * ref — the existing row is revived in place (lead assignments survive) and the
- * superseded provider seat is released. New rows are only inserted for identities
- * nobody holds; identities held by a DIFFERENT tenant are never claimed.
+ * All ownership decisions live in `planLinkedInReconcile`. Pass `adoptNew` only when
+ * handling a return from the connect flow: that is the one moment a brand-new provider
+ * account can be attributed to this tenant at all.
  *
  * `accountId` MUST be resolved from the caller's session (RLS) — never passed
  * from client input.
  */
 export async function reconcileLinkedInAccounts(
-  accountId: string
-): Promise<{ synced: number }> {
+  accountId: string,
+  options: { adoptNew?: boolean } = {}
+): Promise<{ synced: number; unclaimed: number }> {
   const infra = createLinkedInInfraFromEnv();
   const accounts: ConnectedAccount[] = await infra.listAccounts();
-  if (accounts.length === 0) return { synced: 0 };
+  if (accounts.length === 0) return { synced: 0, unclaimed: 0 };
 
   const svc = createServiceClient();
   const { data: allRows } = await svc
     .from("linkedin_accounts")
-    .select("id, account_id, provider_ref, profile_url")
-    .returns<Row[]>();
-  const rows = allRows ?? [];
-  const byRef = new Map(rows.map((r) => [r.provider_ref, r]));
+    .select("id, account_id, provider_ref, profile_url, status, connected_at")
+    .returns<ExistingRow[]>();
 
+  const { ops, unclaimed } = planLinkedInReconcile(accountId, accounts, allRows ?? [], {
+    adoptNew: options.adoptNew ?? false,
+  });
+
+  const now = new Date().toISOString();
   let synced = 0;
-  for (const a of accounts) {
-    const existing = byRef.get(a.providerRef);
+  // The trial clock starts on a real activation, not on any write — a row that merely
+  // appeared as 'connecting' must not burn a day of the trial.
+  let activated = false;
 
-    // Owned by another tenant — never steal it.
-    if (existing && existing.account_id !== accountId) continue;
-
-    if (existing) {
-      // Routine refresh of a row we already hold; connected_at untouched so a sync
-      // never resets the rule-04 ramp clock.
+  for (const op of ops) {
+    if (op.kind === "update") {
       const { error } = await svc
         .from("linkedin_accounts")
         .update({
-          status: a.status,
-          profile_url: a.profileUrl,
-          display_name: a.displayName,
-          updated_at: new Date().toISOString(),
+          ...(op.status ? { status: op.status } : {}),
+          ...(op.setConnectedAt ? { connected_at: now } : {}),
+          profile_url: op.profileUrl,
+          display_name: op.displayName,
+          updated_at: now,
         })
-        .eq("id", existing.id);
-      if (!error) synced++;
-      continue;
-    }
-
-    // A ref nobody holds. Match by PROFILE identity before inserting anything.
-    const identity = identityOf(a.profileUrl);
-    const sameIdentity = identity
-      ? rows.filter((r) => identityOf(r.profile_url) === identity)
-      : [];
-    if (sameIdentity.some((r) => r.account_id !== accountId)) continue; // another tenant's human
-    const ours = sameIdentity.find((r) => r.account_id === accountId);
-
-    if (ours) {
-      // Reconnect under a fresh provider account: revive OUR existing row in place and
-      // release the superseded seat — never a second row for the same person.
-      if (a.status !== "active") continue; // don't adopt a dead duplicate
-      const oldRef = ours.provider_ref;
-      const { error } = await svc
-        .from("linkedin_accounts")
-        .update({
-          provider_ref: a.providerRef,
-          status: "active",
-          profile_url: a.profileUrl,
-          display_name: a.displayName,
-          connected_at: new Date().toISOString(), // a reconnect restarts the ramp clock
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", ours.id);
+        .eq("id", op.rowId);
       if (!error) {
         synced++;
-        ours.provider_ref = a.providerRef;
-        byRef.set(a.providerRef, ours);
-        try {
-          await infra.deleteConnectedAccount(oldRef); // stop billing the dead seat
-        } catch (err) {
-          console.error("reconcile: superseded seat release failed (health sweep retries):", err);
-        }
+        if (op.status === "active") activated = true;
       }
       continue;
     }
 
-    // Genuinely new identity for this tenant — the first-connect backstop.
+    if (op.kind === "reconnect") {
+      const { error } = await svc
+        .from("linkedin_accounts")
+        .update({
+          provider_ref: op.providerRef,
+          status: "active",
+          profile_url: op.profileUrl,
+          display_name: op.displayName,
+          connected_at: now, // a reconnect restarts the ramp clock
+          updated_at: now,
+        })
+        .eq("id", op.rowId);
+      if (error) continue;
+      synced++;
+      activated = true;
+      try {
+        await infra.deleteConnectedAccount(op.supersededRef); // stop billing the dead seat
+      } catch (err) {
+        console.error("reconcile: superseded seat release failed (health sweep retries):", err);
+      }
+      continue;
+    }
+
     const { error } = await svc.from("linkedin_accounts").insert({
       account_id: accountId,
-      provider_ref: a.providerRef,
-      profile_url: a.profileUrl,
-      display_name: a.displayName,
-      status: a.status,
-      connected_at: a.status === "active" ? new Date().toISOString() : null,
+      provider_ref: op.providerRef,
+      profile_url: op.profileUrl,
+      display_name: op.displayName,
+      status: op.status,
+      connected_at: op.setConnectedAt ? now : null,
     });
-    if (!error) synced++;
+    if (!error) {
+      synced++;
+      if (op.status === "active") activated = true;
+    }
   }
+
   // Trial-on-activation (2026-07-15): first active connect starts the 7-day clock.
-  if (synced > 0) {
+  if (activated) {
     await svc
       .from("accounts")
       .update({ trial_ends_at: new Date(Date.now() + 7 * 86_400_000).toISOString() })
@@ -131,5 +106,5 @@ export async function reconcileLinkedInAccounts(
       .eq("subscription_status", "trialing")
       .is("trial_ends_at", null);
   }
-  return { synced };
+  return { synced, unclaimed };
 }

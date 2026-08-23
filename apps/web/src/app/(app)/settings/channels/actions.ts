@@ -4,9 +4,10 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { createLinkedInInfraFromEnv } from "@vantera/linkedin-infra";
-import { buildConnectRedirects } from "./redirects";
+import { buildConnectRedirects } from "@/lib/linkedin/redirects";
 import { gate, loadBillingRow } from "@/lib/billing/entitlement";
 import { reconcileLinkedInAccounts } from "@/lib/linkedin/sync";
+import { countBillableLinkedInAccounts } from "@/lib/linkedin/connection-state";
 
 export type ChannelActionState = { error?: string; success?: string };
 
@@ -57,16 +58,14 @@ export async function createLinkedInConnectLink(): Promise<{ url?: string; error
     .maybeSingle<{ id: string }>();
   if (!account) return { error: "Your session expired. Sign in again." };
 
-  const { count: liCount } = await supabase
-    .from("linkedin_accounts")
-    .select("id", { count: "exact", head: true });
+  const liCount = await countBillableLinkedInAccounts(supabase);
   const billingRow = await loadBillingRow(supabase);
   if (!billingRow) return { error: "No active plan. Choose a plan in Billing first." };
-  const planGate = gate(billingRow, "linkedinAccount", liCount ?? 0);
+  const planGate = gate(billingRow, "linkedinAccount", liCount);
   if (!planGate.ok) return { error: planGate.error };
 
   try {
-    const redirects = buildConnectRedirects(process.env.APP_URL ?? "http://localhost:3000");
+    const redirects = buildConnectRedirects(process.env.APP_URL, "/settings/channels");
     const { url } = await createLinkedInInfraFromEnv().createHostedAuthLink(account.id, redirects);
     return { url };
   } catch (err) {
@@ -101,7 +100,7 @@ export async function createLinkedInReconnectLink(
   if (!row) return { error: "That LinkedIn account is no longer connected here." };
 
   try {
-    const redirects = buildConnectRedirects(process.env.APP_URL ?? "http://localhost:3000");
+    const redirects = buildConnectRedirects(process.env.APP_URL, "/settings/channels");
     const { url } = await createLinkedInInfraFromEnv().createHostedAuthLink(
       row.account_id,
       redirects,
@@ -170,6 +169,9 @@ export async function refreshLinkedInAccounts(): Promise<{ error?: string; synce
   if (!account) return { error: "Your session expired. Sign in again." };
 
   try {
+    // Deliberately non-adopting: this button can be pressed at any time, so it refreshes
+    // statuses and picks up reconnects, but never claims an unrecognised provider account.
+    // A connection that never landed is recovered by connecting/reconnecting, not by this.
     const { synced } = await reconcileLinkedInAccounts(account.id);
     revalidatePath("/settings/channels");
     return { synced };

@@ -7,7 +7,18 @@ import { recordSecurityEvent, eventRequestMeta } from "@/lib/security/audit";
 export async function POST(req: Request) {
   const rawBody = await req.text();
   const headers = Object.fromEntries(req.headers.entries());
-  const infra = createLinkedInInfraFromEnv();
+
+  // A missing provider env var used to throw here, turning every inbound event into an
+  // unexplained 500. Fail with a logged, named reason instead — the 503 still tells the
+  // provider to retry once the config is fixed.
+  let infra: ReturnType<typeof createLinkedInInfraFromEnv>;
+  try {
+    infra = createLinkedInInfraFromEnv();
+  } catch (err) {
+    console.error("linkedin webhook: provider config unavailable", err);
+    return new Response("provider not configured", { status: 503 });
+  }
+
   const result = await handleInboundWebhook("linkedin", headers, rawBody, {
     verify: (h, b) => infra.verifyWebhook(h, b),
     onUnverified: async () => {
@@ -21,6 +32,13 @@ export async function POST(req: Request) {
       });
     },
     extractEventId: (p) => infra.parseEventWebhook(p)?.providerEventId ?? null,
+    onUnparsed: async (payload) => {
+      // Shape only — the payload can carry prospect PII, and the field names are what
+      // identify drift.
+      const keys =
+        typeof payload === "object" && payload !== null ? Object.keys(payload) : [typeof payload];
+      console.warn("linkedin webhook: verified but unparsed; payload keys:", keys);
+    },
     recordEvent: async (source, providerEventId, payload) => {
       const supabase = createServiceClient();
       const { error } = await supabase
