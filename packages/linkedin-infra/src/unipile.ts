@@ -442,7 +442,15 @@ export class UnipileLinkedInInfra implements LinkedInInfra {
    */
   parseEventWebhook(payload: unknown): LinkedInEvent | null {
     if (typeof payload !== "object" || payload === null) return null;
-    const p = payload as Record<string, unknown>;
+    let p = payload as Record<string, unknown>;
+
+    // Account-status webhooks carry NO top-level `event` discriminator: they arrive wrapped as
+    // { AccountStatus: { account_id, account_type, message } }. Unwrap to the flat form the switch
+    // expects — parsing only the flat shape silently discarded every status event the provider sent.
+    const statusEnvelope = p.AccountStatus ?? p.account_status;
+    if (statusEnvelope !== null && typeof statusEnvelope === "object" && !Array.isArray(statusEnvelope)) {
+      p = { ...(statusEnvelope as Record<string, unknown>), event: "account_status" };
+    }
 
     const event = p.event;
     if (typeof event !== "string") return null;
@@ -506,9 +514,13 @@ export class UnipileLinkedInInfra implements LinkedInInfra {
         const eventId = `status:${connectedAccountRef}:${String(rawStatus ?? "unknown")}`;
         const base = { providerEventId: eventId, connectedAccountRef };
         let status: "active" | "restricted" | "disconnected";
-        if (rawStatus === "OK" || rawStatus === "CREATION_SUCCESS") {
+        if (rawStatus === "CONNECTING") {
+          // Documented as temporary — acting on it would flap a row that is mid-handshake.
+          return null;
+        }
+        if (rawStatus === "OK" || rawStatus === "CREATION_SUCCESS" || rawStatus === "RECONNECTED" || rawStatus === "SYNC_SUCCESS") {
           status = "active";
-        } else if (rawStatus === "DISCONNECTED") {
+        } else if (rawStatus === "DISCONNECTED" || rawStatus === "DELETED") {
           status = "disconnected";
         } else if (rawStatus === "CREDENTIALS" || rawStatus === "CHECKPOINT" || rawStatus === "PERMISSIONS" || rawStatus === "ERROR" || rawStatus === "STOPPED" || rawStatus === "SYNC_ERROR") {
           status = "restricted";
