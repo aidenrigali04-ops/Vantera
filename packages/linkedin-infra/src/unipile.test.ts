@@ -476,6 +476,57 @@ describe("UnipileLinkedInInfra", () => {
     });
   });
 
+  // The account-status webhook does NOT use the flat `event` discriminator the fixtures above
+  // assume — it arrives wrapped in an `AccountStatus` envelope carrying `message` as the state
+  // (documented shape). Parsing the flat form only is what silently dropped every status event.
+  describe("parseEventWebhook — real AccountStatus envelope", () => {
+    const adapter = infra({});
+    const envelope = (message: string, over: Record<string, unknown> = {}) => ({
+      AccountStatus: { account_id: "h_EKCy2lRLef5NzHp0iw4A", account_type: "LINKEDIN", message, ...over },
+    });
+
+    it("parses the documented envelope instead of discarding it", () => {
+      expect(adapter.parseEventWebhook(envelope("CREDENTIALS"))).toEqual({
+        type: "account_status",
+        providerEventId: "status:h_EKCy2lRLef5NzHp0iw4A:CREDENTIALS",
+        connectedAccountRef: "h_EKCy2lRLef5NzHp0iw4A",
+        status: "restricted",
+        profileUrl: null,
+        displayName: null,
+        vanteraAccountId: null,
+      });
+    });
+
+    it("maps the connect-time states to active", () => {
+      for (const message of ["OK", "CREATION_SUCCESS", "RECONNECTED", "SYNC_SUCCESS"]) {
+        expect(adapter.parseEventWebhook(envelope(message))).toMatchObject({
+          type: "account_status",
+          status: "active",
+        });
+      }
+    });
+
+    it("maps DELETED to disconnected", () => {
+      expect(adapter.parseEventWebhook(envelope("DELETED"))).toMatchObject({ status: "disconnected" });
+    });
+
+    it("ignores the transient CONNECTING state rather than flapping the row", () => {
+      expect(adapter.parseEventWebhook(envelope("CONNECTING"))).toBeNull();
+    });
+
+    it("dedupes LinkedIn's paired SYNC_SUCCESS payloads on one id", () => {
+      const classic = adapter.parseEventWebhook(envelope("SYNC_SUCCESS", { product: "classic" }));
+      const premium = adapter.parseEventWebhook(envelope("SYNC_SUCCESS", { product: "recruiter" }));
+      expect(classic!.providerEventId).toBe(premium!.providerEventId);
+    });
+
+    it("still accepts the flat shape, so nothing that already worked regresses", () => {
+      expect(
+        adapter.parseEventWebhook({ event: "account_status", account_id: "a1", status: "OK" })
+      ).toMatchObject({ status: "active" });
+    });
+  });
+
   describe("createHostedAuthLink — hosted-auth white-label domain", () => {
     it("rewrites the provider host to the configured custom domain, preserving path + query", async () => {
       const fetchFn = (async () => new Response(JSON.stringify({ url: "https://accounts.unipile.com/abc?token=xyz" }), { status: 200 })) as unknown as typeof fetch;
