@@ -547,6 +547,34 @@ describe("UnipileLinkedInInfra", () => {
       const infra = new UnipileLinkedInInfra({ apiKey: "k", dsn: "d", webhookSecret: "s", fetchFn });
       await expect(infra.createHostedAuthLink("acc_1")).resolves.toMatchObject({ url: "https://accounts.unipile.com/abc" });
     });
+
+    // A configured value is a BARE HOSTNAME. Assigning `url.host` a value that isn't one
+    // fails silently in the URL spec -- "https://host" parses as the hostname "https", which
+    // shipped users a link to https://https/... Every bad value must fall back to the
+    // provider URL (which works) rather than emit a link that cannot resolve.
+    const linkFor = async (hostedAuthDomain: string) => {
+      const fetchFn = (async () => new Response(JSON.stringify({ url: "https://accounts.unipile.com/abc?token=xyz" }), { status: 200 })) as unknown as typeof fetch;
+      const infra = new UnipileLinkedInInfra({ apiKey: "k", dsn: "d", webhookSecret: "s", fetchFn, hostedAuthDomain, appUrl: "https://www.vantera.test" });
+      return (await infra.createHostedAuthLink("acc_1")).url;
+    };
+
+    it("tolerates a value written as a full URL instead of a bare host", async () => {
+      expect(await linkFor("https://connect.vantera.test")).toBe("https://connect.vantera.test/abc?token=xyz");
+      expect(await linkFor("https://connect.vantera.test/")).toBe("https://connect.vantera.test/abc?token=xyz");
+      expect(await linkFor("  connect.vantera.test  ")).toBe("https://connect.vantera.test/abc?token=xyz");
+    });
+
+    it("refuses to rewrite onto the app's own host, which would 404 on the token path", async () => {
+      // The provider's path is not a route this app serves, so this must not be rewritten.
+      expect(await linkFor("www.vantera.test")).toBe("https://accounts.unipile.com/abc?token=xyz");
+      expect(await linkFor("https://www.vantera.test")).toBe("https://accounts.unipile.com/abc?token=xyz");
+    });
+
+    it("keeps the working provider url when the value is unusable", async () => {
+      for (const bad of ["", "   ", "not a host", "http://"]) {
+        expect(await linkFor(bad)).toBe("https://accounts.unipile.com/abc?token=xyz");
+      }
+    });
   });
 
   describe("error handling — Fix 2", () => {

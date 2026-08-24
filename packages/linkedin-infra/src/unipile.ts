@@ -241,6 +241,32 @@ export interface UnipileConfig {
    * (rule 04 — white-label).
    */
   hostedAuthDomain?: string;
+  /**
+   * The app's own base URL. Only used to reject a hostedAuthDomain pointing back at
+   * this app: the provider's token path is not a route we serve, so the rewrite would
+   * hand the user a 404 instead of the auth screen.
+   */
+  appUrl?: string;
+}
+
+/**
+ * Coerce a configured white-label domain to the bare host `URL.host` requires. Assigning a
+ * non-host (e.g. "https://example.com") does NOT throw — the setter parses up to the first
+ * colon and silently yields the host "https" — so anything unusable returns null and the
+ * caller keeps the provider's working URL.
+ */
+function normalizeHostedAuthDomain(raw: string | undefined): string | null {
+  const trimmed = raw?.trim();
+  if (!trimmed) return null;
+  const candidate = /^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  try {
+    const { host, hostname } = new URL(candidate);
+    // A hostname with no dot is a bare label (e.g. "https", "localhost") — never a public
+    // white-label domain, and the shape the silent-parse bug produced.
+    return host && hostname.includes(".") ? host : null;
+  } catch {
+    return null;
+  }
 }
 
 export class UnipileLinkedInInfra implements LinkedInInfra {
@@ -249,6 +275,7 @@ export class UnipileLinkedInInfra implements LinkedInInfra {
   private readonly webhookSecret: string;
   private readonly fetchFn: typeof fetch;
   private readonly hostedAuthDomain: string | undefined;
+  private readonly appUrl: string | undefined;
 
   constructor(config: UnipileConfig) {
     this.apiKey = config.apiKey;
@@ -256,6 +283,7 @@ export class UnipileLinkedInInfra implements LinkedInInfra {
     this.webhookSecret = config.webhookSecret;
     this.fetchFn = config.fetchFn ?? fetch;
     this.hostedAuthDomain = config.hostedAuthDomain;
+    this.appUrl = config.appUrl;
   }
 
   // ── private helper ──────────────────────────────────────────────────────
@@ -305,15 +333,22 @@ export class UnipileLinkedInInfra implements LinkedInInfra {
       body: JSON.stringify(body),
     });
     let url = requireString(data.url, "url");
-    if (this.hostedAuthDomain) {
+    const whiteLabelHost = normalizeHostedAuthDomain(this.hostedAuthDomain);
+    if (!this.hostedAuthDomain?.trim()) {
+      console.warn("HOSTED_AUTH_DOMAIN unset — hosted-auth URL may expose the provider domain (white-label, rule 04)");
+    } else if (!whiteLabelHost) {
+      console.warn("HOSTED_AUTH_DOMAIN is not a usable hostname — expected a bare host like connect.example.com; leaving the provider URL so connect still works");
+    } else if (whiteLabelHost === normalizeHostedAuthDomain(this.appUrl)) {
+      // Pointing the white-label domain at this app sends users to the provider's token
+      // path on our own host, which we don't route — a 404 instead of the auth screen.
+      console.warn("HOSTED_AUTH_DOMAIN points at the app's own host — it must be a separate domain CNAME'd to the provider; leaving the provider URL so connect still works");
+    } else {
       // The provider returns the URL on its own domain; swap in the white-label custom
       // domain (configured vendor-side via CNAME) before any user sees it (rule 04).
       // Path + query are preserved; only the host is replaced.
       const u = new URL(url);
-      u.host = this.hostedAuthDomain;
+      u.host = whiteLabelHost;
       url = u.toString();
-    } else {
-      console.warn("HOSTED_AUTH_DOMAIN unset — hosted-auth URL may expose the provider domain (white-label, rule 04)");
     }
     return { url, expiresAt: expiresOn };
   }
@@ -694,9 +729,9 @@ export function isLinkedInInfraConfigured(): boolean {
 }
 
 export function createLinkedInInfraFromEnv(): LinkedInInfra {
-  const { UNIPILE_API_KEY, UNIPILE_DSN, UNIPILE_WEBHOOK_SECRET, HOSTED_AUTH_DOMAIN } = process.env;
+  const { UNIPILE_API_KEY, UNIPILE_DSN, UNIPILE_WEBHOOK_SECRET, HOSTED_AUTH_DOMAIN, APP_URL } = process.env;
   if (!UNIPILE_API_KEY || !UNIPILE_DSN || !UNIPILE_WEBHOOK_SECRET) {
     throw new Error("linkedin infra env vars missing");
   }
-  return new UnipileLinkedInInfra({ apiKey: UNIPILE_API_KEY, dsn: UNIPILE_DSN, webhookSecret: UNIPILE_WEBHOOK_SECRET, hostedAuthDomain: HOSTED_AUTH_DOMAIN });
+  return new UnipileLinkedInInfra({ apiKey: UNIPILE_API_KEY, dsn: UNIPILE_DSN, webhookSecret: UNIPILE_WEBHOOK_SECRET, hostedAuthDomain: HOSTED_AUTH_DOMAIN, appUrl: APP_URL });
 }
