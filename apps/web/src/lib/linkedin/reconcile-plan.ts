@@ -20,7 +20,7 @@ export interface ProviderAccountLike {
   providerRef: string;
   displayName: string | null;
   profileUrl: string | null;
-  status: "active" | "restricted" | "disconnected";
+  status: "connecting" | "active" | "restricted" | "disconnected";
 }
 
 /** An existing row, as read with the service role (cross-tenant visibility is required). */

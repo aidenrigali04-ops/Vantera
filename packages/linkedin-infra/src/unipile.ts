@@ -27,8 +27,11 @@ function sourceStatus(raw: unknown): "active" | "restricted" | "disconnected" {
 }
 
 /** Reduce all of an account's sources to one status: active only if every source is. */
-function accountStatusFromSources(sources: unknown): "active" | "restricted" | "disconnected" {
-  if (!Array.isArray(sources) || sources.length === 0) return "disconnected";
+function accountStatusFromSources(sources: unknown): "connecting" | "active" | "restricted" | "disconnected" {
+  // No sources yet means the initial sync hasn't finished, not that the account is gone.
+  // Calling it "disconnected" strands a user who just connected: the onboarding gate counts
+  // only connecting|active, so the row it writes wouldn't register as a connection at all.
+  if (!Array.isArray(sources) || sources.length === 0) return "connecting";
   const mapped = sources.map(sourceStatus);
   if (mapped.every((s) => s === "active")) return "active";
   if (mapped.some((s) => s === "disconnected")) return "disconnected";

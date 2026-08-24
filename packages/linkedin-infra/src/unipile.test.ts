@@ -140,6 +140,22 @@ describe("UnipileLinkedInInfra", () => {
         { providerRef: "acc_3", displayName: "Zoe", profileUrl: null, status: "disconnected" },
       ]);
     });
+
+    // A just-created account has no sources yet: the provider hasn't finished the initial
+    // sync. Reporting that as "disconnected" is a claim we can't support -- and it strands a
+    // user who just connected, because the onboarding gate only counts connecting|active.
+    it("reports an account whose sources have not synced yet as connecting, not disconnected", async () => {
+      for (const sources of [undefined, []]) {
+        const adapter = infra({
+          "/api/v1/accounts": {
+            items: [{ id: "acc_new", type: "LINKEDIN", name: "Fresh", connection_params: { im: { publicIdentifier: "fresh-1" } }, sources }],
+          },
+        });
+        await expect(adapter.listAccounts()).resolves.toEqual([
+          { providerRef: "acc_new", displayName: "Fresh", profileUrl: "https://www.linkedin.com/in/fresh-1", status: "connecting" },
+        ]);
+      }
+    });
   });
 
   describe("deleteConnectedAccount", () => {
