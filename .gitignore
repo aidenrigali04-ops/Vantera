@@ -21,6 +21,9 @@ coverage/
 # Claude Code — personal/local files stay out of git
 CLAUDE.local.md
 .claude/settings.local.json
+# Agent worktrees are nested checkouts: committing one records a gitlink with no
+# .gitmodules entry, which fails `git submodule foreach` (exit 128) on CI checkouts.
+.claude/worktrees/
 
 # OS
 .DS_Store
