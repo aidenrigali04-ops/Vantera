@@ -42,6 +42,18 @@ export function agentAttention(input: {
   if (!lastRun) return null;
   const s = lastRun.summary;
 
+  if (kind === "intent") {
+    if (lastRun.note === "no_connection" || s.reason === "no_connection") {
+      return "No LinkedIn connection — connect it in Settings → LinkedIn to start watching for intent.";
+    }
+    if (lastRun.note === "empty_watchlist" || s.reason === "empty_watchlist") {
+      return "The watchlist is empty — add keywords, competitors, or hashtags so the agent has something to watch.";
+    }
+    if (num(s.targets) > 0 && num(s.sourcingErrors) === num(s.targets)) {
+      return "Every LinkedIn read failed on the last run — your connection likely needs a reconnect.";
+    }
+  }
+
   if (lastRun.status === "failed") {
     return "The last run failed — it retries automatically, but if this repeats your config is worth a look.";
   }
@@ -57,16 +69,12 @@ export function agentAttention(input: {
     if (num(s.discoveryTarget) > 0 && num(s.discovered) === 0) {
       return "The last run searched and found 0 prospects — your ICP may be too narrow for the source. Broadening it helps.";
     }
+    if (num(s.rankErrors) > 0 && num(s.qualified) === 0 && num(s.gatePassed) > 0) {
+      return "Scoring failed on the last run — qualified prospects weren't ranked. It retries automatically.";
+    }
     return null;
   }
 
-  // intent
-  if (lastRun.note === "no_connection" || s.reason === "no_connection") {
-    return "No LinkedIn connection — connect it in Settings → LinkedIn to start watching for intent.";
-  }
-  if (num(s.targets) > 0 && num(s.sourcingErrors) === num(s.targets)) {
-    return "Every LinkedIn read failed on the last run — your connection likely needs a reconnect.";
-  }
   return null;
 }
 

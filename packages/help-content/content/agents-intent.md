@@ -25,8 +25,8 @@ Then you choose the signal types:
 
 Showing interest isn't enough on its own. Every person the agent surfaces is judged two ways before they ever enter outreach:
 
-1. **Buying intent** — does what they did actually signal they're in-market for what you sell? A bare like on an unrelated post doesn't count.
-2. **Your ICP** — the same qualification bar your Prospect Agent uses (the Intent Agent inherits your Prospect Agent's targeting). Fast never means spray.
+1. **Buying intent** — does what they did actually signal they're in-market for what you sell? A like with no comment never counts, even on a post about your problem space. Comments and posts they wrote themselves can.
+2. **Your ICP** — the same qualification bar your Prospect Agent uses (the Intent Agent inherits your Prospect Agent's targeting and qualifies against any of its ICPs). Fast never means spray.
 
 Only people who clear both become prospects, each tagged with the "why now" signal that surfaced them — visible on your Prospects page.
 
@@ -44,3 +44,10 @@ On the Growth and Scale plans, Intent also watches for **company events** — fu
 ## Staying safe
 
 The agent reads LinkedIn through your connected account, so it paces those reads under the same safety limits that protect your account during outreach. You never have to tune anything — the limits aren't configurable below their safety thresholds, by design.
+
+## When a run needs attention
+
+A live Intent Agent that can't actually watch won't hide behind a green "Live" label:
+
+- **Empty watchlist** — add keywords, competitors, or hashtags so it has something to watch.
+- **Every LinkedIn read failed** — the connection likely needs a reconnect in Settings → LinkedIn.

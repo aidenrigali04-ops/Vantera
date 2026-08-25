@@ -567,7 +567,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         .onConflictDoNothing();
     },
 
-    async upsertIntentLead(accountId, candidate) {
+    async upsertIntentLead(accountId, candidate, icpId) {
       const [existing] = await db
         .select({ id: leads.id })
         .from(leads)
@@ -588,6 +588,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           lastName: candidate.lastName,
           title: candidate.title,
           linkedinUrl: candidate.linkedinUrl,
+          ...(icpId ? { icpId } : {}),
         })
         .returning({ id: leads.id });
       return { leadId: inserted!.id };
@@ -2536,6 +2537,8 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           icpName: icps.name,
           icpCriteria: icps.criteria,
           accountIndustry: accounts.onboardingIndustry,
+          valueProp: accounts.valueProp,
+          websiteScan: accounts.websiteScan,
         })
         .from(leads)
         .leftJoin(icps, eq(leads.icpId, icps.id))
@@ -2553,6 +2556,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
       const scoutConfig = (scoutAgent?.config ?? {}) as { min_score?: number; minScore?: number };
       const minScore = scoutConfig.min_score ?? scoutConfig.minScore ?? SCOUT_DEFAULTS.minScore;
 
+      const scan = row.websiteScan as (WebsiteScan & { url?: string }) | null;
       return {
         externalRef: row.externalRef ?? "",
         minScore,
@@ -2560,6 +2564,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         icpDescription: row.icpName
           ? `${row.icpName}: ${JSON.stringify(row.icpCriteria ?? {})}`
           : "",
+        valueProp: row.valueProp ?? scan?.summary ?? null,
         candidate: {
           companyName: row.companyName,
           companySize: row.companySize,
@@ -2606,6 +2611,8 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           icpName: icps.name,
           icpCriteria: icps.criteria,
           accountIndustry: accounts.onboardingIndustry,
+          valueProp: accounts.valueProp,
+          websiteScan: accounts.websiteScan,
         })
         .from(leads)
         .leftJoin(icps, eq(leads.icpId, icps.id))
@@ -2623,6 +2630,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
       const scoutConfig = (scoutAgent?.config ?? {}) as { min_score?: number; minScore?: number };
       const minScore = scoutConfig.min_score ?? scoutConfig.minScore ?? SCOUT_DEFAULTS.minScore;
 
+      const scan = row.websiteScan as (WebsiteScan & { url?: string }) | null;
       return {
         alreadyScored: row.scoredAt != null,
         minScore,
@@ -2631,6 +2639,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           ? `${row.icpName}: ${JSON.stringify(row.icpCriteria ?? {})}`
           : "",
         icpCriteria: (row.icpCriteria ?? {}) as IcpCriteria,
+        valueProp: row.valueProp ?? scan?.summary ?? null,
         candidate: {
           companyName: row.companyName,
           companySize: row.companySize,

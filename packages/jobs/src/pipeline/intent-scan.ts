@@ -1,5 +1,5 @@
-import { applyRulesGate, type IntentObservationInput, type IntentVerdict, type RankCandidate } from "@vantera/agent-brains";
-import type { ProspectCandidate } from "@vantera/prospect-data";
+import { applyRulesGate, type IntentObservationInput, type IntentVerdict, type RankCandidate, type RulesGateResult } from "@vantera/agent-brains";
+import type { IcpCriteria, ProspectCandidate } from "@vantera/prospect-data";
 import type { LinkedInPost, LinkedInProfile } from "@vantera/linkedin-infra";
 import {
   INTENT_DEFAULTS,
@@ -10,6 +10,7 @@ import {
   type IntentScanSummary,
 } from "./types";
 import { mapWithConcurrency } from "./concurrency";
+import { rankWithCompleteness } from "./rank-complete";
 
 /** LinkedIn profile reads run at a LOW bounded concurrency — rule-04 account safety caps read volume. */
 const INTENT_READ_CONCURRENCY = 3;
@@ -31,6 +32,32 @@ function candidateFromProfile(p: LinkedInProfile): ProspectCandidate {
     location: p.location ?? undefined,
     linkedinUrl: p.profileUrl,
   };
+}
+
+/** Fields the rules gate actually checks — empty criteria still defer-pass. */
+function hasGateCriteria(criteria: IcpCriteria): boolean {
+  return [criteria.industries, criteria.companySizes, criteria.titles, criteria.seniorities, criteria.geos].some(
+    (arr) => (arr?.length ?? 0) > 0
+  );
+}
+
+/** Pass if any live ICP's rules gate passes; reject only when every non-empty ICP fails. */
+function gateAgainstIcps(
+  candidate: ProspectCandidate,
+  icps: { id: string; criteria: IcpCriteria }[]
+): { gate: RulesGateResult; icpId?: string } {
+  const scored = icps.filter((i) => hasGateCriteria(i.criteria));
+  if (scored.length === 0) {
+    const first = icps[0];
+    return { gate: applyRulesGate(candidate, first?.criteria ?? {}), icpId: first?.id };
+  }
+  const failures: string[] = [];
+  for (const icp of scored) {
+    const gate = applyRulesGate(candidate, icp.criteria);
+    if (gate.passed) return { gate, icpId: icp.id };
+    failures.push(...gate.reasons);
+  }
+  return { gate: { passed: false, reasons: failures } };
 }
 
 /** high/medium buying-intent → the intent-signal strength the rank reads (prospect-data levels). */
@@ -75,6 +102,7 @@ export async function runIntentScan(agentId: string, deps: IntentScanDeps): Prom
   const now = deps.now ?? (() => new Date());
   const skipped: IntentScanSummary = {
     status: "skipped", targets: 0, sourcingErrors: 0, observed: 0, intent: 0, qualified: 0, chained: false,
+    rankMissed: 0, rankErrors: 0,
   };
 
   const ctx = await deps.store.getIntentContext(agentId);
@@ -123,6 +151,23 @@ export async function runIntentScan(agentId: string, deps: IntentScanDeps): Prom
     }
   }
 
+  // every watch-target read failed — the connection is dead, not a quiet day
+  if (targets.length > 0 && sourcingErrors === targets.length) {
+    await deps.store.completeRun(agentId, now());
+    return {
+      status: "failed",
+      reason: "all_targets_failed",
+      targets: targets.length,
+      sourcingErrors,
+      observed: 0,
+      intent: 0,
+      qualified: 0,
+      chained: false,
+      rankMissed: 0,
+      rankErrors: 0,
+    };
+  }
+
   // 2. build observations: content (post authors) + engagement (post engagers)
   const raw: FreshObs[] = [];
   for (const { post, watchTarget } of sourced) {
@@ -141,7 +186,10 @@ export async function runIntentScan(agentId: string, deps: IntentScanDeps): Prom
             ref: e.profileUrl, profileUrl: e.profileUrl, postRef: post.postRef,
             name: e.name, headline: e.headline, signalKind: "engagement",
             action: e.kind === "comment" ? "commented" : "reacted",
-            text: e.text ?? post.text, watchTarget,
+            // evidence = THEIR words only. Never substitute the post they liked (that is context).
+            text: e.text ?? "",
+            context: post.text,
+            watchTarget,
           });
         }
       } catch {
@@ -161,6 +209,7 @@ export async function runIntentScan(agentId: string, deps: IntentScanDeps): Prom
     return {
       status: "completed", targets: targets.length, sourcingErrors,
       observed: 0, intent: 0, qualified: 0, chained: false,
+      rankMissed: 0, rankErrors: 0,
     };
   }
 
@@ -174,11 +223,13 @@ export async function runIntentScan(agentId: string, deps: IntentScanDeps): Prom
     headline: o.headline ?? null, detail, outcome, leadId,
   });
 
-  // one primary intent observation per PERSON (others recorded as observed, person-deduped at the lead)
+  // one primary intent observation per PERSON (others recorded as observed, person-deduped at the lead).
+  // Empty evidence (a like with no comment) can never enter primary even if the classifier over-claims.
+  const hasEvidence = (o: FreshObs) => o.text.trim().length > 0;
   const primary = new Map<string, { o: FreshObs; v: IntentVerdict }>();
   for (const o of fresh) {
     const v = verdictByRef.get(o.ref);
-    if (v?.is_intent && !primary.has(o.profileUrl)) primary.set(o.profileUrl, { o, v });
+    if (v?.is_intent && hasEvidence(o) && !primary.has(o.profileUrl)) primary.set(o.profileUrl, { o, v });
     else rows.push(obsRow(o, "observed", v?.why_now ?? null, null));
   }
 
@@ -186,7 +237,6 @@ export async function runIntentScan(agentId: string, deps: IntentScanDeps): Prom
   // Each person is independent, so run at a LOW bounded concurrency: the per-survivor profile
   // fetch is the dominant cost, and rule-04 caps LinkedIn read volume. Order-independent — rows
   // feed recordObservations and survivors feed the leadId-keyed rank.
-  const icpCriteria = ctx.icps[0]?.criteria ?? {};
   type Survivor = { o: FreshObs; v: IntentVerdict; leadId: string; candidate: ProspectCandidate };
   const resolved = await mapWithConcurrency(
     [...primary.values()],
@@ -199,8 +249,8 @@ export async function runIntentScan(agentId: string, deps: IntentScanDeps): Prom
       if (await deps.store.isSuppressed(accountId, "linkedin", profile.profileUrl))
         return { row: obsRow(o, "suppressed", v.why_now, null), survivor: null };
       const candidate = candidateFromProfile(profile);
-      const { leadId } = await deps.store.upsertIntentLead(accountId, candidate);
-      const gate = applyRulesGate(candidate, icpCriteria);
+      const { gate, icpId } = gateAgainstIcps(candidate, ctx.icps);
+      const { leadId } = await deps.store.upsertIntentLead(accountId, candidate, gate.passed ? icpId : undefined);
       await deps.store.markRulesGate(leadId, gate);
       if (!gate.passed) return { row: obsRow(o, "rejected", v.why_now, leadId), survivor: null };
       return { row: null, survivor: { o, v, leadId, candidate } };
@@ -214,9 +264,12 @@ export async function runIntentScan(agentId: string, deps: IntentScanDeps): Prom
 
   // 5. AI rank the survivors; enroll those clearing the bar
   const qualifiedLeadIds: string[] = [];
+  let rankMissed = 0;
+  let rankErrors = 0;
   if (survivors.length > 0) {
     const rankNow = now();
-    const insights = await deps.rankFn(
+    const ranked = await rankWithCompleteness(
+      deps.rankFn,
       survivors.map((s) => toRankCandidate(s.leadId, s.candidate, s.v, rankNow)),
       {
         accountIndustry: ctx.account.industry,
@@ -224,15 +277,15 @@ export async function runIntentScan(agentId: string, deps: IntentScanDeps): Prom
         icpDescription: ctx.icps.map((i) => `${i.name}: ${JSON.stringify(i.criteria)}`).join(" | "),
       }
     );
-    const byLead = new Map(insights.map((i) => [i.lead_id, i]));
+    rankMissed = ranked.rankMissed;
+    rankErrors = ranked.rankErrors;
+    const byLead = new Map(ranked.insights.map((i) => [i.lead_id, i]));
     const scored = survivors.map((s) => {
-      const ins = byLead.get(s.leadId);
-      return { s, ins, qualified: !!ins && ins.score >= config.minScore };
+      const ins = byLead.get(s.leadId)!;
+      return { s, ins, qualified: ins.score >= config.minScore };
     });
-    // score writes run concurrently; the qualifying side-effects (intent signal + enroll list +
-    // observation rows) stay in a deterministic sequential pass.
     await mapWithConcurrency(scored, WRITE_CONCURRENCY, ({ s, ins, qualified }) =>
-      ins ? deps.store.saveScore(s.leadId, ins, qualified) : Promise.resolve()
+      deps.store.saveScore(s.leadId, ins, qualified)
     );
     for (const { s, qualified } of scored) {
       if (qualified) {
@@ -261,5 +314,6 @@ export async function runIntentScan(agentId: string, deps: IntentScanDeps): Prom
   return {
     status: "completed", targets: targets.length, sourcingErrors,
     observed: fresh.length, intent: primary.size, qualified: qualifiedLeadIds.length, chained,
+    rankMissed, rankErrors,
   };
 }

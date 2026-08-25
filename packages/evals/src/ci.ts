@@ -4,7 +4,7 @@ import { draftLinkedIn, draftConversationMessage } from "@vantera/agent-brains";
 import { getModel } from "@vantera/ai";
 import { loadCopyLinkedinCorpus, loadCopyRespondCorpus } from "./corpus";
 import { runDeterministic } from "./run-deterministic";
-import { runReplyFloors, runIntentFloors } from "./run-classifier";
+import { runReplyFloors, runIntentFloors, runIntentHardFloors, runRankFloors } from "./run-classifier";
 import type { FloorReport } from "./graders/classifier";
 import { runPairwise, PAIRWISE_NONINFERIORITY, type PairwiseReport } from "./judge/pairwise";
 import { judgeCopy, JUDGE_MODEL_ID } from "./judge/judge";
@@ -16,8 +16,8 @@ import { judgeCopy, JUDGE_MODEL_ID } from "./judge/judge";
  * Three layers, two postures:
  * - HARD (fail the build): the deterministic copy gate (Task 4, `runDeterministic("live")`,
  *   `passRate >= DETERMINISTIC_LIVE_FLOOR`, see that const's doc for why this isn't exact 100%)
- *   and the classifier accuracy floors (Task 5, `runReplyFloors` + `runIntentFloors`, every
- *   `FloorReport.pass`).
+ *   and the classifier accuracy floors (Task 5 + 8.0 rank/hard-intent, `runReplyFloors` +
+ *   `runIntentFloors` + `runIntentHardFloors` + `runRankFloors`, every `FloorReport.pass`).
  * - ADVISORY (report, never fail): the LLM judge (Task 6) and the pairwise win-rate harness
  *   (Task 7) — both are informational until a human owner labels ~100 drafts, runs
  *   `runCalibration` (`./judge/kappa.ts`), confirms Cohen's kappa >= 0.7, and flips
@@ -201,6 +201,8 @@ export type CiDeps = {
   runDeterministic: () => Promise<DeterministicSummary>;
   runReplyFloors: () => Promise<FloorReport[]>;
   runIntentFloors: () => Promise<FloorReport[]>;
+  runIntentHardFloors: () => Promise<FloorReport[]>;
+  runRankFloors: () => Promise<FloorReport[]>;
   generateLiveCandidates: () => Promise<LiveCandidate[]>;
   runPairwise: (candidates: { caseId: string; text: string }[]) => Promise<PairwiseReport>;
   scoreJudge: (candidates: LiveCandidate[]) => Promise<JudgeSummary>;
@@ -218,7 +220,12 @@ export type OrchestrationResult = {
  *  (real: `main()`; tests: `ci.test.ts`) decide what to do with the result. */
 export async function orchestrate(deps: CiDeps, judgeGating: boolean): Promise<OrchestrationResult> {
   const deterministic = await deps.runDeterministic();
-  const floors = [...(await deps.runReplyFloors()), ...(await deps.runIntentFloors())];
+  const floors = [
+    ...(await deps.runReplyFloors()),
+    ...(await deps.runIntentFloors()),
+    ...(await deps.runIntentHardFloors()),
+    ...(await deps.runRankFloors()),
+  ];
   const candidates = await deps.generateLiveCandidates();
   const pairwise = await deps.runPairwise(candidates.map(({ caseId, text }) => ({ caseId, text })));
   const judge = await deps.scoreJudge(candidates);
@@ -288,6 +295,8 @@ export async function main(): Promise<number> {
     },
     runReplyFloors: () => runReplyFloors(),
     runIntentFloors: () => runIntentFloors(),
+    runIntentHardFloors: () => runIntentHardFloors(),
+    runRankFloors: () => runRankFloors(),
     generateLiveCandidates: () => generateLiveCandidates(draftingModel),
     runPairwise: (candidates) => runPairwise(candidates, judgeModel),
     scoreJudge: (candidates) => scoreJudge(candidates, judgeModel),

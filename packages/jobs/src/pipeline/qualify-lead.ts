@@ -26,6 +26,8 @@ export interface QualifyLeadLoad {
     location: string | null;
     title: string | null;
   };
+  /** seller-authored positioning, else website-scan summary — same bar as Scout/copy */
+  valueProp: string | null;
 }
 
 export interface QualifyLeadStore {
@@ -84,7 +86,7 @@ export async function runQualifyLead(
     ],
     {
       accountIndustry: lead.accountIndustry,
-      valueProp: null,
+      valueProp: lead.valueProp,
       icpDescription: lead.icpDescription,
     }
   );

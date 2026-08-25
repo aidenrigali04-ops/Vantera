@@ -83,6 +83,17 @@ describe("validateLinkedInDraft", () => {
     );
     expect(violations.map((v) => v.rule)).toContain("ungrounded-claim");
   });
+
+  it("flags an invented Series B as an ungrounded entity", () => {
+    const violations = validateLinkedInDraft(
+      {
+        connection_note: "Dana, congrats on the Series B.",
+        followup_message: "Thanks for connecting. How are you putting that capital to work?",
+      },
+      leadBlock(INPUT),
+    );
+    expect(violations.map((v) => v.rule)).toContain("ungrounded-entity");
+  });
 });
 
 // ── message-shape selector: compliance is enforced regardless of shape (spec §2/§9) ──

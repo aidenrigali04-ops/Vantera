@@ -278,6 +278,11 @@ describe("validateConversationMessage — link whitelist + action claims (2026-0
     expect(out.some((v) => v.rule === "action-claim")).toBe(true);
   });
 
+  it("flags an invented Series B as an ungrounded entity", () => {
+    const out = validateConversationMessage("Congrats on the Series B — how are you putting that to work?", BLOCK, []);
+    expect(out.some((v) => v.rule === "ungrounded-entity")).toBe(true);
+  });
+
   it("allowedConversationLinks collects booking + website + content links only", () => {
     expect(
       allowedConversationLinks({

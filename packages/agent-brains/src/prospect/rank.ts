@@ -168,3 +168,35 @@ export async function rankLeads(
   }
   return results;
 }
+
+/** Rationale stamped on a lead the model omitted after retry — pipelines persist this as unqualified. */
+export const RANK_MISS_RATIONALE = "rank miss";
+
+/** Synthetic insights for a lead the rank model never returned. Score 0 so they never clear min_score. */
+export function rankMissInsights(leadId: string): LeadInsights {
+  return {
+    lead_id: leadId,
+    reasoning: RANK_MISS_RATIONALE,
+    score: 0,
+    rationale: RANK_MISS_RATIONALE,
+    pain_points: [],
+    triggers: [],
+    motivations: [],
+    prospect_offering: "",
+    value_angle: "",
+    aha_moment: "",
+    summary: "",
+  };
+}
+
+/**
+ * Every candidate gets exactly one insights row: the model's if present, otherwise a rank-miss.
+ * First-seen insight per lead_id wins (retry rows that duplicate an id are ignored).
+ */
+export function completeRankResults(candidates: RankCandidate[], insights: LeadInsights[]): LeadInsights[] {
+  const byId = new Map<string, LeadInsights>();
+  for (const i of insights) {
+    if (!byId.has(i.lead_id)) byId.set(i.lead_id, i);
+  }
+  return candidates.map((c) => byId.get(c.leadId) ?? rankMissInsights(c.leadId));
+}

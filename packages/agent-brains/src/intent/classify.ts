@@ -24,8 +24,13 @@ export interface IntentObservationInput {
   signalKind: "engagement" | "content";
   /** "commented", "reacted", or "posted" */
   action: string;
-  /** the post text (engagement: the post they reacted to; content: their own post) */
+  /** THIS person's own words (comment body or their post). Empty for a like with no comment. */
   text: string;
+  /**
+   * The post they engaged with (likes/comments only). Labeled `context:` in the model line so it
+   * cannot be read as their claim. Never a substitute for `text`.
+   */
+  context?: string | null;
   /** what the agent was watching that surfaced this (a creator, competitor, keyword, hashtag) */
   watchTarget?: string | null;
 }
@@ -46,13 +51,17 @@ const trunc = (s: string, max: number) => (s.length > max ? `${s.slice(0, max - 
 // batches; per-batch content rides in the user message only.
 const INTENT_SYSTEM = registerPrompt("intent/classify", `You are the buying-intent brain of a LinkedIn SDR platform. You receive a seller context block and a batch of LinkedIn observations (someone engaged with or published a post). Decide whether each person is showing genuine buying intent FOR THE SELLER'S OFFER right now — not generic engagement.
 
+Each observation line is: ref | kind | action | headline | watch | evidence | context.
+- evidence = THIS person's own words (their comment, or the post they authored). is_intent may be true ONLY from evidence.
+- context = the post they liked or commented on. Background only. Never treat context as their claim. A like with empty evidence is none, even when context is on-topic.
+
 Rubric:
 - high: explicitly seeking, asking for, or describing the exact problem the seller solves (e.g. "anyone recommend a tool for X", "we keep struggling with X").
 - medium: actively engaging with the seller's problem space in a way that implies they have the problem.
 - low: tangential — same broad topic but no signal they're in-market.
-- none: unrelated, off-topic, or pure social noise. Most bare reactions are none.
+- none: unrelated, off-topic, or pure social noise. Most bare reactions are none. Empty evidence is always none.
 
-For each observation emit: ref (copy it exactly), reasoning (one sentence weighing the text against the seller's offer — think here before deciding), is_intent (true ONLY for high/medium), level, why_now (one plain-English line a rep reads — paraphrase what THIS person actually did, e.g. "commented asking for a churn tool on a RevOps post"). Ground why_now in the observed text; never invent a detail that isn't there.`);
+For each observation emit: ref (copy it exactly), reasoning (one sentence weighing the EVIDENCE against the seller's offer — think here before deciding), is_intent (true ONLY for high/medium, and ONLY when evidence supports it), level, why_now (one plain-English line a rep reads — paraphrase what THIS person actually did, e.g. "commented asking for a churn tool on a RevOps post"). Ground why_now in the evidence; never invent a detail that isn't there.`);
 
 function contextBlock(ctx: IntentContext): string {
   return [
@@ -62,13 +71,18 @@ function contextBlock(ctx: IntentContext): string {
 }
 
 function compactObservation(o: IntentObservationInput): string {
+  const evidence = trunc(o.text.replace(/\s+/g, " "), 280) || "-";
+  const context = o.context?.trim()
+    ? `context:${trunc(o.context.replace(/\s+/g, " "), 200)}`
+    : "context:-";
   return [
     o.ref,
     o.signalKind,
     o.action,
     o.headline ? trunc(o.headline, 50) : "-",
     o.watchTarget ? `watch:${trunc(o.watchTarget, 30)}` : "-",
-    trunc(o.text.replace(/\s+/g, " "), 280) || "-",
+    `evidence:${evidence}`,
+    context,
   ].join(" | ");
 }
 
@@ -90,7 +104,7 @@ async function classifyBatch(
 ): Promise<IntentVerdict[]> {
   // strip lone surrogates from the scraped post text — they 400 the model API as invalid JSON
   const prompt = stripLoneSurrogates(
-    `${contextBlock(ctx)}\n\nObservations (ref | kind | action | headline | watch | text):\n${batch
+    `${contextBlock(ctx)}\n\nObservations (ref | kind | action | headline | watch | evidence | context):\n${batch
       .map(compactObservation)
       .join("\n")}`
   );
@@ -111,8 +125,8 @@ async function classifyBatch(
 /**
  * Classify a batch of LinkedIn observations for genuine buying intent — the filter that runs
  * BEFORE ICP qualification (rules-gate + rank), so enrichment spend never lands on social noise,
- * and the why_now line feeds the lead's "why now" chip. Empty-text observations are judged "none"
- * deterministically (no readable signal to weigh).
+ * and the why_now line feeds the lead's "why now" chip. Empty evidence (including a like with no
+ * comment) is judged "none" deterministically — context/post text is never a substitute.
  */
 export async function classifyIntent(
   observations: IntentObservationInput[],
@@ -121,8 +135,9 @@ export async function classifyIntent(
 ): Promise<IntentVerdict[]> {
   const results: IntentVerdict[] = [];
   for (const o of observations) {
+    // a reaction with no comment has no evidence even if `context` is a highly relevant post
     if (o.text.trim().length === 0) {
-      results.push({ ref: o.ref, reasoning: "no readable post text", is_intent: false, level: "none", why_now: "" });
+      results.push({ ref: o.ref, reasoning: "no readable evidence", is_intent: false, level: "none", why_now: "" });
     }
   }
   const readable = observations.filter((o) => o.text.trim().length > 0);

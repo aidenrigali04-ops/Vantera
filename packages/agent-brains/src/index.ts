@@ -5,6 +5,9 @@ export {
   compactLead,
   rankLeads,
   RANK_BATCH_SIZE,
+  rankMissInsights,
+  completeRankResults,
+  RANK_MISS_RATIONALE,
   type RankCandidate,
   type RankContext,
 } from "./prospect/rank";
@@ -38,6 +41,7 @@ export {
   describeViolations,
   findRestartPhrases,
   findUngroundedClaims,
+  findUngroundedEntities,
   findActionClaims,
   findUnapprovedLinks,
   normalizeDashes,

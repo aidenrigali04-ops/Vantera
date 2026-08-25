@@ -52,6 +52,18 @@ describe("agentAttention", () => {
       agentAttention({ kind: "intent", status: "live", linkedinActive: 1, lastRun: run({ status: "failed" }) })
     ).toMatch(/failed/);
   });
+
+  it("intent: an empty watchlist is a failed setup, not a quiet day", () => {
+    const r = run({ kind: "intent", status: "skipped", note: "empty_watchlist", summary: { reason: "empty_watchlist" } });
+    expect(agentAttention({ kind: "intent", status: "live", linkedinActive: 1, lastRun: r })).toMatch(/watchlist/);
+  });
+
+  it("scout: rank errors with no qualified survivors warn that scoring failed", () => {
+    const r = run({
+      summary: { discoveryTarget: 10, discovered: 10, gatePassed: 8, qualified: 0, rankErrors: 8 },
+    });
+    expect(agentAttention({ kind: "scout", status: "live", linkedinActive: 1, lastRun: r })).toMatch(/Scoring failed/);
+  });
 });
 
 describe("runLine", () => {

@@ -1,5 +1,6 @@
 import { applyRulesGate, isScanStale, allocateDiscovery } from "@vantera/agent-brains";
 import { computeRunTarget, computeDiscoveryTarget, dailyOutreachCapacity } from "./capacity";
+import { rankWithCompleteness } from "./rank-complete";
 import type { RankCandidate, LeadOutcomeFlags } from "@vantera/agent-brains";
 import { companyKey, icpCriteriaToFilters, type CompanyRef, type EnrichedProspect, type IcpCriteria, type ProspectSignal } from "@vantera/prospect-data";
 import {
@@ -40,6 +41,10 @@ const EMPTY_SUMMARY = {
   gatePassed: 0,
   qualified: 0,
   chained: false,
+  rankMissed: 0,
+  rankErrors: 0,
+  websiteScanError: false,
+  companySignalsError: false,
 } as const;
 
 /** An ICP has usable discovery filters (the wizard stores free text with empty criteria). */
@@ -54,6 +59,8 @@ export async function runScout(agentId: string, deps: ScoutDeps): Promise<ScoutR
   const { accountId } = ctx.agent;
   const config = { ...SCOUT_DEFAULTS, ...ctx.agent.config };
   const cadenceDays = ctx.agent.cadence === "weekly" ? 7 : 1;
+  let websiteScanError = false;
+  let companySignalsError = false;
 
   // refresh the seller's website scan when missing, stale, or pointing at a new URL
   let scan = ctx.account.websiteScan;
@@ -63,6 +70,7 @@ export async function runScout(agentId: string, deps: ScoutDeps): Promise<ScoutR
       scan = { ...(await deps.scanFn(url)), url };
       await deps.store.saveWebsiteScan(accountId, url, scan);
     } catch {
+      websiteScanError = true;
       // a broken website never blocks prospecting; rank just runs without scan context
     }
   }
@@ -89,6 +97,8 @@ export async function runScout(agentId: string, deps: ScoutDeps): Promise<ScoutR
   let qualifiedThisRun = 0;
   let criteriaDerived = 0;
   let criteriaPending = 0;
+  let rankMissed = 0;
+  let rankErrors = 0;
   // Healed working set: ICPs whose criteria are usable this run (see the self-heal below).
   let icps = ctx.icps;
 
@@ -198,7 +208,7 @@ export async function runScout(agentId: string, deps: ScoutDeps): Promise<ScoutR
           const map = await deps.companySignals.getCompanySignals(companies);
           for (const [k, v] of map) companySignalsByKey.set(k, v);
         } catch {
-          /* fail open */
+          companySignalsError = true;
         }
       }
     }
@@ -238,12 +248,15 @@ export async function runScout(agentId: string, deps: ScoutDeps): Promise<ScoutR
     // stage 2: batched AI rank → persist scores (qualified = score >= min_score)
     const qualifiedThisRunIds: string[] = [];
     if (rankCandidates.length > 0) {
-      const insights = await deps.rankFn(rankCandidates, {
+      const rankCtx = {
         accountIndustry: ctx.account.industry,
         valueProp: scan ? `${scan.summary} Value props: ${scan.value_props.join("; ")}` : null,
         icpDescription: icps.map((i) => `${i.name}: ${JSON.stringify(i.criteria)}`).join(" | "),
-      });
-      const scored = insights.map((insight) => ({ insight, qualified: insight.score >= config.minScore }));
+      };
+      const ranked = await rankWithCompleteness(deps.rankFn, rankCandidates, rankCtx);
+      rankMissed = ranked.rankMissed;
+      rankErrors = ranked.rankErrors;
+      const scored = ranked.insights.map((insight) => ({ insight, qualified: insight.score >= config.minScore }));
       await mapWithConcurrency(scored, WRITE_CONCURRENCY, ({ insight, qualified }) =>
         deps.store.saveScore(insight.lead_id, insight, qualified)
       );
@@ -299,5 +312,9 @@ export async function runScout(agentId: string, deps: ScoutDeps): Promise<ScoutR
     gatePassed,
     qualified: qualifiedThisRun,
     chained,
+    rankMissed,
+    rankErrors,
+    websiteScanError,
+    companySignalsError,
   };
 }

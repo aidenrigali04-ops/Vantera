@@ -18,6 +18,8 @@ export interface RefreshLeadLoad {
     location: string | null;
     title: string | null;
   };
+  /** seller-authored positioning, else website-scan summary — same bar as Scout/copy */
+  valueProp: string | null;
 }
 
 export interface RefreshLeadStore {
@@ -69,7 +71,7 @@ export async function runRefreshLead(
     ],
     {
       accountIndustry: lead.accountIndustry,
-      valueProp: null,
+      valueProp: lead.valueProp,
       icpDescription: lead.icpDescription,
     }
   );
