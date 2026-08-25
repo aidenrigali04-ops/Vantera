@@ -4,11 +4,22 @@ import { recall, precision } from "./classifier";
 import {
   runReplyFloors,
   runIntentFloors,
+  runIntentHardFloors,
+  runRankFloors,
   loadReplyLabels,
   loadIntentLabels,
+  loadIntentHardLabels,
+  loadRankLabels,
+  offeringDirectionMatches,
   REPLY_INTERESTED_RECALL_FLOOR,
   INTENT_RECALL_FLOOR,
   INTENT_PRECISION_FLOOR,
+  INTENT_HARD_PRECISION_FLOOR,
+  INTENT_HARD_RECALL_FLOOR,
+  RANK_QUALIFY_PRECISION_FLOOR,
+  RANK_QUALIFY_RECALL_FLOOR,
+  RANK_OFFERING_DIRECTION_FLOOR,
+  RANK_QUALIFY_MIN,
 } from "../run-classifier";
 
 function textResponse(json: unknown) {
@@ -224,5 +235,128 @@ describe("runIntentFloors (mock model)", () => {
 
     expect(precisionReport.value).toBeCloseTo(expectedPrecision);
     expect(precisionReport.pass).toBe(expectedPrecision >= INTENT_PRECISION_FLOOR);
+  });
+});
+
+describe("offeringDirectionMatches", () => {
+  it("passes a seller offering that preserves they PROVIDE inbound", () => {
+    expect(offeringDirectionMatches("helps founders get 10-20 inbound leads for their companies", "seller")).toBe(true);
+  });
+
+  it("fails a seller offering recast as looking for inbound or running lead gen for N founders", () => {
+    expect(offeringDirectionMatches("looking for inbound leads for their pipeline", "seller")).toBe(false);
+    expect(offeringDirectionMatches("runs lead gen for 10-20 founders", "seller")).toBe(false);
+  });
+
+  it("fails a buyer offering recast as helping founders get inbound", () => {
+    expect(offeringDirectionMatches("helps founders get inbound leads", "buyer")).toBe(false);
+    expect(offeringDirectionMatches("runs customer success at a subscription company", "buyer")).toBe(true);
+  });
+});
+
+describe("runIntentHardFloors (mock model)", () => {
+  it("scores a perfect classifier at precision/recall 1.0 and skips the model for empty reactions", async () => {
+    const labels = loadIntentHardLabels();
+    const model = new MockLanguageModelV3({
+      doGenerate: async (opts) => {
+        const prompt = JSON.stringify(opts.prompt);
+        const matched = labels.filter((l) => l.obs.text.trim().length > 0 && prompt.includes(l.obs.ref));
+        const verdicts = matched.map((l) => ({
+          ref: l.obs.ref,
+          reasoning: "mocked",
+          is_intent: l.expectedIsIntent,
+          level: l.expectedIsIntent ? "high" : "none",
+          why_now: "mocked",
+        }));
+        return textResponse({ verdicts });
+      },
+    });
+
+    const reports = await runIntentHardFloors(model);
+    const precisionReport = reports.find((r) => r.metric === "intent.hard_precision")!;
+    const recallReport = reports.find((r) => r.metric === "intent.hard_recall")!;
+
+    expect(precisionReport.value).toBe(1);
+    expect(precisionReport.floor).toBe(INTENT_HARD_PRECISION_FLOOR);
+    expect(precisionReport.pass).toBe(true);
+    expect(recallReport.value).toBe(1);
+    expect(recallReport.floor).toBe(INTENT_HARD_RECALL_FLOOR);
+    expect(recallReport.pass).toBe(true);
+
+    const emptyReactions = labels.filter((l) => l.obs.text.trim().length === 0);
+    expect(emptyReactions.length).toBeGreaterThan(0);
+    expect(model.doGenerateCalls.length).toBeGreaterThan(0);
+    expect(model.doGenerateCalls.length).toBeLessThan(labels.length);
+  });
+});
+
+describe("runRankFloors (mock model)", () => {
+  function mockLeadsFromPrompt(prompt: string, flipOfferingId?: string, scoreOverride?: { id: string; score: number }) {
+    const labels = loadRankLabels();
+    const matched = labels.filter((l) => prompt.includes(l.candidate.leadId));
+    return matched.map((l) => {
+      const score = scoreOverride?.id === l.candidate.leadId
+        ? scoreOverride.score
+        : l.expectQualified
+          ? 85
+          : 40;
+      let offering = "runs the function named in their title at their company";
+      if (l.expectOfferingDirection === "seller") offering = "helps founders get inbound leads for their clients";
+      if (l.expectOfferingDirection === "buyer") offering = "runs customer success at a subscription company";
+      if (flipOfferingId === l.candidate.leadId) offering = "looking for inbound leads to grow pipeline";
+      return {
+        lead_id: l.candidate.leadId,
+        reasoning: "mocked",
+        score,
+        rationale: "mocked",
+        pain_points: [],
+        triggers: [],
+        motivations: [],
+        prospect_offering: offering,
+        value_angle: "mocked",
+        aha_moment: "mocked",
+        summary: "mocked",
+      };
+    });
+  }
+
+  it("scores a schema-shaped perfect ranker at 1.0 on qualify and direction floors", async () => {
+    const labels = loadRankLabels();
+    const model = new MockLanguageModelV3({
+      doGenerate: async (opts) => textResponse({ leads: mockLeadsFromPrompt(JSON.stringify(opts.prompt)) }),
+    });
+
+    const reports = await runRankFloors(model);
+    const precisionReport = reports.find((r) => r.metric === "rank.qualify_precision")!;
+    const recallReport = reports.find((r) => r.metric === "rank.qualify_recall")!;
+    const directionReport = reports.find((r) => r.metric === "rank.offering_direction")!;
+
+    expect(precisionReport.value).toBe(1);
+    expect(precisionReport.floor).toBe(RANK_QUALIFY_PRECISION_FLOOR);
+    expect(precisionReport.pass).toBe(true);
+    expect(recallReport.value).toBe(1);
+    expect(recallReport.floor).toBe(RANK_QUALIFY_RECALL_FLOOR);
+    expect(recallReport.pass).toBe(true);
+    expect(directionReport.value).toBe(1);
+    expect(directionReport.floor).toBe(RANK_OFFERING_DIRECTION_FLOOR);
+    expect(directionReport.pass).toBe(true);
+    expect(precisionReport.n).toBe(labels.length);
+    expect(model.doGenerateCalls.length).toBeGreaterThan(0);
+  });
+
+  it("drops qualify recall when a labeled buyer is scored below min_score", async () => {
+    const labels = loadRankLabels();
+    const miss = labels.find((l) => l.expectQualified)!;
+    const model = new MockLanguageModelV3({
+      doGenerate: async (opts) =>
+        textResponse({
+          leads: mockLeadsFromPrompt(JSON.stringify(opts.prompt), undefined, { id: miss.candidate.leadId, score: RANK_QUALIFY_MIN - 10 }),
+        }),
+    });
+
+    const reports = await runRankFloors(model);
+    const recallReport = reports.find((r) => r.metric === "rank.qualify_recall")!;
+    const positives = labels.filter((l) => l.expectQualified).length;
+    expect(recallReport.value).toBeCloseTo((positives - 1) / positives);
   });
 });

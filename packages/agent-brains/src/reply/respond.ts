@@ -5,6 +5,7 @@ import type { StoredInsights } from "../prospect/schema";
 import {
   validateHumanity,
   findUngroundedClaims,
+  findUngroundedEntities,
   findRestartPhrases,
   findActionClaims,
   findUnapprovedLinks,
@@ -129,6 +130,7 @@ export function validateConversationMessage(
     // mid-conversation must never restart/re-introduce (rule enforced, not just prompted)
     ...findRestartPhrases(message),
     ...findUngroundedClaims(message, block),
+    ...findUngroundedEntities(message, block),
     // never-hallucinate: no mind-reading the prospect's unstated state ("you're probably swamped")
     ...findSpeculativeClaims(message),
     // anti-slop: no reflexive opener that restates their own message back to them

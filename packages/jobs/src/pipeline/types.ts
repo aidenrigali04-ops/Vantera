@@ -187,6 +187,14 @@ export interface ScoutRunSummary {
   gatePassed: number;
   qualified: number;
   chained: boolean;
+  /** survivors the model omitted after one retry (score-0 miss rows still persisted) */
+  rankMissed: number;
+  /** survivors miss-scored because rankFn threw */
+  rankErrors: number;
+  /** website scan threw — rank ran without seller-site context */
+  websiteScanError: boolean;
+  /** company-signal fetch threw — rank ran without company events */
+  companySignalsError: boolean;
 }
 
 export interface CopyDraftPayload {
@@ -242,8 +250,9 @@ export interface IntentScanStore {
   seenObservationKeys(accountId: string, refs: { profileUrl: string; postRef: string }[]): Promise<Set<string>>;
   /** persist the observation ledger (service-role insert; the unique index is the backstop) */
   recordObservations(accountId: string, agentId: string, rows: IntentObservationRow[]): Promise<void>;
-  /** upsert an intent-sourced lead (source 'intent'), deduped by profile url; returns its id */
-  upsertIntentLead(accountId: string, candidate: ProspectCandidate): Promise<{ leadId: string }>;
+  /** upsert an intent-sourced lead (source 'intent'), deduped by profile url; returns its id.
+   *  When the candidate passed a specific ICP's rules gate, persist that icpId on insert. */
+  upsertIntentLead(accountId: string, candidate: ProspectCandidate, icpId?: string): Promise<{ leadId: string }>;
   markRulesGate(leadId: string, result: RulesGateResult): Promise<void>;
   saveScore(leadId: string, insights: LeadInsights, qualified: boolean): Promise<void>;
   /** capture the "why now" intent signal on the lead — feeds Surface A's why-now chip */
@@ -264,8 +273,8 @@ export interface IntentScanDeps {
 }
 
 export interface IntentScanSummary {
-  status: "completed" | "skipped";
-  reason?: "no_connection" | "empty_watchlist";
+  status: "completed" | "skipped" | "failed";
+  reason?: "no_connection" | "empty_watchlist" | "all_targets_failed";
   /** watch targets this run attempted to read */
   targets: number;
   /** targets whose provider read FAILED (swallowed per-target so one bad read never sinks the
@@ -276,6 +285,8 @@ export interface IntentScanSummary {
   intent: number;
   qualified: number;
   chained: boolean;
+  rankMissed: number;
+  rankErrors: number;
 }
 
 export interface CopyConfig {

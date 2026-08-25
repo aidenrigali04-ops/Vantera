@@ -36,6 +36,7 @@ const baseLoad: RefreshLeadLoad = {
     location: "San Francisco, CA",
     title: "VP Sales",
   },
+  valueProp: null,
 };
 
 const fakeEnriched: EnrichedProspect = {
@@ -128,5 +129,21 @@ describe("runRefreshLead", () => {
     expect(enrichCalled).toBe(false);
     expect(rankCalled).toBe(false);
     expect(saveCalled).toBe(false);
+  });
+
+  it("passes the loaded valueProp into rank so a refresh uses the same seller bar as Scout", async () => {
+    const seen: RankContext[] = [];
+    const deps: RefreshLeadDeps = {
+      store: makeStore({ ...baseLoad, valueProp: "cut onboarding churn" }),
+      prospectData: { enrichProspects: async () => [fakeEnriched] },
+      rankFn: async (_cands, ctx) => {
+        seen.push(ctx);
+        return [makeInsight(LEAD_ID, 85)];
+      },
+    };
+
+    await runRefreshLead(ACCOUNT_ID, LEAD_ID, deps);
+
+    expect(seen[0]?.valueProp).toBe("cut onboarding churn");
   });
 });

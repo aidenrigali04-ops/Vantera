@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { findUngroundedClaims } from "./humanizer";
+import { findUngroundedClaims, findUngroundedEntities } from "./humanizer";
 
 // The 11x failure: a bot stated specific facts the prospect data never supported (fake
 // metrics, a fabricated customer claim) on live touches. This guardrail catches the most
@@ -51,5 +51,46 @@ describe("findUngroundedClaims", () => {
     const copy = "We lift reply rates 50% and 50% again — 50% is the floor.";
     const violations = findUngroundedClaims(copy, grounding);
     expect(violations.filter((v) => v.rule === "ungrounded-claim")).toHaveLength(1);
+  });
+});
+
+describe("findUngroundedEntities", () => {
+  it("flags an invented Series B not in the leadBlock", () => {
+    const grounding = "Pain points: slow onboarding\nTriggers: none";
+    const copy = "Congrats on the Series B — worth a look at how teams keep that capital working?";
+    const violations = findUngroundedEntities(copy, grounding);
+    expect(violations.map((v) => v.rule)).toContain("ungrounded-entity");
+    expect(violations.some((v) => /series b/i.test(v.detail))).toBe(true);
+  });
+
+  it("passes Series B when it is present in the leadBlock", () => {
+    const grounding = "Triggers: closed a $12M Series B last month";
+    const copy = "Congrats on the Series B — usually that's when onboarding starts to creak.";
+    expect(findUngroundedEntities(copy, grounding)).toEqual([]);
+  });
+
+  it("flags 'hired a new VP' when no hire trigger is in the grounding", () => {
+    const grounding = "Pain points: manual prospecting\nTriggers: none";
+    const copy = "Saw you hired a new VP — curious how you're ramping the team.";
+    const violations = findUngroundedEntities(copy, grounding);
+    expect(violations.map((v) => v.rule)).toContain("ungrounded-entity");
+  });
+
+  it("passes a hire clause that appears in the grounding", () => {
+    const grounding = "Triggers: hired a new VP of Sales";
+    const copy = "Saw you hired a new VP — that's usually when this conversation helps.";
+    expect(findUngroundedEntities(copy, grounding)).toEqual([]);
+  });
+
+  it("does not flag generic capitalized words (no NER)", () => {
+    const grounding = "Company: Harborline\nLocation: Austin";
+    const copy = "Austin teams at Harborline usually feel this around Q3.";
+    expect(findUngroundedEntities(copy, grounding)).toEqual([]);
+  });
+
+  it("does not flag 'raised a good point' without a funding clause", () => {
+    const grounding = "Pain points: messy handoffs";
+    const copy = "You raised a good point on handoffs — that's the exact gap.";
+    expect(findUngroundedEntities(copy, grounding)).toEqual([]);
   });
 });

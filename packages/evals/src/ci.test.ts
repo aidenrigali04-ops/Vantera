@@ -168,6 +168,8 @@ describe("orchestrate — wiring with injected fake run-fns (no real model/netwo
       runDeterministic: async () => ({ passRate: 1 }),
       runReplyFloors: async () => [PASSING_FLOOR],
       runIntentFloors: async () => [],
+      runIntentHardFloors: async () => [],
+      runRankFloors: async () => [],
       generateLiveCandidates: async () => [{ caseId: "c1", text: "draft", grounding: "g", cta: "book a call" }],
       runPairwise: async () => PASSING_PAIRWISE,
       scoreJudge: async () => ({ averageOverall: 4.5, n: 1 }),

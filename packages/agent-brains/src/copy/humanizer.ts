@@ -251,6 +251,45 @@ export function findUngroundedClaims(text: string, grounding: string): Violation
   return violations;
 }
 
+/**
+ * High-precision named-entity grounding: flags funding / hire / M&A clauses in `text` that are
+ * not present in `grounding`. Sibling of `findUngroundedClaims` (metrics). No generic
+ * Capitalized-word NER — only the patterns below, same spirit as company-event classification.
+ *
+ * Tokens: `series [a-f]`, `seed round`, `raised`/`raises` with round/seed/funding/$, `acquired` /
+ * `acquires` / `acquisition`, `hired a new (ceo|cfo|cto|coo|vp|chief)`.
+ */
+const ENTITY_PATTERNS: readonly RegExp[] = [
+  /\bseries\s+[a-f]\b/gi,
+  /\bseed round\b/gi,
+  /\b(?:raised|raises)\b.{0,40}\b(?:round|seed|funding)\b/gi,
+  /\b(?:raised|raises)\s+\$/gi,
+  /\b(?:acquired|acquires|acquisition)\b/gi,
+  /\bhired a new (?:ceo|cfo|cto|coo|vp|chief)\b/gi,
+];
+
+export function findUngroundedEntities(text: string, grounding: string): Violation[] {
+  const groundNorm = normalizeClaim(grounding);
+  const seen = new Set<string>();
+  const violations: Violation[] = [];
+  for (const pattern of ENTITY_PATTERNS) {
+    const re = new RegExp(pattern.source, pattern.flags);
+    for (const match of text.match(re) ?? []) {
+      const token = match.trim();
+      const key = normalizeClaim(token);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      if (!groundNorm.includes(key)) {
+        violations.push({
+          rule: "ungrounded-entity",
+          detail: `"${token}" is not supported by the prospect's data`,
+        });
+      }
+    }
+  }
+  return violations;
+}
+
 // Completed platform actions the agent physically cannot perform — sending messages is its
 // only capability. "Just joined your group" shipped to a real prospect on 2026-07-08; a
 // fabricated action is the same trust-killer as a fabricated metric (report pain point #6).
