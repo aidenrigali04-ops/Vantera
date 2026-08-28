@@ -6,9 +6,18 @@ import { login, type AuthFormState } from "../actions";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FormError } from "@/components/form-error";
-import { AuthHeading, CtaArrow, FIELD, SubmitButton } from "../auth-ui";
+import { AuthHeading, AuthDivider, CtaArrow, FIELD, SubmitButton } from "../auth-ui";
+import { GoogleAuthForm } from "../google-auth-form";
 
-export function LoginForm({ linkExpired, next }: { linkExpired: boolean; next?: string }) {
+export function LoginForm({
+  linkExpired,
+  next,
+  queryError,
+}: {
+  linkExpired: boolean;
+  next?: string;
+  queryError?: string;
+}) {
   const [state, action, pending] = useActionState<AuthFormState, FormData>(login, {});
   return (
     <div className="flex flex-col gap-8">
@@ -17,12 +26,17 @@ export function LoginForm({ linkExpired, next }: { linkExpired: boolean; next?: 
         sub="Sign in to Vantera and pick your LinkedIn outreach up right where you left it."
       />
 
+      {linkExpired && (
+        <FormError message="That link expired or was already used. Sign in or request a new one." />
+      )}
+      {queryError && <FormError message={queryError} />}
+
+      <GoogleAuthForm next={next} />
+      <AuthDivider />
+
       <form action={action} className="flex flex-col gap-5">
         {/* R3: deep-link continuation (validated server-side) — invite links survive login. */}
         {next && <input type="hidden" name="next" value={next} />}
-        {linkExpired && (
-          <FormError message="That link expired or was already used. Sign in or request a new one." />
-        )}
         <div className="flex flex-col gap-2">
           <Label htmlFor="email" className="text-[13px] font-medium text-[var(--ink-2)]">Email</Label>
           <Input id="email" name="email" type="email" autoComplete="email" placeholder="you@company.com" className={FIELD} required />

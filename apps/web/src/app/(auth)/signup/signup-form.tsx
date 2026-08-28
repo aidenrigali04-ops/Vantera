@@ -7,12 +7,14 @@ import { signup, type AuthFormState } from "../actions";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FormError } from "@/components/form-error";
-import { AuthHeading, CtaArrow, FIELD, SubmitButton } from "../auth-ui";
+import { AuthHeading, AuthDivider, CtaArrow, FIELD, SubmitButton } from "../auth-ui";
+import { GoogleAuthForm } from "../google-auth-form";
 
 export function SignupForm({
   initialSite,
   invite,
   inviteDead = false,
+  queryError,
 }: {
   /** The URL a visitor typed on the landing page (`?site=`) — carried into onboarding. */
   initialSite?: string;
@@ -20,6 +22,7 @@ export function SignupForm({
   invite?: { token: string; email: string; workspaceName: string };
   /** the URL carried an invite token that is expired/used/unknown */
   inviteDead?: boolean;
+  queryError?: string;
 }) {
   // No confirmation-email interstitial: signup signs the user in and redirects
   // straight to onboarding (see the signup action).
@@ -58,6 +61,8 @@ export function SignupForm({
         </div>
       )}
 
+      {queryError && <FormError message={queryError} />}
+
       {siteHost && !invite && (
         <div className="-mt-3 flex items-start gap-2.5 rounded-[12px] border border-[var(--hairline)] bg-[var(--tint)] px-4 py-3 text-[13px] leading-snug text-[var(--ink-2)]">
           <Sparkles className="mt-0.5 size-4 shrink-0 text-[var(--fb-strong)]" aria-hidden />
@@ -67,6 +72,16 @@ export function SignupForm({
           </span>
         </div>
       )}
+
+      <div className="flex flex-col gap-3">
+        <GoogleAuthForm site={site || undefined} inviteToken={invite?.token} />
+        {invite && (
+          <p className="text-[12px] text-[var(--ink-4)]">
+            Continue with Google using {invite.email} — the invite is bound to that address.
+          </p>
+        )}
+      </div>
+      <AuthDivider />
 
       <form action={action} className="flex flex-col gap-5">
         {site && <input type="hidden" name="site" value={site} />}
