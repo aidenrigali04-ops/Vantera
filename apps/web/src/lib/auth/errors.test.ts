@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { friendlyAuthError } from "./errors";
+import { authQueryMessage, friendlyAuthError } from "./errors";
 
 describe("friendlyAuthError", () => {
   it("maps known Supabase auth errors", () => {
@@ -27,9 +27,25 @@ describe("friendlyAuthError", () => {
     );
   });
 
+  it("maps a disabled Google provider to a usable next step", () => {
+    expect(friendlyAuthError("Unsupported provider: provider is not enabled")).toBe(
+      "Google sign-in isn't available yet. Use email and password."
+    );
+  });
+
   it("falls back to a generic message", () => {
     expect(friendlyAuthError("weird internal thing")).toBe(
       "Something went wrong. Please try again."
     );
+  });
+});
+
+describe("authQueryMessage", () => {
+  it("explains OAuth and invite-email failures from the callback", () => {
+    expect(authQueryMessage("oauth")).toBe(
+      "Google sign-in didn't complete. Try again, or use email and password."
+    );
+    expect(authQueryMessage("invite-email")).toMatch(/doesn't match the invited email/i);
+    expect(authQueryMessage("link-expired")).toBeUndefined();
   });
 });

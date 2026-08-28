@@ -5,13 +5,14 @@ import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { friendlyAuthError } from "@/lib/auth/errors";
+import { startGoogleOAuth } from "@/lib/auth/oauth-start";
 import { safeNext } from "@/lib/auth/safe-next";
 import { validateMemberSignup, validateSignup } from "@/lib/validation";
 import { sendWelcomeEmail } from "@vantera/transactional-email";
 import { siteUrl } from "@/lib/site-url";
 import { recordSecurityEvent } from "@/lib/security/audit";
 
-export type AuthFormState = { error?: string; sent?: boolean };
+export type AuthFormState = { error?: string; sent?: boolean; url?: string };
 
 export async function login(_prev: AuthFormState, formData: FormData): Promise<AuthFormState> {
   const email = String(formData.get("email") ?? "").trim();
@@ -36,6 +37,25 @@ export async function login(_prev: AuthFormState, formData: FormData): Promise<A
   // R3: honor a validated same-origin ?next= (deep links, invite acceptance) — the login
   // action swallowing `next` was silently dead-ending every logged-out invite click.
   redirect(safeNext(formData.get("next")) ?? "/dashboard"); // app gate forwards to /onboarding if incomplete
+}
+
+/**
+ * PKCE Google sign-in / sign-up. Returns the provider URL so the client can navigate
+ * after this action's Set-Cookie (the code verifier) has been committed. A server
+ * `redirect()` to Google can drop that cookie and the callback then fails with no session.
+ */
+export async function signInWithGoogle(
+  _prev: AuthFormState,
+  formData: FormData
+): Promise<AuthFormState> {
+  const supabase = await createClient();
+  const result = await startGoogleOAuth(supabase, {
+    next: formData.get("next"),
+    site: formData.get("site"),
+    invite: formData.get("inviteToken"),
+  });
+  if ("error" in result) return { error: result.error };
+  return { url: result.url };
 }
 
 /** R3: signup THROUGH a team invite — the invitee joins the inviting workspace instead of
