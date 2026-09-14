@@ -17,8 +17,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@trigger.dev/sdk": "^4.0.0",
-    "@supabase/supabase-js": "^2.108.2",
+    "@trigger.dev/sdk": "^4.5.16",
+    "@supabase/supabase-js": "^2.116.0",
     "@vantera/agent-brains": "workspace:*",
     "@vantera/ai": "workspace:*",
     "@vantera/billing": "workspace:*",
@@ -30,7 +30,7 @@
     "drizzle-orm": "^0.45.0"
   },
   "devDependencies": {
-    "trigger.dev": "^4.0.0",
+    "trigger.dev": "^4.5.16",
     "typescript": "^5.8.0",
     "vitest": "^4.1.9"
   }
