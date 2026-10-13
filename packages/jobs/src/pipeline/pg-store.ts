@@ -1047,6 +1047,20 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
       return typeof v === "number" && Number.isFinite(v) && v > 0 ? v : 1;
     },
 
+    async countFirstTouchDraftsSince(accountId, since) {
+      const [row] = await db
+        .select({ n: sql<number>`count(*)::int` })
+        .from(scheduledSends)
+        .where(
+          and(
+            eq(scheduledSends.accountId, accountId),
+            eq(scheduledSends.linkedinStage, "invite"),
+            gte(scheduledSends.createdAt, since)
+          )
+        );
+      return row?.n ?? 0;
+    },
+
     async getMessageShapeAuto() {
       // Global rollout knob (message-shape selector, spec 2026-07-20) — same appSettings/eq pattern
       // as getBestOfN/getAdoptionMode. OFF (byte-identical champion) whenever the row is absent OR

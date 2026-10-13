@@ -11,6 +11,11 @@ import type {
 import { LINKEDIN_SYSTEM, leadBlock, type CopyStrategy, type DraftInput, type JudgeFn } from "@vantera/agent-brains";
 import { getModelId } from "@vantera/ai";
 
+function scored(id: string, score: number): DraftableLead {
+  const row = lead(id);
+  return { ...row, aiInsights: { ...row.aiInsights!, score } };
+}
+
 function lead(id: string, overrides: Partial<DraftableLead> = {}): DraftableLead {
   return {
     id,
@@ -114,6 +119,10 @@ class FakeCopyStore implements CopyDraftStore {
   // solely to satisfy CopyDraftStore; no test below depends on its value.
   async getBestOfN() {
     return 1;
+  }
+  firstTouchDraftsToday = 0;
+  async countFirstTouchDraftsSince() {
+    return this.firstTouchDraftsToday;
   }
   // Message-shape selector: only the thin trigger reads this (the core reads deps.messageShapeAuto
   // directly) — present solely to satisfy CopyDraftStore.
@@ -864,5 +873,53 @@ describe("runCopyDraft — best-of-N (Task 3, off by default)", () => {
       expect(send.styleFlags).toBeNull();
     }
     expect(store.sends.find((s) => s.linkedinStage === "message")?.body).toBe("fixed follow");
+  });
+});
+
+const CLEAN = { connectionNote: "note", followupMessage: "follow", violations: [] as [] };
+
+describe("runCopyDraft — daily first-touch cap", () => {
+  it("drafts at most 15 first touches and leaves the rest unqualified-for-today only", async () => {
+    const store = new FakeCopyStore();
+    store.firstTouchDraftsToday = 14;
+    for (const id of ["a", "b", "c"]) store.leads.push(lead(id));
+    const draftLinkedInFn = vi.fn(async () => CLEAN);
+    const summary = await runCopyDraft(
+      { copyAgentId: "copy1", accountId: "acc1", leadIds: ["a", "b", "c"] },
+      { store, draftLinkedInFn }
+    );
+    expect(draftLinkedInFn).toHaveBeenCalledTimes(1);
+    expect(summary).toMatchObject({ drafted: 1, deferred: 2, skipped: 0 });
+    const draftedIds = new Set(store.sends.map((s) => s.leadId));
+    expect(draftedIds.size).toBe(1);
+    for (const id of ["a", "b", "c"]) {
+      if (!draftedIds.has(id)) expect(store.campaignLeads.has(id)).toBe(false);
+    }
+  });
+
+  it("does not call the model when 15 invites were already drafted today", async () => {
+    const store = new FakeCopyStore();
+    store.firstTouchDraftsToday = 15;
+    store.leads.push(lead("a"));
+    const draftLinkedInFn = vi.fn(async () => CLEAN);
+    const summary = await runCopyDraft(
+      { copyAgentId: "copy1", accountId: "acc1", leadIds: ["a"] },
+      { store, draftLinkedInFn }
+    );
+    expect(draftLinkedInFn).not.toHaveBeenCalled();
+    expect(summary).toMatchObject({ drafted: 0, deferred: 1, skipped: 0 });
+    expect(store.campaignLeads.has("a")).toBe(false);
+  });
+
+  it("spends the last slot on the higher score", async () => {
+    const store = new FakeCopyStore();
+    store.firstTouchDraftsToday = 14;
+    store.leads.push(scored("low", 71), scored("high", 96));
+    const draftLinkedInFn = vi.fn(async () => CLEAN);
+    await runCopyDraft(
+      { copyAgentId: "copy1", accountId: "acc1", leadIds: ["low", "high"] },
+      { store, draftLinkedInFn }
+    );
+    expect(store.sends.map((s) => s.leadId)).toEqual(["high", "high"]);
   });
 });

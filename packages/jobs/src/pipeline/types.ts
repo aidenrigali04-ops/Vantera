@@ -402,6 +402,11 @@ export interface CopyDraftStore {
    * as getBestOfN/getAdoptionMode.
    */
   getMessageShapeAuto(): Promise<boolean>;
+  /**
+   * Invite rows created since `since` for this account. Sequence messages and inbound replies
+   * use linkedin_stage "message" and do not count. The daily first-touch cap reads this.
+   */
+  countFirstTouchDraftsSince(accountId: string, since: Date): Promise<number>;
 }
 
 /** A running experiment as the copy-draft pipeline needs it: id, split, and the challenger strategy. */
@@ -682,6 +687,8 @@ export interface CopyDraftSummary {
   drafted: number;
   suppressed: number;
   skipped: number;
+  /** Qualified leads left undrafted because the daily first-touch cap was full. Not skipped. */
+  deferred: number;
 }
 
 export interface SendContext {
