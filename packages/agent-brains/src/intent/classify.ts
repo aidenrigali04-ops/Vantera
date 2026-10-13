@@ -1,6 +1,6 @@
 import { generateObject, type LanguageModel } from "ai";
 import { z } from "zod";
-import { getModel, registerPrompt } from "@vantera/ai";
+import { getClassifierModel, registerPrompt } from "@vantera/ai";
 import { stripLoneSurrogates } from "../text";
 
 // Permissive schema (validate loose, normalize strict — see prospect/rank). The model returns
@@ -131,7 +131,7 @@ async function classifyBatch(
 export async function classifyIntent(
   observations: IntentObservationInput[],
   ctx: IntentContext,
-  model: LanguageModel = getModel()
+  model: LanguageModel = getClassifierModel()
 ): Promise<IntentVerdict[]> {
   const results: IntentVerdict[] = [];
   for (const o of observations) {

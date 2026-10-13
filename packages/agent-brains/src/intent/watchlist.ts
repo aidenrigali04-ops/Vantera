@@ -1,6 +1,6 @@
 import { generateObject, type LanguageModel } from "ai";
 import { z } from "zod";
-import { getModel, registerPrompt } from "@vantera/ai";
+import { getClassifierModel, registerPrompt } from "@vantera/ai";
 
 // Permissive schema (validate loose, normalize strict in code — same pattern as rank/classify).
 export const watchlistSchema = z.object({
@@ -65,7 +65,7 @@ function clean(list: unknown, max: number, stripHash = false): string[] {
  */
 export async function deriveIntentWatchlist(
   ctx: WatchlistContext,
-  model: LanguageModel = getModel()
+  model: LanguageModel = getClassifierModel()
 ): Promise<IntentWatchlist> {
   let raw: IntentWatchlist;
   try {

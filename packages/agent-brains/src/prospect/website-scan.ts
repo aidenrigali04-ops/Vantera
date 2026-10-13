@@ -1,6 +1,6 @@
 import { generateObject, type LanguageModel } from "ai";
 import { z } from "zod";
-import { getModel, registerPrompt } from "@vantera/ai";
+import { getClassifierModel, registerPrompt } from "@vantera/ai";
 import { assertPublicHttpUrl, createGuardedFetch } from "./url-guard";
 
 // Shape only — NO hard length/count caps here. Anthropic structured output treats
@@ -185,7 +185,7 @@ export async function scanWebsite(
     throw new Error("website returned no readable text");
   }
   const { object } = await generateObject({
-    model: options.model ?? getModel(),
+    model: options.model ?? getClassifierModel(),
     schema: websiteScanSchema,
     system: SCAN_SYSTEM.text,
     prompt: `Homepage text of ${url}:\n\n${text}`,

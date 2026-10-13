@@ -1,5 +1,5 @@
 import { generateObject, type LanguageModel } from "ai";
-import { getModel, registerPrompt } from "@vantera/ai";
+import { getClassifierModel, registerPrompt } from "@vantera/ai";
 import type { ProspectSignal } from "@vantera/prospect-data";
 import { normalizeInsights, rankBatchSchema, type LeadInsights } from "./schema";
 import { stripLoneSurrogates } from "../text";
@@ -151,7 +151,7 @@ const RANK_CONCURRENCY = 3;
 export async function rankLeads(
   candidates: RankCandidate[],
   ctx: RankContext,
-  model: LanguageModel = getModel()
+  model: LanguageModel = getClassifierModel()
 ): Promise<LeadInsights[]> {
   const batches: RankCandidate[][] = [];
   for (let i = 0; i < candidates.length; i += RANK_BATCH_SIZE) {
