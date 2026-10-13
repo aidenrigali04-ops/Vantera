@@ -1,5 +1,5 @@
 import { generateObject } from "ai";
-import { getModel } from "@vantera/ai";
+import { getPublicModel } from "@vantera/ai";
 import { getLiveTool } from "@/lib/tools/registry";
 import { TOOL_PROMPTS } from "@/lib/tools/prompts";
 import { schemaFor, OUTPUT_MAX_TOKENS } from "@/lib/tools/schemas";
@@ -12,10 +12,9 @@ export const runtime = "nodejs";
  * Public, unauthenticated AI endpoint powering the free LinkedIn tools. No session, no DB
  * — stateless generation only. Abuse is bounded by: per-IP burst + daily rate limits,
  * per-field + total input caps (validateToolInput), a small output-token budget, and a
- * cheap model. Every send-path guardrail elsewhere in the app is irrelevant here: nothing
- * this route produces reaches a prospect.
+ * cheap model billed through the Vercel AI Gateway (`getPublicModel`), isolated from the
+ * product brains' Anthropic console credits. Nothing this route produces reaches a prospect.
  */
-const TOOLS_MODEL = process.env.TOOLS_AI_MODEL ?? "claude-haiku-4-5-20251001";
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -57,7 +56,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
 
   try {
     const { object } = await generateObject({
-      model: getModel(TOOLS_MODEL),
+      model: getPublicModel(),
       schema: schemaFor(tool.output),
       system,
       prompt,
