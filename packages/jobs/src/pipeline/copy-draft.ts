@@ -27,9 +27,26 @@ export function utcDayStart(now: Date): Date {
 }
 
 function scoreOf(lead: DraftableLead): number {
-  const insights = lead.aiInsights as ({ score?: unknown } & object) | null;
-  const score = insights && "score" in insights ? Number(insights.score) : 0;
+  const score = Number(lead.aiScore);
   return Number.isFinite(score) ? score : 0;
+}
+
+/** A lead holds a first-touch slot only when this run will insert an invite. */
+async function holdsFirstTouchSlot(
+  lead: DraftableLead,
+  ctx: CopyContext,
+  channels: CopyContext["agent"]["config"]["channels"],
+  accountId: string,
+  store: CopyDraftDeps["store"]
+): Promise<boolean> {
+  if (!toDraftInput(lead, ctx)) return false;
+  if (!channels.linkedin || !lead.linkedinUrl) return false;
+  const suppressed = await store.isSuppressed(
+    accountId,
+    "linkedin",
+    normalizeLinkedInUrl(lead.linkedinUrl)
+  );
+  return !suppressed;
 }
 
 /** linkedin suppression values are normalized profile URLs (rule 11: value = lower(value)) */
@@ -119,19 +136,29 @@ export async function runCopyDraft(
   const alreadyDrafted = await deps.store.leadsWithExistingSends(accountId, payload.leadIds);
   const fresh = leads.filter((lead) => !alreadyDrafted.has(lead.id));
   const used = await deps.store.countFirstTouchDraftsSince(accountId, utcDayStart(new Date()));
-  const remaining = Math.max(0, DAILY_FIRST_TOUCH_DRAFT_CAP - used);
+  let slots = Math.max(0, DAILY_FIRST_TOUCH_DRAFT_CAP - used);
   const ranked = [...fresh].sort((a, b) => scoreOf(b) - scoreOf(a));
-  const room = ranked.slice(0, remaining);
-  const deferred = ranked.length - room.length;
+  const room: DraftableLead[] = [];
+  let deferred = 0;
+  for (const lead of ranked) {
+    if (!(await holdsFirstTouchSlot(lead, ctx, channels, accountId, deps.store))) {
+      room.push(lead);
+      continue;
+    }
+    if (slots <= 0) {
+      deferred += 1;
+      continue;
+    }
+    slots -= 1;
+    room.push(lead);
+  }
 
   type Outcome = { drafted: number; suppressed: number; skipped: number };
-  const ZERO: Outcome = { drafted: 0, suppressed: 0, skipped: 0 };
 
   // Bounded concurrency: the per-lead LLM draft + writes used to run one lead at a time, so
   // wall-clock was N x draft latency. Drafting is the gate between "qualified" and "sendable",
   // so its throughput is the account's outreach volume. DRAFT_CONCURRENCY caps in-flight drafts.
   const outcomes = await mapWithConcurrency(room, DRAFT_CONCURRENCY, async (lead): Promise<Outcome> => {
-    if (alreadyDrafted.has(lead.id)) return ZERO;
     // Deterministic, sticky per-lead arm assignment; strategy is the challenger's or the champion.
     const variant = experiment ? assignVariant(experiment, lead.id) : null;
     let strategy = variant === "challenger" ? experiment!.challengerStrategy : champion.strategy;

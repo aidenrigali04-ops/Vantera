@@ -12,8 +12,7 @@ import { LINKEDIN_SYSTEM, leadBlock, type CopyStrategy, type DraftInput, type Ju
 import { getModelId } from "@vantera/ai";
 
 function scored(id: string, score: number): DraftableLead {
-  const row = lead(id);
-  return { ...row, aiInsights: { ...row.aiInsights!, score } };
+  return lead(id, { aiScore: score });
 }
 
 function lead(id: string, overrides: Partial<DraftableLead> = {}): DraftableLead {
@@ -36,6 +35,7 @@ function lead(id: string, overrides: Partial<DraftableLead> = {}): DraftableLead
       summary: "fit",
     },
     scoredAt: null,
+    aiScore: null,
     ...overrides,
   };
 }
@@ -921,5 +921,21 @@ describe("runCopyDraft — daily first-touch cap", () => {
       { store, draftLinkedInFn }
     );
     expect(store.sends.map((s) => s.leadId)).toEqual(["high", "high"]);
+  });
+
+  it("does not spend the last slot on a suppressed higher score", async () => {
+    const store = new FakeCopyStore();
+    store.firstTouchDraftsToday = 14;
+    store.leads.push(scored("low", 71), scored("high", 96));
+    store.suppressedValues.add("linkedin:https://linkedin.com/in/high");
+    const draftLinkedInFn = vi.fn(async () => CLEAN);
+    await runCopyDraft(
+      { copyAgentId: "copy1", accountId: "acc1", leadIds: ["low", "high"] },
+      { store, draftLinkedInFn }
+    );
+    expect(draftLinkedInFn).toHaveBeenCalledTimes(1);
+    expect(store.sends.map((s) => s.leadId)).toEqual(["low", "low"]);
+    expect(store.campaignLeads.get("high")).toBe("suppressed");
+    expect(store.campaignLeads.has("low")).toBe(true);
   });
 });

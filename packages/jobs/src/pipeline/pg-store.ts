@@ -913,6 +913,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         linkedinUrl: r.linkedinUrl,
         phone: r.phone,
         aiInsights: r.aiInsights as DraftableLead["aiInsights"],
+        aiScore: r.aiScore,
         scoredAt: r.scoredAt,
       }));
     },
@@ -943,6 +944,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         linkedinUrl: r.linkedinUrl,
         phone: r.phone,
         aiInsights: r.aiInsights as DraftableLead["aiInsights"],
+        aiScore: r.aiScore,
         scoredAt: r.scoredAt,
       };
     },

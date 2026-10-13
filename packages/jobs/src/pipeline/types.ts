@@ -336,6 +336,8 @@ export interface DraftableLead {
   linkedinUrl: string | null;
   phone: string | null;
   aiInsights: StoredInsights | null;
+  /** leads.ai_score. Ranking for the daily draft cap. Not stored inside aiInsights. */
+  aiScore: number | null;
   /** when the lead was last AI-ranked; drives refresh-on-release before a delayed email touch */
   scoredAt: Date | null;
 }
