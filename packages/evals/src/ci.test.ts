@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, it, expect } from "vitest";
 import {
   decide,
@@ -240,5 +243,19 @@ describe("orchestrate — wiring with injected fake run-fns (no real model/netwo
     await orchestrate(deps, false);
     expect(seen.pairwise).toEqual([{ caseId: "shared", text: "t" }]);
     expect((seen.judge as { caseId: string }[])[0]?.caseId).toBe("shared");
+  });
+});
+
+describe("production model split", () => {
+  it("live evals score classifiers on getClassifierModel and drafts on getModel", () => {
+    const ci = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "ci.ts"), "utf8");
+    expect(ci).toContain("getClassifierModel()");
+    expect(ci).toContain("runReplyFloors(classifierModel)");
+    expect(ci).toContain("runIntentFloors(classifierModel)");
+    expect(ci).toContain("runIntentHardFloors(classifierModel)");
+    expect(ci).toContain("runRankFloors(classifierModel)");
+    expect(ci).toContain('runDeterministic("live", draftingModel)');
+    // orchestrate still calls deps.runReplyFloors(); only the production wiring must pass a model.
+    expect(ci).not.toMatch(/[^.]runReplyFloors\(\)/);
   });
 });

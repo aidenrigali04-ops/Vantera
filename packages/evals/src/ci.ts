@@ -1,7 +1,7 @@
 import { pathToFileURL } from "node:url";
 import type { LanguageModel } from "ai";
 import { draftLinkedIn, draftConversationMessage } from "@vantera/agent-brains";
-import { getModel } from "@vantera/ai";
+import { getClassifierModel, getModel } from "@vantera/ai";
 import { loadCopyLinkedinCorpus, loadCopyRespondCorpus } from "./corpus";
 import { runDeterministic } from "./run-deterministic";
 import { runReplyFloors, runIntentFloors, runIntentHardFloors, runRankFloors } from "./run-classifier";
@@ -282,6 +282,7 @@ export async function main(): Promise<number> {
   }
 
   const draftingModel = getModel();
+  const classifierModel = getClassifierModel();
   const judgeModel = getModel(JUDGE_MODEL_ID);
   const judgeGating = process.env.EVALS_JUDGE_GATING === "1";
 
@@ -293,10 +294,10 @@ export async function main(): Promise<number> {
         .map((r) => ({ caseId: r.caseId, rules: r.violations.map((v) => v.rule) }));
       return { passRate, failures };
     },
-    runReplyFloors: () => runReplyFloors(),
-    runIntentFloors: () => runIntentFloors(),
-    runIntentHardFloors: () => runIntentHardFloors(),
-    runRankFloors: () => runRankFloors(),
+    runReplyFloors: () => runReplyFloors(classifierModel),
+    runIntentFloors: () => runIntentFloors(classifierModel),
+    runIntentHardFloors: () => runIntentHardFloors(classifierModel),
+    runRankFloors: () => runRankFloors(classifierModel),
     generateLiveCandidates: () => generateLiveCandidates(draftingModel),
     runPairwise: (candidates) => runPairwise(candidates, judgeModel),
     scoreJudge: (candidates) => scoreJudge(candidates, judgeModel),

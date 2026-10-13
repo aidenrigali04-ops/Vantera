@@ -46,9 +46,7 @@ A live run generates every corpus case **twice**, not once: the deterministic ga
 `GradeResult`s, never the draft text), and the judge + pairwise layers need the actual draft text,
 so `ci.ts`'s `generateLiveCandidates` does a **second full-corpus generation pass** to produce
 candidates for them. Net: each case is drafted ~2x per invocation. At the current fixture volume
-(36 copy cases + the labeled classifier sets, plus one extra `rankLeads` pass and one extra hard-intent `classifyIntent` batch) this still lands around $2-5 per run, but budget for
-the doubling — it is the dominant cost driver at nightly cadence (factor it into the ~$50-100/mo
-eval budget; the classifier floors, rank floors, and the judge scoring calls are on top of the generation cost).
+(36 copy cases + the labeled classifier sets, plus one extra `rankLeads` pass and one extra hard-intent `classifyIntent` batch). Classifier floors run on `getClassifierModel()` (Haiku 4.5). The copy gate, pairwise drafts, and the judge stay on Sonnet 4.6 and Opus 4.8. That split is the production split. A green floor on Sonnet would not describe production. Budget stays about $2-5 per nightly run ($50-100/month) and is a platform cost, not part of the per-user $15 ceiling. The doubling is still the dominant cost driver at nightly cadence.
 
 **Named follow-up (not built): the single-shared-pass optimization.** Have `runDeterministic`
 optionally return the draft text (or add a `generateAndGrade` variant) so the judge + pairwise

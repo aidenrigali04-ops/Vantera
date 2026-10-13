@@ -12,7 +12,7 @@ import {
   type RankCandidate,
   type RankContext,
 } from "@vantera/agent-brains";
-import { getModel } from "@vantera/ai";
+import { getClassifierModel } from "@vantera/ai";
 import { recall, precision, type FloorReport } from "./graders/classifier";
 
 /**
@@ -130,7 +130,7 @@ export function offeringDirectionMatches(offering: string, expected: "buyer" | "
  * purposes (it's counted exactly like a model-derived one), since a labeled unsubscribe/OOO case
  * is still a fixture entry the classifier as a whole must get right.
  */
-export async function runReplyFloors(model: LanguageModel = getModel()): Promise<FloorReport[]> {
+export async function runReplyFloors(model: LanguageModel = getClassifierModel()): Promise<FloorReport[]> {
   const labels = loadReplyLabels();
   const preds: string[] = [];
   for (const label of labels) {
@@ -158,7 +158,7 @@ export async function runReplyFloors(model: LanguageModel = getModel()): Promise
  * intent-recall and intent-precision of the normalized `is_intent` boolean (already coupled to
  * `level ∈ {high, medium}` by `normalizeVerdict`) against `expectedIsIntent`.
  */
-export async function runIntentFloors(model: LanguageModel = getModel()): Promise<FloorReport[]> {
+export async function runIntentFloors(model: LanguageModel = getClassifierModel()): Promise<FloorReport[]> {
   const labels = loadIntentLabels();
 
   const groups = new Map<string, { ctx: IntentContext; labels: IntentLabel[] }>();
@@ -244,7 +244,7 @@ async function classifyLabeledIntent(
  * on-topic posts with no buying language. Do not mix into the 24 clear-cut `classify-intent` rows.
  * Empty-text reactions take the deterministic `none` path (no model call).
  */
-export async function runIntentHardFloors(model: LanguageModel = getModel()): Promise<FloorReport[]> {
+export async function runIntentHardFloors(model: LanguageModel = getClassifierModel()): Promise<FloorReport[]> {
   const labels = loadIntentHardLabels();
   const { preds, expected } = await classifyLabeledIntent(labels, model);
   const positiveCount = expected.filter(Boolean).length;
@@ -281,7 +281,7 @@ export async function runIntentHardFloors(model: LanguageModel = getModel()): Pr
  * Rank floors over the labeled `rank-leads` set. Calls production `rankLeads` grouped by seller
  * context. Qualify uses score >= RANK_QUALIFY_MIN (70). Direction uses `offeringDirectionMatches`.
  */
-export async function runRankFloors(model: LanguageModel = getModel()): Promise<FloorReport[]> {
+export async function runRankFloors(model: LanguageModel = getClassifierModel()): Promise<FloorReport[]> {
   const labels = loadRankLabels();
 
   const groups = new Map<string, { ctx: RankContext; labels: RankLabel[] }>();
