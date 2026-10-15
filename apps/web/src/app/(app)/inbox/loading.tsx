@@ -3,7 +3,7 @@ import { HeaderSkeleton, Skeleton } from "@/components/ui/skeleton";
 /** R1a: inbox shape — header, thread list + thread pane. */
 export default function Loading() {
   return (
-    <div className="mx-auto flex w-full max-w-[1560px] flex-col gap-5">
+    <div className="mx-auto flex w-full min-w-0 max-w-[1400px] flex-col gap-5">
       <HeaderSkeleton />
       <div className="grid gap-5 lg:grid-cols-[340px_1fr]">
         <div className="space-y-2 rounded-xl border border-[var(--hairline)] p-3">

@@ -162,7 +162,7 @@ export default async function LeadsPage({
     // with a guard so ultrawide monitors don't stretch rows past scannability.
     // One-screen on desktop (same contract as the lead brief): the PAGE never scrolls —
     // header/tabs/toolbar/pagination stay pinned, the table body scrolls internally.
-    <div className="mx-auto flex w-full max-w-[1680px] flex-col lg:h-[calc(100dvh-3rem)]">
+    <div className="mx-auto flex w-full min-w-0 max-w-[1400px] flex-col lg:min-h-0 lg:flex-1">
       <div className="mb-6 flex shrink-0 flex-wrap items-end justify-between gap-3 border-b border-[var(--hairline)] pb-5">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Prospects</h1>

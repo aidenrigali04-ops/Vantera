@@ -6,7 +6,6 @@ import {
 } from "@vantera/billing";
 import { LandingNav } from "@/components/landing/nav";
 import { Hero } from "@/components/landing/hero";
-import { TrustStrip } from "@/components/landing/trust-strip";
 import { HowItWorks } from "@/components/landing/how-it-works";
 import { ApprovalGate } from "@/components/landing/approval-gate";
 import { Safety } from "@/components/landing/safety";
@@ -54,7 +53,6 @@ export default function Home() {
         {/* Hero + social proof are one above-the-fold screen on lg+. */}
         <div className="lg:flex lg:min-h-[100svh] lg:flex-col">
           <Hero />
-          <TrustStrip />
         </div>
         {/* Below the fold: the blueprint's intent map — each section answers the
             visitor's next question, in the order they ask it (S0 → S10). */}

@@ -81,7 +81,7 @@ export default async function InboxPage({
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-[1560px] flex-col gap-5 lg:h-[calc(100dvh-3rem)]">
+    <div className="mx-auto flex w-full min-w-0 max-w-[1400px] flex-col gap-5 lg:min-h-0 lg:flex-1">
       <header className="shrink-0 border-b border-[var(--hairline)] pb-4">
         <h1 className="text-2xl font-semibold tracking-tight text-foreground">Inbox</h1>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -140,11 +140,11 @@ export default async function InboxPage({
           )}
         </div>
       ) : (
-        <div className="grid min-h-0 flex-1 gap-5 lg:grid-cols-[340px_1fr]">
+        <div className="grid min-h-0 min-w-0 flex-1 gap-5 lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)]">
           {/* Thread list — on phones it hides once a thread is explicitly open. */}
           <div
             className={cn(
-              "min-h-0 overflow-y-auto rounded-xl border border-[var(--hairline)] bg-white/60",
+              "min-h-0 min-w-0 overflow-y-auto rounded-xl border border-[var(--hairline)] bg-white/60",
               hasLeadParam && "hidden lg:block"
             )}
           >
@@ -194,7 +194,7 @@ export default async function InboxPage({
           {/* Thread + composer — on phones it renders only when a thread is explicitly open. */}
           <div
             className={cn(
-              "flex min-h-0 flex-col rounded-xl border border-[var(--hairline)] bg-white/60",
+              "flex min-h-0 min-w-0 flex-col rounded-xl border border-[var(--hairline)] bg-white/60",
               !hasLeadParam && "hidden lg:flex"
             )}
           >

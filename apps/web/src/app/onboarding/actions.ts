@@ -233,13 +233,17 @@ export async function finishOnboarding(): Promise<{ error?: string } | never> {
 
   const { data: account } = await supabase
     .from("accounts")
-    .select("id, onboarding_icp, onboarding_industry, website_scan, stripe_subscription_id, onboarding_completed_at")
+    .select(
+      "id, onboarding_icp, onboarding_industry, website_scan, value_prop, brand_voice, stripe_subscription_id, onboarding_completed_at"
+    )
     .limit(1)
     .maybeSingle<{
       id: string;
       onboarding_icp: string | null;
       onboarding_industry: string | null;
       website_scan: { summary?: string; offerings?: string[]; value_props?: string[] } | null;
+      value_prop: string | null;
+      brand_voice: string | null;
       stripe_subscription_id: string | null;
       onboarding_completed_at: string | null;
     }>();
@@ -343,8 +347,12 @@ export async function finishOnboarding(): Promise<{ error?: string } | never> {
         : "";
       const watch = await deriveIntentWatchlist({
         industry: account.onboarding_industry,
-        offering: offering || icp.name,
+        offering: offering || account.value_prop || icp.name,
+        offerings: scan?.offerings,
+        valueProp: account.value_prop || scan?.value_props?.[0],
+        brand: account.brand_voice,
         icp: icp.name,
+        icpNames: [icp.name],
       });
       if (watch.keywords.length || watch.competitors.length || watch.hashtags.length) {
         await supabase.from("agents").insert({

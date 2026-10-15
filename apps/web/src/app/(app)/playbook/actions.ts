@@ -245,8 +245,8 @@ export async function deployIntentAgent(
 
 /**
  * Suggest an Intent Agent watchlist (keywords / hashtags / competitor names) from what we already
- * know about the seller — industry + website scan + ICP — so setup needs no hunting for profiles or
- * URLs. RLS-scoped read (rule 02); the brain fails open to empty so the wizard always works manually.
+ * know about the seller — website scan, brand, and ICP — so setup needs no hunting for profiles or
+ * URLs. RLS-scoped read (rule 02). The wizard can still add or remove any category.
  */
 export async function suggestIntentWatchlist(): Promise<{
   keywords: string[];
@@ -262,14 +262,25 @@ export async function suggestIntentWatchlist(): Promise<{
 
   const { data: account } = await supabase
     .from("accounts")
-    .select("onboarding_industry, onboarding_icp, website_scan")
+    .select("onboarding_industry, onboarding_icp, website_scan, value_prop, brand_voice")
     .limit(1)
     .maybeSingle<{
       onboarding_industry: string | null;
       onboarding_icp: string | null;
       website_scan: { summary?: string; offerings?: string[]; value_props?: string[] } | null;
+      value_prop: string | null;
+      brand_voice: string | null;
     }>();
   if (!account) return empty;
+
+  const { data: icpRows } = await supabase.from("icps").select("name").limit(8);
+  const icpNames = [
+    ...new Set(
+      [account.onboarding_icp, ...(icpRows ?? []).map((row) => row.name)]
+        .map((name) => name?.trim())
+        .filter((name): name is string => Boolean(name))
+    ),
+  ];
 
   const scan = account.website_scan;
   const offering = scan
@@ -284,8 +295,12 @@ export async function suggestIntentWatchlist(): Promise<{
 
   return deriveIntentWatchlist({
     industry: account.onboarding_industry,
-    offering: offering || account.onboarding_icp,
-    icp: account.onboarding_icp,
+    offering: offering || account.value_prop || icpNames[0],
+    offerings: scan?.offerings,
+    valueProp: account.value_prop || scan?.value_props?.[0],
+    brand: account.brand_voice,
+    icp: icpNames.join("; ") || account.onboarding_icp,
+    icpNames,
   });
 }
 

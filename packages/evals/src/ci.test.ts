@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { describe, it, expect } from "vitest";
 import {
   decide,
+  isAnthropicCreditError,
   orchestrate,
   shouldSkipLiveEvals,
   JUDGE_OVERALL_GATE_FLOOR,
@@ -162,6 +163,25 @@ describe("shouldSkipLiveEvals", () => {
   });
   it("false when ANTHROPIC_API_KEY is present", () => {
     expect(shouldSkipLiveEvals({ ANTHROPIC_API_KEY: "sk-ant-test" })).toBe(false);
+  });
+});
+
+describe("isAnthropicCreditError", () => {
+  it("matches Anthropic's empty-wallet sentence", () => {
+    expect(
+      isAnthropicCreditError(
+        new Error("Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.")
+      )
+    ).toBe(true);
+  });
+
+  it("matches the same sentence when the SDK wraps it in cause", () => {
+    expect(isAnthropicCreditError(new Error("provider failed", { cause: new Error("insufficient credits") }))).toBe(true);
+  });
+
+  it("does not match a quality miss or a generic provider failure", () => {
+    expect(isAnthropicCreditError(new Error("deterministic copy gate (HARD): passRate 0.500 < floor 0.9"))).toBe(false);
+    expect(isAnthropicCreditError(new Error("fetch failed"))).toBe(false);
   });
 });
 

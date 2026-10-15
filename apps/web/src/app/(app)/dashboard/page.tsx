@@ -39,7 +39,7 @@ export default async function DashboardPage({
   return (
     // One-screen on desktop: the tabs bar stays pinned and the PAGE never scrolls —
     // the active view scrolls inside its own region only when its content overflows.
-    <div className="flex flex-col lg:h-[calc(100dvh-3rem)]">
+    <div className="mx-auto flex w-full min-w-0 max-w-[1400px] flex-col lg:min-h-0 lg:flex-1">
       <ResultsTabsBar active={view} />
       <div className="min-h-0 flex-1 lg:overflow-y-auto">
         {view === "analytics" ? (

@@ -34,6 +34,12 @@ evals never executed must be visually distinguishable (the `::warning` annotatio
 where they executed and passed — this is what keeps GATE 1 from being accidentally declared "green"
 by a PR that simply never had the secret available.
 
+An empty Anthropic credit balance is the same loud skip. The key is present, so the run starts,
+then Anthropic answers "credit balance is too low" and both `evals.yml` and `ci.ts` print a
+`::warning` and exit 0. The live gates did not run. Refill the account behind
+`ANTHROPIC_API_KEY` (Plans & Billing on that key's organization) to run them. A quality miss,
+a network error, or any other provider failure still fails the job.
+
 Runner choice: **`tsx`** (already a devDependency of `@vantera/help-content`'s `build-index`
 script, pinned here to the same `^4.0.0`) — the simplest path to running one standalone TypeScript
 entry file without adding a build step, consistent with the one other place in the monorepo that
