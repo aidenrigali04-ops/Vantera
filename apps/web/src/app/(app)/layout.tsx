@@ -274,9 +274,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
       {/* min-w-0 + overflow-x-clip: no surface can produce a sideways-scrolling page —
           wide content clips (and scrolls inside its own container) instead. */}
-      <main className="min-w-0 flex-1 overflow-x-clip pb-24 lg:pb-6">
+      <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-clip px-4 pb-24 sm:px-6 lg:pb-6">
         {!onToday && (connectionBanner || trialBanner) && (
-          <div className="mx-auto w-full max-w-[1248px] px-6 pt-4">
+          <div className="mx-auto w-full max-w-[1248px] pt-4">
             {connectionBanner && <TrialBanner {...connectionBanner} />}
             {trialBanner && <TrialBanner {...trialBanner} />}
           </div>

@@ -85,7 +85,7 @@ export default async function AgentsPage({
 
   return (
     // One-screen on desktop: the page never scrolls — content scrolls in its own region.
-    <div className="mx-auto flex w-full max-w-[1400px] flex-col lg:h-[calc(100dvh-3rem)]">
+    <div className="mx-auto flex w-full min-w-0 max-w-[1400px] flex-col lg:min-h-0 lg:flex-1">
       <div className="mb-6 shrink-0 border-b border-[var(--hairline)] pb-5">
         <h1 className="text-2xl font-semibold tracking-tight">Playbook</h1>
         <p className="mt-1.5 text-sm text-muted-foreground">

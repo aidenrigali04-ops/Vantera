@@ -32,13 +32,38 @@ describe("deriveIntentWatchlist", () => {
     expect(out.competitors).toEqual(["Salesforce", "Gainsight", "Catalyst", "Vitally", "Totango", "ChurnZero"]); // deduped + capped to 6
   });
 
-  it("fails open to empty lists when the model errors (never blocks the wizard)", async () => {
+  it("fills categories from the seller's own words when the model errors", async () => {
     const model = new MockLanguageModelV3({
       doGenerate: async () => {
         throw new Error("model down");
       },
     });
-    const out = await deriveIntentWatchlist({ industry: "SaaS" }, model);
+    const out = await deriveIntentWatchlist(
+      {
+        industry: "B2B SaaS",
+        offerings: ["onboarding churn", "revenue retention"],
+        valueProp: "Keep new customers past day 30",
+        icp: "RevOps leaders",
+      },
+      model
+    );
+    expect(out.keywords).toEqual([
+      "onboarding churn",
+      "revenue retention",
+      "Keep new customers past day 30",
+      "RevOps leaders",
+    ]);
+    expect(out.hashtags).toEqual(expect.arrayContaining(["saas", "onboarding", "churn", "revops"]));
+    expect(out.competitors).toEqual([]);
+  });
+
+  it("stays empty when the model errors and there is nothing to ground a watchlist in", async () => {
+    const model = new MockLanguageModelV3({
+      doGenerate: async () => {
+        throw new Error("model down");
+      },
+    });
+    const out = await deriveIntentWatchlist({}, model);
     expect(out).toEqual({ keywords: [], hashtags: [], competitors: [] });
   });
 });
