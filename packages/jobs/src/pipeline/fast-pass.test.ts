@@ -91,7 +91,7 @@ function makeDeps(
     rankFn: async (cands) => insightsFor(cands.map((c) => c.leadId), (i) => 90 - i),
     runDrafts: async (p) => {
       draftedPayloads.push(p);
-      return { status: "completed", drafted: p.leadIds.length, suppressed: 0, skipped: 0 };
+      return { status: "completed", drafted: p.leadIds.length, suppressed: 0, skipped: 0, deferred: 0 };
     },
     ...over,
   };
