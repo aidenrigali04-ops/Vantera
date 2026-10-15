@@ -7,6 +7,7 @@ import {
 } from "@vantera/billing";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Valid, Invalid } from "@/lib/validation";
+import { accountSkipsPayment } from "./founder-exempt";
 
 export interface AccountBillingRow {
   plan: string;
@@ -60,8 +61,21 @@ export async function loadBillingRow(
 ): Promise<AccountBillingRow | null> {
   const { data } = await supabase
     .from("accounts")
-    .select(`id, ${BILLING_COLS}`)
+    .select(`id, stripe_subscription_id, ${BILLING_COLS}`)
     .limit(1)
-    .maybeSingle();
-  return data ?? null;
+    .maybeSingle<AccountBillingRow & { id: string; stripe_subscription_id: string | null }>();
+  if (!data) return null;
+  const row: AccountBillingRow = {
+    plan: data.plan,
+    subscription_status: data.subscription_status,
+    seats_purchased: data.seats_purchased,
+    linkedin_accounts_purchased: data.linkedin_accounts_purchased,
+    current_period_end: data.current_period_end,
+  };
+  if (data.stripe_subscription_id || !(await accountSkipsPayment(supabase, data.id))) return row;
+  return {
+    ...row,
+    plan: row.plan && row.plan !== "none" ? row.plan : "growth",
+    subscription_status: "active",
+  };
 }
