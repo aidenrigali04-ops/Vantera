@@ -25,6 +25,7 @@ import type {
   ConversationMessageInput,
   ConversationTurn,
   CopyStrategy,
+  DecideV2Options,
   FunnelStageKey,
   GenerateRecipesInput,
   LeadOutcomeFlags,
@@ -581,6 +582,15 @@ export interface OptimizeDeps {
   proposeCandidatesFn?: (input: GenerateRecipesInput) => Promise<CopyStrategy[]>;
   /** RNG for Thompson sampling (injectable for deterministic tests); defaults to Math.random */
   rand?: () => number;
+  /**
+   * Hive simulator tuning surface (optional). Absent ⇒ decideExperimentV2's own defaults — the
+   * production trigger passes nothing, so behavior is byte-identical. The per-experiment `alpha`
+   * always comes from the experiment row and can't be overridden here; values are still clamped
+   * by decideExperimentV2's safety envelope.
+   */
+  decideV2Options?: Omit<DecideV2Options, "alpha" | "rng">;
+  /** Hive simulator tuning surface: Thompson shrinkage strength. Absent ⇒ the bandit's SHRINK_M. */
+  banditShrinkM?: number;
   /**
    * Live A/A canary (WS-1.8): fired when the canary experiment produces a non-`keep_running`
    * verdict — a false signal from the decide gate itself (the arms are identical). Best-effort;

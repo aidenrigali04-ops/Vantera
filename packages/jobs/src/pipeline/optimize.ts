@@ -104,7 +104,7 @@ async function chainNext(
       deps.store.getStampedOutcomes(),
     ]);
     const stats = aggregateBySignature(stageKey, stamped);
-    challenger = chooseChallenger(candidates, stats, deps.rand ?? Math.random);
+    challenger = chooseChallenger(candidates, stats, deps.rand ?? Math.random, { shrinkM: deps.banditShrinkM });
   }
   challenger ??= proposeNextChallenger(stageKey, champion);
   if (!challenger) return "skipped";
@@ -139,7 +139,7 @@ export async function runOptimize(deps: OptimizeDeps): Promise<OptimizeSummary> 
     const verdict = decideExperimentV2(
       aggregateArm(exp.stageKey, championFlags),
       aggregateArm(exp.stageKey, challengerFlags),
-      { alpha: exp.alphaSpent ?? undefined, rng: deps.rand }
+      { ...deps.decideV2Options, alpha: exp.alphaSpent ?? undefined, rng: deps.rand }
     );
 
     // Live A/A canary (enterprise-grade-brain spec, WS-1.8) — SCOPED to the pinned canary account
@@ -244,7 +244,7 @@ export async function runOptimize(deps: OptimizeDeps): Promise<OptimizeSummary> 
       const recheck = decideExperimentV2(
         aggregateArm(exp.stageKey, championFlags),
         aggregateArm(exp.stageKey, challengerFlags),
-        { alpha: exp.alphaSpent ?? undefined, rng: deps.rand }
+        { ...deps.decideV2Options, alpha: exp.alphaSpent ?? undefined, rng: deps.rand }
       );
 
       if (recheck.decision === "adopt_challenger") {

@@ -97,9 +97,17 @@ function pooledRate(stats: Map<string, VariantOutcome>): number {
 export function chooseChallenger(
   candidates: CopyStrategy[],
   stats: Map<string, VariantOutcome>,
-  rand: () => number
+  rand: () => number,
+  /**
+   * Optional shrinkage override (Hive simulator tuning surface). Absent ⇒ SHRINK_M — every
+   * existing call site passes nothing, so production behavior is byte-identical. Non-finite or
+   * negative values fall back to SHRINK_M.
+   */
+  opts?: { shrinkM?: number }
 ): CopyStrategy | null {
   if (candidates.length === 0) return null;
+  const m = opts?.shrinkM;
+  const SHRINK_M_EFF = m !== undefined && Number.isFinite(m) && m >= 0 ? m : SHRINK_M;
   const pooled = pooledRate(stats);
   let best: CopyStrategy | null = null;
   let bestDraw = -1;
@@ -108,8 +116,8 @@ export function chooseChallenger(
     const successes = o?.successes ?? 0;
     const n = o?.denominator ?? 0;
     const failures = Math.max(0, n - successes);
-    const alpha = n > 0 ? 1 + successes + SHRINK_M * pooled : 1;
-    const beta = n > 0 ? 1 + failures + SHRINK_M * (1 - pooled) : 1;
+    const alpha = n > 0 ? 1 + successes + SHRINK_M_EFF * pooled : 1;
+    const beta = n > 0 ? 1 + failures + SHRINK_M_EFF * (1 - pooled) : 1;
     const draw = sampleBeta(alpha, beta, rand);
     if (draw > bestDraw) {
       bestDraw = draw;
