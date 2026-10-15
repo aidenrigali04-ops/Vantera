@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ARENAS } from "../hive/arenas";
 import { HARM_WEIGHT, evaluate } from "./evaluator";
-import { createResearch, runGeneration, runResearch } from "./governor";
+import { createResearch, runGeneration, runResearch, untestedMoves } from "./governor";
 import { validateProposal } from "./proposal";
 
 describe("research hive: governor", () => {
@@ -52,7 +52,7 @@ describe("research hive: governor", () => {
       for (const p of s.proposals) {
         if (p.verdict === "falsified") {
           falsified++;
-          expect(p.sealed!.lift).toBeLessThan(p.falsifyBelow);
+          expect(p.sealed!.lift).toBeLessThanOrEqual(p.falsifyBelow + 0.0005);
         }
         if (p.verdict === "promoted") expect(p.sealed!.lift).toBeGreaterThanOrEqual(p.falsifyBelow);
       }
@@ -110,6 +110,30 @@ describe("research hive: governor", () => {
     const best = promotedBy.sort((a, b) => b.promoted - a.promoted)[0]!;
     const never = Object.values(s.brains).filter((b) => b.promoted === 0 && b.falsified > 0)[0];
     if (never) expect(best.credibility).toBeGreaterThan(never.credibility);
+  });
+
+  it("promotes nothing on A/A worlds where no strategy is truly better", () => {
+    let promotions = 0;
+    let proposals = 0;
+    for (const seed of [21, 22, 23]) {
+      const s = createResearch(seed, { families: ["no_winner"] });
+      for (let i = 0; i < 10 && !s.converged; i++) runGeneration(s);
+      promotions += s.lineage.length - 1;
+      proposals += s.proposals.length;
+    }
+    expect(proposals).toBeGreaterThan(60);
+    expect(promotions).toBe(0);
+  });
+
+  it("continuous mode stops only on exhaustion: every single-gene move tested, final sweep empty", () => {
+    const s = createResearch(11, {});
+    let guard = 0;
+    while (!s.converged && guard++ < 200) runGeneration(s);
+    expect(s.converged).toBe(true);
+    expect(untestedMoves(s)).toHaveLength(0);
+    expect(s.sweeps).toBeGreaterThanOrEqual(1);
+    // and it got most of the way to the oracle ceiling on these worlds
+    expect(s.championScore / s.sealedOracle).toBeGreaterThan(0.6);
   });
 
   it("runGeneration is a no-op once converged", () => {

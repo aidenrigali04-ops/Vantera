@@ -98,7 +98,8 @@ function mutator(ctx: BrainContext, n: number): RawProposal[] {
       if (tried.has(k)) continue;
       const e = ev.get(k);
       const a = 1 + (e?.won ?? 0), b = 1 + ((e?.tried ?? 0) - (e?.won ?? 0));
-      cands.push({ arena, g, gene, draw: sampleBeta(a, b, ctx.rand) });
+      // Untested moves get a small bonus so the search eventually sweeps the whole neighborhood.
+      cands.push({ arena, g, gene, draw: sampleBeta(a, b, ctx.rand) + (e ? 0 : 0.15) });
     }
   }
   cands.sort((x, y) => y.draw - x.draw);

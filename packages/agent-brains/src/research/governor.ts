@@ -3,7 +3,7 @@ import { ARENAS, defaultGenome, type ArenaKey } from "../hive/arenas";
 import { FAMILIES, type Family } from "../hive/sim/world";
 import { BRAINS, BRAIN_KINDS, type BrainContext, type LibraryEntry, type Verdict } from "./brains";
 import type { BrainKind } from "./proposal";
-import { evaluate, type EvalResult, type Strategy, type WorldSet } from "./evaluator";
+import { evaluate, pairedLift, type EvalResult, type Strategy, type WorldSet } from "./evaluator";
 import { mergeStrategy, strategySignature, validateProposal, type Proposal } from "./proposal";
 
 /**
@@ -39,9 +39,17 @@ export type GovernorConfig = {
   worstTolerance: number;
   /** allowed increase in harm rate (negatives / 100 sourced) */
   harmTolerance: number;
-  /** generations without a promotion before the hive declares convergence */
+  /** generations without a promotion before the hive reseeds (or, when exhausted, converges) */
   maxPlateau: number;
+  /**
+   * Continuous mode: never stop on plateau alone. The hive only converges when it is EXHAUSTED —
+   * every untested single-gene move from the champion has been tried and the last full sweep found
+   * nothing — so "until it can't be optimized any more" is a measured fact, not a patience limit.
+   */
+  continuous: boolean;
   arenas: ArenaKey[];
+  /** world families to evaluate on (default: all); narrowing is for tests and audits only */
+  families?: Family[];
 };
 
 export const GOVERNOR_DEFAULTS: GovernorConfig = {
@@ -53,6 +61,7 @@ export const GOVERNOR_DEFAULTS: GovernorConfig = {
   worstTolerance: 0.15,
   harmTolerance: 0.15,
   maxPlateau: 8,
+  continuous: true,
   arenas: Object.keys(ARENAS) as ArenaKey[],
 };
 
@@ -122,6 +131,10 @@ export type ResearchState = {
   elites: { strategy: Strategy; score: number; proposalId: string }[];
   /** plateau escapes performed (reseeding from the second elite) */
   reseeds: number;
+  /** generations since the champion last changed (resets on promotion) */
+  sinceWin: number;
+  /** exhaustion sweeps completed: a sweep tests EVERY untested one-gene move from the champion */
+  sweeps: number;
   /** salts — brains never see these */
   salts: { sealed: number };
 };
@@ -132,7 +145,7 @@ export function createResearch(seed: number, cfg: Partial<GovernorConfig> = {}):
   for (const a of c.arenas) champion[a] = defaultGenome(a);
   const rand = mulberry32(seed ^ 0x3c6ef372);
   const sealedSalt = Math.floor(rand() * 2 ** 31);
-  const sealed: WorldSet = { salt: sealedSalt, perFamily: c.sealedWorldsPerFamily, accounts: c.accountsPerWorld, horizonDays: 180 };
+  const sealed: WorldSet = { salt: sealedSalt, perFamily: c.sealedWorldsPerFamily, accounts: c.accountsPerWorld, horizonDays: 180, families: c.families };
   const base = evaluate(champion, sealed, c.arenas);
   const brains: Record<string, BrainRecord> = {};
   for (const kind of BRAIN_KINDS) {
@@ -157,6 +170,8 @@ export function createResearch(seed: number, cfg: Partial<GovernorConfig> = {}):
     sealedOracle: oracleCeiling(sealed, c.arenas),
     elites: [{ strategy: champion, score: base.score, proposalId: "gen0" }],
     reseeds: 0,
+    sinceWin: 0,
+    sweeps: 0,
     salts: { sealed: sealedSalt },
   };
 }
@@ -234,9 +249,9 @@ export function runGeneration(state: ResearchState): GovEvent[] {
   const gen = ++state.generation;
   const rand = mulberry32((state.seed ^ (gen * 0x5bd1e995)) >>> 0);
   const sets = {
-    screen: { salt: Math.floor(rand() * 2 ** 31), perFamily: state.cfg.screenWorldsPerFamily, accounts: state.cfg.accountsPerWorld, horizonDays: 180 } as WorldSet,
-    replicate: { salt: Math.floor(rand() * 2 ** 31), perFamily: state.cfg.replicateWorldsPerFamily, accounts: state.cfg.accountsPerWorld, horizonDays: 180 } as WorldSet,
-    sealed: { salt: state.salts.sealed, perFamily: state.cfg.sealedWorldsPerFamily, accounts: state.cfg.accountsPerWorld, horizonDays: 180 } as WorldSet,
+    screen: { salt: Math.floor(rand() * 2 ** 31), perFamily: state.cfg.screenWorldsPerFamily, accounts: state.cfg.accountsPerWorld, horizonDays: 180, families: state.cfg.families } as WorldSet,
+    replicate: { salt: Math.floor(rand() * 2 ** 31), perFamily: state.cfg.replicateWorldsPerFamily, accounts: state.cfg.accountsPerWorld, horizonDays: 180, families: state.cfg.families } as WorldSet,
+    sealed: { salt: state.salts.sealed, perFamily: state.cfg.sealedWorldsPerFamily, accounts: state.cfg.accountsPerWorld, horizonDays: 180, families: state.cfg.families } as WorldSet,
   };
   const champScreen = evaluate(state.champion, sets.screen, state.cfg.arenas);
   const champRep = evaluate(state.champion, sets.replicate, state.cfg.arenas);
@@ -292,13 +307,13 @@ export function runGeneration(state: ResearchState): GovEvent[] {
   for (const p of batch) {
     p.stage = "screen";
     const r = evaluate(p.strategy, sets.screen, state.cfg.arenas);
-    const lift = r.score - champScreen.score;
+    const { lift, margin } = pairedLift(champScreen, r);
     const worst = r.worst - champScreen.worst;
-    p.screen = { lift: r3(lift), margin: r3(r.margin), worst: r3(worst) };
-    const pass = lift > 0 && lift - r.margin > -state.cfg.worstTolerance;
-    state.events.push({ kind: "screened", proposalId: p.id, lift, margin: r.margin, worst, pass });
+    p.screen = { lift: r3(lift), margin: r3(margin), worst: r3(worst) };
+    const pass = lift > 0 && lift - margin > -state.cfg.worstTolerance;
+    state.events.push({ kind: "screened", proposalId: p.id, lift, margin, worst, pass });
     if (pass) { survivors.push(p); state.brains[p.brain]!.passedScreen++; }
-    else finish(state, p, "rejected", `screen: lift ${lift.toFixed(2)} ± ${r.margin.toFixed(2)} on fresh worlds`, r, champScreen);
+    else finish(state, p, "rejected", `screen: lift ${lift.toFixed(2)} ± ${margin.toFixed(2)} on fresh worlds`, r, champScreen);
   }
 
   // 3. Replicate on a second fresh set.
@@ -306,11 +321,11 @@ export function runGeneration(state: ResearchState): GovEvent[] {
   for (const p of survivors) {
     p.stage = "replicate";
     const r = evaluate(p.strategy, sets.replicate, state.cfg.arenas);
-    const lift = r.score - champRep.score;
+    const { lift, margin } = pairedLift(champRep, r);
     const worst = r.worst - champRep.worst;
-    p.replicate = { lift: r3(lift), margin: r3(r.margin), worst: r3(worst) };
+    p.replicate = { lift: r3(lift), margin: r3(margin), worst: r3(worst) };
     const pass = lift > 0;
-    state.events.push({ kind: "replicated", proposalId: p.id, lift, margin: r.margin, worst, pass });
+    state.events.push({ kind: "replicated", proposalId: p.id, lift, margin, worst, pass });
     if (pass) { replicated.push(p); state.brains[p.brain]!.replicated++; }
     else finish(state, p, "rejected", `failed to replicate: ${lift.toFixed(2)} on a second set of worlds`, r, champRep);
   }
@@ -330,15 +345,15 @@ export function runGeneration(state: ResearchState): GovEvent[] {
   for (const p of replicated) {
     p.stage = "seal";
     const r = evaluate(p.strategy, sets.sealed, state.cfg.arenas);
-    const lift = r.score - champSealed.score;
+    const { lift, margin } = pairedLift(champSealed, r);
     const worst = r.worst - champSealed.worst;
     const harmDelta = r.harmRate - champSealed.harmRate;
-    p.sealed = { lift: r3(lift), margin: r3(r.margin), worst: r3(worst), worstFamily: r.worstFamily, harmDelta: r3(harmDelta) };
+    p.sealed = { lift: r3(lift), margin: r3(margin), worst: r3(worst), worstFamily: r.worstFamily, harmDelta: r3(harmDelta) };
     const b = state.brains[p.brain]!;
     const tuningLift = (p.screen!.lift + p.replicate!.lift) / 2;
     b.overfitGap = (b.overfitGap * b.overfitN + (tuningLift - lift)) / (b.overfitN + 1);
     b.overfitN++;
-    state.events.push({ kind: "sealed", proposalId: p.id, lift, margin: r.margin, worst, pass: lift > 0 });
+    state.events.push({ kind: "sealed", proposalId: p.id, lift, margin, worst, pass: lift > 0 });
 
     if (r.score > state.sealedOracle + 1e-6) {
       p.flags.push("score exceeds the oracle ceiling");
@@ -357,12 +372,12 @@ export function runGeneration(state: ResearchState): GovEvent[] {
       finish(state, p, "falsified", `pre-registered falsifier: sealed lift ${lift.toFixed(2)} < ${p.falsifyBelow.toFixed(2)}`, r, champSealed);
       continue;
     }
-    if (lift - r.margin <= 0) {
+    if (lift - margin <= 0) {
       // Positive but not decisive: hold it for a re-seal next generation (bounded patience) rather
       // than killing a real but small effect on one noisy read.
       p.pending = (p.pending ?? 0) + 1;
       if (lift > 0 && p.pending <= 2) { p.stage = "replicate"; p.flags.push(`held for re-seal (${p.pending})`); state.pendingIds.add(p.id); continue; }
-      finish(state, p, "rejected", `sealed lift ${lift.toFixed(2)} ± ${r.margin.toFixed(2)} not decisive after ${p.pending} reads`, r, champSealed);
+      finish(state, p, "rejected", `sealed lift ${lift.toFixed(2)} ± ${margin.toFixed(2)} not decisive after ${p.pending} reads`, r, champSealed);
       continue;
     }
     if (worst < -state.cfg.worstTolerance) {
@@ -390,6 +405,8 @@ export function runGeneration(state: ResearchState): GovEvent[] {
 
   // 5. Promote.
   if (best) {
+    state.sinceWin = 0;
+    state.sweeps = 0;
     const { p, r, lift } = best;
     finish(state, p, "promoted", `sealed +${lift.toFixed(2)} (worst family ${r.worstFamily} ${p.sealed!.worst >= 0 ? "+" : ""}${p.sealed!.worst.toFixed(2)})`, r, champSealed);
     state.brains[p.brain]!.promoted++;
@@ -401,14 +418,32 @@ export function runGeneration(state: ResearchState): GovEvent[] {
     state.events.push({ kind: "promoted", proposalId: p.id, championScore: r.score, sealedScore: r.score, changes: p.changes });
   } else {
     state.plateau++;
-    // Plateau escape: before declaring convergence, reseed the search from the runner-up elite so the
-    // brains explore a different basin; the champion is never replaced by this (only by a sealed win).
+    state.sinceWin++;
     if (state.plateau >= state.cfg.maxPlateau) {
       const alt = state.elites.find((e) => strategySignature(e.strategy) !== strategySignature(state.champion));
-      if (alt && state.reseeds < 2) {
+      if (state.cfg.continuous) {
+        // Continuous mode: exhaustion is the only stop. Reseed, reopen rejected blind spots, and run
+        // an explicit sweep of every untested single-gene move; converge only when a sweep finds nothing.
+        if (untestedMoves(state).length === 0) {
+          state.sweeps++;
+          if (state.sweeps >= 1 && state.sinceWin >= state.cfg.maxPlateau) {
+            state.converged = true;
+            state.events.push({ kind: "converged", generation: gen });
+          } else {
+            state.library = state.library.filter((e) => e.verdict !== "rejected" || e.lift > 0);
+            state.plateau = 0;
+            state.events.push({ kind: "flag", target: "governor", detail: "exhaustion sweep complete: reopening rejected moves for one more pass" });
+          }
+        } else {
+          state.reseeds++;
+          state.plateau = 0;
+          state.library = state.library.filter((e) => e.verdict !== "rejected" || e.lift > 0);
+          state.events.push({ kind: "flag", target: "governor", detail: `plateau: ${untestedMoves(state).length} untested moves remain; reseeding${alt ? ` from elite ${alt.proposalId}` : ""}` });
+        }
+      } else if (alt && state.reseeds < 2) {
         state.reseeds++;
         state.plateau = 0;
-        state.library = state.library.filter((e) => e.verdict !== "rejected" || e.lift > 0); // reopen blind spots
+        state.library = state.library.filter((e) => e.verdict !== "rejected" || e.lift > 0);
         state.events.push({ kind: "flag", target: "governor", detail: `plateau: reseeding search from elite ${alt.proposalId}` });
       } else {
         state.converged = true;
@@ -418,6 +453,22 @@ export function runGeneration(state: ResearchState): GovEvent[] {
   }
   state.tick++;
   return state.events.slice(start);
+}
+
+/** Single-gene moves from the champion that the library has no verdict on yet. */
+export function untestedMoves(state: ResearchState): { arena: ArenaKey; gene: string; to: string }[] {
+  const tried = new Set(state.library.map((e) => e.changes.map((c) => `${c.arena}|${c.gene}=${c.to}`).sort().join(";")));
+  const out: { arena: ArenaKey; gene: string; to: string }[] = [];
+  for (const arena of state.cfg.arenas) {
+    const champ = state.champion[arena]!;
+    for (const [gene, spec] of Object.entries(ARENAS[arena].genes)) {
+      for (const v of spec.values) {
+        if (v === champ[gene]) continue;
+        if (!tried.has(`${arena}|${gene}=${v}`)) out.push({ arena, gene, to: v });
+      }
+    }
+  }
+  return out;
 }
 
 function addElite(state: ResearchState, strategy: Strategy, score: number, proposalId: string) {

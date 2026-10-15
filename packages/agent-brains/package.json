@@ -8,7 +8,8 @@
   },
   "scripts": {
     "type-check": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "hive": "tsx src/research/cli.ts"
   },
   "dependencies": {
     "@vantera/ai": "workspace:*",
@@ -20,6 +21,7 @@
   "devDependencies": {
     "msw": "^2.14.6",
     "typescript": "^5.8.0",
-    "vitest": "^4.1.9"
+    "vitest": "^4.1.9",
+    "tsx": "^4.19.0"
   }
 }

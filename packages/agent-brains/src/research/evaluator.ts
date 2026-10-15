@@ -18,6 +18,8 @@ import { FAMILIES, generateWorld, meetingsPerSourced, stageProbs, type Family, t
 export type Strategy = Partial<Record<ArenaKey, Genome>>;
 
 export type EvalResult = {
+  /** per-world scores in a fixed order, so two strategies evaluated on the same set can be PAIRED */
+  perWorld: number[];
   /** mean score across worlds (meetings per 100 sourced, harm-adjusted) */
   score: number;
   /** half-width of a 90% interval over worlds (normal approx) */
@@ -107,7 +109,21 @@ export function evaluate(strategy: Strategy, set: WorldSet, arenas: ArenaKey[] =
       worstFamily = f;
     }
   }
-  return { score: mean, margin: (1.645 * sd) / Math.sqrt(scores.length), worst, worstFamily, byFamily, harmRate: harmSum / n, worlds: n };
+  return { perWorld: scores, score: mean, margin: (1.645 * sd) / Math.sqrt(scores.length), worst, worstFamily, byFamily, harmRate: harmSum / n, worlds: n };
+}
+
+/**
+ * Paired comparison: the lift of `b` over `a` on the SAME worlds, with the 90% interval of the
+ * per-world differences. World-to-world variation (which dwarfs most real effects) cancels, so the
+ * same evidence gives a far tighter read than comparing two independent means. Both results must
+ * come from the same WorldSet and arena list.
+ */
+export function pairedLift(a: EvalResult, b: EvalResult): { lift: number; margin: number } {
+  if (a.perWorld.length !== b.perWorld.length || a.perWorld.length === 0) return { lift: b.score - a.score, margin: Infinity };
+  const d = b.perWorld.map((x, i) => x - a.perWorld[i]!);
+  const mean = d.reduce((s, x) => s + x, 0) / d.length;
+  const sd = Math.sqrt(d.reduce((s, x) => s + (x - mean) ** 2, 0) / Math.max(1, d.length - 1));
+  return { lift: mean, margin: (1.645 * sd) / Math.sqrt(d.length) };
 }
 
 /** A deterministic rng for anything the governor randomizes (never exposed to brains). */

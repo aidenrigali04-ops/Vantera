@@ -11,6 +11,13 @@ Autonomous strategy search for Vantera's funnel. No human in the loop; a Governo
   archive, plateau reseeding, automatic promotion.
 - `governor.test.ts` — the anti-cheating guarantees as tests.
 
+Continuous mode (default): the hive never stops on patience alone. It converges only when it is
+EXHAUSTED — every untested single-gene move from the champion has been raced and a final sweep
+found nothing. Verdicts use PAIRED evaluation (champion vs challenger on the same worlds), which
+is what lets real but small effects clear the sealed test without loosening any guardrail.
+
+Run it: `pnpm --filter @vantera/agent-brains hive -- --seed 11 --out ./hive-results`
+
 Viewer bundle: `esbuild src/research/browser-entry.ts --bundle --format=iife --global-name=Hive`.
 
 World base rates in `../hive/sim/world.ts` are assumptions until calibrated to real outcomes.
