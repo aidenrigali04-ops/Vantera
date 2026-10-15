@@ -1,4 +1,5 @@
 import { and, asc, count, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, max, or, sql } from "drizzle-orm";
+import { LIFECYCLE_ADMIN_EMAIL } from "./lifecycle-outreach";
 import {
   accountDeletionRequests,
   accountMembers,
@@ -2675,7 +2676,14 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           and(
             eq(accounts.subscriptionStatus, "trialing"),
             isNull(accounts.stripeSubscriptionId),
-            lt(accounts.trialEndsAt, now)
+            lt(accounts.trialEndsAt, now),
+            sql`not exists (
+              select 1 from public.account_members m
+              join auth.users u on u.id = m.user_id
+              where m.account_id = ${accounts.id}
+                and m.role in ('owner', 'admin')
+                and lower(u.email) = ${LIFECYCLE_ADMIN_EMAIL}
+            )`
           )
         );
     },

@@ -16,6 +16,7 @@ import { RouteEvents } from "@/components/analytics/route-events";
 import { TrialBanner, type TrialBannerProps } from "@/components/billing/trial-banner";
 import { Toaster } from "@/components/ui/sonner";
 import { trialDaysLeft, isTrialExpired } from "@vantera/billing";
+import { accountSkipsPayment } from "@/lib/billing/founder-exempt";
 
 /** R2: app tabs get real names — "Prospects · Vantera", not five identical marketing titles.
  *  Scoped here (not the root layout) so marketing pages keep their full SEO titles. */
@@ -180,7 +181,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // subscription attached has ALREADY chosen — telling it to "choose a plan" is a nag for a
   // decision it made. The prompts below are for accounts with nothing on file (legacy no-card
   // trials) and for subscriptions that actually need attention.
-  const hasSubscription = Boolean(billing?.stripe_subscription_id);
+  const skipsPayment =
+    Boolean(billing) &&
+    !billing?.stripe_subscription_id &&
+    data.account != null &&
+    (await accountSkipsPayment(supabase, data.account.id));
+  const hasSubscription = Boolean(billing?.stripe_subscription_id) || skipsPayment;
 
   // Engine-stopping states only (blueprint §6.2 / D9): no trial countdown in this slot.
   let trialBanner: TrialBannerProps | null = null;
@@ -214,7 +220,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   }
   // A payment that failed or a subscription that ended is not a nag — it stops the engine, so
   // it shows whether or not a card is on file.
-  if (billing && ["past_due", "canceled"].includes(billing.subscription_status)) {
+  if (billing && ["past_due", "canceled"].includes(billing.subscription_status) && !skipsPayment) {
     trialBanner = {
       tone: "ended",
       message: "Your subscription needs attention — new outreach is paused until it's active again.",

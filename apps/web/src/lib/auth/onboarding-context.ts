@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { accountSkipsPayment } from "@/lib/billing/founder-exempt";
 import type { OnboardingContext } from "./onboarding-gate";
 
 export type OnboardingPrefill = {
@@ -113,7 +114,7 @@ export async function getOnboardingData(): Promise<OnboardingData> {
     hasAccount: true,
     detailsConfirmed: Boolean(account.website_url && profile?.display_name?.trim()),
     linkedinConnected: li != null,
-    subscribed: account.stripe_subscription_id != null,
+    subscribed: account.stripe_subscription_id != null || (await accountSkipsPayment(supabase, account.id)),
     onboardingComplete: account.onboarding_completed_at != null,
     prefill,
   };

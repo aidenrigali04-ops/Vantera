@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { CONNECTION_NOTE_MAX_CHARS, FOLLOWUP_MAX_CHARS } from "@vantera/agent-brains";
+import { accountSkipsPayment } from "@/lib/billing/founder-exempt";
 import { engineLineFor } from "./engine-line";
 import {
   capUsage,
@@ -439,6 +440,7 @@ export async function loadToday(supabase: SupabaseClient, userId: string, now = 
     (meetingsWeekRes.count ?? 0) > 0 ||
     (activityRes.data ?? []).length > 0;
 
+  const skipsPayment = !acct.stripe_subscription_id && (await accountSkipsPayment(supabase, acct.id));
   const inputs: TodayInputs = {
     now,
     timeZone: tz,
@@ -451,8 +453,12 @@ export async function loadToday(supabase: SupabaseClient, userId: string, now = 
     senders: senderFacts,
     pausedAt: acct.paused_at,
     billing: {
-      status: (["none", "trialing", "active", "past_due", "canceled"].includes(acct.subscription_status) ? acct.subscription_status : "none") as TodayInputs["billing"]["status"],
-      plan: acct.plan,
+      status: (skipsPayment
+        ? "active"
+        : ["none", "trialing", "active", "past_due", "canceled"].includes(acct.subscription_status)
+          ? acct.subscription_status
+          : "none") as TodayInputs["billing"]["status"],
+      plan: skipsPayment && (!acct.plan || acct.plan === "none") ? "growth" : acct.plan,
       pastDueSince: acct.subscription_status === "past_due" ? acct.current_period_end : null,
       canceledAt: acct.subscription_status === "canceled" ? acct.current_period_end : null,
     },

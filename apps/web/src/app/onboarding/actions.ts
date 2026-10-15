@@ -16,6 +16,7 @@ import { createClient } from "@/lib/supabase/server";
 import { checkLimit } from "@/lib/rate-limit";
 import { normalizeWebsiteUrl, validateOnboardingDetails } from "@/lib/validation";
 import { billingBypassAllowed } from "./billing-bypass";
+import { accountSkipsPayment } from "@/lib/billing/founder-exempt";
 
 export type DetailsState = { error?: string };
 
@@ -245,8 +246,9 @@ export async function finishOnboarding(): Promise<{ error?: string } | never> {
   if (!account) redirect("/onboarding");
   if (account.onboarding_completed_at) redirect("/dashboard");
 
-  // Card required: no subscription → back to the subscription step (dev-only bypass aside).
-  if (!account.stripe_subscription_id && !billingBypassAllowed()) {
+  // Card required, except the founder workspace and a local environment with no billing keys.
+  const skipsPayment = await accountSkipsPayment(supabase, account.id);
+  if (!account.stripe_subscription_id && !billingBypassAllowed() && !skipsPayment) {
     return { error: "Choose a plan to finish setup." };
   }
 
