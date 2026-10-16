@@ -15,7 +15,7 @@ jobs:
         with:
           fetch-depth: 0 # full history so PR scans cover every new commit
       - name: gitleaks
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Free for personal accounts and public repos. If this repo lives under a GitHub
