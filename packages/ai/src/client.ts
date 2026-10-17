@@ -17,6 +17,16 @@ function resolveModelId(modelId?: string): string {
 }
 
 /**
+ * A key created for one workspace can omit this. A personal or service-account key
+ * that can act in more than one workspace is rejected unless every request names one.
+ */
+export function anthropicWorkspaceHeaders(): Record<string, string> | undefined {
+  const id = process.env.ANTHROPIC_WORKSPACE_ID?.trim();
+  if (!id) return undefined;
+  return { "anthropic-workspace-id": id };
+}
+
+/**
  * The single Anthropic entry point (locked, rule 02). All product code gets
  * models from here — never construct a provider or import an AI SDK provider
  * package anywhere else.
@@ -26,7 +36,8 @@ export function getModel(modelId?: string) {
   if (!apiKey) {
     throw new Error("ANTHROPIC_API_KEY is not set");
   }
-  const anthropic = createAnthropic({ apiKey });
+  const headers = anthropicWorkspaceHeaders();
+  const anthropic = createAnthropic(headers ? { apiKey, headers } : { apiKey });
   return anthropic(resolveModelId(modelId));
 }
 
