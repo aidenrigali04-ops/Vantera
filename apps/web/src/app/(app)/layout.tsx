@@ -78,7 +78,18 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // Today owns the banner slot (blueprint Z1): its copy names the sender and says the drafts
   // are held, and it deliberately shows no trial countdown (D9). Rendering the app-wide
   // strips there too would double the same warning.
-  const onToday = (pathname ?? "").startsWith("/today");
+  const path = (pathname ?? "").split("?")[0] ?? "";
+  const onToday = path.startsWith("/today");
+  // Same breath Today uses under the bar (TodayPageFrame: pt-8 / lg:pt-[72px]). These
+  // surfaces stay one viewport tall, so the inset comes out of the content area.
+  const oneScreen =
+    path === "/approvals" ||
+    path === "/inbox" ||
+    path === "/prospects" ||
+    path.startsWith("/prospects/") ||
+    path === "/playbook" ||
+    path === "/dashboard" ||
+    path === "/sequence";
 
   const supabase = await createClient();
   const [
@@ -243,7 +254,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const initial = email.charAt(0).toUpperCase() || "?";
 
   return (
-    <div className="app-surface relative flex min-h-screen flex-col bg-[var(--canvas)]">
+    <div
+      className={`app-surface relative flex flex-col bg-[var(--canvas)] ${
+        oneScreen ? "min-h-screen lg:h-dvh lg:max-h-dvh" : "min-h-screen"
+      }`}
+    >
       {/* Today's brand wash lives in the SHELL so it passes behind the chrome band (the band
           is translucent and picks up the colour). Today only — it is a launchpad flourish,
           never decoration on a data surface. */}
@@ -280,9 +295,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
       {/* min-w-0 + overflow-x-clip: no surface can produce a sideways-scrolling page —
           wide content clips (and scrolls inside its own container) instead. */}
-      <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-clip px-4 pb-24 sm:px-6 lg:pb-6">
+      <main
+        className={`flex min-h-0 min-w-0 flex-1 flex-col overflow-x-clip px-4 pb-24 sm:px-6 lg:pb-6${
+          !onToday ? " pt-8 lg:pt-[72px]" : ""
+        }${oneScreen ? " lg:overflow-hidden" : ""}`}
+      >
         {!onToday && (connectionBanner || trialBanner) && (
-          <div className="mx-auto w-full max-w-[1248px] pt-4">
+          <div className="mx-auto w-full max-w-[1248px] shrink-0">
             {connectionBanner && <TrialBanner {...connectionBanner} />}
             {trialBanner && <TrialBanner {...trialBanner} />}
           </div>

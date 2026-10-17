@@ -46,7 +46,7 @@ export function TopChrome({
   return (
     <>
       <header
-        className="sticky top-0 z-40 hidden h-16 w-full items-center justify-between bg-[var(--fb)] px-6 lg:flex"
+        className="sticky top-0 z-40 hidden h-16 w-full shrink-0 items-center justify-between bg-[var(--fb)] px-6 lg:flex"
       >
         <div className="flex items-center gap-3">
           <LogoTile />

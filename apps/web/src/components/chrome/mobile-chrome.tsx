@@ -43,7 +43,7 @@ export function MobileChrome({ workspaceName, paused = false, badges, notificati
 
   return (
     <>
-      <div className="sticky top-0 z-40 flex h-12 items-center gap-3 bg-[var(--fb)] px-4 lg:hidden">
+      <div className="sticky top-0 z-40 flex h-12 shrink-0 items-center gap-3 bg-[var(--fb)] px-4 lg:hidden">
         <Link
           href="/today"
           aria-label="Vantera home"
