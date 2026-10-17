@@ -294,9 +294,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       />
 
       {/* min-w-0 + overflow-x-clip: no surface can produce a sideways-scrolling page —
-          wide content clips (and scrolls inside its own container) instead. */}
+          wide content clips (and scrolls inside its own container) instead.
+          Today grows with the work panel so the window scrolls to the rows below
+          the fold. The other surfaces stay one viewport tall. */}
       <main
-        className={`flex min-h-0 min-w-0 flex-1 flex-col overflow-x-clip px-4 pb-24 sm:px-6 lg:pb-6${
+        className={`flex min-w-0 flex-col overflow-x-clip px-4 pb-24 sm:px-6 lg:pb-6${
+          onToday ? " min-h-min" : " min-h-0 flex-1"
+        }${
           !onToday ? " pt-8 lg:pt-[72px]" : ""
         }${oneScreen ? " lg:overflow-hidden" : ""}`}
       >
