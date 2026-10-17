@@ -2,7 +2,17 @@ import type { FaqItem } from "@/components/landing/faq-data";
 import type { BlogPost } from "@/lib/blog";
 
 /** Single source for the production origin (also drives metadataBase, robots, sitemap). */
-export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://vanterasystem.dev";
+// www is the host that serves the site. The apex 308s here, so canonicals, the
+// sitemap, and robots must name www — an apex canonical points at a redirect and
+// Google drops the page. Production may still have the apex in NEXT_PUBLIC_SITE_URL;
+// rewrite only that exact host and leave localhost and preview URLs alone.
+function resolveSiteUrl(): string {
+  const configured = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.vanterasystem.dev").replace(/\/$/, "");
+  if (configured === "https://vanterasystem.dev") return "https://www.vanterasystem.dev";
+  return configured;
+}
+
+export const SITE_URL = resolveSiteUrl();
 
 /** The site's canonical description — reused by metadata AND structured data so they never drift. */
 export const SITE_DESCRIPTION =

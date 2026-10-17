@@ -137,8 +137,7 @@ export function Hero() {
                 needs its own block so its padding and the line gap are controllable
                 (vertical margins on an inline-block don't reliably push the next line).
                 items-start keeps the box shrink-to-content instead of full width. */}
-            <motion.h1
-              {...rise(0.06)}
+            <h1
               className="mt-7 flex flex-col items-start gap-[0.09em] text-[2.5rem] font-extrabold uppercase leading-[0.94] tracking-[-0.015em] text-white sm:text-[3.3rem] lg:text-[3.6rem]"
             >
               {/* The {" "} keep the h1's text string word-separated ("LinkedIn into
@@ -150,16 +149,15 @@ export function Hero() {
                 Revenue
               </span>
               <span>{" "}on Autopilot</span>
-            </motion.h1>
+            </h1>
 
-            {/* Solid white, never white/<100 — opacity drops this under 4.5:1. */}
-            <motion.p
-              {...rise(0.13)}
-              className="mt-6 max-w-lg text-[17px] font-normal leading-relaxed text-white sm:text-[19px]"
-            >
+            {/* Solid white, never white/<100 — opacity drops this under 4.5:1.
+                This paragraph is the mobile LCP element. It stays painted in the
+                first HTML so a fade-in cannot hold Largest Contentful Paint. */}
+            <p className="mt-6 max-w-lg text-[17px] font-normal leading-relaxed text-white sm:text-[19px]">
               The smartest LinkedIn outreach automation — agents find in-market buyers, start real
               conversations, and turn warm replies into booked meetings. You approve every send.
-            </motion.p>
+            </p>
 
             {/* The white pill stays opaque white: the .landing autofill override
                 force-paints inputs white, so a glass field would flash on autofill.
@@ -198,14 +196,9 @@ export function Hero() {
           </div>
 
           {/* RIGHT — LinkedIn conversations filling with warm replies */}
-          <motion.div
-            className="min-w-0"
-            initial={{ opacity: 0, y: 22, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ duration: 0.9, delay: 0.24, ease: EASE }}
-          >
+          <div className="min-w-0">
             <HeroConversations />
-          </motion.div>
+          </div>
         </div>
       </div>
     </section>

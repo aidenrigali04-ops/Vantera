@@ -516,7 +516,9 @@
 }
 .landing .hero-pixel {
   opacity: 0;
-  animation: hero-pixel var(--pixel-dur, 4s) ease-in-out var(--pixel-delay, 0s) infinite;
+  /* Start after first paint. An immediate infinite fade keeps the hero visually
+     unfinished and pushes Speed Index out. */
+  animation: hero-pixel var(--pixel-dur, 4s) ease-in-out calc(var(--pixel-delay, 0s) + 8s) infinite;
 }
 @media (prefers-reduced-motion: reduce) {
   .landing .hero-pixel {
