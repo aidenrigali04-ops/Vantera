@@ -282,9 +282,9 @@ export default async function LeadProfilePage({ params }: { params: Promise<{ id
   const techOverflow = techStack.length - TECH_STACK_MAX;
 
   return (
-    // One-screen brief: the page itself never scrolls on desktop (viewport minus the
-    // shell's py-6); a column scrolls internally only if its real data overflows.
-    <div className="mx-auto flex w-full max-w-[1560px] flex-col lg:h-[calc(100dvh-3rem)]">
+    // One-screen brief: the page fills the space under the bar and never scrolls on
+    // desktop; a column scrolls internally only if its real data overflows.
+    <div className="mx-auto flex w-full max-w-[1560px] flex-col lg:min-h-0 lg:flex-1">
       <header className="shrink-0">
         <Link
           href="/prospects"
