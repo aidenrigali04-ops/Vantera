@@ -4,11 +4,18 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./research/governor": "./src/research/governor.ts",
+    "./research/evaluator": "./src/research/evaluator.ts",
+    "./research/brains": "./src/research/brains.ts",
+    "./hive/arenas": "./src/hive/arenas.ts",
+    "./hive/world": "./src/hive/sim/world.ts"
   },
   "scripts": {
     "type-check": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "hive": "tsx src/research/cli.ts",
+    "hive:compare": "tsx src/research/compare.ts"
   },
   "dependencies": {
     "@vantera/ai": "workspace:*",
@@ -19,6 +26,7 @@
   },
   "devDependencies": {
     "msw": "^2.14.6",
+    "tsx": "^4.19.0",
     "typescript": "^5.8.0",
     "vitest": "^4.1.9"
   }
