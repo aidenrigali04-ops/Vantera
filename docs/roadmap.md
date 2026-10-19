@@ -120,7 +120,7 @@ Each entry stays short — the detail lives in that phase's spec (`docs/superpow
 - [ ] **Phase 24 — Adaptive prospecting (closed loop)**
   Goal: each account's booked meetings per 100 sourced rise over time, with every claimed gain coming from a randomized experiment on that account's own traffic. The function lives only on the Machine Learning page and stays off until that account creates its first subject there (the user creates it, or the AI creates the first one). Spec: `docs/superpowers/specs/2026-10-17-adaptive-prospecting-closed-loop.md`. The founder account is the first live use after the loop is closed and proven. `ofOracle` is not the success metric.
   - [ ] A1 instrumentation — genome stamp at lead entry + pure funnel rollup. No send-path change. Help article deferred until a surface shows calibration (A2).
-  - [ ] A2 per-account calibration
+  - [ ] A2 per-account calibration — daily fit for a live subject only, piggybacked on the existing scheduler tick. No new cron. Help article waits for the Machine Learning page.
   - [ ] A3 proposer bridge (wired genes only, deliberator off)
   - [ ] A4 loop closure
   - [ ] A5 cold-start pooling

@@ -62,6 +62,14 @@ describe("trigger schedule quota", () => {
     expect(src).toContain(`tasks.trigger("pullback-email"`);
   });
 
+  it("calibrate-accounts is a plain task fired by the agent-scheduler tick", () => {
+    const src = readFileSync(join(triggerDir, "calibrate-accounts.ts"), "utf8");
+    expect(src).toContain("task({");
+    expect(src).not.toContain("schedules.task(");
+    const scheduler = readFileSync(join(triggerDir, "agent-scheduler.ts"), "utf8");
+    expect(scheduler).toContain(`tasks.trigger("calibrate-accounts"`);
+  });
+
   describe("recursion (non-vacuity)", () => {
     let sandbox: string | null = null;
 
