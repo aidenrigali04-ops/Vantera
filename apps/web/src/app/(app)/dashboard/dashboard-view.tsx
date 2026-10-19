@@ -325,8 +325,8 @@ function LearningLog({ learning }: { learning: LearningProps }) {
           )}
         </div>
         <Button asChild variant="outline" size="sm" className="shrink-0">
-          <Link href="/dashboard?view=analytics">
-            See the full loop <ArrowRight className="size-4" />
+          <Link href="/learning">
+            Open Learning <ArrowRight className="size-4" />
           </Link>
         </Button>
       </div>

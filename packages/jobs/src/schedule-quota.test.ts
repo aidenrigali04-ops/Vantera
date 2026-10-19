@@ -62,6 +62,12 @@ describe("trigger schedule quota", () => {
     expect(src).toContain(`tasks.trigger("pullback-email"`);
   });
 
+  it("optimizer is a plain task, not a new schedule", () => {
+    const src = readFileSync(join(triggerDir, "optimizer.ts"), "utf8");
+    expect(src).toContain("task({");
+    expect(src).not.toContain("schedules.task(");
+  });
+
   it("calibrate-accounts is a plain task fired by the agent-scheduler tick", () => {
     const src = readFileSync(join(triggerDir, "calibrate-accounts.ts"), "utf8");
     expect(src).toContain("task({");

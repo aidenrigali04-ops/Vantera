@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, PenLine, Radar, Search } from "lucide-react";
+import { PenLine, Radar, Search } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
@@ -89,16 +89,8 @@ export default async function AgentsPage({
       <div className="mb-6 shrink-0 border-b border-[var(--hairline)] pb-5">
         <h1 className="text-2xl font-semibold tracking-tight">Playbook</h1>
         <p className="mt-1.5 text-sm text-muted-foreground">
-          Set it up once. Vera finds and qualifies the right people on LinkedIn, turns every
-          qualified prospect into a conversation — and gets smarter every week, starting from
-          proven plays.{" "}
-          {/* T4: the page that makes the learning claim now links to its proof. */}
-          <Link
-            href="/dashboard?view=analytics"
-            className="inline-flex items-center gap-1 font-medium text-[var(--cyan-strong)] underline-offset-4 hover:underline"
-          >
-            See what Vera&apos;s learning <ArrowRight className="size-3.5" />
-          </Link>
+          Set it up once. Vera finds and qualifies the right people on LinkedIn and turns every
+          qualified prospect into a conversation, starting from proven plays.
         </p>
       </div>
 

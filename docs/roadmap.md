@@ -124,7 +124,8 @@ Each entry stays short — the detail lives in that phase's spec (`docs/superpow
   - [ ] A3 proposer bridge (wired genes only, deliberator off)
   - [ ] A4 loop closure
   - [ ] A5 cold-start pooling
-  - [ ] B0–B3 production wiring (`docs/superpowers/specs/2026-10-17-adaptive-prospecting-production-wiring.md`)
+  - [ ] B1 subject — the Learning page creates the first subject; the scheduler runs that subject only. No experiment launch.
+  - [ ] B0, B2, B3 production wiring (`docs/superpowers/specs/2026-10-17-adaptive-prospecting-production-wiring.md`)
 
 ---
 

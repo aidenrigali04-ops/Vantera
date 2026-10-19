@@ -697,7 +697,7 @@ export const agents = pgTable(
     accountId: uuid("account_id")
       .notNull()
       .references(() => accounts.id, { onDelete: "cascade" }),
-    kind: text("kind", { enum: ["scout", "copy", "intent"] }).notNull(),
+    kind: text("kind", { enum: ["scout", "copy", "intent", "optimizer"] }).notNull(),
     name: text("name").notNull(),
     status: text("status", { enum: ["draft", "live", "paused"] }).notNull().default("draft"),
     // scout: {prospects_per_run, min_score}; copy: {cta, channels: {linkedin}};

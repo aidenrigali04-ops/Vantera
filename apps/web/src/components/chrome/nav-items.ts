@@ -1,9 +1,9 @@
 /**
- * The five primary destinations (blueprint §6.1), shared by the desktop NavPill and the
- * mobile tab bar. Pure data + the active-path and badge rules, so both surfaces agree and
- * the rules are unit-testable without React.
+ * Primary destinations, shared by the desktop NavPill. Learning is the machine-learning
+ * page: the only place a subject is created. Mobile keeps Today, Approvals, and Inbox in
+ * the tab bar; Learning is in the command palette with the other destinations.
  */
-export type NavKey = "today" | "approvals" | "inbox" | "prospects" | "playbook";
+export type NavKey = "today" | "approvals" | "inbox" | "prospects" | "playbook" | "learning";
 
 export type NavItem = { key: NavKey; label: string; href: string };
 
@@ -13,6 +13,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { key: "inbox", label: "Inbox", href: "/inbox" },
   { key: "prospects", label: "Prospects", href: "/prospects" },
   { key: "playbook", label: "Playbook", href: "/playbook" },
+  { key: "learning", label: "Learning", href: "/learning" },
 ];
 
 /** Only Approvals and Inbox carry counts — the two queues a person works down. */

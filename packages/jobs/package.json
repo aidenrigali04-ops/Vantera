@@ -8,6 +8,7 @@
     "./pipeline/safety-limits": "./src/pipeline/safety-limits.ts",
     "./pipeline/send-window": "./src/pipeline/send-window.ts",
     "./pipeline/sequence-config": "./src/pipeline/sequence-config.ts",
+    "./pipeline/subject": "./src/pipeline/subject.ts",
     "./pipeline/types": "./src/pipeline/types.ts"
   },
   "scripts": {

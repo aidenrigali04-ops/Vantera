@@ -2,8 +2,15 @@ import { describe, expect, it } from "vitest";
 import { NAV_ITEMS, badgeFor, formatBadge, isActivePath } from "./nav-items";
 
 describe("NAV_ITEMS", () => {
-  it("is the five primary destinations in blueprint order", () => {
-    expect(NAV_ITEMS.map((i) => i.href)).toEqual(["/today", "/approvals", "/inbox", "/prospects", "/playbook"]);
+  it("is the primary destinations in order, with Learning last", () => {
+    expect(NAV_ITEMS.map((i) => i.href)).toEqual([
+      "/today",
+      "/approvals",
+      "/inbox",
+      "/prospects",
+      "/playbook",
+      "/learning",
+    ]);
   });
 });
 
