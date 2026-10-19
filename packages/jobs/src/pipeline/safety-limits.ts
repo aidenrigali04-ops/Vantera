@@ -9,6 +9,18 @@ export const LINKEDIN_WEEKLY_INVITE_CEILING = 100;
 export const LINKEDIN_STEADY_DAILY_INVITES = 20; // ~100/week across weekdays
 export const LINKEDIN_STEADY_DAILY_MESSAGES = 25; // conservative; non-configurable (rule 04)
 
+/** Connection age at which the invite ramp is finished. */
+export const WARMED_AGE_DAYS = 28;
+
+/**
+ * Age the invite ramp should see. The admin workspace is already trusted and skips
+ * warmup; every other account keeps its real connection age.
+ */
+export function sendingAgeDays(ageDays: number, skipWarmup: boolean): number {
+  const age = Math.max(0, ageDays);
+  return skipWarmup ? Math.max(age, WARMED_AGE_DAYS) : age;
+}
+
 /** new-account ramp: stay tiny while the account builds history */
 const LINKEDIN_RAMP: { maxAgeDays: number; daily: number }[] = [
   { maxAgeDays: 7, daily: 5 },

@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { CONNECTION_NOTE_MAX_CHARS, FOLLOWUP_MAX_CHARS } from "@vantera/agent-brains";
+import { sendingAgeDays } from "@vantera/jobs/pipeline/safety-limits";
 import { accountSkipsPayment } from "@/lib/billing/founder-exempt";
 import { engineLineFor } from "./engine-line";
 import {
@@ -274,13 +275,17 @@ export async function loadToday(supabase: SupabaseClient, userId: string, now = 
   const todaySends = (sendsTodayRes.data ?? []).filter((x) => isToday(x.sent_at));
   const approvedToday = (approvedTodayRes.data ?? []).filter((x) => isToday(x.approved_at)).length;
   const weekSends = invitesWeekRes.data ?? [];
+  const skipWarmup = await accountSkipsPayment(supabase, acct.id);
   const senderFacts: SenderFacts[] = (senders.data ?? []).map((s) => {
     const mine = todaySends.filter((x) => x.linkedin_account_id === s.id);
     return {
       id: s.id,
       name: shortName(s.display_name),
       status: s.status,
-      ageDays: s.connected_at ? Math.max(0, (now.getTime() - new Date(s.connected_at).getTime()) / DAY) : 0,
+      ageDays: sendingAgeDays(
+        s.connected_at ? Math.max(0, (now.getTime() - new Date(s.connected_at).getTime()) / DAY) : 0,
+        skipWarmup,
+      ),
       invitesToday: mine.filter((x) => x.scheduled_sends?.linkedin_stage === "invite").length,
       messagesToday: mine.filter((x) => x.scheduled_sends?.linkedin_stage !== "invite").length,
       invitesThisWeek: weekSends.filter((x) => x.linkedin_account_id === s.id && x.scheduled_sends?.linkedin_stage === "invite").length,

@@ -5,6 +5,7 @@ import {
   LINKEDIN_STEADY_DAILY_MESSAGES,
   dailyAllowance,
   paceWithJitter,
+  sendingAgeDays,
 } from "./safety-limits";
 
 describe("dailyAllowance", () => {
@@ -59,5 +60,17 @@ describe("linkedin message cap", () => {
   });
   it("defaults to invite behavior when kind is omitted", () => {
     expect(dailyAllowance("linkedin", 3)).toBe(5); // ramp step unchanged
+  });
+});
+
+describe("sendingAgeDays", () => {
+  it("gives the admin workspace the steady invite allowance on day one", () => {
+    expect(dailyAllowance("linkedin", sendingAgeDays(3, true))).toBe(LINKEDIN_STEADY_DAILY_INVITES);
+    expect(dailyAllowance("linkedin", sendingAgeDays(0, true))).toBe(LINKEDIN_STEADY_DAILY_INVITES);
+  });
+
+  it("keeps the warmup ramp for every other account", () => {
+    expect(sendingAgeDays(3, false)).toBe(3);
+    expect(dailyAllowance("linkedin", sendingAgeDays(3, false))).toBe(5);
   });
 });

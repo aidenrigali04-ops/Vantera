@@ -9,6 +9,7 @@ import {
   RemoveLinkedInButton,
   RefreshLinkedInButton,
 } from "./channels-forms";
+import { accountSkipsPayment } from "@/lib/billing/founder-exempt";
 import { reconcileLinkedInAccounts } from "@/lib/linkedin/sync";
 
 export const metadata = { title: "Senders" };
@@ -48,6 +49,7 @@ export default async function ChannelsPage({
     .order("created_at", { ascending: true });
 
   const outreachPaused = accountRow?.outreach_paused ?? false;
+  const skipWarmup = accountRow?.id ? await accountSkipsPayment(supabase, accountRow.id) : false;
   const linkedinAccounts = linkedinRows ?? [];
 
   // P1 safety visibility: the pacing the Safety page promises, shown against real counts.
@@ -206,9 +208,10 @@ export default async function ChannelsPage({
                   </div>
                   <p className="text-xs text-muted-foreground">
                     {c.invites7d} of {WEEKLY_INVITE_CEILING} invites this week · {c.invitesToday} today ·{" "}
-                    {c.messagesToday} of {DAILY_MESSAGES} messages today. New accounts ramp gradually
-                    (5→10→15→20/day over four weeks) — these ceilings protect your account and can&apos;t
-                    be raised past the safe line.
+                    {c.messagesToday} of {DAILY_MESSAGES} messages today.
+                    {skipWarmup
+                      ? " This account sends at the steady pace."
+                      : " New accounts ramp gradually (5→10→15→20/day over four weeks) — these ceilings protect your account and can't be raised past the safe line."}
                   </p>
                   {/* R6: send-window visibility — why outreach looks "quiet" at night/weekends
                       (source of truth: send-window.ts, enforced on sequence sends only). */}

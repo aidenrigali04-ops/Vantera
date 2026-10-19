@@ -1,5 +1,6 @@
 import { and, asc, count, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, max, or, sql } from "drizzle-orm";
 import { LIFECYCLE_ADMIN_EMAIL } from "./lifecycle-outreach";
+import { sendingAgeDays } from "./safety-limits";
 import { exemptFromTrialCaps, statusForTrialCaps } from "./trial-caps";
 import {
   accountDeletionRequests,
@@ -853,11 +854,11 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         ?.channels;
 
       const now = Date.now();
+      const skipWarmup = await accountExemptFromTrialCaps(accountId);
+      const rawAge = li?.connectedAt ? Math.floor((now - li.connectedAt.getTime()) / 86_400_000) : null;
       return {
         linkedinConnected: Boolean(li),
-        linkedinAccountAgeDays: li?.connectedAt
-          ? Math.floor((now - li.connectedAt.getTime()) / 86_400_000)
-          : null,
+        linkedinAccountAgeDays: rawAge == null ? null : sendingAgeDays(rawAge, skipWarmup),
         linkedinEnabled: channels?.linkedin ?? Boolean(li),
       };
     },
@@ -1914,15 +1915,17 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           )
         );
 
+      const skipWarmup = await accountExemptFromTrialCaps(accountId);
       return accts.map((a) => {
         const mine = sends.filter((s) => s.liId === a.id);
         const sentToday = mine.filter((s) => s.stage === "invite" && s.sentAt >= dayStart).length;
         const last7d = mine.filter((s) => s.stage === "invite").length;
         const sentTodayMessages = mine.filter((s) => s.stage === "message" && s.sentAt >= dayStart).length;
         const lastAssignedAt = mine.reduce((m, s) => Math.max(m, s.sentAt.getTime()), 0);
-        const ageDays = a.connectedAt
+        const rawAge = a.connectedAt
           ? Math.floor((now.getTime() - a.connectedAt.getTime()) / 86_400_000)
           : 0;
+        const ageDays = sendingAgeDays(rawAge, skipWarmup);
         return {
           linkedinAccountId: a.id,
           ageDays,
