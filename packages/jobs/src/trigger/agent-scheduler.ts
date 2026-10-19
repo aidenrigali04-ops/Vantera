@@ -2,6 +2,7 @@ import { logger, schedules, tasks } from "@trigger.dev/sdk";
 import { createDb } from "@vantera/db";
 import { createPgStore } from "../pipeline/pg-store";
 import { computeNextRunAt } from "../pipeline/schedule";
+import { taskForDueAgent } from "../pipeline/subject";
 
 /**
  * Cron scan over live scheduled agents (Scout + Intent). Schedule state lives in our DB
@@ -9,8 +10,9 @@ import { computeNextRunAt } from "../pipeline/schedule";
  * dispatches its own run task.
  *
  * Also fires the account-health reconcile, the reply-backlog safeguard, the lifecycle-outreach
- * tick, the trial-ending heads-up, and the pull-back email each run (plain tasks piggybacking
- * this cron: the plan's schedule quota is at 10/10 — an 11th schedule fails every deploy).
+ * tick, the trial-ending heads-up, the pull-back email, and subject calibration each run
+ * (plain tasks piggybacking this cron: the plan's schedule quota is at 10/10 — an 11th
+ * schedule fails every deploy). Calibration no-ops until a subject exists.
  */
 export const agentScheduler = schedules.task({
   id: "agent-scheduler",
@@ -20,7 +22,8 @@ export const agentScheduler = schedules.task({
     const now = new Date();
     const due = await store.getDueAgents(now);
     for (const agent of due) {
-      const taskId = agent.kind === "intent" ? "intent-scan" : "scout-run";
+      const taskId = taskForDueAgent(agent.kind);
+      if (!taskId) continue;
       await tasks.trigger(taskId, { agentId: agent.id, accountId: agent.accountId }, { concurrencyKey: agent.accountId });
       await store.advanceSchedule(
         agent.id,
@@ -32,6 +35,7 @@ export const agentScheduler = schedules.task({
     await tasks.trigger("lifecycle-outreach", {});
     await tasks.trigger("trial-ending", {});
     await tasks.trigger("pullback-email", {});
+    await tasks.trigger("calibrate-accounts", {});
     logger.info("agent scheduler tick", { due: due.length });
     return { triggered: due.length };
   },

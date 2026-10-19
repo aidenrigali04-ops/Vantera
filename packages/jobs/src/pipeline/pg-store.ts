@@ -76,6 +76,7 @@ import {
 } from "@vantera/agent-brains";
 import { resolveEntitlements, TRIAL_DAYS, type EntitlementSnapshot } from "@vantera/billing";
 import type { ClosedDeal, CrmProvider } from "@vantera/crm-infra";
+import { calibrationCheckedAt, withCalibration, type CalibrationStore, type StoredCalibration } from "./calibrate-accounts";
 import type { AccountDeletionStore } from "./account-deletion";
 import type { TrialEndingAccount } from "./trial-ending";
 import type { CrmPushStore } from "./crm-push";
@@ -430,7 +431,7 @@ async function creditAlphaWealth(tx: OptimizeTx, accountId: string): Promise<voi
 }
 
 /** Drizzle-backed store used by the Trigger.dev tasks (service-role DATABASE_URL). */
-export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerStore & RetentionStore & TrialStore & SendDispatchStore & OutreachSendStore & InboundStore & SequenceStore & SequenceTouchStore & ConversionStore & RefreshLeadStore & QualifyLeadStore & IntentScanStore & ConnectionSyncStore & OptimizeStore & AgentRunStore & FastPassStore & StrategyStampStore {
+export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerStore & RetentionStore & TrialStore & SendDispatchStore & OutreachSendStore & InboundStore & SequenceStore & SequenceTouchStore & ConversionStore & RefreshLeadStore & QualifyLeadStore & IntentScanStore & ConnectionSyncStore & OptimizeStore & AgentRunStore & FastPassStore & StrategyStampStore & CalibrationStore {
   async function upsertStrategy(accountId: string, genome: StrategyGenome, source: StrategySource): Promise<string> {
     const signature = genomeSignature(genome);
     const [row] = await db
@@ -1252,6 +1253,33 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
       );
     },
 
+    async listCalibrationSubjects() {
+      // Kind `optimizer` is added in the production-wiring phase. Until a subject exists,
+      // this matches nothing, and calibration does not run for the account.
+      const rows = await db
+        .select({ id: agents.id, accountId: agents.accountId, config: agents.config })
+        .from(agents)
+        .where(and(sql`${agents.kind} = 'optimizer'`, eq(agents.status, "live")));
+      return rows.map((row) => ({
+        accountId: row.accountId,
+        agentId: row.id,
+        checkedAt: calibrationCheckedAt(row.config),
+      }));
+    },
+
+    async saveCalibration(agentId, accountId, calibration: StoredCalibration) {
+      const [row] = await db
+        .select({ config: agents.config })
+        .from(agents)
+        .where(and(eq(agents.id, agentId), eq(agents.accountId, accountId), sql`${agents.kind} = 'optimizer'`))
+        .limit(1);
+      if (!row) return;
+      await db
+        .update(agents)
+        .set({ config: withCalibration(row.config, calibration), updatedAt: new Date() })
+        .where(and(eq(agents.id, agentId), eq(agents.accountId, accountId), sql`${agents.kind} = 'optimizer'`));
+    },
+
     // ── OptimizeStore (decide pipeline) ──────────────────────────────────────
 
     async getRunningExperiments() {
@@ -1665,7 +1693,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         .from(agents)
         .where(
           and(
-            inArray(agents.kind, ["scout", "intent"]),
+            inArray(agents.kind, ["scout", "intent", "optimizer"]),
             eq(agents.status, "live"),
             or(isNull(agents.nextRunAt), lte(agents.nextRunAt, now))
           )
@@ -2877,14 +2905,14 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
 export interface DueAgent {
   id: string;
   accountId: string;
-  kind: "scout" | "copy" | "intent";
+  kind: "scout" | "copy" | "intent" | "optimizer";
   runAtTime: string | null;
   cadence: "daily" | "weekly" | null;
   timezone: string;
 }
 
 export interface SchedulerStore {
-  /** Live agents whose schedule is due — the scheduled kinds (scout + intent) only. */
+  /** Live agents whose schedule is due — scout, intent, and a subject (optimizer). */
   getDueAgents(now: Date): Promise<DueAgent[]>;
   advanceSchedule(agentId: string, nextRunAt: Date): Promise<void>;
 }

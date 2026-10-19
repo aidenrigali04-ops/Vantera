@@ -209,6 +209,14 @@ export {
   type StrategySource,
 } from "./optimize/cohort";
 export type { FunnelCohort } from "./research/calibrate";
+export {
+  checkHoldout,
+  fitRanges,
+  type FitResult,
+  type HoldoutReport,
+  type HoldoutStatus,
+} from "./research/calibrate";
+export { releaseWorldCache } from "./research/evaluator";
 export { buildSendRecipe, type SendRecipe, type RecipeBrain } from "./optimize/recipe";
 export { validateRecipeAngle } from "./optimize/angle";
 export { strategySignature, aggregateBySignature, chooseChallenger } from "./optimize/bandit";

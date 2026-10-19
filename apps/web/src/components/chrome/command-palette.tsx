@@ -4,6 +4,7 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   BookOpen,
+  Brain,
   CalendarCheck2,
   ChartBar,
   CreditCard,
@@ -38,6 +39,7 @@ const DESTINATION_ICON: Record<PaletteKey, LucideIcon> = {
   inbox: Inbox,
   prospects: Users,
   playbook: BookOpen,
+  learning: Brain,
   meetings: CalendarCheck2,
   analytics: ChartBar,
   pipeline: SquareKanban,
