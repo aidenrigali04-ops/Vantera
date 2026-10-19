@@ -1,5 +1,6 @@
 import { and, asc, count, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, max, or, sql } from "drizzle-orm";
 import { LIFECYCLE_ADMIN_EMAIL } from "./lifecycle-outreach";
+import { exemptFromTrialCaps, statusForTrialCaps } from "./trial-caps";
 import {
   accountDeletionRequests,
   accountMembers,
@@ -478,6 +479,17 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
     );
   }
 
+  async function accountExemptFromTrialCaps(accountId: string): Promise<boolean> {
+    const rows = await db.execute<{ email: string | null }>(sql`
+      select u.email
+      from public.account_members m
+      join auth.users u on u.id = m.user_id
+      where m.account_id = ${accountId}
+        and m.role in ('owner', 'admin')
+    `);
+    return exemptFromTrialCaps(rows.map((r) => r.email).filter((e): e is string => Boolean(e)));
+  }
+
   return {
     async getScoutContext(agentId: string): Promise<ScoutContext | null> {
       const [agent] = await db.select().from(agents).where(eq(agents.id, agentId));
@@ -506,6 +518,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           websiteScan: account.websiteScan as ScoutContext["account"]["websiteScan"],
           websiteScannedAt: account.websiteScannedAt,
           subscriptionStatus: account.subscriptionStatus,
+          trialCapsExempt: await accountExemptFromTrialCaps(agent.accountId),
           // features.intent (Growth/Scale) — billing is the single source of truth (Phase 15)
           intentEnabled: resolveEntitlements({
             plan: account.plan as EntitlementSnapshot["plan"],
@@ -1797,6 +1810,11 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         for (const r of inFlightAgg) inFlightLeads.add(r.leadId);
       }
 
+      const exemptAccounts = new Set<string>();
+      for (const accountId of new Set(rows.map((r) => r.accountId))) {
+        if (await accountExemptFromTrialCaps(accountId)) exemptAccounts.add(accountId);
+      }
+
       return rows.map((r) => ({
         id: r.id,
         accountId: r.accountId,
@@ -1811,7 +1829,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         leadInvitedAt: r.leadInvitedAt,
         leadConnectedAt: r.leadConnectedAt,
         leadAssignedSenderId: r.leadAssignedSenderId,
-        subscriptionStatus: r.subscriptionStatus,
+        subscriptionStatus: statusForTrialCaps(r.subscriptionStatus, exemptAccounts.has(r.accountId)),
         leadLastMessageSentAt: lastSentByLead.get(r.leadId) ?? null,
         leadRepliedAt: lastReplyByLead.get(r.leadId) ?? null,
         leadHasInFlightMessage: inFlightLeads.has(r.leadId),

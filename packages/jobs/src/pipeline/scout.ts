@@ -1,5 +1,6 @@
 import { applyRulesGate, isScanStale, allocateDiscovery } from "@vantera/agent-brains";
 import { computeRunTarget, computeDiscoveryTarget, dailyOutreachCapacity } from "./capacity";
+import { discoveryIdleReason, statusForTrialCaps } from "./trial-caps";
 import { rankWithCompleteness } from "./rank-complete";
 import type { RankCandidate, LeadOutcomeFlags } from "@vantera/agent-brains";
 import { companyKey, icpCriteriaToFilters, type CompanyRef, type EnrichedProspect, type IcpCriteria, type ProspectSignal } from "@vantera/prospect-data";
@@ -77,20 +78,35 @@ export async function runScout(agentId: string, deps: ScoutDeps): Promise<ScoutR
 
   const capacity = await deps.store.getOutreachCapacity(accountId);
   const totalLeads = await deps.store.countAccountLeads(accountId);
+  const subscriptionStatus = statusForTrialCaps(
+    ctx.account.subscriptionStatus,
+    ctx.account.trialCapsExempt === true
+  );
 
   // ── Phase 1: discovery (overscan) ──────────────────────────────────────────
   // Decoupled from send capacity — pull a cost-capped, cadence-scaled batch to refill the qualified
   // pool until it reaches the target, then idle. Trial accounts are bounded by TRIAL_LEAD_CAP; with
   // no channel connected we source only a small bounded preview so prospects still land.
+  // A workspace trial-expiry never lapses stays exempt, or the cap would zero every later run.
+  const dailyCapacity = dailyOutreachCapacity(capacity);
   let discoveryTarget = computeDiscoveryTarget({
-    dailyCapacity: dailyOutreachCapacity(capacity),
+    dailyCapacity,
     qualifiedPool: await deps.store.countQualifiedPool(accountId),
     cadenceDays,
     totalLeads,
   });
-  if (ctx.account.subscriptionStatus === "trialing") {
+  const discoveryBeforeTrialClamp = discoveryTarget;
+  const trialing = subscriptionStatus === "trialing";
+  if (trialing) {
     discoveryTarget = Math.min(discoveryTarget, Math.max(0, TRIAL_LEAD_CAP - totalLeads));
   }
+  const idleReason = discoveryIdleReason({
+    dailyCapacity,
+    discoveryBeforeTrialClamp,
+    discoveryTarget,
+    totalLeads,
+    trialing,
+  });
 
   let discovered = 0;
   let gatePassed = 0;
@@ -305,6 +321,7 @@ export async function runScout(agentId: string, deps: ScoutDeps): Promise<ScoutR
 
   return {
     status: "completed",
+    ...(idleReason ? { reason: idleReason } : {}),
     discoveryTarget,
     criteriaDerived,
     criteriaPending,

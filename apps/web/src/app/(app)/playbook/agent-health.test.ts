@@ -27,6 +27,11 @@ describe("agentAttention", () => {
     ).toBeNull();
   });
 
+  it("a trial-cap idle tells the owner sourcing stopped, not that the search failed", () => {
+    const r = run({ summary: { discoveryTarget: 0, discovered: 0, gatePassed: 0, qualified: 0, reason: "trial_cap" } });
+    expect(agentAttention({ kind: "scout", status: "live", linkedinActive: 1, lastRun: r })).toMatch(/lead limit/);
+  });
+
   it("dead-scout class: target > 0 with 0 discovered surfaces to the user", () => {
     const r = run({ summary: { discoveryTarget: 25, discovered: 0, gatePassed: 0, qualified: 0 } });
     expect(agentAttention({ kind: "scout", status: "live", linkedinActive: 1, lastRun: r })).toMatch(/0 prospects/);
@@ -77,6 +82,23 @@ describe("runLine", () => {
     expect(runLine(run({ kind: "intent", summary: { observed: 12, intent: 4, qualified: 2 } }))).toBe(
       "12 observed → 4 showing intent → 2 qualified"
     );
+  });
+
+  it("does not report a trial-cap idle as a gate that passed nothing", () => {
+    const line = runLine(
+      run({ summary: { discoveryTarget: 0, discovered: 0, gatePassed: 0, qualified: 0, reason: "trial_cap" } })
+    );
+    expect(line).toBe("Sourcing paused — trial lead limit reached");
+    expect(line).not.toMatch(/passed gate/);
+  });
+
+  it("names a full pool and a missing connection instead of a zero gate", () => {
+    expect(
+      runLine(run({ summary: { discoveryTarget: 0, discovered: 0, gatePassed: 0, qualified: 0, reason: "pool_full" } }))
+    ).toBe("Sourcing paused — the qualified pool is full");
+    expect(
+      runLine(run({ summary: { discoveryTarget: 0, discovered: 0, gatePassed: 0, qualified: 0, reason: "preview_full" } }))
+    ).toBe("Sourcing paused — connect LinkedIn to keep finding prospects");
   });
 
   it("names skip reasons and failures honestly", () => {

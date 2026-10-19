@@ -337,8 +337,25 @@ describe("runScout", () => {
     // completes (the draft phase may drain any existing qualified pool — none here, no copy agent).
     expect(summary.status).toBe("completed");
     expect(summary.discovered).toBe(0);
+    expect(summary.reason).toBe("trial_cap");
     expect(store.enriched).toEqual([]);
     expect(prospectData.enrichCalls).toEqual([]);
+  });
+
+  it("a workspace the trial never lapses still sources after the trial lead ceiling", async () => {
+    const pool = [makeCandidate({ externalRef: "good", industry: "saas" })];
+    const store = new FakeScoutStore(
+      makeContext({ subscriptionStatus: "trialing", trialCapsExempt: true })
+    );
+    store.leadCount = TRIAL_LEAD_CAP;
+    const { deps } = makeDeps(store, pool, { good: 90 });
+
+    const summary = await runScout("scout1", deps);
+
+    expect(summary.status).toBe("completed");
+    expect(summary.reason).toBeUndefined();
+    expect(summary.discovered).toBeGreaterThan(0);
+    expect(store.enriched).toEqual(["good"]);
   });
 
   it("trial cap: a trialing account under the ceiling still prospects", async () => {
