@@ -842,6 +842,8 @@ export interface DispatchableSend {
   leadAssignedSenderId: string | null;
   /** Drives the trial send cap; 'trialing' accounts are bounded by TRIAL_SEND_CAP. */
   subscriptionStatus: string;
+  /** Admin workspace: no trial send cap and no weekday send window. */
+  unconstrained?: boolean;
 }
 
 /** One of a tenant's connected LinkedIn sender accounts, with its current safety state.

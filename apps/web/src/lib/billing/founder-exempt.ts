@@ -1,17 +1,16 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 /**
- * The founder workspace does not enter payment details. The email is the session
- * user from Supabase Auth, and the role is the membership on the session's account.
- * A request body cannot grant this.
+ * The founder workspace is an admin account with no plan or payment constraints.
+ * The email is the session user from Supabase Auth. A request body cannot grant this.
+ * Membership role does not turn it off.
  */
 export const FOUNDER_BILLING_EMAIL = "aiden@vanterasystem.com";
 
 export function isFounderBillingExempt(
   email: string | null | undefined,
-  role: string | null | undefined,
+  _role?: string | null,
 ): boolean {
-  if (role !== "owner" && role !== "admin") return false;
   return (email ?? "").trim().toLowerCase() === FOUNDER_BILLING_EMAIL;
 }
 

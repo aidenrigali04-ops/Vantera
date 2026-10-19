@@ -1,5 +1,5 @@
 import { applyRulesGate, isScanStale, allocateDiscovery } from "@vantera/agent-brains";
-import { computeRunTarget, computeDiscoveryTarget, dailyOutreachCapacity } from "./capacity";
+import { computeRunTarget, computeDiscoveryTarget, dailyOutreachCapacity, DISCOVERY_PER_RUN_CAP } from "./capacity";
 import { discoveryIdleReason, statusForTrialCaps } from "./trial-caps";
 import { rankWithCompleteness } from "./rank-complete";
 import type { RankCandidate, LeadOutcomeFlags } from "@vantera/agent-brains";
@@ -99,6 +99,10 @@ export async function runScout(agentId: string, deps: ScoutDeps): Promise<ScoutR
   const trialing = subscriptionStatus === "trialing";
   if (trialing) {
     discoveryTarget = Math.min(discoveryTarget, Math.max(0, TRIAL_LEAD_CAP - totalLeads));
+  }
+  // This workspace is an admin account: trial ceiling and a full pool must not stop sourcing.
+  if (ctx.account.trialCapsExempt && dailyCapacity > 0 && discoveryTarget === 0) {
+    discoveryTarget = DISCOVERY_PER_RUN_CAP * cadenceDays;
   }
   const idleReason = discoveryIdleReason({
     dailyCapacity,

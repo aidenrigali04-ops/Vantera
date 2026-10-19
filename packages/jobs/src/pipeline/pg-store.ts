@@ -1830,6 +1830,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         leadConnectedAt: r.leadConnectedAt,
         leadAssignedSenderId: r.leadAssignedSenderId,
         subscriptionStatus: statusForTrialCaps(r.subscriptionStatus, exemptAccounts.has(r.accountId)),
+        unconstrained: exemptAccounts.has(r.accountId),
         leadLastMessageSentAt: lastSentByLead.get(r.leadId) ?? null,
         leadRepliedAt: lastReplyByLead.get(r.leadId) ?? null,
         leadHasInFlightMessage: inFlightLeads.has(r.leadId),

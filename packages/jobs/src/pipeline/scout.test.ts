@@ -358,6 +358,21 @@ describe("runScout", () => {
     expect(store.enriched).toEqual(["good"]);
   });
 
+  it("an admin workspace keeps sourcing after the qualified pool is full", async () => {
+    const pool = [makeCandidate({ externalRef: "good", industry: "saas" })];
+    const store = new FakeScoutStore(
+      makeContext({ subscriptionStatus: "trialing", trialCapsExempt: true })
+    );
+    store.leadCount = TRIAL_LEAD_CAP;
+    store.qualifiedPoolOverride = 300;
+    const { deps } = makeDeps(store, pool, { good: 90 });
+
+    const summary = await runScout("scout1", deps);
+
+    expect(summary.reason).toBeUndefined();
+    expect(summary.discovered).toBeGreaterThan(0);
+  });
+
   it("trial cap: a trialing account under the ceiling still prospects", async () => {
     const pool = [makeCandidate({ externalRef: "good", industry: "saas" })];
     const store = new FakeScoutStore(makeContext({ subscriptionStatus: "trialing" }));

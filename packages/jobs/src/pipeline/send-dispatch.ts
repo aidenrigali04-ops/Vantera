@@ -75,7 +75,7 @@ export async function runSendDispatch(deps: SendDispatchDeps): Promise<SendDispa
     // (rule 04/11 channel ceilings still apply on top). Bounds deliverability and per-send
     // COGS until conversion; paid accounts are unbounded here.
     let trialRemaining = Number.POSITIVE_INFINITY;
-    if (rows[0]?.subscriptionStatus === "trialing") {
+    if (!rows[0]?.unconstrained && rows[0]?.subscriptionStatus === "trialing") {
       trialRemaining = Math.max(0, TRIAL_SEND_CAP - (await deps.store.countAccountSends(accountId)));
       if (trialRemaining <= 0) {
         skipped += active.length;
@@ -140,7 +140,7 @@ export async function runSendDispatch(deps: SendDispatchDeps): Promise<SendDispa
       // Proactive sends wait for the prospect's business hours (0044): 62% of sends had gone
       // out on weekends, and reply data + account-safety both favor weekday working hours.
       // Reply-responses and human-typed sends are exempt — answering promptly is human.
-      if (row.origin === "sequence" && !isWithinSendWindow(now, row.leadLocation)) {
+      if (row.origin === "sequence" && !row.unconstrained && !isWithinSendWindow(now, row.leadLocation)) {
         skipped += 1; // outside the prospect's window — re-evaluated next tick
         continue;
       }
