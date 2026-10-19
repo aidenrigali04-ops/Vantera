@@ -75,7 +75,9 @@ export async function loadBillingRow(
   if (data.stripe_subscription_id || !(await accountSkipsPayment(supabase, data.id))) return row;
   return {
     ...row,
-    plan: row.plan && row.plan !== "none" ? row.plan : "growth",
+    plan: "scale",
     subscription_status: "active",
+    seats_purchased: Math.max(row.seats_purchased, 999),
+    linkedin_accounts_purchased: Math.max(row.linkedin_accounts_purchased, 999),
   };
 }
