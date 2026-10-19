@@ -36,7 +36,9 @@ Two systems already exist. Wire them into one loop with a strict division of lab
 
 ---
 
-## 2. The loop (per account, on a Trigger.dev cadence)
+## 2. The loop (per subject, on a Trigger.dev cadence)
+
+The cadence runs only for an account that has created a subject on the Machine Learning page. An account with no subject is not calibrated, not proposed for, and not experimented on. Creating the subject — the user does it, or the AI creates the first one from that page — is what starts this loop. See the production-wiring spec.
 
 ```
 1. WARM-START   calibrate.ts fits this account's six funnel base rates from its real cohort
@@ -102,7 +104,7 @@ Slot as a new roadmap block in `docs/roadmap.md` (e.g. "Phase 14 — Adaptive pr
 - **Full plan:** `docs/superpowers/plans/2026-10-17-adaptive-prospecting-A1-instrumentation.md`.
 
 ### A2 — Per-account calibration job
-- **Build:** a Trigger.dev cron (thin wrapper → pure core, rule 13) that, per account with enough cohort data, runs `calibrate.fitRanges` and stores fitted `WORLD_RANGES` + the `checkHoldout` status (drift monitor). `releaseWorldCache()` between accounts.
+- **Build:** a Trigger.dev cron (thin wrapper → pure core, rule 13) that, per account **that has a subject** and enough cohort data, runs `calibrate.fitRanges` and stores fitted `WORLD_RANGES` + the `checkHoldout` status (drift monitor). Accounts with no subject are skipped. `releaseWorldCache()` between accounts.
 - **DoD:** pure core unit-tested with fake cohorts (fitted vs thin → assumed); drift status persisted; no account below the sample gate gets a fitted range (prior stands); help article.
 
 ### A3 — Proposer bridge (hive → candidate)
@@ -134,6 +136,7 @@ DO NOT BREAK (Vantera closed-loop build):
 - Brain purity: packages/agent-brains imports no Trigger.dev/drizzle/DB (purity.test.ts). Loop wiring
   lives in packages/jobs with deps injected via interfaces (rule 13). Single AI entry (rule 02).
 - Deliberator (LLM) stays OFF in the loop. releaseWorldCache() between accounts.
+- Learning stays off until the account has a subject on the Machine Learning page. No platform-wide cron, tile, or Playbook control starts it.
 - Do not touch the hive's governor gates, paired eval, sealed-oracle flag, falsifier, or harm guardrail.
 - RLS in the same migration as any new table; retention note per rule 11; no vendor names on any
   user-facing surface; a feature isn't done without its help-content article (rule 09).

@@ -94,7 +94,7 @@ The counting logic is pure and lives with the other optimize math (keeps `purity
 
 ## Out of scope for A1 (explicitly — do not let Cursor build ahead)
 
-- No calibration run (A2). No hive/proposer (A3). No experiments created or arms allocated (A4). No cold-start pooling (A5). No `optimizer` agent kind / UI / bootstrap (those are the production-wiring spec, phases B0–B3).
+- No calibration run (A2). No hive/proposer (A3). No experiments created or arms allocated (A4). No cold-start pooling (A5). No `optimizer` agent kind / UI / bootstrap (those are the production-wiring spec, phases B0–B3). The entry stamp is a record, not the start of learning. Learning stays off until a subject exists on the Machine Learning page.
 - No gene flipped to `wired`. No change to the hive, the governor, or `decide-v2`. No new sends.
 
 ---
