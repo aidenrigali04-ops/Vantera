@@ -1,6 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
+import { loadOutreachDiagnosis } from "@/lib/optimize";
+import { OutreachDiagnosis } from "../analytics/outreach-diagnosis";
 import { setSubjectStatus } from "./actions";
 import { CreateSubjectForm } from "./create-subject-form";
 
@@ -20,6 +22,7 @@ export default async function LearningPage({
     .select("id, name, status")
     .eq("kind", "optimizer")
     .maybeSingle<SubjectRow>();
+  const outreach = subject ? await loadOutreachDiagnosis(supabase) : null;
 
   return (
     <div className="mx-auto flex w-full min-w-0 max-w-[1400px] flex-col">
@@ -51,7 +54,11 @@ export default async function LearningPage({
             </Button>
           </form>
         </Panel>
-      ) : (
+      ) : null}
+
+      {outreach ? <div className="mt-6"><OutreachDiagnosis vm={outreach} /></div> : null}
+
+      {!subject ? (
         <Panel className="max-w-xl p-8">
           <h2 className="text-xl font-semibold tracking-tight">Create the first subject</h2>
           <p className="mt-3 text-sm text-muted-foreground">
@@ -61,7 +68,7 @@ export default async function LearningPage({
             <CreateSubjectForm />
           </div>
         </Panel>
-      )}
+      ) : null}
     </div>
   );
 }

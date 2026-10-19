@@ -1,14 +1,14 @@
 ---
 title: What's working — how Vera tests and improves your outreach
 surface: analytics
-routes: /dashboard?view=analytics
+routes: /learning, /dashboard?view=analytics
 ---
 
 # What's working
 
-On the **Analytics** tab, the **What's working** panel is the visible face of Vera's improvement
+On **Learning**, the **What's working** panel is the visible face of Vera's improvement
 loop: your outreach funnel, what Vera is testing right now, and the latest adoption — with the
-proof behind each.
+proof behind each. Learning stays off until this workspace has a subject.
 
 ## Where Vera starts
 
