@@ -8,6 +8,7 @@ export type PaletteKey =
   | "inbox"
   | "prospects"
   | "playbook"
+  | "learning"
   | "meetings"
   | "analytics"
   | "pipeline"
@@ -32,6 +33,7 @@ export const PALETTE_DESTINATIONS: readonly PaletteDestination[] = [
   { key: "inbox", label: "Inbox", href: "/inbox", keywords: ["replies", "conversations", "messages"] },
   { key: "prospects", label: "Prospects", href: "/prospects", keywords: ["leads", "people", "contacts"] },
   { key: "playbook", label: "Playbook", href: "/playbook", keywords: ["agents", "icp", "strategy", "targeting"] },
+  { key: "learning", label: "Learning", href: "/learning", keywords: ["machine learning", "subject", "experiments"] },
   { key: "meetings", label: "Meetings", href: "/meetings", keywords: ["calendar", "booked", "calls"] },
   { key: "analytics", label: "Analytics", href: "/dashboard?view=analytics", keywords: ["results", "stats", "reports", "numbers"] },
   { key: "pipeline", label: "Pipeline", href: "/dashboard?view=pipeline", keywords: ["deals", "stages", "kanban", "closed"] },

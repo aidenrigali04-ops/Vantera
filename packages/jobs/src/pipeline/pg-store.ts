@@ -1693,7 +1693,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         .from(agents)
         .where(
           and(
-            inArray(agents.kind, ["scout", "intent"]),
+            inArray(agents.kind, ["scout", "intent", "optimizer"]),
             eq(agents.status, "live"),
             or(isNull(agents.nextRunAt), lte(agents.nextRunAt, now))
           )
@@ -2905,14 +2905,14 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
 export interface DueAgent {
   id: string;
   accountId: string;
-  kind: "scout" | "copy" | "intent";
+  kind: "scout" | "copy" | "intent" | "optimizer";
   runAtTime: string | null;
   cadence: "daily" | "weekly" | null;
   timezone: string;
 }
 
 export interface SchedulerStore {
-  /** Live agents whose schedule is due — the scheduled kinds (scout + intent) only. */
+  /** Live agents whose schedule is due — scout, intent, and a subject (optimizer). */
   getDueAgents(now: Date): Promise<DueAgent[]>;
   advanceSchedule(agentId: string, nextRunAt: Date): Promise<void>;
 }

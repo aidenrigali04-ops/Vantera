@@ -2,6 +2,7 @@ import { logger, schedules, tasks } from "@trigger.dev/sdk";
 import { createDb } from "@vantera/db";
 import { createPgStore } from "../pipeline/pg-store";
 import { computeNextRunAt } from "../pipeline/schedule";
+import { taskForDueAgent } from "../pipeline/subject";
 
 /**
  * Cron scan over live scheduled agents (Scout + Intent). Schedule state lives in our DB
@@ -21,7 +22,8 @@ export const agentScheduler = schedules.task({
     const now = new Date();
     const due = await store.getDueAgents(now);
     for (const agent of due) {
-      const taskId = agent.kind === "intent" ? "intent-scan" : "scout-run";
+      const taskId = taskForDueAgent(agent.kind);
+      if (!taskId) continue;
       await tasks.trigger(taskId, { agentId: agent.id, accountId: agent.accountId }, { concurrencyKey: agent.accountId });
       await store.advanceSchedule(
         agent.id,
