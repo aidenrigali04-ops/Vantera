@@ -25,9 +25,14 @@ import type {
   ConversationMessageInput,
   ConversationTurn,
   CopyStrategy,
+  FunnelCohort,
   FunnelStageKey,
   GenerateRecipesInput,
   LeadOutcomeFlags,
+  StampArm,
+  StrategyGenome,
+  StrategySource,
+  VariantOutcome,
   ExperimentStatus,
   SendRecipe,
   JudgeFn,
@@ -451,6 +456,30 @@ export interface StartExperimentInput {
    * `optimization_playbook.alpha_wealth` in the same transaction as the insert (pg-store.ts).
    */
   alphaSpent: number;
+}
+
+/** A1 genome stamp. Writes a record at lead entry. Does not draft or send. */
+export type CohortWindow = { since?: Date; until?: Date };
+
+export interface StrategyStampStore {
+  upsertStrategy(accountId: string, genome: StrategyGenome, source: StrategySource): Promise<string>;
+  hasStrategyStamp(accountId: string, leadId: string): Promise<boolean>;
+  stampLead(
+    accountId: string,
+    leadId: string,
+    strategyId: string,
+    opts?: { experimentId?: string | null; arm?: StampArm }
+  ): Promise<void>;
+  /** Non-suppressed leads in the window, counted into the calibrate.ts cohort shape. */
+  getFunnelCohort(accountId: string, window?: CohortWindow): Promise<FunnelCohort>;
+  /**
+   * Per-arm outcomes for one experiment, from lead_strategy_stamp rows only.
+   * Empty arms when the experiment has no randomized stamps yet.
+   */
+  getVariantOutcomes(
+    accountId: string,
+    experimentId: string
+  ): Promise<Record<"champion" | "challenger", VariantOutcome>>;
 }
 
 export interface OptimizeStore {

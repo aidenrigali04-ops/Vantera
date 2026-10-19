@@ -1219,6 +1219,51 @@ export const optimizationPlaybook = pgTable("optimization_playbook", {
   alphaWealth: numeric("alpha_wealth", { mode: "number" }).notNull().default(0.05),
 });
 
+// 0065: full-funnel genome catalog. One row per distinct genome on an account.
+// agents.config.active_strategy_id (jsonb, no new column) may point at one of these later.
+// retention(strategies): kept for the life of the account; cascades on account deletion.
+export const strategies = pgTable(
+  "strategies",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    signature: text("signature").notNull(),
+    genome: jsonb("genome").notNull().default({}),
+    source: text("source", { enum: ["hive", "experiment", "manual", "default"] }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("strategies_account_signature_unique").on(t.accountId, t.signature)]
+);
+
+// 0065: one observational-or-experimental stamp per lead, written at entry.
+// experiment_id and arm stay null until a randomized arm exists. retention follows the lead.
+export const leadStrategyStamps = pgTable(
+  "lead_strategy_stamp",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    leadId: uuid("lead_id")
+      .notNull()
+      .references(() => leads.id, { onDelete: "cascade" }),
+    strategyId: uuid("strategy_id")
+      .notNull()
+      .references(() => strategies.id, { onDelete: "cascade" }),
+    experimentId: uuid("experiment_id").references(() => optimizationExperiments.id, {
+      onDelete: "set null",
+    }),
+    arm: text("arm", { enum: ["champion", "challenger"] }),
+    stampedAt: timestamp("stamped_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("lead_strategy_stamp_lead_unique").on(t.leadId),
+    index("lead_strategy_stamp_account_lead_idx").on(t.accountId, t.leadId),
+  ]
+);
+
 // ── 0018 conversion tokens ────────────────────────────────────────────────────
 
 // retention(conversion_tokens): one-shot tracked-CTA tokens; swept with the lead/campaign.
