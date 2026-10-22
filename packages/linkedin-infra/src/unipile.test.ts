@@ -708,6 +708,20 @@ describe("UnipileLinkedInInfra", () => {
       ]);
     });
 
+    it("listFollowers maps UserFollower rows from the connected profile's followers (ML-8)", async () => {
+      const adapter = infra({
+        "/users/followers": { object: "UserFollowersList", items: [
+          { object: "UserFollower", id: "ACoAA_f", urn: "urn:li:fsd_profile:ACoAA_f", name: "Fay", headline: "Head of RevOps", profile_url: "https://www.linkedin.com/in/fay", profile_picture_url: null, profile_picture_url_large: null },
+          { object: "UserFollower", id: "ACoAA_g", urn: "urn:li:fsd_profile:ACoAA_g", name: "Gus", headline: "CTO", profile_url: "", profile_picture_url: null, profile_picture_url_large: null },
+        ], cursor: null },
+      });
+      const followers = await adapter.listFollowers({ connectedAccountId: "c1", limit: 10 });
+      expect(followers).toEqual([
+        { profileUrl: "https://www.linkedin.com/in/fay", name: "Fay", headline: "Head of RevOps" },
+        { profileUrl: "https://www.linkedin.com/in/ACoAA_g", name: "Gus", headline: "CTO" },
+      ]);
+    });
+
     it("getProfile maps the UserProfile shape (no profile_url field; builds from public_identifier; no company)", async () => {
       const adapter = infra({
         "/users/lee": { object: "UserProfile", public_identifier: "lee", provider_id: "ACoAA_lee", first_name: "Lee", last_name: "Park", headline: "Head of CX", location: "Austin" },

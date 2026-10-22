@@ -215,6 +215,7 @@ describe("featureLabel", () => {
   it("turns feature keys into plain words", async () => {
     const { featureLabel } = await import("./learn");
     expect(featureLabel("signal:exec_hire")).toBe("New executive hire signal");
+    expect(featureLabel("signal:follow")).toBe("Followed you on LinkedIn");
     expect(featureLabel("seniority:founder")).toBe("Founders");
     expect(featureLabel("industry:saas")).toBe("SaaS industry");
     expect(featureLabel("size:11-50")).toBe("11-50 employees");

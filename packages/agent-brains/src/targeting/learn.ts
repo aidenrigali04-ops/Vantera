@@ -251,6 +251,7 @@ const SIGNAL_LABELS: Record<string, string> = {
   legal: "Legal event signal",
   security: "Security event signal",
   intent: "Buying-intent signal",
+  follow: "Followed you on LinkedIn",
   other: "Company news signal",
 };
 const SENIORITY_LABELS: Record<string, string> = {

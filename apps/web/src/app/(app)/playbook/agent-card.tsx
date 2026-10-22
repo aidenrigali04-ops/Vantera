@@ -19,7 +19,7 @@ export type AgentRow = {
   status: "draft" | "live" | "paused";
   config: Record<string, unknown> | null;
   run_at_time: string | null;
-  cadence: "daily" | "weekly" | null;
+  cadence: "daily" | "weekly" | "intraday" | null;
   timezone: string;
   next_run_at: string | null;
   last_run_at: string | null;
@@ -177,7 +177,7 @@ export function AgentCard({
                 : lastRanLabel
                   ? `Last ran ${lastRanLabel}`
                   : "Paused before its first run"}
-              {agent.cadence ? ` · every ${agent.cadence === "daily" ? "day" : "week"}` : ""}
+              {agent.cadence ? ` · every ${agent.cadence === "daily" ? "day" : agent.cadence === "intraday" ? "6 hours" : "week"}` : ""}
             </p>
           </div>
         )}

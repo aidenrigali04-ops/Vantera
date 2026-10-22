@@ -720,6 +720,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           accountId: agent.accountId,
           status: agent.status,
           config: (agent.config ?? {}) as Partial<IntentConfig>,
+          cadence: agent.cadence,
         },
         connectedAccountId: li?.ref ?? null,
         icps: icpRows
@@ -799,7 +800,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         .values({
           accountId,
           leadId,
-          kind: "intent",
+          kind: signal.kind ?? "intent",
           label: signal.label,
           detail: signal.detail,
           // the classifier's verdict level (high | medium) — an ML-1 learner feature
@@ -3214,7 +3215,7 @@ export interface DueAgent {
   accountId: string;
   kind: "scout" | "copy" | "intent";
   runAtTime: string | null;
-  cadence: "daily" | "weekly" | null;
+  cadence: "daily" | "weekly" | "intraday" | null;
   timezone: string;
 }
 

@@ -34,6 +34,7 @@ function makeStore(overrides: Partial<IntentScanStore> = {}) {
     scored: [] as { leadId: string; qualified: boolean }[],
     signals: [] as string[],
     signalLevels: [] as (string | undefined)[],
+    signalKinds: [] as (string | undefined)[],
     chained: null as { leadIds: string[] } | null,
     completed: false,
   };
@@ -62,6 +63,7 @@ function makeStore(overrides: Partial<IntentScanStore> = {}) {
     saveIntentSignal: async (leadId, _a, signal) => {
       calls.signals.push(leadId);
       calls.signalLevels.push(signal.level);
+      calls.signalKinds.push(signal.kind);
     },
     getRankFeedback: async () => ({ rejected: ["Recruiter | TalentCo | staffing"], positive: [] }),
     isSuppressed: async (_a, _k, value) => value === BLOCKED,
@@ -331,6 +333,105 @@ describe("runIntentScan", () => {
     expect(calls.scored.some((s) => s.leadId === `lead_${GOOD}`)).toBe(false);
     expect(calls.observations.find((r) => r.profileUrl === GOOD)?.outcome).toBe("rejected");
     expect(guidance.every((g) => g === "Avoid agencies")).toBe(true);
+  });
+
+  describe("followers — the warm, wordless signal (ML-8)", () => {
+    const FOLLOWER = "https://www.linkedin.com/in/fay";
+    const withFollower = () => {
+      const li = seededLinkedIn();
+      li.followers.push({ profileUrl: FOLLOWER, name: "Fay", headline: "Head of CX" });
+      li.profiles.set(FOLLOWER, { profileUrl: FOLLOWER, firstName: "Fay", lastName: "Ng", headline: "Head of CX", companyName: "Umbrella", location: "Austin" });
+      return li;
+    };
+
+    it("qualifies a follower through the same gate + rank as a 'follow' signal, with no classifier spend", async () => {
+      const { store, calls } = makeStore();
+      const deps = makeDeps(store);
+      deps.linkedin = withFollower();
+      const classified: string[] = [];
+      deps.classifyFn = async (obs) => {
+        classified.push(...obs.map((o) => (o as unknown as { profileUrl: string }).profileUrl));
+        return obs.map((o) => verdict(o.ref));
+      };
+      const rankSignals: { leadId: string; kind?: string }[] = [];
+      deps.rankFn = async (cands) => {
+        rankSignals.push(...cands.map((c) => ({ leadId: c.leadId, kind: c.signals?.[0]?.kind })));
+        return cands.map((c) => insight(c.leadId, 80));
+      };
+
+      const summary = await runIntentScan("intent-1", deps);
+
+      expect(classified).not.toContain(FOLLOWER); // nothing to judge, nothing to pay for
+      expect(calls.upserted).toContain(FOLLOWER);
+      expect(rankSignals.find((r) => r.leadId === `lead_${FOLLOWER}`)?.kind).toBe("follow");
+      const row = calls.observations.find((r) => r.profileUrl === FOLLOWER);
+      expect(row).toMatchObject({ signalKind: "follow", postRef: "follow", outcome: "enrolled" });
+      expect(calls.signalKinds).toContain("follow");
+      expect(summary.followers).toBe(1);
+    });
+
+    it("a follower who also commented is one person: their words win, the follow is only recorded", async () => {
+      const { store, calls } = makeStore();
+      const deps = makeDeps(store);
+      const li = seededLinkedIn();
+      li.followers.push({ profileUrl: GOOD, name: "Gwen", headline: "Head of CX" });
+      deps.linkedin = li;
+
+      await runIntentScan("intent-1", deps);
+
+      expect(calls.upserted.filter((u) => u === GOOD)).toHaveLength(1);
+      expect(calls.observations.find((r) => r.profileUrl === GOOD && r.signalKind === "follow")?.outcome).toBe("observed");
+      expect(calls.observations.find((r) => r.profileUrl === GOOD && r.signalKind === "engagement")?.outcome).toBe("enrolled");
+    });
+
+    it("runs on followers alone when the watchlist is empty, and a failed followers read never sinks the run", async () => {
+      const { store, calls, ctx } = makeStore();
+      ctx.agent.config = { ...ctx.agent.config, watch: { creators: [], competitors: [], keywords: [], hashtags: [] } };
+      const deps = makeDeps(store);
+      deps.linkedin = withFollower();
+      const s1 = await runIntentScan("intent-1", deps);
+      expect(s1.status).toBe("completed");
+      expect(calls.upserted).toContain(FOLLOWER);
+
+      const broken = seededLinkedIn();
+      broken.listFollowers = async () => {
+        throw new Error("provider down");
+      };
+      const d2 = makeDeps(makeStore().store);
+      d2.linkedin = broken;
+      const s2 = await runIntentScan("intent-1", d2);
+      expect(s2.status).toBe("completed");
+      expect(s2.sourcingErrors).toBe(1);
+    });
+
+    it("does nothing when follows are switched off", async () => {
+      const { store, calls, ctx } = makeStore();
+      ctx.agent.config = { ...ctx.agent.config, signals: { engagement: true, content: true, follows: false } };
+      const deps = makeDeps(store);
+      deps.linkedin = withFollower();
+      await runIntentScan("intent-1", deps);
+      expect(calls.upserted).not.toContain(FOLLOWER);
+    });
+  });
+
+  it("an intraday agent reads a quarter of the daily post budget per run, so LinkedIn reads stay flat (ML-8)", async () => {
+    const limits: number[] = [];
+    const run = async (cadence: "daily" | "intraday") => {
+      const { store, ctx } = makeStore();
+      ctx.agent.cadence = cadence;
+      const deps = makeDeps(store);
+      const li = seededLinkedIn();
+      const orig = li.listProfilePosts.bind(li);
+      li.listProfilePosts = async (req) => {
+        limits.push(req.limit);
+        return orig(req);
+      };
+      deps.linkedin = li;
+      await runIntentScan("intent-1", deps);
+    };
+    await run("daily");
+    await run("intraday");
+    expect(limits).toEqual([20, 5]);
   });
 });
 

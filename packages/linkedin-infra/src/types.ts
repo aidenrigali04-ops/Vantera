@@ -118,6 +118,16 @@ export interface GetProfileRequest {
   connectedAccountId: string;
   profileUrl: string;
 }
+export interface ListFollowersRequest {
+  connectedAccountId: string;
+  limit: number;
+}
+/** Someone who follows the connected profile — a warm, wordless signal (ML-8). */
+export interface LinkedInFollower {
+  profileUrl: string;
+  name: string | null;
+  headline: string | null;
+}
 
 /**
  * Provider-agnostic LinkedIn outreach interface (rule 04). Unipile is an
@@ -187,6 +197,9 @@ export interface LinkedInInfra {
   listPostEngagers(req: PostEngagersRequest): Promise<LinkedInEngager[]>;
   /** Resolve a profile URL into a contact candidate; null when the profile can't be read. */
   getProfile(req: GetProfileRequest): Promise<LinkedInProfile | null>;
+  /** People following the connected profile — the warm "follows you" signal. Read volume is
+   *  bounded by the scheduler (rule 04); each follower is processed once by the pipeline ledger. */
+  listFollowers(req: ListFollowersRequest): Promise<LinkedInFollower[]>;
   /**
    * Whether `profileUrl` is now a 1st-degree connection of the connected account — i.e. an invite
    * we sent was accepted. Used to backfill acceptances missed while the webhook was down. Returns

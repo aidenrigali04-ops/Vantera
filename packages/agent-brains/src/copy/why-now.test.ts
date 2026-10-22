@@ -28,6 +28,19 @@ describe("pickWhyNow", () => {
     expect(w?.text).toBe("New VP Sales joined");
   });
 
+  it("treats a new follow as a reason to reach out, below explicit intent but above company news (ML-8)", () => {
+    const w = pickWhyNow(
+      [
+        { kind: "funding", label: "Raised a round", detail: "x", observedAt: daysAgo(3) },
+        { kind: "follow", label: "Started following you on LinkedIn", detail: null, observedAt: daysAgo(1) },
+      ],
+      NOW
+    );
+    expect(w?.kind).toBe("follow");
+    expect(findMissingWhyNow("Thanks for the follow, Dana!", { kind: "follow", text: "Started following you on LinkedIn" })).toEqual([]);
+    expect(findMissingWhyNow("Dana, great to connect.", { kind: "follow", text: "Started following you on LinkedIn" })).toHaveLength(1);
+  });
+
   it("ignores stale or undated signals — an old event is not a why-now", () => {
     expect(pickWhyNow([{ kind: "funding", label: "Raised", detail: "x", observedAt: daysAgo(WHY_NOW_MAX_AGE_DAYS + 1) }], NOW)).toBeNull();
     expect(pickWhyNow([{ kind: "funding", label: "Raised", detail: "x", observedAt: null }], NOW)).toBeNull();

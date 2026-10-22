@@ -234,22 +234,32 @@ export interface CopyDraftPayload {
  *  own connected account, so the scheduler caps reads per run; not configurable upward. */
 export const INTENT_POSTS_PER_RUN = 20;
 export const INTENT_ENGAGERS_PER_POST = 25;
+/** ML-8: new followers processed per run (beyond this they wait for the next run — still followers). */
+export const INTENT_FOLLOWERS_PER_RUN = 25;
 
 export interface IntentConfig {
   watch: { creators: string[]; competitors: string[]; keywords: string[]; hashtags: string[] };
-  signals: { engagement: boolean; content: boolean };
+  /** follows (ML-8): people who start following the connected profile — warm, wordless */
+  signals: { engagement: boolean; content: boolean; follows?: boolean };
   /** qualification threshold (the same bar the Scout uses, rule 06) */
   minScore: number;
 }
 
 export const INTENT_DEFAULTS: IntentConfig = {
   watch: { creators: [], competitors: [], keywords: [], hashtags: [] },
-  signals: { engagement: true, content: true },
+  signals: { engagement: true, content: true, follows: true },
   minScore: 70,
 };
 
 export interface IntentScanContext {
-  agent: { id: string; accountId: string; status: string; config: Partial<IntentConfig> };
+  agent: {
+    id: string;
+    accountId: string;
+    status: string;
+    config: Partial<IntentConfig>;
+    /** ML-8: intraday runs split the per-run read budget so daily LinkedIn reads stay flat */
+    cadence?: "daily" | "weekly" | "intraday" | null;
+  };
   /** the LinkedIn account to read through (the account's active connection); null = can't read */
   connectedAccountId: string | null;
   /** qualification ICP — inherited from the account's Scout (intent qualifies against the same bar) */
@@ -263,7 +273,7 @@ export interface IntentScanContext {
 export interface IntentObservationRow {
   profileUrl: string;
   postRef: string;
-  signalKind: "engagement" | "content";
+  signalKind: "engagement" | "content" | "follow";
   watchTarget: string | null;
   headline: string | null;
   detail: string | null;
@@ -283,7 +293,11 @@ export interface IntentScanStore {
   markRulesGate(leadId: string, result: RulesGateResult): Promise<void>;
   saveScore(leadId: string, insights: LeadInsights, qualified: boolean): Promise<void>;
   /** capture the "why now" intent signal on the lead — feeds Surface A's why-now chip */
-  saveIntentSignal(leadId: string, accountId: string, signal: { label: string; detail: string; level?: string }): Promise<void>;
+  saveIntentSignal(
+    leadId: string,
+    accountId: string,
+    signal: { label: string; detail: string; level?: string; kind?: "intent" | "follow" }
+  ): Promise<void>;
   /** ML-1 fit feedback — same contract as ScoutStore.getRankFeedback */
   getRankFeedback(accountId: string): Promise<{ rejected: string[]; positive: string[] }>;
   /** the rule-11 gate: account + lowercased LinkedIn URL lookup against suppression_entries */
@@ -294,7 +308,7 @@ export interface IntentScanStore {
 
 export interface IntentScanDeps {
   store: IntentScanStore;
-  linkedin: Pick<LinkedInInfra, "searchPosts" | "listProfilePosts" | "listPostEngagers" | "getProfile">;
+  linkedin: Pick<LinkedInInfra, "searchPosts" | "listProfilePosts" | "listPostEngagers" | "getProfile" | "listFollowers">;
   classifyFn: (observations: IntentObservationInput[], ctx: IntentContext) => Promise<IntentVerdict[]>;
   rankFn: (candidates: RankCandidate[], ctx: RankContext) => Promise<LeadInsights[]>;
   triggerCopyDraft: (payload: CopyDraftPayload) => Promise<void>;
@@ -316,6 +330,8 @@ export interface IntentScanSummary {
   chained: boolean;
   rankMissed: number;
   rankErrors: number;
+  /** ML-8: followers read this run (the warm "follows you" signal) */
+  followers?: number;
 }
 
 export interface CopyConfig {

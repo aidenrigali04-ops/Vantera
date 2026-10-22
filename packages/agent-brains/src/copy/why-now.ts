@@ -18,6 +18,8 @@ const WHY_NOW_MAX_CHARS = 200;
  *  never an opener — congratulating someone on layoffs is the worst possible first touch. */
 const PRIORITY = [
   "intent",
+  // a follow is the person's own action toward the seller — warmer than company news (ML-8)
+  "follow",
   "funding",
   "exec_hire",
   "m_and_a",
@@ -53,6 +55,7 @@ const STOP = new Set(
 
 /** Per-kind words a natural reference uses even when it paraphrases the signal text. */
 const KIND_WORDS: Record<string, string[]> = {
+  follow: ["follow"],
   funding: ["rais", "fund", "round", "series", "seed", "capital", "invest"],
   exec_hire: ["join", "welcom", "congrat", "appoint", "promot", "new role"],
   m_and_a: ["acqui", "merg"],

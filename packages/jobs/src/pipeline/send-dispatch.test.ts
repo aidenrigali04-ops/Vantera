@@ -736,3 +736,57 @@ describe("runSendDispatch — proactive business-hours window", () => {
     expect(result.skipped).toBe(1);
   });
 });
+
+describe("runSendDispatch — warm-first ordering (ML-8)", () => {
+  const NOW = new Date("2026-07-07T12:00:00Z"); // Tuesday, inside business hours
+  const longAgo = new Date("2026-06-01T10:00:00Z");
+
+  it("when one message is left today, someone who just replied beats a cold follow-up", async () => {
+    const store = new FakeDispatchStore();
+    store.senders = [makeSender({ sentTodayMessages: 24 })]; // budget 1
+    store.sends = [
+      makeSend({ id: "cold", linkedinStage: "message", leadId: "a", leadConnectedAt: longAgo, leadAssignedSenderId: "li1",
+        leadLastMessageSentAt: new Date("2026-06-20T10:00:00Z"), createdAt: new Date("2026-07-01T00:00:00Z") }),
+      makeSend({ id: "convo", linkedinStage: "message", leadId: "b", leadConnectedAt: longAgo, leadAssignedSenderId: "li1",
+        leadLastMessageSentAt: new Date("2026-07-01T10:00:00Z"), leadRepliedAt: new Date("2026-07-06T10:00:00Z"),
+        createdAt: new Date("2026-07-07T00:00:00Z") }),
+    ];
+    const enqueued: { sendId: string; runAt: Date }[] = [];
+    await runSendDispatch({ ...makeDeps(store, enqueued), now: () => NOW });
+    expect(enqueued.map((e) => e.sendId)).toEqual(["convo"]);
+  });
+
+  it("a first message to someone who just accepted beats an older follow-up", async () => {
+    const store = new FakeDispatchStore();
+    store.senders = [makeSender({ sentTodayMessages: 24 })]; // budget 1
+    store.sends = [
+      makeSend({ id: "followup", linkedinStage: "message", leadId: "a", leadConnectedAt: longAgo, leadAssignedSenderId: "li1",
+        leadLastMessageSentAt: new Date("2026-06-20T10:00:00Z"), createdAt: new Date("2026-06-25T00:00:00Z") }),
+      makeSend({ id: "just-accepted", linkedinStage: "message", leadId: "b", leadConnectedAt: new Date("2026-07-07T09:00:00Z"),
+        leadAssignedSenderId: "li1", createdAt: new Date("2026-07-07T09:05:00Z") }),
+    ];
+    const enqueued: { sendId: string; runAt: Date }[] = [];
+    await runSendDispatch({ ...makeDeps(store, enqueued), now: () => NOW });
+    expect(enqueued.map((e) => e.sendId)).toEqual(["just-accepted"]);
+  });
+});
+
+describe("warmPriority (ML-8)", () => {
+  it("orders reply responses, manual, conversations, fresh accepts, follow-ups, then invites", async () => {
+    const { warmFirst } = await import("./send-dispatch");
+    const t = (iso: string) => new Date(iso);
+    const rows = [
+      makeSend({ id: "invite-old", linkedinStage: "invite", createdAt: t("2026-07-01T00:00:00Z") }),
+      makeSend({ id: "followup", linkedinStage: "message", leadConnectedAt: t("2026-06-01T00:00:00Z"), leadLastMessageSentAt: t("2026-06-10T00:00:00Z") }),
+      makeSend({ id: "accept-older", linkedinStage: "message", leadConnectedAt: t("2026-07-05T00:00:00Z") }),
+      makeSend({ id: "accept-newer", linkedinStage: "message", leadConnectedAt: t("2026-07-06T00:00:00Z") }),
+      makeSend({ id: "convo", linkedinStage: "message", leadRepliedAt: t("2026-07-06T00:00:00Z"), leadLastMessageSentAt: t("2026-07-01T00:00:00Z") }),
+      makeSend({ id: "manual", linkedinStage: "message", origin: "manual" }),
+      makeSend({ id: "reply", linkedinStage: "message", origin: "reply_response" }),
+      makeSend({ id: "invite-new", linkedinStage: "invite", createdAt: t("2026-07-02T00:00:00Z") }),
+    ];
+    expect(warmFirst(rows).map((r) => r.id)).toEqual([
+      "reply", "manual", "convo", "accept-newer", "accept-older", "followup", "invite-old", "invite-new",
+    ]);
+  });
+});

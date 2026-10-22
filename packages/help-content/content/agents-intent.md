@@ -20,6 +20,11 @@ Then you choose the signal types:
 
 - **Engagement** — people who like or comment on the posts you watch.
 - **Content** — people publishing posts about your keywords and hashtags.
+- **Followers** — people who start following your LinkedIn profile. A follow has no words, so it never counts as buying intent on its own — but a follower who fits your ICP is qualified and reached like any other prospect, and your agent learns whether your followers actually reply.
+
+## How often it runs
+
+Pick **every day**, **every week**, or **every 6 hours**. Every 6 hours catches a high-intent moment within hours instead of the next day. Running more often never reads more from LinkedIn: each run uses a quarter of the daily budget, so your account stays within the same safety limits.
 
 ## Intent is a filter, not a bypass
 

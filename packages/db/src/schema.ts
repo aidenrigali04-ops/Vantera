@@ -803,7 +803,7 @@ export const agents = pgTable(
     config: jsonb("config").notNull().default({}),
     // scheduling block (scout agents only)
     runAtTime: time("run_at_time"),
-    cadence: text("cadence", { enum: ["daily", "weekly"] }),
+    cadence: text("cadence", { enum: ["daily", "weekly", "intraday"] }),
     timezone: text("timezone").notNull().default("UTC"),
     nextRunAt: timestamp("next_run_at", { withTimezone: true }),
     lastRunAt: timestamp("last_run_at", { withTimezone: true }),
@@ -1383,7 +1383,7 @@ export const intentObservations = pgTable(
     agentId: uuid("agent_id").notNull(),
     leadId: uuid("lead_id"),
     profileUrl: text("profile_url").notNull(),
-    signalKind: text("signal_kind", { enum: ["engagement", "content"] }).notNull(),
+    signalKind: text("signal_kind", { enum: ["engagement", "content", "follow"] }).notNull(),
     watchTarget: text("watch_target"),
     postRef: text("post_ref").notNull(),
     headline: text("headline"),

@@ -135,10 +135,16 @@ describe("parseIntentForm", () => {
       values: {
         name: "Sonar",
         watch: { creators: ["https://www.linkedin.com/in/creator"], competitors: [], keywords: ["onboarding churn"], hashtags: ["#revops"] },
-        signals: { engagement: true, content: true },
+        signals: { engagement: true, content: true, follows: false },
         cadence: "weekly",
       },
     });
+  });
+
+  it("accepts the intraday cadence and a followers-only signal set (ML-8)", () => {
+    const r = parseIntentForm(intentForm({ cadence: "intraday", signalEngagement: "", signalContent: "", signalFollows: "on" }));
+    expect(r).toMatchObject({ ok: true, values: { cadence: "intraday", signals: { engagement: false, content: false, follows: true } } });
+    expect(parseIntentForm(intentForm({ signalEngagement: "", signalContent: "" })).ok).toBe(false);
   });
 
   it("requires at least one watch target and one signal", () => {

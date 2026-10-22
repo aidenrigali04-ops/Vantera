@@ -115,9 +115,9 @@ export const MAX_WATCH_PER_LIST = 10;
 export type IntentFormValues = {
   name: string;
   watch: { creators: string[]; competitors: string[]; keywords: string[]; hashtags: string[] };
-  signals: { engagement: boolean; content: boolean };
+  signals: { engagement: boolean; content: boolean; follows: boolean };
   runAtTime: string;
-  cadence: "daily" | "weekly";
+  cadence: "daily" | "weekly" | "intraday";
   timezone: string;
 };
 
@@ -159,15 +159,16 @@ export function parseIntentForm(form: FormData): Result<IntentFormValues> {
   const signals = {
     engagement: form.get("signalEngagement") === "on",
     content: form.get("signalContent") === "on",
+    follows: form.get("signalFollows") === "on",
   };
-  if (!signals.engagement && !signals.content) {
-    return { ok: false, error: "Enable at least one intent signal (engagement or content)." };
+  if (!signals.engagement && !signals.content && !signals.follows) {
+    return { ok: false, error: "Enable at least one intent signal (engagement, content, or followers)." };
   }
 
   const runAtTime = String(form.get("runAtTime") ?? "");
   if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(runAtTime)) return { ok: false, error: "Pick a valid run time." };
   const cadence = String(form.get("cadence") ?? "");
-  if (cadence !== "daily" && cadence !== "weekly") return { ok: false, error: "Pick a cadence." };
+  if (cadence !== "daily" && cadence !== "weekly" && cadence !== "intraday") return { ok: false, error: "Pick a cadence." };
   const timezone = String(form.get("timezone") ?? "").trim() || "UTC";
 
   return { ok: true, values: { name, watch, signals, runAtTime, cadence, timezone } };

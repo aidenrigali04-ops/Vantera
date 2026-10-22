@@ -50,6 +50,13 @@ describe("computeNextRunAt", () => {
     );
   });
 
+  it("intraday advances a fixed 6 hours from the run, ignoring the wall-clock time (ML-8)", () => {
+    const from = new Date("2026-06-11T08:00:05Z");
+    expect(computeNextRunAt("08:00", "intraday", "UTC", from).toISOString()).toBe(
+      "2026-06-11T14:00:05.000Z"
+    );
+  });
+
   it("weekly advances ~7 days at the same wall-clock time", () => {
     const from = new Date("2026-06-11T08:00:05Z");
     expect(computeNextRunAt("08:00", "weekly", "UTC", from).toISOString()).toBe(

@@ -213,3 +213,23 @@ article mentions learned ordering + job-seeker exclusion); full gate green on a 
 - Learning: tertile cutpoints from the account's own training similarities → `lookalike:high|mid|low`
   feature in the ML-1 learner, so its real lift is measured with the same shrinkage as every other
   feature. Pool rows never carry it (cross-account similarity is meaningless and a leak risk).
+
+## 10. ML-8 design (warm escalation + speed-to-signal) — shipped
+
+- **Warm-first dispatch** (`warmFirst` in send-dispatch): tiers reply_response → manual → ongoing
+  conversation (lead has replied) → first message to a fresh accept (newest accept first) →
+  follow-ups (oldest queued first) → invites (queue = the learner's drain order). Pure ordering:
+  rule-04 budgets, the business-hours window, per-lead gates, and the trial cap are untouched.
+- **Intraday cadence** (`agents.cadence='intraday'`, 0068): `computeNextRunAt` adds 6 h from the
+  run; intent-scan divides `INTENT_POSTS_PER_RUN` by `INTRADAY_RUNS_PER_DAY` (4) so a day's read
+  volume equals one daily run. Wizard offers "Every 6 hours" for the Intent Agent only.
+- **Followers signal**: `LinkedInInfra.listFollowers` (own-profile followers; provider page cap
+  100). intent-scan reads one page per run, dedupes through the observation ledger with the
+  synthetic post ref `follow`, processes ≤ 25 new followers per run (overflow waits), never sends
+  them to the classifier (no words → no spend), and gives them a synthetic medium verdict so they
+  face the identical suppression → exclusions → ICP gate → rank path as a `follow` signal (the rank
+  prompt treats only `intent` as the strongest why-now). Qualified followers persist a
+  `lead_signals.kind='follow'`, which the ML-1 learner measures (`signal:follow`) and ML-3 can cite
+  ("thanks for the follow"). Someone already surfaced for their words is recorded, not doubled.
+- **Not built:** profile viewers (no provider endpoint); company-page followers (needs the page's
+  provider id — a follow-up config field).

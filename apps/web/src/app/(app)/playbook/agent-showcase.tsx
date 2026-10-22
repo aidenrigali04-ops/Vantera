@@ -144,7 +144,7 @@ function AgentDetails({ agent }: { agent: ShowcaseAgent }) {
   const runLine =
     agent.kind === "scout" || agent.kind === "intent"
       ? live
-        ? `Next run ${timeUntil(agent.nextRunAt)}${agent.cadence ? ` · every ${agent.cadence === "daily" ? "day" : "week"}` : ""}`
+        ? `Next run ${timeUntil(agent.nextRunAt)}${agent.cadence ? ` · every ${agent.cadence === "daily" ? "day" : agent.cadence === "intraday" ? "6 hours" : "week"}` : ""}`
         : `Last ran ${timeAgo(agent.lastRunAt)}`
       : automatic
         ? "Sending automatically — flagged drafts still come to Approvals."

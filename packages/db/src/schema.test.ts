@@ -544,3 +544,12 @@ describe("lead embeddings (0067, ML-7)", () => {
   });
 });
 
+describe("intent speed + follow signal (0068, ML-8)", () => {
+  const sql = readFileSync(join(migrationsDir, "0068_intent_speed_signals.sql"), "utf8").toLowerCase();
+
+  it("lets an agent run intraday and records follows as their own signal kind", () => {
+    expect(sql).toContain("check (cadence in ('daily', 'weekly', 'intraday'))");
+    expect(sql).toContain("check (signal_kind in ('engagement', 'content', 'follow'))");
+  });
+});
+
