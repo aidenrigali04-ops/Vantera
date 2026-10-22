@@ -6,15 +6,76 @@ import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { loadThread } from "@/lib/conversations";
 
-export type ReplyState = { error?: string; sent?: boolean };
+export type ReplyState = { error?: string; sent?: boolean; notice?: string };
 export type DraftState = { error?: string; message?: string; flagged?: boolean };
+
+type SessionClient = Awaited<ReturnType<typeof createClient>>;
+
+/** The AI call failed. Logged server-side (the message never reaches the client) so a broken key
+ *  or provider outage shows up in runtime logs instead of as a silent "try again". */
+function logDraftFailure(action: string, leadId: string, err: unknown): void {
+  const e = err as { name?: string; message?: string; statusCode?: number };
+  console.error(`${action}: draft failed`, {
+    leadId,
+    name: e?.name,
+    statusCode: e?.statusCode,
+    message: e?.message,
+  });
+}
+
+/**
+ * Where a reply for this lead is queued: the account/campaign of the lead's most recent send, else
+ * the live Outreach agent's campaign (compose-to-any-lead). Both reads are RLS-scoped, so the
+ * result proves the lead's account belongs to the caller (rule 02).
+ */
+async function resolveSendTarget(
+  supabase: SessionClient,
+  leadId: string
+): Promise<{ account_id: string; campaign_id: string } | null> {
+  const { data: send } = await supabase
+    .from("scheduled_sends")
+    .select("account_id, campaign_id")
+    .eq("lead_id", leadId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle<{ account_id: string; campaign_id: string | null }>();
+  if (send?.campaign_id) return { account_id: send.account_id, campaign_id: send.campaign_id };
+  const { data: agent } = await supabase
+    .from("agents")
+    .select("account_id, campaign_id")
+    .eq("kind", "copy")
+    .eq("status", "live")
+    .limit(1)
+    .maybeSingle<{ account_id: string; campaign_id: string | null }>();
+  if (!agent?.campaign_id) return null;
+  return { account_id: agent.account_id, campaign_id: agent.campaign_id };
+}
+
+/** Rule 11: the lead's LinkedIn URL is on the account's suppression list. */
+async function isLeadSuppressed(supabase: SessionClient, leadId: string): Promise<boolean> {
+  const { data: leadRow } = await supabase
+    .from("leads")
+    .select("linkedin_url")
+    .eq("id", leadId)
+    .maybeSingle<{ linkedin_url: string | null }>();
+  if (!leadRow?.linkedin_url) return false;
+  const normalized = leadRow.linkedin_url.trim().toLowerCase().replace(/\/+$/, "");
+  const { data: suppressed } = await supabase
+    .from("suppression_entries")
+    .select("id")
+    .eq("kind", "linkedin")
+    .eq("value", normalized)
+    .limit(1)
+    .maybeSingle();
+  return Boolean(suppressed);
+}
 
 /**
  * Assemble the responder brain's grounding from RLS-scoped reads — the web-side twin of the
  * jobs pipeline's getResponderBundle (L2 cockpit). Null when the lead can't ground a reply.
  */
 async function buildConversationInput(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  supabase: SessionClient,
   leadId: string
 ): Promise<ConversationMessageInput | null> {
   const [{ data: lead }, { data: agent }, { data: account }, { data: proof }] = await Promise.all([
@@ -95,7 +156,8 @@ export async function draftWithVera(leadId: string): Promise<DraftState> {
   try {
     const draft = await draftConversationMessage(input);
     return { message: draft.message, flagged: draft.violations.length > 0 };
-  } catch {
+  } catch (err) {
+    logDraftFailure("draftWithVera", leadId, err);
     return { error: "Drafting hit a snag — try again in a moment." };
   }
 }
@@ -117,43 +179,14 @@ export async function sendManualReply(
   } = await supabase.auth.getUser();
   if (!user) return { error: "Your session expired. Sign in again." };
 
-  let { data: send } = await supabase
-    .from("scheduled_sends")
-    .select("account_id, campaign_id")
-    .eq("lead_id", leadId)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (!send) {
-    // L2 compose-to-any-lead: no prior send → ride the live Outreach agent's campaign.
-    const { data: agent } = await supabase
-      .from("agents")
-      .select("account_id, campaign_id")
-      .eq("kind", "copy")
-      .eq("status", "live")
-      .limit(1)
-      .maybeSingle<{ account_id: string; campaign_id: string | null }>();
-    if (!agent?.campaign_id) return { error: "Deploy your Outreach agent first." };
-    send = { account_id: agent.account_id, campaign_id: agent.campaign_id };
-  }
+  // L2 compose-to-any-lead: no prior send → ride the live Outreach agent's campaign.
+  const send = await resolveSendTarget(supabase, leadId);
+  if (!send) return { error: "Deploy your Outreach agent first." };
 
   // Rule 11: suppression is checked before anything that could reach a prospect — manual
   // sends included (dispatch re-checks at the send boundary; this keeps the queue clean).
-  const { data: leadRow } = await supabase
-    .from("leads")
-    .select("linkedin_url")
-    .eq("id", leadId)
-    .maybeSingle<{ linkedin_url: string | null }>();
-  if (leadRow?.linkedin_url) {
-    const normalized = leadRow.linkedin_url.trim().toLowerCase().replace(/\/+$/, "");
-    const { data: suppressed } = await supabase
-      .from("suppression_entries")
-      .select("id")
-      .eq("kind", "linkedin")
-      .eq("value", normalized)
-      .limit(1)
-      .maybeSingle();
-    if (suppressed) return { error: "This prospect opted out — messaging them again isn't allowed." };
+  if (await isLeadSuppressed(supabase, leadId)) {
+    return { error: "This prospect opted out — messaging them again isn't allowed." };
   }
 
   const trimmed = body.trim();
@@ -257,19 +290,46 @@ export async function delegateToAgent(leadId: string): Promise<ReplyState> {
   } = await supabase.auth.getUser();
   if (!user) return { error: "Your session expired. Sign in again." };
 
-  const { data: send } = await supabase
+  // Same target as a manual reply: the lead's campaign, else the live Outreach agent's.
+  const send = await resolveSendTarget(supabase, leadId);
+  if (!send) return { error: "Deploy your Outreach agent first." };
+
+  // Rule 11: never queue anything for a suppressed prospect.
+  if (await isLeadSuppressed(supabase, leadId)) {
+    return { error: "This prospect opted out — messaging them again isn't allowed." };
+  }
+
+  // Double-click guard: one agent reply in flight per lead. A second click hands the thread back
+  // without drafting (and paying for) a duplicate reply.
+  const { data: inFlight } = await supabase
     .from("scheduled_sends")
-    .select("account_id, campaign_id")
+    .select("id")
     .eq("lead_id", leadId)
-    .order("created_at", { ascending: false })
+    .eq("origin", "reply_response")
+    .in("status", ["pending_review", "approved", "scheduled", "sending"])
     .limit(1)
-    .maybeSingle<{ account_id: string; campaign_id: string }>();
-  if (!send) return { error: "This prospect isn't in a campaign yet." };
+    .maybeSingle();
+
   const { data: campaign } = await supabase
     .from("campaigns")
     .select("send_mode")
     .eq("id", send.campaign_id)
     .maybeSingle<{ send_mode: string }>();
+
+  const admin = createServiceClient();
+  const handBack = () =>
+    admin
+      .from("sequence_runs")
+      .update({ status: "active", next_action_at: new Date().toISOString() })
+      .eq("lead_id", leadId)
+      .eq("status", "paused_reply");
+
+  if (inFlight) {
+    await handBack();
+    revalidatePath(`/prospects/${leadId}`);
+    revalidatePath("/inbox");
+    return { sent: true, notice: "Vera already has a reply queued for this thread." };
+  }
 
   const input = await buildConversationInput(supabase, leadId);
   if (!input) return { error: "This prospect doesn't have enough context for Vera to take over." };
@@ -277,7 +337,8 @@ export async function delegateToAgent(leadId: string): Promise<ReplyState> {
   let draft: Awaited<ReturnType<typeof draftConversationMessage>>;
   try {
     draft = await draftConversationMessage(input);
-  } catch {
+  } catch (err) {
+    logDraftFailure("delegateToAgent", leadId, err);
     return { error: "Vera couldn't draft right now — try again in a moment." };
   }
   const clean = draft.violations.length === 0;
@@ -296,12 +357,7 @@ export async function delegateToAgent(leadId: string): Promise<ReplyState> {
   if (error) return { error: "Couldn't queue Vera's reply. Try again shortly." };
 
   // Hand the thread back to automation (paused_reply → active) so follow-ups resume too.
-  const admin = createServiceClient();
-  await admin
-    .from("sequence_runs")
-    .update({ status: "active", next_action_at: new Date().toISOString() })
-    .eq("lead_id", leadId)
-    .eq("status", "paused_reply");
+  await handBack();
 
   revalidatePath(`/prospects/${leadId}`);
   revalidatePath("/inbox");
