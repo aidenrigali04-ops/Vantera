@@ -19,6 +19,7 @@ const lead = {
   phone: "+15555550100",
   aiInsights: null,
   scoredAt: null as Date | null,
+  aiScore: null as number | null,
 };
 
 const bundle = (over: Partial<ResponderBundle> = {}): ResponderBundle => ({

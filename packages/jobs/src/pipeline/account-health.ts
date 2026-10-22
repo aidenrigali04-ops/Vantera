@@ -169,6 +169,9 @@ export async function runAccountHealth(deps: AccountHealthDeps): Promise<Account
     const row = { ...listed, ...(mergedState.get(listed.id) ?? {}) };
     if (row.status === "connecting") continue; // mid-flow — the webhook/backstop owns this state
     const live = liveByRef.get(row.providerRef) ?? "disconnected";
+    // The provider hasn't reported this account's sources yet: that's an absence of evidence,
+    // not a disconnect. Acting on it would downgrade a healthy row and email a false alert.
+    if (live === "connecting") continue;
     if (live === row.status) continue;
 
     await deps.store.setLinkedInAccountStatus(row.id, live);

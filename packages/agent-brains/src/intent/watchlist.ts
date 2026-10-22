@@ -1,6 +1,6 @@
 import { generateObject, type LanguageModel } from "ai";
 import { z } from "zod";
-import { getModel, registerPrompt } from "@vantera/ai";
+import { getClassifierModel, registerPrompt } from "@vantera/ai";
 
 // Permissive schema (validate loose, normalize strict in code — same pattern as rank/classify).
 export const watchlistSchema = z.object({
@@ -15,8 +15,16 @@ export interface WatchlistContext {
   industry?: string | null;
   /** what the seller offers — website-scan summary + offerings + value props */
   offering?: string | null;
+  /** website-scan offerings, already split into phrases */
+  offerings?: string[] | null;
+  /** accounts.value_prop, or the scan's lead value prop */
+  valueProp?: string | null;
+  /** accounts.brand_voice — tone for the model, not a watch topic */
+  brand?: string | null;
   /** the ICP(s) this account targets, human-readable */
   icp?: string | null;
+  /** individual ICP names, when more than one is known */
+  icpNames?: string[] | null;
 }
 
 const MAX = { keywords: 8, hashtags: 6, competitors: 6 } as const;
@@ -33,11 +41,57 @@ Return three lists, each specific to this seller (never generic):
 Ground every entry in the seller's actual offering and industry. If you can't ground a competitor, return fewer rather than invent one.`);
 
 function contextBlock(ctx: WatchlistContext): string {
+  const offerings = (ctx.offerings ?? []).filter(Boolean).join(", ");
   return [
     `Seller industry: ${ctx.industry ?? "unknown"}`,
     `Seller offer: ${ctx.offering ?? "unknown"}`,
+    offerings ? `Offerings: ${offerings}` : "",
+    ctx.valueProp ? `Value proposition: ${ctx.valueProp}` : "",
+    ctx.brand ? `Brand voice: ${ctx.brand}` : "",
     `Target ICP: ${ctx.icp ?? "unknown"}`,
-  ].join("\n");
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+const STOP = new Set([
+  "the", "a", "an", "and", "or", "of", "for", "to", "in", "on", "with", "your", "our",
+  "their", "that", "this", "from", "at", "by", "as", "is", "are", "be", "it", "its",
+  "into", "about", "who", "what", "when", "where", "how", "than", "then", "they",
+  "them", "you", "we",
+]);
+
+function phrase(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const v = raw.replace(/\s+/g, " ").trim().slice(0, FIELD_MAX);
+  return v.length >= 3 ? v : null;
+}
+
+function tokens(text: string): string[] {
+  return text
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((word) => word.length >= 4 && !STOP.has(word));
+}
+
+/**
+ * Best watch categories we can name without a model: the seller's own offerings, value
+ * proposition, and ICP. Competitors stay empty — a name we weren't given is a guess.
+ */
+export function watchlistFromContext(ctx: WatchlistContext): IntentWatchlist {
+  const offeringPhrases = (ctx.offerings ?? []).map(phrase).filter((v): v is string => Boolean(v));
+  const icpPhrases = (ctx.icpNames?.length ? ctx.icpNames : ctx.icp ? [ctx.icp] : [])
+    .map(phrase)
+    .filter((v): v is string => Boolean(v));
+  const keywords = clean(
+    [...offeringPhrases, phrase(ctx.valueProp), ...icpPhrases],
+    MAX.keywords
+  );
+  const hashtags = clean(
+    tokens([ctx.industry, ...offeringPhrases, ...icpPhrases].filter(Boolean).join(" ")),
+    MAX.hashtags
+  );
+  return { keywords, hashtags, competitors: [] };
 }
 
 /** Trim, length-cap, dedupe (case-insensitive), and bound the count; optionally strip a leading "#". */
@@ -61,12 +115,14 @@ function clean(list: unknown, max: number, stripHash = false): string[] {
 /**
  * Derive LinkedIn watch targets (keywords, hashtags, competitor names) from what we already know
  * about the seller — so Intent Agent setup needs no hunting for profiles or URLs. Pure + injectable
- * model (rule 13); fails open to empty lists so a model hiccup never blocks the wizard.
+ * model (rule 13). When the model is unavailable or returns a blank list, the categories fall
+ * back to the seller's own website, brand, and ICP words. Competitors are never invented.
  */
 export async function deriveIntentWatchlist(
   ctx: WatchlistContext,
-  model: LanguageModel = getModel()
+  model: LanguageModel = getClassifierModel()
 ): Promise<IntentWatchlist> {
+  const grounded = watchlistFromContext(ctx);
   let raw: IntentWatchlist;
   try {
     raw = (
@@ -79,11 +135,14 @@ export async function deriveIntentWatchlist(
       })
     ).object;
   } catch {
-    return { keywords: [], hashtags: [], competitors: [] };
+    return grounded;
   }
+  const keywords = clean(raw.keywords, MAX.keywords);
+  const hashtags = clean(raw.hashtags, MAX.hashtags, true);
+  const competitors = clean(raw.competitors, MAX.competitors);
   return {
-    keywords: clean(raw.keywords, MAX.keywords),
-    hashtags: clean(raw.hashtags, MAX.hashtags, true),
-    competitors: clean(raw.competitors, MAX.competitors),
+    keywords: keywords.length ? keywords : grounded.keywords,
+    hashtags: hashtags.length ? hashtags : grounded.hashtags,
+    competitors,
   };
 }

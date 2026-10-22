@@ -1,6 +1,6 @@
 import { generateObject, type LanguageModel } from "ai";
 import { z } from "zod";
-import { getModel, registerPrompt } from "@vantera/ai";
+import { getClassifierModel, registerPrompt } from "@vantera/ai";
 import type { IcpCriteria } from "@vantera/prospect-data";
 import { stripLoneSurrogates } from "../text";
 
@@ -80,7 +80,7 @@ export function normalizeCriteria(raw: {
 export async function deriveIcpCriteria(
   icpText: string,
   ctx: DeriveCriteriaContext = {},
-  model: LanguageModel = getModel()
+  model: LanguageModel = getClassifierModel()
 ): Promise<IcpCriteria> {
   const prompt = stripLoneSurrogates(
     [

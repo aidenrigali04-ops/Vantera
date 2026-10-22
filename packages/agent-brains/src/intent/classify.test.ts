@@ -60,6 +60,61 @@ describe("classifyIntent", () => {
       {},
       model
     );
-    expect(verdicts).toEqual([{ ref: "p/x", reasoning: "no readable post text", is_intent: false, level: "none", why_now: "" }]);
+    expect(verdicts).toEqual([{ ref: "p/x", reasoning: "no readable evidence", is_intent: false, level: "none", why_now: "" }]);
+  });
+
+  it("judges an empty reaction as none even when context carries the post they liked — model is never called", async () => {
+    const model = new MockLanguageModelV3({
+      doGenerate: async () => {
+        throw new Error("model should not be called for a like with no comment");
+      },
+    });
+    const verdicts = await classifyIntent(
+      [
+        {
+          ref: "p/like",
+          signalKind: "engagement",
+          action: "reacted",
+          text: "",
+          context: "We're bleeding customers every renewal — anyone have a churn tool?",
+        },
+      ],
+      { accountIndustry: "SaaS", valueProp: "reduces churn" },
+      model
+    );
+    expect(verdicts).toEqual([
+      { ref: "p/like", reasoning: "no readable evidence", is_intent: false, level: "none", why_now: "" },
+    ]);
+  });
+
+  it("sends the person's words as evidence and the engaged post as labeled context", async () => {
+    let prompt = "";
+    const model = new MockLanguageModelV3({
+      doGenerate: async (opts) => {
+        prompt = JSON.stringify(opts);
+        return textResponse({
+          verdicts: [
+            { ref: "p/c", reasoning: "asks for a churn tool", is_intent: true, level: "high", why_now: "commented asking for a churn tool" },
+          ],
+        });
+      },
+    });
+    await classifyIntent(
+      [
+        {
+          ref: "p/c",
+          signalKind: "engagement",
+          action: "commented",
+          text: "anyone recommend a churn tool?",
+          context: "we keep struggling with onboarding churn",
+        },
+      ],
+      { accountIndustry: "SaaS", valueProp: "reduce churn" },
+      model
+    );
+    expect(prompt).toContain("evidence:anyone recommend a churn tool?");
+    expect(prompt).toContain("context:we keep struggling with onboarding churn");
+    // the post they engaged is labeled context, not unlabeled text the model could treat as theirs
+    expect(prompt).not.toMatch(/ \| we keep struggling with onboarding churn"/);
   });
 });

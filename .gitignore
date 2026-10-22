@@ -21,6 +21,9 @@ coverage/
 # Claude Code — personal/local files stay out of git
 CLAUDE.local.md
 .claude/settings.local.json
+# Agent worktrees are nested checkouts: committing one records a gitlink with no
+# .gitmodules entry, which fails `git submodule foreach` (exit 128) on CI checkouts.
+.claude/worktrees/
 
 # OS
 .DS_Store
@@ -30,6 +33,9 @@ CLAUDE.local.md
 
 # Generated eval artifacts — machine-regenerable, never hand-curated (unlike human-labels.json)
 packages/evals/fixtures/judge-calibration/packet.json
+
+# Hive research runs. The learner is the baseline; its result files are local.
+hive-results/
 
 # HubSpot CLI (may contain tokens)
 hubspot.config.yml

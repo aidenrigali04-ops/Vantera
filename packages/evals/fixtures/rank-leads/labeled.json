@@ -1,0 +1,352 @@
+[
+  {
+    "id": "rank-buyer-cs-01",
+    "candidate": {
+      "leadId": "rank-buyer-cs-01",
+      "companyName": "Harborline",
+      "companySize": "51-200",
+      "industry": "saas",
+      "location": "Austin",
+      "title": "VP Customer Success"
+    },
+    "ctx": {
+      "accountIndustry": "B2B SaaS",
+      "valueProp": "reduces customer churn for subscription businesses",
+      "icpDescription": "VP/Head of CS or RevOps at 50-500 person subscription software"
+    },
+    "expectQualified": true,
+    "expectOfferingDirection": "buyer"
+  },
+  {
+    "id": "rank-buyer-revops-01",
+    "candidate": {
+      "leadId": "rank-buyer-revops-01",
+      "companyName": "Pebblepath",
+      "companySize": "201-500",
+      "industry": "saas",
+      "location": "Remote",
+      "title": "Head of Revenue Operations"
+    },
+    "ctx": {
+      "accountIndustry": "B2B SaaS",
+      "valueProp": "reduces customer churn for subscription businesses",
+      "icpDescription": "VP/Head of CS or RevOps at 50-500 person subscription software"
+    },
+    "expectQualified": true,
+    "expectOfferingDirection": "buyer"
+  },
+  {
+    "id": "rank-buyer-cx-01",
+    "candidate": {
+      "leadId": "rank-buyer-cx-01",
+      "companyName": "Kindling Co",
+      "companySize": "51-200",
+      "industry": "saas",
+      "location": "Chicago",
+      "title": "Head of Customer Experience"
+    },
+    "ctx": {
+      "accountIndustry": "B2B SaaS",
+      "valueProp": "reduces customer churn for subscription businesses",
+      "icpDescription": "VP/Head of CS or RevOps at 50-500 person subscription software"
+    },
+    "expectQualified": true,
+    "expectOfferingDirection": "buyer"
+  },
+  {
+    "id": "rank-buyer-founder-01",
+    "candidate": {
+      "leadId": "rank-buyer-founder-01",
+      "companyName": "Nimbus Ledger",
+      "companySize": "11-50",
+      "industry": "saas",
+      "location": "Denver",
+      "title": "Founder & CEO, subscription analytics"
+    },
+    "ctx": {
+      "accountIndustry": "B2B SaaS",
+      "valueProp": "reduces customer churn for subscription businesses",
+      "icpDescription": "Founders and CS leaders at subscription software companies"
+    },
+    "expectQualified": true,
+    "expectOfferingDirection": "buyer"
+  },
+  {
+    "id": "rank-buyer-cs-02",
+    "candidate": {
+      "leadId": "rank-buyer-cs-02",
+      "companyName": "Northwind Apps",
+      "companySize": "201-500",
+      "industry": "saas",
+      "location": "Seattle",
+      "title": "Director of Customer Success"
+    },
+    "ctx": {
+      "accountIndustry": "B2B SaaS",
+      "valueProp": "reduces customer churn for subscription businesses",
+      "icpDescription": "VP/Head of CS or RevOps at 50-500 person subscription software"
+    },
+    "expectQualified": true
+  },
+  {
+    "id": "rank-buyer-coo-01",
+    "candidate": {
+      "leadId": "rank-buyer-coo-01",
+      "companyName": "Tidepool Software",
+      "companySize": "51-200",
+      "industry": "saas",
+      "location": "Boston",
+      "title": "COO, usage-based billing"
+    },
+    "ctx": {
+      "accountIndustry": "B2B SaaS",
+      "valueProp": "reduces customer churn for subscription businesses",
+      "icpDescription": "Operators at subscription software companies with a churn problem"
+    },
+    "expectQualified": true
+  },
+  {
+    "id": "rank-buyer-talent-01",
+    "candidate": {
+      "leadId": "rank-buyer-talent-01",
+      "companyName": "Brightlane",
+      "companySize": "51-200",
+      "industry": "saas",
+      "location": "Remote",
+      "title": "VP People"
+    },
+    "ctx": {
+      "accountIndustry": "HR tech",
+      "valueProp": "applicant tracking for growing software teams",
+      "icpDescription": "VP People / Head of Talent at 50-500 person software companies"
+    },
+    "expectQualified": true,
+    "expectOfferingDirection": "buyer"
+  },
+  {
+    "id": "rank-buyer-ta-01",
+    "candidate": {
+      "leadId": "rank-buyer-ta-01",
+      "companyName": "Oak & Ember",
+      "companySize": "201-500",
+      "industry": "saas",
+      "location": "NYC",
+      "title": "Head of Talent Acquisition"
+    },
+    "ctx": {
+      "accountIndustry": "HR tech",
+      "valueProp": "applicant tracking for growing software teams",
+      "icpDescription": "VP People / Head of Talent at 50-500 person software companies"
+    },
+    "expectQualified": true
+  },
+  {
+    "id": "rank-seller-inbound-01",
+    "candidate": {
+      "leadId": "rank-seller-inbound-01",
+      "companyName": "Signalwright",
+      "companySize": "1-10",
+      "industry": "marketing",
+      "location": "Remote",
+      "title": "I help founders get 10-20 inbound leads, no cold DMs"
+    },
+    "ctx": {
+      "accountIndustry": "B2B SaaS",
+      "valueProp": "reduces customer churn for subscription businesses",
+      "icpDescription": "VP/Head of CS or RevOps at 50-500 person subscription software"
+    },
+    "expectQualified": false,
+    "expectOfferingDirection": "seller"
+  },
+  {
+    "id": "rank-seller-inbound-02",
+    "candidate": {
+      "leadId": "rank-seller-inbound-02",
+      "companyName": "Quiet Harbor Studio",
+      "companySize": "1-10",
+      "industry": "agencies",
+      "location": "Lisbon",
+      "title": "Founder — I help B2B teams book 15 inbound meetings a month"
+    },
+    "ctx": {
+      "accountIndustry": "B2B SaaS",
+      "valueProp": "reduces customer churn for subscription businesses",
+      "icpDescription": "VP/Head of CS or RevOps at 50-500 person subscription software"
+    },
+    "expectQualified": false,
+    "expectOfferingDirection": "seller"
+  },
+  {
+    "id": "rank-seller-agency-01",
+    "candidate": {
+      "leadId": "rank-seller-agency-01",
+      "companyName": "Copperline Creative",
+      "companySize": "11-50",
+      "industry": "agencies",
+      "location": "London",
+      "title": "We run outbound for SaaS founders"
+    },
+    "ctx": {
+      "accountIndustry": "B2B SaaS",
+      "valueProp": "reduces customer churn for subscription businesses",
+      "icpDescription": "VP/Head of CS or RevOps at 50-500 person subscription software"
+    },
+    "expectQualified": false,
+    "expectOfferingDirection": "seller"
+  },
+  {
+    "id": "rank-seller-agency-02",
+    "candidate": {
+      "leadId": "rank-seller-agency-02",
+      "companyName": "Redthread Demand",
+      "companySize": "1-10",
+      "industry": "marketing",
+      "location": "Toronto",
+      "title": "Helping startups get consistent inbound pipeline"
+    },
+    "ctx": {
+      "accountIndustry": "HR tech",
+      "valueProp": "applicant tracking for growing software teams",
+      "icpDescription": "VP People / Head of Talent at 50-500 person software companies"
+    },
+    "expectQualified": false,
+    "expectOfferingDirection": "seller"
+  },
+  {
+    "id": "rank-seller-coach-01",
+    "candidate": {
+      "leadId": "rank-seller-coach-01",
+      "companyName": "Summit Path Coaching",
+      "companySize": "1-10",
+      "industry": "education",
+      "location": "Remote",
+      "title": "I help founders land their next 10 customers"
+    },
+    "ctx": {
+      "accountIndustry": "HR tech",
+      "valueProp": "applicant tracking for growing software teams",
+      "icpDescription": "VP People / Head of Talent at 50-500 person software companies"
+    },
+    "expectQualified": false,
+    "expectOfferingDirection": "seller"
+  },
+  {
+    "id": "rank-miss-intern-01",
+    "candidate": {
+      "leadId": "rank-miss-intern-01",
+      "companyName": "Harborline",
+      "companySize": "51-200",
+      "industry": "saas",
+      "location": "Austin",
+      "title": "Marketing Intern"
+    },
+    "ctx": {
+      "accountIndustry": "B2B SaaS",
+      "valueProp": "reduces customer churn for subscription businesses",
+      "icpDescription": "VP/Head of CS or RevOps at 50-500 person subscription software"
+    },
+    "expectQualified": false
+  },
+  {
+    "id": "rank-miss-dentist-01",
+    "candidate": {
+      "leadId": "rank-miss-dentist-01",
+      "companyName": "Riverside Dental",
+      "companySize": "11-50",
+      "industry": "healthcare",
+      "location": "Phoenix",
+      "title": "Practice Owner"
+    },
+    "ctx": {
+      "accountIndustry": "B2B SaaS",
+      "valueProp": "reduces customer churn for subscription businesses",
+      "icpDescription": "VP/Head of CS or RevOps at 50-500 person subscription software"
+    },
+    "expectQualified": false
+  },
+  {
+    "id": "rank-miss-student-01",
+    "candidate": {
+      "leadId": "rank-miss-student-01",
+      "companyName": "State University",
+      "companySize": "1001+",
+      "industry": "education",
+      "location": "Iowa",
+      "title": "Computer Science Student"
+    },
+    "ctx": {
+      "accountIndustry": "HR tech",
+      "valueProp": "applicant tracking for growing software teams",
+      "icpDescription": "VP People / Head of Talent at 50-500 person software companies"
+    },
+    "expectQualified": false
+  },
+  {
+    "id": "rank-miss-retail-01",
+    "candidate": {
+      "leadId": "rank-miss-retail-01",
+      "companyName": "Maple & Co Grocer",
+      "companySize": "11-50",
+      "industry": "retail",
+      "location": "Portland",
+      "title": "Store Manager"
+    },
+    "ctx": {
+      "accountIndustry": "HR tech",
+      "valueProp": "applicant tracking for growing software teams",
+      "icpDescription": "VP People / Head of Talent at 50-500 person software companies"
+    },
+    "expectQualified": false
+  },
+  {
+    "id": "rank-miss-journalist-01",
+    "candidate": {
+      "leadId": "rank-miss-journalist-01",
+      "companyName": "Daily Harbor",
+      "companySize": "51-200",
+      "industry": "media",
+      "location": "DC",
+      "title": "Staff Writer"
+    },
+    "ctx": {
+      "accountIndustry": "B2B SaaS",
+      "valueProp": "reduces customer churn for subscription businesses",
+      "icpDescription": "VP/Head of CS or RevOps at 50-500 person subscription software"
+    },
+    "expectQualified": false
+  },
+  {
+    "id": "rank-miss-barista-01",
+    "candidate": {
+      "leadId": "rank-miss-barista-01",
+      "companyName": "Copper Kettle Cafe",
+      "companySize": "1-10",
+      "industry": "hospitality",
+      "location": "Portland",
+      "title": "Shift Lead"
+    },
+    "ctx": {
+      "accountIndustry": "HR tech",
+      "valueProp": "applicant tracking for growing software teams",
+      "icpDescription": "VP People / Head of Talent at 50-500 person software companies"
+    },
+    "expectQualified": false
+  },
+  {
+    "id": "rank-miss-ae-wrong-01",
+    "candidate": {
+      "leadId": "rank-miss-ae-wrong-01",
+      "companyName": "Summit Path Coaching",
+      "companySize": "1-10",
+      "industry": "education",
+      "location": "Remote",
+      "title": "Career Coach for new grads"
+    },
+    "ctx": {
+      "accountIndustry": "B2B SaaS",
+      "valueProp": "reduces customer churn for subscription businesses",
+      "icpDescription": "VP/Head of CS or RevOps at 50-500 person subscription software"
+    },
+    "expectQualified": false
+  }
+]

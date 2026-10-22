@@ -24,7 +24,7 @@ An invitation email is sent to the address you entered. The invite remains pendi
 
 ## Accepting an invitation
 
-Click the link in the email — the invite page shows which workspace you're joining and the address the invite was sent to. If you already have a Vantera account, sign in and you'll return to the invite automatically. If you're new, choose **Create your account & join**: you'll sign up with the invited email (no company setup — the workspace already exists) and land directly on your team's dashboard.
+Click the link in the email — the invite page shows which workspace you're joining and the address the invite was sent to. If you already have a Vantera account, sign in (Google or email) and you'll return to the invite automatically. If you're new, choose **Create your account & join**: you'll sign up with the invited email (no company setup — the workspace already exists) and land directly on your team's dashboard. **Continue with Google** works here too, but it must be the Google account for that same invited address.
 
 ## Revoking access
 

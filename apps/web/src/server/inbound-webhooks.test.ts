@@ -41,6 +41,17 @@ describe("handleInboundWebhook", () => {
     expect(res.body).toBe("ignored");
     expect(enqueued).toHaveLength(0);
   });
+  it("surfaces the payload to onUnparsed when it verifies but maps to nothing", async () => {
+    const seen: unknown[] = [];
+    const { deps, enqueued } = makeDeps({
+      extractEventId: () => null,
+      onUnparsed: (p) => void seen.push(p),
+    });
+    const res = await handleInboundWebhook("linkedin", {}, '{"AccountStatus":{"message":"OK"}}', deps);
+    expect(res.status).toBe(200);
+    expect(seen).toEqual([{ AccountStatus: { message: "OK" } }]);
+    expect(enqueued).toHaveLength(0);
+  });
   it("200-no-ops duplicate events", async () => {
     const { deps, enqueued } = makeDeps({ recordEvent: async () => false });
     const res = await handleInboundWebhook("linkedin", {}, "{}", deps);

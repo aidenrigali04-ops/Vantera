@@ -50,7 +50,8 @@ export interface ConnectedAccount {
   providerRef: string;
   displayName: string | null;
   profileUrl: string | null;
-  status: "active" | "restricted" | "disconnected";
+  /** `connecting` = the provider has the account but its initial sync hasn't reported yet. */
+  status: "connecting" | "active" | "restricted" | "disconnected";
 }
 
 export type LinkedInEvent =

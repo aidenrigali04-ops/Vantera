@@ -13,7 +13,7 @@ three short steps.
 ## 1. Your details
 
 - **Full name** — how you appear to teammates and on your own dashboard.
-- **Brand name** — pre-filled from sign-up; this becomes your workspace name.
+- **Brand name** — pre-filled from sign-up when you typed one; this becomes your workspace name. If you continued with Google, you'll enter it here.
 - **Website** — pre-filled if you typed it on the home page. As soon as it's in, your site's
   icon appears next to the field: that's Vantera confirming it found you.
 

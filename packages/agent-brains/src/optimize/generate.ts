@@ -1,6 +1,6 @@
 import { generateObject, type LanguageModel } from "ai";
 import { z } from "zod";
-import { getModel, registerPrompt } from "@vantera/ai";
+import { getClassifierModel, registerPrompt } from "@vantera/ai";
 import type { CopyStrategy } from "../copy/shared";
 import { MESSAGE_SHAPES, validateProposedShape } from "../copy/shape";
 import type { FunnelStageKey } from "./funnel";
@@ -77,7 +77,7 @@ Hard rules:
 
 export async function proposeRecipeCandidates(
   input: GenerateRecipesInput,
-  model: LanguageModel = getModel()
+  model: LanguageModel = getClassifierModel()
 ): Promise<CopyStrategy[]> {
   const baseline = proposeNextChallenger(input.stageKey, input.champion);
   const out: CopyStrategy[] = baseline ? [baseline] : [];

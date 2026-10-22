@@ -1,0 +1,475 @@
+[
+  {
+    "id": "hard-like-churn-01",
+    "obs": {
+      "ref": "https://profiles.example/hard-like-churn-01",
+      "name": "Nora Ellison",
+      "headline": "VP Customer Success",
+      "signalKind": "engagement",
+      "action": "reacted",
+      "text": "",
+      "context": "We just rolled out a churn-prediction workflow that flags at-risk accounts 45 days before they cancel. Anyone else measuring this weekly?",
+      "watchTarget": "customer churn"
+    },
+    "ctx": { "accountIndustry": "B2B SaaS", "valueProp": "reduces customer churn for subscription businesses" },
+    "expectedIsIntent": false
+  },
+  {
+    "id": "hard-like-churn-02",
+    "obs": {
+      "ref": "https://profiles.example/hard-like-churn-02",
+      "name": "Theo Marquez",
+      "headline": "Head of Revenue Operations",
+      "signalKind": "engagement",
+      "action": "reacted",
+      "text": "",
+      "context": "Looking for a real retention system — dashboards that nobody checks don't count.",
+      "watchTarget": "retention tools"
+    },
+    "ctx": { "accountIndustry": "B2B SaaS", "valueProp": "reduces customer churn for subscription businesses" },
+    "expectedIsIntent": false
+  },
+  {
+    "id": "hard-like-churn-03",
+    "obs": {
+      "ref": "https://profiles.example/hard-like-churn-03",
+      "name": "Imani Okonkwo",
+      "headline": "Director of Customer Experience",
+      "signalKind": "engagement",
+      "action": "reacted",
+      "text": "",
+      "context": "If you sell into subscription companies, the buying committee now asks for churn math on the first call.",
+      "watchTarget": "SaaS retention"
+    },
+    "ctx": { "accountIndustry": "B2B SaaS", "valueProp": "reduces customer churn for subscription businesses" },
+    "expectedIsIntent": false
+  },
+  {
+    "id": "hard-like-churn-04",
+    "obs": {
+      "ref": "https://profiles.example/hard-like-churn-04",
+      "name": "Jules Hartman",
+      "headline": "COO, usage-based billing platform",
+      "signalKind": "engagement",
+      "action": "reacted",
+      "text": "",
+      "context": "Our renewal forecast was off by 18% last quarter. We need a better early-warning signal.",
+      "watchTarget": "renewals"
+    },
+    "ctx": { "accountIndustry": "B2B SaaS", "valueProp": "reduces customer churn for subscription businesses" },
+    "expectedIsIntent": false
+  },
+  {
+    "id": "hard-like-churn-05",
+    "obs": {
+      "ref": "https://profiles.example/hard-like-churn-05",
+      "name": "Sanjay Mehta",
+      "headline": "Founder, workflow SaaS",
+      "signalKind": "engagement",
+      "action": "reacted",
+      "text": "",
+      "context": "Anyone using a dedicated churn tool vs stitching this together in a spreadsheet?",
+      "watchTarget": "churn tools"
+    },
+    "ctx": { "accountIndustry": "B2B SaaS", "valueProp": "reduces customer churn for subscription businesses" },
+    "expectedIsIntent": false
+  },
+  {
+    "id": "hard-like-churn-06",
+    "obs": {
+      "ref": "https://profiles.example/hard-like-churn-06",
+      "name": "Elena Voss",
+      "headline": "VP Success, B2B marketplace",
+      "signalKind": "engagement",
+      "action": "reacted",
+      "text": "",
+      "context": "Playbook: how we cut logo churn in half without adding headcount.",
+      "watchTarget": "logo churn"
+    },
+    "ctx": { "accountIndustry": "B2B SaaS", "valueProp": "reduces customer churn for subscription businesses" },
+    "expectedIsIntent": false
+  },
+  {
+    "id": "hard-like-hire-01",
+    "obs": {
+      "ref": "https://profiles.example/hard-like-hire-01",
+      "name": "Chris Paladino",
+      "headline": "VP People, 200-person SaaS",
+      "signalKind": "engagement",
+      "action": "reacted",
+      "text": "",
+      "context": "We outgrew our applicant tracker last year. Evaluating a replacement that handles structured scorecards.",
+      "watchTarget": "ATS"
+    },
+    "ctx": { "accountIndustry": "HR tech", "valueProp": "applicant tracking for growing software teams" },
+    "expectedIsIntent": false
+  },
+  {
+    "id": "hard-like-hire-02",
+    "obs": {
+      "ref": "https://profiles.example/hard-like-hire-02",
+      "name": "Maya Lindstrom",
+      "headline": "Head of Talent Acquisition",
+      "signalKind": "engagement",
+      "action": "reacted",
+      "text": "",
+      "context": "Time-to-fill is 62 days and recruiting is drowning in email. Need a system, not another spreadsheet.",
+      "watchTarget": "time to fill"
+    },
+    "ctx": { "accountIndustry": "HR tech", "valueProp": "applicant tracking for growing software teams" },
+    "expectedIsIntent": false
+  },
+  {
+    "id": "hard-like-hire-03",
+    "obs": {
+      "ref": "https://profiles.example/hard-like-hire-03",
+      "name": "Owen Ricci",
+      "headline": "People Ops Lead",
+      "signalKind": "engagement",
+      "action": "reacted",
+      "text": "",
+      "context": "If your hiring pipeline lives in inboxes, you already lost the audit.",
+      "watchTarget": "hiring pipeline"
+    },
+    "ctx": { "accountIndustry": "HR tech", "valueProp": "applicant tracking for growing software teams" },
+    "expectedIsIntent": false
+  },
+  {
+    "id": "hard-like-hire-04",
+    "obs": {
+      "ref": "https://profiles.example/hard-like-hire-04",
+      "name": "Priya Dasgupta",
+      "headline": "Director of Recruiting",
+      "signalKind": "engagement",
+      "action": "reacted",
+      "text": "",
+      "context": "Looking for an ATS that doesn't make coordinators copy-paste every candidate.",
+      "watchTarget": "applicant tracking"
+    },
+    "ctx": { "accountIndustry": "HR tech", "valueProp": "applicant tracking for growing software teams" },
+    "expectedIsIntent": false
+  },
+  {
+    "id": "hard-congrats-01",
+    "obs": {
+      "ref": "https://profiles.example/hard-congrats-01",
+      "name": "Bennett Shaw",
+      "headline": "Account Executive",
+      "signalKind": "engagement",
+      "action": "commented",
+      "text": "Congrats on the launch — well deserved!",
+      "context": "We just shipped a churn early-warning product for subscription teams.",
+      "watchTarget": "churn product"
+    },
+    "ctx": { "accountIndustry": "B2B SaaS", "valueProp": "reduces customer churn for subscription businesses" },
+    "expectedIsIntent": false
+  },
+  {
+    "id": "hard-congrats-02",
+    "obs": {
+      "ref": "https://profiles.example/hard-congrats-02",
+      "name": "Lila Chenoweth",
+      "headline": "Product Marketing Manager",
+      "signalKind": "engagement",
+      "action": "commented",
+      "text": "Amazing news, so happy for the team!",
+      "context": "Series of customer stories on how we cut churn without extra CS headcount.",
+      "watchTarget": "retention stories"
+    },
+    "ctx": { "accountIndustry": "B2B SaaS", "valueProp": "reduces customer churn for subscription businesses" },
+    "expectedIsIntent": false
+  },
+  {
+    "id": "hard-congrats-03",
+    "obs": {
+      "ref": "https://profiles.example/hard-congrats-03",
+      "name": "Marcus Pell",
+      "headline": "Partnerships Lead",
+      "signalKind": "engagement",
+      "action": "commented",
+      "text": "Congratulations on 10 years — incredible milestone.",
+      "context": "How subscription companies should think about expansion vs logo retention.",
+      "watchTarget": "retention"
+    },
+    "ctx": { "accountIndustry": "B2B SaaS", "valueProp": "reduces customer churn for subscription businesses" },
+    "expectedIsIntent": false
+  },
+  {
+    "id": "hard-congrats-04",
+    "obs": {
+      "ref": "https://profiles.example/hard-congrats-04",
+      "name": "Aisha Rahman",
+      "headline": "Recruiter",
+      "signalKind": "engagement",
+      "action": "commented",
+      "text": "Congrats on the new role, you're going to crush it!",
+      "context": "We replaced our applicant tracker last quarter and time-to-fill dropped.",
+      "watchTarget": "ATS"
+    },
+    "ctx": { "accountIndustry": "HR tech", "valueProp": "applicant tracking for growing software teams" },
+    "expectedIsIntent": false
+  },
+  {
+    "id": "hard-congrats-05",
+    "obs": {
+      "ref": "https://profiles.example/hard-congrats-05",
+      "name": "Diego Alvarez",
+      "headline": "Office Manager",
+      "signalKind": "engagement",
+      "action": "commented",
+      "text": "So proud of you all, well earned!",
+      "context": "Hiring teams: stop running interviews out of a shared inbox.",
+      "watchTarget": "hiring ops"
+    },
+    "ctx": { "accountIndustry": "HR tech", "valueProp": "applicant tracking for growing software teams" },
+    "expectedIsIntent": false
+  },
+  {
+    "id": "hard-congrats-06",
+    "obs": {
+      "ref": "https://profiles.example/hard-congrats-06",
+      "name": "Hannah Briggs",
+      "headline": "Community Manager",
+      "signalKind": "engagement",
+      "action": "commented",
+      "text": "Huge congrats — this is such a well-deserved win.",
+      "context": "Our ATS migration notes: structured scorecards beat gut feel.",
+      "watchTarget": "scorecards"
+    },
+    "ctx": { "accountIndustry": "HR tech", "valueProp": "applicant tracking for growing software teams" },
+    "expectedIsIntent": false
+  },
+  {
+    "id": "hard-recommend-01",
+    "obs": {
+      "ref": "https://profiles.example/hard-recommend-01",
+      "name": "Gwen Park",
+      "headline": "Head of Customer Experience",
+      "signalKind": "engagement",
+      "action": "commented",
+      "text": "Anyone recommend a churn tool that actually flags accounts before they cancel?",
+      "context": "Retention stack roundup for subscription companies.",
+      "watchTarget": "churn tools"
+    },
+    "ctx": { "accountIndustry": "B2B SaaS", "valueProp": "reduces customer churn for subscription businesses" },
+    "expectedIsIntent": true
+  },
+  {
+    "id": "hard-recommend-02",
+    "obs": {
+      "ref": "https://profiles.example/hard-recommend-02",
+      "name": "Martin Oyelaran",
+      "headline": "Head of Revenue Operations",
+      "signalKind": "engagement",
+      "action": "commented",
+      "text": "We're evaluating vendors for this — does anyone have a system they actually trust?",
+      "context": "How we predict churn without another unused dashboard.",
+      "watchTarget": "churn vendors"
+    },
+    "ctx": { "accountIndustry": "B2B SaaS", "valueProp": "reduces customer churn for subscription businesses" },
+    "expectedIsIntent": true
+  },
+  {
+    "id": "hard-recommend-03",
+    "obs": {
+      "ref": "https://profiles.example/hard-recommend-03",
+      "name": "Jordan Vale",
+      "headline": "VP Customer Success",
+      "signalKind": "engagement",
+      "action": "commented",
+      "text": "Same problem here. Looking for a real fix for renewal surprises, not another slide deck.",
+      "context": "Why logo churn still catches teams off guard.",
+      "watchTarget": "renewals"
+    },
+    "ctx": { "accountIndustry": "B2B SaaS", "valueProp": "reduces customer churn for subscription businesses" },
+    "expectedIsIntent": true
+  },
+  {
+    "id": "hard-recommend-04",
+    "obs": {
+      "ref": "https://profiles.example/hard-recommend-04",
+      "name": "Priya Nandan",
+      "headline": "Founder, subscription analytics",
+      "signalKind": "content",
+      "action": "posted",
+      "text": "Our board asked why churn keeps climbing. If anyone's found a system that flags at-risk accounts early, I want to hear about it.",
+      "watchTarget": "SaaS retention"
+    },
+    "ctx": { "accountIndustry": "B2B SaaS", "valueProp": "reduces customer churn for subscription businesses" },
+    "expectedIsIntent": true
+  },
+  {
+    "id": "hard-recommend-05",
+    "obs": {
+      "ref": "https://profiles.example/hard-recommend-05",
+      "name": "Cara Lin",
+      "headline": "RevOps lead",
+      "signalKind": "engagement",
+      "action": "commented",
+      "text": "Does anyone have a tool they would actually recommend for predicting churn?",
+      "context": "Weekly retention metrics that matter.",
+      "watchTarget": "churn"
+    },
+    "ctx": { "accountIndustry": "B2B SaaS", "valueProp": "reduces customer churn for subscription businesses" },
+    "expectedIsIntent": true
+  },
+  {
+    "id": "hard-recommend-06",
+    "obs": {
+      "ref": "https://profiles.example/hard-recommend-06",
+      "name": "Samira Haddad",
+      "headline": "VP People",
+      "signalKind": "engagement",
+      "action": "commented",
+      "text": "Anyone recommend an applicant tracker that handles structured interviews without the copy-paste?",
+      "context": "Hiring ops that don't live in email.",
+      "watchTarget": "ATS"
+    },
+    "ctx": { "accountIndustry": "HR tech", "valueProp": "applicant tracking for growing software teams" },
+    "expectedIsIntent": true
+  },
+  {
+    "id": "hard-recommend-07",
+    "obs": {
+      "ref": "https://profiles.example/hard-recommend-07",
+      "name": "Noah Kessler",
+      "headline": "Head of Talent",
+      "signalKind": "engagement",
+      "action": "commented",
+      "text": "We're shopping for a replacement ATS — what has actually worked at ~150 people?",
+      "context": "Outgrowing the starter hiring spreadsheet.",
+      "watchTarget": "applicant tracking"
+    },
+    "ctx": { "accountIndustry": "HR tech", "valueProp": "applicant tracking for growing software teams" },
+    "expectedIsIntent": true
+  },
+  {
+    "id": "hard-recommend-08",
+    "obs": {
+      "ref": "https://profiles.example/hard-recommend-08",
+      "name": "Beatrice Okoye",
+      "headline": "Director of Recruiting Operations",
+      "signalKind": "content",
+      "action": "posted",
+      "text": "Time-to-fill hit 70 days. Looking for a hiring system with scorecards and a real pipeline, not another shared inbox.",
+      "watchTarget": "time to fill"
+    },
+    "ctx": { "accountIndustry": "HR tech", "valueProp": "applicant tracking for growing software teams" },
+    "expectedIsIntent": true
+  },
+  {
+    "id": "hard-recommend-09",
+    "obs": {
+      "ref": "https://profiles.example/hard-recommend-09",
+      "name": "Evan Cho",
+      "headline": "People Ops, Series-growth SaaS",
+      "signalKind": "engagement",
+      "action": "commented",
+      "text": "Need a vendor recommendation for applicant tracking — coordinators are drowning.",
+      "context": "Structured hiring without extra headcount.",
+      "watchTarget": "hiring tools"
+    },
+    "ctx": { "accountIndustry": "HR tech", "valueProp": "applicant tracking for growing software teams" },
+    "expectedIsIntent": true
+  },
+  {
+    "id": "hard-topic-01",
+    "obs": {
+      "ref": "https://profiles.example/hard-topic-01",
+      "name": "Dana Whitfield",
+      "headline": "People Ops Manager",
+      "signalKind": "content",
+      "action": "posted",
+      "text": "Loved this thread on building a remote-first culture — so many good ideas here.",
+      "watchTarget": "remote work"
+    },
+    "ctx": { "accountIndustry": "B2B SaaS", "valueProp": "reduces customer churn for subscription businesses" },
+    "expectedIsIntent": false
+  },
+  {
+    "id": "hard-topic-02",
+    "obs": {
+      "ref": "https://profiles.example/hard-topic-02",
+      "name": "Renee Kowalczyk",
+      "headline": "Product Marketing Lead",
+      "signalKind": "content",
+      "action": "posted",
+      "text": "Great turnout at the conference this week — so many good conversations in the hallway track.",
+      "watchTarget": "events"
+    },
+    "ctx": { "accountIndustry": "B2B SaaS", "valueProp": "reduces customer churn for subscription businesses" },
+    "expectedIsIntent": false
+  },
+  {
+    "id": "hard-topic-03",
+    "obs": {
+      "ref": "https://profiles.example/hard-topic-03",
+      "name": "Felix Arroyo",
+      "headline": "Account Executive",
+      "signalKind": "content",
+      "action": "posted",
+      "text": "Monday motivation: ship something small before lunch and protect your calendar after 4.",
+      "watchTarget": "productivity"
+    },
+    "ctx": { "accountIndustry": "B2B SaaS", "valueProp": "reduces customer churn for subscription businesses" },
+    "expectedIsIntent": false
+  },
+  {
+    "id": "hard-topic-04",
+    "obs": {
+      "ref": "https://profiles.example/hard-topic-04",
+      "name": "Keisha Morrow",
+      "headline": "Customer Support Lead",
+      "signalKind": "engagement",
+      "action": "commented",
+      "text": "This is such a thoughtful take on writing in public. Saving this.",
+      "context": "Why I write a weekly note to customers even when nothing shipped.",
+      "watchTarget": "writing"
+    },
+    "ctx": { "accountIndustry": "B2B SaaS", "valueProp": "reduces customer churn for subscription businesses" },
+    "expectedIsIntent": false
+  },
+  {
+    "id": "hard-topic-05",
+    "obs": {
+      "ref": "https://profiles.example/hard-topic-05",
+      "name": "Paul Nguyen",
+      "headline": "Engineering Manager",
+      "signalKind": "content",
+      "action": "posted",
+      "text": "We redesigned the careers page. The photos came out better than expected.",
+      "watchTarget": "employer brand"
+    },
+    "ctx": { "accountIndustry": "HR tech", "valueProp": "applicant tracking for growing software teams" },
+    "expectedIsIntent": false
+  },
+  {
+    "id": "hard-topic-06",
+    "obs": {
+      "ref": "https://profiles.example/hard-topic-06",
+      "name": "Sofia Berg",
+      "headline": "Office Experience Lead",
+      "signalKind": "engagement",
+      "action": "commented",
+      "text": "Love this office-layout thread. We're also debating standing desks vs more meeting rooms.",
+      "context": "How we redid the floor plan after going hybrid.",
+      "watchTarget": "workplace"
+    },
+    "ctx": { "accountIndustry": "HR tech", "valueProp": "applicant tracking for growing software teams" },
+    "expectedIsIntent": false
+  },
+  {
+    "id": "hard-topic-07",
+    "obs": {
+      "ref": "https://profiles.example/hard-topic-07",
+      "name": "Andre Silva",
+      "headline": "Brand Designer",
+      "signalKind": "content",
+      "action": "posted",
+      "text": "New illustration style for our blog. Feedback welcome on the color palette.",
+      "watchTarget": "design"
+    },
+    "ctx": { "accountIndustry": "HR tech", "valueProp": "applicant tracking for growing software teams" },
+    "expectedIsIntent": false
+  }
+]

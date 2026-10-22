@@ -52,6 +52,7 @@ const baseLoad: QualifyLeadLoad = {
     location: null,
     title: "CEO",
   },
+  valueProp: null,
 };
 
 describe("runQualifyLead", () => {
@@ -89,5 +90,14 @@ describe("runQualifyLead", () => {
     const { deps, scores } = makeDeps(baseLoad, 40);
     expect(await runQualifyLead("a1", "l1", deps)).toBe("rejected");
     expect(scores).toEqual([{ insights: insight(40), qualified: false }]);
+  });
+
+  it("passes the loaded valueProp into rank so manual qualify uses the same seller bar as Scout", async () => {
+    const { deps, rankFn } = makeDeps({ ...baseLoad, valueProp: "cut onboarding churn" });
+    await runQualifyLead("a1", "l1", deps);
+    expect(rankFn).toHaveBeenCalledWith(
+      expect.any(Array),
+      expect.objectContaining({ valueProp: "cut onboarding churn" })
+    );
   });
 });

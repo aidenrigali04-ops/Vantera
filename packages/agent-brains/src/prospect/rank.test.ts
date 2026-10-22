@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { MockLanguageModelV3 } from "ai/test";
-import { compactLead, freshSignals, rankLeads, RANK_BATCH_SIZE, type RankCandidate } from "./rank";
+import { compactLead, freshSignals, rankLeads, RANK_BATCH_SIZE, completeRankResults, RANK_MISS_RATIONALE, type RankCandidate } from "./rank";
 import type { LeadInsights } from "./schema";
 
 function insight(leadId: string, overrides: Partial<LeadInsights> = {}): LeadInsights {
@@ -188,5 +188,25 @@ describe("rankLeads", () => {
 
     const userText = JSON.stringify(model.doGenerateCalls[0]!.prompt);
     expect(userText.indexOf("fintech")).toBeLessThan(userText.indexOf("l1|"));
+  });
+});
+
+describe("completeRankResults / rankMissInsights", () => {
+  it("fills omitted candidate ids with a score-0 rank-miss row", () => {
+    const out = completeRankResults(
+      [candidate("a"), candidate("b"), candidate("c")],
+      [insight("a"), insight("c")]
+    );
+    expect(out.map((i) => i.lead_id)).toEqual(["a", "b", "c"]);
+    expect(out[1]).toMatchObject({ lead_id: "b", score: 0, rationale: RANK_MISS_RATIONALE });
+    expect(out[0]!.score).toBe(82);
+  });
+
+  it("keeps the first insight when the model returns a duplicate lead_id", () => {
+    const first = insight("a", { score: 90 });
+    const second = insight("a", { score: 10 });
+    const out = completeRankResults([candidate("a")], [first, second]);
+    expect(out).toHaveLength(1);
+    expect(out[0]!.score).toBe(90);
   });
 });

@@ -16,7 +16,8 @@
   },
   "pnpm": {
     "overrides": {
-      "tar@>=6": "7.5.22"
+      "tar@>=6": "7.5.22",
+      "proxy-addr": "2.0.8"
     }
   },
   "packageManager": "pnpm@10.33.4"

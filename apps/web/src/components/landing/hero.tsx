@@ -49,10 +49,9 @@ export function Hero() {
             </span>
           </h1>
 
-          <p
-            className="landing-rise mt-6 max-w-[41rem] text-balance text-[1.05rem] leading-relaxed text-[var(--ink-3)] sm:text-[1.15rem]"
-            style={rise(0.1)}
-          >
+          {/* No rise on this paragraph: it can be the mobile LCP element, and a fade-in
+              holds Largest Contentful Paint (#58). */}
+          <p className="mt-6 max-w-[41rem] text-balance text-[1.05rem] leading-relaxed text-[var(--ink-3)] sm:text-[1.15rem]">
             Agents find in-market buyers on LinkedIn, write every first message from real
             activity, and turn warm replies into booked meetings, while machine learning
             sharpens who they target.

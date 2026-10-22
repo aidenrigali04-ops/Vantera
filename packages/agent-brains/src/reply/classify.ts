@@ -1,6 +1,6 @@
 import { generateObject, type LanguageModel } from "ai";
 import { z } from "zod";
-import { getModel, registerPrompt } from "@vantera/ai";
+import { getClassifierModel, registerPrompt } from "@vantera/ai";
 
 export const replyVerdictSchema = z.object({
   classification: z.enum(["interested", "not_interested", "neutral", "out_of_office", "unsubscribe", "other"]),
@@ -53,7 +53,7 @@ link is NOT booked. Rationale: one short sentence.`);
 
 export async function classifyReply(
   body: string,
-  model: LanguageModel = getModel()
+  model: LanguageModel = getClassifierModel()
 ): Promise<ReplyVerdict> {
   const pre = preClassify(body);
   if (pre) return pre;

@@ -140,6 +140,22 @@ describe("UnipileLinkedInInfra", () => {
         { providerRef: "acc_3", displayName: "Zoe", profileUrl: null, status: "disconnected" },
       ]);
     });
+
+    // A just-created account has no sources yet: the provider hasn't finished the initial
+    // sync. Reporting that as "disconnected" is a claim we can't support -- and it strands a
+    // user who just connected, because the onboarding gate only counts connecting|active.
+    it("reports an account whose sources have not synced yet as connecting, not disconnected", async () => {
+      for (const sources of [undefined, []]) {
+        const adapter = infra({
+          "/api/v1/accounts": {
+            items: [{ id: "acc_new", type: "LINKEDIN", name: "Fresh", connection_params: { im: { publicIdentifier: "fresh-1" } }, sources }],
+          },
+        });
+        await expect(adapter.listAccounts()).resolves.toEqual([
+          { providerRef: "acc_new", displayName: "Fresh", profileUrl: "https://www.linkedin.com/in/fresh-1", status: "connecting" },
+        ]);
+      }
+    });
   });
 
   describe("deleteConnectedAccount", () => {
@@ -476,6 +492,57 @@ describe("UnipileLinkedInInfra", () => {
     });
   });
 
+  // The account-status webhook does NOT use the flat `event` discriminator the fixtures above
+  // assume — it arrives wrapped in an `AccountStatus` envelope carrying `message` as the state
+  // (documented shape). Parsing the flat form only is what silently dropped every status event.
+  describe("parseEventWebhook — real AccountStatus envelope", () => {
+    const adapter = infra({});
+    const envelope = (message: string, over: Record<string, unknown> = {}) => ({
+      AccountStatus: { account_id: "h_EKCy2lRLef5NzHp0iw4A", account_type: "LINKEDIN", message, ...over },
+    });
+
+    it("parses the documented envelope instead of discarding it", () => {
+      expect(adapter.parseEventWebhook(envelope("CREDENTIALS"))).toEqual({
+        type: "account_status",
+        providerEventId: "status:h_EKCy2lRLef5NzHp0iw4A:CREDENTIALS",
+        connectedAccountRef: "h_EKCy2lRLef5NzHp0iw4A",
+        status: "restricted",
+        profileUrl: null,
+        displayName: null,
+        vanteraAccountId: null,
+      });
+    });
+
+    it("maps the connect-time states to active", () => {
+      for (const message of ["OK", "CREATION_SUCCESS", "RECONNECTED", "SYNC_SUCCESS"]) {
+        expect(adapter.parseEventWebhook(envelope(message))).toMatchObject({
+          type: "account_status",
+          status: "active",
+        });
+      }
+    });
+
+    it("maps DELETED to disconnected", () => {
+      expect(adapter.parseEventWebhook(envelope("DELETED"))).toMatchObject({ status: "disconnected" });
+    });
+
+    it("ignores the transient CONNECTING state rather than flapping the row", () => {
+      expect(adapter.parseEventWebhook(envelope("CONNECTING"))).toBeNull();
+    });
+
+    it("dedupes LinkedIn's paired SYNC_SUCCESS payloads on one id", () => {
+      const classic = adapter.parseEventWebhook(envelope("SYNC_SUCCESS", { product: "classic" }));
+      const premium = adapter.parseEventWebhook(envelope("SYNC_SUCCESS", { product: "recruiter" }));
+      expect(classic!.providerEventId).toBe(premium!.providerEventId);
+    });
+
+    it("still accepts the flat shape, so nothing that already worked regresses", () => {
+      expect(
+        adapter.parseEventWebhook({ event: "account_status", account_id: "a1", status: "OK" })
+      ).toMatchObject({ status: "active" });
+    });
+  });
+
   describe("createHostedAuthLink — hosted-auth white-label domain", () => {
     it("rewrites the provider host to the configured custom domain, preserving path + query", async () => {
       const fetchFn = (async () => new Response(JSON.stringify({ url: "https://accounts.unipile.com/abc?token=xyz" }), { status: 200 })) as unknown as typeof fetch;
@@ -495,6 +562,34 @@ describe("UnipileLinkedInInfra", () => {
       const fetchFn = (async () => new Response(JSON.stringify({ url: "https://accounts.unipile.com/abc" }), { status: 200 })) as unknown as typeof fetch;
       const infra = new UnipileLinkedInInfra({ apiKey: "k", dsn: "d", webhookSecret: "s", fetchFn });
       await expect(infra.createHostedAuthLink("acc_1")).resolves.toMatchObject({ url: "https://accounts.unipile.com/abc" });
+    });
+
+    // A configured value is a BARE HOSTNAME. Assigning `url.host` a value that isn't one
+    // fails silently in the URL spec -- "https://host" parses as the hostname "https", which
+    // shipped users a link to https://https/... Every bad value must fall back to the
+    // provider URL (which works) rather than emit a link that cannot resolve.
+    const linkFor = async (hostedAuthDomain: string) => {
+      const fetchFn = (async () => new Response(JSON.stringify({ url: "https://accounts.unipile.com/abc?token=xyz" }), { status: 200 })) as unknown as typeof fetch;
+      const infra = new UnipileLinkedInInfra({ apiKey: "k", dsn: "d", webhookSecret: "s", fetchFn, hostedAuthDomain, appUrl: "https://www.vantera.test" });
+      return (await infra.createHostedAuthLink("acc_1")).url;
+    };
+
+    it("tolerates a value written as a full URL instead of a bare host", async () => {
+      expect(await linkFor("https://connect.vantera.test")).toBe("https://connect.vantera.test/abc?token=xyz");
+      expect(await linkFor("https://connect.vantera.test/")).toBe("https://connect.vantera.test/abc?token=xyz");
+      expect(await linkFor("  connect.vantera.test  ")).toBe("https://connect.vantera.test/abc?token=xyz");
+    });
+
+    it("refuses to rewrite onto the app's own host, which would 404 on the token path", async () => {
+      // The provider's path is not a route this app serves, so this must not be rewritten.
+      expect(await linkFor("www.vantera.test")).toBe("https://accounts.unipile.com/abc?token=xyz");
+      expect(await linkFor("https://www.vantera.test")).toBe("https://accounts.unipile.com/abc?token=xyz");
+    });
+
+    it("keeps the working provider url when the value is unusable", async () => {
+      for (const bad of ["", "   ", "not a host", "http://"]) {
+        expect(await linkFor(bad)).toBe("https://accounts.unipile.com/abc?token=xyz");
+      }
     });
   });
 

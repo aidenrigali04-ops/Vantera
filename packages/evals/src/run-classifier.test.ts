@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { loadReplyLabels, loadIntentLabels, type ReplyLabel } from "./run-classifier";
+import { loadReplyLabels, loadIntentLabels, loadIntentHardLabels, loadRankLabels, type ReplyLabel } from "./run-classifier";
 
 /**
  * Fixture-integrity guardrail for the classifier floor labeled sets (Phase 2B, Task 5) — mirrors
@@ -94,6 +94,78 @@ describe("loadIntentLabels", () => {
   it("spans more than one seller context (exercises the ctx-batching grouping)", () => {
     const distinctCtx = new Set(labels.map((l) => JSON.stringify(l.ctx)));
     expect(distinctCtx.size).toBeGreaterThan(1);
+  });
+
+  it("never leaks a real vendor name (white-label rule)", () => {
+    for (const l of labels) expect(JSON.stringify(l), l.id).not.toMatch(VENDOR_DENYLIST);
+  });
+});
+
+describe("loadIntentHardLabels", () => {
+  const labels = loadIntentHardLabels();
+
+  it("loads a non-trivial hard labeled set (separate from the 24 clear-cut rows)", () => {
+    expect(labels.length).toBeGreaterThanOrEqual(24);
+  });
+
+  it("every id is unique", () => {
+    const ids = labels.map((l) => l.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it("every observation ref is unique", () => {
+    const refs = labels.map((l) => l.obs.ref);
+    expect(new Set(refs).size).toBe(refs.length);
+  });
+
+  it("empty text is only allowed on reactions (deterministic none path)", () => {
+    for (const l of labels) {
+      const empty = l.obs.text.trim().length === 0;
+      if (empty) {
+        expect(l.obs.action, l.id).toBe("reacted");
+        expect(l.expectedIsIntent, l.id).toBe(false);
+        expect((l.obs.context ?? "").trim().length, l.id).toBeGreaterThan(0);
+      } else {
+        expect(l.obs.text.trim().length, l.id).toBeGreaterThan(0);
+      }
+      expect(["engagement", "content"], l.id).toContain(l.obs.signalKind);
+    }
+  });
+
+  it("has enough true-intent cases to make a 0.80 recall floor meaningful", () => {
+    expect(labels.filter((l) => l.expectedIsIntent).length).toBeGreaterThanOrEqual(5);
+  });
+
+  it("spans both true and false expectedIsIntent cases", () => {
+    const seen = new Set(labels.map((l) => l.expectedIsIntent));
+    expect(seen.has(true)).toBe(true);
+    expect(seen.has(false)).toBe(true);
+  });
+
+  it("never leaks a real vendor name (white-label rule)", () => {
+    for (const l of labels) expect(JSON.stringify(l), l.id).not.toMatch(VENDOR_DENYLIST);
+  });
+});
+
+describe("loadRankLabels", () => {
+  const labels = loadRankLabels();
+
+  it("loads a non-trivial clear-cut rank set", () => {
+    expect(labels.length).toBeGreaterThanOrEqual(16);
+  });
+
+  it("every id and leadId is unique", () => {
+    const ids = labels.map((l) => l.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    const leadIds = labels.map((l) => l.candidate.leadId);
+    expect(new Set(leadIds).size).toBe(leadIds.length);
+  });
+
+  it("spans qualified and not-qualified cases plus a buyer/seller direction subset", () => {
+    expect(labels.some((l) => l.expectQualified)).toBe(true);
+    expect(labels.some((l) => !l.expectQualified)).toBe(true);
+    expect(labels.filter((l) => l.expectOfferingDirection === "seller").length).toBeGreaterThanOrEqual(3);
+    expect(labels.filter((l) => l.expectOfferingDirection === "buyer").length).toBeGreaterThanOrEqual(3);
   });
 
   it("never leaks a real vendor name (white-label rule)", () => {

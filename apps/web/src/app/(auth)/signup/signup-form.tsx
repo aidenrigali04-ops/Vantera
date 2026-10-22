@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { FormError } from "@/components/form-error";
 import { ONBOARDING_MINUTES } from "@/components/landing/claims";
 import {
+  AuthDivider,
   AuthHeading,
   CtaArrow,
   FIELD,
@@ -19,11 +20,13 @@ import {
   SubmitButton,
   TEXT_LINK,
 } from "../auth-ui";
+import { GoogleAuthForm } from "../google-auth-form";
 
 export function SignupForm({
   initialSite,
   invite,
   inviteDead = false,
+  queryError,
 }: {
   /** The URL a visitor typed on the landing page (`?site=`) — carried into onboarding. */
   initialSite?: string;
@@ -31,6 +34,7 @@ export function SignupForm({
   invite?: { token: string; email: string; workspaceName: string };
   /** the URL carried an invite token that is expired/used/unknown */
   inviteDead?: boolean;
+  queryError?: string;
 }) {
   // No confirmation-email interstitial: signup signs the user in and redirects
   // straight to onboarding (see the signup action).
@@ -73,6 +77,12 @@ export function SignupForm({
         </Rise>
       )}
 
+      {queryError && (
+        <div className="mt-6">
+          <FormError message={queryError} />
+        </div>
+      )}
+
       {siteHost && !invite && (
         <Rise delay={0.1}>
           <p className="mt-6 inline-flex max-w-full items-center gap-2 rounded-lg border border-[rgba(12,16,26,0.08)] bg-white px-2.5 py-1.5 text-[0.8rem] text-[var(--ink-2)] shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
@@ -85,8 +95,22 @@ export function SignupForm({
         </Rise>
       )}
 
+      <Rise delay={0.11}>
+        <div className="mt-8">
+          <GoogleAuthForm site={site || undefined} inviteToken={invite?.token} />
+          {invite && (
+            <p className={`mt-2 ${HINT}`}>
+              Continue with Google using {invite.email} — the invite is bound to that address.
+            </p>
+          )}
+          <div className="my-6">
+            <AuthDivider />
+          </div>
+        </div>
+      </Rise>
+
       <Rise delay={0.12}>
-        <form action={action} className="mt-8 space-y-4">
+        <form action={action} className="space-y-4">
           {site && <input type="hidden" name="site" value={site} />}
           {invite && <input type="hidden" name="inviteToken" value={invite.token} />}
           {!invite && (

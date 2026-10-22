@@ -1,6 +1,6 @@
 import { generateObject, type LanguageModel } from "ai";
 import { z } from "zod";
-import { getModel, registerPrompt } from "@vantera/ai";
+import { getClassifierModel, registerPrompt } from "@vantera/ai";
 import type { WebsiteScan } from "./website-scan";
 
 // Permissive schema (validate loose, normalize strict in code — same pattern as watchlist/rank).
@@ -103,7 +103,7 @@ export const EMPTY_ICP_DRAFT: IcpDraft = {
  */
 export async function draftIcp(
   ctx: IcpDraftContext,
-  model: LanguageModel = getModel()
+  model: LanguageModel = getClassifierModel()
 ): Promise<IcpDraft> {
   let raw: IcpDraft;
   try {

@@ -16,6 +16,7 @@ import { RouteEvents } from "@/components/analytics/route-events";
 import { TrialBanner, type TrialBannerProps } from "@/components/billing/trial-banner";
 import { Toaster } from "@/components/ui/sonner";
 import { trialDaysLeft, isTrialExpired } from "@vantera/billing";
+import { accountSkipsPayment } from "@/lib/billing/founder-exempt";
 
 /** R2: app tabs get real names — "Prospects · Vantera", not five identical marketing titles.
  *  Scoped here (not the root layout) so marketing pages keep their full SEO titles. */
@@ -77,7 +78,18 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // Today owns the banner slot (blueprint Z1): its copy names the sender and says the drafts
   // are held, and it deliberately shows no trial countdown (D9). Rendering the app-wide
   // strips there too would double the same warning.
-  const onToday = (pathname ?? "").startsWith("/today");
+  const path = (pathname ?? "").split("?")[0] ?? "";
+  const onToday = path.startsWith("/today");
+  // Same breath Today uses under the bar (TodayPageFrame: pt-8 / lg:pt-[72px]). These
+  // surfaces stay one viewport tall, so the inset comes out of the content area.
+  const oneScreen =
+    path === "/approvals" ||
+    path === "/inbox" ||
+    path === "/prospects" ||
+    path.startsWith("/prospects/") ||
+    path === "/playbook" ||
+    path === "/dashboard" ||
+    path === "/sequence";
 
   const supabase = await createClient();
   const [
@@ -180,7 +192,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // subscription attached has ALREADY chosen — telling it to "choose a plan" is a nag for a
   // decision it made. The prompts below are for accounts with nothing on file (legacy no-card
   // trials) and for subscriptions that actually need attention.
-  const hasSubscription = Boolean(billing?.stripe_subscription_id);
+  const skipsPayment =
+    Boolean(billing) &&
+    !billing?.stripe_subscription_id &&
+    data.account != null &&
+    (await accountSkipsPayment(supabase, data.account.id));
+  const hasSubscription = Boolean(billing?.stripe_subscription_id) || skipsPayment;
 
   // Engine-stopping states only (blueprint §6.2 / D9): no trial countdown in this slot.
   let trialBanner: TrialBannerProps | null = null;
@@ -214,7 +231,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   }
   // A payment that failed or a subscription that ended is not a nag — it stops the engine, so
   // it shows whether or not a card is on file.
-  if (billing && ["past_due", "canceled"].includes(billing.subscription_status)) {
+  if (billing && ["past_due", "canceled"].includes(billing.subscription_status) && !skipsPayment) {
     trialBanner = {
       tone: "ended",
       message: "Your subscription needs attention — new outreach is paused until it's active again.",
@@ -237,7 +254,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const initial = email.charAt(0).toUpperCase() || "?";
 
   return (
-    <div className="app-surface relative flex min-h-screen flex-col bg-[var(--canvas)]">
+    <div
+      className={`app-surface relative flex flex-col bg-[var(--canvas)] ${
+        oneScreen ? "min-h-screen lg:h-dvh lg:max-h-dvh" : "min-h-screen"
+      }`}
+    >
       {/* Today's brand wash lives in the SHELL so it passes behind the chrome band (the band
           is translucent and picks up the colour). Today only — it is a launchpad flourish,
           never decoration on a data surface. */}
@@ -273,10 +294,18 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       />
 
       {/* min-w-0 + overflow-x-clip: no surface can produce a sideways-scrolling page —
-          wide content clips (and scrolls inside its own container) instead. */}
-      <main className="min-w-0 flex-1 overflow-x-clip pb-24 lg:pb-6">
+          wide content clips (and scrolls inside its own container) instead.
+          Today grows with the work panel so the window scrolls to the rows below
+          the fold. The other surfaces stay one viewport tall. */}
+      <main
+        className={`flex min-w-0 flex-col overflow-x-clip px-4 pb-24 sm:px-6 lg:pb-6${
+          onToday ? " min-h-min" : " min-h-0 flex-1"
+        }${
+          !onToday ? " pt-8 lg:pt-[72px]" : ""
+        }${oneScreen ? " lg:overflow-hidden" : ""}`}
+      >
         {!onToday && (connectionBanner || trialBanner) && (
-          <div className="mx-auto w-full max-w-[1248px] px-6 pt-4">
+          <div className="mx-auto w-full max-w-[1248px] shrink-0">
             {connectionBanner && <TrialBanner {...connectionBanner} />}
             {trialBanner && <TrialBanner {...trialBanner} />}
           </div>

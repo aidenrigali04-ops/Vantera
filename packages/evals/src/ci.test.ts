@@ -1,6 +1,10 @@
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, it, expect } from "vitest";
 import {
   decide,
+  isAnthropicCreditError,
   orchestrate,
   shouldSkipLiveEvals,
   JUDGE_OVERALL_GATE_FLOOR,
@@ -162,12 +166,33 @@ describe("shouldSkipLiveEvals", () => {
   });
 });
 
+describe("isAnthropicCreditError", () => {
+  it("matches Anthropic's empty-wallet sentence", () => {
+    expect(
+      isAnthropicCreditError(
+        new Error("Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.")
+      )
+    ).toBe(true);
+  });
+
+  it("matches the same sentence when the SDK wraps it in cause", () => {
+    expect(isAnthropicCreditError(new Error("provider failed", { cause: new Error("insufficient credits") }))).toBe(true);
+  });
+
+  it("does not match a quality miss or a generic provider failure", () => {
+    expect(isAnthropicCreditError(new Error("deterministic copy gate (HARD): passRate 0.500 < floor 0.9"))).toBe(false);
+    expect(isAnthropicCreditError(new Error("fetch failed"))).toBe(false);
+  });
+});
+
 describe("orchestrate — wiring with injected fake run-fns (no real model/network calls)", () => {
   function fakeDeps(overrides: Partial<CiDeps> = {}): CiDeps {
     return {
       runDeterministic: async () => ({ passRate: 1 }),
       runReplyFloors: async () => [PASSING_FLOOR],
       runIntentFloors: async () => [],
+      runIntentHardFloors: async () => [],
+      runRankFloors: async () => [],
       generateLiveCandidates: async () => [{ caseId: "c1", text: "draft", grounding: "g", cta: "book a call" }],
       runPairwise: async () => PASSING_PAIRWISE,
       scoreJudge: async () => ({ averageOverall: 4.5, n: 1 }),
@@ -238,5 +263,19 @@ describe("orchestrate — wiring with injected fake run-fns (no real model/netwo
     await orchestrate(deps, false);
     expect(seen.pairwise).toEqual([{ caseId: "shared", text: "t" }]);
     expect((seen.judge as { caseId: string }[])[0]?.caseId).toBe("shared");
+  });
+});
+
+describe("production model split", () => {
+  it("live evals score classifiers on getClassifierModel and drafts on getModel", () => {
+    const ci = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "ci.ts"), "utf8");
+    expect(ci).toContain("getClassifierModel()");
+    expect(ci).toContain("runReplyFloors(classifierModel)");
+    expect(ci).toContain("runIntentFloors(classifierModel)");
+    expect(ci).toContain("runIntentHardFloors(classifierModel)");
+    expect(ci).toContain("runRankFloors(classifierModel)");
+    expect(ci).toContain('runDeterministic("live", draftingModel)');
+    // orchestrate still calls deps.runReplyFloors(); only the production wiring must pass a model.
+    expect(ci).not.toMatch(/[^.]runReplyFloors\(\)/);
   });
 });

@@ -16,6 +16,14 @@ const PARTIAL: [needle: string, friendly: string][] = [
     "already been registered",
     "An account with this email already exists. Try signing in.",
   ],
+  [
+    "provider is not enabled",
+    "Google sign-in isn't available yet. Use email and password.",
+  ],
+  [
+    "unsupported provider",
+    "Google sign-in isn't available yet. Use email and password.",
+  ],
 ];
 
 export function friendlyAuthError(message: string): string {
@@ -26,4 +34,15 @@ export function friendlyAuthError(message: string): string {
   // Unmapped: surface the raw message in logs so the generic fallback is diagnosable.
   console.error("Unmapped auth error:", message);
   return "Something went wrong. Please try again.";
+}
+
+/** Query-string errors from `/auth/callback` (and the expired-link confirm route). */
+export function authQueryMessage(code: string | undefined): string | undefined {
+  if (code === "oauth") {
+    return "Google sign-in didn't complete. Try again, or use email and password.";
+  }
+  if (code === "invite-email") {
+    return "That Google account doesn't match the invited email. Use the address the invite was sent to.";
+  }
+  return undefined;
 }

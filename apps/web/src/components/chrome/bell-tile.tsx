@@ -97,8 +97,8 @@ export function BellTile({ notifications, className }: { notifications: AppNotif
         title="Notifications"
         className={cn(
           CHROME_TILE,
-          "relative text-[var(--ink-mid)] hover:text-[var(--ink)]",
-          open && "text-[var(--ink)] ring-[var(--line-strong)]"
+          "relative text-[var(--fb)] hover:text-[var(--fb)]",
+          open && "text-[var(--fb)] ring-[var(--line-strong)]"
         )}
       >
         <Bell className="size-4.5" strokeWidth={1.75} aria-hidden="true" />

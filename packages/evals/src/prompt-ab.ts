@@ -14,7 +14,7 @@ import {
 } from "@vantera/agent-brains";
 import { loadCopyLinkedinCorpus, loadCopyRespondCorpus, type CopyLinkedinCase, type CopyRespondCase } from "./corpus";
 import { runPairwise, type PairwiseReport } from "./judge/pairwise";
-import { shouldSkipLiveEvals } from "./ci";
+import { isAnthropicCreditError, shouldSkipLiveEvals } from "./ci";
 
 /**
  * Prompt A/B rig (Phase 2C, Task 4): drafts every corpus case for a brain under a CANDIDATE
@@ -243,6 +243,12 @@ export async function main(argv: string[]): Promise<number> {
     );
     return 0;
   } catch (err) {
+    if (isAnthropicCreditError(err)) {
+      console.log(
+        "::warning::evals:prompt-ab skipped: Anthropic account has insufficient credits. Refill the account behind ANTHROPIC_API_KEY to run a live prompt A/B pass."
+      );
+      return 0;
+    }
     console.log(`::error::evals:prompt-ab failed: ${err instanceof Error ? err.message : String(err)}`);
     return 1;
   }

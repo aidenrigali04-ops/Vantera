@@ -117,6 +117,14 @@ Each entry stays short — the detail lives in that phase's spec (`docs/superpow
 - [ ] **Phase 21 — Prospects + Playbook** — fixed stages surface; Playbook tabs editing the (now real) ICP criteria, sequence, message rules.
 - [ ] **Phase 22 — Lifecycle email** — template layer + scheduling in `transactional-email` (scope contract renegotiated), digests, weekly report.
 - [ ] **Phase 23 — Billing completeness + polish gate** — in-app sender add-on, dunning, pause/cancel, states sweep.
+- [ ] **Phase 24 — Adaptive prospecting (closed loop)**
+  Goal: each account's booked meetings per 100 sourced rise over time, with every claimed gain coming from a randomized experiment on that account's own traffic. The function lives only on the Machine Learning page and stays off until that account creates its first subject there (the user creates it, or the AI creates the first one). Spec: `docs/superpowers/specs/2026-10-17-adaptive-prospecting-closed-loop.md`. The founder account is the first live use after the loop is closed and proven. `ofOracle` is not the success metric.
+  - [ ] A1 instrumentation — genome stamp at lead entry + pure funnel rollup. No send-path change. Help article deferred until a surface shows calibration (A2).
+  - [ ] A2 per-account calibration
+  - [ ] A3 proposer bridge (wired genes only, deliberator off)
+  - [ ] A4 loop closure
+  - [ ] A5 cold-start pooling
+  - [ ] B0–B3 production wiring (`docs/superpowers/specs/2026-10-17-adaptive-prospecting-production-wiring.md`)
 
 ---
 

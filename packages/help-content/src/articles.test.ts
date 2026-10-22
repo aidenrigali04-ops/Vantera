@@ -43,4 +43,11 @@ describe("articlesForRoute", () => {
     const titles = articlesForRoute("/settings").map((a) => a.title);
     expect(titles.length).toBeGreaterThan(0);
   });
+
+  it("covers Google sign-in on login and signup", () => {
+    for (const route of ["/login", "/signup"]) {
+      const body = articlesForRoute(route).map((a) => a.body).join("\n");
+      expect(body).toMatch(/Continue with Google/);
+    }
+  });
 });

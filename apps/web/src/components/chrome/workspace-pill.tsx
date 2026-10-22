@@ -131,11 +131,11 @@ export function WorkspacePill({ name, paused, iconCandidates = [], pauseEngine, 
               className="size-1.5 shrink-0 rounded-full bg-[var(--attention)]"
             />
           )}
-          <span className="max-w-[22ch] truncate text-sm font-medium text-[var(--ink)]">{name}</span>
+          <span className="max-w-[22ch] truncate text-sm font-medium text-[var(--fb)]">{name}</span>
         </span>
         <ChevronDown
           className={cn(
-            "ml-1.5 size-3.5 shrink-0 text-[var(--ink-dim)] transition-transform duration-120 ease-out",
+            "ml-1.5 size-3.5 shrink-0 text-[var(--fb)] transition-transform duration-120 ease-out",
             open && "rotate-180"
           )}
           strokeWidth={1.75}

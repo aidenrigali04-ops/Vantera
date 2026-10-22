@@ -7,6 +7,7 @@ import type { IntentObservationRow, IntentScanContext, IntentScanDeps, IntentSca
 const CREATOR = "https://li/creator";
 const GOOD = "https://li/good";
 const BLOCKED = "https://li/blocked";
+const LIKER = "https://li/liker";
 
 function seededLinkedIn() {
   const li = new InMemoryLinkedInInfra();
@@ -14,11 +15,14 @@ function seededLinkedIn() {
   li.engagersByPost.set("p1", [
     { profileUrl: GOOD, name: "Gwen", headline: "Head of CX", kind: "comment", text: "same — what tool do you use?" },
     { profileUrl: BLOCKED, name: "Bo", headline: "VP Success", kind: "comment", text: "us too" },
+    // a like with no comment — evidence must stay empty; the post body is context only
+    { profileUrl: LIKER, name: "Lee", headline: "Head of CS", kind: "reaction" },
   ]);
   li.profiles.set(CREATOR, { profileUrl: CREATOR, firstName: "Cara", lastName: "Lin", headline: "RevOps lead", companyName: "Acme", location: "Austin" });
   li.profiles.set(GOOD, { profileUrl: GOOD, firstName: "Gwen", lastName: "Park", headline: "Head of CX", companyName: "Globex", location: "Remote" });
   // BLOCKED has a profile too — but suppression must stop us before we ever read or enroll it
   li.profiles.set(BLOCKED, { profileUrl: BLOCKED, firstName: "Bo", lastName: "Day", headline: "VP Success", companyName: "Initech", location: "NYC" });
+  li.profiles.set(LIKER, { profileUrl: LIKER, firstName: "Lee", lastName: "Ng", headline: "Head of CS", companyName: "Soylent", location: "SF" });
   return li;
 }
 
@@ -26,6 +30,7 @@ function makeStore(overrides: Partial<IntentScanStore> = {}) {
   const calls = {
     observations: [] as IntentObservationRow[],
     upserted: [] as string[], // externalRefs that became leads
+    icpIds: [] as Array<string | undefined>,
     scored: [] as { leadId: string; qualified: boolean }[],
     signals: [] as string[],
     chained: null as { leadIds: string[] } | null,
@@ -46,8 +51,9 @@ function makeStore(overrides: Partial<IntentScanStore> = {}) {
     getIntentContext: async () => ctx,
     seenObservationKeys: async () => new Set<string>(),
     recordObservations: async (_a, _ag, rows) => void calls.observations.push(...rows),
-    upsertIntentLead: async (_a, candidate) => {
+    upsertIntentLead: async (_a, candidate, icpId) => {
       calls.upserted.push(candidate.externalRef);
+      calls.icpIds.push(icpId);
       return { leadId: `lead_${candidate.externalRef}` };
     },
     markRulesGate: async () => {},
@@ -172,7 +178,7 @@ describe("runIntentScan", () => {
   });
 
   it("counts failed watch-target reads — a dead connection reports sourcingErrors, never a quiet day", async () => {
-    const { store } = makeStore();
+    const { store, calls } = makeStore();
     const deps = makeDeps(store);
     // every provider read 401s (the 2026-07-08 disconnected-account incident)
     deps.linkedin = Object.assign(seededLinkedIn(), {
@@ -186,9 +192,84 @@ describe("runIntentScan", () => {
 
     const summary = await runIntentScan("intent-1", deps);
 
-    expect(summary.status).toBe("completed"); // one bad target still never sinks the run
+    expect(summary.status).toBe("failed");
+    expect(summary.reason).toBe("all_targets_failed");
     expect(summary.targets).toBe(1);
-    expect(summary.sourcingErrors).toBe(1); // ...but the failure is visible, not swallowed
+    expect(summary.sourcingErrors).toBe(1);
     expect(summary.observed).toBe(0);
+    expect(calls.completed).toBe(true);
+  });
+
+  it("never treats a like with no comment as evidence — post body is context only, liker does not enroll", async () => {
+    const { store, calls } = makeStore();
+    const classified: { ref: string; text: string; context?: string | null; action: string }[] = [];
+    const deps = makeDeps(store);
+    // even a naive classifier that marks EVERY observation as intent must not enroll a like
+    // with no comment — the scan must not pass the post body as the engager's words.
+    deps.classifyFn = async (obs) => {
+      classified.push(
+        ...obs.map((o) => ({ ref: o.ref, text: o.text, context: o.context, action: o.action }))
+      );
+      return obs.map((o) => verdict(o.ref));
+    };
+
+    const summary = await runIntentScan("intent-1", deps);
+
+    const like = classified.find((o) => o.ref === LIKER);
+    expect(like).toMatchObject({ action: "reacted", text: "" });
+    expect(like?.context).toContain("onboarding churn");
+    expect(like?.text).not.toContain("onboarding churn");
+
+    expect(calls.upserted).not.toContain(LIKER);
+    expect(calls.scored.map((s) => s.leadId)).not.toContain(`lead_${LIKER}`);
+    expect(summary.intent).toBe(3); // creator + good + blocked; liker never enters primary
+    const likeRow = calls.observations.find((r) => r.profileUrl === LIKER);
+    expect(likeRow?.outcome).toBe("observed");
+  });
+
+  it("persists an unqualified score when rank omits a survivor", async () => {
+    const { store, calls } = makeStore();
+    const deps = makeDeps(store);
+    deps.rankFn = async (cands) =>
+      cands.filter((c) => !c.leadId.includes("good")).map((c) => insight(c.leadId, 80));
+
+    await runIntentScan("intent-1", deps);
+
+    // creator + good survive suppression; one insight returned → the other is a rank miss, still saved
+    expect(calls.scored.length).toBe(2);
+    expect(calls.scored.some((s) => s.qualified === false)).toBe(true);
+  });
+
+  it("enrolls when a later ICP matches even if the first does not, and persists that icpId", async () => {
+    const { store, calls, ctx } = makeStore();
+    ctx.icps = [
+      { id: "icp-cto", name: "CTOs", criteria: { titles: ["CTO"] } },
+      { id: "icp-cx", name: "CX leaders", criteria: { titles: ["cx"] } },
+    ];
+
+    const summary = await runIntentScan("intent-1", makeDeps(store));
+
+    expect(calls.upserted).toContain(GOOD);
+    const goodIdx = calls.upserted.indexOf(GOOD);
+    expect(calls.icpIds[goodIdx]).toBe("icp-cx");
+    expect(calls.scored.some((s) => s.leadId === `lead_${GOOD}` && s.qualified)).toBe(true);
+    // creator headline "RevOps lead" matches neither ICP
+    expect(calls.upserted).toContain(CREATOR);
+    expect(calls.scored.map((s) => s.leadId)).not.toContain(`lead_${CREATOR}`);
+    expect(summary.qualified).toBe(1);
+  });
+
+  it("rejects when every non-empty ICP fails the title gate", async () => {
+    const { store, calls, ctx } = makeStore();
+    ctx.icps = [
+      { id: "icp-cto", name: "CTOs", criteria: { titles: ["CTO"] } },
+      { id: "icp-vp", name: "VPs", criteria: { titles: ["VP"] } },
+    ];
+
+    const summary = await runIntentScan("intent-1", makeDeps(store));
+
+    expect(summary.qualified).toBe(0);
+    expect(calls.scored).toHaveLength(0);
+    expect(calls.observations.some((r) => r.profileUrl === GOOD && r.outcome === "rejected")).toBe(true);
   });
 });

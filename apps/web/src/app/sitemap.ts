@@ -23,6 +23,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${SITE_URL}/about`, lastModified: now, changeFrequency: "monthly", priority: 0.5 },
     { url: `${SITE_URL}/privacy`, lastModified: now, changeFrequency: "yearly", priority: 0.3 },
     { url: `${SITE_URL}/terms`, lastModified: now, changeFrequency: "yearly", priority: 0.3 },
+    // Linked from the footer. Left out of the sitemap, Google discovered them and
+    // then refused to index them because the old canonical host redirected.
+    { url: `${SITE_URL}/status`, lastModified: now, changeFrequency: "daily", priority: 0.3 },
+    { url: `${SITE_URL}/affiliate`, lastModified: now, changeFrequency: "monthly", priority: 0.4 },
+    { url: `${SITE_URL}/claude-linkedin-mcp`, lastModified: now, changeFrequency: "monthly", priority: 0.5 },
+    { url: `${SITE_URL}/opt-out`, lastModified: now, changeFrequency: "yearly", priority: 0.3 },
   ];
   // Live use-case pages (persona landing pages ship one at a time via the registry).
   const useCases: MetadataRoute.Sitemap = USE_CASES.filter((u) => u.live).map((u) => ({

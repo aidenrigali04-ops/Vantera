@@ -25,6 +25,11 @@ export default function robots(): MetadataRoute.Robots {
         "/invite",
         "/auth",
         "/api",
+        // Login walls. They 307 to /login, which Google records as a page it could not index.
+        "/today",
+        "/inbox",
+        "/meetings",
+        "/learning",
       ],
     },
     sitemap: `${SITE_URL}/sitemap.xml`,

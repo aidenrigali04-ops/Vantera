@@ -1,10 +1,10 @@
 import { pathToFileURL } from "node:url";
 import type { LanguageModel } from "ai";
 import { draftLinkedIn, draftConversationMessage } from "@vantera/agent-brains";
-import { getModel } from "@vantera/ai";
+import { getClassifierModel, getModel } from "@vantera/ai";
 import { loadCopyLinkedinCorpus, loadCopyRespondCorpus } from "./corpus";
 import { runDeterministic } from "./run-deterministic";
-import { runReplyFloors, runIntentFloors } from "./run-classifier";
+import { runReplyFloors, runIntentFloors, runIntentHardFloors, runRankFloors } from "./run-classifier";
 import type { FloorReport } from "./graders/classifier";
 import { runPairwise, PAIRWISE_NONINFERIORITY, type PairwiseReport } from "./judge/pairwise";
 import { judgeCopy, JUDGE_MODEL_ID } from "./judge/judge";
@@ -16,8 +16,8 @@ import { judgeCopy, JUDGE_MODEL_ID } from "./judge/judge";
  * Three layers, two postures:
  * - HARD (fail the build): the deterministic copy gate (Task 4, `runDeterministic("live")`,
  *   `passRate >= DETERMINISTIC_LIVE_FLOOR`, see that const's doc for why this isn't exact 100%)
- *   and the classifier accuracy floors (Task 5, `runReplyFloors` + `runIntentFloors`, every
- *   `FloorReport.pass`).
+ *   and the classifier accuracy floors (Task 5 + 8.0 rank/hard-intent, `runReplyFloors` +
+ *   `runIntentFloors` + `runIntentHardFloors` + `runRankFloors`, every `FloorReport.pass`).
  * - ADVISORY (report, never fail): the LLM judge (Task 6) and the pairwise win-rate harness
  *   (Task 7) — both are informational until a human owner labels ~100 drafts, runs
  *   `runCalibration` (`./judge/kappa.ts`), confirms Cohen's kappa >= 0.7, and flips
@@ -152,6 +152,24 @@ export function shouldSkipLiveEvals(env: { ANTHROPIC_API_KEY?: string }): boolea
   return !env.ANTHROPIC_API_KEY;
 }
 
+/**
+ * True only for Anthropic's empty-wallet response. A quality miss, a network error, or any
+ * other provider failure must stay a hard failure — this match is the billing sentence, not
+ * a general "API failed" bucket. Walks `Error.cause` because the SDK sometimes wraps it.
+ */
+export function isAnthropicCreditError(err: unknown): boolean {
+  const seen = new Set<unknown>();
+  let current: unknown = err;
+  while (current != null && !seen.has(current)) {
+    seen.add(current);
+    const message =
+      current instanceof Error ? current.message : typeof current === "string" ? current : "";
+    if (/credit balance is too low|insufficient credits/i.test(message)) return true;
+    current = current instanceof Error ? current.cause : undefined;
+  }
+  return false;
+}
+
 type LiveCandidate = { caseId: string; text: string; grounding: string; cta?: string };
 
 /**
@@ -201,6 +219,8 @@ export type CiDeps = {
   runDeterministic: () => Promise<DeterministicSummary>;
   runReplyFloors: () => Promise<FloorReport[]>;
   runIntentFloors: () => Promise<FloorReport[]>;
+  runIntentHardFloors: () => Promise<FloorReport[]>;
+  runRankFloors: () => Promise<FloorReport[]>;
   generateLiveCandidates: () => Promise<LiveCandidate[]>;
   runPairwise: (candidates: { caseId: string; text: string }[]) => Promise<PairwiseReport>;
   scoreJudge: (candidates: LiveCandidate[]) => Promise<JudgeSummary>;
@@ -218,7 +238,12 @@ export type OrchestrationResult = {
  *  (real: `main()`; tests: `ci.test.ts`) decide what to do with the result. */
 export async function orchestrate(deps: CiDeps, judgeGating: boolean): Promise<OrchestrationResult> {
   const deterministic = await deps.runDeterministic();
-  const floors = [...(await deps.runReplyFloors()), ...(await deps.runIntentFloors())];
+  const floors = [
+    ...(await deps.runReplyFloors()),
+    ...(await deps.runIntentFloors()),
+    ...(await deps.runIntentHardFloors()),
+    ...(await deps.runRankFloors()),
+  ];
   const candidates = await deps.generateLiveCandidates();
   const pairwise = await deps.runPairwise(candidates.map(({ caseId, text }) => ({ caseId, text })));
   const judge = await deps.scoreJudge(candidates);
@@ -275,6 +300,7 @@ export async function main(): Promise<number> {
   }
 
   const draftingModel = getModel();
+  const classifierModel = getClassifierModel();
   const judgeModel = getModel(JUDGE_MODEL_ID);
   const judgeGating = process.env.EVALS_JUDGE_GATING === "1";
 
@@ -286,8 +312,10 @@ export async function main(): Promise<number> {
         .map((r) => ({ caseId: r.caseId, rules: r.violations.map((v) => v.rule) }));
       return { passRate, failures };
     },
-    runReplyFloors: () => runReplyFloors(),
-    runIntentFloors: () => runIntentFloors(),
+    runReplyFloors: () => runReplyFloors(classifierModel),
+    runIntentFloors: () => runIntentFloors(classifierModel),
+    runIntentHardFloors: () => runIntentHardFloors(classifierModel),
+    runRankFloors: () => runRankFloors(classifierModel),
     generateLiveCandidates: () => generateLiveCandidates(draftingModel),
     runPairwise: (candidates) => runPairwise(candidates, judgeModel),
     scoreJudge: (candidates) => scoreJudge(candidates, judgeModel),
@@ -300,6 +328,12 @@ export async function main(): Promise<number> {
   try {
     result = await orchestrate(deps, judgeGating);
   } catch (err) {
+    if (isAnthropicCreditError(err)) {
+      console.log(
+        "::warning::Live evals skipped: Anthropic account has insufficient credits. Refill the account behind ANTHROPIC_API_KEY to run the live gates. A quality miss still fails the job."
+      );
+      return 0;
+    }
     console.log(`::error::evals:ci failed: ${err instanceof Error ? err.message : String(err)}`);
     return 1;
   }

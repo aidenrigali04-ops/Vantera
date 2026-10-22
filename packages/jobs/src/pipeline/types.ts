@@ -25,9 +25,14 @@ import type {
   ConversationMessageInput,
   ConversationTurn,
   CopyStrategy,
+  FunnelCohort,
   FunnelStageKey,
   GenerateRecipesInput,
   LeadOutcomeFlags,
+  StampArm,
+  StrategyGenome,
+  StrategySource,
+  VariantOutcome,
   ExperimentStatus,
   SendRecipe,
   JudgeFn,
@@ -100,6 +105,12 @@ export interface ScoutContext {
     websiteScannedAt: Date | null;
     /** Drives the trial lead cap; 'trialing' accounts are bounded by TRIAL_LEAD_CAP. */
     subscriptionStatus: string;
+    /**
+     * Trial expiry already skips this workspace, so the row can stay `trialing` forever.
+     * When set, lead and send caps treat it as paid. Otherwise sourcing stops at
+     * TRIAL_LEAD_CAP and later runs look like a search that found nothing.
+     */
+    trialCapsExempt?: boolean;
     /** features.intent (Growth/Scale) — gates the company-event signal fetch (Phase 15). */
     intentEnabled: boolean;
   };
@@ -174,10 +185,13 @@ export interface AgentRunStore {
 
 export interface ScoutRunSummary {
   status: "completed" | "skipped";
-  /** present only on a "skipped" run when the shared credit pool can't cover this run's worst case */
-  reason?: "low_credits";
-  /** raw prospects this run intended to pull (0 = pool full / no capacity — discovery idled by
-   *  design). target > 0 with discovered 0 is the ops signal that the source came back empty. */
+  /**
+   * Why the run did not search. `low_credits` is a skip. The others are a completed idle:
+   * the gate did not run, so the run must not be read as "0 passed gate".
+   */
+  reason?: "low_credits" | "trial_cap" | "pool_full" | "preview_full";
+  /** raw prospects this run intended to pull (0 = pool full / trial cap / no channel — discovery
+   *  idled by design). target > 0 with discovered 0 is the ops signal that the source came back empty. */
   discoveryTarget: number;
   /** ICPs whose criteria were derived from free text and persisted this run */
   criteriaDerived: number;
@@ -187,6 +201,14 @@ export interface ScoutRunSummary {
   gatePassed: number;
   qualified: number;
   chained: boolean;
+  /** survivors the model omitted after one retry (score-0 miss rows still persisted) */
+  rankMissed: number;
+  /** survivors miss-scored because rankFn threw */
+  rankErrors: number;
+  /** website scan threw — rank ran without seller-site context */
+  websiteScanError: boolean;
+  /** company-signal fetch threw — rank ran without company events */
+  companySignalsError: boolean;
 }
 
 export interface CopyDraftPayload {
@@ -242,8 +264,9 @@ export interface IntentScanStore {
   seenObservationKeys(accountId: string, refs: { profileUrl: string; postRef: string }[]): Promise<Set<string>>;
   /** persist the observation ledger (service-role insert; the unique index is the backstop) */
   recordObservations(accountId: string, agentId: string, rows: IntentObservationRow[]): Promise<void>;
-  /** upsert an intent-sourced lead (source 'intent'), deduped by profile url; returns its id */
-  upsertIntentLead(accountId: string, candidate: ProspectCandidate): Promise<{ leadId: string }>;
+  /** upsert an intent-sourced lead (source 'intent'), deduped by profile url; returns its id.
+   *  When the candidate passed a specific ICP's rules gate, persist that icpId on insert. */
+  upsertIntentLead(accountId: string, candidate: ProspectCandidate, icpId?: string): Promise<{ leadId: string }>;
   markRulesGate(leadId: string, result: RulesGateResult): Promise<void>;
   saveScore(leadId: string, insights: LeadInsights, qualified: boolean): Promise<void>;
   /** capture the "why now" intent signal on the lead — feeds Surface A's why-now chip */
@@ -264,8 +287,8 @@ export interface IntentScanDeps {
 }
 
 export interface IntentScanSummary {
-  status: "completed" | "skipped";
-  reason?: "no_connection" | "empty_watchlist";
+  status: "completed" | "skipped" | "failed";
+  reason?: "no_connection" | "empty_watchlist" | "all_targets_failed";
   /** watch targets this run attempted to read */
   targets: number;
   /** targets whose provider read FAILED (swallowed per-target so one bad read never sinks the
@@ -276,6 +299,8 @@ export interface IntentScanSummary {
   intent: number;
   qualified: number;
   chained: boolean;
+  rankMissed: number;
+  rankErrors: number;
 }
 
 export interface CopyConfig {
@@ -325,6 +350,8 @@ export interface DraftableLead {
   linkedinUrl: string | null;
   phone: string | null;
   aiInsights: StoredInsights | null;
+  /** leads.ai_score. Ranking for the daily draft cap. Not stored inside aiInsights. */
+  aiScore: number | null;
   /** when the lead was last AI-ranked; drives refresh-on-release before a delayed email touch */
   scoredAt: Date | null;
 }
@@ -391,6 +418,11 @@ export interface CopyDraftStore {
    * as getBestOfN/getAdoptionMode.
    */
   getMessageShapeAuto(): Promise<boolean>;
+  /**
+   * Invite rows created since `since` for this account. Sequence messages and inbound replies
+   * use linkedin_stage "message" and do not count. The daily first-touch cap reads this.
+   */
+  countFirstTouchDraftsSince(accountId: string, since: Date): Promise<number>;
 }
 
 /** A running experiment as the copy-draft pipeline needs it: id, split, and the challenger strategy. */
@@ -433,6 +465,30 @@ export interface StartExperimentInput {
    * `optimization_playbook.alpha_wealth` in the same transaction as the insert (pg-store.ts).
    */
   alphaSpent: number;
+}
+
+/** A1 genome stamp. Writes a record at lead entry. Does not draft or send. */
+export type CohortWindow = { since?: Date; until?: Date };
+
+export interface StrategyStampStore {
+  upsertStrategy(accountId: string, genome: StrategyGenome, source: StrategySource): Promise<string>;
+  hasStrategyStamp(accountId: string, leadId: string): Promise<boolean>;
+  stampLead(
+    accountId: string,
+    leadId: string,
+    strategyId: string,
+    opts?: { experimentId?: string | null; arm?: StampArm }
+  ): Promise<void>;
+  /** Non-suppressed leads in the window, counted into the calibrate.ts cohort shape. */
+  getFunnelCohort(accountId: string, window?: CohortWindow): Promise<FunnelCohort>;
+  /**
+   * Per-arm outcomes for one experiment, from lead_strategy_stamp rows only.
+   * Empty arms when the experiment has no randomized stamps yet.
+   */
+  getVariantOutcomes(
+    accountId: string,
+    experimentId: string
+  ): Promise<Record<"champion" | "challenger", VariantOutcome>>;
 }
 
 export interface OptimizeStore {
@@ -671,6 +727,8 @@ export interface CopyDraftSummary {
   drafted: number;
   suppressed: number;
   skipped: number;
+  /** Qualified leads left undrafted because the daily first-touch cap was full. Not skipped. */
+  deferred: number;
 }
 
 export interface SendContext {
@@ -784,6 +842,8 @@ export interface DispatchableSend {
   leadAssignedSenderId: string | null;
   /** Drives the trial send cap; 'trialing' accounts are bounded by TRIAL_SEND_CAP. */
   subscriptionStatus: string;
+  /** Admin workspace: no trial send cap and no weekday send window. */
+  unconstrained?: boolean;
 }
 
 /** One of a tenant's connected LinkedIn sender accounts, with its current safety state.

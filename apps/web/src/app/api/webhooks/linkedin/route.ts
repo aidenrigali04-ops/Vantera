@@ -21,6 +21,12 @@ export async function POST(req: Request) {
       });
     },
     extractEventId: (p) => infra.parseEventWebhook(p)?.providerEventId ?? null,
+    onUnparsed: (payload) => {
+      // Authentic but unrecognized: log the envelope's shape (keys only, never values) so a
+      // provider payload change surfaces here instead of vanishing behind a 200.
+      const keys = payload && typeof payload === "object" ? Object.keys(payload as Record<string, unknown>) : [];
+      console.warn("[webhooks/linkedin] verified payload did not parse", { keys });
+    },
     recordEvent: async (source, providerEventId, payload) => {
       const supabase = createServiceClient();
       const { error } = await supabase

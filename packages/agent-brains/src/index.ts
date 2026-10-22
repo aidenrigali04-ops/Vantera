@@ -5,6 +5,9 @@ export {
   compactLead,
   rankLeads,
   RANK_BATCH_SIZE,
+  rankMissInsights,
+  completeRankResults,
+  RANK_MISS_RATIONALE,
   type RankCandidate,
   type RankContext,
 } from "./prospect/rank";
@@ -38,6 +41,7 @@ export {
   describeViolations,
   findRestartPhrases,
   findUngroundedClaims,
+  findUngroundedEntities,
   findActionClaims,
   findUnapprovedLinks,
   normalizeDashes,
@@ -193,6 +197,18 @@ export {
   type ExperimentStatus,
 } from "./optimize/experiment";
 export { aggregateArm, type LeadOutcomeFlags } from "./optimize/outcomes";
+export {
+  asStrategyGenome,
+  genomeSignature,
+  replyPolarity,
+  rollupArms,
+  rollupCohort,
+  type CohortLead,
+  type StampArm,
+  type StrategyGenome,
+  type StrategySource,
+} from "./optimize/cohort";
+export type { FunnelCohort } from "./research/calibrate";
 export { buildSendRecipe, type SendRecipe, type RecipeBrain } from "./optimize/recipe";
 export { validateRecipeAngle } from "./optimize/angle";
 export { strategySignature, aggregateBySignature, chooseChallenger } from "./optimize/bandit";

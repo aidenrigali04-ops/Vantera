@@ -548,10 +548,9 @@ export function LeadsTable({
         </div>
       )}
 
-      {/* Content region. overflow-x-hidden is the hard guarantee against sideways scroll;
-          the fixed-layout table below cannot exceed its container anyway. Vertical overflow
-          only ever happens on very short windows (page size fits a normal screen). */}
-      <div className="min-h-0 flex-1 overflow-x-hidden lg:overflow-y-auto">
+      {/* Content region. The table scrolls inside this pane so the first columns stay
+          reachable. Vertical overflow only happens on short windows. */}
+      <div className="min-h-0 min-w-0 flex-1 overflow-x-auto lg:overflow-y-auto">
       <HotNowStrip
         hotLeads={hotLeads}
         onSelect={open}

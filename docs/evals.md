@@ -11,7 +11,7 @@ for the conventions this suite inherits.
 | Layer | Modules | Posture | Why |
 |---|---|---|---|
 | **Deterministic copy gate** | `run-deterministic.ts` (`runDeterministic("frozen" \| "live")`) | **HARD** | Relints every generated draft with the EXACT production graders (`@vantera/agent-brains`'s humanizer/grounding checks) the drafting brains already run internally. `"frozen"` mode (the unit-test path, `graders/deterministic.test.ts`) asserts exact `passRate === 1` over the 36 hand-verified corpus baselines — a frozen-baseline lint failure is always a real grader/fixture regression, never variance, so it stays 100%-hard. `"live"` mode (`ci.ts`'s CI gate) asserts `passRate >= DETERMINISTIC_LIVE_FLOOR` (**0.9**, not exact 100%): it regenerates a fresh draft per case via the real (stochastic) drafting brains, and production already routes a still-lint-dirty draft (after `draftLinkedIn`/`draftConversationMessage`'s internal `generateHumanized` regenerate) to human review rather than blocking or auto-sending it — so a small, review-routed fraction among 36 freshly-generated live samples is expected sampling variance, not a defect. Only a passRate that drops *below* the floor — a systematic lint-violation rate — signals a real prompt/copy regression worth failing the build over. See `DETERMINISTIC_LIVE_FLOOR`'s doc comment in `ci.ts` for the full rationale (why 0.9, not 1). |
-| **Classifier accuracy floors** | `run-classifier.ts` (`runReplyFloors`, `runIntentFloors`) | **HARD** | Bounds the two classifiers that gate the funnel before anything reaches a human or costs enrichment spend: reply-interested recall (≥ 0.90), intent recall (≥ 0.85), intent precision (≥ 0.80). Any `FloorReport.pass === false` fails the build. |
+| **Classifier accuracy floors** | `run-classifier.ts` (`runReplyFloors`, `runIntentFloors`, `runIntentHardFloors`, `runRankFloors`) | **HARD** | Bounds the classifiers and ranker that gate the funnel before anything reaches a human or costs enrichment spend: reply-interested recall (≥ 0.90), intent recall (≥ 0.85), intent precision (≥ 0.80), hard-intent precision (≥ 0.85) and recall (≥ 0.80 when the set has ≥5 positives), rank qualify precision (≥ 0.80) / recall (≥ 0.85), rank offering-direction (≥ 0.90 on the labeled buyer/seller subset). Any `FloorReport.pass === false` fails the build. The hard-intent set is a separate labeled file from the 24 clear-cut intent rows — likes with empty evidence, congratulations, and “anyone recommend X” belong there, not in the original set. |
 | **LLM judge + pairwise win-rate** | `judge/judge.ts` (`judgeCopy`), `judge/pairwise.ts` (`runPairwise`) | **ADVISORY** (until calibrated — see below) | A stronger, different-family model (Opus) rates specificity/them-focus/posture/naturalness/overall, and separately does position-swapped A/B against each case's frozen baseline. Reported every run for visibility and trend-tracking, but nothing gates on it until the judge itself is proven trustworthy. |
 
 The pure-logic unit suite (`pnpm --filter @vantera/evals test` — mock models, no network) is
@@ -34,6 +34,12 @@ evals never executed must be visually distinguishable (the `::warning` annotatio
 where they executed and passed — this is what keeps GATE 1 from being accidentally declared "green"
 by a PR that simply never had the secret available.
 
+An empty Anthropic credit balance is the same loud skip. The key is present, so the run starts,
+then Anthropic answers "credit balance is too low" and both `evals.yml` and `ci.ts` print a
+`::warning` and exit 0. The live gates did not run. Refill the account behind
+`ANTHROPIC_API_KEY` (Plans & Billing on that key's organization) to run them. A quality miss,
+a network error, or any other provider failure still fails the job.
+
 Runner choice: **`tsx`** (already a devDependency of `@vantera/help-content`'s `build-index`
 script, pinned here to the same `^4.0.0`) — the simplest path to running one standalone TypeScript
 entry file without adding a build step, consistent with the one other place in the monorepo that
@@ -46,9 +52,7 @@ A live run generates every corpus case **twice**, not once: the deterministic ga
 `GradeResult`s, never the draft text), and the judge + pairwise layers need the actual draft text,
 so `ci.ts`'s `generateLiveCandidates` does a **second full-corpus generation pass** to produce
 candidates for them. Net: each case is drafted ~2x per invocation. At the current fixture volume
-(36 copy cases + the labeled classifier sets) this still lands around $2-5 per run, but budget for
-the doubling — it is the dominant cost driver at nightly cadence (factor it into the ~$50-100/mo
-eval budget; the classifier floors and the judge scoring calls are on top of the generation cost).
+(36 copy cases + the labeled classifier sets, plus one extra `rankLeads` pass and one extra hard-intent `classifyIntent` batch). Classifier floors run on `getClassifierModel()` (Haiku 4.5). The copy gate, pairwise drafts, and the judge stay on Sonnet 4.6 and Opus 4.8. That split is the production split. A green floor on Sonnet would not describe production. Budget stays about $2-5 per nightly run ($50-100/month) and is a platform cost, not part of the per-user $15 ceiling. The doubling is still the dominant cost driver at nightly cadence.
 
 **Named follow-up (not built): the single-shared-pass optimization.** Have `runDeterministic`
 optionally return the draft text (or add a `generateAndGrade` variant) so the judge + pairwise

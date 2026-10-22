@@ -223,6 +223,45 @@ describe("runScout", () => {
     expect(results.find((r) => r.score === 55)?.qualified).toBe(false);
   });
 
+  it("persists a score-0 miss for every survivor the rank model omitted", async () => {
+    const pool = [
+      makeCandidate({ externalRef: "kept", industry: "saas" }),
+      makeCandidate({ externalRef: "dropped", industry: "saas" }),
+    ];
+    const store = new FakeScoutStore(makeContext());
+    const { deps } = makeDeps(store, pool, { kept: 90, dropped: 90 });
+    deps.rankFn = async (candidates) => candidates.filter((c) => c.leadId.includes("kept")).map((c) => insight(c.leadId, 90));
+
+    const summary = await runScout("scout1", deps);
+
+    expect(store.scores.size).toBe(2);
+    const dropped = [...store.scores.entries()].find(([id]) => id.includes("dropped"));
+    expect(dropped?.[1]).toMatchObject({ score: 0, qualified: false });
+    expect(summary.rankMissed).toBe(1);
+    expect(summary.qualified).toBe(1);
+  });
+
+  it("miss-scores every survivor when rankFn throws and still completes the run", async () => {
+    const pool = [
+      makeCandidate({ externalRef: "a", industry: "saas" }),
+      makeCandidate({ externalRef: "b", industry: "saas" }),
+    ];
+    const store = new FakeScoutStore(makeContext());
+    const { deps } = makeDeps(store, pool, { a: 90, b: 90 });
+    deps.rankFn = async () => {
+      throw new Error("model 400");
+    };
+
+    const summary = await runScout("scout1", deps);
+
+    expect(summary.status).toBe("completed");
+    expect(summary.rankErrors).toBe(2);
+    expect(summary.qualified).toBe(0);
+    expect(store.scores.size).toBe(2);
+    expect([...store.scores.values()].every((s) => s.qualified === false && s.score === 0)).toBe(true);
+    expect(store.completedAt).not.toBeNull();
+  });
+
   it("dedupes: a second run with the same candidates ranks nothing new", async () => {
     const pool = [makeCandidate({ externalRef: "dup", industry: "saas" })];
     const store = new FakeScoutStore(makeContext());
@@ -274,6 +313,7 @@ describe("runScout", () => {
     };
     const summary = await runScout("scout1", broken.deps);
     expect(summary.status).toBe("completed");
+    expect(summary.websiteScanError).toBe(true);
   });
 
   it("skips paused or icp-less agents", async () => {
@@ -297,8 +337,40 @@ describe("runScout", () => {
     // completes (the draft phase may drain any existing qualified pool — none here, no copy agent).
     expect(summary.status).toBe("completed");
     expect(summary.discovered).toBe(0);
+    expect(summary.reason).toBe("trial_cap");
     expect(store.enriched).toEqual([]);
     expect(prospectData.enrichCalls).toEqual([]);
+  });
+
+  it("a workspace the trial never lapses still sources after the trial lead ceiling", async () => {
+    const pool = [makeCandidate({ externalRef: "good", industry: "saas" })];
+    const store = new FakeScoutStore(
+      makeContext({ subscriptionStatus: "trialing", trialCapsExempt: true })
+    );
+    store.leadCount = TRIAL_LEAD_CAP;
+    const { deps } = makeDeps(store, pool, { good: 90 });
+
+    const summary = await runScout("scout1", deps);
+
+    expect(summary.status).toBe("completed");
+    expect(summary.reason).toBeUndefined();
+    expect(summary.discovered).toBeGreaterThan(0);
+    expect(store.enriched).toEqual(["good"]);
+  });
+
+  it("an admin workspace keeps sourcing after the qualified pool is full", async () => {
+    const pool = [makeCandidate({ externalRef: "good", industry: "saas" })];
+    const store = new FakeScoutStore(
+      makeContext({ subscriptionStatus: "trialing", trialCapsExempt: true })
+    );
+    store.leadCount = TRIAL_LEAD_CAP;
+    store.qualifiedPoolOverride = 300;
+    const { deps } = makeDeps(store, pool, { good: 90 });
+
+    const summary = await runScout("scout1", deps);
+
+    expect(summary.reason).toBeUndefined();
+    expect(summary.discovered).toBeGreaterThan(0);
   });
 
   it("trial cap: a trialing account under the ceiling still prospects", async () => {
@@ -544,6 +616,7 @@ describe("runScout — company-event signals (Phase 15)", () => {
     const summary = await runScout("scout1", deps);
 
     expect(summary.qualified).toBe(1);
+    expect(summary.companySignalsError).toBe(true);
   });
 });
 

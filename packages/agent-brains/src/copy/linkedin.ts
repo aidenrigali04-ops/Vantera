@@ -1,7 +1,7 @@
 import { generateObject, type LanguageModel } from "ai";
 import { z } from "zod";
 import { getModel, registerPrompt } from "@vantera/ai";
-import { validateHumanity, findUngroundedClaims, normalizeDashes, type Violation } from "./humanizer";
+import { validateHumanity, findUngroundedClaims, findUngroundedEntities, normalizeDashes, type Violation } from "./humanizer";
 import { avoidBlock, exemplarBlock, generateHumanized, leadBlock, strategyDirectives, PROSPECT_ACCURACY_RULE, VOICE_RULES, type DraftInput } from "./shared";
 import { FACT_ASSERTING_SHAPES, groundingHasShapeSignal, shapeBudget, type MessageShape } from "./shape";
 
@@ -99,6 +99,7 @@ export function validateLinkedInDraft(
   if (grounding) {
     violations.push(
       ...findUngroundedClaims(`${draft.connection_note}\n${draft.followup_message}`, grounding),
+      ...findUngroundedEntities(`${draft.connection_note}\n${draft.followup_message}`, grounding),
     );
     // Deterministic grounding guard (spec §5c, anti-hallucination layer 3): a fact-asserting shape
     // (trigger_consequence / gift / peer_insider) leans its whole framing on a specific prospect
