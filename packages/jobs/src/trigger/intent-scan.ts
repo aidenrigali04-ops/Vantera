@@ -1,5 +1,6 @@
 import { logger, task, tasks } from "@trigger.dev/sdk";
 import { createDb } from "@vantera/db";
+import { withUsage } from "@vantera/ai";
 import { classifyIntent, rankLeads } from "@vantera/agent-brains";
 import { createLinkedInInfraFromEnv } from "@vantera/linkedin-infra";
 import { runIntentScan } from "../pipeline/intent-scan";
@@ -18,15 +19,19 @@ export const intentScan = task({
     const store = createPgStore(createDb());
     let summary;
     try {
-      summary = await runIntentScan(payload.agentId, {
-        store,
-        linkedin: createLinkedInInfraFromEnv(),
-        classifyFn: (obs, ctx) => classifyIntent(obs, ctx),
-        rankFn: (candidates, ctx) => rankLeads(candidates, ctx),
-        triggerCopyDraft: async (p) => {
-          await tasks.trigger("copy-draft", p, { concurrencyKey: p.accountId });
-        },
-      });
+      const run = await withUsage(() =>
+        runIntentScan(payload.agentId, {
+          store,
+          linkedin: createLinkedInInfraFromEnv(),
+          classifyFn: (obs, ctx) => classifyIntent(obs, ctx),
+          rankFn: (candidates, ctx) => rankLeads(candidates, ctx),
+          triggerCopyDraft: async (p) => {
+            await tasks.trigger("copy-draft", p, { concurrencyKey: p.accountId });
+          },
+        })
+      );
+      // per-run token + $ telemetry rides the agent_runs summary (no new table)
+      summary = { ...run.result, llm: run.usage };
     } catch (err) {
       // T4 operate path: a crashed run must be visible in-product, not just in ops logs.
       await store.recordAgentRun({ ...payload, kind: "intent", status: "failed", summary: {}, note: String(err).slice(0, 300) });

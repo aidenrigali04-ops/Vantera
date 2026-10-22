@@ -9,6 +9,7 @@ import {
   parseCopyForm,
   parseIntentForm,
   parseScoutForm,
+  parseTargetingForm,
   MAX_ICPS,
 } from "./validation";
 import { gate, loadBillingRow, hasActivePlan } from "@/lib/billing/entitlement";
@@ -561,4 +562,41 @@ export async function runAgentNow(formData: FormData): Promise<AgentActionState>
   }
   revalidatePath("/playbook");
   return {};
+}
+
+/**
+ * ML-5: save the Prospect agent's targeting rules — exclusions (checked deterministically before
+ * any spend, for Scout AND Intent leads) and free-text prioritize/avoid guidance (scoring context).
+ * Merged into agents.config.targeting (rule 13 — per-kind settings live in config). Admin-only via
+ * RLS like every agent edit; the account comes from the session (rule 02).
+ */
+export async function updateScoutTargeting(
+  _prev: AgentActionState,
+  formData: FormData
+): Promise<AgentActionState> {
+  const parsed = parseTargetingForm(formData);
+  if (!parsed.ok) return { error: parsed.error };
+
+  const { supabase, user, account } = await sessionAccount();
+  if (!user || !account) return { error: "Your session expired. Sign in again." };
+
+  const { data: agent } = await supabase
+    .from("agents")
+    .select("id, config")
+    .eq("account_id", account.id)
+    .eq("kind", "scout")
+    .limit(1)
+    .maybeSingle<{ id: string; config: Record<string, unknown> | null }>();
+  if (!agent) return { error: "No Prospect Agent yet. Deploy one first." };
+
+  const { data: saved, error } = await supabase
+    .from("agents")
+    .update({ config: { ...(agent.config ?? {}), targeting: parsed.values } })
+    .eq("id", agent.id)
+    .select("id")
+    .maybeSingle();
+  if (error || !saved) return { error: "Could not save. Only workspace admins can change targeting." };
+
+  revalidatePath("/playbook");
+  redirect("/playbook?updated=scout");
 }

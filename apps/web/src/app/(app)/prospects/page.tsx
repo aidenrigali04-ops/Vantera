@@ -10,6 +10,9 @@ import { leadsHref, type LeadsFilters, type LeadsSort } from "./leads-params";
 import { AddLead } from "./add-lead";
 import { HOT_MIN_SCORE } from "./lead-value";
 import { cn } from "@/lib/utils";
+import { parseReadout, reasonsForLead, whatsWorking } from "@/lib/learning/readout";
+import { fitVerdictFromRows } from "@/lib/learning/fit";
+import { WhatsWorkingStrip } from "./whats-working";
 
 export const metadata = { title: "Prospects" };
 
@@ -17,7 +20,7 @@ export const metadata = { title: "Prospects" };
 // lead_signals (0031) are the REAL "why now" — events + intent captured at enrichment.
 // company_size + tech_stack ride along for the side-peek profiler (no second fetch on click).
 const LEAD_SELECT =
-  "id, first_name, last_name, title, company_name, company_size, industry, location, tech_stack, status, source, ai_score, ai_rationale, ai_insights, rules_gate_reasons, scored_at, email, email_status, phone, phone_status, linkedin_url, created_at, replies(channel, classification, classification_rationale, body, received_at), lead_signals(kind, label, detail, observed_at)";
+  "id, first_name, last_name, title, company_name, company_size, industry, location, tech_stack, status, source, ai_score, ai_rationale, ai_insights, rules_gate_reasons, scored_at, email, email_status, phone, phone_status, linkedin_url, created_at, replies(channel, classification, classification_rationale, body, received_at), lead_signals(kind, label, detail, level, observed_at)";
 
 // Tabs where the spotlight makes sense — never above the "Filtered out" list.
 const HOT_STRIP_TABS = new Set(["all", "qualified", "in_campaign", "replied"]);
@@ -133,17 +136,45 @@ export default async function LeadsPage({
     .not("industry", "is", null)
     .limit(1000);
 
+  // ML-2: the latest scout run carries the learned readout (this account's own outcomes only).
+  const learnedQuery = supabase
+    .from("agent_runs")
+    .select("summary")
+    .eq("kind", "scout")
+    .eq("status", "completed")
+    .order("started_at", { ascending: false })
+    .limit(1);
+
   // Account carries the revenue numbers that turn each lead into "≈ $X to your goal".
-  const [leadsRes, hotRes, industriesRes, { account }] = await Promise.all([
+  const [leadsRes, hotRes, industriesRes, learnedRes, { account }] = await Promise.all([
     query,
     hotQuery,
     industriesQuery,
+    learnedQuery,
     getGateData(),
   ]);
+  // Insight only — a failed read just hides the reasons, never the prospects.
+  const readout = parseReadout((learnedRes.data?.[0] as { summary?: unknown } | undefined)?.summary ?? null);
+  const working = whatsWorking(readout);
   // R1c: a failed read hits the error boundary — never renders as "0 leads".
-  const leadsRaw = orThrow(leadsRes, "your prospects");
+  const pageRows = (orThrow(leadsRes, "your prospects") ?? []) as { id: string; status: string }[];
+  const hotRows = (orThrow(hotRes, "hot prospects") ?? []) as { id: string; status: string }[];
+  // ML-4: the user's fit verdicts for the visible leads — its own soft read so a missing table or a
+  // failed read hides the verdicts, never the prospects.
+  const feedbackRes = await supabase
+    .from("lead_feedback")
+    .select("lead_id, verdict")
+    .in("lead_id", [...new Set([...pageRows, ...hotRows].map((r) => r.id))]);
+  const verdicts = fitVerdictFromRows(feedbackRes.error ? null : feedbackRes.data);
+  const withReasons = <T extends { id: string }>(rows: T[]) =>
+    rows.map((r) => ({
+      ...r,
+      learned_reasons: reasonsForLead(readout, r as never),
+      fit_verdict: verdicts.get(r.id) ?? null,
+    }));
+  const leadsRaw = withReasons(pageRows);
   const count = leadsRes.count;
-  const hotLeads = orThrow(hotRes, "hot prospects");
+  const hotLeads = withReasons(hotRows);
   const industries = [
     ...new Set(((industriesRes.data ?? []) as { industry: string | null }[]).map((r) => r.industry).filter(Boolean) as string[]),
   ].sort();
@@ -207,6 +238,8 @@ export default async function LeadsPage({
           })}
         </div>
       </div>
+
+      {working && <WhatsWorkingStrip working={working} />}
 
       {!leads || leads.length === 0 ? (
         <Card className="border-dashed">

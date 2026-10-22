@@ -1,4 +1,5 @@
-import { and, asc, count, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, max, or, sql } from "drizzle-orm";
+import { createHash } from "node:crypto";
+import { and, asc, count, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, max, ne, or, sql } from "drizzle-orm";
 import { LIFECYCLE_ADMIN_EMAIL } from "./lifecycle-outreach";
 import { exemptFromTrialCaps, statusForTrialCaps } from "./trial-caps";
 import {
@@ -20,8 +21,12 @@ import {
   icps,
   intentObservations,
   leadNotifications,
+  leadEmbeddings,
+  leadFeedback,
   leadSignals,
   leadStrategyStamps,
+  meetingConnections,
+  meetingEvents,
   leads,
   lifecycleTouches,
   linkedinAccounts,
@@ -60,9 +65,17 @@ import {
   ALPHA_EARN_ON_CONCLUSION,
   ALPHA_WEALTH_CAP,
   ALPHA_WEALTH_START,
-  buildTargetingProfile,
+  buildLeadOrdering,
+  countRows,
+  RANK_FEEDBACK_MAX,
   describeStrategy,
-  rankByTilt,
+  buildReadout,
+  lookalikeBucket,
+  lookalikeCutpoints,
+  profileText,
+  LOOKALIKE_MIN_POSITIVES,
+  orderLeads,
+  pickWhyNow,
   toStoredInsights,
   genomeSignature,
   replyPolarity,
@@ -71,8 +84,12 @@ import {
   wealthAfterConclusion,
   wealthAfterLaunch,
   type LeadInsights,
+  type CountTable,
+  type LeadOrdering,
+  type LookalikeCutpoints,
+  type LearnerFeatures,
+  type LearnerRow,
   type ProofPoint,
-  type TargetingRow,
   type WebsiteScan,
 } from "@vantera/agent-brains";
 import { resolveEntitlements, TRIAL_DAYS, type EntitlementSnapshot } from "@vantera/billing";
@@ -124,6 +141,7 @@ import {
   type ScoutConfig,
   type ScoutContext,
   type ScoutStore,
+  type MeetingEventStore,
   type SendContext,
   type SendDispatchStore,
   type SequenceRunPatch,
@@ -272,6 +290,11 @@ async function winningOpeners(db: Db, accountId: string): Promise<string[]> {
  * read time (no stored profile). Feeds both the discovery allocator (per-ICP) and the qualified-
  * pool drain tilt (per-segment). Per-account only.
  */
+/** Days an invite needs before its outcome is observable (accept → reply lag). Younger invites are
+ *  right-censored, not failures — counting them as misses biased the ICP allocator + tilt against
+ *  every newly-targeted segment. */
+export const OUTCOME_MATURATION_DAYS = 14;
+
 async function invitedOutcomeRows(
   db: Db,
   accountId: string
@@ -288,7 +311,13 @@ async function invitedOutcomeRows(
       status: leads.status,
     })
     .from(leads)
-    .where(and(eq(leads.accountId, accountId), isNotNull(leads.linkedinInvitedAt)));
+    .where(
+      and(
+        eq(leads.accountId, accountId),
+        isNotNull(leads.linkedinInvitedAt),
+        lte(leads.linkedinInvitedAt, new Date(Date.now() - OUTCOME_MATURATION_DAYS * 86_400_000))
+      )
+    );
   if (rows.length === 0) return [];
   const ids = rows.map((r) => r.id);
   const replyRows = await db
@@ -315,6 +344,162 @@ async function invitedOutcomeRows(
       converted: r.status === "converted",
     },
   }));
+}
+
+/** ML-4: leads the user marked "Not a fit" never get drafted (reversible — flip the verdict). The
+ *  outer lead id is written qualified (see learnerFeatureCols on drizzle's bare-"id" rendering). */
+export const notMarkedNotFit = sql`not exists (select 1 from ${leadFeedback} f where f.lead_id = "leads"."id" and f.verdict = 'not_fit')`;
+
+/** Newest-first union of exemplar lists, deduped by line, capped — the revealed-preferences merge. */
+export function mergeExemplars(lists: { line: string; at: Date }[][], max: number): string[] {
+  const newest = new Map<string, number>();
+  for (const list of lists) for (const { line, at } of list) newest.set(line, Math.max(newest.get(line) ?? 0, at.getTime()));
+  return [...newest.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, max)
+    .map(([line]) => line);
+}
+
+/** ML-1 learner window: matured invites from the last LEARNER_LOOKBACK_DAYS. */
+const LEARNER_LOOKBACK_DAYS = 180;
+/** Bound on the cross-account pool read per ordering (counts only ever leave the store). */
+const LEARNER_POOL_LIMIT = 50_000;
+
+/** Learner features computed in SQL: buying-signal kinds + intent level off lead_signals. The outer
+ *  lead id is written fully qualified: in a select list drizzle renders ${leads.id} as a bare "id",
+ *  which inside these subqueries would bind to lead_signals.id / replies.id instead. */
+export const learnerFeatureCols = {
+  source: leads.source,
+  title: leads.title,
+  industry: leads.industry,
+  companySize: leads.companySize,
+  aiScore: leads.aiScore,
+  signals: sql<string[] | null>`(select array_agg(distinct ls.kind) from ${leadSignals} ls where ls.lead_id = "leads"."id")`,
+  intentLevel: sql<string | null>`(select max(ls.level) from ${leadSignals} ls where ls.lead_id = "leads"."id" and ls.kind = 'intent')`,
+};
+
+const toFeatures = (r: {
+  source: string;
+  title: string | null;
+  industry: string | null;
+  companySize: string | null;
+  aiScore: number | null;
+  signals: string[] | null;
+  intentLevel: string | null;
+}): LearnerFeatures => ({
+  source: r.source,
+  title: r.title,
+  industry: r.industry,
+  companySize: r.companySize,
+  aiScore: r.aiScore,
+  signals: r.signals ?? [],
+  intentLevel: r.intentLevel,
+});
+
+/**
+ * Matured invites as learner training rows — one account, or the cross-account pool excluding
+ * one account (so the hierarchical model never counts the account's own rows twice). Positive =
+ * an interested reply or a booked meeting.
+ */
+async function learnerTrainingRows(
+  db: Db,
+  scope: { accountId: string } | { excludeAccountId: string }
+): Promise<(LearnerRow & { id: string })[]> {
+  const now = Date.now();
+  const rows = await db
+    .select({
+      id: leads.id,
+      ...learnerFeatureCols,
+      accepted: sql<boolean>`${leads.linkedinConnectedAt} is not null`,
+      booked: sql<boolean>`${leads.meetingBookedAt} is not null`,
+      interested: sql<boolean>`exists (select 1 from ${replies} r where r.lead_id = "leads"."id" and r.classification = 'interested')`,
+    })
+    .from(leads)
+    .where(
+      and(
+        "accountId" in scope ? eq(leads.accountId, scope.accountId) : ne(leads.accountId, scope.excludeAccountId),
+        isNotNull(leads.linkedinInvitedAt),
+        lte(leads.linkedinInvitedAt, new Date(now - OUTCOME_MATURATION_DAYS * 86_400_000)),
+        gte(leads.linkedinInvitedAt, new Date(now - LEARNER_LOOKBACK_DAYS * 86_400_000))
+      )
+    )
+    .limit(LEARNER_POOL_LIMIT);
+  return rows.map((r) => ({
+    id: r.id,
+    ...toFeatures(r),
+    flags: {
+      invited: true,
+      accepted: r.accepted,
+      interested: r.interested,
+      negative: false,
+      booked: r.booked,
+      converted: false,
+    },
+  }));
+}
+
+/**
+ * ML-7: cosine similarity of each lead to the account's OWN positive leads (interested reply,
+ * booked, closed, or marked a good fit), leave-one-out — a positive never matches itself. Every
+ * join is pinned to `accountId`: similarity never crosses tenants. Empty until the account has
+ * LOOKALIKE_MIN_POSITIVES embedded positives.
+ */
+export async function lookalikeSims(db: Db, accountId: string, leadIds: string[]): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  if (leadIds.length === 0) return out;
+  const rows = (await db.execute(sql`
+    with pos as (
+      select e.lead_id, e.embedding
+      from ${leadEmbeddings} e
+      join ${leads} l on l.id = e.lead_id and l.account_id = e.account_id
+      where e.account_id = ${accountId}
+        and (l.meeting_booked_at is not null or l.status = 'converted'
+          or exists (select 1 from ${replies} r where r.lead_id = l.id and r.classification = 'interested')
+          or exists (select 1 from ${leadFeedback} f where f.lead_id = l.id and f.account_id = l.account_id and f.verdict = 'good_fit'))
+    )
+    select e.lead_id as lead_id,
+      (select max(1 - (p.embedding <=> e.embedding)) from pos p where p.lead_id <> e.lead_id) as sim,
+      (select count(*) from pos) as npos
+    from ${leadEmbeddings} e
+    where e.account_id = ${accountId}
+      and e.lead_id in (${sql.join(leadIds.map((id) => sql`${id}`), sql`, `)})
+  `)) as unknown as { lead_id: string; sim: number | string | null; npos: number | string }[];
+  for (const r of rows) {
+    if (Number(r.npos) < LOOKALIKE_MIN_POSITIVES || r.sim == null) continue;
+    out.set(r.lead_id, Number(r.sim));
+  }
+  return out;
+}
+
+/** Attach the lookalike bucket to candidate rows using the account's training cutpoints. */
+async function withLookalike<T extends { id: string }>(db: Db, accountId: string, rows: T[], cut: LookalikeCutpoints | null) {
+  if (!cut || rows.length === 0) return rows;
+  const sims = await lookalikeSims(db, accountId, rows.map((r) => r.id));
+  return rows.map((r) => ({ ...r, lookalike: lookalikeBucket(sims.get(r.id), cut) }));
+}
+
+/** The account's lead ordering (the ML-1 learner when it has evidence, else ML-0's tilt) plus the
+ *  account's OWN counts — the only input allowed into anything displayed (ML-2) — and the ML-7
+ *  lookalike cutpoints (from the account's own training similarities) for bucketing candidates. */
+async function leadOrdering(
+  db: Db,
+  accountId: string
+): Promise<{ ordering: LeadOrdering; own: CountTable; cut: LookalikeCutpoints | null }> {
+  const [trainingRows, pool, tilt] = await Promise.all([
+    learnerTrainingRows(db, { accountId }),
+    learnerTrainingRows(db, { excludeAccountId: accountId }),
+    invitedOutcomeRows(db, accountId),
+  ]);
+  const sims = await lookalikeSims(db, accountId, trainingRows.map((r) => r.id));
+  const cut = lookalikeCutpoints([...sims.values()]);
+  const ownRows = trainingRows.map((r) => ({ ...r, lookalike: lookalikeBucket(sims.get(r.id), cut) }));
+  const own = countRows(ownRows);
+  const ordering = buildLeadOrdering(
+    own,
+    countRows(pool),
+    tilt.map((r) => ({ title: r.title, industry: r.industry, flags: r.flags }))
+  );
+  return { ordering, own, cut };
 }
 
 /** The account's citable proof/pricing/FAQ facts (0046), oldest-sort first — fed into the responder
@@ -431,7 +616,7 @@ async function creditAlphaWealth(tx: OptimizeTx, accountId: string): Promise<voi
 }
 
 /** Drizzle-backed store used by the Trigger.dev tasks (service-role DATABASE_URL). */
-export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerStore & RetentionStore & TrialStore & SendDispatchStore & OutreachSendStore & InboundStore & SequenceStore & SequenceTouchStore & ConversionStore & RefreshLeadStore & QualifyLeadStore & IntentScanStore & ConnectionSyncStore & OptimizeStore & AgentRunStore & FastPassStore & StrategyStampStore {
+export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerStore & RetentionStore & TrialStore & SendDispatchStore & OutreachSendStore & InboundStore & SequenceStore & SequenceTouchStore & ConversionStore & RefreshLeadStore & QualifyLeadStore & IntentScanStore & ConnectionSyncStore & OptimizeStore & AgentRunStore & FastPassStore & StrategyStampStore & MeetingEventStore {
   async function upsertStrategy(accountId: string, genome: StrategyGenome, source: StrategySource): Promise<string> {
     const signature = genomeSignature(genome);
     const [row] = await db
@@ -490,6 +675,18 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
     return exemptFromTrialCaps(rows.map((r) => r.email).filter((e): e is string => Boolean(e)));
   }
 
+  // ML-1 ordering is a cross-account read — computed once per account per store (a store lives for
+  // one task run), shared by the drain, the slot ranking, and the run-summary readout.
+  const orderingCache = new Map<string, Promise<{ ordering: LeadOrdering; own: CountTable; cut: LookalikeCutpoints | null }>>();
+  const orderingFor = (accountId: string) => {
+    let cached = orderingCache.get(accountId);
+    if (!cached) {
+      cached = leadOrdering(db, accountId);
+      cached.catch(() => orderingCache.delete(accountId));
+      orderingCache.set(accountId, cached);
+    }
+    return cached;
+  };
   return {
     async getScoutContext(agentId: string): Promise<ScoutContext | null> {
       const [agent] = await db.select().from(agents).where(eq(agents.id, agentId));
@@ -578,7 +775,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         .limit(1);
       // qualification ICP is inherited from the account's Scout (rule 06 — the same bar)
       const [scout] = await db
-        .select({ id: agents.id })
+        .select({ id: agents.id, config: agents.config })
         .from(agents)
         .where(and(eq(agents.accountId, agent.accountId), eq(agents.kind, "scout")))
         .limit(1);
@@ -596,6 +793,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           accountId: agent.accountId,
           status: agent.status,
           config: (agent.config ?? {}) as Partial<IntentConfig>,
+          cadence: agent.cadence,
         },
         connectedAccountId: li?.ref ?? null,
         icps: icpRows
@@ -606,6 +804,8 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           valueProp: scan ? `${scan.summary} Value props: ${scan.value_props.join("; ")}` : null,
           subscriptionStatus: account.subscriptionStatus,
         },
+        // ML-5: exclusions + guidance live on the Scout and govern intent leads too
+        targeting: (scout?.config as { targeting?: unknown } | null)?.targeting,
       };
     },
 
@@ -674,10 +874,11 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         .values({
           accountId,
           leadId,
-          kind: "intent",
+          kind: signal.kind ?? "intent",
           label: signal.label,
           detail: signal.detail,
-          level: "active",
+          // the classifier's verdict level (high | medium) — an ML-1 learner feature
+          level: signal.level ?? "active",
           observedAt: new Date(),
           source: "prospect-data",
         })
@@ -886,34 +1087,213 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
     async getTopQualifiedLeadIds(accountId: string, limit: number) {
       if (limit <= 0) return [];
       // qualified, not-yet-drafted leads (drafting flips status to 'in_campaign'), best first.
-      // Stage 2: ordering = ai_score + the bounded outcome tilt (rankByTilt) so buyers like the
-      // ones who actually replied/booked drain first. Ordering ONLY — the qualification gate and
-      // the draft budget are unchanged, and an empty profile keeps pure score order.
+      // ML-1: ordered by the outcome learner's predicted positive-reply rate once it has evidence,
+      // else by ai_score + the bounded ML-0 tilt. Ordering ONLY — the qualification gate and the
+      // draft budget are unchanged.
       const rows = await db
-        .select({
-          id: leads.id,
-          title: leads.title,
-          industry: leads.industry,
-          aiScore: leads.aiScore,
-        })
+        .select({ id: leads.id, ...learnerFeatureCols })
         .from(leads)
-        .where(and(eq(leads.accountId, accountId), eq(leads.status, "qualified")))
+        .where(and(eq(leads.accountId, accountId), eq(leads.status, "qualified"), notMarkedNotFit))
         .orderBy(desc(leads.aiScore), desc(leads.scoredAt));
-      const targeting: TargetingRow[] = (await invitedOutcomeRows(db, accountId)).map((r) => ({
-        title: r.title,
-        industry: r.industry,
-        flags: r.flags,
-      }));
-      const profile = buildTargetingProfile(targeting);
-      return rankByTilt(rows, profile)
+      const { ordering, cut } = await orderingFor(accountId);
+      return orderLeads(
+        await withLookalike(db, accountId, rows.map((r) => ({ id: r.id, ...toFeatures(r) })), cut),
+        ordering
+      )
         .slice(0, limit)
         .map((r) => r.id);
+    },
+
+    async rankLeadIds(accountId: string, leadIds: string[]) {
+      if (leadIds.length <= 1) return leadIds;
+      const rows = await db
+        .select({ id: leads.id, ...learnerFeatureCols })
+        .from(leads)
+        .where(and(eq(leads.accountId, accountId), inArray(leads.id, leadIds)));
+      const { ordering, cut } = await orderingFor(accountId);
+      const ordered = orderLeads(
+        await withLookalike(db, accountId, rows.map((r) => ({ id: r.id, ...toFeatures(r) })), cut),
+        ordering
+      ).map((r) => r.id);
+      const seen = new Set(ordered);
+      return [...ordered, ...leadIds.filter((id) => !seen.has(id))];
     },
 
     async getIcpOutcomeRows(accountId: string) {
       return (await invitedOutcomeRows(db, accountId))
         .filter((r): r is typeof r & { icpId: string } => r.icpId != null)
         .map((r) => ({ icpId: r.icpId, flags: r.flags }));
+    },
+
+    async getLearnedInsights(accountId: string) {
+      // persisted to agent_runs (web-readable) → built from the account's OWN outcomes only
+      const { ordering, own } = await orderingFor(accountId);
+      return { mode: ordering.kind, ...buildReadout(own) };
+    },
+
+    async getLeadsToEmbed(accountId: string, limit: number) {
+      // qualified/contacted leads whose profile text changed or was never embedded
+      const rows = await db
+        .select({
+          id: leads.id,
+          title: leads.title,
+          companyName: leads.companyName,
+          industry: leads.industry,
+          companySize: leads.companySize,
+          location: leads.location,
+          aiInsights: leads.aiInsights,
+          existingHash: leadEmbeddings.sourceHash,
+        })
+        .from(leads)
+        .leftJoin(leadEmbeddings, and(eq(leadEmbeddings.leadId, leads.id), eq(leadEmbeddings.accountId, leads.accountId)))
+        .where(and(eq(leads.accountId, accountId), inArray(leads.status, ["qualified", "enriched", "in_campaign", "replied", "converted"])))
+        .orderBy(desc(leads.updatedAt))
+        .limit(limit * 5);
+      const out: { leadId: string; text: string; sourceHash: string }[] = [];
+      for (const r of rows) {
+        const insights = (r.aiInsights ?? {}) as { prospect_offering?: string; summary?: string };
+        const text = profileText({
+          title: r.title,
+          companyName: r.companyName,
+          industry: r.industry,
+          companySize: r.companySize,
+          location: r.location,
+          prospectOffering: insights.prospect_offering,
+          summary: insights.summary,
+        });
+        if (!text) continue;
+        const sourceHash = createHash("sha256").update(text).digest("hex").slice(0, 32);
+        if (sourceHash === r.existingHash) continue;
+        out.push({ leadId: r.id, text, sourceHash });
+        if (out.length === limit) break;
+      }
+      return out;
+    },
+
+    async saveLeadEmbeddings(accountId: string, rows: { leadId: string; embedding: number[]; model: string; sourceHash: string }[]) {
+      for (const r of rows) {
+        await db
+          .insert(leadEmbeddings)
+          .values({ leadId: r.leadId, accountId, embedding: r.embedding, model: r.model, sourceHash: r.sourceHash })
+          .onConflictDoUpdate({
+            target: leadEmbeddings.leadId,
+            set: { embedding: r.embedding, model: r.model, sourceHash: r.sourceHash },
+          });
+      }
+    },
+
+    async getRankFeedback(accountId: string) {
+      const line = (r: { title: string | null; companyName: string | null; industry: string | null }) =>
+        [r.title ?? "-", r.companyName ?? "-", r.industry ?? "-"].join(" | ");
+      const verdicts = (verdict: "good_fit" | "not_fit") =>
+        db
+          .select({ title: leads.title, companyName: leads.companyName, industry: leads.industry, at: leadFeedback.updatedAt })
+          .from(leadFeedback)
+          .innerJoin(leads, and(eq(leads.id, leadFeedback.leadId), eq(leads.accountId, leadFeedback.accountId)))
+          .where(and(eq(leadFeedback.accountId, accountId), eq(leadFeedback.verdict, verdict)))
+          .orderBy(desc(leadFeedback.updatedAt))
+          .limit(RANK_FEEDBACK_MAX);
+      const [rejected, positive, notFit, goodFit] = await Promise.all([
+        db
+          .selectDistinctOn([scheduledSends.leadId], {
+            leadId: scheduledSends.leadId,
+            title: leads.title,
+            companyName: leads.companyName,
+            industry: leads.industry,
+            at: scheduledSends.updatedAt,
+          })
+          .from(scheduledSends)
+          .innerJoin(leads, and(eq(leads.id, scheduledSends.leadId), eq(leads.accountId, scheduledSends.accountId)))
+          .where(and(eq(scheduledSends.accountId, accountId), eq(scheduledSends.rejectionReason, "wrong_person")))
+          .orderBy(scheduledSends.leadId, desc(scheduledSends.updatedAt))
+          .limit(200),
+        db
+          .select({ title: leads.title, companyName: leads.companyName, industry: leads.industry, at: leads.updatedAt })
+          .from(leads)
+          .where(
+            and(
+              eq(leads.accountId, accountId),
+              or(
+                isNotNull(leads.meetingBookedAt),
+                sql`exists (select 1 from ${replies} r where r.lead_id = "leads"."id" and r.classification = 'interested')`
+              )
+            )
+          )
+          .orderBy(desc(leads.updatedAt))
+          .limit(RANK_FEEDBACK_MAX),
+        verdicts("not_fit"),
+        verdicts("good_fit"),
+      ]);
+      // ML-4: explicit fit verdicts join review rejections / positive replies, newest first
+      const tagged = (rows: { title: string | null; companyName: string | null; industry: string | null; at: Date }[]) =>
+        rows.map((r) => ({ line: line(r), at: r.at }));
+      return {
+        rejected: mergeExemplars([tagged(rejected), tagged(notFit)], RANK_FEEDBACK_MAX),
+        positive: mergeExemplars([tagged(positive), tagged(goodFit)], RANK_FEEDBACK_MAX),
+      };
+    },
+
+    async getUnrankedLeads(accountId: string, since: Date, limit: number) {
+      const rows = await db
+        .select({
+          id: leads.id,
+          companyName: leads.companyName,
+          companySize: leads.companySize,
+          industry: leads.industry,
+          location: leads.location,
+          title: leads.title,
+          techStack: leads.techStack,
+        })
+        .from(leads)
+        .where(
+          and(
+            eq(leads.accountId, accountId),
+            eq(leads.rulesGatePassed, true),
+            isNull(leads.scoredAt),
+            eq(leads.status, "sourced"),
+            gte(leads.createdAt, since)
+          )
+        )
+        .orderBy(desc(leads.createdAt))
+        .limit(limit);
+      if (rows.length === 0) return [];
+      const signalRows = await db
+        .select({
+          leadId: leadSignals.leadId,
+          kind: leadSignals.kind,
+          label: leadSignals.label,
+          detail: leadSignals.detail,
+          level: leadSignals.level,
+          observedAt: leadSignals.observedAt,
+        })
+        .from(leadSignals)
+        .where(and(eq(leadSignals.accountId, accountId), inArray(leadSignals.leadId, rows.map((r) => r.id))));
+      const signalsByLead = new Map<string, ProspectSignal[]>();
+      for (const s of signalRows) {
+        const list = signalsByLead.get(s.leadId) ?? [];
+        list.push({
+          kind: s.kind,
+          label: s.label,
+          detail: s.detail ?? s.label,
+          ...(s.level ? { level: s.level } : {}),
+          ...(s.observedAt ? { observedAt: s.observedAt.toISOString() } : {}),
+        });
+        signalsByLead.set(s.leadId, list);
+      }
+      return rows.map((r) => {
+        const tech = Array.isArray(r.techStack) ? r.techStack.filter((t): t is string => typeof t === "string") : [];
+        const signals = signalsByLead.get(r.id);
+        return {
+          leadId: r.id,
+          companyName: r.companyName ?? undefined,
+          companySize: r.companySize ?? undefined,
+          industry: r.industry ?? undefined,
+          location: r.location ?? undefined,
+          title: r.title ?? undefined,
+          ...(tech.length > 0 ? { technographics: tech } : {}),
+          ...(signals ? { signals } : {}),
+        };
+      });
     },
 
     async getLiveCopyAgent(accountId: string) {
@@ -978,8 +1358,23 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
       const rows = await db
         .select()
         .from(leads)
-        .where(and(eq(leads.accountId, accountId), inArray(leads.id, leadIds)));
+        .where(and(eq(leads.accountId, accountId), inArray(leads.id, leadIds), notMarkedNotFit));
+      // ML-3: each lead's captured signals → the freshest reach-out-worthy why-now
+      const signalRows = await db
+        .select({
+          leadId: leadSignals.leadId,
+          kind: leadSignals.kind,
+          label: leadSignals.label,
+          detail: leadSignals.detail,
+          observedAt: leadSignals.observedAt,
+        })
+        .from(leadSignals)
+        .where(and(eq(leadSignals.accountId, accountId), inArray(leadSignals.leadId, leadIds)));
+      const signalsByLead = new Map<string, typeof signalRows>();
+      for (const s of signalRows) signalsByLead.set(s.leadId, [...(signalsByLead.get(s.leadId) ?? []), s]);
+      const now = new Date();
       return rows.map((r) => ({
+        whyNow: pickWhyNow(signalsByLead.get(r.id) ?? [], now),
         id: r.id,
         firstName: r.firstName,
         lastName: r.lastName,
@@ -2481,7 +2876,12 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
     },
 
     async setLeadReplied(leadId: string, campaignId: string | null) {
-      await db.update(leads).set({ status: "replied" }).where(eq(leads.id, leadId));
+      // Never demote a closed-won lead: 'converted' is the close-stage label (CRM push, conversion
+      // metrics), and a later reply from that buyer must not erase it.
+      await db
+        .update(leads)
+        .set({ status: "replied" })
+        .where(and(eq(leads.id, leadId), ne(leads.status, "converted")));
       if (campaignId) {
         await db
           .update(campaignLeads)
@@ -2498,6 +2898,123 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         .update(leads)
         .set({ meetingBookedAt: at, meetingSource: "agent" })
         .where(and(eq(leads.id, leadId), isNull(leads.meetingBookedAt)));
+    },
+
+    // ── MeetingEventStore (ML-6 calendar integration) ─────────────────────────
+
+    async getMeetingConnection(connectionId: string) {
+      const [row] = await db
+        .select({ id: meetingConnections.id, accountId: meetingConnections.accountId, provider: meetingConnections.provider, status: meetingConnections.status })
+        .from(meetingConnections)
+        .where(eq(meetingConnections.id, connectionId));
+      return row ?? null;
+    },
+
+    async touchMeetingConnection(connectionId: string) {
+      await db
+        .update(meetingConnections)
+        .set({ lastEventAt: new Date(), status: "active", lastError: null })
+        .where(eq(meetingConnections.id, connectionId));
+    },
+
+    async leadInAccount(accountId: string, leadId: string) {
+      const [row] = await db
+        .select({ id: leads.id })
+        .from(leads)
+        .where(and(eq(leads.id, leadId), eq(leads.accountId, accountId)));
+      return !!row;
+    },
+
+    async findLeadByEmail(accountId: string, email: string) {
+      const [row] = await db
+        .select({ id: leads.id })
+        .from(leads)
+        .where(and(eq(leads.accountId, accountId), sql`lower(${leads.email}) = ${email.trim().toLowerCase()}`))
+        .orderBy(desc(leads.updatedAt))
+        .limit(1);
+      return row?.id ?? null;
+    },
+
+    async upsertMeetingEvent(e) {
+      await db
+        .insert(meetingEvents)
+        .values({
+          accountId: e.accountId,
+          leadId: e.leadId,
+          connectionId: e.connectionId,
+          provider: e.provider,
+          bookingRef: e.bookingRef,
+          status: e.status,
+          startAt: e.startAt,
+          attribution: e.attribution ?? "link",
+        })
+        .onConflictDoUpdate({
+          target: [meetingEvents.accountId, meetingEvents.provider, meetingEvents.bookingRef],
+          set: { status: e.status, ...(e.startAt ? { startAt: e.startAt } : {}) },
+        });
+    },
+
+    async findMeetingEvent(accountId: string, provider: string, bookingRef: string) {
+      const [row] = await db
+        .select({ leadId: meetingEvents.leadId, status: meetingEvents.status })
+        .from(meetingEvents)
+        .where(
+          and(
+            eq(meetingEvents.accountId, accountId),
+            eq(meetingEvents.provider, provider as "calendly" | "calcom"),
+            eq(meetingEvents.bookingRef, bookingRef)
+          )
+        );
+      return row ?? null;
+    },
+
+    async hasLiveBooking(accountId: string, leadId: string) {
+      const [row] = await db
+        .select({ id: meetingEvents.id })
+        .from(meetingEvents)
+        .where(and(eq(meetingEvents.accountId, accountId), eq(meetingEvents.leadId, leadId), eq(meetingEvents.status, "booked")))
+        .limit(1);
+      return !!row;
+    },
+
+    async markCalendarMeeting(accountId: string, leadId: string, startAt: Date | null) {
+      // first booking keeps its booked_at; the calendar is authoritative on WHEN and the source
+      await db
+        .update(leads)
+        .set({
+          meetingBookedAt: sql`coalesce(${leads.meetingBookedAt}, now())`,
+          meetingAt: startAt,
+          meetingSource: "calendar",
+        })
+        .where(and(eq(leads.id, leadId), eq(leads.accountId, accountId)));
+    },
+
+    async clearCalendarMeeting(accountId: string, leadId: string) {
+      await db
+        .update(leads)
+        .set({ meetingBookedAt: null, meetingAt: null, meetingSource: null })
+        .where(and(eq(leads.id, leadId), eq(leads.accountId, accountId), eq(leads.meetingSource, "calendar")));
+    },
+
+    async standDownOutreach(accountId: string, leadId: string) {
+      await db
+        .update(scheduledSends)
+        .set({ status: "canceled", error: "meeting booked — outreach stood down" })
+        .where(
+          and(
+            eq(scheduledSends.accountId, accountId),
+            eq(scheduledSends.leadId, leadId),
+            inArray(scheduledSends.status, ["pending_review", "approved", "scheduled"])
+          )
+        );
+      await db
+        .update(sequenceRuns)
+        .set({ status: "stopped" })
+        .where(and(eq(sequenceRuns.accountId, accountId), eq(sequenceRuns.leadId, leadId), eq(sequenceRuns.status, "active")));
+    },
+
+    async notifyMeetingBooked(accountId: string, leadId: string) {
+      await db.insert(leadNotifications).values({ accountId, leadId, kind: "meeting_booked", body: "calendar" });
     },
 
     async cancelPendingSends(leadId: string) {
@@ -2898,7 +3415,7 @@ export interface DueAgent {
   accountId: string;
   kind: "scout" | "copy" | "intent";
   runAtTime: string | null;
-  cadence: "daily" | "weekly" | null;
+  cadence: "daily" | "weekly" | "intraday" | null;
   timezone: string;
 }
 

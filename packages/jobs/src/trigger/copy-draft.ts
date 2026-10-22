@@ -1,5 +1,6 @@
 import { logger, task } from "@trigger.dev/sdk";
 import { createDb } from "@vantera/db";
+import { withUsage } from "@vantera/ai";
 import { draftLinkedIn, fixLinkedInDraft, judgeCopy } from "@vantera/agent-brains";
 import { runCopyDraft } from "../pipeline/copy-draft";
 import { createPgStore } from "../pipeline/pg-store";
@@ -25,15 +26,17 @@ export const copyDraft = task({
       store.getBestOfN(),
       store.getMessageShapeAuto(),
     ]);
-    const summary = await runCopyDraft(payload, {
-      store,
-      draftLinkedInFn: (input) => draftLinkedIn(input),
-      fixLinkedInFn: (draft, input) => fixLinkedInDraft(draft, input),
-      judgeFn: (draft, ctx) => judgeCopy(draft, ctx),
-      bestOfN,
-      messageShapeAuto,
-    });
-    logger.info("copy draft finished", { ...summary, copyAgentId: payload.copyAgentId });
+    const { result: summary, usage } = await withUsage(() =>
+      runCopyDraft(payload, {
+        store,
+        draftLinkedInFn: (input) => draftLinkedIn(input),
+        fixLinkedInFn: (draft, input) => fixLinkedInDraft(draft, input),
+        judgeFn: (draft, ctx) => judgeCopy(draft, ctx),
+        bestOfN,
+        messageShapeAuto,
+      })
+    );
+    logger.info("copy draft finished", { ...summary, llm: usage, copyAgentId: payload.copyAgentId });
     return summary;
   },
 });

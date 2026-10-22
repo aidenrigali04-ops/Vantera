@@ -252,7 +252,7 @@ export const leads = pgTable(
     // 0050 meeting layer: scheduled time when known + which writer recorded the booking
     // ('agent' = reply-classification detector, 'manual' = the user's control, authoritative)
     meetingAt: timestamp("meeting_at", { withTimezone: true }),
-    meetingSource: text("meeting_source", { enum: ["agent", "manual"] }),
+    meetingSource: text("meeting_source", { enum: ["agent", "manual", "calendar"] }),
     // 0056 R6: last user correction to identity fields — corrected values feed drafts directly
     editedByUserAt: timestamp("edited_by_user_at", { withTimezone: true }),
     // 0040: self-optimizing experiment attribution — stamped by copy-draft when a lead is drafted
@@ -373,6 +373,104 @@ export const leadNotes = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("lead_notes_lead_idx").on(t.leadId, t.createdAt)]
+);
+
+// 0068 ML-7: profile embedding per qualified/contacted lead — lookalike similarity to the account's
+// own positive leads (within-account only). Service-role only; composite (lead_id, account_id) FK in SQL.
+export const leadEmbeddings = pgTable(
+  "lead_embeddings",
+  {
+    leadId: uuid("lead_id")
+      .primaryKey()
+      .references(() => leads.id, { onDelete: "cascade" }),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    embedding: vector1024("embedding").notNull(),
+    model: text("model").notNull(),
+    sourceHash: text("source_hash").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("lead_embeddings_account_idx").on(t.accountId)]
+);
+
+// 0067 ML-6: the account's scheduling-tool connection (Calendly / Cal.com). credential_enc +
+// signing_secret_enc are AES-256-GCM ciphertext, service-role written, never client-selectable.
+export const meetingConnections = pgTable(
+  "meeting_connections",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    provider: text("provider", { enum: ["calendly", "calcom"] }).notNull(),
+    status: text("status", { enum: ["active", "error"] }).notNull().default("active"),
+    credentialEnc: text("credential_enc").notNull(),
+    signingSecretEnc: text("signing_secret_enc").notNull(),
+    webhookRef: text("webhook_ref"),
+    externalOwnerRef: text("external_owner_ref"),
+    label: text("label"),
+    lastEventAt: timestamp("last_event_at", { withTimezone: true }),
+    lastError: text("last_error"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("meeting_connections_account_provider_unique").on(t.accountId, t.provider)]
+);
+
+// 0067 ML-6: a provider booking attributed to a lead ('link' = our per-lead tag came back,
+// 'email' = invitee email matched). The SQL carries a composite (lead_id, account_id) FK.
+export const meetingEvents = pgTable(
+  "meeting_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    leadId: uuid("lead_id")
+      .notNull()
+      .references(() => leads.id, { onDelete: "cascade" }),
+    connectionId: uuid("connection_id").references(() => meetingConnections.id, { onDelete: "set null" }),
+    provider: text("provider", { enum: ["calendly", "calcom"] }).notNull(),
+    bookingRef: text("booking_ref").notNull(),
+    status: text("status", { enum: ["booked", "canceled"] }).notNull(),
+    startAt: timestamp("start_at", { withTimezone: true }),
+    attribution: text("attribution", { enum: ["link", "email"] }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("meeting_events_booking_unique").on(t.accountId, t.provider, t.bookingRef),
+    index("meeting_events_lead_idx").on(t.leadId, t.startAt.desc()),
+    index("meeting_events_account_idx").on(t.accountId, t.createdAt),
+    index("meeting_events_connection_idx").on(t.connectionId),
+  ]
+);
+
+// 0066 ML-4: "Good fit" / "Not a fit" verdict on any prospect — one per lead, latest wins. Feeds the
+// qualification brain as revealed preferences; "not_fit" leads are excluded from drafting. The SQL
+// also carries a composite (lead_id, account_id) FK so a verdict can't cross workspaces.
+export const leadFeedback = pgTable(
+  "lead_feedback",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    leadId: uuid("lead_id")
+      .notNull()
+      .references(() => leads.id, { onDelete: "cascade" }),
+    verdict: text("verdict", { enum: ["good_fit", "not_fit"] }).notNull(),
+    reason: text("reason"),
+    createdBy: uuid("created_by"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("lead_feedback_lead_unique").on(t.leadId),
+    index("lead_feedback_account_idx").on(t.accountId, t.verdict, t.updatedAt),
+  ]
 );
 
 // ── 0003 campaigns, scheduler, suppression ───────────────────────────────────
@@ -532,7 +630,7 @@ export const webhookEvents = pgTable(
   "webhook_events",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    source: text("source", { enum: ["email", "linkedin", "stripe", "voice"] }).notNull(),
+    source: text("source", { enum: ["email", "linkedin", "stripe", "voice", "imessage", "inbound", "ads", "calendly", "calcom"] }).notNull(),
     providerEventId: text("provider_event_id").notNull(),
     payload: jsonb("payload").notNull(),
     receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),
@@ -705,7 +803,7 @@ export const agents = pgTable(
     config: jsonb("config").notNull().default({}),
     // scheduling block (scout agents only)
     runAtTime: time("run_at_time"),
-    cadence: text("cadence", { enum: ["daily", "weekly"] }),
+    cadence: text("cadence", { enum: ["daily", "weekly", "intraday"] }),
     timezone: text("timezone").notNull().default("UTC"),
     nextRunAt: timestamp("next_run_at", { withTimezone: true }),
     lastRunAt: timestamp("last_run_at", { withTimezone: true }),
@@ -1330,7 +1428,7 @@ export const intentObservations = pgTable(
     agentId: uuid("agent_id").notNull(),
     leadId: uuid("lead_id"),
     profileUrl: text("profile_url").notNull(),
-    signalKind: text("signal_kind", { enum: ["engagement", "content"] }).notNull(),
+    signalKind: text("signal_kind", { enum: ["engagement", "content", "follow"] }).notNull(),
     watchTarget: text("watch_target"),
     postRef: text("post_ref").notNull(),
     headline: text("headline"),

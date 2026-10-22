@@ -116,7 +116,7 @@ describe("suppression list (rule 11 — the master gate)", () => {
 });
 
 describe("retention windows (rule 11)", () => {
-  it.each(["leads", "enrichment_results", "scheduled_sends", "replies", "inbound_leads", "lead_signals", "intent_observations", "reveal_runs", "strategies", "lead_strategy_stamp"])(
+  it.each(["leads", "enrichment_results", "scheduled_sends", "replies", "inbound_leads", "lead_signals", "intent_observations", "reveal_runs", "strategies", "lead_strategy_stamp", "lead_feedback", "meeting_connections", "meeting_events", "lead_embeddings"])(
     "%s states its retention window",
     (table) => {
       expect(allMigrations).toContain(`retention(${table})`);
@@ -125,7 +125,7 @@ describe("retention windows (rule 11)", () => {
 });
 
 describe("service-role-only write surfaces (rules 09/11)", () => {
-  it.each(["outreach_sends", "copilot_actions", "enrichment_results", "replies", "unsubscribe_tokens", "conversion_tokens", "copilot_conversations", "copilot_messages", "calls", "security_events", "inbound_leads", "lead_signals", "intent_observations", "reveal_runs", "strategies", "lead_strategy_stamp"])(
+  it.each(["outreach_sends", "copilot_actions", "enrichment_results", "replies", "unsubscribe_tokens", "conversion_tokens", "copilot_conversations", "copilot_messages", "calls", "security_events", "inbound_leads", "lead_signals", "intent_observations", "reveal_runs", "strategies", "lead_strategy_stamp", "meeting_connections", "meeting_events"])(
     "%s has no client write policies",
     (table) => {
     const policyRe = new RegExp(`create policy \\w+ on public\\.${table}\\s+for (insert|update|delete|all)`);
@@ -481,3 +481,75 @@ describe("0060 pull-back email", () => {
     expect(sqlText).not.toMatch(/grant update \(lifecycle_last_email_at\)/);
   });
 });
+
+describe("lead feedback (0066, ML-4)", () => {
+  const sql = readFileSync(join(migrationsDir, "0066_lead_feedback.sql"), "utf8").toLowerCase();
+
+  it("can only attach a verdict to a lead in the same workspace (composite FK)", () => {
+    expect(sql).toMatch(/foreign key \(lead_id, account_id\)\s+references public\.leads \(id, account_id\) on delete cascade/);
+  });
+
+  it("pins the author to the caller on every client write", () => {
+    expect(sql).toMatch(/lead_feedback_insert[\s\S]*?created_by = \(select auth\.uid\(\)\)/);
+    expect(sql).toMatch(/lead_feedback_update[\s\S]*?with check \(public\.is_account_member\(account_id\) and created_by = \(select auth\.uid\(\)\)\)/);
+  });
+
+  it("keeps one verdict per lead", () => {
+    expect(sql).toContain("constraint lead_feedback_lead_unique unique (lead_id)");
+  });
+});
+
+describe("calendar integration (0067, ML-6)", () => {
+  const sql = readFileSync(join(migrationsDir, "0067_meeting_connections.sql"), "utf8").toLowerCase();
+
+  it("never exposes the encrypted credential or signing secret to client roles", () => {
+    expect(sql).toContain("revoke select on public.meeting_connections from authenticated, anon;");
+    const grant = sql.slice(sql.indexOf("grant select ("), sql.indexOf(") on public.meeting_connections to authenticated"));
+    expect(grant).not.toContain("credential_enc");
+    expect(grant).not.toContain("signing_secret_enc");
+  });
+
+  it("pins every meeting event to a lead in the same workspace", () => {
+    expect(sql).toMatch(/foreign key \(lead_id, account_id\)\s+references public\.leads \(id, account_id\) on delete cascade/);
+  });
+
+  it("scopes a booking's identity to the account (shared calendars can't cross workspaces)", () => {
+    expect(sql).toContain("constraint meeting_events_booking_unique unique (account_id, provider, booking_ref)");
+  });
+
+  it("revokes client write privileges on both tables", () => {
+    expect(sql).toContain("revoke insert, update, delete, truncate, references, trigger on public.meeting_connections from authenticated, anon;");
+    expect(sql).toContain("revoke insert, update, delete, truncate, references, trigger on public.meeting_events from authenticated, anon;");
+  });
+
+  it("keeps every existing webhook source when adding the calendar ones", () => {
+    expect(sql).toContain("check (source in ('email', 'linkedin', 'stripe', 'voice', 'imessage', 'inbound', 'ads', 'calendly', 'calcom'))");
+  });
+
+  it("lets leads record a calendar-confirmed meeting", () => {
+    expect(sql).toContain("check (meeting_source in ('agent', 'manual', 'calendar'))");
+  });
+});
+
+describe("lead embeddings (0068, ML-7)", () => {
+  const sql = readFileSync(join(migrationsDir, "0068_lead_embeddings.sql"), "utf8").toLowerCase();
+
+  it("is service-role only — no client policies, no client privileges", () => {
+    expect(sql).toContain("revoke all on public.lead_embeddings from authenticated, anon;");
+    expect(sql).not.toMatch(/create policy \w+ on public\.lead_embeddings/);
+  });
+
+  it("pins every embedding to a lead in the same workspace", () => {
+    expect(sql).toMatch(/foreign key \(lead_id, account_id\)\s+references public\.leads \(id, account_id\) on delete cascade/);
+  });
+});
+
+describe("intent speed + follow signal (0069, ML-8)", () => {
+  const sql = readFileSync(join(migrationsDir, "0069_intent_speed_signals.sql"), "utf8").toLowerCase();
+
+  it("lets an agent run intraday and records follows as their own signal kind", () => {
+    expect(sql).toContain("check (cadence in ('daily', 'weekly', 'intraday'))");
+    expect(sql).toContain("check (signal_kind in ('engagement', 'content', 'follow'))");
+  });
+});
+

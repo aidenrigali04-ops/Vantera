@@ -5,9 +5,36 @@ export interface RulesGateResult {
   reasons: string[];
 }
 
+/**
+ * A wanted term matches only where it starts a word ("cto" in "CTO & Co-founder", not in
+ * "director"; "us" not in "Austin"). Suffixes still match ("engineer" → "Engineering").
+ */
 function containsAny(value: string, wanted: string[]): boolean {
   const v = value.toLowerCase();
-  return wanted.some((w) => v.includes(w.toLowerCase()));
+  return wanted.some((w) => {
+    const term = w.toLowerCase().trim();
+    if (!term) return false;
+    const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return new RegExp(`(?<![a-z0-9])${escaped}`).test(v);
+  });
+}
+
+/**
+ * Headline phrases that mean the person is looking for a job — never a buyer, whatever the ICP.
+ * Anchored to job-search wording ("looking for a new role", "seeking new opportunities") so a
+ * buyer who is "looking for great engineers" or "hiring" is never caught.
+ */
+const JOB_SEEKER = [
+  /open[\s-]?to[\s-]?work/i,
+  /\bseeking (?:a |my )?(?:new |next )?(?:role|position|opportunit|job)/i,
+  /\blooking for (?:a |my )?(?:new |next )(?:role|position|opportunit|job|challenge)/i,
+  /\bactively (?:looking|seeking)\b/i,
+  /\bin transition\b/i,
+  /\bavailable for (?:hire|new roles?)\b/i,
+];
+
+export function isJobSeeker(headline: string | undefined): boolean {
+  return !!headline && JOB_SEEKER.some((re) => re.test(headline));
 }
 
 /**
@@ -25,6 +52,7 @@ export function applyRulesGate(
   criteria: IcpCriteria
 ): RulesGateResult {
   const reasons: string[] = [];
+  if (isJobSeeker(candidate.title)) reasons.push(`job seeker ("${candidate.title}")`);
 
   const checks: { wanted?: string[]; value?: string; label: string }[] = [
     { wanted: criteria.industries, value: candidate.industry, label: "industry" },

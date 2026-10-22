@@ -26,11 +26,6 @@ export function utcDayStart(now: Date): Date {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 }
 
-function scoreOf(lead: DraftableLead): number {
-  const score = Number(lead.aiScore);
-  return Number.isFinite(score) ? score : 0;
-}
-
 /** A lead holds a first-touch slot only when this run will insert an invite. */
 async function holdsFirstTouchSlot(
   lead: DraftableLead,
@@ -68,6 +63,7 @@ function toDraftInput(lead: DraftableLead, ctx: CopyContext, strategy?: CopyStra
       title: lead.title,
       companyName: lead.companyName,
       industry: lead.industry,
+      whyNow: lead.whyNow ?? null,
     },
     insights: lead.aiInsights,
     context: {
@@ -137,7 +133,13 @@ export async function runCopyDraft(
   const fresh = leads.filter((lead) => !alreadyDrafted.has(lead.id));
   const used = await deps.store.countFirstTouchDraftsSince(accountId, utcDayStart(new Date()));
   let slots = Math.max(0, DAILY_FIRST_TOUCH_DRAFT_CAP - used);
-  const ranked = [...fresh].sort((a, b) => scoreOf(b) - scoreOf(a));
+  // Same order the drain used (getTopQualifiedLeadIds): the ML-1 learner's predicted reply rate
+  // when it has evidence, else stored score + the bounded tilt — so the last daily slots go to the
+  // buyers most like those who actually replied. The payload order itself isn't trusted (intent
+  // sends unsorted). Ordering ONLY — never a gate.
+  const order = await deps.store.rankLeadIds(accountId, fresh.map((lead) => lead.id));
+  const position = new Map(order.map((id, i) => [id, i]));
+  const ranked = [...fresh].sort((a, b) => (position.get(a.id) ?? Infinity) - (position.get(b.id) ?? Infinity));
   const room: DraftableLead[] = [];
   let deferred = 0;
   for (const lead of ranked) {

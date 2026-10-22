@@ -386,3 +386,112 @@ describe("createLeadEventEmailStore.stampLifecycleEmail", () => {
   });
 });
 
+
+// A reply must never demote a closed-won lead: status='converted' is the close-stage label the
+// CRM push and conversion metrics depend on. setLeadReplied guards the leads UPDATE in SQL.
+describe("setLeadReplied never overwrites a converted lead", () => {
+  it("scopes the leads UPDATE to status <> 'converted'", async () => {
+    const { PgDialect } = await import("drizzle-orm/pg-core");
+    const wheres: unknown[] = [];
+    const db = {
+      update: (_table: unknown) => ({
+        set: (_vals: Record<string, unknown>) => ({
+          where: (cond: unknown) => {
+            wheres.push(cond);
+            return Promise.resolve();
+          },
+        }),
+      }),
+    };
+    await createPgStore(db as unknown as Db).setLeadReplied("lead-1", null);
+    expect(wheres).toHaveLength(1);
+    const q = new PgDialect().sqlToQuery(wheres[0] as never);
+    expect(q.sql).toMatch(/"status" <> \$\d/);
+    expect(q.params).toContain("converted");
+  });
+});
+
+// Right-censoring: an invite younger than the maturation window hasn't had time to be accepted or
+// answered, so counting it as a failure biases the ICP allocator + tilt against new segments.
+// The outcome rows behind both read only matured invites.
+describe("outcome rows read only matured invites", () => {
+  it("bounds linkedin_invited_at by the maturation cutoff", async () => {
+    const { PgDialect } = await import("drizzle-orm/pg-core");
+    const { OUTCOME_MATURATION_DAYS } = await import("./pg-store");
+    const wheres: unknown[] = [];
+    const db = {
+      select: () => ({
+        from: () => ({
+          where: (cond: unknown) => {
+            wheres.push(cond);
+            return Promise.resolve([]);
+          },
+        }),
+      }),
+    };
+    const before = Date.now();
+    await createPgStore(db as unknown as Db).getIcpOutcomeRows("acc-1");
+    const q = new PgDialect().sqlToQuery(wheres[0] as never);
+    expect(q.sql).toMatch(/"linkedin_invited_at" <= \$\d/);
+    const cutoff = q.params.find((p) => typeof p === "string" && /^\d{4}-\d{2}-\d{2}T/.test(p)) as string;
+    const ageDays = (before - new Date(cutoff).getTime()) / 86_400_000;
+    expect(Math.round(ageDays)).toBe(OUTCOME_MATURATION_DAYS);
+  });
+});
+
+// Regression: in a select list drizzle renders ${leads.id} as a bare "id" — inside a correlated
+// subquery that binds to the subquery's own table (lead_signals.id), silently matching nothing.
+describe("learner feature columns correlate on the OUTER lead id", () => {
+  it("qualifies leads.id inside every subquery", async () => {
+    const { learnerFeatureCols } = await import("./pg-store");
+    const { leads } = await import("@vantera/db");
+    const db = createDb("postgresql://localhost:5432/db");
+    const q = db.select(learnerFeatureCols).from(leads).toSQL().sql;
+    expect(q.match(/ls\.lead_id = "leads"\."id"/g)?.length).toBe(2);
+    expect(q).not.toMatch(/lead_id = "id"/);
+  });
+});
+
+// ML-4: a "Not a fit" verdict keeps a lead out of drafting — correlated on the OUTER lead id.
+describe("notMarkedNotFit", () => {
+  it("excludes leads with a not_fit verdict, correlated on leads.id", async () => {
+    const { notMarkedNotFit } = await import("./pg-store");
+    const { leads } = await import("@vantera/db");
+    const db = createDb("postgresql://localhost:5432/db");
+    const q = db.select({ id: leads.id }).from(leads).where(notMarkedNotFit).toSQL().sql;
+    expect(q).toContain('not exists (select 1 from "lead_feedback" f where f.lead_id = "leads"."id" and f.verdict = \'not_fit\')');
+  });
+});
+
+describe("mergeExemplars", () => {
+  it("merges sources newest first, dedupes lines, caps the result", async () => {
+    const { mergeExemplars } = await import("./pg-store");
+    const d = (iso: string) => new Date(iso);
+    const out = mergeExemplars(
+      [
+        [{ line: "A", at: d("2026-10-01") }, { line: "B", at: d("2026-10-05") }],
+        [{ line: "B", at: d("2026-10-03") }, { line: "C", at: d("2026-10-10") }],
+      ],
+      2
+    );
+    expect(out).toEqual(["C", "B"]);
+  });
+});
+
+// ML-7 guardrail: the service role bypasses RLS, so tenant isolation for lead_embeddings lives in
+// the queries — every statement touching the table must scope by account (rls-auditor 2026-10-21).
+describe("lead_embeddings queries are always account-scoped", () => {
+  it("every reference sits in a statement that filters or joins on the account", async () => {
+    const { readFileSync } = await import("node:fs");
+    const src = readFileSync(new URL("./pg-store.ts", import.meta.url), "utf8");
+    // every use (the bare `  leadEmbeddings,` import-list entry is not a query)
+    const refs = [...src.matchAll(/leadEmbeddings/g)]
+      .map((m) => m.index!)
+      .filter((at) => !/^\s*leadEmbeddings,\s*$/.test(src.slice(src.lastIndexOf("\n", at) + 1, src.indexOf("\n", at))));
+    expect(refs.length).toBeGreaterThan(3);
+    for (const at of refs) {
+      const window = src.slice(Math.max(0, at - 700), at + 700);
+      expect(window, `lead_embeddings reference near offset ${at}`).toMatch(/account_id|accountId/);
+    }
+  });
+});

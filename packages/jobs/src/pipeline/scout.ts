@@ -1,8 +1,9 @@
-import { applyRulesGate, isScanStale, allocateDiscovery } from "@vantera/agent-brains";
+import { applyRulesGate, isScanStale, allocateDiscovery, normalizeTargetingRules } from "@vantera/agent-brains";
+import { gateWithExclusions } from "./exclusions";
 import { computeRunTarget, computeDiscoveryTarget, dailyOutreachCapacity, DISCOVERY_PER_RUN_CAP } from "./capacity";
 import { discoveryIdleReason, statusForTrialCaps } from "./trial-caps";
 import { rankWithCompleteness } from "./rank-complete";
-import type { RankCandidate, LeadOutcomeFlags } from "@vantera/agent-brains";
+import { RANK_MISS_RATIONALE, type RankCandidate, type RankContext, type LeadOutcomeFlags } from "@vantera/agent-brains";
 import { companyKey, icpCriteriaToFilters, type CompanyRef, type EnrichedProspect, type IcpCriteria, type ProspectSignal } from "@vantera/prospect-data";
 import {
   SCOUT_DEFAULTS,
@@ -16,6 +17,11 @@ import { mapWithConcurrency } from "./concurrency";
 
 /** In-flight DB writes when persisting a discovery batch (gate / enrichment / score). Pool max is 10. */
 const WRITE_CONCURRENCY = 8;
+/** Rank-miss retry window + per-run cap (see the retry stage in runScout). */
+export const RANK_RETRY_LOOKBACK_DAYS = 7;
+export const RANK_RETRY_LIMIT = 36;
+/** ML-7: profiles embedded per scout run (backfills existing leads over a few runs). */
+export const EMBED_PER_RUN = 100;
 
 /** "Strike now" signal kinds worth a notification — the high-value timing events (rule 05). */
 const HOT_SIGNAL_KINDS = new Set(["funding", "intent", "exec_hire", "m_and_a"]);
@@ -121,6 +127,37 @@ export async function runScout(agentId: string, deps: ScoutDeps): Promise<ScoutR
   let rankErrors = 0;
   // Healed working set: ICPs whose criteria are usable this run (see the self-heal below).
   let icps = ctx.icps;
+  const rankAttempted = new Set<string>();
+  // ML-5: the user's own exclusions (deterministic, with the rules gate) + guidance (rank context)
+  const targeting = normalizeTargetingRules(config.targeting);
+
+  // Rank a batch and persist ONLY real model rows. A rank miss (model omitted the lead, or the
+  // call threw) is left unscored — scored_at null — so the retry stage below re-ranks it on a
+  // later run instead of permanently rejecting a lead whose discovery credits were already spent.
+  // ML-1: the seller's revealed preferences (review rejections + positive replies), read once per
+  // run on first rank. Fail-open: a failed read ranks without them.
+  let feedback: RankContext["feedback"] | undefined;
+  const rankAndPersist = async (candidates: RankCandidate[]): Promise<string[]> => {
+    if (candidates.length === 0) return [];
+    if (feedback === undefined) feedback = await deps.store.getRankFeedback(accountId).catch(() => null);
+    const rankCtx = {
+      accountIndustry: ctx.account.industry,
+      valueProp: scan ? `${scan.summary} Value props: ${scan.value_props.join("; ")}` : null,
+      icpDescription: icps.map((i) => `${i.name}: ${JSON.stringify(i.criteria)}`).join(" | "),
+      feedback,
+      guidance: targeting.guidance,
+    };
+    const ranked = await rankWithCompleteness(deps.rankFn, candidates, rankCtx);
+    rankMissed += ranked.rankMissed;
+    rankErrors += ranked.rankErrors;
+    const scored = ranked.insights
+      .filter((insight) => insight.rationale !== RANK_MISS_RATIONALE)
+      .map((insight) => ({ insight, qualified: insight.score >= config.minScore }));
+    await mapWithConcurrency(scored, WRITE_CONCURRENCY, ({ insight, qualified }) =>
+      deps.store.saveScore(insight.lead_id, insight, qualified)
+    );
+    return scored.filter((s) => s.qualified).map((s) => s.insight.lead_id);
+  };
 
   if (discoveryTarget > 0) {
     // Platform COGS guard: the prospect-data credit pool is shared across tenants. Confirm it can
@@ -192,7 +229,7 @@ export async function runScout(agentId: string, deps: ScoutDeps): Promise<ScoutR
     // pure gate decisions first (deterministic order), then persist them concurrently
     const gated = fresh.map((lead) => ({
       lead,
-      result: applyRulesGate(lead.candidate, criteriaById.get(lead.icpId) ?? {}),
+      result: gateWithExclusions(applyRulesGate(lead.candidate, criteriaById.get(lead.icpId) ?? {}), lead.candidate, targeting),
     }));
     await mapWithConcurrency(gated, WRITE_CONCURRENCY, ({ lead, result }) =>
       deps.store.markRulesGate(lead.leadId, result)
@@ -266,22 +303,8 @@ export async function runScout(agentId: string, deps: ScoutDeps): Promise<ScoutR
     );
 
     // stage 2: batched AI rank → persist scores (qualified = score >= min_score)
-    const qualifiedThisRunIds: string[] = [];
-    if (rankCandidates.length > 0) {
-      const rankCtx = {
-        accountIndustry: ctx.account.industry,
-        valueProp: scan ? `${scan.summary} Value props: ${scan.value_props.join("; ")}` : null,
-        icpDescription: icps.map((i) => `${i.name}: ${JSON.stringify(i.criteria)}`).join(" | "),
-      };
-      const ranked = await rankWithCompleteness(deps.rankFn, rankCandidates, rankCtx);
-      rankMissed = ranked.rankMissed;
-      rankErrors = ranked.rankErrors;
-      const scored = ranked.insights.map((insight) => ({ insight, qualified: insight.score >= config.minScore }));
-      await mapWithConcurrency(scored, WRITE_CONCURRENCY, ({ insight, qualified }) =>
-        deps.store.saveScore(insight.lead_id, insight, qualified)
-      );
-      for (const s of scored) if (s.qualified) qualifiedThisRunIds.push(s.insight.lead_id);
-    }
+    for (const c of rankCandidates) rankAttempted.add(c.leadId);
+    const qualifiedThisRunIds = await rankAndPersist(rankCandidates);
     qualifiedThisRun = qualifiedThisRunIds.length;
 
     // Anticipation hook: a freshly-qualified lead carrying a fresh, high-value buying signal earns
@@ -295,6 +318,38 @@ export async function runScout(agentId: string, deps: ScoutDeps): Promise<ScoutR
         })
         .filter((x): x is { leadId: string; label: string } => x !== null);
       if (hotItems.length > 0) await deps.store.notifyHotSignals(accountId, hotItems);
+    }
+  }
+
+  // ── Rank-miss retry: re-rank recent gate survivors an earlier run left unscored ──
+  // Bounded lookback (RANK_RETRY_LOOKBACK_DAYS) so a lead the model consistently omits ages out
+  // instead of being retried forever; this run's own misses already had their one retry.
+  const unranked = (
+    await deps.store.getUnrankedLeads(
+      accountId,
+      new Date(now().getTime() - RANK_RETRY_LOOKBACK_DAYS * 24 * 60 * 60 * 1000),
+      RANK_RETRY_LIMIT
+    )
+  ).filter((c) => !rankAttempted.has(c.leadId));
+  qualifiedThisRun += (await rankAndPersist(unranked)).length;
+
+  // ── ML-7: embed new/changed lead profiles BEFORE the drain orders them, so lookalike similarity
+  // to the account's own winners is current. Bounded per run; fail-open (an embedding outage never
+  // blocks prospecting); absent embedder = lookalikes off.
+  let embedded = 0;
+  if (deps.embedFn) {
+    try {
+      const toEmbed = await deps.store.getLeadsToEmbed(accountId, EMBED_PER_RUN);
+      if (toEmbed.length > 0) {
+        const vectors = await deps.embedFn.embed(toEmbed.map((t) => t.text));
+        await deps.store.saveLeadEmbeddings(
+          accountId,
+          toEmbed.map((t, i) => ({ leadId: t.leadId, embedding: vectors[i]!, model: deps.embedFn!.model, sourceHash: t.sourceHash }))
+        );
+        embedded = toEmbed.length;
+      }
+    } catch {
+      embedded = 0;
     }
   }
 
@@ -322,6 +377,8 @@ export async function runScout(agentId: string, deps: ScoutDeps): Promise<ScoutR
   }
 
   await deps.store.completeRun(agentId, now());
+  // ML-1 readout persisted with the run (agent_runs.summary) — insight only, fail-open
+  const learned = await deps.store.getLearnedInsights(accountId).catch(() => null);
 
   return {
     status: "completed",
@@ -337,5 +394,7 @@ export async function runScout(agentId: string, deps: ScoutDeps): Promise<ScoutR
     rankErrors,
     websiteScanError,
     companySignalsError,
+    learned,
+    embedded,
   };
 }

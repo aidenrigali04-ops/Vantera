@@ -115,9 +115,9 @@ export const MAX_WATCH_PER_LIST = 10;
 export type IntentFormValues = {
   name: string;
   watch: { creators: string[]; competitors: string[]; keywords: string[]; hashtags: string[] };
-  signals: { engagement: boolean; content: boolean };
+  signals: { engagement: boolean; content: boolean; follows: boolean };
   runAtTime: string;
-  cadence: "daily" | "weekly";
+  cadence: "daily" | "weekly" | "intraday";
   timezone: string;
 };
 
@@ -159,16 +159,75 @@ export function parseIntentForm(form: FormData): Result<IntentFormValues> {
   const signals = {
     engagement: form.get("signalEngagement") === "on",
     content: form.get("signalContent") === "on",
+    follows: form.get("signalFollows") === "on",
   };
-  if (!signals.engagement && !signals.content) {
-    return { ok: false, error: "Enable at least one intent signal (engagement or content)." };
+  if (!signals.engagement && !signals.content && !signals.follows) {
+    return { ok: false, error: "Enable at least one intent signal (engagement, content, or followers)." };
   }
 
   const runAtTime = String(form.get("runAtTime") ?? "");
   if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(runAtTime)) return { ok: false, error: "Pick a valid run time." };
   const cadence = String(form.get("cadence") ?? "");
-  if (cadence !== "daily" && cadence !== "weekly") return { ok: false, error: "Pick a cadence." };
+  if (cadence !== "daily" && cadence !== "weekly" && cadence !== "intraday") return { ok: false, error: "Pick a cadence." };
   const timezone = String(form.get("timezone") ?? "").trim() || "UTC";
 
   return { ok: true, values: { name, watch, signals, runAtTime, cadence, timezone } };
+}
+
+// ── ML-5 targeting rules (Scout agents.config.targeting) ─────────────────────────────────────
+export const TARGETING_LIST_MAX = 50;
+export const TARGETING_ENTRY_MAX = 80;
+export const TARGETING_GUIDANCE_MAX = 500;
+
+export type TargetingFormValues = {
+  excludeAgencies: boolean;
+  excludeFreelancers: boolean;
+  competitors: string[];
+  customers: string[];
+  companies: string[];
+  keywords: string[];
+  guidance: string | null;
+};
+
+/** One entry per line (commas also split for keywords — company names keep theirs: "Acme, Inc."),
+ *  trimmed + deduped case-insensitively. */
+function splitList(raw: unknown, commas: boolean): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const part of String(raw ?? "").split(commas ? /[\n,]/ : /\n/)) {
+    const t = part.trim().replace(/\s+/g, " ");
+    if (!t || seen.has(t.toLowerCase())) continue;
+    seen.add(t.toLowerCase());
+    out.push(t);
+  }
+  return out;
+}
+
+const LIST_LABELS = { competitors: "competitors", customers: "existing customers", companies: "companies", keywords: "keywords" } as const;
+
+export function parseTargetingForm(form: FormData): Result<TargetingFormValues> {
+  const lists = {} as Record<keyof typeof LIST_LABELS, string[]>;
+  for (const key of Object.keys(LIST_LABELS) as (keyof typeof LIST_LABELS)[]) {
+    const list = splitList(form.get(key), key === "keywords");
+    if (list.length > TARGETING_LIST_MAX) {
+      return { ok: false, error: `Keep ${LIST_LABELS[key]} to ${TARGETING_LIST_MAX} entries.` };
+    }
+    if (list.some((e) => e.length > TARGETING_ENTRY_MAX)) {
+      return { ok: false, error: `Keep each of your ${LIST_LABELS[key]} under ${TARGETING_ENTRY_MAX} characters.` };
+    }
+    lists[key] = list;
+  }
+  const guidance = String(form.get("guidance") ?? "").trim();
+  if (guidance.length > TARGETING_GUIDANCE_MAX) {
+    return { ok: false, error: `Keep your guidance under ${TARGETING_GUIDANCE_MAX} characters.` };
+  }
+  return {
+    ok: true,
+    values: {
+      excludeAgencies: form.get("excludeAgencies") === "on",
+      excludeFreelancers: form.get("excludeFreelancers") === "on",
+      ...lists,
+      guidance: guidance || null,
+    },
+  };
 }

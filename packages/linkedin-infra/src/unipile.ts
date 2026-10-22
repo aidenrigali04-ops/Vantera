@@ -1,5 +1,5 @@
 import { createHash, timingSafeEqual } from "node:crypto";
-import type { ConnectedAccount, GetProfileRequest, HostedAuthLink, HostedAuthRedirects, InviteRequest, LinkedInEngager, LinkedInEvent, LinkedInInfra, LinkedInPost, LinkedInProfile, MessageRequest, PostEngagersRequest, ProfilePostsRequest, SearchPostsRequest, SendOutcome, WebhookSetupResult } from "./types";
+import type { ConnectedAccount, GetProfileRequest, HostedAuthLink, HostedAuthRedirects, InviteRequest, LinkedInEngager, LinkedInEvent, LinkedInInfra, LinkedInPost, LinkedInProfile, MessageRequest, PostEngagersRequest, ProfilePostsRequest, SearchPostsRequest, SendOutcome, WebhookSetupResult, LinkedInFollower, ListFollowersRequest } from "./types";
 
 // ── endpoint constants ──────────────────────────────────────────────────────
 const PATH_HOSTED_AUTH = "/api/v1/hosted/accounts/link";
@@ -196,6 +196,15 @@ function mapReaction(raw: unknown): LinkedInEngager | null {
   const profileUrl = str(author?.profile_url) ?? actorProfileUrl(author);
   if (!profileUrl) return null;
   return { profileUrl, name: str(author?.name), headline: str(author?.headline), kind: "reaction" };
+}
+
+/** A follower row (UserFollower): id / name / headline / profile_url. */
+function mapFollower(raw: unknown): LinkedInFollower | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const f = raw as Record<string, unknown>;
+  const profileUrl = str(f.profile_url) ?? actorProfileUrl(f);
+  if (!profileUrl) return null;
+  return { profileUrl, name: str(f.name), headline: str(f.headline) };
 }
 
 /** A comment row: the commenter is under `author_details`; `author` is the display-name string. */
@@ -623,6 +632,16 @@ export class UnipileLinkedInInfra implements LinkedInInfra {
       if (!existing || (existing.kind === "reaction" && e.kind === "comment")) byProfile.set(e.profileUrl, e);
     }
     return [...byProfile.values()].slice(0, req.limit);
+  }
+
+  async listFollowers(req: ListFollowersRequest): Promise<LinkedInFollower[]> {
+    // own-profile followers (no user_id): the provider caps one page at 100 for the connected account
+    const limit = Math.min(100, Math.max(1, req.limit));
+    const data = await this.call<{ items?: unknown }>(
+      `/api/v1/users/followers?account_id=${encodeURIComponent(req.connectedAccountId)}&limit=${limit}`,
+      { method: "GET" }
+    );
+    return mapItems(data.items, mapFollower, req.limit);
   }
 
   async getProfile(req: GetProfileRequest): Promise<LinkedInProfile | null> {

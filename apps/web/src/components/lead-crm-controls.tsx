@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { Button } from "@/components/ui/button";
+import { meetingSourceLabel } from "@/lib/meeting-source";
 import { Input } from "@/components/ui/input";
 import {
   markClosedWon,
@@ -65,7 +66,7 @@ export function LeadCrmControls({
       )}
       {meetingBooked && !converted && (
         <p className="text-xs text-muted-foreground">
-          Meeting booked{meetingSource === "agent" ? " — detected from the reply" : " — marked by you"}.
+          Meeting booked — {meetingSourceLabel(meetingSource)}.
         </p>
       )}
       {!converted ? (

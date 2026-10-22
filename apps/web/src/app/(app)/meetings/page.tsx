@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { meetingSourceLabel } from "@/lib/meeting-source";
 import { CalendarCheck2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { orThrow } from "@/lib/supabase/guard";
@@ -93,7 +94,10 @@ export default async function MeetingsPage() {
                       {fmtDay.format(new Date(m.meeting_booked_at))}
                     </td>
                     <td className="hidden px-4 py-3 text-muted-foreground md:table-cell">
-                      {m.meeting_source === "agent" ? "Detected from the reply" : "Marked by you"}
+                      {(() => {
+                        const label = meetingSourceLabel(m.meeting_source);
+                        return label[0]!.toUpperCase() + label.slice(1);
+                      })()}
                     </td>
                     <td className="px-4 py-3">
                       {m.status === "converted" ? "Closed-won" : "Booked"}
