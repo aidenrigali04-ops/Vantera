@@ -45,6 +45,8 @@ export interface ScoutConfig {
   /** capacity-throttle tunables (per-agent override via agents.config jsonb) */
   bufferFactor: number;
   floor: number;
+  /** ML-5: the user's exclusions + guidance, raw jsonb (normalizeTargetingRules) */
+  targeting?: unknown;
 }
 
 // Apify-era volume (2026-06-22): LinkedIn-search discovery is cheap to pull wide, so we source a
@@ -246,6 +248,8 @@ export interface IntentScanContext {
   /** qualification ICP — inherited from the account's Scout (intent qualifies against the same bar) */
   icps: { id: string; name: string; criteria: IcpCriteria }[];
   account: { industry: string | null; valueProp: string | null; subscriptionStatus: string };
+  /** ML-5: the Scout's targeting rules (raw agents.config.targeting) — intent leads obey them too */
+  targeting?: unknown;
 }
 
 /** A persisted observation row — the dedupe ledger + audit trail. */

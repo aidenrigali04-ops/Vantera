@@ -1,4 +1,4 @@
-import { applyRulesGate, RANK_MISS_RATIONALE, type IntentObservationInput, type IntentVerdict, type LeadInsights, type RankCandidate, type RulesGateResult } from "@vantera/agent-brains";
+import { applyRulesGate, normalizeTargetingRules, RANK_MISS_RATIONALE, type IntentObservationInput, type IntentVerdict, type LeadInsights, type RankCandidate, type RulesGateResult } from "@vantera/agent-brains";
 import type { IcpCriteria, ProspectCandidate } from "@vantera/prospect-data";
 import type { LinkedInPost, LinkedInProfile } from "@vantera/linkedin-infra";
 import {
@@ -11,6 +11,7 @@ import {
 } from "./types";
 import { mapWithConcurrency } from "./concurrency";
 import { rankWithCompleteness } from "./rank-complete";
+import { gateWithExclusions } from "./exclusions";
 
 /** LinkedIn profile reads run at a LOW bounded concurrency — rule-04 account safety caps read volume. */
 const INTENT_READ_CONCURRENCY = 3;
@@ -117,6 +118,8 @@ export async function runIntentScan(agentId: string, deps: IntentScanDeps): Prom
     watch: { ...INTENT_DEFAULTS.watch, ...cfg.watch },
     signals: { ...INTENT_DEFAULTS.signals, ...cfg.signals },
   };
+  // ML-5: the Scout's targeting rules govern every way a person enters the funnel
+  const targeting = normalizeTargetingRules(ctx.targeting);
 
   // A creator/competitor given as a URL is watched as a profile (its own posts); given as a NAME
   // it's watched as a search query (posts mentioning it). This lets the auto-derived watchlist
@@ -254,7 +257,8 @@ export async function runIntentScan(agentId: string, deps: IntentScanDeps): Prom
       if (await deps.store.isSuppressed(accountId, "linkedin", profile.profileUrl))
         return { row: obsRow(o, "suppressed", v.why_now, null), survivor: null };
       const candidate = candidateFromProfile(profile);
-      const { gate, icpId } = gateAgainstIcps(candidate, ctx.icps);
+      const { gate: icpGate, icpId } = gateAgainstIcps(candidate, ctx.icps);
+      const gate = gateWithExclusions(icpGate, candidate, targeting);
       const { leadId } = await deps.store.upsertIntentLead(accountId, candidate, gate.passed ? icpId : undefined);
       await deps.store.markRulesGate(leadId, gate);
       if (!gate.passed) return { row: obsRow(o, "rejected", v.why_now, leadId), survivor: null };
@@ -282,6 +286,7 @@ export async function runIntentScan(agentId: string, deps: IntentScanDeps): Prom
         valueProp: ctx.account.valueProp,
         icpDescription: ctx.icps.map((i) => `${i.name}: ${JSON.stringify(i.criteria)}`).join(" | "),
         feedback,
+        guidance: targeting.guidance,
       }
     );
     rankMissed = ranked.rankMissed;

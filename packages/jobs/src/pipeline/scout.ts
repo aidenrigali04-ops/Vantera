@@ -1,4 +1,5 @@
-import { applyRulesGate, isScanStale, allocateDiscovery } from "@vantera/agent-brains";
+import { applyRulesGate, isScanStale, allocateDiscovery, normalizeTargetingRules } from "@vantera/agent-brains";
+import { gateWithExclusions } from "./exclusions";
 import { computeRunTarget, computeDiscoveryTarget, dailyOutreachCapacity } from "./capacity";
 import { rankWithCompleteness } from "./rank-complete";
 import { RANK_MISS_RATIONALE, type RankCandidate, type RankContext, type LeadOutcomeFlags } from "@vantera/agent-brains";
@@ -105,6 +106,8 @@ export async function runScout(agentId: string, deps: ScoutDeps): Promise<ScoutR
   // Healed working set: ICPs whose criteria are usable this run (see the self-heal below).
   let icps = ctx.icps;
   const rankAttempted = new Set<string>();
+  // ML-5: the user's own exclusions (deterministic, with the rules gate) + guidance (rank context)
+  const targeting = normalizeTargetingRules(config.targeting);
 
   // Rank a batch and persist ONLY real model rows. A rank miss (model omitted the lead, or the
   // call threw) is left unscored — scored_at null — so the retry stage below re-ranks it on a
@@ -120,6 +123,7 @@ export async function runScout(agentId: string, deps: ScoutDeps): Promise<ScoutR
       valueProp: scan ? `${scan.summary} Value props: ${scan.value_props.join("; ")}` : null,
       icpDescription: icps.map((i) => `${i.name}: ${JSON.stringify(i.criteria)}`).join(" | "),
       feedback,
+      guidance: targeting.guidance,
     };
     const ranked = await rankWithCompleteness(deps.rankFn, candidates, rankCtx);
     rankMissed += ranked.rankMissed;
@@ -203,7 +207,7 @@ export async function runScout(agentId: string, deps: ScoutDeps): Promise<ScoutR
     // pure gate decisions first (deterministic order), then persist them concurrently
     const gated = fresh.map((lead) => ({
       lead,
-      result: applyRulesGate(lead.candidate, criteriaById.get(lead.icpId) ?? {}),
+      result: gateWithExclusions(applyRulesGate(lead.candidate, criteriaById.get(lead.icpId) ?? {}), lead.candidate, targeting),
     }));
     await mapWithConcurrency(gated, WRITE_CONCURRENCY, ({ lead, result }) =>
       deps.store.markRulesGate(lead.leadId, result)

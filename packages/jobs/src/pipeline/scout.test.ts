@@ -826,5 +826,36 @@ describe("runScout — discovery allocation (Stage 2)", () => {
     expect(summary.status).toBe("completed");
     expect(summary.learned).toBeNull();
   });
+
+  it("applies the user's exclusions with the rules gate, before enrichment or AI spend (ML-5)", async () => {
+    const ctx = makeContext();
+    ctx.agent.config = { ...ctx.agent.config, targeting: { excludeAgencies: true, competitors: ["Rival Co"] } } as never;
+    const store = new FakeScoutStore(ctx);
+    const pool = [
+      makeCandidate({ externalRef: "agency", industry: "saas", companyName: "Bright Growth Agency" }),
+      makeCandidate({ externalRef: "rival", industry: "saas", companyName: "Rival Co" }),
+      makeCandidate({ externalRef: "good", industry: "saas", companyName: "Acme" }),
+    ];
+    const { deps, ranked } = makeDeps(store, pool, { good: 80 });
+    await runScout("scout1", deps);
+    expect(ranked.flat().map((id) => id.split("_").at(-1))).toEqual(["good"]);
+    expect(store.enriched).toEqual(["good"]);
+    expect([...store.gates.entries()].filter(([, passed]) => !passed).map(([id]) => id.split("_").at(-1)).sort()).toEqual(["agency", "rival"]);
+  });
+
+  it("hands the user's targeting guidance to the rank (ML-5)", async () => {
+    const ctx = makeContext();
+    ctx.agent.config = { ...ctx.agent.config, targeting: { guidance: "Prioritize founders" } } as never;
+    const store = new FakeScoutStore(ctx);
+    const { deps } = makeDeps(store, [makeCandidate({ externalRef: "a", industry: "saas" })], { a: 80 });
+    const seen: unknown[] = [];
+    const rank = deps.rankFn;
+    deps.rankFn = async (c, rctx) => {
+      seen.push(rctx.guidance);
+      return rank(c, rctx);
+    };
+    await runScout("scout1", deps);
+    expect(seen[0]).toBe("Prioritize founders");
+  });
 });
 

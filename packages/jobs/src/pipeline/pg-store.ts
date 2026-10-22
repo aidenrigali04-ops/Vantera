@@ -643,7 +643,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         .limit(1);
       // qualification ICP is inherited from the account's Scout (rule 06 — the same bar)
       const [scout] = await db
-        .select({ id: agents.id })
+        .select({ id: agents.id, config: agents.config })
         .from(agents)
         .where(and(eq(agents.accountId, agent.accountId), eq(agents.kind, "scout")))
         .limit(1);
@@ -671,6 +671,8 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           valueProp: scan ? `${scan.summary} Value props: ${scan.value_props.join("; ")}` : null,
           subscriptionStatus: account.subscriptionStatus,
         },
+        // ML-5: exclusions + guidance live on the Scout and govern intent leads too
+        targeting: (scout?.config as { targeting?: unknown } | null)?.targeting,
       };
     },
 

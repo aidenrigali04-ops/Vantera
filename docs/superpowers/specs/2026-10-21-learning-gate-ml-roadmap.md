@@ -163,3 +163,16 @@ article mentions learned ordering + job-seeker exclusion); full gate green on a 
 - Web: side-peek Good fit / Not a fit / Undo; verdicts read in a separate soft query so the page
   degrades (no verdicts) instead of erroring if the migration isn't applied yet. Copilot
   `getLeadScoreRationale` now returns `fitVerdict`.
+
+## 7. ML-5 design (steerable targeting) — shipped
+
+- `TargetingRules` in the Scout's `agents.config.targeting` (rule 13), read defensively by
+  `normalizeTargetingRules` (lists ≤ 50 × 80 chars, guidance ≤ 500).
+- `applyExclusions`: agency/consultant + freelancer patterns on title/company; company lists by
+  normalized name (legal suffixes dropped; "Acme" matches "Acme Labs", never "Acmeworks") or
+  domain; keywords at a word start in title/company/industry. `gateWithExclusions` turns a gate
+  pass into a recorded fail — before enrichment/AI spend — in Scout and Intent (the intent context
+  loads the Scout's rules).
+- Guidance: an inline rank-context line (no system-prompt change; newline-stripped, ≤ 500 chars).
+- UI: `/playbook/scout/targeting` (plain form; one company per line so "Acme, Inc." survives),
+  linked from the Scout card. Exempt by design: manual adds, onboarding fast-pass.

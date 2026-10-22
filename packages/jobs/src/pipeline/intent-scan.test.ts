@@ -316,5 +316,21 @@ describe("runIntentScan", () => {
     expect(new Set(refs).size).toBe(refs.length); // every observation has its own id
     expect(calls.upserted).toContain(GOOD); // the p1 intent verdict still enrolls her
   });
+
+  it("applies the Scout's exclusions and guidance to intent leads too (ML-5)", async () => {
+    const { store, calls, ctx } = makeStore();
+    ctx.targeting = { keywords: ["cx"], guidance: "Avoid agencies" };
+    const deps = makeDeps(store);
+    const guidance: unknown[] = [];
+    deps.rankFn = async (cands, rctx) => {
+      guidance.push(rctx.guidance);
+      return cands.map((c) => insight(c.leadId, 80));
+    };
+    await runIntentScan("intent-1", deps);
+    // GOOD ("Head of CX") is excluded by keyword → rejected, never scored
+    expect(calls.scored.some((s) => s.leadId === `lead_${GOOD}`)).toBe(false);
+    expect(calls.observations.find((r) => r.profileUrl === GOOD)?.outcome).toBe("rejected");
+    expect(guidance.every((g) => g === "Avoid agencies")).toBe(true);
+  });
 });
 

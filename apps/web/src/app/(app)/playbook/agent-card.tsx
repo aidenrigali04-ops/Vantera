@@ -113,6 +113,11 @@ export function AgentCard({
               </Link>
             </Button>
           )}
+          {agent.kind === "scout" && (
+            <Button asChild variant="ghost" size="sm">
+              <Link href="/playbook/scout/targeting">Targeting rules</Link>
+            </Button>
+          )}
           {live && (agent.kind === "scout" || agent.kind === "intent") && (
             <RunNowButton agentId={agent.id} />
           )}

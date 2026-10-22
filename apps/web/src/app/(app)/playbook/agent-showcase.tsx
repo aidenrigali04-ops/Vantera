@@ -237,6 +237,11 @@ function AgentDetails({ agent }: { agent: ShowcaseAgent }) {
             </Link>
           </Button>
         )}
+        {agent.kind === "scout" && (
+          <Button asChild variant="outline" size="sm">
+            <Link href="/playbook/scout/targeting">Targeting rules</Link>
+          </Button>
+        )}
         {live && (agent.kind === "scout" || agent.kind === "intent") && (
           <RunNowButton agentId={agent.id} />
         )}

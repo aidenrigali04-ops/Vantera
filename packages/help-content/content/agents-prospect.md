@@ -1,7 +1,7 @@
 ---
 title: Your Prospect Agent
 surface: agents
-routes: /playbook, /playbook/new/scout
+routes: /playbook, /playbook/new/scout, /playbook/scout/targeting
 ---
 
 # Your Prospect Agent
@@ -26,6 +26,17 @@ The Prospect Agent is your prospecting teammate. Once deployed, it hunts for peo
 - If scoring is briefly unavailable, unscored prospects are kept and scored on a later run instead of being thrown away.
 
 If you've added your website URL in settings, the agent reads your homepage so its scoring understands exactly what you sell.
+
+## Targeting rules
+
+Open **Playbook → Prospect Agent → Targeting rules** to tell your agents who to skip and who to favor:
+
+- **Always skip** agencies and consultants, or freelancers and self-employed people.
+- **Competitors**, **existing customers**, and **other companies** to skip — one per line (a website like acme.com works too).
+- **Keywords to skip**, matched in job titles, company names, and industries.
+- **Who to prioritize or avoid**, in your own words — your agent weighs it when scoring, the same way it weighs your ICP.
+
+Skips are checked before anything is spent on a prospect, and they apply to everyone your agents find — from search and from LinkedIn intent alike. Prospects you add yourself are never skipped. Your guidance never lowers the 70+ quality bar.
 
 ## It learns from your results
 

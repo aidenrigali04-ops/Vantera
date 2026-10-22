@@ -33,6 +33,8 @@ export interface RankContext {
    * Evidence about fit — never leads to score.
    */
   feedback?: { rejected: string[]; positive: string[] } | null;
+  /** ML-5: the seller's own "who to prioritize / avoid" words (Scout targeting rules) */
+  guidance?: string | null;
 }
 
 /** Exemplars per side in the rank prompt. */
@@ -136,6 +138,11 @@ function contextBlock(ctx: RankContext): string {
     `Seller industry: ${ctx.accountIndustry ?? "unknown"}`,
     `Seller offer: ${ctx.valueProp ?? "unknown"}`,
     `Target ICP: ${ctx.icpDescription ?? "unknown"}`,
+    ...(ctx.guidance?.trim()
+      ? [
+          `Seller's own targeting guidance (weigh it like the ICP — score leads it prioritizes higher and leads it says to avoid lower): ${trunc(ctx.guidance.replace(/[\r\n]+/g, " ").trim(), 500)}`,
+        ]
+      : []),
     ...feedbackBlock(ctx.feedback),
   ].join("\n");
 }

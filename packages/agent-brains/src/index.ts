@@ -241,3 +241,4 @@ export {
 } from "./targeting/learn";
 export { STARTER_PLAYS, SOURCE_LABEL, matchStarterPlays, type StarterPlay } from "./plays/starter";
 export { pickWhyNow, findMissingWhyNow, WHY_NOW_MAX_AGE_DAYS, type WhyNow, type SignalLike } from "./copy/why-now";
+export { applyExclusions, normalizeTargetingRules, EMPTY_TARGETING, TARGETING_LIST_MAX, TARGETING_ENTRY_MAX, TARGETING_GUIDANCE_MAX, type TargetingRules } from "./prospect/exclusions";
