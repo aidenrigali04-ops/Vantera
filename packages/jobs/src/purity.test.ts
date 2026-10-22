@@ -20,6 +20,7 @@ function ctx(): SequenceTickContext {
     accountPaused: false,
     killSwitch: false,
     leadReplied: false,
+    connection: { invitedAt: null, connectedAt: new Date(NOW.getTime() - 86_400_000) },
     now: NOW,
   };
 }

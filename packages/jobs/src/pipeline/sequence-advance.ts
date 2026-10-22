@@ -10,6 +10,14 @@ const DAY = 86_400_000;
  *  not a no — but only once, and never for leads who never engaged. */
 export const SOFT_NO_REVIVAL_DAYS = 30;
 
+/** An invite still unaccepted this long after it went out ends the run (the dispatcher cancels an
+ *  unaccepted follow-up at 30 days; the run gives up first). */
+export const INVITE_ACCEPT_TIMEOUT_DAYS = 21;
+/** A run whose invite never went out (failed, or never released) ends after this long. */
+export const NEVER_INVITED_TIMEOUT_DAYS = 30;
+/** How often a run waiting on its connection is re-checked. */
+const CONNECTION_RECHECK_DAYS = 1;
+
 function hasIdentifier(_stage: SequenceStage, ch: LeadChannels): boolean {
   return !!ch.linkedinUrl;
 }
@@ -49,6 +57,38 @@ function advanceOrExhaust(ctx: SequenceTickContext): SequenceDecision {
 }
 
 /**
+ * LinkedIn follow-ups only reach a connection, so the run's clock is the CONNECTION, not the
+ * draft. Before acceptance the run waits without spending touches (and gives up after the
+ * timeouts); on first sight of an acceptance the clock restarts there — the invite pair's own
+ * follow-up is touch 1, released by the dispatcher on acceptance. Null = no gating applies.
+ */
+function connectionGate(ctx: SequenceTickContext): SequenceDecision | null {
+  const { invitedAt, connectedAt } = ctx.connection;
+  const now = ctx.now.getTime();
+  if (!connectedAt) {
+    const timedOut = invitedAt
+      ? now - invitedAt.getTime() > INVITE_ACCEPT_TIMEOUT_DAYS * DAY
+      : now - ctx.run.enteredStageAt.getTime() > NEVER_INVITED_TIMEOUT_DAYS * DAY;
+    if (timedOut) return { kind: "exhaust", patch: { status: "exhausted", currentStage: "done" } };
+    return { kind: "wait", patch: { nextActionAt: new Date(now + CONNECTION_RECHECK_DAYS * DAY) } };
+  }
+  if (ctx.run.enteredStageAt.getTime() < connectedAt.getTime()) {
+    const cfg = ctx.config.stages.linkedin;
+    const gapDays = cfg.touches > 1 ? cfg.touchGapDays : cfg.waitDays;
+    return {
+      kind: "wait",
+      patch: {
+        touchesDone: 1,
+        enteredStageAt: connectedAt,
+        lastTouchAt: connectedAt,
+        nextActionAt: new Date(connectedAt.getTime() + gapDays * DAY),
+      },
+    };
+  }
+  return null;
+}
+
+/**
  * One transition for a due, active run. Caller guarantees status === 'active' and
  * now >= nextActionAt. Conversion/reply gates run elsewhere and flip status, so they
  * never reach this function.
@@ -61,6 +101,9 @@ export function advanceSequence(ctx: SequenceTickContext): SequenceDecision {
 
   // current stage unusable (disabled / missing id / suppressed) -> skip it
   if (!stageUsable(stage, ctx)) return advanceOrExhaust(ctx);
+
+  const gated = connectionGate(ctx);
+  if (gated) return gated;
 
   const target = stageTarget(stage, ctx.config);
   const cfg = ctx.config.stages[stage];

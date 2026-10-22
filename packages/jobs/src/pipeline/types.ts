@@ -793,7 +793,8 @@ export interface SendContext {
   body: string | null;
   campaignStatus: string;
   accountPaused: boolean;
-  lead: { linkedinUrl: string | null };
+  /** status = the lead's pipeline status (archived/rejected leads are never sent to) */
+  lead: { linkedinUrl: string | null; status: string };
 }
 
 export interface OutreachSendStore {
@@ -806,6 +807,8 @@ export interface OutreachSendStore {
   markSent(sendId: string): Promise<void>;
   markFailed(sendId: string, error: string): Promise<void>;
   markSuppressed(sendId: string): Promise<void>;
+  /** cancel the lead's not-yet-sent follow-up messages; returns how many were canceled */
+  cancelUnsentFollowups(leadId: string, reason: string): Promise<number>;
   /** The sticky sender assigned to this lead (multi-sender, rule 04/13). Null = unassigned
    *  (the dispatcher assigns at invite time) → the send parks until the next dispatch cycle. */
   getLeadAssignedIdentity(leadId: string): Promise<{ id: string; providerRef: string; status: string } | null>;
@@ -902,6 +905,8 @@ export interface DispatchableSend {
 export interface DispatchSender extends SenderCandidate {
   /** Messages this account has already sent today (its own message cap is independent). */
   sentTodayMessages: number;
+  /** Epoch ms of this account's latest already-scheduled send (0 if none) — pacing continues after it. */
+  scheduledUntil: number;
 }
 
 export interface SendDispatchStore {
@@ -1208,6 +1213,8 @@ export interface SequenceTickContext {
   killSwitch: boolean;
   /** the lead has replied at least once — an exhausting run earns ONE ~30-day revival */
   leadReplied: boolean;
+  /** LinkedIn connection state: follow-ups only make sense once the invite is accepted */
+  connection: { invitedAt: Date | null; connectedAt: Date | null };
   now: Date;
 }
 
@@ -1227,6 +1234,8 @@ export type SequenceDecision =
   | { kind: "advance"; patch: SequenceRunPatch }
   /** write the patch and stop this tick — the soft-no revival parks the run ~30 days out */
   | { kind: "park"; patch: SequenceRunPatch }
+  /** write the patch and stop this tick without spending a touch — waiting on the connection */
+  | { kind: "wait"; patch: SequenceRunPatch }
   | { kind: "exhaust"; patch: SequenceRunPatch };
 
 export interface SequenceTouchDispatch {
@@ -1245,6 +1254,7 @@ export interface DueSequenceRun {
   accountPaused: boolean;
   /** the lead has replied at least once (drives the one-shot soft-no revival) */
   leadReplied: boolean;
+  connection: { invitedAt: Date | null; connectedAt: Date | null };
 }
 
 export interface SequenceStore {

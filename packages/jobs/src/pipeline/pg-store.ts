@@ -152,6 +152,8 @@ import {
 import { normalizeLinkedInUrl } from "./copy-draft";
 import { stampEnteredLead } from "./stamp";
 import { resolveSequenceConfig } from "./sequence-config";
+import { aggregateSenderLoad } from "./sender-load";
+import { STALE_TASK_MINUTES } from "./send-dispatch";
 import type { RefreshLeadLoad, RefreshLeadStore } from "./refresh-lead";
 import type { FastPassContext, FastPassStore, RevealRunPatch } from "./fast-pass";
 import type { QualifyLeadLoad, QualifyLeadStore } from "./qualify-lead";
@@ -2148,9 +2150,14 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         .innerJoin(campaigns, eq(scheduledSends.campaignId, campaigns.id))
         .innerJoin(leads, eq(scheduledSends.leadId, leads.id))
         .where(
-          or(
-            eq(scheduledSends.status, "approved"),
-            and(eq(scheduledSends.status, "scheduled"), lt(scheduledSends.scheduledFor, staleCutoff))
+          and(
+            or(
+              eq(scheduledSends.status, "approved"),
+              and(eq(scheduledSends.status, "scheduled"), lt(scheduledSends.scheduledFor, staleCutoff))
+            ),
+            // archived/rejected leads left outreach — their leftover rows are never dispatched
+            ne(leads.status, "archived"),
+            ne(leads.status, "rejected")
           )
         );
 
@@ -2193,7 +2200,9 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
               inArray(scheduledSends.leadId, messageLeadIds),
               eq(scheduledSends.linkedinStage, "message"),
               or(
-                eq(scheduledSends.status, "sending"),
+                // a "sending" row untouched past the stale cutoff is a dead task, not in flight —
+                // it must not block this lead's messages forever
+                and(eq(scheduledSends.status, "sending"), gte(scheduledSends.updatedAt, staleCutoff)),
                 and(
                   eq(scheduledSends.status, "scheduled"),
                   gte(scheduledSends.scheduledFor, staleCutoff)
@@ -2288,16 +2297,15 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         .where(and(eq(linkedinAccounts.accountId, accountId), eq(linkedinAccounts.status, "active")));
       if (accts.length === 0) return [];
 
-      const dayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
       const since7 = new Date(now.getTime() - 7 * 86_400_000);
+      const staleCutoff = new Date(now.getTime() - STALE_TASK_MINUTES * 60_000);
 
-      // One scan of this tenant's last-7d LinkedIn sends (bounded: ≤ ~100/wk per account),
-      // aggregated per sender in JS — today/7d invites, today messages, last-used recency.
-      const sends = await db
+      // Delivered: one scan of this tenant's last-7d LinkedIn sends (bounded: ≤ ~100/wk per account).
+      const delivered = await db
         .select({
           liId: outreachSends.linkedinAccountId,
           stage: scheduledSends.linkedinStage,
-          sentAt: outreachSends.sentAt,
+          at: outreachSends.sentAt,
         })
         .from(outreachSends)
         .innerJoin(scheduledSends, eq(outreachSends.scheduledSendId, scheduledSends.id))
@@ -2309,25 +2317,33 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           )
         );
 
-      return accts.map((a) => {
-        const mine = sends.filter((s) => s.liId === a.id);
-        const sentToday = mine.filter((s) => s.stage === "invite" && s.sentAt >= dayStart).length;
-        const last7d = mine.filter((s) => s.stage === "invite").length;
-        const sentTodayMessages = mine.filter((s) => s.stage === "message" && s.sentAt >= dayStart).length;
-        const lastAssignedAt = mine.reduce((m, s) => Math.max(m, s.sentAt.getTime()), 0);
-        const ageDays = a.connectedAt
-          ? Math.floor((now.getTime() - a.connectedAt.getTime()) / 86_400_000)
-          : 0;
-        return {
-          linkedinAccountId: a.id,
-          ageDays,
-          sentToday,
-          last7d,
-          sentTodayMessages,
-          lastAssignedAt,
-          healthy: true, // only active accounts were selected
-        };
-      });
+      // Handed out but not yet delivered, attributed to the lead's assigned sender. A scheduled
+      // row past the stale cutoff is excluded: the dispatcher re-dispatches it and counts it then.
+      const handedOut = await db
+        .select({
+          liId: leads.linkedinAccountId,
+          stage: scheduledSends.linkedinStage,
+          at: scheduledSends.scheduledFor,
+        })
+        .from(scheduledSends)
+        .innerJoin(leads, eq(scheduledSends.leadId, leads.id))
+        .where(
+          and(
+            eq(scheduledSends.accountId, accountId),
+            eq(scheduledSends.channel, "linkedin"),
+            or(
+              eq(scheduledSends.status, "sending"),
+              and(eq(scheduledSends.status, "scheduled"), gte(scheduledSends.scheduledFor, staleCutoff))
+            )
+          )
+        );
+
+      return aggregateSenderLoad(
+        accts,
+        delivered,
+        handedOut.map((r) => ({ ...r, at: r.at ?? now })),
+        now
+      );
     },
 
     async assignLeadSender(leadId: string, linkedinAccountId: string): Promise<void> {
@@ -2335,7 +2351,10 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
     },
 
     async markScheduled(sendId: string, scheduledFor: Date) {
-      await db.update(scheduledSends).set({ status: "scheduled", scheduledFor }).where(eq(scheduledSends.id, sendId));
+      await db
+        .update(scheduledSends)
+        .set({ status: "scheduled", scheduledFor })
+        .where(and(eq(scheduledSends.id, sendId), inArray(scheduledSends.status, ["approved", "scheduled"])));
     },
 
     async cancelSend(sendId: string, error: string) {
@@ -2359,6 +2378,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           campaignStatus: campaigns.status,
           accountPaused: accounts.outreachPaused,
           leadLinkedinUrl: leads.linkedinUrl,
+          leadStatus: leads.status,
         })
         .from(scheduledSends)
         .innerJoin(accounts, eq(scheduledSends.accountId, accounts.id))
@@ -2378,7 +2398,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         body: r.body,
         campaignStatus: r.campaignStatus,
         accountPaused: r.accountPaused,
-        lead: { linkedinUrl: r.leadLinkedinUrl },
+        lead: { linkedinUrl: r.leadLinkedinUrl, status: r.leadStatus },
       };
     },
 
@@ -2391,20 +2411,49 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
       return rows.length > 0;
     },
 
+    // Status-guarded transitions: each only moves a row out of the states its caller can be in, so
+    // a late or duplicate task can never flip a row that another task already sent or settled.
     async revertToApproved(sendId: string) {
-      await db.update(scheduledSends).set({ status: "approved", scheduledFor: null }).where(eq(scheduledSends.id, sendId));
+      await db
+        .update(scheduledSends)
+        .set({ status: "approved", scheduledFor: null })
+        .where(and(eq(scheduledSends.id, sendId), inArray(scheduledSends.status, ["scheduled", "sending"])));
     },
 
     async markSent(sendId: string) {
-      await db.update(scheduledSends).set({ status: "sent" }).where(eq(scheduledSends.id, sendId));
+      await db
+        .update(scheduledSends)
+        .set({ status: "sent" })
+        .where(and(eq(scheduledSends.id, sendId), eq(scheduledSends.status, "sending")));
     },
 
     async markFailed(sendId: string, error: string) {
-      await db.update(scheduledSends).set({ status: "failed", error }).where(eq(scheduledSends.id, sendId));
+      await db
+        .update(scheduledSends)
+        .set({ status: "failed", error })
+        .where(and(eq(scheduledSends.id, sendId), inArray(scheduledSends.status, ["scheduled", "sending"])));
     },
 
     async markSuppressed(sendId: string) {
-      await db.update(scheduledSends).set({ status: "suppressed" }).where(eq(scheduledSends.id, sendId));
+      await db
+        .update(scheduledSends)
+        .set({ status: "suppressed" })
+        .where(and(eq(scheduledSends.id, sendId), inArray(scheduledSends.status, ["scheduled", "sending"])));
+    },
+
+    async cancelUnsentFollowups(leadId: string, reason: string) {
+      const rows = await db
+        .update(scheduledSends)
+        .set({ status: "canceled", error: reason })
+        .where(
+          and(
+            eq(scheduledSends.leadId, leadId),
+            eq(scheduledSends.linkedinStage, "message"),
+            inArray(scheduledSends.status, ["pending_review", "approved"])
+          )
+        )
+        .returning({ id: scheduledSends.id });
+      return rows.length;
     },
 
     async getLeadAssignedIdentity(leadId: string) {
@@ -3048,6 +3097,8 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           enteredStageAt: sequenceRuns.enteredStageAt,
           revivedAt: sequenceRuns.revivedAt,
           linkedinUrl: leads.linkedinUrl,
+          leadInvitedAt: leads.linkedinInvitedAt,
+          leadConnectedAt: leads.linkedinConnectedAt,
           sequenceConfig: campaigns.sequenceConfig,
           accountPaused: accounts.outreachPaused,
           // the lead engaged at least once — an exhausting run earns the one-shot soft-no revival
@@ -3087,6 +3138,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         ),
         accountPaused: r.accountPaused,
         leadReplied: r.leadReplied,
+        connection: { invitedAt: r.leadInvitedAt, connectedAt: r.leadConnectedAt },
       }));
     },
 
@@ -3159,6 +3211,17 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
 
     async archiveLead(leadId: string, campaignId: string): Promise<void> {
       await db.update(leads).set({ status: "archived" }).where(eq(leads.id, leadId));
+      // An archived lead is out of outreach: cancel whatever is still queued for them ("sending"
+      // is left alone — that provider call is already in flight).
+      await db
+        .update(scheduledSends)
+        .set({ status: "canceled", error: "lead archived" })
+        .where(
+          and(
+            eq(scheduledSends.leadId, leadId),
+            inArray(scheduledSends.status, ["pending_review", "approved", "scheduled"])
+          )
+        );
       await db
         .update(campaignLeads)
         .set({ status: "completed" })

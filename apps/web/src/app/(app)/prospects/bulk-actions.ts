@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
+import { normalizeSuppressionValue } from "@/lib/suppression";
 
 export type BulkResult = { error?: string; done?: number; skipped?: number };
 
@@ -29,6 +31,21 @@ async function authorizedLeads(ids: string[]) {
   return { supabase, rows: data ?? [] };
 }
 
+/**
+ * Stop the leads' follow-up sequences so no new touch is drafted after they leave outreach.
+ * sequence_runs has no client write policy, so this goes through the service role — safe because
+ * `leadIds` came back from the RLS-scoped authorizedLeads read (the caller owns them).
+ */
+async function stopSequences(leadIds: string[]): Promise<boolean> {
+  const { error } = await createServiceClient()
+    .from("sequence_runs")
+    .update({ status: "stopped" })
+    .in("lead_id", leadIds)
+    .in("status", ["active", "exhausted", "paused_reply"]);
+  if (error) console.error("bulk: stopping sequences failed", { count: leadIds.length, error: error.message });
+  return !error;
+}
+
 /** Archive: outreach stops (queued drafts canceled), history kept. Converted leads are skipped. */
 export async function bulkArchiveLeads(ids: string[]): Promise<BulkResult> {
   const { supabase, rows } = await authorizedLeads(ids);
@@ -40,13 +57,17 @@ export async function bulkArchiveLeads(ids: string[]): Promise<BulkResult> {
   const { error } = await supabase.from("leads").update({ status: "archived" }).in("id", targetIds);
   if (error) return { error: "Could not archive. Only workspace admins can manage prospects." };
 
-  await supabase
+  const { error: cancelError } = await supabase
     .from("scheduled_sends")
     .update({ status: "canceled" })
     .in("lead_id", targetIds)
     .in("status", ["pending_review", "approved", "scheduled"]);
+  const stopped = await stopSequences(targetIds);
 
   revalidatePath("/prospects");
+  if (cancelError || !stopped) {
+    return { error: "Prospects were archived, but some queued messages may not have been stopped. Try again." };
+  }
   return { done: targets.length, skipped: rows.length - targets.length };
 }
 
@@ -75,7 +96,8 @@ export async function bulkSuppressLeads(ids: string[]): Promise<BulkResult> {
     targets.map((r) => ({
       account_id: account.id,
       kind: "linkedin" as const,
-      value: (r.linkedin_url as string).trim(),
+      // normalized exactly like every send-time suppression check (lowercase, no trailing slash)
+      value: normalizeSuppressionValue("linkedin", r.linkedin_url as string),
       source: "manual" as const,
       note: "Bulk suppressed from Prospects",
       created_by: user.id,
@@ -84,12 +106,13 @@ export async function bulkSuppressLeads(ids: string[]): Promise<BulkResult> {
   );
   if (error) return { error: "Could not suppress. Only workspace admins can manage suppression." };
 
-  // rule 11: a suppressed contact never stays queued.
+  // rule 11: a suppressed contact never stays queued, and their sequence never drafts again.
   await supabase
     .from("scheduled_sends")
     .update({ status: "suppressed" })
     .in("lead_id", targets.map((r) => r.id))
     .in("status", ["pending_review", "approved", "scheduled"]);
+  await stopSequences(targets.map((r) => r.id));
 
   revalidatePath("/prospects");
   revalidatePath("/approvals");

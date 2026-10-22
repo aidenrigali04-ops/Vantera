@@ -132,23 +132,32 @@ export async function runSendDispatch(deps: SendDispatchDeps): Promise<SendDispa
           0,
           dailyAllowance("linkedin", s.ageDays, { kind: "message" }) - s.sentTodayMessages
         ),
-        offsetMs: 0,
+        // continue after this sender's already-scheduled sends — restarting at 0 every tick
+        // stacked each tick's queue on top of the last one
+        offsetMs: Math.max(0, s.scheduledUntil - now.getTime()),
       });
     }
 
-    const schedule = async (row: DispatchableSend, st: SenderState) => {
+    /** Schedules the row; false (nothing written, budget untouched) when a proactive send would
+     *  land outside the prospect's business hours — it waits for the next window instead. */
+    const schedule = async (row: DispatchableSend, st: SenderState): Promise<boolean> => {
       let runAt: Date;
       if (row.origin === "reply_response") {
         // priority lane — never pays the accumulated human-pacing offset
         runAt = new Date(now.getTime() + REPLY_LANE_MIN_DELAY_MS + ((seedFrom(row.id) >>> 0) % REPLY_LANE_JITTER_MS));
       } else {
-        st.offsetMs += paceWithJitter(BASE_GAP_MS, seedFrom(row.id));
-        runAt = new Date(now.getTime() + st.offsetMs);
+        const offsetMs = st.offsetMs + paceWithJitter(BASE_GAP_MS, seedFrom(row.id));
+        runAt = new Date(now.getTime() + offsetMs);
+        if (row.origin === "sequence" && !row.unconstrained && !isWithinSendWindow(runAt, row.leadLocation)) {
+          return false;
+        }
+        st.offsetMs = offsetMs;
       }
       await deps.store.markScheduled(row.id, runAt);
       await deps.enqueue(row.id, runAt);
       scheduled += 1;
       trialRemaining -= 1;
+      return true;
     };
 
     // Per-lead message gating (rule 04 pacing survives a drained backlog):
@@ -224,9 +233,12 @@ export async function runSendDispatch(deps: SendDispatchDeps): Promise<SendDispa
           skipped += 1;
           continue;
         }
+        if (!(await schedule(row, st))) {
+          skipped += 1; // would land after the prospect's window closes — next window
+          continue;
+        }
         st.messageBudget -= 1;
         messagedLeads.add(row.leadId);
-        await schedule(row, st);
         continue;
       }
 
@@ -240,6 +252,10 @@ export async function runSendDispatch(deps: SendDispatchDeps): Promise<SendDispa
         skipped += 1; // no healthy sender with budget
         continue;
       }
+      if (!(await schedule(row, st))) {
+        skipped += 1; // would land after the prospect's window closes — next window
+        continue;
+      }
       if (row.leadAssignedSenderId !== st.sender.linkedinAccountId) {
         await deps.store.assignLeadSender(row.leadId, st.sender.linkedinAccountId);
       }
@@ -247,7 +263,6 @@ export async function runSendDispatch(deps: SendDispatchDeps): Promise<SendDispa
       st.sender.sentToday += 1;
       st.sender.last7d += 1;
       st.sender.lastAssignedAt = now.getTime() + assignTick++;
-      await schedule(row, st);
     }
   }
 

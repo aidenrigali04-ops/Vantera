@@ -65,6 +65,12 @@ export async function runOutreachSend(
     return "parked";
   }
 
+  // An archived/rejected lead left outreach after this row was queued — never send to them.
+  if (ctx.lead.status === "archived" || ctx.lead.status === "rejected") {
+    await deps.store.cancelSend(ctx.id, "lead is no longer in outreach");
+    return "canceled";
+  }
+
   const target = ctx.lead.linkedinUrl ? normalizeLinkedInUrl(ctx.lead.linkedinUrl) : null;
   if (!target) {
     await deps.store.markFailed(ctx.id, "missing contact info");
@@ -168,6 +174,9 @@ export async function runOutreachSend(
       return "sender_disconnected";
     }
     await deps.store.markFailed(ctx.id, sanitizeSendError(err));
+    // A failed invite means no connection, so its follow-up could never deliver — release it
+    // instead of leaving it parked as "waiting on acceptance" forever.
+    if (ctx.linkedinStage === "invite") await deps.store.cancelUnsentFollowups(ctx.leadId, "invite failed");
     return "failed";
   }
 

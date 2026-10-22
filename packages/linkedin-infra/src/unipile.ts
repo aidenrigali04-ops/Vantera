@@ -1,6 +1,9 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import type { ConnectedAccount, GetProfileRequest, HostedAuthLink, HostedAuthRedirects, InviteRequest, LinkedInEngager, LinkedInEvent, LinkedInInfra, LinkedInPost, LinkedInProfile, MessageRequest, PostEngagersRequest, ProfilePostsRequest, SearchPostsRequest, SendOutcome, WebhookSetupResult, LinkedInFollower, ListFollowersRequest } from "./types";
 
+/** Per-request ceiling for provider calls. */
+const PROVIDER_TIMEOUT_MS = 60_000;
+
 // ── endpoint constants ──────────────────────────────────────────────────────
 const PATH_HOSTED_AUTH = "/api/v1/hosted/accounts/link";
 const HOSTED_AUTH_TTL_MS = 60 * 60_000;
@@ -303,6 +306,8 @@ export class UnipileLinkedInInfra implements LinkedInInfra {
     const url = `https://${this.dsn}${path}`;
     const res = await this.fetchFn(url, {
       ...init,
+      // a hung provider call must fail, not hold the send task until maxDuration
+      signal: init?.signal ?? AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
       headers: {
         "Content-Type": "application/json",
         ...(init?.headers as Record<string, string> | undefined),

@@ -38,6 +38,8 @@ function dueItem(over: Partial<DueSequenceRun> = {}): DueSequenceRun {
     config: SEQUENCE_DEFAULTS,
     accountPaused: false,
     leadReplied: false,
+    // accepted before the run's clock started — orchestration tests exercise post-acceptance runs
+    connection: { invitedAt: new Date(NOW.getTime() - 12 * 86_400_000), connectedAt: new Date(NOW.getTime() - 10 * 86_400_000) },
     ...over,
   };
 }
@@ -158,6 +160,20 @@ describe("driveSequenceRun", () => {
     expect(out).toEqual({ dispatched: 0, archived: 0 });
     expect(e.store.applyRunPatch).not.toHaveBeenCalled();
     expect(e.dispatch.dispatchTouch).not.toHaveBeenCalled();
+  });
+});
+
+describe("driveSequenceRun — waiting on the connection", () => {
+  it("writes the recheck and neither dispatches nor archives while the invite is unaccepted", async () => {
+    const e = env();
+    const out = await driveSequenceRun(
+      dueItem({ connection: { invitedAt: new Date(NOW.getTime() - 86_400_000), connectedAt: null } }),
+      e
+    );
+    expect(out).toEqual({ dispatched: 0, archived: 0 });
+    expect(e.store.applyRunPatch).toHaveBeenCalledTimes(1);
+    expect(e.dispatch.dispatchTouch).not.toHaveBeenCalled();
+    expect(e.store.archiveLead).not.toHaveBeenCalled();
   });
 });
 

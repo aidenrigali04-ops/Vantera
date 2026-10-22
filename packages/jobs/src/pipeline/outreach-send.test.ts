@@ -20,7 +20,7 @@ function makeCtx(overrides: Partial<SendContext> = {}): SendContext {
     body: "Hi, saw your work at Acme.",
     campaignStatus: "active",
     accountPaused: false,
-    lead: { linkedinUrl: "https://linkedin.com/in/prospect" },
+    lead: { linkedinUrl: "https://linkedin.com/in/prospect", status: "in_campaign" },
     ...overrides,
   };
 }
@@ -112,6 +112,11 @@ class FakeOutreachStore implements OutreachSendStore {
   canceled: { id: string; error: string }[] = [];
   async cancelSend(sendId: string, error: string) {
     this.canceled.push({ id: sendId, error });
+  }
+  followupsCanceled: { leadId: string; reason: string }[] = [];
+  async cancelUnsentFollowups(leadId: string, reason: string) {
+    this.followupsCanceled.push({ leadId, reason });
+    return 1;
   }
 }
 
@@ -416,7 +421,7 @@ describe("runOutreachSend — failure and skip paths", () => {
 
   it("missing contact info → 'failed'", async () => {
     const store = new FakeOutreachStore();
-    store.ctx = makeCtx({ lead: { linkedinUrl: null } });
+    store.ctx = makeCtx({ lead: { linkedinUrl: null, status: "in_campaign" } });
     const deps = makeDeps(store);
 
     const outcome = await runOutreachSend({ sendId: "send1" }, deps);
@@ -514,5 +519,40 @@ describe("runOutreachSend — reply-attribution key (0043)", () => {
     await runOutreachSend({ sendId: "send1" }, deps);
 
     expect(store.savedProviderRefs).toHaveLength(0);
+  });
+});
+
+describe("runOutreachSend — lead no longer in outreach", () => {
+  it.each(["archived", "rejected"])("cancels (never sends) when the lead is %s", async (status) => {
+    const store = new FakeOutreachStore();
+    store.ctx = makeCtx({ linkedinStage: "message", lead: { linkedinUrl: "https://linkedin.com/in/prospect", status } });
+    const outcome = await runOutreachSend({ sendId: "send1" }, makeDeps(store));
+    expect(outcome).toBe("canceled");
+    expect(store.canceled).toEqual([{ id: "send1", error: "lead is no longer in outreach" }]);
+    expect(store.sent).toHaveLength(0);
+  });
+});
+
+describe("runOutreachSend — a failed invite releases its follow-up", () => {
+  it("cancels the lead's unsent follow-ups when the invite fails (they could never deliver)", async () => {
+    const store = new FakeOutreachStore();
+    store.ctx = makeCtx({ linkedinStage: "invite" });
+    const deps = makeDeps(store);
+    deps.linkedinInfra.sendInvite = async () => {
+      throw new Error("linkedin provider error 422: cannot invite this profile");
+    };
+    expect(await runOutreachSend({ sendId: "send1" }, deps)).toBe("failed");
+    expect(store.followupsCanceled).toEqual([{ leadId: "lead1", reason: "invite failed" }]);
+  });
+
+  it("leaves follow-ups alone when a MESSAGE send fails", async () => {
+    const store = new FakeOutreachStore();
+    store.ctx = makeCtx({ linkedinStage: "message" });
+    const deps = makeDeps(store);
+    deps.linkedinInfra.sendMessage = async () => {
+      throw new Error("linkedin provider error 500");
+    };
+    expect(await runOutreachSend({ sendId: "send1" }, deps)).toBe("failed");
+    expect(store.followupsCanceled).toHaveLength(0);
   });
 });
