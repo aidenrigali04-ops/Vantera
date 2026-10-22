@@ -20,6 +20,8 @@ export type LearnerFeatures = {
   industry: string | null;
   companySize?: string | null;
   aiScore: number | null;
+  /** ML-7: similarity to the account's own positive leads, bucketed (lookalike.ts) */
+  lookalike?: "high" | "mid" | "low" | null;
 };
 export type LearnerRow = LearnerFeatures & { flags: LeadOutcomeFlags };
 
@@ -72,6 +74,7 @@ export function featureKeys(lead: LearnerFeatures): string[] {
   if (size) keys.add(`size:${size}`);
   const band = scoreBand(lead.aiScore);
   if (band) keys.add(`score:${band}`);
+  if (lead.lookalike) keys.add(`lookalike:${lead.lookalike}`);
   return [...keys];
 }
 
@@ -266,6 +269,11 @@ const SOURCE_LABELS: Record<string, string> = {
   inbound: "Inbound",
   ad: "From ads",
 };
+const LOOKALIKE_LABELS: Record<string, string> = {
+  high: "Looks like your best replies",
+  mid: "Somewhat like your best replies",
+  low: "Unlike your best replies",
+};
 const ACRONYMS: Record<string, string> = { saas: "SaaS", it: "IT", b2b: "B2B", b2c: "B2C", ai: "AI", hr: "HR", crm: "CRM" };
 const titleCase = (s: string) =>
   s
@@ -293,6 +301,8 @@ export function featureLabel(key: string): string {
       return SOURCE_LABELS[value] ?? titleCase(value);
     case "intent":
       return `${titleCase(value)} intent`;
+    case "lookalike":
+      return LOOKALIKE_LABELS[value] ?? titleCase(value);
     default:
       return titleCase(value);
   }

@@ -19,6 +19,8 @@ const WRITE_CONCURRENCY = 8;
 /** Rank-miss retry window + per-run cap (see the retry stage in runScout). */
 export const RANK_RETRY_LOOKBACK_DAYS = 7;
 export const RANK_RETRY_LIMIT = 36;
+/** ML-7: profiles embedded per scout run (backfills existing leads over a few runs). */
+export const EMBED_PER_RUN = 100;
 
 /** "Strike now" signal kinds worth a notification — the high-value timing events (rule 05). */
 const HOT_SIGNAL_KINDS = new Set(["funding", "intent", "exec_hire", "m_and_a"]);
@@ -311,6 +313,26 @@ export async function runScout(agentId: string, deps: ScoutDeps): Promise<ScoutR
   ).filter((c) => !rankAttempted.has(c.leadId));
   qualifiedThisRun += (await rankAndPersist(unranked)).length;
 
+  // ── ML-7: embed new/changed lead profiles BEFORE the drain orders them, so lookalike similarity
+  // to the account's own winners is current. Bounded per run; fail-open (an embedding outage never
+  // blocks prospecting); absent embedder = lookalikes off.
+  let embedded = 0;
+  if (deps.embedFn) {
+    try {
+      const toEmbed = await deps.store.getLeadsToEmbed(accountId, EMBED_PER_RUN);
+      if (toEmbed.length > 0) {
+        const vectors = await deps.embedFn.embed(toEmbed.map((t) => t.text));
+        await deps.store.saveLeadEmbeddings(
+          accountId,
+          toEmbed.map((t, i) => ({ leadId: t.leadId, embedding: vectors[i]!, model: deps.embedFn!.model, sourceHash: t.sourceHash }))
+        );
+        embedded = toEmbed.length;
+      }
+    } catch {
+      embedded = 0;
+    }
+  }
+
   // ── Phase 2: draft (paced, best-first) ─────────────────────────────────────
   // Drain the qualified pool into outreach up to the send-paced budget, best-scored first — across
   // this run's fresh qualified AND any backlog from prior overscan runs. The drafted-backlog clamp
@@ -352,5 +374,6 @@ export async function runScout(agentId: string, deps: ScoutDeps): Promise<ScoutR
     websiteScanError,
     companySignalsError,
     learned,
+    embedded,
   };
 }

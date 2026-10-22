@@ -116,7 +116,7 @@ describe("suppression list (rule 11 — the master gate)", () => {
 });
 
 describe("retention windows (rule 11)", () => {
-  it.each(["leads", "enrichment_results", "scheduled_sends", "replies", "inbound_leads", "lead_signals", "intent_observations", "reveal_runs", "lead_feedback", "meeting_connections", "meeting_events"])(
+  it.each(["leads", "enrichment_results", "scheduled_sends", "replies", "inbound_leads", "lead_signals", "intent_observations", "reveal_runs", "lead_feedback", "meeting_connections", "meeting_events", "lead_embeddings"])(
     "%s states its retention window",
     (table) => {
       expect(allMigrations).toContain(`retention(${table})`);
@@ -528,6 +528,19 @@ describe("calendar integration (0066, ML-6)", () => {
 
   it("lets leads record a calendar-confirmed meeting", () => {
     expect(sql).toContain("check (meeting_source in ('agent', 'manual', 'calendar'))");
+  });
+});
+
+describe("lead embeddings (0067, ML-7)", () => {
+  const sql = readFileSync(join(migrationsDir, "0067_lead_embeddings.sql"), "utf8").toLowerCase();
+
+  it("is service-role only — no client policies, no client privileges", () => {
+    expect(sql).toContain("revoke all on public.lead_embeddings from authenticated, anon;");
+    expect(sql).not.toMatch(/create policy \w+ on public\.lead_embeddings/);
+  });
+
+  it("pins every embedding to a lead in the same workspace", () => {
+    expect(sql).toMatch(/foreign key \(lead_id, account_id\)\s+references public\.leads \(id, account_id\) on delete cascade/);
   });
 });
 

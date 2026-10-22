@@ -124,6 +124,15 @@ class FakeScoutStore implements ScoutStore {
     if (this.learnedFails) throw new Error("db down");
     return this.learnedInsights;
   }
+  toEmbed: { leadId: string; text: string; sourceHash: string }[] = [];
+  embeddedRows: { leadId: string; embedding: number[]; model: string; sourceHash: string }[] = [];
+  drainedAfterEmbed: boolean | null = null;
+  async getLeadsToEmbed(_accountId: string, limit: number) {
+    return this.toEmbed.slice(0, limit);
+  }
+  async saveLeadEmbeddings(_accountId: string, rows: { leadId: string; embedding: number[]; model: string; sourceHash: string }[]) {
+    this.embeddedRows.push(...rows);
+  }
   rankFeedback: { rejected: string[]; positive: string[] } = { rejected: [], positive: [] };
   feedbackFails = false;
   async getRankFeedback() {
@@ -856,6 +865,50 @@ describe("runScout — discovery allocation (Stage 2)", () => {
     };
     await runScout("scout1", deps);
     expect(seen[0]).toBe("Prioritize founders");
+  });
+
+  it("embeds lead profiles before the drain orders them, and reports the count (ML-7)", async () => {
+    const store = new FakeScoutStore(makeContext());
+    store.copyAgent = { id: "copy1" };
+    store.toEmbed = [
+      { leadId: "l1", text: "VP Sales | Acme | saas", sourceHash: "h1" },
+      { leadId: "l2", text: "CTO | Globex | saas", sourceHash: "h2" },
+    ];
+    const order: string[] = [];
+    const origTop = store.getTopQualifiedLeadIds.bind(store);
+    store.getTopQualifiedLeadIds = async (...a) => {
+      order.push("drain");
+      return origTop(...a);
+    };
+    const { deps } = makeDeps(store, [makeCandidate({ externalRef: "a", industry: "saas" })], { a: 80 });
+    deps.embedFn = {
+      model: "m1",
+      embed: async (texts) => {
+        order.push("embed");
+        return texts.map((_, i) => [i, 0.5]);
+      },
+    };
+    const summary = await runScout("scout1", deps);
+    expect(store.embeddedRows).toEqual([
+      { leadId: "l1", embedding: [0, 0.5], model: "m1", sourceHash: "h1" },
+      { leadId: "l2", embedding: [1, 0.5], model: "m1", sourceHash: "h2" },
+    ]);
+    expect(summary.embedded).toBe(2);
+    expect(order[0]).toBe("embed");
+  });
+
+  it("fails open when embedding errors, and skips it with no embedder configured (ML-7)", async () => {
+    const store = new FakeScoutStore(makeContext());
+    store.toEmbed = [{ leadId: "l1", text: "x", sourceHash: "h" }];
+    const { deps } = makeDeps(store, [makeCandidate({ externalRef: "a", industry: "saas" })], { a: 80 });
+    deps.embedFn = { model: "m", embed: async () => { throw new Error("provider down"); } };
+    const s1 = await runScout("scout1", deps);
+    expect(s1.status).toBe("completed");
+    expect(s1.embedded).toBe(0);
+    delete deps.embedFn;
+    const s2 = await runScout("scout1", deps);
+    expect(s2.embedded).toBe(0);
+    expect(store.embeddedRows).toEqual([]);
   });
 });
 

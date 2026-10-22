@@ -146,6 +146,9 @@ export interface ScoutStore {
   getIcpOutcomeRows(accountId: string): Promise<{ icpId: string; flags: LeadOutcomeFlags }[]>;
   /** ML-1: the learner's readout for the run summary (top winning/losing features). */
   getLearnedInsights(accountId: string): Promise<LearnedInsights>;
+  /** ML-7: qualified/contacted leads whose profile was never embedded or has changed (≤ limit) */
+  getLeadsToEmbed(accountId: string, limit: number): Promise<{ leadId: string; text: string; sourceHash: string }[]>;
+  saveLeadEmbeddings(accountId: string, rows: { leadId: string; embedding: number[]; model: string; sourceHash: string }[]): Promise<void>;
   /** ML-1 fit feedback: recent "title | company | industry" lines for leads the user rejected as the
    *  wrong person in review, and for leads that replied positively (≤ RANK_FEEDBACK_MAX each). */
   getRankFeedback(accountId: string): Promise<{ rejected: string[]; positive: string[] }>;
@@ -161,6 +164,8 @@ export interface ScoutDeps {
   companySignals?: CompanySignalSource;
   scanFn: (url: string) => Promise<WebsiteScan>;
   rankFn: (candidates: RankCandidate[], ctx: RankContext) => Promise<LeadInsights[]>;
+  /** ML-7: embed profile texts (absent = lookalikes off, e.g. no embeddings key configured) */
+  embedFn?: { model: string; embed: (texts: string[]) => Promise<number[][]> };
   /** ICP free text → structured discovery criteria — heals ICPs saved with empty criteria,
    *  which otherwise search with an empty input and silently discover nothing */
   deriveCriteriaFn: (icpText: string, ctx: DeriveCriteriaContext) => Promise<IcpCriteria>;
@@ -209,6 +214,8 @@ export interface ScoutRunSummary {
   companySignalsError: boolean;
   /** ML-1: the learner's strongest winning/losing features at run time (null if unavailable) */
   learned?: LearnedInsights | null;
+  /** ML-7: lead profiles embedded this run (lookalike similarity) */
+  embedded?: number;
 }
 
 /** The learner's readout persisted with each scout run: which ordering is live, plus the account's

@@ -199,3 +199,17 @@ article mentions learned ordering + job-seeker exclusion); full gate green on a 
   event-type webhooks; Cal.com retries are sparse (a bookings-API reconciliation job would add
   resilience); Calendly disables a subscription after 24 h of failed deliveries (surface via
   connection status in a follow-up).
+
+## 9. ML-7 design (lookalikes) — shipped
+
+- `lead_embeddings` (0067): one 1024-d embedding per qualified/contacted lead + `source_hash` of the
+  embedded profile text (re-embed on change). Service-role only (RLS on, no policies, client
+  privileges revoked), composite lead/account FK. rls-auditor: PASS.
+- Embedding: `profileText` (title | company | industry | size | location | offering | summary),
+  ≤ 100 per scout run, before the drain orders anything; fail-open; off when no embeddings key.
+- Similarity: `lookalikeSims(accountId, ids)` — max cosine to the account's own positives
+  (interested / booked / converted / good_fit), leave-one-out, every join pinned to the bound
+  account id (guardrail test scans pg-store for unscoped references). Inert below 3 positives.
+- Learning: tertile cutpoints from the account's own training similarities → `lookalike:high|mid|low`
+  feature in the ML-1 learner, so its real lift is measured with the same shrinkage as every other
+  feature. Pool rows never carry it (cross-account similarity is meaningless and a leak risk).

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { and, asc, count, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, max, ne, or, sql } from "drizzle-orm";
 import {
   accountDeletionRequests,
@@ -18,6 +19,7 @@ import {
   icps,
   intentObservations,
   leadNotifications,
+  leadEmbeddings,
   leadFeedback,
   leadSignals,
   meetingConnections,
@@ -60,6 +62,10 @@ import {
   RANK_FEEDBACK_MAX,
   describeStrategy,
   buildReadout,
+  lookalikeBucket,
+  lookalikeCutpoints,
+  profileText,
+  LOOKALIKE_MIN_POSITIVES,
   orderLeads,
   pickWhyNow,
   toStoredInsights,
@@ -68,6 +74,7 @@ import {
   type LeadInsights,
   type CountTable,
   type LeadOrdering,
+  type LookalikeCutpoints,
   type LearnerFeatures,
   type LearnerRow,
   type ProofPoint,
@@ -383,10 +390,11 @@ const toFeatures = (r: {
 async function learnerTrainingRows(
   db: Db,
   scope: { accountId: string } | { excludeAccountId: string }
-): Promise<LearnerRow[]> {
+): Promise<(LearnerRow & { id: string })[]> {
   const now = Date.now();
   const rows = await db
     .select({
+      id: leads.id,
       ...learnerFeatureCols,
       accepted: sql<boolean>`${leads.linkedinConnectedAt} is not null`,
       booked: sql<boolean>`${leads.meetingBookedAt} is not null`,
@@ -403,6 +411,7 @@ async function learnerTrainingRows(
     )
     .limit(LEARNER_POOL_LIMIT);
   return rows.map((r) => ({
+    id: r.id,
     ...toFeatures(r),
     flags: {
       invited: true,
@@ -415,21 +424,68 @@ async function learnerTrainingRows(
   }));
 }
 
+/**
+ * ML-7: cosine similarity of each lead to the account's OWN positive leads (interested reply,
+ * booked, closed, or marked a good fit), leave-one-out — a positive never matches itself. Every
+ * join is pinned to `accountId`: similarity never crosses tenants. Empty until the account has
+ * LOOKALIKE_MIN_POSITIVES embedded positives.
+ */
+export async function lookalikeSims(db: Db, accountId: string, leadIds: string[]): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  if (leadIds.length === 0) return out;
+  const rows = (await db.execute(sql`
+    with pos as (
+      select e.lead_id, e.embedding
+      from ${leadEmbeddings} e
+      join ${leads} l on l.id = e.lead_id and l.account_id = e.account_id
+      where e.account_id = ${accountId}
+        and (l.meeting_booked_at is not null or l.status = 'converted'
+          or exists (select 1 from ${replies} r where r.lead_id = l.id and r.classification = 'interested')
+          or exists (select 1 from ${leadFeedback} f where f.lead_id = l.id and f.account_id = l.account_id and f.verdict = 'good_fit'))
+    )
+    select e.lead_id as lead_id,
+      (select max(1 - (p.embedding <=> e.embedding)) from pos p where p.lead_id <> e.lead_id) as sim,
+      (select count(*) from pos) as npos
+    from ${leadEmbeddings} e
+    where e.account_id = ${accountId}
+      and e.lead_id in (${sql.join(leadIds.map((id) => sql`${id}`), sql`, `)})
+  `)) as unknown as { lead_id: string; sim: number | string | null; npos: number | string }[];
+  for (const r of rows) {
+    if (Number(r.npos) < LOOKALIKE_MIN_POSITIVES || r.sim == null) continue;
+    out.set(r.lead_id, Number(r.sim));
+  }
+  return out;
+}
+
+/** Attach the lookalike bucket to candidate rows using the account's training cutpoints. */
+async function withLookalike<T extends { id: string }>(db: Db, accountId: string, rows: T[], cut: LookalikeCutpoints | null) {
+  if (!cut || rows.length === 0) return rows;
+  const sims = await lookalikeSims(db, accountId, rows.map((r) => r.id));
+  return rows.map((r) => ({ ...r, lookalike: lookalikeBucket(sims.get(r.id), cut) }));
+}
+
 /** The account's lead ordering (the ML-1 learner when it has evidence, else ML-0's tilt) plus the
- *  account's OWN counts — the only input allowed into anything displayed (ML-2). */
-async function leadOrdering(db: Db, accountId: string): Promise<{ ordering: LeadOrdering; own: CountTable }> {
-  const [ownRows, pool, tilt] = await Promise.all([
+ *  account's OWN counts — the only input allowed into anything displayed (ML-2) — and the ML-7
+ *  lookalike cutpoints (from the account's own training similarities) for bucketing candidates. */
+async function leadOrdering(
+  db: Db,
+  accountId: string
+): Promise<{ ordering: LeadOrdering; own: CountTable; cut: LookalikeCutpoints | null }> {
+  const [trainingRows, pool, tilt] = await Promise.all([
     learnerTrainingRows(db, { accountId }),
     learnerTrainingRows(db, { excludeAccountId: accountId }),
     invitedOutcomeRows(db, accountId),
   ]);
+  const sims = await lookalikeSims(db, accountId, trainingRows.map((r) => r.id));
+  const cut = lookalikeCutpoints([...sims.values()]);
+  const ownRows = trainingRows.map((r) => ({ ...r, lookalike: lookalikeBucket(sims.get(r.id), cut) }));
   const own = countRows(ownRows);
   const ordering = buildLeadOrdering(
     own,
     countRows(pool),
     tilt.map((r) => ({ title: r.title, industry: r.industry, flags: r.flags }))
   );
-  return { ordering, own };
+  return { ordering, own, cut };
 }
 
 /** The account's citable proof/pricing/FAQ facts (0046), oldest-sort first — fed into the responder
@@ -549,7 +605,7 @@ async function creditAlphaWealth(tx: OptimizeTx, accountId: string): Promise<voi
 export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerStore & RetentionStore & TrialStore & SendDispatchStore & OutreachSendStore & InboundStore & SequenceStore & SequenceTouchStore & ConversionStore & RefreshLeadStore & QualifyLeadStore & IntentScanStore & ConnectionSyncStore & OptimizeStore & AgentRunStore & FastPassStore & MeetingEventStore {
   // ML-1 ordering is a cross-account read — computed once per account per store (a store lives for
   // one task run), shared by the drain, the slot ranking, and the run-summary readout.
-  const orderingCache = new Map<string, Promise<{ ordering: LeadOrdering; own: CountTable }>>();
+  const orderingCache = new Map<string, Promise<{ ordering: LeadOrdering; own: CountTable; cut: LookalikeCutpoints | null }>>();
   const orderingFor = (accountId: string) => {
     let cached = orderingCache.get(accountId);
     if (!cached) {
@@ -961,9 +1017,9 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         .from(leads)
         .where(and(eq(leads.accountId, accountId), eq(leads.status, "qualified"), notMarkedNotFit))
         .orderBy(desc(leads.aiScore), desc(leads.scoredAt));
-      const { ordering } = await orderingFor(accountId);
+      const { ordering, cut } = await orderingFor(accountId);
       return orderLeads(
-        rows.map((r) => ({ id: r.id, ...toFeatures(r) })),
+        await withLookalike(db, accountId, rows.map((r) => ({ id: r.id, ...toFeatures(r) })), cut),
         ordering
       )
         .slice(0, limit)
@@ -976,9 +1032,10 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         .select({ id: leads.id, ...learnerFeatureCols })
         .from(leads)
         .where(and(eq(leads.accountId, accountId), inArray(leads.id, leadIds)));
+      const { ordering, cut } = await orderingFor(accountId);
       const ordered = orderLeads(
-        rows.map((r) => ({ id: r.id, ...toFeatures(r) })),
-        (await orderingFor(accountId)).ordering
+        await withLookalike(db, accountId, rows.map((r) => ({ id: r.id, ...toFeatures(r) })), cut),
+        ordering
       ).map((r) => r.id);
       const seen = new Set(ordered);
       return [...ordered, ...leadIds.filter((id) => !seen.has(id))];
@@ -994,6 +1051,57 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
       // persisted to agent_runs (web-readable) → built from the account's OWN outcomes only
       const { ordering, own } = await orderingFor(accountId);
       return { mode: ordering.kind, ...buildReadout(own) };
+    },
+
+    async getLeadsToEmbed(accountId: string, limit: number) {
+      // qualified/contacted leads whose profile text changed or was never embedded
+      const rows = await db
+        .select({
+          id: leads.id,
+          title: leads.title,
+          companyName: leads.companyName,
+          industry: leads.industry,
+          companySize: leads.companySize,
+          location: leads.location,
+          aiInsights: leads.aiInsights,
+          existingHash: leadEmbeddings.sourceHash,
+        })
+        .from(leads)
+        .leftJoin(leadEmbeddings, and(eq(leadEmbeddings.leadId, leads.id), eq(leadEmbeddings.accountId, leads.accountId)))
+        .where(and(eq(leads.accountId, accountId), inArray(leads.status, ["qualified", "enriched", "in_campaign", "replied", "converted"])))
+        .orderBy(desc(leads.updatedAt))
+        .limit(limit * 5);
+      const out: { leadId: string; text: string; sourceHash: string }[] = [];
+      for (const r of rows) {
+        const insights = (r.aiInsights ?? {}) as { prospect_offering?: string; summary?: string };
+        const text = profileText({
+          title: r.title,
+          companyName: r.companyName,
+          industry: r.industry,
+          companySize: r.companySize,
+          location: r.location,
+          prospectOffering: insights.prospect_offering,
+          summary: insights.summary,
+        });
+        if (!text) continue;
+        const sourceHash = createHash("sha256").update(text).digest("hex").slice(0, 32);
+        if (sourceHash === r.existingHash) continue;
+        out.push({ leadId: r.id, text, sourceHash });
+        if (out.length === limit) break;
+      }
+      return out;
+    },
+
+    async saveLeadEmbeddings(accountId: string, rows: { leadId: string; embedding: number[]; model: string; sourceHash: string }[]) {
+      for (const r of rows) {
+        await db
+          .insert(leadEmbeddings)
+          .values({ leadId: r.leadId, accountId, embedding: r.embedding, model: r.model, sourceHash: r.sourceHash })
+          .onConflictDoUpdate({
+            target: leadEmbeddings.leadId,
+            set: { embedding: r.embedding, model: r.model, sourceHash: r.sourceHash },
+          });
+      }
     },
 
     async getRankFeedback(accountId: string) {

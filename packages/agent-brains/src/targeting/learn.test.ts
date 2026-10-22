@@ -223,3 +223,20 @@ describe("featureLabel", () => {
     expect(featureLabel("intent:high")).toBe("High intent");
   });
 });
+
+describe("lookalike as a learner feature (ML-7)", () => {
+  it("emits a lookalike:<bucket> key and learns its lift like any other feature", () => {
+    expect(featureKeys({ title: null, industry: null, aiScore: null, lookalike: "high" })).toContain("lookalike:high");
+    const model = fitLearner(countRows([...rows(40, 14, { lookalike: "high" }), ...rows(40, 2, { lookalike: "low" })]));
+    const hi = predictLead(model, { title: "VP Sales", industry: "saas", aiScore: 75, lookalike: "high" });
+    const lo = predictLead(model, { title: "VP Sales", industry: "saas", aiScore: 75, lookalike: "low" });
+    expect(hi.p).toBeGreaterThan(lo.p);
+  });
+
+  it("labels lookalike buckets in plain words", async () => {
+    const { featureLabel } = await import("./learn");
+    expect(featureLabel("lookalike:high")).toBe("Looks like your best replies");
+    expect(featureLabel("lookalike:mid")).toBe("Somewhat like your best replies");
+    expect(featureLabel("lookalike:low")).toBe("Unlike your best replies");
+  });
+});

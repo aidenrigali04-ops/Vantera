@@ -477,3 +477,21 @@ describe("mergeExemplars", () => {
     expect(out).toEqual(["C", "B"]);
   });
 });
+
+// ML-7 guardrail: the service role bypasses RLS, so tenant isolation for lead_embeddings lives in
+// the queries — every statement touching the table must scope by account (rls-auditor 2026-10-21).
+describe("lead_embeddings queries are always account-scoped", () => {
+  it("every reference sits in a statement that filters or joins on the account", async () => {
+    const { readFileSync } = await import("node:fs");
+    const src = readFileSync(new URL("./pg-store.ts", import.meta.url), "utf8");
+    // every use (the bare `  leadEmbeddings,` import-list entry is not a query)
+    const refs = [...src.matchAll(/leadEmbeddings/g)]
+      .map((m) => m.index!)
+      .filter((at) => !/^\s*leadEmbeddings,\s*$/.test(src.slice(src.lastIndexOf("\n", at) + 1, src.indexOf("\n", at))));
+    expect(refs.length).toBeGreaterThan(3);
+    for (const at of refs) {
+      const window = src.slice(Math.max(0, at - 700), at + 700);
+      expect(window, `lead_embeddings reference near offset ${at}`).toMatch(/account_id|accountId/);
+    }
+  });
+});

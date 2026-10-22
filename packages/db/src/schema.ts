@@ -375,6 +375,26 @@ export const leadNotes = pgTable(
   (t) => [index("lead_notes_lead_idx").on(t.leadId, t.createdAt)]
 );
 
+// 0067 ML-7: profile embedding per qualified/contacted lead — lookalike similarity to the account's
+// own positive leads (within-account only). Service-role only; composite (lead_id, account_id) FK in SQL.
+export const leadEmbeddings = pgTable(
+  "lead_embeddings",
+  {
+    leadId: uuid("lead_id")
+      .primaryKey()
+      .references(() => leads.id, { onDelete: "cascade" }),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    embedding: vector1024("embedding").notNull(),
+    model: text("model").notNull(),
+    sourceHash: text("source_hash").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("lead_embeddings_account_idx").on(t.accountId)]
+);
+
 // 0066 ML-6: the account's scheduling-tool connection (Calendly / Cal.com). credential_enc +
 // signing_secret_enc are AES-256-GCM ciphertext, service-role written, never client-selectable.
 export const meetingConnections = pgTable(

@@ -44,6 +44,7 @@ Your agent gets sharper the more you use it:
 
 - **Your review decisions teach the scoring.** When you reject a draft as **Wrong person**, similar people score lower on future runs. Prospects who reply with interest teach it the opposite.
 - **Your replies decide who goes first.** You can only send a limited number of new invitations each day, so the agent fills those slots with the qualified prospects most like the people who actually replied — by buying signal, role, industry, company size, and even score range. It only counts invitations old enough to have had a fair chance at a reply, and it needs real evidence before it changes anything; a brand-new account simply goes highest score first.
+- **It spots lookalikes.** Once a few prospects have replied with interest, booked, closed, or been marked a good fit, your agent compares every new prospect's profile to theirs. If people who look like your winners really do reply more, those prospects move up — and you'll see "Looks like your best replies" as a reason. It only ever compares against your own results.
 - The 70+ quality bar never moves — learning decides *who goes first*, not who qualifies.
 
 ## Seeing what your agent actually did
