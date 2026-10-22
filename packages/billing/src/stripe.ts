@@ -140,6 +140,7 @@ function mapSubscription(sub: Stripe.Subscription): SubscriptionUpdate {
     seatsPurchased: seatItem?.quantity ?? 0,
     linkedinAccountsPurchased: liItem?.quantity ?? 0,
     currentPeriodEnd: periodEnd != null ? new Date(periodEnd * 1000).toISOString() : null,
+    trialEndsAt: sub.trial_end != null ? new Date(sub.trial_end * 1000).toISOString() : null,
   };
 }
 

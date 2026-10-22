@@ -15,6 +15,7 @@ describe("snapshotFromEvent", () => {
       seatsPurchased: 2,
       linkedinAccountsPurchased: 1,
       currentPeriodEnd: "2026-07-13T00:00:00.000Z",
+      trialEndsAt: null,
     };
     expect(snapshotFromEvent(event)).toEqual({
       stripeCustomerId: "cus_1",
@@ -25,7 +26,40 @@ describe("snapshotFromEvent", () => {
       seatsPurchased: 2,
       linkedinAccountsPurchased: 1,
       currentPeriodEnd: "2026-07-13T00:00:00.000Z",
+      trialEndsAt: null,
     });
+  });
+
+  it("carries trial_end as trialEndsAt ISO", () => {
+    const snap = snapshotFromEvent({
+      type: "subscription_updated",
+      stripeCustomerId: "cus_1",
+      stripeSubscriptionId: "sub_1",
+      accountId: "acc_1",
+      status: "trialing",
+      planPriceId: PLANS.growth.stripePriceId,
+      seatsPurchased: 0,
+      linkedinAccountsPurchased: 0,
+      currentPeriodEnd: null,
+      trialEndsAt: "2026-07-20T00:00:00.000Z",
+    });
+    expect(snap?.trialEndsAt).toBe("2026-07-20T00:00:00.000Z");
+  });
+
+  it("null when the subscription has no trial", () => {
+    const snap = snapshotFromEvent({
+      type: "subscription_updated",
+      stripeCustomerId: "cus_1",
+      stripeSubscriptionId: "sub_1",
+      accountId: "acc_1",
+      status: "active",
+      planPriceId: PLANS.growth.stripePriceId,
+      seatsPurchased: 0,
+      linkedinAccountsPurchased: 0,
+      currentPeriodEnd: null,
+      trialEndsAt: null,
+    });
+    expect(snap?.trialEndsAt).toBeNull();
   });
 
   it("maps a cancellation to a none/canceled snapshot", () => {
@@ -52,6 +86,7 @@ describe("snapshotFromEvent", () => {
       seatsPurchased: 0,
       linkedinAccountsPurchased: 0,
       currentPeriodEnd: null,
+      trialEndsAt: null,
     });
     expect(snap?.plan).toBe("none");
   });

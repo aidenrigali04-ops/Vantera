@@ -45,6 +45,8 @@ export type ParsedWebhookEvent =
       seatsPurchased: number;
       linkedinAccountsPurchased: number;
       currentPeriodEnd: string | null;
+      /** Stripe `trial_end` as ISO (the one trial clock starts at checkout), else null. */
+      trialEndsAt: string | null;
     }
   | { type: "subscription_canceled"; stripeCustomerId: string; stripeSubscriptionId: string }
   | { type: "ignored" };

@@ -29,6 +29,7 @@ const activeBody = JSON.stringify({
   seats: 0,
   linkedin: 0,
   currentPeriodEnd: "2026-07-13T00:00:00.000Z",
+  trialEndsAt: "2026-07-20T00:00:00.000Z",
 });
 
 describe("handleStripeWebhook", () => {
@@ -44,6 +45,12 @@ describe("handleStripeWebhook", () => {
     const res = await handleStripeWebhook(activeBody, "whsec_test", deps);
     expect(res.status).toBe(200);
     expect(updates[0]).toMatchObject({ plan: "growth", subscriptionStatus: "active", outreachPaused: false });
+  });
+
+  it("applySnapshot receives trialEndsAt", async () => {
+    const { deps, updates } = makeDeps();
+    await handleStripeWebhook(activeBody, "whsec_test", deps);
+    expect(updates[0]).toMatchObject({ trialEndsAt: "2026-07-20T00:00:00.000Z" });
   });
 
   it("no-ops on a duplicate event", async () => {

@@ -11,6 +11,7 @@ export interface PersistedSnapshot {
   seatsPurchased: number;
   linkedinAccountsPurchased: number;
   currentPeriodEnd: string | null;
+  trialEndsAt: string | null;
 }
 
 /** Pure: translate a verified event into the columns to write, or null to skip. */
@@ -27,6 +28,7 @@ export function snapshotFromEvent(event: ParsedWebhookEvent): PersistedSnapshot 
       seatsPurchased: 0,
       linkedinAccountsPurchased: 0,
       currentPeriodEnd: null,
+      trialEndsAt: null,
     };
   }
 
@@ -40,5 +42,6 @@ export function snapshotFromEvent(event: ParsedWebhookEvent): PersistedSnapshot 
     seatsPurchased: event.seatsPurchased,
     linkedinAccountsPurchased: event.linkedinAccountsPurchased,
     currentPeriodEnd: event.currentPeriodEnd,
+    trialEndsAt: event.trialEndsAt,
   };
 }

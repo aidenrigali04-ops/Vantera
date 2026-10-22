@@ -15,6 +15,7 @@ describe("StripeBilling.parseWebhook", () => {
           id: "sub_1",
           status: "active",
           current_period_end: 1768262400,
+          trial_end: 1768867200,
           metadata: { accountId: "acc_123" },
           items: {
             data: [
@@ -43,6 +44,25 @@ describe("StripeBilling.parseWebhook", () => {
     });
     if (parsed.type !== "subscription_updated") throw new Error("expected subscription_updated");
     expect(parsed.currentPeriodEnd).toBe(new Date(1768262400 * 1000).toISOString());
+    expect(parsed.trialEndsAt).toBe(new Date(1768867200 * 1000).toISOString());
+  });
+
+  it("trialEndsAt is null when the subscription has no trial", () => {
+    const parsed = adapter.parseWebhook({
+      id: "evt_nt",
+      type: "customer.subscription.updated",
+      data: {
+        object: {
+          customer: "cus_1",
+          id: "sub_1",
+          status: "active",
+          trial_end: null,
+          items: { data: [{ price: { id: PLANS.growth.stripePriceId }, quantity: 1 }] },
+        },
+      },
+    });
+    if (parsed.type !== "subscription_updated") throw new Error("expected subscription_updated");
+    expect(parsed.trialEndsAt).toBeNull();
   });
 
   it("maps customer.subscription.deleted to subscription_canceled", () => {
