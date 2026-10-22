@@ -83,7 +83,7 @@ export default async function BillingPage({
   });
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-10">
+    <div className="mx-auto w-full flex max-w-6xl flex-col gap-10">
       {checkout === "success" &&
         (hasEntitlement ? (
           <div className={cn(PANEL_SURFACE, "p-5 text-sm")} role="status">

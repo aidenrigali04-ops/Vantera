@@ -261,7 +261,7 @@ export function CopyWizard({
             </fieldset>
 
             {linkedinCount === 0 && (
-              <p className="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-muted-foreground">
+              <p className="rounded-md bg-[var(--attention-tint)] px-3 py-2 text-xs text-[var(--attention)]">
                 No LinkedIn account connected yet — drafting works now; sending starts once you{" "}
                 <a href="/settings/senders" className="underline underline-offset-2">
                   connect LinkedIn in Settings → Senders

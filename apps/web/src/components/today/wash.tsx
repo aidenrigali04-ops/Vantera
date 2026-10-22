@@ -21,12 +21,12 @@ export function Wash({ className }: { className?: string }) {
 }
 
 /**
- * The container every Today zone sits in: 1200px, centered, 24px gutters, 72px of breath
- * under the chrome. Today SCROLLS (D5) — the one-screen doctrine is for data surfaces.
+ * The container every Today zone sits in: the data pages' 1400px column, centered, using
+ * the shell's gutters, 72px of breath under the chrome. Today SCROLLS (D5) — the one-screen doctrine is for data surfaces.
  */
 export function TodayPageFrame({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <div className={cn("relative mx-auto w-full max-w-[1248px] px-6 pt-8 pb-16 lg:pt-[72px]", className)}>{children}</div>
+    <div className={cn("relative mx-auto w-full max-w-[1400px] pt-8 lg:pt-[72px]", className)}>{children}</div>
   );
 }
 

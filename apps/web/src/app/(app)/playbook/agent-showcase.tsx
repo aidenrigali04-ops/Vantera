@@ -3,15 +3,15 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useActionState } from "react";
-import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
-import { Bot, PenLine, MessageSquare, Radar, Settings2 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { MessageSquare, Radar, ScanSearch, Send, Settings2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { AnimatedProgress } from "@/components/ui/animated-progress";
-import { CardGlass } from "@/components/ui/card";
 import { Eyebrow, PANEL_SURFACE } from "@/components/ui/panel";
 import { FormError } from "@/components/form-error";
 import { cn } from "@/lib/utils";
+import { SEGMENT_TRACK, segmentClass } from "@/components/app/surface";
 import { setAgentStatus, type AgentActionState } from "./actions";
 import { RunNowButton } from "./run-now";
 import type { ShowcaseAgent, ShowcaseKind } from "./agent-showcase-data";
@@ -42,13 +42,14 @@ function statusLabel(s: ShowcaseAgent["status"]): string {
   return s === "live" ? "Live" : s === "paused" ? "Paused" : "Draft";
 }
 
-const ORB_ICON: Record<ShowcaseKind, typeof Bot> = {
-  scout: Bot,
-  intent: Radar,
-  copy: PenLine,
+/* The same pastel icon tiles as the Playbook cards (agent-card.tsx). */
+const KIND_TILE: Record<ShowcaseKind, { icon: typeof Radar; className: string }> = {
+  scout: { icon: ScanSearch, className: "bg-[#dbe9fd] text-[#1461d1]" },
+  copy: { icon: Send, className: "bg-[#d5efdf] text-[#13824a]" },
+  intent: { icon: Radar, className: "bg-[#e2defb] text-[#5b4bd1]" },
 };
 
-// ── segmented switcher: clean top tabs, sliding highlight ────────────────────
+// ── switcher: the app's segmented filter track ───────────────────────────────
 function Switcher({
   agents,
   activeKind,
@@ -59,75 +60,30 @@ function Switcher({
   onSelect: (k: ShowcaseKind) => void;
 }) {
   return (
-    <div className="mb-10 flex justify-center">
-      <div className="inline-flex items-center gap-1 rounded-full border border-[var(--hairline)] bg-white p-1 shadow-[var(--shadow-card)]">
-        {agents.map((a) => {
-          const active = a.kind === activeKind;
-          return (
-            <button
-              key={a.kind}
-              type="button"
-              onClick={() => onSelect(a.kind)}
-              className="relative rounded-full px-4 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              {active && (
-                <motion.span
-                  layoutId="agent-seg"
-                  className="absolute inset-0 rounded-full bg-foreground"
-                  transition={{ type: "spring", stiffness: 320, damping: 30 }}
-                />
-              )}
-              <span
-                className={cn(
-                  "relative z-10",
-                  active ? "text-background" : "text-[var(--ink-3)] hover:text-foreground",
-                )}
-              >
-                {a.roleLabel}
-              </span>
-            </button>
-          );
-        })}
-      </div>
+    <div role="tablist" aria-label="Agents" className={cn(SEGMENT_TRACK, "mb-8")}>
+      {agents.map((a) => (
+        <button
+          key={a.kind}
+          type="button"
+          role="tab"
+          aria-selected={a.kind === activeKind}
+          onClick={() => onSelect(a.kind)}
+          className={cn(segmentClass(a.kind === activeKind), "focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]")}
+        >
+          {a.roleLabel}
+        </button>
+      ))}
     </div>
   );
 }
 
-// ── orb: the agent, ring rotates only while Live ─────────────────────────────
-function AgentOrb({ agent }: { agent: ShowcaseAgent }) {
-  const reduce = useReducedMotion();
-  const live = agent.status === "live";
-  const Icon = ORB_ICON[agent.kind];
-
+function StatusPill({ status }: { status: ShowcaseAgent["status"] }) {
+  const live = status === "live";
   return (
-    <div className="relative mx-auto shrink-0">
-      {/* dashed orbit ring — spins slowly only while the agent is working */}
-      <motion.div
-        aria-hidden
-        animate={!reduce && live ? { rotate: 360 } : undefined}
-        transition={{ duration: 32, repeat: Infinity, ease: "linear" }}
-        className="absolute inset-[-12%] rounded-full border border-dashed border-foreground/12"
-      />
-
-      <div className="relative grid size-44 place-items-center rounded-full border border-[var(--hairline)] bg-white shadow-[var(--shadow-card)] md:size-52">
-        <span className="grid size-16 place-items-center rounded-2xl bg-gradient-to-br from-[var(--cyan)] to-[var(--cyan-strong)] text-white md:size-20">
-          <Icon className="size-8 md:size-9" />
-        </span>
-      </div>
-
-      {/* status pill */}
-      <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 whitespace-nowrap">
-        <div className="flex items-center gap-2 rounded-full border border-[var(--hairline)] bg-white px-3.5 py-1.5 text-[11px] font-medium uppercase tracking-widest text-muted-foreground shadow-sm">
-          <span
-            className={cn(
-              "size-1.5 rounded-full",
-              live ? "bg-[var(--fb)]" : "bg-muted-foreground/40",
-            )}
-          />
-          {statusLabel(agent.status)}
-        </div>
-      </div>
-    </div>
+    <span className="inline-flex h-6 items-center gap-1.5 rounded-full border border-[var(--line)] bg-[var(--surface)] px-2.5 text-xs font-medium text-[var(--ink-mid)]">
+      <span className={cn("size-1.5 rounded-full", live ? "bg-[var(--positive)]" : "bg-[var(--ink-dim)]/50")} />
+      {statusLabel(status)}
+    </span>
   );
 }
 
@@ -152,11 +108,24 @@ function AgentDetails({ agent }: { agent: ShowcaseAgent }) {
 
   return (
     <div className="flex flex-col items-start text-left">
-      <Eyebrow className="mb-2">{agent.roleLabel}</Eyebrow>
-      <h1 className="font-heading mb-3 text-3xl font-semibold tracking-tight md:text-4xl">
-        {agent.name}
-      </h1>
-      <p className="mb-6 max-w-md leading-relaxed text-muted-foreground">{agent.summary}</p>
+      <div className="mb-4 flex items-center gap-4">
+        {(() => {
+          const tile = KIND_TILE[agent.kind];
+          return (
+            <span className={cn("grid size-12 shrink-0 place-items-center rounded-[var(--r-square)]", tile.className)}>
+              <tile.icon className="size-[22px]" strokeWidth={2} aria-hidden />
+            </span>
+          );
+        })()}
+        <div className="min-w-0">
+          <Eyebrow>{agent.roleLabel}</Eyebrow>
+          <div className="mt-1 flex flex-wrap items-center gap-2.5">
+            <h1 className="text-[26px] font-semibold leading-8 tracking-[-0.03em] text-[var(--ink)]">{agent.name}</h1>
+            <StatusPill status={agent.status} />
+          </div>
+        </div>
+      </div>
+      <p className="mb-6 max-w-xl text-[14.5px] leading-relaxed text-[var(--ink-mid)]">{agent.summary}</p>
 
       {agent.icpNames.length > 0 && (
         <div className="mb-6 flex flex-wrap gap-1.5">
@@ -169,8 +138,7 @@ function AgentDetails({ agent }: { agent: ShowcaseAgent }) {
       )}
 
       {/* run-summary panel */}
-      <div className={cn(PANEL_SURFACE, "relative isolate w-full space-y-5 overflow-hidden p-6 text-left")}>
-        <CardGlass />
+      <div className={cn(PANEL_SURFACE, "w-full space-y-5 p-6 text-left")}>
         <div className="flex gap-8">
           {agent.stats.map((s) => (
             <div key={s.label}>
@@ -207,7 +175,7 @@ function AgentDetails({ agent }: { agent: ShowcaseAgent }) {
 
         {/* T4 operate path: the agent's actual work, run by run — never config-only again. */}
         {agent.attention && (
-          <p className="rounded-xl bg-amber-500/10 px-3 py-2 text-xs leading-relaxed text-amber-800 ring-1 ring-inset ring-amber-500/25">
+          <p className="rounded-[var(--r-btn)] bg-[var(--attention-tint)] px-3 py-2 text-xs font-medium leading-relaxed text-[var(--attention)]">
             {agent.attention}
           </p>
         )}
@@ -259,8 +227,8 @@ function ChannelChip({ on, icon, label }: { on: boolean; icon: React.ReactNode; 
       className={cn(
         "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs",
         on
-          ? "border-foreground/20 bg-foreground text-background"
-          : "border-border bg-muted text-muted-foreground",
+          ? "border-transparent bg-[var(--acc-tint)] font-medium text-[var(--acc-ink)]"
+          : "border-[var(--line)] bg-[var(--surface-2)] text-[var(--ink-dim)]",
       )}
     >
       {icon}
@@ -287,7 +255,7 @@ export function AgentShowcase({
   if (!current) return null;
 
   return (
-    <div className="mx-auto max-w-4xl py-2">
+    <div className="mx-auto w-full max-w-3xl py-2">
       {agents.length > 1 && (
         <Switcher agents={agents} activeKind={activeKind} onSelect={setActiveKind} />
       )}
@@ -301,9 +269,7 @@ export function AgentShowcase({
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -8 }}
           transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-          className="grid items-center gap-12 py-6 md:grid-cols-[auto_1fr] md:gap-16"
         >
-          <AgentOrb agent={current} />
           <AgentDetails agent={current} />
         </motion.div>
       </AnimatePresence>

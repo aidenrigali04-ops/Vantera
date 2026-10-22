@@ -60,7 +60,7 @@ export function CardTabs({ tabs, active }: { tabs: TabSpec[]; active: CardTab })
                 {tab.count > 99 ? "99+" : tab.count}
               </span>
             ) : null}
-            {isActive ? <span aria-hidden="true" className="absolute inset-x-0 -bottom-px h-0.5 bg-[var(--ink)]" /> : null}
+            {isActive ? <span aria-hidden="true" className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-[var(--acc)]" /> : null}
           </Link>
         );
       })}

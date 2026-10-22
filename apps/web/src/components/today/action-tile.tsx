@@ -28,16 +28,16 @@ export interface ActionTileProps {
 }
 
 const ROW = cn(
-  "grid h-16 w-full grid-cols-[48px_1fr_40px] items-center rounded-[var(--r-square)] text-left max-md:h-[72px]",
-  "transition-colors duration-120 ease-out group-hover:bg-[rgb(11_11_13_/_0.025)]",
+  "grid h-[76px] w-full grid-cols-[40px_1fr_32px] items-center rounded-[var(--r-card)] bg-[var(--surface)] px-4 text-left shadow-[var(--shadow-card)] ring-1 ring-[var(--line)] max-md:h-[80px]",
+  "transition-[box-shadow,background-color] duration-120 ease-out group-hover:ring-[var(--line-strong)] group-hover:shadow-[var(--shadow-lift)]",
   FOCUS_RING,
 );
 
 export function ActionTile({ tile, onDismiss, onResume, className }: ActionTileProps) {
   const body = (
     <>
-      <span className={cn("flex size-12 items-center justify-center rounded-[var(--r-square)]", toneClasses(tile.tone))}>
-        <Glyph name={tile.glyph} size={20} />
+      <span className={cn("flex size-10 items-center justify-center rounded-[var(--r-tile)]", toneClasses(tile.tone))}>
+        <Glyph name={tile.glyph} size={18} />
       </span>
       <span className="min-w-0 pl-4 pr-3">
         <span className="block truncate text-sm font-semibold leading-5 text-[var(--ink)]">
@@ -50,8 +50,8 @@ export function ActionTile({ tile, onDismiss, onResume, className }: ActionTileP
       <span
         aria-hidden="true"
         className={cn(
-          "flex size-10 items-center justify-center rounded-[var(--r-tile)] bg-[var(--surface)] text-[var(--ink-mid)] shadow-[var(--shadow-tile)] ring-1 ring-[var(--line)]",
-          "transition-colors duration-120 ease-out group-hover:bg-[var(--ink)] group-hover:text-[var(--ink-fg)]",
+          "flex size-8 items-center justify-center rounded-[var(--r-btn)] text-[var(--ink-dim)]",
+          "transition-[color,transform] duration-120 ease-out group-hover:translate-x-0.5 group-hover:text-[var(--acc)]",
         )}
       >
         <Glyph name="chevron-right" size={16} />
@@ -108,7 +108,7 @@ export interface ActionTileRowProps {
 export function ActionTileRow({ tiles, onDismiss, onResume, emptyText, className }: ActionTileRowProps) {
   return (
     <section className={className} aria-labelledby="today-needs-you">
-      <h2 id="today-needs-you" className="mb-4 text-xs font-medium leading-4 text-[var(--ink-dim)]">
+      <h2 id="today-needs-you" className="mb-3 text-[13px] font-semibold leading-4 text-[var(--ink)]">
         Needs you (<span className="font-mono">{tiles.length}</span>)
       </h2>
       {tiles.length === 0 ? (
@@ -116,7 +116,7 @@ export function ActionTileRow({ tiles, onDismiss, onResume, emptyText, className
           <EmptyLine>{typeof emptyText === "string" ? <MonoText text={emptyText} /> : emptyText}</EmptyLine>
         ) : null
       ) : (
-        <ul className="max-md:divide-y max-md:divide-[var(--line)] md:grid md:grid-cols-12 md:gap-x-6 md:gap-y-3">
+        <ul className="grid gap-3 md:grid-cols-12 md:gap-x-4">
           {tiles.map((tile) => (
             <li key={`${tile.kind}:${tile.href}`} className="md:col-span-4">
               <ActionTile tile={tile} onDismiss={onDismiss} onResume={onResume} />

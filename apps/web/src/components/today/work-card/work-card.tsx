@@ -230,7 +230,7 @@ function QueueTable({
               <Avatar initials={row.initials} />
               <span className="min-w-0 flex-1">
                 <span className="flex items-baseline gap-2">
-                  <span className="min-w-0 flex-1 truncate text-[14px] font-medium text-[var(--ink)]">{row.name}</span>
+                  <span className="min-w-0 flex-1 truncate text-[14px] font-semibold text-[var(--ink)]">{row.name}</span>
                   {row.score !== null ? <ScoreChip score={row.score} /> : null}
                 </span>
                 <span className="mt-0.5 block truncate text-[13px] text-[var(--ink-dim)]">{row.context}</span>
@@ -296,7 +296,7 @@ function QueueTable({
                   <div className="flex items-center gap-3">
                     <Avatar initials={row.initials} />
                     <span className="min-w-0">
-                      <span className="block truncate text-[14px] font-medium text-[var(--ink)]">{row.name}</span>
+                      <span className="block truncate text-[14px] font-semibold text-[var(--ink)]">{row.name}</span>
                       <span className="block truncate text-[13px] text-[var(--ink-dim)]">{row.context}</span>
                     </span>
                   </div>
@@ -381,7 +381,7 @@ function RepliesTable({ rows, answeredThisWeek }: { rows: ReplyRow[]; answeredTh
               <Avatar initials={row.initials} />
               <span className="min-w-0 flex-1">
                 <span className="flex items-baseline gap-2">
-                  <span className="min-w-0 flex-1 truncate text-[14px] font-medium text-[var(--ink)]">{row.name}</span>
+                  <span className="min-w-0 flex-1 truncate text-[14px] font-semibold text-[var(--ink)]">{row.name}</span>
                   <span className="shrink-0 font-mono text-[12px] text-[var(--ink-dim)]">{row.received}</span>
                 </span>
                 <span className="mt-0.5 block truncate text-[13px] text-[var(--ink)]">{row.excerpt}</span>
@@ -421,7 +421,7 @@ function RepliesTable({ rows, answeredThisWeek }: { rows: ReplyRow[]; answeredTh
               <Link href={`/inbox?lead=${row.leadId}`} className="flex items-center gap-3 focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]">
                 <Avatar initials={row.initials} />
                 <span className="min-w-0">
-                  <span className="block truncate text-[14px] font-medium text-[var(--ink)]">{row.name}</span>
+                  <span className="block truncate text-[14px] font-semibold text-[var(--ink)]">{row.name}</span>
                   {row.company ? <span className="block truncate text-[13px] text-[var(--ink-dim)]">{row.company}</span> : null}
                 </span>
               </Link>
@@ -444,7 +444,7 @@ function RepliesTable({ rows, answeredThisWeek }: { rows: ReplyRow[]; answeredTh
               <Link
                 href={`/inbox?lead=${row.leadId}`}
                 aria-label={`Open thread with ${row.name}`}
-                className="ml-auto hidden size-8 place-items-center rounded-[var(--r-btn)] bg-[var(--ink)] text-[var(--ink-fg)] transition-colors hover:bg-[#1f1f23] group-hover:grid focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]"
+                className="ml-auto hidden size-8 place-items-center rounded-[var(--r-btn)] bg-[var(--acc)] text-white transition-colors hover:bg-[var(--acc-ink)] group-hover:grid focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]"
               >
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true">
                   <path d="M5 12h14M13 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />

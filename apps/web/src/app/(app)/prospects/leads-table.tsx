@@ -3,13 +3,15 @@
 import { useState, useSyncExternalStore, useTransition } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { ArrowDown, Flame, Rows3, Search, SlidersHorizontal, Snowflake, Zap } from "lucide-react";
+import { ArrowDown, Rows3, Search, SlidersHorizontal, Snowflake, TrendingUp } from "lucide-react";
 import { PANEL_SURFACE, Eyebrow } from "@/components/ui/panel";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ScoreBadge, SourceBadge, WhyNowLine } from "@/components/lead-why-now";
 import { LeadProfileSheet } from "@/components/lead-profile";
 import { bulkArchiveLeads, bulkSuppressLeads, type BulkResult } from "./bulk-actions";
 import { cn } from "@/lib/utils";
+import { Avatar } from "@/components/today/work-card/chips";
+import { initials } from "@/lib/today/metrics";
 import { EMPTY_FILTERS, leadsHref, type LeadsFilters, type LeadsSort } from "./leads-params";
 
 export type { LeadsFilters, LeadsSort } from "./leads-params";
@@ -92,9 +94,9 @@ const STATUS_CLASS: Record<string, string> = {
   converted: "bg-[var(--positive)] text-white",
   replied:
     "bg-[var(--positive-tint)] text-[var(--positive)] ring-1 ring-inset ring-[var(--positive-line)]",
-  in_campaign: "bg-foreground/10 text-foreground ring-1 ring-inset ring-border",
-  qualified: "bg-foreground/10 text-foreground ring-1 ring-inset ring-border",
-  enriched: "bg-foreground/10 text-foreground ring-1 ring-inset ring-border",
+  in_campaign: "bg-[var(--acc-tint)] text-[var(--acc-ink)]",
+  qualified: "bg-[#f0eefd] text-[#5b4bd1]",
+  enriched: "bg-[var(--surface-2)] text-[var(--ink-mid)]",
   sourced: "text-muted-foreground ring-1 ring-inset ring-border",
   rejected: "text-muted-foreground ring-1 ring-inset ring-border",
   archived: "text-muted-foreground ring-1 ring-inset ring-border",
@@ -125,7 +127,7 @@ function CoolingChip({ lead }: { lead: LeadRow }) {
   const cooling = coolingState(lead.status, latestReply(lead)?.received_at ?? null);
   if (!cooling) return null;
   return (
-    <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-500/12 px-2 py-0.5 text-[11px] font-medium text-amber-700 ring-1 ring-inset ring-amber-500/30 dark:text-amber-300">
+    <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-[var(--attention-tint)] px-2 py-0.5 text-[11px] font-medium text-[var(--attention)]">
       <Snowflake className="size-3" aria-hidden />
       {cooling.label}
     </span>
@@ -152,7 +154,7 @@ function HotNowStrip({
   return (
     <section className="mb-4" data-copilot="hot-leads">
       <div className="mb-2 flex items-center gap-1.5">
-        <Flame className="size-4 text-[var(--positive)]" aria-hidden />
+        <TrendingUp className="size-4 text-[var(--acc)]" strokeWidth={2} aria-hidden />
         <Eyebrow>Hot right now</Eyebrow>
         <span className="text-xs text-muted-foreground">— your strongest-fit prospects to work today</span>
       </div>
@@ -186,8 +188,8 @@ function HotNowStrip({
                 <p className="flex min-w-0 items-center gap-1 text-xs">
                   {signal ? (
                     <>
-                      <Zap className="size-3 shrink-0 text-[var(--positive)]" aria-hidden />
-                      <span className="min-w-0 truncate text-[var(--positive)]">{signal}</span>
+                      <span className="size-1.5 shrink-0 rounded-full bg-[var(--acc)]" aria-hidden />
+                      <span className="min-w-0 truncate text-[var(--ink-2)]">{signal}</span>
                     </>
                   ) : (
                     <span className="truncate text-muted-foreground">
@@ -271,9 +273,9 @@ function Th({
   return (
     <th
       className={cn(
-        "bg-[var(--tint)] px-4 py-2.5 font-medium",
-        first && "rounded-tl-xl",
-        last && "rounded-tr-xl",
+        "border-b border-[var(--line)] bg-[#fbfcfd] px-4 py-3 font-semibold tracking-[0.06em] text-[var(--ink-dim)]",
+        first && "rounded-tl-[var(--r-card)]",
+        last && "rounded-tr-[var(--r-card)]",
         className
       )}
     >
@@ -378,7 +380,7 @@ export function LeadsTable({
               defaultValue={q}
               placeholder="Search name, company, title…"
               aria-label="Search prospects"
-              className="h-9 w-64 rounded-lg border border-[var(--hairline)] bg-white pl-9 pr-3 text-sm shadow-[var(--shadow-sm)] placeholder:text-muted-foreground/60 focus-visible:border-[var(--cyan-line)] focus-visible:outline-none sm:w-80"
+              className="h-9 w-64 rounded-[var(--r-btn)] border border-[var(--line)] bg-[var(--surface)] pl-9 pr-3 text-sm shadow-[var(--shadow-tile)] placeholder:text-muted-foreground/60 focus-visible:border-[var(--cyan-line)] focus-visible:outline-none sm:w-80"
             />
           </form>
 
@@ -465,7 +467,7 @@ export function LeadsTable({
                   </Link>
                   <button
                     type="submit"
-                    className="rounded-lg bg-foreground px-3.5 py-1.5 text-sm font-medium text-background transition-opacity hover:opacity-90"
+                    className="rounded-[var(--r-btn)] bg-[var(--acc)] px-3.5 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-[var(--acc-ink)]"
                   >
                     Apply
                   </button>
@@ -560,7 +562,7 @@ export function LeadsTable({
 
       {/* No overflow-hidden on the table container itself: it would break the sticky header.
           The thead carries its own solid bg + top rounding instead. */}
-      <div className="rounded-xl border border-[var(--hairline)] bg-white" data-copilot="leads-table">
+      <div className="rounded-[var(--r-card)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-card)]" data-copilot="leads-table">
         {/* table-fixed: columns hold their proportional widths no matter how long the content
             is — text truncates inside its cell instead of stretching the table past the
             viewport (the fix for the sideways-scrolling page). */}
@@ -604,8 +606,8 @@ export function LeadsTable({
                   key={lead.id}
                   onClick={() => open(lead)}
                   className={cn(
-                    "cursor-pointer border-t border-[var(--hairline)] transition-colors hover:bg-[var(--cyan-tint)]/50",
-                    selected.has(lead.id) && "bg-[var(--cyan-tint)]/30"
+                    "cursor-pointer border-t border-[var(--line)] transition-colors first:border-t-0 hover:bg-[#f5f9ff]",
+                    selected.has(lead.id) && "bg-[#f5f9ff]"
                   )}
                 >
                   <td className={cn("px-4", cellY)} onClick={(e) => e.stopPropagation()}>
@@ -618,13 +620,18 @@ export function LeadsTable({
                     />
                   </td>
                   <td className={cn("overflow-hidden px-4", cellY)}>
-                    <div className="flex min-w-0 items-center gap-2">
-                      <p className="truncate font-medium">{leadName(lead)}</p>
-                      <SourceBadge source={lead.source} />
+                    <div className="flex min-w-0 items-center gap-3">
+                      <Avatar initials={initials(leadName(lead))} className="max-sm:hidden" />
+                      <div className="min-w-0">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <p className="truncate font-semibold text-[var(--ink)]">{leadName(lead)}</p>
+                          <SourceBadge source={lead.source} />
+                        </div>
+                        {lead.title && (
+                          <p className="truncate text-xs text-[var(--ink-dim)]">{lead.title}</p>
+                        )}
+                      </div>
                     </div>
-                    {lead.title && (
-                      <p className="truncate text-xs text-muted-foreground">{lead.title}</p>
-                    )}
                   </td>
                   <td className={cn("hidden overflow-hidden px-4 sm:table-cell", cellY)}>
                     <p className="truncate">{lead.company_name ?? "—"}</p>
