@@ -261,7 +261,18 @@
    (hover surfaces, menu items, ghost-button hovers) a subtle neutral so electric-cyan
    stays an intentional accent (pipeline, dots, nav) rather than a loud hover color. */
 .app-surface {
-  --accent: #eef2f7;
+  /* Landing parity (2026-10-21): the app carries the marketing blue and the landing's
+     restrained, border-led elevation, so the product reads as the page that sold it. */
+  --cyan: #1877f2;
+  --cyan-strong: #1461d1;
+  --cyan-tint: #e9f1fe;
+  --cyan-line: rgba(24, 119, 242, 0.28);
+  --ring: rgba(24, 119, 242, 0.5);
+  --primary: #166fe5;
+  --primary-foreground: #ffffff;
+  --shadow-sm: 0 1px 1px rgba(12, 16, 26, 0.04);
+  --shadow-lift: 0 1px 2px rgba(12, 16, 26, 0.04), 0 10px 24px -10px rgba(12, 16, 26, 0.09);
+  --accent: #f1f3f6;
   --accent-foreground: #0a0c12;
   /* Crisper corners than the landing's softer 0.85rem. Because every radius-* token is
      calc(var(--radius) * k), overriding --radius here cascades to the whole dashboard
@@ -269,12 +280,12 @@
   --radius: 0.5rem;
   /* Border-led elevation: app cards read as crisp hairline panels, not floating cards.
      (Landing keeps the dramatic --shadow-card lift defined in the shared block above.) */
-  --shadow-card: 0 1px 2px rgba(12, 16, 26, 0.04), 0 1px 3px rgba(12, 16, 26, 0.05);
+  --shadow-card: 0 1px 1px rgba(12, 16, 26, 0.03), 0 4px 12px -4px rgba(12, 16, 26, 0.06);
   /* One success/positive hue across the app (won deals, connected status, win attribution) —
      replaces the scattered emerald-400 / #0f9d58 / #13b07a greens so "good" reads as a single,
      deliberate color rather than three near-misses. */
-  --positive: #0f9d58;
-  --positive-tint: #e9f9f0;
+  --positive: #13824a;
+  --positive-tint: #e3f5ea;
   --positive-line: rgba(15, 157, 88, 0.28);
 }
 
@@ -289,25 +300,25 @@
    light (root layout), so dark stays one token flip away (D2).
 ---------------------------------------------------------------------------- */
 .app-surface {
-  --canvas: #f6f6f7; /* page */
+  --canvas: #f7f8fa; /* page — the landing replica's app ground */
   --surface: #ffffff; /* cards, chrome tiles, pills */
-  --surface-2: #f1f1f3; /* hover rows, neutral chips, icon squares */
-  --line: #e8e8eb; /* hairlines */
-  --line-strong: #d2d2d8; /* inputs, pressed tiles */
+  --surface-2: #f1f3f6; /* hover rows, neutral chips, icon squares */
+  --line: #eceef1; /* hairlines — the landing's 7% ink on white */
+  --line-strong: #d7dbe1; /* inputs, pressed tiles */
 
-  --ink: #0b0b0d; /* text, primary button fill        19.7:1 */
-  --ink-mid: #5c5c66; /* secondary text                   6.6:1 */
-  --ink-dim: #70707b; /* meta, labels, table headers       4.9:1 (4.6 on canvas) */
+  --ink: #0a0c12; /* text                             19.5:1 */
+  --ink-mid: #5e636c; /* secondary text                   6.2:1 */
+  --ink-dim: #6c717a; /* meta, labels, table headers       4.9:1 (4.6 on canvas) */
   --ink-fg: #ffffff; /* text on --ink */
 
-  --acc: #2563eb; /* links, active tab, focus, Interested   5.2:1 */
-  --acc-ink: #1d4ed8; /* accent text on --acc-tint             6.0:1 */
-  --acc-tint: #eef3fe;
+  --acc: #1877f2; /* the landing blue: links, active tab, focus, primary  4.4:1 (large/UI) */
+  --acc-ink: #1461d1; /* accent text on --acc-tint             5.3:1 */
+  --acc-tint: #e9f1fe;
 
-  --positive: #166534; /* sender Active        6.3:1 */
-  --positive-tint: #e6f5ec;
-  --attention: #9a4a0a; /* repair, held         5.6:1 */
-  --attention-tint: #fdf0dd;
+  --positive: #13824a; /* sender Active        4.9:1 */
+  --positive-tint: #e3f5ea;
+  --attention: #9a6a00; /* repair, held         4.6:1 */
+  --attention-tint: #fdf3dc;
   --danger: #dc2626; /* engine stopped        4.8:1 */
   --danger-tint: #fdecec;
 
@@ -315,25 +326,26 @@
      here used to show through the old translucent band. */
   --wash: none;
 
-  --shadow-tile: 0 1px 2px rgb(11 11 13 / 0.04); /* + 1px --line ring */
-  --shadow-card: 0 1px 2px rgb(11 11 13 / 0.03), 0 8px 24px -16px rgb(11 11 13 / 0.12);
-  --focus-ring: 0 0 0 3px rgb(37 99 235 / 0.35);
+  --shadow-tile: 0 1px 2px rgba(16, 24, 40, 0.04); /* + 1px --line ring */
+  --shadow-card: 0 1px 1px rgba(12, 16, 26, 0.03), 0 4px 12px -4px rgba(12, 16, 26, 0.06);
+  --focus-ring: 0 0 0 3px rgb(24 119 242 / 0.3);
 
   --r-chip: 6px;
   --r-btn: 8px;
-  --r-tile: 10px;
+  --r-tile: 8px;
   --r-square: 12px;
-  --r-card: 16px;
+  --r-card: 14px;
   --r-pill: 999px;
 
-  /* Geist Sans for UI, Geist Mono for every number — one family, two roles (D3). The
-     @theme font tokens are remapped here so `font-sans` / `font-mono` / `font-heading`
-     utilities resolve to Geist inside the app shell only; landing/auth keep Poppins. */
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-heading: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", Menlo, monospace;
-  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  letter-spacing: 0;
+  /* Plus Jakarta Sans, the landing's face, for everything — numbers included, in
+     tabular figures (landing parity, 2026-10-21). The shell root carries
+     `landingFont.variable`; the @theme font tokens are remapped so `font-sans` /
+     `font-mono` / `font-heading` all resolve to it inside the app only. */
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: normal;
 
   /* The app page is the CANVAS, not white — every surface (chrome tiles, the work card,
      shadcn Cards) is white ON it, which is what makes the geometry read. This must live in
@@ -367,12 +379,12 @@
   --shadow-card: 0 1px 0 rgb(255 255 255 / 0.04) inset, 0 16px 40px -24px rgb(0 0 0 / 0.6);
 }
 
-/* Mono inside the app shell: tabular figures everywhere a number appears (§5.2). */
+/* Numbers inside the app shell: the same face in tabular figures, so columns align (§5.2). */
 .app-surface .font-mono,
 .app-surface .font-data {
-  font-family: var(--font-geist-mono), ui-monospace, "SF Mono", Menlo, monospace;
-  font-feature-settings: "tnum" 1, "ss01" 1;
-  letter-spacing: 0;
+  font-family: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+  font-feature-settings: "tnum" 1;
+  letter-spacing: normal;
 }
 
 /* Engine dot — a 2s ease-in-out pulse in the Running state only (§5.4). */

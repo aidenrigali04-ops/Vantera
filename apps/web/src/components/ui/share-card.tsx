@@ -72,7 +72,7 @@ export function ShareCard({
     <div className="w-full max-w-xl rounded-3xl border border-[var(--hairline)] bg-white p-7 shadow-[var(--shadow-card)]">
       {/* header */}
       <div className="flex items-center gap-3">
-        <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-foreground text-base font-semibold text-background">
+        <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-[var(--fb)] text-base font-semibold text-white">
           {initials(workspaceName)}
         </span>
         <div className="min-w-0">
@@ -108,7 +108,7 @@ export function ShareCard({
             <button
               type="submit"
               disabled={inviting || seatsLeft === 0}
-              className="inline-flex h-11 items-center justify-center gap-1.5 rounded-xl bg-[#0a0c12] px-5 text-[14px] font-semibold text-white transition-all hover:-translate-y-0.5 hover:shadow-[0_10px_30px_-8px_rgba(11,87,171,0.55)] disabled:opacity-50 disabled:hover:translate-y-0"
+              className="inline-flex h-11 items-center justify-center gap-1.5 rounded-xl bg-[var(--fb-strong)] px-5 text-[14px] font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.16),0_1px_2px_rgba(16,24,40,0.14)] transition-colors hover:bg-[#1161cc] disabled:opacity-50"
             >
               {inviting ? <Loader2 className="size-4 animate-spin" /> : "Send invite"}
             </button>

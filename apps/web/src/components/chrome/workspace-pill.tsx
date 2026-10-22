@@ -113,13 +113,13 @@ export function WorkspacePill({ name, paused, iconCandidates = [], pauseEngine, 
         onKeyDown={onTriggerKeyDown}
         className={cn(
           CHROME_PILL,
-          "py-1 pl-1 pr-3 text-left hover:ring-[var(--line-strong)]",
+          "py-1 pl-1 pr-2.5 text-left hover:bg-[var(--surface-2)] hover:ring-[var(--line-strong)]",
           CHROME_MOTION,
           CHROME_FOCUS,
           open && "ring-[var(--line-strong)]"
         )}
       >
-        <span className="grid size-8 shrink-0 place-items-center overflow-hidden rounded-[var(--r-btn)] bg-[var(--surface-2)] text-[var(--ink-mid)]">
+        <span className="grid size-7 shrink-0 place-items-center overflow-hidden rounded-[6px] bg-[var(--surface-2)] text-[var(--ink-mid)]">
           <WorkspaceIcon candidates={iconCandidates} className="size-4.5 object-contain" />
         </span>
         <span className="ml-2 flex min-w-0 items-center gap-1.5">
@@ -131,11 +131,11 @@ export function WorkspacePill({ name, paused, iconCandidates = [], pauseEngine, 
               className="size-1.5 shrink-0 rounded-full bg-[var(--attention)]"
             />
           )}
-          <span className="max-w-[22ch] truncate text-sm font-medium text-[var(--fb)]">{name}</span>
+          <span className="max-w-[22ch] truncate text-[13.5px] font-medium text-[var(--ink-2)]">{name}</span>
         </span>
         <ChevronDown
           className={cn(
-            "ml-1.5 size-3.5 shrink-0 text-[var(--fb)] transition-transform duration-120 ease-out",
+            "ml-1.5 size-3.5 shrink-0 text-[var(--ink-dim)] transition-transform duration-120 ease-out",
             open && "rotate-180"
           )}
           strokeWidth={1.75}

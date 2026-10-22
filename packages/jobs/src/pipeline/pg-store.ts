@@ -40,7 +40,6 @@ import {
   appSettings,
   userProfiles,
   webhookEvents,
-  optimizationExperiments,
   optimizationPlaybook,
   strategies,
   type Db,
@@ -54,17 +53,12 @@ import type {
 import type {
   CopyStrategy,
   FunnelCohort,
-  FunnelStageKey,
   LeadOutcomeFlags,
-  ExperimentStatus,
   StrategyGenome,
   StrategySource,
-  VariantOutcome,
 } from "@vantera/agent-brains";
 import {
-  ALPHA_EARN_ON_CONCLUSION,
-  ALPHA_WEALTH_CAP,
-  ALPHA_WEALTH_START,
+  buildTargetingProfile,
   buildLeadOrdering,
   countRows,
   RANK_FEEDBACK_MAX,
@@ -80,10 +74,7 @@ import {
   genomeSignature,
   stripIdentity,
   replyPolarity,
-  rollupArms,
   rollupCohort,
-  wealthAfterConclusion,
-  wealthAfterLaunch,
   type LeadInsights,
   type CountTable,
   type LeadOrdering,
@@ -109,10 +100,8 @@ import type { ReplyBacklogStore } from "./reply-backlog";
 import type { PullbackRow, PullbackSegment, PullbackTouch } from "./pullback";
 import {
   SCOUT_DEFAULTS,
-  type ActiveExperiment,
   type ConversionStore,
   type ConnectionSyncStore,
-  type OptimizeStore,
   type CopyConfig,
   type CopyContext,
   type AgentRunRecord,
@@ -537,34 +526,9 @@ async function loadProofPoints(db: Db, accountId: string): Promise<ProofPoint[]>
   return rows.map((r) => ({ kind: r.kind, text: r.text, question: r.question }));
 }
 
-/** The account's running experiment (self-optimizing loop, Phase 3), or null. Extracted to a plain
- *  function (rather than `this.getActiveExperiment`) so getResponderBundle can call it directly —
- *  this file's object-literal store never references sibling methods via `this`. */
-async function fetchActiveExperiment(db: Db, accountId: string): Promise<ActiveExperiment | null> {
-  const [row] = await db
-    .select({
-      id: optimizationExperiments.id,
-      allocationPct: optimizationExperiments.allocationPct,
-      challengerStrategy: optimizationExperiments.challengerStrategy,
-    })
-    .from(optimizationExperiments)
-    .where(
-      and(
-        eq(optimizationExperiments.accountId, accountId),
-        eq(optimizationExperiments.status, "running")
-      )
-    )
-    .limit(1);
-  if (!row) return null;
-  return {
-    id: row.id,
-    allocationPct: row.allocationPct,
-    challengerStrategy: (row.challengerStrategy ?? {}) as CopyStrategy,
-  };
-}
-
-/** The account's adopted champion strategy + playbook version; {strategy:{}, version:null} when no
- *  playbook exists yet. Same extraction reason as fetchActiveExperiment above. */
+/** The account's playbook champion strategy + version; {strategy:{}, version:null} when no
+ *  playbook exists yet. A plain function so getResponderBundle can call it directly — this
+ *  file's object-literal store never references sibling methods via `this`. */
 async function fetchChampion(
   db: Db,
   accountId: string
@@ -583,64 +547,8 @@ async function fetchChampion(
   };
 }
 
-/** The callback-argument type of `Db["transaction"]` — a `PgTransaction`, structurally close to
- *  `Db` but NOT assignable to it (it lacks `$client`). `debitAlphaWealth`/`creditAlphaWealth` are
- *  only ever called with the `tx` handed to a `db.transaction(...)` callback, never with plain
- *  `db`, so they're typed against this instead of `Db`. */
-type OptimizeTx = Parameters<Parameters<Db["transaction"]>[0]>[0];
-
-/**
- * Debit `spend` from the account's alpha-investing wealth (Task 7 / WS-1.1). Upserts the playbook
- * row when this is the account's first-ever experiment (starting from `ALPHA_WEALTH_START` BEFORE
- * the debit — `wealthAfterLaunch`, mirroring `startExperiment`'s "never risked past what a fresh
- * account has" semantics); otherwise decrements the existing balance in SQL so the debit reads and
- * writes atomically against a concurrent credit. Callers always run this inside the SAME
- * transaction as the experiment insert (`startExperiment`) — a rolled-back insert (the one-live
- * 23505 conflict) rolls this debit back too, never leaving a spend with no experiment to show for it.
- */
-async function debitAlphaWealth(tx: OptimizeTx, accountId: string, spend: number): Promise<void> {
-  await tx
-    .insert(optimizationPlaybook)
-    .values({
-      accountId,
-      championStrategy: {},
-      alphaWealth: wealthAfterLaunch(ALPHA_WEALTH_START, spend),
-    })
-    .onConflictDoUpdate({
-      target: optimizationPlaybook.accountId,
-      set: { alphaWealth: sql`${optimizationPlaybook.alphaWealth} - ${spend}` },
-    });
-}
-
-/**
- * Credit `ALPHA_EARN_ON_CONCLUSION` back to the account's alpha-investing wealth on a DECISIVE
- * conclusion (Task 7 / WS-1.1), capped at `ALPHA_WEALTH_CAP`. Called from `concludeExperiment`
- * (discard only — halts are safety stops, not statistical conclusions, and do NOT earn; matching
- * calibration.test.ts's calibrated applyEarn rule) and `adoptChallenger`, and ONLY when the
- * caller's own status-guarded UPDATE actually returned a row (the experiment really did
- * transition out of running/ready_to_adopt) — a repeat call on an already-terminal experiment
- * never reaches here, which is what keeps the credit to exactly once per experiment. Upserts the
- * playbook row for the rare case an experiment was started outside this pipeline's debit path
- * (e.g. the manual web "start test" action) with no playbook row yet.
- */
-async function creditAlphaWealth(tx: OptimizeTx, accountId: string): Promise<void> {
-  await tx
-    .insert(optimizationPlaybook)
-    .values({
-      accountId,
-      championStrategy: {},
-      alphaWealth: wealthAfterConclusion(ALPHA_WEALTH_START),
-    })
-    .onConflictDoUpdate({
-      target: optimizationPlaybook.accountId,
-      set: {
-        alphaWealth: sql`least(${ALPHA_WEALTH_CAP}, ${optimizationPlaybook.alphaWealth} + ${ALPHA_EARN_ON_CONCLUSION})`,
-      },
-    });
-}
-
 /** Drizzle-backed store used by the Trigger.dev tasks (service-role DATABASE_URL). */
-export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerStore & RetentionStore & TrialStore & SendDispatchStore & OutreachSendStore & InboundStore & SequenceStore & SequenceTouchStore & ConversionStore & RefreshLeadStore & QualifyLeadStore & IntentScanStore & ConnectionSyncStore & OptimizeStore & AgentRunStore & FastPassStore & StrategyStampStore & MeetingEventStore {
+export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerStore & RetentionStore & TrialStore & SendDispatchStore & OutreachSendStore & InboundStore & SequenceStore & SequenceTouchStore & ConversionStore & RefreshLeadStore & QualifyLeadStore & IntentScanStore & ConnectionSyncStore & AgentRunStore & FastPassStore & StrategyStampStore & MeetingEventStore {
   async function upsertStrategy(accountId: string, genome: StrategyGenome, source: StrategySource): Promise<string> {
     const signature = genomeSignature(genome);
     const [row] = await db
@@ -1537,10 +1445,6 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
       await db.update(leads).set({ status }).where(eq(leads.id, leadId));
     },
 
-    async getActiveExperiment(accountId) {
-      return fetchActiveExperiment(db, accountId);
-    },
-
     async getChampion(accountId) {
       return fetchChampion(db, accountId);
     },
@@ -1572,13 +1476,6 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
       // holds anything other than the literal boolean `true`; an owner must explicitly opt in.
       const [row] = await db.select().from(appSettings).where(eq(appSettings.key, "message_shape_auto"));
       return row?.value === true;
-    },
-
-    async stampLeadExperiment(leadId, experimentId, variant) {
-      await db
-        .update(leads)
-        .set({ experimentId, strategyVariant: variant })
-        .where(eq(leads.id, leadId));
     },
 
     upsertStrategy,
@@ -1636,457 +1533,6 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           };
         })
       );
-    },
-
-    async getVariantOutcomes(accountId, experimentId): Promise<Record<"champion" | "challenger", VariantOutcome>> {
-      const [experiment] = await db
-        .select({ stageKey: optimizationExperiments.stageKey })
-        .from(optimizationExperiments)
-        .where(and(eq(optimizationExperiments.id, experimentId), eq(optimizationExperiments.accountId, accountId)))
-        .limit(1);
-      if (!experiment) return rollupArms("reply", []);
-      const stamped = await db
-        .select({
-          id: leads.id,
-          arm: leadStrategyStamps.arm,
-          rulesGatePassed: leads.rulesGatePassed,
-          invitedAt: leads.linkedinInvitedAt,
-          connectedAt: leads.linkedinConnectedAt,
-          bookedAt: leads.meetingBookedAt,
-          status: leads.status,
-        })
-        .from(leadStrategyStamps)
-        .innerJoin(leads, eq(leads.id, leadStrategyStamps.leadId))
-        .where(and(eq(leadStrategyStamps.accountId, accountId), eq(leadStrategyStamps.experimentId, experimentId)));
-      if (stamped.length === 0) return rollupArms(experiment.stageKey as FunnelStageKey, []);
-      const replyRows = await db
-        .select({ leadId: replies.leadId, classification: replies.classification })
-        .from(replies)
-        .where(and(eq(replies.accountId, accountId), inArray(replies.leadId, stamped.map((row) => row.id))));
-      const byLead = new Map<string, string[]>();
-      for (const reply of replyRows) {
-        if (!reply.leadId || !reply.classification) continue;
-        const list = byLead.get(reply.leadId) ?? [];
-        list.push(reply.classification);
-        byLead.set(reply.leadId, list);
-      }
-      return rollupArms(
-        experiment.stageKey as FunnelStageKey,
-        stamped.map((row) => {
-          const polarity = replyPolarity(byLead.get(row.id) ?? []);
-          const arm = row.arm === "champion" || row.arm === "challenger" ? row.arm : null;
-          return {
-            id: row.id,
-            sourced: true,
-            qualified: row.rulesGatePassed === true,
-            invited: row.invitedAt != null,
-            accepted: row.connectedAt != null,
-            interested: polarity.interested,
-            negative: polarity.negative,
-            booked: row.bookedAt != null,
-            closed: row.status === "converted",
-            arm,
-          };
-        })
-      );
-    },
-
-    // ── OptimizeStore (decide pipeline) ──────────────────────────────────────
-
-    async getRunningExperiments() {
-      const rows = await db
-        .select({
-          id: optimizationExperiments.id,
-          accountId: optimizationExperiments.accountId,
-          stageKey: optimizationExperiments.stageKey,
-          minSample: optimizationExperiments.minSample,
-          championStrategy: optimizationExperiments.championStrategy,
-          challengerStrategy: optimizationExperiments.challengerStrategy,
-          alphaSpent: optimizationExperiments.alphaSpent,
-        })
-        .from(optimizationExperiments)
-        .where(eq(optimizationExperiments.status, "running"));
-      return rows.map((r) => ({
-        id: r.id,
-        accountId: r.accountId,
-        stageKey: r.stageKey as FunnelStageKey,
-        minSample: r.minSample,
-        championStrategy: (r.championStrategy ?? {}) as CopyStrategy,
-        challengerStrategy: (r.challengerStrategy ?? {}) as CopyStrategy,
-        alphaSpent: r.alphaSpent,
-      }));
-    },
-
-    async getArmFlags(experimentId, variant): Promise<LeadOutcomeFlags[]> {
-      const armLeads = await db
-        .select({
-          id: leads.id,
-          invitedAt: leads.linkedinInvitedAt,
-          connectedAt: leads.linkedinConnectedAt,
-          bookedAt: leads.meetingBookedAt,
-          status: leads.status,
-        })
-        .from(leads)
-        .where(and(eq(leads.experimentId, experimentId), eq(leads.strategyVariant, variant)));
-      if (armLeads.length === 0) return [];
-      const ids = armLeads.map((l) => l.id);
-      const replyRows = await db
-        .select({ leadId: replies.leadId, classification: replies.classification })
-        .from(replies)
-        .where(inArray(replies.leadId, ids));
-      const interested = new Set<string>();
-      const negative = new Set<string>();
-      for (const r of replyRows) {
-        if (r.classification === "interested") interested.add(r.leadId);
-        else if (r.classification === "not_interested" || r.classification === "unsubscribe")
-          negative.add(r.leadId);
-      }
-      return armLeads.map((l) => ({
-        invited: l.invitedAt != null,
-        accepted: l.connectedAt != null,
-        interested: interested.has(l.id),
-        negative: negative.has(l.id),
-        booked: l.bookedAt != null,
-        converted: l.status === "converted",
-      }));
-    },
-
-    async getStampedOutcomes() {
-      // Stage 1b collective prior: every SENT first-touch invite with a Stage-1 recipe stamp,
-      // across ALL accounts (service role) — aggregate patterns only (strategy knobs + outcome
-      // booleans). Message text and lead identity never leave this method.
-      const rows = await db
-        .select({
-          strategy: sql<CopyStrategy | null>`${scheduledSends.recipe} -> 'strategy'`,
-          leadId: scheduledSends.leadId,
-          invitedAt: leads.linkedinInvitedAt,
-          connectedAt: leads.linkedinConnectedAt,
-          bookedAt: leads.meetingBookedAt,
-          status: leads.status,
-        })
-        .from(scheduledSends)
-        .innerJoin(leads, eq(leads.id, scheduledSends.leadId))
-        .where(
-          and(
-            eq(scheduledSends.status, "sent"),
-            eq(scheduledSends.linkedinStage, "invite"),
-            sql`${scheduledSends.recipe} ->> 'brain' = 'first_touch'`
-          )
-        );
-      if (rows.length === 0) return [];
-      const ids = [...new Set(rows.map((r) => r.leadId).filter((v): v is string => Boolean(v)))];
-      const replyRows = ids.length
-        ? await db
-            .select({ leadId: replies.leadId, classification: replies.classification })
-            .from(replies)
-            .where(inArray(replies.leadId, ids))
-        : [];
-      const interested = new Set<string>();
-      const negative = new Set<string>();
-      for (const r of replyRows) {
-        if (r.classification === "interested") interested.add(r.leadId);
-        else if (r.classification === "not_interested" || r.classification === "unsubscribe")
-          negative.add(r.leadId);
-      }
-      return rows.map((r) => ({
-        strategy: (r.strategy ?? {}) as CopyStrategy,
-        flags: {
-          invited: r.invitedAt != null,
-          accepted: r.connectedAt != null,
-          interested: r.leadId ? interested.has(r.leadId) : false,
-          negative: r.leadId ? negative.has(r.leadId) : false,
-          booked: r.bookedAt != null,
-          converted: r.status === "converted",
-        },
-      }));
-    },
-
-    async getRecentConclusions(accountId, limit) {
-      const rows = await db
-        .select({
-          challengerStrategy: optimizationExperiments.challengerStrategy,
-          status: optimizationExperiments.status,
-        })
-        .from(optimizationExperiments)
-        .where(
-          and(
-            eq(optimizationExperiments.accountId, accountId),
-            inArray(optimizationExperiments.status, ["adopted", "discarded", "halted"])
-          )
-        )
-        .orderBy(desc(optimizationExperiments.concludedAt))
-        .limit(limit);
-      return rows.map((r) => ({
-        label: describeStrategy((r.challengerStrategy ?? {}) as CopyStrategy),
-        status: r.status,
-      }));
-    },
-
-    async concludeExperiment(id, status: ExperimentStatus, reason, opts) {
-      // Task 7 / WS-1.1: credit the account's alpha-investing wealth on a DECISIVE conclusion —
-      // guarded by the UPDATE's own `returning()` so a repeat call on an already-terminal
-      // experiment (idempotency) credits nothing a second time. Two exclusions:
-      //   - Halts do NOT earn: the calibrated family-wise evidence (calibration.test.ts's CHAINED
-      //     FAMILY gate) defined "decisive" as the e-process actually reaching an adopt/discard
-      //     conclusion — a breaker halt is a safety stop, not a statistical conclusion, and
-      //     crediting it was measured to fund ~5.6-5.8 of 10 chain experiments vs the calibrated
-      //     ~4.0 (the guarantee would stop describing production).
-      //   - `opts.credit === false` (default true): the caller marks the conclusion
-      //     ADMINISTRATIVE — the identical-arm heal path discards as cleanup, not as a verdict,
-      //     and typically closes an unfunded manual experiment (crediting it would mint free
-      //     wealth). See OptimizeStore.concludeExperiment's doc in types.ts.
-      await db.transaction(async (tx) => {
-        const [row] = await tx
-          .update(optimizationExperiments)
-          .set({ status, decisionReason: reason, concludedAt: new Date() })
-          .where(
-            and(
-              eq(optimizationExperiments.id, id),
-              inArray(optimizationExperiments.status, ["running", "ready_to_adopt"])
-            )
-          )
-          .returning({ accountId: optimizationExperiments.accountId });
-        if (row && status !== "halted" && opts?.credit !== false) {
-          await creditAlphaWealth(tx, row.accountId);
-        }
-      });
-    },
-
-    async markReadyToAdopt(experimentId, reason) {
-      // Mark only — no concludedAt, so the one-live-experiment unique index (which counts
-      // ready_to_adopt as live) keeps the slot occupied until the owner's manual adopt action
-      // applies the win. GATE 1 / WS-3.2: also stamps `readiedAt = now()` (migration 0059) — the
-      // moment this mark happened, which starts the 24h auto-adopt grace clock
-      // `getMatureReadyToAdopt` reads. A repeat mark (shouldn't happen in practice — an experiment
-      // only ever gets one decisive verdict) would reset the clock, which is the correct behavior
-      // if it ever did: the grace window is about time-since-suggested, not time-since-first-mark.
-      await db
-        .update(optimizationExperiments)
-        .set({ status: "ready_to_adopt", decisionReason: reason, readiedAt: new Date() })
-        .where(eq(optimizationExperiments.id, experimentId));
-    },
-
-    async adoptChallenger(experimentId, reason): Promise<CopyStrategy | null> {
-      // Autonomous adoption (spec 2026-07-14): playbook champion ← challenger, version-bumped;
-      // experiment → 'adopted'. Mirrors the manual adopt action's writes, run by the service role.
-      //
-      // Claim-first ordering (WS-3.2 race-condition fix, 2026-07-18): the status-guarded UPDATE
-      // runs FIRST and is the only thing that decides whether this call writes anything at all.
-      // The original ordering wrote the playbook unconditionally (guarded only by `if (exp)`,
-      // true for ANY existing row regardless of status) and gated only the wealth credit on the
-      // claim — so a race against the owner's manual dashboard actions (which also race this same
-      // tick) could commit the playbook write (challenger becomes champion — real outreach copy
-      // changes) even though the claim itself failed. Returning null means someone else already
-      // transitioned the row in the exact tick window; the caller must treat the owner's action as
-      // authoritative and write nothing.
-      //
-      // Task 7 / WS-1.1: also credits alpha-investing wealth — guarded the same way as
-      // concludeExperiment (only reached once the claim above actually transitioned the row).
-      return db.transaction(async (tx) => {
-        const [claimed] = await tx
-          .update(optimizationExperiments)
-          .set({ status: "adopted", decisionReason: reason, concludedAt: new Date() })
-          .where(
-            and(
-              eq(optimizationExperiments.id, experimentId),
-              inArray(optimizationExperiments.status, ["running", "ready_to_adopt"])
-            )
-          )
-          .returning({
-            accountId: optimizationExperiments.accountId,
-            challengerStrategy: optimizationExperiments.challengerStrategy,
-          });
-        if (!claimed) return null;
-
-        const newChampion = ((claimed.challengerStrategy as CopyStrategy | null) ?? {}) as CopyStrategy;
-        const [cur] = await tx
-          .select({ version: optimizationPlaybook.version })
-          .from(optimizationPlaybook)
-          .where(eq(optimizationPlaybook.accountId, claimed.accountId))
-          .limit(1);
-        await tx
-          .insert(optimizationPlaybook)
-          .values({
-            accountId: claimed.accountId,
-            championStrategy: newChampion,
-            version: (cur?.version ?? 0) + 1,
-            updatedAt: new Date(),
-          })
-          .onConflictDoUpdate({
-            target: optimizationPlaybook.accountId,
-            set: {
-              championStrategy: newChampion,
-              version: (cur?.version ?? 0) + 1,
-              updatedAt: new Date(),
-            },
-          });
-        await creditAlphaWealth(tx, claimed.accountId);
-        return newChampion;
-      });
-    },
-
-    async startExperiment(input): Promise<boolean> {
-      // The chained next test. The one-live-experiment partial unique index guards double-starts;
-      // a conflict means another experiment is already live for the account — skip, never throw.
-      // Task 7 / WS-1.1: debits alpha-investing wealth in the SAME transaction as the insert, so a
-      // 23505 conflict (caught below) rolls the debit back too — never a spend with no experiment.
-      try {
-        await db.transaction(async (tx) => {
-          await tx.insert(optimizationExperiments).values({
-            accountId: input.accountId,
-            stageKey: input.stageKey,
-            championStrategy: input.champion,
-            challengerStrategy: input.challenger,
-            allocationPct: 25,
-            minSample: 30,
-            status: "running",
-            alphaSpent: input.alphaSpent,
-          });
-          await debitAlphaWealth(tx, input.accountId, input.alphaSpent);
-        });
-        return true;
-      } catch (err) {
-        if ((err as { code?: string }).code === "23505") return false;
-        throw err;
-      }
-    },
-
-    async getAlphaWealth(accountId: string): Promise<number> {
-      // Task 7 / WS-1.1: a missing playbook row means the account has never adopted anything —
-      // that's the same "never tested before" state as a fresh account, so it gets the classical
-      // single-test alpha rather than null/zero (which would look exhausted and pause forever).
-      const [row] = await db
-        .select({ alphaWealth: optimizationPlaybook.alphaWealth })
-        .from(optimizationPlaybook)
-        .where(eq(optimizationPlaybook.accountId, accountId))
-        .limit(1);
-      return row?.alphaWealth ?? ALPHA_WEALTH_START;
-    },
-
-    // ── GATE 1 auto-adopt (enterprise-grade-brain spec, WS-3.2) ───────────────
-
-    async getAdoptionMode(): Promise<"auto" | "manual"> {
-      // Global rollout knob — same appSettings/eq-by-key pattern as getBestOfN/isKillSwitchOn
-      // above/below. 'manual' (suggest-only-forever, GATE 0's posture) is the default whenever
-      // the row is absent OR holds anything other than the literal string 'auto' — an owner must
-      // explicitly opt in for the auto-adopt pass to ever run.
-      const [row] = await db.select().from(appSettings).where(eq(appSettings.key, "adoption_mode"));
-      return row?.value === "auto" ? "auto" : "manual";
-    },
-
-    async getMatureReadyToAdopt(graceMs: number) {
-      const cutoff = new Date(Date.now() - graceMs);
-      const rows = await db
-        .select({
-          id: optimizationExperiments.id,
-          accountId: optimizationExperiments.accountId,
-          stageKey: optimizationExperiments.stageKey,
-          minSample: optimizationExperiments.minSample,
-          championStrategy: optimizationExperiments.championStrategy,
-          challengerStrategy: optimizationExperiments.challengerStrategy,
-          alphaSpent: optimizationExperiments.alphaSpent,
-        })
-        .from(optimizationExperiments)
-        .where(
-          and(
-            eq(optimizationExperiments.status, "ready_to_adopt"),
-            isNotNull(optimizationExperiments.readiedAt),
-            lte(optimizationExperiments.readiedAt, cutoff)
-          )
-        );
-      return rows.map((r) => ({
-        id: r.id,
-        accountId: r.accountId,
-        stageKey: r.stageKey as FunnelStageKey,
-        minSample: r.minSample,
-        championStrategy: (r.championStrategy ?? {}) as CopyStrategy,
-        challengerStrategy: (r.challengerStrategy ?? {}) as CopyStrategy,
-        alphaSpent: r.alphaSpent,
-      }));
-    },
-
-    // ── Live A/A canary (enterprise-grade-brain spec, WS-1.8) ─────────────────
-
-    async getCanaryAccountId(): Promise<string | null> {
-      const [row] = await db.select().from(appSettings).where(eq(appSettings.key, "aa_canary_account_id"));
-      const v = row?.value;
-      return typeof v === "string" && v.length > 0 ? v : null;
-    },
-
-    async getBoldShapesAccountIds(): Promise<string[]> {
-      // Message-shape selector (spec §7) — admin-pin LIST (same appSettings pattern as
-      // aa_canary_account_id, but a jsonb array). Empty whenever unset or malformed, so a bad value
-      // can never silently open the bold shapes to every account.
-      const [row] = await db.select().from(appSettings).where(eq(appSettings.key, "bold_shapes_account_ids"));
-      const v = row?.value;
-      return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string" && x.length > 0) : [];
-    },
-
-    async getAccountProfileConfig(accountId: string) {
-      // Config-aware selection (spec 2026-07-21): the plain CONFIG subset deriveAccountProfile reads
-      // for GENERATOR eligibility (→ highTrust). Config values only — never message text. Called
-      // once per chained experiment, and only when message_shape_auto is on (see optimize.ts).
-      const [copy] = await db
-        .select({ id: agents.id, config: agents.config })
-        .from(agents)
-        .where(and(eq(agents.accountId, accountId), eq(agents.kind, "copy")))
-        .limit(1);
-      const [account] = await db
-        .select({ industry: accounts.onboardingIndustry, websiteScan: accounts.websiteScan, valueProp: accounts.valueProp })
-        .from(accounts)
-        .where(eq(accounts.id, accountId))
-        .limit(1);
-      const config = (copy?.config ?? {}) as Partial<CopyConfig>;
-      const scan = account?.websiteScan as (WebsiteScan & { url?: string }) | null;
-      let hasArtifact = false;
-      if (copy) {
-        const [asset] = await db
-          .select({ url: agentAssets.url, filename: agentAssets.filename })
-          .from(agentAssets)
-          .where(eq(agentAssets.agentId, copy.id))
-          .limit(1);
-        hasArtifact = Boolean((asset?.url ?? asset?.filename)?.trim());
-      }
-      const [proofRow] = await db
-        .select({ n: count() })
-        .from(proofPoints)
-        .where(eq(proofPoints.accountId, accountId));
-      return {
-        cta: config.cta ?? null,
-        hasBookingUrl: Boolean(config.bookingUrl),
-        hasWebsiteUrl: Boolean(config.websiteUrl),
-        industry: account?.industry ?? null,
-        valueProp: account?.valueProp ?? scan?.summary ?? null,
-        hasArtifact,
-        proofCount: proofRow?.n ?? 0,
-      };
-    },
-
-    async ensureCanaryExperiment(accountId): Promise<boolean> {
-      // Champion vs an IDENTICAL challenger — zero user-facing difference; 50/50 split for power.
-      // Idempotent via the one-live unique index (23505 → already live, skip). Occupies the
-      // account's single experiment slot by design (runs GATE 0 → GATE 1 on the pilot account).
-      const [pb] = await db
-        .select({ championStrategy: optimizationPlaybook.championStrategy })
-        .from(optimizationPlaybook)
-        .where(eq(optimizationPlaybook.accountId, accountId))
-        .limit(1);
-      const champion = ((pb?.championStrategy as CopyStrategy | null) ?? {}) as CopyStrategy;
-      try {
-        await db.insert(optimizationExperiments).values({
-          accountId,
-          stageKey: "reply",
-          championStrategy: champion,
-          challengerStrategy: champion,
-          allocationPct: 50,
-          minSample: 30,
-          status: "running",
-        });
-        return true;
-      } catch (err) {
-        if ((err as { code?: string }).code === "23505") return false;
-        throw err;
-      }
     },
 
     // ── SchedulerStore ───────────────────────────────────────────────────────
@@ -2870,21 +2316,8 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         .limit(1);
       if (!lead?.aiInsights) return null;
 
-      // Self-optimizing loop (Phase 3 / WS-3.1): resolve once which strategy shapes THIS message.
-      // Locked rule: a lead drafts with the challenger strategy ONLY while its own experiment is
-      // still the account's LIVE (running) one; a lead from a concluded/superseded experiment
-      // falls back to the current champion — never a stale challenger. playbookVersion is always
-      // the champion's version (null when no playbook has been adopted yet).
-      const [experiment, champion] = await Promise.all([
-        fetchActiveExperiment(db, accountId),
-        fetchChampion(db, accountId),
-      ]);
-      const onLiveChallenger =
-        lead.strategyVariant === "challenger" &&
-        lead.experimentId != null &&
-        experiment != null &&
-        lead.experimentId === experiment.id;
-      const strategy = onLiveChallenger ? experiment.challengerStrategy : champion.strategy;
+      // The playbook champion shapes every message (null version when no playbook exists yet).
+      const champion = await fetchChampion(db, accountId);
 
       const [account] = await db.select().from(accounts).where(eq(accounts.id, accountId)).limit(1);
       const [campaign] = await db
@@ -3003,9 +2436,9 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           // truthfully instead of deflecting or getting flagged for a fabricated number (0046).
           proofPoints: await loadProofPoints(db, accountId),
           // WS-3.1: conversation drafting (replies + follow-ups) becomes strategy-aware — same
-          // resolved strategy as the attribution stamp below, so the prompt and the recipe never
-          // disagree about what shaped the message.
-          strategy,
+          // strategy as the attribution stamp below, so the prompt and the recipe never disagree
+          // about what shaped the message.
+          strategy: champion.strategy,
         },
         thread,
         agentTurns: agentMessages.length,
@@ -3013,9 +2446,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         lastAgentMessageAt,
         humanHandled: paused !== undefined,
         attribution: {
-          experimentId: lead.experimentId ?? null,
-          variant: (lead.strategyVariant as "champion" | "challenger" | null) ?? null,
-          strategy,
+          strategy: champion.strategy,
           playbookVersion: champion.version,
         },
       };

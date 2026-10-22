@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { normalizeLinkedInUrl, runCopyDraft, MAX_BEST_OF_N } from "./copy-draft";
 import type {
-  ActiveExperiment,
   CopyContext,
   CopyDraftDeps,
   CopyDraftStore,
@@ -56,10 +55,8 @@ class FakeCopyStore implements CopyDraftStore {
   suppressionLookups: string[] = [];
   /** tracks which store method was used per LinkedIn draft: 'pair' or 'single' */
   linkedInCallKinds: ("pair" | "single")[] = [];
-  // Phase 3 experiment plumbing — default to inert (no experiment, empty champion).
-  activeExperiment: ActiveExperiment | null = null;
+  // Playbook champion — defaults to an empty playbook.
   champion: { strategy: CopyStrategy; version: number | null } = { strategy: {}, version: null };
-  stamps: { leadId: string; experimentId: string; variant: string }[] = [];
 
   constructor(channels = { linkedin: true }, sendMode: "review" | "automatic" = "review") {
     this.context = {
@@ -113,18 +110,8 @@ class FakeCopyStore implements CopyDraftStore {
     const known = leadIds.map((id) => byId.get(id)).filter((l): l is DraftableLead => !!l);
     return rankByTilt(known, this.targetingProfile).map((l) => l.id);
   }
-  async getActiveExperiment() {
-    return this.activeExperiment;
-  }
   async getChampion() {
     return this.champion;
-  }
-  async stampLeadExperiment(
-    leadId: string,
-    experimentId: string,
-    variant: "champion" | "challenger"
-  ) {
-    this.stamps.push({ leadId, experimentId, variant });
   }
   // Task 3: only the thin trigger reads this (the core reads deps.bestOfN directly) — present
   // solely to satisfy CopyDraftStore; no test below depends on its value.
@@ -457,67 +444,41 @@ function makeCapturingDeps(store: FakeCopyStore): { deps: CopyDraftDeps; inputs:
   };
 }
 
-describe("runCopyDraft — experiment plumbing (Phase 3)", () => {
-  it("no experiment: champion is empty, no directives, no stamp (identical to before)", async () => {
+describe("runCopyDraft — playbook champion", () => {
+  it("empty playbook: no strategy directives", async () => {
     const store = new FakeCopyStore();
     store.leads = [lead("l1")];
     const { deps, inputs } = makeCapturingDeps(store);
     await runCopyDraft(PAYLOAD, deps);
     expect(inputs[0]!.context.strategy).toEqual({});
-    expect(store.stamps).toHaveLength(0);
   });
 
-  it("active experiment at 100%: the challenger strategy is applied and the lead is stamped challenger", async () => {
+  it("applies the playbook champion strategy to every lead", async () => {
     const store = new FakeCopyStore();
-    store.leads = [lead("l1")];
-    store.activeExperiment = {
-      id: "exp1",
-      allocationPct: 100,
-      challengerStrategy: { followupLength: "tight" },
-    };
-    const { deps, inputs } = makeCapturingDeps(store);
-    await runCopyDraft(PAYLOAD, deps);
-    expect(inputs[0]!.context.strategy).toEqual({ followupLength: "tight" });
-    expect(store.stamps).toEqual([{ leadId: "l1", experimentId: "exp1", variant: "challenger" }]);
-  });
-
-  it("active experiment at 0%: the adopted champion strategy is applied and the lead is stamped champion", async () => {
-    const store = new FakeCopyStore();
-    store.leads = [lead("l1")];
+    store.leads = [lead("l1"), lead("l2")];
     store.champion = { strategy: { openWith: "trigger" }, version: 1 };
-    store.activeExperiment = {
-      id: "exp1",
-      allocationPct: 0,
-      challengerStrategy: { followupLength: "tight" },
-    };
     const { deps, inputs } = makeCapturingDeps(store);
     await runCopyDraft(PAYLOAD, deps);
-    expect(inputs[0]!.context.strategy).toEqual({ openWith: "trigger" });
-    expect(store.stamps).toEqual([{ leadId: "l1", experimentId: "exp1", variant: "champion" }]);
+    expect(inputs.map((i) => i.context.strategy)).toEqual([{ openWith: "trigger" }, { openWith: "trigger" }]);
   });
 });
 
 // ── Stage 1: message-level recipe attribution ────────────────────────────────
 describe("runCopyDraft — recipe stamp (Stage 1)", () => {
-  it("stamps both rows of the pair with the first-touch recipe (challenger arm)", async () => {
+  it("stamps both rows of the pair with the first-touch recipe (playbook champion)", async () => {
     const store = new FakeCopyStore();
     store.leads = [lead("l1")];
     store.champion = { strategy: { openWith: "trigger" }, version: 2 };
     store.context.winningOpeners = ["Saw the Series B announcement"];
-    store.activeExperiment = {
-      id: "exp-1",
-      allocationPct: 100,
-      challengerStrategy: { openWith: "pain" },
-    };
     await runCopyDraft(PAYLOAD, makeDeps(store));
     expect(store.sends).toHaveLength(2);
     for (const row of store.sends) {
       expect(row.recipe).toEqual({
         v: 2,
         brain: "first_touch",
-        strategy: { openWith: "pain" },
-        experimentId: "exp-1",
-        variant: "challenger",
+        strategy: { openWith: "trigger" },
+        experimentId: null,
+        variant: null,
         playbookVersion: 2,
         exemplars: 1,
         promptHash: LINKEDIN_SYSTEM.hash,
@@ -526,7 +487,7 @@ describe("runCopyDraft — recipe stamp (Stage 1)", () => {
     }
   });
 
-  it("stamps a champion recipe with null experiment when nothing is running", async () => {
+  it("stamps an empty-strategy recipe when no playbook exists", async () => {
     const store = new FakeCopyStore();
     store.leads = [lead("l1")];
     await runCopyDraft(PAYLOAD, makeDeps(store));
@@ -624,22 +585,6 @@ describe("runCopyDraft — message-shape champion default (config-gated, OFF by 
     // identical to a no-shape champion (the safe floor is a no-op).
     expect(inputs[0]!.context.strategy).toEqual({});
     for (const row of store.sends) expect(row.recipe!.strategy).toEqual({});
-  });
-
-  it("ON never overrides the challenger arm's own strategy", async () => {
-    const store = new FakeCopyStore();
-    store.leads = [lead("l1")];
-    store.activeExperiment = {
-      id: "exp1",
-      allocationPct: 100,
-      challengerStrategy: { followupLength: "tight" },
-    };
-    const { deps, inputs } = makeCapturingDeps(store);
-    deps.messageShapeAuto = true;
-    await runCopyDraft(PAYLOAD, deps);
-    // challenger strategy is applied verbatim — the champion default never touches a challenger.
-    expect(inputs[0]!.context.strategy).toEqual({ followupLength: "tight" });
-    expect(inputs[0]!.context.strategy).not.toHaveProperty("messageShape");
   });
 
   it("ON never overrides a champion that already pins a shape", async () => {

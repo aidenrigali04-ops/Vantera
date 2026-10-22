@@ -46,7 +46,7 @@ export function TopChrome({
   return (
     <>
       <header
-        className="sticky top-0 z-40 hidden h-16 w-full shrink-0 items-center justify-between bg-[var(--fb)] px-6 lg:flex"
+        className="sticky top-0 z-40 hidden h-16 w-full shrink-0 items-center justify-between border-b border-[var(--line)] bg-[var(--surface)]/90 px-6 backdrop-blur-md backdrop-saturate-150 lg:flex"
       >
         <div className="flex items-center gap-3">
           <LogoTile />
@@ -57,7 +57,7 @@ export function TopChrome({
           <NavPill badges={badges} />
         </div>
 
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-3">
           <UtilityCluster notifications={notifications} />
           <AvatarTile initial={account.initial} displayName={account.displayName} email={account.email} signOut={signOut} />
         </div>

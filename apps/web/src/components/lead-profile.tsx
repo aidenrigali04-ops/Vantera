@@ -183,7 +183,7 @@ export function LeadProfileSheet({
                   <span
                     className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] ${
                       f.stale
-                        ? "bg-amber-500/12 text-amber-700 ring-1 ring-inset ring-amber-500/30 dark:text-amber-300"
+                        ? "bg-[var(--attention-tint)] text-[var(--attention)]"
                         : "text-muted-foreground ring-1 ring-inset ring-border"
                     }`}
                   >

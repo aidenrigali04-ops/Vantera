@@ -538,7 +538,7 @@ describe("runInbound — active responder (converse to close)", () => {
     newestUnsentMessageCreatedAt: null,
     lastAgentMessageAt: null,
     humanHandled: false,
-    attribution: { experimentId: null, variant: null, strategy: {}, playbookVersion: null },
+    attribution: { strategy: {}, playbookVersion: null },
     ...over,
   });
 
@@ -588,9 +588,9 @@ describe("runInbound — active responder (converse to close)", () => {
     expect(store.scheduledSends[0]!.body).toBe("Grab a slot: https://calendly.com/acme/intro?utm_content=vt-lead1&metadata%5Bvt%5D=vt-lead1");
   });
 
-  it("stamps the contextual reply with a conversation_reply recipe carrying the lead's arm (Stage 1)", async () => {
+  it("stamps the contextual reply with a conversation_reply recipe (Stage 1)", async () => {
     const store = storeWithBundle(
-      bundle({ attribution: { experimentId: "exp-9", variant: "champion", strategy: {}, playbookVersion: null } })
+      bundle({ attribution: { strategy: {}, playbookVersion: null } })
     );
 
     await runInbound(
@@ -602,8 +602,8 @@ describe("runInbound — active responder (converse to close)", () => {
       v: 2,
       brain: "conversation_reply",
       strategy: {},
-      experimentId: "exp-9",
-      variant: "champion",
+      experimentId: null,
+      variant: null,
       playbookVersion: null,
       exemplars: 0,
       promptHash: RESPOND_SYSTEM.hash,
@@ -615,8 +615,6 @@ describe("runInbound — active responder (converse to close)", () => {
     const store = storeWithBundle(
       bundle({
         attribution: {
-          experimentId: "exp-9",
-          variant: "challenger",
           strategy: { askStyle: "specific" },
           playbookVersion: 3,
         },
@@ -852,7 +850,7 @@ describe("runInbound — active responder — best-of-N (off by default)", () =>
     newestUnsentMessageCreatedAt: null,
     lastAgentMessageAt: null,
     humanHandled: false,
-    attribution: { experimentId: null, variant: null, strategy: {}, playbookVersion: null },
+    attribution: { strategy: {}, playbookVersion: null },
     ...over,
   });
 
@@ -1463,7 +1461,7 @@ describe("runInbound — responder freshness + thread hygiene", () => {
     newestUnsentMessageCreatedAt: null,
     lastAgentMessageAt: null,
     humanHandled: false,
-    attribution: { experimentId: null, variant: null, strategy: {}, playbookVersion: null },
+    attribution: { strategy: {}, playbookVersion: null },
     ...over,
   });
   const respondFn: InboundDeps["respondFn"] = async () => ({ message: "Happy to — quick look?", violations: [] });

@@ -32,7 +32,7 @@ export type TileGlyph =
   | "user-round"
   | "calendar-check"
   | "play"
-  | "sparkles"
+  | "sliders"
   | "pen-line"
   | "plug"
   | "link";
@@ -212,7 +212,7 @@ export function tilesFor(i: TodayInputs, x: TileExtras): ActionTileSpec[] {
       kind: "playbook_suggestion",
       priority: 3,
       tone: "routine",
-      glyph: "sparkles",
+      glyph: "sliders",
       title: "Playbook suggestion",
       meta: x.playbookSuggestion.meta,
       href: `/playbook?suggestion=${x.playbookSuggestion.id}`,

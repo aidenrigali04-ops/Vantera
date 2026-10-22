@@ -95,7 +95,7 @@ const QUEUE: TodayView["queue"]["rows"] = [
     name: "Lucía Ferreira",
     context: "Founder · Solstice Studio",
     initials: "LF",
-    signal: { label: "Launched agency", age: "14d", glyph: "rocket" },
+    signal: { label: "Launched agency", age: "14d", glyph: "banknote" },
     signalFallback: null,
     score: 76,
     step: "Invite",
@@ -201,7 +201,7 @@ const SENDERS: TodayView["senders"] = [
 /** The steady state — the one the blueprint's §4.1 wireframe draws. */
 export const STEADY: TodayView = {
   state: "steady",
-  greeting: "Morning, Aiden 👋",
+  greeting: "Morning, Aiden",
   sentence: "Overnight the engine drafted 14 messages and 3 people replied. Both senders are inside their limits.",
   primary: { label: "Open queue", count: 14, href: "/approvals" },
   banner: null,
@@ -236,7 +236,7 @@ export const STEADY: TodayView = {
       kind: "playbook_suggestion",
       priority: 3,
       tone: "routine",
-      glyph: "sparkles",
+      glyph: "sliders",
       title: "Playbook suggestion",
       meta: "you rejected ‹3› agency owners under 10 people — exclude 1–10?",
       href: "/playbook?suggestion=p1",

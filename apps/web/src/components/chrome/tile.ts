@@ -11,10 +11,10 @@ export const CHROME_MOTION = "transition-[color,background-color,box-shadow] dur
 /** Visible focus on every interactive element — the 3px accent halo from --focus-ring. */
 export const CHROME_FOCUS = "focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]";
 
-/** 40×40 surface tile (logo, utilities, avatar). */
+/** 36×36 hairline tile (utilities, avatar) — the landing replica's chrome buttons. */
 export const CHROME_TILE = [
-  "grid size-10 shrink-0 place-items-center rounded-[var(--r-tile)] bg-[var(--surface)]",
-  "shadow-[var(--shadow-tile)] ring-1 ring-[var(--line)] hover:ring-[var(--line-strong)]",
+  "grid size-9 shrink-0 place-items-center rounded-[var(--r-tile)] bg-[var(--surface)] text-[var(--ink-mid)]",
+  "shadow-[var(--shadow-tile)] ring-1 ring-[var(--line)] hover:bg-[var(--surface-2)] hover:text-[var(--ink)] hover:ring-[var(--line-strong)]",
   CHROME_MOTION,
   CHROME_FOCUS,
 ].join(" ");
@@ -26,7 +26,11 @@ export const CHROME_TILE = [
  * CONCENTRIC — outer 10 minus the 4px inset is 6.
  */
 export const CHROME_PILL =
-  "flex h-10 items-center rounded-[var(--r-tile)] bg-[var(--surface)] shadow-[var(--shadow-tile)] ring-1 ring-[var(--line)]";
+  "flex h-9 items-center rounded-[var(--r-tile)] bg-[var(--surface)] shadow-[var(--shadow-tile)] ring-1 ring-[var(--line)]";
+
+/** The primary nav's segmented track: a grey full-round rail holding white-on-active tabs. */
+export const CHROME_TRACK =
+  "flex h-10 items-center rounded-[var(--r-pill)] bg-[var(--surface-2)] ring-1 ring-[var(--line)]";
 
 /** Dropdown panel hanging below a tile or pill: --r-square corners, ring + --shadow-card. */
 export const CHROME_MENU =

@@ -5,21 +5,19 @@ import { useState, useSyncExternalStore } from "react";
 import { motion, MotionConfig } from "framer-motion";
 import {
   ArrowRight,
+  BadgeCheck,
   Check,
   CheckCircle2,
   Circle,
   Crosshair,
-  FlaskConical,
   Inbox,
   MessageSquare,
-  PartyPopper,
   Snowflake,
   Star,
   TrendingUp,
   UserPlus,
   Workflow,
   X,
-  Zap,
 } from "lucide-react";
 import { markNotificationsRead } from "@/components/notifications/actions";
 import { Badge } from "@/components/ui/badge";
@@ -117,18 +115,6 @@ export interface Milestones {
 
 export interface LearningProps {
   playbookVersion: number | null;
-  testing: {
-    label: string;
-    stageLabel: string;
-    startedAgo: string;
-    enrolled: number;
-    targetEnrolled: number;
-  } | null;
-  adopted: {
-    label: string;
-    whenAgo: string;
-    receipts: { sent: number; interested: number } | null;
-  } | null;
   focus: { label: string; deep: number; n: number } | null;
 }
 
@@ -267,7 +253,7 @@ function WorkingDashboard(props: DashboardViewProps) {
 
       {/* L1: the conversion-critical config gap — interested buyers with nowhere to book. */}
       {props.needsBookingUrl && (
-        <RevealItem className={cn(PANEL_SURFACE, "flex flex-wrap items-center justify-between gap-3 border-amber-500/30 p-5")}>
+        <RevealItem className={cn(PANEL_SURFACE, "flex flex-wrap items-center justify-between gap-3 border-[var(--attention)]/30 p-5")}>
           <div className="min-w-0">
             <Eyebrow>Action needed</Eyebrow>
             <p className="mt-2 text-sm text-foreground">
@@ -308,11 +294,8 @@ function WorkingDashboard(props: DashboardViewProps) {
  * when the loop has nothing yet (pre-onboarding).
  */
 function LearningLog({ learning }: { learning: LearningProps }) {
-  const { playbookVersion, testing, adopted, focus } = learning;
-  if (!testing && !adopted && !focus) return null;
-  const pct = testing
-    ? Math.min(100, Math.round((testing.enrolled / Math.max(1, testing.targetEnrolled)) * 100))
-    : 0;
+  const { playbookVersion, focus } = learning;
+  if (!focus) return null;
   return (
     <RevealItem className={cn(PANEL_SURFACE, "p-5")} data-copilot="dashboard-whats-working">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -332,58 +315,6 @@ function LearningLog({ learning }: { learning: LearningProps }) {
       </div>
 
       <ul className="mt-4 flex flex-col gap-3">
-        {testing && (
-          <li className="flex items-start gap-3">
-            <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-full bg-[var(--cyan-tint)] text-[var(--cyan-strong)]">
-              <FlaskConical className="size-3.5" />
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm text-foreground">
-                Testing <span className="font-medium">{testing.label}</span>
-                <span className="text-muted-foreground"> — measured on {testing.stageLabel}</span>
-              </p>
-              <div className="mt-1.5 flex items-center gap-3">
-                <span className="h-1.5 w-40 overflow-hidden rounded-full bg-foreground/[0.08]">
-                  <span
-                    className="block h-full rounded-full bg-[var(--cyan-strong)] transition-[width]"
-                    style={{ width: `${pct}%` }}
-                  />
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  {testing.enrolled} of ~{testing.targetEnrolled} prospects enrolled · decides on
-                  real outcomes · started {testing.startedAgo}
-                </span>
-              </div>
-            </div>
-          </li>
-        )}
-
-        {adopted && (
-          <li className="flex items-start gap-3">
-            <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-full bg-[var(--positive)]/12 text-[var(--positive)]">
-              <CheckCircle2 className="size-3.5" />
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm text-foreground">
-                Adopted <span className="font-medium">{adopted.label}</span>
-                <span className="text-muted-foreground">
-                  {" "}
-                  — won its test {adopted.whenAgo}, now your default
-                </span>
-              </p>
-              {adopted.receipts && (
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  Since the change: {adopted.receipts.sent}{" "}
-                  {adopted.receipts.sent === 1 ? "message" : "messages"} sent
-                  {adopted.receipts.interested > 0 && (
-                    <> · {adopted.receipts.interested} interested</>
-                  )}
-                </p>
-              )}
-            </div>
-          </li>
-        )}
-
         {focus && (
           <li className="flex items-start gap-3">
             <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-full bg-[var(--cyan-tint)] text-[var(--cyan-strong)]">
@@ -555,7 +486,7 @@ function WinsAttributionLine({ attribution }: { attribution: SignalAttribution[]
       className="group flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
     >
       <span className="flex items-center gap-1.5 font-data uppercase tracking-[0.14em] text-foreground/70">
-        <Zap className="size-3.5" aria-hidden /> Wins from
+        <TrendingUp className="size-3.5" aria-hidden /> Wins from
       </span>
       {top.map((row, i) => (
         <span key={row.kind}>
@@ -1032,8 +963,8 @@ function ConversionCelebration({
         <X className="size-4" />
       </button>
       <div className="flex flex-wrap items-center gap-4 pr-8">
-        <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-foreground text-background shadow-[var(--shadow-sm)]">
-          <PartyPopper className="size-5" />
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--positive-tint)] text-[var(--positive)]">
+          <BadgeCheck className="size-5" />
         </span>
         <div className="min-w-0">
           {/* T1: `converted` is closed-won, not a meeting — say what actually happened. */}
@@ -1286,8 +1217,7 @@ function FirstRunInProgress({
             <Eyebrow>Vera is working</Eyebrow>
             <span className="flex items-center gap-1.5 text-xs font-medium text-foreground">
               <span className="relative flex size-2" aria-hidden>
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-foreground/60" />
-                <span className="relative inline-flex size-2 rounded-full bg-foreground" />
+                <span className="relative inline-flex size-2 rounded-full bg-[var(--positive)]" />
               </span>
               Live
             </span>
