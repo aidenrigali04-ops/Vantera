@@ -52,7 +52,7 @@ export default async function IntegrationsPage() {
   const connectedCount = (rows ?? []).filter((r) => r.status === "active").length;
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-6">
+    <div className="mx-auto w-full flex max-w-2xl flex-col gap-6">
       <div className="border-b border-[var(--hairline)] pb-5">
         <h1 className="text-2xl font-semibold tracking-tight">CRM &amp; integrations</h1>
         <p className="mt-1.5 text-sm text-muted-foreground">

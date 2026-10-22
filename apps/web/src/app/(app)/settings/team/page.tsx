@@ -73,7 +73,7 @@ export default async function TeamPage() {
   const workspaceName = (account as { name?: string | null }).name ?? "Your workspace";
 
   return (
-    <div className="mx-auto max-w-2xl">
+    <div className="mx-auto w-full max-w-2xl">
       <div className="mb-6 border-b border-[var(--hairline)] pb-5">
         <h1 className="text-2xl font-semibold tracking-tight">Team</h1>
         <p className="mt-1.5 text-sm text-muted-foreground">

@@ -7,8 +7,8 @@ import { createClient } from "@/lib/supabase/server";
 import { signOut } from "./actions";
 import { pauseEngine, resumeEngine } from "./engine-actions";
 import { TopChrome } from "@/components/chrome";
+import { AppFrame } from "@/components/app/app-frame";
 import { landingFont } from "@/components/landing/font";
-import { Wash } from "@/components/today";
 import { workspaceIconCandidates } from "@/lib/workspace-icon";
 import type { AppNotification } from "@/components/notifications/notifications-bell";
 import CopilotOverlay from "@/components/copilot/copilot-overlay";
@@ -76,21 +76,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // surface they promised (e.g. /approvals) instead of dead-ending on /today after sign-in.
   const pathname = (await headers()).get("x-pathname");
   if (dest) redirect(loginRedirect(dest, pathname));
-  // Today owns the banner slot (blueprint Z1): its copy names the sender and says the drafts
-  // are held, and it deliberately shows no trial countdown (D9). Rendering the app-wide
-  // strips there too would double the same warning.
-  const path = (pathname ?? "").split("?")[0] ?? "";
-  const onToday = path.startsWith("/today");
-  // Same breath Today uses under the bar (TodayPageFrame: pt-8 / lg:pt-[72px]). These
-  // surfaces stay one viewport tall, so the inset comes out of the content area.
-  const oneScreen =
-    path === "/approvals" ||
-    path === "/inbox" ||
-    path === "/prospects" ||
-    path.startsWith("/prospects/") ||
-    path === "/playbook" ||
-    path === "/dashboard" ||
-    path === "/sequence";
+  // The per-route frame (Today scrolls, data surfaces stay one screen, Today owns its banner
+  // slot) is decided on the client in AppFrame: this layout is not re-rendered on navigation.
 
   const supabase = await createClient();
   const [
@@ -255,67 +242,57 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const initial = email.charAt(0).toUpperCase() || "?";
 
   return (
-    <div
-      className={`app-surface ${landingFont.variable} relative flex flex-col bg-[var(--canvas)] ${
-        oneScreen ? "min-h-screen lg:h-dvh lg:max-h-dvh" : "min-h-screen"
-      }`}
-    >
-      {/* Today's brand wash lives in the SHELL so it passes behind the chrome band (the band
-          is translucent and picks up the colour). Today only — it is a launchpad flourish,
-          never decoration on a data surface. */}
-      {onToday && <Wash />}
-      {/* Session-scoped analytics identity: recordings become filterable by user,
-          account, and plan. Values come from the validated session (rule 02). */}
-      {data.user && (
-        <ClarityIdentity
-          userId={data.user.id}
-          friendlyName={data.user.email ?? undefined}
-          tags={{
-            surface: "dashboard",
-            accountId: data.account?.id ?? "",
-            plan: billing?.plan ?? "",
-            subscriptionStatus: billing?.subscription_status ?? "",
-          }}
-        />
-      )}
-      <Suspense fallback={null}>
-        <RouteEvents />
-      </Suspense>
+    <AppFrame
+      className={`app-surface ${landingFont.variable}`}
+      top={
+        <>
+          {/* Session-scoped analytics identity: recordings become filterable by user,
+              account, and plan. Values come from the validated session (rule 02). */}
+          {data.user && (
+            <ClarityIdentity
+              userId={data.user.id}
+              friendlyName={data.user.email ?? undefined}
+              tags={{
+                surface: "dashboard",
+                accountId: data.account?.id ?? "",
+                plan: billing?.plan ?? "",
+                subscriptionStatus: billing?.subscription_status ?? "",
+              }}
+            />
+          )}
+          <Suspense fallback={null}>
+            <RouteEvents />
+          </Suspense>
 
-      <TopChrome
-        workspaceName={billing?.name?.trim() || data.account?.name || "Your workspace"}
-        workspaceIconCandidates={workspaceIconCandidates(billing?.website_scan?.faviconUrl, billing?.website_url)}
-        paused={Boolean(billing?.paused_at)}
-        badges={badges}
-        notifications={notifications}
-        account={{ initial, displayName: profile?.display_name ?? null, email }}
-        signOut={signOut}
-        pauseEngine={pauseEngine}
-        resumeEngine={resumeEngine}
-      />
-
-      {/* min-w-0 + overflow-x-clip: no surface can produce a sideways-scrolling page —
-          wide content clips (and scrolls inside its own container) instead.
-          Today grows with the work panel so the window scrolls to the rows below
-          the fold. The other surfaces stay one viewport tall. */}
-      <main
-        className={`flex min-w-0 flex-col overflow-x-clip px-4 pb-24 sm:px-6 lg:pb-6${
-          onToday ? " min-h-min" : " min-h-0 flex-1"
-        }${
-          !onToday ? " pt-8 lg:pt-[72px]" : ""
-        }${oneScreen ? " lg:overflow-hidden" : ""}`}
-      >
-        {!onToday && (connectionBanner || trialBanner) && (
-          <div className="mx-auto w-full max-w-[1248px] shrink-0">
+          <TopChrome
+            workspaceName={billing?.name?.trim() || data.account?.name || "Your workspace"}
+            workspaceIconCandidates={workspaceIconCandidates(billing?.website_scan?.faviconUrl, billing?.website_url)}
+            paused={Boolean(billing?.paused_at)}
+            badges={badges}
+            notifications={notifications}
+            account={{ initial, displayName: profile?.display_name ?? null, email }}
+            signOut={signOut}
+            pauseEngine={pauseEngine}
+            resumeEngine={resumeEngine}
+          />
+        </>
+      }
+      banners={
+        (connectionBanner || trialBanner) && (
+          <div className="mx-auto w-full max-w-[1400px] shrink-0">
             {connectionBanner && <TrialBanner {...connectionBanner} />}
             {trialBanner && <TrialBanner {...trialBanner} />}
           </div>
-        )}
-        {children}
-      </main>
-
-      <Toaster />
-      <CopilotOverlay />
-    </div>
+        )
+      }
+      overlays={
+        <>
+          <Toaster />
+          <CopilotOverlay />
+        </>
+      }
+    >
+      {children}
+    </AppFrame>
   );
 }

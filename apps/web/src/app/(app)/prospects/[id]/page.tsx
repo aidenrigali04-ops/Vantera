@@ -487,7 +487,7 @@ export default async function LeadProfilePage({ params }: { params: Promise<{ id
 
         {/* Journey — next step pinned on top, history behind it; only the history scrolls.
             R6 adds the user's own notes below the timeline — knowledge flows back in. */}
-        <div className="flex min-h-0 flex-col gap-4">
+        <div className="flex min-h-0 flex-col gap-4 lg:overflow-y-auto">
         <section className={cn(PANEL_SURFACE, "flex min-h-0 flex-1 flex-col p-5")}>
           <Eyebrow>Activity</Eyebrow>
           {next && (
