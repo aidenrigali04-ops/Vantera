@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Bot, CheckCircle2, Send } from "lucide-react";
+import { CheckCircle2, Forward, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { sendManualReply, resumeAutomation, delegateToAgent, type ReplyState } from "./reply-actions";
@@ -80,7 +80,7 @@ export function ReplyHandoff({
             <Send className="size-4" /> Send reply
           </Button>
           <Button size="sm" variant="outline" onClick={delegate} disabled={pending}>
-            <Bot className="size-4" /> Let agent handle
+            <Forward className="size-4" /> Let agent handle
           </Button>
         </div>
         {state?.error && <p className="text-xs text-muted-foreground">{state.error}</p>}

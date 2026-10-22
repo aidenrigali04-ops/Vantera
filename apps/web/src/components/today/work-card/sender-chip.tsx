@@ -14,7 +14,7 @@ export function SenderChip({ sender }: { sender: SenderChipRow }) {
     <Link
       href={`/settings/senders#${sender.id}`}
       title={sender.tooltip}
-      className="group inline-flex h-7 max-w-[220px] items-center gap-1.5 rounded-[var(--r-pill)] bg-[var(--surface-2)] py-0 pl-2 pr-2.5 transition-colors hover:bg-[var(--line)] focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]"
+      className="group inline-flex h-7 max-w-[220px] items-center gap-1.5 rounded-[var(--r-pill)] bg-[var(--surface)] py-0 pl-2 pr-2.5 ring-1 ring-[var(--line)] transition-colors hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]"
     >
       <span
         aria-hidden="true"

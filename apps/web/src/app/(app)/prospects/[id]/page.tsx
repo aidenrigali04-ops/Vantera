@@ -311,8 +311,8 @@ export default async function LeadProfilePage({ params }: { params: Promise<{ id
                 </span>
               )}
               {cooling && (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/12 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700 ring-1 ring-inset ring-amber-500/30">
-                  <span className="size-1.5 rounded-full bg-amber-500" /> {cooling.label} — going cold
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--attention-tint)] px-2.5 py-0.5 text-[11px] font-semibold text-[var(--attention)]">
+                  <span className="size-1.5 rounded-full bg-[var(--attention)]" /> {cooling.label} — going cold
                 </span>
               )}
               {fresh && (
@@ -320,7 +320,7 @@ export default async function LeadProfilePage({ params }: { params: Promise<{ id
                   className={cn(
                     "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px]",
                     fresh.stale
-                      ? "bg-amber-500/12 text-amber-700 ring-1 ring-inset ring-amber-500/30"
+                      ? "bg-[var(--attention-tint)] text-[var(--attention)]"
                       : "text-muted-foreground ring-1 ring-inset ring-border"
                   )}
                 >
@@ -487,7 +487,7 @@ export default async function LeadProfilePage({ params }: { params: Promise<{ id
 
         {/* Journey — next step pinned on top, history behind it; only the history scrolls.
             R6 adds the user's own notes below the timeline — knowledge flows back in. */}
-        <div className="flex min-h-0 flex-col gap-4">
+        <div className="flex min-h-0 flex-col gap-4 lg:overflow-y-auto">
         <section className={cn(PANEL_SURFACE, "flex min-h-0 flex-1 flex-col p-5")}>
           <Eyebrow>Activity</Eyebrow>
           {next && (

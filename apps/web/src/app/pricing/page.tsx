@@ -36,11 +36,13 @@ const ADDON_ICONS = { seat: UserPlus, linkedinAccount: Users } as const;
 export default function PricingPage() {
   const plans = getLandingPlans();
   const plan = headlinePlan(plans);
+  // The sender count is read from the plan's own capacity bullet, never hand-typed.
+  const senders = plan?.features.join("\n").match(/(\d+) LinkedIn senders? included/i)?.[1];
   const facts = plan
     ? [
         { value: `$${plan.monthlyUsd}`, label: "a month, everything included" },
         { value: `${TRIAL_DAYS} days`, label: "free trial to start" },
-        { value: `$${plan.annualMonthlyUsd}`, label: "a month, billed yearly" },
+        ...(senders ? [{ value: senders, label: "LinkedIn senders included" }] : []),
         { value: "Anytime", label: "cancel, no long-term contract" },
       ]
     : [];

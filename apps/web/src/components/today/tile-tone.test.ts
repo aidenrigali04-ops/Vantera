@@ -6,7 +6,7 @@ import { TONE_CLASSES, toneClasses } from "./tile-tone";
 
 describe("toneClasses", () => {
   it.each<[TileTone, string, string]>([
-    ["routine", "bg-[var(--surface-2)]", "text-[var(--ink)]"],
+    ["routine", "bg-[#e2defb]", "text-[#5b4bd1]"],
     ["replies", "bg-[var(--acc-tint)]", "text-[var(--acc-ink)]"],
     ["attention", "bg-[var(--attention-tint)]", "text-[var(--attention)]"],
     ["billing", "bg-[var(--danger-tint)]", "text-[var(--danger)]"],

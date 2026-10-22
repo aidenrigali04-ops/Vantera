@@ -32,7 +32,7 @@ export function PauseSendingForm({ outreachPaused }: PauseSendingFormProps) {
       </p>
       <p className="text-sm">
         Status:{" "}
-        <span className={outreachPaused ? "font-medium text-amber-600" : "font-medium text-[var(--positive)]"}>
+        <span className={outreachPaused ? "font-medium text-[var(--attention)]" : "font-medium text-[var(--positive)]"}>
           {outreachPaused ? "Paused" : "Active"}
         </span>
       </p>

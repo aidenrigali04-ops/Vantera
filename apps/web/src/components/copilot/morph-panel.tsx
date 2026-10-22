@@ -2,7 +2,19 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { ColorOrb } from "./color-orb";
+import { VanteraLogo } from "@/components/landing/vantera-logo";
+
+/** The copilot's mark: the app's blue logo tile, small. */
+function CopilotMark({ size }: { size: 20 | 24 }) {
+  return (
+    <span
+      aria-hidden
+      className={cn("grid shrink-0 place-items-center rounded-[6px] bg-[var(--acc,#1877f2)] text-white", size === 20 ? "size-5" : "size-6")}
+    >
+      <VanteraLogo className={size === 20 ? "size-3" : "size-3.5"} />
+    </span>
+  );
+}
 import { ConfirmationCard, OutcomeCard } from "./cards";
 import { useCopilot } from "./use-copilot";
 import { Walkthrough, type WalkStep } from "./walkthrough";
@@ -160,12 +172,8 @@ export function MorphPanel({ surface }: MorphPanelProps) {
               {/* Header */}
               <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
                 <div className="flex items-center gap-2">
-                  <ColorOrb
-                    dimension="20px"
-                    tones={{ base: "oklch(22.64% 0 0)" }}
-                    spinDuration={15}
-                  />
-                  <span className="text-sm font-medium">Ask AI</span>
+                  <CopilotMark size={20} />
+                  <span className="text-sm font-semibold">Ask Vantera</span>
                 </div>
                 <Button
                   variant="ghost"
@@ -181,7 +189,7 @@ export function MorphPanel({ surface }: MorphPanelProps) {
 
               {/* Escalation banner */}
               {escalate && (
-                <div className="bg-yellow-50 border-b border-yellow-200 px-4 py-2 text-xs text-yellow-800 shrink-0">
+                <div className="shrink-0 border-b border-[var(--line,rgba(12,16,26,0.08))] bg-[var(--attention-tint,#fdf3dc)] px-4 py-2 text-xs text-[var(--attention,#9a6a00)]">
                   Still stuck? Email{" "}
                   <a href="mailto:support@vanterasystem.com" className="underline">
                     support@vanterasystem.com
@@ -298,10 +306,10 @@ export function MorphPanel({ surface }: MorphPanelProps) {
             exit={{ opacity: 0, scale: 0.85 }}
             transition={{ duration: 0.12, ease: "easeOut" }}
             onClick={() => setOpen(true)}
-            className="flex cursor-pointer items-center gap-2 rounded-full border border-border bg-background px-3 py-2 shadow-lg"
+            className="flex cursor-pointer items-center gap-2 rounded-full border border-[var(--line,rgba(12,16,26,0.08))] bg-white py-1.5 pl-1.5 pr-3 shadow-[0_1px_2px_rgba(12,16,26,0.06),0_8px_24px_-12px_rgba(12,16,26,0.2)]"
           >
-            <ColorOrb dimension="24px" tones={{ base: "oklch(22.64% 0 0)" }} spinDuration={15} />
-            <span className="text-sm font-medium pr-1">Ask AI</span>
+            <CopilotMark size={24} />
+            <span className="pr-1 text-sm font-semibold">Ask Vantera</span>
           </motion.button>
         )}
       </AnimatePresence>

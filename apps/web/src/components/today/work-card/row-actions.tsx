@@ -56,7 +56,7 @@ function ActionTile({
       className={cn(
         "grid size-8 shrink-0 place-items-center rounded-[var(--r-btn)] transition-colors focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]",
         ink
-          ? "bg-[var(--ink)] text-[var(--ink-fg)] hover:bg-[#1f1f23]"
+          ? "bg-[var(--acc)] text-white hover:bg-[var(--acc-ink)]"
           : "bg-[var(--surface)] text-[var(--ink-mid)] ring-1 ring-[var(--line)] hover:bg-[var(--surface-2)] hover:text-[var(--ink)]"
       )}
     >

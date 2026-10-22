@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Bot, Sparkles, UserRound } from "lucide-react";
+import { PenLine } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
@@ -14,7 +14,7 @@ import { sendManualReply, draftWithVera, delegateToAgent } from "@/app/(app)/pro
  */
 
 const CLASS_CHIP: Record<string, string> = {
-  interested: "bg-[var(--positive)]/10 text-[var(--positive)]",
+  interested: "bg-[var(--acc-tint)] font-semibold text-[var(--acc-ink)]",
   not_interested: "bg-foreground/[0.06] text-muted-foreground",
 };
 
@@ -32,19 +32,16 @@ export function ConversationThread({ turns }: { turns: ThreadTurn[] }) {
         <li key={i} className={cn("flex", t.role === "agent" ? "justify-end" : "justify-start")}>
           <div
             className={cn(
-              "max-w-[78%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed",
+              "max-w-[78%] rounded-[14px] px-3.5 py-2.5 text-[13.5px] leading-relaxed",
               t.role === "agent"
-                ? "bg-[var(--cyan-tint)] text-foreground"
-                : "bg-foreground/[0.05] text-foreground"
+                ? "rounded-br-[4px] bg-[#eef4fe] text-[var(--ink-2)]"
+                : "rounded-bl-[4px] bg-[#f1f3f6] text-[var(--ink)]"
             )}
           >
             <p className="whitespace-pre-wrap">{t.text}</p>
             <p className="mt-1.5 flex flex-wrap items-center gap-2 text-[10.5px] text-muted-foreground">
               {t.role === "agent" ? (
-                <span className="inline-flex items-center gap-1">
-                  {t.manual ? <UserRound className="size-3" /> : <Bot className="size-3" />}
-                  {t.manual ? "You" : "Vera"}
-                </span>
+                <span className="font-medium">{t.manual ? "You" : "Vera"}</span>
               ) : (
                 <span>Them</span>
               )}
@@ -136,7 +133,7 @@ export function Composer({
             })
           }
         >
-          <Sparkles className="size-3.5" /> Draft with Vera
+          <PenLine className="size-3.5" /> Draft with Vera
         </Button>
         <Button
           size="sm"

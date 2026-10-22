@@ -19,7 +19,7 @@ export default function TodayError({ error, reset }: { error: Error & { digest?:
       <button
         type="button"
         onClick={reset}
-        className="mt-7 inline-flex h-10 items-center rounded-[var(--r-btn)] bg-[var(--ink)] px-4 text-[14px] font-medium text-[var(--ink-fg)] transition-colors hover:bg-[#1f1f23] focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]"
+        className="mt-7 inline-flex h-10 items-center rounded-[var(--r-btn)] bg-[var(--acc)] px-4 text-[14px] font-semibold text-white transition-colors hover:bg-[var(--acc-ink)] focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]"
       >
         Retry
       </button>

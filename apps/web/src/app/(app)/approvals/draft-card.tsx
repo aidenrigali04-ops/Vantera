@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { toast } from "sonner";
-import { AlertTriangle, MessageSquare, Wand2 } from "lucide-react";
+import { AlertTriangle, MessageSquare, PenLine } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -73,8 +73,8 @@ export function DraftCard({ draft, compact = false }: { draft: DraftRow; compact
   const content = (
     <div className="space-y-3">
       {draft.style_flags && (
-        <div className="flex items-start justify-between gap-3 rounded-md bg-amber-500/10 px-2.5 py-1.5">
-          <p className="flex items-start gap-1.5 text-xs text-amber-700 dark:text-amber-400">
+        <div className="flex items-start justify-between gap-3 rounded-[var(--r-btn)] bg-[var(--attention-tint)] px-3 py-2">
+          <p className="flex items-start gap-1.5 text-xs font-medium text-[var(--attention)]">
             <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
             Style check: {draft.style_flags}
           </p>
@@ -90,16 +90,16 @@ export function DraftCard({ draft, compact = false }: { draft: DraftRow; compact
                 variant="outline"
                 disabled={busy !== null}
                 data-copilot="fix-draft"
-                className="h-6 gap-1 border-amber-500/40 bg-transparent px-2 text-xs text-amber-700 hover:bg-amber-500/15 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300"
+                className="h-6 gap-1 border-[var(--attention)]/30 bg-transparent px-2 text-xs text-[var(--attention)] hover:bg-[var(--attention-tint)] hover:text-[var(--attention)]"
               >
-                <Wand2 className="size-3" />
+                <PenLine className="size-3" />
                 {busy === "fix" ? "Fixing…" : "Fix"}
               </Button>
             </form>
           )}
         </div>
       )}
-      {notice && <p className="text-xs text-amber-700 dark:text-amber-400">{notice}</p>}
+      {notice && <p className="text-xs font-medium text-[var(--attention)]">{notice}</p>}
 
       {editing ? (
         <form
@@ -122,7 +122,7 @@ export function DraftCard({ draft, compact = false }: { draft: DraftRow; compact
           </div>
         </form>
       ) : (
-        <div className="rounded-md border border-border bg-muted/30 p-3 text-sm">
+        <div className="rounded-[14px] rounded-br-[4px] bg-[#eef4fe] px-4 py-3 text-[13.5px] leading-relaxed text-[var(--ink-2)]">
           {draft.subject && <p className="mb-1 font-medium">{draft.subject}</p>}
           <p className="whitespace-pre-wrap">{draft.body}</p>
         </div>

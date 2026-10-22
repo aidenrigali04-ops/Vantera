@@ -25,17 +25,17 @@ describe("InkButton", () => {
     expect(html).toContain('<button type="submit"');
   });
 
-  it("is the ink fill: --ink background, --ink-fg text, 40px tall, --r-btn radius, focus ring", () => {
+  it("is the landing-blue fill: --acc background, white text, 40px tall, --r-btn radius, focus ring", () => {
     const html = renderToStaticMarkup(<InkButton href="/inbox">Open inbox</InkButton>);
     for (const cls of [
       "h-10",
       "px-4",
       "rounded-[var(--r-btn)]",
-      "bg-[var(--ink)]",
-      "text-[var(--ink-fg)]",
+      "bg-[var(--acc)]",
+      "text-white",
       "text-sm",
-      "font-medium",
-      "hover:bg-[#1f1f23]",
+      "font-semibold",
+      "hover:bg-[var(--acc-ink)]",
       "active:translate-y-[0.5px]",
       "focus-visible:shadow-[var(--focus-ring)]",
       "duration-120",

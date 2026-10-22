@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Rocket, Settings2 } from "lucide-react";
+import { ArrowRight, Columns3, Settings2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { Panel, Eyebrow } from "@/components/ui/panel";
 import { KpiTile, KpiGrid } from "@/components/ui/kpi";
@@ -149,7 +149,6 @@ function PausedCallout({ count }: { count: number }) {
       <Panel interactive className="flex items-center justify-between p-4">
         <div className="flex items-center gap-3">
           <span className="relative flex size-2">
-            <span className="absolute inline-flex size-full animate-ping rounded-full bg-[var(--cyan)]/60 motion-reduce:animate-none" />
             <span className="relative inline-flex size-2 rounded-full bg-[var(--cyan)]" />
           </span>
           <p className="text-sm">
@@ -206,7 +205,7 @@ function EmptyState() {
     >
       <Panel className="flex flex-col items-center px-6 py-16 text-center">
         <div className="flex size-12 items-center justify-center rounded-full bg-[var(--cyan-tint)] text-[var(--cyan-strong)]">
-          <Rocket className="size-5" aria-hidden />
+          <Columns3 className="size-5" aria-hidden />
         </div>
         <h2 className="mt-5 font-heading text-lg font-semibold">Your pipeline is ready to run</h2>
         <p className="mt-2 max-w-sm text-sm text-muted-foreground">

@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { orThrow } from "@/lib/supabase/guard";
 import { Panel } from "@/components/ui/panel";
 import { cn } from "@/lib/utils";
+import { PageHeader, SEGMENT_TRACK, segmentClass } from "@/components/app/surface";
 import { type LeadProfile } from "@/components/lead-profile";
 import { BulkApprove } from "./bulk-approve";
 import { LEAD_PROFILE_FIELDS } from "@/components/lead-profile-fields";
@@ -166,24 +167,24 @@ export default async function ReviewPage({
   return (
     // One-screen on desktop: header + view tabs pinned; the queue scrolls in its own region.
     <div className="mx-auto flex w-full max-w-3xl flex-col lg:min-h-0 lg:flex-1">
-      <div className="mb-6 flex shrink-0 flex-wrap items-end justify-between gap-3 border-b border-[var(--hairline)] pb-5">
-        <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Approvals</h1>
-        <p className="mt-1.5 text-sm text-muted-foreground">
-          {view === "queue"
+      <PageHeader
+        className="mb-5"
+        title="Approvals"
+        subtitle={
+          view === "queue"
             ? `${count ?? 0} draft${count === 1 ? "" : "s"} across ${groups.length} prospect${
                 groups.length === 1 ? "" : "s"
               } waiting. Nothing sends without your approval.`
-            : `${count ?? 0} message${count === 1 ? "" : "s"} past approval — approved, scheduled, sent, or stopped.`}
-        </p>
-        </div>
+            : `${count ?? 0} message${count === 1 ? "" : "s"} past approval — approved, scheduled, sent, or stopped.`
+        }
+      >
         {view === "queue" && (
           <BulkApprove cleanCount={(rows ?? []).filter((r) => !r.style_flags).length} />
         )}
-      </div>
+      </PageHeader>
 
       <div className="mb-5 shrink-0">
-        <div className="inline-flex items-center gap-1 rounded-xl border border-[var(--hairline)] bg-[var(--tint)] p-1 text-sm">
+        <div className={SEGMENT_TRACK}>
           {VIEWS.map((v) => {
             const isActive = view === v;
             return (
@@ -191,12 +192,7 @@ export default async function ReviewPage({
                 key={v}
                 href={withChannel(v === "queue" ? {} : { view: v })}
                 aria-current={isActive ? "page" : undefined}
-                className={cn(
-                  "inline-flex items-center rounded-lg px-3 py-1.5 font-medium transition-colors",
-                  isActive
-                    ? "bg-white text-foreground shadow-[var(--shadow-sm)] ring-1 ring-[var(--hairline)]"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
+                className={segmentClass(isActive)}
               >
                 {v === "queue" ? "Queue" : "Processed"}
               </Link>
@@ -209,7 +205,9 @@ export default async function ReviewPage({
 
       {!rows || rows.length === 0 ? (
         <Panel className="flex flex-col items-center gap-3 border-dashed py-10 text-center">
-          <Inbox className="size-8 text-muted-foreground" />
+          <span className="grid size-11 place-items-center rounded-xl bg-[#d5efdf] text-[#13824a]">
+            <Inbox className="size-5" strokeWidth={2} />
+          </span>
           <h2 className="font-heading text-base font-semibold">
             {view === "queue" ? "Queue's clear" : "Nothing processed yet"}
           </h2>

@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { ChevronRight, MessageSquare } from "lucide-react";
 import { Panel } from "@/components/ui/panel";
+import { Avatar } from "@/components/today/work-card/chips";
+import { initials } from "@/lib/today/metrics";
 import { LeadProfileLink, type LeadProfile } from "@/components/lead-profile";
 import { ScoreBadge, SourceBadge, WhyNowLine } from "@/components/lead-why-now";
 import { DraftCard, type DraftRow } from "./draft-card";
@@ -45,18 +47,19 @@ export function ProspectReviewCard({
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
-        className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-foreground/[0.02]"
+        className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-[#f5f9ff]"
       >
         <ChevronRight
           className={`size-4 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-90" : ""}`}
         />
+        <Avatar initials={initials(name)} size={40} />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="truncate font-medium">{name}</span>
+            <span className="truncate text-[14px] font-semibold text-[var(--ink)]">{name}</span>
             <SourceBadge source={lead?.source} />
             {score !== null && <ScoreBadge score={score} withVerdict />}
           </div>
-          {context && <p className="truncate text-sm text-muted-foreground">{context}</p>}
+          {context && <p className="truncate text-[13px] text-[var(--ink-dim)]">{context}</p>}
           {/* The "because" behind the draft — approve without expanding, informed. */}
           {lead && <WhyNowLine lead={lead} />}
         </div>
@@ -67,14 +70,14 @@ export function ProspectReviewCard({
               {linkedin.length}
             </span>
           )}
-          <span className="rounded-full bg-muted px-2 py-0.5 font-medium text-foreground/70">
+          <span className="rounded-full bg-[var(--acc-tint)] px-2 py-0.5 font-semibold tabular-nums text-[var(--acc-ink)]">
             {drafts.length} draft{drafts.length === 1 ? "" : "s"}
           </span>
         </div>
       </button>
 
       {open && (
-        <div className="space-y-5 border-t border-border px-4 py-4">
+        <div className="space-y-5 border-t border-[var(--line)] bg-[#fbfcfd] px-4 py-4">
           {lead && (
             <LeadProfileLink
               lead={lead}

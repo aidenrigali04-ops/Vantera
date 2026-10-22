@@ -120,7 +120,7 @@ function signalGlyph(kind: string | null): SignalGlyph {
   if (k.includes("hiring") || k.includes("job")) return "briefcase";
   if (k.includes("post") || k.includes("comment") || k.includes("engag")) return "message-circle";
   if (k.includes("role") || k.includes("promot") || k.includes("title")) return "arrow-up-right";
-  if (k.includes("fund") || k.includes("launch") || k.includes("raise")) return "rocket";
+  if (k.includes("fund") || k.includes("launch") || k.includes("raise")) return "banknote";
   return null;
 }
 
@@ -624,9 +624,9 @@ export async function loadToday(supabase: SupabaseClient, userId: string, now = 
   const nextRunLabel = inputs.engine.nextRunAt ? fmtTime(new Date(inputs.engine.nextRunAt), tz) : null;
   const firstName = (prof?.display_name ?? "").trim().split(/\s+/)[0] ?? "";
   const hourNow = Number(new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "numeric", hour12: false }).format(now)) % 24;
-  // Owner's call (2026-08-22): a wave instead of the full stop. This deliberately overrides
-  // the blueprint's no-emoji line for the greeting — and only the greeting.
-  const greeting = firstName ? `${greetingWord(hourNow)}, ${firstName} 👋` : `${greetingWord(hourNow)} 👋`;
+  // No emoji: the 2026-08-22 wave was retired in the 2026-10-21 polish pass (owner: remove
+  // decorative symbols). The blueprint's no-emoji line holds everywhere again.
+  const greeting = firstName ? `${greetingWord(hourNow)}, ${firstName}` : greetingWord(hourNow);
 
   const defaultTab: TodayView["defaultTab"] = draftsTotal > 0 ? "queue" : repliesWaiting > 0 ? "replies" : "activity";
 

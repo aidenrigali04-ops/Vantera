@@ -4,6 +4,7 @@ import Link from "next/link";
 import { TopChrome } from "@/components/chrome";
 import { TodayClient } from "@/app/(app)/today/today-client";
 import { Wash } from "@/components/today";
+import { landingFont } from "@/components/landing/font";
 import { PREVIEW_STATES, type PreviewStateKey } from "./fixtures";
 
 const noop = async () => {};
@@ -18,7 +19,7 @@ const noopEngine = async () => ({});
 export function PreviewClient({ state, tab }: { state: PreviewStateKey; tab: "queue" | "replies" | "activity" }) {
   const view = PREVIEW_STATES[state];
   return (
-    <div className="app-surface relative min-h-screen bg-[var(--canvas)] pb-24 lg:pb-0">
+    <div className={`app-surface ${landingFont.variable} relative min-h-screen bg-[var(--canvas)] pb-24 lg:pb-0`}>
       <Wash />
       <TopChrome
         workspaceName="Vantera"
@@ -31,7 +32,7 @@ export function PreviewClient({ state, tab }: { state: PreviewStateKey; tab: "qu
         pauseEngine={noopEngine}
         resumeEngine={noopEngine}
       />
-      <div className="mx-auto flex w-full max-w-[1200px] flex-wrap gap-1.5 px-6 pt-4">
+      <div className="mx-auto flex w-full max-w-[1400px] flex-wrap gap-1.5 px-4 pt-4 sm:px-6">
         {(Object.keys(PREVIEW_STATES) as PreviewStateKey[]).map((key) => (
           <Link
             key={key}
@@ -46,7 +47,10 @@ export function PreviewClient({ state, tab }: { state: PreviewStateKey; tab: "qu
           </Link>
         ))}
       </div>
-      <TodayClient view={view} tab={tab} openDraftId={null} />
+      {/* The shell's main gutters (AppFrame), which the preview renders without. */}
+      <div className="px-4 pb-16 sm:px-6">
+        <TodayClient view={view} tab={tab} openDraftId={null} />
+      </div>
     </div>
   );
 }

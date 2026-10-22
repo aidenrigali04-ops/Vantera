@@ -2,16 +2,7 @@
 
 import { useCallback, useId, useRef, useState } from "react";
 import Link from "next/link";
-import {
-  Bell,
-  CalendarCheck2,
-  CircleCheck,
-  Flame,
-  MessageSquare,
-  Snowflake,
-  UserRound,
-  type LucideIcon,
-} from "lucide-react";
+import { Bell, CalendarCheck2, CircleCheck, MessageSquare, Snowflake, TrendingUp, UserRound, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { markNotificationsRead } from "@/components/notifications/actions";
 import type { AppNotification } from "@/components/notifications/notifications-bell";
@@ -23,7 +14,7 @@ const KIND_ICON: Record<AppNotification["kind"], LucideIcon> = {
   reply: MessageSquare,
   converted: CircleCheck,
   exhausted: Snowflake,
-  hot_signal: Flame,
+  hot_signal: TrendingUp,
   needs_human: UserRound,
   meeting_booked: CalendarCheck2,
 };
@@ -97,15 +88,15 @@ export function BellTile({ notifications, className }: { notifications: AppNotif
         title="Notifications"
         className={cn(
           CHROME_TILE,
-          "relative text-[var(--fb)] hover:text-[var(--fb)]",
-          open && "text-[var(--fb)] ring-[var(--line-strong)]"
+          "relative",
+          open && "bg-[var(--surface-2)] text-[var(--ink)] ring-[var(--line-strong)]"
         )}
       >
-        <Bell className="size-4.5" strokeWidth={1.75} aria-hidden="true" />
+        <Bell className="size-4" strokeWidth={2} aria-hidden="true" />
         {unread > 0 && (
           <span
             aria-hidden="true"
-            className="absolute -right-1 -top-1 grid h-[18px] min-w-[18px] place-items-center rounded-[var(--r-pill)] bg-[var(--ink)] px-1 font-mono text-[10px] font-semibold leading-none text-[var(--ink-fg)] ring-2 ring-[var(--surface)]"
+            className="absolute -right-1 -top-1 grid h-[18px] min-w-[18px] place-items-center rounded-[var(--r-pill)] bg-[var(--acc)] px-1 font-mono text-[10px] font-semibold leading-none text-white ring-2 ring-[var(--surface)]"
           >
             {unread > 9 ? "9+" : unread}
           </span>

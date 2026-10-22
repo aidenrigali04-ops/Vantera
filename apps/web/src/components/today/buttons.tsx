@@ -29,8 +29,10 @@ interface ButtonBase {
 
 export type InkButtonProps = ButtonBase & { count?: number | null } & (LinkTarget | ClickTarget | ActionTarget);
 
+// The landing's solid blue call to action (components/landing/frame.tsx PRIMARY_BUTTON),
+// at app height. Still exported as InkButton: the name is the role (the one primary), not the hue.
 const INK =
-  "inline-flex h-10 items-center justify-center gap-3 whitespace-nowrap rounded-[var(--r-btn)] bg-[var(--ink)] px-4 text-sm font-medium text-[var(--ink-fg)] hover:bg-[#1f1f23] active:translate-y-[0.5px] disabled:pointer-events-none disabled:opacity-60";
+  "inline-flex h-10 items-center justify-center gap-3 whitespace-nowrap rounded-[var(--r-btn)] bg-[var(--acc)] px-4 text-sm font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.16),0_1px_2px_rgba(16,24,40,0.14)] hover:bg-[var(--acc-ink)] active:translate-y-[0.5px] disabled:pointer-events-none disabled:opacity-60";
 
 export function InkButton({ children, glyph, count, className, "aria-label": ariaLabel, ...target }: InkButtonProps) {
   const classes = cn(INK, HOVER_TRANSITION, FOCUS_RING, className);
@@ -71,7 +73,7 @@ export function InkButton({ children, glyph, count, className, "aria-label": ari
 export type GhostButtonProps = ButtonBase & (LinkTarget | ClickTarget);
 
 const GHOST =
-  "inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-[var(--r-btn)] bg-transparent px-3 text-sm font-medium text-[var(--ink)] ring-1 ring-[var(--line)] hover:bg-[var(--surface-2)] disabled:pointer-events-none disabled:opacity-60";
+  "inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-[var(--r-btn)] bg-[var(--surface)] px-3 text-sm font-medium text-[var(--ink)] shadow-[var(--shadow-tile)] ring-1 ring-[var(--line)] hover:bg-[var(--surface-2)] hover:ring-[var(--line-strong)] disabled:pointer-events-none disabled:opacity-60";
 
 export function GhostButton({ children, glyph, className, "aria-label": ariaLabel, ...target }: GhostButtonProps) {
   const classes = cn(GHOST, HOVER_TRANSITION, FOCUS_RING, className);

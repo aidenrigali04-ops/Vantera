@@ -13,15 +13,14 @@ export function Stat({ stat, rule = false, className }: { stat: StatTile; rule?:
   return (
     <div
       className={cn(
-        "relative flex h-[88px] min-w-0 flex-1 flex-col justify-center gap-2",
-        rule &&
-          "lg:pl-6 lg:before:absolute lg:before:left-0 lg:before:top-1/2 lg:before:h-7 lg:before:w-px lg:before:-translate-y-1/2 lg:before:bg-[var(--line)] lg:before:content-['']",
+        "relative flex min-w-0 flex-1 flex-col justify-center gap-2 px-5 py-5",
+        rule && "lg:border-l lg:border-[var(--line)]",
         className,
       )}
     >
       <dt className="truncate text-xs font-medium leading-4 text-[var(--ink-dim)]">{stat.label}</dt>
       {/* `.app-surface .font-mono` pins letter-spacing to 0; the blueprint's -0.01em needs the important flag */}
-      <dd className="truncate font-mono text-[28px] font-semibold leading-8 tracking-[-0.01em]! text-[var(--ink)] max-md:text-2xl">
+      <dd className="truncate font-mono text-[30px] font-semibold leading-8 tracking-[-0.03em]! text-[var(--ink)] max-md:text-2xl">
         {stat.value}
       </dd>
       <dd className="truncate text-[13px] leading-[18px] text-[var(--ink-dim)]">
@@ -33,7 +32,12 @@ export function Stat({ stat, rule = false, className }: { stat: StatTile; rule?:
 
 export function StatRow({ stats, className }: { stats: TodayView["stats"]; className?: string }) {
   return (
-    <dl className={cn("grid grid-cols-2 gap-x-6 gap-y-4 lg:flex lg:gap-0", className)}>
+    <dl
+      className={cn(
+        "grid grid-cols-2 overflow-hidden rounded-[var(--r-card)] bg-[var(--surface)] shadow-[var(--shadow-card)] ring-1 ring-[var(--line)] max-lg:[&>*:nth-child(even)]:border-l max-lg:[&>*:nth-child(even)]:border-[var(--line)] max-lg:[&>*:nth-child(n+3)]:border-t max-lg:[&>*:nth-child(n+3)]:border-[var(--line)] lg:flex",
+        className,
+      )}
+    >
       {stats.map((stat, i) => (
         <Stat key={i} stat={stat} rule={i > 0} />
       ))}

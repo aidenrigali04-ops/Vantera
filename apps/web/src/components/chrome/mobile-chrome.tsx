@@ -43,11 +43,11 @@ export function MobileChrome({ workspaceName, paused = false, badges, notificati
 
   return (
     <>
-      <div className="sticky top-0 z-40 flex h-12 shrink-0 items-center gap-3 bg-[var(--fb)] px-4 lg:hidden">
+      <div className="sticky top-0 z-40 flex h-12 shrink-0 items-center gap-3 border-b border-[var(--line)] bg-[var(--surface)]/90 px-4 backdrop-blur-md lg:hidden">
         <Link
           href="/today"
           aria-label="Vantera home"
-          className={cn("grid size-8 shrink-0 place-items-center rounded-[var(--r-btn)] text-white", CHROME_FOCUS)}
+          className={cn("grid size-8 shrink-0 place-items-center rounded-[var(--r-btn)] bg-[var(--acc)] text-white", CHROME_FOCUS)}
         >
           <VanteraLogo className="size-4.5" />
         </Link>
@@ -60,7 +60,7 @@ export function MobileChrome({ workspaceName, paused = false, badges, notificati
               className="size-1.5 shrink-0 rounded-full bg-[var(--attention)]"
             />
           )}
-          <span className="truncate text-sm font-medium text-white">{workspaceName}</span>
+          <span className="truncate text-sm font-medium text-[var(--ink-2)]">{workspaceName}</span>
         </span>
         <div className="flex shrink-0 items-center gap-1.5">
           <BellTile notifications={notifications} />
@@ -86,7 +86,7 @@ export function MobileChrome({ workspaceName, paused = false, badges, notificati
                 <span className="relative">
                   <Icon className="size-5" strokeWidth={1.75} aria-hidden="true" />
                   {badgeText && (
-                    <span className="absolute -right-2.5 -top-1.5 grid h-4 min-w-4 place-items-center rounded-[var(--r-pill)] bg-[var(--ink)] px-1 font-mono text-[10px] font-semibold leading-none text-[var(--ink-fg)] ring-2 ring-[var(--surface)]">
+                    <span className="absolute -right-2.5 -top-1.5 grid h-4 min-w-4 place-items-center rounded-[var(--r-pill)] bg-[var(--acc)] px-1 font-mono text-[10px] font-semibold leading-none text-white ring-2 ring-[var(--surface)]">
                       {badgeText}
                     </span>
                   )}

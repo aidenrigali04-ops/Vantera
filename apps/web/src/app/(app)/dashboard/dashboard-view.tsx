@@ -5,6 +5,7 @@ import { useState, useSyncExternalStore } from "react";
 import { motion, MotionConfig } from "framer-motion";
 import {
   ArrowRight,
+  BadgeCheck,
   Check,
   CheckCircle2,
   Circle,
@@ -12,14 +13,12 @@ import {
   FlaskConical,
   Inbox,
   MessageSquare,
-  PartyPopper,
   Snowflake,
   Star,
   TrendingUp,
   UserPlus,
   Workflow,
   X,
-  Zap,
 } from "lucide-react";
 import { markNotificationsRead } from "@/components/notifications/actions";
 import { Badge } from "@/components/ui/badge";
@@ -267,7 +266,7 @@ function WorkingDashboard(props: DashboardViewProps) {
 
       {/* L1: the conversion-critical config gap — interested buyers with nowhere to book. */}
       {props.needsBookingUrl && (
-        <RevealItem className={cn(PANEL_SURFACE, "flex flex-wrap items-center justify-between gap-3 border-amber-500/30 p-5")}>
+        <RevealItem className={cn(PANEL_SURFACE, "flex flex-wrap items-center justify-between gap-3 border-[var(--attention)]/30 p-5")}>
           <div className="min-w-0">
             <Eyebrow>Action needed</Eyebrow>
             <p className="mt-2 text-sm text-foreground">
@@ -555,7 +554,7 @@ function WinsAttributionLine({ attribution }: { attribution: SignalAttribution[]
       className="group flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
     >
       <span className="flex items-center gap-1.5 font-data uppercase tracking-[0.14em] text-foreground/70">
-        <Zap className="size-3.5" aria-hidden /> Wins from
+        <TrendingUp className="size-3.5" aria-hidden /> Wins from
       </span>
       {top.map((row, i) => (
         <span key={row.kind}>
@@ -1032,8 +1031,8 @@ function ConversionCelebration({
         <X className="size-4" />
       </button>
       <div className="flex flex-wrap items-center gap-4 pr-8">
-        <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-foreground text-background shadow-[var(--shadow-sm)]">
-          <PartyPopper className="size-5" />
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--positive-tint)] text-[var(--positive)]">
+          <BadgeCheck className="size-5" />
         </span>
         <div className="min-w-0">
           {/* T1: `converted` is closed-won, not a meeting — say what actually happened. */}
@@ -1286,8 +1285,7 @@ function FirstRunInProgress({
             <Eyebrow>Vera is working</Eyebrow>
             <span className="flex items-center gap-1.5 text-xs font-medium text-foreground">
               <span className="relative flex size-2" aria-hidden>
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-foreground/60" />
-                <span className="relative inline-flex size-2 rounded-full bg-foreground" />
+                <span className="relative inline-flex size-2 rounded-full bg-[var(--positive)]" />
               </span>
               Live
             </span>
