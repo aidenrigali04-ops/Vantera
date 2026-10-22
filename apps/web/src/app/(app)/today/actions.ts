@@ -64,22 +64,6 @@ export async function markTodayViewed(): Promise<void> {
 }
 
 /**
- * The first approval session is over (queue cleared or the user left the queue) — from now
- * on /today is the home (blueprint §8 "First session").
- */
-export async function markFirstSessionDone(): Promise<void> {
-  const { supabase, user } = await sessionUser();
-  if (!user) return;
-  const { data: prof } = await supabase
-    .from("user_profiles")
-    .select("first_session_done_at")
-    .eq("user_id", user.id)
-    .maybeSingle<{ first_session_done_at: string | null }>();
-  if (prof?.first_session_done_at) return;
-  await supabase.from("user_profiles").upsert({ user_id: user.id, first_session_done_at: new Date().toISOString() });
-}
-
-/**
  * Inline reject from the Today queue: the draft is canceled with a reason (0064) so the
  * rejection learning loop can read patterns later. Only queued drafts can be rejected; the
  * same admin-only RLS policy the review queue uses authorizes the write.

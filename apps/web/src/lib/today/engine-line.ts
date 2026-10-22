@@ -57,8 +57,6 @@ export function engineLineFor(state: TodayState, i: TodayInputs, f: EngineLineFa
       };
     case "stopped_billing":
       return { dot: "stopped", status: "Stopped", facts: ["billing", "queue and replies kept"], link: { label: "Update payment", href: "/settings/billing" } };
-    case "first_session":
-      return { dot: "running", status: "Running", facts: [], link: null };
     default: {
       // Running — steady / caught up / working-empty / starved
       if (sender && weeklyCeilingReached(sender)) {

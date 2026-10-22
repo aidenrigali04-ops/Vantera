@@ -16,9 +16,6 @@ const TABS: readonly Tab[] = ["queue", "replies", "activity"];
  * to bottom: is anything broken · what needs me · is it working · what exactly is waiting ·
  * what did it do while I was gone. One server round-trip (`loadToday`), server-formatted
  * times, zero client Date.now().
- *
- * First session (§8): until the user's first approval session has ended, /today forwards to
- * the queue — the queue is the post-payment landing, Today becomes the home afterwards.
  */
 export default async function TodayPage({
   searchParams,
@@ -34,7 +31,6 @@ export default async function TodayPage({
 
   const load = await loadToday(supabase, user.id);
   if (!load) redirect("/onboarding");
-  if (load.view.state === "first_session") redirect("/approvals?first=1");
 
   const tab: Tab = TABS.includes(tabParam as Tab) ? (tabParam as Tab) : load.view.defaultTab;
 

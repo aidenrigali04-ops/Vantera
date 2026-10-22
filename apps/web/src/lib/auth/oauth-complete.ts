@@ -116,5 +116,5 @@ export async function completeGoogleOAuth(
     }
   }
 
-  return { ok: true, redirectTo: safeNext(input.next) ?? "/dashboard" };
+  return { ok: true, redirectTo: safeNext(input.next) ?? "/today" };
 }

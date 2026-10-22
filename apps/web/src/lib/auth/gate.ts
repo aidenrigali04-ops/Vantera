@@ -12,10 +12,10 @@ export type GateContext = {
 export function resolveGate(area: GateArea, ctx: GateContext): string | null {
   switch (area) {
     case "auth":
-      return ctx.isAuthenticated ? "/dashboard" : null;
+      return ctx.isAuthenticated ? "/today" : null;
     case "onboarding":
       if (!ctx.isAuthenticated) return "/login";
-      return ctx.onboardingComplete ? "/dashboard" : null;
+      return ctx.onboardingComplete ? "/today" : null;
     case "app":
       if (!ctx.isAuthenticated) return "/login";
       if (!ctx.hasAccount || !ctx.onboardingComplete) return "/onboarding";

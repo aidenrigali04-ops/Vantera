@@ -58,7 +58,6 @@ export interface TodayInputs {
 }
 
 export type TodayState =
-  | "first_session"
   | "steady"
   | "caught_up"
   | "working_empty"

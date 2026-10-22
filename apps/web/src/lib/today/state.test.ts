@@ -32,11 +32,10 @@ export function inputs(over: Partial<TodayInputs> = {}): TodayInputs {
 }
 
 describe("resolveTodayState — every §8 row", () => {
-  it("first session: /today is not the home yet", () => {
-    expect(resolveTodayState(inputs({ firstSessionDone: false }))).toBe("first_session");
+  it("a first visit with drafts is steady, not a forward", () => {
+    expect(resolveTodayState(inputs({ firstSessionDone: false, drafts: 3 }))).toBe("steady");
   });
-  it("never forwards a first-session user to an EMPTY queue — Today explains instead", () => {
-    expect(resolveTodayState(inputs({ firstSessionDone: false, drafts: 0, repliesWaiting: 0 }))).not.toBe("first_session");
+  it("a first visit with an empty queue is steady too — Today explains instead", () => {
     expect(resolveTodayState(inputs({ firstSessionDone: false, drafts: 0 }))).toBe("steady");
   });
   it("steady: drafts or replies waiting, senders OK", () => {

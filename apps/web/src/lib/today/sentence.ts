@@ -74,7 +74,5 @@ export function buildStatusSentence(state: TodayState, i: TodayInputs): string {
       return "The engine is paused. Approvals stay open; nothing is being sourced or sent until you resume it.";
     case "stopped_billing":
       return "Sending is stopped until billing is sorted. Your queue and replies are safe.";
-    case "first_session":
-      return ""; // never rendered — /today forwards to the queue
   }
 }

@@ -63,10 +63,10 @@ describe("completeGoogleOAuth", () => {
     expect(failed).toEqual({ ok: false, redirectTo: "/login?error=oauth" });
   });
 
-  it("a successful exchange lands on dashboard (or a safe next)", async () => {
+  it("a successful exchange lands on Today (or a safe next)", async () => {
     const { deps: d, calls } = deps();
     const ok = await completeGoogleOAuth({ code: "pkce" }, d);
-    expect(ok).toEqual({ ok: true, redirectTo: "/dashboard" });
+    expect(ok).toEqual({ ok: true, redirectTo: "/today" });
     expect(calls.exchanged).toEqual(["pkce"]);
 
     const next = await completeGoogleOAuth({ code: "pkce", next: "/invite/x" }, deps().deps);
@@ -76,7 +76,7 @@ describe("completeGoogleOAuth", () => {
       { code: "pkce", next: "https://evil.example" },
       deps().deps
     );
-    expect(evil).toEqual({ ok: true, redirectTo: "/dashboard" });
+    expect(evil).toEqual({ ok: true, redirectTo: "/today" });
   });
 
   it("stashes the landing-page site, prefills name from Google, and welcomes a fresh user", async () => {
@@ -121,7 +121,7 @@ describe("completeGoogleOAuth", () => {
       { code: "pkce", invite: "11111111-2222-3333-4444-555555555555" },
       d
     );
-    expect(out).toEqual({ ok: true, redirectTo: "/dashboard" });
+    expect(out).toEqual({ ok: true, redirectTo: "/today" });
     expect(calls.signedOut).toBe(0);
     expect(calls.welcomes).toEqual(["dana@acme.example"]);
   });

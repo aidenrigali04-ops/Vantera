@@ -20,5 +20,5 @@ export async function acceptInvite(token: string): Promise<{ error?: string }> {
 
   // data is the account_id returned by the RPC — redirect on success
   void data;
-  redirect("/dashboard");
+  redirect("/today");
 }
