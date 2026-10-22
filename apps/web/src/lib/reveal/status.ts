@@ -1,17 +1,12 @@
 /**
  * Pure shaping for /api/reveal/status — the Reveal's poll feed. The two pre-payment
  * rules live HERE, unit-tested, not scattered in the route:
- *   1. at most PREVIEW_SHOWN (5) non-rejected matches are shown, best-first; a rejected
- *      lead is replaced by the next scored one (poolRemaining 0 = pool exhausted);
+ *   1. at most REVEAL_SURFACED_CAP matches are surfaced (identities/scores fully shown);
  *   2. exactly ONE draft body ever leaves the endpoint (the top-scored invite) —
  *      matches carry no bodies (blueprint §6.4: the lock is on depth, never on truth).
  */
 
-/** Mirrors REVEAL_SURFACED_CAP in packages/jobs/src/pipeline/fast-pass.ts:48 (the read-side cap on `matched`). */
-const SURFACED_CAP = 15;
-
-/** Leads shown on the "First prospects" step. */
-export const PREVIEW_SHOWN = 5;
+export const REVEAL_SURFACED_CAP = 15;
 
 export type RevealRunRow = {
   status: "queued" | "scanning" | "ranking" | "drafting" | "done" | "failed";
@@ -62,8 +57,6 @@ export type RevealStatus =
         score: number;
         evidenceLine: string | null;
       }[];
-      /** non-rejected scored leads beyond the shown PREVIEW_SHOWN; 0 = pool exhausted */
-      poolRemaining: number;
       topDraft: { leadId: string; body: string } | null;
     };
 
@@ -80,44 +73,33 @@ function evidenceLine(row: RevealMatchRow): string | null {
 export function buildRevealStatus(
   run: RevealRunRow | null,
   matchRows: RevealMatchRow[],
-  draftRows: NonNullable<RevealDraftRow>[],
-  rejectedLeadIds: ReadonlySet<string>
+  draftRow: RevealDraftRow
 ): RevealStatus {
   if (!run) return { status: "not_started" };
 
-  const eligible = matchRows
-    .filter((m) => m.ai_score != null && !rejectedLeadIds.has(m.id))
-    .sort((a, b) => (b.ai_score ?? 0) - (a.ai_score ?? 0));
-  const shown = eligible.slice(0, PREVIEW_SHOWN);
+  const matches = matchRows
+    .filter((m) => m.ai_score != null)
+    .sort((a, b) => (b.ai_score ?? 0) - (a.ai_score ?? 0))
+    .slice(0, REVEAL_SURFACED_CAP)
+    .map((m) => ({
+      leadId: m.id,
+      name: [m.first_name, m.last_name].filter(Boolean).join(" ") || "Unnamed prospect",
+      title: m.title,
+      company: m.company_name,
+      score: m.ai_score ?? 0,
+      evidenceLine: evidenceLine(m),
+    }));
 
-  const matches = shown.map((m) => ({
-    leadId: m.id,
-    name: [m.first_name, m.last_name].filter(Boolean).join(" ") || "Unnamed prospect",
-    title: m.title,
-    company: m.company_name,
-    score: m.ai_score ?? 0,
-    evidenceLine: evidenceLine(m),
-  }));
-
-  // Exactly one body leaves: the draft of the highest-scored SHOWN lead that has one.
-  const bodyByLead = new Map(draftRows.filter((d) => d.body).map((d) => [d.lead_id, d.body as string]));
-  let topDraft: { leadId: string; body: string } | null = null;
-  for (const m of matches) {
-    const body = bodyByLead.get(m.leadId);
-    if (body) {
-      topDraft = { leadId: m.leadId, body };
-      break;
-    }
-  }
+  const topDraft =
+    draftRow && draftRow.body ? { leadId: draftRow.lead_id, body: draftRow.body } : null;
 
   return {
     status: run.status,
     scanned: run.scanned,
-    matched: Math.min(run.matched, SURFACED_CAP),
+    matched: Math.min(run.matched, REVEAL_SURFACED_CAP),
     drafted: run.drafted,
     error: clampClientError(run.error),
     matches,
-    poolRemaining: eligible.length - shown.length,
     topDraft,
   };
 }
