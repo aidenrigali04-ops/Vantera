@@ -195,12 +195,10 @@ async function maybeRespond(
     linkedinStage: "message",
     origin: "reply_response", // rides the dispatch speed-to-lead lane (0044)
     styleFlags: clean ? null : describeViolations(reply.violations),
-    // Stage 1 / WS-3.1: conversation replies carry the lead's arm AND the resolved strategy +
-    // playbook version that shaped this message, so message-level attribution is complete.
+    // Stage 1: conversation replies carry the strategy + playbook version that shaped this
+    // message, so message-level attribution is complete.
     recipe: buildSendRecipe({
       brain: "conversation_reply",
-      experimentId: bundle.attribution.experimentId,
-      variant: bundle.attribution.variant,
       strategy: bundle.attribution.strategy,
       playbookVersion: bundle.attribution.playbookVersion,
       // WS-3.4: the EXACT registry hash/model id that drafted this reply, threaded from the

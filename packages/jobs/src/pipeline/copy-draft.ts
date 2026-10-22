@@ -1,4 +1,4 @@
-import { describeViolations, assignVariant, buildSendRecipe, LINKEDIN_SYSTEM, bestOfN, leadBlock, selectMessageShape, deriveAccountProfile } from "@vantera/agent-brains";
+import { describeViolations, buildSendRecipe, LINKEDIN_SYSTEM, bestOfN, leadBlock, selectMessageShape, deriveAccountProfile } from "@vantera/agent-brains";
 import type { DraftInput, CopyStrategy } from "@vantera/agent-brains";
 import { getModelId } from "@vantera/ai";
 import type {
@@ -124,10 +124,8 @@ export async function runCopyDraft(
   const { accountId } = ctx.agent;
   const channels = ctx.agent.config.channels;
 
-  // Self-optimizing loop (Phase 3): resolve the account's running experiment + adopted champion
-  // strategy once. Inert by default — no experiment + an empty playbook means every lead resolves to
-  // {} (no strategy directives), so drafting is identical to before the optimizer existed.
-  const experiment = await deps.store.getActiveExperiment(accountId);
+  // The account's playbook champion strategy, resolved once. An empty playbook resolves every lead
+  // to {} (no strategy directives).
   const champion = await deps.store.getChampion(accountId);
 
   const leads = await deps.store.getDraftableLeads(accountId, payload.leadIds);
@@ -159,21 +157,17 @@ export async function runCopyDraft(
   // wall-clock was N x draft latency. Drafting is the gate between "qualified" and "sendable",
   // so its throughput is the account's outreach volume. DRAFT_CONCURRENCY caps in-flight drafts.
   const outcomes = await mapWithConcurrency(room, DRAFT_CONCURRENCY, async (lead): Promise<Outcome> => {
-    // Deterministic, sticky per-lead arm assignment; strategy is the challenger's or the champion.
-    const variant = experiment ? assignVariant(experiment, lead.id) : null;
-    let strategy = variant === "challenger" ? experiment!.challengerStrategy : champion.strategy;
+    let strategy = champion.strategy;
     // Message-shape selector (spec 2026-07-20) — CONFIG-GATED champion default. When the global
     // `message_shape_auto` app-setting is OFF (default), this whole block is skipped and the
     // champion behaves EXACTLY as before (byte-identical). When ON, the champion's opener structure
-    // becomes the signal-justified SAFE shape for this lead. Applied ONLY on the champion arm (never
-    // a challenger's chosen shape) and ONLY when the champion doesn't already pin a shape. A thin
-    // signal resolves to observation_question, which we deliberately do NOT stamp — leaving strategy
-    // untouched keeps the recipe/signature byte-identical to the no-shape champion (the safe floor
-    // is a no-op, preserving the optimizer's null hypothesis). Never mutates the shared champion
-    // object (a fresh object is spread).
+    // becomes the signal-justified SAFE shape for this lead. Applied ONLY when the champion doesn't
+    // already pin a shape. A thin signal resolves to observation_question, which we deliberately do
+    // NOT stamp — leaving strategy untouched keeps the recipe/signature byte-identical to the
+    // no-shape champion (the safe floor is a no-op). Never mutates the shared champion object (a
+    // fresh object is spread).
     if (
       deps.messageShapeAuto &&
-      variant !== "challenger" &&
       !strategy.messageShape &&
       lead.aiInsights
     ) {
@@ -237,8 +231,6 @@ export async function runCopyDraft(
         const recipe = buildSendRecipe({
           brain: "first_touch",
           strategy,
-          experimentId: experiment?.id ?? null,
-          variant,
           playbookVersion: champion.version,
           exemplars: (ctx.winningOpeners ?? []).length,
           // WS-3.4: the EXACT registry hash/model id that drafted this pair, threaded from the
@@ -271,8 +263,6 @@ export async function runCopyDraft(
     if (leadDrafted > 0) {
       await deps.store.setCampaignLeadStatus(campaignId, lead.id, "queued");
       await deps.store.setLeadStatus(lead.id, "in_campaign");
-      // Attribute this lead's whole sequence to its arm so later outcomes measure the experiment.
-      if (experiment && variant) await deps.store.stampLeadExperiment(lead.id, experiment.id, variant);
       return { drafted: leadDrafted, suppressed: leadSuppressed, skipped: 0 };
     } else if (leadSuppressed > 0) {
       await deps.store.setCampaignLeadStatus(campaignId, lead.id, "suppressed");
