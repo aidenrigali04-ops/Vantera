@@ -5,9 +5,18 @@ export interface RulesGateResult {
   reasons: string[];
 }
 
+/**
+ * A wanted term matches only where it starts a word ("cto" in "CTO & Co-founder", not in
+ * "director"; "us" not in "Austin"). Suffixes still match ("engineer" → "Engineering").
+ */
 function containsAny(value: string, wanted: string[]): boolean {
   const v = value.toLowerCase();
-  return wanted.some((w) => v.includes(w.toLowerCase()));
+  return wanted.some((w) => {
+    const term = w.toLowerCase().trim();
+    if (!term) return false;
+    const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return new RegExp(`(?<![a-z0-9])${escaped}`).test(v);
+  });
 }
 
 /**
