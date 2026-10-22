@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { trackEvent } from "@/lib/analytics/clarity";
+import { eventsForRouteParams } from "./route-event-map";
 
 /**
  * Fires funnel events from redirect landing params, so success moments that end
@@ -57,6 +58,19 @@ export function RouteEvents() {
     for (const key of ["checkout", "plan", "interval", "value"]) rest.delete(key);
     router.replace(rest.size ? `${pathname}?${rest}` : pathname, { scroll: false });
   }, [checkout, plan, interval, value, params, pathname, router]);
+
+  // `connected=1` on the senders page → linkedin_connected. The page reads the param
+  // server-side only (reconcile on return; no client UI depends on it), and that work
+  // is done by the time this effect runs, so stripping it is safe and stops refresh re-fires.
+  const connectedEvent = eventsForRouteParams(params, pathname).find((e) => e.name === "linkedin_connected");
+  useEffect(() => {
+    if (!connectedEvent || fired.current.has("connected")) return;
+    fired.current.add("connected");
+    trackEvent("linkedin_connected");
+    const rest = new URLSearchParams(params);
+    rest.delete("connected");
+    router.replace(rest.size ? `${pathname}?${rest}` : pathname, { scroll: false });
+  }, [connectedEvent, params, pathname, router]);
 
   return null;
 }

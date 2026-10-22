@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { parseStyleFlags } from "./style-flags";
 import type { QueueRow } from "@/lib/today/rows";
 import { fixDraft, saveDraftEdit, type ReviewActionState } from "@/app/(app)/approvals/actions";
+import { trackFirstDraftApproved } from "@/lib/analytics/activation";
 import { approveFromToday, rejectDraftWithReason, undoApproveDraft, undoRejectDraft, type RejectReason } from "@/app/(app)/today/actions";
 
 /**
@@ -83,6 +84,7 @@ export function DraftPeek({
         setError(res.error);
         return;
       }
+      trackFirstDraftApproved();
       onRemoved(id, "approved");
       toast(`Approved · ${sends}`, {
         duration: 5000,
