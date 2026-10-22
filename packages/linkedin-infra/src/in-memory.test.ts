@@ -69,6 +69,12 @@ describe("InMemoryLinkedInInfra", () => {
       ).toEqual({ type: "account_status", providerEventId: "le_4", connectedAccountRef: "li_acc_1", status: "disconnected", profileUrl: null, displayName: null, vanteraAccountId: null });
       expect(infra.parseEventWebhook({})).toBeNull();
     });
+
+    it("parses an outbound echo (a message the account owner sent)", () => {
+      expect(
+        infra.parseEventWebhook({ event_id: "le_5", event_type: "outbound_echo", connected_account: "li_acc_1", to_profile_url: "https://linkedin.com/in/jane", body: "hi", sent_at: "2026-06-12T10:00:00.000Z", from_provider_ref: "ACoAA_J" })
+      ).toEqual({ type: "outbound_echo", providerEventId: "le_5", connectedAccountRef: "li_acc_1", toProfileUrl: "https://linkedin.com/in/jane", body: "hi", sentAt: "2026-06-12T10:00:00.000Z", fromProviderRef: "ACoAA_J", fromPublicIdentifier: null, fromName: null });
+    });
   });
 });
 

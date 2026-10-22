@@ -144,7 +144,7 @@ export function Composer({
               setError(null);
               const res = await delegateToAgent(leadId);
               if (res.error) setError(res.error);
-              else setNote("Vera has the thread — the reply is queued and follow-ups resume.");
+              else setNote(res.notice ?? "Vera has the thread — the reply is queued and follow-ups resume.");
             })
           }
         >

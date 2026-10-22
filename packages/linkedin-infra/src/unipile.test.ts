@@ -362,6 +362,51 @@ describe("UnipileLinkedInInfra", () => {
       expect(adapter.parseEventWebhook(realReply({ is_sender: "true" }))).toBeNull();
     });
 
+    // Native human takeover: a message the account owner typed in LinkedIn itself arrives as an
+    // is_sender message_received. It is surfaced as an outbound echo addressed to the counterpart
+    // so the pipeline can tell OUR sends from a human's; it is never a reply.
+    it("maps an is_sender message to an outbound echo addressed to the counterpart", () => {
+      const event = adapter.parseEventWebhook(
+        realReply({
+          is_sender: true,
+          sender: { attendee_provider_id: "ACoAA_OWNER", attendee_name: "Owner" },
+          message: "Hey Ryan — I'll take it from here",
+          message_id: "msg_own_1",
+        })
+      );
+      expect(event).toEqual({
+        type: "outbound_echo",
+        providerEventId: "msg_own_1",
+        connectedAccountRef: "0uuEXoQMSKOiZiTtCb2cgg",
+        toProfileUrl: "https://www.linkedin.com/in/ACoAA_RYAN",
+        fromProviderRef: "ACoAA_RYAN",
+        fromPublicIdentifier: null,
+        fromName: "Ryan Cunningham",
+        body: "Hey Ryan — I'll take it from here",
+        sentAt: "2026-06-28T09:37:13Z",
+      });
+    });
+
+    it("drops an is_sender message whose counterpart is ambiguous (group chat) or unknown", () => {
+      expect(
+        adapter.parseEventWebhook(
+          realReply({
+            is_sender: true,
+            sender: { attendee_provider_id: "ACoAA_OWNER" },
+            attendees: [
+              { attendee_provider_id: "ACoAA_RYAN", attendee_profile_url: "https://www.linkedin.com/in/ACoAA_RYAN" },
+              { attendee_provider_id: "ACoAA_ZED", attendee_profile_url: "https://www.linkedin.com/in/ACoAA_ZED" },
+            ],
+          })
+        )
+      ).toBeNull();
+      expect(
+        adapter.parseEventWebhook(
+          realReply({ is_sender: true, sender: { attendee_provider_id: "ACoAA_OWNER" }, attendees: [] })
+        )
+      ).toBeNull();
+    });
+
     it("falls back to provider_message_id when message_id is absent", () => {
       const event = adapter.parseEventWebhook(realReply({ message_id: undefined, provider_message_id: "pmid_9" }));
       expect(event).toMatchObject({ type: "reply", providerEventId: "pmid_9" });
@@ -420,7 +465,7 @@ describe("UnipileLinkedInInfra", () => {
       });
       expect(event).toEqual({
         type: "account_status",
-        providerEventId: "status:li_acct_3:OK",
+        providerEventId: expect.stringMatching(/^status:li_acct_3:OK:/),
         connectedAccountRef: "li_acct_3",
         status: "active",
         profileUrl: "https://linkedin.com/in/carol",
@@ -451,7 +496,7 @@ describe("UnipileLinkedInInfra", () => {
       });
       expect(event).toEqual({
         type: "account_status",
-        providerEventId: "status:li_acct_5:DISCONNECTED",
+        providerEventId: expect.stringMatching(/^status:li_acct_5:DISCONNECTED:/),
         connectedAccountRef: "li_acct_5",
         status: "disconnected",
         profileUrl: null,
@@ -504,7 +549,7 @@ describe("UnipileLinkedInInfra", () => {
     it("parses the documented envelope instead of discarding it", () => {
       expect(adapter.parseEventWebhook(envelope("CREDENTIALS"))).toEqual({
         type: "account_status",
-        providerEventId: "status:h_EKCy2lRLef5NzHp0iw4A:CREDENTIALS",
+        providerEventId: expect.stringMatching(/^status:h_EKCy2lRLef5NzHp0iw4A:CREDENTIALS:/),
         connectedAccountRef: "h_EKCy2lRLef5NzHp0iw4A",
         status: "restricted",
         profileUrl: null,
@@ -534,6 +579,21 @@ describe("UnipileLinkedInInfra", () => {
       const classic = adapter.parseEventWebhook(envelope("SYNC_SUCCESS", { product: "classic" }));
       const premium = adapter.parseEventWebhook(envelope("SYNC_SUCCESS", { product: "recruiter" }));
       expect(classic!.providerEventId).toBe(premium!.providerEventId);
+    });
+
+    it("a later delivery of the same state is a NEW event (an OK after a disconnect must process)", () => {
+      let at = new Date("2026-10-01T10:00:00Z");
+      const clocked = new UnipileLinkedInInfra({ apiKey: "k", dsn: "d", webhookSecret: "s", now: () => at });
+      const first = clocked.parseEventWebhook(envelope("OK"));
+      at = new Date("2026-10-03T08:30:00Z"); // disconnected in between, reconnected days later
+      const second = clocked.parseEventWebhook(envelope("OK"));
+      expect(first!.providerEventId).not.toBe(second!.providerEventId);
+    });
+
+    it("prefers a payload timestamp over the clock when the provider sends one", () => {
+      const clocked = new UnipileLinkedInInfra({ apiKey: "k", dsn: "d", webhookSecret: "s", now: () => new Date("2030-01-01T00:00:00Z") });
+      const ev = clocked.parseEventWebhook(envelope("OK", { timestamp: "2026-10-01T10:00:05Z" }));
+      expect(ev!.providerEventId).toBe("status:h_EKCy2lRLef5NzHp0iw4A:OK:2026-10-01T10:00:05Z");
     });
 
     it("still accepts the flat shape, so nothing that already worked regresses", () => {

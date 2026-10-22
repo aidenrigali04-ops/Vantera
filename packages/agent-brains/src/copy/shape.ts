@@ -66,7 +66,7 @@ export const FACT_ASSERTING_SHAPES: readonly MessageShape[] = [
 ];
 
 /**
- * The prompt directive that REPLACES the default thanks/observation/question structure. Written
+ * The prompt directive that REPLACES the default specific-observation/question structure. Written
  * dash-free on purpose (prompt prose primes output style — the humanizer bans dashes downstream).
  * The fact-asserting shapes carry an explicit no-invention clause: a shape may reframe structure,
  * it may never manufacture the fact its structure leans on. Compliance (de-pitch + humanizer) is
@@ -76,7 +76,7 @@ export const SHAPE_DIRECTIVE: Record<MessageShape, string> = {
   // The default structure. Never emitted as an override (it IS the default); present for
   // completeness so the record is total.
   observation_question:
-    "A brief thanks, then one sharp observation about their situation, then one genuinely curious question about how they handle it today.",
+    "Open with the one specific thing from the block that is unique to this prospect (their trigger, why now, or what they do), then one question that only makes sense for them. A thanks is optional and never the first words.",
   trigger_consequence:
     "Open on a real, recent trigger in their world and the specific downstream consequence they have not clocked yet. The trigger is the reason to message now. End by making it easy to opt out. Use ONLY the trigger or fact stated in the block. Never invent a funding event, a hiring event, a competitor move, a tool switch, or any fact not present. If the specific trigger is not in the block, do not use this framing, fall back to a plain observation and question.",
   provocation:

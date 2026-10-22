@@ -46,8 +46,16 @@ export {
   findActionClaims,
   findUnapprovedLinks,
   normalizeDashes,
+  findTemplateOpener,
   type Violation,
 } from "./copy/humanizer";
+export {
+  openerSkeleton,
+  openerSkeletons,
+  findRepeatedOpener,
+  stripIdentity,
+  OPENER_SKELETON_WORDS,
+} from "./copy/opener";
 export {
   draftLinkedIn,
   validateLinkedInDraft,
@@ -104,7 +112,10 @@ export {
   judgeCopy,
   JUDGE_MODEL_ID,
   JUDGE_PROMPT,
+  LINKEDIN_PAIR_MESSAGE_TYPE,
+  linkedinJudgeText,
   type JudgeVerdict,
+  type JudgeContext,
 } from "./copy/judge";
 export { bestOfN, type JudgeFn } from "./copy/best-of-n";
 export { classifyReply, preClassify, replyVerdictSchema, type ReplyVerdict } from "./reply/classify";
@@ -160,12 +171,6 @@ export {
   type RecommendationAction,
 } from "./optimize/recommend";
 export {
-  assignVariant,
-  leadBucket,
-  type Variant,
-  type ExperimentAllocation,
-} from "./optimize/allocate";
-export {
   decideExperiment,
   checkCircuitBreaker,
   DECIDE_DEFAULTS,
@@ -175,30 +180,8 @@ export {
   type DecideOptions,
   type BreakerOptions,
 } from "./optimize/decide";
-export {
-  decideExperimentV2,
-  clampDecideV2Options,
-  DECIDE_V2_DEFAULTS,
-  type DecideV2Options,
-} from "./optimize/decide-v2";
-export {
-  ALPHA_WEALTH_START,
-  ALPHA_WEALTH_CAP,
-  ALPHA_EARN_ON_CONCLUSION,
-  ALPHA_MIN_SPEND,
-  nextAlphaSpend,
-  wealthAfterLaunch,
-  wealthAfterConclusion,
-} from "./optimize/alpha";
-export {
-  proposeChallengerStrategy,
-  proposeNextChallenger,
-  nextExperimentStage,
-  describeStrategy,
-  isTerminalStatus,
-  type ExperimentStatus,
-} from "./optimize/experiment";
 export { aggregateArm, type LeadOutcomeFlags } from "./optimize/outcomes";
+export { describeStrategy } from "./copy/describe";
 export {
   asStrategyGenome,
   genomeSignature,
@@ -214,7 +197,6 @@ export type { FunnelCohort } from "./research/calibrate";
 export { buildSendRecipe, type SendRecipe, type RecipeBrain } from "./optimize/recipe";
 export { validateRecipeAngle } from "./optimize/angle";
 export { strategySignature, aggregateBySignature, chooseChallenger } from "./optimize/bandit";
-export { proposeRecipeCandidates, type GenerateRecipesInput } from "./optimize/generate";
 export {
   seniorityBucket,
   buildTargetingProfile,

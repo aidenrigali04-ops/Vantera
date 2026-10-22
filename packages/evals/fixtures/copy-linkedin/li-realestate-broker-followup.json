@@ -34,7 +34,7 @@
   "grounding": "Seller offer: FollowUp Loop reminds agents to follow up before a lead goes cold Prospect: Sofia Lindqvist, Broker/Owner at Cobblestone Realty Group (Residential Real Estate). Pain points: New leads go quiet after the first showing; Agents forget to follow up once things get busy. Value angle: A simple follow up cadence catches the leads busy agents forget",
   "frozenDraft": {
     "connectionNote": "Saw Cobblestone brought on three new agents this spring, good sign for the brokerage.",
-    "followupMessage": "Thanks for connecting. New agents are great, though follow up can slip once things get busy. How do you track that today?",
+    "followupMessage": "New agents are great, though follow up can slip once things get busy. How do you track that today?",
     "violations": []
   }
 }

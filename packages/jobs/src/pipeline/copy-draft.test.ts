@@ -1,15 +1,19 @@
 import { describe, expect, it, vi } from "vitest";
 import { normalizeLinkedInUrl, runCopyDraft, MAX_BEST_OF_N } from "./copy-draft";
 import type {
-  ActiveExperiment,
   CopyContext,
   CopyDraftDeps,
   CopyDraftStore,
   DraftableLead,
   NewScheduledSend,
 } from "./types";
-import { LINKEDIN_SYSTEM, buildTargetingProfile, leadBlock, rankByTilt, type CopyStrategy, type DraftInput, type JudgeFn, type LeadOutcomeFlags } from "@vantera/agent-brains";
+import { LINKEDIN_SYSTEM, LINKEDIN_PAIR_MESSAGE_TYPE, buildTargetingProfile, leadBlock, rankByTilt, type CopyStrategy, type DraftInput, type JudgeFn, type LeadOutcomeFlags } from "@vantera/agent-brains";
 import { getModelId } from "@vantera/ai";
+
+/** The follow-up part of the labeled pair the best-of-N judge reads (linkedinJudgeText). */
+function followupOf(judgeText: string): string {
+  return judgeText.split("Follow-up:\n")[1] ?? judgeText;
+}
 
 function scored(id: string, score: number): DraftableLead {
   return lead(id, { aiScore: score });
@@ -51,10 +55,8 @@ class FakeCopyStore implements CopyDraftStore {
   suppressionLookups: string[] = [];
   /** tracks which store method was used per LinkedIn draft: 'pair' or 'single' */
   linkedInCallKinds: ("pair" | "single")[] = [];
-  // Phase 3 experiment plumbing — default to inert (no experiment, empty champion).
-  activeExperiment: ActiveExperiment | null = null;
+  // Playbook champion — defaults to an empty playbook.
   champion: { strategy: CopyStrategy; version: number | null } = { strategy: {}, version: null };
-  stamps: { leadId: string; experimentId: string; variant: string }[] = [];
 
   constructor(channels = { linkedin: true }, sendMode: "review" | "automatic" = "review") {
     this.context = {
@@ -108,18 +110,8 @@ class FakeCopyStore implements CopyDraftStore {
     const known = leadIds.map((id) => byId.get(id)).filter((l): l is DraftableLead => !!l);
     return rankByTilt(known, this.targetingProfile).map((l) => l.id);
   }
-  async getActiveExperiment() {
-    return this.activeExperiment;
-  }
   async getChampion() {
     return this.champion;
-  }
-  async stampLeadExperiment(
-    leadId: string,
-    experimentId: string,
-    variant: "champion" | "challenger"
-  ) {
-    this.stamps.push({ leadId, experimentId, variant });
   }
   // Task 3: only the thin trigger reads this (the core reads deps.bestOfN directly) — present
   // solely to satisfy CopyDraftStore; no test below depends on its value.
@@ -452,67 +444,41 @@ function makeCapturingDeps(store: FakeCopyStore): { deps: CopyDraftDeps; inputs:
   };
 }
 
-describe("runCopyDraft — experiment plumbing (Phase 3)", () => {
-  it("no experiment: champion is empty, no directives, no stamp (identical to before)", async () => {
+describe("runCopyDraft — playbook champion", () => {
+  it("empty playbook: no strategy directives", async () => {
     const store = new FakeCopyStore();
     store.leads = [lead("l1")];
     const { deps, inputs } = makeCapturingDeps(store);
     await runCopyDraft(PAYLOAD, deps);
     expect(inputs[0]!.context.strategy).toEqual({});
-    expect(store.stamps).toHaveLength(0);
   });
 
-  it("active experiment at 100%: the challenger strategy is applied and the lead is stamped challenger", async () => {
+  it("applies the playbook champion strategy to every lead", async () => {
     const store = new FakeCopyStore();
-    store.leads = [lead("l1")];
-    store.activeExperiment = {
-      id: "exp1",
-      allocationPct: 100,
-      challengerStrategy: { followupLength: "tight" },
-    };
-    const { deps, inputs } = makeCapturingDeps(store);
-    await runCopyDraft(PAYLOAD, deps);
-    expect(inputs[0]!.context.strategy).toEqual({ followupLength: "tight" });
-    expect(store.stamps).toEqual([{ leadId: "l1", experimentId: "exp1", variant: "challenger" }]);
-  });
-
-  it("active experiment at 0%: the adopted champion strategy is applied and the lead is stamped champion", async () => {
-    const store = new FakeCopyStore();
-    store.leads = [lead("l1")];
+    store.leads = [lead("l1"), lead("l2")];
     store.champion = { strategy: { openWith: "trigger" }, version: 1 };
-    store.activeExperiment = {
-      id: "exp1",
-      allocationPct: 0,
-      challengerStrategy: { followupLength: "tight" },
-    };
     const { deps, inputs } = makeCapturingDeps(store);
     await runCopyDraft(PAYLOAD, deps);
-    expect(inputs[0]!.context.strategy).toEqual({ openWith: "trigger" });
-    expect(store.stamps).toEqual([{ leadId: "l1", experimentId: "exp1", variant: "champion" }]);
+    expect(inputs.map((i) => i.context.strategy)).toEqual([{ openWith: "trigger" }, { openWith: "trigger" }]);
   });
 });
 
 // ── Stage 1: message-level recipe attribution ────────────────────────────────
 describe("runCopyDraft — recipe stamp (Stage 1)", () => {
-  it("stamps both rows of the pair with the first-touch recipe (challenger arm)", async () => {
+  it("stamps both rows of the pair with the first-touch recipe (playbook champion)", async () => {
     const store = new FakeCopyStore();
     store.leads = [lead("l1")];
     store.champion = { strategy: { openWith: "trigger" }, version: 2 };
     store.context.winningOpeners = ["Saw the Series B announcement"];
-    store.activeExperiment = {
-      id: "exp-1",
-      allocationPct: 100,
-      challengerStrategy: { openWith: "pain" },
-    };
     await runCopyDraft(PAYLOAD, makeDeps(store));
     expect(store.sends).toHaveLength(2);
     for (const row of store.sends) {
       expect(row.recipe).toEqual({
         v: 2,
         brain: "first_touch",
-        strategy: { openWith: "pain" },
-        experimentId: "exp-1",
-        variant: "challenger",
+        strategy: { openWith: "trigger" },
+        experimentId: null,
+        variant: null,
         playbookVersion: 2,
         exemplars: 1,
         promptHash: LINKEDIN_SYSTEM.hash,
@@ -521,7 +487,7 @@ describe("runCopyDraft — recipe stamp (Stage 1)", () => {
     }
   });
 
-  it("stamps a champion recipe with null experiment when nothing is running", async () => {
+  it("stamps an empty-strategy recipe when no playbook exists", async () => {
     const store = new FakeCopyStore();
     store.leads = [lead("l1")];
     await runCopyDraft(PAYLOAD, makeDeps(store));
@@ -619,22 +585,6 @@ describe("runCopyDraft — message-shape champion default (config-gated, OFF by 
     // identical to a no-shape champion (the safe floor is a no-op).
     expect(inputs[0]!.context.strategy).toEqual({});
     for (const row of store.sends) expect(row.recipe!.strategy).toEqual({});
-  });
-
-  it("ON never overrides the challenger arm's own strategy", async () => {
-    const store = new FakeCopyStore();
-    store.leads = [lead("l1")];
-    store.activeExperiment = {
-      id: "exp1",
-      allocationPct: 100,
-      challengerStrategy: { followupLength: "tight" },
-    };
-    const { deps, inputs } = makeCapturingDeps(store);
-    deps.messageShapeAuto = true;
-    await runCopyDraft(PAYLOAD, deps);
-    // challenger strategy is applied verbatim — the champion default never touches a challenger.
-    expect(inputs[0]!.context.strategy).toEqual({ followupLength: "tight" });
-    expect(inputs[0]!.context.strategy).not.toHaveProperty("messageShape");
   });
 
   it("ON never overrides a champion that already pins a shape", async () => {
@@ -738,10 +688,13 @@ describe("runCopyDraft — best-of-N (Task 3, off by default)", () => {
       return { connectionNote: `note-${call}`, followupMessage: `follow-${call}`, violations: [] };
     });
     const scoreByFollowup: Record<string, number> = { "follow-1": 2, "follow-2": 4, "follow-3": 3 };
-    const seenContexts: { grounding: string; cta?: string }[] = [];
+    const seenContexts: { grounding: string; cta?: string; messageType?: string }[] = [];
+    const seenTexts: string[] = [];
     const judgeFn: JudgeFn = vi.fn(async (draft, ctx) => {
       seenContexts.push(ctx);
-      return { overall: scoreByFollowup[draft.text]! };
+      seenTexts.push(draft.text);
+      // the judge now reads the labeled pair (note, then follow-up) — key the score by the follow-up part
+      return { overall: scoreByFollowup[followupOf(draft.text)]! };
     });
     let capturedInput: DraftInput | undefined;
     const wrappedDraftFn: CopyDraftDeps["draftLinkedInFn"] = async (input) => {
@@ -766,7 +719,10 @@ describe("runCopyDraft — best-of-N (Task 3, off by default)", () => {
     for (const ctx of seenContexts) {
       expect(ctx.grounding).toBe(expectedGrounding);
       expect(ctx.cta).toBe("book a 15-min intro");
+      expect(ctx.messageType).toBe(LINKEDIN_PAIR_MESSAGE_TYPE);
     }
+    // labeled parts: the judge sees the note AND the follow-up, in the order the prospect reads them
+    expect(seenTexts).toContain("Connection note:\nnote-2\n\nFollow-up:\nfollow-2");
   });
 
   it("caps the effective n at MAX_BEST_OF_N regardless of a larger configured value", async () => {
@@ -823,7 +779,7 @@ describe("runCopyDraft — best-of-N (Task 3, off by default)", () => {
         : { connectionNote: `clean note ${call}`, followupMessage: `clean follow ${call}`, violations: [] };
     });
     const judgeFn: JudgeFn = vi.fn(async (draft) => ({
-      overall: draft.text === "dirty follow" ? 5 : 1,
+      overall: followupOf(draft.text) === "dirty follow" ? 5 : 1,
     }));
     const fixLinkedInFn = vi.fn(async () => ({
       connectionNote: "still dirty note",
@@ -862,7 +818,7 @@ describe("runCopyDraft — best-of-N (Task 3, off by default)", () => {
         : { connectionNote: `clean note ${call}`, followupMessage: `clean follow ${call}`, violations: [] };
     });
     const judgeFn: JudgeFn = vi.fn(async (draft) => ({
-      overall: draft.text === "dirty follow" ? 5 : 1,
+      overall: followupOf(draft.text) === "dirty follow" ? 5 : 1,
     }));
     const fixLinkedInFn = vi.fn(async () => ({
       connectionNote: "fixed note",
@@ -980,3 +936,56 @@ describe("runCopyDraft — daily first-touch cap", () => {
   });
 });
 
+
+describe("runCopyDraft — opener skeletons (copy-quality fix)", () => {
+  it("passes skeletons from recent openers AND winning exemplars to the brain (code-only, not the prompt list)", async () => {
+    const store = new FakeCopyStore();
+    store.leads = [lead("l1")];
+    store.context.winningOpeners = ["Saw your post on hiring SDRs"];
+    store.context.avoidPhrases = ["saw your post on hiring sdrs", "Thanks for connecting. Curious how you run outbound?"];
+    const captured: DraftInput[] = [];
+    const deps: CopyDraftDeps = {
+      store,
+      draftLinkedInFn: async (input) => {
+        captured.push(input);
+        return { connectionNote: "note", followupMessage: "A distinct opener for this one.", violations: [] };
+      },
+    };
+
+    await runCopyDraft(PAYLOAD, deps);
+
+    expect(captured[0]?.context.avoidSkeletons).toEqual(
+      expect.arrayContaining(["saw your post on hiring", "thanks for connecting curious how"])
+    );
+    // the winner stays out of the PROMPT's avoid list (no contradictory instruction)
+    expect(captured[0]?.context.avoidPhrases).toEqual(["Thanks for connecting. Curious how you run outbound?"]);
+  });
+
+  it("drafts later in the same run see earlier drafts' skeletons, and an in-run repeat routes to review", async () => {
+    const store = new FakeCopyStore({ linkedin: true }, "automatic");
+    store.leads = [lead("l1"), lead("l2", { firstName: "Sam", companyName: "Globex" })];
+    const captured: DraftInput[] = [];
+    let call = 0;
+    const deps: CopyDraftDeps = {
+      store,
+      draftLinkedInFn: async (input) => {
+        captured.push(input);
+        call += 1;
+        // both drafts open with the same five words, only the name differs
+        const name = call === 1 ? "Dana" : "Sam";
+        return { connectionNote: "note", followupMessage: `Three new reps at once, ${name}, is a lot. How's ramp?`, violations: [] };
+      },
+    };
+
+    await runCopyDraft({ ...PAYLOAD, leadIds: ["l1", "l2"] }, deps);
+
+    const messages = store.sends.filter((s) => s.linkedinStage === "message");
+    expect(messages).toHaveLength(2);
+    const flagged = messages.filter((m) => m.styleFlags?.includes("repeated-opener"));
+    // exactly one of the pair is flagged (whichever finished second) and it is held for review
+    expect(flagged).toHaveLength(1);
+    expect(store.sends.filter((s) => s.leadId === flagged[0]!.leadId).every((s) => s.status === "pending_review")).toBe(true);
+    const clean = messages.find((m) => !m.styleFlags);
+    expect(clean?.status).toBe("approved");
+  });
+});

@@ -28,17 +28,12 @@ import type {
   ConversationTurn,
   CopyStrategy,
   FunnelCohort,
-  FunnelStageKey,
-  GenerateRecipesInput,
   LeadOutcomeFlags,
   StampArm,
   StrategyGenome,
   StrategySource,
-  VariantOutcome,
-  ExperimentStatus,
   SendRecipe,
   JudgeFn,
-  AccountProfileConfig,
 } from "@vantera/agent-brains";
 import type { OutreachCapacity } from "./capacity";
 import type { SenderCandidate } from "./sender-assignment";
@@ -442,17 +437,8 @@ export interface CopyDraftStore {
   /** Both rows or neither — the dispatch core assumes complete pairs. */
   insertLinkedInSendPair(invite: NewScheduledSend, message: NewScheduledSend): Promise<void>;
   setLeadStatus(leadId: string, status: "in_campaign"): Promise<void>;
-  // ── self-optimizing loop (Phase 3), inert when no experiment/playbook exists ──
-  /** the account's running experiment, or null; loaded once per run */
-  getActiveExperiment(accountId: string): Promise<ActiveExperiment | null>;
-  /** the account's adopted champion strategy + playbook version; {strategy:{}, version:null} when none */
+  /** the account's playbook champion strategy + version; {strategy:{}, version:null} when none */
   getChampion(accountId: string): Promise<{ strategy: CopyStrategy; version: number | null }>;
-  /** attribute a lead's outreach to its experiment arm (service-role write) */
-  stampLeadExperiment(
-    leadId: string,
-    experimentId: string,
-    variant: "champion" | "challenger"
-  ): Promise<void>;
   /**
    * The `best_of_n` app-setting (Task 3, quality lever 2) — a GLOBAL rollout knob (app_settings
    * has no accountId), not per-account config. Default 1 (today's single-draft behavior) when
@@ -475,48 +461,6 @@ export interface CopyDraftStore {
   countFirstTouchDraftsSince(accountId: string, since: Date): Promise<number>;
 }
 
-/** A running experiment as the copy-draft pipeline needs it: id, split, and the challenger strategy. */
-export interface ActiveExperiment {
-  id: string;
-  allocationPct: number;
-  challengerStrategy: CopyStrategy;
-}
-
-// ── OptimizeStore: the decide pipeline (GATE 0 suggest-only, enterprise-grade-brain spec 2026-07-16) ─
-/** A running experiment as the decide pipeline needs it. */
-export interface RunningExperiment {
-  id: string;
-  accountId: string;
-  stageKey: FunnelStageKey;
-  minSample: number;
-  /** the champion strategy this experiment tested against (jsonb on the row) */
-  championStrategy: CopyStrategy;
-  /** the challenger strategy under test (jsonb on the row) — canary detection compares it to the champion */
-  challengerStrategy: CopyStrategy;
-  /**
-   * Alpha-investing wealth spent to run THIS experiment (Task 7 / WS-1.1, migration 0058's
-   * `alpha_spent`). Null = a pre-2A row (honest unknown, never backfilled) — `decideExperimentV2`
-   * self-clamps an `undefined` alpha option to its own default (0.05), so the pipeline passes
-   * `exp.alphaSpent ?? undefined` straight through rather than special-casing null itself.
-   */
-  alphaSpent: number | null;
-}
-
-/** A new experiment the autonomous loop chains after a conclusion. */
-export interface StartExperimentInput {
-  accountId: string;
-  stageKey: FunnelStageKey;
-  champion: CopyStrategy;
-  challenger: CopyStrategy;
-  /**
-   * Alpha-investing spend for this experiment (Task 7 / WS-1.1) — always a concrete number here:
-   * the caller (chainNext) only reaches `startExperiment` after `nextAlphaSpend` returned non-null
-   * (a null spend means the chain PAUSES and never calls this at all). Debited from the account's
-   * `optimization_playbook.alpha_wealth` in the same transaction as the insert (pg-store.ts).
-   */
-  alphaSpent: number;
-}
-
 /** A1 genome stamp. Writes a record at lead entry. Does not draft or send. */
 export type CohortWindow = { since?: Date; until?: Date };
 
@@ -531,214 +475,6 @@ export interface StrategyStampStore {
   ): Promise<void>;
   /** Non-suppressed leads in the window, counted into the calibrate.ts cohort shape. */
   getFunnelCohort(accountId: string, window?: CohortWindow): Promise<FunnelCohort>;
-  /**
-   * Per-arm outcomes for one experiment, from lead_strategy_stamp rows only.
-   * Empty arms when the experiment has no randomized stamps yet.
-   */
-  getVariantOutcomes(
-    accountId: string,
-    experimentId: string
-  ): Promise<Record<"champion" | "challenger", VariantOutcome>>;
-}
-
-export interface OptimizeStore {
-  /** all running experiments across accounts (service-role scan) */
-  getRunningExperiments(): Promise<RunningExperiment[]>;
-  /** per-lead outcome flags for one arm of an experiment */
-  getArmFlags(experimentId: string, variant: "champion" | "challenger"): Promise<LeadOutcomeFlags[]>;
-  /**
-   * Conclude an experiment (discarded / halted) with the decision reason.
-   *
-   * Task 7 / WS-1.1: a decisive conclusion credits alpha-investing wealth back (see pg-store.ts).
-   * `opts.credit` (default true) lets a caller mark the conclusion ADMINISTRATIVE — the
-   * identical-arm heal path passes `{ credit: false }` because freeing a stuck slot is cleanup,
-   * not a statistical conclusion (and heals typically close UNFUNDED manual experiments, so
-   * crediting them would mint wealth that was never spent). Halts never credit regardless of this
-   * flag (the status guard in pg-store.ts).
-   */
-  concludeExperiment(
-    id: string,
-    status: ExperimentStatus,
-    reason: string,
-    opts?: { credit?: boolean }
-  ): Promise<void>;
-  /**
-   * Adopt a proven challenger autonomously: playbook champion ← challenger_strategy
-   * (version-bumped), experiment → 'adopted' with the decision reason. Returns the NEW
-   * champion strategy so the loop can chain the next test against it — or `null` if the claim
-   * failed (see below), in which case the caller must write nothing and skip chaining for this
-   * experiment.
-   *
-   * GATE 0 (enterprise-grade-brain spec, 2026-07-16): the decide loop no longer calls this — a
-   * winning challenger only gets `markReadyToAdopt` below, and the owner's manual adopt action
-   * (`apps/web` `adoptExperiment`) applies the win with its own writes. Kept on the interface for
-   * GATE 1, when the anytime-valid decision core resumes autonomous adoption.
-   *
-   * Claim-first ordering (WS-3.2 race-condition fix, 2026-07-18): GATE 1's auto-adopt tick is the
-   * first concurrent actor racing the owner's manual dashboard buttons (adopt/discard/revert), all
-   * of which act on the same experiment row. The implementation MUST run its status-guarded claim
-   * (`ready_to_adopt`/`running` → `adopted`) FIRST, before writing anything else, and only proceed
-   * to the playbook write + wealth credit if that claim actually transitioned the row — never write
-   * the playbook unconditionally and gate only the credit, or a lost race can still commit the
-   * challenger as champion under a row that says something else happened.
-   *
-   * Task 7 / WS-1.1: also credits alpha-investing wealth on adoption (see pg-store.ts) — reached
-   * only on a successful claim, which naturally limits the credit to real adoptions. Since
-   * `apps/web`'s `adoptExperiment` bypasses this method entirely (per the GATE 0 note above), that
-   * credit is dormant in production today, same as the rest of this method — it activates once
-   * GATE 1 (or a wiring of the manual action) actually calls it.
-   */
-  adoptChallenger(experimentId: string, reason: string): Promise<CopyStrategy | null>;
-  /**
-   * A winning challenger is MARKED ready_to_adopt (suggest-only surface — the owner's manual
-   * adopt action can still apply it any time). No concluded_at: the experiment still occupies the
-   * account's one-live slot. GATE 1 / WS-3.2: also stamps `readied_at = now()` — the moment this
-   * mark happened — which starts the 24h auto-adopt grace clock `getMatureReadyToAdopt` reads.
-   */
-  markReadyToAdopt(experimentId: string, reason: string): Promise<void>;
-  /**
-   * GATE 1 (enterprise-grade-brain spec, WS-3.2): the global `adoption_mode` app-setting —
-   * 'auto' enables the grace-period auto-adopt pass in the decide pipeline; 'manual' (the
-   * default) keeps today's suggest-only-forever behavior byte-identical. Same
-   * appSettings/eq-by-key pattern as `getBestOfN`/`isKillSwitchOn` (pg-store.ts).
-   */
-  getAdoptionMode(): Promise<"auto" | "manual">;
-  /**
-   * GATE 1 (enterprise-grade-brain spec, WS-3.2): experiments sitting in `ready_to_adopt` whose
-   * `readied_at` is at least `graceMs` in the past — mature enough for the auto-adopt pass to
-   * re-verify and (if the verdict still holds) adopt autonomously. Returns the same shape
-   * `getRunningExperiments` does; a row with a null `readied_at` (pre-0059, or never marked) is
-   * never considered mature.
-   */
-  getMatureReadyToAdopt(graceMs: number): Promise<RunningExperiment[]>;
-  /**
-   * Start the chained experiment. Returns false (never throws) when the account already has a
-   * live experiment (the one-live unique index) — the loop simply skips chaining then.
-   */
-  startExperiment(input: StartExperimentInput): Promise<boolean>;
-  /**
-   * Stage 1b collective prior: every SENT first-touch message with a Stage-1 recipe stamp,
-   * ACROSS accounts (service role) — strategy knobs + outcome booleans only, never text.
-   */
-  getStampedOutcomes(): Promise<{ strategy: CopyStrategy; flags: LeadOutcomeFlags }[]>;
-  /** recently concluded experiments for one account (label + status) — generation context so
-   *  the recipe generator doesn't re-propose already-tested ideas */
-  getRecentConclusions(accountId: string, limit: number): Promise<{ label: string; status: string }[]>;
-  /**
-   * Live A/A canary (enterprise-grade-brain spec, WS-1.8): the app-setting-pinned account the
-   * canary experiment runs on. null when unset — the seeding step is then a no-op.
-   */
-  getCanaryAccountId(): Promise<string | null>;
-  /**
-   * Idempotently ensure a running A/A experiment (challenger deep-equal to champion) exists for
-   * this account — 50/50 allocation for maximum power. Returns true if it created one, false if
-   * the account already has a live experiment (one-live unique index, 23505 swallowed — never
-   * throws). The canary occupies the account's single experiment slot by design.
-   */
-  ensureCanaryExperiment(accountId: string): Promise<boolean>;
-  /**
-   * The account's alpha-investing wealth (Task 7 / WS-1.1, `optimization_playbook.alpha_wealth`).
-   * A missing playbook row means the account has never adopted anything — returns
-   * `ALPHA_WEALTH_START` (0.05) in that case rather than throwing or returning null.
-   */
-  getAlphaWealth(accountId: string): Promise<number>;
-  /**
-   * Message-shape selector (spec §7): the `bold_shapes_account_ids` app-setting — the accounts
-   * pinned to explore the bold shapes (provocation/disqualifier/own_cold) in generation. Same
-   * admin-pin pattern as `aa_canary_account_id`, but a LIST (jsonb array of account ids). Empty
-   * when unset or malformed ⇒ no account may propose a bold shape (safe subset only, everywhere).
-   */
-  getBoldShapesAccountIds(): Promise<string[]>;
-  /**
-   * Config-aware selection (spec 2026-07-21): the plain config subset needed to derive the account's
-   * profile for GENERATOR eligibility (`deriveAccountProfile` → `highTrust`). Read once per chained
-   * experiment, and ONLY when `messageShapeAuto` is on (byte-identical + no extra read when off).
-   * Returns config values only (cta, url presence, industry, valueProp, artifact presence, proof
-   * count) — never message text, keeping the brain's profile a pure approach prior.
-   */
-  getAccountProfileConfig(accountId: string): Promise<AccountProfileConfig>;
-}
-
-export interface OptimizeDeps {
-  store: OptimizeStore;
-  /**
-   * Stage 1b generate→gate: LLM-proposed candidates for the next challenger (knob-flip baseline
-   * always included by the brain). ABSENT ⇒ chaining is the deterministic knob-flip, exactly the
-   * pre-1b behavior — guarded by test.
-   */
-  proposeCandidatesFn?: (input: GenerateRecipesInput) => Promise<CopyStrategy[]>;
-  /** RNG for Thompson sampling (injectable for deterministic tests); defaults to Math.random */
-  rand?: () => number;
-  /**
-   * Live A/A canary (WS-1.8): fired when the canary experiment produces a non-`keep_running`
-   * verdict — a false signal from the decide gate itself (the arms are identical). Best-effort;
-   * absent = no alert (tests, dev). The pure core never touches email — this is the only hook.
-   */
-  notifyCanaryAlert?: (info: {
-    experimentId: string;
-    accountId: string;
-    decision: string;
-    reason: string;
-  }) => Promise<void>;
-  /**
-   * The app-setting-pinned account the live A/A canary is seeded on (the same value the trigger
-   * task reads via `getCanaryAccountId()`). Canary semantics (exempt from every action branch,
-   * alert-only) apply ONLY when a signature-equal experiment's `accountId` matches this value.
-   * null/undefined ⇒ no account is exempt — a signature-equal experiment anywhere is treated as
-   * an accidental identical-arm experiment (see the discard-and-free-the-slot path below), never
-   * as the canary.
-   */
-  canaryAccountId?: string | null;
-  /**
-   * Message-shape selector (spec §7): the accounts pinned into `bold_shapes_account_ids`, read once
-   * by the thin trigger. Only a pinned account's generation may propose the bold shapes
-   * (provocation/disqualifier/own_cold); everyone else stays on the safe subset. Absent/empty ⇒ no
-   * account may propose a bold shape. Only consulted when `messageShapeAuto` is on.
-   */
-  boldShapesAccountIds?: string[];
-  /**
-   * Message-shape selector MASTER enable (review M-gate): the `message_shape_auto` app-setting,
-   * read once by the thin trigger via `getMessageShapeAuto`. Absent/false (default) ⇒ generation
-   * proposes NO messageShape on any candidate for any account, so the feature is dormant in the
-   * challenger arms too (mirrors the champion-default gate in copy-draft). true ⇒ safe shapes for
-   * all accounts, bold shapes only for pinned ones (`boldShapesAccountIds`).
-   */
-  messageShapeAuto?: boolean;
-}
-
-export interface OptimizeSummary {
-  evaluated: number;
-  /** discarded + halted this tick — conservative conclusions only (GATE 0: adopt no longer concludes) */
-  concluded: number;
-  /**
-   * GATE 0 (enterprise-grade-brain spec, 2026-07-16): stays 0 during the suggest-only window — the
-   * decide loop no longer adopts on its own. Returns to counting real adoptions at GATE 1.
-   */
-  adopted: number;
-  chained: number;
-  /** winning challengers marked ready_to_adopt this tick — suggestions surfaced for the owner */
-  readied: number;
-  /**
-   * A/A canary: decisive verdicts fired on an identical-arm experiment this tick — a calibration
-   * failure in the decide gate itself. Alerted, not acted on; never counted in concluded/readied.
-   */
-  canaryAlerts: number;
-  /**
-   * Task 7 / WS-1.1: a discard/halt conclusion left the account's alpha-investing wealth below
-   * `ALPHA_MIN_SPEND` — the chain paused (no next experiment launched) rather than spend a
-   * de-minimis alpha. Distinct from `chained` (which only counts an experiment actually started)
-   * and from a `startExperiment` one-live conflict (neither chained nor chainPaused — a real
-   * experiment is already occupying the slot, nothing to pause).
-   */
-  chainPaused: number;
-  /**
-   * GATE 1 (enterprise-grade-brain spec, WS-3.2): mature `ready_to_adopt` experiments (readied_at
-   * at least `GRACE_MS` in the past) that STILL cleared re-verification and were adopted
-   * autonomously this tick. Config-gated: stays 0 whenever `adoption_mode` is 'manual' (the
-   * default) — the auto-adopt pass never even runs then. Distinct from `adopted` (which GATE 0
-   * hardwired to 0 and GATE 1 leaves untouched — the ordinary per-tick loop still only suggests).
-   */
-  autoAdopted: number;
 }
 
 export interface CopyDraftDeps {
@@ -767,7 +503,7 @@ export interface CopyDraftDeps {
    * Message-shape selector champion default (spec 2026-07-20) — resolved from the
    * `message_shape_auto` app-setting by the thin trigger. Absent/false (default) ⇒ the champion's
    * opener structure is byte-identical to today; true ⇒ the champion default becomes the
-   * signal-justified SAFE shape per lead. Never affects the challenger arm.
+   * signal-justified SAFE shape per lead.
    */
   messageShapeAuto?: boolean;
 }
@@ -793,7 +529,8 @@ export interface SendContext {
   body: string | null;
   campaignStatus: string;
   accountPaused: boolean;
-  lead: { linkedinUrl: string | null };
+  /** status = the lead's pipeline status (archived/rejected leads are never sent to) */
+  lead: { linkedinUrl: string | null; status: string };
 }
 
 export interface OutreachSendStore {
@@ -806,6 +543,8 @@ export interface OutreachSendStore {
   markSent(sendId: string): Promise<void>;
   markFailed(sendId: string, error: string): Promise<void>;
   markSuppressed(sendId: string): Promise<void>;
+  /** cancel the lead's not-yet-sent follow-up messages; returns how many were canceled */
+  cancelUnsentFollowups(leadId: string, reason: string): Promise<number>;
   /** The sticky sender assigned to this lead (multi-sender, rule 04/13). Null = unassigned
    *  (the dispatcher assigns at invite time) → the send parks until the next dispatch cycle. */
   getLeadAssignedIdentity(leadId: string): Promise<{ id: string; providerRef: string; status: string } | null>;
@@ -854,6 +593,8 @@ export type OutreachSendOutcome =
   | "failed"
   | "skipped"
   | "canceled"
+  /** the provider call timed out — it may have gone out, so the row is left as-is (never resent) */
+  | "ambiguous"
   /** the sender's LinkedIn session is dead — send parked; wrapper fires an immediate health check */
   | "sender_disconnected";
 
@@ -902,6 +643,8 @@ export interface DispatchableSend {
 export interface DispatchSender extends SenderCandidate {
   /** Messages this account has already sent today (its own message cap is independent). */
   sentTodayMessages: number;
+  /** Epoch ms of this account's latest already-scheduled send (0 if none) — pacing continues after it. */
+  scheduledUntil: number;
 }
 
 export interface SendDispatchStore {
@@ -1029,8 +772,34 @@ export interface InboundStore {
     providerMessageRef: string | null;
     body: string;
     receivedAt: Date;
-  }): Promise<{ id: string; created: boolean }>;
+  }): Promise<{
+    id: string;
+    created: boolean;
+    /** OUR ingestion time (replies.created_at) — the clock queued drafts are compared against */
+    createdAt: Date;
+    /** the row already carries a classification — the processed marker (set LAST by runInbound),
+     *  so an existing-but-unclassified row is a crashed run to finish, not a duplicate */
+    classified: boolean;
+  }>;
+  /** Written LAST in reply processing: classification doubles as the "fully processed" marker. */
   setReplyClassification(replyId: string, verdict: ReplyVerdict): Promise<void>;
+  /** The lead's STORED LinkedIn URL — the value every send-path suppression check compares
+   *  against (rule 11). Inbound payloads carry a provider-id URL form that rarely matches it. */
+  getLeadLinkedInUrl(accountId: string, leadId: string): Promise<string | null>;
+  isSuppressed(accountId: string, kind: "linkedin", value: string): Promise<boolean>;
+  /**
+   * True when an outbound LinkedIn message in this lead's thread is one Vantera sent (its provider
+   * message id is on an outreach_sends row, or its text matches a send already in flight/sent —
+   * the in-flight match covers the echo racing our post-send bookkeeping).
+   */
+  isOwnOutboundMessage(accountId: string, leadId: string, providerMessageRef: string, body: string): Promise<boolean>;
+  /**
+   * Human takeover (the pipeline twin of the in-app manual reply): cancel the agent's queued drafts
+   * (never manual sends) and hold the lead's runs at paused_reply — inserting a paused marker run on
+   * `campaignId` when the lead has none — so neither the responder nor proactive touches message on
+   * top of the person now driving the thread.
+   */
+  pauseForHumanTakeover(accountId: string, leadId: string, campaignId: string | null): Promise<void>;
   addSuppression(
     accountId: string,
     kind: "linkedin",
@@ -1061,6 +830,8 @@ export interface InboundStore {
    * one touch of headroom, next nudge at `nextActionAt` — so an engaged thread never dies
    * with the cold sequence (2026-07-08: replied leads were exhausting at 2 cold touches).
    * The MAX_AGENT_TURNS cap in sequence-touch bounds total agent messages.
+   * Revives ONLY active/exhausted runs: 'stopped' is a deliberate stand-down (hard negative,
+   * booking, calendar, turn-cap hand-off) and never re-arms; nor does a booked or suppressed lead.
    */
   reviveSequenceRun(leadId: string, nextActionAt: Date): Promise<void>;
   /**
@@ -1069,7 +840,12 @@ export interface InboundStore {
    * Outreach agent or the lead has no insights to ground a reply — the responder then stays silent
    * and the inbound reply is merely classified + the user notified (the prior behavior).
    */
-  getResponderBundle(accountId: string, leadId: string, campaignId: string | null): Promise<ResponderBundle | null>;
+  getResponderBundle(
+    accountId: string,
+    leadId: string,
+    campaignId: string | null,
+    opts?: { excludeReplyId?: string }
+  ): Promise<ResponderBundle | null>;
   /** Queue the contextual reply as a message-stage send — the existing dispatch path delivers it. */
   insertScheduledSend(send: NewScheduledSend): Promise<void>;
 }
@@ -1083,9 +859,11 @@ export interface ResponderBundle {
   insights: StoredInsights;
   /** same grounding the first-touch copy used — CTA, value prop, seller identity, guardrails */
   context: BrainCopyContext;
-  /** prior messages in the thread, oldest first (excludes the incoming one) */
+  /** prior messages in the thread, oldest first by DELIVERY time (excludes the incoming reply when
+   *  `excludeReplyId` is passed, and out-of-office auto-replies, which aren't conversation) */
   thread: ConversationTurn[];
-  /** prior agent messages actually sent in this thread — drives the converse-to-close turn cap */
+  /** prior AGENT messages actually sent in this thread — drives the converse-to-close turn cap.
+   *  Human (manual) messages are thread context, never agent turns. */
   agentTurns: number;
   /** created_at of the NEWEST queued/in-flight message for this lead (null = none). Sequence
    *  touches skip whenever one exists (never stack). The responder compares it to the reply's
@@ -1100,15 +878,11 @@ export interface ResponderBundle {
    *  responder and proactive touches stand down: once a person is driving the conversation, the
    *  agent never messages on top of them until the user resumes automation. */
   humanHandled: boolean;
-  /** the lead's experiment-arm stamp (0040, lead-level) — carried onto every conversation
-   *  send's recipe so message-level attribution never loses the arm (Stage 1) */
+  /** carried onto every conversation send's recipe so message-level attribution is complete */
   attribution: {
-    experimentId: string | null;
-    variant: "champion" | "challenger" | null;
-    /** the strategy that shaped THIS message: the challenger strategy only while the lead's own
-     *  experiment is still the account's LIVE one; otherwise the current champion (WS-3.1). */
+    /** the strategy that shaped THIS message: the playbook champion */
     strategy: CopyStrategy;
-    /** optimization_playbook.version at bundle-build time (null = no playbook adopted yet) */
+    /** optimization_playbook.version at bundle-build time (null = no playbook yet) */
     playbookVersion: number | null;
   };
 }
@@ -1193,6 +967,8 @@ export interface SequenceRun {
   enteredStageAt: Date;
   /** one-shot soft-no revival timestamp (0044); null = revival still available */
   revivedAt: Date | null;
+  /** when the run last dispatched a touch (null = never) */
+  lastTouchAt: Date | null;
 }
 
 export interface LeadChannels {
@@ -1208,6 +984,8 @@ export interface SequenceTickContext {
   killSwitch: boolean;
   /** the lead has replied at least once — an exhausting run earns ONE ~30-day revival */
   leadReplied: boolean;
+  /** LinkedIn connection state: follow-ups only make sense once the invite is accepted */
+  connection: { invitedAt: Date | null; connectedAt: Date | null };
   now: Date;
 }
 
@@ -1227,6 +1005,8 @@ export type SequenceDecision =
   | { kind: "advance"; patch: SequenceRunPatch }
   /** write the patch and stop this tick — the soft-no revival parks the run ~30 days out */
   | { kind: "park"; patch: SequenceRunPatch }
+  /** write the patch and stop this tick without spending a touch — waiting on the connection */
+  | { kind: "wait"; patch: SequenceRunPatch }
   | { kind: "exhaust"; patch: SequenceRunPatch };
 
 export interface SequenceTouchDispatch {
@@ -1245,6 +1025,7 @@ export interface DueSequenceRun {
   accountPaused: boolean;
   /** the lead has replied at least once (drives the one-shot soft-no revival) */
   leadReplied: boolean;
+  connection: { invitedAt: Date | null; connectedAt: Date | null };
 }
 
 export interface SequenceStore {

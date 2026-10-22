@@ -9,14 +9,14 @@ import { createLeadEventNotifier } from "../pipeline/lead-event-emails";
 import { createLeadEventEmailStore, createLifecycleStore, createPgStore } from "../pipeline/pg-store";
 import type { InboundPayload } from "../pipeline/types";
 
-/**
- * Routes verified LinkedIn webhook events: replies, connection acceptances, account state.
+/** Routes verified LinkedIn webhook events: replies, outbound echoes, acceptances, account state.
  * On a genuine, non-terminal reply the active responder drafts the seller's next message with
  * the SAME grounding + humanizer as the outreach copy and queues it for delivery — continuing the
  * conversation toward close (auto-sent in 'automatic' mode, queued for review otherwise).
  */
 export const processInbound = task({
   id: "process-inbound",
+  queue: { concurrencyLimit: 1 }, // per concurrencyKey: the webhook route keys by lead → one lead at a time
   maxDuration: 600,
   run: async (payload: InboundPayload) => {
     const db = createDb();

@@ -6,15 +6,150 @@ import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { loadThread } from "@/lib/conversations";
 
-export type ReplyState = { error?: string; sent?: boolean };
+export type ReplyState = { error?: string; sent?: boolean; notice?: string };
 export type DraftState = { error?: string; message?: string; flagged?: boolean };
+
+type SessionClient = Awaited<ReturnType<typeof createClient>>;
+
+/** The AI call failed. Logged server-side (the message never reaches the client) so a broken key
+ *  or provider outage shows up in runtime logs instead of as a silent "try again". */
+function logDraftFailure(action: string, leadId: string, err: unknown): void {
+  const e = err as { name?: string; message?: string; statusCode?: number };
+  console.error(`${action}: draft failed`, {
+    leadId,
+    name: e?.name,
+    statusCode: e?.statusCode,
+    message: e?.message,
+  });
+}
+
+/**
+ * Where a reply for this lead is queued: the account/campaign of the lead's most recent send, else
+ * the live Outreach agent's campaign (compose-to-any-lead). Both reads are RLS-scoped, so the
+ * result proves the lead's account belongs to the caller (rule 02).
+ */
+async function resolveSendTarget(
+  supabase: SessionClient,
+  leadId: string
+): Promise<{ account_id: string; campaign_id: string } | null> {
+  const { data: send } = await supabase
+    .from("scheduled_sends")
+    .select("account_id, campaign_id")
+    .eq("lead_id", leadId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle<{ account_id: string; campaign_id: string | null }>();
+  if (send?.campaign_id) return { account_id: send.account_id, campaign_id: send.campaign_id };
+  const { data: agent } = await supabase
+    .from("agents")
+    .select("account_id, campaign_id")
+    .eq("kind", "copy")
+    .eq("status", "live")
+    .limit(1)
+    .maybeSingle<{ account_id: string; campaign_id: string | null }>();
+  if (!agent?.campaign_id) return null;
+  return { account_id: agent.account_id, campaign_id: agent.campaign_id };
+}
+
+type AdminClient = ReturnType<typeof createServiceClient>;
+
+/**
+ * Human takeover: the user is now driving this thread, so the agent stands down — it must never
+ * message on top of a human reply (the "bot re-pitched after I answered" failure — Mohamed K,
+ * 2026-07-05). Service-role writes (sequence_runs has no client write policy, and scheduled_sends
+ * cancel isn't a client op) — safe because the caller already proved, under RLS, that this lead
+ * belongs to the caller's account:
+ *   1. cancel the agent's queued/scheduled drafts (NEVER the user's own manual sends), and
+ *   2. hold every run of the lead at paused_reply — 'stopped' included (a booked lead's run is
+ *      stopped, yet the responder still answers its replies) — and, when the lead has no run at
+ *      all, insert a paused marker on the send's campaign: the paused run IS the takeover flag
+ *      the responder and proactive touches read. 'converted' (the win) is left as-is.
+ * Automation resumes only when the user explicitly hands the thread back. Returns false when a
+ * write failed, so the caller can say so instead of implying Vera stood down.
+ */
+async function takeOverThread(
+  admin: AdminClient,
+  leadId: string,
+  target: { account_id: string; campaign_id: string }
+): Promise<boolean> {
+  const { error: cancelError } = await admin
+    .from("scheduled_sends")
+    .update({ status: "canceled", error: "human took over the thread" })
+    .eq("lead_id", leadId)
+    .in("status", ["pending_review", "approved", "scheduled"])
+    .neq("origin", "manual");
+  const { data: paused, error: pauseError } = await admin
+    .from("sequence_runs")
+    .update({ status: "paused_reply" })
+    .eq("lead_id", leadId)
+    .in("status", ["active", "exhausted", "stopped", "paused_reply"])
+    .select("id");
+  let markerError: unknown = null;
+  if (!pauseError && (paused ?? []).length === 0) {
+    ({ error: markerError } = await admin
+      .from("sequence_runs")
+      .upsert(
+        { account_id: target.account_id, campaign_id: target.campaign_id, lead_id: leadId, status: "paused_reply" },
+        { onConflict: "campaign_id,lead_id", ignoreDuplicates: true }
+      ));
+  }
+  const failure = cancelError ?? pauseError ?? markerError;
+  if (failure) console.error("takeOverThread: write failed", { leadId, failure });
+  return !failure;
+}
+
+/**
+ * Hand a human-held thread back to automation (paused_reply → live). A booked lead comes back in
+ * reply-only mode ('stopped': the responder answers, no scripted nudges re-arm — a booking is the
+ * win, L1); everyone else rejoins the active sequence from now.
+ */
+async function handBackToAgent(admin: AdminClient, leadId: string): Promise<boolean> {
+  const { data: lead } = await admin
+    .from("leads")
+    .select("meeting_booked_at")
+    .eq("id", leadId)
+    .maybeSingle<{ meeting_booked_at: string | null }>();
+  const { error } = await admin
+    .from("sequence_runs")
+    .update(
+      lead?.meeting_booked_at
+        ? { status: "stopped" }
+        : { status: "active", next_action_at: new Date().toISOString() }
+    )
+    .eq("lead_id", leadId)
+    .eq("status", "paused_reply");
+  if (error) console.error("handBackToAgent: write failed", { leadId, error });
+  return !error;
+}
+
+const TAKEOVER_FAILED_NOTICE =
+  "Your reply is queued, but we couldn't pause Vera on this thread — send it again in a moment to retry.";
+
+/** Rule 11: the lead's LinkedIn URL is on the account's suppression list. */
+async function isLeadSuppressed(supabase: SessionClient, leadId: string): Promise<boolean> {
+  const { data: leadRow } = await supabase
+    .from("leads")
+    .select("linkedin_url")
+    .eq("id", leadId)
+    .maybeSingle<{ linkedin_url: string | null }>();
+  if (!leadRow?.linkedin_url) return false;
+  const normalized = leadRow.linkedin_url.trim().toLowerCase().replace(/\/+$/, "");
+  const { data: suppressed } = await supabase
+    .from("suppression_entries")
+    .select("id")
+    .eq("kind", "linkedin")
+    .eq("value", normalized)
+    .limit(1)
+    .maybeSingle();
+  return Boolean(suppressed);
+}
 
 /**
  * Assemble the responder brain's grounding from RLS-scoped reads — the web-side twin of the
  * jobs pipeline's getResponderBundle (L2 cockpit). Null when the lead can't ground a reply.
  */
 async function buildConversationInput(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  supabase: SessionClient,
   leadId: string
 ): Promise<ConversationMessageInput | null> {
   const [{ data: lead }, { data: agent }, { data: account }, { data: proof }] = await Promise.all([
@@ -95,7 +230,8 @@ export async function draftWithVera(leadId: string): Promise<DraftState> {
   try {
     const draft = await draftConversationMessage(input);
     return { message: draft.message, flagged: draft.violations.length > 0 };
-  } catch {
+  } catch (err) {
+    logDraftFailure("draftWithVera", leadId, err);
     return { error: "Drafting hit a snag — try again in a moment." };
   }
 }
@@ -117,43 +253,14 @@ export async function sendManualReply(
   } = await supabase.auth.getUser();
   if (!user) return { error: "Your session expired. Sign in again." };
 
-  let { data: send } = await supabase
-    .from("scheduled_sends")
-    .select("account_id, campaign_id")
-    .eq("lead_id", leadId)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (!send) {
-    // L2 compose-to-any-lead: no prior send → ride the live Outreach agent's campaign.
-    const { data: agent } = await supabase
-      .from("agents")
-      .select("account_id, campaign_id")
-      .eq("kind", "copy")
-      .eq("status", "live")
-      .limit(1)
-      .maybeSingle<{ account_id: string; campaign_id: string | null }>();
-    if (!agent?.campaign_id) return { error: "Deploy your Outreach agent first." };
-    send = { account_id: agent.account_id, campaign_id: agent.campaign_id };
-  }
+  // L2 compose-to-any-lead: no prior send → ride the live Outreach agent's campaign.
+  const send = await resolveSendTarget(supabase, leadId);
+  if (!send) return { error: "Deploy your Outreach agent first." };
 
   // Rule 11: suppression is checked before anything that could reach a prospect — manual
   // sends included (dispatch re-checks at the send boundary; this keeps the queue clean).
-  const { data: leadRow } = await supabase
-    .from("leads")
-    .select("linkedin_url")
-    .eq("id", leadId)
-    .maybeSingle<{ linkedin_url: string | null }>();
-  if (leadRow?.linkedin_url) {
-    const normalized = leadRow.linkedin_url.trim().toLowerCase().replace(/\/+$/, "");
-    const { data: suppressed } = await supabase
-      .from("suppression_entries")
-      .select("id")
-      .eq("kind", "linkedin")
-      .eq("value", normalized)
-      .limit(1)
-      .maybeSingle();
-    if (suppressed) return { error: "This prospect opted out — messaging them again isn't allowed." };
+  if (await isLeadSuppressed(supabase, leadId)) {
+    return { error: "This prospect opted out — messaging them again isn't allowed." };
   }
 
   const trimmed = body.trim();
@@ -164,16 +271,35 @@ export async function sendManualReply(
   // delivered = tell the user instead of silently re-sending.
   const { data: duplicate } = await supabase
     .from("scheduled_sends")
-    .select("id, status")
+    .select("id, status, origin")
     .eq("lead_id", leadId)
     .eq("body", trimmed)
     .in("status", ["pending_review", "approved", "scheduled", "sending", "sent"])
     .limit(1)
-    .maybeSingle();
+    .maybeSingle<{ id: string; status: string; origin: string | null }>();
   if (duplicate) {
-    return duplicate.status === "sent"
-      ? { error: "This exact message was already sent to this prospect." }
-      : { sent: true }; // already queued — sending it is in progress
+    if (duplicate.status === "sent") return { error: "This exact message was already sent to this prospect." };
+    // The Inbox pre-fills Vera's pending draft; sending it unedited is an APPROVAL of that draft
+    // (the same transition — and the same RLS-enforced reviewer check — as Approvals), not a human
+    // takeover: the words are Vera's, so the conversation stays hers. It used to hit this guard
+    // and return sent:true while the draft sat unapproved.
+    if (duplicate.status === "pending_review" && duplicate.origin !== "manual") {
+      const { error: approveError } = await supabase
+        .from("scheduled_sends")
+        .update({ status: "approved", approved_by: user.id, approved_at: new Date().toISOString() })
+        .eq("id", duplicate.id)
+        .eq("status", "pending_review");
+      if (approveError) return { error: "Could not send Vera's draft. Only workspace admins can approve." };
+      revalidatePath(`/prospects/${leadId}`);
+      revalidatePath("/inbox");
+      return { sent: true };
+    }
+    // already queued — sending it is in progress; re-assert the takeover (idempotent) so a retry
+    // after a failed takeover write actually retries it
+    if (duplicate.origin === "manual" && !(await takeOverThread(createServiceClient(), leadId, send))) {
+      return { sent: true, notice: TAKEOVER_FAILED_NOTICE };
+    }
+    return { sent: true };
   }
 
   const { error } = await supabase.from("scheduled_sends").insert({
@@ -188,38 +314,17 @@ export async function sendManualReply(
   });
   if (error) return { error: "Could not queue your reply. Please try again." };
 
-  // Human takeover. The user is now driving this thread, so the agent stands down: it must never
-  // message on top of a human reply (the "bot re-pitched after I answered" failure — Mohamed K,
-  // 2026-07-05). Two writes via the service role (sequence_runs has no client write policy, and
-  // scheduled_sends cancel isn't a client op) — safe because `send` above already proved, under
-  // RLS, that this lead belongs to the caller's account:
-  //   1. cancel the agent's queued/scheduled drafts (NEVER the user's own manual sends), and
-  //   2. pause the lead's active sequence run so no proactive nudge fires.
-  // Automation resumes only when the user explicitly calls resumeAutomation.
-  const admin = createServiceClient();
-  await admin
-    .from("scheduled_sends")
-    .update({ status: "canceled", error: "human took over the thread" })
-    .eq("lead_id", leadId)
-    .in("status", ["pending_review", "approved", "scheduled"])
-    .neq("origin", "manual");
-  await admin
-    .from("sequence_runs")
-    .update({ status: "paused_reply" })
-    .eq("lead_id", leadId)
-    // active OR exhausted: an engaged lead whose cold sequence already ran out can still be
-    // re-engaged by the responder on their next reply — pausing both makes the takeover total.
-    // 'converted' (won) and 'stopped' (hard-negative) are left as-is.
-    .in("status", ["active", "exhausted"]);
+  // Human takeover — see takeOverThread.
+  const tookOver = await takeOverThread(createServiceClient(), leadId, send);
 
   revalidatePath("/prospects");
   revalidatePath(`/prospects/${leadId}`); // the brief shows the queued reply on next load
-  return { sent: true };
+  return tookOver ? { sent: true } : { sent: true, notice: TAKEOVER_FAILED_NOTICE };
 }
 
 /**
- * Hand the thread back to automation after a human takeover. Flips the lead's paused_reply run
- * back to active from now, so the Outreach agent may follow up / respond again. Ownership is
+ * Hand the thread back to automation after a human takeover (see handBackToAgent), so the
+ * Outreach agent may follow up / respond again. Ownership is
  * enforced by the RLS read (the lead resolves only if it belongs to the caller's account);
  * the state write then goes through the service role, since sequence_runs has no client policy.
  */
@@ -233,12 +338,9 @@ export async function resumeAutomation(leadId: string): Promise<ReplyState> {
   const { data: owned } = await supabase.from("leads").select("id").eq("id", leadId).maybeSingle();
   if (!owned) return { error: "Prospect not found." };
 
-  const admin = createServiceClient();
-  await admin
-    .from("sequence_runs")
-    .update({ status: "active", next_action_at: new Date().toISOString() })
-    .eq("lead_id", leadId)
-    .eq("status", "paused_reply");
+  if (!(await handBackToAgent(createServiceClient(), leadId))) {
+    return { error: "Couldn't hand the thread back to Vera. Try again in a moment." };
+  }
 
   revalidatePath("/prospects");
   revalidatePath(`/prospects/${leadId}`);
@@ -257,19 +359,40 @@ export async function delegateToAgent(leadId: string): Promise<ReplyState> {
   } = await supabase.auth.getUser();
   if (!user) return { error: "Your session expired. Sign in again." };
 
-  const { data: send } = await supabase
+  // Same target as a manual reply: the lead's campaign, else the live Outreach agent's.
+  const send = await resolveSendTarget(supabase, leadId);
+  if (!send) return { error: "Deploy your Outreach agent first." };
+
+  // Rule 11: never queue anything for a suppressed prospect.
+  if (await isLeadSuppressed(supabase, leadId)) {
+    return { error: "This prospect opted out — messaging them again isn't allowed." };
+  }
+
+  // Double-click guard: one agent reply in flight per lead. A second click hands the thread back
+  // without drafting (and paying for) a duplicate reply.
+  const { data: inFlight } = await supabase
     .from("scheduled_sends")
-    .select("account_id, campaign_id")
+    .select("id")
     .eq("lead_id", leadId)
-    .order("created_at", { ascending: false })
+    .eq("origin", "reply_response")
+    .in("status", ["pending_review", "approved", "scheduled", "sending"])
     .limit(1)
-    .maybeSingle<{ account_id: string; campaign_id: string }>();
-  if (!send) return { error: "This prospect isn't in a campaign yet." };
+    .maybeSingle();
+
   const { data: campaign } = await supabase
     .from("campaigns")
     .select("send_mode")
     .eq("id", send.campaign_id)
     .maybeSingle<{ send_mode: string }>();
+
+  const handBack = () => handBackToAgent(createServiceClient(), leadId);
+
+  if (inFlight) {
+    await handBack();
+    revalidatePath(`/prospects/${leadId}`);
+    revalidatePath("/inbox");
+    return { sent: true, notice: "Vera already has a reply queued for this thread." };
+  }
 
   const input = await buildConversationInput(supabase, leadId);
   if (!input) return { error: "This prospect doesn't have enough context for Vera to take over." };
@@ -277,7 +400,8 @@ export async function delegateToAgent(leadId: string): Promise<ReplyState> {
   let draft: Awaited<ReturnType<typeof draftConversationMessage>>;
   try {
     draft = await draftConversationMessage(input);
-  } catch {
+  } catch (err) {
+    logDraftFailure("delegateToAgent", leadId, err);
     return { error: "Vera couldn't draft right now — try again in a moment." };
   }
   const clean = draft.violations.length === 0;
@@ -296,12 +420,7 @@ export async function delegateToAgent(leadId: string): Promise<ReplyState> {
   if (error) return { error: "Couldn't queue Vera's reply. Try again shortly." };
 
   // Hand the thread back to automation (paused_reply → active) so follow-ups resume too.
-  const admin = createServiceClient();
-  await admin
-    .from("sequence_runs")
-    .update({ status: "active", next_action_at: new Date().toISOString() })
-    .eq("lead_id", leadId)
-    .eq("status", "paused_reply");
+  await handBack();
 
   revalidatePath(`/prospects/${leadId}`);
   revalidatePath("/inbox");

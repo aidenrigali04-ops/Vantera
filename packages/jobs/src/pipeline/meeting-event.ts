@@ -74,6 +74,11 @@ export async function runMeetingEvent(
     });
   }
 
+  // Webhook redelivery: the same booking already recorded as booked must not alert the user twice.
+  // The meeting/stand-down writes below are idempotent and still run (self-healing on a retry).
+  const alreadyBooked =
+    (await store.findMeetingEvent(connection.accountId, connection.provider, event.bookingRef))?.status === "booked";
+
   await store.upsertMeetingEvent({
     accountId: connection.accountId,
     connectionId,
@@ -86,6 +91,6 @@ export async function runMeetingEvent(
   });
   await store.markCalendarMeeting(connection.accountId, leadId, event.startAt);
   await store.standDownOutreach(connection.accountId, leadId);
-  await store.notifyMeetingBooked(connection.accountId, leadId);
+  if (!alreadyBooked) await store.notifyMeetingBooked(connection.accountId, leadId);
   return { status: "booked", leadId, attribution };
 }

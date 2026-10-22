@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { MockLanguageModelV3 } from "ai/test";
 import { listPrompts } from "@vantera/ai";
-import { judgeCopy, JUDGE_MODEL_ID, JUDGE_PROMPT } from "./judge";
+import { judgeCopy, JUDGE_MODEL_ID, JUDGE_PROMPT, linkedinJudgeText, LINKEDIN_PAIR_MESSAGE_TYPE } from "./judge";
 
 function textResponse(json: unknown) {
   return {
@@ -145,5 +145,57 @@ describe("judgeCopy (mock model)", () => {
     await expect(
       judgeCopy({ text: "draft text" }, { grounding: "grounding text" }, model)
     ).rejects.toThrow();
+  });
+});
+
+describe("judgeCopy — message type, labeled parts, conversation (copy-quality fix)", () => {
+  const canned = { specificity: 5, themFocus: 5, posture: 5, naturalness: 5, overall: 5, rationale: "Fits the moment." };
+
+  it("passes the message type and the conversation so far into the prompt", async () => {
+    let capturedPrompt = "";
+    const model = new MockLanguageModelV3({
+      doGenerate: async (opts) => {
+        capturedPrompt = JSON.stringify(opts.prompt);
+        return textResponse(canned);
+      },
+    });
+    await judgeCopy(
+      { text: "Happy to, here's pricing." },
+      {
+        grounding: "Prospect: Priya",
+        messageType: "Reply to the prospect's latest message",
+        conversation: "You: hi\nProspect (latest message): what does it cost?",
+      },
+      model
+    );
+    expect(capturedPrompt).toContain("Message type: Reply to the prospect's latest message");
+    expect(capturedPrompt).toContain("Conversation so far:");
+    expect(capturedPrompt).toContain("what does it cost?");
+  });
+
+  it("omits the optional sections when absent", async () => {
+    let capturedPrompt = "";
+    const model = new MockLanguageModelV3({
+      doGenerate: async (opts) => {
+        capturedPrompt = JSON.stringify(opts.prompt);
+        return textResponse(canned);
+      },
+    });
+    await judgeCopy({ text: "x" }, { grounding: "g" }, model);
+    // the user message (not the rubric, which describes these sections) carries neither section
+    const user = capturedPrompt.slice(capturedPrompt.indexOf('"role":"user"'));
+    expect(user).toContain("Draft:\\nx");
+    expect(user).not.toContain("Message type:");
+    expect(user).not.toContain("Conversation so far:");
+  });
+
+  it("the rubric explains labeled parts and that a short fitting reply can score 5 on specificity", () => {
+    expect(JUDGE_PROMPT.text).toContain('"Connection note:" then "Follow-up:"');
+    expect(JUDGE_PROMPT.text).toContain("A short reply that fits the moment and answers what they asked can score 5 on specificity");
+  });
+
+  it("linkedinJudgeText labels the two parts", () => {
+    expect(linkedinJudgeText({ connectionNote: "N", followupMessage: "F" })).toBe("Connection note:\nN\n\nFollow-up:\nF");
+    expect(LINKEDIN_PAIR_MESSAGE_TYPE).toMatch(/connection note/);
   });
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { validateHumanity, findRestartPhrases, findActionClaims, findUnapprovedLinks, findSpeculativeClaims, findParrotOpener, normalizeDashes } from "./humanizer";
+import { validateHumanity, findRestartPhrases, findActionClaims, findUnapprovedLinks, findSpeculativeClaims, findParrotOpener, normalizeDashes, findTemplateOpener } from "./humanizer";
 
 const CLEAN_EMAIL = `Saw you're hiring three SDRs while running outbound yourself. That usually means pipeline is outgrowing the team.
 
@@ -197,5 +197,27 @@ describe("normalizeDashes", () => {
     expect(normalizeDashes("pricing is $2-4k per month")).toBe("pricing is $2-4k per month");
     expect(normalizeDashes("we get you 10–20 leads")).toBe("we get you 10–20 leads");
     expect(normalizeDashes("a range of 10 - 20 works")).toBe("a range of 10 - 20 works");
+  });
+});
+
+describe("\"I noticed\" ban (copy-quality fix)", () => {
+  it("flags the AI-tell opener the judge penalizes", () => {
+    expect(validateHumanity("I noticed you opened a second bay.").some((v) => v.detail.includes("i noticed"))).toBe(true);
+    expect(validateHumanity("Noticed you opened a second bay.").some((v) => v.rule === "banned-phrase")).toBe(false);
+  });
+});
+
+describe("findTemplateOpener", () => {
+  it("flags a follow-up that STARTS with the stock thanks or 'curious how'", () => {
+    expect(findTemplateOpener("Thanks for connecting. Curious how you run outbound?")[0]?.rule).toBe("template-opener");
+    expect(findTemplateOpener("Thanks for connecting, Dana! Ramping four reps is a lot.")).toHaveLength(1);
+    expect(findTemplateOpener("Curious how the new bay changed intake?")).toHaveLength(1);
+    expect(findTemplateOpener("Hi Dana, thanks for connecting. What's next?")).toHaveLength(1);
+    expect(findTemplateOpener("  thank you for connecting")).toHaveLength(1);
+  });
+
+  it("is a first-words check, not a ban on the phrase anywhere", () => {
+    expect(findTemplateOpener("Four new AEs in a month is a big class. Thanks for connecting, by the way.")).toEqual([]);
+    expect(findTemplateOpener("Ramping four reps at once is its own project, curious how you're pacing it?")).toEqual([]);
   });
 });

@@ -1,4 +1,18 @@
-import { describeViolations, assignVariant, buildSendRecipe, LINKEDIN_SYSTEM, bestOfN, leadBlock, selectMessageShape, deriveAccountProfile } from "@vantera/agent-brains";
+import {
+  describeViolations,
+  buildSendRecipe,
+  LINKEDIN_SYSTEM,
+  LINKEDIN_PAIR_MESSAGE_TYPE,
+  bestOfN,
+  leadBlock,
+  leadIdentity,
+  linkedinJudgeText,
+  selectMessageShape,
+  deriveAccountProfile,
+  findRepeatedOpener,
+  openerSkeleton,
+  openerSkeletons,
+} from "@vantera/agent-brains";
 import type { DraftInput, CopyStrategy } from "@vantera/agent-brains";
 import { getModelId } from "@vantera/ai";
 import type {
@@ -49,10 +63,17 @@ export function normalizeLinkedInUrl(url: string): string {
   return url.trim().toLowerCase().replace(/\/+$/, "");
 }
 
-function toDraftInput(lead: DraftableLead, ctx: CopyContext, strategy?: CopyStrategy): DraftInput | null {
+function toDraftInput(
+  lead: DraftableLead,
+  ctx: CopyContext,
+  strategy?: CopyStrategy,
+  avoidSkeletons?: string[]
+): DraftInput | null {
   if (!lead.aiInsights) return null;
-  // Vera's positive memory (Stage 0.5): a winning opener must never also sit in the avoid list —
-  // "use as a guide" + "do not reuse" on the same string is a contradictory prompt. Exemplars win.
+  // Vera's positive memory (Stage 0.5): a winning opener must never also sit in the PROMPT's avoid
+  // list — "reuse the angle" + "do not reuse" on the same string is a contradictory prompt. But the
+  // exemplars DO stay in the code-enforced skeleton check (avoidSkeletons): reusing a winner's
+  // angle is the point, cloning its first words is the template problem (copy-quality fix).
   const winners = ctx.winningOpeners ?? [];
   const winnerSet = new Set(winners.map((w) => w.trim().toLowerCase()));
   const avoidPhrases = ctx.avoidPhrases.filter((p) => !winnerSet.has(p.trim().toLowerCase()));
@@ -81,6 +102,8 @@ function toDraftInput(lead: DraftableLead, ctx: CopyContext, strategy?: CopyStra
       brandVoice: ctx.account.brandVoice ?? null,
       guardrails: ctx.account.guardrails ?? null,
       avoidPhrases,
+      // Code-only (never prompt/grounding): enforced by the repeated-opener lint.
+      ...(avoidSkeletons && avoidSkeletons.length > 0 ? { avoidSkeletons } : {}),
       winningExemplars: winners,
       // Empty / absent → strategyDirectives("") → prompt unchanged from before the optimizer.
       strategy,
@@ -120,10 +143,8 @@ export async function runCopyDraft(
   const { accountId } = ctx.agent;
   const channels = ctx.agent.config.channels;
 
-  // Self-optimizing loop (Phase 3): resolve the account's running experiment + adopted champion
-  // strategy once. Inert by default — no experiment + an empty playbook means every lead resolves to
-  // {} (no strategy directives), so drafting is identical to before the optimizer existed.
-  const experiment = await deps.store.getActiveExperiment(accountId);
+  // The account's playbook champion strategy, resolved once. An empty playbook resolves every lead
+  // to {} (no strategy directives).
   const champion = await deps.store.getChampion(accountId);
 
   const leads = await deps.store.getDraftableLeads(accountId, payload.leadIds);
@@ -157,25 +178,27 @@ export async function runCopyDraft(
 
   type Outcome = { drafted: number; suppressed: number; skipped: number };
 
+  // Opener skeletons (copy-quality fix): recent sends (sent + queued, identity already stripped by
+  // the store) and the winning exemplars, plus every follow-up drafted EARLIER IN THIS RUN — the
+  // drafts run concurrently, so without the in-run list a batch could converge on one template.
+  const baseSkeletons = openerSkeletons([...ctx.avoidPhrases, ...(ctx.winningOpeners ?? [])]);
+  const runSkeletons: string[] = [];
+
   // Bounded concurrency: the per-lead LLM draft + writes used to run one lead at a time, so
   // wall-clock was N x draft latency. Drafting is the gate between "qualified" and "sendable",
   // so its throughput is the account's outreach volume. DRAFT_CONCURRENCY caps in-flight drafts.
   const outcomes = await mapWithConcurrency(room, DRAFT_CONCURRENCY, async (lead): Promise<Outcome> => {
-    // Deterministic, sticky per-lead arm assignment; strategy is the challenger's or the champion.
-    const variant = experiment ? assignVariant(experiment, lead.id) : null;
-    let strategy = variant === "challenger" ? experiment!.challengerStrategy : champion.strategy;
+    let strategy = champion.strategy;
     // Message-shape selector (spec 2026-07-20) — CONFIG-GATED champion default. When the global
     // `message_shape_auto` app-setting is OFF (default), this whole block is skipped and the
     // champion behaves EXACTLY as before (byte-identical). When ON, the champion's opener structure
-    // becomes the signal-justified SAFE shape for this lead. Applied ONLY on the champion arm (never
-    // a challenger's chosen shape) and ONLY when the champion doesn't already pin a shape. A thin
-    // signal resolves to observation_question, which we deliberately do NOT stamp — leaving strategy
-    // untouched keeps the recipe/signature byte-identical to the no-shape champion (the safe floor
-    // is a no-op, preserving the optimizer's null hypothesis). Never mutates the shared champion
-    // object (a fresh object is spread).
+    // becomes the signal-justified SAFE shape for this lead. Applied ONLY when the champion doesn't
+    // already pin a shape. A thin signal resolves to observation_question, which we deliberately do
+    // NOT stamp — leaving strategy untouched keeps the recipe/signature byte-identical to the
+    // no-shape champion (the safe floor is a no-op). Never mutates the shared champion object (a
+    // fresh object is spread).
     if (
       deps.messageShapeAuto &&
-      variant !== "challenger" &&
       !strategy.messageShape &&
       lead.aiInsights
     ) {
@@ -198,7 +221,7 @@ export async function runCopyDraft(
       const shape = selectMessageShape(lead.aiInsights, profile);
       if (shape !== "observation_question") strategy = { ...strategy, messageShape: shape };
     }
-    const input = toDraftInput(lead, ctx, strategy);
+    const input = toDraftInput(lead, ctx, strategy, [...baseSkeletons, ...runSkeletons]);
     if (!input) return { drafted: 0, suppressed: 0, skipped: 1 };
     await deps.store.ensureCampaignLead(campaignId, lead.id, accountId);
 
@@ -223,15 +246,37 @@ export async function runCopyDraft(
         const { chosen } = await bestOfN(
           n,
           () => deps.draftLinkedInFn(input),
-          (d) => d.followupMessage,
-          { grounding: leadBlock(input), cta: input.context.cta },
+          // the judge reads the pair as the prospect will (note, then follow-up) so it can score
+          // whether the follow-up builds on the note — not the follow-up in isolation
+          linkedinJudgeText,
+          { grounding: leadBlock(input), cta: input.context.cta, messageType: LINKEDIN_PAIR_MESSAGE_TYPE },
           deps.judgeFn
         );
         let draft = chosen;
+        // In-run collision: a draft that finished while this one was in flight may share its first
+        // words. Checked synchronously against the live list (no await between check and push), so
+        // two concurrent drafts can't both slip through; a collision routes to review / the fix pass.
+        const identity = leadIdentity(input.lead);
+        if (!draft.violations.some((v) => v.rule === "repeated-opener")) {
+          const repeat = findRepeatedOpener(draft.followupMessage, runSkeletons, identity);
+          if (repeat.length > 0) draft = { ...draft, violations: [...draft.violations, ...repeat] };
+        }
+        const mine = openerSkeleton(draft.followupMessage, identity);
+        if (mine) runSkeletons.push(mine);
         // Automatic senders get ONE targeted fix of a flagged pair before it may auto-approve; the
         // fix is re-linted with the same validator, so a still-flagged pair waits in review.
         if (ctx.agent.sendMode === "automatic" && draft.violations.length > 0 && deps.fixLinkedInFn) {
-          draft = await deps.fixLinkedInFn(draft, input);
+          // the fix re-lints against EVERY skeleton known now (other in-run drafts included)
+          const fixInput: DraftInput = {
+            ...input,
+            context: {
+              ...input.context,
+              avoidSkeletons: [...baseSkeletons, ...runSkeletons.filter((sk) => sk !== mine)],
+            },
+          };
+          draft = await deps.fixLinkedInFn(draft, fixInput);
+          const fixed = openerSkeleton(draft.followupMessage, identity);
+          if (fixed && fixed !== mine) runSkeletons.push(fixed);
         }
         const status = draftStatus(ctx.agent.sendMode, draft.violations);
         const flags = draft.violations.length > 0 ? describeViolations(draft.violations) : null;
@@ -239,8 +284,6 @@ export async function runCopyDraft(
         const recipe = buildSendRecipe({
           brain: "first_touch",
           strategy,
-          experimentId: experiment?.id ?? null,
-          variant,
           playbookVersion: champion.version,
           exemplars: (ctx.winningOpeners ?? []).length,
           // WS-3.4: the EXACT registry hash/model id that drafted this pair, threaded from the
@@ -273,8 +316,6 @@ export async function runCopyDraft(
     if (leadDrafted > 0) {
       await deps.store.setCampaignLeadStatus(campaignId, lead.id, "queued");
       await deps.store.setLeadStatus(lead.id, "in_campaign");
-      // Attribute this lead's whole sequence to its arm so later outcomes measure the experiment.
-      if (experiment && variant) await deps.store.stampLeadExperiment(lead.id, experiment.id, variant);
       return { drafted: leadDrafted, suppressed: leadSuppressed, skipped: 0 };
     } else if (leadSuppressed > 0) {
       await deps.store.setCampaignLeadStatus(campaignId, lead.id, "suppressed");

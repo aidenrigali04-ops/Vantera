@@ -31,6 +31,37 @@ describe("preClassify (deterministic, no model call)", () => {
   it("passes everything else to the model", () => {
     expect(preClassify("sounds interesting, tell me more")).toBeNull();
   });
+
+  // Over-match audit: "remove me from" / "out of office" / "auto-reply" used to fire anywhere in a
+  // message, so a human loop-in became an opt-out (suppressed forever) and any mention of OOO
+  // silenced a real reply. Removal must name a LIST; OOO must read like an auto-responder.
+  it("does not treat a cc/thread removal or a loop-in as an unsubscribe", () => {
+    expect(preClassify("remove me from the cc, loop in Sara — she owns this")).toBeNull();
+    expect(preClassify("Please remove me from this thread and add my colleague Dan")).toBeNull();
+    expect(preClassify("take me off the email chain, Priya will run point")).toBeNull();
+  });
+
+  it("still catches list-removal requests in their common phrasings", () => {
+    expect(preClassify("remove me from your mailing list")?.classification).toBe("unsubscribe");
+    expect(preClassify("Remove me from your contact list please")?.classification).toBe("unsubscribe");
+    expect(preClassify("take me off your list")?.classification).toBe("unsubscribe");
+    expect(preClassify("please remove me from all future messages")?.classification).toBe("unsubscribe");
+    expect(preClassify("don't contact me again")?.classification).toBe("unsubscribe");
+  });
+
+  it("does not treat a human mentioning OOO / auto-replies as an auto-responder", () => {
+    expect(preClassify("Out of office stuff aside — yes, I'm interested, send it over")).toBeNull();
+    expect(preClassify("Does your tool send an auto-reply when someone answers?")).toBeNull();
+    expect(preClassify("I was out of the office last week, sorry for the delay — what's the price?")).toBeNull();
+  });
+
+  it("still catches real auto-responder phrasings", () => {
+    expect(preClassify("I'm currently out of the office until June 30 with limited access to email.")?.classification).toBe("out_of_office");
+    expect(preClassify("Auto-reply: I am away until Monday")?.classification).toBe("out_of_office");
+    expect(preClassify("This is an automatic reply. I am on annual leave until the 4th.")?.classification).toBe("out_of_office");
+    expect(preClassify("I am on parental leave and will return in September.")?.classification).toBe("out_of_office");
+    expect(preClassify("Out of the office this week at a conference, will reply when I'm back.")?.classification).toBe("out_of_office");
+  });
 });
 
 describe("classifyReply", () => {
@@ -71,6 +102,19 @@ describe("classifyReply", () => {
 
     expect(result.classification).toBe("interested");
     expect(result.booked).toBe(true);
+  });
+
+  it("never fails a reply over an over-long rationale — it is clipped, not rejected", async () => {
+    // A schema-level max would throw on a chatty model and lose the reply's whole processing run.
+    const long = "x".repeat(900);
+    const model = new MockLanguageModelV3({
+      doGenerate: async () => textResponse({ classification: "neutral", rationale: long }),
+    });
+
+    const result = await classifyReply("what does it cost?", model);
+
+    expect(result.classification).toBe("neutral");
+    expect(result.rationale.length).toBeLessThanOrEqual(300);
   });
 
   it("defaults booked to false when the model omits it", async () => {
