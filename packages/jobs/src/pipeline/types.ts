@@ -1036,8 +1036,34 @@ export interface InboundStore {
     providerMessageRef: string | null;
     body: string;
     receivedAt: Date;
-  }): Promise<{ id: string; created: boolean }>;
+  }): Promise<{
+    id: string;
+    created: boolean;
+    /** OUR ingestion time (replies.created_at) — the clock queued drafts are compared against */
+    createdAt: Date;
+    /** the row already carries a classification — the processed marker (set LAST by runInbound),
+     *  so an existing-but-unclassified row is a crashed run to finish, not a duplicate */
+    classified: boolean;
+  }>;
+  /** Written LAST in reply processing: classification doubles as the "fully processed" marker. */
   setReplyClassification(replyId: string, verdict: ReplyVerdict): Promise<void>;
+  /** The lead's STORED LinkedIn URL — the value every send-path suppression check compares
+   *  against (rule 11). Inbound payloads carry a provider-id URL form that rarely matches it. */
+  getLeadLinkedInUrl(accountId: string, leadId: string): Promise<string | null>;
+  isSuppressed(accountId: string, kind: "linkedin", value: string): Promise<boolean>;
+  /**
+   * True when an outbound LinkedIn message in this lead's thread is one Vantera sent (its provider
+   * message id is on an outreach_sends row, or its text matches a send already in flight/sent —
+   * the in-flight match covers the echo racing our post-send bookkeeping).
+   */
+  isOwnOutboundMessage(accountId: string, leadId: string, providerMessageRef: string, body: string): Promise<boolean>;
+  /**
+   * Human takeover (the pipeline twin of the in-app manual reply): cancel the agent's queued drafts
+   * (never manual sends) and hold the lead's runs at paused_reply — inserting a paused marker run on
+   * `campaignId` when the lead has none — so neither the responder nor proactive touches message on
+   * top of the person now driving the thread.
+   */
+  pauseForHumanTakeover(accountId: string, leadId: string, campaignId: string | null): Promise<void>;
   addSuppression(
     accountId: string,
     kind: "linkedin",
@@ -1068,6 +1094,8 @@ export interface InboundStore {
    * one touch of headroom, next nudge at `nextActionAt` — so an engaged thread never dies
    * with the cold sequence (2026-07-08: replied leads were exhausting at 2 cold touches).
    * The MAX_AGENT_TURNS cap in sequence-touch bounds total agent messages.
+   * Revives ONLY active/exhausted runs: 'stopped' is a deliberate stand-down (hard negative,
+   * booking, calendar, turn-cap hand-off) and never re-arms; nor does a booked or suppressed lead.
    */
   reviveSequenceRun(leadId: string, nextActionAt: Date): Promise<void>;
   /**
@@ -1076,7 +1104,12 @@ export interface InboundStore {
    * Outreach agent or the lead has no insights to ground a reply — the responder then stays silent
    * and the inbound reply is merely classified + the user notified (the prior behavior).
    */
-  getResponderBundle(accountId: string, leadId: string, campaignId: string | null): Promise<ResponderBundle | null>;
+  getResponderBundle(
+    accountId: string,
+    leadId: string,
+    campaignId: string | null,
+    opts?: { excludeReplyId?: string }
+  ): Promise<ResponderBundle | null>;
   /** Queue the contextual reply as a message-stage send — the existing dispatch path delivers it. */
   insertScheduledSend(send: NewScheduledSend): Promise<void>;
 }
@@ -1090,9 +1123,11 @@ export interface ResponderBundle {
   insights: StoredInsights;
   /** same grounding the first-touch copy used — CTA, value prop, seller identity, guardrails */
   context: BrainCopyContext;
-  /** prior messages in the thread, oldest first (excludes the incoming one) */
+  /** prior messages in the thread, oldest first by DELIVERY time (excludes the incoming reply when
+   *  `excludeReplyId` is passed, and out-of-office auto-replies, which aren't conversation) */
   thread: ConversationTurn[];
-  /** prior agent messages actually sent in this thread — drives the converse-to-close turn cap */
+  /** prior AGENT messages actually sent in this thread — drives the converse-to-close turn cap.
+   *  Human (manual) messages are thread context, never agent turns. */
   agentTurns: number;
   /** created_at of the NEWEST queued/in-flight message for this lead (null = none). Sequence
    *  touches skip whenever one exists (never stack). The responder compares it to the reply's

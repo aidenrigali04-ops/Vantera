@@ -103,18 +103,27 @@ async function maybeRespond(
   deps: InboundDeps,
   accountId: string,
   lead: { id: string; campaignId: string | null },
-  incoming: string,
+  incomingReply: { id: string; body: string; receivedAt: Date; ingestedAt: Date },
   verdict: ReplyVerdict,
-  receivedAt: Date,
+  suppressionValues: string[],
   now: Date
 ): Promise<boolean> {
   const respondFn = deps.respondFn;
   if (!respondFn) return false;
   if (!RESPONDABLE.has(verdict.classification) || verdict.booked) return false;
   // Stale reply (replay/backfill artifact) — never auto-answer days later.
-  if (now.getTime() - receivedAt.getTime() > RESPOND_MAX_REPLY_AGE_MS) return false;
+  if (now.getTime() - incomingReply.receivedAt.getTime() > RESPOND_MAX_REPLY_AGE_MS) return false;
+  // Rule 11: suppression is checked before anything that could reach a prospect — the stored URL
+  // send paths compare against, plus the payload URL. Dispatch re-checks; this keeps the queue clean.
+  for (const value of suppressionValues) {
+    if (await deps.store.isSuppressed(accountId, "linkedin", value)) return false;
+  }
+  const incoming = incomingReply.body;
 
-  const bundle = await deps.store.getResponderBundle(accountId, lead.id, lead.campaignId);
+  // The incoming reply is passed as `incoming` — excluded from the thread so it isn't seen twice.
+  const bundle = await deps.store.getResponderBundle(accountId, lead.id, lead.campaignId, {
+    excludeReplyId: incomingReply.id,
+  });
   if (!bundle) return false; // no live Outreach agent, or no insights to ground a reply
   // A human took this thread over (replied manually → paused_reply). Stand down silently — the
   // person is driving now, and the reply notification above already told them a reply came in.
@@ -141,10 +150,12 @@ async function maybeRespond(
   // A queued message NEWER than this reply is (or already covers) the answer — don't double-
   // message. An OLDER one was drafted blind to what the lead just said: fall through and let
   // cancelPendingSends below supersede it (a blind scripted draft used to both block this
-  // response AND later send as a tone-deaf duplicate).
+  // response AND later send as a tone-deaf duplicate). "Newer" is judged on OUR clock — the
+  // reply row's ingestion time — never the provider's send time: a draft made while the webhook
+  // was in flight postdates the provider timestamp yet never saw the reply.
   if (
     bundle.newestUnsentMessageCreatedAt !== null &&
-    bundle.newestUnsentMessageCreatedAt > receivedAt
+    bundle.newestUnsentMessageCreatedAt > incomingReply.ingestedAt
   ) {
     return false;
   }
@@ -305,7 +316,7 @@ export async function runInbound(payload: InboundPayload, deps: InboundDeps): Pr
         now
       );
       if (matched) return { handled: true, action: "lifecycle:accepted" };
-    } else {
+    } else if (event.type === "reply") {
       const who = await deps.lifecycle.recordReply(
         { providerRef: event.fromProviderRef, profileUrl: event.fromProfileUrl },
         now
@@ -337,9 +348,26 @@ export async function runInbound(payload: InboundPayload, deps: InboundDeps): Pr
     return { handled: true, action: "relationship_accepted" };
   }
 
+  if (event.type === "outbound_echo") {
+    // A message the connected account itself sent. Ours (a dispatched send, incl. in-app manual
+    // replies) is ignored; one typed natively in LinkedIn means a human took the thread over —
+    // the agent stands down exactly as it does for an in-app manual reply.
+    const lead = await matchLead(deps.store, accountId, {
+      profileUrl: event.toProfileUrl,
+      providerRef: event.fromProviderRef,
+      publicIdentifier: event.fromPublicIdentifier,
+      name: event.fromName,
+    });
+    if (!lead) return { handled: false, action: "no matching lead" };
+    if (await deps.store.isOwnOutboundMessage(accountId, lead.id, event.providerEventId, event.body)) {
+      return { handled: true, action: "echo:own" };
+    }
+    await deps.store.pauseForHumanTakeover(accountId, lead.id, lead.campaignId);
+    return { handled: true, action: "echo:human_takeover" };
+  }
+
   // LinkedIn reply — explicit narrow so a future event variant can't fall into the reply path
   if (event.type !== "reply") return { handled: false, action: "unhandled event type" };
-  const url = normalizeLinkedInUrl(event.fromProfileUrl);
   const lead = await matchLead(deps.store, accountId, {
     profileUrl: event.fromProfileUrl,
     providerRef: event.fromProviderRef,
@@ -349,6 +377,7 @@ export async function runInbound(payload: InboundPayload, deps: InboundDeps): Pr
   if (!lead) return { handled: false, action: "no matching lead" };
   // provider_message_ref makes the insert idempotent (0043 partial unique index) — provider
   // retries and the stored-event replay can never double-count a reply.
+  const receivedAt = new Date(event.receivedAt);
   const inserted = await deps.store.insertReply({
     accountId,
     leadId: lead.id,
@@ -356,12 +385,32 @@ export async function runInbound(payload: InboundPayload, deps: InboundDeps): Pr
     channel: "linkedin",
     providerMessageRef: event.providerEventId,
     body: event.body,
-    receivedAt: new Date(event.receivedAt),
+    receivedAt,
   });
-  if (!inserted.created) return { handled: true, action: "reply:duplicate" };
+  // The classification is the processed marker, written LAST. An existing row WITHOUT one is a
+  // run that crashed mid-way (its Trigger retry lands here) — finish it rather than drop the
+  // reply unclassified, unsuppressed and un-notified. Every effect below is idempotent or
+  // self-guarding on a retry (suppression upserts; a draft queued by the crashed run is newer
+  // than the reply row, so the responder treats it as the answer).
+  if (!inserted.created && inserted.classified) return { handled: true, action: "reply:duplicate" };
   const replyId = inserted.id;
   const verdict = await deps.classifyFn(event.body);
-  await deps.store.setReplyClassification(replyId, verdict);
+
+  // Rule 11: suppress the value every send-path check compares against — the lead's STORED url
+  // (vanity / ACwAA form) — plus the payload's provider-id url as a second entry. Suppressing only
+  // the payload url left opted-out leads contactable. Written first: the legal effect never waits
+  // on (or is lost to) a later failure.
+  const storedUrl = await deps.store.getLeadLinkedInUrl(accountId, lead.id);
+  const suppressionValues = [
+    ...new Set([storedUrl, event.fromProfileUrl].filter((u): u is string => Boolean(u)).map(normalizeLinkedInUrl)),
+  ];
+  if (verdict.classification === "not_interested" || verdict.classification === "unsubscribe") {
+    for (const value of suppressionValues) {
+      await deps.store.addSuppression(accountId, "linkedin", value, verdict.classification, lead.id);
+    }
+  }
+
+  let responded = false;
   if (verdict.classification !== "out_of_office") {
     await applyGenuineReply(deps.store, accountId, lead, verdict, now);
     // Moment-of-value emails (L3): the two reply-driven events worth interrupting someone for.
@@ -378,23 +427,22 @@ export async function runInbound(payload: InboundPayload, deps: InboundDeps): Pr
       }
     }
   }
-  if (verdict.classification === "not_interested") {
-    await deps.store.addSuppression(accountId, "linkedin", url, "not_interested", lead.id);
-    return { handled: true, action: "reply:not_interested" };
-  }
-  if (verdict.classification === "unsubscribe") {
-    await deps.store.addSuppression(accountId, "linkedin", url, "unsubscribe", lead.id);
-    return { handled: true, action: "reply:unsubscribe" };
-  }
-  // Active responder: draft + queue the seller's next move, continuing the conversation toward close.
-  const responded = await maybeRespond(
-    deps, accountId, lead, event.body, verdict, new Date(event.receivedAt), now
-  );
-  // Conversation cadence (0044): an engaged prospect's run switches to the conversation clock —
-  // if they go quiet after this exchange, a thread-aware nudge follows in a couple of days
-  // instead of the thread dying with the cold sequence. Booked = the win; no nudging needed.
   if (RESPONDABLE.has(verdict.classification) && !verdict.booked) {
+    // Active responder: draft + queue the seller's next move, continuing the conversation toward close.
+    responded = await maybeRespond(
+      deps,
+      accountId,
+      lead,
+      { id: replyId, body: event.body, receivedAt, ingestedAt: inserted.createdAt },
+      verdict,
+      suppressionValues,
+      now
+    );
+    // Conversation cadence (0044): an engaged prospect's run switches to the conversation clock —
+    // if they go quiet after this exchange, a thread-aware nudge follows in a couple of days
+    // instead of the thread dying with the cold sequence. Booked = the win; no nudging needed.
     await deps.store.reviveSequenceRun(lead.id, new Date(now.getTime() + CONVERSATION_NUDGE_GAP_DAYS * DAY_MS));
   }
+  await deps.store.setReplyClassification(replyId, verdict);
   return { handled: true, action: `reply:${verdict.classification}${responded ? "+responded" : ""}` };
 }

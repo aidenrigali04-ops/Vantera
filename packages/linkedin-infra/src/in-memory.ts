@@ -125,6 +125,9 @@ export class InMemoryLinkedInInfra implements LinkedInInfra {
       case "relationship_accepted":
         if (typeof p.profile_url !== "string") return null;
         return { type: "relationship_accepted", ...base, ...identity, profileUrl: p.profile_url };
+      case "outbound_echo":
+        if (typeof p.to_profile_url !== "string" || typeof p.body !== "string" || typeof p.sent_at !== "string") return null;
+        return { type: "outbound_echo", ...base, ...identity, toProfileUrl: p.to_profile_url, body: p.body, sentAt: p.sent_at };
       case "account_status":
         if ((p.status !== "active" && p.status !== "restricted" && p.status !== "disconnected")) return null;
         return {

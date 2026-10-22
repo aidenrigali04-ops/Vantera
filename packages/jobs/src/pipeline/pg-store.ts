@@ -1475,12 +1475,17 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
     async reviveSequenceRun(leadId: string, nextActionAt: Date) {
       // Conversation cadence (0044): the engaged lead's run goes back on the clock with one
       // touch of headroom — touches_done drops to (target-1)-equivalent by simply stepping
-      // back one from wherever it is, floored at 0. Exhausted/stopped runs come back active;
-      // converted runs stay converted (the win is never reopened).
+      // back one from wherever it is, floored at 0. Exhausted runs come back active; converted
+      // runs stay converted (the win is never reopened).
       //
       // paused_reply is EXCLUDED: that status means a human took the thread over (manual reply).
       // A later prospect reply must never silently re-arm automation on a human-driven thread —
       // only an explicit "resume automation" does that. (Human-takeover fix, 2026-07-10.)
+      //
+      // 'stopped' is EXCLUDED too: it is always a deliberate stand-down (hard negative, booking,
+      // calendar stand-down, turn-cap hand-off), and reviving it re-armed scripted nudges at a
+      // prospect who had booked or been handed to a human. A booked or suppressed lead never
+      // revives whatever its run status says.
       await db
         .update(sequenceRuns)
         .set({
@@ -1492,7 +1497,9 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         .where(
           and(
             eq(sequenceRuns.leadId, leadId),
-            inArray(sequenceRuns.status, ["active", "exhausted", "stopped"])
+            inArray(sequenceRuns.status, ["active", "exhausted"]),
+            sql`not exists (select 1 from ${leads} l where l.id = ${sequenceRuns.leadId} and l.meeting_booked_at is not null)`,
+            sql`not exists (select 1 from ${suppressionEntries} se join ${leads} l on l.id = ${sequenceRuns.leadId} where se.account_id = ${sequenceRuns.accountId} and se.kind = 'linkedin' and (se.lead_id = l.id or se.value = l.linkedin_url_normalized))`
           )
         );
     },
@@ -2713,11 +2720,13 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           target: [replies.accountId, replies.providerMessageRef],
           where: sql`provider_message_ref is not null`,
         })
-        .returning({ id: replies.id });
-      if (row) return { id: row.id, created: true };
+        .returning({ id: replies.id, createdAt: replies.createdAt });
+      if (row) return { id: row.id, created: true, createdAt: row.createdAt, classified: false };
       if (!r.providerMessageRef) throw new Error("failed to insert reply");
+      // classified_at is the processed marker (runInbound writes it last): an existing row without
+      // it belongs to a run that crashed mid-way, and the caller finishes it instead of deduping.
       const [existing] = await db
-        .select({ id: replies.id })
+        .select({ id: replies.id, createdAt: replies.createdAt, classifiedAt: replies.classifiedAt })
         .from(replies)
         .where(
           and(
@@ -2727,7 +2736,83 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         )
         .limit(1);
       if (!existing) throw new Error("failed to insert reply");
-      return { id: existing.id, created: false };
+      return { id: existing.id, created: false, createdAt: existing.createdAt, classified: existing.classifiedAt !== null };
+    },
+
+    async getLeadLinkedInUrl(accountId: string, leadId: string) {
+      const [row] = await db
+        .select({ url: leads.linkedinUrl })
+        .from(leads)
+        .where(and(eq(leads.accountId, accountId), eq(leads.id, leadId)))
+        .limit(1);
+      return row?.url ?? null;
+    },
+
+    async isOwnOutboundMessage(accountId: string, leadId: string, providerMessageRef: string, body: string) {
+      // Our provider message id on the audit row is the strong key …
+      const [byRef] = await db
+        .select({ id: outreachSends.id })
+        .from(outreachSends)
+        .where(
+          and(
+            eq(outreachSends.accountId, accountId),
+            eq(outreachSends.leadId, leadId),
+            eq(outreachSends.messageRef, providerMessageRef)
+          )
+        )
+        .limit(1);
+      if (byRef) return true;
+      // … and the text of a send already claimed or delivered covers the echo racing the post-send
+      // bookkeeping (the row is 'sending' before the provider call, its body final).
+      const [byBody] = await db
+        .select({ id: scheduledSends.id })
+        .from(scheduledSends)
+        .where(
+          and(
+            eq(scheduledSends.accountId, accountId),
+            eq(scheduledSends.leadId, leadId),
+            inArray(scheduledSends.status, ["sending", "sent"]),
+            sql`btrim(${scheduledSends.body}) = btrim(${body})`
+          )
+        )
+        .limit(1);
+      return Boolean(byBody);
+    },
+
+    async pauseForHumanTakeover(accountId: string, leadId: string, campaignId: string | null) {
+      // Same semantics as the in-app manual reply (sendManualReply): the agent's queued drafts go
+      // (never a human's own manual sends), and every live-or-stood-down run holds at paused_reply
+      // until the user explicitly hands the thread back. 'converted' (the win) is left alone.
+      await db
+        .update(scheduledSends)
+        .set({ status: "canceled", error: "human took over the thread" })
+        .where(
+          and(
+            eq(scheduledSends.accountId, accountId),
+            eq(scheduledSends.leadId, leadId),
+            inArray(scheduledSends.status, ["pending_review", "approved", "scheduled"]),
+            or(isNull(scheduledSends.origin), ne(scheduledSends.origin, "manual"))
+          )
+        );
+      const paused = await db
+        .update(sequenceRuns)
+        .set({ status: "paused_reply", updatedAt: new Date() })
+        .where(
+          and(
+            eq(sequenceRuns.accountId, accountId),
+            eq(sequenceRuns.leadId, leadId),
+            inArray(sequenceRuns.status, ["active", "exhausted", "stopped", "paused_reply"])
+          )
+        )
+        .returning({ id: sequenceRuns.id });
+      // No run at all (never enrolled / compose-to-any-lead): a paused marker is what the
+      // responder and proactive touches read, so one must exist for the takeover to hold.
+      if (paused.length === 0 && campaignId) {
+        await db
+          .insert(sequenceRuns)
+          .values({ accountId, campaignId, leadId, status: "paused_reply" })
+          .onConflictDoNothing({ target: [sequenceRuns.campaignId, sequenceRuns.leadId] });
+      }
     },
 
     async setReplyClassification(replyId: string, verdict: import("@vantera/agent-brains").ReplyVerdict) {
@@ -2744,7 +2829,8 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
     async getResponderBundle(
       accountId: string,
       leadId: string,
-      _campaignId: string | null
+      _campaignId: string | null,
+      opts?: { excludeReplyId?: string }
     ): Promise<ResponderBundle | null> {
       // The live Outreach (copy) agent owns reply handling (rule 08). No live agent ⇒ responder off.
       const [agent] = await db
@@ -2794,12 +2880,14 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
       // Running thread: delivered agent touches + the lead's replies, merged oldest-first.
       // The INVITE note is included — it's the actual first touch, and a brain that can't see
       // it can regenerate the same hook, making a follow-up read like a second cold intro.
+      // Ordered by DELIVERY time (the audit row's sent_at, else markSent's updated_at stamp) — a
+      // draft created early but delivered after the lead's reply must sit after it in the thread.
       const sent = await db
         .select({
           body: scheduledSends.body,
           stage: scheduledSends.linkedinStage,
-          at: scheduledSends.createdAt,
-          deliveredAt: scheduledSends.updatedAt, // markSent stamps updated_at ⇒ delivery-time proxy
+          origin: scheduledSends.origin,
+          deliveredAt: sql<Date>`coalesce((select max(o.sent_at) from ${outreachSends} o where o.scheduled_send_id = ${scheduledSends.id}), ${scheduledSends.updatedAt})`.mapWith(scheduledSends.updatedAt),
         })
         .from(scheduledSends)
         .where(
@@ -2810,12 +2898,20 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
             isNotNull(scheduledSends.body)
           )
         );
+      // The incoming reply is handed to the brain separately (`incoming`); auto-responders aren't
+      // conversation and would read as the lead's last word.
       const got = await db
         .select({ body: replies.body, at: replies.receivedAt })
         .from(replies)
-        .where(eq(replies.leadId, leadId));
+        .where(
+          and(
+            eq(replies.leadId, leadId),
+            opts?.excludeReplyId ? ne(replies.id, opts.excludeReplyId) : undefined,
+            or(isNull(replies.classification), ne(replies.classification, "out_of_office"))
+          )
+        );
       const thread = [
-        ...sent.map((s) => ({ role: "agent" as const, text: s.body ?? "", at: s.at })),
+        ...sent.map((s) => ({ role: "agent" as const, text: s.body ?? "", at: s.deliveredAt })),
         ...got.map((r) => ({ role: "lead" as const, text: r.body ?? "", at: r.at })),
       ]
         .filter((t) => t.text.trim() !== "")
@@ -2824,6 +2920,9 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
 
       // Turn cap + delivery gap count MESSAGES only — the invite is thread context, not a turn.
       const sentMessages = sent.filter((s) => s.stage === "message");
+      // A human's manual message is thread context and gates the delivery gap, but never spends
+      // the AGENT's converse-to-close budget.
+      const agentMessages = sentMessages.filter((s) => s.origin !== "manual");
       const lastAgentMessageAt = sentMessages.reduce<Date | null>(
         (max, r) => (max === null || r.deliveredAt > max ? r.deliveredAt : max),
         null
@@ -2887,7 +2986,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           strategy,
         },
         thread,
-        agentTurns: sentMessages.length,
+        agentTurns: agentMessages.length,
         newestUnsentMessageCreatedAt: pending?.createdAt ?? null,
         lastAgentMessageAt,
         humanHandled: paused !== undefined,
