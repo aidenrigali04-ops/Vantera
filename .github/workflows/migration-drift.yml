@@ -9,7 +9,7 @@ name: Migration drift check
 # the diff has run clean for a while) — this is signal only.
 on:
   schedule: [{ cron: "17 5 * * *" }]
-  push: { paths: ["packages/db/migrations/**"] }
+  push: { paths: ["packages/db/migrations/**", ".github/workflows/migration-drift.yml"] }
   workflow_dispatch:
 
 jobs:
@@ -43,6 +43,19 @@ jobs:
             echo "::warning::PROD_DB_URL secret not set — drift check SKIPPED. The spec's WS-4.1 owner dependency is open."
           fi
 
+      # Prod runs Postgres 17 (Supabase); ubuntu-latest ships pg_dump 16, which refuses a newer
+      # server ("aborting because of server version mismatch"). Install the 17 client from the PGDG
+      # repo and put it first on PATH. A pg_dump newer than the pg15 scratch service is fine.
+      - name: Install PostgreSQL 17 client tools
+        if: steps.check.outputs.has_prod == 'true'
+        run: |
+          set -euo pipefail
+          sudo apt-get install -y -qq postgresql-common >/dev/null
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y >/dev/null
+          sudo apt-get install -y -qq postgresql-client-17 >/dev/null
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+          /usr/lib/postgresql/17/bin/pg_dump --version
+
       - name: Replay migrations onto scratch DB
         if: steps.check.outputs.has_prod == 'true'
         env: { DATABASE_URL: "postgresql://postgres@localhost:5432/postgres" }
@@ -54,12 +67,16 @@ jobs:
           SCRATCH: "postgresql://postgres@localhost:5432/postgres"
           PROD: ${{ secrets.PROD_DB_URL }}
         run: |
+          # pipefail: a pg_dump failure (auth, version, network) must fail THIS step with its own
+          # error, not surface as a bogus "everything is drift" diff against an empty dump.
+          set -euo pipefail
+          pg_dump --version
           # Strip comment lines, SET statements, and pg_catalog SELECTs (non-deterministic
           # server-version chatter) plus the \restrict/\unrestrict meta-command lines that recent
           # pg_dump builds bracket every dump with — each carries a random per-invocation token,
           # so without stripping them a scratch-vs-scratch dump never diffs clean either.
           dump() { pg_dump "$1" --schema-only --schema=public --no-owner --no-privileges \
-            | grep -vE '^(--|SET |SELECT pg_catalog|\\restrict|\\unrestrict)' | sed -e 's/[[:space:]]*$//' ; }
+            | { grep -vE '^(--|SET |SELECT pg_catalog|\\restrict|\\unrestrict)' || true; } | sed -e 's/[[:space:]]*$//' ; }
           dump "$SCRATCH" > /tmp/expected.sql
           dump "$PROD"    > /tmp/actual.sql
           if ! diff -u /tmp/expected.sql /tmp/actual.sql > /tmp/drift.diff; then
