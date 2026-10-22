@@ -2200,9 +2200,9 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
               inArray(scheduledSends.leadId, messageLeadIds),
               eq(scheduledSends.linkedinStage, "message"),
               or(
-                // a "sending" row untouched past the stale cutoff is a dead task, not in flight —
-                // it must not block this lead's messages forever
-                and(eq(scheduledSends.status, "sending"), gte(scheduledSends.updatedAt, staleCutoff)),
+                // any "sending" row blocks, stale or not: a stuck one may have been DELIVERED with
+                // the bookkeeping lost, so a second message could land right behind it
+                eq(scheduledSends.status, "sending"),
                 and(
                   eq(scheduledSends.status, "scheduled"),
                   gte(scheduledSends.scheduledFor, staleCutoff)
@@ -2332,7 +2332,8 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
             eq(scheduledSends.accountId, accountId),
             eq(scheduledSends.channel, "linkedin"),
             or(
-              eq(scheduledSends.status, "sending"),
+              // a dead "sending" row (killed task) must not hold budget forever
+              and(eq(scheduledSends.status, "sending"), gte(scheduledSends.updatedAt, staleCutoff)),
               and(eq(scheduledSends.status, "scheduled"), gte(scheduledSends.scheduledFor, staleCutoff))
             )
           )
@@ -2442,6 +2443,13 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
     },
 
     async cancelUnsentFollowups(leadId: string, reason: string) {
+      // an already-connected lead can still be messaged — the invite failing doesn't matter then
+      const [lead] = await db
+        .select({ connectedAt: leads.linkedinConnectedAt })
+        .from(leads)
+        .where(eq(leads.id, leadId))
+        .limit(1);
+      if (!lead || lead.connectedAt) return 0;
       const rows = await db
         .update(scheduledSends)
         .set({ status: "canceled", error: reason })
@@ -2449,6 +2457,8 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           and(
             eq(scheduledSends.leadId, leadId),
             eq(scheduledSends.linkedinStage, "message"),
+            // agent follow-ups only — a human-typed or reply-response message is never dropped here
+            eq(scheduledSends.origin, "sequence"),
             inArray(scheduledSends.status, ["pending_review", "approved"])
           )
         )
@@ -3096,6 +3106,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           nextActionAt: sequenceRuns.nextActionAt,
           enteredStageAt: sequenceRuns.enteredStageAt,
           revivedAt: sequenceRuns.revivedAt,
+          lastTouchAt: sequenceRuns.lastTouchAt,
           linkedinUrl: leads.linkedinUrl,
           leadInvitedAt: leads.linkedinInvitedAt,
           leadConnectedAt: leads.linkedinConnectedAt,
@@ -3129,6 +3140,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           nextActionAt: r.nextActionAt,
           enteredStageAt: r.enteredStageAt,
           revivedAt: r.revivedAt,
+          lastTouchAt: r.lastTouchAt,
         },
         channels: {
           linkedinUrl: r.linkedinUrl,

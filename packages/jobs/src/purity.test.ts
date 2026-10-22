@@ -10,7 +10,7 @@ function ctx(): SequenceTickContext {
     run: {
       id: "r1", accountId: "a1", campaignId: "c1", leadId: "l1",
       status: "active", currentStage: "linkedin", touchesDone: 0,
-      nextActionAt: NOW, enteredStageAt: NOW, revivedAt: null,
+      nextActionAt: NOW, enteredStageAt: NOW, revivedAt: null, lastTouchAt: null,
     },
     config: SEQUENCE_DEFAULTS,
     channels: {

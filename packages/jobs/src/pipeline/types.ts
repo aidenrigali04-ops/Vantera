@@ -857,6 +857,8 @@ export type OutreachSendOutcome =
   | "failed"
   | "skipped"
   | "canceled"
+  /** the provider call timed out — it may have gone out, so the row is left as-is (never resent) */
+  | "ambiguous"
   /** the sender's LinkedIn session is dead — send parked; wrapper fires an immediate health check */
   | "sender_disconnected";
 
@@ -1198,6 +1200,8 @@ export interface SequenceRun {
   enteredStageAt: Date;
   /** one-shot soft-no revival timestamp (0044); null = revival still available */
   revivedAt: Date | null;
+  /** when the run last dispatched a touch (null = never) */
+  lastTouchAt: Date | null;
 }
 
 export interface LeadChannels {

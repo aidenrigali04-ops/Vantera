@@ -247,6 +247,12 @@ export async function runSendDispatch(deps: SendDispatchDeps): Promise<SendDispa
         skipped += 1; // invite already went out (stale-row safety)
         continue;
       }
+      if (row.leadConnectedAt) {
+        // already a connection — the invite would fail; its follow-up delivers without one
+        await deps.store.cancelSend(row.id, "already connected");
+        canceled += 1;
+        continue;
+      }
       const st = pickInviteSender(row, state);
       if (!st) {
         skipped += 1; // no healthy sender with budget

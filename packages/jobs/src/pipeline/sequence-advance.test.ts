@@ -15,7 +15,7 @@ function ctx(run: Partial<SequenceRun>, over: Partial<SequenceTickContext> = {})
     run: {
       id: "r1", accountId: "a1", campaignId: "c1", leadId: "l1",
       status: "active", currentStage: "linkedin", touchesDone: 0,
-      nextActionAt: NOW, enteredStageAt: NOW, revivedAt: null, ...run,
+      nextActionAt: NOW, enteredStageAt: NOW, revivedAt: null, lastTouchAt: null, ...run,
     },
     config: SEQUENCE_DEFAULTS,
     channels: fullChannels,
@@ -156,5 +156,19 @@ describe("advanceSequence — connection gating (prod 2026-10-22: touches spent 
       ctx({ touchesDone: 1, enteredStageAt: connectedAt }, { connection: { invitedAt: new Date(NOW.getTime() - 4 * DAY), connectedAt } })
     );
     expect(d).toMatchObject({ kind: "dispatch", touchNo: 2 });
+  });
+});
+
+describe("advanceSequence — acceptance reset never rewinds real post-acceptance touches (review 2026-10-22)", () => {
+  it("leaves a run alone when its last touch already happened after acceptance", () => {
+    const connectedAt = new Date(NOW.getTime() - 6 * DAY);
+    const d = advanceSequence(
+      ctx(
+        // enrolled before the invite (prod), touch 2 delivered after acceptance, now past waitDays
+        { touchesDone: 2, enteredStageAt: new Date(NOW.getTime() - 9 * DAY), lastTouchAt: new Date(NOW.getTime() - 4 * DAY) },
+        { connection: { invitedAt: new Date(NOW.getTime() - 8 * DAY), connectedAt } }
+      )
+    );
+    expect(d.kind).toBe("exhaust"); // NOT a rewind to touch 1 and a third message
   });
 });

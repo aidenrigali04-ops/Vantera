@@ -72,7 +72,10 @@ function connectionGate(ctx: SequenceTickContext): SequenceDecision | null {
     if (timedOut) return { kind: "exhaust", patch: { status: "exhausted", currentStage: "done" } };
     return { kind: "wait", patch: { nextActionAt: new Date(now + CONNECTION_RECHECK_DAYS * DAY) } };
   }
-  if (ctx.run.enteredStageAt.getTime() < connectedAt.getTime()) {
+  // Reset only when no touch happened since acceptance — a run whose touch already went out
+  // after the accept is mid-sequence and keeps its count (rewinding it re-sends a nudge).
+  const touchedSinceAccept = ctx.run.lastTouchAt !== null && ctx.run.lastTouchAt.getTime() >= connectedAt.getTime();
+  if (!touchedSinceAccept && ctx.run.enteredStageAt.getTime() < connectedAt.getTime()) {
     const cfg = ctx.config.stages.linkedin;
     const gapDays = cfg.touches > 1 ? cfg.touchGapDays : cfg.waitDays;
     return {

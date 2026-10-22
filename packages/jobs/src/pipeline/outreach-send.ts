@@ -47,6 +47,12 @@ export function isDisconnectedAccount(err: unknown): boolean {
   return message.includes("disconnected_account");
 }
 
+/** The provider call was aborted by its timeout (AbortSignal.timeout → TimeoutError). */
+function isProviderTimeout(err: unknown): boolean {
+  const name = (err as { name?: string } | null)?.name;
+  return name === "TimeoutError" || name === "AbortError";
+}
+
 /**
  * One live LinkedIn send. Re-checks suppression, kill switch, pause and identity health
  * immediately before the provider call (rule 11) — dispatch-time checks are not
@@ -167,6 +173,12 @@ export async function runOutreachSend(
     // neutral prefix, so the real 400/403 body would otherwise be lost — that's why prior invite
     // failures couldn't be diagnosed).
     deps.onProviderError?.(err instanceof Error ? err.message : String(err));
+    if (isProviderTimeout(err)) {
+      // Ambiguous: the provider may have acted before the response timed out. Leave the row in
+      // "sending" (never re-dispatched, blocks this lead's other messages) for an ops check —
+      // marking it failed would cancel the follow-up of an invite that actually went out.
+      return "ambiguous";
+    }
     if (isDisconnectedAccount(err)) {
       // The sender's LinkedIn session is dead — park the send (it retries after reconnect)
       // and let the wrapper trigger an immediate health reconcile + admin alert.

@@ -27,6 +27,7 @@ function run(over: Partial<SequenceRun> = {}): SequenceRun {
     nextActionAt: NOW,
     enteredStageAt: NOW,
     revivedAt: null,
+    lastTouchAt: null,
     ...over,
   };
 }

@@ -845,3 +845,13 @@ describe("runSendDispatch — pacing continuity and the send window at landing t
     expect(result.scheduled).toBe(1);
   });
 });
+
+describe("runSendDispatch — never invites an existing connection", () => {
+  it("cancels the invite row of a lead who is already connected", async () => {
+    const store = new FakeDispatchStore();
+    store.sends = [makeSend({ id: "inv1", linkedinStage: "invite", leadConnectedAt: new Date("2026-06-01T00:00:00Z") })];
+    const result = await runSendDispatch(makeDeps(store));
+    expect(result.scheduled).toBe(0);
+    expect(store.canceled).toEqual([{ sendId: "inv1", error: "already connected" }]);
+  });
+});

@@ -533,6 +533,21 @@ describe("runOutreachSend — lead no longer in outreach", () => {
   });
 });
 
+describe("runOutreachSend — a provider timeout is ambiguous, never a failure", () => {
+  it("leaves a timed-out invite untouched (it may have gone out) and keeps its follow-up", async () => {
+    const store = new FakeOutreachStore();
+    store.ctx = makeCtx({ linkedinStage: "invite" });
+    const deps = makeDeps(store);
+    deps.linkedinInfra.sendInvite = async () => {
+      throw Object.assign(new Error("The operation was aborted due to timeout"), { name: "TimeoutError" });
+    };
+    expect(await runOutreachSend({ sendId: "send1" }, deps)).toBe("ambiguous");
+    expect(store.failed).toHaveLength(0);
+    expect(store.reverted).toHaveLength(0);
+    expect(store.followupsCanceled).toHaveLength(0);
+  });
+});
+
 describe("runOutreachSend — a failed invite releases its follow-up", () => {
   it("cancels the lead's unsent follow-ups when the invite fails (they could never deliver)", async () => {
     const store = new FakeOutreachStore();
