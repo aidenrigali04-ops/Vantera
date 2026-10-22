@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { parseFitVerdict, type FitVerdict } from "@/lib/learning/fit";
+import { upsertLeadFit } from "@/lib/learning/fit-write";
 
 export type FitState = { verdict?: FitVerdict | null; error?: string };
 
@@ -33,9 +34,7 @@ export async function setLeadFit(_prev: FitState, formData: FormData): Promise<F
   } else {
     const { data: account } = await supabase.from("accounts").select("id").limit(1).maybeSingle();
     if (!account) return { error: FAILED };
-    const { error } = await supabase
-      .from("lead_feedback")
-      .upsert({ account_id: account.id, lead_id: leadId, verdict, created_by: user.id }, { onConflict: "lead_id" });
+    const { error } = await upsertLeadFit(supabase, { accountId: account.id, leadId, verdict, userId: user.id });
     if (error) return { error: FAILED };
   }
 
