@@ -217,7 +217,7 @@ function StageRow({
     <div
       className={cn(
         "rounded-xl border p-3",
-        highlight ? "border-amber-500/40 bg-amber-500/[0.06]" : "border-[var(--hairline)]"
+        highlight ? "border-[var(--attention)]/30 bg-[var(--attention-tint)]" : "border-[var(--hairline)]"
       )}
     >
       <div className="flex items-baseline justify-between gap-3">

@@ -111,16 +111,20 @@ Supersedes the lines above where they disagree; the landing/auth/onboarding sect
 
 - **Theme**: the app is **light-first** (root layout forces light); the landing stays dark.
   App tokens live under `.app-surface` with a complete dormant `.dark .app-surface` block.
-- **Type**: **Geist Sans + Geist Mono** inside `.app-surface` (the theme font tokens are
-  remapped there); marketing pages, auth and onboarding use Plus Jakarta Sans (see below).
-  Sentence case; numbers tabular mono.
-- **Accent**: blue (`--acc`) means *interactive / Interested / active tab* only; the
-  primary button is **ink**. Replaces the "interactive elements (cyan)" line of the
-  data-surface doctrine.
-- **Nav model**: the dock rail is retired. A 64px **top chrome band** carries the logo
-  tile, workspace pill, centered nav pill (Today · Approvals · Inbox · Prospects · Playbook),
-  utility tiles (search ⌘K · bell · settings) and the avatar. Mobile: 48px top bar +
-  bottom tab bar.
+- **Landing parity (2026-10-21)**: the app is built in the landing's system; the reference
+  is the landing's app replica (`components/landing/app-replica.tsx`). Shared pieces live in
+  `components/app/surface.tsx` (`PageHeader`, `PANEL`, `StatusChip`, segmented filters).
+- **Type**: **Plus Jakarta Sans** inside `.app-surface` (the theme font tokens are remapped
+  there), numbers included, in tabular figures — no monospace. Sentence case.
+- **Accent**: the landing blue (`--acc` = `#1877f2`) is the **primary button**, the active
+  nav tab, links and Interested; otherwise colour carries meaning only. Avatars are round
+  initials in the replica's hues (`avatarTint`); icon tiles use the landing's pastel tones.
+  Replaces the "interactive elements (cyan)" line of the data-surface doctrine.
+- **Nav model**: the dock rail is retired. A 64px **white top chrome band** (hairline
+  bottom) carries the blue logo tile, workspace pill, a centered segmented nav track
+  (Today · Approvals · Inbox · Prospects · Playbook; white active tab, blue label),
+  hairline utility tiles (search ⌘K · bell · settings) and a round avatar. Mobile: 48px
+  white top bar + bottom tab bar.
 - **Vocabulary**: Review → **Approvals**, Leads → **Prospects**, Brain/Agents → **Playbook**,
   Results → **Today**, Channels → **Senders** — labels and routes agree (308 redirects from
   the old paths).

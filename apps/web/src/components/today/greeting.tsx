@@ -40,7 +40,7 @@ export function Greeting({ greeting, sentence, primary, glyph, onResume, classNa
   return (
     <section className={cn("relative", className)}>
       <div className="grid grid-cols-1 gap-y-2.5 md:grid-cols-[minmax(0,1fr)_auto] md:gap-x-6">
-        <h1 className="text-[32px] font-semibold leading-8 tracking-[-0.02em] text-[var(--ink)] md:col-start-1 md:row-start-1">
+        <h1 className="text-[32px] font-semibold leading-9 tracking-[-0.035em] text-[var(--ink)] md:col-start-1 md:row-start-1">
           {greeting}
         </h1>
         <p className="max-w-[72ch] text-[15px] leading-[22px] text-[var(--ink-mid)] md:col-start-1 md:row-start-2">{sentence}</p>
@@ -71,7 +71,7 @@ export function FadedHairline({ className }: { className?: string }) {
   return (
     <div
       aria-hidden="true"
-      className={cn("h-px w-full bg-[var(--line)] [mask-image:linear-gradient(90deg,transparent,#000_25%)]", className)}
+      className={cn("h-px w-full bg-[var(--line)]", className)}
     />
   );
 }

@@ -19,7 +19,7 @@ export interface QueueRow {
   context: string;
   initials: string;
   /** top lead_signals row, or the step reason when there is no fresh signal */
-  signal: { label: string; age: string; glyph: "briefcase" | "message-circle" | "arrow-up-right" | "rocket" | null } | null;
+  signal: { label: string; age: string; glyph: "briefcase" | "message-circle" | "arrow-up-right" | "banknote" | null } | null;
   signalFallback: string | null;
   score: number | null;
   step: QueueStep;

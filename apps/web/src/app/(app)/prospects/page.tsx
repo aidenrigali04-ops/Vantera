@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { parseReadout, reasonsForLead, whatsWorking } from "@/lib/learning/readout";
 import { fitVerdictFromRows } from "@/lib/learning/fit";
 import { WhatsWorkingStrip } from "./whats-working";
+import { PageHeader, SEGMENT_TRACK, segmentClass } from "@/components/app/surface";
 
 export const metadata = { title: "Prospects" };
 
@@ -194,30 +195,26 @@ export default async function LeadsPage({
     // One-screen on desktop (same contract as the lead brief): the PAGE never scrolls —
     // header/tabs/toolbar/pagination stay pinned, the table body scrolls internally.
     <div className="mx-auto flex w-full min-w-0 max-w-[1400px] flex-col lg:min-h-0 lg:flex-1">
-      <div className="mb-6 flex shrink-0 flex-wrap items-end justify-between gap-3 border-b border-[var(--hairline)] pb-5">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Prospects</h1>
-          <p className="mt-1.5 text-sm text-muted-foreground">
-            Every prospect your agents sourced, with the reasoning behind each score.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
+      <PageHeader
+        className="mb-5"
+        title="Prospects"
+        subtitle="Every prospect your agents sourced, with the reasoning behind each score."
+      >
           {/* P1: CSV export — the user's own data, one click. */}
           <a
             href="/api/export/leads"
-            className="inline-flex items-center rounded-lg border border-[var(--hairline)] px-3.5 py-2 text-sm font-medium transition-colors hover:bg-[var(--tint)]"
+            className="inline-flex h-9 items-center rounded-[var(--r-btn)] border border-[var(--line)] bg-[var(--surface)] px-3.5 text-sm font-medium shadow-[var(--shadow-tile)] transition-colors hover:bg-[var(--surface-2)]"
           >
             Export CSV
           </a>
           {/* R6: bring your own prospect — same qualification bar as discovery. */}
           <AddLead />
-        </div>
-      </div>
+      </PageHeader>
 
       {/* Segmented control (matches the Results tabs) — one bordered track, active is a raised
           white segment. Replaces the old full-pill tabs. */}
       <div className="mb-5 shrink-0" data-copilot="leads-tabs">
-        <div className="inline-flex flex-wrap items-center gap-1 rounded-xl border border-[var(--hairline)] bg-[var(--tint)] p-1 text-sm">
+        <div className={cn(SEGMENT_TRACK, "flex-wrap")}>
           {TABS.map((t) => {
             const isActive = tab.key === t.key;
             return (
@@ -225,12 +222,7 @@ export default async function LeadsPage({
                 key={t.key}
                 href={leadsHref({ tab: t.key, q, sort, per, filters })}
                 aria-current={isActive ? "page" : undefined}
-                className={cn(
-                  "inline-flex items-center rounded-lg px-3 py-1.5 font-medium transition-colors",
-                  isActive
-                    ? "bg-white text-foreground shadow-[var(--shadow-sm)] ring-1 ring-[var(--hairline)]"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
+                className={segmentClass(isActive)}
               >
                 {t.label}
               </Link>

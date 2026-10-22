@@ -4,6 +4,9 @@ import { createClient } from "@/lib/supabase/server";
 import { loadInbox, loadThread } from "@/lib/conversations";
 import { ConversationPanel } from "@/components/conversation-panel";
 import { cn } from "@/lib/utils";
+import { initials } from "@/lib/today/metrics";
+import { Avatar } from "@/components/today/work-card/chips";
+import { PANEL, PageHeader, SEGMENT_TRACK, StatusChip, segmentClass } from "@/components/app/surface";
 
 export const metadata = { title: "Inbox" };
 
@@ -82,12 +85,14 @@ export default async function InboxPage({
 
   return (
     <div className="mx-auto flex w-full min-w-0 max-w-[1400px] flex-col gap-5 lg:min-h-0 lg:flex-1">
-      <header className="shrink-0 border-b border-[var(--hairline)] pb-4">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Inbox</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Every conversation, both sides, in one place. Unanswered warm replies come first.
-        </p>
-      </header>
+      <PageHeader
+        title="Inbox"
+        subtitle="Every conversation, both sides, in one place. Unanswered warm replies come first."
+      >
+        {items.some((i) => i.waiting) && (
+          <StatusChip tone="blue">{items.filter((i) => i.waiting).length} waiting on you</StatusChip>
+        )}
+      </PageHeader>
 
       {/* R4 toolbar: search + filter chips — all URL state. */}
       <div className={cn("flex shrink-0 flex-wrap items-center gap-2", hasLeadParam && "hidden lg:flex")}>
@@ -103,21 +108,16 @@ export default async function InboxPage({
             defaultValue={params.q ?? ""}
             placeholder="Search conversations…"
             aria-label="Search conversations"
-            className="h-9 w-56 rounded-lg border border-[var(--hairline)] bg-white pl-9 pr-3 text-sm shadow-[var(--shadow-sm)] placeholder:text-muted-foreground/60 focus-visible:border-[var(--cyan-line)] focus-visible:outline-none sm:w-72"
+            className="h-9 w-56 rounded-[var(--r-btn)] border border-[var(--line)] bg-[var(--surface)] pl-9 pr-3 text-sm shadow-[var(--shadow-tile)] placeholder:text-[var(--ink-dim)] focus-visible:border-[var(--cyan-line)] focus-visible:shadow-[var(--focus-ring)] focus-visible:outline-none sm:w-72"
           />
         </form>
-        <div className="inline-flex items-center gap-1 rounded-xl border border-[var(--hairline)] bg-[var(--tint)] p-1 text-sm">
+        <div className={SEGMENT_TRACK}>
           {FILTERS.map((f) => (
             <Link
               key={f.key}
               href={inboxHref({ filter: f.key, q: params.q })}
               aria-current={filter === f.key ? "page" : undefined}
-              className={cn(
-                "inline-flex items-center rounded-lg px-3 py-1 font-medium transition-colors",
-                filter === f.key
-                  ? "bg-white text-foreground shadow-[var(--shadow-sm)] ring-1 ring-[var(--hairline)]"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
+              className={segmentClass(filter === f.key)}
             >
               {f.label}
             </Link>
@@ -126,8 +126,10 @@ export default async function InboxPage({
       </div>
 
       {items.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 rounded-xl border border-[var(--hairline)] bg-white/60 py-16 text-center">
-          <MessagesSquare className="size-7 text-muted-foreground" />
+        <div className={cn(PANEL, "flex flex-col items-center gap-3 py-16 text-center")}>
+          <span className="grid size-11 place-items-center rounded-xl bg-[#dbe9fd] text-[#1461d1]">
+            <MessagesSquare className="size-5" strokeWidth={2} />
+          </span>
           <p className="max-w-sm text-sm text-muted-foreground">
             {q || filter !== "all"
               ? "No conversations match — clear the search or filter to see everything."
@@ -140,40 +142,45 @@ export default async function InboxPage({
           )}
         </div>
       ) : (
-        <div className="grid min-h-0 min-w-0 flex-1 gap-5 lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)]">
+        <div className="grid min-h-0 min-w-0 flex-1 gap-3 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
           {/* Thread list — on phones it hides once a thread is explicitly open. */}
           <div
             className={cn(
-              "min-h-0 min-w-0 overflow-y-auto rounded-xl border border-[var(--hairline)] bg-white/60",
+              PANEL,
+              "min-h-0 min-w-0 overflow-y-auto",
               hasLeadParam && "hidden lg:block"
             )}
           >
-            <ul>
+            <ul className="flex flex-col gap-1 p-2">
               {items.map((i) => (
                 <li key={i.leadId}>
                   <Link
                     href={inboxHref({ filter, q: params.q, show: show !== 30 ? show : undefined, lead: i.leadId })}
+                    aria-current={i.leadId === selectedId ? "true" : undefined}
                     className={cn(
-                      "flex flex-col gap-0.5 border-b border-[var(--hairline)] px-4 py-3 transition-colors hover:bg-[var(--cyan-tint)]/40",
-                      i.leadId === selectedId && "bg-[var(--cyan-tint)]/60",
+                      "flex items-center gap-3 rounded-[10px] px-2.5 py-2.5 transition-colors hover:bg-[#f5f9ff]",
+                      i.leadId === selectedId && "bg-[#f5f9ff] ring-1 ring-[var(--cyan-line)]",
                       // R4: settled threads recede — waiting/unanswered stay full-strength.
                       !i.waiting && i.lastRole === "agent" && "opacity-60"
                     )}
                   >
-                    <span className="flex items-center gap-2">
-                      <span className="truncate text-sm font-medium text-foreground">{i.name}</span>
-                      {i.waiting && (
-                        <span className="rounded-full bg-[var(--cyan-strong)] px-1.5 py-0.5 text-[10px] font-semibold text-white">
-                          waiting
+                    <Avatar initials={initials(i.name)} size={40} />
+                    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                      <span className="flex items-center gap-2">
+                        <span className="truncate text-[14px] font-semibold text-[var(--ink)]">{i.name}</span>
+                        {i.waiting && (
+                          <span className="shrink-0 rounded px-1.5 py-px text-[10.5px] font-semibold bg-[var(--acc-tint)] text-[var(--acc-ink)]">
+                            Waiting
+                          </span>
+                        )}
+                        <span className="ml-auto shrink-0 text-[11.5px] tabular-nums text-[var(--ink-dim)]">
+                          {new Date(i.lastAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                         </span>
-                      )}
-                      <span className="ml-auto shrink-0 text-[10.5px] text-muted-foreground">
-                        {new Date(i.lastAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                       </span>
-                    </span>
-                    <span className="line-clamp-1 text-xs text-muted-foreground">
-                      {i.lastRole === "agent" ? "You: " : ""}
-                      {i.lastSnippet}
+                      <span className="line-clamp-1 text-[13px] text-[var(--ink-mid)]">
+                        {i.lastRole === "agent" ? "You: " : ""}
+                        {i.lastSnippet}
+                      </span>
                     </span>
                   </Link>
                 </li>
@@ -194,13 +201,14 @@ export default async function InboxPage({
           {/* Thread + composer — on phones it renders only when a thread is explicitly open. */}
           <div
             className={cn(
-              "flex min-h-0 min-w-0 flex-col rounded-xl border border-[var(--hairline)] bg-white/60",
+              PANEL,
+              "flex min-h-0 min-w-0 flex-col overflow-hidden",
               !hasLeadParam && "hidden lg:flex"
             )}
           >
             {selected ? (
               <>
-                <div className="flex shrink-0 items-center justify-between gap-2 border-b border-[var(--hairline)] px-5 py-3">
+                <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--line)] px-5 py-3">
                   {/* R4 mobile back affordance — the list is hidden while a thread is open. */}
                   <Link
                     href={inboxHref({ filter, q: params.q, show: show !== 30 ? show : undefined })}
@@ -209,15 +217,16 @@ export default async function InboxPage({
                   >
                     <ArrowLeft className="size-4" />
                   </Link>
+                  <Avatar initials={initials(selected.name)} size={40} className="max-lg:hidden" />
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold text-foreground">{selected.name}</p>
+                    <p className="truncate text-[14px] font-semibold text-[var(--ink)]">{selected.name}</p>
                     {selected.company && (
                       <p className="truncate text-xs text-muted-foreground">{selected.company}</p>
                     )}
                   </div>
                   <Link
                     href={`/prospects/${selected.leadId}`}
-                    className="shrink-0 text-xs font-medium text-[var(--cyan-strong)] hover:underline"
+                    className="shrink-0 rounded-[var(--r-btn)] border border-[var(--line)] bg-[var(--surface)] px-3 py-1.5 text-[12.5px] font-medium text-[var(--ink)] shadow-[var(--shadow-tile)] transition-colors hover:bg-[var(--surface-2)]"
                   >
                     Full profile
                   </Link>
@@ -227,7 +236,7 @@ export default async function InboxPage({
                   turns={turns}
                   initialDraft={queuedDraft}
                   threadClassName="min-h-0 flex-1 overflow-y-auto p-5"
-                  composerClassName="shrink-0 border-t border-[var(--hairline)] p-4"
+                  composerClassName="shrink-0 border-t border-[var(--line)] p-4"
                 />
               </>
             ) : (

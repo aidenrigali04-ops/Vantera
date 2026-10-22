@@ -5,7 +5,7 @@ import type { TileTone } from "@/lib/today/tiles";
  * square only — the row, title, meta and chevron stay neutral in every tone.
  */
 export const TONE_CLASSES: Record<TileTone, string> = {
-  routine: "bg-[var(--surface-2)] text-[var(--ink)]",
+  routine: "bg-[#e2defb] text-[#5b4bd1]",
   replies: "bg-[var(--acc-tint)] text-[var(--acc-ink)]",
   attention: "bg-[var(--attention-tint)] text-[var(--attention)]",
   billing: "bg-[var(--danger-tint)] text-[var(--danger)]",
