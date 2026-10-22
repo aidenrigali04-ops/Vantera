@@ -1,34 +1,51 @@
-"use client";
-
-import { Reveal, RevealItem, CARD } from "./surface";
-import { SectionIntro } from "./section-intro";
+import { Crosshair, Gauge, PenLine, Scale, SlidersHorizontal, Wallet } from "lucide-react";
+import { Reveal, RevealItem } from "./surface";
+import { Accent, Band, LINE, SectionHead, type Icon } from "./frame";
+import { VanteraLogo } from "./vantera-logo";
 import { cn } from "@/lib/utils";
 
 /**
- * S6 · Why not the alternatives — the comparison every visitor runs in another tab,
- * kept on-page and framed by APPROACH, not brand (brand rows go stale and hand out
- * SEO; blueprint S6). Desktop: a real <table> with the Vantera column emphasized.
- * ≤lg: stacked approach cards, Vantera first. Cells ≤ 7 words; the pricing row uses
- * the honest "from $45/mo" shape (real starter price flows in via prop).
+ * Why not the alternatives — the comparison every visitor runs in another tab, kept
+ * on-page and framed by APPROACH, not brand (brand rows go stale and hand out SEO).
+ * After rankbox.xyz's sample-output index: one hairline row per question, read like a
+ * published feed — number, the question, Vantera's answer as the headline with the
+ * three alternatives as its standfirst, and a Vantera chip. The pricing row's answer
+ * is the honest "from $X/mo" shape (the real starter price flows in via prop).
  */
 
-const ROWS = [
+type Approach = "sequencers" | "aiSdrs" | "yourself";
+
+const ALTERNATIVES: { key: Approach; title: string }[] = [
+  { key: "sequencers", title: "Sequencers" },
+  { key: "aiSdrs", title: "AI SDRs" },
+  { key: "yourself", title: "Doing it yourself" },
+];
+
+const ROWS: ({
+  label: string;
+  icon: Icon;
+  /** Vantera's answer; null on the pricing row, which takes the real price. */
+  vantera: string | null;
+} & Record<Approach, string>)[] = [
   {
     label: "Who writes the message",
+    icon: PenLine,
     sequencers: "You — templates and variables",
     aiSdrs: "The AI",
     yourself: "You, one at a time",
-    vantera: "Agents draft; you approve",
+    vantera: "Agents, from each buyer’s real activity",
   },
   {
-    label: "Who decides what sends",
-    sequencers: "You, in bulk",
-    aiSdrs: "The AI — review optional",
-    yourself: "You",
-    vantera: "You, every message",
+    label: "Who picks who gets messaged",
+    icon: Crosshair,
+    sequencers: "You, from a list",
+    aiSdrs: "The AI, unexplained",
+    yourself: "You, by gut",
+    vantera: "Machine learning, every score explained",
   },
   {
     label: "Who watches account limits",
+    icon: Gauge,
     sequencers: "You configure them",
     aiSdrs: "Varies",
     yourself: "You",
@@ -36,148 +53,102 @@ const ROWS = [
   },
   {
     label: "What you set up",
+    icon: SlidersHorizontal,
     sequencers: "Lists, sequences, conditions",
     aiSdrs: "ICP and a credit card",
     yourself: "Everything",
-    vantera: "Website and LinkedIn",
+    vantera: "Website and LinkedIn, about 3 minutes",
   },
   {
-    label: "How it's priced",
+    label: "How it’s priced",
+    icon: Wallet,
     sequencers: "Per seat, per month",
     aiSdrs: "Often annual, per action",
     yourself: "Your evenings",
-    vantera: "", // filled from the real starter price
+    vantera: null,
   },
 ];
 
-const COLS = [
-  { key: "sequencers", title: "Sequencers" },
-  { key: "aiSdrs", title: "AI SDRs" },
-  { key: "yourself", title: "Doing it yourself" },
-  { key: "vantera", title: "Vantera" },
-] as const;
-
 export function Compare({ starterPriceUsd }: { starterPriceUsd?: number }) {
   const priceCell = starterPriceUsd ? `From $${starterPriceUsd}/mo, cancel anytime` : "Monthly, cancel anytime";
-  const rows = ROWS.map((r) => (r.label === "How it's priced" ? { ...r, vantera: priceCell } : r));
 
   return (
-    <section id="compare" className="relative border-t border-[var(--hairline)] bg-white py-24 sm:py-28">
-      <div className="mx-auto max-w-6xl px-6 lg:px-8">
-        <SectionIntro
-          label="Why Vantera"
-          title="Not another sequencer. Not a black-box AI SDR."
-          lead="Sequencers make you build the machine. AI SDRs run it without you. Vantera runs it with you — a few minutes of review a day."
-        />
+    <section>
+      <SectionHead
+        id="compare"
+        icon={Scale}
+        eyebrow="Why Vantera"
+        title={
+          <>
+            Not another sequencer. <Accent>Not a black-box AI SDR.</Accent>
+          </>
+        }
+        subtitle="Sequencers make you build the machine. Black-box AI SDRs won’t show their work. Vantera runs on autopilot and shows you why every prospect made the list."
+      />
 
-        {/* Desktop — the table; the Vantera column is set solid brand blue
-            (--cyan-strong: white text clears AA at 13.5px) */}
-        <Reveal className="mt-12 hidden lg:block">
-          <RevealItem>
-            <table className="w-full border-separate border-spacing-0">
-              <caption className="sr-only">
-                Vantera compared with sequencers, AI SDRs, and manual outreach
-              </caption>
-              <thead>
-                <tr>
-                  <th scope="col" className="w-[21%] pb-4" aria-label="Dimension" />
-                  {COLS.map((c) => (
-                    <th
-                      key={c.key}
-                      scope="col"
-                      className={cn(
-                        "text-left text-[14px] font-semibold",
-                        c.key === "vantera"
-                          ? "rounded-t-2xl bg-[var(--cyan-strong)] px-5 pb-4 pt-5 text-white shadow-[0_18px_40px_-18px_rgba(20,97,209,0.6)]"
-                          : "px-4 pb-4 text-[var(--ink-3)]",
-                      )}
-                    >
-                      {c.title}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((r, ri) => (
-                  <tr key={r.label}>
-                    <th
-                      scope="row"
-                      className="border-t border-[var(--hairline)] py-4 pr-4 text-left text-[13px] font-semibold text-foreground"
-                    >
-                      {r.label}
-                    </th>
-                    {COLS.map((c) => (
-                      <td
-                        key={c.key}
-                        className={cn(
-                          "px-4 py-4 text-[13.5px] leading-snug",
-                          c.key === "vantera"
-                            ? cn(
-                                "bg-[var(--cyan-strong)] px-5 font-medium text-white [border-top:1px_solid_rgba(255,255,255,0.16)]",
-                                ri === rows.length - 1 && "rounded-b-2xl pb-5",
-                              )
-                            : "border-t border-[var(--hairline)] text-[var(--ink-3)]",
-                        )}
-                      >
-                        {r[c.key]}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </RevealItem>
-        </Reveal>
+      <Band>
+        <ol className="divide-y divide-[var(--hairline)]">
+          {ROWS.map((r, i) => (
+            <li key={r.label}>
+              {/* Each row reveals as it reaches the screen, not the list at once. */}
+              <Reveal>
+                <RevealItem style={{ transitionDelay: `${(i % 3) * 0.04}s` }}>
+                  <div className="grid gap-3 px-6 py-6 transition-colors duration-300 hover:bg-[color-mix(in_oklab,var(--tint)_40%,white)] sm:px-8 lg:grid-cols-[3rem_15rem_1fr_auto] lg:items-center lg:gap-6 lg:px-10">
+                    <span className="hidden font-[family-name:var(--font-geist-mono),ui-monospace,monospace] text-xs tabular-nums text-[var(--ink-3)]/70 lg:block">
+                      {String(i + 1).padStart(2, "0")}
+                    </span>
 
-        {/* ≤lg — stacked approach cards, Vantera first */}
-        <Reveal className="mt-12 flex flex-col gap-4 lg:hidden">
-          {[COLS[3], COLS[0], COLS[1], COLS[2]].map((c) => (
-            <RevealItem
-              key={c.key}
-              className={cn(
-                c.key === "vantera"
-                  ? "rounded-2xl bg-[var(--cyan-strong)] p-5 shadow-[0_18px_40px_-18px_rgba(20,97,209,0.6)]"
-                  : cn(CARD, "p-5"),
-              )}
-            >
-              <p
-                className={cn(
-                  "text-[15px] font-semibold",
-                  c.key === "vantera" ? "text-white" : "text-foreground",
-                )}
-              >
-                {c.title}
-              </p>
-              <dl className="mt-3 flex flex-col gap-2.5">
-                {rows.map((r) => (
-                  <div key={r.label}>
-                    <dt
-                      className={cn(
-                        "text-[11px] font-semibold uppercase tracking-[0.06em]",
-                        c.key === "vantera" ? "text-white/70" : "text-[var(--ink-4)]",
-                      )}
-                    >
+                    {/* the question, where rankbox shows the site an article ran on */}
+                    <span className="flex items-center gap-2.5 text-[0.8rem] font-medium text-[var(--ink-3)]">
+                      <span className="flex size-7 shrink-0 items-center justify-center rounded-md border border-[rgba(12,16,26,0.08)] bg-white text-foreground shadow-[0_1px_2px_rgba(16,24,40,0.05)]">
+                        <r.icon className="size-3.5" strokeWidth={2} />
+                      </span>
                       {r.label}
-                    </dt>
-                    <dd
+                    </span>
+
+                    <div className="min-w-0">
+                      <h3 className="text-[1.02rem] font-semibold leading-snug tracking-tight text-foreground">
+                        {r.vantera ?? priceCell}
+                      </h3>
+                      <dl className="mt-1 max-w-2xl text-sm leading-relaxed text-[var(--ink-3)]">
+                        {ALTERNATIVES.map((a, j) => (
+                          <div key={a.key} className="inline">
+                            <dt className="inline font-medium text-foreground/70">
+                              {j > 0 && (
+                                <span aria-hidden className="mx-2 font-normal text-foreground/25">
+                                  ·
+                                </span>
+                              )}
+                              {a.title}:
+                            </dt>{" "}
+                            <dd className="inline">{r[a.key]}</dd>
+                          </div>
+                        ))}
+                      </dl>
+                    </div>
+
+                    <span
                       className={cn(
-                        "mt-0.5 text-[13.5px]",
-                        c.key === "vantera" ? "text-white" : "text-[var(--ink-2)]",
+                        "inline-flex w-fit items-center gap-1.5 whitespace-nowrap rounded-md border bg-white px-2 py-0.5 text-[0.7rem] font-medium text-[var(--ink-3)]",
+                        LINE,
                       )}
                     >
-                      {r[c.key]}
-                    </dd>
+                      <VanteraLogo className="size-3 text-[var(--fb)]" />
+                      Vantera
+                    </span>
                   </div>
-                ))}
-              </dl>
-            </RevealItem>
+                </RevealItem>
+              </Reveal>
+            </li>
           ))}
-        </Reveal>
+        </ol>
+      </Band>
 
-        <p className="mt-6 text-[12.5px] leading-relaxed text-[var(--ink-4)]">
+      <Band inner="px-6 py-5 text-center sm:px-8">
+        <p className="text-[0.8rem] text-[var(--ink-3)]/80">
           Compared by approach — sequencers like Waalaxy or Expandi, AI SDRs like Artisan.
         </p>
-      </div>
+      </Band>
     </section>
   );
 }

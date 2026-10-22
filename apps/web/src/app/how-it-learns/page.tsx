@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { MarketingShell } from "@/components/landing/marketing-shell";
 import { MarketingHeader } from "@/components/landing/marketing-header";
+import { CTA_REASSURANCE } from "@/components/landing/claims";
 
 export const metadata: Metadata = {
   title: "How It Learns — Vantera",
@@ -78,7 +79,7 @@ const NEVER_LIST = [
 ];
 
 const CONTROL_POINTS = [
-  "You can approve every message before it sends — review mode is the default.",
+  "You can pause an agent or step into any conversation, anytime.",
   "You can see what it's testing right now, and why, on your dashboard.",
   "You can change your targeting, your facts, and your goals anytime in Settings.",
 ];
@@ -247,7 +248,7 @@ export default function HowItLearnsPage() {
             <ArrowRight className="size-4" />
           </Link>
           <p className="mt-3 text-[13px] text-[var(--ink-3)]">
-            No credit card required · You approve every message
+            {CTA_REASSURANCE}
           </p>
         </div>
       </section>

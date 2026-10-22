@@ -8,7 +8,7 @@ import { ArrowRight } from "lucide-react";
  */
 export function GlossaryCta({
   title = "Stop reading about outreach. Start booking meetings.",
-  subtitle = "Vantera runs the whole LinkedIn motion — finds in-market buyers, qualifies them, and drafts every message from real activity. You approve every send.",
+  subtitle = "Vantera runs the whole LinkedIn motion on autopilot — finds in-market buyers, qualifies them, and writes every message from real activity.",
 }: {
   title?: string;
   subtitle?: string;

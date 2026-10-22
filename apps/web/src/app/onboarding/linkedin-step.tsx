@@ -2,23 +2,27 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { AlertCircle, Eye, Loader2, Lock, RefreshCw, ShieldCheck, TrendingUp } from "lucide-react";
+import { AlertCircle, Gauge, Loader2, Lock, Power, RefreshCw, TrendingUp } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { FormError } from "@/components/form-error";
+import { PRIMARY_BUTTON } from "@/components/landing/frame";
 import { LinkedinMark } from "@/components/landing/brand-glyphs";
+import { CEILING_FACT, CUSTODY_SENTENCE } from "@/components/landing/claims";
 import { createOnboardingConnectLink } from "./actions";
 
 /** The promise block — the fear precedes the click, so the answers precede the button. */
 const PROMISES = [
-  { icon: Lock, text: "You sign in through LinkedIn's own flow — your password never touches Vantera." },
-  { icon: Eye, text: "Connecting only looks. Nothing is sent, liked, or changed until you approve it." },
-  { icon: ShieldCheck, text: "Every message waits for your approval before it goes out." },
+  { icon: Lock, text: CUSTODY_SENTENCE },
+  { icon: Power, text: "Connecting sends nothing. Your agents start only once your trial begins." },
+  { icon: Gauge, text: `Sends stay inside a hard weekly ceiling (${CEILING_FACT}), at a human pace.` },
   { icon: TrendingUp, text: "New or quiet accounts ramp up gradually to stay well inside LinkedIn's limits." },
 ];
 
 /**
- * Step 2 · LinkedIn — the highest-anxiety step. The hosted connect window returns to
- * /onboarding?connected=1, where the page reconciles and advances; `failed` re-renders
- * this step with an honest, non-alarming message.
+ * Step 2 · LinkedIn — the highest-anxiety step, so the answers sit in one bordered list
+ * above the button. The hosted connect window returns to /onboarding?connected=1, where
+ * the page reconciles and advances; `failed` re-renders this step with an honest,
+ * non-alarming message.
  */
 export function LinkedInStep({
   failed,
@@ -52,7 +56,7 @@ export function LinkedInStep({
   return (
     <div className="flex flex-col">
       {unconfirmed && (
-        <div className="mb-7 rounded-[14px] border border-amber-300 bg-amber-50 p-4">
+        <div className="mb-6 rounded-xl border border-amber-300 bg-amber-50 p-4">
           <div className="flex items-start gap-3">
             <AlertCircle className="mt-0.5 size-4 shrink-0 text-amber-600" strokeWidth={2.4} />
             <div className="min-w-0">
@@ -70,7 +74,7 @@ export function LinkedInStep({
                 type="button"
                 onClick={() => startRecheck(() => router.refresh())}
                 disabled={rechecking}
-                className="mt-3 inline-flex items-center gap-2 rounded-[10px] bg-amber-500 px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-amber-600 disabled:opacity-70"
+                className="mt-3 inline-flex h-9 items-center gap-2 rounded-lg bg-amber-500 px-4 text-[13px] font-semibold text-white transition-colors hover:bg-amber-600 disabled:opacity-70"
               >
                 <RefreshCw className={rechecking ? "size-3.5 animate-spin" : "size-3.5"} />
                 {rechecking ? "Checking…" : "Check again"}
@@ -80,18 +84,18 @@ export function LinkedInStep({
         </div>
       )}
 
-      <ul className="flex flex-col gap-4">
+      <ul className="divide-y divide-[var(--hairline)] overflow-hidden rounded-xl border border-[rgba(12,16,26,0.09)] bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
         {PROMISES.map((p) => (
-          <li key={p.text} className="flex items-start gap-3">
-            <span className="mt-0.5 grid size-6 shrink-0 place-items-center rounded-[8px] bg-[rgba(24,119,242,0.08)] text-[var(--fb-strong)] ring-1 ring-inset ring-[rgba(24,119,242,0.18)]">
+          <li key={p.text} className="flex items-start gap-3 px-4 py-3.5">
+            <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-[var(--cyan-tint)] text-[var(--fb-strong)]">
               <p.icon className="size-3.5" strokeWidth={2.2} />
             </span>
-            <p className="text-[14px] leading-relaxed text-[var(--ink-2)]">{p.text}</p>
+            <p className="pt-1 text-[0.88rem] leading-relaxed text-[var(--ink-2)]">{p.text}</p>
           </li>
         ))}
       </ul>
 
-      <div className="mt-7">
+      <div className="mt-6">
         <FormError message={error ?? undefined} />
       </div>
 
@@ -99,14 +103,14 @@ export function LinkedInStep({
         type="button"
         onClick={connect}
         disabled={pending}
-        className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-[12px] bg-[var(--fb-strong)] px-6 py-3.5 text-[15px] font-semibold text-white transition-all hover:bg-[#1461d1] hover:shadow-[0_10px_28px_-10px_rgba(24,119,242,0.6)] active:scale-[0.99] disabled:opacity-60"
+        className={cn("mt-2 w-full disabled:opacity-60 disabled:active:scale-100", PRIMARY_BUTTON)}
       >
         {pending ? <Loader2 className="size-4 animate-spin" /> : <LinkedinMark className="size-4" />}
         {pending ? "Opening the secure connect window…" : unconfirmed ? "Reconnect LinkedIn" : "Connect LinkedIn"}
       </button>
 
-      <p className="mt-4 text-center text-[12.5px] leading-relaxed text-[var(--ink-4)]">
-        This is the account your outreach will come from.
+      <p className="mt-3.5 text-center text-[0.8rem] leading-relaxed text-[var(--ink-3)]">
+        This is the account your agents will send from.
       </p>
     </div>
   );

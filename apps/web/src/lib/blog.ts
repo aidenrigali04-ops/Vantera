@@ -25,6 +25,13 @@ export interface BlogPost {
   readingMinutes: number;
   keywords: string[];
   body: Block[];
+  /** Leads the blog index. Without one, the newest post leads. */
+  featured?: boolean;
+  /** Two or three sentences that answer the title outright, shown above the body. Drawn
+      from the post's own text — never a claim the body doesn't make. */
+  shortAnswer?: string;
+  /** The post's main points, as the "Key takeaways" card above the body. */
+  takeaways?: string[];
 }
 
 export const BLOG_AUTHOR = "Vantera Team";
@@ -39,6 +46,15 @@ export const BLOG_POSTS: BlogPost[] = [
     date: "2026-06-20",
     readingMinutes: 6,
     keywords: ["is linkedin automation safe", "linkedin automation safety", "linkedin account restriction"],
+    shortAnswer:
+      "Yes, when it respects limits and paces like a human. Accounts get restricted for reckless volume and robotic behavior, not for using a tool: safe automation keeps hard daily and weekly ceilings, randomized pacing, a ramp for newer accounts, and reaches only qualified people.",
+    takeaways: [
+      "Automation itself isn't what gets accounts restricted — reckless volume and robotic behavior are.",
+      "Volume spikes, brand-new accounts blasting invites, and metronomic pacing are the usual triggers.",
+      "Safe automation runs under hard daily and weekly ceilings you can't push past.",
+      "Randomized, human pacing and a gradual ramp for newer accounts build trust over weeks.",
+      "Reaching only qualified people keeps acceptance high and ignores low.",
+    ],
     body: [
       { t: "p", text: "It's the first question every serious operator asks, and the right one: if you automate LinkedIn outreach, will you lose the account you've spent years building? The honest answer is that automation itself isn't what gets accounts restricted — reckless volume and obviously robotic behavior do. Done correctly, automation is safer than a human rushing through 80 manual invites before lunch." },
       { t: "h2", text: "What actually gets a LinkedIn account restricted" },
@@ -74,8 +90,18 @@ export const BLOG_POSTS: BlogPost[] = [
       "Looking for a Waalaxy alternative that prioritizes qualified pipeline over raw volume? Here's what to look for — and how a quality-first system compares.",
     category: "Comparison",
     date: "2026-06-24",
+    updated: "2026-10-21",
     readingMinutes: 7,
     keywords: ["waalaxy alternative", "best linkedin automation tool", "goji berry alternative"],
+    shortAnswer:
+      "Look for a tool that optimizes for qualified conversations, not send count: real qualification on ICP fit and buying intent, messages written from each prospect's actual activity, account safety built into the scheduler, and a clean path from reply to your CRM.",
+    takeaways: [
+      "Volume-first tools fill your pipeline with the wrong people, and reply rates quietly drop.",
+      "A quality-first system asks who is in-market right now, and what to say to them.",
+      "Real qualification combines ICP fit with genuine buying-intent signals.",
+      "Messages should be grounded in what a prospect actually posts, not merge tags.",
+      "Account safety belongs in the scheduler, non-configurable below safe thresholds.",
+    ],
     body: [
       { t: "p", text: "Tools like Waalaxy made LinkedIn automation mainstream, and that's a good thing — manual prospecting doesn't scale. But as teams mature, many start looking for an alternative for the same reason: volume-first tooling fills your pipeline with the wrong people. More sends, more sequences, more contacts — and a reply rate that quietly drops as your sender reputation and your prospects' patience wear thin." },
       { t: "h2", text: "Why teams outgrow volume-first tools" },
@@ -93,11 +119,11 @@ export const BLOG_POSTS: BlogPost[] = [
         "Real qualification: ICP fit plus genuine buying-intent signals, not just a job-title filter.",
         "Personalization from real activity — messages grounded in what a prospect actually posts and engages with, not {{first_name}} swaps.",
         "Account safety built into the scheduler, non-configurable below safe thresholds.",
-        "Human-in-the-loop control: you approve every message before it sends.",
+        "Autopilot you can trust: messages go out on their own, but only to qualified people and inside hard safety limits.",
         "A clean path from reply to closed, including pushing won deals to your CRM.",
       ] },
       { t: "h2", text: "How Vantera compares" },
-      { t: "p", text: "Vantera is built quality-first from the ground up. Its agents identify people showing real intent on LinkedIn, qualify them against your ICP, and draft a message for each one grounded in their actual activity — then queue it for your approval. Nothing sends automatically, pacing stays under hard safety ceilings, and the whole system is focused on LinkedIn rather than spraying across five channels at once." },
+      { t: "p", text: "Vantera is built quality-first from the ground up. Its agents identify people showing real intent on LinkedIn, qualify them against your ICP, and write a message for each one grounded in their actual activity — then send it on autopilot at a human pace. Machine learning sharpens who gets messaged as replies come in, pacing stays under hard safety ceilings, and the whole system is focused on LinkedIn rather than spraying across five channels at once." },
       { t: "p", text: "If you're happy maximizing send count, a volume tool is fine. If you want qualified conversations that turn into revenue — without risking the account they run on — that's the gap a quality-first alternative is meant to close." },
     ],
   },
@@ -108,8 +134,19 @@ export const BLOG_POSTS: BlogPost[] = [
       "Most LinkedIn outreach fails because it targets the wrong people. Here's how to find buyers who are actually in-market — using ICP fit and intent signals.",
     category: "Playbook",
     date: "2026-06-26",
+    updated: "2026-10-21",
+    featured: true,
     readingMinutes: 6,
     keywords: ["find buyers on linkedin", "linkedin intent signals", "in-market buyers"],
+    shortAnswer:
+      "Use two filters together: ICP fit and buying intent. In-market buyers match your ideal customer profile and show a real, recent reason to care — posting about the problem, engaging with your category, or a company trigger like new funding or a key hire.",
+    takeaways: [
+      "In-market means someone feels the problem you solve today, not just that they match your ideal title.",
+      "Intent shows up as behavior: posts about the problem, engagement in your space, and company triggers.",
+      "Fit without intent finds buyers who aren't ready; intent without fit finds people who can't buy.",
+      "The buyers worth your time clear both bars.",
+      "A short, specific note about their moment beats a thousand generic invites.",
+    ],
     body: [
       { t: "p", text: "The hardest part of LinkedIn outreach isn't the message — it's the list. Reach out to the wrong people and even a perfect message gets ignored. Reach out to someone already feeling the problem you solve, and an average message gets a reply. The whole game is finding people who are in-market right now." },
       { t: "h2", text: "What 'in-market' actually means" },
@@ -127,7 +164,7 @@ export const BLOG_POSTS: BlogPost[] = [
       { t: "quote", text: "Intent is a second filter, never a bypass. The goal isn't more people — it's the right people at the right moment." },
       { t: "h2", text: "Turning signals into conversations" },
       { t: "p", text: "Once you've found someone who fits and is in-market, the message writes itself — because you have a real reason to reach out. Reference the post they wrote, the problem they're clearly feeling, the trigger at their company. Skip the template. A short, specific, human note that proves you actually understand their moment will out-convert a thousand generic invites." },
-      { t: "p", text: "This is exactly the workflow Vantera automates: it watches LinkedIn for in-market behavior, scores each person on ICP fit and intent, and drafts a message grounded in their real activity — so you spend your time approving good conversations instead of building lists." },
+      { t: "p", text: "This is exactly the workflow Vantera automates: it watches LinkedIn for in-market behavior, scores each person on ICP fit and intent, and writes and sends a message grounded in their real activity — then hands you the warm replies, so you spend your time in conversations instead of building lists. Machine learning sharpens the targeting as the replies come in." },
     ],
   },
 ];

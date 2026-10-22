@@ -1,13 +1,25 @@
 "use client";
 
 import Link from "next/link";
-import { Sparkles } from "lucide-react";
+import { Globe } from "lucide-react";
 import { useActionState } from "react";
 import { signup, type AuthFormState } from "../actions";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FormError } from "@/components/form-error";
-import { AuthHeading, AuthDivider, CtaArrow, FIELD, SubmitButton } from "../auth-ui";
+import { ONBOARDING_MINUTES } from "@/components/landing/claims";
+import {
+  AuthDivider,
+  AuthHeading,
+  CtaArrow,
+  FIELD,
+  FIELD_STACK,
+  HINT,
+  LABEL,
+  Rise,
+  SubmitButton,
+  TEXT_LINK,
+} from "../auth-ui";
 import { GoogleAuthForm } from "../google-auth-form";
 
 export function SignupForm({
@@ -41,100 +53,152 @@ export function SignupForm({
   })();
 
   return (
-    <div className="flex flex-col gap-8">
+    <div>
       {invite ? (
         <AuthHeading
-          title={<>Join {invite.workspaceName} on Vantera</>}
+          title={<>Join {invite.workspaceName}</>}
+          accent="on Vantera"
           sub="Create your account and you'll land inside your team's workspace — their pipeline, prospects, and agents, shared with you."
         />
       ) : (
         <AuthHeading
-          title="Create your account"
-          sub="Free 7-day trial. Your agents start finding in-market buyers the moment you're in — and you approve every send."
+          title="Turn LinkedIn into"
+          accent="pipeline on autopilot"
+          sub={`Paste your website and connect LinkedIn. Your agents start finding in-market buyers in about ${ONBOARDING_MINUTES} minutes.`}
         />
       )}
 
       {inviteDead && (
-        <div className="-mt-3 rounded-[12px] border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-[13px] leading-snug text-amber-800">
-          That invite link is no longer valid — ask your teammate to send a fresh one. You can
-          still create your own workspace below.
-        </div>
+        <Rise delay={0.1}>
+          <div className="mt-6 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3.5 py-3 text-[0.82rem] leading-snug text-amber-800">
+            That invite link is no longer valid — ask your teammate to send a fresh one. You can
+            still create your own workspace below.
+          </div>
+        </Rise>
       )}
 
-      {queryError && <FormError message={queryError} />}
+      {queryError && (
+        <div className="mt-6">
+          <FormError message={queryError} />
+        </div>
+      )}
 
       {siteHost && !invite && (
-        <div className="-mt-3 flex items-start gap-2.5 rounded-[12px] border border-[var(--hairline)] bg-[var(--tint)] px-4 py-3 text-[13px] leading-snug text-[var(--ink-2)]">
-          <Sparkles className="mt-0.5 size-4 shrink-0 text-[var(--fb-strong)]" aria-hidden />
-          <span>
-            Next, we&rsquo;ll read <span className="font-semibold text-foreground">{siteHost}</span> to
-            learn what you sell and who buys it — no forms to fill.
-          </span>
-        </div>
+        <Rise delay={0.1}>
+          <p className="mt-6 inline-flex max-w-full items-center gap-2 rounded-lg border border-[rgba(12,16,26,0.08)] bg-white px-2.5 py-1.5 text-[0.8rem] text-[var(--ink-2)] shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
+            <Globe className="size-3.5 shrink-0 text-[var(--fb)]" aria-hidden />
+            <span className="truncate">
+              Next, we&rsquo;ll read <span className="font-semibold text-foreground">{siteHost}</span>{" "}
+              to learn what you sell
+            </span>
+          </p>
+        </Rise>
       )}
 
-      <div className="flex flex-col gap-3">
-        <GoogleAuthForm site={site || undefined} inviteToken={invite?.token} />
-        {invite && (
-          <p className="text-[12px] text-[var(--ink-4)]">
-            Continue with Google using {invite.email} — the invite is bound to that address.
-          </p>
-        )}
-      </div>
-      <AuthDivider />
-
-      <form action={action} className="flex flex-col gap-5">
-        {site && <input type="hidden" name="site" value={site} />}
-        {invite && <input type="hidden" name="inviteToken" value={invite.token} />}
-        {!invite && (
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="companyName" className="text-[13px] font-medium text-[var(--ink-2)]">Brand name</Label>
-            <Input id="companyName" name="companyName" autoComplete="organization" placeholder="Acme Inc" className={FIELD} required />
-          </div>
-        )}
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="email" className="text-[13px] font-medium text-[var(--ink-2)]">
-            {invite ? "Email" : "Business email"}
-          </Label>
-          <Input
-            id="email"
-            name="email"
-            type="email"
-            autoComplete="email"
-            placeholder="you@company.com"
-            className={FIELD}
-            required
-            defaultValue={invite?.email}
-            readOnly={Boolean(invite)}
-          />
+      <Rise delay={0.11}>
+        <div className="mt-8">
+          <GoogleAuthForm site={site || undefined} inviteToken={invite?.token} />
           {invite && (
-            <p className="text-[12px] text-[var(--ink-4)]">
-              The invite was sent to this address — it&apos;s your sign-in email.
+            <p className={`mt-2 ${HINT}`}>
+              Continue with Google using {invite.email} — the invite is bound to that address.
             </p>
           )}
+          <div className="my-6">
+            <AuthDivider />
+          </div>
         </div>
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="password" className="text-[13px] font-medium text-[var(--ink-2)]">Password</Label>
-          <Input id="password" name="password" type="password" autoComplete="new-password" minLength={8} placeholder="Create a password" className={FIELD} required />
-          <p className="text-[12px] text-[var(--ink-4)]">At least 8 characters.</p>
-        </div>
-        <FormError message={state.error} />
-        <SubmitButton pending={pending} idle={<>Create account <CtaArrow /></>} busy="Creating account…" className="mt-1" />
-      </form>
+      </Rise>
 
-      <p className="text-[12px] leading-relaxed text-[var(--ink-4)]">
-        By creating an account you agree to our{" "}
-        <Link href="/terms" className="font-medium text-[var(--ink-3)] underline-offset-2 hover:text-foreground hover:underline">Terms of Service</Link>{" "}
-        and{" "}
-        <Link href="/privacy" className="font-medium text-[var(--ink-3)] underline-offset-2 hover:text-foreground hover:underline">Privacy Policy</Link>.
-      </p>
+      <Rise delay={0.12}>
+        <form action={action} className="space-y-4">
+          {site && <input type="hidden" name="site" value={site} />}
+          {invite && <input type="hidden" name="inviteToken" value={invite.token} />}
+          {!invite && (
+            <div className={FIELD_STACK}>
+              <Label htmlFor="companyName" className={LABEL}>
+                Brand name
+              </Label>
+              <Input
+                id="companyName"
+                name="companyName"
+                autoComplete="organization"
+                placeholder="Acme Inc"
+                className={FIELD}
+                required
+              />
+            </div>
+          )}
+          <div className={FIELD_STACK}>
+            <Label htmlFor="email" className={LABEL}>
+              {invite ? "Email" : "Business email"}
+            </Label>
+            <Input
+              id="email"
+              name="email"
+              type="email"
+              autoComplete="email"
+              placeholder="you@company.com"
+              className={FIELD}
+              required
+              defaultValue={invite?.email}
+              readOnly={Boolean(invite)}
+            />
+            {invite && (
+              <p className={HINT}>The invite was sent to this address — it&apos;s your sign-in email.</p>
+            )}
+          </div>
+          <div className={FIELD_STACK}>
+            <Label htmlFor="password" className={LABEL}>
+              Password
+            </Label>
+            <Input
+              id="password"
+              name="password"
+              type="password"
+              autoComplete="new-password"
+              minLength={8}
+              placeholder="Create a password"
+              className={FIELD}
+              required
+            />
+            <p className={HINT}>At least 8 characters.</p>
+          </div>
+          <FormError message={state.error} />
+          <SubmitButton
+            pending={pending}
+            idle={
+              <>
+                Create account <CtaArrow />
+              </>
+            }
+            busy="Creating account…"
+            className="mt-2"
+          />
+        </form>
+      </Rise>
 
-      <p className="text-[14px] text-[var(--ink-3)]">
-        Already have an account?{" "}
-        <Link className="font-semibold text-[var(--fb-strong)] hover:underline" href="/login">
-          Sign in
-        </Link>
-      </p>
+      <Rise delay={0.16}>
+        <p className="mt-4 text-center text-[0.78rem] leading-relaxed text-[var(--ink-3)]">
+          By creating an account you agree to our{" "}
+          <Link href="/terms" className="font-medium text-foreground underline-offset-2 hover:underline">
+            Terms of Service
+          </Link>{" "}
+          and{" "}
+          <Link href="/privacy" className="font-medium text-foreground underline-offset-2 hover:underline">
+            Privacy Policy
+          </Link>
+          .
+        </p>
+      </Rise>
+
+      <Rise delay={0.2}>
+        <p className="mt-6 text-center text-sm text-[var(--ink-3)]">
+          Already have an account?{" "}
+          <Link className={TEXT_LINK} href="/login">
+            Sign in
+          </Link>
+        </p>
+      </Rise>
     </div>
   );
 }

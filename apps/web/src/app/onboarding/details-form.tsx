@@ -3,14 +3,15 @@
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { Globe, Loader2 } from "lucide-react";
 import { FormError } from "@/components/form-error";
-import { CtaArrow, FIELD, SubmitButton } from "@/app/(auth)/auth-ui";
+import { CtaArrow, FieldLabel, INPUT, SubmitButton } from "./onboarding-ui";
 import { peekFaviconAction, saveDetails, type DetailsState } from "./actions";
 import type { OnboardingPrefill } from "@/lib/auth/onboarding-context";
 
 /**
- * Step 1 · Details — the only step with inputs. Brand name and website arrive pre-filled
- * from signup and the landing hero; the favicon appears as soon as the URL is known, so
- * the page reads as "we already looked you up" rather than "fill in this form".
+ * Step 1 · Details — the only step with inputs, set like the landing hero's URL field.
+ * Brand name and website arrive pre-filled from signup and the landing hero; the favicon
+ * appears as soon as the URL is known, so the page reads as "we already looked you up"
+ * rather than "fill in this form".
  */
 export function DetailsForm({ prefill }: { prefill: OnboardingPrefill }) {
   const [state, formAction, pending] = useActionState<DetailsState, FormData>(saveDetails, {});
@@ -44,7 +45,7 @@ export function DetailsForm({ prefill }: { prefill: OnboardingPrefill }) {
   }, [prefill.websiteUrl]);
 
   return (
-    <form action={formAction} className="flex flex-col gap-7">
+    <form action={formAction} className="flex flex-col gap-5">
       <Field label="Full name" htmlFor="fullName">
         <input
           id="fullName"
@@ -53,7 +54,7 @@ export function DetailsForm({ prefill }: { prefill: OnboardingPrefill }) {
           required
           defaultValue={prefill.fullName}
           placeholder="Jane Doe"
-          className={`${FIELD} w-full`}
+          className={INPUT}
         />
       </Field>
 
@@ -65,13 +66,13 @@ export function DetailsForm({ prefill }: { prefill: OnboardingPrefill }) {
           required
           defaultValue={prefill.brandName}
           placeholder="Acme"
-          className={`${FIELD} w-full`}
+          className={INPUT}
         />
       </Field>
 
       <Field label="Website" htmlFor="websiteUrl">
         <div className="relative">
-          <span className="pointer-events-none absolute left-3.5 top-1/2 grid size-6 -translate-y-1/2 place-items-center overflow-hidden rounded-[6px] bg-[var(--tint)]">
+          <span className="pointer-events-none absolute left-3 top-1/2 grid size-6 -translate-y-1/2 place-items-center overflow-hidden rounded-md border border-[rgba(12,16,26,0.06)] bg-[var(--tint)]">
             {peeking ? (
               <Loader2 className="size-3.5 animate-spin text-[var(--ink-4)]" />
             ) : favicon ? (
@@ -101,10 +102,10 @@ export function DetailsForm({ prefill }: { prefill: OnboardingPrefill }) {
             }}
             onBlur={(e) => lookup(e.target.value)}
             placeholder="acme.com"
-            className={`${FIELD} w-full pl-12`}
+            className={`${INPUT} pl-11`}
           />
         </div>
-        <p className="mt-2.5 text-[12.5px] leading-relaxed text-[var(--ink-4)]">
+        <p className="mt-2 text-[0.8rem] leading-relaxed text-[var(--ink-3)]">
           We read your site to learn what you sell and who buys it — that&rsquo;s how your agents know who to target.
         </p>
       </Field>
@@ -112,6 +113,7 @@ export function DetailsForm({ prefill }: { prefill: OnboardingPrefill }) {
       <FormError message={state.error} />
 
       <SubmitButton
+        className="mt-1"
         pending={pending}
         idle={
           <>
@@ -133,9 +135,7 @@ export function DetailsForm({ prefill }: { prefill: OnboardingPrefill }) {
 function Field({ label, htmlFor, children }: { label: string; htmlFor: string; children: React.ReactNode }) {
   return (
     <div>
-      <label htmlFor={htmlFor} className="mb-2.5 block text-[13.5px] font-semibold text-foreground">
-        {label}
-      </label>
+      <FieldLabel htmlFor={htmlFor}>{label}</FieldLabel>
       {children}
     </div>
   );

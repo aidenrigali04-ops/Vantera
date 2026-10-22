@@ -112,7 +112,8 @@ Supersedes the lines above where they disagree; the landing/auth/onboarding sect
 - **Theme**: the app is **light-first** (root layout forces light); the landing stays dark.
   App tokens live under `.app-surface` with a complete dormant `.dark .app-surface` block.
 - **Type**: **Geist Sans + Geist Mono** inside `.app-surface` (the theme font tokens are
-  remapped there); landing/auth keep Poppins. Sentence case; numbers tabular mono.
+  remapped there); marketing pages, auth and onboarding use Plus Jakarta Sans (see below).
+  Sentence case; numbers tabular mono.
 - **Accent**: blue (`--acc`) means *interactive / Interested / active tab* only; the
   primary button is **ink**. Replaces the "interactive elements (cyan)" line of the
   data-surface doctrine.
@@ -127,3 +128,36 @@ Supersedes the lines above where they disagree; the landing/auth/onboarding sect
   **Today scrolls** — it is a launchpad, not a data surface.
 - **Caps on screen are the code's caps** (`packages/jobs/src/pipeline/safety-limits.ts`);
   the UI never hardcodes a send limit.
+
+## Marketing landing — rankbox layout (locked 2026-10-20)
+
+Supersedes the Landing line in "Theme strategy" above (the landing is no longer dark).
+
+- **Layout follows rankbox.xyz section for section** (the owner's other product, itself
+  after rankaria.com; source at `/Users/admin/Rankvolt Final/rank-leap-boost/src/components/landing/`):
+  hero + proof band → painted product showcase + marquee rows → sample conversations →
+  how it works → feature rows + chip marquee → comparison list → who it's for → pricing →
+  guarantee → FAQ → blue closing CTA → blue footer. New landing work ports the matching
+  rankbox component near 1:1 with Vantera content rather than inventing a new pattern.
+- **Frame**: white page, hairline rails down the 72rem column, every section a band with a
+  top hairline, empty spacer bands between sections — `components/landing/frame.tsx`
+  (`Band`, `Spacer`, `SectionHead`, `Accent`, `CellGrid`, `TONES`, `GhostLink`).
+- **Type**: marketing pages (homepage, pricing, MarketingShell) are set in **Plus Jakarta
+  Sans** (`components/landing/font.ts`, scoped by `.landing:not(.auth-surface)`); display
+  `font-medium` with tight tracking, the closing phrase of a title `font-bold` in `--fb`.
+- **Colour**: `--fb` (#1877f2) / `--fb-strong` (#166fe5) — identical to rankbox's blues. The
+  headline's rotating icon tiles are brand blue; the proof band's "Works with" marks rest grey
+  and light to each brand's own colour on hover. Blue bands carrying small white text use
+  #1468da for AA.
+- **Nav**: white bar; menus open one white panel (grey icon tiles → soft blue on hover, a
+  tinted rail with a sample card, a footer strip), never the old deep-blue panel.
+- **Showcase backdrop** is generated, never hand-edited: `apps/web/scripts/painting/render.sh`.
+- **The same system on every public surface**: feature sub-landing pages (`/features`,
+  `/features/[slug]` — copy in `lib/features.ts`, sections in `components/features/`, one
+  visuals module per feature), the blog (`/blog`, `/blog/[slug]`, `components/blog/`),
+  `/pricing`, and auth + onboarding (split screen: form column + rounded painted panel; they
+  opt into the marketing face with `marketing-type` + `landingFont.variable`).
+  `/onboarding-preview` (dev only) renders onboarding without a login for design review.
+- **Positioning in copy**: autopilot (no per-message approval), machine-learned targeting,
+  3-minute setup (`ONBOARDING_MINUTES` in `components/landing/claims.ts`).
+

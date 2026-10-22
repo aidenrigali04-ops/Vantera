@@ -87,9 +87,10 @@ const geistMono = Geist_Mono({
   preload: false,
 });
 
-// Poppins powers the 2026 marketing landing (weight hierarchy: 400 body → 800
-// display; 800 is the all-caps hero headline). Montserrat / Geist Mono stay the
-// app + dashboard typefaces.
+// Poppins backs the theme's display / heading / mono tokens by default. Marketing,
+// auth, and onboarding re-point it to their own face (components/landing/font.ts, loaded
+// only there so app routes never download it). Montserrat / Geist Mono stay the app +
+// dashboard typefaces.
 const poppins = Poppins({
   variable: "--font-poppins",
   subsets: ["latin"],

@@ -16,7 +16,7 @@ export const SITE_URL = resolveSiteUrl();
 
 /** The site's canonical description — reused by metadata AND structured data so they never drift. */
 export const SITE_DESCRIPTION =
-  "#1 LinkedIn Lead Gen. Vantera's agents find in-market buyers, qualify them, draft outreach you approve, and get smarter with every reply. Start free.";
+  "#1 LinkedIn Lead Gen. Vantera's agents find in-market buyers, qualify them, and run your outreach on autopilot, while machine learning sharpens your targeting with every reply. Start free.";
 
 /** Renders a JSON-LD <script>. Accepts one object or an array of schema.org objects. */
 export function JsonLd({ data }: { data: object | object[] }) {
@@ -76,9 +76,9 @@ export function softwareApplicationLd(plans: { name: string; monthlyUsd: number 
     featureList: [
       "Finds and prioritizes your best buyers — agents watch LinkedIn for in-market behavior and rank every match against your ICP (intent signals, lookalikes, lead scoring, ICP filtering).",
       "Human-quality LinkedIn messages at scale — every message starts from a proven play and is written from the prospect's real activity, never a template (context-aware, personalized).",
-      "Full auto or approve before it sends — run hands-off or keep a human in the loop and sign off on each message; no rigid sequences (human-in-the-loop by default).",
-      "100% reply visibility — every response captured in one place with a suggested reply pre-drafted, one click to send.",
-      "Clean CRM handoff — qualified conversations sync straight into your CRM with no copy-paste (HubSpot, Salesforce, GoHighLevel).",
+      "Runs on autopilot — agents write and send every message at a safe, human pace, with no rigid sequences; pause an agent or step into any conversation anytime.",
+      "One inbox for every reply — responses classified and sorted warm-first, answered on autopilot, with opt-outs added to suppression automatically.",
+      "Clean CRM handoff — qualified conversations push straight into your CRM with no copy-paste (HubSpot, Salesforce, and GoHighLevel, with win alerts in Slack or monday.com).",
       "LinkedIn-safe, anti-ban pacing — human-like limits, realistic timing, and multi-sender distribution protect your account.",
       "Self-optimizing learning loop — starts from proven plays, tests careful improvements on live conversations, keeps winners, drops losers, and rolls back anything that hurts results.",
     ],

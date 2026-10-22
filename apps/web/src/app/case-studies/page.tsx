@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 export const metadata: Metadata = {
   title: "Case Studies — Results from Teams Running Vantera",
   description:
-    "How sales teams use Vantera to book more meetings on LinkedIn — quality-first prospecting, in-market intent, and outreach they approve. See the numbers.",
+    "How sales teams use Vantera to book more meetings on LinkedIn — quality-first prospecting, in-market intent, and outreach on autopilot. See the numbers.",
   alternates: { canonical: "/case-studies" },
 };
 
@@ -41,7 +41,7 @@ const CASE_STUDIES: CaseStudy[] = [
     segment: "Agency · 20 seats",
     metric: "42",
     metricLabel: "meetings / mo",
-    summary: "One SDR now books what three used to, with every message approved before it sends.",
+    summary: "One SDR now books what three used to, with outreach running on autopilot.",
     href: "#",
   },
   {
@@ -96,7 +96,7 @@ export default function CaseStudiesPage() {
         <MarketingHeader
           eyebrow="Case studies"
           title="Results from teams running Vantera"
-          subtitle="Real numbers from teams that swapped volume for quality — more of the right conversations, on LinkedIn, on their approval."
+          subtitle="How teams that swapped volume for quality get more of the right conversations on LinkedIn — on autopilot."
         />
       </section>
 

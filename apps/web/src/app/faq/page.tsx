@@ -10,7 +10,7 @@ import { FaqAccordion } from "./faq-accordion";
 export const metadata: Metadata = {
   title: "FAQ — Vantera LinkedIn Automation",
   description:
-    "Answers on how Vantera works: account safety, message approval, in-market buyer detection, multi-sender distribution, CRM sync, timelines, and pricing.",
+    "Answers on how Vantera works: account safety, autopilot outreach, in-market buyer detection, multi-sender distribution, CRM sync, timelines, and pricing.",
   alternates: { canonical: "/faq" },
 };
 
@@ -31,7 +31,7 @@ export default function FaqPage() {
         <MarketingHeader
           eyebrow="FAQ"
           title="Frequently asked questions"
-          subtitle="Everything you need to know about how Vantera runs your LinkedIn — safely, on your approval."
+          subtitle="Everything you need to know about how Vantera runs your LinkedIn — safely, on autopilot."
         />
       </section>
 

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { MarketingShell } from "@/components/landing/marketing-shell";
 import { MarketingHeader } from "@/components/landing/marketing-header";
+import { ONBOARDING_MINUTES } from "@/components/landing/claims";
 import { JsonLd, breadcrumbLd } from "@/lib/seo";
 
 export const metadata: Metadata = {
@@ -103,7 +104,7 @@ export default function SafetyPage() {
 
           <div className="mt-14 flex flex-col items-center gap-3 border-t border-[var(--hairline)] pt-10 text-center">
             <p className="text-[14.5px] text-[var(--ink-3)]">
-              See what your first queue looks like — nothing sends without your approval.
+              Set up in about {ONBOARDING_MINUTES} minutes — every send stays inside the limits above.
             </p>
             <Link
               href="/signup"

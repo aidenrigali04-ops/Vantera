@@ -21,7 +21,7 @@ import { cn } from "@/lib/utils";
 export const metadata: Metadata = {
   title: "Claude LinkedIn MCP — Run LinkedIn Outreach From Claude | Vantera",
   description:
-    "Connect Vantera's MCP server to Claude and run your LinkedIn outreach from a prompt: prospect in-market buyers, draft messages in your voice, and book meetings — every send waits for your approval.",
+    "Connect Vantera's MCP server to Claude and run your LinkedIn outreach from a prompt: prospect in-market buyers, write messages in your voice, and book meetings — sent on autopilot at a safe, human pace.",
   alternates: { canonical: "/claude-linkedin-mcp" },
   keywords: [
     "Claude LinkedIn MCP",
@@ -42,15 +42,15 @@ const UNLOCKS = [
   },
   {
     icon: PenLine,
-    label: "Draft",
-    title: "Draft in your voice",
-    body: "Claude writes each message from the prospect's real activity and your positioning, then hands it to Vantera as a ready-to-review draft.",
+    label: "Write",
+    title: "Written in your voice",
+    body: "Claude writes each message from the prospect's real activity and your positioning, and Vantera runs quality and safety checks before anything sends.",
   },
   {
     icon: CheckCheck,
-    label: "Approve",
-    title: "Approve, then send",
-    body: "Nothing leaves your account without a yes. Approve a draft in chat and Vantera sends it on LinkedIn at a safe, human-like pace.",
+    label: "Send",
+    title: "Sent on autopilot",
+    body: "Vantera sends each message on LinkedIn at a safe, human-like pace, inside hard limits. Pause an agent or step into any conversation anytime.",
   },
   {
     icon: Inbox,
@@ -78,7 +78,7 @@ const STEPS = [
     n: "03",
     icon: Sparkles,
     title: "Prompt Claude to run outreach",
-    body: "Describe who you want and what you're offering. Claude calls Vantera's tools, returns drafts for review, and books meetings once you approve.",
+    body: "Describe who you want and what you're offering. Claude calls Vantera's tools; the agents send each message on autopilot and answer replies on the way to a booked meeting.",
   },
 ] as const;
 
@@ -91,8 +91,8 @@ const WHY = [
   },
   {
     icon: ShieldCheck,
-    title: "Approval and safety by design",
-    body: "Every send waits for your yes, and human-like pacing plus hard limits are enforced in Vantera — never something the prompt can override.",
+    title: "Autopilot, safe by design",
+    body: "Human-like pacing and hard limits are enforced in Vantera on every send — never something the prompt can override.",
   },
   {
     icon: PenLine,
@@ -122,7 +122,7 @@ export default function ClaudeLinkedinMcpPage() {
               Run your LinkedIn outreach <span className="text-[var(--cyan-strong)]">from Claude</span>
             </>
           }
-          subtitle="Connect Vantera's MCP server and Claude can prospect, draft, and book on LinkedIn for you — sourcing in-market buyers and writing each message in your voice, with your approval on every send."
+          subtitle="Connect Vantera's MCP server and Claude can prospect, draft, and book on LinkedIn for you — sourcing in-market buyers and writing each message in your voice, sent on autopilot at a safe, human pace."
         />
 
         <div className="mx-auto mt-9 flex max-w-2xl flex-wrap items-center justify-center gap-3">
@@ -280,8 +280,8 @@ export default function ClaudeLinkedinMcpPage() {
             Run LinkedIn outreach from your next prompt.
           </h2>
           <p className="mx-auto mt-5 max-w-xl text-[16px] leading-relaxed text-[var(--ink-3)] sm:text-[17.5px]">
-            Connect Vantera to Claude and let a conversation do the prospecting, drafting, and booking — with
-            your approval on every send.
+            Connect Vantera to Claude and let a conversation do the prospecting, writing, and booking — on
+            autopilot, at a safe, human pace.
           </p>
           <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
             <Link
@@ -331,7 +331,7 @@ function PromptMock() {
       <div className="mt-4">
         <span className="text-[9.5px] font-bold uppercase tracking-[0.12em] text-[var(--ink-4)]">You</span>
         <div className="mt-1.5 rounded-[10px] bg-[#F4F6F8] px-3.5 py-3 text-[13px] leading-relaxed text-[#3A444D]">
-          Find 25 in-market RevOps leaders at Series A–C SaaS companies and draft a first message for each.
+          Find 25 in-market RevOps leaders at Series A–C SaaS companies and reach out to each.
         </div>
       </div>
 
@@ -370,14 +370,14 @@ function PromptMock() {
         </span>
         <div className={cn(CARD_INNER, "mt-1.5 p-3")}>
           <div className="flex items-center justify-between">
-            <span className="text-[11.5px] font-semibold text-[#0F172A]">25 qualified · 25 drafts ready</span>
+            <span className="text-[11.5px] font-semibold text-[#0F172A]">25 qualified · 25 messages written</span>
             <span className="flex items-center gap-1 rounded-full bg-[#eafaf0] px-2 py-[3px] text-[8.5px] font-bold uppercase tracking-[0.08em] text-[#1a9e4b]">
               <CheckCheck className="size-2.5" strokeWidth={2.6} />
-              Awaiting approval
+              Queued to send
             </span>
           </div>
 
-          {/* mini drafted-lead rows */}
+          {/* mini queued-lead rows */}
           <div className="mt-2.5 space-y-1.5">
             {[
               { initials: "DM", name: "Dana Meyer", role: "VP RevOps · Northwind", fit: "94" },
@@ -404,7 +404,7 @@ function PromptMock() {
       </div>
 
       <p className="mt-3 text-center text-[10.5px] text-[var(--ink-4)]">
-        You review the drafts, then approve to send on LinkedIn.
+        Vantera sends them on LinkedIn at a safe, human pace — step in anytime.
       </p>
     </div>
   );

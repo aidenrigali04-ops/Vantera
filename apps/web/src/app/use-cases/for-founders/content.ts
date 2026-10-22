@@ -1,9 +1,16 @@
+import { PLAN_DISPLAY, PLAN_DISPLAY_ORDER } from "@vantera/billing";
 import type { UseCaseContent } from "@/components/landing/use-case/types";
+import { ONBOARDING_MINUTES } from "@/components/landing/claims";
+
+// The plan on sale, read from billing so the pricing answer never quotes a stale price.
+const PLAN =
+  PLAN_DISPLAY_ORDER.map((tier) => PLAN_DISPLAY[tier]).find((p) => p.highlight) ??
+  PLAN_DISPLAY[PLAN_DISPLAY_ORDER[0]];
 
 /**
  * "For Founders" — founder-led sales. Same product, angled at the solo/early operator who
  * can't afford an SDR and can't risk their one LinkedIn account. Grounded in the real
- * product (Scout + Outreach, ≥70 gate, approve-every-send, safe pacing, HubSpot/Pipedrive).
+ * product (Scout + Outreach, ≥70 gate, autopilot sending, safe pacing, HubSpot/Salesforce/GoHighLevel).
  * The differentiator card uses the single-account "pace" mock (one account, not multi-sender).
  */
 export const FOUNDERS_CONTENT: UseCaseContent = {
@@ -11,7 +18,7 @@ export const FOUNDERS_CONTENT: UseCaseContent = {
   seo: {
     title: "LinkedIn Automation for Founders — Founder-Led Sales on Autopilot | Vantera",
     description:
-      "Pipeline while you build. Vantera runs founder-led LinkedIn outreach for you — finds in-market buyers, qualifies them against your ICP, and drafts every message in your voice. You approve in minutes a day. No SDR hire required.",
+      "Pipeline while you build. Vantera runs founder-led LinkedIn outreach for you on autopilot — finds in-market buyers, qualifies them against your ICP, and writes and sends every message in your voice. No SDR hire required.",
   },
 
   hero: {
@@ -19,10 +26,10 @@ export const FOUNDERS_CONTENT: UseCaseContent = {
     headlinePre: "Your first sales hire is an",
     headlineHighlight: "AI SDR team",
     headlinePost: ".",
-    sub: "You don't have time to prospect and can't afford an SDR yet. Vantera runs founder-led outreach on your LinkedIn — surfacing in-market buyers, qualifying them against your ICP, and drafting every message in your voice. You approve a few minutes a day. Pipeline builds while you build the product.",
+    sub: "You don't have time to prospect and can't afford an SDR yet. Vantera runs founder-led outreach on your LinkedIn, on autopilot — surfacing in-market buyers, qualifying them against your ICP, and writing and sending every message in your voice. Pipeline builds while you build the product.",
     primaryCta: { label: "Start free", href: "/signup" },
     secondaryCta: { label: "See how it works", href: "#how-it-works" },
-    trust: ["7-day free trial", "Live in ~15 minutes", "You approve every message"],
+    trust: ["7-day free trial", `Set up in ${ONBOARDING_MINUTES} minutes`, "Runs on autopilot"],
     visual: {
       title: "Your pipeline",
       period: "This week",
@@ -90,14 +97,14 @@ export const FOUNDERS_CONTENT: UseCaseContent = {
         costLabel: "for a hire you can't de-risk yet",
       },
     ],
-    kicker: "You don't have to choose between building and selling. Vantera runs the selling — you just approve it.",
+    kicker: "You don't have to choose between building and selling. Vantera runs the selling on autopilot — you step in when a conversation needs you.",
   },
 
   compare: {
     eyebrow: "Before / after",
     title: "Two ways to do founder-led sales.",
     subtitle:
-      "One eats the hours you don't have and risks the account you can't replace. The other runs in the background and waits for your OK.",
+      "One eats the hours you don't have and risks the account you can't replace. The other runs in the background on autopilot — and gets sharper every week.",
     before: {
       heading: "Doing it yourself",
       caption: "In the gaps between building",
@@ -117,9 +124,9 @@ export const FOUNDERS_CONTENT: UseCaseContent = {
         { label: "Agents surface in-market buyers", meta: "24/7" },
         { label: "Scored against your ICP", meta: "≥ 70 to pass" },
         { label: "Drafted in your voice from real activity" },
-        { label: "You approve in a few taps", meta: "~15 min/day" },
-        { label: "Safe pacing protects your account" },
+        { label: "Sent on autopilot at a safe pace" },
         { label: "Replies and follow-ups handled for you" },
+        { label: "Targeting sharpens with every outcome" },
       ],
     },
   },
@@ -128,13 +135,13 @@ export const FOUNDERS_CONTENT: UseCaseContent = {
     eyebrow: "Why founders run it",
     title: "Pipeline that compounds while you build.",
     subtitle:
-      "A few minutes of approvals a day, and outreach that never goes quiet — without a hire, a spreadsheet, or a spammed network.",
+      "Outreach that runs itself and never goes quiet — without a hire, a spreadsheet, or a spammed network.",
     items: [
       {
         icon: "clock",
-        value: "~15 min",
-        title: "A day is all it takes",
-        body: "Approve or tweak the day's drafts over coffee. The sourcing, qualifying, and writing already happened.",
+        value: `${ONBOARDING_MINUTES} min`,
+        title: "To set up, then hands-off",
+        body: "Paste your site, confirm your ICP, connect LinkedIn. The sourcing, qualifying, writing, and sending run on autopilot from there.",
       },
       {
         icon: "filter",
@@ -163,7 +170,7 @@ export const FOUNDERS_CONTENT: UseCaseContent = {
     eyebrow: "The platform",
     title: "Your AI SDR team, working while you build.",
     subtitle:
-      "The whole outbound motion — sourcing, qualifying, writing, safe sending — run for you, and nothing sends without your OK.",
+      "The whole outbound motion — sourcing, qualifying, writing, safe sending — run for you on autopilot, and you can step in anytime.",
     highlightMock: "pace",
     items: [
       {
@@ -196,27 +203,27 @@ export const FOUNDERS_CONTENT: UseCaseContent = {
         highlight: true,
       },
       {
-        icon: "control",
-        label: "Approve in minutes",
-        title: "You stay in control",
-        body: "Every draft waits for a one-tap approve, edit, or skip. Go full-auto when you trust it, and anything questionable routes back to you.",
-        chips: ["approve or auto", "one tap", "nothing sends unseen"],
+        icon: "trend",
+        label: "Learning",
+        title: "Targeting that sharpens itself",
+        body: "Machine learning studies who accepts, replies, and books, then steers discovery and scoring toward the buyers who respond. Pause an agent or step into any conversation anytime.",
+        chips: ["learns from outcomes", "sharper every week", "step in anytime"],
       },
       {
         icon: "crm",
         label: "CRM sync",
         title: "Clean handoff when you land one",
-        body: "Qualified and closed conversations push into HubSpot or Pipedrive — so when you do hire, the pipeline's already organized.",
-        chips: ["HubSpot", "Pipedrive", "auto-sync"],
+        body: "Won conversations land in HubSpot, Salesforce, or GoHighLevel as a contact and a deal — so when you do hire, the pipeline's already organized.",
+        chips: ["HubSpot", "Salesforce", "auto-sync"],
       },
     ],
   },
 
   review: {
     eyebrow: "See it in action",
-    title: "Every message, in your voice — you just approve.",
+    title: "Every message, in your voice — sent for you.",
     subtitle:
-      "This is the queue you live in for a few minutes a day. Pick a draft to see the signal that triggered it, the insight behind it, and the message — then approve, edit, or skip.",
+      "This is your AI SDR at work while you build. Pick a lead to see the signal that triggered it, the insight behind it, and the message it wrote — sent on autopilot at a safe, human pace.",
     drafts: [
       {
         initials: "DM",
@@ -272,24 +279,24 @@ export const FOUNDERS_CONTENT: UseCaseContent = {
   pipeline: {
     eyebrow: "How it works",
     title: "From in-market signal to a booked call.",
-    subtitle: "One system runs the whole motion — and stops at your approval, every time.",
+    subtitle: "One system runs the whole motion on autopilot — and gets sharper with every outcome.",
     nodes: [
       { icon: "radar", label: "Identify", line: "ICP fit + LinkedIn intent", metric: "24/7 scan" },
       { icon: "filter", label: "Qualify", line: "Scored on fit + intent", metric: "≥ 70 to pass" },
       { icon: "outreach", label: "Draft", line: "Written in your voice", metric: "0 templates" },
-      { icon: "control", label: "Approve", line: "One-tap approve or edit", metric: "you, in minutes" },
       { icon: "safety", label: "Send", line: "Safe, human-like pacing", metric: "≤ 100 / wk" },
-      { icon: "replies", label: "Converse", line: "Replies captured + drafted", metric: "full visibility" },
+      { icon: "replies", label: "Converse", line: "Replies answered for you", metric: "full visibility" },
       { icon: "calendar", label: "Book", line: "Qualified calls land", metric: "on your calendar" },
-      { icon: "crm", label: "Sync", line: "Wins pushed to your CRM", metric: "HubSpot · Pipedrive" },
+      { icon: "crm", label: "Sync", line: "Wins pushed to your CRM", metric: "HubSpot · Salesforce" },
+      { icon: "trend", label: "Learn", line: "Outcomes sharpen targeting", metric: "every week" },
     ],
     howto: [
       { name: "Identify in-market buyers", text: "Vantera's Scout agent watches LinkedIn for buying behavior and matches people to your ideal customer profile." },
       { name: "Qualify against your ICP", text: "Each prospect is scored on fit, seniority, and intent; only those scoring 70 or above enter outreach." },
       { name: "Draft in your voice", text: "The Outreach agent writes each message from the prospect's real activity in your tone — never a template." },
-      { name: "Approve the send", text: "Every draft waits in a review queue for you to approve, edit, or skip before anything sends." },
-      { name: "Send with safe pacing", text: "Approved messages send within human-like limits to keep your one account safe." },
-      { name: "Book and sync", text: "Replies are captured and drafted, booked calls land on your calendar, and closed conversations sync to your CRM." },
+      { name: "Send with safe pacing", text: "Each message passes quality and safety checks, then sends on autopilot within human-like limits to keep your one account safe." },
+      { name: "Book and sync", text: "Replies are answered on autopilot, booked calls land on your calendar, and closed conversations sync to your CRM." },
+      { name: "Learn from every outcome", text: "Machine learning studies which invites are accepted, which replies show interest, and which conversations book calls, then sharpens who the agents reach next." },
     ],
   },
 
@@ -300,7 +307,7 @@ export const FOUNDERS_CONTENT: UseCaseContent = {
       "Directional figures from founders running quality-first outreach — pipeline that builds without a hire or a spammed network.",
     metrics: [
       { value: 3.4, decimals: 1, suffix: "×", label: "reply rate vs. templates", caption: "Messages in your voice, from real activity." },
-      { value: 15, suffix: "min", label: "a day to run it", caption: "Approve the day's drafts — that's it." },
+      { value: ONBOARDING_MINUTES, suffix: "min", label: "to set up", caption: "Then it runs on autopilot." },
       { value: 1, suffix: "wk", label: "to first replies", caption: "Agents work the moment you deploy." },
       { value: 0, label: "account restrictions", caption: "Safe pacing, enforced — never optional." },
     ],
@@ -315,7 +322,7 @@ export const FOUNDERS_CONTENT: UseCaseContent = {
 
   roi: {
     eyebrow: "Business impact",
-    title: "What could a few minutes a day add?",
+    title: "What could hands-off outbound add?",
     subtitle: "Move the sliders to your world. Illustrative — but the shape of the win holds.",
     reps: { min: 1, max: 10, default: 1 },
     dealSize: { min: 1000, max: 100000, step: 1000, default: 12000 },
@@ -336,11 +343,11 @@ export const FOUNDERS_CONTENT: UseCaseContent = {
     items: [
       {
         q: "Do I need a sales team to use this?",
-        a: "No — Vantera is built for founder-led sales. It runs the sourcing, qualifying, and drafting so you can run real outbound in a few minutes a day, without hiring an SDR. When you do hire, the pipeline and CRM are already organized for them.",
+        a: "No — Vantera is built for founder-led sales. It runs the sourcing, qualifying, writing, and sending on autopilot, so you can run real outbound without hiring an SDR. When you do hire, the pipeline and CRM are already organized for them.",
       },
       {
         q: "Will it sound like me, or like a bot?",
-        a: "Like you. Every message is drafted from the prospect's real LinkedIn activity in your tone — not a template — and a humanizer check flags anything that reads automated before it reaches your queue. You approve or tweak before it sends.",
+        a: "Like you. Every message is drafted from the prospect's real LinkedIn activity in your tone — not a template — and a humanizer check rewrites anything that reads automated before it sends.",
       },
       {
         q: "Is my personal LinkedIn account safe?",
@@ -348,15 +355,15 @@ export const FOUNDERS_CONTENT: UseCaseContent = {
       },
       {
         q: "How much time does it actually take me?",
-        a: "A few minutes a day. The agents source, qualify, and draft around the clock; your only job is to approve, edit, or skip the day's drafts — over coffee. When you trust it, switch an agent to full-auto and it sends clean drafts on its own.",
+        a: `About ${ONBOARDING_MINUTES} minutes to set up: paste your site, confirm your ICP, connect LinkedIn. After that it runs on autopilot — the agents source and qualify around the clock, write each message, and send at a safe, human pace. You step into a conversation only when you want to.`,
       },
       {
         q: "How is this different from Waalaxy or other LinkedIn tools?",
-        a: "Most tools help you send more. Vantera decides who's worth sending to: only prospects that clear a fit-and-intent gate get a message, every message is written from real activity, and you approve the sends. For a founder, that means protecting your name and your account instead of spraying your network.",
+        a: "Most tools help you send more. Vantera decides who's worth sending to: only prospects that clear a fit-and-intent gate get a message, every message is written from real activity, and machine learning sharpens the targeting from every outcome. For a founder, that means protecting your name and your account instead of spraying your network.",
       },
       {
         q: "What does it cost?",
-        a: "Starter is $45/month — built for a solo founder running account-safe outreach with a deployed agent. Plans scale with your revenue goal, not a long-term contract, so you can change or cancel anytime.",
+        a: `${PLAN.name} is $${PLAN.monthlyUsd}/month and includes everything Vantera does — built for a solo founder running account-safe outreach. There's a free 7-day trial and no long-term contract, so you can change or cancel anytime.`,
       },
       {
         q: "How fast will I see results?",
@@ -364,7 +371,7 @@ export const FOUNDERS_CONTENT: UseCaseContent = {
       },
       {
         q: "Does it sync with my CRM?",
-        a: "Yes — qualified and closed conversations push into HubSpot or Pipedrive automatically. Vantera fills the pipeline; your CRM keeps it, so nothing's lost when you scale up.",
+        a: "Yes — every won conversation lands in HubSpot, Salesforce, or GoHighLevel as a contact and a deal, automatically. Vantera fills the pipeline; your CRM keeps it, so nothing's lost when you scale up.",
       },
     ],
   },
@@ -372,10 +379,9 @@ export const FOUNDERS_CONTENT: UseCaseContent = {
   finalCta: {
     eyebrow: "Get started",
     title: "Your next ten customers are on LinkedIn — while you're heads-down building.",
-    urgency:
-      "Every week without outbound is pipeline a competitor is booking instead. Deploy your AI SDR team today — live in about fifteen minutes, first replies this week.",
+    urgency: `Every week without outbound is pipeline a competitor is booking instead. Deploy your AI SDR team today — set up in about ${ONBOARDING_MINUTES} minutes, first replies this week.`,
     primaryCta: { label: "Start free", href: "/signup" },
     secondaryCta: { label: "See pricing", href: "/#pricing" },
-    reassurance: ["7-day free trial", "Live in ~15 min", "You approve every message"],
+    reassurance: ["7-day free trial", `Set up in ${ONBOARDING_MINUTES} minutes`, "Runs on autopilot"],
   },
 };

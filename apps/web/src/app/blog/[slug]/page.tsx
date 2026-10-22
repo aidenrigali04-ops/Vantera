@@ -1,11 +1,20 @@
+import type { CSSProperties } from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, ArrowRight } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { MarketingShell } from "@/components/landing/marketing-shell";
-import { ArticleBody } from "@/components/blog/article-body";
+import { Band, CELL, CellGrid, GhostLink, LINE, Spacer } from "@/components/landing/frame";
+import { FinalCta } from "@/components/landing/final-cta";
+import { ArticleBody, ShortAnswer, Takeaways } from "@/components/blog/article-body";
+import { ReadingProgress, ShareButtons, TableOfContents } from "@/components/blog/article-chrome";
+import { AuthorCard, RailCta } from "@/components/blog/article-aside";
+import { CoverArt } from "@/components/blog/cover-art";
+import { AuthorMark, PostCard, PostStamp, toPostMeta } from "@/components/blog/post-cards";
+import { outlineArticle } from "@/components/blog/outline";
 import { getAllPosts, getPost, formatPostDate, BLOG_AUTHOR } from "@/lib/blog";
 import { JsonLd, articleLd, breadcrumbLd, SITE_URL } from "@/lib/seo";
+import { cn } from "@/lib/utils";
 
 export function generateStaticParams() {
   return getAllPosts().map((p) => ({ slug: p.slug }));
@@ -37,15 +46,30 @@ export async function generateMetadata({
   };
 }
 
+/**
+ * A post, after rankbox.xyz's article: in the landing's frame, a header split by a
+ * hairline with the cover inset in its own cell; the text column beside a sticky rail
+ * that holds the contents and the offer; then more reading in hairline cells, and the
+ * landing's closing band. A thin line under the nav tracks how much has been read.
+ */
 export default async function ArticlePage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const post = getPost(slug);
   if (!post) notFound();
 
   const url = `${SITE_URL}/blog/${post.slug}`;
+  const meta = toPostMeta(post);
+  const takeaways = post.takeaways ?? [];
+  const { ids, toc } = outlineArticle(post.body, { takeaways: takeaways.length > 0 });
+  const related = getAllPosts()
+    .filter((p) => p.slug !== post.slug)
+    .slice(0, 3)
+    .map(toPostMeta);
+  const topicHref = `/blog?topic=${encodeURIComponent(post.category)}`;
+  const leadsWithCallout = !!post.shortAnswer || takeaways.length > 0;
 
   return (
-    <MarketingShell>
+    <MarketingShell framed>
       <JsonLd
         data={[
           articleLd(post, url),
@@ -56,46 +80,152 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
           ]),
         ]}
       />
-      <article className="px-6 pt-36 pb-24 sm:pt-40 lg:px-8">
-        <div className="mx-auto max-w-2xl">
-          <Link
-            href="/blog"
-            className="inline-flex items-center gap-1.5 text-[13px] font-medium text-[var(--ink-3)] transition-colors hover:text-foreground"
+      <ReadingProgress targetId="article-body" />
+
+      <article>
+        {/* ---------- header ---------- */}
+        <header className="relative bg-white">
+          <div
+            className={cn(
+              "relative mx-auto grid max-w-6xl border-x lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]",
+              LINE,
+            )}
           >
-            <ArrowLeft className="size-3.5" />
-            All articles
-          </Link>
-
-          <header className="mt-6">
-            <span className="inline-flex w-fit items-center rounded-full bg-[var(--cyan-tint)] px-2.5 py-0.5 text-[11.5px] font-semibold text-[var(--cyan-strong)]">
-              {post.category}
-            </span>
-            <h1 className="mt-4 text-[2.1rem] font-semibold leading-[1.1] tracking-[-0.03em] text-foreground sm:text-[2.55rem]">
-              {post.title}
-            </h1>
-            <p className="mt-4 text-[14.5px] text-[var(--ink-4)]">
-              {formatPostDate(post.date)} · {post.readingMinutes} min read · {BLOG_AUTHOR}
-            </p>
-          </header>
-
-          <ArticleBody blocks={post.body} />
-
-          <aside className="mt-16 rounded-3xl border border-[var(--hairline)] bg-[var(--tint)] p-8 text-center">
-            <h2 className="text-[1.4rem] font-semibold tracking-[-0.02em] text-foreground">Put this into practice</h2>
-            <p className="mx-auto mt-3 max-w-md text-[15px] leading-relaxed text-[var(--ink-3)]">
-              Vantera finds in-market buyers, qualifies them against your ICP, and drafts every
-              message from their real activity — you approve each send.
-            </p>
-            <Link
-              href="/signup"
-              className="mt-6 inline-flex items-center gap-1.5 rounded-full bg-[#0a0c12] px-5 py-2.5 text-[14px] font-medium text-white transition-all hover:shadow-[0_8px_24px_-8px_rgba(11,87,171,0.6)]"
+            {/* The headline is the LCP element: no entrance on this column, only on the
+                cover beside it. */}
+            <div className="flex flex-col justify-center px-5 pb-10 pt-8 sm:px-10 lg:py-14 lg:pl-12 lg:pr-10">
+              <nav aria-label="Breadcrumb">
+                <ol className="flex items-center gap-1.5 text-[0.8rem] text-[var(--ink-3)]">
+                  <li>
+                    <Link href="/blog" className="py-2 transition-colors hover:text-foreground">
+                      Blog
+                    </Link>
+                  </li>
+                  <li aria-hidden>
+                    <ChevronRight className="size-3.5 text-foreground/25" />
+                  </li>
+                  <li>
+                    <Link
+                      href={topicHref}
+                      className="py-2 font-medium text-[var(--fb-strong)] transition-colors hover:text-[#1161cc]"
+                    >
+                      {post.category}
+                    </Link>
+                  </li>
+                </ol>
+              </nav>
+              <h1 className="mt-5 text-balance text-[2.05rem] font-medium leading-[1.1] tracking-[-0.03em] text-foreground sm:text-[2.7rem] lg:text-[2.9rem]">
+                {post.title}
+              </h1>
+              <p className="mt-5 max-w-2xl text-[1.05rem] leading-relaxed text-[var(--ink-3)] sm:text-[1.15rem]">
+                {post.description}
+              </p>
+              <div className="mt-8 flex flex-wrap items-center justify-between gap-5">
+                <div className="flex items-center gap-3">
+                  <AuthorMark className="size-10" />
+                  <div className="text-sm leading-tight">
+                    <Link
+                      href="/about"
+                      className="font-semibold text-foreground underline decoration-foreground/20 underline-offset-4 transition-colors hover:decoration-foreground"
+                    >
+                      {BLOG_AUTHOR}
+                    </Link>
+                    <p className="mt-1 text-xs text-[var(--ink-3)]">
+                      <PostStamp post={meta} />
+                      {post.updated && <> · Updated {formatPostDate(post.updated)}</>}
+                    </p>
+                  </div>
+                </div>
+                <ShareButtons url={url} title={post.title} />
+              </div>
+            </div>
+            {/* The cover, inset in its own cell with a hairline of white around it. */}
+            <div
+              className={cn("landing-rise border-t p-3 lg:border-l lg:border-t-0", LINE)}
+              style={{ "--rise-delay": "0.08s" } as CSSProperties}
             >
-              Start free
-              <ArrowRight className="size-4" />
-            </Link>
+              <div className="h-full overflow-hidden rounded-lg border border-[rgba(12,16,26,0.06)]">
+                <CoverArt
+                  post={post}
+                  className="aspect-[16/11] h-full w-full lg:aspect-auto lg:min-h-[22rem]"
+                />
+              </div>
+            </div>
+          </div>
+        </header>
+
+        {/* ---------- body + rail ---------- */}
+        <Band inner="grid lg:grid-cols-[minmax(0,1fr)_18rem]">
+          <div id="article-body" className="min-w-0 px-5 py-10 sm:px-10 lg:py-14 lg:pl-12 lg:pr-14">
+            <div className="max-w-[43rem]">
+              <TableOfContents entries={toc} variant="inline" className="mb-10 lg:hidden" />
+              {post.shortAnswer && <ShortAnswer text={post.shortAnswer} />}
+              {takeaways.length > 0 && (
+                <Takeaways items={takeaways} className={post.shortAnswer ? "mt-12" : undefined} />
+              )}
+              <ArticleBody
+                blocks={post.body}
+                ids={ids}
+                className={leadsWithCallout ? "mt-4" : "mt-0 [&>:first-child]:mt-0"}
+              />
+
+              <footer className={cn("mt-14 space-y-8 border-t pt-10", LINE)}>
+                <div className="flex flex-wrap items-center justify-between gap-5">
+                  <ul aria-label="Topics" className="flex flex-wrap gap-2">
+                    <li>
+                      <Link
+                        href={topicHref}
+                        className="inline-flex h-8 items-center rounded-lg border border-[rgba(12,16,26,0.08)] bg-white px-3 text-[0.8rem] font-medium text-foreground/75 transition-colors hover:border-[rgba(22,111,229,0.3)] hover:text-[var(--fb-strong)]"
+                      >
+                        {post.category}
+                      </Link>
+                    </li>
+                  </ul>
+                  <ShareButtons url={url} title={post.title} />
+                </div>
+                <AuthorCard />
+              </footer>
+            </div>
+          </div>
+
+          <aside className={cn("hidden border-l lg:block", LINE)}>
+            <div className="sticky top-24 max-h-[calc(100dvh-7rem)] space-y-8 overflow-y-auto px-6 py-14 [scrollbar-width:none]">
+              <TableOfContents entries={toc} variant="rail" />
+              <RailCta />
+            </div>
           </aside>
-        </div>
+        </Band>
       </article>
+
+      {/* ---------- keep reading ---------- */}
+      {related.length > 0 && (
+        <section aria-labelledby="related-title">
+          <Spacer />
+          <Band inner="flex items-end justify-between gap-4 px-6 py-8 sm:px-10 lg:px-12">
+            <h2
+              id="related-title"
+              className="text-[1.6rem] font-medium leading-tight tracking-[-0.025em] text-foreground sm:text-[1.9rem]"
+            >
+              Keep reading
+            </h2>
+            <div className="shrink-0">
+              <GhostLink href="/blog">All articles</GhostLink>
+            </div>
+          </Band>
+          <Band>
+            <CellGrid className="sm:grid-cols-2 lg:grid-cols-3">
+              {related.map((p) => (
+                <li key={p.slug} className={CELL}>
+                  <PostCard post={p} />
+                </li>
+              ))}
+            </CellGrid>
+          </Band>
+        </section>
+      )}
+
+      <Spacer />
+      <FinalCta />
     </MarketingShell>
   );
 }

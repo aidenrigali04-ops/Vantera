@@ -191,8 +191,8 @@ export default async function ToolPage({ params }: { params: Promise<{ slug: str
             Put your whole LinkedIn motion on autopilot.
           </h2>
           <p className="mx-auto mt-5 max-w-xl text-[16px] leading-relaxed text-[var(--ink-3)] sm:text-[17.5px]">
-            This tool writes one message at a time. Vantera&rsquo;s agents find in-market buyers and draft a
-            personal message for each — you approve every send.
+            This tool writes one message at a time. Vantera&rsquo;s agents find in-market buyers and send each
+            one a personal message — on autopilot.
           </p>
           <Link
             href="/signup"

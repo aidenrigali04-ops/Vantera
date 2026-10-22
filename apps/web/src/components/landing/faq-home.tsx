@@ -1,61 +1,74 @@
-"use client";
-
-import Link from "next/link";
-import { ArrowRight, ChevronDown } from "lucide-react";
+import { HelpCircle, Plus } from "lucide-react";
+import { Band, GhostLink, LINE, Pill, TITLE } from "./frame";
 import { Reveal, RevealItem } from "./surface";
-import { SectionIntro } from "./section-intro";
-import { FAQ_ITEMS } from "./faq-data";
+import { FAQ_ITEMS, type FaqItem } from "./faq-data";
+import { cn } from "@/lib/utils";
 
 /**
- * S9 · FAQ on the homepage — "What's the catch?" plus the long tail for search and AI
- * answer engines. Renders the SAME FAQ_ITEMS the /faq page and the FAQPage JSON-LD use
- * (they must stay identical — see faq-data.ts). Native <details>/<summary>: content is
- * in the DOM for crawlers, zero JS state, keyboard-accessible for free.
+ * The homepage FAQ, after rankbox.xyz's (itself after Rankaria's): the title on the
+ * left, the questions down the right, each on a hairline with a plus that turns into a
+ * blue cross when open.
+ *
+ * Renders the SAME FAQ_ITEMS the /faq page and the FAQPage JSON-LD use (they must stay
+ * identical — see faq-data.ts). Native <details>/<summary>: every answer is in the DOM
+ * for crawlers and answer engines, keyboard-accessible with no JS. The shared `name`
+ * makes them one accordion where the browser supports it (one answer open at a time,
+ * like rankbox's); elsewhere each opens on its own.
+ *
+ * Feature pages pass their own questions and heading; the defaults are the homepage's.
+ * Whoever passes `items` must emit the matching FAQPage JSON-LD.
  */
-export function FaqHome() {
+export function FaqHome({
+  items = FAQ_ITEMS,
+  title = "Frequently asked questions",
+  subtitle = "Everything you need to know about safety, pricing, and how Vantera books meetings on LinkedIn.",
+}: {
+  items?: FaqItem[];
+  title?: string;
+  subtitle?: string;
+} = {}) {
   return (
-    <section id="faq" className="relative border-t border-[var(--hairline)] bg-white py-24 sm:py-28">
-      <div className="mx-auto max-w-6xl px-6 lg:px-8">
-        <div className="grid gap-12 lg:grid-cols-[1fr_1.6fr] lg:gap-20">
-          {/* LEFT — sticky intro */}
-          <div className="lg:sticky lg:top-32 lg:self-start">
-            <SectionIntro
-              label="FAQ"
-              title="Questions people ask before they connect."
-              lead="Safety first, then everything else — the same answers our team gives one-to-one."
-            />
-            <Link
-              href="/faq"
-              className="group mt-7 inline-flex items-center gap-1.5 text-[14px] font-semibold text-[var(--cyan-strong)]"
-            >
-              All questions
-              <ArrowRight
-                className="size-3.5 transition-transform duration-200 group-hover:translate-x-0.5"
-                strokeWidth={2.4}
-              />
-            </Link>
+    <Band id="faq">
+      <Reveal className="grid lg:grid-cols-[0.8fr_1.2fr]">
+        <RevealItem
+          className={cn(
+            "flex flex-col items-start justify-center border-b px-6 py-10 sm:px-10 lg:border-b-0 lg:border-r lg:px-12 lg:py-14",
+            LINE,
+          )}
+        >
+          <Pill icon={HelpCircle}>FAQ</Pill>
+          <h2 className={cn(TITLE, "mt-5")}>{title}</h2>
+          <p className="mt-4 max-w-sm text-[0.98rem] leading-relaxed text-[var(--ink-3)]">
+            {subtitle}
+          </p>
+          <div className="mt-6">
+            <GhostLink href="/faq">All questions</GhostLink>
           </div>
+        </RevealItem>
 
-          {/* RIGHT — the answers (native details: crawlable, keyboard-free) */}
-          <Reveal className="-mt-2">
-            {FAQ_ITEMS.map((item, i) => (
-              <RevealItem key={item.q}>
-                <details id={`faq-${i + 1}`} className="group border-b border-[var(--hairline)]">
-                  <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-5 text-[16px] font-medium text-foreground transition-colors hover:text-[var(--cyan-strong)] [&::-webkit-details-marker]:hidden">
-                    {item.q}
-                    <span className="grid size-7 shrink-0 place-items-center rounded-full border border-[var(--hairline)] bg-white text-[var(--ink-4)] transition-all duration-200 group-open:rotate-180 group-open:border-[var(--cyan-line)] group-open:text-[var(--cyan-strong)]">
-                      <ChevronDown className="size-3.5" strokeWidth={2.2} aria-hidden />
-                    </span>
-                  </summary>
-                  <p className="max-w-[64ch] pb-6 text-[14.5px] leading-relaxed text-[var(--ink-3)]">
-                    {item.a}
-                  </p>
-                </details>
-              </RevealItem>
+        <RevealItem className="px-6 py-4 sm:px-10 lg:px-12 lg:py-8">
+          <div className="divide-y divide-[var(--hairline)]">
+            {items.map((item, i) => (
+              <details key={item.q} id={`faq-${i + 1}`} name="faq" className="group/item">
+                <summary className="group/q flex cursor-pointer list-none items-center justify-between gap-6 rounded-sm py-5 text-left text-[0.98rem] font-medium text-foreground transition-colors hover:text-[var(--fb)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--fb)]/40 focus-visible:ring-offset-2 [&::-webkit-details-marker]:hidden">
+                  {item.q}
+                  <span
+                    aria-hidden
+                    className="grid size-6 shrink-0 place-items-center rounded-md border border-[rgba(12,16,26,0.08)] bg-white text-foreground transition-[transform,background-color,color,border-color] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover/q:border-[var(--fb)]/30 group-open/item:rotate-45 group-open/item:border-[var(--fb)] group-open/item:bg-[var(--fb)] group-open/item:text-white"
+                  >
+                    <Plus className="size-3.5" />
+                  </span>
+                </summary>
+                {/* Plays each time the answer is shown: an opened <details> renders
+                    its content afresh. */}
+                <p className="max-w-2xl pb-5 pr-10 text-sm leading-relaxed text-[var(--ink-3)] animate-in fade-in-0 slide-in-from-top-1 duration-300 motion-reduce:animate-none">
+                  {item.a}
+                </p>
+              </details>
             ))}
-          </Reveal>
-        </div>
-      </div>
-    </section>
+          </div>
+        </RevealItem>
+      </Reveal>
+    </Band>
   );
 }

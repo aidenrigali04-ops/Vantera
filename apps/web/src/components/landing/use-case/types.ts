@@ -126,7 +126,7 @@ export interface FeaturesContent {
   highlightMock?: "senders" | "pace";
 }
 
-/** One draft in the interactive review-queue showcase. */
+/** One message in the autopilot showcase. */
 export interface ReviewDraft {
   initials: string;
   name: string;

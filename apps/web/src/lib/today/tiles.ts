@@ -238,7 +238,7 @@ export function tilesFor(i: TodayInputs, x: TileExtras): ActionTileSpec[] {
       tone: "routine",
       glyph: "plug",
       title: "Route wins to your CRM",
-      meta: `${x.crmHandoff.leadName} reached Conversation · HubSpot or Pipedrive, one time`,
+      meta: `${x.crmHandoff.leadName} reached Conversation · HubSpot, Salesforce, or GoHighLevel, one time`,
       href: "/settings/integrations",
       dismissible: true,
     });
