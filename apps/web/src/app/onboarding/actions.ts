@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
   scanWebsite,
@@ -9,12 +10,15 @@ import {
   deriveIntentWatchlist,
   matchStarterPlays,
   proposeNextChallenger,
+  type IcpDraft,
   type WebsiteScan,
 } from "@vantera/agent-brains";
 import { createLinkedInInfraFromEnv, isLinkedInInfraConfigured } from "@vantera/linkedin-infra";
 import { createClient } from "@/lib/supabase/server";
 import { checkLimit } from "@/lib/rate-limit";
 import { normalizeWebsiteUrl, validateOnboardingDetails } from "@/lib/validation";
+import { parseBuyersForm } from "@/lib/validation/buyers";
+import { maybeStartFastPass, resetRevealRun } from "@/lib/reveal/start-fast-pass";
 import { billingBypassAllowed } from "./billing-bypass";
 import { provisionOnboardingAgents } from "./provision";
 import { accountSkipsPayment } from "@/lib/billing/founder-exempt";
@@ -140,6 +144,151 @@ export async function saveDetails(_prev: DetailsState, formData: FormData): Prom
   if (icpError) console.error("onboarding icp write failed (non-blocking)", icpError);
 
   redirect("/onboarding");
+}
+
+// ── Step 2 · Your buyers (the drafted ICP, confirmed or edited → agents + preview) ─────────
+
+/**
+ * Confirm (or correct) the ICP `saveDetails` drafted: write it back to the onboarding `icps`
+ * row, provision the Scout + Outreach agents on it, store the exclusions/guidance on the
+ * Scout (`agents.config.targeting`), stamp the milestone once, and start the lead preview.
+ * Idempotent — re-confirming updates in place.
+ */
+export async function confirmBuyers(_prev: DetailsState, formData: FormData): Promise<DetailsState> {
+  const parsed = parseBuyersForm(formData);
+  if (!parsed.ok) return { error: parsed.error };
+  const { name, criteria, targeting } = parsed.values;
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const { data: account } = await supabase
+    .from("accounts")
+    .select("id, buyers_confirmed_at")
+    .limit(1)
+    .maybeSingle<{ id: string; buyers_confirmed_at: string | null }>();
+  if (!account) redirect("/onboarding");
+
+  const { data: icp } = await supabase
+    .from("icps")
+    .select("id")
+    .eq("account_id", account.id)
+    .eq("source", "onboarding")
+    .limit(1)
+    .maybeSingle<{ id: string }>();
+  if (!icp) return { error: "Save your details first." };
+
+  const { error: icpError } = await supabase.from("icps").update({ name, criteria }).eq("id", icp.id);
+  if (icpError) return { error: "Could not save your buyers. Please try again." };
+
+  const { error: accountError } = await supabase
+    .from("accounts")
+    .update({ onboarding_icp: name })
+    .eq("id", account.id);
+  if (accountError) return { error: "Could not save your buyers. Please try again." };
+
+  let scoutId: string;
+  try {
+    ({ scoutId } = await provisionOnboardingAgents({
+      supabase,
+      accountId: account.id,
+      userId: user.id,
+      icp: { id: icp.id, name },
+    }));
+  } catch {
+    return { error: "Could not set up your agents. Only workspace admins can do this." };
+  }
+
+  const { data: scout } = await supabase
+    .from("agents")
+    .select("config")
+    .eq("id", scoutId)
+    .maybeSingle<{ config: Record<string, unknown> | null }>();
+  const { error: targetingError } = await supabase
+    .from("agents")
+    .update({ config: { ...(scout?.config ?? {}), targeting } })
+    .eq("id", scoutId);
+  if (targetingError) return { error: "Could not save your exclusions. Please try again." };
+
+  if (!account.buyers_confirmed_at) {
+    const { error: stampError } = await supabase
+      .from("accounts")
+      .update({ buyers_confirmed_at: new Date().toISOString() })
+      .eq("id", account.id)
+      .is("buyers_confirmed_at", null);
+    if (stampError) return { error: "Could not save your buyers. Please try again." };
+  }
+
+  try {
+    await maybeStartFastPass(account.id);
+  } catch (err) {
+    // the preview is a bonus beat; the prospects step retries it — never block confirming
+    console.error("confirmBuyers: fast pass failed to start (non-blocking)", err);
+  }
+
+  redirect("/onboarding?done=buyers");
+}
+
+/**
+ * Redraft the buyer profile from the saved website scan (the "that's not us" escape hatch).
+ * Overwrites the onboarding ICP's name + criteria and clears any preview built on the old one.
+ */
+export async function regenerateBuyers(): Promise<{ error?: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Your session expired. Sign in again." };
+
+  const { data: account } = await supabase
+    .from("accounts")
+    .select("id, name, website_scan")
+    .limit(1)
+    .maybeSingle<{ id: string; name: string | null; website_scan: WebsiteScan | null }>();
+  if (!account) return { error: "Save your details first." };
+  if (!account.website_scan) {
+    return { error: "We couldn't read your site, so there's nothing to redraft from — edit the profile directly." };
+  }
+
+  let draft: IcpDraft;
+  try {
+    draft = await draftIcp({ companyName: account.name, scan: account.website_scan });
+  } catch (err) {
+    console.error("regenerateBuyers: draft failed", err);
+    return { error: "Could not redraft right now. Try again shortly." };
+  }
+  if (icpDraftIsEmpty(draft)) {
+    return { error: "Your site didn't give us enough to redraft — edit the profile directly." };
+  }
+
+  const { error } = await supabase
+    .from("icps")
+    .update({
+      name: draft.name || "Ideal buyers",
+      criteria: {
+        titles: draft.titles,
+        industries: draft.industries,
+        companySizes: draft.companySizes,
+        geos: draft.geos,
+        signals: draft.signals,
+      },
+    })
+    .eq("account_id", account.id)
+    .eq("source", "onboarding");
+  if (error) return { error: "Could not save the new draft. Please try again." };
+
+  try {
+    await resetRevealRun(account.id);
+  } catch (err) {
+    console.error("regenerateBuyers: reveal reset failed", err);
+    return { error: "Saved the new draft, but couldn't refresh your preview. Try again." };
+  }
+
+  revalidatePath("/onboarding");
+  return {};
 }
 
 /**
