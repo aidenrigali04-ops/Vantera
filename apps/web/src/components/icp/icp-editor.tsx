@@ -223,29 +223,15 @@ export function IcpEditor({
 
       <div className="flex flex-col gap-3">
         <Submit mode={mode} disabled={regenerating} />
-        {onRegenerate && (
-          <button
-            type="button"
-            onClick={onRegenerate}
-            disabled={regenerating}
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg text-[0.85rem] font-medium text-[var(--ink-3)] transition-colors hover:text-foreground disabled:opacity-60"
-          >
-            {regenerating ? (
-              <>
-                <Loader2 className="size-4 animate-spin" />
-                Rewriting your buyer profile…
-              </>
-            ) : (
-              <>
-                <RefreshCw className="size-4" />
-                Redraft from my website
-              </>
-            )}
-          </button>
-        )}
+        {onRegenerate && <RegenerateButton onRegenerate={onRegenerate} regenerating={regenerating} />}
       </div>
 
-      {mode === "onboarding" && (
+      {mode === "onboarding" ? (
+        // plain text: /settings is gated until onboarding completes, so a link would bounce here
+        <p className="text-center text-[0.8rem] text-[var(--ink-3)]">
+          Drafted from your website. You can refine your positioning later in Settings.
+        </p>
+      ) : (
         <p className="text-center text-[0.8rem] text-[var(--ink-3)]">
           Where this came from →{" "}
           <Link href="/settings/positioning" className="font-medium text-foreground underline-offset-4 hover:underline">
@@ -284,6 +270,31 @@ function Submit({ mode, disabled }: { mode: "onboarding" | "settings"; disabled:
         )
       }
     />
+  );
+}
+
+/** Disabled while the form submits or a redraft is in flight — one write at a time. */
+function RegenerateButton({ onRegenerate, regenerating }: { onRegenerate: () => void; regenerating: boolean }) {
+  const { pending } = useFormStatus();
+  return (
+    <button
+      type="button"
+      onClick={onRegenerate}
+      disabled={regenerating || pending}
+      className="inline-flex h-10 items-center justify-center gap-2 rounded-lg text-[0.85rem] font-medium text-[var(--ink-3)] transition-colors hover:text-foreground disabled:opacity-60"
+    >
+      {regenerating ? (
+        <>
+          <Loader2 className="size-4 animate-spin" />
+          Rewriting your buyer profile…
+        </>
+      ) : (
+        <>
+          <RefreshCw className="size-4" />
+          Redraft from my website
+        </>
+      )}
+    </button>
   );
 }
 

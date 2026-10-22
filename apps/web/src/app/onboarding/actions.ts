@@ -199,17 +199,19 @@ export async function confirmBuyers(_prev: DetailsState, formData: FormData): Pr
       icp: { id: icp.id, name },
     }));
   } catch {
-    return { error: "Could not set up your agents. Only workspace admins can do this." };
+    return { error: "Couldn't set up your agents. Try again." };
   }
 
-  const { data: scout } = await supabase
+  // never write `{ targeting }` over a config we failed to read — it would wipe the Scout's settings
+  const { data: scout, error: scoutError } = await supabase
     .from("agents")
     .select("config")
     .eq("id", scoutId)
     .maybeSingle<{ config: Record<string, unknown> | null }>();
+  if (scoutError || !scout) return { error: "Couldn't save your targeting. Try again." };
   const { error: targetingError } = await supabase
     .from("agents")
-    .update({ config: { ...(scout?.config ?? {}), targeting } })
+    .update({ config: { ...(scout.config ?? {}), targeting } })
     .eq("id", scoutId);
   if (targetingError) return { error: "Could not save your exclusions. Please try again." };
 
@@ -242,6 +244,8 @@ export async function regenerateBuyers(): Promise<{ error?: string }> {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "Your session expired. Sign in again." };
+  const limit = await checkLimit("icpRegenerate", user.id);
+  if (!limit.success) return { error: "Give it a minute before regenerating again." };
 
   const { data: account } = await supabase
     .from("accounts")
