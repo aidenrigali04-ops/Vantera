@@ -451,3 +451,29 @@ describe("learner feature columns correlate on the OUTER lead id", () => {
     expect(q).not.toMatch(/lead_id = "id"/);
   });
 });
+
+// ML-4: a "Not a fit" verdict keeps a lead out of drafting — correlated on the OUTER lead id.
+describe("notMarkedNotFit", () => {
+  it("excludes leads with a not_fit verdict, correlated on leads.id", async () => {
+    const { notMarkedNotFit } = await import("./pg-store");
+    const { leads } = await import("@vantera/db");
+    const db = createDb("postgresql://localhost:5432/db");
+    const q = db.select({ id: leads.id }).from(leads).where(notMarkedNotFit).toSQL().sql;
+    expect(q).toContain('not exists (select 1 from "lead_feedback" f where f.lead_id = "leads"."id" and f.verdict = \'not_fit\')');
+  });
+});
+
+describe("mergeExemplars", () => {
+  it("merges sources newest first, dedupes lines, caps the result", async () => {
+    const { mergeExemplars } = await import("./pg-store");
+    const d = (iso: string) => new Date(iso);
+    const out = mergeExemplars(
+      [
+        [{ line: "A", at: d("2026-10-01") }, { line: "B", at: d("2026-10-05") }],
+        [{ line: "B", at: d("2026-10-03") }, { line: "C", at: d("2026-10-10") }],
+      ],
+      2
+    );
+    expect(out).toEqual(["C", "B"]);
+  });
+});

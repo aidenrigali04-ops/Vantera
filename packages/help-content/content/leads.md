@@ -28,6 +28,16 @@ Open any prospect and, under its score, you'll see **Ranked higher** / **Ranked 
 
 Nothing shows here for a new account; it appears once there's real evidence (roughly 30 invitations at least two weeks old).
 
+## Good fit / Not a fit
+
+Open any prospect and tell your agent what you think with **Good fit** or **Not a fit**. Any workspace member can do this.
+
+- **Not a fit** keeps that person out of your outreach — your agent won't draft a message for them — and teaches the scoring to rank similar people lower.
+- **Good fit** teaches it to look for more people like this one.
+- Changed your mind? **Undo** clears it, and a "Not a fit" prospect becomes eligible for outreach again.
+
+These verdicts work alongside the **Wrong person** reason you can pick when rejecting a draft in Approvals.
+
 ## Adding a prospect yourself
 
 **Add prospect** (top right) lets you bring your own prospect: first name and their LinkedIn profile URL are required; title and company are optional but help the scoring judge fit. They enter the exact same funnel as sourced prospects — Vera researches and scores them against your ICP, and only a qualifying score moves them into outreach drafting. Adding someone by hand is never a shortcut past the quality bar, so a hand-added prospect can still land in "Filtered out" with the reasons. Profiles on your suppression list can't be added, and a profile that's already a prospect won't be duplicated. Adding prospects is an admin action.

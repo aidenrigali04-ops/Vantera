@@ -375,6 +375,31 @@ export const leadNotes = pgTable(
   (t) => [index("lead_notes_lead_idx").on(t.leadId, t.createdAt)]
 );
 
+// 0065 ML-4: "Good fit" / "Not a fit" verdict on any prospect — one per lead, latest wins. Feeds the
+// qualification brain as revealed preferences; "not_fit" leads are excluded from drafting. The SQL
+// also carries a composite (lead_id, account_id) FK so a verdict can't cross workspaces.
+export const leadFeedback = pgTable(
+  "lead_feedback",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    leadId: uuid("lead_id")
+      .notNull()
+      .references(() => leads.id, { onDelete: "cascade" }),
+    verdict: text("verdict", { enum: ["good_fit", "not_fit"] }).notNull(),
+    reason: text("reason"),
+    createdBy: uuid("created_by"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("lead_feedback_lead_unique").on(t.leadId),
+    index("lead_feedback_account_idx").on(t.accountId, t.verdict, t.updatedAt),
+  ]
+);
+
 // ── 0003 campaigns, scheduler, suppression ───────────────────────────────────
 
 export const campaigns = pgTable(

@@ -148,3 +148,18 @@ article mentions learned ordering + job-seeker exclusion); full gate green on a 
   byte-identical.
 - `findMissingWhyNow`: content-word overlap with the signal (prospect's own name/company words
   excluded) or a kind word ("congrats on the round"); wired into draft, fix, and the eval grader.
+
+## 6. ML-4 design (fit feedback everywhere) — shipped
+
+- `lead_feedback` (0065): one verdict per lead (`good_fit` / `not_fit`), composite
+  `(lead_id, account_id)` FK so a verdict can't cross workspaces, RLS (members read/record, author
+  pinned to `auth.uid()`, delete = author or admin), `updated_at` trigger, retention = life of lead.
+  rls-auditor: PASS (upsert path analysed; error-type oracle closed by one generic action error).
+- Learning: verdicts are a *qualification* signal, so they feed the rank prompt's revealed
+  preferences (merged newest-first with review "wrong person" rejections / positive replies), not
+  the reply-outcome learner.
+- Safety: `notMarkedNotFit` excludes "Not a fit" leads in both the drain and `getDraftableLeads`
+  (covers every chain into copy-draft); flipping the verdict re-includes them.
+- Web: side-peek Good fit / Not a fit / Undo; verdicts read in a separate soft query so the page
+  degrades (no verdicts) instead of erroring if the migration isn't applied yet. Copilot
+  `getLeadScoreRationale` now returns `fitVerdict`.

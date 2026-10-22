@@ -11,6 +11,7 @@ import { AddLead } from "./add-lead";
 import { HOT_MIN_SCORE } from "./lead-value";
 import { cn } from "@/lib/utils";
 import { parseReadout, reasonsForLead, whatsWorking } from "@/lib/learning/readout";
+import { fitVerdictFromRows } from "@/lib/learning/fit";
 import { WhatsWorkingStrip } from "./whats-working";
 
 export const metadata = { title: "Prospects" };
@@ -155,12 +156,25 @@ export default async function LeadsPage({
   // Insight only — a failed read just hides the reasons, never the prospects.
   const readout = parseReadout((learnedRes.data?.[0] as { summary?: unknown } | undefined)?.summary ?? null);
   const working = whatsWorking(readout);
-  const withReasons = <T extends Record<string, unknown>>(rows: T[] | null) =>
-    (rows ?? []).map((r) => ({ ...r, learned_reasons: reasonsForLead(readout, r as never) }));
   // R1c: a failed read hits the error boundary — never renders as "0 leads".
-  const leadsRaw = withReasons(orThrow(leadsRes, "your prospects"));
+  const pageRows = (orThrow(leadsRes, "your prospects") ?? []) as { id: string; status: string }[];
+  const hotRows = (orThrow(hotRes, "hot prospects") ?? []) as { id: string; status: string }[];
+  // ML-4: the user's fit verdicts for the visible leads — its own soft read so a missing table or a
+  // failed read hides the verdicts, never the prospects.
+  const feedbackRes = await supabase
+    .from("lead_feedback")
+    .select("lead_id, verdict")
+    .in("lead_id", [...new Set([...pageRows, ...hotRows].map((r) => r.id))]);
+  const verdicts = fitVerdictFromRows(feedbackRes.error ? null : feedbackRes.data);
+  const withReasons = <T extends { id: string }>(rows: T[]) =>
+    rows.map((r) => ({
+      ...r,
+      learned_reasons: reasonsForLead(readout, r as never),
+      fit_verdict: verdicts.get(r.id) ?? null,
+    }));
+  const leadsRaw = withReasons(pageRows);
   const count = leadsRes.count;
-  const hotLeads = withReasons(orThrow(hotRes, "hot prospects"));
+  const hotLeads = withReasons(hotRows);
   const industries = [
     ...new Set(((industriesRes.data ?? []) as { industry: string | null }[]).map((r) => r.industry).filter(Boolean) as string[]),
   ].sort();

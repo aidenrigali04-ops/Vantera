@@ -18,6 +18,7 @@ import {
   icps,
   intentObservations,
   leadNotifications,
+  leadFeedback,
   leadSignals,
   leads,
   lifecycleTouches,
@@ -319,6 +320,20 @@ async function invitedOutcomeRows(
       converted: r.status === "converted",
     },
   }));
+}
+
+/** ML-4: leads the user marked "Not a fit" never get drafted (reversible — flip the verdict). The
+ *  outer lead id is written qualified (see learnerFeatureCols on drizzle's bare-"id" rendering). */
+export const notMarkedNotFit = sql`not exists (select 1 from ${leadFeedback} f where f.lead_id = "leads"."id" and f.verdict = 'not_fit')`;
+
+/** Newest-first union of exemplar lists, deduped by line, capped — the revealed-preferences merge. */
+export function mergeExemplars(lists: { line: string; at: Date }[][], max: number): string[] {
+  const newest = new Map<string, number>();
+  for (const list of lists) for (const { line, at } of list) newest.set(line, Math.max(newest.get(line) ?? 0, at.getTime()));
+  return [...newest.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, max)
+    .map(([line]) => line);
 }
 
 /** ML-1 learner window: matured invites from the last LEARNER_LOOKBACK_DAYS. */
@@ -939,7 +954,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
       const rows = await db
         .select({ id: leads.id, ...learnerFeatureCols })
         .from(leads)
-        .where(and(eq(leads.accountId, accountId), eq(leads.status, "qualified")))
+        .where(and(eq(leads.accountId, accountId), eq(leads.status, "qualified"), notMarkedNotFit))
         .orderBy(desc(leads.aiScore), desc(leads.scoredAt));
       const { ordering } = await orderingFor(accountId);
       return orderLeads(
@@ -979,7 +994,15 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
     async getRankFeedback(accountId: string) {
       const line = (r: { title: string | null; companyName: string | null; industry: string | null }) =>
         [r.title ?? "-", r.companyName ?? "-", r.industry ?? "-"].join(" | ");
-      const [rejected, positive] = await Promise.all([
+      const verdicts = (verdict: "good_fit" | "not_fit") =>
+        db
+          .select({ title: leads.title, companyName: leads.companyName, industry: leads.industry, at: leadFeedback.updatedAt })
+          .from(leadFeedback)
+          .innerJoin(leads, and(eq(leads.id, leadFeedback.leadId), eq(leads.accountId, leadFeedback.accountId)))
+          .where(and(eq(leadFeedback.accountId, accountId), eq(leadFeedback.verdict, verdict)))
+          .orderBy(desc(leadFeedback.updatedAt))
+          .limit(RANK_FEEDBACK_MAX);
+      const [rejected, positive, notFit, goodFit] = await Promise.all([
         db
           .selectDistinctOn([scheduledSends.leadId], {
             leadId: scheduledSends.leadId,
@@ -994,7 +1017,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           .orderBy(scheduledSends.leadId, desc(scheduledSends.updatedAt))
           .limit(200),
         db
-          .select({ title: leads.title, companyName: leads.companyName, industry: leads.industry })
+          .select({ title: leads.title, companyName: leads.companyName, industry: leads.industry, at: leads.updatedAt })
           .from(leads)
           .where(
             and(
@@ -1007,13 +1030,15 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           )
           .orderBy(desc(leads.updatedAt))
           .limit(RANK_FEEDBACK_MAX),
+        verdicts("not_fit"),
+        verdicts("good_fit"),
       ]);
+      // ML-4: explicit fit verdicts join review rejections / positive replies, newest first
+      const tagged = (rows: { title: string | null; companyName: string | null; industry: string | null; at: Date }[]) =>
+        rows.map((r) => ({ line: line(r), at: r.at }));
       return {
-        rejected: rejected
-          .sort((a, b) => b.at.getTime() - a.at.getTime())
-          .slice(0, RANK_FEEDBACK_MAX)
-          .map(line),
-        positive: positive.map(line),
+        rejected: mergeExemplars([tagged(rejected), tagged(notFit)], RANK_FEEDBACK_MAX),
+        positive: mergeExemplars([tagged(positive), tagged(goodFit)], RANK_FEEDBACK_MAX),
       };
     },
 
@@ -1142,7 +1167,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
       const rows = await db
         .select()
         .from(leads)
-        .where(and(eq(leads.accountId, accountId), inArray(leads.id, leadIds)));
+        .where(and(eq(leads.accountId, accountId), inArray(leads.id, leadIds), notMarkedNotFit));
       // ML-3: each lead's captured signals → the freshest reach-out-worthy why-now
       const signalRows = await db
         .select({

@@ -7,6 +7,8 @@ import { ArrowRight, Clock, ExternalLink, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { LeadCrmControls } from "@/components/lead-crm-controls";
+import { LeadFitControls } from "@/components/lead-fit-controls";
+import type { FitVerdict } from "@/lib/learning/fit";
 import { SourceBadge, WhyNowLine } from "@/components/lead-why-now";
 import { projectedRevenue } from "@/app/(app)/prospects/lead-value";
 
@@ -51,6 +53,8 @@ export interface LeadProfile {
   lead_signals?: { kind: string; label: string | null; detail?: string | null; observed_at?: string | null }[] | null;
   /** ML-2: what in this prospect matches the people who actually reply (account's own outcomes) */
   learned_reasons?: { label: string; ratio: number }[] | null;
+  /** ML-4: the user's own "Good fit" / "Not a fit" verdict */
+  fit_verdict?: FitVerdict | null;
 }
 
 /** "Funding signal (2.1× your reply rate)" — one plain line per direction, highest impact first. */
@@ -263,6 +267,8 @@ export function LeadProfileSheet({
               </a>
             </section>
           )}
+
+          {lead.id && <LeadFitControls key={lead.id} leadId={lead.id} verdict={lead.fit_verdict ?? null} />}
 
           {lead.id && <LeadCrmControls leadId={lead.id} status={lead.status} />}
         </div>

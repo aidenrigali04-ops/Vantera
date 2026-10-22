@@ -116,7 +116,7 @@ describe("suppression list (rule 11 — the master gate)", () => {
 });
 
 describe("retention windows (rule 11)", () => {
-  it.each(["leads", "enrichment_results", "scheduled_sends", "replies", "inbound_leads", "lead_signals", "intent_observations", "reveal_runs"])(
+  it.each(["leads", "enrichment_results", "scheduled_sends", "replies", "inbound_leads", "lead_signals", "intent_observations", "reveal_runs", "lead_feedback"])(
     "%s states its retention window",
     (table) => {
       expect(allMigrations).toContain(`retention(${table})`);
@@ -481,3 +481,21 @@ describe("0060 pull-back email", () => {
     expect(sqlText).not.toMatch(/grant update \(lifecycle_last_email_at\)/);
   });
 });
+
+describe("lead feedback (0065, ML-4)", () => {
+  const sql = readFileSync(join(migrationsDir, "0065_lead_feedback.sql"), "utf8").toLowerCase();
+
+  it("can only attach a verdict to a lead in the same workspace (composite FK)", () => {
+    expect(sql).toMatch(/foreign key \(lead_id, account_id\)\s+references public\.leads \(id, account_id\) on delete cascade/);
+  });
+
+  it("pins the author to the caller on every client write", () => {
+    expect(sql).toMatch(/lead_feedback_insert[\s\S]*?created_by = \(select auth\.uid\(\)\)/);
+    expect(sql).toMatch(/lead_feedback_update[\s\S]*?with check \(public\.is_account_member\(account_id\) and created_by = \(select auth\.uid\(\)\)\)/);
+  });
+
+  it("keeps one verdict per lead", () => {
+    expect(sql).toContain("constraint lead_feedback_lead_unique unique (lead_id)");
+  });
+});
+

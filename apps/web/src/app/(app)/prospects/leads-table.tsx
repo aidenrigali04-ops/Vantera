@@ -59,6 +59,8 @@ export interface LeadRow {
   lead_signals?: LeadSignalView[] | null;
   /** ML-2: why the learner ranks this prospect where it does (account's own outcomes) */
   learned_reasons?: { label: string; ratio: number }[] | null;
+  /** ML-4: the user's own fit verdict */
+  fit_verdict?: "good_fit" | "not_fit" | null;
 }
 
 export interface ReplyView {
