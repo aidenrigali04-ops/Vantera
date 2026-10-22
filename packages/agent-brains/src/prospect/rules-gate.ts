@@ -20,6 +20,24 @@ function containsAny(value: string, wanted: string[]): boolean {
 }
 
 /**
+ * Headline phrases that mean the person is looking for a job — never a buyer, whatever the ICP.
+ * Anchored to job-search wording ("looking for a new role", "seeking new opportunities") so a
+ * buyer who is "looking for great engineers" or "hiring" is never caught.
+ */
+const JOB_SEEKER = [
+  /open[\s-]?to[\s-]?work/i,
+  /\bseeking (?:a |my )?(?:new |next )?(?:role|position|opportunit|job)/i,
+  /\blooking for (?:a |my )?(?:new |next )(?:role|position|opportunit|job|challenge)/i,
+  /\bactively (?:looking|seeking)\b/i,
+  /\bin transition\b/i,
+  /\bavailable for (?:hire|new roles?)\b/i,
+];
+
+export function isJobSeeker(headline: string | undefined): boolean {
+  return !!headline && JOB_SEEKER.some((re) => re.test(headline));
+}
+
+/**
  * Stage 1 of the scoring gate (rule 06): deterministic ICP-fit checks on discovery
  * fields. Cheap, explainable, zero AI cost. Rejects on a *positive* mismatch — a
  * field the candidate has whose value falls outside the ICP. A field the discovery
@@ -34,6 +52,7 @@ export function applyRulesGate(
   criteria: IcpCriteria
 ): RulesGateResult {
   const reasons: string[] = [];
+  if (isJobSeeker(candidate.title)) reasons.push(`job seeker ("${candidate.title}")`);
 
   const checks: { wanted?: string[]; value?: string; label: string }[] = [
     { wanted: criteria.industries, value: candidate.industry, label: "industry" },

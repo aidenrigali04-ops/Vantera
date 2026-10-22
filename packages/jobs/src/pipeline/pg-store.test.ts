@@ -438,3 +438,16 @@ describe("outcome rows read only matured invites", () => {
     expect(Math.round(ageDays)).toBe(OUTCOME_MATURATION_DAYS);
   });
 });
+
+// Regression: in a select list drizzle renders ${leads.id} as a bare "id" — inside a correlated
+// subquery that binds to the subquery's own table (lead_signals.id), silently matching nothing.
+describe("learner feature columns correlate on the OUTER lead id", () => {
+  it("qualifies leads.id inside every subquery", async () => {
+    const { learnerFeatureCols } = await import("./pg-store");
+    const { leads } = await import("@vantera/db");
+    const db = createDb("postgresql://localhost:5432/db");
+    const q = db.select(learnerFeatureCols).from(leads).toSQL().sql;
+    expect(q.match(/ls\.lead_id = "leads"\."id"/g)?.length).toBe(2);
+    expect(q).not.toMatch(/lead_id = "id"/);
+  });
+});

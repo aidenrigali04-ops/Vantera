@@ -1,4 +1,4 @@
-import { describeViolations, assignVariant, buildSendRecipe, LINKEDIN_SYSTEM, bestOfN, leadBlock, selectMessageShape, deriveAccountProfile, rankByTilt } from "@vantera/agent-brains";
+import { describeViolations, assignVariant, buildSendRecipe, LINKEDIN_SYSTEM, bestOfN, leadBlock, selectMessageShape, deriveAccountProfile } from "@vantera/agent-brains";
 import type { DraftInput, CopyStrategy } from "@vantera/agent-brains";
 import { getModelId } from "@vantera/ai";
 import type {
@@ -132,12 +132,13 @@ export async function runCopyDraft(
   const fresh = leads.filter((lead) => !alreadyDrafted.has(lead.id));
   const used = await deps.store.countFirstTouchDraftsSince(accountId, utcDayStart(new Date()));
   let slots = Math.max(0, DAILY_FIRST_TOUCH_DRAFT_CAP - used);
-  // Same order the drain used (getTopQualifiedLeadIds): stored score + the bounded outcome tilt,
-  // so the last daily slots go to the buyers most like those who actually replied. Re-sorting by
-  // raw score here would undo the tilt; the payload order itself isn't trusted (intent sends
-  // unsorted). Ordering ONLY — never a gate.
-  const profile = await deps.store.getTargetingProfile(accountId);
-  const ranked = rankByTilt(fresh, profile);
+  // Same order the drain used (getTopQualifiedLeadIds): the ML-1 learner's predicted reply rate
+  // when it has evidence, else stored score + the bounded tilt — so the last daily slots go to the
+  // buyers most like those who actually replied. The payload order itself isn't trusted (intent
+  // sends unsorted). Ordering ONLY — never a gate.
+  const order = await deps.store.rankLeadIds(accountId, fresh.map((lead) => lead.id));
+  const position = new Map(order.map((id, i) => [id, i]));
+  const ranked = [...fresh].sort((a, b) => (position.get(a.id) ?? Infinity) - (position.get(b.id) ?? Infinity));
   const room: DraftableLead[] = [];
   let deferred = 0;
   for (const lead of ranked) {

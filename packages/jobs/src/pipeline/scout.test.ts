@@ -111,6 +111,23 @@ class FakeScoutStore implements ScoutStore {
   async getIcpOutcomeRows() {
     return this.icpOutcomeRows;
   }
+  learnedInsights: Awaited<ReturnType<ScoutStore["getLearnedInsights"]>> = {
+    mode: "learned",
+    evidence: 120,
+    positive: [{ feature: "signal:funding", lift: 0.6, n: 40 }],
+    negative: [{ feature: "seniority:manager", lift: -0.4, n: 30 }],
+  };
+  learnedFails = false;
+  async getLearnedInsights() {
+    if (this.learnedFails) throw new Error("db down");
+    return this.learnedInsights;
+  }
+  rankFeedback: { rejected: string[]; positive: string[] } = { rejected: [], positive: [] };
+  feedbackFails = false;
+  async getRankFeedback() {
+    if (this.feedbackFails) throw new Error("db down");
+    return this.rankFeedback;
+  }
   // Rank-miss retry backlog: gate survivors a previous run left unscored
   unranked: RankCandidate[] = [];
   unrankedQueries: { since: Date; limit: number }[] = [];
@@ -767,4 +784,45 @@ describe("runScout — discovery allocation (Stage 2)", () => {
     expect(a).toBeGreaterThan(b); // evidence tilts the split
     expect(b).toBeGreaterThanOrEqual(Math.max(1, Math.floor((total * 0.4) / 2))); // floor keeps exploring
   });
+
+  it("hands the seller's revealed preferences (review rejections + positive replies) to the rank", async () => {
+    const pool = [makeCandidate({ externalRef: "a", industry: "saas" })];
+    const store = new FakeScoutStore(makeContext());
+    store.rankFeedback = { rejected: ["Recruiter | TalentCo | staffing"], positive: ["CTO | Acme | saas"] };
+    const { deps } = makeDeps(store, pool, { a: 80 });
+    const seen: unknown[] = [];
+    const rank = deps.rankFn;
+    deps.rankFn = async (c, ctx) => {
+      seen.push(ctx.feedback);
+      return rank(c, ctx);
+    };
+    await runScout("scout1", deps);
+    expect(seen[0]).toEqual(store.rankFeedback);
+  });
+
+  it("still ranks (no feedback) when the feedback read fails — fail-open", async () => {
+    const pool = [makeCandidate({ externalRef: "a", industry: "saas" })];
+    const store = new FakeScoutStore(makeContext());
+    store.feedbackFails = true;
+    const { deps } = makeDeps(store, pool, { a: 80 });
+    const summary = await runScout("scout1", deps);
+    expect(summary.qualified).toBe(1);
+  });
+
+  it("records which signals and segments the learner found winning/losing in the run summary", async () => {
+    const store = new FakeScoutStore(makeContext());
+    const { deps } = makeDeps(store, [makeCandidate({ externalRef: "a", industry: "saas" })], { a: 80 });
+    const summary = await runScout("scout1", deps);
+    expect(summary.learned).toEqual(store.learnedInsights);
+  });
+
+  it("completes with learned=null when the insight read fails", async () => {
+    const store = new FakeScoutStore(makeContext());
+    store.learnedFails = true;
+    const { deps } = makeDeps(store, [makeCandidate({ externalRef: "a", industry: "saas" })], { a: 80 });
+    const summary = await runScout("scout1", deps);
+    expect(summary.status).toBe("completed");
+    expect(summary.learned).toBeNull();
+  });
 });
+

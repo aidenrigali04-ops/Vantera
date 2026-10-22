@@ -203,7 +203,12 @@ export async function runIntentScan(agentId: string, deps: IntentScanDeps): Prom
   for (const o of raw) withinRun.set(obsKey(o.profileUrl, o.postRef), withinRun.get(obsKey(o.profileUrl, o.postRef)) ?? o);
   const candidates = [...withinRun.values()];
   const seen = await deps.store.seenObservationKeys(accountId, candidates.map((o) => ({ profileUrl: o.profileUrl, postRef: o.postRef })));
-  const fresh = candidates.filter((o) => !seen.has(obsKey(o.profileUrl, o.postRef)));
+  // Each observation gets its own short id for the classifier: one person engaging with two posts
+  // is two observations, and keying verdicts by profile url let one post's verdict (and why-now)
+  // overwrite the other's. Short ids are also echoed back more reliably than long urls.
+  const fresh = candidates
+    .filter((o) => !seen.has(obsKey(o.profileUrl, o.postRef)))
+    .map((o, i) => ({ ...o, ref: `o${i}` }));
   if (fresh.length === 0) {
     await deps.store.completeRun(agentId, now());
     return {
@@ -268,6 +273,7 @@ export async function runIntentScan(agentId: string, deps: IntentScanDeps): Prom
   let rankErrors = 0;
   if (survivors.length > 0) {
     const rankNow = now();
+    const feedback = await deps.store.getRankFeedback(accountId).catch(() => null);
     const ranked = await rankWithCompleteness(
       deps.rankFn,
       survivors.map((s) => toRankCandidate(s.leadId, s.candidate, s.v, rankNow)),
@@ -275,6 +281,7 @@ export async function runIntentScan(agentId: string, deps: IntentScanDeps): Prom
         accountIndustry: ctx.account.industry,
         valueProp: ctx.account.valueProp,
         icpDescription: ctx.icps.map((i) => `${i.name}: ${JSON.stringify(i.criteria)}`).join(" | "),
+        feedback,
       }
     );
     rankMissed = ranked.rankMissed;
@@ -296,7 +303,7 @@ export async function runIntentScan(agentId: string, deps: IntentScanDeps): Prom
     );
     for (const { s, qualified } of scored) {
       if (qualified) {
-        await deps.store.saveIntentSignal(s.leadId, accountId, { label: s.v.why_now, detail: s.v.why_now });
+        await deps.store.saveIntentSignal(s.leadId, accountId, { label: s.v.why_now, detail: s.v.why_now, level: s.v.level });
         qualifiedLeadIds.push(s.leadId);
         rows.push(obsRow(s.o, "enrolled", s.v.why_now, s.leadId));
       } else {

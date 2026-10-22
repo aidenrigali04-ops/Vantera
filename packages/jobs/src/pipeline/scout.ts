@@ -1,7 +1,7 @@
 import { applyRulesGate, isScanStale, allocateDiscovery } from "@vantera/agent-brains";
 import { computeRunTarget, computeDiscoveryTarget, dailyOutreachCapacity } from "./capacity";
 import { rankWithCompleteness } from "./rank-complete";
-import { RANK_MISS_RATIONALE, type RankCandidate, type LeadOutcomeFlags } from "@vantera/agent-brains";
+import { RANK_MISS_RATIONALE, type RankCandidate, type RankContext, type LeadOutcomeFlags } from "@vantera/agent-brains";
 import { companyKey, icpCriteriaToFilters, type CompanyRef, type EnrichedProspect, type IcpCriteria, type ProspectSignal } from "@vantera/prospect-data";
 import {
   SCOUT_DEFAULTS,
@@ -109,12 +109,17 @@ export async function runScout(agentId: string, deps: ScoutDeps): Promise<ScoutR
   // Rank a batch and persist ONLY real model rows. A rank miss (model omitted the lead, or the
   // call threw) is left unscored — scored_at null — so the retry stage below re-ranks it on a
   // later run instead of permanently rejecting a lead whose discovery credits were already spent.
+  // ML-1: the seller's revealed preferences (review rejections + positive replies), read once per
+  // run on first rank. Fail-open: a failed read ranks without them.
+  let feedback: RankContext["feedback"] | undefined;
   const rankAndPersist = async (candidates: RankCandidate[]): Promise<string[]> => {
     if (candidates.length === 0) return [];
+    if (feedback === undefined) feedback = await deps.store.getRankFeedback(accountId).catch(() => null);
     const rankCtx = {
       accountIndustry: ctx.account.industry,
       valueProp: scan ? `${scan.summary} Value props: ${scan.value_props.join("; ")}` : null,
       icpDescription: icps.map((i) => `${i.name}: ${JSON.stringify(i.criteria)}`).join(" | "),
+      feedback,
     };
     const ranked = await rankWithCompleteness(deps.rankFn, candidates, rankCtx);
     rankMissed += ranked.rankMissed;
@@ -326,6 +331,8 @@ export async function runScout(agentId: string, deps: ScoutDeps): Promise<ScoutR
   }
 
   await deps.store.completeRun(agentId, now());
+  // ML-1 readout persisted with the run (agent_runs.summary) — insight only, fail-open
+  const learned = await deps.store.getLearnedInsights(accountId).catch(() => null);
 
   return {
     status: "completed",
@@ -340,5 +347,6 @@ export async function runScout(agentId: string, deps: ScoutDeps): Promise<ScoutR
     rankErrors,
     websiteScanError,
     companySignalsError,
+    learned,
   };
 }

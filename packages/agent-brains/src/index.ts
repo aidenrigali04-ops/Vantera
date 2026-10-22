@@ -8,6 +8,7 @@ export {
   rankMissInsights,
   completeRankResults,
   RANK_MISS_RATIONALE,
+  RANK_FEEDBACK_MAX,
   type RankCandidate,
   type RankContext,
 } from "./prospect/rank";
@@ -213,4 +214,22 @@ export {
   type SegmentStat,
 } from "./targeting/tilt";
 export { allocateDiscovery } from "./targeting/allocate";
+export {
+  countRows,
+  featureKeys,
+  fitLearner,
+  isInformative,
+  predictLead,
+  rankByLearned,
+  signalReport,
+  buildLeadOrdering,
+  orderLeads,
+  LEARN_MIN_N,
+  type LearnerFeatures,
+  type LearnerRow,
+  type CountTable,
+  type LearnedModel,
+  type LeadOrdering,
+  type SignalReportRow,
+} from "./targeting/learn";
 export { STARTER_PLAYS, SOURCE_LABEL, matchStarterPlays, type StarterPlay } from "./plays/starter";

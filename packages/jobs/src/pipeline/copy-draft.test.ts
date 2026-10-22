@@ -8,7 +8,7 @@ import type {
   DraftableLead,
   NewScheduledSend,
 } from "./types";
-import { LINKEDIN_SYSTEM, buildTargetingProfile, leadBlock, type CopyStrategy, type DraftInput, type JudgeFn, type LeadOutcomeFlags } from "@vantera/agent-brains";
+import { LINKEDIN_SYSTEM, buildTargetingProfile, leadBlock, rankByTilt, type CopyStrategy, type DraftInput, type JudgeFn, type LeadOutcomeFlags } from "@vantera/agent-brains";
 import { getModelId } from "@vantera/ai";
 
 function scored(id: string, score: number): DraftableLead {
@@ -103,8 +103,10 @@ class FakeCopyStore implements CopyDraftStore {
     this.leadStatuses.set(leadId, status);
   }
   targetingProfile = buildTargetingProfile([]);
-  async getTargetingProfile() {
-    return this.targetingProfile;
+  async rankLeadIds(_accountId: string, leadIds: string[]) {
+    const byId = new Map(this.leads.map((l) => [l.id, l]));
+    const known = leadIds.map((id) => byId.get(id)).filter((l): l is DraftableLead => !!l);
+    return rankByTilt(known, this.targetingProfile).map((l) => l.id);
   }
   async getActiveExperiment() {
     return this.activeExperiment;

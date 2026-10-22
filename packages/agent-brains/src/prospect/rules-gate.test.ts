@@ -76,4 +76,31 @@ describe("applyRulesGate", () => {
     expect(applyRulesGate(makeCandidate({ companySize: "201-500" }), { companySizes: ["201-500"] }).passed).toBe(true);
     expect(applyRulesGate(makeCandidate({ title: "VP, R&D (US)" }), { titles: ["r&d"] }).passed).toBe(true);
   });
+
+  it("rejects job seekers regardless of ICP — someone looking for work is not a buyer", () => {
+    for (const title of [
+      "Open to Work | Former VP Sales",
+      "#OpenToWork — RevOps leader",
+      "Seeking new opportunities in SaaS sales",
+      "Ex-CTO, looking for a new role",
+      "Actively looking for my next opportunity",
+      "Marketing Director (in transition)",
+    ]) {
+      const r = applyRulesGate(makeCandidate({ title }), {});
+      expect(r.passed, title).toBe(false);
+      expect(r.reasons[0]).toContain("job seeker");
+    }
+  });
+
+  it("does not mistake buyers for job seekers", () => {
+    for (const title of [
+      "VP Sales — we're hiring SDRs",
+      "Founder, open source workflow tools",
+      "Head of Talent, looking for great engineers",
+      "CTO | building the work OS",
+    ]) {
+      expect(applyRulesGate(makeCandidate({ title }), {}).passed, title).toBe(true);
+    }
+  });
 });
+

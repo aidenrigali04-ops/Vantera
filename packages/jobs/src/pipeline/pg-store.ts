@@ -52,15 +52,20 @@ import {
   ALPHA_EARN_ON_CONCLUSION,
   ALPHA_WEALTH_CAP,
   ALPHA_WEALTH_START,
-  buildTargetingProfile,
+  buildLeadOrdering,
+  countRows,
+  RANK_FEEDBACK_MAX,
   describeStrategy,
-  rankByTilt,
+  orderLeads,
+  signalReport,
   toStoredInsights,
   wealthAfterConclusion,
   wealthAfterLaunch,
   type LeadInsights,
+  type LeadOrdering,
+  type LearnerFeatures,
+  type LearnerRow,
   type ProofPoint,
-  type TargetingRow,
   type WebsiteScan,
 } from "@vantera/agent-brains";
 import { resolveEntitlements, TRIAL_DAYS, type EntitlementSnapshot } from "@vantera/billing";
@@ -314,6 +319,96 @@ async function invitedOutcomeRows(
   }));
 }
 
+/** ML-1 learner window: matured invites from the last LEARNER_LOOKBACK_DAYS. */
+const LEARNER_LOOKBACK_DAYS = 180;
+/** Bound on the cross-account pool read per ordering (counts only ever leave the store). */
+const LEARNER_POOL_LIMIT = 50_000;
+
+/** Learner features computed in SQL: buying-signal kinds + intent level off lead_signals. The outer
+ *  lead id is written fully qualified: in a select list drizzle renders ${leads.id} as a bare "id",
+ *  which inside these subqueries would bind to lead_signals.id / replies.id instead. */
+export const learnerFeatureCols = {
+  source: leads.source,
+  title: leads.title,
+  industry: leads.industry,
+  companySize: leads.companySize,
+  aiScore: leads.aiScore,
+  signals: sql<string[] | null>`(select array_agg(distinct ls.kind) from ${leadSignals} ls where ls.lead_id = "leads"."id")`,
+  intentLevel: sql<string | null>`(select max(ls.level) from ${leadSignals} ls where ls.lead_id = "leads"."id" and ls.kind = 'intent')`,
+};
+
+const toFeatures = (r: {
+  source: string;
+  title: string | null;
+  industry: string | null;
+  companySize: string | null;
+  aiScore: number | null;
+  signals: string[] | null;
+  intentLevel: string | null;
+}): LearnerFeatures => ({
+  source: r.source,
+  title: r.title,
+  industry: r.industry,
+  companySize: r.companySize,
+  aiScore: r.aiScore,
+  signals: r.signals ?? [],
+  intentLevel: r.intentLevel,
+});
+
+/**
+ * Matured invites as learner training rows — one account, or the cross-account pool excluding
+ * one account (so the hierarchical model never counts the account's own rows twice). Positive =
+ * an interested reply or a booked meeting.
+ */
+async function learnerTrainingRows(
+  db: Db,
+  scope: { accountId: string } | { excludeAccountId: string }
+): Promise<LearnerRow[]> {
+  const now = Date.now();
+  const rows = await db
+    .select({
+      ...learnerFeatureCols,
+      accepted: sql<boolean>`${leads.linkedinConnectedAt} is not null`,
+      booked: sql<boolean>`${leads.meetingBookedAt} is not null`,
+      interested: sql<boolean>`exists (select 1 from ${replies} r where r.lead_id = "leads"."id" and r.classification = 'interested')`,
+    })
+    .from(leads)
+    .where(
+      and(
+        "accountId" in scope ? eq(leads.accountId, scope.accountId) : ne(leads.accountId, scope.excludeAccountId),
+        isNotNull(leads.linkedinInvitedAt),
+        lte(leads.linkedinInvitedAt, new Date(now - OUTCOME_MATURATION_DAYS * 86_400_000)),
+        gte(leads.linkedinInvitedAt, new Date(now - LEARNER_LOOKBACK_DAYS * 86_400_000))
+      )
+    )
+    .limit(LEARNER_POOL_LIMIT);
+  return rows.map((r) => ({
+    ...toFeatures(r),
+    flags: {
+      invited: true,
+      accepted: r.accepted,
+      interested: r.interested,
+      negative: false,
+      booked: r.booked,
+      converted: false,
+    },
+  }));
+}
+
+/** The account's lead ordering: the ML-1 learner when it has evidence, else ML-0's tilt. */
+async function leadOrdering(db: Db, accountId: string): Promise<LeadOrdering> {
+  const [own, pool, tilt] = await Promise.all([
+    learnerTrainingRows(db, { accountId }),
+    learnerTrainingRows(db, { excludeAccountId: accountId }),
+    invitedOutcomeRows(db, accountId),
+  ]);
+  return buildLeadOrdering(
+    countRows(own),
+    countRows(pool),
+    tilt.map((r) => ({ title: r.title, industry: r.industry, flags: r.flags }))
+  );
+}
+
 /** The account's citable proof/pricing/FAQ facts (0046), oldest-sort first — fed into the responder
  *  grounding so the brain can answer "prove it / what's the price" truthfully (never in a first touch). */
 async function loadProofPoints(db: Db, accountId: string): Promise<ProofPoint[]> {
@@ -429,6 +524,18 @@ async function creditAlphaWealth(tx: OptimizeTx, accountId: string): Promise<voi
 
 /** Drizzle-backed store used by the Trigger.dev tasks (service-role DATABASE_URL). */
 export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerStore & RetentionStore & TrialStore & SendDispatchStore & OutreachSendStore & InboundStore & SequenceStore & SequenceTouchStore & ConversionStore & RefreshLeadStore & QualifyLeadStore & IntentScanStore & ConnectionSyncStore & OptimizeStore & AgentRunStore & FastPassStore {
+  // ML-1 ordering is a cross-account read — computed once per account per store (a store lives for
+  // one task run), shared by the drain, the slot ranking, and the run-summary readout.
+  const orderingCache = new Map<string, Promise<LeadOrdering>>();
+  const orderingFor = (accountId: string) => {
+    let cached = orderingCache.get(accountId);
+    if (!cached) {
+      cached = leadOrdering(db, accountId);
+      cached.catch(() => orderingCache.delete(accountId));
+      orderingCache.set(accountId, cached);
+    }
+    return cached;
+  };
   return {
     async getScoutContext(agentId: string): Promise<ScoutContext | null> {
       const [agent] = await db.select().from(agents).where(eq(agents.id, agentId));
@@ -614,7 +721,8 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           kind: "intent",
           label: signal.label,
           detail: signal.detail,
-          level: "active",
+          // the classifier's verdict level (high | medium) — an ML-1 learner feature
+          level: signal.level ?? "active",
           observedAt: new Date(),
           source: "prospect-data",
         })
@@ -820,40 +928,88 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
     async getTopQualifiedLeadIds(accountId: string, limit: number) {
       if (limit <= 0) return [];
       // qualified, not-yet-drafted leads (drafting flips status to 'in_campaign'), best first.
-      // Stage 2: ordering = ai_score + the bounded outcome tilt (rankByTilt) so buyers like the
-      // ones who actually replied/booked drain first. Ordering ONLY — the qualification gate and
-      // the draft budget are unchanged, and an empty profile keeps pure score order.
+      // ML-1: ordered by the outcome learner's predicted positive-reply rate once it has evidence,
+      // else by ai_score + the bounded ML-0 tilt. Ordering ONLY — the qualification gate and the
+      // draft budget are unchanged.
       const rows = await db
-        .select({
-          id: leads.id,
-          title: leads.title,
-          industry: leads.industry,
-          aiScore: leads.aiScore,
-        })
+        .select({ id: leads.id, ...learnerFeatureCols })
         .from(leads)
         .where(and(eq(leads.accountId, accountId), eq(leads.status, "qualified")))
         .orderBy(desc(leads.aiScore), desc(leads.scoredAt));
-      const targeting: TargetingRow[] = (await invitedOutcomeRows(db, accountId)).map((r) => ({
-        title: r.title,
-        industry: r.industry,
-        flags: r.flags,
-      }));
-      const profile = buildTargetingProfile(targeting);
-      return rankByTilt(rows, profile)
+      const ordering = await orderingFor(accountId);
+      return orderLeads(
+        rows.map((r) => ({ id: r.id, ...toFeatures(r) })),
+        ordering
+      )
         .slice(0, limit)
         .map((r) => r.id);
     },
 
-    async getTargetingProfile(accountId: string) {
-      return buildTargetingProfile(
-        (await invitedOutcomeRows(db, accountId)).map((r) => ({ title: r.title, industry: r.industry, flags: r.flags }))
-      );
+    async rankLeadIds(accountId: string, leadIds: string[]) {
+      if (leadIds.length <= 1) return leadIds;
+      const rows = await db
+        .select({ id: leads.id, ...learnerFeatureCols })
+        .from(leads)
+        .where(and(eq(leads.accountId, accountId), inArray(leads.id, leadIds)));
+      const ordered = orderLeads(
+        rows.map((r) => ({ id: r.id, ...toFeatures(r) })),
+        await orderingFor(accountId)
+      ).map((r) => r.id);
+      const seen = new Set(ordered);
+      return [...ordered, ...leadIds.filter((id) => !seen.has(id))];
     },
 
     async getIcpOutcomeRows(accountId: string) {
       return (await invitedOutcomeRows(db, accountId))
         .filter((r): r is typeof r & { icpId: string } => r.icpId != null)
         .map((r) => ({ icpId: r.icpId, flags: r.flags }));
+    },
+
+    async getLearnedInsights(accountId: string) {
+      const ordering = await orderingFor(accountId);
+      if (ordering.kind === "tilt") return { mode: "tilt" as const, evidence: ordering.profile.baseline.n, positive: [], negative: [] };
+      return { mode: "learned" as const, evidence: ordering.model.evidence, ...signalReport(ordering.model) };
+    },
+
+    async getRankFeedback(accountId: string) {
+      const line = (r: { title: string | null; companyName: string | null; industry: string | null }) =>
+        [r.title ?? "-", r.companyName ?? "-", r.industry ?? "-"].join(" | ");
+      const [rejected, positive] = await Promise.all([
+        db
+          .selectDistinctOn([scheduledSends.leadId], {
+            leadId: scheduledSends.leadId,
+            title: leads.title,
+            companyName: leads.companyName,
+            industry: leads.industry,
+            at: scheduledSends.updatedAt,
+          })
+          .from(scheduledSends)
+          .innerJoin(leads, and(eq(leads.id, scheduledSends.leadId), eq(leads.accountId, scheduledSends.accountId)))
+          .where(and(eq(scheduledSends.accountId, accountId), eq(scheduledSends.rejectionReason, "wrong_person")))
+          .orderBy(scheduledSends.leadId, desc(scheduledSends.updatedAt))
+          .limit(200),
+        db
+          .select({ title: leads.title, companyName: leads.companyName, industry: leads.industry })
+          .from(leads)
+          .where(
+            and(
+              eq(leads.accountId, accountId),
+              or(
+                isNotNull(leads.meetingBookedAt),
+                sql`exists (select 1 from ${replies} r where r.lead_id = "leads"."id" and r.classification = 'interested')`
+              )
+            )
+          )
+          .orderBy(desc(leads.updatedAt))
+          .limit(RANK_FEEDBACK_MAX),
+      ]);
+      return {
+        rejected: rejected
+          .sort((a, b) => b.at.getTime() - a.at.getTime())
+          .slice(0, RANK_FEEDBACK_MAX)
+          .map(line),
+        positive: positive.map(line),
+      };
     },
 
     async getUnrankedLeads(accountId: string, since: Date, limit: number) {

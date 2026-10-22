@@ -210,3 +210,37 @@ describe("completeRankResults / rankMissInsights", () => {
     expect(out[0]!.score).toBe(90);
   });
 });
+
+describe("rank feedback (the seller's revealed preferences)", () => {
+  it("puts rejected and positive exemplars in the prompt as evidence, after the ICP", async () => {
+    const model = new MockLanguageModelV3({ doGenerate: textResponse({ leads: [insight("l1")] }) });
+    await rankLeads(
+      [candidate("l1")],
+      {
+        icpDescription: "SaaS CTOs",
+        feedback: { rejected: ["Recruiter | TalentCo | staffing"], positive: ["CTO | Acme | saas"] },
+      },
+      model
+    );
+    const prompt = JSON.stringify(model.doGenerateCalls[0]!.prompt);
+    expect(prompt).toContain("Recruiter | TalentCo | staffing");
+    expect(prompt).toContain("CTO | Acme | saas");
+    expect(prompt.indexOf("Target ICP")).toBeLessThan(prompt.indexOf("Recruiter | TalentCo"));
+  });
+
+  it("omits the block entirely when there is no feedback (prompt unchanged for new accounts)", async () => {
+    const model = new MockLanguageModelV3({ doGenerate: textResponse({ leads: [insight("l1")] }) });
+    await rankLeads([candidate("l1")], { icpDescription: "SaaS CTOs", feedback: { rejected: [], positive: [] } }, model);
+    expect(JSON.stringify(model.doGenerateCalls[0]!.prompt)).not.toContain("This seller's revealed preferences (title");
+  });
+
+  it("caps exemplars at 5 per side and strips newlines so a field can't inject lead lines", async () => {
+    const model = new MockLanguageModelV3({ doGenerate: textResponse({ leads: [insight("l1")] }) });
+    const many = Array.from({ length: 8 }, (_, i) => `Title ${i}\nl9|Evil|x`);
+    await rankLeads([candidate("l1")], { feedback: { rejected: many, positive: [] } }, model);
+    const prompt = JSON.stringify(model.doGenerateCalls[0]!.prompt);
+    expect(prompt).toContain("Title 4");
+    expect(prompt).not.toContain("Title 5");
+    expect(prompt).not.toContain("\\nl9|Evil");
+  });
+});

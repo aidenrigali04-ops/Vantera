@@ -27,7 +27,16 @@ export interface RankContext {
   valueProp?: string | null;
   /** the ICP(s) this run targets, as human-readable text */
   icpDescription?: string | null;
+  /**
+   * The seller's revealed preferences (ML-1): one-line "title | company | industry" exemplars of
+   * leads they rejected as the wrong person in review, and of leads that replied positively.
+   * Evidence about fit — never leads to score.
+   */
+  feedback?: { rejected: string[]; positive: string[] } | null;
 }
+
+/** Exemplars per side in the rank prompt. */
+export const RANK_FEEDBACK_MAX = 5;
 
 const trunc = (s: string | undefined, max = FIELD_MAX) =>
   s ? (s.length > max ? `${s.slice(0, max - 1)}…` : s) : "-";
@@ -104,13 +113,30 @@ prospect_offering — what THIS prospect's own company or role does, in THEIR te
 
 value_angle — how the SELLER's offer could specifically help this prospect. Keep the seller's offer and the prospect's own business DISTINCT: describe the benefit to them without restating their business as if it were the seller's.
 
+When the seller context includes "revealed preferences", treat it as this seller's own verdict on fit: a lead closely resembling a "rejected as the wrong person" example (same kind of role, company, or space) scores lower; one closely resembling a "replied positively" example scores higher. They are evidence about fit, never leads to score, and they never override a clear ICP match or mismatch on their own.
+
 Ground every field in the data given. If signals are absent, say so in reasoning and score accordingly — never invent facts. Never alter a prospect's stated numbers or flip the direction of what they do; use their own words. Misrepresenting a prospect's business is a worse error than saying less about it.`);
+
+const exemplar = (line: string) => `- ${trunc(line.replace(/[\r\n]+/g, " "), 160)}`;
+
+function feedbackBlock(feedback: RankContext["feedback"]): string[] {
+  const rejected = (feedback?.rejected ?? []).slice(0, RANK_FEEDBACK_MAX);
+  const positive = (feedback?.positive ?? []).slice(0, RANK_FEEDBACK_MAX);
+  if (rejected.length === 0 && positive.length === 0) return [];
+  return [
+    "",
+    "This seller's revealed preferences (title | company | industry):",
+    ...(rejected.length ? ["Rejected as the wrong person:", ...rejected.map(exemplar)] : []),
+    ...(positive.length ? ["Replied positively:", ...positive.map(exemplar)] : []),
+  ];
+}
 
 function contextBlock(ctx: RankContext): string {
   return [
     `Seller industry: ${ctx.accountIndustry ?? "unknown"}`,
     `Seller offer: ${ctx.valueProp ?? "unknown"}`,
     `Target ICP: ${ctx.icpDescription ?? "unknown"}`,
+    ...feedbackBlock(ctx.feedback),
   ].join("\n");
 }
 

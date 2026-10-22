@@ -17,7 +17,7 @@ export type IntentVerdict = z.infer<typeof intentVerdictSchema>;
 
 /** One LinkedIn observation to judge for buying intent. */
 export interface IntentObservationInput {
-  /** stable ref (the engager/poster profile url) — the model echoes it back */
+  /** unique per observation within a batch (one person on two posts = two refs) — the model echoes it back */
   ref: string;
   name?: string | null;
   headline?: string | null;

@@ -22,8 +22,18 @@ The Prospect Agent is your prospecting teammate. Once deployed, it hunts for peo
 - Survivors are enriched with verified contact details and buying signals (hiring, funding, technology changes).
 - Each prospect gets a score from 0–100 with a plain-English rationale, plus tailored insights: pain points, triggers, and the moment your offer clicks for them.
 - Only prospects scoring 70+ move on to outreach.
+- People whose headline says they're job hunting ("Open to Work", "seeking new opportunities") are skipped — someone looking for a job isn't a buyer.
+- If scoring is briefly unavailable, unscored prospects are kept and scored on a later run instead of being thrown away.
 
 If you've added your website URL in settings, the agent reads your homepage so its scoring understands exactly what you sell.
+
+## It learns from your results
+
+Your agent gets sharper the more you use it:
+
+- **Your review decisions teach the scoring.** When you reject a draft as **Wrong person**, similar people score lower on future runs. Prospects who reply with interest teach it the opposite.
+- **Your replies decide who goes first.** You can only send a limited number of new invitations each day, so the agent fills those slots with the qualified prospects most like the people who actually replied — by buying signal, role, industry, company size, and even score range. It only counts invitations old enough to have had a fair chance at a reply, and it needs real evidence before it changes anything; a brand-new account simply goes highest score first.
+- The 70+ quality bar never moves — learning decides *who goes first*, not who qualifies.
 
 ## Seeing what your agent actually did
 

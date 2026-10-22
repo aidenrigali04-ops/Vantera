@@ -15,7 +15,7 @@ import type {
   DraftInput,
   RankCandidate,
   RankContext,
-  TargetingProfile,
+  SignalReportRow,
   ReplyVerdict,
   RulesGateResult,
   StoredInsights,
@@ -141,6 +141,11 @@ export interface ScoutStore {
   /** Stage 2: per-ICP outcome evidence (invited leads → flags) for the discovery allocator.
    *  Empty ⇒ the allocator falls back to the equal split. */
   getIcpOutcomeRows(accountId: string): Promise<{ icpId: string; flags: LeadOutcomeFlags }[]>;
+  /** ML-1: the learner's readout for the run summary (top winning/losing features). */
+  getLearnedInsights(accountId: string): Promise<LearnedInsights>;
+  /** ML-1 fit feedback: recent "title | company | industry" lines for leads the user rejected as the
+   *  wrong person in review, and for leads that replied positively (≤ RANK_FEEDBACK_MAX each). */
+  getRankFeedback(accountId: string): Promise<{ rejected: string[]; positive: string[] }>;
   /** Rank-miss retry: gate survivors created since `since` that were never scored (scored_at null,
    *  status 'sourced'), newest first, as rank inputs. Feeds Scout's retry stage. */
   getUnrankedLeads(accountId: string, since: Date, limit: number): Promise<RankCandidate[]>;
@@ -199,7 +204,17 @@ export interface ScoutRunSummary {
   websiteScanError: boolean;
   /** company-signal fetch threw — rank ran without company events */
   companySignalsError: boolean;
+  /** ML-1: the learner's strongest winning/losing features at run time (null if unavailable) */
+  learned?: LearnedInsights | null;
 }
+
+/** The learner's readout: which ordering is live, the evidence behind it, top ± features. */
+export type LearnedInsights = {
+  mode: "learned" | "tilt";
+  evidence: number;
+  positive: SignalReportRow[];
+  negative: SignalReportRow[];
+};
 
 export interface CopyDraftPayload {
   copyAgentId: string;
@@ -260,7 +275,9 @@ export interface IntentScanStore {
   markRulesGate(leadId: string, result: RulesGateResult): Promise<void>;
   saveScore(leadId: string, insights: LeadInsights, qualified: boolean): Promise<void>;
   /** capture the "why now" intent signal on the lead — feeds Surface A's why-now chip */
-  saveIntentSignal(leadId: string, accountId: string, signal: { label: string; detail: string }): Promise<void>;
+  saveIntentSignal(leadId: string, accountId: string, signal: { label: string; detail: string; level?: string }): Promise<void>;
+  /** ML-1 fit feedback — same contract as ScoutStore.getRankFeedback */
+  getRankFeedback(accountId: string): Promise<{ rejected: string[]; positive: string[] }>;
   /** the rule-11 gate: account + lowercased LinkedIn URL lookup against suppression_entries */
   isSuppressed(accountId: string, kind: "linkedin", value: string): Promise<boolean>;
   getLiveCopyAgent(accountId: string): Promise<{ id: string } | null>;
@@ -366,9 +383,9 @@ export interface NewScheduledSend {
 }
 
 export interface CopyDraftStore {
-  /** the account's learned outcome profile (seniority/industry segments) — copy-draft orders the
-   *  daily first-touch slots by ai_score + targetingTilt, the same order the scout drain uses. */
-  getTargetingProfile(accountId: string): Promise<TargetingProfile>;
+  /** best-first order for these leads — the same ordering the scout drain uses (ML-1 learner when
+   *  informative, else ai_score + tilt). Ids the store can't order are appended in input order. */
+  rankLeadIds(accountId: string, leadIds: string[]): Promise<string[]>;
   getCopyContext(copyAgentId: string): Promise<CopyContext | null>;
   getDraftableLeads(accountId: string, leadIds: string[]): Promise<DraftableLead[]>;
   /** idempotency guard: which of these leadIds already have a scheduled_send, so a retried run never re-drafts */

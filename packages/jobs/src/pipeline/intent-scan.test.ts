@@ -33,6 +33,7 @@ function makeStore(overrides: Partial<IntentScanStore> = {}) {
     icpIds: [] as Array<string | undefined>,
     scored: [] as { leadId: string; qualified: boolean }[],
     signals: [] as string[],
+    signalLevels: [] as (string | undefined)[],
     chained: null as { leadIds: string[] } | null,
     completed: false,
   };
@@ -58,7 +59,11 @@ function makeStore(overrides: Partial<IntentScanStore> = {}) {
     },
     markRulesGate: async () => {},
     saveScore: async (leadId, _i, qualified) => void calls.scored.push({ leadId, qualified }),
-    saveIntentSignal: async (leadId) => void calls.signals.push(leadId),
+    saveIntentSignal: async (leadId, _a, signal) => {
+      calls.signals.push(leadId);
+      calls.signalLevels.push(signal.level);
+    },
+    getRankFeedback: async () => ({ rejected: ["Recruiter | TalentCo | staffing"], positive: [] }),
     isSuppressed: async (_a, _k, value) => value === BLOCKED,
     getLiveCopyAgent: async () => ({ id: "copy-1" }),
     completeRun: async () => void (calls.completed = true),
@@ -202,20 +207,20 @@ describe("runIntentScan", () => {
 
   it("never treats a like with no comment as evidence — post body is context only, liker does not enroll", async () => {
     const { store, calls } = makeStore();
-    const classified: { ref: string; text: string; context?: string | null; action: string }[] = [];
+    const classified: { profileUrl: string; text: string; context?: string | null; action: string }[] = [];
     const deps = makeDeps(store);
     // even a naive classifier that marks EVERY observation as intent must not enroll a like
     // with no comment — the scan must not pass the post body as the engager's words.
     deps.classifyFn = async (obs) => {
       classified.push(
-        ...obs.map((o) => ({ ref: o.ref, text: o.text, context: o.context, action: o.action }))
+        ...obs.map((o) => ({ profileUrl: (o as unknown as { profileUrl: string }).profileUrl, text: o.text, context: o.context, action: o.action }))
       );
       return obs.map((o) => verdict(o.ref));
     };
 
     const summary = await runIntentScan("intent-1", deps);
 
-    const like = classified.find((o) => o.ref === LIKER);
+    const like = classified.find((o) => o.profileUrl === LIKER);
     expect(like).toMatchObject({ action: "reacted", text: "" });
     expect(like?.context).toContain("onboarding churn");
     expect(like?.text).not.toContain("onboarding churn");
@@ -273,4 +278,43 @@ describe("runIntentScan", () => {
     expect(calls.scored).toHaveLength(0);
     expect(calls.observations.some((r) => r.profileUrl === GOOD && r.outcome === "rejected")).toBe(true);
   });
+
+  it("hands the seller's revealed preferences to the rank and persists the verdict's real intent level", async () => {
+    const { store, calls } = makeStore();
+    const deps = makeDeps(store);
+    const feedback: unknown[] = [];
+    deps.rankFn = async (cands, ctx) => {
+      feedback.push(ctx.feedback);
+      return cands.map((c) => insight(c.leadId, 80));
+    };
+    await runIntentScan("intent-1", deps);
+    expect(feedback[0]).toEqual({ rejected: ["Recruiter | TalentCo | staffing"], positive: [] });
+    expect(calls.signalLevels.length).toBeGreaterThan(0);
+    expect(calls.signalLevels.every((l) => l === "high")).toBe(true);
+  });
+
+  it("judges each (person, post) on its own evidence — one person on two posts can't swap verdicts", async () => {
+    const { store, calls } = makeStore();
+    const deps = makeDeps(store);
+    const li = seededLinkedIn();
+    // GOOD also leaves a neutral comment on a SECOND post by the same creator
+    li.posts.push({ postRef: "p2", authorProfileUrl: CREATOR, authorName: "Cara", authorHeadline: "RevOps lead", text: "quarterly offsite pics", postedAt: null, url: null });
+    li.engagersByPost.set("p2", [{ profileUrl: GOOD, name: "Gwen", headline: "Head of CX", kind: "comment", text: "great team!" }]);
+    deps.linkedin = li;
+    const refs: string[] = [];
+    deps.classifyFn = async (obs) => {
+      refs.push(...obs.map((o) => o.ref));
+      return obs.map((o) =>
+        o.text.includes("what tool")
+          ? verdict(o.ref)
+          : { ref: o.ref, reasoning: "no intent", is_intent: false, level: "none" as const, why_now: "said something unrelated" }
+      );
+    };
+
+    await runIntentScan("intent-1", deps);
+
+    expect(new Set(refs).size).toBe(refs.length); // every observation has its own id
+    expect(calls.upserted).toContain(GOOD); // the p1 intent verdict still enrolls her
+  });
 });
+

@@ -118,6 +118,14 @@ Each entry stays short — the detail lives in that phase's spec (`docs/superpow
 - [ ] **Phase 22 — Lifecycle email** — template layer + scheduling in `transactional-email` (scope contract renegotiated), digests, weekly report.
 - [ ] **Phase 23 — Billing completeness + polish gate** — in-app sender add-on, dunning, pause/cancel, states sweep.
 
+### ML track (spec: `docs/superpowers/specs/2026-10-21-learning-gate-ml-roadmap.md` — competitor-informed; complements the adaptive-prospecting A1–A5/B0–B3 strategy loop)
+
+- [x] **ML-0 — Learning-loop correctness** — rank misses retried not rejected; tilt-ordered draft slots; converted never demoted; 14-day outcome maturation; per-run token/$ telemetry + system-prompt cache breakpoint; rules-gate word-start matching; evals gate `prospect/**`. (commits `072e967c`, `439189cb`)
+- [x] **ML-1 — Learning gate** — outcome learner (hierarchically shrunk log-odds over source/signal/intent/seniority/industry/size/score band, global pool → account) orders the scarce daily slots once it has evidence; review "wrong person" rejections + positive replies feed the rank prompt as the seller's revealed preferences; job-seeker exclusion; real intent level persisted; intent verdicts per (person, post); learner readout in every scout run summary. No migration.
+- [ ] **ML-2 — Lookalikes** — embed positive/won leads (existing embeddings + pgvector); similarity as a learner feature + a lookalike signal. Needs a migration (vector column + RLS).
+- [ ] **ML-3 — Strategy loop** — the owner's adaptive-prospecting A1–A5 + B0–B3, plus the 2026-10-21 hive-audit fixes (harm-count bug — fixed in tree; sealed-holdout reuse/leak; generator's zero-effect defaults; Beta(1,1) unseen-candidate prior).
+- [ ] **ML-4 — Speed-to-signal** — high-intent re-scan more than daily; warm escalation (accepted + engaged first); more signal types where the LinkedIn layer exposes them (profile viewers, company followers, activity level).
+
 ---
 
 ## Continuous tracks (no single phase)
