@@ -76,6 +76,24 @@ describe("tilesFor — the Z4 priority engine", () => {
     const stale = tilesFor(inputs({ repliesWaiting: 0 }), extras({ playbookSuggestion: { id: "p1", meta: "x" }, dismissedAsks: { playbook_suggestion: "2026-08-19T10:00:00Z" } }));
     expect(stale.map((x) => x.kind)).toEqual(["drafts", "playbook_suggestion"]);
   });
+  it("zero senders yields sender_missing at priority 1", () => {
+    const t = tilesFor(inputs({ senders: [], drafts: 0, repliesWaiting: 0 }), extras());
+    expect(t[0]).toEqual({
+      kind: "sender_missing",
+      priority: 1,
+      tone: "attention",
+      glyph: "plug",
+      title: "No LinkedIn connected yet",
+      meta: "Your agent is finding prospects. Connect to start sending.",
+      href: "/settings/senders",
+      dismissible: false,
+    });
+    expect(primaryFor(t)).toMatchObject({ label: "Connect LinkedIn", href: "/settings/senders" });
+  });
+  it("one active sender yields no sender_missing", () => {
+    const t = tilesFor(inputs({ senders: [senderFixture()], drafts: 0, repliesWaiting: 0 }), extras());
+    expect(t.map((x) => x.kind)).not.toContain("sender_missing");
+  });
   it("empty when nothing needs the user", () => {
     expect(tilesFor(inputs({ drafts: 0, repliesWaiting: 0 }), extras())).toEqual([]);
   });

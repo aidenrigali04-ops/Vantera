@@ -18,6 +18,8 @@ import {
   shortName,
 } from "./metrics";
 import type { ActivityRow, QueueRow, QueueStep, ReplyClass, ReplyRow, SenderChipRow, StatTile, TodayView } from "./rows";
+import { checklistFor, GET_STARTED_ASK } from "./checklist";
+import { readChecklistFacts } from "./checklist-facts";
 import { buildStatusSentence } from "./sentence";
 import { downSenders, greetingWord, healthySenders, resolveTodayState } from "./state";
 import { primaryFor, tilesFor, type TileExtras } from "./tiles";
@@ -170,6 +172,7 @@ export async function loadToday(supabase: SupabaseClient, userId: string, now = 
     invitesWeekRes,
     approvedTodayRes,
     answeredWeekRes,
+    checklistData,
   ] = await Promise.all([
     supabase
       .from("accounts")
@@ -256,6 +259,8 @@ export async function loadToday(supabase: SupabaseClient, userId: string, now = 
       .returns<{ linkedin_account_id: string | null; scheduled_sends: { linkedin_stage: string | null } | null }[]>(),
     supabase.from("scheduled_sends").select("approved_at").gte("approved_at", sinceYesterdayish).returns<{ approved_at: string }[]>(),
     supabase.from("replies").select("id", { count: "exact", head: true }).gte("received_at", weekAgo).in("classification", ["interested", "neutral", "other"]),
+    // Get Started facts (UX-1): derived from existing data; degrades to "not done" on error.
+    readChecklistFacts(supabase).catch(() => ({ buyersConfirmed: false, prospectsReviewed: false, firstApprovedAt: null, calendarOrCrmConnected: false })),
   ]);
 
   if (!account.data) return null;
@@ -628,6 +633,12 @@ export async function loadToday(supabase: SupabaseClient, userId: string, now = 
   // decorative symbols). The blueprint's no-emoji line holds everywhere again.
   const greeting = firstName ? `${greetingWord(hourNow)}, ${firstName}` : greetingWord(hourNow);
 
+  const checklist = checklistFor({
+    ...checklistData,
+    linkedinActive: senderFacts.some((x) => x.status === "active"),
+    dismissedAt: prof?.dismissed_asks?.[GET_STARTED_ASK] ?? null,
+  });
+
   const defaultTab: TodayView["defaultTab"] = draftsTotal > 0 ? "queue" : repliesWaiting > 0 ? "replies" : "activity";
 
   const view: TodayView = {
@@ -647,6 +658,7 @@ export async function loadToday(supabase: SupabaseClient, userId: string, now = 
     updatedLabel: fmtTime(now, tz),
     paused: Boolean(acct.paused_at),
     defaultTab,
+    checklist,
   };
 
   return { view, inputs, profile: { displayName: prof?.display_name ?? null, firstSessionDoneAt: prof?.first_session_done_at ?? null }, accountId: acct.id };

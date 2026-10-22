@@ -8,7 +8,6 @@ import {
   BadgeCheck,
   Check,
   CheckCircle2,
-  Circle,
   Crosshair,
   FlaskConical,
   Inbox,
@@ -23,7 +22,6 @@ import {
 import { markNotificationsRead } from "@/components/notifications/actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { AnimatedProgress } from "@/components/ui/animated-progress";
 import { Reveal, RevealItem, Eyebrow, PANEL_SURFACE } from "@/components/ui/panel";
 import { KpiTile } from "@/components/ui/kpi";
 import { cn } from "@/lib/utils";
@@ -68,10 +66,7 @@ export interface DashboardViewProps {
   industry: string | null;
   goal: string | null;
   goalCents: number | null;
-  isNew: boolean;
-  isWorkingEmpty: boolean;
   showCrmNudge: boolean;
-  scoutDeployed: boolean;
   drafts: number;
   agents: AgentRow[];
   liveAgentsCount: number;
@@ -94,15 +89,12 @@ export interface DashboardViewProps {
   /** interested replies still WAITING on the user (answered ones are filtered server-side) */
   recentReplies: ReplyRow[];
   repliesWaiting: number;
-  channels: { liStatus: string | null };
   week: { sends: number; li: number; replies: number };
   attribution: SignalAttribution[];
   /** Vera's learning log — the self-optimizing loop's visible heartbeat, all real data */
   learning: LearningProps;
   /** L1: a live Outreach agent has no booking link — interested buyers have nowhere to book */
   needsBookingUrl: boolean;
-  /** matched starter plays — fill the waiting states with proven competence, honestly labeled */
-  plays: { slug: string; name: string; description: string; sourceLabel: string }[];
   /** R2 early-days regime: real firsts, so a $0 chart under a $45k goal never reads as failure */
   milestones: Milestones;
 }
@@ -132,7 +124,7 @@ export interface LearningProps {
 }
 
 export function DashboardView(props: DashboardViewProps) {
-  const { firstName, icp, industry, goal, isNew, isWorkingEmpty, showCrmNudge, convertedClients, conversionWin, replyWin } =
+  const { firstName, icp, industry, goal, showCrmNudge, convertedClients, conversionWin, replyWin } =
     props;
 
   return (
@@ -173,25 +165,7 @@ export function DashboardView(props: DashboardViewProps) {
 
       {showCrmNudge && <CrmNudge convertedClients={convertedClients} />}
 
-      {isNew ? (
-        <ActivationRamp
-          scoutDeployed={props.scoutDeployed}
-          goal={goal}
-          channels={props.channels}
-          plays={props.plays}
-          icp={icp}
-        />
-      ) : isWorkingEmpty ? (
-        <FirstRunInProgress
-          scoutNextRunLabel={props.scoutNextRunLabel}
-          goal={goal}
-          channels={props.channels}
-          plays={props.plays}
-          icp={icp}
-        />
-      ) : (
-        <WorkingDashboard {...props} />
-      )}
+      <WorkingDashboard {...props} />
     </div>
     </MotionConfig>
   );
@@ -398,48 +372,6 @@ function LearningLog({ learning }: { learning: LearningProps }) {
           </li>
         )}
       </ul>
-    </RevealItem>
-  );
-}
-
-/** The proven plays Vera runs, shown while the first results are still landing — competence in
- *  the waiting room instead of silence. Honest source labels, never network claims (Stage 0). */
-function ProvenPlaysPanel({
-  plays,
-  icp,
-}: {
-  plays: DashboardViewProps["plays"];
-  icp: string | null;
-}) {
-  if (plays.length === 0) return null;
-  return (
-    <RevealItem className={cn(PANEL_SURFACE, "p-5")} data-copilot="dashboard-proven-plays">
-      <Eyebrow>Vera&apos;s plays</Eyebrow>
-      <p className="mt-2 text-sm text-muted-foreground">
-        While the first results land, here&apos;s what Vera is running
-        {icp ? (
-          <>
-            {" "}
-            for <span className="font-medium text-foreground">{icp}</span>
-          </>
-        ) : null}
-        :
-      </p>
-      <ul className="mt-3 flex flex-col gap-2.5">
-        {plays.map((p) => (
-          <li key={p.slug} className="rounded-xl border border-[var(--hairline)] p-3">
-            <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-              <span className="text-sm font-medium text-foreground">{p.name}</span>
-              <span className="text-[11px] text-muted-foreground/80">{p.sourceLabel}</span>
-            </div>
-            <p className="mt-1 text-xs text-muted-foreground">{p.description}</p>
-          </li>
-        ))}
-      </ul>
-      <p className="mt-3 border-t border-border/60 pt-3 text-xs text-muted-foreground">
-        Vera tests improvements against these on real conversations and keeps what wins — you
-        approve every send.
-      </p>
     </RevealItem>
   );
 }
@@ -1159,285 +1091,5 @@ function CrmNudge({ convertedClients }: { convertedClients: number }) {
         </Button>
       </div>
     </motion.div>
-  );
-}
-
-// New-user activation hub. Two non-blocking surfaces side by side: the path to
-// first reply (agent-centric — agents are the front door, rule 08) and a parallel
-// LinkedIn-connect panel. Connecting LinkedIn doesn't gate deploying an agent; the
-// panel just lets the user connect early (the one activation gate). Shown only while
-// isNew — it disappears the moment the Scout goes live.
-function ActivationRamp({
-  scoutDeployed,
-  goal,
-  channels,
-  plays,
-  icp,
-}: {
-  scoutDeployed: boolean;
-  goal: string | null;
-  channels: DashboardViewProps["channels"];
-  plays: DashboardViewProps["plays"];
-  icp: string | null;
-}) {
-  // Onboarding auto-provisions the whole agent stack, so this ramp only appears for the
-  // rare account without a live Scout — and the checklist reflects the real remaining
-  // dependency: LinkedIn is what gates sending, not more agent setup.
-  const liConnected = channels.liStatus === "active";
-  const steps = [
-    { label: "Create your account", done: true },
-    { label: "Set your targeting and revenue goal", done: true },
-    { label: "Deploy your agents", done: scoutDeployed, current: !scoutDeployed },
-    { label: "Connect LinkedIn so outreach can send", done: liConnected, current: scoutDeployed && !liConnected },
-    { label: "Approve your first outreach — then the replies start", done: false },
-  ];
-  const doneCount = steps.filter((s) => s.done).length;
-
-  return (
-    <Reveal className="flex flex-col gap-6">
-      <div className="grid gap-6 md:grid-cols-[1.2fr_1fr]">
-        <RevealItem className={cn(PANEL_SURFACE, "p-5")} data-copilot="dashboard-checklist">
-          <Eyebrow>Get to your first reply</Eyebrow>
-          <h2 className="font-heading mt-3 text-xl font-semibold tracking-tight">
-            You&apos;re {doneCount}/{steps.length} of the way there
-          </h2>
-          <div className="mt-4 flex flex-col gap-4">
-            <AnimatedProgress value={(doneCount / steps.length) * 100} />
-            <ul className="flex flex-col gap-3">
-              {steps.map((s) => (
-                <li key={s.label} className="flex items-center gap-2 text-sm">
-                  {s.done ? (
-                    <CheckCircle2 className="size-4 text-foreground" />
-                  ) : (
-                    <Circle
-                      className={`size-4 ${s.current ? "text-foreground" : "text-muted-foreground/50"}`}
-                    />
-                  )}
-                  <span className={s.done ? "" : s.current ? "font-medium" : "text-muted-foreground"}>
-                    {s.label}
-                  </span>
-                </li>
-              ))}
-            </ul>
-            <Button asChild className="mt-1 w-fit">
-              {scoutDeployed && !liConnected ? (
-                <Link href="/settings/senders">
-                  Connect LinkedIn <ArrowRight className="size-4" />
-                </Link>
-              ) : (
-                <Link href="/playbook/new/scout">
-                  Deploy your agents <ArrowRight className="size-4" />
-                </Link>
-              )}
-            </Button>
-            <p className="border-t border-border/60 pt-3 text-xs text-muted-foreground">
-              Its first run starts within ~15 minutes. Nothing ever sends until you approve it
-              {goal && (
-                <>
-                  {" "}
-                  — and every reply is measured against your{" "}
-                  <span className="font-medium text-foreground">{goal}/mo</span> goal
-                </>
-              )}
-              .
-            </p>
-          </div>
-        </RevealItem>
-
-        <ChannelSetupPanel channels={channels} />
-      </div>
-
-      {/* Competence in the waiting room (Stage 0): the proven plays Vera starts on. */}
-      <ProvenPlaysPanel plays={plays} icp={icp} />
-    </Reveal>
-  );
-}
-
-// Agents are live but the first run hasn't landed leads yet (the post-deploy wait). Show the
-// work in progress — a live pulse, the next-run countdown, and the next action — so the silence
-// before the first results never reads as a dead, empty dashboard (retention: show activity).
-function FirstRunInProgress({
-  scoutNextRunLabel,
-  goal,
-  channels,
-  plays,
-  icp,
-}: {
-  scoutNextRunLabel: string;
-  goal: string | null;
-  channels: DashboardViewProps["channels"];
-  plays: DashboardViewProps["plays"];
-  icp: string | null;
-}) {
-  const steps = [
-    { label: "Agents deployed — Prospect, Outreach & Intent", done: true, current: false },
-    { label: "Sourcing & scoring your first leads", done: false, current: true },
-    { label: "Your first qualified leads land here", done: false, current: false },
-  ];
-  // Onboarding offers a "skip for now" on the LinkedIn connect, so this panel is the
-  // skipper's home for the one real dependency: sourcing runs either way, sending doesn't.
-  const liConnected = channels.liStatus === "active";
-  return (
-    <Reveal className="flex flex-col gap-6">
-      <div className={cn("grid gap-6", !liConnected && "md:grid-cols-[1.2fr_1fr]")}>
-        <RevealItem className={cn(PANEL_SURFACE, "p-5")} data-copilot="dashboard-first-run">
-          <div className="flex items-center justify-between gap-3">
-            <Eyebrow>Vera is working</Eyebrow>
-            <span className="flex items-center gap-1.5 text-xs font-medium text-foreground">
-              <span className="relative flex size-2" aria-hidden>
-                <span className="relative inline-flex size-2 rounded-full bg-[var(--positive)]" />
-              </span>
-              Live
-            </span>
-          </div>
-          <h2 className="font-heading mt-3 text-xl font-semibold tracking-tight">
-            Finding your first prospects
-          </h2>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Vera is scanning your market and scoring fits against your ICP. The
-            first qualified leads land here{" "}
-            {scoutNextRunLabel ? (
-              <>
-                in about <span className="font-medium text-foreground">{scoutNextRunLabel}</span>
-              </>
-            ) : (
-              "within ~15 minutes"
-            )}{" "}
-            — quality over volume, and nothing ever sends until you approve it
-            {goal && (
-              <>
-                {" "}
-                — measured against your{" "}
-                <span className="font-medium text-foreground">{goal}/mo</span> goal
-              </>
-            )}
-            .
-          </p>
-          <div className="mt-4 flex flex-col gap-4">
-            <AnimatedProgress value={40} />
-            <ul className="flex flex-col gap-3">
-              {steps.map((s) => (
-                <li key={s.label} className="flex items-center gap-2 text-sm">
-                  {s.done ? (
-                    <CheckCircle2 className="size-4 text-foreground" />
-                  ) : (
-                    <Circle
-                      className={`size-4 ${s.current ? "text-foreground" : "text-muted-foreground/50"}`}
-                    />
-                  )}
-                  <span
-                    className={s.done ? "" : s.current ? "font-medium" : "text-muted-foreground"}
-                  >
-                    {s.label}
-                  </span>
-                </li>
-              ))}
-            </ul>
-            <div className="flex flex-wrap gap-2">
-              {/* Outreach is already provisioned — the only setup left is the send gate. */}
-              {!liConnected && (
-                <Button asChild size="sm">
-                  <Link href="/settings/senders">
-                    Connect LinkedIn <ArrowRight className="size-4" />
-                  </Link>
-                </Button>
-              )}
-              <Button asChild variant={liConnected ? "outline" : "ghost"} size="sm">
-                <Link href="/prospects">Watch prospects arrive</Link>
-              </Button>
-            </div>
-          </div>
-        </RevealItem>
-
-        {!liConnected && <ChannelSetupPanel channels={channels} />}
-      </div>
-
-      {/* Competence in the waiting room (Stage 0): the proven plays Vera is running right now. */}
-      <ProvenPlaysPanel plays={plays} icp={icp} />
-    </Reveal>
-  );
-}
-
-// LinkedIn connect — the single activation gate. One-click hosted auth; connecting
-// doesn't block deploying an agent, but nothing sends until LinkedIn is connected.
-// Shown only while isNew (the new-user activation hub).
-function ChannelSetupPanel({ channels }: { channels: DashboardViewProps["channels"] }) {
-  const liConnected = channels.liStatus === "active";
-  const liConnecting =
-    Boolean(channels.liStatus) && !liConnected && channels.liStatus !== "restricted";
-
-  return (
-    <RevealItem className={cn(PANEL_SURFACE, "flex flex-col p-5")}>
-      <Eyebrow>Connect LinkedIn</Eyebrow>
-      <p className="mt-2 text-xs text-muted-foreground">
-        One click — sign in on LinkedIn&apos;s own page. Your agents keep sourcing and qualifying
-        either way, but no outreach sends until it&apos;s connected.
-      </p>
-      <div className="mt-4 flex flex-col divide-y divide-border/60">
-        <ChannelSetupRow
-          icon={<UserPlus className="size-4" />}
-          label="LinkedIn"
-          done={liConnected}
-          detail={
-            liConnected
-              ? "Connected — ready to send"
-              : liConnecting
-                ? "Finishing connection…"
-                : channels.liStatus === "restricted"
-                  ? "Account restricted — reconnect"
-                  : "The one step before your agents can reach out"
-          }
-          action={
-            liConnected ? undefined : (
-              <Button asChild size="sm" variant={liConnecting ? "ghost" : "default"}>
-                <Link href="/settings/senders">{liConnecting ? "Resume" : "Connect"}</Link>
-              </Button>
-            )
-          }
-        />
-      </div>
-    </RevealItem>
-  );
-}
-
-function ChannelSetupRow({
-  icon,
-  label,
-  detail,
-  done,
-  muted = false,
-  action,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  detail: string;
-  done: boolean;
-  muted?: boolean;
-  action?: React.ReactNode;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
-      <div className="flex min-w-0 items-start gap-3">
-        <span
-          className={cn(
-            "mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg",
-            done
-              ? "bg-foreground text-background"
-              : muted
-                ? "bg-foreground/5 text-muted-foreground/60"
-                : "bg-foreground/10 text-muted-foreground"
-          )}
-        >
-          {done ? <CheckCircle2 className="size-4" /> : icon}
-        </span>
-        <div className="min-w-0">
-          <p className={cn("text-sm font-medium", muted && !done && "text-muted-foreground")}>
-            {label}
-          </p>
-          <p className="text-xs text-muted-foreground">{detail}</p>
-        </div>
-      </div>
-      {action && <div className="shrink-0">{action}</div>}
-    </div>
   );
 }

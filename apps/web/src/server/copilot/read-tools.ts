@@ -3,6 +3,8 @@ import { resolveEntitlements } from "@vantera/billing";
 import { snapshotFromRow, type AccountBillingRow } from "@/lib/billing/entitlement";
 import { getLinkedInChannelStatus, type LinkedInChannelStatus } from "@/lib/channel-status";
 import { loadAnalytics } from "@/lib/analytics";
+import { checklistFor } from "@/lib/today/checklist";
+import { readChecklistFacts } from "@/lib/today/checklist-facts";
 
 // ── Draft queue ───────────────────────────────────────────────────────────────
 
@@ -230,6 +232,30 @@ export async function getChannelStatusForAccount(
   accountId: string
 ): Promise<LinkedInChannelStatus> {
   return getLinkedInChannelStatus(db, accountId);
+}
+
+// ── Activation checklist (UX-1) ───────────────────────────────────────────────
+
+export interface ActivationChecklistDTO {
+  steps: { label: string; done: boolean }[];
+  /** required steps done, of four (the optional calendar/CRM step never counts) */
+  done: number;
+}
+
+/**
+ * The Today "Get started" checklist for the copilot — the same facts and labels the rail
+ * shows (shared `checklistFor`), minus hrefs. Answers "what's left to set up?". Every read is
+ * pinned to the session's account on top of RLS (rule 02); a dismissal is ignored here so the
+ * copilot can still answer after the user hid the rail.
+ * accountId MUST come from the validated session.
+ */
+export async function getActivationChecklist(db: SupabaseClient, accountId: string): Promise<ActivationChecklistDTO> {
+  const [facts, li] = await Promise.all([readChecklistFacts(db, accountId), getLinkedInChannelStatus(db, accountId)]);
+  const c = checklistFor({ ...facts, linkedinActive: li.connected, dismissedAt: null })!;
+  return {
+    steps: c.steps.map((s) => ({ label: s.optional ? `${s.label} (optional)` : s.label, done: s.done })),
+    done: c.done,
+  };
 }
 
 // ── Return on spend (WS-A) ────────────────────────────────────────────────────

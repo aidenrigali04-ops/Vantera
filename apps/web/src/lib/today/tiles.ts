@@ -1,5 +1,6 @@
 import { fmtDate, fmtRelative, fmtTime, fmtWindow, nextSendWindow } from "./metrics";
 import { downSenders, healthySenders } from "./state";
+import { GET_STARTED_ASK } from "./checklist";
 import type { SenderFacts, TodayInputs } from "./types";
 
 /**
@@ -11,6 +12,7 @@ import type { SenderFacts, TodayInputs } from "./types";
 export type TileTone = "routine" | "replies" | "attention" | "billing";
 
 export type TileKind =
+  | "sender_missing"
   | "sender_disconnected"
   | "sender_restricted"
   | "payment_failed"
@@ -74,7 +76,8 @@ export interface TileExtras {
 export const MAX_TILES = 4;
 const PER_ROW = 3;
 
-const DISMISSIBLE: ReadonlySet<TileKind> = new Set(["playbook_suggestion", "style_memory", "crm_handoff", "calendar_link"]);
+/** Kinds that may be dismissed — the tile asks plus the Get Started checklist (permanent). */
+const DISMISSIBLE: ReadonlySet<string> = new Set(["playbook_suggestion", "style_memory", "crm_handoff", "calendar_link", GET_STARTED_ASK]);
 
 /** A dismissed ask stays hidden for the day; a new trigger is a new day. */
 function dismissedToday(kind: TileKind, dismissed: Record<string, string>, now: Date): boolean {
@@ -128,7 +131,20 @@ export function tilesFor(i: TodayInputs, x: TileExtras): ActionTileSpec[] {
     });
   }
 
-  // P1 — the work
+  // P1 — the work. A workspace that never connected LinkedIn is not "stopped" (state.ts keeps
+  // zero senders steady — sourcing runs either way), but sending can't start until it does.
+  if (i.senders.length === 0) {
+    tiles.push({
+      kind: "sender_missing",
+      priority: 1,
+      tone: "attention",
+      glyph: "plug",
+      title: "No LinkedIn connected yet",
+      meta: "Your agent is finding prospects. Connect to start sending.",
+      href: "/settings/senders",
+      dismissible: false,
+    });
+  }
   if (i.drafts > 0) {
     const slot = nextSendWindow(i.now, x.topDraftLocation);
     const sends = slot.openNow ? fmtWindow(slot.startsAt, slot.endsAt, tz) : `${slot.dayLabel} ${fmtTime(slot.startsAt, tz)}`;
@@ -291,6 +307,8 @@ export function primaryFor(tiles: ActionTileSpec[]): { label: string; count: num
       return { label: top.title, count: null, href: top.href };
     case "sender_restricted":
       return { label: "Open sender", count: null, href: top.href };
+    case "sender_missing":
+      return { label: "Connect LinkedIn", count: null, href: top.href };
     case "payment_failed":
       return { label: "Update payment", count: null, href: top.href };
     case "engine_paused":

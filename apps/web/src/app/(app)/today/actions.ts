@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { GET_STARTED_ASK } from "@/lib/today/checklist";
 
 /**
  * Today's own server actions. Every write resolves the user from the validated session and
@@ -12,7 +13,8 @@ import { createClient } from "@/lib/supabase/server";
 export type RejectReason = "wrong_person" | "bad_timing" | "weak_message" | "other";
 const REJECT_REASONS: ReadonlySet<string> = new Set(["wrong_person", "bad_timing", "weak_message", "other"]);
 
-const DISMISSIBLE: ReadonlySet<string> = new Set(["playbook_suggestion", "style_memory", "crm_handoff", "calendar_link"]);
+// The tile asks hide for a day (tiles.ts); GET_STARTED_ASK hides the checklist for good.
+const DISMISSIBLE: ReadonlySet<string> = new Set(["playbook_suggestion", "style_memory", "crm_handoff", "calendar_link", GET_STARTED_ASK]);
 
 async function sessionUser() {
   const supabase = await createClient();
@@ -22,7 +24,7 @@ async function sessionUser() {
   return { supabase, user };
 }
 
-/** Dismiss a one-time ask (P3/P4 tile). Stored as {kind: iso} on the user's own profile row. */
+/** Dismiss a one-time ask (P3/P4 tile, or the Get Started checklist). Stored as {kind: iso} on the user's own profile row. */
 export async function dismissAsk(kind: string): Promise<{ error?: string }> {
   if (!DISMISSIBLE.has(kind)) return { error: "Invalid request." };
   const { supabase, user } = await sessionUser();

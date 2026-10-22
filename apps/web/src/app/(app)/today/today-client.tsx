@@ -9,6 +9,8 @@ import { dismissAsk, markTodayViewed, rejectDraftWithReason, undoRejectDraft, ty
 import { BannerSlot, Greeting, StatRow, ActionTileRow, TodayPageFrame } from "@/components/today";
 import { WorkCard } from "@/components/today/work-card";
 import { DraftPeek } from "@/components/today/draft-peek";
+import { GetStarted } from "@/components/today/get-started";
+import { GET_STARTED_ASK } from "@/lib/today/checklist";
 
 type Tab = "queue" | "replies" | "activity";
 
@@ -153,9 +155,8 @@ export function TodayClient({ view, tab, openDraftId }: { view: TodayView; tab: 
       ? `Nothing needs you right now. Next drafts are expected around ‹${view.nextRunLabel}›.`
       : "Nothing needs you right now.";
 
-  return (
-    <TodayPageFrame>
-      <div className="relative">
+  const main = (
+    <>
         <BannerSlot banner={view.banner} className="mb-7" />
         <Greeting greeting={view.greeting} sentence={view.sentence} primary={view.primary} glyph={primaryGlyph(view.primary)} onResume={onResume} />
         <StatRow stats={view.stats} className="mt-7" />
@@ -169,6 +170,27 @@ export function TodayClient({ view, tab, openDraftId }: { view: TodayView; tab: 
           onResume={onResume}
         />
         <DraftPeek key={openDraftId ?? "closed"} rows={queueRows} openId={openDraftId} onClose={onClosePeek} onNavigate={onOpenDraft} onRemoved={(id) => onRemoved(id)} />
+    </>
+  );
+
+  // The Get Started rail (UX-1): only while the checklist exists; otherwise the single column
+  // stays exactly as it was. On narrow screens the rail stacks above the content.
+  if (!view.checklist) {
+    return (
+      <TodayPageFrame>
+        <div className="relative">{main}</div>
+      </TodayPageFrame>
+    );
+  }
+  return (
+    <TodayPageFrame>
+      <div className="relative grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="relative order-2 min-w-0 lg:order-1">{main}</div>
+        <aside className="order-1 lg:order-2" aria-label="Get started">
+          <div className="lg:sticky lg:top-6">
+            <GetStarted checklist={view.checklist} onDismiss={() => onDismiss(GET_STARTED_ASK)} />
+          </div>
+        </aside>
       </div>
     </TodayPageFrame>
   );

@@ -9,6 +9,7 @@ import {
   getBillingStatus,
   getCrmStatus,
   getChannelStatusForAccount,
+  getActivationChecklist,
   getReturnOnSpend,
   getIntentStatus,
 } from "./read-tools";
@@ -68,6 +69,14 @@ export function buildAccountTools(db: SupabaseClient, accountId: string): Copilo
         "LinkedIn connection status: whether a LinkedIn account is connected and active, the primary account's state, and how many accounts are connected. Connecting LinkedIn is the activation gate. Use to answer 'is my LinkedIn connected?' or 'why isn't my outreach going out yet?'.",
       parameters: z.object({}),
       run: async () => getChannelStatusForAccount(db, accountId),
+    },
+    {
+      name: "getActivationChecklist",
+      tier: "read",
+      description:
+        "The Get started checklist on Today: which setup steps are done (confirm your buyers, review first prospects, connect LinkedIn, approve your first message, optional calendar or CRM) and how many of the four required steps are complete. Use for 'what's left to set up?' or 'how do I get started?'.",
+      parameters: z.object({}),
+      run: async () => getActivationChecklist(db, accountId),
     },
     {
       name: "getReturnOnSpend",
