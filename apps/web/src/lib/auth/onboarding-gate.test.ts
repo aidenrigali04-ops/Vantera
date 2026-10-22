@@ -8,16 +8,13 @@ import {
 const ctx = (over: Partial<OnboardingContext>): OnboardingContext => ({
   hasAccount: false,
   detailsConfirmed: false,
-  buyersConfirmed: false,
-  prospectsReviewed: false,
+  linkedinConnected: false,
   subscribed: false,
   onboardingComplete: false,
   ...over,
 });
 
 describe("resolveOnboardingStep", () => {
-  const acct = { hasAccount: true, detailsConfirmed: true };
-
   it("starts at Details with no account", () => {
     expect(resolveOnboardingStep(ctx({}))).toBe(1);
   });
@@ -26,24 +23,20 @@ describe("resolveOnboardingStep", () => {
     expect(resolveOnboardingStep(ctx({ hasAccount: true }))).toBe(1);
   });
 
-  it("moves to Buyers once details are in", () => {
-    expect(resolveOnboardingStep(ctx(acct))).toBe(2);
+  it("moves to LinkedIn once details are in", () => {
+    expect(resolveOnboardingStep(ctx({ hasAccount: true, detailsConfirmed: true }))).toBe(2);
   });
 
-  it("moves to Prospects once buyers are confirmed", () => {
-    expect(resolveOnboardingStep(ctx({ ...acct, buyersConfirmed: true }))).toBe(3);
-  });
-
-  it("moves to Plan once prospects are reviewed", () => {
+  it("moves to Subscription once LinkedIn is connected (connecting counts)", () => {
     expect(
-      resolveOnboardingStep(ctx({ ...acct, buyersConfirmed: true, prospectsReviewed: true }))
-    ).toBe(4);
+      resolveOnboardingStep(ctx({ hasAccount: true, detailsConfirmed: true, linkedinConnected: true }))
+    ).toBe(3);
   });
 
-  it("is done once subscribed", () => {
+  it("is done once subscribed — the page finishes provisioning and leaves", () => {
     expect(
       resolveOnboardingStep(
-        ctx({ ...acct, buyersConfirmed: true, prospectsReviewed: true, subscribed: true })
+        ctx({ hasAccount: true, detailsConfirmed: true, linkedinConnected: true, subscribed: true })
       )
     ).toBe("done");
   });
@@ -52,18 +45,17 @@ describe("resolveOnboardingStep", () => {
     expect(resolveOnboardingStep(ctx({ onboardingComplete: true }))).toBe("done");
   });
 
-  it("a legacy context that connected LinkedIn but never confirmed buyers resolves to 2", () => {
-    const legacy = { ...ctx(acct), linkedinConnected: true } as OnboardingContext;
-    expect(resolveOnboardingStep(legacy)).toBe(2);
+  it("a returning user lands on the furthest incomplete step, never an earlier one", () => {
+    // LinkedIn connected but details somehow missing → details first (the scan feeds the ICP)
+    expect(resolveOnboardingStep(ctx({ hasAccount: true, linkedinConnected: true }))).toBe(1);
   });
 });
 
 describe("onboardingProgressPercent", () => {
-  it("opens at 20% (endowed account segment) and advances by fifths", () => {
-    expect(onboardingProgressPercent(1)).toBe(20);
-    expect(onboardingProgressPercent(2)).toBe(40);
-    expect(onboardingProgressPercent(3)).toBe(60);
-    expect(onboardingProgressPercent(4)).toBe(80);
+  it("opens at 25% (endowed account segment) and advances by quarters", () => {
+    expect(onboardingProgressPercent(1)).toBe(25);
+    expect(onboardingProgressPercent(2)).toBe(50);
+    expect(onboardingProgressPercent(3)).toBe(75);
     expect(onboardingProgressPercent("done")).toBe(100);
   });
 });

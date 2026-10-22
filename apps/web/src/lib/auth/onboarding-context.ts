@@ -44,8 +44,7 @@ export async function getOnboardingData(): Promise<OnboardingData> {
       accountId: null,
       hasAccount: false,
       detailsConfirmed: false,
-      buyersConfirmed: false,
-      prospectsReviewed: false,
+      linkedinConnected: false,
       subscribed: false,
       onboardingComplete: false,
       prefill: EMPTY_PREFILL,
@@ -63,7 +62,7 @@ export async function getOnboardingData(): Promise<OnboardingData> {
   const [{ data: account }, { data: profile }] = await Promise.all([
     supabase
       .from("accounts")
-      .select("id, name, website_url, website_scan, stripe_subscription_id, onboarding_completed_at, buyers_confirmed_at, prospects_reviewed_at")
+      .select("id, name, website_url, website_scan, stripe_subscription_id, onboarding_completed_at")
       .limit(1)
       .maybeSingle<{
         id: string;
@@ -72,8 +71,6 @@ export async function getOnboardingData(): Promise<OnboardingData> {
         website_scan: { faviconUrl?: string } | null;
         stripe_subscription_id: string | null;
         onboarding_completed_at: string | null;
-        buyers_confirmed_at: string | null;
-        prospects_reviewed_at: string | null;
       }>(),
     supabase
       .from("user_profiles")
@@ -96,21 +93,27 @@ export async function getOnboardingData(): Promise<OnboardingData> {
       accountId: null,
       hasAccount: false,
       detailsConfirmed: false,
-      buyersConfirmed: false,
-      prospectsReviewed: false,
+      linkedinConnected: false,
       subscribed: false,
       onboardingComplete: false,
       prefill,
     };
   }
 
+  const { data: li } = await supabase
+    .from("linkedin_accounts")
+    .select("id")
+    .eq("account_id", account.id)
+    .in("status", ["connecting", "active"])
+    .limit(1)
+    .maybeSingle<{ id: string }>();
+
   return {
     userId: user.id,
     accountId: account.id,
     hasAccount: true,
     detailsConfirmed: Boolean(account.website_url && profile?.display_name?.trim()),
-    buyersConfirmed: account.buyers_confirmed_at != null,
-    prospectsReviewed: account.prospects_reviewed_at != null,
+    linkedinConnected: li != null,
     subscribed: account.stripe_subscription_id != null || (await accountSkipsPayment(supabase, account.id)),
     onboardingComplete: account.onboarding_completed_at != null,
     prefill,
