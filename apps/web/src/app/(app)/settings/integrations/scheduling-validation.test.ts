@@ -9,9 +9,9 @@ const form = (o: Record<string, string>) => {
 
 describe("parseSchedulingForm", () => {
   it("accepts a supported tool and a plausible key", () => {
-    expect(parseSchedulingForm(form({ provider: "calendly", apiKey: "  eyJraWQiOiIxY2UxZTEzNjE3ZGNm  " }))).toEqual({
+    expect(parseSchedulingForm(form({ provider: "calendly", apiKey: "  test-token-0123456789  " }))).toEqual({
       ok: true,
-      values: { provider: "calendly", apiKey: "eyJraWQiOiIxY2UxZTEzNjE3ZGNm" },
+      values: { provider: "calendly", apiKey: "test-token-0123456789" },
     });
   });
 
