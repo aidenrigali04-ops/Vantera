@@ -300,7 +300,6 @@ export function Pricing({ plans }: { plans?: LandingPlan[] }) {
   const planRows = features.filter((f) => !/approv/i.test(f)).map(featureRow);
   // The sender count is the plan's headline capacity; it rides beside the name.
   const senders = features.join("\n").match(/(\d+) LinkedIn senders? included/i)?.[1];
-  const monthsFree = plan ? Math.round(12 - plan.annualYearlyUsd / plan.monthlyUsd) : 0;
 
   const customRows: Row[] = [
     { icon: Check, title: `Everything in ${name}`, detail: "The same system, built around your team" },
@@ -343,19 +342,7 @@ export function Pricing({ plans }: { plans?: LandingPlan[] }) {
             tag={senders ? `${senders} LinkedIn senders` : undefined}
             subtitle={plan?.tagline ?? FALLBACK_TAGLINE}
             price={<Price amount={plan?.monthlyUsd ?? null} suffix="/month" />}
-            priceNote={
-              plan && monthsFree > 0 ? (
-                <>
-                  Or{" "}
-                  <span className="font-semibold tabular-nums text-foreground">
-                    ${plan.annualMonthlyUsd}/month
-                  </span>{" "}
-                  billed yearly, {monthsFree} months free.
-                </>
-              ) : (
-                "Billed monthly."
-              )
-            }
+            priceNote="Billed monthly. Everything included."
             action={{ label: "Get Started Free", href: "/signup" }}
             reassurance={
               plan
