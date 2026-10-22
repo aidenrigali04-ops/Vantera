@@ -47,8 +47,9 @@ export const INTENT_BATCH_SIZE = 15;
 const MAX_OUTPUT_TOKENS = 4000;
 const trunc = (s: string, max: number) => (s.length > max ? `${s.slice(0, max - 1)}…` : s);
 
-// Stable system prompt (rubric + output contract) so Anthropic prompt caching hits across
-// batches; per-batch content rides in the user message only.
+// Stable system prompt (rubric + output contract); per-batch content rides in the user message
+// only. getModel() marks it cacheable, but it caches only once it reaches Haiku 4.5's 4096-token
+// minimum — today it is well below, so every batch pays full input price for it.
 const INTENT_SYSTEM = registerPrompt("intent/classify", `You are the buying-intent brain of a LinkedIn SDR platform. You receive a seller context block and a batch of LinkedIn observations (someone engaged with or published a post). Decide whether each person is showing genuine buying intent FOR THE SELLER'S OFFER right now — not generic engagement.
 
 Each observation line is: ref | kind | action | headline | watch | evidence | context.

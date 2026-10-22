@@ -85,8 +85,9 @@ export function compactLead(c: RankCandidate, now: Date = new Date()): string {
   ].join("|");
 }
 
-// Stable system prompt (rubric + output contract) — identical across batches and runs
-// so Anthropic prompt caching hits; per-batch content goes in the user message only.
+// Stable system prompt (rubric + output contract) — identical across batches and runs; per-batch
+// content goes in the user message only. getModel() marks it cacheable, but it caches only once it
+// reaches Haiku 4.5's 4096-token minimum — today it is well below that.
 const RANK_SYSTEM = registerPrompt("prospect/rank", `You are the prospect-quality brain of an SDR platform. You receive a seller context block and a batch of lead lines (format: id|company|size|industry|geo|title|tech|signals). Score how strongly each lead fits the seller's ICP right now.
 
 Rubric:
@@ -144,7 +145,7 @@ async function rankBatch(
 }
 
 /** Max rank batches in flight at once. Bounded so a large survivor set doesn't burst the model's
- *  rate limit; the stable system prompt still lets concurrent calls share Anthropic's prompt cache. */
+ *  rate limit. */
 const RANK_CONCURRENCY = 3;
 
 /** Stage 2 of the scoring gate (rule 06): batched AI rank over rules-gate survivors. */

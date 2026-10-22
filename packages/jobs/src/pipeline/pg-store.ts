@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, max, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, max, ne, or, sql } from "drizzle-orm";
 import {
   accountDeletionRequests,
   accountMembers,
@@ -258,6 +258,11 @@ async function winningOpeners(db: Db, accountId: string): Promise<string[]> {
  * read time (no stored profile). Feeds both the discovery allocator (per-ICP) and the qualified-
  * pool drain tilt (per-segment). Per-account only.
  */
+/** Days an invite needs before its outcome is observable (accept → reply lag). Younger invites are
+ *  right-censored, not failures — counting them as misses biased the ICP allocator + tilt against
+ *  every newly-targeted segment. */
+export const OUTCOME_MATURATION_DAYS = 14;
+
 async function invitedOutcomeRows(
   db: Db,
   accountId: string
@@ -274,7 +279,13 @@ async function invitedOutcomeRows(
       status: leads.status,
     })
     .from(leads)
-    .where(and(eq(leads.accountId, accountId), isNotNull(leads.linkedinInvitedAt)));
+    .where(
+      and(
+        eq(leads.accountId, accountId),
+        isNotNull(leads.linkedinInvitedAt),
+        lte(leads.linkedinInvitedAt, new Date(Date.now() - OUTCOME_MATURATION_DAYS * 86_400_000))
+      )
+    );
   if (rows.length === 0) return [];
   const ids = rows.map((r) => r.id);
   const replyRows = await db
@@ -833,10 +844,79 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         .map((r) => r.id);
     },
 
+    async getTargetingProfile(accountId: string) {
+      return buildTargetingProfile(
+        (await invitedOutcomeRows(db, accountId)).map((r) => ({ title: r.title, industry: r.industry, flags: r.flags }))
+      );
+    },
+
     async getIcpOutcomeRows(accountId: string) {
       return (await invitedOutcomeRows(db, accountId))
         .filter((r): r is typeof r & { icpId: string } => r.icpId != null)
         .map((r) => ({ icpId: r.icpId, flags: r.flags }));
+    },
+
+    async getUnrankedLeads(accountId: string, since: Date, limit: number) {
+      const rows = await db
+        .select({
+          id: leads.id,
+          companyName: leads.companyName,
+          companySize: leads.companySize,
+          industry: leads.industry,
+          location: leads.location,
+          title: leads.title,
+          techStack: leads.techStack,
+        })
+        .from(leads)
+        .where(
+          and(
+            eq(leads.accountId, accountId),
+            eq(leads.rulesGatePassed, true),
+            isNull(leads.scoredAt),
+            eq(leads.status, "sourced"),
+            gte(leads.createdAt, since)
+          )
+        )
+        .orderBy(desc(leads.createdAt))
+        .limit(limit);
+      if (rows.length === 0) return [];
+      const signalRows = await db
+        .select({
+          leadId: leadSignals.leadId,
+          kind: leadSignals.kind,
+          label: leadSignals.label,
+          detail: leadSignals.detail,
+          level: leadSignals.level,
+          observedAt: leadSignals.observedAt,
+        })
+        .from(leadSignals)
+        .where(and(eq(leadSignals.accountId, accountId), inArray(leadSignals.leadId, rows.map((r) => r.id))));
+      const signalsByLead = new Map<string, ProspectSignal[]>();
+      for (const s of signalRows) {
+        const list = signalsByLead.get(s.leadId) ?? [];
+        list.push({
+          kind: s.kind,
+          label: s.label,
+          detail: s.detail ?? s.label,
+          ...(s.level ? { level: s.level } : {}),
+          ...(s.observedAt ? { observedAt: s.observedAt.toISOString() } : {}),
+        });
+        signalsByLead.set(s.leadId, list);
+      }
+      return rows.map((r) => {
+        const tech = Array.isArray(r.techStack) ? r.techStack.filter((t): t is string => typeof t === "string") : [];
+        const signals = signalsByLead.get(r.id);
+        return {
+          leadId: r.id,
+          companyName: r.companyName ?? undefined,
+          companySize: r.companySize ?? undefined,
+          industry: r.industry ?? undefined,
+          location: r.location ?? undefined,
+          title: r.title ?? undefined,
+          ...(tech.length > 0 ? { technographics: tech } : {}),
+          ...(signals ? { signals } : {}),
+        };
+      });
     },
 
     async getLiveCopyAgent(accountId: string) {
@@ -2288,7 +2368,12 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
     },
 
     async setLeadReplied(leadId: string, campaignId: string | null) {
-      await db.update(leads).set({ status: "replied" }).where(eq(leads.id, leadId));
+      // Never demote a closed-won lead: 'converted' is the close-stage label (CRM push, conversion
+      // metrics), and a later reply from that buyer must not erase it.
+      await db
+        .update(leads)
+        .set({ status: "replied" })
+        .where(and(eq(leads.id, leadId), ne(leads.status, "converted")));
       if (campaignId) {
         await db
           .update(campaignLeads)

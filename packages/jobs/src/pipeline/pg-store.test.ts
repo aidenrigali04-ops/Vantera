@@ -386,3 +386,55 @@ describe("createLeadEventEmailStore.stampLifecycleEmail", () => {
   });
 });
 
+
+// A reply must never demote a closed-won lead: status='converted' is the close-stage label the
+// CRM push and conversion metrics depend on. setLeadReplied guards the leads UPDATE in SQL.
+describe("setLeadReplied never overwrites a converted lead", () => {
+  it("scopes the leads UPDATE to status <> 'converted'", async () => {
+    const { PgDialect } = await import("drizzle-orm/pg-core");
+    const wheres: unknown[] = [];
+    const db = {
+      update: (_table: unknown) => ({
+        set: (_vals: Record<string, unknown>) => ({
+          where: (cond: unknown) => {
+            wheres.push(cond);
+            return Promise.resolve();
+          },
+        }),
+      }),
+    };
+    await createPgStore(db as unknown as Db).setLeadReplied("lead-1", null);
+    expect(wheres).toHaveLength(1);
+    const q = new PgDialect().sqlToQuery(wheres[0] as never);
+    expect(q.sql).toMatch(/"status" <> \$\d/);
+    expect(q.params).toContain("converted");
+  });
+});
+
+// Right-censoring: an invite younger than the maturation window hasn't had time to be accepted or
+// answered, so counting it as a failure biases the ICP allocator + tilt against new segments.
+// The outcome rows behind both read only matured invites.
+describe("outcome rows read only matured invites", () => {
+  it("bounds linkedin_invited_at by the maturation cutoff", async () => {
+    const { PgDialect } = await import("drizzle-orm/pg-core");
+    const { OUTCOME_MATURATION_DAYS } = await import("./pg-store");
+    const wheres: unknown[] = [];
+    const db = {
+      select: () => ({
+        from: () => ({
+          where: (cond: unknown) => {
+            wheres.push(cond);
+            return Promise.resolve([]);
+          },
+        }),
+      }),
+    };
+    const before = Date.now();
+    await createPgStore(db as unknown as Db).getIcpOutcomeRows("acc-1");
+    const q = new PgDialect().sqlToQuery(wheres[0] as never);
+    expect(q.sql).toMatch(/"linkedin_invited_at" <= \$\d/);
+    const cutoff = q.params.find((p) => typeof p === "string" && /^\d{4}-\d{2}-\d{2}T/.test(p)) as string;
+    const ageDays = (before - new Date(cutoff).getTime()) / 86_400_000;
+    expect(Math.round(ageDays)).toBe(OUTCOME_MATURATION_DAYS);
+  });
+});

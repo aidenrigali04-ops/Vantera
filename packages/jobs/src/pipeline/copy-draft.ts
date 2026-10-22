@@ -1,4 +1,4 @@
-import { describeViolations, assignVariant, buildSendRecipe, LINKEDIN_SYSTEM, bestOfN, leadBlock, selectMessageShape, deriveAccountProfile } from "@vantera/agent-brains";
+import { describeViolations, assignVariant, buildSendRecipe, LINKEDIN_SYSTEM, bestOfN, leadBlock, selectMessageShape, deriveAccountProfile, rankByTilt } from "@vantera/agent-brains";
 import type { DraftInput, CopyStrategy } from "@vantera/agent-brains";
 import { getModelId } from "@vantera/ai";
 import type {
@@ -24,11 +24,6 @@ export const DAILY_FIRST_TOUCH_DRAFT_CAP = 15;
 
 export function utcDayStart(now: Date): Date {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-}
-
-function scoreOf(lead: DraftableLead): number {
-  const score = Number(lead.aiScore);
-  return Number.isFinite(score) ? score : 0;
 }
 
 /** A lead holds a first-touch slot only when this run will insert an invite. */
@@ -137,7 +132,12 @@ export async function runCopyDraft(
   const fresh = leads.filter((lead) => !alreadyDrafted.has(lead.id));
   const used = await deps.store.countFirstTouchDraftsSince(accountId, utcDayStart(new Date()));
   let slots = Math.max(0, DAILY_FIRST_TOUCH_DRAFT_CAP - used);
-  const ranked = [...fresh].sort((a, b) => scoreOf(b) - scoreOf(a));
+  // Same order the drain used (getTopQualifiedLeadIds): stored score + the bounded outcome tilt,
+  // so the last daily slots go to the buyers most like those who actually replied. Re-sorting by
+  // raw score here would undo the tilt; the payload order itself isn't trusted (intent sends
+  // unsorted). Ordering ONLY — never a gate.
+  const profile = await deps.store.getTargetingProfile(accountId);
+  const ranked = rankByTilt(fresh, profile);
   const room: DraftableLead[] = [];
   let deferred = 0;
   for (const lead of ranked) {

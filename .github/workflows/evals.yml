@@ -1,6 +1,6 @@
 name: Evals
 
-# Path-triggered — this workflow only runs when the copy/reply/optimize brains, the AI client, or
+# Path-triggered — this workflow only runs when the copy/reply/optimize/intent/prospect brains, the AI client, or
 # the evals package itself change, plus a nightly full sweep and manual dispatch. See
 # docs/evals.md for the full design (three layers: deterministic + classifier = hard gates, judge
 # + pairwise = advisory until the owner's kappa-calibration flips EVALS_JUDGE_GATING=1).
@@ -11,6 +11,8 @@ on:
       - "packages/agent-brains/src/reply/**"
       - "packages/agent-brains/src/optimize/**"
       - "packages/agent-brains/src/intent/**"
+      # rank + rules gate: the qualification floors (precision/recall) must gate the PR that changes them
+      - "packages/agent-brains/src/prospect/**"
       - "packages/ai/**"
       - "packages/evals/**"
   push:

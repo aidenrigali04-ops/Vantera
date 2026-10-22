@@ -15,6 +15,7 @@ import type {
   DraftInput,
   RankCandidate,
   RankContext,
+  TargetingProfile,
   ReplyVerdict,
   RulesGateResult,
   StoredInsights,
@@ -140,6 +141,9 @@ export interface ScoutStore {
   /** Stage 2: per-ICP outcome evidence (invited leads → flags) for the discovery allocator.
    *  Empty ⇒ the allocator falls back to the equal split. */
   getIcpOutcomeRows(accountId: string): Promise<{ icpId: string; flags: LeadOutcomeFlags }[]>;
+  /** Rank-miss retry: gate survivors created since `since` that were never scored (scored_at null,
+   *  status 'sourced'), newest first, as rank inputs. Feeds Scout's retry stage. */
+  getUnrankedLeads(accountId: string, since: Date, limit: number): Promise<RankCandidate[]>;
 }
 
 export interface ScoutDeps {
@@ -362,6 +366,9 @@ export interface NewScheduledSend {
 }
 
 export interface CopyDraftStore {
+  /** the account's learned outcome profile (seniority/industry segments) — copy-draft orders the
+   *  daily first-touch slots by ai_score + targetingTilt, the same order the scout drain uses. */
+  getTargetingProfile(accountId: string): Promise<TargetingProfile>;
   getCopyContext(copyAgentId: string): Promise<CopyContext | null>;
   getDraftableLeads(accountId: string, leadIds: string[]): Promise<DraftableLead[]>;
   /** idempotency guard: which of these leadIds already have a scheduled_send, so a retried run never re-drafts */

@@ -227,7 +227,7 @@ describe("runIntentScan", () => {
     expect(likeRow?.outcome).toBe("observed");
   });
 
-  it("persists an unqualified score when rank omits a survivor", async () => {
+  it("leaves a survivor the rank omitted unscored (retryable by Scout), logged as observed", async () => {
     const { store, calls } = makeStore();
     const deps = makeDeps(store);
     deps.rankFn = async (cands) =>
@@ -235,9 +235,10 @@ describe("runIntentScan", () => {
 
     await runIntentScan("intent-1", deps);
 
-    // creator + good survive suppression; one insight returned → the other is a rank miss, still saved
-    expect(calls.scored.length).toBe(2);
-    expect(calls.scored.some((s) => s.qualified === false)).toBe(true);
+    // creator + good survive suppression; one insight returned → the other is a rank miss, NOT saved
+    expect(calls.scored.length).toBe(1);
+    expect(calls.scored.some((s) => s.leadId === `lead_${GOOD}`)).toBe(false);
+    expect(calls.observations.find((r) => r.profileUrl === GOOD)?.outcome).toBe("observed");
   });
 
   it("enrolls when a later ICP matches even if the first does not, and persists that icpId", async () => {

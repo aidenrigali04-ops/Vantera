@@ -1,5 +1,6 @@
 import { logger, task, tasks } from "@trigger.dev/sdk";
 import { createDb } from "@vantera/db";
+import { withUsage } from "@vantera/ai";
 import { deriveIcpCriteria, rankLeads, scanWebsite } from "@vantera/agent-brains";
 import { runScout } from "../pipeline/scout";
 import { createPgStore } from "../pipeline/pg-store";
@@ -16,17 +17,21 @@ export const scoutRun = task({
     const store = createPgStore(createDb());
     let summary;
     try {
-      summary = await runScout(payload.agentId, {
-        store,
-        prospectData: createProspectData(),
-        companySignals: createCompanySignals(),
-        scanFn: (url) => scanWebsite(url),
-        rankFn: (candidates, ctx) => rankLeads(candidates, ctx),
-        deriveCriteriaFn: (icpText, ctx) => deriveIcpCriteria(icpText, ctx),
-        triggerCopyDraft: async (p) => {
-          await tasks.trigger("copy-draft", p, { concurrencyKey: p.accountId });
-        },
-      });
+      const run = await withUsage(() =>
+        runScout(payload.agentId, {
+          store,
+          prospectData: createProspectData(),
+          companySignals: createCompanySignals(),
+          scanFn: (url) => scanWebsite(url),
+          rankFn: (candidates, ctx) => rankLeads(candidates, ctx),
+          deriveCriteriaFn: (icpText, ctx) => deriveIcpCriteria(icpText, ctx),
+          triggerCopyDraft: async (p) => {
+            await tasks.trigger("copy-draft", p, { concurrencyKey: p.accountId });
+          },
+        })
+      );
+      // per-run token + $ telemetry rides the agent_runs summary (no new table)
+      summary = { ...run.result, llm: run.usage };
     } catch (err) {
       // T4 operate path: a crashed run must be visible in-product, not just in ops logs.
       await store.recordAgentRun({ ...payload, kind: "scout", status: "failed", summary: {}, note: String(err).slice(0, 300) });

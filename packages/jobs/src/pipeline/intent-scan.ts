@@ -1,4 +1,4 @@
-import { applyRulesGate, type IntentObservationInput, type IntentVerdict, type RankCandidate, type RulesGateResult } from "@vantera/agent-brains";
+import { applyRulesGate, RANK_MISS_RATIONALE, type IntentObservationInput, type IntentVerdict, type LeadInsights, type RankCandidate, type RulesGateResult } from "@vantera/agent-brains";
 import type { IcpCriteria, ProspectCandidate } from "@vantera/prospect-data";
 import type { LinkedInPost, LinkedInProfile } from "@vantera/linkedin-infra";
 import {
@@ -280,10 +280,17 @@ export async function runIntentScan(agentId: string, deps: IntentScanDeps): Prom
     rankMissed = ranked.rankMissed;
     rankErrors = ranked.rankErrors;
     const byLead = new Map(ranked.insights.map((i) => [i.lead_id, i]));
-    const scored = survivors.map((s) => {
+    // A rank miss stays unscored (scored_at null) — Scout's retry stage re-ranks it later rather
+    // than this run permanently rejecting a real intent lead over a model omission/outage.
+    const scored: { s: (typeof survivors)[number]; ins: LeadInsights; qualified: boolean }[] = [];
+    for (const s of survivors) {
       const ins = byLead.get(s.leadId)!;
-      return { s, ins, qualified: ins.score >= config.minScore };
-    });
+      if (ins.rationale === RANK_MISS_RATIONALE) {
+        rows.push(obsRow(s.o, "observed", s.v.why_now, s.leadId));
+        continue;
+      }
+      scored.push({ s, ins, qualified: ins.score >= config.minScore });
+    }
     await mapWithConcurrency(scored, WRITE_CONCURRENCY, ({ s, ins, qualified }) =>
       deps.store.saveScore(s.leadId, ins, qualified)
     );

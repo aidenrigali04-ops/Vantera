@@ -8,7 +8,7 @@ import type {
   DraftableLead,
   NewScheduledSend,
 } from "./types";
-import { LINKEDIN_SYSTEM, leadBlock, type CopyStrategy, type DraftInput, type JudgeFn } from "@vantera/agent-brains";
+import { LINKEDIN_SYSTEM, buildTargetingProfile, leadBlock, type CopyStrategy, type DraftInput, type JudgeFn, type LeadOutcomeFlags } from "@vantera/agent-brains";
 import { getModelId } from "@vantera/ai";
 
 function scored(id: string, score: number): DraftableLead {
@@ -101,6 +101,10 @@ class FakeCopyStore implements CopyDraftStore {
   }
   async setLeadStatus(leadId: string, status: string) {
     this.leadStatuses.set(leadId, status);
+  }
+  targetingProfile = buildTargetingProfile([]);
+  async getTargetingProfile() {
+    return this.targetingProfile;
   }
   async getActiveExperiment() {
     return this.activeExperiment;
@@ -921,6 +925,26 @@ describe("runCopyDraft — daily first-touch cap", () => {
       { store, draftLinkedInFn }
     );
     expect(store.sends.map((s) => s.leadId)).toEqual(["high", "high"]);
+  });
+
+  it("spends the last slot by score + the learned outcome tilt, matching the drain order", async () => {
+    const store = new FakeCopyStore();
+    store.firstTouchDraftsToday = 14;
+    const flags = (accepted: boolean, interested: boolean): LeadOutcomeFlags => ({
+      invited: true, accepted, interested, negative: false, booked: false, converted: false,
+    });
+    // founders reply far above baseline, VPs far below → founder tilt +, VP tilt −
+    store.targetingProfile = buildTargetingProfile([
+      ...Array.from({ length: 30 }, () => ({ title: "Founder", industry: "saas", flags: flags(true, true) })),
+      ...Array.from({ length: 30 }, () => ({ title: "VP Sales", industry: "saas", flags: flags(false, false) })),
+    ]);
+    store.leads.push(lead("vp", { aiScore: 73, title: "VP Sales" }), lead("founder", { aiScore: 70, title: "Founder" }));
+    const draftLinkedInFn = vi.fn(async () => CLEAN);
+    await runCopyDraft(
+      { copyAgentId: "copy1", accountId: "acc1", leadIds: ["vp", "founder"] },
+      { store, draftLinkedInFn }
+    );
+    expect(store.sends.map((s) => s.leadId)).toEqual(["founder", "founder"]);
   });
 
   it("does not spend the last slot on a suppressed higher score", async () => {

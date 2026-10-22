@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { InMemoryProspectData, InMemoryCompanySignals, makeCandidate, type CompanyRef, type ProspectSignal } from "@vantera/prospect-data";
-import type { LeadInsights, LeadOutcomeFlags } from "@vantera/agent-brains";
+import type { LeadInsights, LeadOutcomeFlags, RankCandidate } from "@vantera/agent-brains";
 import { runScout, pickHotSignal } from "./scout";
 import { TRIAL_LEAD_CAP } from "./types";
 import type { CopyDraftPayload, FreshLead, ScoutContext, ScoutDeps, ScoutStore } from "./types";
@@ -110,6 +110,13 @@ class FakeScoutStore implements ScoutStore {
   icpOutcomeRows: { icpId: string; flags: LeadOutcomeFlags }[] = [];
   async getIcpOutcomeRows() {
     return this.icpOutcomeRows;
+  }
+  // Rank-miss retry backlog: gate survivors a previous run left unscored
+  unranked: RankCandidate[] = [];
+  unrankedQueries: { since: Date; limit: number }[] = [];
+  async getUnrankedLeads(_accountId: string, since: Date, limit: number) {
+    this.unrankedQueries.push({ since, limit });
+    return this.unranked.filter((c) => !this.scores.has(c.leadId)).slice(0, limit);
   }
 }
 
@@ -223,7 +230,7 @@ describe("runScout", () => {
     expect(results.find((r) => r.score === 55)?.qualified).toBe(false);
   });
 
-  it("persists a score-0 miss for every survivor the rank model omitted", async () => {
+  it("leaves a survivor the rank model omitted unscored (retryable), never rejected", async () => {
     const pool = [
       makeCandidate({ externalRef: "kept", industry: "saas" }),
       makeCandidate({ externalRef: "dropped", industry: "saas" }),
@@ -234,14 +241,13 @@ describe("runScout", () => {
 
     const summary = await runScout("scout1", deps);
 
-    expect(store.scores.size).toBe(2);
-    const dropped = [...store.scores.entries()].find(([id]) => id.includes("dropped"));
-    expect(dropped?.[1]).toMatchObject({ score: 0, qualified: false });
+    expect(store.scores.size).toBe(1);
+    expect([...store.scores.keys()].some((id) => id.includes("dropped"))).toBe(false);
     expect(summary.rankMissed).toBe(1);
     expect(summary.qualified).toBe(1);
   });
 
-  it("miss-scores every survivor when rankFn throws and still completes the run", async () => {
+  it("persists no score when rankFn throws (all retryable) and still completes the run", async () => {
     const pool = [
       makeCandidate({ externalRef: "a", industry: "saas" }),
       makeCandidate({ externalRef: "b", industry: "saas" }),
@@ -257,9 +263,50 @@ describe("runScout", () => {
     expect(summary.status).toBe("completed");
     expect(summary.rankErrors).toBe(2);
     expect(summary.qualified).toBe(0);
-    expect(store.scores.size).toBe(2);
-    expect([...store.scores.values()].every((s) => s.qualified === false && s.score === 0)).toBe(true);
+    expect(store.scores.size).toBe(0);
     expect(store.completedAt).not.toBeNull();
+  });
+
+  it("re-ranks survivors a previous run left unscored and drafts the ones that qualify", async () => {
+    const store = new FakeScoutStore(makeContext());
+    store.copyAgent = { id: "copy1" };
+    store.unranked = [
+      { leadId: "old_lead_retryhigh", title: "CTO", industry: "saas" },
+      { leadId: "old_lead_retrylow", title: "CTO", industry: "saas" },
+    ];
+    const { deps, chained } = makeDeps(store, [], { retryhigh: 88, retrylow: 40 });
+
+    const summary = await runScout("scout1", deps);
+
+    expect(store.scores.get("old_lead_retryhigh")).toMatchObject({ score: 88, qualified: true });
+    expect(store.scores.get("old_lead_retrylow")).toMatchObject({ score: 40, qualified: false });
+    expect(summary.qualified).toBe(1);
+    expect(chained.flatMap((c) => c.leadIds)).toContain("old_lead_retryhigh");
+    // bounded lookback: only recent survivors are retried, so a lead the model always omits ages out
+    const q = store.unrankedQueries[0]!;
+    expect(deps.now!().getTime() - q.since.getTime()).toBe(7 * 24 * 60 * 60 * 1000);
+  });
+
+  it("does not re-rank this run's own misses in the retry stage", async () => {
+    const pool = [makeCandidate({ externalRef: "flaky", industry: "saas" })];
+    const store = new FakeScoutStore(makeContext());
+    const { deps } = makeDeps(store, pool, { flaky: 90 });
+    let calls = 0;
+    deps.rankFn = async () => {
+      calls += 1;
+      return [];
+    };
+    // the fake backlog would surface this run's miss if the retry stage didn't exclude it
+    const origUpsert = store.upsertLeads.bind(store);
+    store.upsertLeads = async (...args) => {
+      const fresh = await origUpsert(...args);
+      store.unranked.push(...fresh.map((f) => ({ leadId: f.leadId })));
+      return fresh;
+    };
+
+    await runScout("scout1", deps);
+
+    expect(calls).toBe(2); // first pass + rankWithCompleteness's one retry; no third attempt
   });
 
   it("dedupes: a second run with the same candidates ranks nothing new", async () => {
