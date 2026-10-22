@@ -1,6 +1,5 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
   scanWebsite,
@@ -10,20 +9,19 @@ import {
   deriveIntentWatchlist,
   matchStarterPlays,
   proposeNextChallenger,
-  type IcpDraft,
   type WebsiteScan,
 } from "@vantera/agent-brains";
 import { createLinkedInInfraFromEnv, isLinkedInInfraConfigured } from "@vantera/linkedin-infra";
 import { createClient } from "@/lib/supabase/server";
 import { checkLimit } from "@/lib/rate-limit";
 import { normalizeWebsiteUrl, validateOnboardingDetails } from "@/lib/validation";
-import { parseBuyersForm } from "@/lib/validation/buyers";
-import { maybeStartFastPass, resetRevealRun } from "@/lib/reveal/start-fast-pass";
 import { billingBypassAllowed } from "./billing-bypass";
-import { provisionOnboardingAgents } from "./provision";
 import { accountSkipsPayment } from "@/lib/billing/founder-exempt";
 
 export type DetailsState = { error?: string };
+
+/** Default outreach CTA — sensible out of the box, refined later in Settings → Sharpen your results. */
+const DEFAULT_CTA = "a quick intro call to see if it's a fit";
 
 // ── Step 1 · Details (full name + brand + website → workspace, scan, drafted ICP) ──────────
 
@@ -144,155 +142,6 @@ export async function saveDetails(_prev: DetailsState, formData: FormData): Prom
   if (icpError) console.error("onboarding icp write failed (non-blocking)", icpError);
 
   redirect("/onboarding");
-}
-
-// ── Step 2 · Your buyers (the drafted ICP, confirmed or edited → agents + preview) ─────────
-
-/**
- * Confirm (or correct) the ICP `saveDetails` drafted: write it back to the onboarding `icps`
- * row, provision the Scout + Outreach agents on it, store the exclusions/guidance on the
- * Scout (`agents.config.targeting`), stamp the milestone once, and start the lead preview.
- * Idempotent — re-confirming updates in place.
- */
-export async function confirmBuyers(_prev: DetailsState, formData: FormData): Promise<DetailsState> {
-  const parsed = parseBuyersForm(formData);
-  if (!parsed.ok) return { error: parsed.error };
-  const { name, criteria, targeting } = parsed.values;
-
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-
-  const { data: account } = await supabase
-    .from("accounts")
-    .select("id, buyers_confirmed_at")
-    .limit(1)
-    .maybeSingle<{ id: string; buyers_confirmed_at: string | null }>();
-  if (!account) redirect("/onboarding");
-
-  const { data: icp } = await supabase
-    .from("icps")
-    .select("id")
-    .eq("account_id", account.id)
-    .eq("source", "onboarding")
-    .limit(1)
-    .maybeSingle<{ id: string }>();
-  if (!icp) return { error: "Save your details first." };
-
-  const { error: icpError } = await supabase.from("icps").update({ name, criteria }).eq("id", icp.id);
-  if (icpError) return { error: "Could not save your buyers. Please try again." };
-
-  const { error: accountError } = await supabase
-    .from("accounts")
-    .update({ onboarding_icp: name })
-    .eq("id", account.id);
-  if (accountError) return { error: "Could not save your buyers. Please try again." };
-
-  let scoutId: string;
-  try {
-    ({ scoutId } = await provisionOnboardingAgents({
-      supabase,
-      accountId: account.id,
-      userId: user.id,
-      icp: { id: icp.id, name },
-    }));
-  } catch {
-    return { error: "Couldn't set up your agents. Try again." };
-  }
-
-  // never write `{ targeting }` over a config we failed to read — it would wipe the Scout's settings
-  const { data: scout, error: scoutError } = await supabase
-    .from("agents")
-    .select("config")
-    .eq("id", scoutId)
-    .maybeSingle<{ config: Record<string, unknown> | null }>();
-  if (scoutError || !scout) return { error: "Couldn't save your targeting. Try again." };
-  const { error: targetingError } = await supabase
-    .from("agents")
-    .update({ config: { ...(scout.config ?? {}), targeting } })
-    .eq("id", scoutId);
-  if (targetingError) return { error: "Could not save your exclusions. Please try again." };
-
-  if (!account.buyers_confirmed_at) {
-    const { error: stampError } = await supabase
-      .from("accounts")
-      .update({ buyers_confirmed_at: new Date().toISOString() })
-      .eq("id", account.id)
-      .is("buyers_confirmed_at", null);
-    if (stampError) return { error: "Could not save your buyers. Please try again." };
-  }
-
-  try {
-    await maybeStartFastPass(account.id);
-  } catch (err) {
-    // the preview is a bonus beat; the prospects step retries it — never block confirming
-    console.error("confirmBuyers: fast pass failed to start (non-blocking)", err);
-  }
-
-  redirect("/onboarding?done=buyers");
-}
-
-/**
- * Redraft the buyer profile from the saved website scan (the "that's not us" escape hatch).
- * Overwrites the onboarding ICP's name + criteria and clears any preview built on the old one.
- */
-export async function regenerateBuyers(): Promise<{ error?: string }> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: "Your session expired. Sign in again." };
-  const limit = await checkLimit("icpRegenerate", user.id);
-  if (!limit.success) return { error: "Give it a minute before regenerating again." };
-
-  const { data: account } = await supabase
-    .from("accounts")
-    .select("id, name, website_scan")
-    .limit(1)
-    .maybeSingle<{ id: string; name: string | null; website_scan: WebsiteScan | null }>();
-  if (!account) return { error: "Save your details first." };
-  if (!account.website_scan) {
-    return { error: "We couldn't read your site, so there's nothing to redraft from — edit the profile directly." };
-  }
-
-  let draft: IcpDraft;
-  try {
-    draft = await draftIcp({ companyName: account.name, scan: account.website_scan });
-  } catch (err) {
-    console.error("regenerateBuyers: draft failed", err);
-    return { error: "Could not redraft right now. Try again shortly." };
-  }
-  if (icpDraftIsEmpty(draft)) {
-    return { error: "Your site didn't give us enough to redraft — edit the profile directly." };
-  }
-
-  const { error } = await supabase
-    .from("icps")
-    .update({
-      name: draft.name || "Ideal buyers",
-      criteria: {
-        titles: draft.titles,
-        industries: draft.industries,
-        companySizes: draft.companySizes,
-        geos: draft.geos,
-        signals: draft.signals,
-      },
-    })
-    .eq("account_id", account.id)
-    .eq("source", "onboarding");
-  if (error) return { error: "Could not save the new draft. Please try again." };
-
-  try {
-    await resetRevealRun(account.id);
-  } catch (err) {
-    console.error("regenerateBuyers: reveal reset failed", err);
-    return { error: "Saved the new draft, but couldn't refresh your preview. Try again." };
-  }
-
-  revalidatePath("/onboarding");
-  return {};
 }
 
 /**
@@ -416,7 +265,7 @@ export async function finishOnboarding(): Promise<{ error?: string } | never> {
     .maybeSingle<{ id: string; name: string }>();
   if (!icp) return { error: "Save your details first." };
 
-  const existing = async (kind: "intent") =>
+  const existing = async (kind: "scout" | "copy" | "intent") =>
     (
       await supabase
         .from("agents")
@@ -427,11 +276,60 @@ export async function finishOnboarding(): Promise<{ error?: string } | never> {
         .maybeSingle<{ id: string }>()
     ).data;
 
-  // ── Prospect (Scout) + internal campaign + Outreach (Copy) agent ──
-  try {
-    await provisionOnboardingAgents({ supabase, accountId: account.id, userId: user.id, icp });
-  } catch {
-    return { error: "Could not finish setup. Only workspace admins can do this." };
+  // ── Prospect (Scout) — sources + qualifies against the drafted ICP ──
+  if (!(await existing("scout"))) {
+    const { data: scout, error: scoutErr } = await supabase
+      .from("agents")
+      .insert({
+        account_id: account.id,
+        kind: "scout",
+        name: "Scout",
+        status: "live",
+        config: { prospects_per_run: 60, min_score: 70 },
+        run_at_time: "08:00",
+        cadence: "daily",
+        timezone: "UTC",
+        deployed_at: new Date().toISOString(),
+        created_by: user.id,
+      })
+      .select("id")
+      .single<{ id: string }>();
+    if (scoutErr || !scout) {
+      return { error: "Could not finish setup. Only workspace admins can do this." };
+    }
+    await supabase
+      .from("agent_icps")
+      .insert({ agent_id: scout.id, icp_id: icp.id, account_id: account.id, position: 0 });
+  }
+
+  // ── Outreach (Copy) — drafts on a default CTA into the review queue ──
+  if (!(await existing("copy"))) {
+    const { data: campaign } = await supabase
+      .from("campaigns")
+      .insert({
+        account_id: account.id,
+        name: "Outreach (agent)",
+        status: "active",
+        channels: ["linkedin"],
+        targeting: [{ type: "icp", value: icp.name }],
+        copywriting_mode: "agent",
+        send_mode: "review",
+        created_by: user.id,
+      })
+      .select("id")
+      .single<{ id: string }>();
+    if (campaign) {
+      await supabase.from("agents").insert({
+        account_id: account.id,
+        kind: "copy",
+        name: "Outreach",
+        status: "live",
+        config: { cta: DEFAULT_CTA, channels: { linkedin: true } },
+        campaign_id: campaign.id,
+        deployed_at: new Date().toISOString(),
+        created_by: user.id,
+      });
+    }
   }
 
   // ── Intent (best-effort) — auto-derived watchlist; never blocks finishing ──

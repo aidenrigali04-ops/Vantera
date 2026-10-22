@@ -39,7 +39,6 @@ const CONFIGS = {
   // Onboarding favicon peek — per user id; one guarded fetch per URL blur.
   faviconPeek: { tokens: 20, window: "60 s" as Window },
   // Onboarding "redraft my buyers" — per user id; each click is an LLM call.
-  icpRegenerate: { tokens: 5, window: "10 m" as Window },
 } as const;
 
 export type LimitName = keyof typeof CONFIGS;
