@@ -91,8 +91,10 @@ describe("exemplarBlock — Vera's winning-message memory (Stage 0.5)", () => {
     const block = exemplarBlock(["Saw your post on hiring SDRs", "Congrats on the Series B"]);
     expect(block).toContain('"Saw your post on hiring SDRs"');
     expect(block).toContain('"Congrats on the Series B"');
-    // the load-bearing instructions: guide for angle, never copy, never borrow claims
-    expect(block.toLowerCase()).toContain("guide");
+    // the load-bearing instructions: reuse the angle, never its first words/structure, never copy,
+    // never borrow claims (copy-quality fix 2026-10-21: "guide for angle and energy" let exemplars
+    // clone the template)
+    expect(block).toContain("Reuse the angle (what it referenced), never its first words or sentence structure");
     expect(block.toLowerCase()).toContain("do not copy");
     expect(block.toLowerCase()).toContain("numbers");
   });

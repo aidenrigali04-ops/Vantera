@@ -25,9 +25,9 @@ When a real reply is received (anything except out of office), any remaining dra
 
 ## Replying yourself — you're in control
 
-You can always answer a conversation yourself from the prospect's page. The moment you send a reply, **automation pauses for that thread**: the agent stands down and won't message on top of you, so a prospect never gets a bot message right after your personal one. Any drafts the agent had queued for that person are pulled at the same time.
+You can always answer a conversation yourself from the prospect's page — or straight from LinkedIn. The moment you send a reply either way, **automation pauses for that thread**: the agent stands down and won't message on top of you, so a prospect never gets a bot message right after your personal one. Any drafts the agent had queued for that person are pulled at the same time. (Sending the agent's own pre-filled draft unchanged just approves it — that's not a takeover.)
 
-When you're ready to hand the thread back, use **Resume automation** on the prospect — the agent picks the conversation back up and will follow up if the prospect goes quiet. Until you do, the thread is yours.
+When you're ready to hand the thread back, use **Resume automation** on the prospect — the agent picks the conversation back up and will follow up if the prospect goes quiet. If the prospect has already booked a meeting, the agent only answers their replies; it won't start sending follow-ups again. Until you hand it back, the thread is yours.
 
 ## If a reply goes unanswered
 

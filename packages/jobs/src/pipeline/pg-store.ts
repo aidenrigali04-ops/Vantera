@@ -72,6 +72,7 @@ import {
   pickWhyNow,
   toStoredInsights,
   genomeSignature,
+  stripIdentity,
   replyPolarity,
   rollupCohort,
   type LeadInsights,
@@ -141,6 +142,8 @@ import {
 import { normalizeLinkedInUrl } from "./copy-draft";
 import { stampEnteredLead } from "./stamp";
 import { resolveSequenceConfig } from "./sequence-config";
+import { aggregateSenderLoad } from "./sender-load";
+import { STALE_TASK_MINUTES } from "./send-dispatch";
 import type { RefreshLeadLoad, RefreshLeadStore } from "./refresh-lead";
 import type { FastPassContext, FastPassStore, RevealRunPatch } from "./fast-pass";
 import type { QualifyLeadLoad, QualifyLeadStore } from "./qualify-lead";
@@ -201,32 +204,53 @@ function toRow(send: NewScheduledSend) {
 }
 
 /**
- * The account's most recent sent-message openers (first line, clipped) — injected into draft
- * prompts as "do not reuse" so a batch of drafts can't converge on one scaffold (69% of sends
- * had shared the same opener before this; AI-detectable templating is the category's #1
- * churn driver). Never used as grounding — see avoidBlock in @vantera/agent-brains.
+ * The account's most recent message openers — injected into draft prompts as "do not reuse" and
+ * (as skeletons, see openerSkeletons in @vantera/agent-brains) enforced in code, so a batch of
+ * drafts can't converge on one scaffold (69% of sends had shared the same opener before 0044;
+ * AI-detectable templating is the category's #1 churn driver). Never used as grounding.
+ *
+ * Copy-quality fix (2026-10-21): reads QUEUED drafts too (pending_review/approved — the template
+ * was repeating inside the review queue before anything sent), keeps a separate budget per
+ * linkedin_stage (invites no longer crowd follow-ups out of a mixed 10-row window), and strips the
+ * prospect's name/company from each opener so a rename can't satisfy "don't reuse".
  */
 const AVOID_PHRASES_LIMIT = 10;
-async function recentSendOpeners(db: Db, accountId: string): Promise<string[]> {
-  const rows = await db
-    .select({ body: scheduledSends.body })
-    .from(scheduledSends)
-    .where(
-      and(
-        eq(scheduledSends.accountId, accountId),
-        eq(scheduledSends.status, "sent"),
-        isNotNull(scheduledSends.body)
-      )
+const AVOID_OPENER_STATUSES = ["sent", "pending_review", "approved"] as const;
+const AVOID_OPENER_STAGES = ["message", "invite"] as const;
+export async function recentSendOpeners(db: Db, accountId: string): Promise<string[]> {
+  const perStage = await Promise.all(
+    AVOID_OPENER_STAGES.map((stage) =>
+      db
+        .select({
+          body: scheduledSends.body,
+          firstName: leads.firstName,
+          lastName: leads.lastName,
+          companyName: leads.companyName,
+        })
+        .from(scheduledSends)
+        .leftJoin(leads, eq(leads.id, scheduledSends.leadId))
+        .where(
+          and(
+            eq(scheduledSends.accountId, accountId),
+            inArray(scheduledSends.status, [...AVOID_OPENER_STATUSES]),
+            eq(scheduledSends.linkedinStage, stage),
+            isNotNull(scheduledSends.body)
+          )
+        )
+        .orderBy(desc(scheduledSends.updatedAt))
+        .limit(AVOID_PHRASES_LIMIT)
     )
-    .orderBy(desc(scheduledSends.updatedAt))
-    .limit(AVOID_PHRASES_LIMIT);
+  );
   const seen = new Set<string>();
   const out: string[] = [];
-  for (const r of rows) {
-    const opener = (r.body ?? "").split("\n")[0]!.slice(0, 70).trim();
-    if (opener.length < 12 || seen.has(opener.toLowerCase())) continue;
-    seen.add(opener.toLowerCase());
-    out.push(opener);
+  for (const rows of perStage) {
+    for (const r of rows) {
+      const identity = [r.firstName, r.lastName, r.companyName].filter(Boolean).join(" ");
+      const opener = stripIdentity((r.body ?? "").split("\n")[0]!, identity).slice(0, 90).trim();
+      if (opener.length < 12 || seen.has(opener.toLowerCase())) continue;
+      seen.add(opener.toLowerCase());
+      out.push(opener);
+    }
   }
   return out;
 }
@@ -1381,12 +1405,17 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
     async reviveSequenceRun(leadId: string, nextActionAt: Date) {
       // Conversation cadence (0044): the engaged lead's run goes back on the clock with one
       // touch of headroom — touches_done drops to (target-1)-equivalent by simply stepping
-      // back one from wherever it is, floored at 0. Exhausted/stopped runs come back active;
-      // converted runs stay converted (the win is never reopened).
+      // back one from wherever it is, floored at 0. Exhausted runs come back active; converted
+      // runs stay converted (the win is never reopened).
       //
       // paused_reply is EXCLUDED: that status means a human took the thread over (manual reply).
       // A later prospect reply must never silently re-arm automation on a human-driven thread —
       // only an explicit "resume automation" does that. (Human-takeover fix, 2026-07-10.)
+      //
+      // 'stopped' is EXCLUDED too: it is always a deliberate stand-down (hard negative, booking,
+      // calendar stand-down, turn-cap hand-off), and reviving it re-armed scripted nudges at a
+      // prospect who had booked or been handed to a human. A booked or suppressed lead never
+      // revives whatever its run status says.
       await db
         .update(sequenceRuns)
         .set({
@@ -1398,7 +1427,9 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         .where(
           and(
             eq(sequenceRuns.leadId, leadId),
-            inArray(sequenceRuns.status, ["active", "exhausted", "stopped"])
+            inArray(sequenceRuns.status, ["active", "exhausted"]),
+            sql`not exists (select 1 from ${leads} l where l.id = ${sequenceRuns.leadId} and l.meeting_booked_at is not null)`,
+            sql`not exists (select 1 from ${suppressionEntries} se join ${leads} l on l.id = ${sequenceRuns.leadId} where se.account_id = ${sequenceRuns.accountId} and se.kind = 'linkedin' and (se.lead_id = l.id or se.value = l.linkedin_url_normalized))`
           )
         );
     },
@@ -1594,9 +1625,14 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         .innerJoin(campaigns, eq(scheduledSends.campaignId, campaigns.id))
         .innerJoin(leads, eq(scheduledSends.leadId, leads.id))
         .where(
-          or(
-            eq(scheduledSends.status, "approved"),
-            and(eq(scheduledSends.status, "scheduled"), lt(scheduledSends.scheduledFor, staleCutoff))
+          and(
+            or(
+              eq(scheduledSends.status, "approved"),
+              and(eq(scheduledSends.status, "scheduled"), lt(scheduledSends.scheduledFor, staleCutoff))
+            ),
+            // archived/rejected leads left outreach — their leftover rows are never dispatched
+            ne(leads.status, "archived"),
+            ne(leads.status, "rejected")
           )
         );
 
@@ -1639,6 +1675,8 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
               inArray(scheduledSends.leadId, messageLeadIds),
               eq(scheduledSends.linkedinStage, "message"),
               or(
+                // any "sending" row blocks, stale or not: a stuck one may have been DELIVERED with
+                // the bookkeeping lost, so a second message could land right behind it
                 eq(scheduledSends.status, "sending"),
                 and(
                   eq(scheduledSends.status, "scheduled"),
@@ -1734,16 +1772,15 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         .where(and(eq(linkedinAccounts.accountId, accountId), eq(linkedinAccounts.status, "active")));
       if (accts.length === 0) return [];
 
-      const dayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
       const since7 = new Date(now.getTime() - 7 * 86_400_000);
+      const staleCutoff = new Date(now.getTime() - STALE_TASK_MINUTES * 60_000);
 
-      // One scan of this tenant's last-7d LinkedIn sends (bounded: ≤ ~100/wk per account),
-      // aggregated per sender in JS — today/7d invites, today messages, last-used recency.
-      const sends = await db
+      // Delivered: one scan of this tenant's last-7d LinkedIn sends (bounded: ≤ ~100/wk per account).
+      const delivered = await db
         .select({
           liId: outreachSends.linkedinAccountId,
           stage: scheduledSends.linkedinStage,
-          sentAt: outreachSends.sentAt,
+          at: outreachSends.sentAt,
         })
         .from(outreachSends)
         .innerJoin(scheduledSends, eq(outreachSends.scheduledSendId, scheduledSends.id))
@@ -1755,25 +1792,34 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           )
         );
 
-      return accts.map((a) => {
-        const mine = sends.filter((s) => s.liId === a.id);
-        const sentToday = mine.filter((s) => s.stage === "invite" && s.sentAt >= dayStart).length;
-        const last7d = mine.filter((s) => s.stage === "invite").length;
-        const sentTodayMessages = mine.filter((s) => s.stage === "message" && s.sentAt >= dayStart).length;
-        const lastAssignedAt = mine.reduce((m, s) => Math.max(m, s.sentAt.getTime()), 0);
-        const ageDays = a.connectedAt
-          ? Math.floor((now.getTime() - a.connectedAt.getTime()) / 86_400_000)
-          : 0;
-        return {
-          linkedinAccountId: a.id,
-          ageDays,
-          sentToday,
-          last7d,
-          sentTodayMessages,
-          lastAssignedAt,
-          healthy: true, // only active accounts were selected
-        };
-      });
+      // Handed out but not yet delivered, attributed to the lead's assigned sender. A scheduled
+      // row past the stale cutoff is excluded: the dispatcher re-dispatches it and counts it then.
+      const handedOut = await db
+        .select({
+          liId: leads.linkedinAccountId,
+          stage: scheduledSends.linkedinStage,
+          at: scheduledSends.scheduledFor,
+        })
+        .from(scheduledSends)
+        .innerJoin(leads, eq(scheduledSends.leadId, leads.id))
+        .where(
+          and(
+            eq(scheduledSends.accountId, accountId),
+            eq(scheduledSends.channel, "linkedin"),
+            or(
+              // a dead "sending" row (killed task) must not hold budget forever
+              and(eq(scheduledSends.status, "sending"), gte(scheduledSends.updatedAt, staleCutoff)),
+              and(eq(scheduledSends.status, "scheduled"), gte(scheduledSends.scheduledFor, staleCutoff))
+            )
+          )
+        );
+
+      return aggregateSenderLoad(
+        accts,
+        delivered,
+        handedOut.map((r) => ({ ...r, at: r.at ?? now })),
+        now
+      );
     },
 
     async assignLeadSender(leadId: string, linkedinAccountId: string): Promise<void> {
@@ -1781,7 +1827,10 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
     },
 
     async markScheduled(sendId: string, scheduledFor: Date) {
-      await db.update(scheduledSends).set({ status: "scheduled", scheduledFor }).where(eq(scheduledSends.id, sendId));
+      await db
+        .update(scheduledSends)
+        .set({ status: "scheduled", scheduledFor })
+        .where(and(eq(scheduledSends.id, sendId), inArray(scheduledSends.status, ["approved", "scheduled"])));
     },
 
     async cancelSend(sendId: string, error: string) {
@@ -1805,6 +1854,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           campaignStatus: campaigns.status,
           accountPaused: accounts.outreachPaused,
           leadLinkedinUrl: leads.linkedinUrl,
+          leadStatus: leads.status,
         })
         .from(scheduledSends)
         .innerJoin(accounts, eq(scheduledSends.accountId, accounts.id))
@@ -1824,7 +1874,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         body: r.body,
         campaignStatus: r.campaignStatus,
         accountPaused: r.accountPaused,
-        lead: { linkedinUrl: r.leadLinkedinUrl },
+        lead: { linkedinUrl: r.leadLinkedinUrl, status: r.leadStatus },
       };
     },
 
@@ -1837,20 +1887,58 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
       return rows.length > 0;
     },
 
+    // Status-guarded transitions: each only moves a row out of the states its caller can be in, so
+    // a late or duplicate task can never flip a row that another task already sent or settled.
     async revertToApproved(sendId: string) {
-      await db.update(scheduledSends).set({ status: "approved", scheduledFor: null }).where(eq(scheduledSends.id, sendId));
+      await db
+        .update(scheduledSends)
+        .set({ status: "approved", scheduledFor: null })
+        .where(and(eq(scheduledSends.id, sendId), inArray(scheduledSends.status, ["scheduled", "sending"])));
     },
 
     async markSent(sendId: string) {
-      await db.update(scheduledSends).set({ status: "sent" }).where(eq(scheduledSends.id, sendId));
+      await db
+        .update(scheduledSends)
+        .set({ status: "sent" })
+        .where(and(eq(scheduledSends.id, sendId), eq(scheduledSends.status, "sending")));
     },
 
     async markFailed(sendId: string, error: string) {
-      await db.update(scheduledSends).set({ status: "failed", error }).where(eq(scheduledSends.id, sendId));
+      await db
+        .update(scheduledSends)
+        .set({ status: "failed", error })
+        .where(and(eq(scheduledSends.id, sendId), inArray(scheduledSends.status, ["scheduled", "sending"])));
     },
 
     async markSuppressed(sendId: string) {
-      await db.update(scheduledSends).set({ status: "suppressed" }).where(eq(scheduledSends.id, sendId));
+      await db
+        .update(scheduledSends)
+        .set({ status: "suppressed" })
+        .where(and(eq(scheduledSends.id, sendId), inArray(scheduledSends.status, ["scheduled", "sending"])));
+    },
+
+    async cancelUnsentFollowups(leadId: string, reason: string) {
+      // an already-connected lead can still be messaged — the invite failing doesn't matter then
+      const [lead] = await db
+        .select({ connectedAt: leads.linkedinConnectedAt })
+        .from(leads)
+        .where(eq(leads.id, leadId))
+        .limit(1);
+      if (!lead || lead.connectedAt) return 0;
+      const rows = await db
+        .update(scheduledSends)
+        .set({ status: "canceled", error: reason })
+        .where(
+          and(
+            eq(scheduledSends.leadId, leadId),
+            eq(scheduledSends.linkedinStage, "message"),
+            // agent follow-ups only — a human-typed or reply-response message is never dropped here
+            eq(scheduledSends.origin, "sequence"),
+            inArray(scheduledSends.status, ["pending_review", "approved"])
+          )
+        )
+        .returning({ id: scheduledSends.id });
+      return rows.length;
     },
 
     async getLeadAssignedIdentity(leadId: string) {
@@ -2100,11 +2188,13 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           target: [replies.accountId, replies.providerMessageRef],
           where: sql`provider_message_ref is not null`,
         })
-        .returning({ id: replies.id });
-      if (row) return { id: row.id, created: true };
+        .returning({ id: replies.id, createdAt: replies.createdAt });
+      if (row) return { id: row.id, created: true, createdAt: row.createdAt, classified: false };
       if (!r.providerMessageRef) throw new Error("failed to insert reply");
+      // classified_at is the processed marker (runInbound writes it last): an existing row without
+      // it belongs to a run that crashed mid-way, and the caller finishes it instead of deduping.
       const [existing] = await db
-        .select({ id: replies.id })
+        .select({ id: replies.id, createdAt: replies.createdAt, classifiedAt: replies.classifiedAt })
         .from(replies)
         .where(
           and(
@@ -2114,7 +2204,83 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         )
         .limit(1);
       if (!existing) throw new Error("failed to insert reply");
-      return { id: existing.id, created: false };
+      return { id: existing.id, created: false, createdAt: existing.createdAt, classified: existing.classifiedAt !== null };
+    },
+
+    async getLeadLinkedInUrl(accountId: string, leadId: string) {
+      const [row] = await db
+        .select({ url: leads.linkedinUrl })
+        .from(leads)
+        .where(and(eq(leads.accountId, accountId), eq(leads.id, leadId)))
+        .limit(1);
+      return row?.url ?? null;
+    },
+
+    async isOwnOutboundMessage(accountId: string, leadId: string, providerMessageRef: string, body: string) {
+      // Our provider message id on the audit row is the strong key …
+      const [byRef] = await db
+        .select({ id: outreachSends.id })
+        .from(outreachSends)
+        .where(
+          and(
+            eq(outreachSends.accountId, accountId),
+            eq(outreachSends.leadId, leadId),
+            eq(outreachSends.messageRef, providerMessageRef)
+          )
+        )
+        .limit(1);
+      if (byRef) return true;
+      // … and the text of a send already claimed or delivered covers the echo racing the post-send
+      // bookkeeping (the row is 'sending' before the provider call, its body final).
+      const [byBody] = await db
+        .select({ id: scheduledSends.id })
+        .from(scheduledSends)
+        .where(
+          and(
+            eq(scheduledSends.accountId, accountId),
+            eq(scheduledSends.leadId, leadId),
+            inArray(scheduledSends.status, ["sending", "sent"]),
+            sql`btrim(${scheduledSends.body}) = btrim(${body})`
+          )
+        )
+        .limit(1);
+      return Boolean(byBody);
+    },
+
+    async pauseForHumanTakeover(accountId: string, leadId: string, campaignId: string | null) {
+      // Same semantics as the in-app manual reply (sendManualReply): the agent's queued drafts go
+      // (never a human's own manual sends), and every live-or-stood-down run holds at paused_reply
+      // until the user explicitly hands the thread back. 'converted' (the win) is left alone.
+      await db
+        .update(scheduledSends)
+        .set({ status: "canceled", error: "human took over the thread" })
+        .where(
+          and(
+            eq(scheduledSends.accountId, accountId),
+            eq(scheduledSends.leadId, leadId),
+            inArray(scheduledSends.status, ["pending_review", "approved", "scheduled"]),
+            or(isNull(scheduledSends.origin), ne(scheduledSends.origin, "manual"))
+          )
+        );
+      const paused = await db
+        .update(sequenceRuns)
+        .set({ status: "paused_reply", updatedAt: new Date() })
+        .where(
+          and(
+            eq(sequenceRuns.accountId, accountId),
+            eq(sequenceRuns.leadId, leadId),
+            inArray(sequenceRuns.status, ["active", "exhausted", "stopped", "paused_reply"])
+          )
+        )
+        .returning({ id: sequenceRuns.id });
+      // No run at all (never enrolled / compose-to-any-lead): a paused marker is what the
+      // responder and proactive touches read, so one must exist for the takeover to hold.
+      if (paused.length === 0 && campaignId) {
+        await db
+          .insert(sequenceRuns)
+          .values({ accountId, campaignId, leadId, status: "paused_reply" })
+          .onConflictDoNothing({ target: [sequenceRuns.campaignId, sequenceRuns.leadId] });
+      }
     },
 
     async setReplyClassification(replyId: string, verdict: import("@vantera/agent-brains").ReplyVerdict) {
@@ -2131,7 +2297,8 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
     async getResponderBundle(
       accountId: string,
       leadId: string,
-      _campaignId: string | null
+      _campaignId: string | null,
+      opts?: { excludeReplyId?: string }
     ): Promise<ResponderBundle | null> {
       // The live Outreach (copy) agent owns reply handling (rule 08). No live agent ⇒ responder off.
       const [agent] = await db
@@ -2168,12 +2335,14 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
       // Running thread: delivered agent touches + the lead's replies, merged oldest-first.
       // The INVITE note is included — it's the actual first touch, and a brain that can't see
       // it can regenerate the same hook, making a follow-up read like a second cold intro.
+      // Ordered by DELIVERY time (the audit row's sent_at, else markSent's updated_at stamp) — a
+      // draft created early but delivered after the lead's reply must sit after it in the thread.
       const sent = await db
         .select({
           body: scheduledSends.body,
           stage: scheduledSends.linkedinStage,
-          at: scheduledSends.createdAt,
-          deliveredAt: scheduledSends.updatedAt, // markSent stamps updated_at ⇒ delivery-time proxy
+          origin: scheduledSends.origin,
+          deliveredAt: sql<Date>`coalesce((select max(o.sent_at) from ${outreachSends} o where o.scheduled_send_id = ${scheduledSends.id}), ${scheduledSends.updatedAt})`.mapWith(scheduledSends.updatedAt),
         })
         .from(scheduledSends)
         .where(
@@ -2184,12 +2353,20 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
             isNotNull(scheduledSends.body)
           )
         );
+      // The incoming reply is handed to the brain separately (`incoming`); auto-responders aren't
+      // conversation and would read as the lead's last word.
       const got = await db
         .select({ body: replies.body, at: replies.receivedAt })
         .from(replies)
-        .where(eq(replies.leadId, leadId));
+        .where(
+          and(
+            eq(replies.leadId, leadId),
+            opts?.excludeReplyId ? ne(replies.id, opts.excludeReplyId) : undefined,
+            or(isNull(replies.classification), ne(replies.classification, "out_of_office"))
+          )
+        );
       const thread = [
-        ...sent.map((s) => ({ role: "agent" as const, text: s.body ?? "", at: s.at })),
+        ...sent.map((s) => ({ role: "agent" as const, text: s.body ?? "", at: s.deliveredAt })),
         ...got.map((r) => ({ role: "lead" as const, text: r.body ?? "", at: r.at })),
       ]
         .filter((t) => t.text.trim() !== "")
@@ -2198,6 +2375,9 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
 
       // Turn cap + delivery gap count MESSAGES only — the invite is thread context, not a turn.
       const sentMessages = sent.filter((s) => s.stage === "message");
+      // A human's manual message is thread context and gates the delivery gap, but never spends
+      // the AGENT's converse-to-close budget.
+      const agentMessages = sentMessages.filter((s) => s.origin !== "manual");
       const lastAgentMessageAt = sentMessages.reduce<Date | null>(
         (max, r) => (max === null || r.deliveredAt > max ? r.deliveredAt : max),
         null
@@ -2261,7 +2441,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           strategy: champion.strategy,
         },
         thread,
-        agentTurns: sentMessages.length,
+        agentTurns: agentMessages.length,
         newestUnsentMessageCreatedAt: pending?.createdAt ?? null,
         lastAgentMessageAt,
         humanHandled: paused !== undefined,
@@ -2478,7 +2658,10 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           nextActionAt: sequenceRuns.nextActionAt,
           enteredStageAt: sequenceRuns.enteredStageAt,
           revivedAt: sequenceRuns.revivedAt,
+          lastTouchAt: sequenceRuns.lastTouchAt,
           linkedinUrl: leads.linkedinUrl,
+          leadInvitedAt: leads.linkedinInvitedAt,
+          leadConnectedAt: leads.linkedinConnectedAt,
           sequenceConfig: campaigns.sequenceConfig,
           accountPaused: accounts.outreachPaused,
           // the lead engaged at least once — an exhausting run earns the one-shot soft-no revival
@@ -2509,6 +2692,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           nextActionAt: r.nextActionAt,
           enteredStageAt: r.enteredStageAt,
           revivedAt: r.revivedAt,
+          lastTouchAt: r.lastTouchAt,
         },
         channels: {
           linkedinUrl: r.linkedinUrl,
@@ -2518,6 +2702,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         ),
         accountPaused: r.accountPaused,
         leadReplied: r.leadReplied,
+        connection: { invitedAt: r.leadInvitedAt, connectedAt: r.leadConnectedAt },
       }));
     },
 
@@ -2590,6 +2775,17 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
 
     async archiveLead(leadId: string, campaignId: string): Promise<void> {
       await db.update(leads).set({ status: "archived" }).where(eq(leads.id, leadId));
+      // An archived lead is out of outreach: cancel whatever is still queued for them ("sending"
+      // is left alone — that provider call is already in flight).
+      await db
+        .update(scheduledSends)
+        .set({ status: "canceled", error: "lead archived" })
+        .where(
+          and(
+            eq(scheduledSends.leadId, leadId),
+            inArray(scheduledSends.status, ["pending_review", "approved", "scheduled"])
+          )
+        );
       await db
         .update(campaignLeads)
         .set({ status: "completed" })

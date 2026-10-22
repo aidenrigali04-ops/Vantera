@@ -7,8 +7,13 @@ import type {
   DraftableLead,
   NewScheduledSend,
 } from "./types";
-import { LINKEDIN_SYSTEM, buildTargetingProfile, leadBlock, rankByTilt, type CopyStrategy, type DraftInput, type JudgeFn, type LeadOutcomeFlags } from "@vantera/agent-brains";
+import { LINKEDIN_SYSTEM, LINKEDIN_PAIR_MESSAGE_TYPE, buildTargetingProfile, leadBlock, rankByTilt, type CopyStrategy, type DraftInput, type JudgeFn, type LeadOutcomeFlags } from "@vantera/agent-brains";
 import { getModelId } from "@vantera/ai";
+
+/** The follow-up part of the labeled pair the best-of-N judge reads (linkedinJudgeText). */
+function followupOf(judgeText: string): string {
+  return judgeText.split("Follow-up:\n")[1] ?? judgeText;
+}
 
 function scored(id: string, score: number): DraftableLead {
   return lead(id, { aiScore: score });
@@ -683,10 +688,13 @@ describe("runCopyDraft — best-of-N (Task 3, off by default)", () => {
       return { connectionNote: `note-${call}`, followupMessage: `follow-${call}`, violations: [] };
     });
     const scoreByFollowup: Record<string, number> = { "follow-1": 2, "follow-2": 4, "follow-3": 3 };
-    const seenContexts: { grounding: string; cta?: string }[] = [];
+    const seenContexts: { grounding: string; cta?: string; messageType?: string }[] = [];
+    const seenTexts: string[] = [];
     const judgeFn: JudgeFn = vi.fn(async (draft, ctx) => {
       seenContexts.push(ctx);
-      return { overall: scoreByFollowup[draft.text]! };
+      seenTexts.push(draft.text);
+      // the judge now reads the labeled pair (note, then follow-up) — key the score by the follow-up part
+      return { overall: scoreByFollowup[followupOf(draft.text)]! };
     });
     let capturedInput: DraftInput | undefined;
     const wrappedDraftFn: CopyDraftDeps["draftLinkedInFn"] = async (input) => {
@@ -711,7 +719,10 @@ describe("runCopyDraft — best-of-N (Task 3, off by default)", () => {
     for (const ctx of seenContexts) {
       expect(ctx.grounding).toBe(expectedGrounding);
       expect(ctx.cta).toBe("book a 15-min intro");
+      expect(ctx.messageType).toBe(LINKEDIN_PAIR_MESSAGE_TYPE);
     }
+    // labeled parts: the judge sees the note AND the follow-up, in the order the prospect reads them
+    expect(seenTexts).toContain("Connection note:\nnote-2\n\nFollow-up:\nfollow-2");
   });
 
   it("caps the effective n at MAX_BEST_OF_N regardless of a larger configured value", async () => {
@@ -768,7 +779,7 @@ describe("runCopyDraft — best-of-N (Task 3, off by default)", () => {
         : { connectionNote: `clean note ${call}`, followupMessage: `clean follow ${call}`, violations: [] };
     });
     const judgeFn: JudgeFn = vi.fn(async (draft) => ({
-      overall: draft.text === "dirty follow" ? 5 : 1,
+      overall: followupOf(draft.text) === "dirty follow" ? 5 : 1,
     }));
     const fixLinkedInFn = vi.fn(async () => ({
       connectionNote: "still dirty note",
@@ -807,7 +818,7 @@ describe("runCopyDraft — best-of-N (Task 3, off by default)", () => {
         : { connectionNote: `clean note ${call}`, followupMessage: `clean follow ${call}`, violations: [] };
     });
     const judgeFn: JudgeFn = vi.fn(async (draft) => ({
-      overall: draft.text === "dirty follow" ? 5 : 1,
+      overall: followupOf(draft.text) === "dirty follow" ? 5 : 1,
     }));
     const fixLinkedInFn = vi.fn(async () => ({
       connectionNote: "fixed note",
@@ -925,3 +936,56 @@ describe("runCopyDraft — daily first-touch cap", () => {
   });
 });
 
+
+describe("runCopyDraft — opener skeletons (copy-quality fix)", () => {
+  it("passes skeletons from recent openers AND winning exemplars to the brain (code-only, not the prompt list)", async () => {
+    const store = new FakeCopyStore();
+    store.leads = [lead("l1")];
+    store.context.winningOpeners = ["Saw your post on hiring SDRs"];
+    store.context.avoidPhrases = ["saw your post on hiring sdrs", "Thanks for connecting. Curious how you run outbound?"];
+    const captured: DraftInput[] = [];
+    const deps: CopyDraftDeps = {
+      store,
+      draftLinkedInFn: async (input) => {
+        captured.push(input);
+        return { connectionNote: "note", followupMessage: "A distinct opener for this one.", violations: [] };
+      },
+    };
+
+    await runCopyDraft(PAYLOAD, deps);
+
+    expect(captured[0]?.context.avoidSkeletons).toEqual(
+      expect.arrayContaining(["saw your post on hiring", "thanks for connecting curious how"])
+    );
+    // the winner stays out of the PROMPT's avoid list (no contradictory instruction)
+    expect(captured[0]?.context.avoidPhrases).toEqual(["Thanks for connecting. Curious how you run outbound?"]);
+  });
+
+  it("drafts later in the same run see earlier drafts' skeletons, and an in-run repeat routes to review", async () => {
+    const store = new FakeCopyStore({ linkedin: true }, "automatic");
+    store.leads = [lead("l1"), lead("l2", { firstName: "Sam", companyName: "Globex" })];
+    const captured: DraftInput[] = [];
+    let call = 0;
+    const deps: CopyDraftDeps = {
+      store,
+      draftLinkedInFn: async (input) => {
+        captured.push(input);
+        call += 1;
+        // both drafts open with the same five words, only the name differs
+        const name = call === 1 ? "Dana" : "Sam";
+        return { connectionNote: "note", followupMessage: `Three new reps at once, ${name}, is a lot. How's ramp?`, violations: [] };
+      },
+    };
+
+    await runCopyDraft({ ...PAYLOAD, leadIds: ["l1", "l2"] }, deps);
+
+    const messages = store.sends.filter((s) => s.linkedinStage === "message");
+    expect(messages).toHaveLength(2);
+    const flagged = messages.filter((m) => m.styleFlags?.includes("repeated-opener"));
+    // exactly one of the pair is flagged (whichever finished second) and it is held for review
+    expect(flagged).toHaveLength(1);
+    expect(store.sends.filter((s) => s.leadId === flagged[0]!.leadId).every((s) => s.status === "pending_review")).toBe(true);
+    const clean = messages.find((m) => !m.styleFlags);
+    expect(clean?.status).toBe("approved");
+  });
+});

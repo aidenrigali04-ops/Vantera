@@ -54,6 +54,22 @@ describe("runMeetingEvent", () => {
     expect(store.touched).toBe(1);
   });
 
+  it("a redelivered booking webhook is idempotent — one meeting-booked notification, not two", async () => {
+    const store = new FakeStore();
+    await runMeetingEvent({ connectionId: "c1", event: booked() }, { store });
+    const again = await runMeetingEvent({ connectionId: "c1", event: booked() }, { store });
+    expect(again).toEqual({ status: "booked", leadId: LEAD, attribution: "link" });
+    expect(store.notified).toEqual([LEAD]);
+  });
+
+  it("re-booking a previously CANCELED booking ref notifies again (a genuinely new booking)", async () => {
+    const store = new FakeStore();
+    await runMeetingEvent({ connectionId: "c1", event: booked() }, { store });
+    await runMeetingEvent({ connectionId: "c1", event: { ...booked(), kind: "canceled" } }, { store });
+    await runMeetingEvent({ connectionId: "c1", event: booked() }, { store });
+    expect(store.notified).toEqual([LEAD, LEAD]);
+  });
+
   it("never attributes a tag pointing at another workspace's lead (falls back to email, else unmatched)", async () => {
     const store = new FakeStore();
     const r = await runMeetingEvent({ connectionId: "c1", event: booked({ leadId: OTHER_ACCOUNT_LEAD }) }, { store });

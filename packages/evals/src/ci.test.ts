@@ -9,9 +9,18 @@ import {
   shouldSkipLiveEvals,
   JUDGE_OVERALL_GATE_FLOOR,
   DETERMINISTIC_LIVE_FLOOR,
+  linkedinJudgeCandidate,
+  respondJudgeCandidate,
+  summarizeJudgeCases,
+  lowestJudgeCases,
+  judgeDetailLines,
+  scoreJudge,
   type CiDeps,
   type CiInputs,
+  type JudgeCaseResult,
 } from "./ci";
+import { loadCopyLinkedinCorpus, loadCopyRespondCorpus } from "./corpus";
+import { leadBlock, LINKEDIN_PAIR_MESSAGE_TYPE } from "@vantera/agent-brains";
 import { PAIRWISE_NONINFERIORITY } from "./judge/pairwise";
 import type { FloorReport } from "./graders/classifier";
 
@@ -277,5 +286,104 @@ describe("production model split", () => {
     expect(ci).toContain('runDeterministic("live", draftingModel)');
     // orchestrate still calls deps.runReplyFloors(); only the production wiring must pass a model.
     expect(ci).not.toMatch(/[^.]runReplyFloors\(\)/);
+  });
+});
+
+describe("judge inputs — same grounding the writer sees, labeled parts, conversation context", () => {
+  const li = loadCopyLinkedinCorpus()[0]!;
+  const re = loadCopyRespondCorpus().find((c) => c.input.incoming)!;
+
+  it("first-touch: grounding is the writer's leadBlock (triggers, motivations, aha moment, what they do)", () => {
+    const cand = linkedinJudgeCandidate(li, { connectionNote: "N", followupMessage: "F" });
+    expect(cand.grounding).toBe(leadBlock(li.input));
+    expect(cand.grounding).toContain("Triggers:");
+    expect(cand.grounding).toContain("Aha moment:");
+    expect(cand.text).toBe("Connection note:\nN\n\nFollow-up:\nF");
+    expect(cand.messageType).toBe(LINKEDIN_PAIR_MESSAGE_TYPE);
+    // pairwise keeps the frozen-baseline flat format so the label never biases the head-to-head
+    expect(cand.pairwiseText).toBe("N\nF");
+  });
+
+  it("reply: the judge gets the thread, the prospect's latest message, and a message-type line", () => {
+    const cand = respondJudgeCandidate(re, { message: "Sure, here you go." });
+    const { lead, insights, context } = re.input;
+    expect(cand.grounding).toBe(leadBlock({ lead, insights, context }));
+    expect(cand.text).toBe("Sure, here you go.");
+    expect(cand.messageType).toMatch(/reply to the prospect's latest message/);
+    expect(cand.conversation).toContain(re.input.thread[0]!.text);
+    expect(cand.conversation).toContain(`latest message`);
+    expect(cand.conversation).toContain(re.input.incoming!);
+  });
+
+  it("orchestrate sends pairwiseText (flat) to pairwise and the labeled text to the judge", async () => {
+    const seen: { pairwise?: unknown; judge?: unknown } = {};
+    await orchestrate(
+      {
+        runDeterministic: async () => ({ passRate: 1 }),
+        runReplyFloors: async () => [],
+        runIntentFloors: async () => [],
+        runIntentHardFloors: async () => [],
+        runRankFloors: async () => [],
+        generateLiveCandidates: async () => [linkedinJudgeCandidate(li, { connectionNote: "N", followupMessage: "F" })],
+        runPairwise: async (c) => {
+          seen.pairwise = c;
+          return PASSING_PAIRWISE;
+        },
+        scoreJudge: async (c) => {
+          seen.judge = c;
+          return { averageOverall: 4, n: 1 };
+        },
+      },
+      false
+    );
+    expect(seen.pairwise).toEqual([{ caseId: li.id, text: "N\nF" }]);
+    expect((seen.judge as { text: string }[])[0]!.text).toContain("Follow-up:");
+  });
+});
+
+describe("judge summary explains itself", () => {
+  const mk = (caseId: string, overall: number, rationale = `r-${caseId}`): JudgeCaseResult => ({
+    caseId,
+    specificity: overall,
+    themFocus: 5,
+    posture: 4,
+    naturalness: 3,
+    overall,
+    rationale,
+  });
+
+  it("summarizeJudgeCases computes per-dimension means and keeps per-case results", () => {
+    const s = summarizeJudgeCases([mk("a", 2), mk("b", 4)]);
+    expect(s.n).toBe(2);
+    expect(s.averageOverall).toBe(3);
+    expect(s.dimensionMeans).toEqual({ specificity: 3, themFocus: 5, posture: 4, naturalness: 3, overall: 3 });
+    expect(s.cases).toHaveLength(2);
+    expect(summarizeJudgeCases([])).toMatchObject({ averageOverall: 0, n: 0 });
+  });
+
+  it("lowestJudgeCases returns the 5 lowest overall, ties in corpus order", () => {
+    const cases = [mk("a", 4), mk("b", 1), mk("c", 3), mk("d", 1), mk("e", 5), mk("f", 2), mk("g", 3)];
+    expect(lowestJudgeCases(cases).map((c) => c.caseId)).toEqual(["b", "d", "f", "c", "g"]);
+  });
+
+  it("judgeDetailLines prints dimension means and the lowest cases with rationales", () => {
+    const lines = judgeDetailLines(summarizeJudgeCases([mk("a", 2, "opens on a template"), mk("b", 4)]));
+    expect(lines[0]).toMatch(/dimension means: specificity=3\.00 themFocus=5\.00 posture=4\.00 naturalness=3\.00 overall=3\.00/);
+    expect(lines.join("\n")).toContain("a: overall=2");
+    expect(lines.join("\n")).toContain("opens on a template");
+    expect(judgeDetailLines({ averageOverall: 0, n: 0 })).toEqual([]);
+  });
+
+  it("scoreJudge passes each candidate's context (minus pairwiseText) and returns per-case verdicts", async () => {
+    const ctxs: unknown[] = [];
+    const s = await scoreJudge(
+      [{ caseId: "x", text: "t", grounding: "g", messageType: "m", conversation: "c", pairwiseText: "p" }],
+      async (_draft, ctx) => {
+        ctxs.push(ctx);
+        return { specificity: 4, themFocus: 4, posture: 4, naturalness: 4, overall: 4, rationale: "ok" };
+      }
+    );
+    expect(ctxs[0]).toEqual({ grounding: "g", messageType: "m", conversation: "c" });
+    expect(s.cases).toEqual([{ caseId: "x", specificity: 4, themFocus: 4, posture: 4, naturalness: 4, overall: 4, rationale: "ok" }]);
   });
 });

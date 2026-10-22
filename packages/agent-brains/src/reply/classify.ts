@@ -4,7 +4,9 @@ import { getClassifierModel, registerPrompt } from "@vantera/ai";
 
 export const replyVerdictSchema = z.object({
   classification: z.enum(["interested", "not_interested", "neutral", "out_of_office", "unsubscribe", "other"]),
-  rationale: z.string().max(300),
+  // No schema-level max: a chatty model exceeding it failed validation and threw, sinking the
+  // whole reply run (classify/suppress/notify). The length bound is applied after generation.
+  rationale: z.string(),
   /**
    * The prospect confirmed a SPECIFIC scheduled meeting or call — a time agreed, an invite
    * accepted, "see you then". Stamps the lead's meeting_booked_at so the funnel's Meetings stage
@@ -15,18 +17,28 @@ export const replyVerdictSchema = z.object({
 
 export type ReplyVerdict = z.infer<typeof replyVerdictSchema>;
 
+export const RATIONALE_MAX_CHARS = 300;
+
+// Removal must name a LIST (or all future contact): "remove me from the cc / this thread" is a
+// human loop-in, and an unsubscribe here writes suppression that never expires (rule 11).
+const LIST_TARGET = String.raw`(?:(?:your|the|this|that|any|all)\s+)?(?:(?:mailing|email|contact|distribution|marketing|prospect(?:ing)?|outreach|sales)\s+)?(?:list|lists|database|sequence|campaign)\b`;
 const UNSUB_PATTERNS = [
   /\bunsubscribe\b/i,
-  /\bremove me from\b/i,
-  /\btake me off (your|the|this)\b/i,
+  new RegExp(String.raw`\bremove me from\s+${LIST_TARGET}`, "i"),
+  new RegExp(String.raw`\btake me off\s+${LIST_TARGET}`, "i"),
+  /\bremove me from (all|any) (future )?(messages|emails|outreach|communications?|contact)\b/i,
   /\bstop (emailing|messaging|contacting) (me|us)\b/i,
   /\bdon'?t contact (me|us)\b/i,
 ];
 
+// Auto-responder phrasing only: a header-style prefix, the canned "this is an automatic reply",
+// or an absence statement (first-person, or opening the message) with a return cue. A human who merely MENTIONS being out
+// of office ("I was out last week — what's the price?") goes to the model.
+const RETURN_CUE = String.raw`\b(until|returning|return(ing)? on|will return|back on|back in|limited access|when i'?m back|when i am back|when i return|upon (my )?return)\b`;
 const OOO_PATTERNS = [
-  /out of (the )?office/i,
-  /on (annual|parental|sick) leave/i,
-  /auto(matic)?[- ]?reply/i,
+  /^\s*(automatic|auto)[- ]?(reply|response)\s*:/i,
+  /\bthis is an? auto(matic|mated)?[- ]?(reply|response)\b/i,
+  new RegExp(String.raw`(^\s*|\b(i am|i'm|i will be|i'll be)\s+)(currently\s+)?(out of (the )?office|away|on (annual|parental|sick|maternity|paternity) leave)\b[^.?!]*${RETURN_CUE}`, "i"),
 ];
 
 /** Deterministic first pass: legal-significance phrases never depend on a model. */
@@ -62,7 +74,7 @@ export async function classifyReply(
     schema: replyVerdictSchema,
     system: CLASSIFY_SYSTEM.text,
     prompt: `Reply:\n${body.slice(0, 2000)}`,
-    maxOutputTokens: 200,
+    maxOutputTokens: 300,
   });
-  return object;
+  return { ...object, rationale: object.rationale.slice(0, RATIONALE_MAX_CHARS) };
 }

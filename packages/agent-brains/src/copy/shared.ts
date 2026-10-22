@@ -29,6 +29,10 @@ export interface CopyContext {
    *  a batch of drafts doesn't converge on the model's favorite template (AI-detectable
    *  messaging is the #1 churn driver in the category). NEVER part of grounding. */
   avoidPhrases?: string[];
+  /** opener SKELETONS (identity-stripped first words, see copy/opener.ts) of recent sends, winning
+   *  exemplars, and drafts earlier in the same run. CODE-ONLY: enforced by validateLinkedInDraft's
+   *  repeated-opener lint, never rendered into the prompt or the grounding. */
+  avoidSkeletons?: string[];
   /** the seller's company name — so the caller can honestly say "this is {rep} from {company}" */
   accountName?: string | null;
   accountIndustry?: string | null;
@@ -74,7 +78,7 @@ export type CopyStrategy = {
    *  instruct a number, price, or promise. */
   openerAngle?: string;
   /** Message-shape selector (spec 2026-07-20): which STRUCTURE the first touch takes. Unset OR
-   *  "observation_question" is the byte-identical default (today's thanks/observation/question).
+   *  "observation_question" is the byte-identical default (the specific observation + question).
    *  A shape rewrites structure only — it can never override compliance (de-pitch + humanizer),
    *  which is enforced after generation regardless of shape. First-touch only (see
    *  FIRST_TOUCH_ONLY_KNOBS). */
@@ -124,7 +128,7 @@ export function strategyDirectives(strategy?: CopyStrategy, shape: TouchShape = 
       continue;
     }
     // Message-shape selector (spec §2/§3): the ONE directive allowed to REPLACE the default
-    // thanks/observation/question structure — precisely because compliance (de-pitch + humanizer)
+    // observation/question structure — precisely because compliance (de-pitch + humanizer)
     // is enforced deterministically after generation, so a structural override can never buy past
     // it. "observation_question" IS the default, so it emits nothing (byte-identical to unset).
     if (key === "messageShape") {
@@ -136,7 +140,7 @@ export function strategyDirectives(strategy?: CopyStrategy, shape: TouchShape = 
         // feature is off. A shape reshapes STRUCTURE only, never what may be claimed. Dash-free on
         // purpose (prompt prose primes output style).
         lines.push(
-          `- Use this message shape instead of the default thanks, observation and question structure: ${directive} This changes the STRUCTURE of the message only, never what you may claim. The de-pitch rules (no product name, no link, no meeting ask) and the voice rules still apply in full.`
+          `- Use this message shape instead of the default observation and question structure: ${directive} This changes the STRUCTURE of the message only, never what you may claim. The de-pitch rules (no product name, no link, no meeting ask) and the voice rules still apply in full.`
         );
       }
       continue;
@@ -230,7 +234,7 @@ export function avoidBlock(avoidPhrases?: string[]): string {
 
 /**
  * Vera's positive memory block (Stage 0.5) — openers that earned interested replies, offered as
- * a guide for angle and energy, NEVER copy material. Appended to the PROMPT only, never to the
+ * a guide for the angle (what it referenced), NEVER for first words or structure. Appended to the PROMPT only, never to the
  * grounding string (same rule as avoidBlock: an old message's metric must never whitelist a new
  * claim — the prompt-only invariant is guarded by test). Empty input → "" → prompt unchanged.
  */
@@ -238,7 +242,7 @@ export function exemplarBlock(winningExemplars?: string[]): string {
   const exemplars = (winningExemplars ?? []).map((e) => e.trim()).filter(Boolean);
   if (exemplars.length === 0) return "";
   return [
-    `These openers from this account earned interested replies from similar prospects. Use them ONLY as a guide for the angle and energy that works here. Write a fresh message for THIS prospect: do not copy or lightly rephrase any of them, and never borrow their specific numbers, names, or claims:`,
+    `These openers from this account earned interested replies from similar prospects. Reuse the angle (what it referenced), never its first words or sentence structure. Write a fresh message for THIS prospect: do not copy or lightly rephrase any of them, and never borrow their specific numbers, names, or claims:`,
     ...exemplars.map((e) => `- "${e}"`),
   ].join("\n");
 }

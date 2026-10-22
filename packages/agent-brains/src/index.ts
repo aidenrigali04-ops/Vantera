@@ -46,8 +46,16 @@ export {
   findActionClaims,
   findUnapprovedLinks,
   normalizeDashes,
+  findTemplateOpener,
   type Violation,
 } from "./copy/humanizer";
+export {
+  openerSkeleton,
+  openerSkeletons,
+  findRepeatedOpener,
+  stripIdentity,
+  OPENER_SKELETON_WORDS,
+} from "./copy/opener";
 export {
   draftLinkedIn,
   validateLinkedInDraft,
@@ -104,7 +112,10 @@ export {
   judgeCopy,
   JUDGE_MODEL_ID,
   JUDGE_PROMPT,
+  LINKEDIN_PAIR_MESSAGE_TYPE,
+  linkedinJudgeText,
   type JudgeVerdict,
+  type JudgeContext,
 } from "./copy/judge";
 export { bestOfN, type JudgeFn } from "./copy/best-of-n";
 export { classifyReply, preClassify, replyVerdictSchema, type ReplyVerdict } from "./reply/classify";

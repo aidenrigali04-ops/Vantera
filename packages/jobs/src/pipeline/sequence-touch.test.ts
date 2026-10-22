@@ -182,6 +182,31 @@ describe("runSequenceTouch", () => {
     expect(insert).not.toHaveBeenCalled();
   });
 
+  it("never sends a scripted nudge when the lead's message is the last, unanswered turn", async () => {
+    // A proactive nudge is written as "they haven't replied" — on a thread whose last word is
+    // the lead's, it reads as ignoring them. The touch skips; answering is the responder's job
+    // (or, past its freshness window, the stale-reply sweep's needs_human alert).
+    const draftFn = vi.fn();
+    const d = deps(
+      {
+        getResponderBundle: async () =>
+          bundle({
+            thread: [
+              { role: "agent", text: "Thanks for connecting, Sam." },
+              { role: "lead", text: "What would this cost for a 10-person team?" },
+            ],
+          }),
+      },
+      "ok",
+      [],
+      draftFn
+    );
+    const out = await runSequenceTouch(dispatch, d);
+    expect(out).toBe("skipped");
+    expect(draftFn).not.toHaveBeenCalled();
+    expect(d.store.insertScheduledSend).not.toHaveBeenCalled();
+  });
+
   it("forces review on a style-flagged draft even in automatic mode", async () => {
     const insert = vi.fn(async () => {});
     const draftFn = vi.fn(async () => ({ message: "salesy", violations: [{ rule: "buzzword", detail: "game-changer" }] }));

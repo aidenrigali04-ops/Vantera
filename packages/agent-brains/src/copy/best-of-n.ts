@@ -13,7 +13,7 @@
 /** Minimal judge contract this selector needs — `judgeCopy` (agent-brains) satisfies it directly. */
 export type JudgeFn = (
   draft: { text: string },
-  ctx: { grounding: string; cta?: string }
+  ctx: { grounding: string; cta?: string; messageType?: string; conversation?: string }
 ) => Promise<{ overall: number }>;
 
 /**
@@ -33,7 +33,7 @@ export async function bestOfN<T>(
   n: number,
   draftFn: () => Promise<T>,
   toText: (draft: T) => string,
-  context: { grounding: string; cta?: string },
+  context: Parameters<JudgeFn>[1],
   judge?: JudgeFn
 ): Promise<{ chosen: T; candidates: T[]; scores: number[] }> {
   if (n <= 1) {
