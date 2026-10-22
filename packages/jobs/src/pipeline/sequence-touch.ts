@@ -138,12 +138,10 @@ export async function runSequenceTouch(
     status,
     linkedinStage: "message",
     styleFlags,
-    // Stage 1 / WS-3.1: proactive follow-ups carry the lead's arm AND the resolved strategy +
-    // playbook version that shaped this message, so message-level attribution is complete.
+    // Stage 1: proactive follow-ups carry the strategy + playbook version that shaped this
+    // message, so message-level attribution is complete.
     recipe: buildSendRecipe({
       brain: "sequence_followup",
-      experimentId: bundle.attribution.experimentId,
-      variant: bundle.attribution.variant,
       strategy: bundle.attribution.strategy,
       playbookVersion: bundle.attribution.playbookVersion,
       // WS-3.4: the EXACT registry hash/model id that drafted this follow-up, threaded from the

@@ -9,7 +9,6 @@ const HAIKU = [
   "prospect/icp-draft.ts",
   "prospect/derive-criteria.ts",
   "intent/watchlist.ts",
-  "optimize/generate.ts",
 ];
 const SONNET = ["copy/linkedin.ts", "reply/respond.ts", "copy/fix.ts"];
 
