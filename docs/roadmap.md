@@ -139,6 +139,10 @@ Each entry stays short — the detail lives in that phase's spec (`docs/superpow
 - [x] **ML-8 — Warm escalation + speed-to-signal** — dispatch orders each account's sends warm-first when the day's safety budgets bind (reply responses → manual → ongoing conversations → fresh accepts newest-first → follow-ups → invites; ordering only, every cap/window/gate unchanged); the Intent Agent gains an **every 6 hours** cadence (`agents.cadence='intraday'`, per-run post budget ÷ 4 so daily LinkedIn reads are flat) and a **Followers** signal (`listFollowers` behind the LinkedIn interface; wordless → never classified as intent, still suppression → ICP gate → rank, as a `follow` signal the learner measures). Profile viewers are not exposed by the LinkedIn layer — not built. Migration `0069_intent_speed_signals` (two check constraints).
 - [ ] **ML-9 — Strategy loop** — the owner's adaptive-prospecting A1–A5 + B0–B3, plus the 2026-10-21 hive-audit fixes (harm-count bug — fixed in tree; sealed-holdout reuse/leak; generator's zero-effect defaults; Beta(1,1) unseen-candidate prior).
 
+### UX track
+
+- [x] **UX-1 — Activation (reduced)** — Today is the single home (login/OAuth/invite/gate land on /today; no first-session forward); Get Started checklist on Today (buyers · first prospects · LinkedIn · first approval, optional calendar/CRM; collapses at 2/4, dismissable at 4/4) + "No LinkedIn connected yet" tile; Playbook → Targeting shares the ICP chip editor with the buyer profile; scheduler holds accounts still in onboarding; trial clock starts at checkout (one clock); linkedin_connected / first_draft_approved events. Spec §3.1/§3.2 onboarding re-sequence + first-prospects preview were built and reverted on the owner's 2026-10-22 "onboarding stays untouched" decision — see the plan's Re-scope section. Spec: docs/superpowers/specs/2026-10-21-activation-ux-gojiberry-gap-design.md; plan: docs/superpowers/plans/2026-10-22-ux1-activation.md.
+
 ---
 
 ## Continuous tracks (no single phase)
