@@ -78,6 +78,7 @@ import {
   pickWhyNow,
   toStoredInsights,
   genomeSignature,
+  stripIdentity,
   replyPolarity,
   rollupArms,
   rollupCohort,
@@ -212,32 +213,53 @@ function toRow(send: NewScheduledSend) {
 }
 
 /**
- * The account's most recent sent-message openers (first line, clipped) — injected into draft
- * prompts as "do not reuse" so a batch of drafts can't converge on one scaffold (69% of sends
- * had shared the same opener before this; AI-detectable templating is the category's #1
- * churn driver). Never used as grounding — see avoidBlock in @vantera/agent-brains.
+ * The account's most recent message openers — injected into draft prompts as "do not reuse" and
+ * (as skeletons, see openerSkeletons in @vantera/agent-brains) enforced in code, so a batch of
+ * drafts can't converge on one scaffold (69% of sends had shared the same opener before 0044;
+ * AI-detectable templating is the category's #1 churn driver). Never used as grounding.
+ *
+ * Copy-quality fix (2026-10-21): reads QUEUED drafts too (pending_review/approved — the template
+ * was repeating inside the review queue before anything sent), keeps a separate budget per
+ * linkedin_stage (invites no longer crowd follow-ups out of a mixed 10-row window), and strips the
+ * prospect's name/company from each opener so a rename can't satisfy "don't reuse".
  */
 const AVOID_PHRASES_LIMIT = 10;
-async function recentSendOpeners(db: Db, accountId: string): Promise<string[]> {
-  const rows = await db
-    .select({ body: scheduledSends.body })
-    .from(scheduledSends)
-    .where(
-      and(
-        eq(scheduledSends.accountId, accountId),
-        eq(scheduledSends.status, "sent"),
-        isNotNull(scheduledSends.body)
-      )
+const AVOID_OPENER_STATUSES = ["sent", "pending_review", "approved"] as const;
+const AVOID_OPENER_STAGES = ["message", "invite"] as const;
+export async function recentSendOpeners(db: Db, accountId: string): Promise<string[]> {
+  const perStage = await Promise.all(
+    AVOID_OPENER_STAGES.map((stage) =>
+      db
+        .select({
+          body: scheduledSends.body,
+          firstName: leads.firstName,
+          lastName: leads.lastName,
+          companyName: leads.companyName,
+        })
+        .from(scheduledSends)
+        .leftJoin(leads, eq(leads.id, scheduledSends.leadId))
+        .where(
+          and(
+            eq(scheduledSends.accountId, accountId),
+            inArray(scheduledSends.status, [...AVOID_OPENER_STATUSES]),
+            eq(scheduledSends.linkedinStage, stage),
+            isNotNull(scheduledSends.body)
+          )
+        )
+        .orderBy(desc(scheduledSends.updatedAt))
+        .limit(AVOID_PHRASES_LIMIT)
     )
-    .orderBy(desc(scheduledSends.updatedAt))
-    .limit(AVOID_PHRASES_LIMIT);
+  );
   const seen = new Set<string>();
   const out: string[] = [];
-  for (const r of rows) {
-    const opener = (r.body ?? "").split("\n")[0]!.slice(0, 70).trim();
-    if (opener.length < 12 || seen.has(opener.toLowerCase())) continue;
-    seen.add(opener.toLowerCase());
-    out.push(opener);
+  for (const rows of perStage) {
+    for (const r of rows) {
+      const identity = [r.firstName, r.lastName, r.companyName].filter(Boolean).join(" ");
+      const opener = stripIdentity((r.body ?? "").split("\n")[0]!, identity).slice(0, 90).trim();
+      if (opener.length < 12 || seen.has(opener.toLowerCase())) continue;
+      seen.add(opener.toLowerCase());
+      out.push(opener);
+    }
   }
   return out;
 }

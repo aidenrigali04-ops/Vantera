@@ -495,3 +495,56 @@ describe("lead_embeddings queries are always account-scoped", () => {
     }
   });
 });
+
+// Copy-quality fix (2026-10-21): the avoid list reads queued drafts too, keeps a budget per
+// linkedin_stage, and strips the prospect's identity so a rename can't dodge "don't reuse".
+describe("recentSendOpeners", () => {
+  it("queries sent + queued rows per linkedin_stage and returns identity-stripped openers", async () => {
+    const { PgDialect } = await import("drizzle-orm/pg-core");
+    const { recentSendOpeners } = await import("./pg-store");
+    const wheres: unknown[] = [];
+    const limits: number[] = [];
+    const rowsByCall = [
+      [
+        { body: "Thanks for connecting, Sarah. Curious how Acme runs outbound?", firstName: "Sarah", lastName: "Lee", companyName: "Acme" },
+        { body: "Thanks for connecting, Tom. Curious how Northwind runs outbound?", firstName: "Tom", lastName: "Hale", companyName: "Northwind" },
+      ],
+      [{ body: "Congrats on the third warehouse, Priya.\nsecond line", firstName: "Priya", lastName: null, companyName: null }],
+    ];
+    let call = 0;
+    const db = {
+      select: () => ({
+        from: () => ({
+          leftJoin: () => ({
+            where: (cond: unknown) => {
+              wheres.push(cond);
+              const rows = rowsByCall[call++] ?? [];
+              return {
+                orderBy: () => ({
+                  limit: (n: number) => {
+                    limits.push(n);
+                    return Promise.resolve(rows);
+                  },
+                }),
+              };
+            },
+          }),
+        }),
+      }),
+    };
+
+    const out = await recentSendOpeners(db as unknown as Db, "acc-1");
+
+    expect(wheres).toHaveLength(2);
+    const dialect = new PgDialect();
+    const stages = wheres.map((w) => dialect.sqlToQuery(w as never).params);
+    for (const params of stages) {
+      expect(params).toEqual(expect.arrayContaining(["acc-1", "sent", "pending_review", "approved"]));
+    }
+    expect(stages[0]).toContain("message");
+    expect(stages[1]).toContain("invite");
+    expect(limits).toEqual([10, 10]);
+    // names/companies stripped: the two follow-ups collapse to ONE template entry
+    expect(out).toEqual(["Thanks for connecting. Curious how runs outbound?", "Congrats on the third warehouse."]);
+  });
+});

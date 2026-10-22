@@ -53,8 +53,10 @@ export const JUDGE_PROMPT = registerPrompt(
   `You are an independent quality judge for cold-outreach copy on a B2B LinkedIn sales platform. You did NOT write the draft below — score it as a skeptical outside reviewer, not as a collaborator trying to be generous.
 
 You will receive:
-- Draft: the outreach copy to evaluate (a LinkedIn connection note, follow-up message, or reply).
+- (optional) Message type: what kind of message this is and where it sits in the conversation.
+- Draft: the outreach copy to evaluate (a LinkedIn connection note, follow-up message, or reply). When it arrives in labeled parts ("Connection note:" then "Follow-up:"), judge them as the sequence the prospect will read: the follow-up should build on the note, not repeat its fact.
 - Grounding: the citable facts about the prospect this draft was supposed to be written from.
+- (optional) Conversation so far, ending with the prospect's latest message: judge the draft as the NEXT message in that thread. A short reply that fits the moment and answers what they asked can score 5 on specificity; do not demand new prospect facts a good reply would not need.
 - (optional) Intended call-to-action.
 
 Score four dimensions, each an integer 1-5 (5 = excellent, 1 = poor):
@@ -79,15 +81,29 @@ Respond with integer scores 1-5 for specificity, themFocus, posture, naturalness
  * `getModel(JUDGE_MODEL_ID)` — tests always inject a mock, so `getModel()`'s
  * ANTHROPIC_API_KEY requirement is never hit in the test suite.
  */
+export type JudgeContext = {
+  grounding: string;
+  cta?: string;
+  /** e.g. "LinkedIn connection note + first follow-up" or "Reply to the prospect's latest message" */
+  messageType?: string;
+  /** the rendered thread so far, ending with the prospect's latest message (conversation replies) */
+  conversation?: string;
+};
+
 export async function judgeCopy(
   draft: { text: string },
-  context: { grounding: string; cta?: string },
+  context: JudgeContext,
   model: LanguageModel = getModel(JUDGE_MODEL_ID)
 ): Promise<JudgeVerdict> {
-  const lines = [
+  const lines: string[] = [];
+  if (context.messageType) lines.push(`Message type: ${context.messageType}\n`);
+  lines.push(
     `Draft:\n${draft.text}`,
     `\nGrounding (citable facts this draft was written from):\n${context.grounding}`,
-  ];
+  );
+  if (context.conversation) {
+    lines.push(`\nConversation so far:\n${context.conversation}`);
+  }
   if (context.cta) {
     lines.push(`\nIntended call-to-action:\n${context.cta}`);
   }
@@ -100,4 +116,14 @@ export async function judgeCopy(
   });
 
   return object;
+}
+
+/** Message-type line for a first-touch pair (connection note + post-accept follow-up). */
+export const LINKEDIN_PAIR_MESSAGE_TYPE =
+  "LinkedIn first touch: a connection note, then the first follow-up sent after they accept";
+
+/** The first-touch pair as labeled parts, so the judge reads the sequence the prospect sees
+ *  (and can tell whether the follow-up builds on the note or repeats it). */
+export function linkedinJudgeText(draft: { connectionNote: string; followupMessage: string }): string {
+  return `Connection note:\n${draft.connectionNote}\n\nFollow-up:\n${draft.followupMessage}`;
 }

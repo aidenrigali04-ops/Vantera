@@ -34,7 +34,7 @@
   "grounding": "Seller offer: StockSync keeps stock counts in sync across every warehouse in real time Prospect: Jordan Vance, COO at Driftwood Mercantile (Ecommerce Retail). Pain points: Stock counts differ across three warehouses; Orders get promised on inventory that's already gone. Value angle: One shared inventory view stops orders from promising stock that's already gone",
   "frozenDraft": {
     "connectionNote": "Saw Driftwood added a third fulfillment warehouse this year, big step for the operation.",
-    "followupMessage": "Thanks for connecting. A third warehouse is great, though stock counts can drift apart fast. How do you track inventory today?",
+    "followupMessage": "A third warehouse is great, though stock counts can drift apart fast. How do you track inventory today?",
     "violations": []
   }
 }
