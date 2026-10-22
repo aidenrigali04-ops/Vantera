@@ -7,6 +7,9 @@ import { cn } from "@/lib/utils";
 import { initials } from "@/lib/today/metrics";
 import { Avatar } from "@/components/today/work-card/chips";
 import { PANEL, PageHeader, SEGMENT_TRACK, StatusChip, segmentClass } from "@/components/app/surface";
+import { IntentChip } from "@/components/app/intent-chip";
+import { replyIntent } from "@/lib/inbox-intent";
+import { leadSignalLine, type LeadSignalView } from "../prospects/lead-value";
 
 export const metadata = { title: "Inbox" };
 
@@ -18,6 +21,8 @@ export const metadata = { title: "Inbox" };
 const FILTERS = [
   { key: "all", label: "All" },
   { key: "waiting", label: "Waiting" },
+  { key: "interested", label: "Interested" },
+  { key: "booked", label: "Booked" },
   { key: "not_interested", label: "Not interested" },
 ] as const;
 type FilterKey = (typeof FILTERS)[number]["key"];
@@ -53,6 +58,8 @@ export default async function InboxPage({
 
   const filtered = allItems.filter((i) => {
     if (filter === "waiting" && !i.waiting) return false;
+    if (filter === "interested" && i.lastClassification !== "interested") return false;
+    if (filter === "booked" && !i.booked) return false;
     if (filter === "not_interested" && i.lastClassification !== "not_interested") return false;
     if (q && !`${i.name} ${i.company ?? ""}`.toLowerCase().includes(q)) return false;
     return true;
@@ -68,20 +75,36 @@ export default async function InboxPage({
     items.find((i) => i.leadId === selectedId) ?? allItems.find((i) => i.leadId === selectedId) ?? null;
   const turns = selectedId ? await loadThread(supabase, selectedId) : [];
 
-  // Pre-draft: a queued agent draft for this lead opens in the composer ("one click to send").
+  // Pre-draft: a message already queued or in flight for this lead opens in the composer
+  // ("one click to send") — never an invite note, and never blank while a reply is sending, which
+  // invited a re-typed duplicate. Same guard as the prospect page.
   let queuedDraft = "";
+  let whyNow: string | null = null;
   if (selectedId) {
-    const { data: q } = await supabase
-      .from("scheduled_sends")
-      .select("body")
-      .eq("lead_id", selectedId)
-      .in("status", ["pending_review", "approved", "scheduled"])
-      .neq("origin", "manual")
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle<{ body: string | null }>();
+    const [{ data: q }, { data: brief }] = await Promise.all([
+      supabase
+        .from("scheduled_sends")
+        .select("body")
+        .eq("lead_id", selectedId)
+        .eq("linkedin_stage", "message")
+        .in("status", ["pending_review", "approved", "scheduled", "sending"])
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle<{ body: string | null }>(),
+      supabase
+        .from("leads")
+        .select("ai_insights, lead_signals(kind, label, detail, observed_at)")
+        .eq("id", selectedId)
+        .maybeSingle<{
+          ai_insights: { triggers?: string[]; pain_points?: string[] } | null;
+          lead_signals: LeadSignalView[] | null;
+        }>(),
+    ]);
     queuedDraft = q?.body ?? "";
+    whyNow = brief ? leadSignalLine(brief.lead_signals, brief.ai_insights) : null;
   }
+  const selectedIntent = selected ? replyIntent(selected) : null;
+  const waitingCount = filtered.filter((i) => i.waiting).length;
 
   return (
     <div className="mx-auto flex w-full min-w-0 max-w-[1400px] flex-col gap-5 lg:min-h-0 lg:flex-1">
@@ -89,9 +112,7 @@ export default async function InboxPage({
         title="Inbox"
         subtitle="Every conversation, both sides, in one place. Unanswered warm replies come first."
       >
-        {items.some((i) => i.waiting) && (
-          <StatusChip tone="blue">{items.filter((i) => i.waiting).length} waiting on you</StatusChip>
-        )}
+        {waitingCount > 0 && <StatusChip tone="blue">{waitingCount} waiting on you</StatusChip>}
       </PageHeader>
 
       {/* R4 toolbar: search + filter chips — all URL state. */}
@@ -168,10 +189,13 @@ export default async function InboxPage({
                     <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                       <span className="flex items-center gap-2">
                         <span className="truncate text-[14px] font-semibold text-[var(--ink)]">{i.name}</span>
-                        {i.waiting && (
-                          <span className="shrink-0 rounded px-1.5 py-px text-[10.5px] font-semibold bg-[var(--acc-tint)] text-[var(--acc-ink)]">
-                            Waiting
-                          </span>
+                        {i.waiting ? (
+                          <IntentChip label="Waiting" tone="blue" />
+                        ) : (
+                          (() => {
+                            const intent = replyIntent(i);
+                            return intent && <IntentChip label={intent.label} tone={intent.tone} />;
+                          })()
                         )}
                         <span className="ml-auto shrink-0 text-[11.5px] tabular-nums text-[var(--ink-dim)]">
                           {new Date(i.lastAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
@@ -219,9 +243,19 @@ export default async function InboxPage({
                   </Link>
                   <Avatar initials={initials(selected.name)} size={40} className="max-lg:hidden" />
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-[14px] font-semibold text-[var(--ink)]">{selected.name}</p>
-                    {selected.company && (
-                      <p className="truncate text-xs text-muted-foreground">{selected.company}</p>
+                    <p className="flex items-center gap-2">
+                      <span className="truncate text-[14px] font-semibold text-[var(--ink)]">{selected.name}</span>
+                      {selectedIntent && <IntentChip label={selectedIntent.label} tone={selectedIntent.tone} />}
+                      {selected.aiScore !== null && (
+                        <span className="shrink-0 rounded border border-[var(--line)] px-1.5 py-px font-mono text-[10.5px] font-semibold text-[var(--ink-mid)]">
+                          {selected.aiScore} fit
+                        </span>
+                      )}
+                    </p>
+                    {(selected.company || whyNow) && (
+                      <p className="truncate text-xs text-muted-foreground">
+                        {[selected.company, whyNow && `Why now: ${whyNow}`].filter(Boolean).join(" · ")}
+                      </p>
                     )}
                   </div>
                   <Link

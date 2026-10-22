@@ -10,7 +10,7 @@ const ctx = (over: Partial<GateContext>): GateContext => ({
 
 describe("resolveGate", () => {
   it("auth pages redirect signed-in users to the dashboard", () => {
-    expect(resolveGate("auth", ctx({ isAuthenticated: true }))).toBe("/dashboard");
+    expect(resolveGate("auth", ctx({ isAuthenticated: true }))).toBe("/today");
   });
 
   it("auth pages render for anonymous users", () => {
@@ -31,7 +31,7 @@ describe("resolveGate", () => {
         "onboarding",
         ctx({ isAuthenticated: true, hasAccount: true, onboardingComplete: true })
       )
-    ).toBe("/dashboard");
+    ).toBe("/today");
   });
 
   it("app requires sign-in", () => {

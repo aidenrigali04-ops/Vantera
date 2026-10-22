@@ -6,7 +6,7 @@ routes: /today
 
 # Today — your five-second answer
 
-**Today** is your home. It is not an analytics page: it exists to answer five questions in order, top to bottom, and then hand you off to the work.
+**Today** is your home — it's where you land every time you sign in. It is not an analytics page: it exists to answer five questions in order, top to bottom, and then hand you off to the work.
 
 1. **Is anything broken?** A banner appears only when something has actually stopped the engine — a LinkedIn sender that dropped or was restricted, or a payment that failed. No banner means nothing is stopping it.
 2. **What needs me?** The greeting's one sentence, the dark button beside it, and the **Needs you** row.
@@ -31,7 +31,7 @@ When nothing needs you, the row says so in one line and the dark button disappea
 
 ## The four numbers
 
-**Sent**, **Replies**, **Interested**, and **Meetings** — each over the last seven days, each with one line of context underneath. Reply rate is only shown once you have at least twenty sends, because below that it is noise rather than a rate. There are no deltas, arrows, or charts here on purpose; the weekly email covers trends.
+**Sent**, **Replies**, **Interested**, and **Meetings** — each over the last seven days, each with one line of context underneath. Reply rate is only shown once you have at least twenty sends, because below that it is noise rather than a rate. There are no deltas, arrows, or charts here on purpose; the weekly email covers trends. Each number opens where it lives: **Sent** opens what's sending in Approvals, **Replies** and **Interested** open the Inbox, and **Meetings** opens your meetings list.
 
 ## The work card
 

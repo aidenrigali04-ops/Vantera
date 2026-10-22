@@ -20,6 +20,7 @@ import { loadThread } from "@/lib/conversations";
 import { EraseControl } from "./erase-control";
 import { LeadIdentity } from "./edit-lead";
 import { LeadNotes, type LeadNote } from "./lead-notes";
+import { ResumeAutomation } from "./resume-automation";
 
 const LEAD_SELECT =
   "id, first_name, last_name, title, company_name, company_size, industry, location, tech_stack, status, source, ai_score, ai_rationale, ai_insights, rules_gate_reasons, scored_at, email, email_status, phone, phone_status, linkedin_url, created_at, meeting_booked_at, meeting_source, replies(channel, classification, classification_rationale, body, received_at), lead_signals(kind, label, detail, observed_at)";
@@ -153,7 +154,19 @@ function buildTimeline(l: Lead): TimelineItem[] {
  * Goal-gradient: the journey's forward pointer, pinned at the top of the Activity
  * panel so it can never scroll out of view. "Won" is the closed peak state.
  */
-function nextStep(l: Lead): { label: "Next" | "Won"; title: string; description: string } | null {
+function nextStep(
+  l: Lead,
+  draftInReview: boolean
+): { label: "Next" | "Won"; title: string; description: string; cta?: { label: string; href: string } } | null {
+  // A draft waiting on the user outranks the status line — it's the one thing to do here.
+  if (draftInReview && l.status !== "converted") {
+    return {
+      label: "Next",
+      title: "Outreach drafted for approval",
+      description: "A personalized message is waiting for your sign-off.",
+      cta: { label: "Review in Approvals", href: "/approvals" },
+    };
+  }
   switch (l.status) {
     case "converted":
       return { label: "Won", title: "Closed — meeting booked", description: "Revenue in your pipeline." };
@@ -162,6 +175,7 @@ function nextStep(l: Lead): { label: "Next" | "Won"; title: string; description:
         label: "Next",
         title: "Book the meeting",
         description: "A reply landed — take the conversation to a booked call.",
+        cta: { label: "Open the thread", href: `/inbox?lead=${l.id}` },
       };
     case "in_campaign":
       return {
@@ -174,8 +188,8 @@ function nextStep(l: Lead): { label: "Next" | "Won"; title: string; description:
     default:
       return {
         label: "Next",
-        title: "Outreach drafted for approval",
-        description: "Your outreach layer writes a personalized message and queues it in Approvals.",
+        title: "Next in line for outreach",
+        description: "Your Outreach agent writes a personalized message and queues it in Approvals.",
       };
   }
 }
@@ -235,7 +249,7 @@ export default async function LeadProfilePage({ params }: { params: Promise<{ id
     // inviting a re-send (a re-typed duplicate used to reach the prospect twice).
     supabase
       .from("scheduled_sends")
-      .select("body")
+      .select("body, status")
       .eq("lead_id", id)
       .eq("linkedin_stage", "message")
       .in("status", ["pending_review", "approved", "scheduled", "sending"])
@@ -267,7 +281,7 @@ export default async function LeadProfilePage({ params }: { params: Promise<{ id
 
   const insights = lead.ai_insights;
   const timeline = buildTimeline(lead);
-  const next = nextStep(lead);
+  const next = nextStep(lead, queuedSend?.status === "pending_review");
   const verdict = scoreVerdict(lead.ai_score);
   const inactiveStatus = ["archived", "rejected"].includes(lead.status);
   const fresh = dataFreshness(lead.scored_at);
@@ -418,11 +432,7 @@ export default async function LeadProfilePage({ params }: { params: Promise<{ id
               latest-message-only. The human never takes over blind again. */}
           <Section label="Conversation">
             <div className="space-y-3">
-              {pausedRun && (
-                <p className="text-xs text-muted-foreground">
-                  You&apos;re driving this thread — automation is paused until you hand it back.
-                </p>
-              )}
+              {pausedRun && <ResumeAutomation leadId={lead.id} />}
               <ConversationPanel
                 leadId={lead.id}
                 turns={conversationTurns}
@@ -507,6 +517,14 @@ export default async function LeadProfilePage({ params }: { params: Promise<{ id
               </p>
               <p className="mt-0.5 text-sm font-medium text-foreground">{next.title}</p>
               <p className="mt-0.5 text-[13px] leading-relaxed text-[var(--ink-3)]">{next.description}</p>
+              {next.cta && (
+                <Link
+                  href={next.cta.href}
+                  className="mt-2 inline-flex text-[13px] font-medium text-[var(--cyan-strong)] hover:underline"
+                >
+                  {next.cta.label} →
+                </Link>
+              )}
             </div>
           )}
           <div className="mt-4 min-h-0 flex-1 lg:overflow-y-auto lg:pr-1">
