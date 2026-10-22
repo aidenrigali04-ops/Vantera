@@ -16,12 +16,10 @@ import { createClient } from "@/lib/supabase/server";
 import { checkLimit } from "@/lib/rate-limit";
 import { normalizeWebsiteUrl, validateOnboardingDetails } from "@/lib/validation";
 import { billingBypassAllowed } from "./billing-bypass";
+import { provisionOnboardingAgents } from "./provision";
 import { accountSkipsPayment } from "@/lib/billing/founder-exempt";
 
 export type DetailsState = { error?: string };
-
-/** Default outreach CTA — sensible out of the box, refined later in Settings → Sharpen your results. */
-const DEFAULT_CTA = "a quick intro call to see if it's a fit";
 
 // ── Step 1 · Details (full name + brand + website → workspace, scan, drafted ICP) ──────────
 
@@ -265,7 +263,7 @@ export async function finishOnboarding(): Promise<{ error?: string } | never> {
     .maybeSingle<{ id: string; name: string }>();
   if (!icp) return { error: "Save your details first." };
 
-  const existing = async (kind: "scout" | "copy" | "intent") =>
+  const existing = async (kind: "intent") =>
     (
       await supabase
         .from("agents")
@@ -276,60 +274,11 @@ export async function finishOnboarding(): Promise<{ error?: string } | never> {
         .maybeSingle<{ id: string }>()
     ).data;
 
-  // ── Prospect (Scout) — sources + qualifies against the drafted ICP ──
-  if (!(await existing("scout"))) {
-    const { data: scout, error: scoutErr } = await supabase
-      .from("agents")
-      .insert({
-        account_id: account.id,
-        kind: "scout",
-        name: "Scout",
-        status: "live",
-        config: { prospects_per_run: 60, min_score: 70 },
-        run_at_time: "08:00",
-        cadence: "daily",
-        timezone: "UTC",
-        deployed_at: new Date().toISOString(),
-        created_by: user.id,
-      })
-      .select("id")
-      .single<{ id: string }>();
-    if (scoutErr || !scout) {
-      return { error: "Could not finish setup. Only workspace admins can do this." };
-    }
-    await supabase
-      .from("agent_icps")
-      .insert({ agent_id: scout.id, icp_id: icp.id, account_id: account.id, position: 0 });
-  }
-
-  // ── Outreach (Copy) — drafts on a default CTA into the review queue ──
-  if (!(await existing("copy"))) {
-    const { data: campaign } = await supabase
-      .from("campaigns")
-      .insert({
-        account_id: account.id,
-        name: "Outreach (agent)",
-        status: "active",
-        channels: ["linkedin"],
-        targeting: [{ type: "icp", value: icp.name }],
-        copywriting_mode: "agent",
-        send_mode: "review",
-        created_by: user.id,
-      })
-      .select("id")
-      .single<{ id: string }>();
-    if (campaign) {
-      await supabase.from("agents").insert({
-        account_id: account.id,
-        kind: "copy",
-        name: "Outreach",
-        status: "live",
-        config: { cta: DEFAULT_CTA, channels: { linkedin: true } },
-        campaign_id: campaign.id,
-        deployed_at: new Date().toISOString(),
-        created_by: user.id,
-      });
-    }
+  // ── Prospect (Scout) + internal campaign + Outreach (Copy) agent ──
+  try {
+    await provisionOnboardingAgents({ supabase, accountId: account.id, userId: user.id, icp });
+  } catch {
+    return { error: "Could not finish setup. Only workspace admins can do this." };
   }
 
   // ── Intent (best-effort) — auto-derived watchlist; never blocks finishing ──
