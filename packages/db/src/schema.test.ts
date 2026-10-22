@@ -553,3 +553,18 @@ describe("intent speed + follow signal (0069, ML-8)", () => {
   });
 });
 
+describe("onboarding milestones (0070, UX-1)", () => {
+  const sql = readFileSync(join(migrationsDir, "0070_onboarding_milestones.sql"), "utf8").toLowerCase();
+  it("adds two nullable timestamps on accounts", () => {
+    expect(sql).toMatch(/alter table public\.accounts\s+add column buyers_confirmed_at timestamptz/);
+    expect(sql).toMatch(/add column prospects_reviewed_at timestamptz/);
+    expect(sql).not.toMatch(/not null/);
+  });
+  it("is mirrored in Drizzle", () => {
+    expect(schema.accounts.buyersConfirmedAt).toBeDefined();
+    expect(schema.accounts.prospectsReviewedAt).toBeDefined();
+  });
+  it("grants authenticated column-level update for the session-client stamps", () => {
+    expect(sql).toMatch(/grant update \(buyers_confirmed_at, prospects_reviewed_at\) on public\.accounts to authenticated/);
+  });
+});

@@ -53,6 +53,9 @@ export const accounts = pgTable("accounts", {
   // revenue snapshot (closed + expected MRR vs. the goal). Null until set in Settings.
   avgDealValueCents: bigint("avg_deal_value_cents", { mode: "number" }),
   onboardingCompletedAt: timestamp("onboarding_completed_at", { withTimezone: true }),
+  // 0070 (UX-1): onboarding milestones — ICP confirmed / first prospects reviewed
+  buyersConfirmedAt: timestamp("buyers_confirmed_at", { withTimezone: true }),
+  prospectsReviewedAt: timestamp("prospects_reviewed_at", { withTimezone: true }),
   stripeCustomerId: text("stripe_customer_id").unique(),
   stripeSubscriptionId: text("stripe_subscription_id"),
   outreachPaused: boolean("outreach_paused").notNull().default(false),
