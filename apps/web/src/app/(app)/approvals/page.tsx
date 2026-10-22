@@ -165,7 +165,7 @@ export default async function ReviewPage({
 
   return (
     // One-screen on desktop: header + view tabs pinned; the queue scrolls in its own region.
-    <div className="mx-auto flex w-full max-w-3xl flex-col lg:h-[calc(100dvh-3rem)]">
+    <div className="mx-auto flex w-full max-w-3xl flex-col lg:min-h-0 lg:flex-1">
       <div className="mb-6 flex shrink-0 flex-wrap items-end justify-between gap-3 border-b border-[var(--hairline)] pb-5">
         <div>
         <h1 className="text-2xl font-semibold tracking-tight">Approvals</h1>

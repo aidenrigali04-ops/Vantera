@@ -1,0 +1,297 @@
+<!doctype html>
+<!--
+  The landing's painted backdrop (behind the product showcase under the hero),
+  drawn as a generative oil painting: thousands of short brush strokes laid
+  along a flow field, in the brand blues and white. Rankaria sets its product
+  shot on a Van Gogh; this is our own canvas in the same spirit: a swirling
+  sky with a ringed sun over a rolling sea.
+
+  Rendered by render.sh (headless Chrome screenshot, then WebP via ffmpeg) to
+  public/landing/painting.webp. Deterministic: the seed fixes every stroke, so
+  a re-render reproduces the same picture. Change SEED for a new one.
+-->
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: #0b3a86;
+      }
+      canvas {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="c"></canvas>
+    <script>
+      const W = 2200;
+      const H = 1400;
+      const SEED = 20261020;
+
+      const canvas = document.getElementById("c");
+      canvas.width = W;
+      canvas.height = H;
+      const ctx = canvas.getContext("2d");
+
+      /* Seeded PRNG (mulberry32), so every run paints the same strokes. */
+      let s = SEED >>> 0;
+      const rand = () => {
+        s = (s + 0x6d2b79f5) >>> 0;
+        let t = s;
+        t = Math.imul(t ^ (t >>> 15), t | 1);
+        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+
+      /* 2D Perlin noise, permutation table from the seeded PRNG. */
+      const perm = new Uint8Array(512);
+      {
+        const p = Array.from({ length: 256 }, (_, i) => i);
+        for (let i = 255; i > 0; i--) {
+          const j = Math.floor(rand() * (i + 1));
+          [p[i], p[j]] = [p[j], p[i]];
+        }
+        for (let i = 0; i < 512; i++) perm[i] = p[i & 255];
+      }
+      const fade = (t) => t * t * t * (t * (t * 6 - 15) + 10);
+      const grad = (h, x, y) => {
+        switch (h & 7) {
+          case 0:
+            return x + y;
+          case 1:
+            return -x + y;
+          case 2:
+            return x - y;
+          case 3:
+            return -x - y;
+          case 4:
+            return x;
+          case 5:
+            return -x;
+          case 6:
+            return y;
+          default:
+            return -y;
+        }
+      };
+      const noise = (x, y) => {
+        const X = Math.floor(x) & 255;
+        const Y = Math.floor(y) & 255;
+        const xf = x - Math.floor(x);
+        const yf = y - Math.floor(y);
+        const u = fade(xf);
+        const v = fade(yf);
+        const aa = perm[perm[X] + Y];
+        const ab = perm[perm[X] + Y + 1];
+        const ba = perm[perm[X + 1] + Y];
+        const bb = perm[perm[X + 1] + Y + 1];
+        const l1 = grad(aa, xf, yf) + u * (grad(ba, xf - 1, yf) - grad(aa, xf, yf));
+        const l2 = grad(ab, xf, yf - 1) + u * (grad(bb, xf - 1, yf - 1) - grad(ab, xf, yf - 1));
+        return l1 + v * (l2 - l1); // about -1..1
+      };
+      const fbm = (x, y) => noise(x, y) * 0.65 + noise(x * 2.1, y * 2.1) * 0.35;
+
+      /* The sun: a ringed disc high on the right, the brightest thing in the
+         sky, with light rings rippling out from it. */
+      const SUN = { x: 0.86, y: 0.2, r: 0.07 };
+
+      /* The swirls. The product covers the middle of the picture, so they
+         sit where the frame around it shows: the corners and the rim. */
+      const VORTICES = [
+        { x: 0.1, y: 0.16, r: 0.12, spin: 1 },
+        { x: 0.36, y: 0.07, r: 0.08, spin: -1 },
+        { x: 0.62, y: 0.12, r: 0.1, spin: 1 },
+        { x: SUN.x, y: SUN.y, r: 0.15, spin: -1 },
+        { x: 0.04, y: 0.48, r: 0.09, spin: -1 },
+        { x: 0.97, y: 0.52, r: 0.09, spin: 1 },
+      ];
+
+      /* The horizon: where the sky meets a rolling sea. A gentle swell, not
+         hills, so the foot of the picture reads as water. */
+      const horizon = (x) =>
+        H * (0.74 + 0.012 * Math.sin((x / W) * 3.1 + 0.7) + 0.006 * Math.sin((x / W) * 11 + 2.1));
+
+      const flow = (x, y) => {
+        const nx = x / W;
+        const ny = y / H;
+        // The sea: long horizontal strokes that ride the swell, lifting into
+        // crests and dipping into troughs.
+        const hy = horizon(x);
+        if (y > hy - 4) {
+          const depth = (y - hy) / (H - hy);
+          const swell = Math.sin(nx * (18 + depth * 10) + ny * 26 + fbm(nx * 4, ny * 8) * 2.4);
+          return swell * (0.22 + depth * 0.18) + fbm(nx * 7, ny * 9) * 0.18;
+        }
+        // The sky: a broad wind from the left rolling into long waves.
+        let a = fbm(nx * 2.2, ny * 2.2) * Math.PI * 0.8 + Math.sin(nx * 6 + ny * 4) * 0.22;
+        let wx = Math.cos(a);
+        let wy = Math.sin(a) * 0.5;
+        for (const v of VORTICES) {
+          const dx = (nx - v.x) * (W / H);
+          const dy = ny - v.y;
+          const d = Math.hypot(dx, dy);
+          const k = Math.exp(-((d - v.r * 0.75) ** 2) / (2 * (v.r * 0.6) ** 2)) * 1.6;
+          // Tangent to the circle around the centre.
+          wx += (-dy / (d || 1)) * v.spin * k;
+          wy += (dx / (d || 1)) * v.spin * k;
+        }
+        return Math.atan2(wy, wx);
+      };
+
+      /* Palette: brand blue through the sky, deeper toward the top and in the
+         water, pale and white for the light. */
+      const mix = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
+      const DEEP = [9, 40, 108];
+      const NAVY = [13, 58, 142];
+      const BRAND = [24, 119, 242];
+      const SKY = [92, 160, 247];
+      const PALE = [188, 218, 253];
+      const WHITE = [247, 250, 255];
+
+      const baseColor = (x, y) => {
+        const nx = x / W;
+        const ny = y / H;
+        const hy = horizon(x);
+        if (y > hy) {
+          // The sea: deep blue, darkening toward the foot, with the sun's
+          // light laid across it as a broken path of white.
+          const depth = Math.min(1, (y - hy) / (H - hy));
+          let c = mix(BRAND, DEEP, depth ** 0.6);
+          const crest = Math.max(0, fbm(nx * 14, ny * 30));
+          c = mix(c, SKY, crest * 0.5);
+          const path = Math.exp(-((nx - SUN.x) ** 2) / (2 * (0.035 + depth * 0.05) ** 2));
+          const glint = Math.max(0, noise(nx * 60, ny * 40));
+          c = mix(c, WHITE, path * glint * 0.85);
+          // A pale line along the horizon itself.
+          c = mix(c, PALE, Math.exp(-((y - hy) ** 2) / (2 * 9 ** 2)) * 0.6);
+          return c;
+        }
+        // Vertical bands: deep at the top, brand blue through the middle,
+        // lightening toward the horizon.
+        let c =
+          ny < 0.32
+            ? mix(NAVY, BRAND, ny / 0.32)
+            : mix(BRAND, SKY, Math.min(1, (ny - 0.32) / (hy / H - 0.32)));
+        // Light gathers on the swirls' rings and in noise-driven clouds.
+        let light = Math.max(0, fbm(nx * 4 + 10, ny * 4) * 1.25);
+        for (const v of VORTICES) {
+          const dx = (nx - v.x) * (W / H);
+          const dy = ny - v.y;
+          const d = Math.hypot(dx, dy);
+          light +=
+            Math.max(0, Math.cos((d / v.r) * Math.PI * 2.2)) * Math.exp(-((d / v.r) ** 2)) * 0.85;
+        }
+        // The sun's disc, solid light.
+        {
+          const dx = (nx - SUN.x) * (W / H);
+          const dy = ny - SUN.y;
+          const d = Math.hypot(dx, dy);
+          if (d < SUN.r) light = 1.2;
+          else light += Math.exp(-((d - SUN.r) ** 2) / (2 * 0.03 ** 2)) * 0.6;
+        }
+        light = Math.min(1, light);
+        c = mix(c, light > 0.55 ? WHITE : PALE, light * 0.75);
+        // Shadow lanes between the light.
+        const dark = Math.max(0, -fbm(nx * 3 - 7, ny * 3 + 2));
+        c = mix(c, DEEP, dark * 0.5);
+        return c;
+      };
+
+      const rgb = (c, a = 1) => `rgba(${c[0] | 0},${c[1] | 0},${c[2] | 0},${a})`;
+
+      /* Ground: the base colours, blurred, so gaps between strokes read as
+         under-painting rather than bare canvas. */
+      const ground = () => {
+        const step = 20;
+        for (let y = 0; y < H; y += step) {
+          for (let x = 0; x < W; x += step) {
+            ctx.fillStyle = rgb(mix(baseColor(x, y), DEEP, 0.25));
+            ctx.fillRect(x, y, step, step);
+          }
+        }
+        ctx.filter = "blur(18px)";
+        ctx.drawImage(canvas, 0, 0);
+        ctx.filter = "none";
+      };
+
+      /* One brush stroke: a short path along the flow, drawn three times —
+         a darker underside, the paint, and a thin catch of light on top —
+         so each stroke stands up off the canvas like impasto. */
+      const stroke = (x0, y0, len, width, jitter) => {
+        const pts = [[x0, y0]];
+        let x = x0;
+        let y = y0;
+        for (let i = 0; i < len; i++) {
+          const a = flow(x, y) + jitter;
+          x += Math.cos(a) * 3.2;
+          y += Math.sin(a) * 3.2;
+          pts.push([x, y]);
+        }
+        const c = baseColor(x0, y0);
+        // Every stroke mixed a little differently on the palette.
+        const v = (rand() - 0.5) * 30;
+        let paint = [c[0] + v, c[1] + v, c[2] + v * 0.6];
+        const r = rand();
+        if (r < 0.045) paint = mix(paint, WHITE, 0.28);
+        else if (r < 0.16) paint = mix(paint, DEEP, 0.3);
+        const path = new Path2D();
+        path.moveTo(pts[0][0], pts[0][1]);
+        for (let i = 1; i < pts.length; i++) path.lineTo(pts[i][0], pts[i][1]);
+
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        ctx.save();
+        ctx.translate(1.2, 1.8);
+        ctx.strokeStyle = rgb(mix(paint, DEEP, 0.45), 0.55);
+        ctx.lineWidth = width + 1.2;
+        ctx.stroke(path);
+        ctx.restore();
+
+        ctx.strokeStyle = rgb(paint);
+        ctx.lineWidth = width;
+        ctx.stroke(path);
+
+        ctx.save();
+        ctx.translate(-0.8, -1);
+        ctx.strokeStyle = rgb(mix(paint, WHITE, 0.55), 0.35);
+        ctx.lineWidth = Math.max(1, width * 0.32);
+        ctx.stroke(path);
+        ctx.restore();
+      };
+
+      ground();
+
+      // Three passes, broad to fine, like a painter blocking in, then working
+      // the surface, then the final small marks.
+      const passes = [
+        { n: 9000, len: [10, 22], w: [9, 14] },
+        { n: 16000, len: [8, 18], w: [5, 9] },
+        { n: 14000, len: [5, 12], w: [3, 5] },
+      ];
+      for (const p of passes) {
+        for (let i = 0; i < p.n; i++) {
+          const x = rand() * (W + 80) - 40;
+          const y = rand() * (H + 80) - 40;
+          const len = p.len[0] + Math.floor(rand() * (p.len[1] - p.len[0]));
+          const w = p.w[0] + rand() * (p.w[1] - p.w[0]);
+          stroke(x, y, len, w, (rand() - 0.5) * 0.35);
+        }
+      }
+
+      // A faint canvas grain over everything.
+      const img = ctx.getImageData(0, 0, W, H);
+      for (let i = 0; i < img.data.length; i += 4) {
+        const g = (rand() - 0.5) * 10;
+        img.data[i] += g;
+        img.data[i + 1] += g;
+        img.data[i + 2] += g;
+      }
+      ctx.putImageData(img, 0, 0);
+
+      document.title = "done";
+    </script>
+  </body>
+</html>

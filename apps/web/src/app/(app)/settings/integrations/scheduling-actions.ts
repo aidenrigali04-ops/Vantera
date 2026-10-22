@@ -34,7 +34,7 @@ async function adminAccount(): Promise<string | null> {
  * ML-6: connect a scheduling tool. Verify the pasted key, create the booking webhook pointing at
  * this connection's own URL with a fresh signing secret, then store key + secret encrypted.
  * Secrets are written with the service role only after the admin check above; the client roles
- * can never read them back (0066 column lockdown). If storing fails, the vendor webhook is removed.
+ * can never read them back (0067 column lockdown). If storing fails, the vendor webhook is removed.
  */
 export async function connectScheduling(_prev: SchedulingState, formData: FormData): Promise<SchedulingState> {
   const parsed = parseSchedulingForm(formData);

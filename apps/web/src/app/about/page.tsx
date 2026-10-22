@@ -7,13 +7,13 @@ import { MarketingHeader } from "@/components/landing/marketing-header";
 export const metadata: Metadata = {
   title: "About Vantera — Quality-First LinkedIn Automation",
   description:
-    "Why we built Vantera: a quality-first, safety-first LinkedIn automation system that reaches the right people — on your approval, without risking your account.",
+    "Why we built Vantera: a quality-first, safety-first LinkedIn automation system that reaches the right people — on autopilot, without risking your account.",
   alternates: { canonical: "/about" },
 };
 
 const INTRO_PARAS = [
   "Most LinkedIn outreach is broken in the same way: it optimizes for volume. Send more invites, run more sequences, contact more people — and watch reply rates fall as your prospects' patience and your account's standing quietly wear down.",
-  "We think that's backwards. The number that matters isn't how many people you reach — it's how many of the right people you reach at the right moment. So we built Vantera to find the people actually in-market, qualify them against your ICP, and write each message from their real activity. You approve every send, and account safety is enforced, not optional.",
+  "We think that's backwards. The number that matters isn't how many people you reach — it's how many of the right people you reach at the right moment. So we built Vantera to find the people actually in-market, qualify them against your ICP, and write each message from their real activity. It runs on autopilot, machine learning sharpens who it targets with every reply, and account safety is enforced, not optional.",
   "The result is outreach that feels less like a machine and more like your sharpest rep — one who only ever reaches out when there's a genuine reason to.",
 ];
 
@@ -25,8 +25,8 @@ const PRINCIPLES = [
   },
   {
     icon: CheckCircle2,
-    title: "You stay in control",
-    body: "Nothing sends without your approval. Agents draft each message from real activity; you approve, edit, or skip every one.",
+    title: "Hands-off, never out of reach",
+    body: "Agents write and send each message from real activity, on autopilot. Pause an agent or step into any conversation whenever you like.",
   },
   {
     icon: ShieldCheck,

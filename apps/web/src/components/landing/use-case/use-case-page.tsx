@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { MarketingShell } from "@/components/landing/marketing-shell";
-import { TrustStrip } from "@/components/landing/trust-strip";
 import { Integrations } from "@/components/landing/integrations";
 import { JsonLd, breadcrumbLd, faqPageLd, SITE_URL } from "@/lib/seo";
 import { UseCaseHero } from "./use-case-hero";
@@ -81,7 +80,6 @@ export function UseCasePageBody({ content }: { content: UseCaseContent }) {
       />
 
       <UseCaseHero content={content.hero} />
-      <TrustStrip />
       <ProblemSection content={content.problem} />
       <WorkflowCompare content={content.compare} />
       <BenefitTiles content={content.benefits} />

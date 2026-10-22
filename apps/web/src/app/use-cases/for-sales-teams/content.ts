@@ -1,10 +1,11 @@
 import type { UseCaseContent } from "@/components/landing/use-case/types";
+import { ONBOARDING_MINUTES } from "@/components/landing/claims";
 
 /**
  * "For Sales Teams" — the flagship use-case page content. Plain, serializable data only
  * (the server page passes it into "use client" sections). Copy is grounded in the real
- * product (Scout + Outreach agents, ≥70 qualification gate, approve-every-send, safe pacing,
- * HubSpot/Pipedrive sync) and positioned on the gap competitors leave open: they automate
+ * product (Scout + Outreach agents, ≥70 qualification gate, autopilot sending, safe pacing,
+ * HubSpot/Salesforce/GoHighLevel sync) and positioned on the gap competitors leave open: they automate
  * SENDING; Vantera automates JUDGMENT. Metrics that aren't measured are framed illustratively.
  */
 export const SALES_TEAMS_CONTENT: UseCaseContent = {
@@ -12,7 +13,7 @@ export const SALES_TEAMS_CONTENT: UseCaseContent = {
   seo: {
     title: "LinkedIn Automation for Sales Teams — AI SDR Agents | Vantera",
     description:
-      "Give every rep an AI SDR on LinkedIn. Vantera finds in-market buyers, qualifies them against your ICP, and drafts every message from real activity — your team approves and closes. Safe pacing, CRM sync, no spray.",
+      "Give every rep an AI SDR on LinkedIn. Vantera finds in-market buyers, qualifies them against your ICP, and writes and sends every message from real activity on autopilot — your team closes. Safe pacing, CRM sync, no spray.",
   },
 
   hero: {
@@ -20,10 +21,10 @@ export const SALES_TEAMS_CONTENT: UseCaseContent = {
     headlinePre: "Turn your team's LinkedIn into",
     headlineHighlight: "booked pipeline",
     headlinePost: ".",
-    sub: "Vantera runs a team of AI SDRs on your reps' LinkedIn — surfacing in-market buyers, qualifying them against your ICP, and drafting every message from real activity. Your reps approve and close. No spray, no bans, no busywork.",
+    sub: "Vantera runs a team of AI SDRs on your reps' LinkedIn, on autopilot — surfacing in-market buyers, qualifying them against your ICP, and writing and sending every message from real activity. Your reps step in to close. No spray, no bans, no busywork.",
     primaryCta: { label: "Start free", href: "/signup" },
     secondaryCta: { label: "See how it works", href: "#how-it-works" },
-    trust: ["7-day free trial", "Cancel anytime", "You approve every send"],
+    trust: ["7-day free trial", "Cancel anytime", `Set up in ${ONBOARDING_MINUTES} minutes`],
     visual: {
       title: "Team pipeline",
       period: "This week",
@@ -115,9 +116,9 @@ export const SALES_TEAMS_CONTENT: UseCaseContent = {
         { label: "Agents surface in-market buyers", meta: "24/7" },
         { label: "Every lead scored against your ICP", meta: "≥ 70 to pass" },
         { label: "Messages drafted from real activity" },
-        { label: "You approve in one click" },
-        { label: "Safe-paced sends, human timing" },
-        { label: "Replies captured, wins synced to CRM" },
+        { label: "Sent on autopilot, at human timing" },
+        { label: "Replies answered, wins synced to CRM" },
+        { label: "Targeting sharpens with every outcome" },
       ],
     },
   },
@@ -149,10 +150,10 @@ export const SALES_TEAMS_CONTENT: UseCaseContent = {
         trend: [40, 55, 62, 70, 78, 84],
       },
       {
-        icon: "control",
-        value: "100%",
-        title: "Messages you approve",
-        body: "Every draft waits for a one-click approve, edit, or skip. Move to full-auto when you trust it.",
+        icon: "trend",
+        value: "Weekly",
+        title: "Sharper targeting",
+        body: "Machine learning studies who accepts, replies, and books, then sharpens who your agents reach next.",
       },
     ],
   },
@@ -161,7 +162,7 @@ export const SALES_TEAMS_CONTENT: UseCaseContent = {
     eyebrow: "The platform",
     title: "An AI SDR team — not another sequencer.",
     subtitle:
-      "Six parts of the outbound motion, working as one system, with your reps in control of every send.",
+      "Six parts of the outbound motion, working as one system on autopilot, with your reps free to step into any conversation.",
     items: [
       {
         icon: "prospecting",
@@ -194,26 +195,26 @@ export const SALES_TEAMS_CONTENT: UseCaseContent = {
       },
       {
         icon: "replies",
-        label: "Shared review queue",
-        title: "Approve outbound in one place",
-        body: "Every drafted message and reply lands in one queue the team works together — approve, edit, or skip, and nothing slips through.",
-        chips: ["one queue", "one-click approve", "full reply visibility"],
+        label: "Unified inbox",
+        title: "Every reply in one place",
+        body: "Replies from every connected sender land in one inbox, classified and sorted warm-first. Agents answer on autopilot, and your team can step into any conversation.",
+        chips: ["one inbox", "warm-first", "step in anytime"],
       },
       {
         icon: "crm",
         label: "CRM sync",
         title: "Clean handoff to your pipeline",
-        body: "Qualified conversations and closed deals flow straight into HubSpot or Pipedrive — no copy-paste, no lost context.",
-        chips: ["HubSpot", "Pipedrive", "auto-sync"],
+        body: "Won conversations land in HubSpot, Salesforce, or GoHighLevel as a contact and a deal — no copy-paste, no lost context.",
+        chips: ["HubSpot", "Salesforce", "auto-sync"],
       },
     ],
   },
 
   review: {
     eyebrow: "See it in action",
-    title: "Every message, drafted from real activity — you just approve.",
+    title: "Every message, written from real activity — and sent for you.",
     subtitle:
-      "This is the review queue your reps live in. Pick a draft to see the signal that triggered it, the insight behind it, and the message — then approve, edit, or skip.",
+      "This is your AI SDR at work. Pick a lead to see the signal that triggered it, the insight behind it, and the message it wrote — sent on autopilot at a safe, human pace.",
     drafts: [
       {
         initials: "DM",
@@ -269,24 +270,24 @@ export const SALES_TEAMS_CONTENT: UseCaseContent = {
   pipeline: {
     eyebrow: "How it works",
     title: "From in-market signal to booked meeting.",
-    subtitle: "One system runs the whole motion — and stops at your approval, every time.",
+    subtitle: "One system runs the whole motion on autopilot — and gets sharper with every outcome.",
     nodes: [
       { icon: "radar", label: "Identify", line: "ICP fit + LinkedIn intent", metric: "24/7 scan" },
       { icon: "filter", label: "Qualify", line: "Scored on fit + intent", metric: "≥ 70 to pass" },
       { icon: "outreach", label: "Draft", line: "Written from real activity", metric: "0 templates" },
-      { icon: "control", label: "Approve", line: "One-click approve or edit", metric: "100% yours" },
       { icon: "safety", label: "Send", line: "Safe, human-like pacing", metric: "≤ 100 / wk" },
-      { icon: "replies", label: "Converse", line: "Replies captured + drafted", metric: "full visibility" },
+      { icon: "replies", label: "Converse", line: "Replies answered for you", metric: "full visibility" },
       { icon: "calendar", label: "Book", line: "Qualified meetings land", metric: "on your calendar" },
-      { icon: "crm", label: "Sync", line: "Wins pushed to your CRM", metric: "HubSpot · Pipedrive" },
+      { icon: "crm", label: "Sync", line: "Wins pushed to your CRM", metric: "HubSpot · Salesforce" },
+      { icon: "trend", label: "Learn", line: "Outcomes sharpen targeting", metric: "every week" },
     ],
     howto: [
       { name: "Identify in-market buyers", text: "Vantera's Scout agent watches LinkedIn for buying behavior and matches people to your ideal customer profile." },
       { name: "Qualify against your ICP", text: "Each prospect is scored on fit, seniority, and intent; only those scoring 70 or above enter outreach." },
       { name: "Draft a personal message", text: "The Outreach agent writes each message from the prospect's real activity — never a template." },
-      { name: "Approve the send", text: "Every draft waits in a review queue for a rep to approve, edit, or skip before anything sends." },
-      { name: "Send with safe pacing", text: "Approved messages send within human-like limits spread across your connected senders to keep accounts safe." },
-      { name: "Book and sync", text: "Replies are captured and drafted, booked meetings land on the calendar, and closed deals sync to your CRM." },
+      { name: "Send with safe pacing", text: "Each message passes quality and safety checks, then sends on autopilot within human-like limits spread across your connected senders to keep accounts safe." },
+      { name: "Book and sync", text: "Replies are answered on autopilot, booked meetings land on the calendar, and closed deals sync to your CRM." },
+      { name: "Learn from every outcome", text: "Machine learning studies which invites are accepted, which replies show interest, and which conversations book meetings, then sharpens who the agents reach next." },
     ],
   },
 
@@ -333,19 +334,19 @@ export const SALES_TEAMS_CONTENT: UseCaseContent = {
       },
       {
         q: "Will the messages sound automated?",
-        a: "No. Every message is drafted from the prospect's own LinkedIn activity — a post they wrote, a signal at their company — instead of a merge tag. A humanizer check flags anything that reads like a bot before it reaches your queue, so what you approve sounds like a rep wrote it.",
+        a: "No. Every message is drafted from the prospect's own LinkedIn activity — a post they wrote, a signal at their company — instead of a merge tag. A humanizer check rewrites anything that reads like a bot before it sends, so every message sounds like a rep wrote it.",
       },
       {
-        q: "Do my reps stay in control of what gets sent?",
-        a: "Always. Human-in-the-loop review is the default: agents draft, reps approve, edit, or skip, and nothing sends until someone signs off. When a rep trusts the drafts, they can switch an agent to full-auto — clean messages send on their own and anything questionable routes back to review.",
+        q: "Do reps have to approve every message?",
+        a: "No. Vantera runs on autopilot: agents write each message from the prospect's real activity and send it at a safe, human pace inside each account's limits. Your team sets the goal and the audience once, machine learning keeps refining who gets messaged, and you can pause an agent or step into any conversation whenever you like.",
       },
       {
         q: "How is this different from Waalaxy or other LinkedIn tools?",
-        a: "Most LinkedIn tools automate sending — more invites, more sequences, more volume. Vantera automates the judgment: only prospects that clear an ICP-fit and in-market intent gate ever get a message, every message is written from real activity, and your team approves the sends. You end up with fewer, higher-quality conversations instead of a wall of ignored invites — and accounts that stay safe.",
+        a: "Most LinkedIn tools automate sending — more invites, more sequences, more volume. Vantera automates the judgment: only prospects that clear an ICP-fit and in-market intent gate ever get a message, every message is written from real activity, and machine learning sharpens the targeting from every outcome. You end up with fewer, higher-quality conversations instead of a wall of ignored invites — and accounts that stay safe.",
       },
       {
         q: "Does it work with our CRM?",
-        a: "Yes. Qualified and closed conversations push straight into HubSpot or Pipedrive, so your pipeline stays current without manual data entry. Vantera isn't a CRM itself — it does the finding, qualifying, and outreach, then hands the won conversations to the system your team already runs on.",
+        a: "Yes. Every won conversation lands in HubSpot, Salesforce, or GoHighLevel as a contact and a deal, so your pipeline stays current without manual data entry — and in HubSpot you can opt in to log every LinkedIn touch on the contact's timeline. Vantera isn't a CRM itself — it does the finding, qualifying, and outreach, then hands the won conversations to the system your team already runs on.",
       },
       {
         q: "How many meetings can a rep expect?",
@@ -365,10 +366,9 @@ export const SALES_TEAMS_CONTENT: UseCaseContent = {
   finalCta: {
     eyebrow: "Get started",
     title: "Your team's next quarter of pipeline is on LinkedIn right now.",
-    urgency:
-      "Every week you wait, a competitor is booking the meetings your reps could have. Deploy your AI SDR team today — live in minutes, first replies this week.",
+    urgency: `Every week you wait, a competitor is booking the meetings your reps could have. Deploy your AI SDR team today — set up in about ${ONBOARDING_MINUTES} minutes, first replies this week.`,
     primaryCta: { label: "Start free", href: "/signup" },
     secondaryCta: { label: "Talk to sales", href: "/pricing" },
-    reassurance: ["7-day free trial", "Live in minutes", "You approve every send"],
+    reassurance: ["7-day free trial", `Set up in ${ONBOARDING_MINUTES} minutes`, "Runs on autopilot"],
   },
 };

@@ -375,7 +375,7 @@ export const leadNotes = pgTable(
   (t) => [index("lead_notes_lead_idx").on(t.leadId, t.createdAt)]
 );
 
-// 0067 ML-7: profile embedding per qualified/contacted lead — lookalike similarity to the account's
+// 0068 ML-7: profile embedding per qualified/contacted lead — lookalike similarity to the account's
 // own positive leads (within-account only). Service-role only; composite (lead_id, account_id) FK in SQL.
 export const leadEmbeddings = pgTable(
   "lead_embeddings",
@@ -395,7 +395,7 @@ export const leadEmbeddings = pgTable(
   (t) => [index("lead_embeddings_account_idx").on(t.accountId)]
 );
 
-// 0066 ML-6: the account's scheduling-tool connection (Calendly / Cal.com). credential_enc +
+// 0067 ML-6: the account's scheduling-tool connection (Calendly / Cal.com). credential_enc +
 // signing_secret_enc are AES-256-GCM ciphertext, service-role written, never client-selectable.
 export const meetingConnections = pgTable(
   "meeting_connections",
@@ -419,7 +419,7 @@ export const meetingConnections = pgTable(
   (t) => [uniqueIndex("meeting_connections_account_provider_unique").on(t.accountId, t.provider)]
 );
 
-// 0066 ML-6: a provider booking attributed to a lead ('link' = our per-lead tag came back,
+// 0067 ML-6: a provider booking attributed to a lead ('link' = our per-lead tag came back,
 // 'email' = invitee email matched). The SQL carries a composite (lead_id, account_id) FK.
 export const meetingEvents = pgTable(
   "meeting_events",
@@ -448,7 +448,7 @@ export const meetingEvents = pgTable(
   ]
 );
 
-// 0065 ML-4: "Good fit" / "Not a fit" verdict on any prospect — one per lead, latest wins. Feeds the
+// 0066 ML-4: "Good fit" / "Not a fit" verdict on any prospect — one per lead, latest wins. Feeds the
 // qualification brain as revealed preferences; "not_fit" leads are excluded from drafting. The SQL
 // also carries a composite (lead_id, account_id) FK so a verdict can't cross workspaces.
 export const leadFeedback = pgTable(
@@ -1316,6 +1316,51 @@ export const optimizationPlaybook = pgTable("optimization_playbook", {
   // down/replenished by the e-process decide pipeline.
   alphaWealth: numeric("alpha_wealth", { mode: "number" }).notNull().default(0.05),
 });
+
+// 0065: full-funnel genome catalog. One row per distinct genome on an account.
+// agents.config.active_strategy_id (jsonb, no new column) may point at one of these later.
+// retention(strategies): kept for the life of the account; cascades on account deletion.
+export const strategies = pgTable(
+  "strategies",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    signature: text("signature").notNull(),
+    genome: jsonb("genome").notNull().default({}),
+    source: text("source", { enum: ["hive", "experiment", "manual", "default"] }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("strategies_account_signature_unique").on(t.accountId, t.signature)]
+);
+
+// 0065: one observational-or-experimental stamp per lead, written at entry.
+// experiment_id and arm stay null until a randomized arm exists. retention follows the lead.
+export const leadStrategyStamps = pgTable(
+  "lead_strategy_stamp",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    leadId: uuid("lead_id")
+      .notNull()
+      .references(() => leads.id, { onDelete: "cascade" }),
+    strategyId: uuid("strategy_id")
+      .notNull()
+      .references(() => strategies.id, { onDelete: "cascade" }),
+    experimentId: uuid("experiment_id").references(() => optimizationExperiments.id, {
+      onDelete: "set null",
+    }),
+    arm: text("arm", { enum: ["champion", "challenger"] }),
+    stampedAt: timestamp("stamped_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("lead_strategy_stamp_lead_unique").on(t.leadId),
+    index("lead_strategy_stamp_account_lead_idx").on(t.accountId, t.leadId),
+  ]
+);
 
 // ── 0018 conversion tokens ────────────────────────────────────────────────────
 

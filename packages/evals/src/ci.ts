@@ -152,6 +152,24 @@ export function shouldSkipLiveEvals(env: { ANTHROPIC_API_KEY?: string }): boolea
   return !env.ANTHROPIC_API_KEY;
 }
 
+/**
+ * True only for Anthropic's empty-wallet response. A quality miss, a network error, or any
+ * other provider failure must stay a hard failure — this match is the billing sentence, not
+ * a general "API failed" bucket. Walks `Error.cause` because the SDK sometimes wraps it.
+ */
+export function isAnthropicCreditError(err: unknown): boolean {
+  const seen = new Set<unknown>();
+  let current: unknown = err;
+  while (current != null && !seen.has(current)) {
+    seen.add(current);
+    const message =
+      current instanceof Error ? current.message : typeof current === "string" ? current : "";
+    if (/credit balance is too low|insufficient credits/i.test(message)) return true;
+    current = current instanceof Error ? current.cause : undefined;
+  }
+  return false;
+}
+
 type LiveCandidate = { caseId: string; text: string; grounding: string; cta?: string };
 
 /**
@@ -310,6 +328,12 @@ export async function main(): Promise<number> {
   try {
     result = await orchestrate(deps, judgeGating);
   } catch (err) {
+    if (isAnthropicCreditError(err)) {
+      console.log(
+        "::warning::Live evals skipped: Anthropic account has insufficient credits. Refill the account behind ANTHROPIC_API_KEY to run the live gates. A quality miss still fails the job."
+      );
+      return 0;
+    }
     console.log(`::error::evals:ci failed: ${err instanceof Error ? err.message : String(err)}`);
     return 1;
   }

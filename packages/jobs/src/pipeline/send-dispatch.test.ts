@@ -699,6 +699,20 @@ describe("runSendDispatch — proactive business-hours window", () => {
     expect(store.canceled).toHaveLength(0); // waiting, not destroying
   });
 
+  it("an admin workspace sends on the weekend and is not trial-capped", async () => {
+    const store = new FakeDispatchStore();
+    store.accountSendsCount = 50;
+    store.sends = [
+      makeSend({ id: "inv1", linkedinStage: "invite", subscriptionStatus: "trialing", unconstrained: true }),
+    ];
+    const deps = { ...makeDeps(store), now: () => SATURDAY };
+
+    const result = await runSendDispatch(deps);
+
+    expect(result.scheduled).toBe(1);
+    expect(result.skipped).toBe(0);
+  });
+
   it("reply-responses and manual sends are exempt — answering promptly is human", async () => {
     const store = new FakeDispatchStore();
     store.sends = [

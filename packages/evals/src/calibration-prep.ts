@@ -7,7 +7,7 @@ import { getModel } from "@vantera/ai";
 import { loadCopyLinkedinCorpus, loadCopyRespondCorpus, type CopyLinkedinCase, type CopyRespondCase } from "./corpus";
 import { judgeCopy, JUDGE_MODEL_ID } from "./judge/judge";
 import { cohensKappa, binOverall, KAPPA_TRUST_THRESHOLD, type CalibrationReport } from "./judge/kappa";
-import { shouldSkipLiveEvals } from "./ci";
+import { isAnthropicCreditError, shouldSkipLiveEvals } from "./ci";
 
 /**
  * The calibration LABELING PACKET builder + scorer (Phase 2C, Task 1 — "the unblocker"). This is
@@ -231,6 +231,12 @@ export async function main(): Promise<number> {
     );
     return 0;
   } catch (err) {
+    if (isAnthropicCreditError(err)) {
+      console.log(
+        "::warning::Calibration packet skipped: Anthropic account has insufficient credits. Refill the account behind ANTHROPIC_API_KEY to build the packet."
+      );
+      return 0;
+    }
     console.log(`::error::evals:calibration-prep failed: ${err instanceof Error ? err.message : String(err)}`);
     return 1;
   }

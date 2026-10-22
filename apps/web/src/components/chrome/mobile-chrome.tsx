@@ -43,11 +43,11 @@ export function MobileChrome({ workspaceName, paused = false, badges, notificati
 
   return (
     <>
-      <div className="sticky top-0 z-40 flex h-12 items-center gap-3 border-b border-[var(--line)] bg-[var(--surface)] px-4 lg:hidden">
+      <div className="sticky top-0 z-40 flex h-12 shrink-0 items-center gap-3 bg-[var(--fb)] px-4 lg:hidden">
         <Link
           href="/today"
           aria-label="Vantera home"
-          className={cn("grid size-8 shrink-0 place-items-center rounded-[var(--r-btn)] text-[var(--ink)]", CHROME_FOCUS)}
+          className={cn("grid size-8 shrink-0 place-items-center rounded-[var(--r-btn)] text-white", CHROME_FOCUS)}
         >
           <VanteraLogo className="size-4.5" />
         </Link>
@@ -60,7 +60,7 @@ export function MobileChrome({ workspaceName, paused = false, badges, notificati
               className="size-1.5 shrink-0 rounded-full bg-[var(--attention)]"
             />
           )}
-          <span className="truncate text-sm font-medium text-[var(--ink)]">{workspaceName}</span>
+          <span className="truncate text-sm font-medium text-white">{workspaceName}</span>
         </span>
         <div className="flex shrink-0 items-center gap-1.5">
           <BellTile notifications={notifications} />

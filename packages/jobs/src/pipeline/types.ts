@@ -27,9 +27,14 @@ import type {
   ConversationMessageInput,
   ConversationTurn,
   CopyStrategy,
+  FunnelCohort,
   FunnelStageKey,
   GenerateRecipesInput,
   LeadOutcomeFlags,
+  StampArm,
+  StrategyGenome,
+  StrategySource,
+  VariantOutcome,
   ExperimentStatus,
   SendRecipe,
   JudgeFn,
@@ -104,6 +109,12 @@ export interface ScoutContext {
     websiteScannedAt: Date | null;
     /** Drives the trial lead cap; 'trialing' accounts are bounded by TRIAL_LEAD_CAP. */
     subscriptionStatus: string;
+    /**
+     * Trial expiry already skips this workspace, so the row can stay `trialing` forever.
+     * When set, lead and send caps treat it as paid. Otherwise sourcing stops at
+     * TRIAL_LEAD_CAP and later runs look like a search that found nothing.
+     */
+    trialCapsExempt?: boolean;
     /** features.intent (Growth/Scale) — gates the company-event signal fetch (Phase 15). */
     intentEnabled: boolean;
   };
@@ -191,10 +202,13 @@ export interface AgentRunStore {
 
 export interface ScoutRunSummary {
   status: "completed" | "skipped";
-  /** present only on a "skipped" run when the shared credit pool can't cover this run's worst case */
-  reason?: "low_credits";
-  /** raw prospects this run intended to pull (0 = pool full / no capacity — discovery idled by
-   *  design). target > 0 with discovered 0 is the ops signal that the source came back empty. */
+  /**
+   * Why the run did not search. `low_credits` is a skip. The others are a completed idle:
+   * the gate did not run, so the run must not be read as "0 passed gate".
+   */
+  reason?: "low_credits" | "trial_cap" | "pool_full" | "preview_full";
+  /** raw prospects this run intended to pull (0 = pool full / trial cap / no channel — discovery
+   *  idled by design). target > 0 with discovered 0 is the ops signal that the source came back empty. */
   discoveryTarget: number;
   /** ICPs whose criteria were derived from free text and persisted this run */
   criteriaDerived: number;
@@ -501,6 +515,30 @@ export interface StartExperimentInput {
    * `optimization_playbook.alpha_wealth` in the same transaction as the insert (pg-store.ts).
    */
   alphaSpent: number;
+}
+
+/** A1 genome stamp. Writes a record at lead entry. Does not draft or send. */
+export type CohortWindow = { since?: Date; until?: Date };
+
+export interface StrategyStampStore {
+  upsertStrategy(accountId: string, genome: StrategyGenome, source: StrategySource): Promise<string>;
+  hasStrategyStamp(accountId: string, leadId: string): Promise<boolean>;
+  stampLead(
+    accountId: string,
+    leadId: string,
+    strategyId: string,
+    opts?: { experimentId?: string | null; arm?: StampArm }
+  ): Promise<void>;
+  /** Non-suppressed leads in the window, counted into the calibrate.ts cohort shape. */
+  getFunnelCohort(accountId: string, window?: CohortWindow): Promise<FunnelCohort>;
+  /**
+   * Per-arm outcomes for one experiment, from lead_strategy_stamp rows only.
+   * Empty arms when the experiment has no randomized stamps yet.
+   */
+  getVariantOutcomes(
+    accountId: string,
+    experimentId: string
+  ): Promise<Record<"champion" | "challenger", VariantOutcome>>;
 }
 
 export interface OptimizeStore {
@@ -854,6 +892,8 @@ export interface DispatchableSend {
   leadAssignedSenderId: string | null;
   /** Drives the trial send cap; 'trialing' accounts are bounded by TRIAL_SEND_CAP. */
   subscriptionStatus: string;
+  /** Admin workspace: no trial send cap and no weekday send window. */
+  unconstrained?: boolean;
 }
 
 /** One of a tenant's connected LinkedIn sender accounts, with its current safety state.

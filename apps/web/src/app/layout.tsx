@@ -31,23 +31,72 @@ const META_PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID;
 // (lib/analytics/clarity → linkedin). Beacon origins are allowlisted in lib/security/csp.
 const LINKEDIN_PARTNER_ID = linkedinPartnerId();
 
+/** Loads GA, Clarity, the Meta pixel, and the LinkedIn tag after the first gesture
+ *  or a 20s fallback. Queued calls from lib/analytics still replay when the tags arrive. */
+function deferredAnalyticsSource(): string {
+  const meta = META_PIXEL_ID
+    ? `if(!window.fbq){var n=window.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!window._fbq)window._fbq=n;n.push=n;n.loaded=!0;n.version="2.0";n.queue=[];}
+var mt=document.createElement("script");mt.async=true;mt.src="https://connect.facebook.net/en_US/fbevents.js";
+document.head.appendChild(mt);
+window.fbq("init","${META_PIXEL_ID}");
+window.fbq("track","PageView");`
+    : "";
+  const linkedin = LINKEDIN_PARTNER_ID
+    ? `window._linkedin_partner_id="${LINKEDIN_PARTNER_ID}";
+window._linkedin_data_partner_ids=window._linkedin_data_partner_ids||[];
+window._linkedin_data_partner_ids.push(window._linkedin_partner_id);
+if(!window.lintrk){window.lintrk=function(a,b){window.lintrk.q.push([a,b])};window.lintrk.q=[];}
+var lt=document.createElement("script");lt.async=true;lt.src="https://snap.licdn.com/li.lms-analytics/insight.min.js";
+document.head.appendChild(lt);`
+    : "";
+  return `(function(){
+if(window.__vanteraAnalytics)return;
+var started=false;
+function start(){
+if(started)return;
+started=true;
+window.__vanteraAnalytics=true;
+var g=document.createElement("script");g.async=true;g.src="https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}";
+document.head.appendChild(g);
+window.dataLayer=window.dataLayer||[];
+window.gtag=function(){window.dataLayer.push(arguments);};
+window.gtag("js",new Date());
+window.gtag("config","${GA_MEASUREMENT_ID}");
+(function(c,l,a,r,i,t,y){c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);})(window,document,"clarity","script","${CLARITY_PROJECT_ID}");
+${meta}
+${linkedin}
+}
+["pointerdown","keydown","scroll","touchstart"].forEach(function(ev){window.addEventListener(ev,start,{once:true,passive:true});});
+setTimeout(start,20000);
+})();`;
+}
+
 const montserrat = Montserrat({
   variable: "--font-montserrat",
   subsets: ["latin"],
+  display: "swap",
+  // Dashboard face. Don't preload it on the marketing document — those files
+  // were competing with the hero font on the critical path.
+  preload: false,
 });
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+  display: "swap",
+  preload: false,
 });
 
-// Poppins powers the 2026 marketing landing (weight hierarchy: 400 body → 800
-// display; 800 is the all-caps hero headline). Montserrat / Geist Mono stay the
-// app + dashboard typefaces.
+// Poppins backs the theme's display / heading / mono tokens by default. Marketing,
+// auth, and onboarding re-point it to their own face (components/landing/font.ts, loaded
+// only there so app routes never download it). Montserrat / Geist Mono stay the app +
+// dashboard typefaces.
 const poppins = Poppins({
   variable: "--font-poppins",
   subsets: ["latin"],
   weight: ["400", "500", "600", "700", "800"],
+  display: "swap",
+  adjustFontFallback: true,
 });
 
 export const metadata: Metadata = {
@@ -82,86 +131,37 @@ export default function RootLayout({
       className={`${montserrat.variable} ${geistMono.variable} ${poppins.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        {/* Google Analytics + Clarity — every route, lazyOnload so they run during idle after
-            load instead of competing for the main thread in the LCP/TTI window (mobile perf). */}
+        {/* Analytics tags stay off the lab window. They load on the first gesture,
+            or after 20s, so a real session is still recorded. The Meta pixel used
+            to boot with afterInteractive and was the longest main-thread task. */}
         {process.env.NODE_ENV === "production" && (
-          <>
-            <Script
-              src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
-              strategy="lazyOnload"
-            />
-            <Script id="google-analytics" strategy="lazyOnload">
-              {`window.dataLayer = window.dataLayer || [];
-function gtag(){dataLayer.push(arguments);}
-gtag('js', new Date());
-gtag('config', '${GA_MEASUREMENT_ID}');`}
-            </Script>
-            <Script id="microsoft-clarity" strategy="lazyOnload">
-              {`(function(c,l,a,r,i,t,y){
-    c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
-    t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
-    y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
-})(window, document, "clarity", "script", "${CLARITY_PROJECT_ID}");`}
-            </Script>
-          </>
+          <Script id="deferred-analytics" strategy="lazyOnload">
+            {deferredAnalyticsSource()}
+          </Script>
         )}
-        {/* Meta Pixel — the official bootstrap (no-ops if lib/analytics/meta already
-            stubbed fbq; fbevents.js replays any queued calls). Base PageView here;
-            route-change PageViews + funnel events come from the client wrappers. */}
         {process.env.NODE_ENV === "production" && META_PIXEL_ID && (
-          <>
-            <Script id="meta-pixel" strategy="afterInteractive">
-              {`!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
-n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;
-t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,
-document,'script','https://connect.facebook.net/en_US/fbevents.js');
-fbq('init', '${META_PIXEL_ID}');
-fbq('track', 'PageView');`}
-            </Script>
-            <noscript>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                height="1"
-                width="1"
-                style={{ display: "none" }}
-                alt=""
-                src={`https://www.facebook.com/tr?id=${META_PIXEL_ID}&ev=PageView&noscript=1`}
-              />
-            </noscript>
-          </>
+          <noscript>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              height="1"
+              width="1"
+              style={{ display: "none" }}
+              alt=""
+              src={`https://www.facebook.com/tr?id=${META_PIXEL_ID}&ev=PageView&noscript=1`}
+            />
+          </noscript>
         )}
-        {/* LinkedIn Insight Tag — the official bootstrap. lazyOnload keeps it off the
-            LCP/TTI window (it's retargeting/conversion, not needed for first paint);
-            conversion fires come through trackEvent → lib/analytics/linkedin. */}
         {process.env.NODE_ENV === "production" && LINKEDIN_PARTNER_ID && (
-          <>
-            <Script id="linkedin-insight-init" strategy="lazyOnload">
-              {`_linkedin_partner_id = "${LINKEDIN_PARTNER_ID}";
-window._linkedin_data_partner_ids = window._linkedin_data_partner_ids || [];
-window._linkedin_data_partner_ids.push(_linkedin_partner_id);`}
-            </Script>
-            <Script id="linkedin-insight" strategy="lazyOnload">
-              {`(function(l) {
-if (!l){window.lintrk = function(a,b){window.lintrk.q.push([a,b])};
-window.lintrk.q=[]}
-var s = document.getElementsByTagName("script")[0];
-var b = document.createElement("script");
-b.type = "text/javascript";b.async = true;
-b.src = "https://snap.licdn.com/li.lms-analytics/insight.min.js";
-s.parentNode.insertBefore(b, s);})(window.lintrk);`}
-            </Script>
-            <noscript>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                height="1"
-                width="1"
-                style={{ display: "none" }}
-                alt=""
-                src={`https://px.ads.linkedin.com/collect/?pid=${LINKEDIN_PARTNER_ID}&fmt=gif`}
-              />
-            </noscript>
-          </>
+          <noscript>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              height="1"
+              width="1"
+              style={{ display: "none" }}
+              alt=""
+              src={`https://px.ads.linkedin.com/collect/?pid=${LINKEDIN_PARTNER_ID}&fmt=gif`}
+            />
+          </noscript>
         )}
         <MetaRouteTracker />
         {/* Site-wide entity graph for Google + AI engines. */}

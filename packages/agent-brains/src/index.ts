@@ -199,6 +199,18 @@ export {
   type ExperimentStatus,
 } from "./optimize/experiment";
 export { aggregateArm, type LeadOutcomeFlags } from "./optimize/outcomes";
+export {
+  asStrategyGenome,
+  genomeSignature,
+  replyPolarity,
+  rollupArms,
+  rollupCohort,
+  type CohortLead,
+  type StampArm,
+  type StrategyGenome,
+  type StrategySource,
+} from "./optimize/cohort";
+export type { FunnelCohort } from "./research/calibrate";
 export { buildSendRecipe, type SendRecipe, type RecipeBrain } from "./optimize/recipe";
 export { validateRecipeAngle } from "./optimize/angle";
 export { strategySignature, aggregateBySignature, chooseChallenger } from "./optimize/bandit";

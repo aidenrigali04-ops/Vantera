@@ -279,7 +279,7 @@ export default async function TermPage({ params }: { params: Promise<{ slug: str
               </span>
               <p className="text-[14px] leading-relaxed text-[var(--ink-2)]">
                 <span className="font-semibold text-foreground">See it in practice.</span> Vantera puts concepts like
-                this to work — qualifying in-market buyers and drafting outreach from real activity, on your approval.{" "}
+                this to work — qualifying in-market buyers and writing outreach from real activity, on autopilot.{" "}
                 <Link href="/signup" className="font-semibold text-[var(--cyan-strong)] hover:text-[var(--fb-strong)]">
                   Start free →
                 </Link>

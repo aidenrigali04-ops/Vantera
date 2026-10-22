@@ -1,5 +1,7 @@
 import { createHash } from "node:crypto";
 import { and, asc, count, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, max, ne, or, sql } from "drizzle-orm";
+import { LIFECYCLE_ADMIN_EMAIL } from "./lifecycle-outreach";
+import { exemptFromTrialCaps, statusForTrialCaps } from "./trial-caps";
 import {
   accountDeletionRequests,
   accountMembers,
@@ -22,6 +24,7 @@ import {
   leadEmbeddings,
   leadFeedback,
   leadSignals,
+  leadStrategyStamps,
   meetingConnections,
   meetingEvents,
   leads,
@@ -39,6 +42,7 @@ import {
   webhookEvents,
   optimizationExperiments,
   optimizationPlaybook,
+  strategies,
   type Db,
 } from "@vantera/db";
 import type {
@@ -49,9 +53,13 @@ import type {
 } from "@vantera/prospect-data";
 import type {
   CopyStrategy,
+  FunnelCohort,
   FunnelStageKey,
   LeadOutcomeFlags,
   ExperimentStatus,
+  StrategyGenome,
+  StrategySource,
+  VariantOutcome,
 } from "@vantera/agent-brains";
 import {
   ALPHA_EARN_ON_CONCLUSION,
@@ -69,6 +77,10 @@ import {
   orderLeads,
   pickWhyNow,
   toStoredInsights,
+  genomeSignature,
+  replyPolarity,
+  rollupArms,
+  rollupCohort,
   wealthAfterConclusion,
   wealthAfterLaunch,
   type LeadInsights,
@@ -135,8 +147,10 @@ import {
   type SequenceRunPatch,
   type SequenceStore,
   type SequenceTouchStore,
+  type StrategyStampStore,
 } from "./types";
 import { normalizeLinkedInUrl } from "./copy-draft";
+import { stampEnteredLead } from "./stamp";
 import { resolveSequenceConfig } from "./sequence-config";
 import type { RefreshLeadLoad, RefreshLeadStore } from "./refresh-lead";
 import type { FastPassContext, FastPassStore, RevealRunPatch } from "./fast-pass";
@@ -602,7 +616,65 @@ async function creditAlphaWealth(tx: OptimizeTx, accountId: string): Promise<voi
 }
 
 /** Drizzle-backed store used by the Trigger.dev tasks (service-role DATABASE_URL). */
-export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerStore & RetentionStore & TrialStore & SendDispatchStore & OutreachSendStore & InboundStore & SequenceStore & SequenceTouchStore & ConversionStore & RefreshLeadStore & QualifyLeadStore & IntentScanStore & ConnectionSyncStore & OptimizeStore & AgentRunStore & FastPassStore & MeetingEventStore {
+export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerStore & RetentionStore & TrialStore & SendDispatchStore & OutreachSendStore & InboundStore & SequenceStore & SequenceTouchStore & ConversionStore & RefreshLeadStore & QualifyLeadStore & IntentScanStore & ConnectionSyncStore & OptimizeStore & AgentRunStore & FastPassStore & StrategyStampStore & MeetingEventStore {
+  async function upsertStrategy(accountId: string, genome: StrategyGenome, source: StrategySource): Promise<string> {
+    const signature = genomeSignature(genome);
+    const [row] = await db
+      .insert(strategies)
+      .values({ accountId, signature, genome, source })
+      .onConflictDoUpdate({
+        target: [strategies.accountId, strategies.signature],
+        set: { signature: sql`${strategies.signature}` },
+      })
+      .returning({ id: strategies.id });
+    return row!.id;
+  }
+
+  async function hasStrategyStamp(accountId: string, leadId: string): Promise<boolean> {
+    const [row] = await db
+      .select({ id: leadStrategyStamps.id })
+      .from(leadStrategyStamps)
+      .where(and(eq(leadStrategyStamps.accountId, accountId), eq(leadStrategyStamps.leadId, leadId)))
+      .limit(1);
+    return Boolean(row);
+  }
+
+  async function stampLead(
+    accountId: string,
+    leadId: string,
+    strategyId: string,
+    opts?: { experimentId?: string | null; arm?: "champion" | "challenger" | null }
+  ): Promise<void> {
+    await db
+      .insert(leadStrategyStamps)
+      .values({
+        accountId,
+        leadId,
+        strategyId,
+        experimentId: opts?.experimentId ?? null,
+        arm: opts?.arm ?? null,
+      })
+      .onConflictDoNothing({ target: leadStrategyStamps.leadId });
+  }
+
+  async function recordStrategyStamp(accountId: string, leadId: string): Promise<void> {
+    await stampEnteredLead(
+      { upsertStrategy, hasStamp: hasStrategyStamp, stampLead },
+      { accountId, leadId }
+    );
+  }
+
+  async function accountExemptFromTrialCaps(accountId: string): Promise<boolean> {
+    const rows = await db.execute<{ email: string | null }>(sql`
+      select u.email
+      from public.account_members m
+      join auth.users u on u.id = m.user_id
+      where m.account_id = ${accountId}
+        and m.role in ('owner', 'admin')
+    `);
+    return exemptFromTrialCaps(rows.map((r) => r.email).filter((e): e is string => Boolean(e)));
+  }
+
   // ML-1 ordering is a cross-account read — computed once per account per store (a store lives for
   // one task run), shared by the drain, the slot ranking, and the run-summary readout.
   const orderingCache = new Map<string, Promise<{ ordering: LeadOrdering; own: CountTable; cut: LookalikeCutpoints | null }>>();
@@ -643,6 +715,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           websiteScan: account.websiteScan as ScoutContext["account"]["websiteScan"],
           websiteScannedAt: account.websiteScannedAt,
           subscriptionStatus: account.subscriptionStatus,
+          trialCapsExempt: await accountExemptFromTrialCaps(agent.accountId),
           // features.intent (Growth/Scale) — billing is the single source of truth (Phase 15)
           intentEnabled: resolveEntitlements({
             plan: account.plan as EntitlementSnapshot["plan"],
@@ -791,6 +864,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           ...(icpId ? { icpId } : {}),
         })
         .returning({ id: leads.id });
+      if (inserted) await recordStrategyStamp(accountId, inserted.id);
       return { leadId: inserted!.id };
     },
 
@@ -865,7 +939,10 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
             linkedinUrl: candidate.linkedinUrl,
           })
           .returning({ id: leads.id });
-        if (inserted) fresh.push({ leadId: inserted.id, icpId, candidate });
+        if (inserted) {
+          await recordStrategyStamp(accountId, inserted.id);
+          fresh.push({ leadId: inserted.id, icpId, candidate });
+        }
       }
       return fresh;
     },
@@ -1473,6 +1550,116 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         .where(eq(leads.id, leadId));
     },
 
+    upsertStrategy,
+    hasStrategyStamp,
+    stampLead,
+
+    async getFunnelCohort(accountId, window): Promise<FunnelCohort> {
+      const filters = [eq(leads.accountId, accountId)];
+      if (window?.since) filters.push(gte(leads.createdAt, window.since));
+      if (window?.until) filters.push(lt(leads.createdAt, window.until));
+      const rows = await db
+        .select({
+          id: leads.id,
+          linkedinUrl: leads.linkedinUrl,
+          rulesGatePassed: leads.rulesGatePassed,
+          invitedAt: leads.linkedinInvitedAt,
+          connectedAt: leads.linkedinConnectedAt,
+          bookedAt: leads.meetingBookedAt,
+          status: leads.status,
+        })
+        .from(leads)
+        .where(and(...filters));
+      const suppressed = await db
+        .select({ value: suppressionEntries.value })
+        .from(suppressionEntries)
+        .where(and(eq(suppressionEntries.accountId, accountId), eq(suppressionEntries.kind, "linkedin")));
+      const blocked = new Set(suppressed.map((row) => row.value));
+      const visible = rows.filter((row) => !row.linkedinUrl || !blocked.has(normalizeLinkedInUrl(row.linkedinUrl)));
+      if (visible.length === 0) return rollupCohort([]);
+      const replyRows = await db
+        .select({ leadId: replies.leadId, classification: replies.classification })
+        .from(replies)
+        .where(and(eq(replies.accountId, accountId), inArray(replies.leadId, visible.map((row) => row.id))));
+      const byLead = new Map<string, string[]>();
+      for (const reply of replyRows) {
+        if (!reply.leadId || !reply.classification) continue;
+        const list = byLead.get(reply.leadId) ?? [];
+        list.push(reply.classification);
+        byLead.set(reply.leadId, list);
+      }
+      return rollupCohort(
+        visible.map((row) => {
+          const polarity = replyPolarity(byLead.get(row.id) ?? []);
+          return {
+            id: row.id,
+            sourced: true,
+            qualified: row.rulesGatePassed === true,
+            invited: row.invitedAt != null,
+            accepted: row.connectedAt != null,
+            interested: polarity.interested,
+            negative: polarity.negative,
+            booked: row.bookedAt != null,
+            closed: row.status === "converted",
+            arm: null,
+          };
+        })
+      );
+    },
+
+    async getVariantOutcomes(accountId, experimentId): Promise<Record<"champion" | "challenger", VariantOutcome>> {
+      const [experiment] = await db
+        .select({ stageKey: optimizationExperiments.stageKey })
+        .from(optimizationExperiments)
+        .where(and(eq(optimizationExperiments.id, experimentId), eq(optimizationExperiments.accountId, accountId)))
+        .limit(1);
+      if (!experiment) return rollupArms("reply", []);
+      const stamped = await db
+        .select({
+          id: leads.id,
+          arm: leadStrategyStamps.arm,
+          rulesGatePassed: leads.rulesGatePassed,
+          invitedAt: leads.linkedinInvitedAt,
+          connectedAt: leads.linkedinConnectedAt,
+          bookedAt: leads.meetingBookedAt,
+          status: leads.status,
+        })
+        .from(leadStrategyStamps)
+        .innerJoin(leads, eq(leads.id, leadStrategyStamps.leadId))
+        .where(and(eq(leadStrategyStamps.accountId, accountId), eq(leadStrategyStamps.experimentId, experimentId)));
+      if (stamped.length === 0) return rollupArms(experiment.stageKey as FunnelStageKey, []);
+      const replyRows = await db
+        .select({ leadId: replies.leadId, classification: replies.classification })
+        .from(replies)
+        .where(and(eq(replies.accountId, accountId), inArray(replies.leadId, stamped.map((row) => row.id))));
+      const byLead = new Map<string, string[]>();
+      for (const reply of replyRows) {
+        if (!reply.leadId || !reply.classification) continue;
+        const list = byLead.get(reply.leadId) ?? [];
+        list.push(reply.classification);
+        byLead.set(reply.leadId, list);
+      }
+      return rollupArms(
+        experiment.stageKey as FunnelStageKey,
+        stamped.map((row) => {
+          const polarity = replyPolarity(byLead.get(row.id) ?? []);
+          const arm = row.arm === "champion" || row.arm === "challenger" ? row.arm : null;
+          return {
+            id: row.id,
+            sourced: true,
+            qualified: row.rulesGatePassed === true,
+            invited: row.invitedAt != null,
+            accepted: row.connectedAt != null,
+            interested: polarity.interested,
+            negative: polarity.negative,
+            booked: row.bookedAt != null,
+            closed: row.status === "converted",
+            arm,
+          };
+        })
+      );
+    },
+
     // ── OptimizeStore (decide pipeline) ──────────────────────────────────────
 
     async getRunningExperiments() {
@@ -2018,6 +2205,11 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         for (const r of inFlightAgg) inFlightLeads.add(r.leadId);
       }
 
+      const exemptAccounts = new Set<string>();
+      for (const accountId of new Set(rows.map((r) => r.accountId))) {
+        if (await accountExemptFromTrialCaps(accountId)) exemptAccounts.add(accountId);
+      }
+
       return rows.map((r) => ({
         id: r.id,
         accountId: r.accountId,
@@ -2032,7 +2224,8 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         leadInvitedAt: r.leadInvitedAt,
         leadConnectedAt: r.leadConnectedAt,
         leadAssignedSenderId: r.leadAssignedSenderId,
-        subscriptionStatus: r.subscriptionStatus,
+        subscriptionStatus: statusForTrialCaps(r.subscriptionStatus, exemptAccounts.has(r.accountId)),
+        unconstrained: exemptAccounts.has(r.accountId),
         leadLastMessageSentAt: lastSentByLead.get(r.leadId) ?? null,
         leadRepliedAt: lastReplyByLead.get(r.leadId) ?? null,
         leadHasInFlightMessage: inFlightLeads.has(r.leadId),
@@ -3192,7 +3385,14 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           and(
             eq(accounts.subscriptionStatus, "trialing"),
             isNull(accounts.stripeSubscriptionId),
-            lt(accounts.trialEndsAt, now)
+            lt(accounts.trialEndsAt, now),
+            sql`not exists (
+              select 1 from public.account_members m
+              join auth.users u on u.id = m.user_id
+              where m.account_id = ${accounts.id}
+                and m.role in ('owner', 'admin')
+                and lower(u.email) = ${LIFECYCLE_ADMIN_EMAIL}
+            )`
           )
         );
     },

@@ -151,7 +151,7 @@ article mentions learned ordering + job-seeker exclusion); full gate green on a 
 
 ## 6. ML-4 design (fit feedback everywhere) — shipped
 
-- `lead_feedback` (0065): one verdict per lead (`good_fit` / `not_fit`), composite
+- `lead_feedback` (0066): one verdict per lead (`good_fit` / `not_fit`), composite
   `(lead_id, account_id)` FK so a verdict can't cross workspaces, RLS (members read/record, author
   pinned to `auth.uid()`, delete = author or admin), `updated_at` trigger, retention = life of lead.
   rls-auditor: PASS (upsert path analysed; error-type oracle closed by one generic action error).
@@ -202,7 +202,7 @@ article mentions learned ordering + job-seeker exclusion); full gate green on a 
 
 ## 9. ML-7 design (lookalikes) — shipped
 
-- `lead_embeddings` (0067): one 1024-d embedding per qualified/contacted lead + `source_hash` of the
+- `lead_embeddings` (0068): one 1024-d embedding per qualified/contacted lead + `source_hash` of the
   embedded profile text (re-embed on change). Service-role only (RLS on, no policies, client
   privileges revoked), composite lead/account FK. rls-auditor: PASS.
 - Embedding: `profileText` (title | company | industry | size | location | offering | summary),
@@ -220,7 +220,7 @@ article mentions learned ordering + job-seeker exclusion); full gate green on a 
   conversation (lead has replied) → first message to a fresh accept (newest accept first) →
   follow-ups (oldest queued first) → invites (queue = the learner's drain order). Pure ordering:
   rule-04 budgets, the business-hours window, per-lead gates, and the trial cap are untouched.
-- **Intraday cadence** (`agents.cadence='intraday'`, 0068): `computeNextRunAt` adds 6 h from the
+- **Intraday cadence** (`agents.cadence='intraday'`, 0069): `computeNextRunAt` adds 6 h from the
   run; intent-scan divides `INTENT_POSTS_PER_RUN` by `INTRADAY_RUNS_PER_DAY` (4) so a day's read
   volume equals one daily run. Wizard offers "Every 6 hours" for the Intent Agent only.
 - **Followers signal**: `LinkedInInfra.listFollowers` (own-profile followers; provider page cap

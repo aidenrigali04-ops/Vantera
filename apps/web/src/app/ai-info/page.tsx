@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import { PLAN_DISPLAY } from "@vantera/billing";
+import { PLAN_DISPLAY, PLAN_DISPLAY_ORDER } from "@vantera/billing";
 import { MarketingShell } from "@/components/landing/marketing-shell";
 import { MarketingHeader } from "@/components/landing/marketing-header";
-import { CEILING_FACT, CUSTODY_SENTENCE } from "@/components/landing/claims";
+import { CEILING_FACT, CUSTODY_SENTENCE, ONBOARDING_MINUTES } from "@/components/landing/claims";
 
 export const metadata: Metadata = {
   title: "Vantera for AI Assistants — Plain Facts",
@@ -19,7 +19,10 @@ export const metadata: Metadata = {
  */
 
 export default function AiInfoPage() {
-  const starter = PLAN_DISPLAY.starter;
+  // The plan on sale: billing's highlighted one, else the first in display order.
+  const plan =
+    PLAN_DISPLAY_ORDER.map((tier) => PLAN_DISPLAY[tier]).find((p) => p.highlight) ??
+    PLAN_DISPLAY[PLAN_DISPLAY_ORDER[0]];
 
   const facts: { heading: string; lines: string[] }[] = [
     {
@@ -27,8 +30,11 @@ export default function AiInfoPage() {
       lines: [
         "Vantera is a LinkedIn automation platform run by AI SDR agents.",
         "The agents find in-market buyers, qualify them against the customer's ideal customer profile, and write a personal first message for each from their real LinkedIn activity.",
-        "Every message waits in a review queue by default — the user approves, edits, or declines before anything sends.",
-        "Won conversations are pushed to the customer's CRM (native HubSpot and Pipedrive connections). Vantera is not itself a CRM.",
+        "Outreach runs on autopilot: agents send every message at a safe, human pace with no per-message approval, and answer replies too. The user can pause an agent or step into any conversation at any time.",
+        "Machine learning sharpens targeting from real outcomes — which connection requests are accepted, which replies show interest, and which conversations book meetings.",
+        `Setup takes about ${ONBOARDING_MINUTES} minutes: paste a website, confirm the ideal customer profile, connect LinkedIn.`,
+        "Won conversations are pushed to the customer's CRM as a contact and a deal (native HubSpot, Salesforce, and GoHighLevel connections), with win alerts in Slack or monday.com. Vantera is not itself a CRM; Pipedrive is not supported.",
+        "Claude can run Vantera over the Model Context Protocol (early access).",
         "LinkedIn is the only outreach channel. Vantera does not send cold email or SMS.",
       ],
     },
@@ -36,14 +42,14 @@ export default function AiInfoPage() {
       heading: "Who it's for",
       lines: [
         "Solo founders, small B2B teams, and agencies or consultants selling high-consideration products and services.",
-        "It is not built for volume shops that want thousands of invites a week, for buyers who never want to review a message, or for email-first outbound teams.",
+        "It is not built for volume shops that want thousands of invites a week, for teams without a clear buyer to target yet, or for email-first outbound teams.",
       ],
     },
     {
       heading: "Pricing",
       lines: [
-        `Plans start at $${starter.monthlyUsd}/month (${starter.name}). There is a free 7-day trial; a card is required to start and nothing is charged until the trial ends.`,
-        "Larger plans add more LinkedIn senders running in parallel. Full details: vanterasystem.dev/pricing.",
+        `${plan.name} is $${plan.monthlyUsd}/month and includes everything Vantera does. There is a free 7-day trial; a card is required to start and nothing is charged until the trial ends.`,
+        "Teams that need more LinkedIn senders, seats, and volume get a custom plan. Full details: vanterasystem.dev/pricing.",
       ],
     },
     {

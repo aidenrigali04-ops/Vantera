@@ -1,5 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { getClassifierModel, getModel, getModelId, getPublicModel, toGatewayModelId } from "./client";
+import {
+  anthropicWorkspaceHeaders,
+  getClassifierModel,
+  getModel,
+  getModelId,
+  getPublicModel,
+  toGatewayModelId,
+} from "./client";
 
 describe("getModel", () => {
   const saved = { ...process.env };
@@ -25,6 +32,13 @@ describe("getModel", () => {
     process.env.ANTHROPIC_MODEL = "claude-opus-4-8";
     expect(getModel().modelId).toBe("claude-opus-4-8");
     expect(getModel("claude-haiku-4-5-20251001").modelId).toBe("claude-haiku-4-5-20251001");
+  });
+
+  it("names the workspace only when ANTHROPIC_WORKSPACE_ID is set", () => {
+    delete process.env.ANTHROPIC_WORKSPACE_ID;
+    expect(anthropicWorkspaceHeaders()).toBeUndefined();
+    process.env.ANTHROPIC_WORKSPACE_ID = "  wrkspc_test  ";
+    expect(anthropicWorkspaceHeaders()).toEqual({ "anthropic-workspace-id": "wrkspc_test" });
   });
 });
 

@@ -62,6 +62,12 @@ export function agentAttention(input: {
     if (lastRun.note === "low_credits" || s.reason === "low_credits") {
       return "The last run paused on sourcing capacity — it resumes automatically.";
     }
+    if (s.reason === "trial_cap") {
+      return "Sourcing is paused — this trial has reached its lead limit. Outreach can still use prospects already found.";
+    }
+    if (s.reason === "preview_full") {
+      return "Sourcing is paused until a LinkedIn account is connected.";
+    }
     if (num(s.criteriaPending) > 0) {
       const n = num(s.criteriaPending);
       return `${n} ICP${n === 1 ? "" : "s"} couldn't be turned into a search yet — a more concrete description (industry, role, size) fixes it.`;
@@ -89,6 +95,9 @@ export function runLine(run: AgentRunRow): string {
     return "Skipped";
   }
   if (run.kind === "scout") {
+    if (s.reason === "trial_cap") return "Sourcing paused — trial lead limit reached";
+    if (s.reason === "pool_full") return "Sourcing paused — the qualified pool is full";
+    if (s.reason === "preview_full") return "Sourcing paused — connect LinkedIn to keep finding prospects";
     const parked = num(s.criteriaPending);
     return (
       `${num(s.discovered)} sourced → ${num(s.gatePassed)} passed gate → ${num(s.qualified)} qualified` +

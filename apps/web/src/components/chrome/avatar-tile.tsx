@@ -22,7 +22,7 @@ export type AvatarTileProps = {
 const ACCOUNT_MENU_RESTYLE = [
   // trigger → 40px surface tile, mono initials
   "[&>div>button]:size-10 [&>div>button]:rounded-[var(--r-tile)] [&>div>button]:bg-[var(--surface)]",
-  "[&>div>button]:font-mono [&>div>button]:text-xs [&>div>button]:font-semibold [&>div>button]:text-[var(--ink)]",
+  "[&>div>button]:font-mono [&>div>button]:text-xs [&>div>button]:font-semibold [&>div>button]:text-[var(--fb)]",
   "[&>div>button]:ring-1 [&>div>button]:ring-[var(--line)] [&>div>button]:shadow-[var(--shadow-tile)]",
   "[&>div>button]:transition-[color,background-color,box-shadow] [&>div>button]:duration-120 [&>div>button]:ease-out",
   "[&>div>button:hover]:bg-[var(--surface)] [&>div>button:hover]:ring-[var(--line-strong)]",

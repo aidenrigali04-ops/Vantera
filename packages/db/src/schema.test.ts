@@ -116,7 +116,7 @@ describe("suppression list (rule 11 — the master gate)", () => {
 });
 
 describe("retention windows (rule 11)", () => {
-  it.each(["leads", "enrichment_results", "scheduled_sends", "replies", "inbound_leads", "lead_signals", "intent_observations", "reveal_runs", "lead_feedback", "meeting_connections", "meeting_events", "lead_embeddings"])(
+  it.each(["leads", "enrichment_results", "scheduled_sends", "replies", "inbound_leads", "lead_signals", "intent_observations", "reveal_runs", "strategies", "lead_strategy_stamp", "lead_feedback", "meeting_connections", "meeting_events", "lead_embeddings"])(
     "%s states its retention window",
     (table) => {
       expect(allMigrations).toContain(`retention(${table})`);
@@ -125,7 +125,7 @@ describe("retention windows (rule 11)", () => {
 });
 
 describe("service-role-only write surfaces (rules 09/11)", () => {
-  it.each(["meeting_connections", "meeting_events", "outreach_sends", "copilot_actions", "enrichment_results", "replies", "unsubscribe_tokens", "conversion_tokens", "copilot_conversations", "copilot_messages", "calls", "security_events", "inbound_leads", "lead_signals", "intent_observations", "reveal_runs"])(
+  it.each(["outreach_sends", "copilot_actions", "enrichment_results", "replies", "unsubscribe_tokens", "conversion_tokens", "copilot_conversations", "copilot_messages", "calls", "security_events", "inbound_leads", "lead_signals", "intent_observations", "reveal_runs", "strategies", "lead_strategy_stamp", "meeting_connections", "meeting_events"])(
     "%s has no client write policies",
     (table) => {
     const policyRe = new RegExp(`create policy \\w+ on public\\.${table}\\s+for (insert|update|delete|all)`);
@@ -482,8 +482,8 @@ describe("0060 pull-back email", () => {
   });
 });
 
-describe("lead feedback (0065, ML-4)", () => {
-  const sql = readFileSync(join(migrationsDir, "0065_lead_feedback.sql"), "utf8").toLowerCase();
+describe("lead feedback (0066, ML-4)", () => {
+  const sql = readFileSync(join(migrationsDir, "0066_lead_feedback.sql"), "utf8").toLowerCase();
 
   it("can only attach a verdict to a lead in the same workspace (composite FK)", () => {
     expect(sql).toMatch(/foreign key \(lead_id, account_id\)\s+references public\.leads \(id, account_id\) on delete cascade/);
@@ -499,8 +499,8 @@ describe("lead feedback (0065, ML-4)", () => {
   });
 });
 
-describe("calendar integration (0066, ML-6)", () => {
-  const sql = readFileSync(join(migrationsDir, "0066_meeting_connections.sql"), "utf8").toLowerCase();
+describe("calendar integration (0067, ML-6)", () => {
+  const sql = readFileSync(join(migrationsDir, "0067_meeting_connections.sql"), "utf8").toLowerCase();
 
   it("never exposes the encrypted credential or signing secret to client roles", () => {
     expect(sql).toContain("revoke select on public.meeting_connections from authenticated, anon;");
@@ -531,8 +531,8 @@ describe("calendar integration (0066, ML-6)", () => {
   });
 });
 
-describe("lead embeddings (0067, ML-7)", () => {
-  const sql = readFileSync(join(migrationsDir, "0067_lead_embeddings.sql"), "utf8").toLowerCase();
+describe("lead embeddings (0068, ML-7)", () => {
+  const sql = readFileSync(join(migrationsDir, "0068_lead_embeddings.sql"), "utf8").toLowerCase();
 
   it("is service-role only — no client policies, no client privileges", () => {
     expect(sql).toContain("revoke all on public.lead_embeddings from authenticated, anon;");
@@ -544,8 +544,8 @@ describe("lead embeddings (0067, ML-7)", () => {
   });
 });
 
-describe("intent speed + follow signal (0068, ML-8)", () => {
-  const sql = readFileSync(join(migrationsDir, "0068_intent_speed_signals.sql"), "utf8").toLowerCase();
+describe("intent speed + follow signal (0069, ML-8)", () => {
+  const sql = readFileSync(join(migrationsDir, "0069_intent_speed_signals.sql"), "utf8").toLowerCase();
 
   it("lets an agent run intraday and records follows as their own signal kind", () => {
     expect(sql).toContain("check (cadence in ('daily', 'weekly', 'intraday'))");
