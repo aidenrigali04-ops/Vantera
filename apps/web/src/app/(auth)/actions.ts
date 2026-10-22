@@ -11,6 +11,7 @@ import { validateMemberSignup, validateSignup } from "@/lib/validation";
 import { sendWelcomeEmail } from "@vantera/transactional-email";
 import { siteUrl } from "@/lib/site-url";
 import { recordSecurityEvent } from "@/lib/security/audit";
+import { APP_HOME } from "@/lib/auth/home";
 
 export type AuthFormState = { error?: string; sent?: boolean; url?: string };
 
@@ -36,7 +37,7 @@ export async function login(_prev: AuthFormState, formData: FormData): Promise<A
   }
   // R3: honor a validated same-origin ?next= (deep links, invite acceptance) — the login
   // action swallowing `next` was silently dead-ending every logged-out invite click.
-  redirect(safeNext(formData.get("next")) ?? "/dashboard"); // app gate forwards to /onboarding if incomplete
+  redirect(safeNext(formData.get("next")) ?? APP_HOME); // app gate forwards to /onboarding if incomplete
 }
 
 /**
@@ -103,7 +104,7 @@ async function signupWithInvite(inviteToken: string, formData: FormData): Promis
       error: "Your account was created, but the invite could not be accepted — open the invite link again.",
     };
   }
-  redirect("/dashboard");
+  redirect(APP_HOME);
 }
 
 export async function signup(_prev: AuthFormState, formData: FormData): Promise<AuthFormState> {
@@ -155,7 +156,7 @@ export async function signup(_prev: AuthFormState, formData: FormData): Promise<
   } catch {
     // no-op — signup continues
   }
-  redirect("/dashboard"); // app gate forwards to /onboarding
+  redirect(APP_HOME); // app gate forwards to /onboarding
 }
 
 export async function requestPasswordReset(
@@ -183,5 +184,5 @@ export async function resetPassword(
   const supabase = await createClient();
   const { error } = await supabase.auth.updateUser({ password });
   if (error) return { error: friendlyAuthError(error.message) };
-  redirect("/dashboard");
+  redirect(APP_HOME);
 }

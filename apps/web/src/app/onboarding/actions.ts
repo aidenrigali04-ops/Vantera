@@ -17,6 +17,7 @@ import { checkLimit } from "@/lib/rate-limit";
 import { normalizeWebsiteUrl, validateOnboardingDetails } from "@/lib/validation";
 import { billingBypassAllowed } from "./billing-bypass";
 import { accountSkipsPayment } from "@/lib/billing/founder-exempt";
+import { APP_HOME } from "@/lib/auth/home";
 
 export type DetailsState = { error?: string };
 
@@ -248,7 +249,7 @@ export async function finishOnboarding(): Promise<{ error?: string } | never> {
       onboarding_completed_at: string | null;
     }>();
   if (!account) redirect("/onboarding");
-  if (account.onboarding_completed_at) redirect("/dashboard");
+  if (account.onboarding_completed_at) redirect(APP_HOME);
 
   // Card required, except the founder workspace and a local environment with no billing keys.
   const skipsPayment = await accountSkipsPayment(supabase, account.id);
@@ -422,7 +423,7 @@ export async function finishOnboarding(): Promise<{ error?: string } | never> {
     .eq("id", account.id);
   if (error) return { error: "Could not finish setup. Please try again." };
 
-  redirect("/dashboard");
+  redirect(APP_HOME);
 }
 
 /** Form-action wrapper for the dev-only finish button (form actions must return void). */

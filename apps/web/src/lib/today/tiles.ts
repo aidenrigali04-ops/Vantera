@@ -251,7 +251,7 @@ export function tilesFor(i: TodayInputs, x: TileExtras): ActionTileSpec[] {
       glyph: "link",
       title: "Add a booking link",
       meta: `${x.calendarLink.leadName} asked for a time · paste it once, the agent uses it`,
-      href: "/settings#calendar",
+      href: "/settings#booking-link",
       dismissible: true,
     });
   }

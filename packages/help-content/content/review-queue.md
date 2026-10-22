@@ -15,7 +15,7 @@ Each draft shows who it's for, the channel, and the message. If our style check 
 - **Approve** — the draft is cleared to send.
 - **Fix** — one-click rewrite of a style-flagged draft; the copy is corrected without changing what the message says, then re-checked. The draft stays in the queue for your approval.
 - **Edit** — change the subject or message; we re-check the style automatically.
-- **Decline** — drop this draft.
+- **Decline** — drop this draft. Pick a quick reason (*Wrong person*, *Bad timing*, *Weak message*, or *Other*) — rejections teach your agent who and what to avoid. Changed your mind? Hit **Undo** on the confirmation.
 - **Decline & never contact** — drop the draft and add the contact to your suppression list so no agent messages them again.
 
 LinkedIn outreach goes out in two steps, so its drafts come in pairs: a **connection request** and a **Follow-up** message. The connection request sends without a note (this keeps your acceptance rate high), and your personalized message lands as the follow-up — the first thing they read once they accept. Each card is tagged so you know which is which.
@@ -38,3 +38,5 @@ If your Outreach Agent is set to **automatic** sending, clean drafts skip the qu
 ## Working the queue faster
 
 The queue is fully keyboard-driven: press **j**/**k** to move between prospects, **Enter** to open one, **a** to approve, **d** to decline, and **e** to edit — press **?** anytime for the map. Large backlogs paginate 50 drafts at a time, so every draft is always reachable.
+
+When you've worked through everything, the queue tells you you're all caught up and points you to the Inbox and to what's sending next.

@@ -90,6 +90,10 @@ export type InboxItem = {
   status: string;
   /** the most recent inbound classification, for inbox filter chips (R4) */
   lastClassification: string | null;
+  /** a meeting is recorded for this lead */
+  booked: boolean;
+  /** the rank's fit score (null = never scored) */
+  aiScore: number | null;
 };
 
 /** Every conversation, newest activity first, unanswered-interested pinned.
@@ -174,9 +178,17 @@ export async function loadInbox(
   if (ids.length === 0) return [];
   const { data: leads } = await db
     .from("leads")
-    .select("id, first_name, last_name, company_name, status")
+    .select("id, first_name, last_name, company_name, status, meeting_booked_at, ai_score")
     .in("id", ids)
-    .returns<{ id: string; first_name: string | null; last_name: string | null; company_name: string | null; status: string }[]>();
+    .returns<{
+      id: string;
+      first_name: string | null;
+      last_name: string | null;
+      company_name: string | null;
+      status: string;
+      meeting_booked_at: string | null;
+      ai_score: number | null;
+    }[]>();
   const items: InboxItem[] = (leads ?? []).map((l) => {
     const c = byLead.get(l.id)!;
     return {
@@ -192,6 +204,8 @@ export async function loadInbox(
         c.lastInterestedAt > c.lastSentAt,
       status: l.status,
       lastClassification: c.lastClassification,
+      booked: l.meeting_booked_at !== null,
+      aiScore: l.ai_score,
     };
   });
   return items.sort((a, b) =>

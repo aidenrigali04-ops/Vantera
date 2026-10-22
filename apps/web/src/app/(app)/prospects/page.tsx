@@ -89,6 +89,7 @@ export default async function LeadsPage({
     intent: params.intent === "1",
   };
   const from = (page - 1) * per;
+  const filtering = Boolean(filters.industry || filters.min || filters.days || filters.intent);
 
   const supabase = await createClient();
   let query = supabase.from("leads").select(LEAD_SELECT, { count: "exact" });
@@ -240,7 +241,9 @@ export default async function LeadsPage({
             <CardTitle className="text-base">
               {q
                 ? `No matches for “${q}”`
-                : tab.key === "all"
+                : filtering
+                  ? "No prospects match these filters"
+                  : tab.key === "all"
                   ? "No prospects yet"
                   : tab.key === "intent"
                     ? "No in-market prospects yet"
@@ -249,16 +252,28 @@ export default async function LeadsPage({
             <p className="mx-auto max-w-md text-pretty text-sm text-muted-foreground">
               {q
                 ? "Try a shorter name or company — or clear the search to see everything in this view."
-                : tab.key === "all"
+                : filtering
+                  ? "Loosen or clear the filters to see everything in this view."
+                  : tab.key === "all"
                   ? "Your Prospect Agent fills this page on its schedule — sourcing, scoring, and keeping only high-quality prospects."
                   : tab.key === "intent"
                     ? "Your Intent Agent surfaces people here the moment they show buying behavior on LinkedIn — engaging your competitors, posting about your space — qualified against your ICP."
                     : "Prospects move here as your agents work the pipeline."}
             </p>
-            {q ? (
-              <Button asChild variant="outline" size="sm" className="mx-auto mt-2">
-                <Link href={leadsHref({ tab: tab.key, q: "", sort })}>Clear search</Link>
-              </Button>
+            {q || filtering ? (
+              <div className="mx-auto mt-2 flex flex-wrap justify-center gap-2">
+                {q && (
+                  <Button asChild variant="outline" size="sm">
+                    {/* clearing one control keeps the others (and the page size) */}
+                    <Link href={leadsHref({ tab: tab.key, q: "", sort, per, filters })}>Clear search</Link>
+                  </Button>
+                )}
+                {filtering && (
+                  <Button asChild variant="outline" size="sm">
+                    <Link href={leadsHref({ tab: tab.key, q, sort, per })}>Clear filters</Link>
+                  </Button>
+                )}
+              </div>
             ) : (
               (tab.key === "all" || tab.key === "intent") && (
                 <Button asChild variant="outline" size="sm" className="mx-auto mt-2">

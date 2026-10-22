@@ -25,7 +25,7 @@ export default function AppError({ reset }: { error: Error & { digest?: string }
           <RotateCcw className="size-4" /> Try again
         </Button>
         <Button asChild size="sm" variant="outline">
-          <Link href="/dashboard">Back to Results</Link>
+          <Link href="/today">Back to Today</Link>
         </Button>
       </div>
     </div>
