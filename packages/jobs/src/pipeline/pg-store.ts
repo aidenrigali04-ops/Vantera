@@ -2069,8 +2069,10 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           runAtTime: agents.runAtTime,
           cadence: agents.cadence,
           timezone: agents.timezone,
+          onboardingCompletedAt: accounts.onboardingCompletedAt,
         })
         .from(agents)
+        .innerJoin(accounts, eq(accounts.id, agents.accountId))
         .where(
           and(
             inArray(agents.kind, ["scout", "intent"]),
@@ -3417,6 +3419,8 @@ export interface DueAgent {
   runAtTime: string | null;
   cadence: "daily" | "weekly" | "intraday" | null;
   timezone: string;
+  /** Null while the account is still in onboarding — the scheduler holds those out. */
+  onboardingCompletedAt: Date | null;
 }
 
 export interface SchedulerStore {

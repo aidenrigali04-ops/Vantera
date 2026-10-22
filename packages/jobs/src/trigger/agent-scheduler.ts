@@ -1,6 +1,7 @@
 import { logger, schedules, tasks } from "@trigger.dev/sdk";
 import { createDb } from "@vantera/db";
 import { createPgStore } from "../pipeline/pg-store";
+import { isHeldForOnboarding } from "../pipeline/onboarding-hold";
 import { computeNextRunAt } from "../pipeline/schedule";
 
 /**
@@ -20,6 +21,10 @@ export const agentScheduler = schedules.task({
     const now = new Date();
     const due = await store.getDueAgents(now);
     for (const agent of due) {
+      if (isHeldForOnboarding(agent)) {
+        logger.info("held_onboarding", { agentId: agent.id });
+        continue;
+      }
       const taskId = agent.kind === "intent" ? "intent-scan" : "scout-run";
       await tasks.trigger(taskId, { agentId: agent.id, accountId: agent.accountId }, { concurrencyKey: agent.accountId });
       await store.advanceSchedule(
