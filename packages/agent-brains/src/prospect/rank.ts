@@ -102,10 +102,12 @@ export function compactLead(c: RankCandidate, now: Date = new Date()): string {
 const RANK_SYSTEM = registerPrompt("prospect/rank", `You are the prospect-quality brain of an SDR platform. You receive a seller context block and a batch of lead lines (format: id|company|size|industry|geo|title|tech|signals). Score how strongly each lead fits the seller's ICP right now.
 
 Rubric:
-- 85-100: precise ICP fit AND an active timing signal (hiring, funding, tech change, intent).
-- 70-84: precise ICP fit, no strong timing signal — still worth outreach.
-- 40-69: partial fit or unclear persona; do not flatter these upward.
-- 0-39: weak fit. Be ruthless; most leads are not good leads.
+- 85-100: clear ICP fit AND an active timing signal (hiring, funding, tech change, intent).
+- 70-84: clear ICP fit — the role/persona matches the ICP and nothing in the data contradicts it. No timing signal is needed; most good leads have none.
+- 50-69: partial fit — an adjacent role, or a concrete sign the company or space is off-ICP.
+- 0-49: clear mismatch — wrong persona, wrong space, a job seeker, a student, or a direct competitor selling the same product as the seller.
+
+Score on the evidence present, not on what is missing. Lines arrive from a discovery search that already targeted the ICP's industries and company sizes, so a blank field (\`-\` for size, industry, tech, or signals) means the data was not returned — it is never a mismatch and never a reason to score down. Judge only against criteria the ICP actually states: if it names no geography, location is not a factor; if it names no company size, size is not a factor. A lead with a matching role and no contradicting evidence is a 70+ lead.
 
 A \`signals\` entry of kind \`intent\` is the strongest "why now": it means THIS person is actively showing they have the problem the seller solves (asking for a tool, describing the pain) — weight it above generic company events. A lead with a recent, explicit intent signal AND a role/company that plausibly fits the ICP belongs at the top of the range, even when size/industry are blank (normal for an intent-sourced lead — do not mark it down only for missing firmographics). Intent never overrides a clear ICP mismatch: a wrong-persona or wrong-space lead is still weak, intent or not.
 
@@ -117,7 +119,7 @@ value_angle — how the SELLER's offer could specifically help this prospect. Ke
 
 When the seller context includes "revealed preferences", treat it as this seller's own verdict on fit: a lead closely resembling a "rejected as the wrong person" example (same kind of role, company, or space) scores lower; one closely resembling a "replied positively" example scores higher. They are evidence about fit, never leads to score, and they never override a clear ICP match or mismatch on their own.
 
-Ground every field in the data given. If signals are absent, say so in reasoning and score accordingly — never invent facts. Never alter a prospect's stated numbers or flip the direction of what they do; use their own words. Misrepresenting a prospect's business is a worse error than saying less about it.`);
+Ground every field in the data given. If signals are absent, say so in reasoning — a missing signal caps a lead below 85, never below 70 — and never invent facts. Never alter a prospect's stated numbers or flip the direction of what they do; use their own words. Misrepresenting a prospect's business is a worse error than saying less about it.`);
 
 const exemplar = (line: string) => `- ${trunc(line.replace(/[\r\n]+/g, " "), 160)}`;
 

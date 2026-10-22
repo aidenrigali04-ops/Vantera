@@ -1,4 +1,5 @@
 import type { IcpCriteria, ProspectCandidate } from "@vantera/prospect-data";
+import { titleMatchesAny } from "./title-match";
 
 export interface RulesGateResult {
   passed: boolean;
@@ -54,18 +55,25 @@ export function applyRulesGate(
   const reasons: string[] = [];
   if (isJobSeeker(candidate.title)) reasons.push(`job seeker ("${candidate.title}")`);
 
-  const checks: { wanted?: string[]; value?: string; label: string }[] = [
-    { wanted: criteria.industries, value: candidate.industry, label: "industry" },
-    { wanted: criteria.companySizes, value: candidate.companySize, label: "company size" },
-    { wanted: criteria.titles, value: candidate.title, label: "title" },
-    { wanted: criteria.seniorities, value: candidate.title, label: "seniority" },
-    { wanted: criteria.geos, value: candidate.location, label: "geo" },
+  // Titles/seniorities match by words in any order with abbreviations expanded (title-match.ts);
+  // the other fields keep phrase matching.
+  const checks: {
+    wanted?: string[];
+    value?: string;
+    label: string;
+    match: (value: string, wanted: string[]) => boolean;
+  }[] = [
+    { wanted: criteria.industries, value: candidate.industry, label: "industry", match: containsAny },
+    { wanted: criteria.companySizes, value: candidate.companySize, label: "company size", match: containsAny },
+    { wanted: criteria.titles, value: candidate.title, label: "title", match: titleMatchesAny },
+    { wanted: criteria.seniorities, value: candidate.title, label: "seniority", match: titleMatchesAny },
+    { wanted: criteria.geos, value: candidate.location, label: "geo", match: containsAny },
   ];
 
-  for (const { wanted, value, label } of checks) {
+  for (const { wanted, value, label, match } of checks) {
     if (!wanted || wanted.length === 0) continue;
     if (!value) continue; // provider gave no value at discovery → defer to discovery filter + AI rank
-    if (!containsAny(value, wanted)) {
+    if (!match(value, wanted)) {
       reasons.push(`${label} "${value}" outside ICP (${wanted.join(", ")})`);
     }
   }

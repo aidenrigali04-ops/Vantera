@@ -104,3 +104,56 @@ describe("applyRulesGate", () => {
   });
 });
 
+
+describe("applyRulesGate — title matching (prod rejections, 2026-10-22)", () => {
+  // The account's real ICP titles; each case below was wrongly rejected in production.
+  const icp = {
+    titles: ["Founder", "CEO", "Co-Founder", "Sales Director", "VP of Sales", "Head of Business Development"],
+  };
+  const gate = (title: string) => applyRulesGate(makeCandidate({ title }), icp).passed;
+
+  it("matches an abbreviation against its spelled-out title", () => {
+    expect(gate("Chief Executive Officer")).toBe(true);
+    expect(gate("Chief Executive Officer (CEO)")).toBe(true);
+  });
+
+  it("matches the same words in a different order", () => {
+    expect(gate("Director of Sales And Business Development")).toBe(true);
+    expect(gate("Sales and Marketing Director, member of leadership team")).toBe(true);
+    expect(gate("Director of Sales Marketing")).toBe(true);
+  });
+
+  it("expands Vice President to VP", () => {
+    expect(gate("Vice President of Sales")).toBe(true);
+    expect(gate("Vice President of Sales at LTS Health, Public Sector and Higher Education")).toBe(true);
+  });
+
+  it("treats the top-executive titles used outside the US as CEO-level", () => {
+    expect(gate("Managing Director")).toBe(true);
+    expect(gate("Owner")).toBe(true);
+    expect(gate("President")).toBe(true);
+    expect(gate("Board Director")).toBe(false);
+  });
+
+  it("treats leadership levels of the same function as equivalent", () => {
+    expect(gate("Vice President, Business Development & Alliances")).toBe(true);
+    expect(gate("SVP Sales")).toBe(true);
+    expect(gate("Head of Sales")).toBe(true);
+  });
+
+  it("still matches founder variants", () => {
+    expect(gate("CTO & Co-founder")).toBe(true);
+    expect(gate("Cofounder")).toBe(true);
+  });
+
+  it("still rejects a different function or a non-leadership role", () => {
+    expect(gate("Software Architect & Forensics Lead")).toBe(false);
+    expect(gate("Sr. Digital Marketing Manager")).toBe(false);
+    expect(gate("Sales Manager - Customer Success Evangelist")).toBe(false);
+    expect(gate("Business Development Executive")).toBe(false);
+  });
+
+  it("keeps word-start matching: 'cto' never matches inside 'director'", () => {
+    expect(applyRulesGate(makeCandidate({ title: "Director of Ops" }), { titles: ["cto"] }).passed).toBe(false);
+  });
+});
