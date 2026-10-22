@@ -386,3 +386,38 @@ describe("createLeadEventEmailStore.stampLifecycleEmail", () => {
   });
 });
 
+
+// ── ensureCanaryExperiment: a stale canary pin must not abort the daily optimize run ──────────
+// The pin lives in app_settings (aa_canary_account_id) with no FK to accounts, so deleting the
+// pinned account leaves it dangling. The seed insert then hits the experiments→accounts FK
+// (23503), and before this guard that threw out of the optimize task before any account was
+// evaluated (prod, 2026-10-19 → 10-21).
+describe("ensureCanaryExperiment", () => {
+  function fakeCanaryDb(insertError: { code: string } | null) {
+    const db = {
+      select: () => ({
+        from: () => ({ where: () => ({ limit: () => Promise.resolve([]) }) }),
+      }),
+      insert: () => ({
+        values: () => (insertError ? Promise.reject(insertError) : Promise.resolve()),
+      }),
+    };
+    return db as unknown as Db;
+  }
+
+  it("seeds the canary and reports it", async () => {
+    await expect(createPgStore(fakeCanaryDb(null)).ensureCanaryExperiment("acct-1")).resolves.toBe(true);
+  });
+
+  it("skips quietly when a canary is already live (unique violation)", async () => {
+    await expect(createPgStore(fakeCanaryDb({ code: "23505" })).ensureCanaryExperiment("acct-1")).resolves.toBe(false);
+  });
+
+  it("skips quietly when the pinned account no longer exists (FK violation)", async () => {
+    await expect(createPgStore(fakeCanaryDb({ code: "23503" })).ensureCanaryExperiment("gone")).resolves.toBe(false);
+  });
+
+  it("still throws on any other database error", async () => {
+    await expect(createPgStore(fakeCanaryDb({ code: "57014" })).ensureCanaryExperiment("acct-1")).rejects.toMatchObject({ code: "57014" });
+  });
+});

@@ -1658,7 +1658,14 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         });
         return true;
       } catch (err) {
-        if ((err as { code?: string }).code === "23505") return false;
+        const code = (err as { code?: string }).code;
+        if (code === "23505") return false;
+        // 23503: the pinned account was deleted (app_settings has no FK to accounts). Skip the
+        // canary rather than abort the whole optimize run for every other account.
+        if (code === "23503") {
+          console.warn("optimize: aa_canary_account_id points at a missing account; canary skipped", { accountId });
+          return false;
+        }
         throw err;
       }
     },
