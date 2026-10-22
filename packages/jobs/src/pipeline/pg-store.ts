@@ -59,9 +59,6 @@ import type {
 } from "@vantera/agent-brains";
 import {
   buildTargetingProfile,
-  ALPHA_EARN_ON_CONCLUSION,
-  ALPHA_WEALTH_CAP,
-  ALPHA_WEALTH_START,
   buildLeadOrdering,
   countRows,
   RANK_FEEDBACK_MAX,
@@ -527,8 +524,7 @@ async function fetchChampion(
 }
 
 /** Drizzle-backed store used by the Trigger.dev tasks (service-role DATABASE_URL). */
-export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerStore & RetentionStore & TrialStore & SendDispatchStore & OutreachSendStore & InboundStore & SequenceStore & SequenceTouchStore & ConversionStore & RefreshLeadStore & QualifyLeadStore & IntentScanStore & ConnectionSyncStore & AgentRunStore & FastPassStore & StrategyStampStore {
-export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerStore & RetentionStore & TrialStore & SendDispatchStore & OutreachSendStore & InboundStore & SequenceStore & SequenceTouchStore & ConversionStore & RefreshLeadStore & QualifyLeadStore & IntentScanStore & ConnectionSyncStore & OptimizeStore & AgentRunStore & FastPassStore & StrategyStampStore & MeetingEventStore {
+export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerStore & RetentionStore & TrialStore & SendDispatchStore & OutreachSendStore & InboundStore & SequenceStore & SequenceTouchStore & ConversionStore & RefreshLeadStore & QualifyLeadStore & IntentScanStore & ConnectionSyncStore & AgentRunStore & FastPassStore & StrategyStampStore & MeetingEventStore {
   async function upsertStrategy(accountId: string, genome: StrategyGenome, source: StrategySource): Promise<string> {
     const signature = genomeSignature(genome);
     const [row] = await db

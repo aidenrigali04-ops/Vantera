@@ -105,9 +105,6 @@ class FakeCopyStore implements CopyDraftStore {
     const known = leadIds.map((id) => byId.get(id)).filter((l): l is DraftableLead => !!l);
     return rankByTilt(known, this.targetingProfile).map((l) => l.id);
   }
-  async getActiveExperiment() {
-    return this.activeExperiment;
-  }
   async getChampion() {
     return this.champion;
   }
