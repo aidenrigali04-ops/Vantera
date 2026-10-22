@@ -20,6 +20,8 @@ import {
   leadNotifications,
   leadFeedback,
   leadSignals,
+  meetingConnections,
+  meetingEvents,
   leads,
   lifecycleTouches,
   linkedinAccounts,
@@ -120,6 +122,7 @@ import {
   type ScoutConfig,
   type ScoutContext,
   type ScoutStore,
+  type MeetingEventStore,
   type SendContext,
   type SendDispatchStore,
   type SequenceRunPatch,
@@ -543,7 +546,7 @@ async function creditAlphaWealth(tx: OptimizeTx, accountId: string): Promise<voi
 }
 
 /** Drizzle-backed store used by the Trigger.dev tasks (service-role DATABASE_URL). */
-export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerStore & RetentionStore & TrialStore & SendDispatchStore & OutreachSendStore & InboundStore & SequenceStore & SequenceTouchStore & ConversionStore & RefreshLeadStore & QualifyLeadStore & IntentScanStore & ConnectionSyncStore & OptimizeStore & AgentRunStore & FastPassStore {
+export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerStore & RetentionStore & TrialStore & SendDispatchStore & OutreachSendStore & InboundStore & SequenceStore & SequenceTouchStore & ConversionStore & RefreshLeadStore & QualifyLeadStore & IntentScanStore & ConnectionSyncStore & OptimizeStore & AgentRunStore & FastPassStore & MeetingEventStore {
   // ML-1 ordering is a cross-account read — computed once per account per store (a store lives for
   // one task run), shared by the drain, the slot ranking, and the run-summary readout.
   const orderingCache = new Map<string, Promise<{ ordering: LeadOrdering; own: CountTable }>>();
@@ -2593,6 +2596,123 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         .update(leads)
         .set({ meetingBookedAt: at, meetingSource: "agent" })
         .where(and(eq(leads.id, leadId), isNull(leads.meetingBookedAt)));
+    },
+
+    // ── MeetingEventStore (ML-6 calendar integration) ─────────────────────────
+
+    async getMeetingConnection(connectionId: string) {
+      const [row] = await db
+        .select({ id: meetingConnections.id, accountId: meetingConnections.accountId, provider: meetingConnections.provider, status: meetingConnections.status })
+        .from(meetingConnections)
+        .where(eq(meetingConnections.id, connectionId));
+      return row ?? null;
+    },
+
+    async touchMeetingConnection(connectionId: string) {
+      await db
+        .update(meetingConnections)
+        .set({ lastEventAt: new Date(), status: "active", lastError: null })
+        .where(eq(meetingConnections.id, connectionId));
+    },
+
+    async leadInAccount(accountId: string, leadId: string) {
+      const [row] = await db
+        .select({ id: leads.id })
+        .from(leads)
+        .where(and(eq(leads.id, leadId), eq(leads.accountId, accountId)));
+      return !!row;
+    },
+
+    async findLeadByEmail(accountId: string, email: string) {
+      const [row] = await db
+        .select({ id: leads.id })
+        .from(leads)
+        .where(and(eq(leads.accountId, accountId), sql`lower(${leads.email}) = ${email.trim().toLowerCase()}`))
+        .orderBy(desc(leads.updatedAt))
+        .limit(1);
+      return row?.id ?? null;
+    },
+
+    async upsertMeetingEvent(e) {
+      await db
+        .insert(meetingEvents)
+        .values({
+          accountId: e.accountId,
+          leadId: e.leadId,
+          connectionId: e.connectionId,
+          provider: e.provider,
+          bookingRef: e.bookingRef,
+          status: e.status,
+          startAt: e.startAt,
+          attribution: e.attribution ?? "link",
+        })
+        .onConflictDoUpdate({
+          target: [meetingEvents.accountId, meetingEvents.provider, meetingEvents.bookingRef],
+          set: { status: e.status, ...(e.startAt ? { startAt: e.startAt } : {}) },
+        });
+    },
+
+    async findMeetingEvent(accountId: string, provider: string, bookingRef: string) {
+      const [row] = await db
+        .select({ leadId: meetingEvents.leadId, status: meetingEvents.status })
+        .from(meetingEvents)
+        .where(
+          and(
+            eq(meetingEvents.accountId, accountId),
+            eq(meetingEvents.provider, provider as "calendly" | "calcom"),
+            eq(meetingEvents.bookingRef, bookingRef)
+          )
+        );
+      return row ?? null;
+    },
+
+    async hasLiveBooking(accountId: string, leadId: string) {
+      const [row] = await db
+        .select({ id: meetingEvents.id })
+        .from(meetingEvents)
+        .where(and(eq(meetingEvents.accountId, accountId), eq(meetingEvents.leadId, leadId), eq(meetingEvents.status, "booked")))
+        .limit(1);
+      return !!row;
+    },
+
+    async markCalendarMeeting(accountId: string, leadId: string, startAt: Date | null) {
+      // first booking keeps its booked_at; the calendar is authoritative on WHEN and the source
+      await db
+        .update(leads)
+        .set({
+          meetingBookedAt: sql`coalesce(${leads.meetingBookedAt}, now())`,
+          meetingAt: startAt,
+          meetingSource: "calendar",
+        })
+        .where(and(eq(leads.id, leadId), eq(leads.accountId, accountId)));
+    },
+
+    async clearCalendarMeeting(accountId: string, leadId: string) {
+      await db
+        .update(leads)
+        .set({ meetingBookedAt: null, meetingAt: null, meetingSource: null })
+        .where(and(eq(leads.id, leadId), eq(leads.accountId, accountId), eq(leads.meetingSource, "calendar")));
+    },
+
+    async standDownOutreach(accountId: string, leadId: string) {
+      await db
+        .update(scheduledSends)
+        .set({ status: "canceled", error: "meeting booked — outreach stood down" })
+        .where(
+          and(
+            eq(scheduledSends.accountId, accountId),
+            eq(scheduledSends.leadId, leadId),
+            inArray(scheduledSends.status, ["pending_review", "approved", "scheduled"])
+          )
+        );
+      await db
+        .update(sequenceRuns)
+        .set({ status: "stopped" })
+        .where(and(eq(sequenceRuns.accountId, accountId), eq(sequenceRuns.leadId, leadId), eq(sequenceRuns.status, "active")));
+    },
+
+    async notifyMeetingBooked(accountId: string, leadId: string) {
+      await db.insert(leadNotifications).values({ accountId, leadId, kind: "meeting_booked", body: "calendar" });
     },
 
     async cancelPendingSends(leadId: string) {

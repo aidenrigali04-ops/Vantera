@@ -1,3 +1,4 @@
+import { tagLinksInText } from "@vantera/meetings-infra";
 import {
   describeViolations,
   buildSendRecipe,
@@ -190,7 +191,9 @@ async function maybeRespond(
     leadId: lead.id,
     channel: "linkedin",
     subject: null,
-    body: reply.message,
+    // ML-6: the seller's booking link carries this lead's tag, so a booking made from it attributes
+    // to the exact lead (the brain writes the clean link; we tag the final text deterministically)
+    body: tagLinksInText(reply.message, bundle.context.bookingUrl, lead.id),
     status: autoSend ? "approved" : "pending_review",
     linkedinStage: "message",
     origin: "reply_response", // rides the dispatch speed-to-lead lane (0044)

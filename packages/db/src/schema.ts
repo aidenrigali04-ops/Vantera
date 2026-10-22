@@ -252,7 +252,7 @@ export const leads = pgTable(
     // 0050 meeting layer: scheduled time when known + which writer recorded the booking
     // ('agent' = reply-classification detector, 'manual' = the user's control, authoritative)
     meetingAt: timestamp("meeting_at", { withTimezone: true }),
-    meetingSource: text("meeting_source", { enum: ["agent", "manual"] }),
+    meetingSource: text("meeting_source", { enum: ["agent", "manual", "calendar"] }),
     // 0056 R6: last user correction to identity fields — corrected values feed drafts directly
     editedByUserAt: timestamp("edited_by_user_at", { withTimezone: true }),
     // 0040: self-optimizing experiment attribution — stamped by copy-draft when a lead is drafted
@@ -373,6 +373,59 @@ export const leadNotes = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("lead_notes_lead_idx").on(t.leadId, t.createdAt)]
+);
+
+// 0066 ML-6: the account's scheduling-tool connection (Calendly / Cal.com). credential_enc +
+// signing_secret_enc are AES-256-GCM ciphertext, service-role written, never client-selectable.
+export const meetingConnections = pgTable(
+  "meeting_connections",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    provider: text("provider", { enum: ["calendly", "calcom"] }).notNull(),
+    status: text("status", { enum: ["active", "error"] }).notNull().default("active"),
+    credentialEnc: text("credential_enc").notNull(),
+    signingSecretEnc: text("signing_secret_enc").notNull(),
+    webhookRef: text("webhook_ref"),
+    externalOwnerRef: text("external_owner_ref"),
+    label: text("label"),
+    lastEventAt: timestamp("last_event_at", { withTimezone: true }),
+    lastError: text("last_error"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("meeting_connections_account_provider_unique").on(t.accountId, t.provider)]
+);
+
+// 0066 ML-6: a provider booking attributed to a lead ('link' = our per-lead tag came back,
+// 'email' = invitee email matched). The SQL carries a composite (lead_id, account_id) FK.
+export const meetingEvents = pgTable(
+  "meeting_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    leadId: uuid("lead_id")
+      .notNull()
+      .references(() => leads.id, { onDelete: "cascade" }),
+    connectionId: uuid("connection_id").references(() => meetingConnections.id, { onDelete: "set null" }),
+    provider: text("provider", { enum: ["calendly", "calcom"] }).notNull(),
+    bookingRef: text("booking_ref").notNull(),
+    status: text("status", { enum: ["booked", "canceled"] }).notNull(),
+    startAt: timestamp("start_at", { withTimezone: true }),
+    attribution: text("attribution", { enum: ["link", "email"] }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("meeting_events_booking_unique").on(t.accountId, t.provider, t.bookingRef),
+    index("meeting_events_lead_idx").on(t.leadId, t.startAt.desc()),
+    index("meeting_events_account_idx").on(t.accountId, t.createdAt),
+    index("meeting_events_connection_idx").on(t.connectionId),
+  ]
 );
 
 // 0065 ML-4: "Good fit" / "Not a fit" verdict on any prospect — one per lead, latest wins. Feeds the
@@ -557,7 +610,7 @@ export const webhookEvents = pgTable(
   "webhook_events",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    source: text("source", { enum: ["email", "linkedin", "stripe", "voice"] }).notNull(),
+    source: text("source", { enum: ["email", "linkedin", "stripe", "voice", "imessage", "inbound", "ads", "calendly", "calcom"] }).notNull(),
     providerEventId: text("provider_event_id").notNull(),
     payload: jsonb("payload").notNull(),
     receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),

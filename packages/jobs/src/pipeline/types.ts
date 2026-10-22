@@ -1389,3 +1389,36 @@ export interface InboundLifecycleHooks {
   recordAcceptance: LifecycleStore["recordLifecycleAcceptance"];
   notifyReply(displayName: string | null, body: string): Promise<void>;
 }
+
+// ── ML-6 calendar integration ────────────────────────────────────────────────────────────────
+
+export type MeetingConnectionRow = { id: string; accountId: string; provider: "calendly" | "calcom"; status: string };
+
+export interface MeetingEventStore {
+  getMeetingConnection(connectionId: string): Promise<MeetingConnectionRow | null>;
+  touchMeetingConnection(connectionId: string): Promise<void>;
+  /** true only when the lead exists in THIS account — the tag can never cross workspaces */
+  leadInAccount(accountId: string, leadId: string): Promise<boolean>;
+  findLeadByEmail(accountId: string, email: string): Promise<string | null>;
+  /** insert-or-update by (account, provider, booking_ref); attribution null = keep the stored value */
+  upsertMeetingEvent(e: {
+    accountId: string;
+    connectionId: string;
+    provider: "calendly" | "calcom";
+    leadId: string;
+    bookingRef: string;
+    status: "booked" | "canceled";
+    startAt: Date | null;
+    attribution: "link" | "email" | null;
+  }): Promise<void>;
+  /** account-scoped: (account, provider, booking_ref) is the identity of a booking */
+  findMeetingEvent(accountId: string, provider: string, bookingRef: string): Promise<{ leadId: string; status: "booked" | "canceled" } | null>;
+  hasLiveBooking(accountId: string, leadId: string): Promise<boolean>;
+  /** meeting_booked_at (first booking wins) + meeting_at + meeting_source='calendar' */
+  markCalendarMeeting(accountId: string, leadId: string, startAt: Date | null): Promise<void>;
+  /** clears meeting fields only when meeting_source='calendar' (never a manual/agent record) */
+  clearCalendarMeeting(accountId: string, leadId: string): Promise<void>;
+  /** cancel queued drafts + stop the active sequence — a lead who booked gets no more nudges */
+  standDownOutreach(accountId: string, leadId: string): Promise<void>;
+  notifyMeetingBooked(accountId: string, leadId: string): Promise<void>;
+}

@@ -116,7 +116,7 @@ describe("suppression list (rule 11 — the master gate)", () => {
 });
 
 describe("retention windows (rule 11)", () => {
-  it.each(["leads", "enrichment_results", "scheduled_sends", "replies", "inbound_leads", "lead_signals", "intent_observations", "reveal_runs", "lead_feedback"])(
+  it.each(["leads", "enrichment_results", "scheduled_sends", "replies", "inbound_leads", "lead_signals", "intent_observations", "reveal_runs", "lead_feedback", "meeting_connections", "meeting_events"])(
     "%s states its retention window",
     (table) => {
       expect(allMigrations).toContain(`retention(${table})`);
@@ -125,7 +125,7 @@ describe("retention windows (rule 11)", () => {
 });
 
 describe("service-role-only write surfaces (rules 09/11)", () => {
-  it.each(["outreach_sends", "copilot_actions", "enrichment_results", "replies", "unsubscribe_tokens", "conversion_tokens", "copilot_conversations", "copilot_messages", "calls", "security_events", "inbound_leads", "lead_signals", "intent_observations", "reveal_runs"])(
+  it.each(["meeting_connections", "meeting_events", "outreach_sends", "copilot_actions", "enrichment_results", "replies", "unsubscribe_tokens", "conversion_tokens", "copilot_conversations", "copilot_messages", "calls", "security_events", "inbound_leads", "lead_signals", "intent_observations", "reveal_runs"])(
     "%s has no client write policies",
     (table) => {
     const policyRe = new RegExp(`create policy \\w+ on public\\.${table}\\s+for (insert|update|delete|all)`);
@@ -496,6 +496,38 @@ describe("lead feedback (0065, ML-4)", () => {
 
   it("keeps one verdict per lead", () => {
     expect(sql).toContain("constraint lead_feedback_lead_unique unique (lead_id)");
+  });
+});
+
+describe("calendar integration (0066, ML-6)", () => {
+  const sql = readFileSync(join(migrationsDir, "0066_meeting_connections.sql"), "utf8").toLowerCase();
+
+  it("never exposes the encrypted credential or signing secret to client roles", () => {
+    expect(sql).toContain("revoke select on public.meeting_connections from authenticated, anon;");
+    const grant = sql.slice(sql.indexOf("grant select ("), sql.indexOf(") on public.meeting_connections to authenticated"));
+    expect(grant).not.toContain("credential_enc");
+    expect(grant).not.toContain("signing_secret_enc");
+  });
+
+  it("pins every meeting event to a lead in the same workspace", () => {
+    expect(sql).toMatch(/foreign key \(lead_id, account_id\)\s+references public\.leads \(id, account_id\) on delete cascade/);
+  });
+
+  it("scopes a booking's identity to the account (shared calendars can't cross workspaces)", () => {
+    expect(sql).toContain("constraint meeting_events_booking_unique unique (account_id, provider, booking_ref)");
+  });
+
+  it("revokes client write privileges on both tables", () => {
+    expect(sql).toContain("revoke insert, update, delete, truncate, references, trigger on public.meeting_connections from authenticated, anon;");
+    expect(sql).toContain("revoke insert, update, delete, truncate, references, trigger on public.meeting_events from authenticated, anon;");
+  });
+
+  it("keeps every existing webhook source when adding the calendar ones", () => {
+    expect(sql).toContain("check (source in ('email', 'linkedin', 'stripe', 'voice', 'imessage', 'inbound', 'ads', 'calendly', 'calcom'))");
+  });
+
+  it("lets leads record a calendar-confirmed meeting", () => {
+    expect(sql).toContain("check (meeting_source in ('agent', 'manual', 'calendar'))");
   });
 });
 

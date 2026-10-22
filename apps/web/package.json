@@ -20,6 +20,7 @@
     "@vantera/ai": "workspace:*",
     "@vantera/billing": "workspace:*",
     "@vantera/crm-infra": "workspace:*",
+    "@vantera/meetings-infra": "workspace:*",
     "@vantera/help-agent": "workspace:*",
     "@vantera/jobs": "workspace:*",
     "@vantera/linkedin-infra": "workspace:*",

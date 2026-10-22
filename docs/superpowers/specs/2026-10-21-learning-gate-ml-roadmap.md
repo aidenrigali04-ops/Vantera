@@ -176,3 +176,26 @@ article mentions learned ordering + job-seeker exclusion); full gate green on a 
 - Guidance: an inline rank-context line (no system-prompt change; newline-stripped, ≤ 500 chars).
 - UI: `/playbook/scout/targeting` (plain form; one company per line so "Acme, Inc." survives),
   linked from the Scout card. Exempt by design: manual adds, onboarding fast-pass.
+
+## 8. ML-6 design (calendar integration) — shipped
+
+- **Connect** (owner/admin): paste a Calendly PAT (scopes users:read, webhooks:write,
+  scheduled_events:read; webhooks need a paid Standard+ plan) or a Cal.com v2 API key (v1 shut down
+  2026-04-08). The server verifies it (/users/me · /v2/me), creates a user-scoped webhook at
+  `/api/webhooks/meetings/<provider>/<connectionId>` with a fresh 32-byte signing secret, and stores
+  key + secret encrypted (crm-infra keyring). Disconnect deletes the vendor webhook + the row.
+- **Attribution:** the conversation brain writes the clean booking link; `tagLinksInText` tags the
+  final message with `utm_content=vt-<leadId>` (Calendly echoes `payload.tracking.utm_content`) and
+  `metadata[vt]=vt-<leadId>` (Cal.com echoes `payload.metadata.vt`; it does NOT echo utm_*). The
+  tag is re-checked against the connection's account; then the reschedule chain (Calendly
+  `old_invitee`, Cal.com `rescheduleUid`); then invitee email within the account. Unattributed
+  bookings store nothing.
+- **Signatures:** Calendly `t=…,v1=…` HMAC of `${t}.${rawBody}`, 180 s replay window; Cal.com hex
+  HMAC of the raw body (no timestamp → idempotency on uid+trigger). Dedupe log keeps only
+  {kind, bookingRef}.
+- **Effects:** `meeting_source='calendar'` (most trustworthy), outreach stood down, notification.
+  Cancels clear only calendar-recorded meetings with no other live booking.
+- **Known limits (documented, not built):** Cal.com team/round-robin event types may need
+  event-type webhooks; Cal.com retries are sparse (a bookings-API reconciliation job would add
+  resilience); Calendly disables a subscription after 24 h of failed deliveries (surface via
+  connection status in a follow-up).
