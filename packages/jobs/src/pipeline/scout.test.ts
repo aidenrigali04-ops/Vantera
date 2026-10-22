@@ -114,8 +114,10 @@ class FakeScoutStore implements ScoutStore {
   learnedInsights: Awaited<ReturnType<ScoutStore["getLearnedInsights"]>> = {
     mode: "learned",
     evidence: 120,
-    positive: [{ feature: "signal:funding", lift: 0.6, n: 40 }],
-    negative: [{ feature: "seniority:manager", lift: -0.4, n: 30 }],
+    features: [
+      { feature: "signal:funding", lift: 0.6, ratio: 1.8, n: 40 },
+      { feature: "seniority:manager", lift: -0.4, ratio: 0.7, n: 30 },
+    ],
   };
   learnedFails = false;
   async getLearnedInsights() {

@@ -15,7 +15,7 @@ import type {
   DraftInput,
   RankCandidate,
   RankContext,
-  SignalReportRow,
+  LearnedReadout,
   ReplyVerdict,
   RulesGateResult,
   StoredInsights,
@@ -208,13 +208,9 @@ export interface ScoutRunSummary {
   learned?: LearnedInsights | null;
 }
 
-/** The learner's readout: which ordering is live, the evidence behind it, top ± features. */
-export type LearnedInsights = {
-  mode: "learned" | "tilt";
-  evidence: number;
-  positive: SignalReportRow[];
-  negative: SignalReportRow[];
-};
+/** The learner's readout persisted with each scout run: which ordering is live, plus the account's
+ *  OWN-data feature readout the web app renders (ML-2 — never pool-derived). */
+export type LearnedInsights = LearnedReadout & { mode: "learned" | "tilt" };
 
 export interface CopyDraftPayload {
   copyAgentId: string;

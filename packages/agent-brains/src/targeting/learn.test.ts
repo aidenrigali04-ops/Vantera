@@ -172,3 +172,54 @@ describe("orderLeads", () => {
     expect(orderLeads(leads, ordering).map((l) => l.id)).toEqual(["b", "a"]);
   });
 });
+
+describe("buildReadout / explainLead (what users see — their OWN data only)", () => {
+  it("is built from the account's counts alone — there is no way to pass the cross-account pool", async () => {
+    const { buildReadout } = await import("./learn");
+    expect(buildReadout.length).toBe(1); // (account) only — guardrail: displayed numbers never blend other tenants
+  });
+
+  it("lists features with enough of the account's own evidence, strongest first, as ratios", async () => {
+    const { buildReadout } = await import("./learn");
+    const readout = buildReadout(
+      countRows([...rows(40, 14, { signals: ["funding"] }), ...rows(40, 2, { title: "Sales Manager" }), ...rows(3, 3, { industry: "fintech" })])
+    );
+    expect(readout.evidence).toBe(83);
+    const keys = readout.features.map((f) => f.feature);
+    expect(keys).toContain("signal:funding");
+    expect(keys).not.toContain("industry:fintech"); // 3 own observations — below the display floor
+    expect(readout.features.find((f) => f.feature === "signal:funding")!.ratio).toBeGreaterThan(1);
+    expect(readout.features.find((f) => f.feature === "seniority:manager")!.ratio).toBeLessThan(1);
+    // strongest first, in either direction
+    const mags = readout.features.map((f) => Math.abs(f.lift));
+    expect(mags).toEqual([...mags].sort((a, b) => b - a));
+  });
+
+  it("explains a lead with up to 3 human-readable reasons from the readout", async () => {
+    const { buildReadout, explainLead } = await import("./learn");
+    const readout = buildReadout(countRows([...rows(40, 14, { signals: ["funding"] }), ...rows(40, 2, {})]));
+    const reasons = explainLead(readout, { title: "VP Sales", industry: "saas", aiScore: 75, signals: ["funding"] });
+    expect(reasons[0]).toMatchObject({ feature: "signal:funding", label: "Funding signal" });
+    expect(reasons[0]!.ratio).toBeGreaterThan(1);
+    expect(reasons.length).toBeLessThanOrEqual(3);
+  });
+
+  it("explains nothing until the account has enough matured invites", async () => {
+    const { buildReadout, explainLead } = await import("./learn");
+    const readout = buildReadout(countRows(rows(10, 5, { signals: ["funding"] })));
+    expect(explainLead(readout, { title: "VP Sales", industry: "saas", aiScore: 75, signals: ["funding"] })).toEqual([]);
+  });
+});
+
+describe("featureLabel", () => {
+  it("turns feature keys into plain words", async () => {
+    const { featureLabel } = await import("./learn");
+    expect(featureLabel("signal:exec_hire")).toBe("New executive hire signal");
+    expect(featureLabel("seniority:founder")).toBe("Founders");
+    expect(featureLabel("industry:saas")).toBe("SaaS industry");
+    expect(featureLabel("size:11-50")).toBe("11-50 employees");
+    expect(featureLabel("score:90+")).toBe("Score 90+");
+    expect(featureLabel("source:intent")).toBe("Found showing intent");
+    expect(featureLabel("intent:high")).toBe("High intent");
+  });
+});

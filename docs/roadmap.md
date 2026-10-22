@@ -122,9 +122,14 @@ Each entry stays short — the detail lives in that phase's spec (`docs/superpow
 
 - [x] **ML-0 — Learning-loop correctness** — rank misses retried not rejected; tilt-ordered draft slots; converted never demoted; 14-day outcome maturation; per-run token/$ telemetry + system-prompt cache breakpoint; rules-gate word-start matching; evals gate `prospect/**`. (commits `072e967c`, `439189cb`)
 - [x] **ML-1 — Learning gate** — outcome learner (hierarchically shrunk log-odds over source/signal/intent/seniority/industry/size/score band, global pool → account) orders the scarce daily slots once it has evidence; review "wrong person" rejections + positive replies feed the rank prompt as the seller's revealed preferences; job-seeker exclusion; real intent level persisted; intent verdicts per (person, post); learner readout in every scout run summary. No migration.
-- [ ] **ML-2 — Lookalikes** — embed positive/won leads (existing embeddings + pgvector); similarity as a learner feature + a lookalike signal. Needs a migration (vector column + RLS).
-- [ ] **ML-3 — Strategy loop** — the owner's adaptive-prospecting A1–A5 + B0–B3, plus the 2026-10-21 hive-audit fixes (harm-count bug — fixed in tree; sealed-holdout reuse/leak; generator's zero-effect defaults; Beta(1,1) unseen-candidate prior).
-- [ ] **ML-4 — Speed-to-signal** — high-intent re-scan more than daily; warm escalation (accepted + engaged first); more signal types where the LinkedIn layer exposes them (profile viewers, company followers, activity level).
+- [x] **ML-2 — Visible learning** — "Ranked higher/lower" reasons in the prospect side-peek + a "What's working" strip on Prospects, built from the account's OWN outcomes only (persisted readout in the scout run summary; the cross-account pool shapes ordering, never a displayed number). No migration.
+- [ ] **ML-3 — Signal-cited openers** — the first touch references the triggering signal (why-now) when one exists; lint + eval enforced.
+- [ ] **ML-4 — Fit feedback everywhere** — Good fit / Not a fit on any prospect feeds the learner + rank prompt. Migration (feedback + RLS).
+- [ ] **ML-5 — Steerable targeting** — user exclusions (agencies, freelancers, competitors, existing customers, companies/keywords) + free-text prioritize/avoid guidance, in `agents.config`.
+- [ ] **ML-6 — Honest meetings** — booking-link/calendar meeting detection + one-click in Inbox, so counts (and the learner's labels) match reality.
+- [ ] **ML-7 — Lookalikes** — embed positive/won leads (existing embeddings + pgvector); similarity as a learner feature + a lookalike signal. Migration (vector column + RLS).
+- [ ] **ML-8 — Warm escalation + speed-to-signal** — engaged/accepted first; high-intent re-scan more than daily; profile-viewer/follower signals where available.
+- [ ] **ML-9 — Strategy loop** — the owner's adaptive-prospecting A1–A5 + B0–B3, plus the 2026-10-21 hive-audit fixes (harm-count bug — fixed in tree; sealed-holdout reuse/leak; generator's zero-effect defaults; Beta(1,1) unseen-candidate prior).
 
 ---
 

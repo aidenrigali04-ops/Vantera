@@ -1,5 +1,5 @@
 import type { LeadOutcomeFlags } from "../optimize/outcomes";
-import { buildTargetingProfile, rankByTilt, seniorityBucket, type TargetingProfile, type TargetingRow } from "./tilt";
+import { buildTargetingProfile, rankByTilt, SEGMENT_FLOOR, seniorityBucket, type TargetingProfile, type TargetingRow } from "./tilt";
 
 /**
  * ML-1 outcome learner (spec 2026-10-21-learning-gate-ml-roadmap.md §3.2): which features of a
@@ -186,4 +186,114 @@ export function buildLeadOrdering(account: CountTable, global: CountTable | unde
 
 export function orderLeads<T extends LearnerFeatures>(leads: T[], ordering: LeadOrdering): T[] {
   return ordering.kind === "learned" ? rankByLearned(leads, ordering.model) : rankByTilt(leads, ordering.profile);
+}
+
+// ── What users see (ML-2) ────────────────────────────────────────────────────────────────────
+// Displayed numbers come from the account's OWN outcomes only: the cross-account pool may shape
+// ordering (above), but never a number on screen — with few accounts in the pool a blended rate
+// could reveal another tenant's results.
+
+/** Own matured invites behind a feature before it may be shown (same floor as tilt.ts). */
+const DISPLAY_FLOOR = SEGMENT_FLOOR;
+/** Lifts smaller than this read as noise and aren't shown (≈ ±10%). */
+const DISPLAY_MIN_LIFT = 0.1;
+const DISPLAY_MAX_FEATURES = 40;
+
+export type ReadoutFeature = { feature: string; lift: number; ratio: number; n: number };
+/** The account's learned readout, persisted with each scout run and read by the web app. */
+export type LearnedReadout = { evidence: number; features: ReadoutFeature[] };
+
+export function buildReadout(account: CountTable): LearnedReadout {
+  const model = fitLearner(account);
+  const features = [...model.lifts.entries()]
+    .map(([feature, l]) => ({ feature, lift: l.lift, n: account.features.get(feature)?.n ?? 0 }))
+    .filter((f) => f.n >= DISPLAY_FLOOR && Math.abs(f.lift) >= DISPLAY_MIN_LIFT)
+    .sort((a, b) => Math.abs(b.lift) - Math.abs(a.lift))
+    .slice(0, DISPLAY_MAX_FEATURES)
+    .map((f) => ({ ...f, lift: Math.round(f.lift * 100) / 100, ratio: Math.round(Math.exp(f.lift) * 10) / 10 }));
+  return { evidence: account.n, features };
+}
+
+export type LeadReason = { feature: string; label: string; ratio: number };
+
+/** Up to `k` plain reasons this lead ranks where it does — empty until the account has evidence. */
+export function explainLead(readout: LearnedReadout, lead: LearnerFeatures, k = 3): LeadReason[] {
+  if (readout.evidence < LEARN_MIN_N) return [];
+  const byKey = new Map(readout.features.map((f) => [f.feature, f]));
+  const byFamily = new Map<string, ReadoutFeature>();
+  for (const key of featureKeys(lead)) {
+    const f = byKey.get(key);
+    if (!f) continue;
+    const family = key.slice(0, key.indexOf(":"));
+    const prev = byFamily.get(family);
+    if (!prev || Math.abs(f.lift) > Math.abs(prev.lift)) byFamily.set(family, f);
+  }
+  return [...byFamily.values()]
+    .sort((a, b) => Math.abs(b.lift) - Math.abs(a.lift))
+    .slice(0, k)
+    .map((f) => ({ feature: f.feature, label: featureLabel(f.feature), ratio: f.ratio }));
+}
+
+const SIGNAL_LABELS: Record<string, string> = {
+  funding: "Funding signal",
+  exec_hire: "New executive hire signal",
+  m_and_a: "Acquisition signal",
+  office_opening: "New office signal",
+  product_launch: "Product launch signal",
+  partnership: "Partnership signal",
+  award: "Award signal",
+  hiring: "Hiring signal",
+  workforce: "Workforce change signal",
+  cost_cutting: "Cost-cutting signal",
+  legal: "Legal event signal",
+  security: "Security event signal",
+  intent: "Buying-intent signal",
+  other: "Company news signal",
+};
+const SENIORITY_LABELS: Record<string, string> = {
+  founder: "Founders",
+  exec: "C-level executives",
+  vp: "VPs",
+  director: "Directors",
+  manager: "Managers",
+  other: "Other roles",
+};
+const SOURCE_LABELS: Record<string, string> = {
+  intent: "Found showing intent",
+  discovery: "Found by search",
+  manual: "Added by you",
+  import: "Imported",
+  inbound: "Inbound",
+  ad: "From ads",
+};
+const ACRONYMS: Record<string, string> = { saas: "SaaS", it: "IT", b2b: "B2B", b2c: "B2C", ai: "AI", hr: "HR", crm: "CRM" };
+const titleCase = (s: string) =>
+  s
+    .split(/[\s_]+/)
+    .map((w) => ACRONYMS[w] ?? (w ? w[0]!.toUpperCase() + w.slice(1) : w))
+    .join(" ");
+
+/** A feature key in plain words, for reasons and the "What's working" panel. */
+export function featureLabel(key: string): string {
+  const i = key.indexOf(":");
+  const family = key.slice(0, i);
+  const value = key.slice(i + 1);
+  switch (family) {
+    case "signal":
+      return SIGNAL_LABELS[value] ?? `${titleCase(value)} signal`;
+    case "seniority":
+      return SENIORITY_LABELS[value] ?? titleCase(value);
+    case "industry":
+      return `${titleCase(value)} industry`;
+    case "size":
+      return `${value} employees`;
+    case "score":
+      return `Score ${value}`;
+    case "source":
+      return SOURCE_LABELS[value] ?? titleCase(value);
+    case "intent":
+      return `${titleCase(value)} intent`;
+    default:
+      return titleCase(value);
+  }
 }

@@ -57,6 +57,8 @@ export interface LeadRow {
   created_at: string;
   replies?: ReplyView[] | null;
   lead_signals?: LeadSignalView[] | null;
+  /** ML-2: why the learner ranks this prospect where it does (account's own outcomes) */
+  learned_reasons?: { label: string; ratio: number }[] | null;
 }
 
 export interface ReplyView {

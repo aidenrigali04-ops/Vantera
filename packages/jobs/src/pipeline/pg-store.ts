@@ -56,12 +56,13 @@ import {
   countRows,
   RANK_FEEDBACK_MAX,
   describeStrategy,
+  buildReadout,
   orderLeads,
-  signalReport,
   toStoredInsights,
   wealthAfterConclusion,
   wealthAfterLaunch,
   type LeadInsights,
+  type CountTable,
   type LeadOrdering,
   type LearnerFeatures,
   type LearnerRow,
@@ -395,18 +396,21 @@ async function learnerTrainingRows(
   }));
 }
 
-/** The account's lead ordering: the ML-1 learner when it has evidence, else ML-0's tilt. */
-async function leadOrdering(db: Db, accountId: string): Promise<LeadOrdering> {
-  const [own, pool, tilt] = await Promise.all([
+/** The account's lead ordering (the ML-1 learner when it has evidence, else ML-0's tilt) plus the
+ *  account's OWN counts — the only input allowed into anything displayed (ML-2). */
+async function leadOrdering(db: Db, accountId: string): Promise<{ ordering: LeadOrdering; own: CountTable }> {
+  const [ownRows, pool, tilt] = await Promise.all([
     learnerTrainingRows(db, { accountId }),
     learnerTrainingRows(db, { excludeAccountId: accountId }),
     invitedOutcomeRows(db, accountId),
   ]);
-  return buildLeadOrdering(
-    countRows(own),
+  const own = countRows(ownRows);
+  const ordering = buildLeadOrdering(
+    own,
     countRows(pool),
     tilt.map((r) => ({ title: r.title, industry: r.industry, flags: r.flags }))
   );
+  return { ordering, own };
 }
 
 /** The account's citable proof/pricing/FAQ facts (0046), oldest-sort first — fed into the responder
@@ -526,7 +530,7 @@ async function creditAlphaWealth(tx: OptimizeTx, accountId: string): Promise<voi
 export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerStore & RetentionStore & TrialStore & SendDispatchStore & OutreachSendStore & InboundStore & SequenceStore & SequenceTouchStore & ConversionStore & RefreshLeadStore & QualifyLeadStore & IntentScanStore & ConnectionSyncStore & OptimizeStore & AgentRunStore & FastPassStore {
   // ML-1 ordering is a cross-account read — computed once per account per store (a store lives for
   // one task run), shared by the drain, the slot ranking, and the run-summary readout.
-  const orderingCache = new Map<string, Promise<LeadOrdering>>();
+  const orderingCache = new Map<string, Promise<{ ordering: LeadOrdering; own: CountTable }>>();
   const orderingFor = (accountId: string) => {
     let cached = orderingCache.get(accountId);
     if (!cached) {
@@ -936,7 +940,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         .from(leads)
         .where(and(eq(leads.accountId, accountId), eq(leads.status, "qualified")))
         .orderBy(desc(leads.aiScore), desc(leads.scoredAt));
-      const ordering = await orderingFor(accountId);
+      const { ordering } = await orderingFor(accountId);
       return orderLeads(
         rows.map((r) => ({ id: r.id, ...toFeatures(r) })),
         ordering
@@ -953,7 +957,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         .where(and(eq(leads.accountId, accountId), inArray(leads.id, leadIds)));
       const ordered = orderLeads(
         rows.map((r) => ({ id: r.id, ...toFeatures(r) })),
-        await orderingFor(accountId)
+        (await orderingFor(accountId)).ordering
       ).map((r) => r.id);
       const seen = new Set(ordered);
       return [...ordered, ...leadIds.filter((id) => !seen.has(id))];
@@ -966,9 +970,9 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
     },
 
     async getLearnedInsights(accountId: string) {
-      const ordering = await orderingFor(accountId);
-      if (ordering.kind === "tilt") return { mode: "tilt" as const, evidence: ordering.profile.baseline.n, positive: [], negative: [] };
-      return { mode: "learned" as const, evidence: ordering.model.evidence, ...signalReport(ordering.model) };
+      // persisted to agent_runs (web-readable) → built from the account's OWN outcomes only
+      const { ordering, own } = await orderingFor(accountId);
+      return { mode: ordering.kind, ...buildReadout(own) };
     },
 
     async getRankFeedback(accountId: string) {

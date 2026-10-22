@@ -38,15 +38,27 @@ by making the loop **actually learn**: every signal, source, score band and segm
 against real accepts/replies, and the gate + draft ordering move with that evidence —
 automatically, with no weeks of manual signal tuning.
 
-## 2. The integrated ML roadmap
+## 2. The integrated ML roadmap (v2 — 2026-10-21, organized for execution quality)
 
-| Phase | Lever | Status |
-|---|---|---|
-| **ML-0** Correctness | Rank misses retried; tilt-ordered draft slots; converted never demoted; 14-day maturation (right-censoring); per-run token/$ telemetry + cache breakpoint; rules-gate word-start matching; evals gate prospect/** | **Shipped** |
-| **ML-1** Learning gate *(this spec)* | Outcome learner over features; learned draft ordering; fit-feedback in the rank prompt; job-seeker exclusion; intent keyed per (profile, post) | Build now |
-| **ML-2** Lookalikes | Embed won/positive leads (existing Voyage + pgvector); similarity becomes a learner feature + a "lookalike" signal | Next — needs a migration (vector column) |
-| **ML-3** Strategy loop | = owner's A1–A5/B0–B3 (adaptive-prospecting spec), plus the hive fixes from the 2026-10-21 audit (harm-count bug — fixed in tree; reused/leaking sealed holdout; generator plants zero-effect defaults; Beta(1,1) unseen prior) | Owner-sequenced |
-| **ML-4** Speed-to-signal | High-intent re-scan more than once a day; warm escalation (accepted + engaged first); more signal types where the LinkedIn layer exposes them (profile viewers, company followers, activity level) | After ML-2 |
+Ordering principles: (1) one concern per phase, one PR, its own quality gate; (2) **label quality
+before model capacity** — fix what the learner trains on (fit feedback, meetings) before adding
+model inputs (lookalikes); (3) no-migration phases first, migration phases each get an
+`rls-auditor` pass; (4) every user-visible phase ships its help article (rule 09) and keeps UI
+plain/functional for the owner to restyle; (5) **users only ever see their own data** — the
+cross-account pool may shape *ordering*, never a displayed number.
+
+| Phase | Concern | User-visible outcome | Migration | Quality gate (beyond the full CI gate) |
+|---|---|---|---|---|
+| **ML-0** ✅ | Learning-loop correctness | — | no | — |
+| **ML-1** ✅ | Learning gate | Better leads first; job seekers skipped | no | rank eval floors (CI) |
+| **ML-2** | **Visible learning** | "Why this rank" on every prospect; "What's working" panel on Prospects | no | explanations computed from the account's OWN data only (guardrail test); white-label audit |
+| **ML-3** | **Signal-cited openers** | First touch references what the person actually did | no | humanizer lint test + copy eval corpus pass-rate holds; no invented why-now |
+| **ML-4** | **Fit feedback everywhere** | Good fit / Not a fit on any prospect, feeding ML-1 | yes (feedback table + RLS) | rls-auditor; learner + rank-prompt consume it (tests) |
+| **ML-5** | **Steerable targeting** | Exclusions (agencies/consultants, freelancers, competitors, existing customers, companies/keywords) + "who to prioritize/avoid" guidance | no (`agents.config`, rule 13) | deterministic exclusion tests; guidance reaches rank prompt; rank eval floors |
+| **ML-6** | **Honest meetings** | Meeting counts that match reality (booking-link/calendar detection + one-click in Inbox) | likely yes | precision of detection vs manual; learner trains on it |
+| **ML-7** | **Lookalikes** | "Looks like your best replies" signal + ordering lift | yes (vector col + RLS) | rls-auditor; inert without positives; embedding cost in telemetry |
+| **ML-8** | **Warm escalation + speed-to-signal** | Engaged/accepted connections first; fresher high-intent pickup; profile-viewer/follower signals where the LinkedIn layer exposes them | maybe | LinkedIn read caps (rule 04) unchanged; suppression tests |
+| **ML-9** | **Strategy loop** | = owner's adaptive-prospecting A1–A5/B0–B3 + hive-audit fixes | per that spec | per that spec |
 
 ## 3. ML-1 design
 
@@ -110,3 +122,15 @@ UI, Phase 21); lookalikes (ML-2).
 TDD for every unit; the learner inert with no data (tests prove ML-0-identical order); no
 migration; rank eval floors pass on the new prompt; help article updated (prospects/agents
 article mentions learned ordering + job-seeker exclusion); full gate green on a clean tree.
+
+## 4. ML-2 design (visible learning) — shipped
+
+- **Readout** (`buildReadout(account)` — takes the account's counts only, by signature): features
+  with ≥ 8 own matured invites and |lift| ≥ 0.1, strongest first, as rate ratios vs the account's
+  own average. Persisted as `summary.learned` on every scout run (agent_runs, RLS-scoped).
+- **Privacy rule:** the cross-account pool shapes *ordering* only. Anything displayed comes from
+  the readout. (Fixes an ML-1 gap where the persisted readout came from the pooled model.)
+- **Surfaces:** Prospects "What's working" strip (top 3 up / down, hidden below 30 invites of
+  evidence) and "Ranked higher / lower" reasons in the side-peek (`explainLead`, ≤ 3, one per
+  feature family). Plain markup; owner restyles.
+- **Labels:** `featureLabel` maps keys to plain words (white-label safe — no vendor names).
