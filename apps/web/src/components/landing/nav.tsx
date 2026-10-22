@@ -1,38 +1,44 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { ArrowRight, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { VanteraLogo } from "./vantera-logo";
+import { ClaudeMark, HubSpotMark, SalesforceMark, SlackMark } from "./brand-glyphs";
 import { FLAT_LINKS, MENUS, type Menu, type MenuItem } from "./nav-menus";
 
 /**
- * Landing nav — a full-width bar pinned to the top of the viewport, with three
- * mega-menus (Platform / Solutions / Resources) plus a flat Pricing link.
+ * Landing nav, after rankbox.xyz: a white bar with the mark and wordmark on the left,
+ * three menus and two flat links centred, and the hairline Sign in beside the solid
+ * Get started on the right.
  *
- * Each mega-menu is one wide panel aligned to the page container: two icon-and-copy
- * link columns under tracked-caps eyebrows, and a tinted feature card with a mono
- * readout on the right. One menu is open at a time (shared state, not per-item CSS
+ * Each menu opens one white panel centred under the bar, two-tone like rankbox's: the
+ * link columns sit on white (grey icon tiles that turn soft blue on hover), the right
+ * rail and the footer strip sit on a soft grey, so the eye lands on the product first
+ * and the extras second. One menu is open at a time (shared state, not per-item CSS
  * hover) so the pointer can travel across triggers without the panel flickering shut;
- * a short close delay bridges the gap between trigger and panel.
+ * a short close delay bridges the gap between trigger and panel. A faint wash lifts
+ * the panel off the page without blurring it.
  *
- * `onDark` (homepage only) inverts the bar while it overlaps the blue hero slab
- * (`[data-hero-dark]`): white content over transparent chrome, crossfading back to the
- * standard white bar once the hero scrolls past. Every other marketing page omits the
- * prop and is behaviorally untouched. An open menu always forces the solid bar — a
- * white panel hanging off transparent chrome reads as detached.
+ * `framed` (homepage) pins the bar in the page flow as the top of the page frame, its
+ * hairline rails continuing down into the hero's. Every other marketing page omits the
+ * prop and gets the floating bar that turns solid once the page scrolls.
  */
 
 /** How long the panel survives after the pointer leaves, so the gap is crossable. */
 const CLOSE_DELAY_MS = 120;
 
-function linkCls(dark: boolean) {
-  return cn(
-    "rounded-full px-3.5 py-2 text-[14px] font-medium transition-colors duration-200",
-    dark ? "text-white/85 hover:text-white" : "text-[var(--ink-3)] hover:text-foreground",
-  );
-}
+const FOCUS_RING =
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(24,119,242,0.4)]";
+
+/** The rail and footer tone: the page's soft grey, half-mixed with white. */
+const MENU_RAIL = "bg-[color-mix(in_oklab,var(--tint)_70%,white)]";
+
+const TOP_ITEM = cn(
+  "flex h-9 items-center gap-1 whitespace-nowrap rounded-md px-3.5 text-sm font-medium text-foreground/65 transition-colors hover:text-foreground",
+  FOCUS_RING,
+);
 
 /** Renders <a> for hash links (same-page jumps), <Link> for real routes. */
 function NavLink({
@@ -43,7 +49,7 @@ function NavLink({
 }: {
   href: string;
   className?: string;
-  children: React.ReactNode;
+  children: ReactNode;
   onClick?: () => void;
 }) {
   if (href.includes("#")) {
@@ -60,22 +66,40 @@ function NavLink({
   );
 }
 
+function ColumnLabel({ children, action }: { children: ReactNode; action?: ReactNode }) {
+  return (
+    <div className="flex h-8 items-center justify-between px-2.5">
+      <p className="text-[0.75rem] font-medium text-[var(--ink-3)]">{children}</p>
+      {action}
+    </div>
+  );
+}
+
+/** The primary row: grey icon tile, name, one line of what it does. The tile turns
+    soft blue on hover, and an arrow slides in beside the name. */
 function MenuRow({ item, onNavigate }: { item: MenuItem; onNavigate: () => void }) {
   const Icon = item.icon;
   return (
     <NavLink
       href={item.href}
       onClick={onNavigate}
-      className="group/row flex items-start gap-3.5 rounded-xl p-3 transition-colors duration-200 hover:bg-white/10"
+      className={cn(
+        "group flex items-start gap-3 rounded-md px-2.5 py-2.5 transition-colors hover:bg-[rgba(12,16,26,0.03)]",
+        FOCUS_RING,
+      )}
     >
-      <span className="grid size-10 shrink-0 place-items-center rounded-[10px] bg-white/12 text-white ring-1 ring-inset ring-white/20 transition-transform duration-200 group-hover/row:scale-105">
-        <Icon className="size-[18px]" />
+      <span className="mt-0.5 grid size-9 shrink-0 place-items-center rounded-md bg-[rgba(12,16,26,0.045)] text-foreground/75 transition-colors group-hover:bg-[var(--cyan-tint)] group-hover:text-[var(--fb-strong)]">
+        <Icon className="size-4" />
       </span>
       <span className="min-w-0">
-        <span className="block text-[14px] font-semibold tracking-[-0.01em] text-white">
+        <span className="flex items-center gap-1 text-[0.9rem] font-medium leading-tight text-foreground">
           {item.title}
+          <ArrowRight
+            aria-hidden
+            className="size-3.5 -translate-x-1 opacity-0 transition-all duration-200 group-hover:translate-x-0 group-hover:opacity-100 group-focus-visible:translate-x-0 group-focus-visible:opacity-100 motion-reduce:transition-none"
+          />
         </span>
-        <span className="mt-0.5 block text-[12.5px] leading-snug text-[#c3d9f8]">
+        <span className="mt-1 block text-pretty text-[0.78rem] leading-snug text-[var(--ink-3)]">
           {item.desc}
         </span>
       </span>
@@ -83,69 +107,163 @@ function MenuRow({ item, onNavigate }: { item: MenuItem; onNavigate: () => void 
   );
 }
 
-function MegaPanel({ menu, onNavigate }: { menu: Menu; onNavigate: () => void }) {
-  const { readout } = menu.feature;
+/** A blue "see all" link with a sliding arrow. */
+function MoreLink({
+  href,
+  onNavigate,
+  className,
+  children,
+}: {
+  href: string;
+  onNavigate: () => void;
+  className?: string;
+  children: ReactNode;
+}) {
   return (
-    <div className="grid grid-cols-[1fr_1fr_320px] gap-8 p-6">
-      {menu.columns.map((col) => (
-        <div key={col.eyebrow}>
-          <span className="block px-3 text-[10.5px] font-semibold uppercase tracking-[0.18em] text-[#c3d9f8]">
-            {col.eyebrow}
-          </span>
-          <div className="mt-2 flex flex-col gap-0.5">
-            {col.items.map((item) => (
-              <MenuRow key={item.title} item={item} onNavigate={onNavigate} />
-            ))}
-          </div>
-        </div>
-      ))}
-
-      {/* feature card — a lifted glass panel on the blue */}
-      <div className="flex flex-col rounded-2xl border border-white/20 bg-white/[0.08] p-5">
-        <span className="text-[15px] font-semibold tracking-[-0.01em] text-white">
-          {menu.feature.title}
-        </span>
-        <p className="mt-2 text-[12.5px] leading-relaxed text-[#c3d9f8]">{menu.feature.blurb}</p>
-
-        <div className="mt-4 rounded-xl border border-white/12 bg-[rgba(3,22,58,0.34)] p-3.5">
-          <span className="block text-[9.5px] font-semibold uppercase tracking-[0.14em] text-[#c3d9f8]">
-            {readout.label}
-          </span>
-          <div className="mt-2.5 flex flex-col gap-1.5">
-            {readout.rows.map((r) => (
-              <div key={r.k} className="flex items-baseline justify-between gap-3">
-                <span className="truncate text-[12px] font-medium text-white">{r.k}</span>
-                <span className="shrink-0 text-[11.5px] tabular-nums text-[#c3d9f8]">{r.v}</span>
-              </div>
-            ))}
-          </div>
-          <p className="mt-3 border-t border-white/12 pt-2.5 text-[10.5px] leading-snug text-[#c3d9f8]">
-            {readout.note}
-          </p>
-        </div>
-
-        <NavLink
-          href={menu.feature.cta.href}
-          onClick={onNavigate}
-          className="group/cta mt-4 inline-flex items-center gap-1.5 text-[13px] font-semibold text-white"
-        >
-          {menu.feature.cta.label}
-          <ArrowRight
-            className="size-3.5 transition-transform duration-200 group-hover/cta:translate-x-0.5"
-            strokeWidth={2.4}
-          />
-        </NavLink>
-      </div>
-    </div>
+    <NavLink
+      href={href}
+      onClick={onNavigate}
+      className={cn(
+        "group inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium text-[var(--fb-strong)] transition-colors hover:bg-[var(--cyan-tint)]",
+        FOCUS_RING,
+        className,
+      )}
+    >
+      {children}
+      <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none" />
+    </NavLink>
   );
 }
 
-export function LandingNav({ onDark = false }: { onDark?: boolean } = {}) {
+const MARKS = [
+  { name: "HubSpot", Mark: HubSpotMark, color: "#ff5c35" },
+  { name: "Salesforce", Mark: SalesforceMark, color: "#00a1e0" },
+  { name: "Slack", Mark: SlackMark, color: "#4a154b" },
+  { name: "Claude", Mark: ClaudeMark, color: "#d97757" },
+];
+
+function MegaPanel({ menu, onNavigate }: { menu: Menu; onNavigate: () => void }) {
+  const { feature, footer } = menu;
+  return (
+    <>
+      <div className="grid grid-cols-[minmax(0,1fr)_18rem]">
+        <div className="grid grid-cols-2 gap-x-2 p-3">
+          {menu.columns.map((col) => (
+            <div key={col.eyebrow}>
+              <ColumnLabel>{col.eyebrow}</ColumnLabel>
+              {col.items.map((item) => (
+                <MenuRow key={item.title} item={item} onNavigate={onNavigate} />
+              ))}
+            </div>
+          ))}
+        </div>
+
+        {/* The rail: the menu's spotlight, then a sample card with the way in. */}
+        <div className={cn("flex flex-col gap-0.5 border-l border-[var(--hairline)] p-3", MENU_RAIL)}>
+          <ColumnLabel
+            action={
+              <NavLink
+                href={feature.cta.href}
+                onClick={onNavigate}
+                className={cn(
+                  "group -mr-1 inline-flex items-center gap-1 rounded-md px-1 text-xs font-medium text-[var(--fb-strong)] transition-colors hover:text-[#1161cc]",
+                  FOCUS_RING,
+                )}
+              >
+                {feature.cta.label}
+                <ArrowRight className="size-3 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none" />
+              </NavLink>
+            }
+          >
+            {feature.title}
+          </ColumnLabel>
+          <p className="px-2.5 pb-3 text-pretty text-[0.78rem] leading-snug text-[var(--ink-3)]">
+            {feature.blurb}
+          </p>
+
+          <div className="mt-auto rounded-lg border border-[rgba(12,16,26,0.08)] bg-white p-3.5">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[0.875rem] font-medium text-foreground">{feature.readout.label}</p>
+              <span className="shrink-0 rounded-md border border-[rgba(12,16,26,0.08)] px-1.5 py-0.5 text-[0.6rem] font-medium uppercase tracking-[0.1em] text-[var(--ink-3)]">
+                Sample
+              </span>
+            </div>
+            <div className="mt-2.5 flex flex-col gap-1.5">
+              {feature.readout.rows.map((r) => (
+                <div key={r.k} className="flex items-center justify-between gap-2 text-xs">
+                  <span className="truncate text-[var(--ink-3)]">{r.k}</span>
+                  <span className="shrink-0 font-semibold text-foreground">{r.v}</span>
+                </div>
+              ))}
+            </div>
+            <p className="mt-2.5 border-t border-[var(--hairline)] pt-2 text-[0.7rem] leading-snug text-[var(--ink-3)]">
+              {feature.readout.note}
+            </p>
+            <Link
+              href="/signup"
+              onClick={onNavigate}
+              className={cn(
+                "group mt-3 flex items-center justify-center gap-1.5 rounded-md bg-[var(--fb-strong)] px-3 py-2 text-sm font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.16),0_1px_2px_rgba(16,24,40,0.14)] transition-colors hover:bg-[#1161cc]",
+                FOCUS_RING,
+              )}
+            >
+              Start free
+              <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none" />
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      {/* The footer strip: a lead link on the left, "see all" on the right. */}
+      <div
+        className={cn(
+          "flex items-center justify-between gap-4 border-t border-[var(--hairline)] px-3 py-2.5",
+          MENU_RAIL,
+        )}
+      >
+        <NavLink
+          href={footer.lead.href}
+          onClick={onNavigate}
+          className={cn(
+            "group flex min-w-0 items-center gap-3 rounded-md px-2.5 py-1.5 transition-colors hover:bg-white",
+            FOCUS_RING,
+          )}
+        >
+          {footer.lead.marks && (
+            <span aria-hidden className="flex shrink-0 gap-1">
+              {MARKS.map(({ name, Mark, color }) => (
+                <span
+                  key={name}
+                  className="grid size-5 place-items-center rounded-[5px] bg-white ring-1 ring-inset ring-[rgba(12,16,26,0.08)] transition-transform duration-200 group-hover:-translate-y-0.5 motion-reduce:transition-none"
+                  style={{ color }}
+                >
+                  <Mark className="size-3" />
+                </span>
+              ))}
+            </span>
+          )}
+          <span className="shrink-0 text-[0.875rem] font-medium text-foreground">
+            {footer.lead.label}
+          </span>
+          <span className="hidden truncate text-xs text-[var(--ink-3)] lg:inline">
+            {footer.lead.text}
+          </span>
+        </NavLink>
+        <MoreLink href={footer.more.href} onNavigate={onNavigate} className="shrink-0">
+          {footer.more.label}
+        </MoreLink>
+      </div>
+    </>
+  );
+}
+
+export function LandingNav({ framed = false }: { framed?: boolean } = {}) {
   const [scrolled, setScrolled] = useState(false);
-  // Seeded from onDark so the homepage's first paint is already inverted (no flash).
-  const [overHero, setOverHero] = useState(onDark);
   const [open, setOpen] = useState<string | null>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const navRef = useRef<HTMLElement>(null);
+  /** How the last press came in: a mouse press lands on a menu hover already opened. */
+  const lastPointer = useRef<string>("mouse");
 
   const cancelClose = useCallback(() => {
     if (closeTimer.current) clearTimeout(closeTimer.current);
@@ -165,184 +283,161 @@ export function LandingNav({ onDark = false }: { onDark?: boolean } = {}) {
   useEffect(() => cancelClose, [cancelClose]);
 
   useEffect(() => {
-    const onScroll = () => {
-      setScrolled(window.scrollY > 8);
-      if (!onDark) return;
-      const hero = document.querySelector<HTMLElement>("[data-hero-dark]");
-      // 64 = bar height: the nav is "over" the hero until the hero's bottom clears the bar.
-      setOverHero(!!hero && hero.getBoundingClientRect().bottom > 64);
-    };
+    const onScroll = () => setScrolled(window.scrollY > 8);
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onScroll);
-    return () => {
-      window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", onScroll);
-    };
-  }, [onDark]);
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
+  // Escape closes the panel, and so does a tap or click anywhere outside the bar
+  // (the wash behind the panel never takes the pointer, so touch needs this).
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") closeNow();
     };
+    const onPointerDown = (e: PointerEvent) => {
+      if (!navRef.current?.contains(e.target as Node)) closeNow();
+    };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("pointerdown", onPointerDown);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("pointerdown", onPointerDown);
+    };
   }, [open, closeNow]);
 
-  const dark = onDark && overHero;
-  // An open panel always sits on solid chrome, whatever the scroll/hero state.
-  const solid = scrolled || open !== null;
+  // The framed bar is always solid: it is the top of the page frame. The floating
+  // bar turns solid once the page scrolls, or while a panel is open (a white panel
+  // hanging off transparent chrome reads as detached).
+  const solid = framed || scrolled || open !== null;
   const activeMenu = MENUS.find((m) => m.key === open) ?? null;
 
   return (
-    <>
-      <header className="fixed inset-x-0 top-0 z-40">
-        {/* Page scrim — blurs and dims everything behind an open panel. Fixed inside
-            the z-40 header at -z-10, so it sits above all page content but beneath the
-            bar and the panel. */}
-        {open && (
-          <div
-            aria-hidden
-            className="fixed inset-0 -z-10 animate-[nav-scrim_180ms_ease-out] bg-[rgba(4,24,64,0.22)] backdrop-blur-[7px]"
-            onPointerEnter={scheduleClose}
-            onClick={closeNow}
-          />
+    <header className={cn("inset-x-0 top-0 z-40", framed ? "sticky" : "fixed")}>
+      {/* A faint wash over the page while a panel is open, lifting the panel off
+          whatever it opens over without blurring it. Purely visual. */}
+      <div
+        aria-hidden
+        className={cn(
+          "pointer-events-none fixed inset-x-0 bottom-0 top-16 hidden bg-[rgba(12,16,26,0.04)] transition-opacity duration-300 md:block",
+          open ? "opacity-100" : "opacity-0",
         )}
-        <nav
+      />
+      <nav
+        ref={navRef}
+        aria-label="Main"
+        className={cn(
+          "relative border-b transition-colors duration-300",
+          solid ? "border-[var(--hairline)] bg-white" : "border-transparent bg-transparent",
+        )}
+        onPointerLeave={scheduleClose}
+      >
+        {/* Framed: the bar's rails run on into the hero's. */}
+        <div
           className={cn(
-            "relative border-b transition-colors duration-300",
-            dark
-              ? solid
-                ? "border-white/12 bg-[rgba(15,94,203,0.72)] backdrop-blur-xl backdrop-saturate-150"
-                : "border-transparent bg-transparent"
-              : solid
-                ? "border-[var(--hairline)] bg-white/80 backdrop-blur-xl backdrop-saturate-150"
-                : "border-transparent bg-transparent",
+            "relative mx-auto flex h-16 max-w-6xl items-center px-5 lg:px-6",
+            framed && "border-x border-[var(--hairline)]",
           )}
-          onPointerLeave={scheduleClose}
         >
-          {/* Top scrim over the raw brand blue — lifts the 14px white links past AA
-              (effective bar bg ≈ #1360c4, 6.4:1). Only while transparent over the hero. */}
-          {dark && !solid && (
-            <div
-              aria-hidden
-              className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[110px] [background:linear-gradient(180deg,rgba(4,24,64,0.26)_0%,rgba(4,24,64,0.10)_60%,transparent_100%)]"
-            />
-          )}
+          <Link href="/" className="flex shrink-0 items-center gap-2.5 text-foreground">
+            <VanteraLogo className="size-6 text-[var(--fb)]" />
+            <span className="text-[1.2rem] font-semibold tracking-tight">Vantera</span>
+          </Link>
 
-          <div className="relative mx-auto flex h-16 max-w-6xl items-center px-6 lg:px-8">
+          {/* Absolutely centered so the links sit at the true middle of the bar,
+              independent of the logo/actions widths on either side. */}
+          <ul className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-0.5 md:flex">
+            {MENUS.map((m) => {
+              const on = open === m.key;
+              return (
+                <li key={m.key}>
+                  <button
+                    type="button"
+                    aria-haspopup="true"
+                    aria-expanded={on}
+                    onPointerEnter={() => {
+                      cancelClose();
+                      setOpen(m.key);
+                    }}
+                    onFocus={() => {
+                      cancelClose();
+                      setOpen(m.key);
+                    }}
+                    onPointerDown={(e) => {
+                      lastPointer.current = e.pointerType;
+                    }}
+                    onClick={(e) => {
+                      // Hover already opened it: clicking the label the pointer is on
+                      // shouldn't shut it again. Touch and keyboard still toggle.
+                      if (on && e.detail > 0 && lastPointer.current === "mouse") return;
+                      if (on) closeNow();
+                      else setOpen(m.key);
+                    }}
+                    className={cn(TOP_ITEM, on && "bg-[rgba(12,16,26,0.045)] text-foreground")}
+                  >
+                    {m.label}
+                    <ChevronDown
+                      className={cn(
+                        "size-3.5 opacity-60 transition-transform duration-200",
+                        on && "rotate-180",
+                      )}
+                      strokeWidth={2.2}
+                      aria-hidden
+                    />
+                  </button>
+                </li>
+              );
+            })}
+            {FLAT_LINKS.map((l) => (
+              <li key={l.href}>
+                <NavLink href={l.href} className={TOP_ITEM} onClick={closeNow}>
+                  {l.label}
+                </NavLink>
+              </li>
+            ))}
+          </ul>
+
+          {/* Rankbox's pair: a hairline secondary beside the solid primary. */}
+          <div className="ml-auto flex items-center gap-2">
             <Link
-              href="/"
+              href="/login"
               className={cn(
-                "flex shrink-0 items-center gap-2 transition-colors duration-300",
-                dark ? "text-white" : "text-foreground",
+                "hidden h-[38px] items-center rounded-lg border border-[rgba(12,16,26,0.1)] bg-white px-4 text-sm font-semibold text-foreground shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-colors hover:border-[rgba(12,16,26,0.16)] hover:bg-[rgba(12,16,26,0.02)] sm:inline-flex",
+                FOCUS_RING,
               )}
             >
-              <VanteraLogo className="size-[22px]" />
-              <span className="text-[16.5px] font-semibold tracking-[-0.02em]">Vantera</span>
+              Sign in
             </Link>
+            <Link
+              href="/signup"
+              className={cn(
+                "inline-flex h-[38px] items-center rounded-lg bg-[var(--fb-strong)] px-4 text-sm font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.16),0_1px_2px_rgba(16,24,40,0.14)] transition-colors hover:bg-[#1161cc]",
+                FOCUS_RING,
+              )}
+            >
+              Get Started Free
+            </Link>
+          </div>
+        </div>
 
-            {/* Absolutely centered so the links sit at the true middle of the bar,
-                independent of the logo/actions widths on either side. */}
-            <ul className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-1 md:flex">
-              {MENUS.map((m) => {
-                const on = open === m.key;
-                return (
-                  <li key={m.key} className="flex items-center">
-                    <button
-                      type="button"
-                      aria-haspopup="menu"
-                      aria-expanded={on}
-                      onPointerEnter={() => {
-                        cancelClose();
-                        setOpen(m.key);
-                      }}
-                      onFocus={() => {
-                        cancelClose();
-                        setOpen(m.key);
-                      }}
-                      onClick={() => (on ? closeNow() : setOpen(m.key))}
-                      className={cn(
-                        linkCls(dark),
-                        "inline-flex items-center gap-1.5",
-                        on && (dark ? "bg-white/15 text-white" : "bg-[var(--tint)] text-foreground"),
-                      )}
-                    >
-                      {m.label}
-                      <ChevronDown
-                        className={cn(
-                          "size-3.5 transition-transform duration-200",
-                          on && "rotate-180",
-                          dark ? "text-white/70" : "text-[var(--ink-4)]",
-                        )}
-                        strokeWidth={2.2}
-                        aria-hidden
-                      />
-                    </button>
-                  </li>
-                );
-              })}
-              {FLAT_LINKS.map((l) => (
-                <li key={l.href}>
-                  <NavLink
-                    href={l.href}
-                    className={linkCls(dark)}
-                    onClick={closeNow}
-                  >
-                    {l.label}
-                  </NavLink>
-                </li>
-              ))}
-            </ul>
-
-            <div className="ml-auto flex items-center gap-1.5">
-              <Link
-                href="/login"
-                className={cn(
-                  "hidden rounded-md px-3.5 py-2 text-[14px] font-medium transition-colors duration-300 sm:inline-flex",
-                  dark ? "text-white/85 hover:text-white" : "text-[var(--ink-2)] hover:text-foreground",
-                )}
-              >
-                Sign in
-              </Link>
-              <Link
-                href="/signup"
-                className={cn(
-                  "inline-flex items-center rounded-full px-4 py-2.5 text-[14px] font-medium transition-all duration-300",
-                  dark
-                    ? "bg-white text-[var(--fb-strong)] shadow-[0_8px_24px_-10px_rgba(3,22,58,0.6)] hover:shadow-[0_12px_32px_-10px_rgba(3,22,58,0.7)]"
-                    : "bg-[#0a0c12] text-white shadow-[0_1px_2px_rgba(12,16,26,0.2)] hover:shadow-[0_8px_24px_-8px_rgba(24,119,242,0.55)]",
-                )}
-              >
-                Get started
-              </Link>
+        {/* The panel: one white card centred under the bar, not aligned to its
+            trigger. Opaque, so it reads on any bar state. */}
+        {activeMenu && (
+          <div className="absolute inset-x-0 top-full hidden px-4 pt-2 md:block" onPointerEnter={cancelClose}>
+            {/* Not role="menu": the children are ordinary links, not menuitems, so
+                application-menu semantics would mislead a screen reader. The trigger's
+                aria-expanded already conveys the disclosure state. */}
+            <div
+              data-nav-panel
+              aria-label={activeMenu.label}
+              className="mx-auto w-[min(60rem,calc(100vw-2rem))] origin-top animate-[nav-panel_180ms_ease-out] overflow-hidden rounded-lg border border-[rgba(12,16,26,0.08)] bg-white shadow-[0_2px_6px_-2px_rgba(16,24,40,0.06),0_16px_40px_-16px_rgba(16,24,40,0.2)]"
+            >
+              <MegaPanel menu={activeMenu} onNavigate={closeNow} />
             </div>
           </div>
-
-          {/* Mega panel — one wide surface aligned to the page container, not to the
-              trigger. Stays opaque white so it reads on any bar state. */}
-          {activeMenu && (
-            <div
-              className="absolute inset-x-0 top-full hidden md:block"
-              onPointerEnter={cancelClose}
-            >
-              <div className="mx-auto max-w-6xl px-6 lg:px-8">
-                {/* Not role="menu": the children are ordinary links, not menuitems,
-                    so application-menu semantics would mislead a screen reader. The
-                    trigger's aria-expanded already conveys the disclosure state. */}
-                <div
-                  data-nav-panel
-                  aria-label={activeMenu.label}
-                  className="mt-2 origin-top animate-[nav-panel_180ms_ease-out] overflow-hidden rounded-2xl border border-white/15 shadow-[0_2px_8px_rgba(3,22,58,0.20),0_30px_64px_-24px_rgba(3,22,58,0.55)] [background:linear-gradient(180deg,#0e4fb0_0%,#0a3f92_100%)]"
-                >
-                  <MegaPanel menu={activeMenu} onNavigate={closeNow} />
-                </div>
-              </div>
-            </div>
-          )}
-        </nav>
-      </header>
-    </>
+        )}
+      </nav>
+    </header>
   );
 }

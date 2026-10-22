@@ -274,8 +274,8 @@ export function ToolRunner({ slug, cta, output, outputHeading, fields }: ToolRun
                 Now imagine this written for every prospect — automatically.
               </p>
               <p className="mx-auto mt-2 max-w-md text-[14px] leading-relaxed text-[var(--ink-3)]">
-                Vantera&rsquo;s SDR agents find in-market buyers on LinkedIn and draft a message like this for each
-                one. You approve every send.
+                Vantera&rsquo;s SDR agents find in-market buyers on LinkedIn, write a message like this for
+                each one, and send it on autopilot.
               </p>
               <Link
                 href="/signup"

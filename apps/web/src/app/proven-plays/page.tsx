@@ -222,7 +222,7 @@ export default function ProvenPlaysPage() {
             <ArrowRight className="size-4" />
           </Link>
           <p className="mt-3 text-[13px] text-[var(--ink-3)]">
-            No credit card required · Your plays are matched at signup
+            Free 7-day trial · Your plays are matched at signup
           </p>
         </div>
       </section>

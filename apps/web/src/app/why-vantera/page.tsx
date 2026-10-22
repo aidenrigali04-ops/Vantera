@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowRight, Check, Minus } from "lucide-react";
 import { MarketingShell } from "@/components/landing/marketing-shell";
 import { MarketingHeader } from "@/components/landing/marketing-header";
+import { CTA_REASSURANCE } from "@/components/landing/claims";
 
 export const metadata: Metadata = {
   title: "Why Vantera — Not Another LinkedIn Tool",
@@ -46,7 +47,7 @@ const COMPARISON: { dimension: string; sequencer: string; vantera: string }[] = 
   {
     dimension: "Your role",
     sequencer: "Operator. The tool waits for instructions.",
-    vantera: "Owner. You approve sends and set direction; the system does the thinking.",
+    vantera: "Owner. You set direction and step in when you want; the system does the thinking.",
   },
 ];
 
@@ -175,7 +176,7 @@ export default function WhyVanteraPage() {
             <ArrowRight className="size-4" />
           </Link>
           <p className="mt-3 text-[13px] text-[var(--ink-3)]">
-            No credit card required · You approve every message
+            {CTA_REASSURANCE}
           </p>
         </div>
       </section>

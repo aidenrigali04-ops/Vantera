@@ -1,61 +1,95 @@
-"use client";
-
-import { motion } from "framer-motion";
-import { RevealItem } from "./surface";
-import {
-  HubSpotLogo,
-  IntuitLogo,
-  NaverLogo,
-  OktaLogo,
-  ScribdLogo,
-  ZendeskLogo,
-} from "./brand-logos";
+import type { ComponentType, CSSProperties } from "react";
+import { cn } from "@/lib/utils";
+import { Laurel } from "./laurel-badges";
+import { ONBOARDING_MINUTES } from "./claims";
+import { ClaudeMark, HubSpotMark, LinkedinMark, McpMark, SalesforceMark, SlackMark } from "./brand-glyphs";
 
 /**
- * "Powering revenue for modern teams" — a social-proof logo cloud. The marks sit in
- * one cohesive monochrome grey so the row reads as a calm set (the label never
- * competes with the brands), and each lights to its own colour on hover. Sizes are
- * optically balanced per-mark rather than set to a single height.
+ * The band under the hero, after rankbox.xyz's proof band (itself after Rankaria's
+ * "As seen on" strip): a hairline band inside the page rails, framed by a laurel wing
+ * at each end, holding three proof points: what Vantera works with, how long setup
+ * takes (ONBOARDING_MINUTES, claims.ts), and the one network it is built for.
+ *
+ * The "Works with" marks rest in greyscale like a press strip and take their own
+ * colour on hover; the LinkedIn mark is set in the Vantera blue. Only integrations
+ * Vantera really has appear (integrations.tsx); white-labeled vendors never do
+ * (rules 03/04/05).
  */
-const LOGOS = [
-  { name: "HubSpot", color: "#ff5c35", node: <HubSpotLogo className="h-[27px] w-auto" /> },
-  { name: "Intuit", color: "#236cff", node: <IntuitLogo className="h-[19px] w-auto" /> },
-  { name: "NAVER", color: "#03c75a", node: <NaverLogo className="text-[22px]" /> },
-  { name: "Okta", color: "#0a0c12", node: <OktaLogo className="h-[26px] w-auto" /> },
-  { name: "Scribd", color: "#0a0c12", node: <ScribdLogo className="h-[22px] w-auto" /> },
-  { name: "Zendesk", color: "#0a0c12", node: <ZendeskLogo className="h-[19px] w-auto" /> },
+
+const LINE = "border-[var(--hairline)]";
+
+const MARKS: { name: string; color: string; Mark: ComponentType<{ className?: string }> }[] = [
+  { name: "HubSpot", color: "#ff5c35", Mark: HubSpotMark },
+  { name: "Salesforce", color: "#00a1e0", Mark: SalesforceMark },
+  { name: "Slack", color: "#4a154b", Mark: SlackMark },
+  { name: "Claude", color: "#d97757", Mark: ClaudeMark },
+  { name: "MCP", color: "#0a0c12", Mark: McpMark },
 ];
+
+function Label({ children }: { children: string }) {
+  return (
+    <span className="whitespace-nowrap text-[0.62rem] font-semibold uppercase tracking-[0.15em] text-[var(--ink-3)]/85 sm:text-[0.64rem] sm:tracking-[0.2em]">
+      {children}
+    </span>
+  );
+}
+
+function Stat({ value, label }: { value: string; label: string }) {
+  return (
+    <>
+      <span className="text-[1.3rem] font-bold leading-none tracking-tight text-foreground/75">
+        {value}
+      </span>
+      <Label>{label}</Label>
+    </>
+  );
+}
 
 export function TrustStrip() {
   return (
-    <section className="relative border-t border-[var(--hairline)] bg-[var(--tint)] py-12 lg:py-9">
-      <div className="mx-auto max-w-6xl px-6 lg:px-8">
-        {/* Above the fold on lg, so reveal on load rather than on scroll-into-view. */}
-        <motion.p
-          initial={{ opacity: 0, y: 14 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.1 }}
-          className="text-center font-mono text-[11px] uppercase tracking-[0.2em] text-[var(--ink-4)]"
-        >
-          Powering revenue for modern teams
-        </motion.p>
+    // Top hairline only: the band that follows draws the line under this one.
+    <section aria-label="What Vantera works with" className={cn("border-t bg-white", LINE)}>
+      <div className={cn("relative mx-auto max-w-6xl border-x", LINE)}>
+        <Laurel className="pointer-events-none absolute left-5 top-1/2 hidden h-[68px] w-auto -translate-y-1/2 text-[rgba(12,16,26,0.1)] md:block" />
+        <Laurel
+          flip
+          className="pointer-events-none absolute right-5 top-1/2 hidden h-[68px] w-auto -translate-y-1/2 text-[rgba(12,16,26,0.1)] md:block"
+        />
 
-        <motion.div
-          initial="hidden"
-          animate="show"
-          variants={{ hidden: {}, show: { transition: { staggerChildren: 0.08, delayChildren: 0.18 } } }}
-          className="mt-10 flex flex-wrap items-center justify-center gap-x-10 gap-y-8 sm:gap-x-12 lg:mt-7 lg:gap-x-16"
-        >
-          {LOGOS.map((l) => (
-            <RevealItem
-              key={l.name}
-              style={{ "--logo": l.color } as React.CSSProperties}
-              className="flex items-center text-[#8e96a1] transition-colors duration-300 hover:text-[var(--logo)]"
-            >
-              {l.node}
-            </RevealItem>
-          ))}
-        </motion.div>
+        <div className="grid grid-cols-2 md:mx-16 md:grid-cols-[1.5fr_1fr_1fr]">
+          <div
+            className={cn(
+              "col-span-2 flex h-[72px] items-center justify-center gap-3 border-b md:col-span-1 md:border-b-0 md:border-r",
+              LINE,
+            )}
+          >
+            <Label>Works with</Label>
+            <span className="flex items-center gap-0.5">
+              {MARKS.map(({ name, color, Mark }) => (
+                <span
+                  key={name}
+                  title={name}
+                  style={{ "--mark": color } as CSSProperties}
+                  className="grid size-8 place-items-center rounded-lg text-[#8e96a1] transition-[color,background-color,transform] duration-200 hover:-translate-y-0.5 hover:bg-[rgba(12,16,26,0.035)] hover:text-[var(--mark)]"
+                >
+                  <Mark className="size-[17px]" />
+                </span>
+              ))}
+            </span>
+          </div>
+
+          <div className={cn("flex h-[72px] items-center justify-center gap-2 border-r sm:gap-2.5", LINE)}>
+            <Stat value={`${ONBOARDING_MINUTES} min`} label="To set up" />
+          </div>
+
+          <div className="group/li flex h-[72px] items-center justify-center gap-2 sm:gap-2.5">
+            <Label>Built for</Label>
+            <span className="flex items-center gap-1.5 text-[1.05rem] font-semibold tracking-tight text-foreground/70 transition-colors group-hover/li:text-foreground">
+              <LinkedinMark className="size-[17px] text-[var(--fb)]" />
+              LinkedIn
+            </span>
+          </div>
+        </div>
       </div>
     </section>
   );

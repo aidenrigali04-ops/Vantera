@@ -7,7 +7,7 @@ import { PrimaryCta, SecondaryCta } from "@/components/landing/cta";
 export const metadata: Metadata = {
   title: "Book a Demo — Vantera",
   description:
-    "See Vantera on your own pipeline: how its agents find in-market buyers, qualify them to your ICP, and draft outreach you approve. Book a live walkthrough.",
+    "See Vantera on your own pipeline: how its agents find in-market buyers, qualify them to your ICP, and run outreach on autopilot. Book a live walkthrough.",
   alternates: { canonical: "/demo" },
 };
 
@@ -20,8 +20,8 @@ const AGENDA = [
   },
   {
     icon: MessageSquare,
-    title: "Real drafts, not slides",
-    body: "See the messages the system writes from a prospect's activity — and the approve-before-send review flow.",
+    title: "Real messages, not slides",
+    body: "See the messages the system writes from a prospect's activity — and how it sends them on autopilot, at a safe, human pace.",
   },
   {
     icon: CalendarCheck,

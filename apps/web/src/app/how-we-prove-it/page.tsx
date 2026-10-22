@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowRight, BadgeCheck, Ban, Eye, ScanSearch } from "lucide-react";
 import { MarketingShell } from "@/components/landing/marketing-shell";
 import { MarketingHeader } from "@/components/landing/marketing-header";
+import { CTA_REASSURANCE } from "@/components/landing/claims";
 
 export const metadata: Metadata = {
   title: "How We Prove It — Vantera",
@@ -160,7 +161,7 @@ export default function HowWeProveItPage() {
             <ArrowRight className="size-4" />
           </Link>
           <p className="mt-3 text-[13px] text-[var(--ink-3)]">
-            No credit card required · You approve every message
+            {CTA_REASSURANCE}
           </p>
         </div>
       </section>

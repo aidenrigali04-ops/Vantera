@@ -13,8 +13,8 @@ const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
  * AI workflow visualization — the end-to-end motion as a node rail. On lg the eight nodes
  * sit on a single flowing connector (the shared `vc-flow` dashed-stroke animation, reduced-
  * motion-safe); below lg they wrap to a 2/4-up grid with chevrons implied by order. Each
- * node carries a blue icon well, its stage, a one-line, and a metric. Approval sits mid-
- * rail as the accent node so "you stay in control" reads visually.
+ * node carries a blue icon well, its stage, a one-line, and a metric. Learning closes the
+ * rail as the accent node so "it gets sharper with every outcome" reads visually.
  */
 export function PipelineViz({ content }: { content: PipelineContent }) {
   return (
@@ -44,7 +44,7 @@ export function PipelineViz({ content }: { content: PipelineContent }) {
 
           <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-4 lg:grid-cols-8 lg:gap-x-2">
             {content.nodes.map((node, i) => {
-              const accent = node.label === "Approve";
+              const accent = node.label === "Learn";
               return (
                 <RevealItem key={node.label} className="relative flex flex-col items-center text-center">
                   <span

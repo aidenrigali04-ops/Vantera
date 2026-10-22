@@ -1,26 +1,26 @@
-"use client";
-
 import Link from "next/link";
-import { ArrowRight, Check, X } from "lucide-react";
-import { Reveal, RevealItem, CARD } from "./surface";
-import { SectionIntro } from "./section-intro";
+import { ArrowRight, Check, Users, X } from "lucide-react";
+import { Reveal, RevealItem } from "./surface";
+import { Accent, Band, CELL, CellGrid, PRIMARY_BUTTON, SectionHead } from "./frame";
 import { CTA_HREF, CTA_LABEL, CTA_REASSURANCE } from "./claims";
 import { cn } from "@/lib/utils";
 
 /**
- * S7 · Built for — "Is this for someone like me?" Fit AND anti-fit: saying who
- * Vantera is NOT for is the cheapest trust on the page (blueprint S7 — almost absent
- * in the category). The anti-fit rows are true product boundaries: volume shops
- * (hard ceilings), hands-off buyers (review-first), email-first teams (LinkedIn-only
- * by design). First primary CTA of the page.
+ * Built for — "Is this for someone like me?" Fit AND anti-fit: saying who Vantera is
+ * NOT for is the cheapest trust on the page (almost absent in the category). The
+ * anti-fit rows are true product boundaries: volume shops (hard ceilings), no clear
+ * buyer yet (targeting learns from a customer profile), email-first teams
+ * (LinkedIn-only by design). Two hairline cells typeset like rankbox.xyz's capability
+ * cells — title, a muted line, then the rows as small bordered cards — over the page's
+ * first primary CTA.
  */
 
 const GOOD_FIT = [
-  { role: "Solo founders", line: "You are the SDR. Minutes a day, not a second job." },
+  { role: "Solo founders", line: "You are the SDR. Now it runs on autopilot." },
   { role: "Small B2B teams", line: "One or two people selling a high-ticket product or service." },
   {
     role: "Agencies & consultants",
-    line: "Your LinkedIn reputation is the asset, so nothing goes out unread.",
+    line: "Your LinkedIn reputation is the asset, so every send stays inside hard safety limits.",
   },
 ];
 
@@ -30,8 +30,8 @@ const NOT_FIT = [
     line: "A thousand invites a week? The ceilings will frustrate you.",
   },
   {
-    role: "Hands-off buyers",
-    line: "Never want to read a message? This isn't that.",
+    role: "No clear buyer yet",
+    line: "No customer profile to start from? Targeting needs a buyer to learn from.",
   },
   {
     role: "Email-first teams",
@@ -39,89 +39,107 @@ const NOT_FIT = [
   },
 ];
 
+const COLUMNS = [
+  {
+    head: "Good fit",
+    body: "Small teams whose pipeline lives on LinkedIn.",
+    items: GOOD_FIT,
+    icon: Check,
+    fit: true,
+  },
+  {
+    head: "Not a fit",
+    body: "Real limits of the product, so nobody starts a trial for the wrong thing.",
+    items: NOT_FIT,
+    icon: X,
+    fit: false,
+  },
+] as const;
+
+/* rankbox's mini-UI row: a small white card ruled in a hairline. */
+const ROW =
+  "flex items-start gap-3 rounded-lg border border-[var(--hairline)] bg-white px-3.5 py-3 shadow-[0_1px_2px_rgba(16,24,40,0.03)]";
+
 export function BuiltFor() {
   return (
-    <section id="built-for" className="relative border-t border-[var(--hairline)] bg-white py-24 sm:py-28">
-      <div className="mx-auto max-w-6xl px-6 lg:px-8">
-        <SectionIntro
-          align="center"
-          label="Who it's for"
-          title="Built for people who sell what they build."
-          lead="And honestly not for everyone — here's both sides."
-        />
+    <section>
+      <SectionHead
+        id="built-for"
+        icon={Users}
+        eyebrow="Who it’s for"
+        title={
+          <>
+            Built for people who <Accent>sell what they build</Accent>
+          </>
+        }
+        subtitle="And honestly not for everyone — here's both sides."
+      />
 
-        <Reveal className="mx-auto mt-14 grid max-w-4xl gap-5 sm:grid-cols-2">
-          {(
-            [
-              { head: "Good fit", items: GOOD_FIT, icon: Check, fit: true },
-              { head: "Not a fit", items: NOT_FIT, icon: X, fit: false },
-            ] as const
-          ).map((col) => (
-            <RevealItem
-              key={col.head}
-              className={cn(
-                CARD,
-                "relative overflow-hidden p-7",
-                col.fit && "border-[var(--cyan-line)]",
-              )}
-            >
-              {/* fit card gets the brand top rail */}
-              {col.fit && (
-                <span
-                  aria-hidden
-                  className="absolute inset-x-0 top-0 h-[3px] [background:linear-gradient(90deg,transparent,var(--fb)_22%,var(--fb)_78%,transparent)]"
-                />
-              )}
-              <p
-                className={cn(
-                  "font-mono text-[11px] font-semibold uppercase tracking-[0.16em]",
-                  col.fit ? "text-[var(--cyan-strong)]" : "text-[var(--ink-4)]",
-                )}
-              >
-                {col.head}
-              </p>
-              <div className="mt-6 flex flex-col gap-6">
-                {col.items.map((it) => (
-                  <div key={it.role} className="flex items-start gap-3.5">
+      <Band>
+        <Reveal>
+          <CellGrid className="sm:grid-cols-2">
+            {COLUMNS.map((col, i) => (
+              <li key={col.head} className={CELL}>
+                {/* Only the content rises in, so the hairlines never move; the inline
+                    delay restores the stagger the nth-child rule gives direct
+                    children. */}
+                <RevealItem
+                  className="flex h-full flex-col p-6 sm:p-8"
+                  style={{ transitionDelay: `${i * 0.06}s` }}
+                >
+                  <div className="flex items-center gap-2.5">
                     <span
                       className={cn(
-                        "mt-0.5 grid size-6 shrink-0 place-items-center rounded-full",
-                        col.fit
-                          ? "bg-[var(--cyan-tint)] text-[var(--cyan-strong)] ring-1 ring-inset ring-[var(--cyan-line)]"
-                          : "bg-[#f1f2f4] text-[var(--ink-4)]",
+                        "grid size-7 shrink-0 place-items-center rounded-md",
+                        col.fit ? "bg-[#d5efdf] text-[#13824a]" : "bg-[#eef0f3] text-[var(--ink-4)]",
                       )}
                     >
                       <col.icon className="size-3.5" strokeWidth={2.4} aria-hidden />
                     </span>
-                    <div>
-                      <p className="text-[15px] font-semibold text-foreground">{it.role}</p>
-                      <p className="mt-1 text-[13.5px] leading-relaxed text-[var(--ink-3)]">
-                        {it.line}
-                      </p>
-                    </div>
+                    <h3 className="text-[1.05rem] font-semibold tracking-tight text-foreground">
+                      {col.head}
+                    </h3>
                   </div>
-                ))}
-              </div>
-            </RevealItem>
-          ))}
-        </Reveal>
+                  <p className="mt-1.5 text-sm leading-relaxed text-[var(--ink-3)]">{col.body}</p>
 
-        {/* CTA #1 */}
-        <Reveal className="mt-14 flex flex-col items-center gap-3.5">
-          <RevealItem>
-            <Link
-              href={CTA_HREF}
-              className="group inline-flex items-center gap-2 rounded-full bg-[var(--fb)] px-7 py-3 text-[15px] font-semibold text-white shadow-[0_6px_18px_-8px_rgba(24,119,242,0.4)] transition-all hover:-translate-y-0.5 hover:bg-[var(--fb-strong)] hover:shadow-[0_12px_28px_-12px_rgba(24,119,242,0.45)] active:scale-[0.98]"
-            >
-              {CTA_LABEL}
-              <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
-            </Link>
-          </RevealItem>
-          <RevealItem>
-            <p className="text-[13px] text-[var(--ink-4)]">{CTA_REASSURANCE}</p>
-          </RevealItem>
+                  <ul className="mt-6 flex flex-1 flex-col gap-2">
+                    {col.items.map((it) => (
+                      <li key={it.role} className={ROW}>
+                        <span
+                          aria-hidden
+                          className={cn(
+                            "mt-0.5 grid size-4 shrink-0 place-items-center rounded-full",
+                            col.fit ? "bg-[#e3f5ea] text-[#13824a]" : "bg-[#f1f2f4] text-[var(--ink-4)]",
+                          )}
+                        >
+                          <col.icon className="size-2.5" strokeWidth={3} />
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block text-[0.85rem] font-semibold text-foreground">
+                            {it.role}
+                          </span>
+                          <span className="mt-0.5 block text-[0.8rem] leading-relaxed text-[var(--ink-3)]">
+                            {it.line}
+                          </span>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </RevealItem>
+              </li>
+            ))}
+          </CellGrid>
         </Reveal>
-      </div>
+      </Band>
+
+      {/* CTA #1 */}
+      <Band inner="flex flex-col items-center gap-3.5 px-6 py-10 text-center sm:py-12">
+        <Link href={CTA_HREF} className={cn(PRIMARY_BUTTON, "group")}>
+          {CTA_LABEL}
+          <ArrowRight className="size-4 transition-transform duration-200 group-hover:translate-x-0.5" />
+        </Link>
+        <p className="text-[0.82rem] text-[var(--ink-3)]">{CTA_REASSURANCE}</p>
+      </Band>
     </section>
   );
 }

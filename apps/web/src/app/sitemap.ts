@@ -4,6 +4,7 @@ import { getAllPosts } from "@/lib/blog";
 import { USE_CASES } from "@/components/landing/use-case/registry";
 import { getAllTerms } from "@/lib/glossary";
 import { LIVE_TOOLS } from "@/lib/tools/registry";
+import { FEATURES } from "@/lib/features";
 
 /** Indexable marketing pages + blog (the authed app is disallowed in robots.ts). */
 export default function sitemap(): MetadataRoute.Sitemap {
@@ -11,6 +12,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const staticPages: MetadataRoute.Sitemap = [
     { url: `${SITE_URL}/`, lastModified: now, changeFrequency: "weekly", priority: 1 },
     { url: `${SITE_URL}/pricing`, lastModified: now, changeFrequency: "monthly", priority: 0.8 },
+    { url: `${SITE_URL}/features`, lastModified: now, changeFrequency: "monthly", priority: 0.8 },
     { url: `${SITE_URL}/use-cases`, lastModified: now, changeFrequency: "monthly", priority: 0.7 },
     { url: `${SITE_URL}/glossary`, lastModified: now, changeFrequency: "weekly", priority: 0.7 },
     { url: `${SITE_URL}/tools`, lastModified: now, changeFrequency: "weekly", priority: 0.7 },
@@ -25,6 +27,13 @@ export default function sitemap(): MetadataRoute.Sitemap {
   // Live use-case pages (persona landing pages ship one at a time via the registry).
   const useCases: MetadataRoute.Sitemap = USE_CASES.filter((u) => u.live).map((u) => ({
     url: `${SITE_URL}/use-cases/${u.slug}`,
+    lastModified: now,
+    changeFrequency: "monthly",
+    priority: 0.8,
+  }));
+  // One sub-landing page per feature (registry-driven, like the tools).
+  const features: MetadataRoute.Sitemap = FEATURES.map((f) => ({
+    url: `${SITE_URL}/features/${f.slug}`,
     lastModified: now,
     changeFrequency: "monthly",
     priority: 0.8,
@@ -49,5 +58,5 @@ export default function sitemap(): MetadataRoute.Sitemap {
     changeFrequency: "monthly",
     priority: 0.6,
   }));
-  return [...staticPages, ...useCases, ...glossary, ...tools, ...posts];
+  return [...staticPages, ...features, ...useCases, ...glossary, ...tools, ...posts];
 }

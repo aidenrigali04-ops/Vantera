@@ -1,10 +1,17 @@
+import { PLAN_DISPLAY, PLAN_DISPLAY_ORDER } from "@vantera/billing";
 import type { UseCaseContent } from "@/components/landing/use-case/types";
+import { ONBOARDING_MINUTES } from "@/components/landing/claims";
+
+// The plan on sale, read from billing so the pricing answer never quotes a stale price.
+const PLAN =
+  PLAN_DISPLAY_ORDER.map((tier) => PLAN_DISPLAY[tier]).find((p) => p.highlight) ??
+  PLAN_DISPLAY[PLAN_DISPLAY_ORDER[0]];
 
 /**
  * "For Recruiters" — a market-expansion page. Vantera's engine (find in-market people, fit-
- * score them, personalize from real activity, pace safely, approve every send) applied to
+ * score them, personalize from real activity, pace safely, send on autopilot) applied to
  * candidate sourcing on LinkedIn. HONESTY GUARDRAILS: no fabricated ATS integrations — the
- * only real sync targets are HubSpot/Pipedrive, framed as "your CRM". Intent is framed
+ * only real sync targets are HubSpot/Salesforce/GoHighLevel, framed as "your CRM". Intent is framed
  * softly as "signals they may be open to a move" (no claim of a bespoke open-to-work detector).
  */
 export const RECRUITERS_CONTENT: UseCaseContent = {
@@ -12,7 +19,7 @@ export const RECRUITERS_CONTENT: UseCaseContent = {
   seo: {
     title: "LinkedIn Automation for Recruiters — Source & Reach Candidates | Vantera",
     description:
-      "Source and reach qualified candidates on LinkedIn without the spam. Vantera finds people who fit the role, personalizes every message from their real activity, and paces safely — you approve every send. More replies, zero account risk.",
+      "Source and reach qualified candidates on LinkedIn without the spam. Vantera finds people who fit the role, personalizes every message from their real activity, and sends at a safe pace on autopilot. More replies, zero account risk.",
   },
 
   hero: {
@@ -20,10 +27,10 @@ export const RECRUITERS_CONTENT: UseCaseContent = {
     headlinePre: "Fill every role with",
     headlineHighlight: "qualified candidates",
     headlinePost: ".",
-    sub: "Vantera runs candidate outreach on LinkedIn for you — surfacing people who fit the role, personalizing every message from their real activity, and pacing safely so your account stays clean. You approve every send. More replies from the right people, less time sourcing.",
+    sub: "Vantera runs candidate outreach on LinkedIn for you — surfacing people who fit the role, personalizing every message from their real activity, and pacing safely so your account stays clean — all on autopilot. More replies from the right people, less time sourcing.",
     primaryCta: { label: "Start free", href: "/signup" },
     secondaryCta: { label: "See how it works", href: "#how-it-works" },
-    trust: ["7-day free trial", "Safe pacing built in", "You approve every message"],
+    trust: ["7-day free trial", "Safe pacing built in", `Set up in ${ONBOARDING_MINUTES} minutes`],
     visual: {
       title: "Requisitions",
       period: "This week",
@@ -91,7 +98,7 @@ export const RECRUITERS_CONTENT: UseCaseContent = {
         costLabel: "instead of a shortlist",
       },
     ],
-    kicker: "Reach fewer, better-fit candidates with messages worth replying to — safely, on your approval.",
+    kicker: "Reach fewer, better-fit candidates with messages worth replying to — safely, on autopilot.",
   },
 
   compare: {
@@ -118,7 +125,7 @@ export const RECRUITERS_CONTENT: UseCaseContent = {
         { label: "Agents surface fitting candidates", meta: "24/7" },
         { label: "Scored against the role profile", meta: "≥ 70 to pass" },
         { label: "Messages from their real activity" },
-        { label: "You approve in one click" },
+        { label: "Sent on autopilot, no copy-paste" },
         { label: "Safe pacing protects your account" },
         { label: "Replies captured, follow-ups handled" },
       ],
@@ -164,7 +171,7 @@ export const RECRUITERS_CONTENT: UseCaseContent = {
     eyebrow: "The platform",
     title: "An AI sourcer that works while you close roles.",
     subtitle:
-      "The whole outreach motion — finding fits, qualifying, personalizing, safe sending — run for you, with you approving every message.",
+      "The whole outreach motion — finding fits, qualifying, personalizing, safe sending — run for you on autopilot, and you can step into any conversation.",
     items: [
       {
         icon: "prospecting",
@@ -177,7 +184,7 @@ export const RECRUITERS_CONTENT: UseCaseContent = {
         icon: "filter",
         label: "Qualification",
         title: "Only strong fits pass",
-        body: "A deterministic fit gate plus an AI rank score every candidate on fit and signals — only the best reach your queue.",
+        body: "A deterministic fit gate plus an AI rank score every candidate on fit and signals — only the best get a message.",
         chips: ["fit + signals", "score ≥ 70", "a real shortlist"],
       },
       {
@@ -197,26 +204,26 @@ export const RECRUITERS_CONTENT: UseCaseContent = {
       },
       {
         icon: "replies",
-        label: "Shared review queue",
-        title: "Approve outreach in one place",
-        body: "Every drafted message and reply lands in one queue your team works together — approve, edit, or skip, nothing slips through.",
-        chips: ["one queue", "one-click approve", "full reply visibility"],
+        label: "Unified inbox",
+        title: "Every reply in one place",
+        body: "Replies from every connected sender land in one inbox, classified and sorted warm-first. Agents answer on autopilot, and you can step into any conversation.",
+        chips: ["one inbox", "warm-first", "step in anytime"],
       },
       {
         icon: "crm",
         label: "CRM sync",
         title: "Clean handoff to your CRM",
-        body: "Interested candidates flow into your CRM — with native connections to HubSpot and Pipedrive — so nothing gets lost between LinkedIn and your pipeline.",
-        chips: ["HubSpot", "Pipedrive", "auto-sync"],
+        body: "Won conversations land in your CRM — with native connections to HubSpot, Salesforce, and GoHighLevel — so nothing gets lost between LinkedIn and your pipeline.",
+        chips: ["HubSpot", "Salesforce", "auto-sync"],
       },
     ],
   },
 
   review: {
     eyebrow: "See it in action",
-    title: "Every message, from their real work — you just approve.",
+    title: "Every message, from their real work — sent for you.",
     subtitle:
-      "This is the queue you live in. Pick a candidate to see the signal that surfaced them, why they fit, and the message — then approve, edit, or skip.",
+      "This is your AI sourcer at work. Pick a candidate to see the signal that surfaced them, why they fit, and the message it wrote — sent on autopilot at a safe, human pace.",
     drafts: [
       {
         initials: "AR",
@@ -272,24 +279,24 @@ export const RECRUITERS_CONTENT: UseCaseContent = {
   pipeline: {
     eyebrow: "How it works",
     title: "From a role profile to a booked interview.",
-    subtitle: "One system runs the whole motion — and stops at your approval, every time.",
+    subtitle: "One system runs the whole motion on autopilot — and gets sharper with every outcome.",
     nodes: [
       { icon: "radar", label: "Identify", line: "Role fit + open-to-move signals", metric: "24/7 scan" },
       { icon: "filter", label: "Qualify", line: "Scored to the role profile", metric: "≥ 70 to pass" },
       { icon: "outreach", label: "Draft", line: "From their real work", metric: "0 templates" },
-      { icon: "control", label: "Approve", line: "One-click approve or edit", metric: "100% yours" },
       { icon: "safety", label: "Send", line: "Safe, human-like pacing", metric: "≤ 100 / wk" },
-      { icon: "replies", label: "Converse", line: "Replies captured + drafted", metric: "full visibility" },
+      { icon: "replies", label: "Converse", line: "Replies answered for you", metric: "full visibility" },
       { icon: "calendar", label: "Interview", line: "Candidates booked in", metric: "on the calendar" },
-      { icon: "crm", label: "Sync", line: "Warm candidates to your CRM", metric: "HubSpot · Pipedrive" },
+      { icon: "crm", label: "Sync", line: "Wins pushed to your CRM", metric: "HubSpot · Salesforce" },
+      { icon: "trend", label: "Learn", line: "Outcomes sharpen targeting", metric: "every week" },
     ],
     howto: [
       { name: "Identify candidates who fit", text: "Vantera's Scout agent matches people on LinkedIn to your role profile and surfaces signals they may be open to a move." },
       { name: "Qualify against the role", text: "Each candidate is scored on fit and signals; only those scoring 70 or above enter outreach." },
       { name: "Draft from their real work", text: "The Outreach agent writes each message from the candidate's own projects and activity — never a template." },
-      { name: "Approve the send", text: "Every draft waits in a review queue for you to approve, edit, or skip before anything sends." },
-      { name: "Send with safe pacing", text: "Approved messages send within human-like limits spread across your seats to keep the account safe." },
-      { name: "Book and sync", text: "Replies are captured and drafted, interviews land on the calendar, and interested candidates sync to your CRM." },
+      { name: "Send with safe pacing", text: "Each message passes quality and safety checks, then sends on autopilot within human-like limits spread across your seats to keep the account safe." },
+      { name: "Book and sync", text: "Replies are answered on autopilot, interviews land on the calendar, and won conversations sync to your CRM." },
+      { name: "Learn from every outcome", text: "Machine learning studies which invites are accepted, which replies show interest, and which conversations book interviews, then sharpens who the agents reach next." },
     ],
   },
 
@@ -343,23 +350,23 @@ export const RECRUITERS_CONTENT: UseCaseContent = {
       },
       {
         q: "Will candidates know it's automated?",
-        a: "No. Every message is drafted from the candidate's own work and activity — a project, a post, a signal — not a merge tag. A humanizer check flags anything that reads automated before it hits your queue, so what you send sounds personal, because it is.",
+        a: "No. Every message is drafted from the candidate's own work and activity — a project, a post, a signal — not a merge tag. A humanizer check rewrites anything that reads automated before it sends, so every message sounds personal, because it is.",
       },
       {
         q: "Do I approve every message?",
-        a: "Yes by default. Agents draft, you approve, edit, or skip, and nothing sends until you sign off. When you trust the drafts for a role, switch to full-auto and it sends clean messages on its own, routing anything questionable back to you.",
+        a: "No. Vantera runs on autopilot: agents write each message from the candidate's real work and activity and send it at a safe, human pace inside your account's limits. You set the role profile once, machine learning keeps refining who gets messaged, and you can pause an agent or step into any conversation whenever you like.",
       },
       {
         q: "How does it know who's a fit?",
-        a: "You define the role profile; Vantera scores every candidate on fit and on signals they may be open to a move, and only those clearing the bar reach your queue. You get a shortlist worth messaging, not a raw search dump.",
+        a: "You define the role profile; Vantera scores every candidate on fit and on signals they may be open to a move, and only those clearing the bar get a message. You get a shortlist worth messaging, not a raw search dump.",
       },
       {
         q: "How is this different from LinkedIn Recruiter or InMail blasts?",
-        a: "Volume tools help you send more messages. Vantera decides who's worth reaching and writes each message from the candidate's real activity, then waits for your approval — so the right people reply and your account stays safe. It's the quality of outreach, not the quantity of sends.",
+        a: "Volume tools help you send more messages. Vantera decides who's worth reaching and writes each message from the candidate's real activity, then sends it at a safe, human pace — so the right people reply and your account stays safe. It's the quality of outreach, not the quantity of sends.",
       },
       {
         q: "Does it connect to my ATS or CRM?",
-        a: "Interested candidates sync into your CRM, with native connections to HubSpot and Pipedrive, so nothing gets lost between LinkedIn and your pipeline. Vantera handles the sourcing and outreach and hands the warm conversations to the system you track people in.",
+        a: "Won conversations sync into your CRM as a contact and a deal, with native connections to HubSpot, Salesforce, and GoHighLevel, and in HubSpot you can opt in to log every LinkedIn touch on the candidate's timeline. There's no ATS connection today: Vantera handles the sourcing and outreach and hands the conversations to the CRM you track people in.",
       },
       {
         q: "How fast will I see replies?",
@@ -367,7 +374,7 @@ export const RECRUITERS_CONTENT: UseCaseContent = {
       },
       {
         q: "What does it cost?",
-        a: "Starter is $45/month to get one recruiter running account-safe candidate outreach. Plans scale with your hiring volume, not a long-term contract, so you can change or cancel anytime.",
+        a: `${PLAN.name} is $${PLAN.monthlyUsd}/month to get a recruiter running account-safe candidate outreach, with no long-term contract, so you can change or cancel anytime. Teams that need more senders and seats get a custom plan.`,
       },
     ],
   },
@@ -375,10 +382,9 @@ export const RECRUITERS_CONTENT: UseCaseContent = {
   finalCta: {
     eyebrow: "Get started",
     title: "The candidate you need is on LinkedIn — and getting spammed by everyone else.",
-    urgency:
-      "Every day a role stays open, the best people get hired elsewhere. Deploy candidate outreach that actually gets replies — live in minutes, first replies this week.",
+    urgency: `Every day a role stays open, the best people get hired elsewhere. Deploy candidate outreach that actually gets replies — set up in about ${ONBOARDING_MINUTES} minutes, first replies this week.`,
     primaryCta: { label: "Start free", href: "/signup" },
     secondaryCta: { label: "See pricing", href: "/#pricing" },
-    reassurance: ["7-day free trial", "Safe pacing built in", "You approve every message"],
+    reassurance: ["7-day free trial", "Safe pacing built in", "Runs on autopilot"],
   },
 };

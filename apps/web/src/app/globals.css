@@ -242,14 +242,19 @@
   --shadow-sm: 0 1px 1px rgba(12, 16, 26, 0.04);
   --shadow-card: 0 1px 1px rgba(12, 16, 26, 0.03), 0 4px 12px -4px rgba(12, 16, 26, 0.06);
   --shadow-lift: 0 1px 2px rgba(12, 16, 26, 0.04), 0 10px 24px -10px rgba(12, 16, 26, 0.09);
+}
 
-  /* Hero blue slab (homepage hero only). --hero-blue is the brand identity color;
-     the slab deepens toward --hero-blue-deep so pure-white body copy clears WCAG AA
-     (4.5:1) in the lower half where the small text lives. Ratios vs #fff noted. */
-  --hero-blue: #1877f2; /* 4.23:1 — display type only (AA-large) */
-  --hero-blue-mid: #1468da; /* 5.22:1 */
-  --hero-blue-deep: #1163d2; /* 5.50:1 */
-  --hero-scrim: rgba(4, 24, 64, 0.26);
+/* Marketing pages (homepage, pricing, MarketingShell) are set in Plus Jakarta Sans — the
+   rankbox-layout restyle, 2026-10-20. Their roots carry `landingFont.variable`
+   (components/landing/font.ts). Re-pointing --font-poppins here moves every Poppins
+   reference beneath in one place: the base family above and the font-display / -heading
+   / -mono utilities. The face sets its own rhythm, so body tracking returns to normal;
+   headings keep their own. Auth and onboarding share `.landing`; they opt in with the
+   `marketing-type` class beside `landingFont.variable`. */
+.landing:not(.auth-surface),
+.marketing-type {
+  --font-poppins: var(--font-jakarta);
+  letter-spacing: normal;
 }
 
 /* Dashboard shell rides the premium-light system above, but keeps shadcn `accent`
@@ -560,9 +565,9 @@
   }
 }
 
-/* Hero conversation ring — the white/blue conic gradient spinning inside the active
-   message card's 1.5px border frame (hero-conversations.tsx). The oversized square
-   rotates; the clipped frame turns it into a traveling borderline. */
+/* Conversation ring — the white/blue conic gradient spinning inside the active
+   thread's 1.5px border frame (app-replica.tsx). The oversized square rotates; the
+   clipped frame turns it into a traveling borderline. */
 @keyframes hc-ring-spin {
   to {
     transform: rotate(360deg);
@@ -610,9 +615,34 @@
 }
 .landing .landing-rise {
   animation: landing-rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--rise-delay, 0s);
 }
 @media (prefers-reduced-motion: reduce) {
   .landing .landing-rise {
+    animation: none;
+  }
+}
+
+/* Prospect rows under the product showcase (prospect-rows.tsx): each row holds
+   its cards twice, so sliding it half its width loops seamlessly. Rows run in
+   alternating directions and hold still under the pointer; reduced motion
+   leaves them parked. */
+@keyframes landing-marquee {
+  to {
+    transform: translateX(-50%);
+  }
+}
+.landing .landing-marquee {
+  animation: landing-marquee var(--marquee-s, 60s) linear infinite;
+}
+.landing .landing-marquee[data-reverse] {
+  animation-direction: reverse;
+}
+.landing .landing-marquee:hover {
+  animation-play-state: paused;
+}
+@media (prefers-reduced-motion: reduce) {
+  .landing .landing-marquee {
     animation: none;
   }
 }

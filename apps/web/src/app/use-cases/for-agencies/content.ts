@@ -1,9 +1,15 @@
+import { PLAN_DISPLAY, PLAN_DISPLAY_ORDER } from "@vantera/billing";
 import type { UseCaseContent } from "@/components/landing/use-case/types";
+
+// The plan on sale, read from billing so the pricing answer never quotes a stale price.
+const PLAN =
+  PLAN_DISPLAY_ORDER.map((tier) => PLAN_DISPLAY[tier]).find((p) => p.highlight) ??
+  PLAN_DISPLAY[PLAN_DISPLAY_ORDER[0]];
 
 /**
  * "For Agencies" — lead-gen / outbound agencies running LinkedIn for many clients. Same
  * product, angled at the multi-client operator: seats, multi-sender distribution per client
- * account, safe pacing on every account, one queue, clean reporting. Grounded in the real
+ * account, safe pacing on every account, autopilot sending, clean reporting. Grounded in the real
  * product; the differentiator card keeps the multi-sender "senders" mock.
  */
 export const AGENCIES_CONTENT: UseCaseContent = {
@@ -11,7 +17,7 @@ export const AGENCIES_CONTENT: UseCaseContent = {
   seo: {
     title: "LinkedIn Automation for Agencies — Run Outbound for Every Client | Vantera",
     description:
-      "Run safe, quality-first LinkedIn outreach for every client from one place. Vantera finds in-market buyers, qualifies them to each client's ICP, and drafts every message — your team approves. Seats, multi-sender, and clean reporting built in.",
+      "Run safe, quality-first LinkedIn outreach for every client from one place. Vantera finds in-market buyers, qualifies them to each client's ICP, and writes and sends every message on autopilot. Seats, multi-sender, and clean reporting built in.",
   },
 
   hero: {
@@ -19,10 +25,10 @@ export const AGENCIES_CONTENT: UseCaseContent = {
     headlinePre: "Run outbound for every client from",
     headlineHighlight: "one place",
     headlinePost: ".",
-    sub: "Vantera runs a team of AI SDRs across your clients' LinkedIn accounts — finding in-market buyers, qualifying them to each client's ICP, and drafting every message from real activity. Your team approves. Safe pacing on every account, one login, reporting that runs itself.",
+    sub: "Vantera runs a team of AI SDRs across your clients' LinkedIn accounts, on autopilot — finding in-market buyers, qualifying them to each client's ICP, and writing and sending every message from real activity. Safe pacing on every account, one login, reporting that runs itself.",
     primaryCta: { label: "Start free", href: "/signup" },
     secondaryCta: { label: "See how it works", href: "#how-it-works" },
-    trust: ["Every client, one login", "Safe pacing per account", "You approve every send"],
+    trust: ["Every client, one login", "Safe pacing per account", "Runs on autopilot"],
     visual: {
       title: "Client pipeline",
       period: "This week",
@@ -117,7 +123,7 @@ export const AGENCIES_CONTENT: UseCaseContent = {
         { label: "Agents source in-market buyers", meta: "per client" },
         { label: "Scored to each client's ICP", meta: "≥ 70" },
         { label: "Messages drafted from real activity" },
-        { label: "Your team approves in one queue" },
+        { label: "Sent on autopilot, replies answered" },
         { label: "Safe pacing on every account" },
         { label: "Reporting and CRM handoff, automatic" },
       ],
@@ -134,7 +140,7 @@ export const AGENCIES_CONTENT: UseCaseContent = {
         icon: "layers",
         value: "1 login",
         title: "Every client, one place",
-        body: "Run sourcing, qualifying, drafting, and approvals for all clients from a single system — no tool sprawl.",
+        body: "Run sourcing, qualifying, writing, and sending for all clients from a single system — no tool sprawl.",
       },
       {
         icon: "filter",
@@ -163,7 +169,7 @@ export const AGENCIES_CONTENT: UseCaseContent = {
     eyebrow: "The platform",
     title: "An AI SDR team for every client you run.",
     subtitle:
-      "The whole outbound motion — sourcing, qualifying, writing, safe sending — run per client, with your team in control of every send.",
+      "The whole outbound motion — sourcing, qualifying, writing, safe sending — run per client on autopilot, with your team free to step into any conversation.",
     items: [
       {
         icon: "prospecting",
@@ -176,7 +182,7 @@ export const AGENCIES_CONTENT: UseCaseContent = {
         icon: "filter",
         label: "Qualification",
         title: "Only high-quality leads pass",
-        body: "A deterministic fit gate plus an AI rank score every prospect on fit, seniority, and intent — only 70-and-up reach the queue.",
+        body: "A deterministic fit gate plus an AI rank score every prospect on fit, seniority, and intent — only 70-and-up enter outreach.",
         chips: ["fit + intent", "score ≥ 70", "no spray"],
       },
       {
@@ -196,26 +202,26 @@ export const AGENCIES_CONTENT: UseCaseContent = {
       },
       {
         icon: "replies",
-        label: "Shared review queue",
-        title: "Approve across clients in one place",
-        body: "Every drafted message and reply lands in one queue your team works together — approve, edit, or skip, nothing slips through.",
-        chips: ["one queue", "one-click approve", "full reply visibility"],
+        label: "Unified inbox",
+        title: "Every reply in one place",
+        body: "Replies from every connected sender land in one inbox, classified and sorted warm-first. Agents answer on autopilot, and your team can step into any conversation.",
+        chips: ["one inbox", "warm-first", "step in anytime"],
       },
       {
         icon: "crm",
         label: "CRM sync",
         title: "Clean handoff to each client's CRM",
-        body: "Qualified conversations and closed deals flow straight into each client's HubSpot or Pipedrive — no copy-paste, no lost context.",
-        chips: ["HubSpot", "Pipedrive", "per-client sync"],
+        body: "Won conversations land in each client's HubSpot, Salesforce, or GoHighLevel as a contact and a deal — no copy-paste, no lost context.",
+        chips: ["HubSpot", "Salesforce", "per-client sync"],
       },
     ],
   },
 
   review: {
     eyebrow: "See it in action",
-    title: "Every message, drafted from real activity — your team just approves.",
+    title: "Every message, written from real activity — and sent for you.",
     subtitle:
-      "This is the queue your team works across every client. Pick a draft to see the signal that triggered it, the insight behind it, and the message — then approve, edit, or skip.",
+      "This is your AI SDR team at work across every client. Pick a lead to see the signal that triggered it, the insight behind it, and the message it wrote — sent on autopilot at a safe, human pace.",
     drafts: [
       {
         initials: "DM",
@@ -271,24 +277,24 @@ export const AGENCIES_CONTENT: UseCaseContent = {
   pipeline: {
     eyebrow: "How it works",
     title: "From in-market signal to a client's booked meeting.",
-    subtitle: "One system runs the whole motion for every client — and stops at your approval, every time.",
+    subtitle: "One system runs the whole motion for every client on autopilot — and gets sharper with every outcome.",
     nodes: [
       { icon: "radar", label: "Identify", line: "Client ICP + LinkedIn intent", metric: "24/7 scan" },
       { icon: "filter", label: "Qualify", line: "Scored to each client", metric: "≥ 70 to pass" },
       { icon: "outreach", label: "Draft", line: "In each client's voice", metric: "0 templates" },
-      { icon: "control", label: "Approve", line: "Your team, one queue", metric: "100% yours" },
       { icon: "safety", label: "Send", line: "Safe pacing per account", metric: "≤ 100 / wk" },
-      { icon: "replies", label: "Converse", line: "Replies captured + drafted", metric: "full visibility" },
+      { icon: "replies", label: "Converse", line: "Replies answered for you", metric: "full visibility" },
       { icon: "calendar", label: "Book", line: "Client meetings land", metric: "on their calendar" },
-      { icon: "crm", label: "Sync", line: "Wins to each client's CRM", metric: "HubSpot · Pipedrive" },
+      { icon: "crm", label: "Sync", line: "Wins to each client's CRM", metric: "HubSpot · Salesforce" },
+      { icon: "trend", label: "Learn", line: "Outcomes sharpen targeting", metric: "every week" },
     ],
     howto: [
       { name: "Identify each client's buyers", text: "Vantera's Scout agent watches LinkedIn for buying behavior and matches people to each client's ideal customer profile." },
       { name: "Qualify against the client's ICP", text: "Each prospect is scored on fit, seniority, and intent; only those scoring 70 or above enter outreach." },
       { name: "Draft in the client's voice", text: "The Outreach agent writes each message from the prospect's real activity in the client's voice — never a template." },
-      { name: "Approve the send", text: "Every draft waits in a shared review queue for your team to approve, edit, or skip before anything sends." },
-      { name: "Send with safe pacing", text: "Approved messages send within human-like limits spread across each client's senders to keep accounts safe." },
-      { name: "Book and sync", text: "Replies are captured and drafted, booked meetings land on the calendar, and closed deals sync to each client's CRM." },
+      { name: "Send with safe pacing", text: "Each message passes quality and safety checks, then sends on autopilot within human-like limits spread across each client's senders to keep accounts safe." },
+      { name: "Book and sync", text: "Replies are answered on autopilot, booked meetings land on the calendar, and closed deals sync to each client's CRM." },
+      { name: "Learn from every outcome", text: "Machine learning studies which invites are accepted, which replies show interest, and which conversations book meetings, then sharpens who the agents reach next." },
     ],
   },
 
@@ -338,7 +344,7 @@ export const AGENCIES_CONTENT: UseCaseContent = {
     items: [
       {
         q: "Can I run multiple clients from one account?",
-        a: "Yes — that's the point. You run sourcing, qualifying, drafting, and approvals for every client from one login, with each client's targeting, voice, senders, and reporting kept separate. No more juggling a different tool stack per client.",
+        a: "Yes — that's the point. You run sourcing, qualifying, writing, and sending for every client from one login, with each client's targeting, voice, senders, and reporting kept separate. No more juggling a different tool stack per client.",
       },
       {
         q: "How does it keep each client's LinkedIn accounts safe?",
@@ -346,7 +352,7 @@ export const AGENCIES_CONTENT: UseCaseContent = {
       },
       {
         q: "Will the outreach sound like each client, or generic?",
-        a: "Like each client. Every message is drafted from the prospect's real LinkedIn activity in that client's voice — not a shared template — and a humanizer check flags anything that reads automated before it reaches your queue.",
+        a: "Like each client. Every message is drafted from the prospect's real LinkedIn activity in that client's voice — not a shared template — and a humanizer check rewrites anything that reads automated before it sends.",
       },
       {
         q: "How is this different from stitching together separate tools?",
@@ -358,7 +364,7 @@ export const AGENCIES_CONTENT: UseCaseContent = {
       },
       {
         q: "Does it sync to each client's CRM?",
-        a: "Yes — qualified and closed conversations push into each client's HubSpot or Pipedrive, so their pipeline stays current without manual data entry. Vantera fills the pipeline; their CRM keeps it.",
+        a: "Yes — every won conversation lands in that client's HubSpot, Salesforce, or GoHighLevel as a contact and a deal, so their pipeline stays current without manual data entry. Vantera fills the pipeline; their CRM keeps it.",
       },
       {
         q: "How fast do clients see results?",
@@ -366,7 +372,7 @@ export const AGENCIES_CONTENT: UseCaseContent = {
       },
       {
         q: "What does it cost?",
-        a: "Plans scale with seats and volume rather than a long-term contract. Starter is $45/month to get going; for a multi-client book, our Custom plan is scoped to your seats and senders — talk to us and we'll size it with you.",
+        a: `${PLAN.name} is $${PLAN.monthlyUsd}/month and includes everything Vantera does, with no long-term contract. For a multi-client book, a custom plan is scoped to your seats and senders — talk to us and we'll size it with you.`,
       },
     ],
   },
@@ -378,6 +384,6 @@ export const AGENCIES_CONTENT: UseCaseContent = {
       "Every week of tool-juggling is margin you're not billing and pipeline your clients aren't seeing. Move your book onto one safe, quality-first system — live in minutes, first replies this week.",
     primaryCta: { label: "Start free", href: "/signup" },
     secondaryCta: { label: "Talk to sales", href: "/pricing" },
-    reassurance: ["Every client, one login", "Safe pacing per account", "You approve every send"],
+    reassurance: ["Every client, one login", "Safe pacing per account", "Runs on autopilot"],
   },
 };

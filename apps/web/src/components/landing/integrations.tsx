@@ -5,6 +5,7 @@ import { ArrowUpRight } from "lucide-react";
 import { LandingHeading } from "./heading";
 import { Reveal, RevealItem, CARD_INTERACTIVE } from "./surface";
 import { HubSpotLogo } from "./brand-logos";
+import { SalesforceMark } from "./brand-glyphs";
 import { StatusDot } from "./viz";
 import { cn } from "@/lib/utils";
 
@@ -19,15 +20,6 @@ function LinkedinMark({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="currentColor" className={className} role="img" aria-label="LinkedIn">
       <path d="M20.45 20.45h-3.56v-5.57c0-1.33-.03-3.04-1.85-3.04-1.86 0-2.14 1.45-2.14 2.94v5.67H9.34V9h3.42v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.45v6.29zM5.34 7.43a2.06 2.06 0 1 1 0-4.13 2.06 2.06 0 0 1 0 4.13zM7.12 20.45H3.56V9h3.56v11.45zM22.22 0H1.77C.79 0 0 .77 0 1.72v20.56C0 23.23.79 24 1.77 24h20.45c.98 0 1.78-.77 1.78-1.72V1.72C24 .77 23.2 0 22.22 0z" />
-    </svg>
-  );
-}
-
-/** Pipedrive brand glyph — the rounded "p" mark. */
-function PipedriveMark({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className={className} role="img" aria-label="Pipedrive">
-      <path d="M13.02 3.2c-2.02 0-3.32.94-4.02 1.86-.05-.6-.45-1.53-2.05-1.53H3.4v3.13h1.36c.27 0 .34.07.34.34v13.8h3.52v-6.02c0-.24-.01-.46-.03-.62.7.82 1.93 1.55 3.66 1.55 3.32 0 5.72-2.66 5.72-6.35 0-3.74-2.32-6.29-5.68-6.29zm-.85 9.55c-1.75 0-2.98-1.4-2.98-3.4 0-2.09 1.42-3.27 2.94-3.27 1.9 0 3.02 1.51 3.02 3.32 0 2.32-1.42 3.35-2.98 3.35z" />
     </svg>
   );
 }
@@ -73,11 +65,11 @@ const TILES: Tile[] = [
     metric: "Synced 2m ago",
   },
   {
-    name: "Pipedrive",
-    desc: "Won leads land in the right pipeline stage.",
-    logo: PipedriveMark,
+    name: "Salesforce",
+    desc: "Every win lands as a contact and an opportunity.",
+    logo: SalesforceMark,
     status: "Native",
-    brand: "#0B1B33",
+    brand: "#00A1E0",
     logoClass: "size-[26px]",
     metric: "Synced 5m ago",
   },

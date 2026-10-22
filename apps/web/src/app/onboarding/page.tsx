@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
   PLAN_DISPLAY,
@@ -7,7 +6,6 @@ import {
   annualMonthlyUsd,
   annualYearlyUsd,
 } from "@vantera/billing";
-import { VanteraLogo } from "@/components/landing/vantera-logo";
 import { getOnboardingData } from "@/lib/auth/onboarding-context";
 import { resolveOnboardingStep } from "@/lib/auth/onboarding-gate";
 import { reconcileLinkedInAccounts } from "@/lib/linkedin/sync";
@@ -16,24 +14,9 @@ import { finishOnboarding } from "./actions";
 import { billingBypassAllowed } from "./billing-bypass";
 import { DetailsForm } from "./details-form";
 import { LinkedInStep } from "./linkedin-step";
-import { OnboardingProgress } from "./onboarding-progress";
-import { OnboardingRail } from "./onboarding-rail";
+import { OnboardingShell } from "./onboarding-shell";
+import { STEP_COPY } from "./step-copy";
 import { SubscriptionStep, type OnboardingPlan } from "./subscription-step";
-
-const COPY = {
-  1: {
-    title: "Tell us about your business",
-    sub: "Three details — we take it from here. Your site tells us what you sell and who buys it.",
-  },
-  2: {
-    title: "Connect your LinkedIn",
-    sub: "The account your outreach will come from. Nothing sends without your approval.",
-  },
-  3: {
-    title: "Choose your plan",
-    sub: `Start with a ${TRIAL_DAYS}-day free trial. Your agents go live the moment you're in.`,
-  },
-} as const;
 
 /**
  * The frictionless onboarding: Details → LinkedIn → Subscription → dashboard. One route;
@@ -117,57 +100,33 @@ export default async function OnboardingPage({
     };
   });
 
-  const copy = COPY[step];
+  const copy = STEP_COPY[step];
   // Back from Checkout but the webhook hasn't written the subscription yet → confirming mode.
   const confirming = step === 3 && checkout === "success" && !data.subscribed && !finishFailed;
 
   return (
-    // 25 / 75 split: the blue rail carries the progress, the white column carries the step.
-    <div className="min-h-screen lg:grid lg:grid-cols-[25%_75%]">
-      <OnboardingRail step={step} />
-
-      <section className="flex min-h-screen flex-col px-6 py-8 sm:px-12 lg:px-16 xl:px-24">
-        {/* compact chrome below lg, where the rail is hidden */}
-        <div className="lg:hidden">
-          <Link href="/" className="mb-8 flex items-center gap-2 text-foreground">
-            <VanteraLogo className="size-6 text-foreground" />
-            <span className="text-[18px] font-semibold tracking-[-0.02em]">Vantera</span>
-          </Link>
-          <OnboardingProgress step={step} />
-        </div>
-
-        <div className="flex flex-1 items-center py-6 lg:py-10">
-          <div className="w-full max-w-[560px]">
-            <h1 className="text-[26px] font-bold leading-[1.12] tracking-[-0.03em] text-foreground sm:text-[30px]">
-              {copy.title}
-            </h1>
-            <p className="mt-3 max-w-[46ch] text-[14.5px] leading-relaxed text-[var(--ink-3)]">{copy.sub}</p>
-
-            <div className="mt-9">
-              {step === 1 && <DetailsForm prefill={data.prefill} />}
-              {step === 2 && (
-                <LinkedInStep
-                  failed={connected === "failed"}
-                  unconfirmed={connectUnconfirmed}
-                  // The underlying reason is a diagnostic, not user-facing copy — dev only.
-                  devReason={process.env.NODE_ENV === "development" ? connectFailure : null}
-                />
-              )}
-              {step === 3 && (
-                <SubscriptionStep
-                  plans={plans}
-                  trialDays={TRIAL_DAYS}
-                  confirming={confirming}
-                  canceled={checkout === "cancel"}
-                  checkoutError={checkout === "error"}
-                  finishFailed={finishFailed}
-                  devBypass={billingBypassAllowed()}
-                />
-              )}
-            </div>
-          </div>
-        </div>
-      </section>
-    </div>
+    // The split: the step on the left, the painted panel on the right (onboarding-shell.tsx).
+    <OnboardingShell step={step} title={copy.title} sub={copy.sub} trialDays={TRIAL_DAYS}>
+      {step === 1 && <DetailsForm prefill={data.prefill} />}
+      {step === 2 && (
+        <LinkedInStep
+          failed={connected === "failed"}
+          unconfirmed={connectUnconfirmed}
+          // The underlying reason is a diagnostic, not user-facing copy — dev only.
+          devReason={process.env.NODE_ENV === "development" ? connectFailure : null}
+        />
+      )}
+      {step === 3 && (
+        <SubscriptionStep
+          plans={plans}
+          trialDays={TRIAL_DAYS}
+          confirming={confirming}
+          canceled={checkout === "cancel"}
+          checkoutError={checkout === "error"}
+          finishFailed={finishFailed}
+          devBypass={billingBypassAllowed()}
+        />
+      )}
+    </OnboardingShell>
   );
 }

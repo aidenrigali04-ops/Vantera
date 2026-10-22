@@ -11,7 +11,7 @@ import { JsonLd, breadcrumbLd, SITE_URL } from "@/lib/seo";
 export const metadata: Metadata = {
   title: "Use Cases — LinkedIn Automation by Team | Vantera",
   description:
-    "See how Vantera runs LinkedIn outreach for your team — sales teams, founders, agencies, and recruiters. AI SDR agents that qualify before they reach out, on your approval.",
+    "See how Vantera runs LinkedIn outreach for your team — sales teams, founders, agencies, and recruiters. AI SDR agents that qualify before they reach out, on autopilot.",
   alternates: { canonical: "/use-cases" },
 };
 
@@ -46,7 +46,7 @@ export default function UseCasesHubPage() {
         <MarketingHeader
           eyebrow="Use cases"
           title="Built for the way your team sells"
-          subtitle="Same system, tuned to your motion — AI SDR agents that find in-market buyers, qualify them against your ICP, and draft every message from real activity. You approve every send."
+          subtitle="Same system, tuned to your motion — AI SDR agents that find in-market buyers, qualify them against your ICP, and send every message written from real activity — on autopilot."
         />
       </section>
 
@@ -69,7 +69,7 @@ export default function UseCasesHubPage() {
           </h2>
           <p className="mx-auto mt-4 max-w-lg text-[15.5px] leading-relaxed text-[var(--ink-3)]">
             Start free and Vantera reads your site to map your ICP for you — no matter how your team is
-            structured, the motion is the same: quality-first outreach, on your approval.
+            structured, the motion is the same: quality-first outreach, on autopilot.
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
             <Link

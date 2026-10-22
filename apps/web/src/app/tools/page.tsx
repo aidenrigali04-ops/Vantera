@@ -105,8 +105,8 @@ export default function ToolsHubPage() {
             The tools are the free part.
           </h2>
           <p className="mx-auto mt-5 max-w-xl text-[16px] leading-relaxed text-[var(--ink-3)] sm:text-[17.5px]">
-            Vantera runs the whole motion: find in-market buyers on LinkedIn, qualify them, and draft a
-            message for each — you approve every send.
+            Vantera runs the whole motion on autopilot: find in-market buyers on LinkedIn, qualify
+            them, and send each one a message written from their real activity.
           </p>
           <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
             <Link

@@ -11,7 +11,7 @@ export const USE_CASES: UseCaseSummary[] = [
     persona: "Sales teams",
     title: "LinkedIn automation for sales teams",
     blurb:
-      "Give every rep an AI SDR that finds in-market buyers, qualifies them, and books meetings — safely, on your approval.",
+      "Give every rep an AI SDR that finds in-market buyers, qualifies them, and books meetings — safely, on autopilot.",
     icon: "users",
     metric: { value: "3×", label: "more selling time" },
     live: true,
@@ -41,7 +41,7 @@ export const USE_CASES: UseCaseSummary[] = [
     persona: "Recruiters",
     title: "LinkedIn automation for recruiters",
     blurb:
-      "Source and reach qualified candidates on LinkedIn with personal outreach, safe pacing, and human approval.",
+      "Source and reach qualified candidates on LinkedIn with personal outreach and safe pacing, on autopilot.",
     icon: "search",
     metric: { value: "0", label: "account risk" },
     live: true,

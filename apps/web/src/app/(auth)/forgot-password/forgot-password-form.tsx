@@ -1,48 +1,89 @@
 "use client";
 
 import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { useActionState } from "react";
 import { requestPasswordReset, type AuthFormState } from "../actions";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FormError } from "@/components/form-error";
-import { AuthHeading, FIELD, SubmitButton } from "../auth-ui";
+import {
+  AuthHeading,
+  CtaArrow,
+  FIELD,
+  FIELD_STACK,
+  LABEL,
+  Rise,
+  SubmitButton,
+  TEXT_LINK,
+} from "../auth-ui";
+
+function BackToSignIn({ delay }: { delay: number }) {
+  return (
+    <Rise delay={delay}>
+      <p className="mt-6 text-center text-sm">
+        <Link href="/login" className={`${TEXT_LINK} inline-flex items-center gap-1.5`}>
+          <ArrowLeft className="size-3.5" aria-hidden />
+          Back to sign in
+        </Link>
+      </p>
+    </Rise>
+  );
+}
 
 export function ForgotPasswordForm() {
   const [state, action, pending] = useActionState<AuthFormState, FormData>(requestPasswordReset, {});
 
   if (state.sent) {
     return (
-      <div className="flex flex-col gap-4">
-        <h1 className="text-[30px] font-bold tracking-[-0.03em] text-foreground">Check your email</h1>
-        <p className="text-[15px] leading-relaxed text-[var(--ink-3)]">
-          If an account exists for that email, a reset link is on its way.
-        </p>
-        <p className="text-[14px]">
-          <Link className="font-semibold text-[var(--cyan-strong)] hover:underline" href="/login">
-            Back to sign in
-          </Link>
-        </p>
+      <div>
+        <AuthHeading
+          title="Check your"
+          accent="email"
+          sub="If an account exists for that email, a reset link is on its way."
+        />
+        <BackToSignIn delay={0.12} />
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-8">
-      <AuthHeading title="Reset your password" sub="We'll email you a link to set a new one." />
-      <form action={action} className="flex flex-col gap-5">
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="email" className="text-[13px] font-medium text-[var(--ink-2)]">Email</Label>
-          <Input id="email" name="email" type="email" autoComplete="email" placeholder="you@company.com" className={FIELD} required />
-        </div>
-        <FormError message={state.error} />
-        <SubmitButton pending={pending} idle="Send reset link" busy="Sending…" className="mt-1" />
-      </form>
-      <p className="text-center text-[14px] text-[var(--ink-3)]">
-        <Link className="transition-colors hover:text-foreground" href="/login">
-          Back to sign in
-        </Link>
-      </p>
+    <div>
+      <AuthHeading
+        title="Reset your"
+        accent="password"
+        sub="Enter your email and we'll send you a link to set a new one."
+      />
+      <Rise delay={0.12}>
+        <form action={action} className="mt-8 space-y-4">
+          <div className={FIELD_STACK}>
+            <Label htmlFor="email" className={LABEL}>
+              Email
+            </Label>
+            <Input
+              id="email"
+              name="email"
+              type="email"
+              autoComplete="email"
+              placeholder="you@company.com"
+              className={FIELD}
+              required
+            />
+          </div>
+          <FormError message={state.error} />
+          <SubmitButton
+            pending={pending}
+            idle={
+              <>
+                Send reset link <CtaArrow />
+              </>
+            }
+            busy="Sending…"
+            className="mt-2"
+          />
+        </form>
+      </Rise>
+      <BackToSignIn delay={0.18} />
     </div>
   );
 }

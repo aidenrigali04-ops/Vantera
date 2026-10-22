@@ -1,7 +1,5 @@
 "use client";
 
-import { LinkedinMark } from "./brand-glyphs";
-
 /* Laurel geometry — computed, not eyeballed. Leaves ride a semicircular stem in
    PAIRS (one each side, angled ~38° toward the tip, shrinking as they climb): the
    feathered look of a classic award laurel. Pure math, so SSR and client render the
@@ -33,7 +31,7 @@ const LAUREL_LEAVES = (() => {
 })();
 
 /** One branch (left half of the ring); mirrored with scaleX(-1) for the right. */
-function Laurel({ className, flip = false }: { className?: string; flip?: boolean }) {
+export function Laurel({ className, flip = false }: { className?: string; flip?: boolean }) {
   return (
     <svg
       viewBox="0 0 24 44"
@@ -58,48 +56,5 @@ function Laurel({ className, flip = false }: { className?: string; flip?: boolea
         ))}
       </g>
     </svg>
-  );
-}
-
-/** The three laurel badges — shared by the hero (on blue) and the auth form column
-    (on white). Only publicly-named integrations appear (LinkedIn); white-labeled
-    vendors never do. `tone` flips the palette for the ground it sits on. */
-export function LaurelBadges({
-  className = "",
-  tone = "light",
-}: {
-  className?: string;
-  /** light = white marks for the blue slab · dark = ink marks for a white column */
-  tone?: "light" | "dark";
-}) {
-  const dark = tone === "dark";
-  const leaf = dark ? "text-[rgba(12,16,26,0.32)]" : "text-white/80";
-  const label = dark ? "text-[var(--ink-4)]" : "text-white/75";
-  return (
-    <div
-      className={`flex flex-wrap items-center gap-x-6 gap-y-3 sm:gap-x-8 ${dark ? "text-foreground" : "text-white"} ${className}`}
-    >
-      {(
-        [
-          { key: "li", big: <LinkedinMark className="size-[14px]" />, name: "LinkedIn", small: "Powered by" },
-          { key: "acc", big: null, name: "98%", small: "Accuracy" },
-          { key: "conv", big: null, name: "85%", small: "Conversion" },
-        ] as const
-      ).map((b) => (
-        <span key={b.key} className="flex items-center">
-          <Laurel className={`h-10 w-auto ${leaf}`} />
-          <span className="-mx-1 flex flex-col items-center px-1">
-            <span className="flex items-center gap-1.5 text-[13.5px] font-bold leading-none tabular-nums">
-              {b.big}
-              {b.name}
-            </span>
-            <span className={`mt-1 text-[8.5px] font-semibold uppercase leading-none tracking-[0.16em] ${label}`}>
-              {b.small}
-            </span>
-          </span>
-          <Laurel flip className={`h-9 w-auto ${leaf}`} />
-        </span>
-      ))}
-    </div>
   );
 }
