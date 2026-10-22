@@ -210,3 +210,35 @@ describe("parseTargetingForm (ML-5)", () => {
   });
 });
 
+
+describe("targeting page values", () => {
+  it("targeting page values round-trip through parseBuyersForm (criteria + targeting)", async () => {
+    const { parseBuyersForm } = await import("@/lib/validation/buyers");
+    const f = new FormData();
+    f.set("name", "Heads of Sales");
+    f.append("titles[]", "VP Sales");
+    f.append("industries[]", "SaaS");
+    f.append("companySizes[]", "51-200");
+    f.append("geos[]", "US");
+    f.append("signals[]", "Hiring SDRs");
+    f.set("excludeAgencies", "on");
+    f.set("excludeFreelancers", "off");
+    f.set("competitors", "Acme\nRival Co");
+    f.set("guidance", "Founders first.");
+    const r = parseBuyersForm(f);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.values.name).toBe("Heads of Sales");
+    expect(r.values.criteria).toEqual({
+      titles: ["VP Sales"],
+      industries: ["SaaS"],
+      companySizes: ["51-200"],
+      geos: ["US"],
+      signals: ["Hiring SDRs"],
+    });
+    expect(r.values.targeting.excludeAgencies).toBe(true);
+    expect(r.values.targeting.excludeFreelancers).toBe(false);
+    expect(r.values.targeting.competitors).toEqual(["Acme", "Rival Co"]);
+    expect(r.values.targeting.guidance).toBe("Founders first.");
+  });
+});

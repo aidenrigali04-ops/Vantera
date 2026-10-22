@@ -9,9 +9,9 @@ import {
   parseCopyForm,
   parseIntentForm,
   parseScoutForm,
-  parseTargetingForm,
   MAX_ICPS,
 } from "./validation";
+import { parseBuyersForm } from "@/lib/validation/buyers";
 import { gate, loadBillingRow, hasActivePlan } from "@/lib/billing/entitlement";
 
 export type AgentActionState = {
@@ -574,24 +574,39 @@ export async function updateScoutTargeting(
   _prev: AgentActionState,
   formData: FormData
 ): Promise<AgentActionState> {
-  const parsed = parseTargetingForm(formData);
+  const parsed = parseBuyersForm(formData);
   if (!parsed.ok) return { error: parsed.error };
+  const { name, criteria, targeting } = parsed.values;
 
   const { supabase, user, account } = await sessionAccount();
   if (!user || !account) return { error: "Your session expired. Sign in again." };
 
-  const { data: agent } = await supabase
+  const { data: agent, error: readError } = await supabase
     .from("agents")
     .select("id, config")
     .eq("account_id", account.id)
     .eq("kind", "scout")
     .limit(1)
     .maybeSingle<{ id: string; config: Record<string, unknown> | null }>();
+  if (readError) return { error: "Could not save. Please try again." };
   if (!agent) return { error: "No Prospect Agent yet. Deploy one first." };
+
+  // The shared buyer profile: the onboarding ICP row (insert if the account never had one).
+  const { data: icp } = await supabase
+    .from("icps")
+    .select("id")
+    .eq("account_id", account.id)
+    .eq("source", "onboarding")
+    .limit(1)
+    .maybeSingle<{ id: string }>();
+  const { error: icpError } = icp
+    ? await supabase.from("icps").update({ name, criteria }).eq("id", icp.id)
+    : await supabase.from("icps").insert({ account_id: account.id, name, criteria, source: "onboarding" });
+  if (icpError) return { error: "Could not save. Only workspace admins can change targeting." };
 
   const { data: saved, error } = await supabase
     .from("agents")
-    .update({ config: { ...(agent.config ?? {}), targeting: parsed.values } })
+    .update({ config: { ...(agent.config ?? {}), targeting } })
     .eq("id", agent.id)
     .select("id")
     .maybeSingle();
