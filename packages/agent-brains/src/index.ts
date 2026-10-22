@@ -51,6 +51,7 @@ export {
 export {
   draftLinkedIn,
   validateLinkedInDraft,
+  leadIdentity,
   linkedinDraftSchema,
   LINKEDIN_SYSTEM,
   CONNECTION_NOTE_MAX_CHARS,
@@ -239,3 +240,4 @@ export {
   type SignalReportRow,
 } from "./targeting/learn";
 export { STARTER_PLAYS, SOURCE_LABEL, matchStarterPlays, type StarterPlay } from "./plays/starter";
+export { pickWhyNow, findMissingWhyNow, WHY_NOW_MAX_AGE_DAYS, type WhyNow, type SignalLike } from "./copy/why-now";

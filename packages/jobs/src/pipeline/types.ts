@@ -15,6 +15,7 @@ import type {
   DraftInput,
   RankCandidate,
   RankContext,
+  WhyNow,
   LearnedReadout,
   ReplyVerdict,
   RulesGateResult,
@@ -357,6 +358,8 @@ export interface DraftableLead {
   aiScore: number | null;
   /** when the lead was last AI-ranked; drives refresh-on-release before a delayed email touch */
   scoredAt: Date | null;
+  /** ML-3: freshest captured reach-out-worthy signal (pickWhyNow) — the opener must cite it */
+  whyNow?: WhyNow | null;
 }
 
 export interface NewScheduledSend {

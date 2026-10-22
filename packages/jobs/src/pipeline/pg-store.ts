@@ -58,6 +58,7 @@ import {
   describeStrategy,
   buildReadout,
   orderLeads,
+  pickWhyNow,
   toStoredInsights,
   wealthAfterConclusion,
   wealthAfterLaunch,
@@ -1142,7 +1143,22 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         .select()
         .from(leads)
         .where(and(eq(leads.accountId, accountId), inArray(leads.id, leadIds)));
+      // ML-3: each lead's captured signals → the freshest reach-out-worthy why-now
+      const signalRows = await db
+        .select({
+          leadId: leadSignals.leadId,
+          kind: leadSignals.kind,
+          label: leadSignals.label,
+          detail: leadSignals.detail,
+          observedAt: leadSignals.observedAt,
+        })
+        .from(leadSignals)
+        .where(and(eq(leadSignals.accountId, accountId), inArray(leadSignals.leadId, leadIds)));
+      const signalsByLead = new Map<string, typeof signalRows>();
+      for (const s of signalRows) signalsByLead.set(s.leadId, [...(signalsByLead.get(s.leadId) ?? []), s]);
+      const now = new Date();
       return rows.map((r) => ({
+        whyNow: pickWhyNow(signalsByLead.get(r.id) ?? [], now),
         id: r.id,
         firstName: r.firstName,
         lastName: r.lastName,

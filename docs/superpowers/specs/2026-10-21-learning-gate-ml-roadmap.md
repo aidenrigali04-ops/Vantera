@@ -134,3 +134,17 @@ article mentions learned ordering + job-seeker exclusion); full gate green on a 
   evidence) and "Ranked higher / lower" reasons in the side-peek (`explainLead`, ≤ 3, one per
   feature family). Plain markup; owner restyles.
 - **Labels:** `featureLabel` maps keys to plain words (white-label safe — no vendor names).
+
+## 5. ML-3 design (signal-cited openers) — shipped
+
+- **Gap found:** the copy brain never received the captured why-now (lead_signals) — only the
+  rank model's paraphrased `triggers`.
+- `pickWhyNow(signals)`: intent > funding > exec_hire > m_and_a > product_launch > partnership >
+  office_opening > hiring > award; ≤ 90 days, dated only; negative kinds (legal, cost_cutting,
+  security, workforce) never qualify. Loaded per lead in `getDraftableLeads`.
+- Rendered in `leadBlock` as "Why now (verified — …)" — also the grounding string, so citing it
+  passes the claim checks. The instruction rides the per-lead block, not `LINKEDIN_SYSTEM`, so the
+  pinned system-prompt hash (champion stamps) is unchanged and leads without a why-now are
+  byte-identical.
+- `findMissingWhyNow`: content-word overlap with the signal (prospect's own name/company words
+  excluded) or a kind word ("congrats on the round"); wired into draft, fix, and the eval grader.

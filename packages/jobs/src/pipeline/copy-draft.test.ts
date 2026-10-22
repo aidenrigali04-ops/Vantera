@@ -964,4 +964,19 @@ describe("runCopyDraft — daily first-touch cap", () => {
     expect(store.campaignLeads.get("high")).toBe("suppressed");
     expect(store.campaignLeads.has("low")).toBe(true);
   });
+
+  it("hands the lead's verified why-now to the copy brain (ML-3)", async () => {
+    const store = new FakeCopyStore();
+    const why = { kind: "intent", text: "Commented asking for a churn tool on a RevOps post", ageDays: 2 };
+    store.leads.push(lead("w", { whyNow: why }), lead("plain"));
+    const seen: DraftInput[] = [];
+    const draftLinkedInFn = vi.fn(async (input: DraftInput) => {
+      seen.push(input);
+      return CLEAN;
+    });
+    await runCopyDraft({ copyAgentId: "copy1", accountId: "acc1", leadIds: ["w", "plain"] }, { store, draftLinkedInFn });
+    expect(seen.some((i) => i.lead.whyNow?.text === why.text)).toBe(true);
+    expect(seen.filter((i) => i.lead.whyNow).length).toBe(1);
+  });
 });
+

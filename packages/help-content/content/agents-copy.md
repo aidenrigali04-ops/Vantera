@@ -21,6 +21,7 @@ The Outreach Agent owns everything after a prospect qualifies. For every qualifi
 
 - It writes for LinkedIn specifically: a personal connection note that never pitches on the first touch, then tailored follow-up messages once they accept.
 - Every draft is personalized from the prospect's insights — never a template with a name swapped in.
+- When there's a real reason to reach out now — they commented asking about a problem you solve, their company just raised a round, they started a new role — the connection note mentions it in plain words. It only ever uses what was actually observed (within the last 90 days), never an invented detail. If a note misses it, the draft is rewritten once, and if it still misses, it waits for you in Approvals.
 - Messages read like a text from a colleague: short (a sentence or two), plain everyday words, and flowing punctuation — no dashes, no bullet lists, no business-speak like "leverage" or "streamline".
 - A style guard enforces that voice mechanically — robotic phrasing, AI-tell vocabulary, and machine punctuation are stripped before anything reaches a prospect. If a draft still trips a style rule, it's flagged for you in Approvals.
 

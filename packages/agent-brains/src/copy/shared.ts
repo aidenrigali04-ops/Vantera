@@ -1,6 +1,7 @@
 import type { StoredInsights } from "../prospect/schema";
 import { describeViolations, type Violation } from "./humanizer";
 import { SHAPE_DIRECTIVE, type MessageShape } from "./shape";
+import type { WhyNow } from "./why-now";
 
 export interface CopyLead {
   firstName?: string | null;
@@ -8,6 +9,8 @@ export interface CopyLead {
   title?: string | null;
   companyName?: string | null;
   industry?: string | null;
+  /** ML-3: the freshest captured, reach-out-worthy signal (pickWhyNow) — a verified fact */
+  whyNow?: WhyNow | null;
 }
 
 export interface CopyContext {
@@ -256,6 +259,9 @@ export function leadBlock({ lead, insights, context }: DraftInput): string {
     proofSection(context.proofPoints),
     ``,
     `Prospect: ${name}, ${lead.title ?? "unknown role"} at ${lead.companyName ?? "unknown"} (${lead.industry ?? "unknown industry"})`,
+    lead.whyNow
+      ? `Why now (verified — the connection note must reference this moment in your own words, adding no detail it doesn't state): ${lead.whyNow.text}${lead.whyNow.ageDays != null ? ` (${lead.whyNow.ageDays}d ago)` : ""}`
+      : null,
     insights.prospect_offering ? `What they do (their words, do not restate through our offer): ${insights.prospect_offering}` : null,
     `Pain points: ${insights.pain_points.join("; ") || "unknown"}`,
     `Triggers: ${insights.triggers.join("; ") || "none observed"}`,

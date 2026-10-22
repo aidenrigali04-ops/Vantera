@@ -1,5 +1,6 @@
 import {
   validateLinkedInDraft,
+  leadIdentity,
   validateConversationMessage,
   allowedConversationLinks,
   findActionClaims,
@@ -50,7 +51,7 @@ export function gradeLinkedinDraft(
   const built = { connection_note: draft.connectionNote, followup_message: draft.followupMessage };
   const allowed = allowedConversationLinks(c.input.context);
   const violations: Violation[] = [
-    ...validateLinkedInDraft(built, c.grounding, sellerName),
+    ...validateLinkedInDraft(built, c.grounding, sellerName, null, c.input.lead.whyNow, leadIdentity(c.input.lead)),
     ...findActionClaims(`${draft.connectionNote} ${draft.followupMessage}`),
     ...findUnapprovedLinks(draft.followupMessage, allowed),
   ];

@@ -1,6 +1,7 @@
 import { generateObject, type LanguageModel } from "ai";
 import { z } from "zod";
 import { getModel, registerPrompt } from "@vantera/ai";
+import { findMissingWhyNow, type WhyNow } from "./why-now";
 import { validateHumanity, findUngroundedClaims, findUngroundedEntities, normalizeDashes, type Violation } from "./humanizer";
 import { avoidBlock, exemplarBlock, generateHumanized, leadBlock, strategyDirectives, PROSPECT_ACCURACY_RULE, VOICE_RULES, type DraftInput } from "./shared";
 import { FACT_ASSERTING_SHAPES, groundingHasShapeSignal, shapeBudget, type MessageShape } from "./shape";
@@ -74,6 +75,8 @@ export function validateLinkedInDraft(
   grounding?: string,
   sellerName?: string | null,
   shape?: MessageShape | null,
+  whyNow?: WhyNow | null,
+  identity?: string | null,
 ): Violation[] {
   const budget = shapeBudget(shape);
   const violations = [
@@ -83,6 +86,8 @@ export function validateLinkedInDraft(
   if (/https?:\/\//i.test(draft.connection_note)) {
     violations.push({ rule: "no-links", detail: "no links in a connection note" });
   }
+  // ML-3: a verified why-now is the reason to reach out — the note must reference it.
+  violations.push(...findMissingWhyNow(draft.connection_note, whyNow, identity));
   // The first follow-up is a soft, human ask — a raw link makes it read like a pitch (content is
   // referenced, never pasted in the first touch). Same anti-pitch discipline as the note.
   if (/https?:\/\//i.test(draft.followup_message)) {
@@ -115,6 +120,11 @@ export function validateLinkedInDraft(
     }
   }
   return violations;
+}
+
+/** The prospect's own name + company words — excluded from why-now citation matching. */
+export function leadIdentity(lead: DraftInput["lead"]): string {
+  return [lead.firstName, lead.lastName, lead.companyName].filter(Boolean).join(" ");
 }
 
 /** LinkedIn copy system: personalized connection note + post-accept follow-up per lead. */
@@ -153,7 +163,7 @@ export async function draftLinkedIn(
         followup_message: normalizeDashes(obj.followup_message),
       };
     },
-    (draft) => validateLinkedInDraft(draft, block, input.context.accountName, shape)
+    (draft) => validateLinkedInDraft(draft, block, input.context.accountName, shape, input.lead.whyNow, leadIdentity(input.lead))
   );
   return {
     connectionNote: output.connection_note,

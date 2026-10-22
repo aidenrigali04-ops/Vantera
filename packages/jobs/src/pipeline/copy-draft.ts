@@ -63,6 +63,7 @@ function toDraftInput(lead: DraftableLead, ctx: CopyContext, strategy?: CopyStra
       title: lead.title,
       companyName: lead.companyName,
       industry: lead.industry,
+      whyNow: lead.whyNow ?? null,
     },
     insights: lead.aiInsights,
     context: {
