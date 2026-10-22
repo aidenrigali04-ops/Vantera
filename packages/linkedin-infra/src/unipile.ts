@@ -128,6 +128,40 @@ function senderAttendee(p: Record<string, unknown>): Record<string, unknown> | n
   );
 }
 
+/**
+ * An is_sender `message_received` → outbound echo addressed to the counterpart: the single attendee
+ * that is neither the account owner nor the sender. Ambiguous (group chat) or unresolvable → null,
+ * which keeps the pre-existing "drop our own messages" behavior.
+ */
+function ownMessageEcho(p: Record<string, unknown>, eventId: string, connectedAccountRef: string): LinkedInEvent | null {
+  const body = str(p.message);
+  const sentAt = str(p.timestamp);
+  if (!body || !sentAt) return null;
+  const self = new Set(
+    [str((p.account_info as Record<string, unknown> | undefined)?.user_id), str((p.sender as Record<string, unknown> | undefined)?.attendee_provider_id)]
+      .filter((v): v is string => v !== null)
+  );
+  const attendees: Record<string, unknown>[] = Array.isArray(p.attendees) ? (p.attendees as Record<string, unknown>[]) : [];
+  const others = attendees.filter((a) => {
+    const id = str(a.attendee_provider_id);
+    return id !== null && !self.has(id);
+  });
+  if (others.length !== 1) return null;
+  const to = others[0]!;
+  const providerId = str(to.attendee_provider_id)!;
+  return {
+    type: "outbound_echo",
+    providerEventId: eventId,
+    connectedAccountRef,
+    toProfileUrl: str(to.attendee_profile_url) ?? profileUrlFromId(providerId),
+    fromProviderRef: providerId,
+    fromPublicIdentifier: str(to.attendee_public_identifier),
+    fromName: str(to.attendee_name),
+    body,
+    sentAt,
+  };
+}
+
 /** Resolve the new connection's profile URL from a `new_relation` payload across Unipile encodings. */
 function relationProfileUrl(p: Record<string, unknown>): string | null {
   const user = (p.user ?? {}) as Record<string, unknown>;
@@ -259,6 +293,8 @@ export interface UnipileConfig {
    * hand the user a 404 instead of the auth screen.
    */
   appUrl?: string;
+  /** Clock for synthesized event ids (tests); defaults to the wall clock. */
+  now?: () => Date;
 }
 
 /**
@@ -288,6 +324,7 @@ export class UnipileLinkedInInfra implements LinkedInInfra {
   private readonly fetchFn: typeof fetch;
   private readonly hostedAuthDomain: string | undefined;
   private readonly appUrl: string | undefined;
+  private readonly now: () => Date;
 
   constructor(config: UnipileConfig) {
     this.apiKey = config.apiKey;
@@ -296,6 +333,7 @@ export class UnipileLinkedInInfra implements LinkedInInfra {
     this.fetchFn = config.fetchFn ?? fetch;
     this.hostedAuthDomain = config.hostedAuthDomain;
     this.appUrl = config.appUrl;
+    this.now = config.now ?? (() => new Date());
   }
 
   // ── private helper ──────────────────────────────────────────────────────
@@ -507,10 +545,13 @@ export class UnipileLinkedInInfra implements LinkedInInfra {
 
     switch (event) {
       case "message_received": {
-        if (isOwnMessage(p)) return null; // our own outbound copy echoed back — never a reply
         // No event_id on real payloads: the message id IS the idempotency key.
         const eventId = str(p.message_id) ?? str(p.provider_message_id);
         if (!eventId) return null;
+        // The account owner's own message (our send echoed back, OR one typed natively in
+        // LinkedIn) — never a reply. Surfaced as an echo so the pipeline can tell the two apart
+        // and stand the agent down when a human took the thread over.
+        if (isOwnMessage(p)) return ownMessageEcho(p, eventId, connectedAccountRef);
         const fromProfileUrl = senderProfileUrl(p);
         const body = str(p.message);
         const receivedAt = str(p.timestamp);
@@ -556,9 +597,12 @@ export class UnipileLinkedInInfra implements LinkedInInfra {
       case "account_status": {
         // Tolerate both the flat `status` and the `message` field Unipile has used for the state.
         const rawStatus = p.status ?? p.message;
-        // Synthesized id keyed on the state so a re-delivery of the SAME transition dedupes while a
-        // later state change (e.g. recovery back to OK) is still processed.
-        const eventId = `status:${connectedAccountRef}:${String(rawStatus ?? "unknown")}`;
+        // Synthesized id keyed on the state AND when it was reported: a re-delivery of the same
+        // transition (incl. LinkedIn's paired payloads) dedupes, while the same state reported
+        // again later — an OK after a disconnect — is a new event. A bare state key deduped that
+        // second OK forever. Payload timestamp when present, else a minute bucket of the clock.
+        const reportedAt = str(p.timestamp) ?? str(p.created_at) ?? this.now().toISOString().slice(0, 16);
+        const eventId = `status:${connectedAccountRef}:${String(rawStatus ?? "unknown")}:${reportedAt}`;
         const base = { providerEventId: eventId, connectedAccountRef };
         let status: "active" | "restricted" | "disconnected";
         if (rawStatus === "CONNECTING") {

@@ -57,6 +57,9 @@ export interface ConnectedAccount {
 export type LinkedInEvent =
   | ({ type: "reply"; providerEventId: string; connectedAccountRef: string; fromProfileUrl: string; body: string; receivedAt: string } & InboundIdentity)
   | ({ type: "relationship_accepted"; providerEventId: string; connectedAccountRef: string; profileUrl: string } & InboundIdentity)
+  // A message the connected account itself sent (ours or typed natively in LinkedIn). The identity
+  // fields describe the COUNTERPART it was sent to, so it matches a lead the same way a reply does.
+  | ({ type: "outbound_echo"; providerEventId: string; connectedAccountRef: string; toProfileUrl: string; body: string; sentAt: string } & InboundIdentity)
   | { type: "account_status"; providerEventId: string; connectedAccountRef: string; status: "active" | "restricted" | "disconnected"; profileUrl: string | null; displayName: string | null; vanteraAccountId: string | null };
 
 // ── Read surface (Intent Agent, Phase 13) ────────────────────────────────────

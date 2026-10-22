@@ -59,6 +59,13 @@ export async function runSequenceTouch(
   // proactive nudge never lands on top of a human who just took the thread over.
   if (bundle.humanHandled) return "skipped";
 
+  // The lead spoke last and nobody answered: a proactive nudge (written as "they went quiet")
+  // would ignore what they said. Skip rather than switch to reply mode — the responder owns
+  // answering, deliberately refuses replies past RESPOND_MAX_REPLY_AGE_MS, and the stale-reply
+  // sweep raises needs_human for anything it left unanswered; a scripted path must not route
+  // around either. (Out-of-office auto-replies are kept out of the thread by the bundle.)
+  if (bundle.thread.at(-1)?.role === "lead") return "skipped";
+
   // Converse-to-close turn cap (shared with the responder): past it, the agent steps aside
   // LOUDLY — the run stops and the human is told to take the thread over. Only threads with
   // real engagement can reach the cap, so the notification is always about a live prospect.

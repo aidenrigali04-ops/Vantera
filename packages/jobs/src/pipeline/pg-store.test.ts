@@ -495,3 +495,63 @@ describe("lead_embeddings queries are always account-scoped", () => {
     }
   });
 });
+
+// ── Conversation-path audit fixes (2026-10) ─────────────────────────────────────────────
+describe("reviveSequenceRun never re-arms a deliberate stand-down", () => {
+  it("revives only active/exhausted runs, and never for a booked or suppressed lead", async () => {
+    const { PgDialect } = await import("drizzle-orm/pg-core");
+    const wheres: unknown[] = [];
+    const db = {
+      update: (_table: unknown) => ({
+        set: (_vals: Record<string, unknown>) => ({
+          where: (cond: unknown) => {
+            wheres.push(cond);
+            return Promise.resolve();
+          },
+        }),
+      }),
+    };
+    await createPgStore(db as unknown as Db).reviveSequenceRun("lead-1", new Date("2026-10-01T00:00:00Z"));
+    expect(wheres).toHaveLength(1);
+    const q = new PgDialect().sqlToQuery(wheres[0] as never);
+    expect(q.params).toEqual(expect.arrayContaining(["active", "exhausted"]));
+    expect(q.params).not.toContain("stopped");
+    expect(q.sql).toMatch(/meeting_booked_at is not null/);
+    expect(q.sql).toMatch(/suppression_entries/);
+  });
+});
+
+describe("pauseForHumanTakeover always leaves a paused marker", () => {
+  function fakeDb(pausedRows: { id: string }[]) {
+    const inserts: Record<string, unknown>[] = [];
+    const db = {
+      update: (_table: unknown) => ({
+        set: (_vals: Record<string, unknown>) => ({
+          where: (_cond: unknown) => {
+            const p = Promise.resolve();
+            return Object.assign(p, { returning: () => Promise.resolve(pausedRows) });
+          },
+        }),
+      }),
+      insert: (_table: unknown) => ({
+        values: (v: Record<string, unknown>) => {
+          inserts.push(v);
+          return { onConflictDoNothing: () => Promise.resolve() };
+        },
+      }),
+    };
+    return { db: db as unknown as Db, inserts };
+  }
+
+  it("inserts a paused_reply run when the lead had none to pause", async () => {
+    const { db, inserts } = fakeDb([]);
+    await createPgStore(db).pauseForHumanTakeover("acc", "lead", "camp");
+    expect(inserts).toEqual([{ accountId: "acc", campaignId: "camp", leadId: "lead", status: "paused_reply" }]);
+  });
+
+  it("does not insert when an existing run was paused", async () => {
+    const { db, inserts } = fakeDb([{ id: "run-1" }]);
+    await createPgStore(db).pauseForHumanTakeover("acc", "lead", "camp");
+    expect(inserts).toHaveLength(0);
+  });
+});

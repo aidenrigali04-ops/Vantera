@@ -30,6 +30,10 @@ function makeStore(overrides: Partial<InboundStore> = {}): InboundStore & {
   notifications: Parameters<InboundStore["insertLeadNotification"]>[0][];
   bookedMeetings: { leadId: string; at: Date }[];
   scheduledSends: NewScheduledSend[];
+  takeovers: { accountId: string; leadId: string; campaignId: string | null }[];
+  bundleRequests: { leadId: string; opts?: { excludeReplyId?: string } }[];
+  /** ordered log of effect calls — proves the classification marker is written LAST */
+  effects: string[];
 } {
   let replyCounter = 0;
   const replies: Parameters<InboundStore["insertReply"]>[0][] = [];
@@ -46,6 +50,9 @@ function makeStore(overrides: Partial<InboundStore> = {}): InboundStore & {
 
   const savedProviderRefs: { leadId: string; providerRef: string }[] = [];
   const revivedRuns: { leadId: string; nextActionAt: Date }[] = [];
+  const takeovers: { accountId: string; leadId: string; campaignId: string | null }[] = [];
+  const bundleRequests: { leadId: string; opts?: { excludeReplyId?: string } }[] = [];
+  const effects: string[] = [];
   const base: InboundStore = {
     findLinkedInAccountByProviderRef: async () => null,
     upsertLinkedInAccountStatus: async (e) => {
@@ -60,12 +67,20 @@ function makeStore(overrides: Partial<InboundStore> = {}): InboundStore & {
     },
     insertReply: async (r) => {
       replies.push(r);
-      return { id: `reply_${++replyCounter}`, created: true };
+      // ingestion time defaults to the provider time — tests that care about webhook lag override it
+      return { id: `reply_${++replyCounter}`, created: true, createdAt: r.receivedAt, classified: false };
     },
     setReplyClassification: async (replyId, verdict) => {
+      effects.push("classify");
       classifications.push({ replyId, verdict });
     },
-    addSuppression: async (...args) => { suppressions.push(args); },
+    getLeadLinkedInUrl: async () => null,
+    isSuppressed: async () => false,
+    isOwnOutboundMessage: async () => false,
+    pauseForHumanTakeover: async (accountId, leadId, campaignId) => {
+      takeovers.push({ accountId, leadId, campaignId });
+    },
+    addSuppression: async (...args) => { effects.push("suppress"); suppressions.push(args); },
     setLeadConnected: async (leadId, at) => { connectedLeads.push({ leadId, at }); },
     setLeadReplied: async (leadId, campaignId) => { repliedLeads.push({ leadId, campaignId }); },
     markMeetingBooked: async (leadId, at) => { bookedMeetings.push({ leadId, at }); },
@@ -77,6 +92,12 @@ function makeStore(overrides: Partial<InboundStore> = {}): InboundStore & {
     getResponderBundle: async () => null,
     insertScheduledSend: async (send) => { scheduledSends.push(send); },
     ...overrides,
+  };
+  // every bundle read is recorded (incl. overridden ones) so tests can assert the exclusion opts
+  const innerBundle = base.getResponderBundle;
+  base.getResponderBundle = async (accountId, leadId, campaignId, opts) => {
+    bundleRequests.push({ leadId, opts });
+    return innerBundle(accountId, leadId, campaignId, opts);
   };
 
   return Object.assign(base, {
@@ -93,6 +114,9 @@ function makeStore(overrides: Partial<InboundStore> = {}): InboundStore & {
     bookedMeetings,
     scheduledSends,
     savedProviderRefs,
+    takeovers,
+    bundleRequests,
+    effects,
   });
 }
 
@@ -1118,7 +1142,7 @@ describe("runInbound — layered lead matching", () => {
       findLinkedInAccountByProviderRef: async () => ({ id: "li_id_1", accountId: "acc1" }),
       findLeadByLinkedInUrl: async () => null,
       findLeadByProviderRef: async () => ({ id: "lead1", campaignId: null }),
-      insertReply: async () => ({ id: "existing_reply", created: false }),
+      insertReply: async (r) => ({ id: "existing_reply", created: false, createdAt: r.receivedAt, classified: true }),
     });
 
     const result = await runInbound(
@@ -1272,5 +1296,254 @@ describe("lifecycle sender interception (0045)", () => {
       { store: store as never, linkedinInfra: new InMemoryLinkedInInfra(), classifyFn: vi.fn(), lifecycle } as never
     );
     expect(lifecycle.recordReply).not.toHaveBeenCalled();
+  });
+});
+
+// ── Audit fixes (conversation path, 2026-10) ────────────────────────────────────────────
+describe("runInbound — opt-out suppression targets the lead's STORED url (rule 11)", () => {
+  // The payload carries the provider-id URL form; every send-path check compares against the
+  // lead's stored linkedin_url (vanity or ACwAA form). Suppressing only the payload URL left the
+  // lead contactable. The fixtures here deliberately use DIFFERENT urls.
+  const PAYLOAD = {
+    event_id: "li_evt_optout",
+    connected_account: LINKEDIN_ACCOUNT_REF,
+    event_type: "reply",
+    from_profile_url: "https://www.linkedin.com/in/ACoAA_PROSPECT",
+    from_provider_ref: "ACoAA_PROSPECT",
+    body: "please stop",
+    received_at: "2026-06-12T10:05:00.000Z",
+  };
+  const STORED = "https://www.linkedin.com/in/Prospect-Vanity/";
+
+  for (const classification of ["not_interested", "unsubscribe"] as const) {
+    it(`a ${classification} reply suppresses the lead's stored url AND the payload url`, async () => {
+      const store = makeStore({
+        findLinkedInAccountByProviderRef: async () => ({ id: "li", accountId: "acc1" }),
+        findLeadByProviderRef: async () => ({ id: "lead1", campaignId: "camp1" }),
+        getLeadLinkedInUrl: async () => STORED,
+      });
+
+      await runInbound({ source: "linkedin", payload: PAYLOAD }, deps(store, { classifyFn: classify(classification) }));
+
+      const values = store.suppressions.map((s) => s[2]);
+      expect(values).toEqual([
+        "https://www.linkedin.com/in/prospect-vanity", // the value send-path checks compare against
+        "https://www.linkedin.com/in/acoaa_prospect",
+      ]);
+      expect(store.suppressions.every((s) => s[4] === "lead1" && s[3] === classification)).toBe(true);
+    });
+  }
+
+  it("writes one entry when the stored url and the payload url are the same", async () => {
+    const store = makeStore({
+      findLinkedInAccountByProviderRef: async () => ({ id: "li", accountId: "acc1" }),
+      findLeadByProviderRef: async () => ({ id: "lead1", campaignId: "camp1" }),
+      getLeadLinkedInUrl: async () => "https://www.linkedin.com/in/ACoAA_PROSPECT/",
+    });
+    await runInbound({ source: "linkedin", payload: PAYLOAD }, deps(store, { classifyFn: classify("unsubscribe") }));
+    expect(store.suppressions).toHaveLength(1);
+  });
+
+  it("the responder never drafts for a suppressed lead (checked against the stored url)", async () => {
+    const checked: string[] = [];
+    const store = makeStore({
+      findLinkedInAccountByProviderRef: async () => ({ id: "li", accountId: "acc1" }),
+      findLeadByProviderRef: async () => ({ id: "lead1", campaignId: "camp1" }),
+      getLeadLinkedInUrl: async () => STORED,
+      isSuppressed: async (_a, _k, value) => {
+        checked.push(value);
+        return value === "https://www.linkedin.com/in/prospect-vanity";
+      },
+      getResponderBundle: async () => {
+        throw new Error("must not build a bundle for a suppressed lead");
+      },
+    });
+    const respondFn = vi.fn();
+
+    const result = await runInbound(
+      { source: "linkedin", payload: { ...PAYLOAD, body: "tell me more" } },
+      deps(store, { classifyFn: classify("interested"), respondFn })
+    );
+
+    expect(result.action).toBe("reply:interested");
+    expect(respondFn).not.toHaveBeenCalled();
+    expect(store.scheduledSends).toHaveLength(0);
+    expect(checked).toContain("https://www.linkedin.com/in/prospect-vanity");
+  });
+});
+
+describe("runInbound — a reply is never lost to a mid-processing failure", () => {
+  function storeForLead(over: Partial<InboundStore> = {}) {
+    return makeStore({
+      findLinkedInAccountByProviderRef: async () => ({ id: "li", accountId: "acc1" }),
+      findLeadByLinkedInUrl: async () => ({ id: "lead1", campaignId: "camp1" }),
+      ...over,
+    });
+  }
+
+  it("an existing but UNclassified reply row (a crashed run's retry) is processed in full", async () => {
+    const store = storeForLead({
+      insertReply: async (r) => ({ id: "reply_existing", created: false, createdAt: r.receivedAt, classified: false }),
+    });
+
+    const result = await runInbound(
+      { source: "linkedin", payload: LINKEDIN_REPLY_FIXTURE },
+      deps(store, { classifyFn: classify("not_interested") })
+    );
+
+    expect(result).toEqual({ handled: true, action: "reply:not_interested" });
+    expect(store.suppressions).toHaveLength(1);
+    expect(store.classifications).toEqual([
+      { replyId: "reply_existing", verdict: expect.objectContaining({ classification: "not_interested" }) },
+    ]);
+  });
+
+  it("a classified existing row is the true duplicate — no effects", async () => {
+    const store = storeForLead({
+      insertReply: async (r) => ({ id: "reply_existing", created: false, createdAt: r.receivedAt, classified: true }),
+    });
+    const result = await runInbound({ source: "linkedin", payload: LINKEDIN_REPLY_FIXTURE }, deps(store));
+    expect(result).toEqual({ handled: true, action: "reply:duplicate" });
+    expect(store.notifications).toHaveLength(0);
+  });
+
+  it("writes the classification (the processed marker) LAST — after suppression", async () => {
+    const store = storeForLead();
+    await runInbound({ source: "linkedin", payload: LINKEDIN_REPLY_FIXTURE }, deps(store, { classifyFn: classify("unsubscribe") }));
+    expect(store.effects).toEqual(["suppress", "classify"]);
+  });
+
+  it("a throw after the reply row exists leaves it unclassified, so the retry finishes the job", async () => {
+    let failOnce = true;
+    const rows = new Map<string, { id: string; classified: boolean }>();
+    const store = storeForLead({
+      insertReply: async (r) => {
+        const existing = rows.get(r.providerMessageRef!);
+        if (existing) return { id: existing.id, created: false, createdAt: r.receivedAt, classified: existing.classified };
+        rows.set(r.providerMessageRef!, { id: "reply_1", classified: false });
+        return { id: "reply_1", created: true, createdAt: r.receivedAt, classified: false };
+      },
+      setLeadReplied: async () => {
+        if (failOnce) {
+          failOnce = false;
+          throw new Error("db blip");
+        }
+      },
+    });
+    const origClassify = store.setReplyClassification;
+    store.setReplyClassification = async (id, v) => {
+      rows.get("li_evt_001")!.classified = true;
+      await origClassify(id, v);
+    };
+
+    await expect(
+      runInbound({ source: "linkedin", payload: LINKEDIN_REPLY_FIXTURE }, deps(store, { classifyFn: classify("interested") }))
+    ).rejects.toThrow("db blip");
+    expect(store.classifications).toHaveLength(0);
+
+    const retry = await runInbound(
+      { source: "linkedin", payload: LINKEDIN_REPLY_FIXTURE },
+      deps(store, { classifyFn: classify("interested") })
+    );
+    expect(retry.action).toBe("reply:interested");
+    expect(store.classifications).toHaveLength(1);
+    expect(store.notifications.some((n) => n.kind === "reply")).toBe(true);
+  });
+});
+
+describe("runInbound — responder freshness + thread hygiene", () => {
+  const bundle = (over: Partial<ResponderBundle> = {}): ResponderBundle => ({
+    campaignId: "camp1",
+    sendMode: "automatic",
+    lead: { firstName: "Ryan", lastName: "C", title: "VP Sales", companyName: "Northwind", industry: "SaaS" },
+    insights: { pain_points: [], triggers: [], motivations: [], value_angle: "", aha_moment: "", summary: "" },
+    context: { cta: "a quick intro" },
+    thread: [],
+    agentTurns: 0,
+    newestUnsentMessageCreatedAt: null,
+    lastAgentMessageAt: null,
+    humanHandled: false,
+    attribution: { experimentId: null, variant: null, strategy: {}, playbookVersion: null },
+    ...over,
+  });
+  const respondFn: InboundDeps["respondFn"] = async () => ({ message: "Happy to — quick look?", violations: [] });
+
+  it("a draft created AFTER the provider timestamp but BEFORE we ingested the reply was drafted blind — supersede it", async () => {
+    // reply sent 10:05:00, webhook lagged → ingested 10:20:00; a scripted touch drafted 10:10:00
+    // couldn't see it, so it must not be treated as the answer.
+    const store = makeStore({
+      findLinkedInAccountByProviderRef: async () => ({ id: "li", accountId: "acc1" }),
+      findLeadByLinkedInUrl: async () => ({ id: "lead1", campaignId: "camp1" }),
+      insertReply: async () => ({ id: "r1", created: true, createdAt: new Date("2026-06-12T10:20:00.000Z"), classified: false }),
+      getResponderBundle: async () => bundle({ newestUnsentMessageCreatedAt: new Date("2026-06-12T10:10:00.000Z") }),
+    });
+
+    const result = await runInbound(
+      { source: "linkedin", payload: LINKEDIN_REPLY_FIXTURE },
+      deps(store, { respondFn, now: () => new Date("2026-06-12T10:21:00.000Z") })
+    );
+
+    expect(result.action).toBe("reply:interested+responded");
+    expect(store.canceledSends).toContain("lead1");
+  });
+
+  it("asks for the bundle WITHOUT the incoming reply, so it isn't both thread history and `incoming`", async () => {
+    const store = makeStore({
+      findLinkedInAccountByProviderRef: async () => ({ id: "li", accountId: "acc1" }),
+      findLeadByLinkedInUrl: async () => ({ id: "lead1", campaignId: "camp1" }),
+      getResponderBundle: async () => bundle(),
+    });
+
+    await runInbound({ source: "linkedin", payload: LINKEDIN_REPLY_FIXTURE }, deps(store, { respondFn }));
+
+    expect(store.bundleRequests).toEqual([{ leadId: "lead1", opts: { excludeReplyId: "reply_1" } }]);
+  });
+});
+
+describe("runInbound — native human takeover (outbound echo)", () => {
+  const ECHO = {
+    event_id: "li_msg_own_1",
+    connected_account: LINKEDIN_ACCOUNT_REF,
+    event_type: "outbound_echo",
+    to_profile_url: "https://www.linkedin.com/in/ACoAA_PROSPECT",
+    from_provider_ref: "ACoAA_PROSPECT",
+    body: "Hi Ryan, jumping in personally here",
+    sent_at: "2026-06-12T10:05:00.000Z",
+  };
+  function storeForLead(over: Partial<InboundStore> = {}) {
+    return makeStore({
+      findLinkedInAccountByProviderRef: async () => ({ id: "li", accountId: "acc1" }),
+      findLeadByProviderRef: async () => ({ id: "lead1", campaignId: "camp1" }),
+      ...over,
+    });
+  }
+
+  it("a message the user typed in LinkedIn itself pauses the agent on that thread", async () => {
+    const store = storeForLead();
+    const result = await runInbound({ source: "linkedin", payload: ECHO }, deps(store));
+    expect(result).toEqual({ handled: true, action: "echo:human_takeover" });
+    expect(store.takeovers).toEqual([{ accountId: "acc1", leadId: "lead1", campaignId: "camp1" }]);
+    expect(store.replies).toHaveLength(0); // never a reply
+  });
+
+  it("our own send echoed back is ignored (no takeover)", async () => {
+    const seen: unknown[][] = [];
+    const store = storeForLead({
+      isOwnOutboundMessage: async (...args) => {
+        seen.push(args);
+        return true;
+      },
+    });
+    const result = await runInbound({ source: "linkedin", payload: ECHO }, deps(store));
+    expect(result).toEqual({ handled: true, action: "echo:own" });
+    expect(store.takeovers).toHaveLength(0);
+    expect(seen).toEqual([["acc1", "lead1", "li_msg_own_1", "Hi Ryan, jumping in personally here"]]);
+  });
+
+  it("an echo to someone who isn't a lead is ignored", async () => {
+    const store = storeForLead({ findLeadByProviderRef: async () => null });
+    const result = await runInbound({ source: "linkedin", payload: ECHO }, deps(store));
+    expect(result).toEqual({ handled: false, action: "no matching lead" });
+    expect(store.takeovers).toHaveLength(0);
   });
 });
