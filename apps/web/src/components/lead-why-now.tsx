@@ -1,6 +1,6 @@
 "use client";
 
-import { Radar, Zap } from "lucide-react";
+import { Radar } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   leadSignalLine,
@@ -51,7 +51,7 @@ export function WhyNowLine({ lead, className }: { lead: WhyNowLead; className?: 
       {isIntent ? (
         <Radar className="size-3 shrink-0" aria-hidden />
       ) : (
-        <Zap className="size-3 shrink-0 text-[var(--positive)]" aria-hidden />
+        <span className="size-1.5 shrink-0 rounded-full bg-[var(--acc)]" aria-hidden />
       )}
       {/* min-w-0 lets the flex item shrink so truncate actually clips inside fixed table cells */}
       <span className="min-w-0 truncate">{isIntent ? `In-market: ${signal}` : signal}</span>

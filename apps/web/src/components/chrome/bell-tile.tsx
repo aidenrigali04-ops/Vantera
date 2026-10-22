@@ -2,16 +2,7 @@
 
 import { useCallback, useId, useRef, useState } from "react";
 import Link from "next/link";
-import {
-  Bell,
-  CalendarCheck2,
-  CircleCheck,
-  Flame,
-  MessageSquare,
-  Snowflake,
-  UserRound,
-  type LucideIcon,
-} from "lucide-react";
+import { Bell, CalendarCheck2, CircleCheck, MessageSquare, Snowflake, TrendingUp, UserRound, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { markNotificationsRead } from "@/components/notifications/actions";
 import type { AppNotification } from "@/components/notifications/notifications-bell";
@@ -23,7 +14,7 @@ const KIND_ICON: Record<AppNotification["kind"], LucideIcon> = {
   reply: MessageSquare,
   converted: CircleCheck,
   exhausted: Snowflake,
-  hot_signal: Flame,
+  hot_signal: TrendingUp,
   needs_human: UserRound,
   meeting_booked: CalendarCheck2,
 };

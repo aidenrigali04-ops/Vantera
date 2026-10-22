@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { ArrowUpRight, Briefcase, MessageCircle, Rocket, type LucideIcon } from "lucide-react";
+import { ArrowUpRight, Banknote, Briefcase, MessageCircle, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { QueueRow, ReplyClass } from "@/lib/today/rows";
 
@@ -15,7 +15,7 @@ const SIGNAL_GLYPHS: Record<NonNullable<NonNullable<QueueRow["signal"]>["glyph"]
   briefcase: Briefcase,
   "message-circle": MessageCircle,
   "arrow-up-right": ArrowUpRight,
-  rocket: Rocket,
+  banknote: Banknote,
 };
 
 /** A prospect's initials square — 28px in rows, 40px in the peek. */

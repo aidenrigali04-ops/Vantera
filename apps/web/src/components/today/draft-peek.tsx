@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
-import { ArrowLeft, ArrowRight, Check, ExternalLink, Loader2, PenLine, Sparkles, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, ExternalLink, Loader2, PenLine, X } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { parseStyleFlags } from "./style-flags";
@@ -294,7 +294,7 @@ export function DraftPeek({
                   className="w-full resize-y rounded-[var(--r-square)] border border-[var(--line-strong)] bg-[var(--surface)] p-4 text-[14px] leading-[1.55] text-[var(--ink)] outline-none focus:shadow-[var(--focus-ring)]"
                 />
                 <div className="flex items-center gap-2">
-                  <button type="button" onClick={saveEdit} disabled={pending || over || !body.trim()} className="inline-flex h-9 items-center gap-2 rounded-[var(--r-btn)] bg-[var(--ink)] px-4 text-[14px] font-medium text-[var(--ink-fg)] disabled:opacity-40">
+                  <button type="button" onClick={saveEdit} disabled={pending || over || !body.trim()} className="inline-flex h-9 items-center gap-2 rounded-[var(--r-btn)] bg-[var(--acc)] px-4 text-[14px] font-semibold text-white disabled:opacity-40">
                     {pending ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" strokeWidth={1.75} />} Save
                   </button>
                   <button type="button" onClick={() => { setBody(row.body); setMode("read"); }} className="inline-flex h-9 items-center rounded-[var(--r-btn)] px-3 text-[14px] font-medium text-[var(--ink-mid)] ring-1 ring-[var(--line)] hover:bg-[var(--surface-2)]">
@@ -343,7 +343,7 @@ export function DraftPeek({
             </div>
           ) : (
             <div className="flex items-center gap-2">
-              <button type="button" onClick={approve} disabled={pending || mode === "edit"} className="inline-flex h-10 items-center gap-2 rounded-[var(--r-btn)] bg-[var(--ink)] px-4 text-[14px] font-medium text-[var(--ink-fg)] transition-colors hover:bg-[#1f1f23] disabled:opacity-40 focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]">
+              <button type="button" onClick={approve} disabled={pending || mode === "edit"} className="inline-flex h-10 items-center gap-2 rounded-[var(--r-btn)] bg-[var(--acc)] px-4 text-[14px] font-semibold text-white transition-colors hover:bg-[var(--acc-ink)] disabled:opacity-40 focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]">
                 {pending ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" strokeWidth={1.75} />}
                 Approve <kbd className="ml-1 rounded bg-[rgb(255_255_255/0.16)] px-1.5 font-mono text-[11px]">A</kbd>
               </button>
@@ -352,7 +352,7 @@ export function DraftPeek({
               </button>
               {row.styleFlags && (
                 <button type="button" onClick={fix} disabled={pending} className="inline-flex h-9 items-center gap-1.5 rounded-[var(--r-btn)] px-3 text-[14px] font-medium text-[var(--ink)] ring-1 ring-[var(--line)] hover:bg-[var(--surface-2)] disabled:opacity-40">
-                  <Sparkles className="size-4" strokeWidth={1.75} /> Fix <kbd className="font-mono text-[11px] text-[var(--ink-dim)]">G</kbd>
+                  <PenLine className="size-4" strokeWidth={1.75} /> Fix <kbd className="font-mono text-[11px] text-[var(--ink-dim)]">G</kbd>
                 </button>
               )}
               <button type="button" onClick={() => setMode("reject")} className="inline-flex h-9 items-center gap-1.5 rounded-[var(--r-btn)] px-3 text-[14px] font-medium text-[var(--ink-mid)] hover:bg-[var(--surface-2)]">

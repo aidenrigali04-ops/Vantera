@@ -3,7 +3,7 @@
 import { useState, useSyncExternalStore, useTransition } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { ArrowDown, Flame, Rows3, Search, SlidersHorizontal, Snowflake, Zap } from "lucide-react";
+import { ArrowDown, Rows3, Search, SlidersHorizontal, Snowflake, TrendingUp } from "lucide-react";
 import { PANEL_SURFACE, Eyebrow } from "@/components/ui/panel";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ScoreBadge, SourceBadge, WhyNowLine } from "@/components/lead-why-now";
@@ -127,7 +127,7 @@ function CoolingChip({ lead }: { lead: LeadRow }) {
   const cooling = coolingState(lead.status, latestReply(lead)?.received_at ?? null);
   if (!cooling) return null;
   return (
-    <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-500/12 px-2 py-0.5 text-[11px] font-medium text-amber-700 ring-1 ring-inset ring-amber-500/30 dark:text-amber-300">
+    <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-[var(--attention-tint)] px-2 py-0.5 text-[11px] font-medium text-[var(--attention)]">
       <Snowflake className="size-3" aria-hidden />
       {cooling.label}
     </span>
@@ -154,7 +154,7 @@ function HotNowStrip({
   return (
     <section className="mb-4" data-copilot="hot-leads">
       <div className="mb-2 flex items-center gap-1.5">
-        <Flame className="size-4 text-[var(--positive)]" aria-hidden />
+        <TrendingUp className="size-4 text-[var(--acc)]" strokeWidth={2} aria-hidden />
         <Eyebrow>Hot right now</Eyebrow>
         <span className="text-xs text-muted-foreground">— your strongest-fit prospects to work today</span>
       </div>
@@ -188,8 +188,8 @@ function HotNowStrip({
                 <p className="flex min-w-0 items-center gap-1 text-xs">
                   {signal ? (
                     <>
-                      <Zap className="size-3 shrink-0 text-[var(--positive)]" aria-hidden />
-                      <span className="min-w-0 truncate text-[var(--positive)]">{signal}</span>
+                      <span className="size-1.5 shrink-0 rounded-full bg-[var(--acc)]" aria-hidden />
+                      <span className="min-w-0 truncate text-[var(--ink-2)]">{signal}</span>
                     </>
                   ) : (
                     <span className="truncate text-muted-foreground">

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Bot, Sparkles, UserRound } from "lucide-react";
+import { PenLine } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
@@ -41,10 +41,7 @@ export function ConversationThread({ turns }: { turns: ThreadTurn[] }) {
             <p className="whitespace-pre-wrap">{t.text}</p>
             <p className="mt-1.5 flex flex-wrap items-center gap-2 text-[10.5px] text-muted-foreground">
               {t.role === "agent" ? (
-                <span className="inline-flex items-center gap-1">
-                  {t.manual ? <UserRound className="size-3" /> : <Bot className="size-3" />}
-                  {t.manual ? "You" : "Vera"}
-                </span>
+                <span className="font-medium">{t.manual ? "You" : "Vera"}</span>
               ) : (
                 <span>Them</span>
               )}
@@ -136,7 +133,7 @@ export function Composer({
             })
           }
         >
-          <Sparkles className="size-3.5" /> Draft with Vera
+          <PenLine className="size-3.5" /> Draft with Vera
         </Button>
         <Button
           size="sm"

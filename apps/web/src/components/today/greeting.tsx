@@ -71,7 +71,7 @@ export function FadedHairline({ className }: { className?: string }) {
   return (
     <div
       aria-hidden="true"
-      className={cn("h-px w-full bg-[var(--line)] [mask-image:linear-gradient(90deg,transparent,#000_25%)]", className)}
+      className={cn("h-px w-full bg-[var(--line)]", className)}
     />
   );
 }

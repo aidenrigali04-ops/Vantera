@@ -1,16 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import {
-  Bot,
-  CheckCircle2,
-  Flame,
-  Inbox,
-  PencilLine,
-  Send,
-  Users,
-  type LucideIcon,
-} from "lucide-react";
+import { CheckCircle2, Inbox, MessagesSquare, PencilLine, ScanSearch, Send, Users, type LucideIcon } from "lucide-react";
 import { Eyebrow, PANEL_SURFACE, RevealItem } from "@/components/ui/panel";
 import { cn } from "@/lib/utils";
 
@@ -72,7 +63,7 @@ export function LivePipeline(p: LivePipelineData) {
   const stages: Stage[] = [
     {
       key: "agent",
-      icon: Bot,
+      icon: ScanSearch,
       label: "Sourcing",
       value: 0,
       status: p.scoutLive ? "Live" : p.scoutDeployed ? "Paused" : "Off",
@@ -123,7 +114,7 @@ export function LivePipeline(p: LivePipelineData) {
     },
     {
       key: "active",
-      icon: p.won > 0 ? CheckCircle2 : Flame,
+      icon: p.won > 0 ? CheckCircle2 : MessagesSquare,
       label: "Live conversations",
       value: p.active,
       reached: p.active > 0 || p.sent > 0,

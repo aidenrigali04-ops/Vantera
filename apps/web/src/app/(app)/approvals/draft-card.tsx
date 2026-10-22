@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { toast } from "sonner";
-import { AlertTriangle, MessageSquare, Wand2 } from "lucide-react";
+import { AlertTriangle, MessageSquare, PenLine } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -90,16 +90,16 @@ export function DraftCard({ draft, compact = false }: { draft: DraftRow; compact
                 variant="outline"
                 disabled={busy !== null}
                 data-copilot="fix-draft"
-                className="h-6 gap-1 border-amber-500/40 bg-transparent px-2 text-xs text-amber-700 hover:bg-amber-500/15 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300"
+                className="h-6 gap-1 border-[var(--attention)]/30 bg-transparent px-2 text-xs text-[var(--attention)] hover:bg-[var(--attention-tint)] hover:text-[var(--attention)]"
               >
-                <Wand2 className="size-3" />
+                <PenLine className="size-3" />
                 {busy === "fix" ? "Fixing…" : "Fix"}
               </Button>
             </form>
           )}
         </div>
       )}
-      {notice && <p className="text-xs text-amber-700 dark:text-amber-400">{notice}</p>}
+      {notice && <p className="text-xs font-medium text-[var(--attention)]">{notice}</p>}
 
       {editing ? (
         <form

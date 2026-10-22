@@ -444,7 +444,7 @@ function RepliesTable({ rows, answeredThisWeek }: { rows: ReplyRow[]; answeredTh
               <Link
                 href={`/inbox?lead=${row.leadId}`}
                 aria-label={`Open thread with ${row.name}`}
-                className="ml-auto hidden size-8 place-items-center rounded-[var(--r-btn)] bg-[var(--ink)] text-[var(--ink-fg)] transition-colors hover:bg-[#1f1f23] group-hover:grid focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]"
+                className="ml-auto hidden size-8 place-items-center rounded-[var(--r-btn)] bg-[var(--acc)] text-white transition-colors hover:bg-[var(--acc-ink)] group-hover:grid focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]"
               >
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true">
                   <path d="M5 12h14M13 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
