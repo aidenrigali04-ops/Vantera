@@ -23,7 +23,7 @@ const CLEAN = {
   connection_note:
     "Dana, noticed Acme is hiring three SDRs at once. Scaling outbound that fast is a ride, happy to swap notes from the builder side.",
   followup_message:
-    "Thanks for connecting. When teams hire SDRs in batches, pipeline usually outruns ramp time. How are you keeping sourcing ahead of the new reps?",
+    "When teams hire SDRs in batches, pipeline usually outruns ramp time. How are you keeping sourcing ahead of the new reps?",
 };
 
 function textResponse(json: unknown) {
@@ -77,7 +77,7 @@ describe("validateLinkedInDraft", () => {
     const violations = validateLinkedInDraft(
       {
         connection_note: "Dana, saw Acme grew 40% last quarter, impressive.",
-        followup_message: "Thanks for connecting. Worth a quick look?",
+        followup_message: "Worth a quick look?",
       },
       leadBlock(INPUT),
     );
@@ -88,7 +88,7 @@ describe("validateLinkedInDraft", () => {
     const violations = validateLinkedInDraft(
       {
         connection_note: "Dana, congrats on the Series B.",
-        followup_message: "Thanks for connecting. How are you putting that capital to work?",
+        followup_message: "How are you putting that capital to work?",
       },
       leadBlock(INPUT),
     );
@@ -103,12 +103,12 @@ const SHAPE_DRAFTS: Record<MessageShape, { connection_note: string; followup_mes
   observation_question: {
     connection_note: "Your work in outbound stood out, glad to connect.",
     followup_message:
-      "Thanks for connecting. When pipeline leans on one person, sourcing eats the week. How are you splitting finding people from writing to them now?",
+      "When pipeline leans on one person, sourcing eats the week. How are you splitting finding people from writing to them now?",
   },
   trigger_consequence: {
     connection_note: "Saw the hiring push, glad to connect.",
     followup_message:
-      "Thanks for connecting. Saw you are hiring three reps. What bites is pipeline outrunning ramp, so new folks land with thin lists by month two. How are you keeping sourcing ahead of them? All good if timing is off.",
+      "Saw you are hiring three reps. What bites is pipeline outrunning ramp, so new folks land with thin lists by month two. How are you keeping sourcing ahead of them? All good if timing is off.",
   },
   provocation: {
     connection_note: "Glad to connect with a fellow outbound builder.",
@@ -118,7 +118,7 @@ const SHAPE_DRAFTS: Record<MessageShape, { connection_note: string; followup_mes
   gift: {
     connection_note: "Your work in outbound stood out, glad to connect.",
     followup_message:
-      "Thanks for connecting. One thing that helps teams like yours: when you sort replies by first line instead of subject, the openers that land jump out fast. Steal it, no ask here, just thought it was worth passing on.",
+      "One thing that helps teams like yours: when you sort replies by first line instead of subject, the openers that land jump out fast. Steal it, no ask here, just thought it was worth passing on.",
   },
   own_cold: {
     connection_note: "Glad to connect.",
@@ -254,11 +254,14 @@ describe("draftLinkedIn — byte-identical default (feature OFF by default)", ()
 // ── review I2: the LINKEDIN_SYSTEM base prompt is SHAPE-CONDITIONAL, so the OFF path is truly
 //    byte-identical (base prompt + hash) to before the message-shape feature existed. ──
 describe("LINKEDIN_SYSTEM — byte-identical base prompt when the feature is off (review I2)", () => {
-  // The FNV-1a 64-bit hash of the assembled LINKEDIN_SYSTEM text at commit c4261053~2 — the last
-  // revision BEFORE the message-shape feature added its two lines to the base prompt. Recovered from
-  // git and pinned here: if any shape/escape-hatch language leaks back into the BASE prompt, this
-  // hash shifts and this test fails (and every champion's stamped promptHash would silently drift).
-  const PRE_FEATURE_LINKEDIN_HASH = "85072182e5f97d23";
+  // The FNV-1a 64-bit hash of the assembled LINKEDIN_SYSTEM text. Originally the pre-message-shape
+  // revision (c4261053~2, "85072182e5f97d23"); DELIBERATELY re-pinned on 2026-10-21 by the
+  // copy-quality fix, which rewrote the default follow-up shape (open on the prospect-specific
+  // fact, never "Thanks for connecting"/"Curious how"; question about their world, not the seller's
+  // category; build on the note, don't repeat it). Any OTHER edit — in particular shape/escape-hatch
+  // language leaking into the BASE prompt — shifts this hash and fails here, so a champion's stamped
+  // promptHash can never drift silently. Re-pin only alongside an intentional prompt revision.
+  const PRE_FEATURE_LINKEDIN_HASH = "8a03268161956ddf";
 
   it("LINKEDIN_SYSTEM.hash equals the pre-feature hash (true old == new)", () => {
     expect(LINKEDIN_SYSTEM.hash).toBe(PRE_FEATURE_LINKEDIN_HASH);
@@ -268,8 +271,10 @@ describe("LINKEDIN_SYSTEM — byte-identical base prompt when the feature is off
 
   it("the base prompt carries the ORIGINAL default-shape line and NONE of the feature escape-hatch language", () => {
     expect(LINKEDIN_SYSTEM.text).toContain(
-      "- Shape: a brief thanks (3 to 6 words, not gushing), then ONE sharp observation"
+      "- Shape: open with the one specific thing from the block that is unique to THIS prospect"
     );
+    // the template the copy-quality fix retired must not come back into the base prompt
+    expect(LINKEDIN_SYSTEM.text).not.toContain("a brief thanks (3 to 6 words");
     // the two lines the feature had added to the base prompt must be gone from the base
     expect(LINKEDIN_SYSTEM.text).not.toContain("Default shape, UNLESS");
     expect(LINKEDIN_SYSTEM.text).not.toContain("Whatever the shape");
@@ -341,7 +346,7 @@ describe("validateLinkedInDraft — follow-up link guard", () => {
   it("rejects a link in the first follow-up (anti-pitch, soft ask)", () => {
     const violations = validateLinkedInDraft({
       connection_note: "Dana, clean note, no pitch.",
-      followup_message: "Thanks for connecting. See a demo: https://example.com/demo",
+      followup_message: "See a demo: https://example.com/demo",
     });
     expect(violations.some((v) => v.rule === "no-links")).toBe(true);
   });
@@ -352,7 +357,7 @@ describe("validateLinkedInDraft — de-pitched first touch (2026-07-08)", () => 
     const violations = validateLinkedInDraft(
       {
         connection_note: "Your PMO work in Doha stood out.",
-        followup_message: "Thanks for connecting. Vantera finds in-market buyers for you.",
+        followup_message: "Vantera finds in-market buyers for you.",
       },
       undefined,
       "Vantera"
@@ -363,7 +368,7 @@ describe("validateLinkedInDraft — de-pitched first touch (2026-07-08)", () => 
   it("flags a call/meeting ask in the first message — the question IS the CTA", () => {
     const violations = validateLinkedInDraft({
       connection_note: "Sharp take on churn.",
-      followup_message: "Thanks for connecting. Would a quick call make sense this week?",
+      followup_message: "Would a quick call make sense this week?",
     });
     expect(violations.some((v) => v.rule === "no-meeting-ask")).toBe(true);
   });
@@ -372,7 +377,7 @@ describe("validateLinkedInDraft — de-pitched first touch (2026-07-08)", () => 
     const violations = validateLinkedInDraft(
       {
         connection_note: "Your PMO work in Doha stood out.",
-        followup_message: "Thanks for connecting. When pipeline depends on you alone, what eats more hours: finding the right people or writing to them?",
+        followup_message: "When pipeline depends on you alone, what eats more hours: finding the right people or writing to them?",
       },
       undefined,
       "Vantera"
@@ -404,5 +409,80 @@ describe("why-now citation (ML-3)", () => {
     const out = await draftLinkedIn(INPUT, model);
     expect(model.doGenerateCalls).toHaveLength(1);
     expect(out.violations.some((v) => v.rule === "why-now-missing")).toBe(false);
+  });
+});
+
+// ── copy-quality fix (2026-10-21): kill the "Thanks for connecting. Curious how…" template ──
+describe("LINKEDIN_SYSTEM — prospect-first follow-up (copy-quality fix)", () => {
+  it("opens on the prospect-specific fact and bans the template first words", () => {
+    expect(LINKEDIN_SYSTEM.text).toContain("A short thanks is optional and never the first words");
+    expect(LINKEDIN_SYSTEM.text).toContain('Never start with "Thanks for connecting" or "Curious how"');
+  });
+
+  it("keeps the question in the prospect's world, not the seller's category", () => {
+    expect(LINKEDIN_SYSTEM.text).toContain("not about the seller's category (for example how they handle outbound or prospecting)");
+    expect(LINKEDIN_SYSTEM.text).toContain("ask about their own offering, in their own words");
+  });
+
+  it("tells the follow-up to build on the note, not repeat its fact", () => {
+    expect(LINKEDIN_SYSTEM.text).toContain("Do not repeat the connection note's fact");
+  });
+
+  it("stays dash-free prose (prompt prose primes output style)", () => {
+    const prose = LINKEDIN_SYSTEM.text.replace(/^- /gm, "");
+    expect(prose).not.toMatch(/[—–]|\s-\s/);
+  });
+});
+
+describe("validateLinkedInDraft — template + repeated openers (copy-quality fix)", () => {
+  it("flags a follow-up that opens with 'Thanks for connecting' or 'Curious how'", () => {
+    for (const followup_message of [
+      "Thanks for connecting, Dana. Three SDRs at once is a lot. How's ramp going?",
+      "Curious how you're keeping sourcing ahead of three new SDRs?",
+    ]) {
+      const rules = validateLinkedInDraft({ connection_note: CLEAN.connection_note, followup_message }).map((v) => v.rule);
+      expect(rules).toContain("template-opener");
+    }
+  });
+
+  it("flags a follow-up whose first five words repeat a recent skeleton, even with a different name", () => {
+    const rules = validateLinkedInDraft(
+      { connection_note: CLEAN.connection_note, followup_message: "Three SDRs at once, Dana, is a lot. How's ramp going?" },
+      undefined,
+      null,
+      null,
+      null,
+      "Dana Reed Acme",
+      ["three sdrs at once is"]
+    ).map((v) => v.rule);
+    expect(rules).toContain("repeated-opener");
+  });
+
+  it("passes when no recent skeleton matches", () => {
+    expect(validateLinkedInDraft(CLEAN, undefined, null, null, null, "Dana Acme", ["thanks for connecting curious how"])).toEqual([]);
+  });
+});
+
+describe("draftLinkedIn — repeated opener feeds the bounded regenerate (copy-quality fix)", () => {
+  it("regenerates when the follow-up repeats a recent skeleton, and never puts skeletons in the prompt", async () => {
+    const seen: string[] = [];
+    const responses = [
+      textResponse({ ...CLEAN, followup_message: "When teams hire SDRs in batches, ramp lags. How are you pacing it?" }),
+      textResponse({ ...CLEAN, followup_message: "Three SDRs at once is a big class. What slows new reps down most?" }),
+    ];
+    let call = 0;
+    const model = new MockLanguageModelV3({
+      doGenerate: async (options: { prompt: unknown }) => {
+        seen.push(JSON.stringify(options.prompt));
+        return responses[Math.min(call++, responses.length - 1)]!;
+      },
+    });
+    const SKEL = "when teams hire sdrs in";
+    const out = await draftLinkedIn({ ...INPUT, context: { ...INPUT.context, avoidSkeletons: [SKEL] } }, model);
+    expect(seen).toHaveLength(2);
+    expect(seen[1]).toContain("repeated-opener");
+    expect(seen[0]).not.toContain(SKEL);
+    expect(out.violations).toEqual([]);
+    expect(out.followupMessage).toMatch(/^Three SDRs/);
   });
 });

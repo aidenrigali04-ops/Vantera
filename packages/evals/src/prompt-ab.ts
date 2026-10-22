@@ -91,7 +91,7 @@ export function exemplarBlock(winningExemplars?: string[]): string {
   const exemplars = (winningExemplars ?? []).map((e) => e.trim()).filter(Boolean);
   if (exemplars.length === 0) return "";
   return [
-    `These openers from this account earned interested replies from similar prospects. Use them ONLY as a guide for the angle and energy that works here. Write a fresh message for THIS prospect: do not copy or lightly rephrase any of them, and never borrow their specific numbers, names, or claims:`,
+    `These openers from this account earned interested replies from similar prospects. Reuse the angle (what it referenced), never its first words or sentence structure. Write a fresh message for THIS prospect: do not copy or lightly rephrase any of them, and never borrow their specific numbers, names, or claims:`,
     ...exemplars.map((e) => `- "${e}"`),
   ].join("\n");
 }

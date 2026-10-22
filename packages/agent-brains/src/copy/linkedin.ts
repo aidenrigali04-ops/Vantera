@@ -2,7 +2,8 @@ import { generateObject, type LanguageModel } from "ai";
 import { z } from "zod";
 import { getModel, registerPrompt } from "@vantera/ai";
 import { findMissingWhyNow, type WhyNow } from "./why-now";
-import { validateHumanity, findUngroundedClaims, findUngroundedEntities, normalizeDashes, type Violation } from "./humanizer";
+import { validateHumanity, findUngroundedClaims, findUngroundedEntities, findTemplateOpener, normalizeDashes, type Violation } from "./humanizer";
+import { findRepeatedOpener } from "./opener";
 import { avoidBlock, exemplarBlock, generateHumanized, leadBlock, strategyDirectives, PROSPECT_ACCURACY_RULE, VOICE_RULES, type DraftInput } from "./shared";
 import { FACT_ASSERTING_SHAPES, groundingHasShapeSignal, shapeBudget, type MessageShape } from "./shape";
 
@@ -47,7 +48,9 @@ Connection note, under ${CONNECTION_NOTE_MAX_CHARS} characters:
 
 Follow-up message: one or two short sentences, aim for about 120 characters and never exceed ${FOLLOWUP_MAX_CHARS} (about ${FOLLOWUP_MAX_WORDS} words). Shorter always wins. This is the FIRST real exchange, and buyers delete anything long or anything that opens with a pitch, so:
 - Do NOT name the seller's company or product. Do NOT list features or describe what the seller does. Do NOT ask for a call, meeting, or demo. All of that comes later, after they engage.
-- Shape: a brief thanks (3 to 6 words, not gushing), then ONE sharp observation about THEIR situation and ONE genuinely curious question about how they handle it today. The question is the whole CTA, so make it easy and interesting to answer.
+- Shape: open with the one specific thing from the block that is unique to THIS prospect (their why now, their trigger, or what they do), then ask ONE question that only makes sense for them. The question is the whole CTA, so make it easy and interesting to answer. A short thanks is optional and never the first words. Never start with "Thanks for connecting" or "Curious how".
+- The question must be about something in their world that the block names (their trigger, their why now, or what they do), not about the seller's category (for example how they handle outbound or prospecting) unless the block shows that is their stated problem. If the block has nothing specific, ask about their own offering, in their own words.
+- Do not repeat the connection note's fact. The follow-up builds on it: what it means for them, or the question it raises.
 - The "CTA goal" in the block only tells you where the conversation should eventually head. It must NOT appear as an ask in this message.
 - If the prospect's location strongly implies a primary language other than English, writing in that language is welcome.
 
@@ -77,6 +80,8 @@ export function validateLinkedInDraft(
   shape?: MessageShape | null,
   whyNow?: WhyNow | null,
   identity?: string | null,
+  /** recent opener skeletons (account sends + exemplars + this run) — code-enforced anti-repeat */
+  avoidSkeletons?: readonly string[] | null,
 ): Violation[] {
   const budget = shapeBudget(shape);
   const violations = [
@@ -86,6 +91,10 @@ export function validateLinkedInDraft(
   if (/https?:\/\//i.test(draft.connection_note)) {
     violations.push({ rule: "no-links", detail: "no links in a connection note" });
   }
+  // Copy-quality fix (2026-10-21): the follow-up must open on THIS prospect, never on the stock
+  // "Thanks for connecting / Curious how" template, and never on a recent message's first words.
+  violations.push(...findTemplateOpener(draft.followup_message));
+  violations.push(...findRepeatedOpener(draft.followup_message, avoidSkeletons, identity));
   // ML-3: a verified why-now is the reason to reach out — the note must reference it.
   violations.push(...findMissingWhyNow(draft.connection_note, whyNow, identity));
   // The first follow-up is a soft, human ask — a raw link makes it read like a pitch (content is
@@ -163,7 +172,8 @@ export async function draftLinkedIn(
         followup_message: normalizeDashes(obj.followup_message),
       };
     },
-    (draft) => validateLinkedInDraft(draft, block, input.context.accountName, shape, input.lead.whyNow, leadIdentity(input.lead))
+    (draft) =>
+      validateLinkedInDraft(draft, block, input.context.accountName, shape, input.lead.whyNow, leadIdentity(input.lead), input.context.avoidSkeletons)
   );
   return {
     connectionNote: output.connection_note,

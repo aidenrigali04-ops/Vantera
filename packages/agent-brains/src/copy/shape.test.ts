@@ -341,3 +341,12 @@ describe("isNoSignalToken — placeholder trigger predicate (review I3)", () => 
     }
   });
 });
+
+describe("SHAPE_DIRECTIVE.observation_question (copy-quality fix)", () => {
+  it("mirrors the base prompt: prospect-specific fact first, thanks optional and never first", async () => {
+    const { SHAPE_DIRECTIVE } = await import("./shape");
+    expect(SHAPE_DIRECTIVE.observation_question).toContain("unique to this prospect");
+    expect(SHAPE_DIRECTIVE.observation_question).toContain("A thanks is optional and never the first words");
+    expect(SHAPE_DIRECTIVE.observation_question).not.toMatch(/^A brief thanks/);
+  });
+});

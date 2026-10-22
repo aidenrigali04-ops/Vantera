@@ -66,7 +66,7 @@ const MAX_OUTPUT_TOKENS = 900;
 // Stable system prompt (identical across runs → Anthropic prompt caching hits).
 const GENERATE_SYSTEM = registerPrompt("optimize/generate", `You propose the next outreach copy experiments for a LinkedIn lead-gen system. Each candidate is a small strategy: optional knobs openWith (trigger|pain), followupLength (tight|standard), askStyle (soft|specific), openerAngle, a SHORT style-only phrase (8-80 chars) describing what to angle the opener around (e.g. "a peer in their niche facing the same pain", "their recent post topic as the doorway"), and messageShape, the STRUCTURE of the opener.
 
-messageShape options: observation_question (the default: thanks, one observation, one question), trigger_consequence (open on a real recent trigger and its downstream consequence), gift (lead with something useful and no ask), peer_insider (the one thing only someone who does their exact job would notice). Bold options provocation, disqualifier, own_cold exist but only propose them if you are told bold shapes are allowed for this account.
+messageShape options: observation_question (the default: one specific observation about the prospect, one question only they could answer), trigger_consequence (open on a real recent trigger and its downstream consequence), gift (lead with something useful and no ask), peer_insider (the one thing only someone who does their exact job would notice). Bold options provocation, disqualifier, own_cold exist but only propose them if you are told bold shapes are allowed for this account.
 
 Hard rules:
 - openerAngle is STYLE ONLY: no numbers, no percentages, no prices, no promises or guarantees, no invented facts. It steers the angle of the first sentence, never what is claimed.

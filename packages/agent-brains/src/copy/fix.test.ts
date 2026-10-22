@@ -118,7 +118,7 @@ describe("fixLinkedInDraft — automatic-send first-touch fix", () => {
     const model = new MockLanguageModelV3({
       doGenerate: textResponse({
         connection_note: "Congrats on the Series A, Ryan. Sharp timing to grow the team.",
-        followup_message: "Thanks for connecting. Curious how you qualify leads before reps dig in, open to comparing notes?",
+        followup_message: "How do you qualify leads before reps dig in? Open to comparing notes.",
       }),
     });
     const out = await fixLinkedInDraft(
@@ -166,7 +166,7 @@ describe("fixLinkedInDraft — automatic-send first-touch fix", () => {
     const model = new MockLanguageModelV3({
       doGenerate: textResponse({
         connection_note: "Ryan, glad to connect from the builder side.",
-        followup_message: "Thanks for connecting. Curious how you keep sourcing ahead of the team as it grows, no worries if the timing is off.",
+        followup_message: "How do you keep sourcing ahead of the team as it grows? No worries if the timing is off.",
       }),
     });
     const out = await fixLinkedInDraft(
