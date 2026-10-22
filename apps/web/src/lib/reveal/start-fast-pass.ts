@@ -15,9 +15,9 @@ import { createServiceClient } from "@/lib/supabase/service";
 export async function maybeStartFastPass(accountId: string): Promise<{ started: boolean }> {
   const supabase = await createClient();
 
-  // Preconditions (RLS reads): an onboarding ICP, a usable LinkedIn connection, and a
-  // journey still in progress. Anything missing → not our moment; the gate handles routing.
-  const [{ data: account }, { data: icp }, { data: li }] = await Promise.all([
+  // Preconditions (RLS reads): an onboarding ICP and a journey still in progress. No
+  // LinkedIn connection is required — the fast pass runs before connect/pay. Anything missing → not our moment; the gate handles routing.
+  const [{ data: account }, { data: icp }] = await Promise.all([
     supabase
       .from("accounts")
       .select("id, onboarding_completed_at")
@@ -30,15 +30,8 @@ export async function maybeStartFastPass(accountId: string): Promise<{ started: 
       .eq("source", "onboarding")
       .limit(1)
       .maybeSingle<{ id: string }>(),
-    supabase
-      .from("linkedin_accounts")
-      .select("id")
-      .eq("account_id", accountId)
-      .in("status", ["connecting", "active"])
-      .limit(1)
-      .maybeSingle<{ id: string }>(),
   ]);
-  if (!account || account.onboarding_completed_at != null || !icp || !li) {
+  if (!account || account.onboarding_completed_at != null || !icp) {
     return { started: false };
   }
 
@@ -88,4 +81,25 @@ export async function maybeStartFastPass(accountId: string): Promise<{ started: 
     { concurrencyKey: accountId }
   );
   return { started: true };
+}
+
+/**
+ * Drop the account's reveal_runs row so the next maybeStartFastPass inserts fresh
+ * (e.g. the owner changed their ICP and wants a new pass). Service role — the table has
+ * no client write policy. `accountId` MUST come from the caller's session (rule 02).
+ */
+export async function resetRevealRun(accountId: string): Promise<void> {
+  // Never trust the caller's id: confirm the session can see this in-progress account (RLS).
+  const supabase = await createClient();
+  const { data: account } = await supabase
+    .from("accounts")
+    .select("id")
+    .eq("id", accountId)
+    .is("onboarding_completed_at", null)
+    .maybeSingle<{ id: string }>();
+  if (!account) return;
+
+  const svc = createServiceClient();
+  const { error } = await svc.from("reveal_runs").delete().eq("account_id", accountId);
+  if (error) throw new Error("reveal reset failed");
 }
