@@ -62,9 +62,9 @@ export function WhyNowLine({ lead, className }: { lead: WhyNowLead; className?: 
 // Score tiers on the same positive→amber ramp: hot gets the filled tint, strong just the ring,
 // "look" steps to amber (caution), unscored is muted. No glow — the tint + the number carry it.
 const SCORE_BADGE_CLASS: Record<ScoreTier, string> = {
-  hot: "bg-[var(--positive-tint)] text-[var(--positive)] ring-1 ring-inset ring-[var(--positive-line)]",
-  strong: "text-[var(--positive)] ring-1 ring-inset ring-[var(--positive-line)]",
-  look: "bg-amber-500/10 text-amber-700 ring-1 ring-inset ring-amber-500/25",
+  hot: "bg-[var(--acc-tint)] text-[var(--acc-ink)]",
+  strong: "bg-[var(--positive-tint)] text-[var(--positive)]",
+  look: "bg-[var(--attention-tint)] text-[var(--attention)]",
   unscored: "text-muted-foreground/60",
 };
 
@@ -75,7 +75,7 @@ export function ScoreBadge({ score, withVerdict = false }: { score: number | nul
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-md px-2 py-0.5 font-mono text-xs font-semibold tabular-nums",
+        "inline-flex items-center rounded-full px-2.5 py-0.5 font-mono text-xs font-semibold tabular-nums",
         SCORE_BADGE_CLASS[tier]
       )}
     >

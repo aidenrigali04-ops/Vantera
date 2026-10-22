@@ -4,6 +4,7 @@ import Link from "next/link";
 import { TopChrome } from "@/components/chrome";
 import { TodayClient } from "@/app/(app)/today/today-client";
 import { Wash } from "@/components/today";
+import { landingFont } from "@/components/landing/font";
 import { PREVIEW_STATES, type PreviewStateKey } from "./fixtures";
 
 const noop = async () => {};
@@ -18,7 +19,7 @@ const noopEngine = async () => ({});
 export function PreviewClient({ state, tab }: { state: PreviewStateKey; tab: "queue" | "replies" | "activity" }) {
   const view = PREVIEW_STATES[state];
   return (
-    <div className="app-surface relative min-h-screen bg-[var(--canvas)] pb-24 lg:pb-0">
+    <div className={`app-surface ${landingFont.variable} relative min-h-screen bg-[var(--canvas)] pb-24 lg:pb-0`}>
       <Wash />
       <TopChrome
         workspaceName="Vantera"

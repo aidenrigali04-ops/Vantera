@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
 import { AgentCard, type AgentRow } from "./agent-card";
 import { agentAttention, type AgentRunRow } from "./agent-health";
+import { PageHeader } from "@/components/app/surface";
 
 export const metadata = { title: "Playbook" };
 
@@ -86,21 +87,20 @@ export default async function AgentsPage({
   return (
     // One-screen on desktop: the page never scrolls — content scrolls in its own region.
     <div className="mx-auto flex w-full min-w-0 max-w-[1400px] flex-col lg:min-h-0 lg:flex-1">
-      <div className="mb-6 shrink-0 border-b border-[var(--hairline)] pb-5">
-        <h1 className="text-2xl font-semibold tracking-tight">Playbook</h1>
-        <p className="mt-1.5 text-sm text-muted-foreground">
-          Set it up once. Vera finds and qualifies the right people on LinkedIn, turns every
-          qualified prospect into a conversation — and gets smarter every week, starting from
-          proven plays.{" "}
-          {/* T4: the page that makes the learning claim now links to its proof. */}
-          <Link
-            href="/dashboard?view=analytics"
-            className="inline-flex items-center gap-1 font-medium text-[var(--cyan-strong)] underline-offset-4 hover:underline"
-          >
-            See what Vera&apos;s learning <ArrowRight className="size-3.5" />
-          </Link>
-        </p>
-      </div>
+      <PageHeader
+        className="mb-6"
+        title="Playbook"
+        subtitle="Set it up once. Vera finds and qualifies the right people on LinkedIn, turns every qualified prospect into a conversation — and gets smarter every week, starting from proven plays."
+      >
+        {/* T4: the page that makes the learning claim links to its proof. */}
+        <Link
+          href="/dashboard?view=analytics"
+          className="group inline-flex h-9 items-center gap-1.5 rounded-[var(--r-btn)] border border-[var(--line)] bg-[var(--surface)] px-3.5 text-sm font-medium text-[var(--ink)] shadow-[var(--shadow-tile)] transition-colors hover:bg-[var(--surface-2)]"
+        >
+          See what Vera&apos;s learning
+          <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" />
+        </Link>
+      </PageHeader>
 
       <div className="min-h-0 flex-1 lg:overflow-y-auto">
 

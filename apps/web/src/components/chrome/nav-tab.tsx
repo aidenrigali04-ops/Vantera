@@ -26,10 +26,12 @@ export function NavTab({ href, label, active, badge }: NavTabProps) {
       aria-current={active ? "page" : undefined}
       className={cn(
         // --r-chip (6px), not --r-btn: concentric inside the 10px pill's 4px inset.
-        "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-[var(--r-chip)] px-3.5 text-sm font-medium text-[var(--fb)]",
+        "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-[var(--r-pill)] px-3.5 text-[13.5px] font-medium",
         CHROME_MOTION,
         CHROME_FOCUS,
-        active ? "bg-[var(--fb)] font-semibold text-white" : "hover:bg-[rgb(24_119_242_/_0.08)]"
+        active
+          ? "bg-[var(--surface)] font-semibold text-[var(--acc)] shadow-[0_1px_2px_rgba(12,16,26,0.08)]"
+          : "text-[var(--ink-mid)] hover:text-[var(--ink)]"
       )}
     >
       <span className="grid justify-items-center">
@@ -41,8 +43,8 @@ export function NavTab({ href, label, active, badge }: NavTabProps) {
       {badgeText && (
         <span
           className={cn(
-            "inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-[var(--r-pill)] px-1 font-mono text-xs font-medium leading-none",
-            active ? "bg-white text-[var(--fb)]" : "bg-[rgb(24_119_242_/_0.1)] text-[var(--fb)]"
+            "inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-[var(--r-pill)] px-1.5 font-mono text-[11px] font-semibold leading-none",
+            active ? "bg-[var(--acc-tint)] text-[var(--acc-ink)]" : "bg-[var(--surface)] text-[var(--ink-mid)] ring-1 ring-[var(--line)]"
           )}
         >
           {badgeText}

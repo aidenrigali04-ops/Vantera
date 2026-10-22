@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { signOut } from "./actions";
 import { pauseEngine, resumeEngine } from "./engine-actions";
 import { TopChrome } from "@/components/chrome";
+import { landingFont } from "@/components/landing/font";
 import { Wash } from "@/components/today";
 import { workspaceIconCandidates } from "@/lib/workspace-icon";
 import type { AppNotification } from "@/components/notifications/notifications-bell";
@@ -255,7 +256,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div
-      className={`app-surface relative flex flex-col bg-[var(--canvas)] ${
+      className={`app-surface ${landingFont.variable} relative flex flex-col bg-[var(--canvas)] ${
         oneScreen ? "min-h-screen lg:h-dvh lg:max-h-dvh" : "min-h-screen"
       }`}
     >

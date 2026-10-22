@@ -73,8 +73,8 @@ export function DraftCard({ draft, compact = false }: { draft: DraftRow; compact
   const content = (
     <div className="space-y-3">
       {draft.style_flags && (
-        <div className="flex items-start justify-between gap-3 rounded-md bg-amber-500/10 px-2.5 py-1.5">
-          <p className="flex items-start gap-1.5 text-xs text-amber-700 dark:text-amber-400">
+        <div className="flex items-start justify-between gap-3 rounded-[var(--r-btn)] bg-[var(--attention-tint)] px-3 py-2">
+          <p className="flex items-start gap-1.5 text-xs font-medium text-[var(--attention)]">
             <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
             Style check: {draft.style_flags}
           </p>
@@ -122,7 +122,7 @@ export function DraftCard({ draft, compact = false }: { draft: DraftRow; compact
           </div>
         </form>
       ) : (
-        <div className="rounded-md border border-border bg-muted/30 p-3 text-sm">
+        <div className="rounded-[14px] rounded-br-[4px] bg-[#eef4fe] px-4 py-3 text-[13.5px] leading-relaxed text-[var(--ink-2)]">
           {draft.subject && <p className="mb-1 font-medium">{draft.subject}</p>}
           <p className="whitespace-pre-wrap">{draft.body}</p>
         </div>

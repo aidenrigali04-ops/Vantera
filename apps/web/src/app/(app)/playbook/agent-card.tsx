@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useActionState, useRef } from "react";
-import { Settings2 } from "lucide-react";
+import { Radar, ScanSearch, Send, Settings2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Panel, Eyebrow } from "@/components/ui/panel";
@@ -11,6 +11,13 @@ import { setAgentStatus, updateSendMode, type AgentActionState } from "./actions
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { RunNowButton } from "./run-now";
 import { runLine, type AgentRunRow } from "./agent-health";
+
+/* Each agent gets the landing's pastel icon tile (components/landing/frame.tsx TONES). */
+const KIND_TILE = {
+  scout: { icon: ScanSearch, className: "bg-[#dbe9fd] text-[#1461d1]" },
+  copy: { icon: Send, className: "bg-[#d5efdf] text-[#13824a]" },
+  intent: { icon: Radar, className: "bg-[#e2defb] text-[#5b4bd1]" },
+} as const;
 
 export type AgentRow = {
   id: string;
@@ -81,6 +88,15 @@ export function AgentCard({
   return (
     <Panel index={index} interactive className="flex flex-col gap-4">
       <div className="flex items-start justify-between gap-2">
+        <div className="flex items-start gap-3">
+        {(() => {
+          const tile = KIND_TILE[agent.kind];
+          return (
+            <span className={`grid size-10 shrink-0 place-items-center rounded-[var(--r-tile)] ${tile.className}`}>
+              <tile.icon className="size-[18px]" strokeWidth={2} aria-hidden />
+            </span>
+          );
+        })()}
         <div className="flex flex-col gap-1.5">
           <Eyebrow>{roleLabel}</Eyebrow>
           <h3 className="font-heading flex items-center gap-2 text-lg font-semibold tracking-tight">
@@ -92,18 +108,23 @@ export function AgentCard({
             </Link>
             {/* T4: a live-but-stalled agent shows amber "Needs attention", never a green lie. */}
             <span
-              className={`inline-flex items-center gap-1.5 text-xs font-medium ${
-                live ? (attention ? "text-amber-700" : "text-[var(--cyan-strong)]") : "text-muted-foreground"
+              className={`inline-flex h-6 items-center gap-1.5 rounded-full border px-2.5 text-xs font-medium tracking-normal ${
+                live
+                  ? attention
+                    ? "border-transparent bg-[var(--attention-tint)] text-[var(--attention)]"
+                    : "border-[var(--line)] bg-[var(--surface)] text-[var(--ink-mid)]"
+                  : "border-[var(--line)] bg-[var(--surface-2)] text-[var(--ink-dim)]"
               }`}
             >
               <span
-                className={`size-2 rounded-full ${
-                  live ? (attention ? "bg-amber-500" : "bg-[var(--fb)]") : "bg-muted-foreground/40"
+                className={`size-1.5 rounded-full ${
+                  live ? (attention ? "bg-[var(--attention)]" : "bg-[#13a05a]") : "bg-[var(--ink-dim)]/50"
                 }`}
               />
               {live ? (attention ? "Needs attention" : "Live") : agent.status === "paused" ? "Paused" : "Draft"}
             </span>
           </h3>
+        </div>
         </div>
         <div className="flex items-center gap-1">
           {agent.kind !== "intent" && (
@@ -127,7 +148,7 @@ export function AgentCard({
       </div>
 
       {attention && (
-        <p className="rounded-xl bg-amber-500/10 px-3 py-2 text-xs leading-relaxed text-amber-800 ring-1 ring-inset ring-amber-500/25">
+        <p className="rounded-[var(--r-btn)] bg-[var(--attention-tint)] px-3 py-2 text-xs font-medium leading-relaxed text-[var(--attention)]">
           {attention}
         </p>
       )}

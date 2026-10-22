@@ -230,7 +230,7 @@ function QueueTable({
               <Avatar initials={row.initials} />
               <span className="min-w-0 flex-1">
                 <span className="flex items-baseline gap-2">
-                  <span className="min-w-0 flex-1 truncate text-[14px] font-medium text-[var(--ink)]">{row.name}</span>
+                  <span className="min-w-0 flex-1 truncate text-[14px] font-semibold text-[var(--ink)]">{row.name}</span>
                   {row.score !== null ? <ScoreChip score={row.score} /> : null}
                 </span>
                 <span className="mt-0.5 block truncate text-[13px] text-[var(--ink-dim)]">{row.context}</span>
@@ -296,7 +296,7 @@ function QueueTable({
                   <div className="flex items-center gap-3">
                     <Avatar initials={row.initials} />
                     <span className="min-w-0">
-                      <span className="block truncate text-[14px] font-medium text-[var(--ink)]">{row.name}</span>
+                      <span className="block truncate text-[14px] font-semibold text-[var(--ink)]">{row.name}</span>
                       <span className="block truncate text-[13px] text-[var(--ink-dim)]">{row.context}</span>
                     </span>
                   </div>
@@ -381,7 +381,7 @@ function RepliesTable({ rows, answeredThisWeek }: { rows: ReplyRow[]; answeredTh
               <Avatar initials={row.initials} />
               <span className="min-w-0 flex-1">
                 <span className="flex items-baseline gap-2">
-                  <span className="min-w-0 flex-1 truncate text-[14px] font-medium text-[var(--ink)]">{row.name}</span>
+                  <span className="min-w-0 flex-1 truncate text-[14px] font-semibold text-[var(--ink)]">{row.name}</span>
                   <span className="shrink-0 font-mono text-[12px] text-[var(--ink-dim)]">{row.received}</span>
                 </span>
                 <span className="mt-0.5 block truncate text-[13px] text-[var(--ink)]">{row.excerpt}</span>
@@ -421,7 +421,7 @@ function RepliesTable({ rows, answeredThisWeek }: { rows: ReplyRow[]; answeredTh
               <Link href={`/inbox?lead=${row.leadId}`} className="flex items-center gap-3 focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]">
                 <Avatar initials={row.initials} />
                 <span className="min-w-0">
-                  <span className="block truncate text-[14px] font-medium text-[var(--ink)]">{row.name}</span>
+                  <span className="block truncate text-[14px] font-semibold text-[var(--ink)]">{row.name}</span>
                   {row.company ? <span className="block truncate text-[13px] text-[var(--ink-dim)]">{row.company}</span> : null}
                 </span>
               </Link>

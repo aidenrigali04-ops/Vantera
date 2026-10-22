@@ -20,12 +20,12 @@ export type AvatarTileProps = {
  * specificity beats the component's own single-class utilities.
  */
 const ACCOUNT_MENU_RESTYLE = [
-  // trigger → 40px surface tile, mono initials
-  "[&>div>button]:size-10 [&>div>button]:rounded-[var(--r-tile)] [&>div>button]:bg-[var(--surface)]",
-  "[&>div>button]:font-mono [&>div>button]:text-xs [&>div>button]:font-semibold [&>div>button]:text-[var(--fb)]",
+  // trigger → 36px round initials chip, the landing replica's avatar
+  "[&>div>button]:size-9 [&>div>button]:rounded-full [&>div>button]:bg-[#e8ebf0]",
+  "[&>div>button]:text-[11px] [&>div>button]:font-semibold [&>div>button]:text-[var(--ink-2)]",
   "[&>div>button]:ring-1 [&>div>button]:ring-[var(--line)] [&>div>button]:shadow-[var(--shadow-tile)]",
   "[&>div>button]:transition-[color,background-color,box-shadow] [&>div>button]:duration-120 [&>div>button]:ease-out",
-  "[&>div>button:hover]:bg-[var(--surface)] [&>div>button:hover]:ring-[var(--line-strong)]",
+  "[&>div>button:hover]:bg-[#dfe3e9] [&>div>button:hover]:ring-[var(--line-strong)]",
   "[&>div>button:focus-visible]:outline-none [&>div>button:focus-visible]:ring-1 [&>div>button:focus-visible]:ring-[var(--line)] [&>div>button:focus-visible]:shadow-[var(--focus-ring)]",
   // menu → below-right, Today panel tokens
   "[&>div>div]:bottom-auto [&>div>div]:left-auto [&>div>div]:right-0 [&>div>div]:top-full [&>div>div]:ml-0 [&>div>div]:mt-2",
@@ -36,7 +36,7 @@ const ACCOUNT_MENU_RESTYLE = [
   "[&_[role=menuitem]:focus-visible]:outline-none [&_[role=menuitem]:focus-visible]:shadow-[var(--focus-ring)]",
 ].join(" ");
 
-/** 40×40 tile showing the person's initials; opens the existing account menu below-right. */
+/** 36px round chip showing the person's initials; opens the existing account menu below-right. */
 export function AvatarTile({ initial, displayName, email, signOut, className }: AvatarTileProps & { className?: string }) {
   return (
     <div className={cn("relative shrink-0", ACCOUNT_MENU_RESTYLE, className)}>

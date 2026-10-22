@@ -97,15 +97,15 @@ export function BellTile({ notifications, className }: { notifications: AppNotif
         title="Notifications"
         className={cn(
           CHROME_TILE,
-          "relative text-[var(--fb)] hover:text-[var(--fb)]",
-          open && "text-[var(--fb)] ring-[var(--line-strong)]"
+          "relative",
+          open && "bg-[var(--surface-2)] text-[var(--ink)] ring-[var(--line-strong)]"
         )}
       >
-        <Bell className="size-4.5" strokeWidth={1.75} aria-hidden="true" />
+        <Bell className="size-4" strokeWidth={2} aria-hidden="true" />
         {unread > 0 && (
           <span
             aria-hidden="true"
-            className="absolute -right-1 -top-1 grid h-[18px] min-w-[18px] place-items-center rounded-[var(--r-pill)] bg-[var(--ink)] px-1 font-mono text-[10px] font-semibold leading-none text-[var(--ink-fg)] ring-2 ring-[var(--surface)]"
+            className="absolute -right-1 -top-1 grid h-[18px] min-w-[18px] place-items-center rounded-[var(--r-pill)] bg-[var(--acc)] px-1 font-mono text-[10px] font-semibold leading-none text-white ring-2 ring-[var(--surface)]"
           >
             {unread > 9 ? "9+" : unread}
           </span>
