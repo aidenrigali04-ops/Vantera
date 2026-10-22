@@ -38,7 +38,6 @@ const CONFIGS = {
   revealStatus: { tokens: 60, window: "60 s" as Window },
   // Onboarding favicon peek — per user id; one guarded fetch per URL blur.
   faviconPeek: { tokens: 20, window: "60 s" as Window },
-  // Onboarding "redraft my buyers" — per user id; each click is an LLM call.
 } as const;
 
 export type LimitName = keyof typeof CONFIGS;

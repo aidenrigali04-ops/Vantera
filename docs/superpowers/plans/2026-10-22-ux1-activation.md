@@ -10,6 +10,29 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-21-activation-ux-gojiberry-gap-design.md` §0, §1, §3.1, §3.2, §3.7, §3.8 (one-home + events), §5 "UX-1", §7 decisions 1–3 and 6 taken as recommended.
 
+## Re-scope (owner decision, 2026-10-22): onboarding is frozen
+
+The owner ruled mid-execution that **the onboarding flow must not be touched**. Everything under `apps/web/src/app/onboarding/**`, `lib/auth/onboarding-*`, `lib/reveal/*` and migration `0070_onboarding_milestones` was reverted on this branch (commits `2773a091`, `ce94f6eb`, `8ee86e02`, `fe2c42ca`, `e0583601`). Consequences for the tasks below:
+
+| Task | Status |
+|---|---|
+| 1 Migration 0070 | **Dropped** (reverted) — no onboarding milestones; the Today checklist derives its facts from existing data instead. |
+| 2 Four-step resolver | **Dropped** (reverted). |
+| 3 Scheduler hold | **Kept** — accounts still in onboarding never have live agents today; the hold is a defence-in-depth no-op for the current flow and correct for any future pre-card provisioning. |
+| 4 Reveal start/status/read | **Dropped** (reverted; no caller without the preview step). |
+| 5 Provisioning extraction | **Dropped** (reverted). |
+| 6 Your buyers step | **Reduced** — the shared `IcpEditor` (`components/icp/*`) and `parseBuyersForm` (`lib/validation/buyers.ts`) stay; the onboarding step, `confirmBuyers`/`regenerateBuyers` and the `icpRegenerate` rate-limit key were removed. |
+| 6b Playbook targeting editor | **Kept** as built. |
+| 7 First prospects step | **Dropped** (reverted). |
+| 8 Page re-sequence | **Dropped** (not started). |
+| 9 One home | **Reduced** — every post-auth redirect lands on `/today` and `/today` stops forwarding; `finishOnboarding`'s redirect stays `/dashboard` (onboarding file). Gap recorded for the owner. |
+| 10 Today checklist | **Re-specified** below: steps derive from data, no onboarding stamps. |
+| 11 Events | **Reduced** — only events outside onboarding (`linkedin_connected`, `first_draft_approved`); `onboarding_*` events need the frozen files. |
+| 12 Trial clock | **Kept** — billing/webhook/LinkedIn-sync code, not onboarding. |
+| 13 Help/roadmap | **Reduced** — `getting-started.md` untouched; `today.md` + roadmap + deploy note only. |
+
+**Task 10 re-specification.** `ChecklistFacts = { buyersConfirmed: boolean; prospectsReviewed: boolean; linkedinActive: boolean; firstApprovedAt: string|null; calendarOrCrmConnected: boolean; dismissedAt: string|null }` where `buyersConfirmed` = the scout agent's `config.targeting` exists (the user saved Playbook → Targeting), `prospectsReviewed` = any `lead_feedback` row OR any `scheduled_sends` row with `rejection_reason` not null exists for the account (the user judged a prospect), `firstApprovedAt` = earliest `scheduled_sends.created_at` with status in `('approved','scheduled','sending','sent')`. Step hrefs: buyers → `/playbook/scout/targeting`, prospects → `/prospects`, linkedin → `/settings/senders`, approve → `/approvals`, connect (optional) → `/settings/integrations`. No migration.
+
 ## Global Constraints
 
 - Onboarding order: `Details → Your buyers → First prospects → Plan → Today` (spec §3.1). LinkedIn connect is **not** an onboarding step.
