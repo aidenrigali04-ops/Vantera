@@ -109,3 +109,24 @@ describe("exemplarBlock — Vera's winning-message memory (Stage 0.5)", () => {
     expect(flagged.length).toBeGreaterThan(0);
   });
 });
+
+describe("leadBlock — verified why-now (ML-3)", () => {
+  it("renders the captured why-now as a verified line with the reference instruction", () => {
+    const block = leadBlock({
+      ...base,
+      lead: { ...base.lead, whyNow: { kind: "intent", text: "Commented asking for a churn tool on a RevOps post", ageDays: 2 } },
+      insights: insights(),
+    });
+    expect(block).toContain("Why now (verified");
+    expect(block).toContain("Commented asking for a churn tool on a RevOps post (2d ago)");
+    // the why-now text is grounding: a note citing it never trips the claim check
+    expect(findUngroundedClaims("Saw you asked about a churn tool", block)).toEqual([]);
+  });
+
+  it("is byte-identical to before when there is no why-now", () => {
+    const without = leadBlock({ ...base, insights: insights() });
+    const withNull = leadBlock({ ...base, lead: { ...base.lead, whyNow: null }, insights: insights() });
+    expect(withNull).toBe(without);
+    expect(without).not.toContain("Why now");
+  });
+});

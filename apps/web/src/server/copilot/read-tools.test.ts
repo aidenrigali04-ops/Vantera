@@ -117,17 +117,27 @@ describe("getLeadScoreRationale", () => {
     });
     const dto = await getLeadScoreRationale(db, "Alice");
     expect(dto).toEqual({
+      fitVerdict: null,
       score: 87,
       rationale: "Strong ICP fit with recent funding signal.",
     });
     // No extra keys
-    expect(Object.keys(dto).sort()).toEqual(["rationale", "score"]);
+    expect(Object.keys(dto).sort()).toEqual(["fitVerdict", "rationale", "score"]);
   });
 
   it("returns nulls when lead not found", async () => {
     const db = fakeDb({ leads: null });
     const dto = await getLeadScoreRationale(db, "Unknown");
-    expect(dto).toEqual({ score: null, rationale: null });
+    expect(dto).toEqual({ score: null, rationale: null, fitVerdict: null });
+  });
+
+  it("includes the user's own fit verdict (ML-4)", async () => {
+    const db = fakeDb({
+      leads: { id: "l1", ai_score: 72, ai_rationale: "ok", first_name: "Bo" },
+      lead_feedback: { verdict: "not_fit" },
+    });
+    const dto = await getLeadScoreRationale(db, "Bo");
+    expect(dto.fitVerdict).toBe("not_fit");
   });
 });
 

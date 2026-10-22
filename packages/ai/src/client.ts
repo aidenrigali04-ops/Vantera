@@ -1,4 +1,5 @@
 import { createAnthropic } from "@ai-sdk/anthropic";
+import { withTelemetry } from "./usage";
 
 const DEFAULT_MODEL = "claude-sonnet-4-6";
 /** Rank, intent, and reply classification. Not the draft model. Does not follow ANTHROPIC_MODEL. */
@@ -38,7 +39,8 @@ export function getModel(modelId?: string) {
   }
   const headers = anthropicWorkspaceHeaders();
   const anthropic = createAnthropic(headers ? { apiKey, headers } : { apiKey });
-  return anthropic(resolveModelId(modelId));
+  // every product call gets a system-prompt cache breakpoint + per-run token/cost telemetry
+  return withTelemetry(anthropic(resolveModelId(modelId)));
 }
 
 /**

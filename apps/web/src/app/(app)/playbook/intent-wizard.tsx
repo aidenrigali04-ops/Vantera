@@ -13,6 +13,10 @@ import { deployIntentAgent, suggestIntentWatchlist, type AgentActionState } from
 const RUN_TIMES = ["06:00", "07:00", "08:00", "09:00", "10:00", "12:00", "15:00", "18:00"];
 const STEPS = ["Name", "Watch", "Schedule", "Deploy"] as const;
 
+/** ML-8: "Every 6 hours" catches a high-intent moment within hours; the read budget per run shrinks
+ *  to match, so LinkedIn reads per day are unchanged. */
+const CADENCE_LABEL = { daily: "Every day", intraday: "Every 6 hours", weekly: "Every week" } as const;
+
 export function IntentWizard({ scoutName }: { scoutName: string }) {
   const [step, setStep] = useState(0);
   const [name, setName] = useState("");
@@ -24,8 +28,9 @@ export function IntentWizard({ scoutName }: { scoutName: string }) {
   const [suggested, setSuggested] = useState(false);
   const [engagement, setEngagement] = useState(true);
   const [content, setContent] = useState(true);
+  const [follows, setFollows] = useState(true);
   const [runAtTime, setRunAtTime] = useState("08:00");
-  const [cadence, setCadence] = useState<"daily" | "weekly">("daily");
+  const [cadence, setCadence] = useState<"daily" | "intraday" | "weekly">("daily");
   const [timezone] = useState(() => Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC");
   const [state, action, pending] = useActionState<AgentActionState, FormData>(deployIntentAgent, {});
 
@@ -54,7 +59,7 @@ export function IntentWizard({ scoutName }: { scoutName: string }) {
   const watchCount = creators.length + competitors.length + keywords.length + hashtags.length;
   const canNext =
     (step === 0 && name.trim().length > 0) ||
-    (step === 1 && watchCount > 0 && (engagement || content)) ||
+    (step === 1 && watchCount > 0 && (engagement || content || follows)) ||
     step >= 2;
 
   return (
@@ -88,6 +93,7 @@ export function IntentWizard({ scoutName }: { scoutName: string }) {
         <input type="hidden" name="hashtags" value={JSON.stringify(hashtags)} />
         {engagement && <input type="hidden" name="signalEngagement" value="on" />}
         {content && <input type="hidden" name="signalContent" value="on" />}
+        {follows && <input type="hidden" name="signalFollows" value="on" />}
         <input type="hidden" name="runAtTime" value={runAtTime} />
         <input type="hidden" name="cadence" value={cadence} />
         <input type="hidden" name="timezone" value={timezone} suppressHydrationWarning />
@@ -139,6 +145,12 @@ export function IntentWizard({ scoutName }: { scoutName: string }) {
                   on={content}
                   set={setContent}
                 />
+                <SignalToggle
+                  label="Followers"
+                  note="People who start following your LinkedIn profile — warm, and still held to your ICP"
+                  on={follows}
+                  set={setFollows}
+                />
               </div>
             </div>
           </div>
@@ -167,7 +179,7 @@ export function IntentWizard({ scoutName }: { scoutName: string }) {
             <div className="flex flex-col gap-2">
               <Label>Cadence</Label>
               <div className="flex gap-2" role="radiogroup" aria-label="Cadence">
-                {(["daily", "weekly"] as const).map((c) => (
+                {(["daily", "intraday", "weekly"] as const).map((c) => (
                   <Button
                     key={c}
                     type="button"
@@ -176,7 +188,7 @@ export function IntentWizard({ scoutName }: { scoutName: string }) {
                     variant={cadence === c ? "default" : "outline"}
                     onClick={() => setCadence(c)}
                   >
-                    Every {c === "daily" ? "day" : "week"}
+                    {CADENCE_LABEL[c]}
                   </Button>
                 ))}
               </div>
@@ -189,11 +201,11 @@ export function IntentWizard({ scoutName }: { scoutName: string }) {
             <dt className="text-muted-foreground">Agent</dt>
             <dd className="font-medium">{name}</dd>
             <dt className="text-muted-foreground">Watching</dt>
-            <dd>{watchCount} target{watchCount === 1 ? "" : "s"} · {[engagement && "engagement", content && "content"].filter(Boolean).join(" + ")}</dd>
+            <dd>{watchCount} target{watchCount === 1 ? "" : "s"} · {[engagement && "engagement", content && "content", follows && "followers"].filter(Boolean).join(" + ")}</dd>
             <dt className="text-muted-foreground">Qualifies against</dt>
             <dd>{scoutName}&apos;s ICP</dd>
             <dt className="text-muted-foreground">Schedule</dt>
-            <dd>Every {cadence === "daily" ? "day" : "week"} at {runAtTime} ({timezone})</dd>
+            <dd>Every {cadence === "daily" ? "day" : cadence === "intraday" ? "6 hours" : "week"} at {runAtTime} ({timezone})</dd>
             <dt className="text-muted-foreground">First run</dt>
             <dd>within 15 minutes of deploy</dd>
           </dl>

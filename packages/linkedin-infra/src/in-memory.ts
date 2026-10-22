@@ -5,6 +5,8 @@ import type {
   HostedAuthRedirects,
   InviteRequest,
   LinkedInEngager,
+  ListFollowersRequest,
+  LinkedInFollower,
   LinkedInEvent,
   LinkedInInfra,
   LinkedInPost,
@@ -26,6 +28,7 @@ export class InMemoryLinkedInInfra implements LinkedInInfra {
   /** Seedable read fixtures for the Intent Agent reads. */
   readonly posts: LinkedInPost[] = [];
   readonly engagersByPost = new Map<string, LinkedInEngager[]>();
+  readonly followers: LinkedInFollower[] = [];
   readonly profiles = new Map<string, LinkedInProfile>();
   private counter = 0;
 
@@ -89,6 +92,10 @@ export class InMemoryLinkedInInfra implements LinkedInInfra {
 
   async listPostEngagers(req: PostEngagersRequest): Promise<LinkedInEngager[]> {
     return (this.engagersByPost.get(req.postRef) ?? []).slice(0, req.limit);
+  }
+
+  async listFollowers(req: ListFollowersRequest): Promise<LinkedInFollower[]> {
+    return this.followers.slice(0, req.limit);
   }
 
   async getProfile(req: GetProfileRequest): Promise<LinkedInProfile | null> {

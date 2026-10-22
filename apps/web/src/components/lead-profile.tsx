@@ -7,6 +7,8 @@ import { ArrowRight, Clock, ExternalLink, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { LeadCrmControls } from "@/components/lead-crm-controls";
+import { LeadFitControls } from "@/components/lead-fit-controls";
+import type { FitVerdict } from "@/lib/learning/fit";
 import { SourceBadge, WhyNowLine } from "@/components/lead-why-now";
 import { projectedRevenue } from "@/app/(app)/prospects/lead-value";
 
@@ -49,6 +51,23 @@ export interface LeadProfile {
   source?: string | null;
   /** real captured buying signals (lead_signals, 0031) — the "why now" line, when present */
   lead_signals?: { kind: string; label: string | null; detail?: string | null; observed_at?: string | null }[] | null;
+  /** ML-2: what in this prospect matches the people who actually reply (account's own outcomes) */
+  learned_reasons?: { label: string; ratio: number }[] | null;
+  /** ML-4: the user's own "Good fit" / "Not a fit" verdict */
+  fit_verdict?: FitVerdict | null;
+}
+
+/** "Funding signal (2.1× your reply rate)" — one plain line per direction, highest impact first. */
+function LearnedReasons({ reasons }: { reasons: { label: string; ratio: number }[] }) {
+  const up = reasons.filter((r) => r.ratio > 1);
+  const down = reasons.filter((r) => r.ratio < 1);
+  const fmt = (r: { label: string; ratio: number }) => `${r.label} (${r.ratio}× your reply rate)`;
+  return (
+    <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+      {up.length > 0 && <p>Ranked higher: {up.map(fmt).join(" · ")}</p>}
+      {down.length > 0 && <p>Ranked lower: {down.map(fmt).join(" · ")}</p>}
+    </div>
+  );
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -196,6 +215,9 @@ export function LeadProfileSheet({
             {lead.ai_rationale && (
               <p className="mt-2 text-sm text-muted-foreground">{lead.ai_rationale}</p>
             )}
+            {lead.learned_reasons && lead.learned_reasons.length > 0 && (
+              <LearnedReasons reasons={lead.learned_reasons} />
+            )}
           </section>
 
           {insights && (
@@ -245,6 +267,8 @@ export function LeadProfileSheet({
               </a>
             </section>
           )}
+
+          {lead.id && <LeadFitControls key={lead.id} leadId={lead.id} verdict={lead.fit_verdict ?? null} />}
 
           {lead.id && <LeadCrmControls leadId={lead.id} status={lead.status} />}
         </div>

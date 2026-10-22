@@ -8,6 +8,7 @@ export {
   rankMissInsights,
   completeRankResults,
   RANK_MISS_RATIONALE,
+  RANK_FEEDBACK_MAX,
   type RankCandidate,
   type RankContext,
 } from "./prospect/rank";
@@ -50,6 +51,7 @@ export {
 export {
   draftLinkedIn,
   validateLinkedInDraft,
+  leadIdentity,
   linkedinDraftSchema,
   LINKEDIN_SYSTEM,
   CONNECTION_NOTE_MAX_CHARS,
@@ -196,4 +198,31 @@ export {
   type SegmentStat,
 } from "./targeting/tilt";
 export { allocateDiscovery } from "./targeting/allocate";
+export {
+  countRows,
+  featureKeys,
+  fitLearner,
+  isInformative,
+  predictLead,
+  rankByLearned,
+  signalReport,
+  buildLeadOrdering,
+  orderLeads,
+  LEARN_MIN_N,
+  buildReadout,
+  explainLead,
+  featureLabel,
+  type LearnedReadout,
+  type ReadoutFeature,
+  type LeadReason,
+  type LearnerFeatures,
+  type LearnerRow,
+  type CountTable,
+  type LearnedModel,
+  type LeadOrdering,
+  type SignalReportRow,
+} from "./targeting/learn";
 export { STARTER_PLAYS, SOURCE_LABEL, matchStarterPlays, type StarterPlay } from "./plays/starter";
+export { pickWhyNow, findMissingWhyNow, WHY_NOW_MAX_AGE_DAYS, type WhyNow, type SignalLike } from "./copy/why-now";
+export { applyExclusions, normalizeTargetingRules, EMPTY_TARGETING, TARGETING_LIST_MAX, TARGETING_ENTRY_MAX, TARGETING_GUIDANCE_MAX, type TargetingRules } from "./prospect/exclusions";
+export { profileText, lookalikeCutpoints, lookalikeBucket, LOOKALIKE_MIN_POSITIVES, type LookalikeCutpoints, type ProfileFields } from "./targeting/lookalike";

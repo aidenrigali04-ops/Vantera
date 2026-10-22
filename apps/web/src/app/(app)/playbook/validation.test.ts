@@ -135,10 +135,16 @@ describe("parseIntentForm", () => {
       values: {
         name: "Sonar",
         watch: { creators: ["https://www.linkedin.com/in/creator"], competitors: [], keywords: ["onboarding churn"], hashtags: ["#revops"] },
-        signals: { engagement: true, content: true },
+        signals: { engagement: true, content: true, follows: false },
         cadence: "weekly",
       },
     });
+  });
+
+  it("accepts the intraday cadence and a followers-only signal set (ML-8)", () => {
+    const r = parseIntentForm(intentForm({ cadence: "intraday", signalEngagement: "", signalContent: "", signalFollows: "on" }));
+    expect(r).toMatchObject({ ok: true, values: { cadence: "intraday", signals: { engagement: false, content: false, follows: true } } });
+    expect(parseIntentForm(intentForm({ signalEngagement: "", signalContent: "" })).ok).toBe(false);
   });
 
   it("requires at least one watch target and one signal", () => {
@@ -156,3 +162,51 @@ describe("parseIntentForm", () => {
     if (r.ok) expect(r.values.watch.competitors).toEqual(["Salesforce", "Gainsight"]);
   });
 });
+
+describe("parseTargetingForm (ML-5)", () => {
+  const form = (fields: Record<string, string>) => {
+    const f = new FormData();
+    for (const [k, v] of Object.entries(fields)) f.set(k, v);
+    return f;
+  };
+
+  it("parses checkboxes, one-per-line lists, and guidance", async () => {
+    const { parseTargetingForm } = await import("./validation");
+    const r = parseTargetingForm(
+      form({
+        excludeAgencies: "on",
+        competitors: "Acme\n  Rival Co  \n\nacme",
+        customers: "globex.com",
+        companies: "",
+        keywords: "crypto, recruit",
+        guidance: "  Prioritize B2B SaaS founders. ",
+      })
+    );
+    expect(r).toEqual({
+      ok: true,
+      values: {
+        excludeAgencies: true,
+        excludeFreelancers: false,
+        competitors: ["Acme", "Rival Co"],
+        customers: ["globex.com"],
+        companies: [],
+        keywords: ["crypto", "recruit"],
+        guidance: "Prioritize B2B SaaS founders.",
+      },
+    });
+  });
+
+  it("rejects over-long guidance and too many entries instead of silently truncating", async () => {
+    const { parseTargetingForm } = await import("./validation");
+    expect(parseTargetingForm(form({ guidance: "x".repeat(501) })).ok).toBe(false);
+    expect(parseTargetingForm(form({ keywords: Array.from({ length: 51 }, (_, i) => `k${i}`).join("\n") })).ok).toBe(false);
+    expect(parseTargetingForm(form({ competitors: "y".repeat(81) })).ok).toBe(false);
+  });
+
+  it("keeps commas inside company names (one company per line)", async () => {
+    const { parseTargetingForm } = await import("./validation");
+    const r = parseTargetingForm(form({ competitors: "Acme, Inc.\nRival Co" }));
+    expect(r.ok && r.values.competitors).toEqual(["Acme, Inc.", "Rival Co"]);
+  });
+});
+

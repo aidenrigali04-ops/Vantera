@@ -1,4 +1,8 @@
-export type Cadence = "daily" | "weekly";
+export type Cadence = "daily" | "weekly" | "intraday";
+/** ML-8: the Intent Agent's intraday cadence — every 6 hours. The pipeline divides its per-run
+ *  LinkedIn read budget by INTRADAY_RUNS_PER_DAY so daily read volume is unchanged (rule 04). */
+export const INTRADAY_INTERVAL_HOURS = 6;
+export const INTRADAY_RUNS_PER_DAY = 24 / INTRADAY_INTERVAL_HOURS;
 
 /** Wall-clock offset of a timezone at an instant, in ms (DST-aware via Intl). */
 function tzOffsetMs(timeZone: string, at: Date): number {
@@ -86,6 +90,8 @@ export function computeNextRunAt(
   timeZone: string,
   from: Date
 ): Date {
+  // intraday ignores the wall-clock run time: a fixed interval from the last run
+  if (cadence === "intraday") return new Date(from.getTime() + INTRADAY_INTERVAL_HOURS * 3_600_000);
   const base = cadence === "weekly" ? new Date(from.getTime() + 6 * 86_400_000) : from;
   return nextOccurrence(runAtTime, timeZone, base);
 }

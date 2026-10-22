@@ -13,7 +13,7 @@ export type ShowcaseAgent = {
   status: "draft" | "live" | "paused";
   summary: string;
   icpNames: string[];
-  cadence: "daily" | "weekly" | null;
+  cadence: "daily" | "weekly" | "intraday" | null;
   timezone: string;
   nextRunAt: string | null;
   lastRunAt: string | null;
@@ -37,7 +37,7 @@ type AgentDbRow = {
   name: string;
   status: "draft" | "live" | "paused";
   config: Record<string, unknown> | null;
-  cadence: "daily" | "weekly" | null;
+  cadence: "daily" | "weekly" | "intraday" | null;
   timezone: string;
   next_run_at: string | null;
   last_run_at: string | null;

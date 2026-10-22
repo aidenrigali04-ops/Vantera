@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { InMemoryProspectData, InMemoryCompanySignals, makeCandidate, type CompanyRef, type ProspectSignal } from "@vantera/prospect-data";
-import type { LeadInsights, LeadOutcomeFlags } from "@vantera/agent-brains";
+import type { LeadInsights, LeadOutcomeFlags, RankCandidate } from "@vantera/agent-brains";
 import { runScout, pickHotSignal } from "./scout";
 import { TRIAL_LEAD_CAP } from "./types";
 import type { CopyDraftPayload, FreshLead, ScoutContext, ScoutDeps, ScoutStore } from "./types";
@@ -110,6 +110,41 @@ class FakeScoutStore implements ScoutStore {
   icpOutcomeRows: { icpId: string; flags: LeadOutcomeFlags }[] = [];
   async getIcpOutcomeRows() {
     return this.icpOutcomeRows;
+  }
+  learnedInsights: Awaited<ReturnType<ScoutStore["getLearnedInsights"]>> = {
+    mode: "learned",
+    evidence: 120,
+    features: [
+      { feature: "signal:funding", lift: 0.6, ratio: 1.8, n: 40 },
+      { feature: "seniority:manager", lift: -0.4, ratio: 0.7, n: 30 },
+    ],
+  };
+  learnedFails = false;
+  async getLearnedInsights() {
+    if (this.learnedFails) throw new Error("db down");
+    return this.learnedInsights;
+  }
+  toEmbed: { leadId: string; text: string; sourceHash: string }[] = [];
+  embeddedRows: { leadId: string; embedding: number[]; model: string; sourceHash: string }[] = [];
+  drainedAfterEmbed: boolean | null = null;
+  async getLeadsToEmbed(_accountId: string, limit: number) {
+    return this.toEmbed.slice(0, limit);
+  }
+  async saveLeadEmbeddings(_accountId: string, rows: { leadId: string; embedding: number[]; model: string; sourceHash: string }[]) {
+    this.embeddedRows.push(...rows);
+  }
+  rankFeedback: { rejected: string[]; positive: string[] } = { rejected: [], positive: [] };
+  feedbackFails = false;
+  async getRankFeedback() {
+    if (this.feedbackFails) throw new Error("db down");
+    return this.rankFeedback;
+  }
+  // Rank-miss retry backlog: gate survivors a previous run left unscored
+  unranked: RankCandidate[] = [];
+  unrankedQueries: { since: Date; limit: number }[] = [];
+  async getUnrankedLeads(_accountId: string, since: Date, limit: number) {
+    this.unrankedQueries.push({ since, limit });
+    return this.unranked.filter((c) => !this.scores.has(c.leadId)).slice(0, limit);
   }
 }
 
@@ -223,7 +258,7 @@ describe("runScout", () => {
     expect(results.find((r) => r.score === 55)?.qualified).toBe(false);
   });
 
-  it("persists a score-0 miss for every survivor the rank model omitted", async () => {
+  it("leaves a survivor the rank model omitted unscored (retryable), never rejected", async () => {
     const pool = [
       makeCandidate({ externalRef: "kept", industry: "saas" }),
       makeCandidate({ externalRef: "dropped", industry: "saas" }),
@@ -234,14 +269,13 @@ describe("runScout", () => {
 
     const summary = await runScout("scout1", deps);
 
-    expect(store.scores.size).toBe(2);
-    const dropped = [...store.scores.entries()].find(([id]) => id.includes("dropped"));
-    expect(dropped?.[1]).toMatchObject({ score: 0, qualified: false });
+    expect(store.scores.size).toBe(1);
+    expect([...store.scores.keys()].some((id) => id.includes("dropped"))).toBe(false);
     expect(summary.rankMissed).toBe(1);
     expect(summary.qualified).toBe(1);
   });
 
-  it("miss-scores every survivor when rankFn throws and still completes the run", async () => {
+  it("persists no score when rankFn throws (all retryable) and still completes the run", async () => {
     const pool = [
       makeCandidate({ externalRef: "a", industry: "saas" }),
       makeCandidate({ externalRef: "b", industry: "saas" }),
@@ -257,9 +291,50 @@ describe("runScout", () => {
     expect(summary.status).toBe("completed");
     expect(summary.rankErrors).toBe(2);
     expect(summary.qualified).toBe(0);
-    expect(store.scores.size).toBe(2);
-    expect([...store.scores.values()].every((s) => s.qualified === false && s.score === 0)).toBe(true);
+    expect(store.scores.size).toBe(0);
     expect(store.completedAt).not.toBeNull();
+  });
+
+  it("re-ranks survivors a previous run left unscored and drafts the ones that qualify", async () => {
+    const store = new FakeScoutStore(makeContext());
+    store.copyAgent = { id: "copy1" };
+    store.unranked = [
+      { leadId: "old_lead_retryhigh", title: "CTO", industry: "saas" },
+      { leadId: "old_lead_retrylow", title: "CTO", industry: "saas" },
+    ];
+    const { deps, chained } = makeDeps(store, [], { retryhigh: 88, retrylow: 40 });
+
+    const summary = await runScout("scout1", deps);
+
+    expect(store.scores.get("old_lead_retryhigh")).toMatchObject({ score: 88, qualified: true });
+    expect(store.scores.get("old_lead_retrylow")).toMatchObject({ score: 40, qualified: false });
+    expect(summary.qualified).toBe(1);
+    expect(chained.flatMap((c) => c.leadIds)).toContain("old_lead_retryhigh");
+    // bounded lookback: only recent survivors are retried, so a lead the model always omits ages out
+    const q = store.unrankedQueries[0]!;
+    expect(deps.now!().getTime() - q.since.getTime()).toBe(7 * 24 * 60 * 60 * 1000);
+  });
+
+  it("does not re-rank this run's own misses in the retry stage", async () => {
+    const pool = [makeCandidate({ externalRef: "flaky", industry: "saas" })];
+    const store = new FakeScoutStore(makeContext());
+    const { deps } = makeDeps(store, pool, { flaky: 90 });
+    let calls = 0;
+    deps.rankFn = async () => {
+      calls += 1;
+      return [];
+    };
+    // the fake backlog would surface this run's miss if the retry stage didn't exclude it
+    const origUpsert = store.upsertLeads.bind(store);
+    store.upsertLeads = async (...args) => {
+      const fresh = await origUpsert(...args);
+      store.unranked.push(...fresh.map((f) => ({ leadId: f.leadId })));
+      return fresh;
+    };
+
+    await runScout("scout1", deps);
+
+    expect(calls).toBe(2); // first pass + rankWithCompleteness's one retry; no third attempt
   });
 
   it("dedupes: a second run with the same candidates ranks nothing new", async () => {
@@ -752,4 +827,120 @@ describe("runScout — discovery allocation (Stage 2)", () => {
     expect(a).toBeGreaterThan(b); // evidence tilts the split
     expect(b).toBeGreaterThanOrEqual(Math.max(1, Math.floor((total * 0.4) / 2))); // floor keeps exploring
   });
+
+  it("hands the seller's revealed preferences (review rejections + positive replies) to the rank", async () => {
+    const pool = [makeCandidate({ externalRef: "a", industry: "saas" })];
+    const store = new FakeScoutStore(makeContext());
+    store.rankFeedback = { rejected: ["Recruiter | TalentCo | staffing"], positive: ["CTO | Acme | saas"] };
+    const { deps } = makeDeps(store, pool, { a: 80 });
+    const seen: unknown[] = [];
+    const rank = deps.rankFn;
+    deps.rankFn = async (c, ctx) => {
+      seen.push(ctx.feedback);
+      return rank(c, ctx);
+    };
+    await runScout("scout1", deps);
+    expect(seen[0]).toEqual(store.rankFeedback);
+  });
+
+  it("still ranks (no feedback) when the feedback read fails — fail-open", async () => {
+    const pool = [makeCandidate({ externalRef: "a", industry: "saas" })];
+    const store = new FakeScoutStore(makeContext());
+    store.feedbackFails = true;
+    const { deps } = makeDeps(store, pool, { a: 80 });
+    const summary = await runScout("scout1", deps);
+    expect(summary.qualified).toBe(1);
+  });
+
+  it("records which signals and segments the learner found winning/losing in the run summary", async () => {
+    const store = new FakeScoutStore(makeContext());
+    const { deps } = makeDeps(store, [makeCandidate({ externalRef: "a", industry: "saas" })], { a: 80 });
+    const summary = await runScout("scout1", deps);
+    expect(summary.learned).toEqual(store.learnedInsights);
+  });
+
+  it("completes with learned=null when the insight read fails", async () => {
+    const store = new FakeScoutStore(makeContext());
+    store.learnedFails = true;
+    const { deps } = makeDeps(store, [makeCandidate({ externalRef: "a", industry: "saas" })], { a: 80 });
+    const summary = await runScout("scout1", deps);
+    expect(summary.status).toBe("completed");
+    expect(summary.learned).toBeNull();
+  });
+
+  it("applies the user's exclusions with the rules gate, before enrichment or AI spend (ML-5)", async () => {
+    const ctx = makeContext();
+    ctx.agent.config = { ...ctx.agent.config, targeting: { excludeAgencies: true, competitors: ["Rival Co"] } } as never;
+    const store = new FakeScoutStore(ctx);
+    const pool = [
+      makeCandidate({ externalRef: "agency", industry: "saas", companyName: "Bright Growth Agency" }),
+      makeCandidate({ externalRef: "rival", industry: "saas", companyName: "Rival Co" }),
+      makeCandidate({ externalRef: "good", industry: "saas", companyName: "Acme" }),
+    ];
+    const { deps, ranked } = makeDeps(store, pool, { good: 80 });
+    await runScout("scout1", deps);
+    expect(ranked.flat().map((id) => id.split("_").at(-1))).toEqual(["good"]);
+    expect(store.enriched).toEqual(["good"]);
+    expect([...store.gates.entries()].filter(([, passed]) => !passed).map(([id]) => id.split("_").at(-1)).sort()).toEqual(["agency", "rival"]);
+  });
+
+  it("hands the user's targeting guidance to the rank (ML-5)", async () => {
+    const ctx = makeContext();
+    ctx.agent.config = { ...ctx.agent.config, targeting: { guidance: "Prioritize founders" } } as never;
+    const store = new FakeScoutStore(ctx);
+    const { deps } = makeDeps(store, [makeCandidate({ externalRef: "a", industry: "saas" })], { a: 80 });
+    const seen: unknown[] = [];
+    const rank = deps.rankFn;
+    deps.rankFn = async (c, rctx) => {
+      seen.push(rctx.guidance);
+      return rank(c, rctx);
+    };
+    await runScout("scout1", deps);
+    expect(seen[0]).toBe("Prioritize founders");
+  });
+
+  it("embeds lead profiles before the drain orders them, and reports the count (ML-7)", async () => {
+    const store = new FakeScoutStore(makeContext());
+    store.copyAgent = { id: "copy1" };
+    store.toEmbed = [
+      { leadId: "l1", text: "VP Sales | Acme | saas", sourceHash: "h1" },
+      { leadId: "l2", text: "CTO | Globex | saas", sourceHash: "h2" },
+    ];
+    const order: string[] = [];
+    const origTop = store.getTopQualifiedLeadIds.bind(store);
+    store.getTopQualifiedLeadIds = async (...a) => {
+      order.push("drain");
+      return origTop(...a);
+    };
+    const { deps } = makeDeps(store, [makeCandidate({ externalRef: "a", industry: "saas" })], { a: 80 });
+    deps.embedFn = {
+      model: "m1",
+      embed: async (texts) => {
+        order.push("embed");
+        return texts.map((_, i) => [i, 0.5]);
+      },
+    };
+    const summary = await runScout("scout1", deps);
+    expect(store.embeddedRows).toEqual([
+      { leadId: "l1", embedding: [0, 0.5], model: "m1", sourceHash: "h1" },
+      { leadId: "l2", embedding: [1, 0.5], model: "m1", sourceHash: "h2" },
+    ]);
+    expect(summary.embedded).toBe(2);
+    expect(order[0]).toBe("embed");
+  });
+
+  it("fails open when embedding errors, and skips it with no embedder configured (ML-7)", async () => {
+    const store = new FakeScoutStore(makeContext());
+    store.toEmbed = [{ leadId: "l1", text: "x", sourceHash: "h" }];
+    const { deps } = makeDeps(store, [makeCandidate({ externalRef: "a", industry: "saas" })], { a: 80 });
+    deps.embedFn = { model: "m", embed: async () => { throw new Error("provider down"); } };
+    const s1 = await runScout("scout1", deps);
+    expect(s1.status).toBe("completed");
+    expect(s1.embedded).toBe(0);
+    delete deps.embedFn;
+    const s2 = await runScout("scout1", deps);
+    expect(s2.embedded).toBe(0);
+    expect(store.embeddedRows).toEqual([]);
+  });
 });
+

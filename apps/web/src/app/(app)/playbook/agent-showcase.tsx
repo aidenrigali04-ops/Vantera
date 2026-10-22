@@ -144,7 +144,7 @@ function AgentDetails({ agent }: { agent: ShowcaseAgent }) {
   const runLine =
     agent.kind === "scout" || agent.kind === "intent"
       ? live
-        ? `Next run ${timeUntil(agent.nextRunAt)}${agent.cadence ? ` · every ${agent.cadence === "daily" ? "day" : "week"}` : ""}`
+        ? `Next run ${timeUntil(agent.nextRunAt)}${agent.cadence ? ` · every ${agent.cadence === "daily" ? "day" : agent.cadence === "intraday" ? "6 hours" : "week"}` : ""}`
         : `Last ran ${timeAgo(agent.lastRunAt)}`
       : automatic
         ? "Sending automatically — flagged drafts still come to Approvals."
@@ -235,6 +235,11 @@ function AgentDetails({ agent }: { agent: ShowcaseAgent }) {
             <Link href={`/playbook/${agent.kind}/edit`}>
               <Settings2 className="size-4" /> Edit config
             </Link>
+          </Button>
+        )}
+        {agent.kind === "scout" && (
+          <Button asChild variant="outline" size="sm">
+            <Link href="/playbook/scout/targeting">Targeting rules</Link>
           </Button>
         )}
         {live && (agent.kind === "scout" || agent.kind === "intent") && (

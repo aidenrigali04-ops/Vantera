@@ -7,7 +7,7 @@ import type {
   DraftableLead,
   NewScheduledSend,
 } from "./types";
-import { LINKEDIN_SYSTEM, leadBlock, type CopyStrategy, type DraftInput, type JudgeFn } from "@vantera/agent-brains";
+import { LINKEDIN_SYSTEM, buildTargetingProfile, leadBlock, rankByTilt, type CopyStrategy, type DraftInput, type JudgeFn, type LeadOutcomeFlags } from "@vantera/agent-brains";
 import { getModelId } from "@vantera/ai";
 
 function scored(id: string, score: number): DraftableLead {
@@ -98,6 +98,15 @@ class FakeCopyStore implements CopyDraftStore {
   }
   async setLeadStatus(leadId: string, status: string) {
     this.leadStatuses.set(leadId, status);
+  }
+  targetingProfile = buildTargetingProfile([]);
+  async rankLeadIds(_accountId: string, leadIds: string[]) {
+    const byId = new Map(this.leads.map((l) => [l.id, l]));
+    const known = leadIds.map((id) => byId.get(id)).filter((l): l is DraftableLead => !!l);
+    return rankByTilt(known, this.targetingProfile).map((l) => l.id);
+  }
+  async getActiveExperiment() {
+    return this.activeExperiment;
   }
   async getChampion() {
     return this.champion;
@@ -868,6 +877,26 @@ describe("runCopyDraft — daily first-touch cap", () => {
     expect(store.sends.map((s) => s.leadId)).toEqual(["high", "high"]);
   });
 
+  it("spends the last slot by score + the learned outcome tilt, matching the drain order", async () => {
+    const store = new FakeCopyStore();
+    store.firstTouchDraftsToday = 14;
+    const flags = (accepted: boolean, interested: boolean): LeadOutcomeFlags => ({
+      invited: true, accepted, interested, negative: false, booked: false, converted: false,
+    });
+    // founders reply far above baseline, VPs far below → founder tilt +, VP tilt −
+    store.targetingProfile = buildTargetingProfile([
+      ...Array.from({ length: 30 }, () => ({ title: "Founder", industry: "saas", flags: flags(true, true) })),
+      ...Array.from({ length: 30 }, () => ({ title: "VP Sales", industry: "saas", flags: flags(false, false) })),
+    ]);
+    store.leads.push(lead("vp", { aiScore: 73, title: "VP Sales" }), lead("founder", { aiScore: 70, title: "Founder" }));
+    const draftLinkedInFn = vi.fn(async () => CLEAN);
+    await runCopyDraft(
+      { copyAgentId: "copy1", accountId: "acc1", leadIds: ["vp", "founder"] },
+      { store, draftLinkedInFn }
+    );
+    expect(store.sends.map((s) => s.leadId)).toEqual(["founder", "founder"]);
+  });
+
   it("does not spend the last slot on a suppressed higher score", async () => {
     const store = new FakeCopyStore();
     store.firstTouchDraftsToday = 14;
@@ -883,4 +912,19 @@ describe("runCopyDraft — daily first-touch cap", () => {
     expect(store.campaignLeads.get("high")).toBe("suppressed");
     expect(store.campaignLeads.has("low")).toBe(true);
   });
+
+  it("hands the lead's verified why-now to the copy brain (ML-3)", async () => {
+    const store = new FakeCopyStore();
+    const why = { kind: "intent", text: "Commented asking for a churn tool on a RevOps post", ageDays: 2 };
+    store.leads.push(lead("w", { whyNow: why }), lead("plain"));
+    const seen: DraftInput[] = [];
+    const draftLinkedInFn = vi.fn(async (input: DraftInput) => {
+      seen.push(input);
+      return CLEAN;
+    });
+    await runCopyDraft({ copyAgentId: "copy1", accountId: "acc1", leadIds: ["w", "plain"] }, { store, draftLinkedInFn });
+    expect(seen.some((i) => i.lead.whyNow?.text === why.text)).toBe(true);
+    expect(seen.filter((i) => i.lead.whyNow).length).toBe(1);
+  });
 });
+

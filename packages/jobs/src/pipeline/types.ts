@@ -15,6 +15,8 @@ import type {
   DraftInput,
   RankCandidate,
   RankContext,
+  WhyNow,
+  LearnedReadout,
   ReplyVerdict,
   RulesGateResult,
   StoredInsights,
@@ -43,6 +45,8 @@ export interface ScoutConfig {
   /** capacity-throttle tunables (per-agent override via agents.config jsonb) */
   bufferFactor: number;
   floor: number;
+  /** ML-5: the user's exclusions + guidance, raw jsonb (normalizeTargetingRules) */
+  targeting?: unknown;
 }
 
 // Apify-era volume (2026-06-22): LinkedIn-search discovery is cheap to pull wide, so we source a
@@ -146,6 +150,17 @@ export interface ScoutStore {
   /** Stage 2: per-ICP outcome evidence (invited leads → flags) for the discovery allocator.
    *  Empty ⇒ the allocator falls back to the equal split. */
   getIcpOutcomeRows(accountId: string): Promise<{ icpId: string; flags: LeadOutcomeFlags }[]>;
+  /** ML-1: the learner's readout for the run summary (top winning/losing features). */
+  getLearnedInsights(accountId: string): Promise<LearnedInsights>;
+  /** ML-7: qualified/contacted leads whose profile was never embedded or has changed (≤ limit) */
+  getLeadsToEmbed(accountId: string, limit: number): Promise<{ leadId: string; text: string; sourceHash: string }[]>;
+  saveLeadEmbeddings(accountId: string, rows: { leadId: string; embedding: number[]; model: string; sourceHash: string }[]): Promise<void>;
+  /** ML-1 fit feedback: recent "title | company | industry" lines for leads the user rejected as the
+   *  wrong person in review, and for leads that replied positively (≤ RANK_FEEDBACK_MAX each). */
+  getRankFeedback(accountId: string): Promise<{ rejected: string[]; positive: string[] }>;
+  /** Rank-miss retry: gate survivors created since `since` that were never scored (scored_at null,
+   *  status 'sourced'), newest first, as rank inputs. Feeds Scout's retry stage. */
+  getUnrankedLeads(accountId: string, since: Date, limit: number): Promise<RankCandidate[]>;
 }
 
 export interface ScoutDeps {
@@ -155,6 +170,8 @@ export interface ScoutDeps {
   companySignals?: CompanySignalSource;
   scanFn: (url: string) => Promise<WebsiteScan>;
   rankFn: (candidates: RankCandidate[], ctx: RankContext) => Promise<LeadInsights[]>;
+  /** ML-7: embed profile texts (absent = lookalikes off, e.g. no embeddings key configured) */
+  embedFn?: { model: string; embed: (texts: string[]) => Promise<number[][]> };
   /** ICP free text → structured discovery criteria — heals ICPs saved with empty criteria,
    *  which otherwise search with an empty input and silently discover nothing */
   deriveCriteriaFn: (icpText: string, ctx: DeriveCriteriaContext) => Promise<IcpCriteria>;
@@ -204,7 +221,15 @@ export interface ScoutRunSummary {
   websiteScanError: boolean;
   /** company-signal fetch threw — rank ran without company events */
   companySignalsError: boolean;
+  /** ML-1: the learner's strongest winning/losing features at run time (null if unavailable) */
+  learned?: LearnedInsights | null;
+  /** ML-7: lead profiles embedded this run (lookalike similarity) */
+  embedded?: number;
 }
+
+/** The learner's readout persisted with each scout run: which ordering is live, plus the account's
+ *  OWN-data feature readout the web app renders (ML-2 — never pool-derived). */
+export type LearnedInsights = LearnedReadout & { mode: "learned" | "tilt" };
 
 export interface CopyDraftPayload {
   copyAgentId: string;
@@ -218,34 +243,46 @@ export interface CopyDraftPayload {
  *  own connected account, so the scheduler caps reads per run; not configurable upward. */
 export const INTENT_POSTS_PER_RUN = 20;
 export const INTENT_ENGAGERS_PER_POST = 25;
+/** ML-8: new followers processed per run (beyond this they wait for the next run — still followers). */
+export const INTENT_FOLLOWERS_PER_RUN = 25;
 
 export interface IntentConfig {
   watch: { creators: string[]; competitors: string[]; keywords: string[]; hashtags: string[] };
-  signals: { engagement: boolean; content: boolean };
+  /** follows (ML-8): people who start following the connected profile — warm, wordless */
+  signals: { engagement: boolean; content: boolean; follows?: boolean };
   /** qualification threshold (the same bar the Scout uses, rule 06) */
   minScore: number;
 }
 
 export const INTENT_DEFAULTS: IntentConfig = {
   watch: { creators: [], competitors: [], keywords: [], hashtags: [] },
-  signals: { engagement: true, content: true },
+  signals: { engagement: true, content: true, follows: true },
   minScore: 70,
 };
 
 export interface IntentScanContext {
-  agent: { id: string; accountId: string; status: string; config: Partial<IntentConfig> };
+  agent: {
+    id: string;
+    accountId: string;
+    status: string;
+    config: Partial<IntentConfig>;
+    /** ML-8: intraday runs split the per-run read budget so daily LinkedIn reads stay flat */
+    cadence?: "daily" | "weekly" | "intraday" | null;
+  };
   /** the LinkedIn account to read through (the account's active connection); null = can't read */
   connectedAccountId: string | null;
   /** qualification ICP — inherited from the account's Scout (intent qualifies against the same bar) */
   icps: { id: string; name: string; criteria: IcpCriteria }[];
   account: { industry: string | null; valueProp: string | null; subscriptionStatus: string };
+  /** ML-5: the Scout's targeting rules (raw agents.config.targeting) — intent leads obey them too */
+  targeting?: unknown;
 }
 
 /** A persisted observation row — the dedupe ledger + audit trail. */
 export interface IntentObservationRow {
   profileUrl: string;
   postRef: string;
-  signalKind: "engagement" | "content";
+  signalKind: "engagement" | "content" | "follow";
   watchTarget: string | null;
   headline: string | null;
   detail: string | null;
@@ -265,7 +302,13 @@ export interface IntentScanStore {
   markRulesGate(leadId: string, result: RulesGateResult): Promise<void>;
   saveScore(leadId: string, insights: LeadInsights, qualified: boolean): Promise<void>;
   /** capture the "why now" intent signal on the lead — feeds Surface A's why-now chip */
-  saveIntentSignal(leadId: string, accountId: string, signal: { label: string; detail: string }): Promise<void>;
+  saveIntentSignal(
+    leadId: string,
+    accountId: string,
+    signal: { label: string; detail: string; level?: string; kind?: "intent" | "follow" }
+  ): Promise<void>;
+  /** ML-1 fit feedback — same contract as ScoutStore.getRankFeedback */
+  getRankFeedback(accountId: string): Promise<{ rejected: string[]; positive: string[] }>;
   /** the rule-11 gate: account + lowercased LinkedIn URL lookup against suppression_entries */
   isSuppressed(accountId: string, kind: "linkedin", value: string): Promise<boolean>;
   getLiveCopyAgent(accountId: string): Promise<{ id: string } | null>;
@@ -274,7 +317,7 @@ export interface IntentScanStore {
 
 export interface IntentScanDeps {
   store: IntentScanStore;
-  linkedin: Pick<LinkedInInfra, "searchPosts" | "listProfilePosts" | "listPostEngagers" | "getProfile">;
+  linkedin: Pick<LinkedInInfra, "searchPosts" | "listProfilePosts" | "listPostEngagers" | "getProfile" | "listFollowers">;
   classifyFn: (observations: IntentObservationInput[], ctx: IntentContext) => Promise<IntentVerdict[]>;
   rankFn: (candidates: RankCandidate[], ctx: RankContext) => Promise<LeadInsights[]>;
   triggerCopyDraft: (payload: CopyDraftPayload) => Promise<void>;
@@ -296,6 +339,8 @@ export interface IntentScanSummary {
   chained: boolean;
   rankMissed: number;
   rankErrors: number;
+  /** ML-8: followers read this run (the warm "follows you" signal) */
+  followers?: number;
 }
 
 export interface CopyConfig {
@@ -349,6 +394,8 @@ export interface DraftableLead {
   aiScore: number | null;
   /** when the lead was last AI-ranked; drives refresh-on-release before a delayed email touch */
   scoredAt: Date | null;
+  /** ML-3: freshest captured reach-out-worthy signal (pickWhyNow) — the opener must cite it */
+  whyNow?: WhyNow | null;
 }
 
 export interface NewScheduledSend {
@@ -371,6 +418,9 @@ export interface NewScheduledSend {
 }
 
 export interface CopyDraftStore {
+  /** best-first order for these leads — the same ordering the scout drain uses (ML-1 learner when
+   *  informative, else ai_score + tilt). Ids the store can't order are appended in input order. */
+  rankLeadIds(accountId: string, leadIds: string[]): Promise<string[]>;
   getCopyContext(copyAgentId: string): Promise<CopyContext | null>;
   getDraftableLeads(accountId: string, leadIds: string[]): Promise<DraftableLead[]>;
   /** idempotency guard: which of these leadIds already have a scheduled_send, so a retried run never re-drafts */
@@ -1133,4 +1183,37 @@ export interface InboundLifecycleHooks {
   recordReply: LifecycleStore["recordLifecycleReply"];
   recordAcceptance: LifecycleStore["recordLifecycleAcceptance"];
   notifyReply(displayName: string | null, body: string): Promise<void>;
+}
+
+// ── ML-6 calendar integration ────────────────────────────────────────────────────────────────
+
+export type MeetingConnectionRow = { id: string; accountId: string; provider: "calendly" | "calcom"; status: string };
+
+export interface MeetingEventStore {
+  getMeetingConnection(connectionId: string): Promise<MeetingConnectionRow | null>;
+  touchMeetingConnection(connectionId: string): Promise<void>;
+  /** true only when the lead exists in THIS account — the tag can never cross workspaces */
+  leadInAccount(accountId: string, leadId: string): Promise<boolean>;
+  findLeadByEmail(accountId: string, email: string): Promise<string | null>;
+  /** insert-or-update by (account, provider, booking_ref); attribution null = keep the stored value */
+  upsertMeetingEvent(e: {
+    accountId: string;
+    connectionId: string;
+    provider: "calendly" | "calcom";
+    leadId: string;
+    bookingRef: string;
+    status: "booked" | "canceled";
+    startAt: Date | null;
+    attribution: "link" | "email" | null;
+  }): Promise<void>;
+  /** account-scoped: (account, provider, booking_ref) is the identity of a booking */
+  findMeetingEvent(accountId: string, provider: string, bookingRef: string): Promise<{ leadId: string; status: "booked" | "canceled" } | null>;
+  hasLiveBooking(accountId: string, leadId: string): Promise<boolean>;
+  /** meeting_booked_at (first booking wins) + meeting_at + meeting_source='calendar' */
+  markCalendarMeeting(accountId: string, leadId: string, startAt: Date | null): Promise<void>;
+  /** clears meeting fields only when meeting_source='calendar' (never a manual/agent record) */
+  clearCalendarMeeting(accountId: string, leadId: string): Promise<void>;
+  /** cancel queued drafts + stop the active sequence — a lead who booked gets no more nudges */
+  standDownOutreach(accountId: string, leadId: string): Promise<void>;
+  notifyMeetingBooked(accountId: string, leadId: string): Promise<void>;
 }

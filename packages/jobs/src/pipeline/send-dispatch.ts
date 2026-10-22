@@ -37,6 +37,38 @@ interface SenderState {
 }
 
 /**
+ * ML-8 warm-first: when today's safety budgets bind, the warmest people get the slots — never
+ * whatever order the database happened to return. Tiers: a reply to someone who just replied
+ * (the speed lane), a human-typed send, an ongoing conversation (the lead has replied before), the
+ * FIRST message to a fresh accept (most recent accept first — attention decays fast), other
+ * follow-ups (oldest queued first), then cold invites (queue order, which is the learner's drain
+ * order). Ordering only: every budget, window, and per-lead gate below still applies.
+ */
+function warmTier(r: DispatchableSend): number {
+  if (r.origin === "reply_response") return 0;
+  if (r.origin === "manual") return 1;
+  if (r.linkedinStage === "message") {
+    if (r.leadRepliedAt) return 2;
+    if (!r.leadLastMessageSentAt) return 3;
+    return 4;
+  }
+  return 5;
+}
+
+export function warmFirst<T extends DispatchableSend>(rows: T[]): T[] {
+  const time = (d: Date | null) => (d ? d.getTime() : 0);
+  return rows
+    .map((r, i) => ({ r, i, tier: warmTier(r) }))
+    .sort((a, b) => {
+      if (a.tier !== b.tier) return a.tier - b.tier;
+      // fresh accepts: most recent first; everything else: oldest queued first; then stable
+      if (a.tier === 3) return time(b.r.leadConnectedAt) - time(a.r.leadConnectedAt) || a.i - b.i;
+      return time(a.r.createdAt) - time(b.r.createdAt) || a.i - b.i;
+    })
+    .map((x) => x.r);
+}
+
+/**
  * The send gatekeeper (rules 04/11): every outbound send passes here first.
  * Kill switch → nothing moves. Caps clamp per SENDER account, never raise. Times jitter
  * like a human. Multi-sender (rule 04/13): a tenant's connected accounts each carry their
@@ -83,7 +115,7 @@ export async function runSendDispatch(deps: SendDispatchDeps): Promise<SendDispa
       }
     }
 
-    const lis = active.filter((r) => r.channel === "linkedin");
+    const lis = warmFirst(active.filter((r) => r.channel === "linkedin"));
     if (lis.length === 0) continue;
 
     // Per-sender safety state. Empty → no connected identity for this tenant.

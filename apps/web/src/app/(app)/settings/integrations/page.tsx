@@ -8,6 +8,7 @@ import {
   ConnectionManager,
   type CrmConnectionRow,
 } from "./integrations-forms";
+import { SchedulingCards, type SchedulingConnectionRow } from "./scheduling-cards";
 
 export const metadata = { title: "Integrations" };
 
@@ -47,6 +48,12 @@ export default async function IntegrationsPage() {
     .order("created_at", { ascending: true })
     .returns<CrmConnectionRow[]>();
 
+  // ML-6 scheduling connections — non-secret columns only (0066 column grants)
+  const { data: scheduling } = await supabase
+    .from("meeting_connections")
+    .select("provider, status, label, last_event_at, last_error")
+    .returns<SchedulingConnectionRow[]>();
+
   const connections = new Map((rows ?? []).map((r) => [r.provider, r]));
   const connectors = listConnectors();
   const connectedCount = (rows ?? []).filter((r) => r.status === "active").length;
@@ -63,6 +70,8 @@ export default async function IntegrationsPage() {
           </Link>
         </p>
       </div>
+
+      <SchedulingCards connections={scheduling ?? []} />
 
       {connectedCount === 0 && (
         <Card className="border-foreground/15 bg-muted/40">

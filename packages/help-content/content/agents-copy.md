@@ -21,6 +21,7 @@ The Outreach Agent owns everything after a prospect qualifies. For every qualifi
 
 - It writes for LinkedIn specifically: a personal connection note that never pitches on the first touch, then tailored follow-up messages once they accept.
 - Every draft is personalized from the prospect's insights — never a template with a name swapped in.
+- When there's a real reason to reach out now — they commented asking about a problem you solve, their company just raised a round, they started a new role — the connection note mentions it in plain words. It only ever uses what was actually observed (within the last 90 days), never an invented detail. If a note misses it, the draft is rewritten once, and if it still misses, it waits for you in Approvals.
 - Messages read like a text from a colleague: short (a sentence or two), plain everyday words, and flowing punctuation — no dashes, no bullet lists, no business-speak like "leverage" or "streamline".
 - A style guard enforces that voice mechanically — robotic phrasing, AI-tell vocabulary, and machine punctuation are stripped before anything reaches a prospect. If a draft still trips a style rule, it's flagged for you in Approvals.
 
@@ -42,3 +43,8 @@ When you deploy, you choose how outreach and replies leave the agent:
 - **Automatic** — clean messages send on their own; any message the style guard flags falls back to Approvals. Flagged copy never sends silently.
 
 Either way, anyone on your suppression list is never drafted to at all — unsubscribes and opt-outs are honored before a single word is written.
+
+## Who goes first when the day's limit is tight
+
+LinkedIn allows only so many messages and invitations a day, and those limits are never raised. When they're nearly used up, the warmest people go first: a reply to someone who just wrote back, then a message you typed yourself, then ongoing conversations, then the first message to someone who just accepted your request (most recent first), then other follow-ups, and finally new invitations. Nothing skips the limits — this only decides the order.
+

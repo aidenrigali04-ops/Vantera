@@ -556,6 +556,16 @@ describe("runInbound — active responder (converse to close)", () => {
   });
 
   it("stamps the contextual reply with a conversation_reply recipe (Stage 1)", async () => {
+  it("tags the booking link in the queued reply so a booking attributes to this lead (ML-6)", async () => {
+    const store = storeWithBundle(bundle({ context: { cta: "a quick intro", bookingUrl: "https://calendly.com/acme/intro" } }));
+    await runInbound(
+      { source: "linkedin", payload: LINKEDIN_REPLY_FIXTURE },
+      deps(store, { classifyFn: classify("interested"), respondFn: respond("Grab a slot: https://calendly.com/acme/intro") })
+    );
+    expect(store.scheduledSends[0]!.body).toBe("Grab a slot: https://calendly.com/acme/intro?utm_content=vt-lead1&metadata%5Bvt%5D=vt-lead1");
+  });
+
+  it("stamps the contextual reply with a conversation_reply recipe carrying the lead's arm (Stage 1)", async () => {
     const store = storeWithBundle(
       bundle({ attribution: { strategy: {}, playbookVersion: null } })
     );

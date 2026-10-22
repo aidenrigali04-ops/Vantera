@@ -380,3 +380,29 @@ describe("validateLinkedInDraft — de-pitched first touch (2026-07-08)", () => 
     expect(violations).toEqual([]);
   });
 });
+
+describe("why-now citation (ML-3)", () => {
+  const WHY = { kind: "intent", text: "Commented asking for a churn tool on a RevOps post", ageDays: 2 };
+  const IGNORES = { ...CLEAN, connection_note: "Dana, always good to meet other sales leaders here." };
+  const CITES = { ...CLEAN, connection_note: "Dana, saw your comment about churn tools, curious what you picked." };
+
+  it("flags a connection note that ignores the verified why-now", () => {
+    expect(validateLinkedInDraft(IGNORES, undefined, null, null, WHY).some((v) => v.rule === "why-now-missing")).toBe(true);
+    expect(validateLinkedInDraft(CITES, undefined, null, null, WHY).some((v) => v.rule === "why-now-missing")).toBe(false);
+  });
+
+  it("regenerates once when the first note ignores the why-now, keeping the citing draft", async () => {
+    const model = new MockLanguageModelV3({ doGenerate: sequence(textResponse(IGNORES), textResponse(CITES)) });
+    const out = await draftLinkedIn({ ...INPUT, lead: { ...INPUT.lead, whyNow: WHY } }, model);
+    expect(model.doGenerateCalls).toHaveLength(2);
+    expect(out.connectionNote).toBe(CITES.connection_note);
+    expect(out.violations.some((v) => v.rule === "why-now-missing")).toBe(false);
+  });
+
+  it("does not check citation for a lead with no why-now (unchanged behavior)", async () => {
+    const model = new MockLanguageModelV3({ doGenerate: sequence(textResponse(IGNORES)) });
+    const out = await draftLinkedIn(INPUT, model);
+    expect(model.doGenerateCalls).toHaveLength(1);
+    expect(out.violations.some((v) => v.rule === "why-now-missing")).toBe(false);
+  });
+});

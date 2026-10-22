@@ -107,6 +107,8 @@ export async function getGoalProgress(
 export interface LeadScoreDTO {
   score: number | null;
   rationale: string | null;
+  /** ML-4: the user's own "Good fit" / "Not a fit" verdict ("not_fit" = excluded from outreach) */
+  fitVerdict: "good_fit" | "not_fit" | null;
 }
 
 export async function getLeadScoreRationale(
@@ -116,13 +118,18 @@ export async function getLeadScoreRationale(
   const safe = leadName.replace(/[\\%_]/g, (c) => `\\${c}`);
   const { data } = await db
     .from("leads")
-    .select("ai_score, ai_rationale")
+    .select("id, ai_score, ai_rationale")
     .ilike("first_name", `%${safe}%`)
     .limit(1)
     .maybeSingle();
+  const { data: fit } = data?.id
+    ? await db.from("lead_feedback").select("verdict").eq("lead_id", data.id).maybeSingle()
+    : { data: null };
+  const verdict = (fit as { verdict?: string } | null)?.verdict;
   return {
     score: data?.ai_score ?? null,
     rationale: data?.ai_rationale ?? null,
+    fitVerdict: verdict === "good_fit" || verdict === "not_fit" ? verdict : null,
   };
 }
 

@@ -1,23 +1,39 @@
-import { applyRulesGate, type IntentObservationInput, type IntentVerdict, type RankCandidate, type RulesGateResult } from "@vantera/agent-brains";
+import { applyRulesGate, normalizeTargetingRules, RANK_MISS_RATIONALE, type IntentObservationInput, type IntentVerdict, type LeadInsights, type RankCandidate, type RulesGateResult } from "@vantera/agent-brains";
 import type { IcpCriteria, ProspectCandidate } from "@vantera/prospect-data";
 import type { LinkedInPost, LinkedInProfile } from "@vantera/linkedin-infra";
 import {
   INTENT_DEFAULTS,
   INTENT_ENGAGERS_PER_POST,
   INTENT_POSTS_PER_RUN,
+  INTENT_FOLLOWERS_PER_RUN,
   type IntentObservationRow,
   type IntentScanDeps,
   type IntentScanSummary,
 } from "./types";
 import { mapWithConcurrency } from "./concurrency";
 import { rankWithCompleteness } from "./rank-complete";
+import { gateWithExclusions } from "./exclusions";
+import { INTRADAY_RUNS_PER_DAY } from "./schedule";
 
 /** LinkedIn profile reads run at a LOW bounded concurrency — rule-04 account safety caps read volume. */
 const INTENT_READ_CONCURRENCY = 3;
 /** Score-write concurrency for rank persistence; under the DB pool max of 10. */
 const WRITE_CONCURRENCY = 8;
 
-type FreshObs = IntentObservationInput & { postRef: string; profileUrl: string };
+type FreshObs = Omit<IntentObservationInput, "signalKind" | "action"> & {
+  postRef: string;
+  profileUrl: string;
+  signalKind: IntentObservationRow["signalKind"];
+  /** "posted" | "commented" | "reacted" | "followed" */
+  action: string;
+};
+/** Worded observations — the only kind the buying-intent classifier judges. */
+type WordedObs = FreshObs & { signalKind: "engagement" | "content" };
+const isWorded = (o: FreshObs): o is WordedObs => o.signalKind !== "follow";
+
+/** ML-8: a follow is one observation per person, ever (ledger key profile + this synthetic post ref). */
+const FOLLOW_POST_REF = "follow";
+const FOLLOW_WHY_NOW = "Started following you on LinkedIn";
 
 const obsKey = (profileUrl: string, postRef: string) => `${profileUrl}|${postRef}`;
 
@@ -69,7 +85,13 @@ const INTENT_LEVEL: Record<string, string> = { high: "in_depth", medium: "active
  * for this" instead of judging a bare LinkedIn headline (rule 06). A LinkedIn read carries no
  * firmographics, so size/industry stay undefined — the rank weighs intent + plausible fit.
  */
-function toRankCandidate(leadId: string, c: ProspectCandidate, v: IntentVerdict, observedAt: Date): RankCandidate {
+function toRankCandidate(
+  leadId: string,
+  c: ProspectCandidate,
+  v: IntentVerdict,
+  observedAt: Date,
+  kind: FreshObs["signalKind"]
+): RankCandidate {
   return {
     leadId,
     companyName: c.companyName,
@@ -78,13 +100,16 @@ function toRankCandidate(leadId: string, c: ProspectCandidate, v: IntentVerdict,
     location: c.location,
     title: c.title,
     signals: [
-      {
-        kind: "intent",
-        label: v.why_now,
-        detail: v.why_now,
-        level: INTENT_LEVEL[v.level] ?? "active",
-        observedAt: observedAt.toISOString(),
-      },
+      // a follow is a 'follow' signal, never 'intent' — the rank weighs explicit intent above it
+      kind === "follow"
+        ? { kind: "follow", label: v.why_now, detail: v.why_now, observedAt: observedAt.toISOString() }
+        : {
+            kind: "intent",
+            label: v.why_now,
+            detail: v.why_now,
+            level: INTENT_LEVEL[v.level] ?? "active",
+            observedAt: observedAt.toISOString(),
+          },
     ],
   };
 }
@@ -117,6 +142,8 @@ export async function runIntentScan(agentId: string, deps: IntentScanDeps): Prom
     watch: { ...INTENT_DEFAULTS.watch, ...cfg.watch },
     signals: { ...INTENT_DEFAULTS.signals, ...cfg.signals },
   };
+  // ML-5: the Scout's targeting rules govern every way a person enters the funnel
+  const targeting = normalizeTargetingRules(ctx.targeting);
 
   // A creator/competitor given as a URL is watched as a profile (its own posts); given as a NAME
   // it's watched as a search query (posts mentioning it). This lets the auto-derived watchlist
@@ -129,10 +156,14 @@ export async function runIntentScan(agentId: string, deps: IntentScanDeps): Prom
     ...config.watch.keywords.map((value) => ({ kind: "query" as const, value })),
     ...config.watch.hashtags.map((v) => ({ kind: "query" as const, value: v.startsWith("#") ? v : `#${v}` })),
   ];
-  if (targets.length === 0) return { ...skipped, reason: "empty_watchlist" };
+  if (targets.length === 0 && !config.signals.follows) return { ...skipped, reason: "empty_watchlist" };
 
   const acct = ctx.connectedAccountId;
-  const perTarget = Math.max(1, Math.floor(INTENT_POSTS_PER_RUN / targets.length));
+  // ML-8: an intraday agent runs INTRADAY_RUNS_PER_DAY times a day — split the post budget so the
+  // day's LinkedIn read volume is identical to a daily run (rule 04 ceilings are non-configurable)
+  const postsBudget =
+    ctx.agent.cadence === "intraday" ? Math.max(1, Math.ceil(INTENT_POSTS_PER_RUN / INTRADAY_RUNS_PER_DAY)) : INTENT_POSTS_PER_RUN;
+  const perTarget = Math.max(1, Math.floor(postsBudget / Math.max(1, targets.length)));
 
   // 1. gather posts per watch target (account-safety: capped reads, rule 04)
   const sourced: { post: LinkedInPost; watchTarget: string }[] = [];
@@ -168,6 +199,25 @@ export async function runIntentScan(agentId: string, deps: IntentScanDeps): Prom
     };
   }
 
+  // ML-8: people who started following the connected profile — warm but wordless. One read per
+  // run; each follower is processed once ever (ledger). A failed read counts like a failed target.
+  let followersSeen = 0;
+  const followObs: FreshObs[] = [];
+  if (config.signals.follows) {
+    try {
+      const followers = await deps.linkedin.listFollowers({ connectedAccountId: acct, limit: 100 });
+      followersSeen = followers.length;
+      for (const f of followers) {
+        followObs.push({
+          ref: f.profileUrl, profileUrl: f.profileUrl, postRef: FOLLOW_POST_REF,
+          name: f.name, headline: f.headline, signalKind: "follow", action: "followed", text: "", watchTarget: null,
+        });
+      }
+    } catch {
+      sourcingErrors += 1;
+    }
+  }
+
   // 2. build observations: content (post authors) + engagement (post engagers)
   const raw: FreshObs[] = [];
   for (const { post, watchTarget } of sourced) {
@@ -200,21 +250,32 @@ export async function runIntentScan(agentId: string, deps: IntentScanDeps): Prom
 
   // dedupe within-run by (profile, post), then against the persisted ledger (cross-run)
   const withinRun = new Map<string, FreshObs>();
-  for (const o of raw) withinRun.set(obsKey(o.profileUrl, o.postRef), withinRun.get(obsKey(o.profileUrl, o.postRef)) ?? o);
+  for (const o of [...raw, ...followObs]) withinRun.set(obsKey(o.profileUrl, o.postRef), withinRun.get(obsKey(o.profileUrl, o.postRef)) ?? o);
   const candidates = [...withinRun.values()];
   const seen = await deps.store.seenObservationKeys(accountId, candidates.map((o) => ({ profileUrl: o.profileUrl, postRef: o.postRef })));
-  const fresh = candidates.filter((o) => !seen.has(obsKey(o.profileUrl, o.postRef)));
+  // Each observation gets its own short id for the classifier: one person engaging with two posts
+  // is two observations, and keying verdicts by profile url let one post's verdict (and why-now)
+  // overwrite the other's. Short ids are also echoed back more reliably than long urls.
+  const freshRaw = candidates.filter((o) => !seen.has(obsKey(o.profileUrl, o.postRef)));
+  // ML-8: new follows are bounded per run; the overflow stays unrecorded and is picked up next run
+  const freshFollows = freshRaw.filter((o) => o.signalKind === "follow").slice(0, INTENT_FOLLOWERS_PER_RUN);
+  const fresh = [...freshRaw.filter(isWorded), ...freshFollows].map((o, i) => ({ ...o, ref: `o${i}` }));
   if (fresh.length === 0) {
     await deps.store.completeRun(agentId, now());
     return {
       status: "completed", targets: targets.length, sourcingErrors,
       observed: 0, intent: 0, qualified: 0, chained: false,
-      rankMissed: 0, rankErrors: 0,
+      rankMissed: 0, rankErrors: 0, followers: followersSeen,
     };
   }
 
-  // 3. classify buying intent (the filter before any enrichment/qualification spend)
-  const verdicts = await deps.classifyFn(fresh, { accountIndustry: ctx.account.industry, valueProp: ctx.account.valueProp });
+  // 3. classify buying intent (the filter before any enrichment/qualification spend) — worded
+  // observations only; a follow has nothing to judge and never pays for a classifier call
+  const worded = fresh.filter(isWorded);
+  const verdicts =
+    worded.length > 0
+      ? await deps.classifyFn(worded, { accountIndustry: ctx.account.industry, valueProp: ctx.account.valueProp })
+      : [];
   const verdictByRef = new Map(verdicts.map((v) => [v.ref, v]));
 
   const rows: IntentObservationRow[] = [];
@@ -228,9 +289,24 @@ export async function runIntentScan(agentId: string, deps: IntentScanDeps): Prom
   const hasEvidence = (o: FreshObs) => o.text.trim().length > 0;
   const primary = new Map<string, { o: FreshObs; v: IntentVerdict }>();
   for (const o of fresh) {
+    if (o.signalKind === "follow") continue; // below — worded evidence takes the person first
     const v = verdictByRef.get(o.ref);
     if (v?.is_intent && hasEvidence(o) && !primary.has(o.profileUrl)) primary.set(o.profileUrl, { o, v });
     else rows.push(obsRow(o, "observed", v?.why_now ?? null, null));
+  }
+  // ML-8: a follow is warm but wordless — it skips the classifier, yet still faces the SAME
+  // suppression → ICP gate → rank bar below (intent is a filter, never a bypass), as a 'follow'
+  // signal. Someone already in primary for what they said is recorded, not doubled.
+  for (const o of fresh) {
+    if (o.signalKind !== "follow") continue;
+    if (primary.has(o.profileUrl)) {
+      rows.push(obsRow(o, "observed", FOLLOW_WHY_NOW, null));
+      continue;
+    }
+    primary.set(o.profileUrl, {
+      o,
+      v: { ref: o.ref, reasoning: "started following the seller's profile", is_intent: true, level: "medium", why_now: FOLLOW_WHY_NOW },
+    });
   }
 
   // 4. resolve → suppress → ICP rules gate; collect gate survivors for rank.
@@ -249,7 +325,8 @@ export async function runIntentScan(agentId: string, deps: IntentScanDeps): Prom
       if (await deps.store.isSuppressed(accountId, "linkedin", profile.profileUrl))
         return { row: obsRow(o, "suppressed", v.why_now, null), survivor: null };
       const candidate = candidateFromProfile(profile);
-      const { gate, icpId } = gateAgainstIcps(candidate, ctx.icps);
+      const { gate: icpGate, icpId } = gateAgainstIcps(candidate, ctx.icps);
+      const gate = gateWithExclusions(icpGate, candidate, targeting);
       const { leadId } = await deps.store.upsertIntentLead(accountId, candidate, gate.passed ? icpId : undefined);
       await deps.store.markRulesGate(leadId, gate);
       if (!gate.passed) return { row: obsRow(o, "rejected", v.why_now, leadId), survivor: null };
@@ -268,28 +345,43 @@ export async function runIntentScan(agentId: string, deps: IntentScanDeps): Prom
   let rankErrors = 0;
   if (survivors.length > 0) {
     const rankNow = now();
+    const feedback = await deps.store.getRankFeedback(accountId).catch(() => null);
     const ranked = await rankWithCompleteness(
       deps.rankFn,
-      survivors.map((s) => toRankCandidate(s.leadId, s.candidate, s.v, rankNow)),
+      survivors.map((s) => toRankCandidate(s.leadId, s.candidate, s.v, rankNow, s.o.signalKind)),
       {
         accountIndustry: ctx.account.industry,
         valueProp: ctx.account.valueProp,
         icpDescription: ctx.icps.map((i) => `${i.name}: ${JSON.stringify(i.criteria)}`).join(" | "),
+        feedback,
+        guidance: targeting.guidance,
       }
     );
     rankMissed = ranked.rankMissed;
     rankErrors = ranked.rankErrors;
     const byLead = new Map(ranked.insights.map((i) => [i.lead_id, i]));
-    const scored = survivors.map((s) => {
+    // A rank miss stays unscored (scored_at null) — Scout's retry stage re-ranks it later rather
+    // than this run permanently rejecting a real intent lead over a model omission/outage.
+    const scored: { s: (typeof survivors)[number]; ins: LeadInsights; qualified: boolean }[] = [];
+    for (const s of survivors) {
       const ins = byLead.get(s.leadId)!;
-      return { s, ins, qualified: ins.score >= config.minScore };
-    });
+      if (ins.rationale === RANK_MISS_RATIONALE) {
+        rows.push(obsRow(s.o, "observed", s.v.why_now, s.leadId));
+        continue;
+      }
+      scored.push({ s, ins, qualified: ins.score >= config.minScore });
+    }
     await mapWithConcurrency(scored, WRITE_CONCURRENCY, ({ s, ins, qualified }) =>
       deps.store.saveScore(s.leadId, ins, qualified)
     );
     for (const { s, qualified } of scored) {
       if (qualified) {
-        await deps.store.saveIntentSignal(s.leadId, accountId, { label: s.v.why_now, detail: s.v.why_now });
+        await deps.store.saveIntentSignal(s.leadId, accountId, {
+          label: s.v.why_now,
+          detail: s.v.why_now,
+          level: s.v.level,
+          kind: s.o.signalKind === "follow" ? "follow" : "intent",
+        });
         qualifiedLeadIds.push(s.leadId);
         rows.push(obsRow(s.o, "enrolled", s.v.why_now, s.leadId));
       } else {
@@ -314,6 +406,6 @@ export async function runIntentScan(agentId: string, deps: IntentScanDeps): Prom
   return {
     status: "completed", targets: targets.length, sourcingErrors,
     observed: fresh.length, intent: primary.size, qualified: qualifiedLeadIds.length, chained,
-    rankMissed, rankErrors,
+    rankMissed, rankErrors, followers: followersSeen,
   };
 }

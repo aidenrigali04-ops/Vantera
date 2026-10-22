@@ -61,4 +61,46 @@ describe("applyRulesGate", () => {
     expect(applyRulesGate(candidate, { seniorities: ["founder"] }).passed).toBe(true);
     expect(applyRulesGate(candidate, { seniorities: ["intern"] }).passed).toBe(false);
   });
+
+  it("matches terms at a word start, not mid-word", () => {
+    // "director" contains "cto", "Austin" contains "us", "Hospitality" contains "it" — none are matches.
+    expect(applyRulesGate(makeCandidate({ title: "Director of Sales" }), { titles: ["cto"] }).passed).toBe(false);
+    expect(applyRulesGate(makeCandidate({ location: "Austin, Texas" }), { geos: ["us"] }).passed).toBe(false);
+    expect(applyRulesGate(makeCandidate({ industry: "Hospitality" }), { industries: ["it"] }).passed).toBe(false);
+  });
+
+  it("still matches word-start terms, suffixes, and punctuated values", () => {
+    expect(applyRulesGate(makeCandidate({ industry: "IT Services" }), { industries: ["it"] }).passed).toBe(true);
+    expect(applyRulesGate(makeCandidate({ title: "Head of Engineering" }), { titles: ["engineer"] }).passed).toBe(true);
+    expect(applyRulesGate(makeCandidate({ title: "Co-Founder/CEO" }), { seniorities: ["ceo"] }).passed).toBe(true);
+    expect(applyRulesGate(makeCandidate({ companySize: "201-500" }), { companySizes: ["201-500"] }).passed).toBe(true);
+    expect(applyRulesGate(makeCandidate({ title: "VP, R&D (US)" }), { titles: ["r&d"] }).passed).toBe(true);
+  });
+
+  it("rejects job seekers regardless of ICP — someone looking for work is not a buyer", () => {
+    for (const title of [
+      "Open to Work | Former VP Sales",
+      "#OpenToWork — RevOps leader",
+      "Seeking new opportunities in SaaS sales",
+      "Ex-CTO, looking for a new role",
+      "Actively looking for my next opportunity",
+      "Marketing Director (in transition)",
+    ]) {
+      const r = applyRulesGate(makeCandidate({ title }), {});
+      expect(r.passed, title).toBe(false);
+      expect(r.reasons[0]).toContain("job seeker");
+    }
+  });
+
+  it("does not mistake buyers for job seekers", () => {
+    for (const title of [
+      "VP Sales — we're hiring SDRs",
+      "Founder, open source workflow tools",
+      "Head of Talent, looking for great engineers",
+      "CTO | building the work OS",
+    ]) {
+      expect(applyRulesGate(makeCandidate({ title }), {}).passed, title).toBe(true);
+    }
+  });
 });
+
