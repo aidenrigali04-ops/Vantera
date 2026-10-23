@@ -41,7 +41,6 @@ export interface EngineFacts {
 export interface TodayInputs {
   now: Date;
   timeZone: string;
-  firstSessionDone: boolean;
   drafts: number;
   /** drafts held because their assigned sender is down */
   draftsHeld: number;

@@ -1,6 +1,5 @@
 import { fmtDate, fmtRelative, fmtTime, fmtWindow, nextSendWindow } from "./metrics";
 import { downSenders, healthySenders } from "./state";
-import { GET_STARTED_ASK } from "./checklist";
 import type { SenderFacts, TodayInputs } from "./types";
 
 /**
@@ -76,8 +75,8 @@ export interface TileExtras {
 export const MAX_TILES = 4;
 const PER_ROW = 3;
 
-/** Kinds that may be dismissed — the tile asks plus the Get Started checklist (permanent). */
-const DISMISSIBLE: ReadonlySet<string> = new Set(["playbook_suggestion", "style_memory", "crm_handoff", "calendar_link", GET_STARTED_ASK]);
+/** Tile kinds that may be dismissed (hidden for the day). */
+const DISMISSIBLE: ReadonlySet<TileKind> = new Set(["playbook_suggestion", "style_memory", "crm_handoff", "calendar_link"]);
 
 /** A dismissed ask stays hidden for the day; a new trigger is a new day. */
 function dismissedToday(kind: TileKind, dismissed: Record<string, string>, now: Date): boolean {

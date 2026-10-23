@@ -9,7 +9,6 @@ export function inputs(over: Partial<TodayInputs> = {}): TodayInputs {
   return {
     now: NOW,
     timeZone: "America/Los_Angeles",
-    firstSessionDone: true,
     drafts: 14,
     draftsHeld: 0,
     repliesWaiting: 3,
@@ -32,12 +31,6 @@ export function inputs(over: Partial<TodayInputs> = {}): TodayInputs {
 }
 
 describe("resolveTodayState — every §8 row", () => {
-  it("a first visit with drafts is steady, not a forward", () => {
-    expect(resolveTodayState(inputs({ firstSessionDone: false, drafts: 3 }))).toBe("steady");
-  });
-  it("a first visit with an empty queue is steady too — Today explains instead", () => {
-    expect(resolveTodayState(inputs({ firstSessionDone: false, drafts: 0 }))).toBe("steady");
-  });
   it("steady: drafts or replies waiting, senders OK", () => {
     expect(resolveTodayState(inputs())).toBe("steady");
     expect(resolveTodayState(inputs({ drafts: 0 }))).toBe("steady");

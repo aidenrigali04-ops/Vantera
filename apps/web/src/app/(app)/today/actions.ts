@@ -13,7 +13,8 @@ import { GET_STARTED_ASK } from "@/lib/today/checklist";
 export type RejectReason = "wrong_person" | "bad_timing" | "weak_message" | "other";
 const REJECT_REASONS: ReadonlySet<string> = new Set(["wrong_person", "bad_timing", "weak_message", "other"]);
 
-// The tile asks hide for a day (tiles.ts); GET_STARTED_ASK hides the checklist for good.
+// The tile asks hide for a day (tiles.ts); GET_STARTED_ASK hides the checklist for good —
+// its permanence lives in `checklistFor`, not in tiles.ts.
 const DISMISSIBLE: ReadonlySet<string> = new Set(["playbook_suggestion", "style_memory", "crm_handoff", "calendar_link", GET_STARTED_ASK]);
 
 async function sessionUser() {
@@ -55,9 +56,8 @@ export async function markTodayViewed(): Promise<void> {
     .select("first_session_done_at")
     .eq("user_id", user.id)
     .maybeSingle<{ first_session_done_at: string | null }>();
-  // Reaching Today at all means the first approval session is behind this user (the page
-  // forwards to the queue until then), so stamp the flag on the way past — one write, and
-  // the redirect never has to re-derive it from history again.
+  // Stamp first_session_done_at on the first visit (kept for the profile record; Today no
+  // longer forwards new workspaces anywhere) — one write alongside the visit stamp.
   await supabase.from("user_profiles").upsert({
     user_id: user.id,
     last_today_viewed_at: now,

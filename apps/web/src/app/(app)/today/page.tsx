@@ -14,7 +14,7 @@ const TABS: readonly Tab[] = ["queue", "replies", "activity"];
 /**
  * Today — the post-payment home (Dashboard blueprint v1.0). A launchpad that answers, top
  * to bottom: is anything broken · what needs me · is it working · what exactly is waiting ·
- * what did it do while I was gone. One server round-trip (`loadToday`), server-formatted
+ * what did it do while I was gone. Server-loaded (`loadToday`), server-formatted
  * times, zero client Date.now().
  */
 export default async function TodayPage({

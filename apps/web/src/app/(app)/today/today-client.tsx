@@ -157,7 +157,6 @@ export function TodayClient({ view, tab, openDraftId }: { view: TodayView; tab: 
 
   const main = (
     <>
-        <BannerSlot banner={view.banner} className="mb-7" />
         <Greeting greeting={view.greeting} sentence={view.sentence} primary={view.primary} glyph={primaryGlyph(view.primary)} onResume={onResume} />
         <StatRow stats={view.stats} className="mt-7" />
         <ActionTileRow tiles={view.tiles} onDismiss={onDismiss} onResume={onResume} emptyText={emptyTiles} className="mt-12" />
@@ -174,23 +173,28 @@ export function TodayClient({ view, tab, openDraftId }: { view: TodayView; tab: 
   );
 
   // The Get Started rail (UX-1): only while the checklist exists; otherwise the single column
-  // stays exactly as it was. On narrow screens the rail stacks above the content.
+  // stays exactly as it was. On narrow screens the rail stacks below the repair banners.
   if (!view.checklist) {
     return (
       <TodayPageFrame>
+        <BannerSlot banner={view.banner} className="mb-7" />
         <div className="relative">{main}</div>
       </TodayPageFrame>
     );
   }
   return (
     <TodayPageFrame>
-      <div className="relative grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="relative order-2 min-w-0 lg:order-1">{main}</div>
-        <aside className="order-1 lg:order-2" aria-label="Get started">
+      <div className="relative grid gap-x-8 lg:grid-cols-[minmax(0,1fr)_320px]">
+        {/* mobile: banner, then the rail, then the page; desktop: banner + page left, rail right */}
+        <div className="min-w-0 lg:col-start-1 lg:row-start-1">
+          <BannerSlot banner={view.banner} className="mb-7" />
+        </div>
+        <aside className="mb-8 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:mb-0" aria-label="Get started">
           <div className="lg:sticky lg:top-6">
             <GetStarted checklist={view.checklist} onDismiss={() => onDismiss(GET_STARTED_ASK)} />
           </div>
         </aside>
+        <div className="relative min-w-0 lg:col-start-1 lg:row-start-2">{main}</div>
       </div>
     </TodayPageFrame>
   );
