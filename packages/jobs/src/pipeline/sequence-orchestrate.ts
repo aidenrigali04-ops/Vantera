@@ -48,6 +48,7 @@ export async function driveSequenceRun(
       accountPaused: item.accountPaused,
       killSwitch: env.killSwitch,
       leadReplied: item.leadReplied,
+      connection: item.connection,
       now: env.now,
     };
     const decision = advanceSequence(ctx);
@@ -57,8 +58,8 @@ export async function driveSequenceRun(
     const claimed = await env.store.applyRunPatch(run.id, run.nextActionAt, decision.patch);
     if (!claimed) return { dispatched: 0, archived: 0 };
 
-    // park: the soft-no revival wrote its future next_action_at — nothing more this tick
-    if (decision.kind === "park") return { dispatched: 0, archived: 0 };
+    // park (soft-no revival) / wait (connection pending): next_action_at is written — done this tick
+    if (decision.kind === "park" || decision.kind === "wait") return { dispatched: 0, archived: 0 };
 
     if (decision.kind === "dispatch") {
       await env.dispatch.dispatchTouch({

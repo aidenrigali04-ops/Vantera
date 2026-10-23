@@ -1,14 +1,8 @@
 import { redirect } from "next/navigation";
-import {
-  buildTargetingProfile,
-  describeStrategy,
-  topTiltSegment,
-  type CopyStrategy,
-} from "@vantera/agent-brains";
+import { buildTargetingProfile, topTiltSegment } from "@vantera/agent-brains";
 import { createClient } from "@/lib/supabase/server";
 import { orThrow } from "@/lib/supabase/guard";
 import { getGateData } from "@/lib/auth/context";
-import { countInterestedSince } from "@/lib/optimize";
 import { shapePipeline } from "../pipeline/queries";
 import {
   buildRevenueSeries,
@@ -421,94 +415,12 @@ async function OverviewTab() {
   // proof). Surfaced as a one-liner on Overview when there's at least one attributed win.
   const signalAttribution = await loadSignalAttribution(supabase);
 
-  // Vera's learning log — the self-optimizing loop's visible heartbeat on the Overview
-  // (retention brief: variable reward + goal-gradient against the silent-wait churn cliff).
-  // Every line is a real, RLS-scoped fact: the live test with its enrollment progress, the
-  // latest adoption with real receipts, and the targeting focus. Never a placeholder.
-  const STAGE_LABEL: Record<string, string> = {
-    acceptance: "connection accepts",
-    reply: "interested replies",
-    booking: "booked meetings",
-    close: "closed deals",
-  };
-  const [{ data: runningExp }, { data: adoptedExp }, { data: playbook }] = await Promise.all([
-    supabase
-      .from("optimization_experiments")
-      .select("id, stage_key, challenger_strategy, started_at, min_sample")
-      .eq("status", "running")
-      .order("started_at", { ascending: false })
-      .limit(1)
-      .maybeSingle<{
-        id: string;
-        stage_key: string;
-        challenger_strategy: CopyStrategy;
-        started_at: string;
-        min_sample: number;
-      }>(),
-    supabase
-      .from("optimization_experiments")
-      .select("challenger_strategy, decision_reason, concluded_at")
-      .eq("status", "adopted")
-      .order("concluded_at", { ascending: false })
-      .limit(1)
-      .maybeSingle<{
-        challenger_strategy: CopyStrategy;
-        decision_reason: string | null;
-        concluded_at: string | null;
-      }>(),
-    supabase.from("optimization_playbook").select("version").maybeSingle<{ version: number }>(),
-  ]);
-
-  let testing: LearningProps["testing"] = null;
-  if (runningExp) {
-    const { count: enrolled } = await supabase
-      .from("leads")
-      .select("id", { count: "exact", head: true })
-      .eq("experiment_id", runningExp.id);
-    testing = {
-      label: describeStrategy(runningExp.challenger_strategy ?? {}),
-      stageLabel: STAGE_LABEL[runningExp.stage_key] ?? runningExp.stage_key,
-      startedAgo: timeAgo(runningExp.started_at),
-      enrolled: enrolled ?? 0,
-      // decision needs min_sample RESULTS per side; enrollment is the honest leading proxy
-      targetEnrolled: runningExp.min_sample * 2,
-    };
-  }
-
-  let adopted: LearningProps["adopted"] = null;
-  if (adoptedExp && !(adoptedExp.decision_reason ?? "").includes("· reverted")) {
-    // Stage-1 receipts under the adopted play: sends stamped with the CURRENT playbook
-    // version + distinct leads among them that replied interested since the adoption.
-    let receipts: { sent: number; interested: number } | null = null;
-    if (playbook?.version) {
-      const { data: stamped } = await supabase
-        .from("scheduled_sends")
-        .select("lead_id")
-        .eq("status", "sent")
-        .eq("recipe->>playbookVersion", String(playbook.version))
-        .returns<{ lead_id: string }[]>();
-      if ((stamped ?? []).length > 0) {
-        const { data: interestedAll } = await supabase
-          .from("replies")
-          .select("lead_id, received_at")
-          .eq("classification", "interested")
-          .returns<{ lead_id: string; received_at: string }[]>();
-        receipts = {
-          sent: (stamped ?? []).length,
-          interested: countInterestedSince(
-            new Set((stamped ?? []).map((r) => r.lead_id)),
-            interestedAll ?? [],
-            adoptedExp.concluded_at
-          ),
-        };
-      }
-    }
-    adopted = {
-      label: describeStrategy(adoptedExp.challenger_strategy ?? {}),
-      whenAgo: timeAgo(adoptedExp.concluded_at),
-      receipts,
-    };
-  }
+  // Vera's learning log on the Overview: the playbook version and the targeting focus. Every
+  // line is a real, RLS-scoped fact — never a placeholder.
+  const { data: playbook } = await supabase
+    .from("optimization_playbook")
+    .select("version")
+    .maybeSingle<{ version: number }>();
 
   // Targeting focus (Stage 2): the buyer segment being prioritized, from real outcomes.
   let focus: LearningProps["focus"] = null;
@@ -554,8 +466,6 @@ async function OverviewTab() {
 
   const learning: LearningProps = {
     playbookVersion: playbook?.version ?? null,
-    testing,
-    adopted,
     focus,
   };
 

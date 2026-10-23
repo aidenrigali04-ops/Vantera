@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { APP_HOME } from "@/lib/auth/home";
 
 export async function acceptInvite(token: string): Promise<{ error?: string }> {
   const supabase = await createClient();
@@ -20,5 +21,5 @@ export async function acceptInvite(token: string): Promise<{ error?: string }> {
 
   // data is the account_id returned by the RPC — redirect on success
   void data;
-  redirect("/today");
+  redirect(APP_HOME);
 }

@@ -41,7 +41,7 @@ const bundle = (over: Partial<ResponderBundle> = {}): ResponderBundle => ({
   newestUnsentMessageCreatedAt: null,
   lastAgentMessageAt: null,
   humanHandled: false,
-  attribution: { experimentId: null, variant: null, strategy: {}, playbookVersion: null },
+  attribution: { strategy: {}, playbookVersion: null },
   ...over,
 });
 
@@ -111,12 +111,12 @@ describe("runSequenceTouch", () => {
     expect(captured?.incoming).toBeUndefined();
   });
 
-  it("stamps the proactive follow-up with a sequence_followup recipe carrying the lead's arm (Stage 1)", async () => {
+  it("stamps the proactive follow-up with a sequence_followup recipe (Stage 1)", async () => {
     const insert = vi.fn(async () => {});
     const d = deps({
       getResponderBundle: async () =>
         bundle({
-          attribution: { experimentId: "exp-3", variant: "challenger", strategy: {}, playbookVersion: null },
+          attribution: { strategy: {}, playbookVersion: null },
         }),
       insertScheduledSend: insert,
     });
@@ -127,8 +127,8 @@ describe("runSequenceTouch", () => {
           v: 2,
           brain: "sequence_followup",
           strategy: {},
-          experimentId: "exp-3",
-          variant: "challenger",
+          experimentId: null,
+          variant: null,
           playbookVersion: null,
           exemplars: 0,
           promptHash: RESPOND_SYSTEM.hash,
@@ -144,8 +144,6 @@ describe("runSequenceTouch", () => {
       getResponderBundle: async () =>
         bundle({
           attribution: {
-            experimentId: "exp-3",
-            variant: "challenger",
             strategy: { askStyle: "specific" },
             playbookVersion: 3,
           },
@@ -182,6 +180,31 @@ describe("runSequenceTouch", () => {
     const out = await runSequenceTouch(dispatch, d);
     expect(out).toBe("skipped");
     expect(insert).not.toHaveBeenCalled();
+  });
+
+  it("never sends a scripted nudge when the lead's message is the last, unanswered turn", async () => {
+    // A proactive nudge is written as "they haven't replied" — on a thread whose last word is
+    // the lead's, it reads as ignoring them. The touch skips; answering is the responder's job
+    // (or, past its freshness window, the stale-reply sweep's needs_human alert).
+    const draftFn = vi.fn();
+    const d = deps(
+      {
+        getResponderBundle: async () =>
+          bundle({
+            thread: [
+              { role: "agent", text: "Thanks for connecting, Sam." },
+              { role: "lead", text: "What would this cost for a 10-person team?" },
+            ],
+          }),
+      },
+      "ok",
+      [],
+      draftFn
+    );
+    const out = await runSequenceTouch(dispatch, d);
+    expect(out).toBe("skipped");
+    expect(draftFn).not.toHaveBeenCalled();
+    expect(d.store.insertScheduledSend).not.toHaveBeenCalled();
   });
 
   it("forces review on a style-flagged draft even in automatic mode", async () => {

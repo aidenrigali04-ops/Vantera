@@ -1,14 +1,14 @@
 ---
-title: What's working — how Vera tests and improves your outreach
+title: What's working — how Vera reads and improves your outreach
 surface: analytics
 routes: /dashboard?view=analytics
 ---
 
 # What's working
 
-On the **Analytics** tab, the **What's working** panel is the visible face of Vera's improvement
-loop: your outreach funnel, what Vera is testing right now, and the latest adoption — with the
-proof behind each.
+On the **Analytics** tab, the **What's working** panel shows where your outreach converts and
+where it leaks: your outreach funnel, the one change most likely to help, and the buyers Vera is
+prioritizing — with the real numbers behind each.
 
 ## Where Vera starts
 
@@ -31,37 +31,18 @@ touches — not blast volume). The band is a reference, never a target or a prom
 counts once enough touches have completed, and the panel shows a **95% confidence interval** so
 you can see how firm each number is — Vera will not invent a problem from a few touches.
 
-## How the testing works
+## The recommended change
 
-Vera runs one careful test at a time: a single change (for example, opening from the prospect's
-pain instead of their trigger), tried on a small slice of new drafts and measured against your
-current approach on real outcomes.
-
-Vera also comes up with what to test next. New candidate approaches are generated — including
-fresh opener angles beyond the built-in styles — then screened by hard rules (an angle can never
-add numbers, prices, or promises), and the most promising candidate is picked using the real
-results of every approach tried so far. Approaches that keep winning get tested more; unproven
-ideas still get their fair shot. What actually becomes your default is decided the same way as
-always: a controlled test on real outcomes, with the do-no-harm circuit breaker.
-
-- **If it genuinely wins** — with statistical confidence, not vibes — Vera surfaces it in the
-  panel as a **ready-to-adopt suggestion**, with the real numbers behind it. Nothing changes
-  until you approve it: click **Adopt as default** to make it your new approach, or **Keep
-  current** to stay put. Vera holds that slot until you decide. Once you act, Vera doesn't
-  automatically start another test on your behalf — you'll see a new one offered when a leak is
-  diagnosed, ready for you to start.
-- **If it loses**, it's dropped automatically and your current approach stands — the next test
-  is lined up right away.
-- **If it ever does harm** — more negative replies — a circuit breaker stops it immediately and
-  the next test is lined up. A variant that gets more replies but angrier ones loses.
+When one stage is clearly leaking, the panel names the single change most likely to fix it —
+for example, tightening who you target when connection requests aren't being accepted — and
+links you straight to where you make it. It's a suggestion, never an automatic change, and it
+only appears once there's enough data to trust.
 
 ## Every message keeps its receipt
 
 Every message Vera drafts is stamped with the exact approach used to write it — which opener
-style, which test it belonged to, which version of your playbook. When a change is adopted,
-the panel shows the real numbers behind it: how many messages have gone out under the new
-approach and how many earned an interested reply. The numbers are always your real results —
-never estimates, and never shown before at least one message has actually been sent.
+style and which version of your playbook — so your results can always be traced back to how
+each message was written.
 
 ## Vera learns who your real buyers are
 
@@ -82,11 +63,8 @@ messages is ever shared with any other account.
 
 ## You stay in charge
 
-- Every adoption shows in the panel with a **Revert to the previous approach** button — one
-  click undoes it.
-- Nothing sends without your approval in review mode, tested or not.
-- Every draft — including every test — passes the same honesty and humanity checks. A test can
-  change how a message is written, never what it claims.
+- Nothing sends without your approval in review mode.
+- Every draft passes the same honesty and humanity checks, whatever approach wrote it.
 
 ## What Vera will never do
 

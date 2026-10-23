@@ -55,12 +55,12 @@ describe("resolveStartStep — furthest incomplete step", () => {
   });
 
   it("onboarding complete → /dashboard from any state (legacy or post-payment users never re-enter)", () => {
-    expect(resolveStartStep(ctx({ isAuthenticated: true, onboardingComplete: true }))).toBe("/dashboard");
+    expect(resolveStartStep(ctx({ isAuthenticated: true, onboardingComplete: true }))).toBe("/today");
     expect(
       resolveStartStep(
         ctx({ isAuthenticated: true, hasAccount: true, businessConfirmed: true, onboardingComplete: true })
       )
-    ).toBe("/dashboard");
+    ).toBe("/today");
   });
 });
 

@@ -157,25 +157,6 @@ export async function fixDraft(
     : {};
 }
 
-export async function declineDraft(
-  _prev: ReviewActionState,
-  formData: FormData
-): Promise<ReviewActionState> {
-  const sendId = String(formData.get("sendId") ?? "");
-  if (!sendId) return { error: "Invalid request." };
-  const { supabase, user } = await session();
-  if (!user) return { error: "Your session expired. Sign in again." };
-
-  const { error } = await supabase
-    .from("scheduled_sends")
-    .update({ status: "canceled" })
-    .eq("id", sendId)
-    .eq("status", "pending_review");
-  if (error) return { error: "Could not decline the draft. Only workspace admins can review." };
-  revalidatePath("/approvals");
-  return {};
-}
-
 export async function declineAndSuppress(
   _prev: ReviewActionState,
   formData: FormData

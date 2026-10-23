@@ -1,4 +1,5 @@
 import { safeNext } from "./safe-next";
+import { APP_HOME } from "./home";
 
 export type GateArea = "auth" | "onboarding" | "app";
 
@@ -12,10 +13,10 @@ export type GateContext = {
 export function resolveGate(area: GateArea, ctx: GateContext): string | null {
   switch (area) {
     case "auth":
-      return ctx.isAuthenticated ? "/today" : null;
+      return ctx.isAuthenticated ? APP_HOME : null;
     case "onboarding":
       if (!ctx.isAuthenticated) return "/login";
-      return ctx.onboardingComplete ? "/today" : null;
+      return ctx.onboardingComplete ? APP_HOME : null;
     case "app":
       if (!ctx.isAuthenticated) return "/login";
       if (!ctx.hasAccount || !ctx.onboardingComplete) return "/onboarding";

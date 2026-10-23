@@ -13,7 +13,7 @@ export function AcceptButton({ token }: { token: string }) {
       setError(null);
       const result = await acceptInvite(token);
       if (result?.error) setError(result.error);
-      // on success acceptInvite calls redirect("/today") — no explicit handling needed
+      // on success acceptInvite calls redirect(APP_HOME) — no explicit handling needed
     });
   }
 

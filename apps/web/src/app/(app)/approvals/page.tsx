@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Inbox } from "lucide-react";
+import { CheckCircle2, Inbox } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { orThrow } from "@/lib/supabase/guard";
 import { Panel } from "@/components/ui/panel";
@@ -130,6 +130,17 @@ export default async function ReviewPage({
 
   const groups = view === "queue" ? groupByProspect((rows ?? []) as unknown as DraftRow[]) : [];
 
+  // An empty queue after real reviews is a finish line, not a blank page: it gets its own
+  // "all caught up" state with the next places to go (only read when the queue is empty).
+  let caughtUp = false;
+  if (view === "queue" && (!rows || rows.length === 0)) {
+    const { count: reviewed } = await supabase
+      .from("scheduled_sends")
+      .select("id", { count: "exact", head: true })
+      .neq("status", "pending_review");
+    caughtUp = (reviewed ?? 0) > 0;
+  }
+
   // Processed tab: pull the prospects' replies (RLS-scoped) so the log reads as a real
   // conversation — the agent's copy and the prospect's responses, not just statuses.
   let processedGroups: ProcessedConversationGroup[] = [];
@@ -203,7 +214,32 @@ export default async function ReviewPage({
 
       <div className="min-h-0 flex-1 lg:overflow-y-auto">
 
-      {!rows || rows.length === 0 ? (
+      {caughtUp ? (
+        <Panel className="flex flex-col items-center gap-3 py-10 text-center">
+          <span className="grid size-11 place-items-center rounded-xl bg-[var(--positive-tint)] text-[var(--positive)]">
+            <CheckCircle2 className="size-5" strokeWidth={2} />
+          </span>
+          <h2 className="font-heading text-base font-semibold">You&apos;re all caught up</h2>
+          <p className="mx-auto max-w-md text-pretty text-sm text-muted-foreground">
+            Everything you approved sends at a human pace. New drafts land here as more prospects
+            qualify.
+          </p>
+          <div className="mt-1 flex flex-wrap justify-center gap-2">
+            <Link
+              href="/inbox"
+              className="rounded-[var(--r-btn)] bg-[var(--ink)] px-3.5 py-2 text-sm font-medium text-[var(--ink-fg)] transition-opacity hover:opacity-90"
+            >
+              Check the Inbox
+            </Link>
+            <Link
+              href="/approvals?view=processed"
+              className="rounded-[var(--r-btn)] border border-[var(--line)] bg-[var(--surface)] px-3.5 py-2 text-sm font-medium text-[var(--ink)] transition-colors hover:bg-[var(--surface-2)]"
+            >
+              See what&apos;s sending
+            </Link>
+          </div>
+        </Panel>
+      ) : !rows || rows.length === 0 ? (
         <Panel className="flex flex-col items-center gap-3 border-dashed py-10 text-center">
           <span className="grid size-11 place-items-center rounded-xl bg-[#d5efdf] text-[#13824a]">
             <Inbox className="size-5" strokeWidth={2} />

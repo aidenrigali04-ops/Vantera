@@ -6,7 +6,7 @@ routes: /dashboard
 
 # Understanding your Results dashboard
 
-**Results** is your home base — one place that proves the system is working. It has three tabs along the top: **Overview** (revenue, goal pace, live agents, top prospects, recent replies), **Analytics** (the conversion funnel and return on spend), and **Pipeline** (the live, stage-by-stage view of every prospect your agents are working).
+**Results** is the deeper view behind Today — open it from search (⌘K) when you want the full picture of what's working. It has three tabs along the top: **Overview** (revenue, goal pace, live agents, top prospects, recent replies), **Analytics** (the conversion funnel and return on spend), and **Pipeline** (the live, stage-by-stage view of every prospect your agents are working).
 
 On the **Overview** tab:
 
@@ -15,7 +15,7 @@ On the **Overview** tab:
 - **Getting started** — your setup checklist. Launching your first campaign and getting your first reply unlock as those features arrive.
 - **Prospect Agent** — your agent's status. *Standing by* means it's ready and waiting for a campaign; it flips to *Live* when one launches.
 - **Hot leads** — your strongest-fit prospects to work today. The top prospect is spotlighted with its live **buying signal** (the "why now"), what a client like this is worth toward your goal, and the one next action — if a draft is already waiting for that person, the card links you straight to Approvals. The rest queue below it, each led by its own signal. Prospects marked **In-market** were surfaced by your Intent Agent because they're showing buying behavior on LinkedIn right now — engaging your competitors or posting about your space.
-- **Vera is learning** — the self-optimizing loop, live. It shows the test running right now with its progress toward a decision, the last change Vera adopted (with the real send and reply numbers since), and which buyer segment is being prioritized based on your actual outcomes. Every line is real data from your account — click through to Analytics for the full loop.
+- **Vera is learning** — which buyer segment is being prioritized based on your actual outcomes, and the version of your playbook in use. Every line is real data from your account — click through to Analytics for the full funnel.
 - **Warm replies** — interested replies that are still **waiting on your answer**. Once a reply has been answered (by you or by the agent) it leaves this list, so the count always matches reality. Not-interested replies never appear here — they show in the notification bell and stop the sequence automatically.
 
 **Meetings** in the sidebar lists every booked meeting your outreach produced — detected from

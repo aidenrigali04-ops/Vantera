@@ -38,6 +38,7 @@ function makeSender(over: Partial<DispatchSender> = {}): DispatchSender {
     last7d: 0,
     sentTodayMessages: 0,
     lastAssignedAt: 0,
+    scheduledUntil: 0,
     healthy: true,
     ...over,
   };
@@ -802,5 +803,55 @@ describe("warmPriority (ML-8)", () => {
     expect(warmFirst(rows).map((r) => r.id)).toEqual([
       "reply", "manual", "convo", "accept-newer", "accept-older", "followup", "invite-old", "invite-new",
     ]);
+  });
+});
+
+describe("runSendDispatch — pacing continuity and the send window at landing time", () => {
+  const NOW = new Date("2026-06-12T10:00:00Z"); // Friday, UTC window 08:00–16:59
+
+  it("continues a sender's pacing after its already-scheduled sends instead of restarting at now", async () => {
+    const store = new FakeDispatchStore();
+    const queuedUntil = new Date(NOW.getTime() + 2 * 3_600_000); // previous ticks queued to 12:00
+    store.senders = [makeSender({ scheduledUntil: queuedUntil.getTime() })];
+    store.sends = [makeSend({ id: "inv1" })];
+    const enqueued: { sendId: string; runAt: Date }[] = [];
+    await runSendDispatch({ ...makeDeps(store, enqueued), now: () => NOW });
+    expect(enqueued).toHaveLength(1);
+    expect(enqueued[0]!.runAt.getTime()).toBeGreaterThan(queuedUntil.getTime());
+  });
+
+  it("leaves a proactive send queued (budget unspent) when it would land after the window closes", async () => {
+    const store = new FakeDispatchStore();
+    // queued to 16:55 already — the next paced send would land after 17:00
+    store.senders = [makeSender({ scheduledUntil: new Date("2026-06-12T16:55:00Z").getTime() })];
+    store.sends = [makeSend({ id: "inv1" })];
+    const result = await runSendDispatch({ ...makeDeps(store), now: () => NOW });
+    expect(result.scheduled).toBe(0);
+    expect(result.skipped).toBe(1);
+    expect(store.scheduled).toHaveLength(0);
+    expect(store.assigned).toHaveLength(0);
+  });
+
+  it("a reply-response is exempt from the landing-time window (answering promptly is human)", async () => {
+    const store = new FakeDispatchStore();
+    store.senders = [makeSender({ scheduledUntil: new Date("2026-06-12T16:55:00Z").getTime() })];
+    store.sends = [
+      makeSend({
+        id: "r1", linkedinStage: "message", origin: "reply_response",
+        leadConnectedAt: new Date("2026-06-01T00:00:00Z"), leadAssignedSenderId: "li1",
+      }),
+    ];
+    const result = await runSendDispatch({ ...makeDeps(store), now: () => NOW });
+    expect(result.scheduled).toBe(1);
+  });
+});
+
+describe("runSendDispatch — never invites an existing connection", () => {
+  it("cancels the invite row of a lead who is already connected", async () => {
+    const store = new FakeDispatchStore();
+    store.sends = [makeSend({ id: "inv1", linkedinStage: "invite", leadConnectedAt: new Date("2026-06-01T00:00:00Z") })];
+    const result = await runSendDispatch(makeDeps(store));
+    expect(result.scheduled).toBe(0);
+    expect(store.canceled).toEqual([{ sendId: "inv1", error: "already connected" }]);
   });
 });

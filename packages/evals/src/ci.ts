@@ -1,8 +1,18 @@
 import { pathToFileURL } from "node:url";
 import type { LanguageModel } from "ai";
-import { draftLinkedIn, draftConversationMessage } from "@vantera/agent-brains";
+import {
+  draftLinkedIn,
+  draftConversationMessage,
+  leadBlock,
+  linkedinJudgeText,
+  renderThread,
+  LINKEDIN_PAIR_MESSAGE_TYPE,
+  type ConversationDraft,
+  type JudgeVerdict,
+  type LinkedInDraft,
+} from "@vantera/agent-brains";
 import { getClassifierModel, getModel } from "@vantera/ai";
-import { loadCopyLinkedinCorpus, loadCopyRespondCorpus } from "./corpus";
+import { loadCopyLinkedinCorpus, loadCopyRespondCorpus, type CopyLinkedinCase, type CopyRespondCase } from "./corpus";
 import { runDeterministic } from "./run-deterministic";
 import { runReplyFloors, runIntentFloors, runIntentHardFloors, runRankFloors } from "./run-classifier";
 import type { FloorReport } from "./graders/classifier";
@@ -68,7 +78,25 @@ export const DETERMINISTIC_LIVE_FLOOR = 0.9;
 
 export type DeterministicFailure = { caseId: string; rules: string[] };
 export type DeterministicSummary = { passRate: number; failures?: DeterministicFailure[] };
-export type JudgeSummary = { averageOverall: number; n: number };
+/** One judged case — every rubric dimension plus the judge's rationale, so a low average explains itself. */
+export type JudgeCaseResult = {
+  caseId: string;
+  specificity: number;
+  themFocus: number;
+  posture: number;
+  naturalness: number;
+  overall: number;
+  rationale: string;
+};
+export type JudgeDimensionMeans = Pick<JudgeCaseResult, "specificity" | "themFocus" | "posture" | "naturalness" | "overall">;
+export type JudgeSummary = {
+  averageOverall: number;
+  n: number;
+  /** per-case verdicts (absent in hand-built decide() fixtures) */
+  cases?: JudgeCaseResult[];
+  /** per-dimension means over `cases` */
+  dimensionMeans?: JudgeDimensionMeans;
+};
 
 export type CiInputs = {
   deterministic: DeterministicSummary;
@@ -170,7 +198,63 @@ export function isAnthropicCreditError(err: unknown): boolean {
   return false;
 }
 
-type LiveCandidate = { caseId: string; text: string; grounding: string; cta?: string };
+export type LiveCandidate = {
+  caseId: string;
+  text: string;
+  grounding: string;
+  cta?: string;
+  /** what kind of message this is (judge context line) */
+  messageType?: string;
+  /** conversation replies: the thread so far + the prospect's latest message */
+  conversation?: string;
+  /** text for the pairwise harness, in the SAME flat format as the frozen baselines it is compared
+   *  against (`note\nfollow-up`) — so the labeled judge format never biases the head-to-head */
+  pairwiseText?: string;
+};
+
+export type JudgeInputContext = Omit<LiveCandidate, "caseId" | "text" | "pairwiseText">;
+
+/**
+ * Judge candidate for a first-touch pair. Grounding is the SAME leadBlock the writer saw (not the
+ * fixture's hand-written grounding string, which omits triggers/motivations/aha moment/what they
+ * do — the judge was docking specificity for facts it was never shown), and the pair is judged as
+ * labeled parts so the judge can tell whether the follow-up builds on the note.
+ */
+export function linkedinJudgeCandidate(c: CopyLinkedinCase, draft: Pick<LinkedInDraft, "connectionNote" | "followupMessage">): LiveCandidate {
+  return {
+    caseId: c.id,
+    text: linkedinJudgeText(draft),
+    grounding: leadBlock(c.input),
+    cta: c.input.context.cta,
+    messageType: LINKEDIN_PAIR_MESSAGE_TYPE,
+    pairwiseText: `${draft.connectionNote}\n${draft.followupMessage}`,
+  };
+}
+
+/**
+ * Judge candidate for a conversation message: the judge sees the thread so far and the prospect's
+ * latest message, plus a message-type line — a short reply that answers what they asked is judged
+ * as the right reply, not as a cold opener that lacks prospect facts.
+ */
+export function respondJudgeCandidate(c: CopyRespondCase, draft: Pick<ConversationDraft, "message">): LiveCandidate {
+  const { lead, insights, context, thread, incoming, classification } = c.input;
+  const conversation = [
+    renderThread(thread),
+    incoming ? `Prospect (latest message${classification ? `, classified ${classification}` : ""}): ${incoming}` : null,
+  ]
+    .filter((l): l is string => l !== null)
+    .join("\n");
+  return {
+    caseId: c.id,
+    text: draft.message,
+    grounding: leadBlock({ lead, insights, context }),
+    cta: context.cta,
+    messageType: incoming
+      ? "LinkedIn conversation reply to the prospect's latest message"
+      : "LinkedIn conversation follow-up (the prospect has not replied to your last message yet)",
+    conversation,
+  };
+}
 
 /**
  * One live draft per corpus case (both `copy-linkedin` and `copy-respond`), via the SAME
@@ -187,29 +271,52 @@ async function generateLiveCandidates(model: LanguageModel): Promise<LiveCandida
   const out: LiveCandidate[] = [];
 
   for (const c of linkedinCases) {
-    const draft = await draftLinkedIn(c.input, model);
-    out.push({
-      caseId: c.id,
-      text: `${draft.connectionNote}\n${draft.followupMessage}`,
-      grounding: c.grounding,
-      cta: c.input.context.cta,
-    });
+    out.push(linkedinJudgeCandidate(c, await draftLinkedIn(c.input, model)));
   }
   for (const c of respondCases) {
-    const draft = await draftConversationMessage(c.input, model);
-    out.push({ caseId: c.id, text: draft.message, grounding: c.grounding, cta: c.input.context.cta });
+    out.push(respondJudgeCandidate(c, await draftConversationMessage(c.input, model)));
   }
   return out;
 }
 
-async function scoreJudge(candidates: LiveCandidate[], judgeModel: LanguageModel): Promise<JudgeSummary> {
-  if (candidates.length === 0) return { averageOverall: 0, n: 0 };
-  let sum = 0;
-  for (const c of candidates) {
-    const verdict = await judgeCopy({ text: c.text }, { grounding: c.grounding, cta: c.cta }, judgeModel);
-    sum += verdict.overall;
+const DIMENSIONS = ["specificity", "themFocus", "posture", "naturalness", "overall"] as const;
+
+/** Pure fold of per-case verdicts into the summary (means per dimension). */
+export function summarizeJudgeCases(cases: JudgeCaseResult[]): JudgeSummary {
+  if (cases.length === 0) return { averageOverall: 0, n: 0, cases: [] };
+  const mean = (k: (typeof DIMENSIONS)[number]) => cases.reduce((sum, c) => sum + c[k], 0) / cases.length;
+  const dimensionMeans = Object.fromEntries(DIMENSIONS.map((k) => [k, mean(k)])) as JudgeDimensionMeans;
+  return { averageOverall: dimensionMeans.overall, n: cases.length, cases, dimensionMeans };
+}
+
+/** The `k` lowest-`overall` cases (ties keep corpus order) — what to read first when the mean dips. */
+export function lowestJudgeCases(cases: JudgeCaseResult[], k = 5): JudgeCaseResult[] {
+  return cases
+    .map((c, i) => ({ c, i }))
+    .sort((a, b) => a.c.overall - b.c.overall || a.i - b.i)
+    .slice(0, k)
+    .map(({ c }) => c);
+}
+
+export async function scoreJudge(
+  candidates: LiveCandidate[],
+  judge: (draft: { text: string }, ctx: JudgeInputContext) => Promise<JudgeVerdict>
+): Promise<JudgeSummary> {
+  const cases: JudgeCaseResult[] = [];
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- pairwiseText is pairwise-only
+  for (const { caseId, text, pairwiseText, ...ctx } of candidates) {
+    const v = await judge({ text }, ctx);
+    cases.push({
+      caseId,
+      specificity: v.specificity,
+      themFocus: v.themFocus,
+      posture: v.posture,
+      naturalness: v.naturalness,
+      overall: v.overall,
+      rationale: v.rationale,
+    });
   }
-  return { averageOverall: sum / candidates.length, n: candidates.length };
+  return summarizeJudgeCases(cases);
 }
 
 /** Injectable seams for `orchestrate()` — `main()` wires the real functions; `ci.test.ts` wires
@@ -245,11 +352,34 @@ export async function orchestrate(deps: CiDeps, judgeGating: boolean): Promise<O
     ...(await deps.runRankFloors()),
   ];
   const candidates = await deps.generateLiveCandidates();
-  const pairwise = await deps.runPairwise(candidates.map(({ caseId, text }) => ({ caseId, text })));
+  const pairwise = await deps.runPairwise(
+    candidates.map(({ caseId, text, pairwiseText }) => ({ caseId, text: pairwiseText ?? text }))
+  );
   const judge = await deps.scoreJudge(candidates);
 
   const decision = decide({ deterministic, floors, pairwise, judge, judgeGating });
   return { decision, deterministic, floors, pairwise, judge };
+}
+
+/** Per-dimension means + the 5 lowest cases with rationales — pure so it's testable. */
+export function judgeDetailLines(judge: JudgeSummary): string[] {
+  const lines: string[] = [];
+  if (judge.dimensionMeans) {
+    const m = judge.dimensionMeans;
+    lines.push(
+      `  dimension means: specificity=${m.specificity.toFixed(2)} themFocus=${m.themFocus.toFixed(2)} posture=${m.posture.toFixed(2)} naturalness=${m.naturalness.toFixed(2)} overall=${m.overall.toFixed(2)}`
+    );
+  }
+  const lowest = lowestJudgeCases(judge.cases ?? []);
+  if (lowest.length > 0) {
+    lines.push(`  lowest ${lowest.length} case(s):`);
+    for (const c of lowest) {
+      lines.push(
+        `    - ${c.caseId}: overall=${c.overall} (spec=${c.specificity} them=${c.themFocus} posture=${c.posture} natural=${c.naturalness}) ${c.rationale}`
+      );
+    }
+  }
+  return lines;
 }
 
 function printSummary(result: OrchestrationResult, judgeGating: boolean): void {
@@ -271,6 +401,7 @@ function printSummary(result: OrchestrationResult, judgeGating: boolean): void {
   console.log(
     `judge (${judgeGating ? "HARD — EVALS_JUDGE_GATING=1" : "advisory"}): averageOverall=${judge.averageOverall.toFixed(2)} n=${judge.n} floor=${JUDGE_OVERALL_GATE_FLOOR}`
   );
+  for (const line of judgeDetailLines(judge)) console.log(line);
 
   if (decision.advisoryFlags.length > 0) {
     console.log("--- advisory (not gating) ---");
@@ -318,7 +449,7 @@ export async function main(): Promise<number> {
     runRankFloors: () => runRankFloors(classifierModel),
     generateLiveCandidates: () => generateLiveCandidates(draftingModel),
     runPairwise: (candidates) => runPairwise(candidates, judgeModel),
-    scoreJudge: (candidates) => scoreJudge(candidates, judgeModel),
+    scoreJudge: (candidates) => scoreJudge(candidates, (draft, ctx) => judgeCopy(draft, ctx, judgeModel)),
   };
 
   // Fail SAFE on any throw from the run (e.g. a future fixture missing its frozenDraft, a

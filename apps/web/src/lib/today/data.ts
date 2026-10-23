@@ -520,17 +520,20 @@ export async function loadToday(supabase: SupabaseClient, userId: string, now = 
     {
       label: "Sent · 7 days",
       value: fmtCount(sent7),
+      href: "/approvals?view=processed",
       note: sent7 === 0 ? "none yet" : `‹${todaySends.length}› today · ‹${healthyCount}› ${healthyCount === 1 ? "sender" : "senders"}`,
     },
-    { label: "Replies · 7 days", value: fmtCount(replies7), note: replies7 === 0 ? "none yet" : rate === null ? "— of sends" : `‹${rate.toFixed(1)}%› of sends` },
+    { label: "Replies · 7 days", value: fmtCount(replies7), href: "/inbox", note: replies7 === 0 ? "none yet" : rate === null ? "— of sends" : `‹${rate.toFixed(1)}%› of sends` },
     {
       label: "Interested · 7 days",
       value: fmtCount(interested7),
+      href: "/inbox?filter=interested",
       note: interested7 === 0 ? "none yet" : repliesInterestedWaiting > 0 ? `‹${repliesInterestedWaiting}› waiting on you` : "all answered",
     },
     {
       label: "Meetings · 7 days",
       value: fmtCount(meetings7),
+      href: "/meetings",
       note: nextMeeting ? `next ‹${fmtDayTime(new Date(nextMeeting.meeting_at), tz)}›` : meetings7 === 0 ? "none yet" : "none scheduled",
     },
   ];

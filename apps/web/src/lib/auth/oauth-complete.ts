@@ -1,5 +1,6 @@
 import { safeNext } from "./safe-next";
 import { safeInviteToken, safeSite } from "./oauth-redirect";
+import { APP_HOME } from "./home";
 
 /** Fresh OAuth users are created during code exchange — welcome only in this window. */
 export const OAUTH_NEW_USER_MS = 5 * 60 * 1000;
@@ -116,5 +117,5 @@ export async function completeGoogleOAuth(
     }
   }
 
-  return { ok: true, redirectTo: safeNext(input.next) ?? "/today" };
+  return { ok: true, redirectTo: safeNext(input.next) ?? APP_HOME };
 }

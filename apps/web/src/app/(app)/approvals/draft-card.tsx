@@ -10,8 +10,10 @@ import { Panel } from "@/components/ui/panel";
 import { Textarea } from "@/components/ui/textarea";
 import { LeadProfileLink, type LeadProfile } from "@/components/lead-profile";
 import { trackFirstDraftApproved } from "@/lib/analytics/activation";
-import { approveDraft, declineDraft, declineAndSuppress, fixDraft, saveDraftEdit } from "./actions";
+import { approveDraft, declineAndSuppress, fixDraft, saveDraftEdit } from "./actions";
 import type { ReviewActionState } from "./actions";
+import { rejectDraftWithReason, undoRejectDraft } from "../today/actions";
+import { REJECT_REASONS, REJECT_REASON_ORDER, type RejectReason } from "@/components/today/work-card/reject-reasons";
 
 export interface DraftRow {
   id: string;
@@ -38,6 +40,8 @@ type BusyKey = "approve" | "decline" | "suppress" | "save" | "fix";
  */
 export function DraftCard({ draft, compact = false }: { draft: DraftRow; compact?: boolean }) {
   const [editing, setEditing] = useState(false);
+  // Decline asks why (the same closed set as Today) — rejections teach the engine.
+  const [choosingReason, setChoosingReason] = useState(false);
   const suppressFormRef = useRef<HTMLFormElement>(null);
   const [busy, setBusy] = useState<BusyKey | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -62,6 +66,31 @@ export function DraftCard({ draft, compact = false }: { draft: DraftRow; compact
           if (res.notice) setNotice(res.notice);
           toast.success(res.notice ?? success);
         }
+      })
+      .finally(() => setBusy(null));
+  };
+
+  const decline = (reason: RejectReason) => {
+    setBusy("decline");
+    setError(null);
+    void rejectDraftWithReason(draft.id, reason)
+      .then((res) => {
+        if (res.error) {
+          setError(res.error);
+          toast.error(res.error);
+          return;
+        }
+        setChoosingReason(false);
+        toast.success("Declined — it won't send.", {
+          action: {
+            label: "Undo",
+            onClick: () => {
+              void undoRejectDraft(draft.id).then((u) => {
+                if (u.error) toast.error(u.error);
+              });
+            },
+          },
+        });
       })
       .finally(() => setBusy(null));
   };
@@ -141,12 +170,17 @@ export function DraftCard({ draft, compact = false }: { draft: DraftRow; compact
           <Button size="sm" variant="outline" onClick={() => setEditing(true)} data-hotkey="edit-draft">
             Edit
           </Button>
-          <form action={(fd) => run("decline", declineDraft, fd, "Declined — it won't send.")}>
-            <input type="hidden" name="sendId" value={draft.id} />
-            <Button type="submit" size="sm" variant="ghost" disabled={busy !== null} data-hotkey="decline-draft">
-              {busy === "decline" ? "Declining…" : "Decline"}
-            </Button>
-          </form>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            disabled={busy !== null}
+            data-hotkey="decline-draft"
+            aria-expanded={choosingReason}
+            onClick={() => setChoosingReason((v) => !v)}
+          >
+            {busy === "decline" ? "Declining…" : "Decline"}
+          </Button>
           <form
             ref={suppressFormRef}
             action={(fd) =>
@@ -175,6 +209,25 @@ export function DraftCard({ draft, compact = false }: { draft: DraftRow; compact
               )}
             />
           </form>
+        </div>
+      )}
+
+      {choosingReason && !editing && (
+        <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Why decline this draft?">
+          <span className="mr-1 text-xs text-[var(--ink-dim)]">Why?</span>
+          {REJECT_REASON_ORDER.map((reason) => (
+            <Button
+              key={reason}
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={busy !== null}
+              className="h-7 px-2.5 text-xs"
+              onClick={() => decline(reason)}
+            >
+              {REJECT_REASONS[reason]}
+            </Button>
+          ))}
         </div>
       )}
 

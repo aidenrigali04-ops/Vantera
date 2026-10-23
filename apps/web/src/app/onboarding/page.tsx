@@ -17,6 +17,7 @@ import { LinkedInStep } from "./linkedin-step";
 import { OnboardingShell } from "./onboarding-shell";
 import { STEP_COPY } from "./step-copy";
 import { SubscriptionStep, type OnboardingPlan } from "./subscription-step";
+import { APP_HOME } from "@/lib/auth/home";
 
 /**
  * The frictionless onboarding: Details → LinkedIn → Subscription → dashboard. One route;
@@ -99,7 +100,7 @@ export default async function OnboardingPage({
   // Subscription attached (webhook landed) → provision + complete + leave. finishOnboarding
   // redirects on success; an error falls through to the subscription step with a message.
   if (step === "done") {
-    if (data.onboardingComplete) redirect("/dashboard");
+    if (data.onboardingComplete) redirect(APP_HOME);
     const res = await finishOnboarding();
     finishFailed = Boolean(res?.error);
     step = 3;

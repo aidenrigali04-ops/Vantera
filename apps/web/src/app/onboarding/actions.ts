@@ -8,7 +8,6 @@ import {
   peekFavicon,
   deriveIntentWatchlist,
   matchStarterPlays,
-  proposeNextChallenger,
   type WebsiteScan,
 } from "@vantera/agent-brains";
 import { createLinkedInInfraFromEnv, isLinkedInInfraConfigured } from "@vantera/linkedin-infra";
@@ -17,6 +16,7 @@ import { checkLimit } from "@/lib/rate-limit";
 import { normalizeWebsiteUrl, validateOnboardingDetails } from "@/lib/validation";
 import { billingBypassAllowed } from "./billing-bypass";
 import { accountSkipsPayment } from "@/lib/billing/founder-exempt";
+import { APP_HOME } from "@/lib/auth/home";
 
 export type DetailsState = { error?: string };
 
@@ -248,7 +248,7 @@ export async function finishOnboarding(): Promise<{ error?: string } | never> {
       onboarding_completed_at: string | null;
     }>();
   if (!account) redirect("/onboarding");
-  if (account.onboarding_completed_at) redirect("/dashboard");
+  if (account.onboarding_completed_at) redirect(APP_HOME);
 
   // Card required, except the founder workspace and a local environment with no billing keys.
   const skipsPayment = await accountSkipsPayment(supabase, account.id);
@@ -382,9 +382,8 @@ export async function finishOnboarding(): Promise<{ error?: string } | never> {
     }
   }
 
-  // ── Vera's playbook (Stage 0) — seed the matched starter play as the champion strategy and
-  //    start the first live test. Best-effort: never blocks finishing; the one-live-experiment
-  //    index makes a duplicate start a caught no-op. ──
+  // ── Vera's playbook (Stage 0) — seed the matched starter play as the champion strategy.
+  //    Best-effort: never blocks finishing. ──
   try {
     const [play] = matchStarterPlays({ industry: account.onboarding_industry ?? "", icp: icp.name });
     if (play) {
@@ -398,19 +397,6 @@ export async function finishOnboarding(): Promise<{ error?: string } | never> {
           .from("optimization_playbook")
           .insert({ account_id: account.id, champion_strategy: play.strategy, version: 1 });
       }
-      const challenger = proposeNextChallenger("acceptance", play.strategy);
-      if (challenger) {
-        await supabase.from("optimization_experiments").insert({
-          account_id: account.id,
-          stage_key: "acceptance",
-          champion_strategy: play.strategy,
-          challenger_strategy: challenger,
-          allocation_pct: 25,
-          min_sample: 30,
-          status: "running",
-          created_by: user.id,
-        });
-      }
     }
   } catch (err) {
     console.error("onboarding: playbook seeding failed (non-blocking)", err);
@@ -422,7 +408,7 @@ export async function finishOnboarding(): Promise<{ error?: string } | never> {
     .eq("id", account.id);
   if (error) return { error: "Could not finish setup. Please try again." };
 
-  redirect("/dashboard");
+  redirect(APP_HOME);
 }
 
 /** Form-action wrapper for the dev-only finish button (form actions must return void). */

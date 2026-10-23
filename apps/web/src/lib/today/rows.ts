@@ -85,6 +85,8 @@ export interface StatTile {
   label: string;
   value: string;
   note: string;
+  /** where the number lives — the tile opens it */
+  href?: string;
 }
 
 export interface TodayView {

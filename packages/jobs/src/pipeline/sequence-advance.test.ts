@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { advanceSequence } from "./sequence-advance";
+import { advanceSequence, INVITE_ACCEPT_TIMEOUT_DAYS, NEVER_INVITED_TIMEOUT_DAYS } from "./sequence-advance";
 import { SEQUENCE_DEFAULTS } from "./sequence-config";
 import type { LeadChannels, SequenceRun, SequenceTickContext } from "./types";
 
@@ -15,7 +15,7 @@ function ctx(run: Partial<SequenceRun>, over: Partial<SequenceTickContext> = {})
     run: {
       id: "r1", accountId: "a1", campaignId: "c1", leadId: "l1",
       status: "active", currentStage: "linkedin", touchesDone: 0,
-      nextActionAt: NOW, enteredStageAt: NOW, revivedAt: null, ...run,
+      nextActionAt: NOW, enteredStageAt: NOW, revivedAt: null, lastTouchAt: null, ...run,
     },
     config: SEQUENCE_DEFAULTS,
     channels: fullChannels,
@@ -23,6 +23,8 @@ function ctx(run: Partial<SequenceRun>, over: Partial<SequenceTickContext> = {})
     accountPaused: false,
     killSwitch: false,
     leadReplied: false,
+    // default: accepted well before the run's clock started (no acceptance reset)
+    connection: { invitedAt: new Date(NOW.getTime() - 12 * DAY), connectedAt: new Date(NOW.getTime() - 10 * DAY) },
     now: NOW,
     ...over,
   };
@@ -99,5 +101,74 @@ describe("advanceSequence — soft-no revival (0044)", () => {
       ctx({ currentStage: "linkedin", touchesDone: 0 }, { suppressed: { linkedin: true }, leadReplied: true })
     );
     expect(d).toMatchObject({ kind: "exhaust" });
+  });
+});
+
+describe("advanceSequence — connection gating (prod 2026-10-22: touches spent before invites went out)", () => {
+  const pending = (invitedDaysAgo: number | null) => ({
+    invitedAt: invitedDaysAgo === null ? null : new Date(NOW.getTime() - invitedDaysAgo * DAY),
+    connectedAt: null,
+  });
+
+  it("waits a day without spending a touch while the invite is unaccepted", () => {
+    const d = advanceSequence(ctx({ touchesDone: 0 }, { connection: pending(2) }));
+    expect(d.kind).toBe("wait");
+    expect(d.kind === "wait" && d.patch).toEqual({ nextActionAt: new Date(NOW.getTime() + DAY) });
+  });
+
+  it("waits while the invite hasn't even been sent yet", () => {
+    const d = advanceSequence(ctx({ touchesDone: 0, enteredStageAt: new Date(NOW.getTime() - 3 * DAY) }, { connection: pending(null) }));
+    expect(d.kind).toBe("wait");
+  });
+
+  it("ends the run once an invite has gone unaccepted past the timeout", () => {
+    const d = advanceSequence(ctx({ touchesDone: 0 }, { connection: pending(INVITE_ACCEPT_TIMEOUT_DAYS + 1) }));
+    expect(d).toMatchObject({ kind: "exhaust", patch: { status: "exhausted", currentStage: "done" } });
+  });
+
+  it("ends the run when the invite never went out within the never-invited timeout", () => {
+    const d = advanceSequence(
+      ctx({ enteredStageAt: new Date(NOW.getTime() - (NEVER_INVITED_TIMEOUT_DAYS + 1) * DAY) }, { connection: pending(null) })
+    );
+    expect(d.kind).toBe("exhaust");
+  });
+
+  it("restarts the clock at acceptance: the invite pair's follow-up is touch 1, the nudge comes a gap later", () => {
+    const connectedAt = new Date(NOW.getTime() - 3_600_000); // accepted an hour ago
+    const d = advanceSequence(
+      ctx(
+        { touchesDone: 2, enteredStageAt: new Date(NOW.getTime() - 5 * DAY) }, // touches spent pre-acceptance
+        { connection: { invitedAt: new Date(NOW.getTime() - 3 * DAY), connectedAt } }
+      )
+    );
+    expect(d.kind).toBe("wait");
+    expect(d.kind === "wait" && d.patch).toEqual({
+      touchesDone: 1,
+      enteredStageAt: connectedAt,
+      lastTouchAt: connectedAt,
+      nextActionAt: new Date(connectedAt.getTime() + 2 * DAY), // touchGapDays
+    });
+  });
+
+  it("after the reset, dispatches the second touch normally", () => {
+    const connectedAt = new Date(NOW.getTime() - 2 * DAY);
+    const d = advanceSequence(
+      ctx({ touchesDone: 1, enteredStageAt: connectedAt }, { connection: { invitedAt: new Date(NOW.getTime() - 4 * DAY), connectedAt } })
+    );
+    expect(d).toMatchObject({ kind: "dispatch", touchNo: 2 });
+  });
+});
+
+describe("advanceSequence — acceptance reset never rewinds real post-acceptance touches (review 2026-10-22)", () => {
+  it("leaves a run alone when its last touch already happened after acceptance", () => {
+    const connectedAt = new Date(NOW.getTime() - 6 * DAY);
+    const d = advanceSequence(
+      ctx(
+        // enrolled before the invite (prod), touch 2 delivered after acceptance, now past waitDays
+        { touchesDone: 2, enteredStageAt: new Date(NOW.getTime() - 9 * DAY), lastTouchAt: new Date(NOW.getTime() - 4 * DAY) },
+        { connection: { invitedAt: new Date(NOW.getTime() - 8 * DAY), connectedAt } }
+      )
+    );
+    expect(d.kind).toBe("exhaust"); // NOT a rewind to touch 1 and a third message
   });
 });

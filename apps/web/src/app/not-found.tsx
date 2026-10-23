@@ -17,10 +17,10 @@ export default function NotFound() {
         </p>
         <div className="mt-6 flex items-center justify-center gap-3 text-sm font-medium">
           <Link
-            href="/dashboard"
+            href="/today"
             className="rounded-lg bg-foreground px-4 py-2 text-background transition-opacity hover:opacity-90"
           >
-            Go to your dashboard
+            Go to Today
           </Link>
           <Link
             href="/"

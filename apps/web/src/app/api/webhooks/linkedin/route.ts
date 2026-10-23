@@ -1,7 +1,7 @@
 import { tasks } from "@trigger.dev/sdk";
 import { createLinkedInInfraFromEnv } from "@vantera/linkedin-infra";
 import { createServiceClient } from "@/lib/supabase/service";
-import { handleInboundWebhook } from "@/server/inbound-webhooks";
+import { handleInboundWebhook, inboundConcurrencyKey } from "@/server/inbound-webhooks";
 import { recordSecurityEvent, eventRequestMeta } from "@/lib/security/audit";
 
 export async function POST(req: Request) {
@@ -21,6 +21,10 @@ export async function POST(req: Request) {
       });
     },
     extractEventId: (p) => infra.parseEventWebhook(p)?.providerEventId ?? null,
+    concurrencyKeyFor: (p) => {
+      const event = infra.parseEventWebhook(p);
+      return event ? inboundConcurrencyKey(event) : null;
+    },
     onUnparsed: (payload) => {
       // Authentic but unrecognized: log the envelope's shape (keys only, never values) so a
       // provider payload change surfaces here instead of vanishing behind a 200.
@@ -38,8 +42,9 @@ export async function POST(req: Request) {
       }
       return true;
     },
-    enqueue: async (payload) => {
-      await tasks.trigger("process-inbound", payload);
+    enqueue: async (payload, { idempotencyKey, concurrencyKey }) => {
+      // process-inbound's queue has concurrencyLimit 1, so the key serializes one lead's thread
+      await tasks.trigger("process-inbound", payload, { idempotencyKey, concurrencyKey });
     },
   });
   return new Response(result.body, { status: result.status });

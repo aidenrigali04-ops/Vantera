@@ -1,3 +1,5 @@
+import { APP_HOME } from "./home";
+
 /**
  * The /start journey gate (journey v2, blueprint §4) — a pure sibling of resolveGate
  * (gate.ts stays byte-untouched; the legacy /signup → /onboarding chain keeps working
@@ -23,9 +25,9 @@ export type StartContext = {
 };
 
 /** Furthest-incomplete step for the /start journey. */
-export function resolveStartStep(ctx: StartContext): StartStep | "/dashboard" {
+export function resolveStartStep(ctx: StartContext): StartStep | typeof APP_HOME {
   if (!ctx.isAuthenticated) return "/start";
-  if (ctx.onboardingComplete) return "/dashboard";
+  if (ctx.onboardingComplete) return APP_HOME;
   if (!ctx.hasAccount) return "/start";
   if (!ctx.businessConfirmed) return "/start/business";
   if (!ctx.icpConfirmed) return "/start/buyers";

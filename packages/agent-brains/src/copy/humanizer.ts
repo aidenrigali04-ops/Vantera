@@ -86,6 +86,9 @@ const BANNED_PHRASES = [
   "looking forward to hearing",
   "don't hesitate",
   "feel free to",
+  // copy-quality fix (2026-10-21): the judge penalizes "I noticed…" as AI throat-clearing
+  // (judge.ts naturalness rubric) — the writer is now held to the same bar.
+  "i noticed",
 ];
 
 // Phrases that re-introduce or cold-open — always wrong MID-CONVERSATION: a reply or scripted
@@ -168,6 +171,35 @@ export function validateHumanity(text: string, limits: HumanityLimits = {}): Vio
   }
 
   return violations;
+}
+
+// First-words templates of the post-accept follow-up (copy-quality fix, 2026-10-21): 6 of 7 real
+// follow-ups opened "Thanks for connecting… Curious how…" regardless of prospect. This is a
+// FIRST-WORDS check only — the phrases stay legal later in a message.
+const TEMPLATE_OPENERS = ["thanks for connecting", "thank you for connecting", "thanks for the connect", "curious how"];
+
+/**
+ * Flags a first follow-up whose opening words are a stock template ("Thanks for connecting",
+ * "Curious how"). The follow-up must open on the one specific thing about THIS prospect. Feeds
+ * the bounded regenerate; a persistent template routes to review.
+ */
+export function findTemplateOpener(text: string): Violation[] {
+  const head = text
+    .toLowerCase()
+    .replace(/[‘’]/g, "'")
+    .replace(/^[^a-z0-9]+/, "")
+    .replace(/^(?:hi|hey|hello)\b[^a-z0-9]*(?:[a-z']+[,!.]\s*)?/, "");
+  for (const phrase of TEMPLATE_OPENERS) {
+    if (head.startsWith(phrase)) {
+      return [
+        {
+          rule: "template-opener",
+          detail: `don't open with "${phrase}"; open on the one specific thing about this prospect`,
+        },
+      ];
+    }
+  }
+  return [];
 }
 
 export function describeViolations(violations: Violation[]): string {

@@ -43,7 +43,7 @@
   "grounding": "Seller offer: Uptime Metrics helped a similar plant recover $1.2M in lost production time last year Proof: Helped a similar plant recover $1.2M in lost production time last year Prospect: Grace Okafor, Plant Manager at Ironwood Manufacturing (Industrial Manufacturing). Pain points: Downtime causes get logged on paper after the fact; Same machine issues keep recurring unnoticed. Value angle: Real time downtime logging surfaces the repeat issues paper logs hide",
   "frozenDraft": {
     "connectionNote": "Saw Ironwood added a second production shift this year, running two shifts well takes real coordination.",
-    "followupMessage": "Thanks for connecting. Two shifts usually means twice the downtime causes to track down. How are you logging issues today?",
+    "followupMessage": "Two shifts usually means twice the downtime causes to track down. How are you logging issues today?",
     "violations": []
   }
 }
