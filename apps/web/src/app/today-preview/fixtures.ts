@@ -1,3 +1,4 @@
+import { checklistFor } from "@/lib/today/checklist";
 import type { TodayView } from "@/lib/today/rows";
 
 /**
@@ -257,6 +258,7 @@ export const STEADY: TodayView = {
   updatedLabel: "8:04am",
   paused: false,
   defaultTab: "queue",
+  checklist: null,
 };
 
 /** Nothing waiting: the page is over in one line. */
@@ -339,7 +341,7 @@ export const PAUSED: TodayView = {
 export const WORKING_EMPTY: TodayView = {
   ...STEADY,
   state: "working_empty",
-  sentence: "The engine is on its first pass. First drafts are expected in about 26 minutes — this page fills itself.",
+  sentence: "Finding prospects · first batch in about 26 min — this page fills itself.",
   primary: null,
   stats: [
     { label: "Sent · 7 days", value: "0", note: "none yet" },
@@ -352,6 +354,14 @@ export const WORKING_EMPTY: TodayView = {
   replies: { rows: [], total: 0, answeredThisWeek: 0 },
   activity: { rows: [], engineStartedAgo: "12 min" },
   defaultTab: "activity",
+  checklist: checklistFor({
+    buyersConfirmed: true,
+    prospectsReviewed: false,
+    linkedinActive: false,
+    firstApprovedAt: null,
+    calendarOrCrmConnected: false,
+    dismissedAt: null,
+  }),
 };
 
 /** Billing stopped the engine. */

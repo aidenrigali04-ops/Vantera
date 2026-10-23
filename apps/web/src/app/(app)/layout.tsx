@@ -193,7 +193,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     if (billing.subscription_status === "trialing" && billing.trial_ends_at === null) {
       trialBanner = {
         tone: "info",
-        message: "Your free trial starts the moment you connect LinkedIn — nothing is counting down yet.",
+        message: "Your free trial starts when you pick a plan.",
         cta: "Connect LinkedIn",
         href: "/settings/senders",
       };

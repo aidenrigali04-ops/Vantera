@@ -9,6 +9,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Panel } from "@/components/ui/panel";
 import { Textarea } from "@/components/ui/textarea";
 import { LeadProfileLink, type LeadProfile } from "@/components/lead-profile";
+import { trackFirstDraftApproved } from "@/lib/analytics/activation";
 import { approveDraft, declineAndSuppress, fixDraft, saveDraftEdit } from "./actions";
 import type { ReviewActionState } from "./actions";
 import { rejectDraftWithReason, undoRejectDraft } from "../today/actions";
@@ -61,6 +62,7 @@ export function DraftCard({ draft, compact = false }: { draft: DraftRow; compact
           setError(res.error);
           toast.error(res.error);
         } else {
+          if (key === "approve") trackFirstDraftApproved();
           if (res.notice) setNotice(res.notice);
           toast.success(res.notice ?? success);
         }

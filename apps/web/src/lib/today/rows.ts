@@ -4,6 +4,7 @@
  * client never touches Date. Sample identities only in tests/stories.
  */
 
+import type { Checklist } from "./checklist";
 import type { EngineLine } from "./engine-line";
 import type { ActionTileSpec } from "./tiles";
 import type { SenderStatus, TodayState } from "./types";
@@ -107,4 +108,6 @@ export interface TodayView {
   updatedLabel: string;
   paused: boolean;
   defaultTab: "queue" | "replies" | "activity";
+  /** the Get Started rail (null once dismissed) */
+  checklist: Checklist;
 }

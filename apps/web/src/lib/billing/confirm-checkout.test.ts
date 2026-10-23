@@ -14,6 +14,7 @@ const subscription: SubscriptionUpdate = {
   seatsPurchased: 0,
   linkedinAccountsPurchased: 0,
   currentPeriodEnd: null,
+  trialEndsAt: null,
 };
 
 const session = (over: Partial<CheckoutSessionResult> = {}): CheckoutSessionResult => ({

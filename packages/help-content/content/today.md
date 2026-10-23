@@ -16,18 +16,32 @@ routes: /today
 
 ## The status sentence
 
-Under your greeting is a single sentence of fact — what the engine did since your last visit, and whether your senders are inside their limits. It changes with the state of your account: overnight runs read "Overnight the engine drafted 14 messages and 3 people replied"; a mid-day visit reads "Since 6:30am…". When there is nothing waiting, it tells you when the next drafts are expected instead.
+Under your greeting is a single sentence of fact — what the engine did since your last visit, and whether your senders are inside their limits. It changes with the state of your account: overnight runs read "Overnight the engine drafted 14 messages and 3 people replied"; a mid-day visit reads "Since 6:30am…". When there is nothing waiting, it tells you when the next drafts are expected instead. On a brand-new account, while the first pass is still running, it reads "Finding prospects · first batch in about N min".
 
 ## Needs you
 
 Up to four items, in priority order, each one click from done:
 
 - **Repairs first** — a disconnected or restricted sender, or a failed payment. These stop sending, so they outrank everything.
+- **No LinkedIn connected yet** — shown when no LinkedIn account is connected. Your agent is already finding prospects, but nothing can send until you connect one, and the tile links to **Senders**.
 - **Your queue and your replies** — how many drafts are waiting, and how many people are waiting on an answer.
 - **Specific threads** — a conversation the agent handed back to you because it reached its limit, or a meeting happening today.
 - **Occasional suggestions** — a pattern in what you have been rejecting, an edit habit worth saving as a rule, or a one-time setup ask. These can be dismissed and only return on a new trigger.
 
 When nothing needs you, the row says so in one line and the dark button disappears. That is the intended end state, not an empty page.
+
+## Get started
+
+New accounts see a **Get started** checklist on Today. Four steps count toward your progress, in this order:
+
+1. **Confirm your buyers.** Done when you save your targeting in **Playbook → Targeting**.
+2. **Review first prospects.** Done when you mark any prospect **Good fit** or **Not a fit**, or reject a draft with a reason.
+3. **Connect LinkedIn.** Done when you have an active LinkedIn sender.
+4. **Approve your first message.** Done when you approve your first draft.
+
+There is also an optional fifth step, **Connect calendar or CRM**. It is done when you have an active scheduling or CRM connection, and it never counts toward the four.
+
+Once two steps are done, the checklist collapses to a small progress pill. You can dismiss it only after all four steps are done, and once dismissed it does not come back.
 
 ## The four numbers
 

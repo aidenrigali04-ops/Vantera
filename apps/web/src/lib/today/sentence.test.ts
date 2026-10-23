@@ -43,8 +43,12 @@ describe("buildStatusSentence — the §7 Z2 table", () => {
   it("working-empty gives an ETA in minutes", () => {
     const i = inputs({ drafts: 0, repliesWaiting: 0, engine: { ...inputs().engine, nextRunAt: "2026-08-21T15:30:00Z", everDrafted: false } });
     expect(buildStatusSentence("working_empty", i)).toBe(
-      "The engine is on its first pass. First drafts are expected in about 26 minutes — this page fills itself."
+      "Finding prospects · first batch in about 26 min — this page fills itself."
     );
+  });
+  it("working-empty without a next run still reads as progress", () => {
+    const i = inputs({ drafts: 0, repliesWaiting: 0, engine: { ...inputs().engine, nextRunAt: null, everDrafted: false } });
+    expect(buildStatusSentence("working_empty", i)).toBe("Finding prospects · first batch is on its way — this page fills itself.");
   });
   it("sender down names the held drafts and the other sender", () => {
     const i = inputs({

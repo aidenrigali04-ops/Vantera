@@ -18,14 +18,16 @@ import {
   shortName,
 } from "./metrics";
 import type { ActivityRow, QueueRow, QueueStep, ReplyClass, ReplyRow, SenderChipRow, StatTile, TodayView } from "./rows";
+import { checklistFor, GET_STARTED_ASK } from "./checklist";
+import { readChecklistFacts } from "./checklist-facts";
 import { buildStatusSentence } from "./sentence";
 import { downSenders, greetingWord, healthySenders, resolveTodayState } from "./state";
 import { primaryFor, tilesFor, type TileExtras } from "./tiles";
 import type { SenderFacts, TodayInputs, TodayState } from "./types";
 
 /**
- * Today's data contract (blueprint §9): ONE round-trip. Every read below is fired in a
- * single Promise.all on the session's RLS-scoped client — no account id is passed (rule 02)
+ * Today's data contract (blueprint §9): batched reads. Every read below is fired in a
+ * Promise.all (a few dependent follow-ups aside) on the session's RLS-scoped client — no account id is passed (rule 02)
  * — and every time/relative label is formatted here, on the server, in the account
  * timezone. Derived metrics come from `metrics.ts`; the state machine from `state.ts`.
  *
@@ -170,6 +172,7 @@ export async function loadToday(supabase: SupabaseClient, userId: string, now = 
     invitesWeekRes,
     approvedTodayRes,
     answeredWeekRes,
+    checklistData,
   ] = await Promise.all([
     supabase
       .from("accounts")
@@ -256,6 +259,8 @@ export async function loadToday(supabase: SupabaseClient, userId: string, now = 
       .returns<{ linkedin_account_id: string | null; scheduled_sends: { linkedin_stage: string | null } | null }[]>(),
     supabase.from("scheduled_sends").select("approved_at").gte("approved_at", sinceYesterdayish).returns<{ approved_at: string }[]>(),
     supabase.from("replies").select("id", { count: "exact", head: true }).gte("received_at", weekAgo).in("classification", ["interested", "neutral", "other"]),
+    // Get Started facts (UX-1): derived from existing data; degrades to "not done" on error.
+    readChecklistFacts(supabase).catch(() => ({ buyersConfirmed: false, prospectsReviewed: false, firstApprovedAt: null, calendarOrCrmConnected: false })),
   ]);
 
   if (!account.data) return null;
@@ -428,11 +433,8 @@ export async function loadToday(supabase: SupabaseClient, userId: string, now = 
     runs.length >= 3 && runs.every((r) => r.status === "completed" && Number((r.summary as Row)?.qualified ?? 0) === 0);
   const firstRunAt = scout?.last_run_at ?? runs[runs.length - 1]?.started_at ?? null;
   const everDrafted = draftsTotal > 0 || approvedToday > 0 || (activityRes.data ?? []).some((a) => a.kind === "drafted" || a.kind === "sends");
-  // "First session" means a brand-new workspace that has never worked a queue — for those,
-  // the post-payment landing is the queue itself (blueprint §8). It must NOT capture an
-  // established account: `first_session_done_at` only exists from migration 0063 on, so every
-  // account that predates it has the flag unset and would otherwise be bounced off its own
-  // home page forever. Any real history is proof the first session is long over.
+  // Any real history (drafts, sends, replies, meetings, activity) means the workspace is
+  // established — used to hide the new-account Get Started checklist.
   const hasHistory =
     everDrafted ||
     (sentWeekRes.count ?? 0) > 0 ||
@@ -444,7 +446,6 @@ export async function loadToday(supabase: SupabaseClient, userId: string, now = 
   const inputs: TodayInputs = {
     now,
     timeZone: tz,
-    firstSessionDone: Boolean(prof?.first_session_done_at) || hasHistory,
     drafts: draftsTotal,
     draftsHeld,
     repliesWaiting,
@@ -631,6 +632,15 @@ export async function loadToday(supabase: SupabaseClient, userId: string, now = 
   // decorative symbols). The blueprint's no-emoji line holds everywhere again.
   const greeting = firstName ? `${greetingWord(hourNow)}, ${firstName}` : greetingWord(hourNow);
 
+  // Get Started is for new workspaces only: any real history means the customer is established.
+  const checklist = hasHistory
+    ? null
+    : checklistFor({
+        ...checklistData,
+        linkedinActive: senderFacts.some((x) => x.status === "active"),
+        dismissedAt: prof?.dismissed_asks?.[GET_STARTED_ASK] ?? null,
+      });
+
   const defaultTab: TodayView["defaultTab"] = draftsTotal > 0 ? "queue" : repliesWaiting > 0 ? "replies" : "activity";
 
   const view: TodayView = {
@@ -650,6 +660,7 @@ export async function loadToday(supabase: SupabaseClient, userId: string, now = 
     updatedLabel: fmtTime(now, tz),
     paused: Boolean(acct.paused_at),
     defaultTab,
+    checklist,
   };
 
   return { view, inputs, profile: { displayName: prof?.display_name ?? null, firstSessionDoneAt: prof?.first_session_done_at ?? null }, accountId: acct.id };

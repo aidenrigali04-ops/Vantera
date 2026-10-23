@@ -63,7 +63,7 @@ describe("completeGoogleOAuth", () => {
     expect(failed).toEqual({ ok: false, redirectTo: "/login?error=oauth" });
   });
 
-  it("a successful exchange lands on dashboard (or a safe next)", async () => {
+  it("a successful exchange lands on Today (or a safe next)", async () => {
     const { deps: d, calls } = deps();
     const ok = await completeGoogleOAuth({ code: "pkce" }, d);
     expect(ok).toEqual({ ok: true, redirectTo: "/today" });

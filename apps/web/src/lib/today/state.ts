@@ -19,11 +19,6 @@ const WORKING_EMPTY_WINDOW_MIN = 60;
  * the routine states; and the routine states resolve on what's waiting.
  */
 export function resolveTodayState(i: TodayInputs): TodayState {
-  // The post-payment landing is the QUEUE, not Today (blueprint §8) — but only while there
-  // is something in it. Forwarding a brand-new workspace to an empty queue tells it nothing;
-  // Today's working-empty state explains what the engine is doing instead.
-  if (!i.firstSessionDone && i.drafts > 0) return "first_session";
-
   const down = downSenders(i.senders);
   const healthy = healthySenders(i.senders);
   if (i.senders.length > 0 && healthy.length === 0 && down.length > 0) return "stopped_senders";

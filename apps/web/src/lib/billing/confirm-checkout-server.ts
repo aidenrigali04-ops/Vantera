@@ -48,6 +48,7 @@ export async function confirmCheckoutFromReturn(
       stripe_subscription_id: snap.stripeSubscriptionId,
       stripe_customer_id: snap.stripeCustomerId,
       outreach_paused: !isActive(snap.subscriptionStatus),
+      ...(snap.trialEndsAt ? { trial_ends_at: snap.trialEndsAt } : {}),
     })
     .eq("id", accountId);
 

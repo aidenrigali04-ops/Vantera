@@ -84,7 +84,7 @@ import {
   type ProofPoint,
   type WebsiteScan,
 } from "@vantera/agent-brains";
-import { resolveEntitlements, TRIAL_DAYS, type EntitlementSnapshot } from "@vantera/billing";
+import { resolveEntitlements, type EntitlementSnapshot } from "@vantera/billing";
 import type { ClosedDeal, CrmProvider } from "@vantera/crm-infra";
 import type { AccountDeletionStore } from "./account-deletion";
 import type { TrialEndingAccount } from "./trial-ending";
@@ -1546,8 +1546,10 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           runAtTime: agents.runAtTime,
           cadence: agents.cadence,
           timezone: agents.timezone,
+          onboardingCompletedAt: accounts.onboardingCompletedAt,
         })
         .from(agents)
+        .innerJoin(accounts, eq(accounts.id, agents.accountId))
         .where(
           and(
             inArray(agents.kind, ["scout", "intent"]),
@@ -1996,21 +1998,6 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
       profileUrl: string | null;
       displayName: string | null;
     }): Promise<{ supersededRefs: string[] }> {
-      // Trial-on-activation (owner decision 2026-07-15): the 7-day clock starts at the FIRST
-      // active LinkedIn connect, not at signup. Idempotent: only when trialing and unset.
-      if (e.status === "active") {
-        await db
-          .update(accounts)
-          .set({ trialEndsAt: new Date(Date.now() + TRIAL_DAYS * 86_400_000) })
-          .where(
-            and(
-              eq(accounts.id, e.vanteraAccountId),
-              eq(accounts.subscriptionStatus, "trialing"),
-              isNull(accounts.trialEndsAt)
-            )
-          );
-      }
-
       // Identity dedupe BEFORE the ref-keyed upsert: an ACTIVE arrival for a profile this
       // tenant already holds under a DIFFERENT ref is a reconnect that minted a fresh
       // provider account. Revive the existing row in place — its id carries the lead
@@ -3044,6 +3031,8 @@ export interface DueAgent {
   runAtTime: string | null;
   cadence: "daily" | "weekly" | "intraday" | null;
   timezone: string;
+  /** Null while the account is still in onboarding — the scheduler holds those out. */
+  onboardingCompletedAt: Date | null;
 }
 
 export interface SchedulerStore {

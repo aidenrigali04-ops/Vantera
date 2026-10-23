@@ -4,6 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { CheckCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { trackFirstDraftApproved } from "@/lib/analytics/activation";
 import { approveAllClean } from "./actions";
 
 /** P1 bulk approve: one click for every CLEAN draft — flagged copy still needs human eyes.
@@ -23,6 +24,7 @@ export function BulkApprove({ cleanCount }: { cleanCount: number }) {
               setError(res.error);
               toast.error(res.error);
             } else {
+              trackFirstDraftApproved();
               toast.success(
                 res.notice ?? `Approved ${cleanCount} clean draft${cleanCount === 1 ? "" : "s"} — queued to send.`
               );

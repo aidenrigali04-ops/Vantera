@@ -1,6 +1,5 @@
 import "server-only";
 import { createLinkedInInfraFromEnv, type ConnectedAccount } from "@vantera/linkedin-infra";
-import { TRIAL_DAYS } from "@vantera/billing";
 import { createServiceClient } from "@/lib/supabase/service";
 import { planClaimsAnything, planReconcile, type ExistingRow } from "./reconcile-plan";
 
@@ -150,16 +149,7 @@ export async function reconcileLinkedInAccounts(
   }
 
   if (synced > 0) {
-    // Trial-on-activation (owner decision 2026-07-15): the first active connect starts the
-    // no-card trial clock. Idempotent — only when trialing and the clock is still unset; the
-    // webhook path (jobs `upsertLinkedInAccountStatus`) applies the same rule.
-    const { error } = await svc
-      .from("accounts")
-      .update({ trial_ends_at: new Date(Date.now() + TRIAL_DAYS * 86_400_000).toISOString() })
-      .eq("id", accountId)
-      .eq("subscription_status", "trialing")
-      .is("trial_ends_at", null);
-    if (error) console.error("reconcileLinkedInAccounts: trial clock stamp failed", error);
+    // The trial clock starts at checkout (Stripe trial_end), not on connect.
     return { synced, claimed: true, failure: null };
   }
   return {

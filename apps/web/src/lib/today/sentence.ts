@@ -56,8 +56,8 @@ export function buildStatusSentence(state: TodayState, i: TodayInputs): string {
     case "working_empty": {
       const eta = next ? Math.max(1, Math.round((new Date(i.engine.nextRunAt!).getTime() - i.now.getTime()) / 60_000)) : null;
       return eta
-        ? `The engine is on its first pass. First drafts are expected in about ${eta} minutes — this page fills itself.`
-        : "The engine is on its first pass. First drafts are expected shortly — this page fills itself.";
+        ? `Finding prospects · first batch in about ${eta} min — this page fills itself.`
+        : "Finding prospects · first batch is on its way — this page fills itself.";
     }
     case "starved":
       return "The engine ran three passes and found nothing above 70. Your profile may be too narrow.";
@@ -74,7 +74,5 @@ export function buildStatusSentence(state: TodayState, i: TodayInputs): string {
       return "The engine is paused. Approvals stay open; nothing is being sourced or sent until you resume it.";
     case "stopped_billing":
       return "Sending is stopped until billing is sorted. Your queue and replies are safe.";
-    case "first_session":
-      return ""; // never rendered — /today forwards to the queue
   }
 }

@@ -62,6 +62,7 @@ export class InMemoryBilling implements BillingProvider {
         seatsPurchased: Number(e.seats ?? 0),
         linkedinAccountsPurchased: Number(e.linkedin ?? 0),
         currentPeriodEnd: (e.currentPeriodEnd as string) ?? null,
+        trialEndsAt: (e.trialEndsAt as string) ?? null,
       };
     }
     return { type: "ignored" };

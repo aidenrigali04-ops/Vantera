@@ -9,7 +9,7 @@ const ctx = (over: Partial<GateContext>): GateContext => ({
 });
 
 describe("resolveGate", () => {
-  it("auth pages redirect signed-in users to the dashboard", () => {
+  it("auth pages redirect signed-in users to Today", () => {
     expect(resolveGate("auth", ctx({ isAuthenticated: true }))).toBe("/today");
   });
 
@@ -25,7 +25,7 @@ describe("resolveGate", () => {
     expect(resolveGate("onboarding", ctx({ isAuthenticated: true }))).toBeNull();
   });
 
-  it("onboarding redirects to dashboard once complete", () => {
+  it("onboarding redirects to Today once complete", () => {
     expect(
       resolveGate(
         "onboarding",

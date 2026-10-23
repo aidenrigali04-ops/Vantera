@@ -9,7 +9,7 @@ export type GateContext = {
   onboardingComplete: boolean;
 };
 
-/** Single source of truth for the signup → onboarding → dashboard chain (spec: hard gate). */
+/** Single source of truth for the signup → onboarding → Today chain (spec: hard gate). */
 export function resolveGate(area: GateArea, ctx: GateContext): string | null {
   switch (area) {
     case "auth":

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { getDraftQueueSummary, getCampaignStatus, getGoalProgress, getLeadScoreRationale, getBillingStatus, getReturnOnSpend } from "./read-tools";
+import { getDraftQueueSummary, getCampaignStatus, getGoalProgress, getLeadScoreRationale, getBillingStatus, getReturnOnSpend, getActivationChecklist } from "./read-tools";
 
 // fake supabase: each query resolves to the canned result for its table
 function fakeDb(rows: Record<string, unknown>) {
@@ -230,5 +230,63 @@ describe("getReturnOnSpend", () => {
     expect(dto.annualSpend).toBeNull();
     expect(dto.pipelineToSpend).toBeNull();
     expect(dto.clearsRenewalBar).toBeNull();
+  });
+});
+
+describe("getActivationChecklist", () => {
+  // records every filter per table so the test can prove each read is pinned to the account
+  function recordingDb(rows: Record<string, unknown[]>) {
+    const filters: Record<string, Record<string, unknown>[]> = {};
+    const db = {
+      from(table: string) {
+        const r = rows[table] ?? [];
+        const f: Record<string, unknown> = {};
+        (filters[table] ??= []).push(f);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- recursive self-referential builder
+        const b: Record<string, any> = {
+          select: () => b,
+          match: (m: Record<string, unknown>) => (Object.assign(f, m), b),
+          eq: (c: string, v: unknown) => ((f[c] = v), b),
+          in: () => b,
+          not: () => b,
+          order: () => b,
+          limit: () => b,
+          maybeSingle: async () => ({ data: r[0] ?? null }),
+          then: (resolve: (v: unknown) => unknown) => Promise.resolve({ data: r }).then(resolve),
+        };
+        return b;
+      },
+    } as unknown as SupabaseClient;
+    return { db, filters };
+  }
+
+  it("derives the steps from the account's own rows, pinned to the session account", async () => {
+    const { db, filters } = recordingDb({
+      agents: [{ targeting: { titles: ["CFO"] } }],
+      lead_feedback: [],
+      scheduled_sends: [{ id: "x", created_at: "2026-10-20T10:00:00Z" }],
+      meeting_connections: [],
+      crm_connections: [],
+      linkedin_accounts: [{ status: "active" }],
+    });
+    const dto = await getActivationChecklist(db, "acc1");
+    expect(dto.done).toBe(4);
+    expect(dto.steps).toEqual([
+      { label: "Confirm your buyers", done: true },
+      { label: "Review first prospects", done: true },
+      { label: "Connect LinkedIn", done: true },
+      { label: "Approve your first message", done: true },
+      { label: "Connect calendar or CRM (optional)", done: false },
+    ]);
+    for (const [table, calls] of Object.entries(filters)) {
+      for (const f of calls) expect(f.account_id, table).toBe("acc1");
+    }
+  });
+
+  it("a fresh account has nothing done; null targeting is not confirmed", async () => {
+    const { db } = recordingDb({ agents: [{ targeting: null }] });
+    const dto = await getActivationChecklist(db, "acc1");
+    expect(dto.done).toBe(0);
+    expect(dto.steps.every((s) => !s.done)).toBe(true);
   });
 });

@@ -1,8 +1,8 @@
+import { redirect } from "next/navigation";
 import { buildTargetingProfile, topTiltSegment } from "@vantera/agent-brains";
 import { createClient } from "@/lib/supabase/server";
 import { orThrow } from "@/lib/supabase/guard";
 import { getGateData } from "@/lib/auth/context";
-import { playCards } from "@/lib/plays";
 import { shapePipeline } from "../pipeline/queries";
 import {
   buildRevenueSeries,
@@ -124,7 +124,6 @@ async function OverviewTab() {
     leadCountsRes,
     draftsRes,
     { data: recentReplies },
-    { data: linkedinAccounts },
     { data: weekSends },
     repliesWeekRes,
     { data: prospects },
@@ -152,7 +151,6 @@ async function OverviewTab() {
       .order("received_at", { ascending: false })
       .limit(24)
       .returns<ReplyRowRaw[]>(),
-    supabase.from("linkedin_accounts").select("status"),
     supabase.from("outreach_sends").select("channel").gte("sent_at", weekAgo),
     // Warm replies this week — interested only. Counting every classification here made the
     // tile disagree with real activity (a not-interested reply is not a warm reply).
@@ -204,7 +202,6 @@ async function OverviewTab() {
   const leadCountList = (leadCountRows ?? []) as { status: string; n: number }[];
   const leadCounts = new Map(leadCountList.map((r): [string, number] => [r.status, Number(r.n)]));
   const countOf = (...ss: string[]) => ss.reduce((sum, s) => sum + (leadCounts.get(s) ?? 0), 0);
-  const total = [...leadCounts.values()].reduce((a, b) => a + b, 0);
   const qualified = countOf("qualified", "enriched");
   const inOutreach = countOf("in_campaign");
   const repliedOnly = countOf("replied");
@@ -235,6 +232,9 @@ async function OverviewTab() {
   const agentRowsRaw = agents ?? [];
   const scout = agentRowsRaw.find((a) => a.kind === "scout") ?? null;
   const liveAgents = agentRowsRaw.filter((a) => a.status === "live");
+  // Brand-new account (no live agent, zero leads): onboarding still lands here, but Results is
+  // empty — Today's Get Started checklist is the real home.
+  if (liveAgents.length === 0 && leadCountList.reduce((n, r) => n + Number(r.n), 0) === 0) redirect("/today");
   // Map to the view's shape with server-formatted labels (no client Date.now()).
   const agentRows: AgentRow[] = agentRowsRaw.map((a) => ({
     id: a.id,
@@ -278,21 +278,10 @@ async function OverviewTab() {
   const goal = account.revenue_goal_cents ? usd.format(account.revenue_goal_cents / 100) : null;
   const firstName = user?.email?.split("@")[0] ?? "there";
 
-  // Channel readiness — is LinkedIn connected? (the only channel, the activation gate)
-  const liStatus = (linkedinAccounts ?? [])[0]?.status ?? null;
-
   // This week's momentum
   const sendsWeek = (weekSends ?? []).length;
   const liWeek = (weekSends ?? []).filter((s) => s.channel === "linkedin").length;
   const repliesWeek = repliesWeekRes.count ?? 0;
-
-  // State machine: an activation ramp before the first agent is live with no leads
-  // yet; the working dashboard once either condition is met.
-  const isNew = liveAgents.length === 0 && total === 0;
-  // Agents are live but the first run hasn't produced leads yet — the post-deploy waiting
-  // window. Surface a "working now" state instead of a hollow dashboard of zeros so the
-  // silence after launch never reads as "nothing's happening" (retention: show activity).
-  const isWorkingEmpty = !isNew && liveAgents.length > 0 && total === 0;
 
   // Pipeline pulse — leads moving through the outreach sequence (sequence_runs),
   // a compact mirror of the full /pipeline board.
@@ -480,10 +469,6 @@ async function OverviewTab() {
     focus,
   };
 
-  // Vera's matched starter plays — fill the waiting states with proven competence instead
-  // of silence (honest source labels; server-computed).
-  const plays = playCards({ industry: account.onboarding_industry, icp: account.onboarding_icp });
-
   // L1 meeting layer: interested buyers need somewhere to book. A live Outreach agent with no
   // bookingUrl is the single most conversion-critical config gap (prod 2026-07-15: 0/3 set,
   // 10 interested replies, 0 meetings ever) — nag until it's set.
@@ -504,10 +489,7 @@ async function OverviewTab() {
       industry={account.onboarding_industry}
       goal={goal}
       goalCents={account.revenue_goal_cents}
-      isNew={isNew}
-      isWorkingEmpty={isWorkingEmpty}
       showCrmNudge={showCrmNudge}
-      scoutDeployed={Boolean(scout)}
       drafts={drafts}
       agents={agentRows}
       liveAgentsCount={liveAgents.length}
@@ -535,12 +517,10 @@ async function OverviewTab() {
       prospects={prospects ?? []}
       recentReplies={replyRows}
       repliesWaiting={repliesWaiting}
-      channels={{ liStatus }}
       week={{ sends: sendsWeek, li: liWeek, replies: repliesWeek }}
       attribution={signalAttribution}
       learning={learning}
       needsBookingUrl={needsBookingUrl}
-      plays={plays}
     />
   );
 }

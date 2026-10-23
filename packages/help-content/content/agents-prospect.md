@@ -29,14 +29,14 @@ If you've added your website URL in settings, the agent reads your homepage so i
 
 ## Targeting rules
 
-Open **Playbook → Prospect Agent → Targeting rules** to tell your agents who to skip and who to favor:
+Open **Playbook → Targeting** to tell your agents who to look for, who to skip, and who to favor. At the top is your buyer profile as editable chips: **Job titles**, **Industries**, **Company size**, **Locations**, and **Signals**. Below it are the skip rules and your own guidance:
 
 - **Always skip** agencies and consultants, or freelancers and self-employed people.
 - **Competitors**, **existing customers**, and **other companies** to skip — one per line (a website like acme.com works too).
 - **Keywords to skip**, matched in job titles, company names, and industries.
 - **Who to prioritize or avoid**, in your own words — your agent weighs it when scoring, the same way it weighs your ICP.
 
-Skips are checked before anything is spent on a prospect, and they apply to everyone your agents find — from search and from LinkedIn intent alike. Prospects you add yourself are never skipped. Your guidance never lowers the 70+ quality bar.
+Saving updates both the buyer profile your agents score against and the skip rules, so there is one place for both. Skips are checked before anything is spent on a prospect, and they apply to everyone your agents find — from search and from LinkedIn intent alike. Prospects you add yourself are never skipped. Your guidance never lowers the 70+ quality bar.
 
 ## It learns from your results
 

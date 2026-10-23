@@ -30,6 +30,8 @@ export async function POST(req: Request) {
         stripe_subscription_id: snap.stripeSubscriptionId,
         stripe_customer_id: snap.stripeCustomerId,
         outreach_paused: snap.outreachPaused,
+        // One trial clock: Stripe's trial_end at checkout. Never clear an existing value.
+        ...(snap.trialEndsAt ? { trial_ends_at: snap.trialEndsAt } : {}),
       };
 
       // Lapse/cancel pausing is carried by the outreach_paused snapshot column (set by the
