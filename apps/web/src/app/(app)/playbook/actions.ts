@@ -11,6 +11,7 @@ import {
   parseScoutForm,
   MAX_ICPS,
 } from "./validation";
+import { saveScoutIcp } from "./scout/targeting/resolve-icp";
 import { parseBuyersForm } from "@/lib/validation/buyers";
 import { gate, loadBillingRow, hasActivePlan } from "@/lib/billing/entitlement";
 
@@ -591,17 +592,9 @@ export async function updateScoutTargeting(
   if (readError) return { error: "Could not save. Please try again." };
   if (!agent) return { error: "No Prospect Agent yet. Deploy one first." };
 
-  // The shared buyer profile: the onboarding ICP row (insert if the account never had one).
-  const { data: icp } = await supabase
-    .from("icps")
-    .select("id")
-    .eq("account_id", account.id)
-    .eq("source", "onboarding")
-    .limit(1)
-    .maybeSingle<{ id: string }>();
-  const { error: icpError } = icp
-    ? await supabase.from("icps").update({ name, criteria }).eq("id", icp.id)
-    : await supabase.from("icps").insert({ account_id: account.id, name, criteria, source: "onboarding" });
+  // The ICP the Scout scores against (linked row, else onboarding, else create + link) — one
+  // resolver shared with the Targeting page so both read and write the same row.
+  const { error: icpError } = await saveScoutIcp(supabase, { accountId: account.id, agentId: agent.id, name, criteria });
   if (icpError) return { error: "Could not save. Only workspace admins can change targeting." };
 
   const { data: saved, error } = await supabase

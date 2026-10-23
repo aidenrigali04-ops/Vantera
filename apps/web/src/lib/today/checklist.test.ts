@@ -56,4 +56,12 @@ describe("checklistFor — the Today Get Started rail", () => {
     ]);
     expect(c!.done).toBe(1);
   });
+  it("one done is still expanded; three done is not yet dismissable", () => {
+    const one = checklistFor(facts({ buyersConfirmed: true }));
+    expect(one!.done).toBe(1);
+    expect(one!.collapsed).toBe(false);
+    const three = checklistFor(facts({ buyersConfirmed: true, prospectsReviewed: true, linkedinActive: true }));
+    expect(three!.done).toBe(3);
+    expect(three!.dismissable).toBe(false);
+  });
 });

@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import {
   buildTargetingProfile,
   describeStrategy,
@@ -237,6 +238,9 @@ async function OverviewTab() {
   const agentRowsRaw = agents ?? [];
   const scout = agentRowsRaw.find((a) => a.kind === "scout") ?? null;
   const liveAgents = agentRowsRaw.filter((a) => a.status === "live");
+  // Brand-new account (no live agent, zero leads): onboarding still lands here, but Results is
+  // empty — Today's Get Started checklist is the real home.
+  if (liveAgents.length === 0 && leadCountList.reduce((n, r) => n + Number(r.n), 0) === 0) redirect("/today");
   // Map to the view's shape with server-formatted labels (no client Date.now()).
   const agentRows: AgentRow[] = agentRowsRaw.map((a) => ({
     id: a.id,

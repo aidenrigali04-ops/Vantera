@@ -1,8 +1,10 @@
 import { redirect } from "next/navigation";
 import { normalizeTargetingRules } from "@vantera/agent-brains";
+import { getGateData } from "@/lib/auth/context";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader, PANEL } from "@/components/app/surface";
 import type { IcpEditorValue } from "@/components/icp/icp-editor";
+import { resolveScoutIcp } from "./resolve-icp";
 import { TargetingForm } from "./targeting-form";
 
 export const metadata = { title: "Targeting" };
@@ -12,37 +14,22 @@ const list = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is st
 
 /** Your buyers + who to skip — the same editor as onboarding, applied to every new prospect. */
 export default async function ScoutTargetingPage() {
+  const { account } = await getGateData();
+  if (!account) redirect("/playbook");
   const supabase = await createClient();
   const { data: agent } = await supabase
     .from("agents")
     .select("id, config")
+    .eq("account_id", account.id)
     .eq("kind", "scout")
     .limit(1)
     .maybeSingle<{ id: string; config: Record<string, unknown> | null }>();
   if (!agent) redirect("/playbook");
 
-  const { data: onboardingIcp } = await supabase
-    .from("icps")
-    .select("name, criteria")
-    .eq("source", "onboarding")
-    .limit(1)
-    .maybeSingle<{ name: string; criteria: Criteria }>();
-
-  let name = onboardingIcp?.name;
-  if (!name) {
-    const { data: link } = await supabase
-      .from("agent_icps")
-      .select("icps(name)")
-      .eq("agent_id", agent.id)
-      .order("position", { ascending: true })
-      .limit(1)
-      .maybeSingle<{ icps: { name: string } | null }>();
-    name = link?.icps?.name;
-  }
-
-  const c = onboardingIcp?.criteria;
+  const icp = await resolveScoutIcp(supabase, account.id, agent.id);
+  const c = icp?.criteria as Criteria;
   const value: IcpEditorValue = {
-    name: name ?? "Ideal buyers",
+    name: icp?.name ?? "Ideal buyers",
     criteria: {
       titles: list(c?.titles),
       industries: list(c?.industries),
