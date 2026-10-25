@@ -1,4 +1,5 @@
 import { logger, task } from "@trigger.dev/sdk";
+import { PLAN_DISPLAY, type PlanTier } from "@vantera/billing";
 import { createDb } from "@vantera/db";
 import { sendTrialEndingEmail } from "@vantera/transactional-email";
 import { createTrialEndingStore } from "../pipeline/pg-store";
@@ -25,7 +26,8 @@ export const trialEnding = task({
     const appUrl = process.env.APP_URL ?? "https://www.vanterasystem.dev";
     const summary = await runTrialEnding({
       store: createTrialEndingStore(db),
-      send: ({ to, daysLeft }) => sendTrialEndingEmail({ to, daysLeft, appUrl }),
+      send: (opts) => sendTrialEndingEmail({ ...opts, appUrl }),
+      planNameFor: (p) => (p && p in PLAN_DISPLAY ? PLAN_DISPLAY[p as PlanTier].name : null),
     });
     logger.info("trial-ending finished", { ...summary });
     return summary;

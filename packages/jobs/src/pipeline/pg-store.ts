@@ -4012,8 +4012,15 @@ export function createTrialEndingStore(db: Db) {
   return {
     async getTrialEndingAccounts(now: Date, withinMs: number): Promise<TrialEndingAccount[]> {
       const until = new Date(now.getTime() + withinMs);
-      const rows = await db.execute<{ id: string; trial_ends_at: string; email: string | null }>(sql`
-        select a.id, a.trial_ends_at, u.email
+      const rows = await db.execute<{
+        id: string;
+        trial_ends_at: string;
+        email: string | null;
+        plan: string | null;
+        has_card: boolean;
+      }>(sql`
+        select a.id, a.trial_ends_at, u.email, a.plan,
+          (a.stripe_subscription_id is not null) as has_card
         from public.accounts a
         join public.account_members m on m.account_id = a.id and m.role in ('owner','admin')
         join auth.users u on u.id = m.user_id
@@ -4023,11 +4030,16 @@ export function createTrialEndingStore(db: Db) {
           and a.trial_ends_at <= ${until.toISOString()}
           and a.trial_ending_notified_at is null
           and a.lifecycle_emails_enabled = true
-          and a.stripe_subscription_id is null
       `);
       const byId = new Map<string, TrialEndingAccount>();
       for (const r of [...rows]) {
-        const cur = byId.get(r.id) ?? { id: r.id, trialEndsAt: r.trial_ends_at, emails: [] };
+        const cur = byId.get(r.id) ?? {
+          id: r.id,
+          trialEndsAt: r.trial_ends_at,
+          emails: [],
+          plan: r.plan ?? null,
+          hasCard: Boolean(r.has_card),
+        };
         if (r.email && !cur.emails.includes(r.email)) cur.emails.push(r.email);
         byId.set(r.id, cur);
       }

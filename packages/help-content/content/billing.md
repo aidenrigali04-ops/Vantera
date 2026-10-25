@@ -24,11 +24,11 @@ Every new workspace starts on a **7-day free trial** of the plan you choose duri
 
 To keep things fair, a trial sources a capped number of prospects — plenty to prove the motion and reach your first replies. Choosing a plan lifts the cap and prospecting continues at your plan's full capacity.
 
-When the trial ends, your agents pause and you'll be asked to choose a plan. Your prospects, campaigns, and history are kept exactly as they were — picking a plan resumes everything.
+When the trial ends, your card is charged for the plan you picked and your agents keep running. Cancel before then and nothing is charged. Your prospects, campaigns, and history are kept exactly as they were either way.
 
 ## Deploying agents needs an active plan
 
-Your agents go live the moment a plan is active — so deploying your first agent requires either a paid plan or an active trial. Since every workspace starts on a trial, your first deploy just works; you're only asked to choose a plan once the trial ends. Nothing else in onboarding is blocked before that point.
+Your agents go live the moment a plan is active — so deploying your first agent requires either a paid plan or an active trial. Since every workspace starts on a trial, your first deploy just works; your card on file is simply charged when the trial ends; cancel before then and nothing is charged. Nothing else in onboarding is blocked before that point.
 
 ## Add-ons
 

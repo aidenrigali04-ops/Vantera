@@ -43,7 +43,7 @@ export async function sendWelcomeEmail(opts: WelcomeEmailOptions): Promise<void>
     [
       "Your workspace is ready. Two steps stand between you and a working pipeline:",
       "1. Finish the short setup — Vantera maps your ICP and matches proven plays to it.",
-      "2. Connect LinkedIn. Your 7-day free trial only starts counting the moment you do, and your agents start sourcing and qualifying prospects the same day.",
+      "2. Connect LinkedIn. Your 7-day free trial starts the moment you pick a plan, and your agents start sourcing and qualifying prospects the same day.",
       "Everything the agents draft waits for your approval — nothing sends without you.",
     ],
     "Open Vantera",
@@ -55,6 +55,11 @@ export async function sendWelcomeEmail(opts: WelcomeEmailOptions): Promise<void>
 export interface TrialEndingEmailOptions {
   to: string;
   daysLeft: number;
+  /** Trial end date, already formatted for display (e.g. "October 27"). */
+  endsOn: string;
+  /** Card on file: Stripe charges at trial end and agents keep running. */
+  hasCard: boolean;
+  planName: string | null;
   appUrl: string;
 }
 
@@ -64,6 +69,19 @@ export async function sendTrialEndingEmail(opts: TrialEndingEmailOptions): Promi
   const days = Math.max(1, opts.daysLeft);
   const subject =
     days === 1 ? "Your Vantera trial ends tomorrow" : `Your Vantera trial ends in ${days} days`;
+  if (opts.hasCard) {
+    const { html, text } = shell(
+      subject,
+      [
+        `Your free trial ends on ${opts.endsOn}. Your card on file will then be charged for ${opts.planName ? `the ${opts.planName} plan` : "your plan"} and your agents keep running without interruption.`,
+        "You can see the exact amount, switch plans, or cancel under Settings → Billing. If you've already cancelled, nothing is charged.",
+      ],
+      "Manage billing",
+      `${opts.appUrl}/settings/billing`
+    );
+    await mailer.send({ to: opts.to, subject, html, text });
+    return;
+  }
   const { html, text } = shell(
     subject,
     [

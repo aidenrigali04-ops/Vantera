@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { sendPullbackEmail } from "./lifecycle";
+import { sendPullbackEmail, sendTrialEndingEmail } from "./lifecycle";
 
 /**
  * sendPullbackEmail has no injection seam (it calls createTransactionalEmailFromEnv()
@@ -58,5 +58,61 @@ describe("sendPullbackEmail", () => {
       "List-Unsubscribe": "<https://app.vanterasystem.com/api/lifecycle-unsubscribe/tok123>",
       "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
     });
+  });
+});
+
+describe("sendTrialEndingEmail", () => {
+  const prevEnv = { key: process.env.RESEND_API_KEY, from: process.env.RESEND_FROM_EMAIL };
+
+  afterEach(() => {
+    if (prevEnv.key === undefined) delete process.env.RESEND_API_KEY;
+    else process.env.RESEND_API_KEY = prevEnv.key;
+    if (prevEnv.from === undefined) delete process.env.RESEND_FROM_EMAIL;
+    else process.env.RESEND_FROM_EMAIL = prevEnv.from;
+    vi.unstubAllGlobals();
+  });
+
+  async function capture(over: { daysLeft: number; hasCard: boolean; planName: string | null }) {
+    process.env.RESEND_API_KEY = "re_test";
+    process.env.RESEND_FROM_EMAIL = "noreply@example.com";
+    let body: Record<string, unknown> = {};
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: unknown, init: RequestInit) => {
+        body = JSON.parse(String(init.body));
+        return new Response(JSON.stringify({ id: "msg_1" }), { status: 200 });
+      })
+    );
+    await sendTrialEndingEmail({
+      to: "u@example.com",
+      endsOn: "October 27",
+      appUrl: "https://app.example.com",
+      ...over,
+    });
+    return body;
+  }
+
+  it("card on file: charge-date copy, plan name, Manage billing CTA", async () => {
+    const body = await capture({ daysLeft: 2, hasCard: true, planName: "All Access" });
+    expect(body.subject).toBe("Your Vantera trial ends in 2 days");
+    const html = String(body.html);
+    expect(html).toContain("October 27");
+    expect(html).toContain("charged for the All Access plan");
+    expect(html).toContain("agents keep running");
+    expect(html).toContain("Manage billing");
+    expect(html).toContain("https://app.example.com/settings/billing");
+    expect(html).not.toContain("Choose a plan");
+  });
+
+  it("card on file without a plan name falls back to 'your'", async () => {
+    const body = await capture({ daysLeft: 2, hasCard: true, planName: null });
+    expect(String(body.html)).toContain("charged for your plan and your agents keep running");
+  });
+
+  it("legacy no-card: keeps the pause copy and Choose a plan CTA; 1 day subject", async () => {
+    const body = await capture({ daysLeft: 1, hasCard: false, planName: null });
+    expect(body.subject).toBe("Your Vantera trial ends tomorrow");
+    expect(String(body.html)).toContain("Choose a plan");
+    expect(String(body.html)).not.toContain("Manage billing");
   });
 });

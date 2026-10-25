@@ -10,6 +10,10 @@ export interface TrialEndingAccount {
   id: string;
   trialEndsAt: string;
   emails: string[];
+  /** accounts.plan — the tier the user picked at checkout (null on legacy rows). */
+  plan: string | null;
+  /** A Stripe subscription exists: the card is charged at trial end and agents keep running. */
+  hasCard: boolean;
 }
 
 export interface TrialEndingDeps {
@@ -24,7 +28,15 @@ export interface TrialEndingDeps {
      */
     stampLifecycleEmails?(ids: string[], at: Date): Promise<void>;
   };
-  send(opts: { to: string; daysLeft: number }): Promise<void>;
+  send(opts: {
+    to: string;
+    daysLeft: number;
+    endsOn: string;
+    hasCard: boolean;
+    planName: string | null;
+  }): Promise<void>;
+  /** Display name for a plan id; injected so the pipeline stays free of billing imports. */
+  planNameFor?: (plan: string | null) => string | null;
   now?: () => Date;
 }
 
@@ -40,6 +52,12 @@ export interface TrialEndingSummary {
   lifecycleStampFailures: number;
 }
 
+const END_DATE_FORMAT = new Intl.DateTimeFormat("en-US", {
+  month: "long",
+  day: "numeric",
+  timeZone: "UTC",
+});
+
 const WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
 
 export async function runTrialEnding(deps: TrialEndingDeps): Promise<TrialEndingSummary> {
@@ -52,10 +70,12 @@ export async function runTrialEnding(deps: TrialEndingDeps): Promise<TrialEnding
       1,
       Math.ceil((new Date(account.trialEndsAt).getTime() - now.getTime()) / 86_400_000)
     );
+    const endsOn = END_DATE_FORMAT.format(new Date(account.trialEndsAt));
+    const planName = deps.planNameFor ? deps.planNameFor(account.plan) : null;
     let sent = 0;
     for (const to of account.emails) {
       try {
-        await deps.send({ to, daysLeft });
+        await deps.send({ to, daysLeft, endsOn, hasCard: account.hasCard, planName });
         sent += 1;
       } catch {
         // best-effort per recipient — one bad address must not block the rest
