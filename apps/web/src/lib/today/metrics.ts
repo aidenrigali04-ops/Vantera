@@ -125,6 +125,19 @@ export function fmtRelative(then: Date, now: Date): string {
   return `${Math.round(hrs / 24)}d`;
 }
 
+/** Future-facing counterpart of `fmtRelative`: "in ~12 min" / "in ~3h" / "in ~2d". */
+export function fmtUntil(then: string | Date | null, now: Date): string {
+  if (then == null) return "within ~15 min";
+  const ms = new Date(then).getTime() - now.getTime();
+  if (!Number.isFinite(ms)) return "within ~15 min";
+  if (ms <= 60_000) return "any moment now";
+  const mins = Math.round(ms / 60_000);
+  if (mins < 60) return `in ~${mins} min`;
+  const hrs = Math.round(mins / 60);
+  if (hrs < 24) return `in ~${hrs}h`;
+  return `in ~${Math.round(hrs / 24)}d`;
+}
+
 /** `1,204` — never `1.2k` under 10k (and we never show ≥ 10k on Today). */
 export function fmtCount(n: number): string {
   return n.toLocaleString("en-US");
