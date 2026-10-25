@@ -118,6 +118,8 @@ export interface LeadSignalView {
   kind: string;
   label: string | null;
   detail?: string | null;
+  level?: string | null;
+  source?: string | null;
   observed_at?: string | null;
 }
 

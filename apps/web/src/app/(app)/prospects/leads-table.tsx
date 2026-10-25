@@ -12,7 +12,8 @@ import { bulkArchiveLeads, bulkSuppressLeads, type BulkResult } from "./bulk-act
 import { cn } from "@/lib/utils";
 import { Avatar } from "@/components/today/work-card/chips";
 import { initials } from "@/lib/today/metrics";
-import { EMPTY_FILTERS, leadsHref, type LeadsFilters, type LeadsSort } from "./leads-params";
+import { EMPTY_FILTERS, leadsHref, type LeadsFilters, type LeadsSort, type TabCounts } from "./leads-params";
+import type { IntentPostIn, SignalGroup, WhyNowCell } from "@/lib/prospects/why-now-cell";
 
 export type { LeadsFilters, LeadsSort } from "./leads-params";
 import {
@@ -63,6 +64,18 @@ export interface LeadRow {
   learned_reasons?: { label: string; ratio: number }[] | null;
   /** ML-4: the user's own fit verdict */
   fit_verdict?: "good_fit" | "not_fit" | null;
+  /** UX-2: batched server-side reasons (rendered by the table in a later task) */
+  intent_posts?: IntentPostIn[];
+  queued_draft?: {
+    id: string;
+    body: string;
+    status: string;
+    linkedin_stage: string | null;
+    origin: string | null;
+    style_flags: unknown;
+  } | null;
+  fit_reason?: string | null;
+  why_now?: WhyNowCell;
 }
 
 export interface ReplyView {
@@ -299,6 +312,10 @@ export function LeadsTable({
   per = 25,
   filters = EMPTY_FILTERS,
   industries = [],
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- consumed by the Task 3 table UI
+  tabCounts,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- consumed by the Task 3 table UI
+  signalGroups,
 }: {
   leads: LeadRow[];
   hotLeads?: LeadRow[];
@@ -310,6 +327,8 @@ export function LeadsTable({
   per?: number;
   filters?: LeadsFilters;
   industries?: string[];
+  tabCounts?: TabCounts;
+  signalGroups?: SignalGroup[];
 }) {
   const [peek, setPeek] = useState<LeadRow | null>(null);
   // R4 bulk selection — page-scoped; every bulk op confirms and toasts its outcome.
@@ -357,7 +376,7 @@ export function LeadsTable({
     leadsHref({ tab, q, sort: sort === field ? "newest" : field, per, filters });
 
   const activeFilterCount =
-    (filters.industry ? 1 : 0) + (filters.min ? 1 : 0) + (filters.days ? 1 : 0) + (filters.intent ? 1 : 0);
+    (filters.industry ? 1 : 0) + (filters.min ? 1 : 0) + (filters.days ? 1 : 0) + (filters.intent ? 1 : 0) + (filters.signal ? 1 : 0);
 
   return (
     // Fills the page's one-screen column: toolbar pinned, the region below scrolls
@@ -374,6 +393,7 @@ export function LeadsTable({
             {filters.min && <input type="hidden" name="min" value={filters.min} />}
             {filters.days && <input type="hidden" name="days" value={filters.days} />}
             {filters.intent && <input type="hidden" name="intent" value="1" />}
+            {filters.signal && <input type="hidden" name="signal" value={filters.signal} />}
             <Search
               className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground/60"
               aria-hidden
@@ -465,6 +485,8 @@ export function LeadsTable({
                   />
                   <span>In-market only</span>
                 </label>
+                {/* Signal filter group is Task 3's UI; the param just round-trips here. */}
+                {filters.signal && <input type="hidden" name="signal" value={filters.signal} />}
                 <div className="flex items-center justify-between pt-1">
                   <Link href={leadsHref({ tab, q, sort, per })} className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground">
                     Clear filters

@@ -50,7 +50,7 @@ export interface LeadProfile {
   /** where the lead entered the funnel — "intent" drives the In-market badge */
   source?: string | null;
   /** real captured buying signals (lead_signals, 0031) — the "why now" line, when present */
-  lead_signals?: { kind: string; label: string | null; detail?: string | null; observed_at?: string | null }[] | null;
+  lead_signals?: { kind: string; label: string | null; detail?: string | null; level?: string | null; source?: string | null; observed_at?: string | null }[] | null;
   /** ML-2: what in this prospect matches the people who actually reply (account's own outcomes) */
   learned_reasons?: { label: string; ratio: number }[] | null;
   /** ML-4: the user's own "Good fit" / "Not a fit" verdict */

@@ -6,7 +6,16 @@ import { getGateData } from "@/lib/auth/context";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { LeadsTable, type LeadRow } from "./leads-table";
-import { leadsHref, type LeadsFilters, type LeadsSort } from "./leads-params";
+import {
+  LEADS_TABS,
+  leadsHref,
+  tabPredicate,
+  type LeadsFilters,
+  type LeadsSort,
+  type LeadsTab,
+  type TabCounts,
+} from "./leads-params";
+import { signalGroups, whyNowCell, type IntentPostIn } from "@/lib/prospects/why-now-cell";
 import { AddLead } from "./add-lead";
 import { HOT_MIN_SCORE } from "./lead-value";
 import { cn } from "@/lib/utils";
@@ -23,19 +32,23 @@ export const metadata = { title: "Prospects" };
 const LEAD_SELECT =
   "id, first_name, last_name, title, company_name, company_size, industry, location, tech_stack, status, source, ai_score, ai_rationale, ai_insights, rules_gate_reasons, scored_at, email, email_status, phone, phone_status, linkedin_url, created_at, replies(channel, classification, classification_rationale, body, received_at), lead_signals(kind, label, detail, level, observed_at)";
 
+// The signal-filter variant adds an inner embed so only leads with that signal kind come back.
+const LEAD_SELECT_SIGNAL = `${LEAD_SELECT}, sig:lead_signals!inner(kind)`;
+
 // Tabs where the spotlight makes sense — never above the "Filtered out" list.
 const HOT_STRIP_TABS = new Set(["all", "qualified", "in_campaign", "replied"]);
 
-// `source` tabs filter by where the lead entered the funnel (In-market = the Intent Agent), so the
-// differentiator gets its own first-class view; `statuses` tabs filter by pipeline stage.
-const TABS: { key: string; label: string; statuses: string[] | null; source?: string }[] = [
-  { key: "all", label: "All", statuses: null },
-  { key: "intent", label: "In-market", statuses: null, source: "intent" },
-  { key: "qualified", label: "Qualified", statuses: ["qualified", "enriched"] },
-  { key: "in_campaign", label: "In outreach", statuses: ["in_campaign"] },
-  { key: "replied", label: "Replied", statuses: ["replied", "converted"] },
-  { key: "rejected", label: "Filtered out", statuses: ["rejected"] },
-];
+// Tab predicates live in leads-params (tabPredicate); this is only the label table.
+const TAB_LABELS: Record<LeadsTab, string> = {
+  all: "All",
+  intent: "In-market",
+  qualified: "Qualified",
+  scheduled: "Scheduled",
+  in_campaign: "In outreach",
+  replied: "Replied",
+  rejected: "Filtered out",
+};
+const TABS = LEADS_TABS.map((key) => ({ key, label: TAB_LABELS[key], ...tabPredicate(key) }));
 
 /** PostgREST `or()` treats , % ( ) as syntax — strip them so a search term can't break the filter. */
 function sanitizeSearch(raw: string | undefined): string {
@@ -65,9 +78,11 @@ export default async function LeadsPage({
     min?: string;
     days?: string;
     intent?: string;
+    signal?: string;
   }>;
 }) {
   const params = await searchParams;
+  const now = new Date(); // per request (server code) so "3d ago" never drifts on a warm instance
   const tab = TABS.find((t) => t.key === params.tab) ?? TABS[0];
   const page = Math.max(1, Number(params.page) || 1);
   const q = sanitizeSearch(params.q);
@@ -87,23 +102,42 @@ export default async function LeadsPage({
       ? Number(params.days)
       : null,
     intent: params.intent === "1",
+    signal: (params.signal ?? "").replace(/[^a-z0-9_:-]/gi, "").slice(0, 60),
   };
   const from = (page - 1) * per;
-  const filtering = Boolean(filters.industry || filters.min || filters.days || filters.intent);
+  const filtering = Boolean(filters.industry || filters.min || filters.days || filters.intent || filters.signal);
 
   const supabase = await createClient();
-  let query = supabase.from("leads").select(LEAD_SELECT, { count: "exact" });
-  if (tab.statuses) query = query.in("status", tab.statuses);
-  if (tab.source) query = query.eq("source", tab.source);
-  // R4 filters — compose with tabs and search; each is URL state, shareable and back-safe.
-  if (filters.industry) query = query.eq("industry", filters.industry);
-  if (filters.min) query = query.gte("ai_score", filters.min);
-  if (filters.days) query = query.gte("created_at", sourcedSinceIso(filters.days));
-  if (filters.intent && !tab.source) query = query.eq("source", "intent");
-  if (q)
-    query = query.or(
-      `first_name.ilike.%${q}%,last_name.ilike.%${q}%,company_name.ilike.%${q}%,title.ilike.%${q}%`
-    );
+  // One filter/search recipe shared by the main query and every tab count, so a tab's count is
+  // exactly what clicking it shows. `tabKey` swaps the tab predicate; filters/search are constant.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const applyFilters = <T extends { in: any; eq: any; gte: any; or: any }>(qb: T, tabKey: LeadsTab): T => {
+    const p = tabPredicate(tabKey);
+    let out = qb;
+    if (p.statuses) out = out.in("status", p.statuses);
+    if (p.source) out = out.eq("source", p.source);
+    if (p.scheduled) out = out.eq("sequence_runs.status", "active");
+    // R4 filters — compose with tabs and search; each is URL state, shareable and back-safe.
+    if (filters.industry) out = out.eq("industry", filters.industry);
+    if (filters.min) out = out.gte("ai_score", filters.min);
+    if (filters.days) out = out.gte("created_at", sourcedSinceIso(filters.days));
+    if (filters.intent && !p.source) out = out.eq("source", "intent");
+    if (filters.signal) out = out.eq("sig.kind", filters.signal);
+    if (q)
+      out = out.or(
+        `first_name.ilike.%${q}%,last_name.ilike.%${q}%,company_name.ilike.%${q}%,title.ilike.%${q}%`
+      );
+    return out;
+  };
+  const tabKey = tab.key as LeadsTab;
+  const selectFor = (key: LeadsTab, base: string) =>
+    key === "scheduled" ? `${base}, sequence_runs!inner(status)` : base;
+  let query = applyFilters(
+    supabase
+      .from("leads")
+      .select(selectFor(tabKey, filters.signal ? LEAD_SELECT_SIGNAL : LEAD_SELECT), { count: "exact" }),
+    tabKey
+  );
   query =
     sort === "score"
       ? query
@@ -147,33 +181,103 @@ export default async function LeadsPage({
     .order("started_at", { ascending: false })
     .limit(1);
 
+  // Tab counts: one head count per tab, same search + filters as the main query.
+  const countQueries = LEADS_TABS.map((key) =>
+    applyFilters(
+      supabase
+        .from("leads")
+        .select(
+          selectFor(key, filters.signal ? "id, sig:lead_signals!inner(kind)" : "id"),
+          { count: "exact", head: true }
+        ),
+      key
+    )
+  );
+
+  // Signal kinds present on this account's prospects → the filter's option list.
+  const signalKindsQuery = supabase.from("lead_signals").select("kind").limit(2000);
+
   // Account carries the revenue numbers that turn each lead into "≈ $X to your goal".
-  const [leadsRes, hotRes, industriesRes, learnedRes, { account }] = await Promise.all([
-    query,
-    hotQuery,
-    industriesQuery,
-    learnedQuery,
-    getGateData(),
-  ]);
+  const [leadsRes, hotRes, industriesRes, learnedRes, signalKindsRes, { account }, ...countRes] =
+    await Promise.all([
+      query,
+      hotQuery,
+      industriesQuery,
+      learnedQuery,
+      signalKindsQuery,
+      getGateData(),
+      ...countQueries,
+    ]);
+  // Counts are decoration: a failed one shows 0 rather than taking the page down.
+  const tabCounts = Object.fromEntries(
+    LEADS_TABS.map((key, i) => [key, countRes[i]?.error ? 0 : (countRes[i]?.count ?? 0)])
+  ) as TabCounts;
+  const signalGroupList = signalGroups(
+    signalKindsRes.error ? [] : ((signalKindsRes.data ?? []) as { kind: string }[])
+  );
   // Insight only — a failed read just hides the reasons, never the prospects.
   const readout = parseReadout((learnedRes.data?.[0] as { summary?: unknown } | undefined)?.summary ?? null);
   const working = whatsWorking(readout);
   // R1c: a failed read hits the error boundary — never renders as "0 leads".
-  const pageRows = (orThrow(leadsRes, "your prospects") ?? []) as { id: string; status: string }[];
+  const pageRows = (orThrow(leadsRes, "your prospects") ?? []) as unknown as { id: string; status: string }[];
   const hotRows = (orThrow(hotRes, "hot prospects") ?? []) as { id: string; status: string }[];
-  // ML-4: the user's fit verdicts for the visible leads — its own soft read so a missing table or a
-  // failed read hides the verdicts, never the prospects.
-  const feedbackRes = await supabase
-    .from("lead_feedback")
-    .select("lead_id, verdict")
-    .in("lead_id", [...new Set([...pageRows, ...hotRows].map((r) => r.id))]);
-  const verdicts = fitVerdictFromRows(feedbackRes.error ? null : feedbackRes.data);
+  // ML-4 + UX-2 reasons: batched by the visible ids, each a soft read — a missing table or a
+  // failed read hides that decoration, never the prospects.
+  const ids = [...new Set([...pageRows, ...hotRows].map((r) => r.id))];
+  const [feedbackRes, postsRes, draftsRes] = await Promise.all([
+    supabase.from("lead_feedback").select("lead_id, verdict, reason").in("lead_id", ids),
+    supabase
+      .from("intent_observations")
+      .select("lead_id, post_ref, headline, detail, observed_at")
+      .in("lead_id", ids)
+      .order("observed_at", { ascending: false }),
+    supabase
+      .from("scheduled_sends")
+      .select("id, lead_id, body, status, linkedin_stage, origin, style_flags")
+      .in("lead_id", ids)
+      .in("status", ["pending_review", "approved", "scheduled"])
+      .order("created_at", { ascending: false }),
+  ]);
+  const feedbackRows = feedbackRes.error
+    ? null
+    : (feedbackRes.data as { lead_id: string; verdict: string; reason: string | null }[] | null);
+  const verdicts = fitVerdictFromRows(feedbackRows);
+  const fitReasons = new Map<string, string>();
+  for (const r of feedbackRows ?? []) if (r.reason && !fitReasons.has(r.lead_id)) fitReasons.set(r.lead_id, r.reason);
+  const postsByLead = new Map<string, IntentPostIn[]>();
+  for (const p of postsRes.error ? [] : ((postsRes.data ?? []) as (IntentPostIn & { lead_id: string | null })[])) {
+    if (!p.lead_id) continue;
+    const list = postsByLead.get(p.lead_id) ?? [];
+    list.push({ post_ref: p.post_ref, headline: p.headline, detail: p.detail, observed_at: p.observed_at });
+    postsByLead.set(p.lead_id, list);
+  }
+  type Draft = NonNullable<LeadRow["queued_draft"]>;
+  const draftByLead = new Map<string, Draft>();
+  for (const d of draftsRes.error ? [] : ((draftsRes.data ?? []) as (Draft & { lead_id: string })[])) {
+    // newest first → keep the first seen per lead
+    if (!draftByLead.has(d.lead_id)) {
+      const { lead_id: _leadId, ...draft } = d;
+      void _leadId;
+      draftByLead.set(d.lead_id, draft);
+    }
+  }
   const withReasons = <T extends { id: string }>(rows: T[]) =>
-    rows.map((r) => ({
-      ...r,
-      learned_reasons: reasonsForLead(readout, r as never),
-      fit_verdict: verdicts.get(r.id) ?? null,
-    }));
+    rows.map((r) => {
+      const row = r as T & {
+        lead_signals?: { kind: string; label: string | null; detail?: string | null; level?: string | null; observed_at?: string | null }[] | null;
+        ai_insights?: { triggers?: string[]; pain_points?: string[] } | null;
+      };
+      const posts = postsByLead.get(r.id) ?? [];
+      return {
+        ...r,
+        learned_reasons: reasonsForLead(readout, r as never),
+        fit_verdict: verdicts.get(r.id) ?? null,
+        fit_reason: fitReasons.get(r.id) ?? null,
+        intent_posts: posts,
+        queued_draft: draftByLead.get(r.id) ?? null,
+        why_now: whyNowCell(row.lead_signals ?? [], posts, row.ai_insights ?? null, now),
+      };
+    });
   const leadsRaw = withReasons(pageRows);
   const count = leadsRes.count;
   const hotLeads = withReasons(hotRows);
@@ -300,6 +404,8 @@ export default async function LeadsPage({
             per={per}
             filters={filters}
             industries={industries}
+            tabCounts={tabCounts}
+            signalGroups={signalGroupList}
           />
           {(totalPages > 1 || per !== 25) && (
             <div className="mt-4 flex shrink-0 flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
@@ -337,6 +443,7 @@ export default async function LeadsPage({
                     {filters.min && <input type="hidden" name="min" value={filters.min} />}
                     {filters.days && <input type="hidden" name="days" value={filters.days} />}
                     {filters.intent && <input type="hidden" name="intent" value="1" />}
+                    {filters.signal && <input type="hidden" name="signal" value={filters.signal} />}
                     <label htmlFor="page-jump">Go to</label>
                     <input
                       id="page-jump"
