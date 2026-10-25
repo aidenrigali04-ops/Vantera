@@ -167,6 +167,27 @@ describe("createTrialEndingStore separates the idempotence write from the lifecy
     expect(sets).toEqual([{ lifecycleLastEmailAt: at }]);
   });
 
+  it("getTrialEndingAccounts targets card-on-file trials too and selects plan + has_card", async () => {
+    let text = "";
+    const db = {
+      execute: async (q: { queryChunks: unknown[] }) => {
+        text = q.queryChunks
+          .map((c) => (c && typeof c === "object" && "value" in c ? [(c as { value: unknown }).value].flat().join("") : ""))
+          .join("");
+        return [
+          { id: "a1", trial_ends_at: "2026-07-17T10:00:00Z", email: "o@x.com", plan: "growth", has_card: true },
+        ];
+      },
+    } as unknown as Db;
+    const out = await createTrialEndingStore(db).getTrialEndingAccounts(new Date(), 1000);
+    expect(text).not.toContain("stripe_subscription_id is null");
+    expect(text).toContain("a.plan");
+    expect(text).toContain("has_card");
+    expect(out).toEqual([
+      { id: "a1", trialEndsAt: "2026-07-17T10:00:00Z", emails: ["o@x.com"], plan: "growth", hasCard: true },
+    ]);
+  });
+
   it("is a no-op with an empty id list — no UPDATE attempted", async () => {
     const { db, updateCalls } = fakeUpdateDb();
     const store = createTrialEndingStore(db);

@@ -32,8 +32,8 @@ Every Monday, workspace owners and admins get a one-screen recap of what the age
 ## Lifecycle emails
 
 Workspace owners and admins also get two account-level emails, each sent exactly once per
-event: a **heads-up two days before your free trial ends** (your data and agents stay exactly
-as they are either way), and a **notice if a subscription payment fails** and outreach pauses —
+event: a **heads-up two days before your free trial ends**, telling you the date your card
+will be charged and how to change or cancel, and a **notice if a subscription payment fails** and outreach pauses —
 with a link to fix billing and pick back up. New signups also get a short **welcome email**
 covering how the trial starts. Turn the trial/payment emails off under
 **Settings → Notifications**.

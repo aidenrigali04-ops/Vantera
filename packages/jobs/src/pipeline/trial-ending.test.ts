@@ -1,10 +1,18 @@
 import { describe, expect, it, vi } from "vitest";
 import { runTrialEnding, type TrialEndingAccount } from "./trial-ending";
 
+type SendOpts = {
+  to: string;
+  daysLeft: number;
+  endsOn: string;
+  hasCard: boolean;
+  planName: string | null;
+};
+
 const NOW = new Date("2026-07-15T14:00:00Z");
 
 function makeDeps(accounts: TrialEndingAccount[]) {
-  const sent: { to: string; daysLeft: number }[] = [];
+  const sent: SendOpts[] = [];
   const marked: string[][] = [];
   return {
     deps: {
@@ -14,9 +22,10 @@ function makeDeps(accounts: TrialEndingAccount[]) {
           marked.push(ids);
         }),
       },
-      send: vi.fn(async (opts: { to: string; daysLeft: number }) => {
+      send: vi.fn(async (opts: SendOpts) => {
         sent.push(opts);
       }),
+      planNameFor: (plan: string | null) => (plan === "growth" ? "All Access" : null),
       now: () => NOW,
     },
     sent,
@@ -27,7 +36,7 @@ function makeDeps(accounts: TrialEndingAccount[]) {
 describe("runTrialEnding", () => {
   it("emails every owner/admin and stamps the account once", async () => {
     const { deps, sent, marked } = makeDeps([
-      { id: "a1", trialEndsAt: "2026-07-17T10:00:00Z", emails: ["o@x.com", "a@x.com"] },
+      { id: "a1", trialEndsAt: "2026-07-17T10:00:00Z", emails: ["o@x.com", "a@x.com"], plan: "growth", hasCard: true },
     ]);
     const summary = await runTrialEnding(deps);
     expect(sent.map((s) => s.to)).toEqual(["o@x.com", "a@x.com"]);
@@ -41,9 +50,25 @@ describe("runTrialEnding", () => {
     });
   });
 
+  it("emails a card-on-file account with the formatted end date, card flag and plan name", async () => {
+    const { deps, sent } = makeDeps([
+      { id: "a1", trialEndsAt: "2026-07-17T10:00:00Z", emails: ["o@x.com"], plan: "growth", hasCard: true },
+      { id: "a2", trialEndsAt: "2026-07-17T10:00:00Z", emails: ["l@x.com"], plan: null, hasCard: false },
+    ]);
+    await runTrialEnding(deps);
+    expect(sent[0]).toEqual({
+      to: "o@x.com",
+      daysLeft: 2,
+      endsOn: "July 17",
+      hasCard: true,
+      planName: "All Access",
+    });
+    expect(sent[1]).toMatchObject({ hasCard: false, planName: null, endsOn: "July 17" });
+  });
+
   it("computes daysLeft with a floor of 1 (ends-tomorrow reads as 1 day)", async () => {
     const { deps, sent } = makeDeps([
-      { id: "a1", trialEndsAt: "2026-07-16T02:00:00Z", emails: ["o@x.com"] },
+      { id: "a1", trialEndsAt: "2026-07-16T02:00:00Z", emails: ["o@x.com"], plan: "growth", hasCard: true },
     ]);
     await runTrialEnding(deps);
     expect(sent[0]?.daysLeft).toBe(1);
@@ -51,7 +76,7 @@ describe("runTrialEnding", () => {
 
   it("does not stamp an account whose every send failed (retries next run)", async () => {
     const { deps, marked } = makeDeps([
-      { id: "a1", trialEndsAt: "2026-07-17T10:00:00Z", emails: ["o@x.com"] },
+      { id: "a1", trialEndsAt: "2026-07-17T10:00:00Z", emails: ["o@x.com"], plan: "growth", hasCard: true },
     ]);
     deps.send = vi.fn(async () => {
       throw new Error("mail down");
@@ -80,7 +105,7 @@ describe("runTrialEnding", () => {
     const summary = await runTrialEnding({
       store: {
         getTrialEndingAccounts: async () => [
-          { id: "acc-1", trialEndsAt: "2026-07-22T00:00:00Z", emails: ["a@x.com"] },
+          { id: "acc-1", trialEndsAt: "2026-07-22T00:00:00Z", emails: ["a@x.com"], plan: "growth", hasCard: true },
         ],
         markTrialEndingNotified: async (ids) => {
           marked.push(...ids);
@@ -113,8 +138,8 @@ describe("runTrialEnding", () => {
         deps: {
           store: {
             getTrialEndingAccounts: async () => [
-              { id: "acc-1", trialEndsAt: "2026-07-22T00:00:00Z", emails: ["a@x.com"] },
-              { id: "acc-2", trialEndsAt: "2026-07-22T00:00:00Z", emails: ["b@x.com"] },
+              { id: "acc-1", trialEndsAt: "2026-07-22T00:00:00Z", emails: ["a@x.com"], plan: "growth", hasCard: true },
+              { id: "acc-2", trialEndsAt: "2026-07-22T00:00:00Z", emails: ["b@x.com"], plan: "growth", hasCard: true },
             ],
             markTrialEndingNotified: async (ids: string[]) => {
               marked.push(...ids);
