@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { exemplarBlock, leadBlock, proofSection, PROSPECT_ACCURACY_RULE } from "./shared";
+import { exemplarBlock, leadBlock, proofSection, steerBlock, STEER_MAX_CHARS, PROSPECT_ACCURACY_RULE } from "./shared";
 import { findUngroundedClaims } from "./humanizer";
 import type { StoredInsights } from "../prospect/schema";
 
@@ -130,5 +130,31 @@ describe("leadBlock — verified why-now (ML-3)", () => {
     const withNull = leadBlock({ ...base, lead: { ...base.lead, whyNow: null }, insights: insights() });
     expect(withNull).toBe(without);
     expect(without).not.toContain("Why now");
+  });
+});
+
+describe("steerBlock — owner direction (prompt-only)", () => {
+  it("returns empty for blank input", () => {
+    expect(steerBlock()).toBe("");
+    expect(steerBlock(null)).toBe("");
+    expect(steerBlock("  \n\t ")).toBe("");
+  });
+
+  it("collapses whitespace and newlines to single spaces and trims", () => {
+    expect(steerBlock("  warmer\n\n tone,   shorter  ")).toBe(
+      "Owner direction (style and angle only — adds no facts, never a claim about the prospect):\nwarmer tone, shorter",
+    );
+  });
+
+  it("caps the steer at STEER_MAX_CHARS", () => {
+    expect(STEER_MAX_CHARS).toBe(280);
+    const out = steerBlock("a".repeat(500));
+    expect(out.split("\n")[1]).toHaveLength(280);
+  });
+
+  it("is prompt-only: a number inside the steer never whitelists a claim", () => {
+    const base = { lead: { firstName: "Dana" }, insights: insights(), context: { cta: "intro" } };
+    const grounding = leadBlock(base);
+    expect(findUngroundedClaims("Acme grew 40% last quarter", grounding).length).toBeGreaterThan(0);
   });
 });
