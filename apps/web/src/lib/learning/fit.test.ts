@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fitVerdictFromRows, parseFitVerdict } from "./fit";
+import { fitVerdictFromRows, parseFitReason, parseFitVerdict } from "./fit";
 
 describe("parseFitVerdict", () => {
   it("accepts only the known verdicts (and clear)", () => {
@@ -25,5 +25,15 @@ describe("fitVerdictFromRows", () => {
 
   it("is empty for a failed or missing read", () => {
     expect(fitVerdictFromRows(null).size).toBe(0);
+  });
+});
+
+describe("parseFitReason", () => {
+  it("trims, drops blanks, and rejects over 200 chars", () => {
+    expect(parseFitReason("  Too small  ")).toEqual({ ok: true, reason: "Too small" });
+    expect(parseFitReason("   ")).toEqual({ ok: true, reason: null });
+    expect(parseFitReason(null)).toEqual({ ok: true, reason: null });
+    expect(parseFitReason("x".repeat(200))).toEqual({ ok: true, reason: "x".repeat(200) });
+    expect(parseFitReason("x".repeat(201))).toEqual({ ok: false });
   });
 });

@@ -3,14 +3,22 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowRight, Clock, ExternalLink, X } from "lucide-react";
+import { ArrowRight, ChevronDown, ChevronUp, Clock, ExternalLink, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { LeadCrmControls } from "@/components/lead-crm-controls";
 import { LeadFitControls } from "@/components/lead-fit-controls";
 import type { FitVerdict } from "@/lib/learning/fit";
-import { SourceBadge, WhyNowLine } from "@/components/lead-why-now";
+import { SourceBadge, WhyNowCellView, WhyNowLine } from "@/components/lead-why-now";
 import { projectedRevenue } from "@/app/(app)/prospects/lead-value";
+import type { IntentPostIn, WhyNowCell } from "@/lib/prospects/why-now-cell";
+import {
+  MessageSection,
+  Section,
+  SignalsTimeline,
+  type QueuedDraft,
+  type RegenerateDraft,
+} from "@/components/lead-profile/sections";
 
 const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 
@@ -55,6 +63,22 @@ export interface LeadProfile {
   learned_reasons?: { label: string; ratio: number }[] | null;
   /** ML-4: the user's own "Good fit" / "Not a fit" verdict */
   fit_verdict?: FitVerdict | null;
+  /** UX-2: the saved "why not a fit" note */
+  fit_reason?: string | null;
+  /** UX-2: the precomputed reason cell (server-side `when`, no clock read in render) */
+  why_now?: WhyNowCell;
+  /** UX-2: in-market posts behind the intent signal */
+  intent_posts?: IntentPostIn[];
+  /** UX-2: the prospect's queued draft, if one is waiting */
+  queued_draft?: QueuedDraft | null;
+}
+
+export type PeekNavProps = { index: number; total: number; onPrev: () => void; onNext: () => void };
+
+/** Arrow keys walk the list — but never while typing in a field. */
+function isEditable(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName);
 }
 
 /** "Funding signal (2.1× your reply rate)" — one plain line per direction, highest impact first. */
@@ -130,6 +154,9 @@ export function LeadProfileSheet({
   avgDealValueCents = null,
   goalCents = null,
   fullProfileHref,
+  nav,
+  initialSection,
+  onRegenerate,
 }: {
   lead: LeadProfile;
   onClose: () => void;
@@ -138,18 +165,42 @@ export function LeadProfileSheet({
   goalCents?: number | null;
   /** when set, a pinned footer links through to the full-page brief */
   fullProfileHref?: string;
+  /** prev/next over the caller's list (Prospects table); omitted elsewhere */
+  nav?: PeekNavProps;
+  /** open + scroll to this section first (the table's `+N` chip opens Signals) */
+  initialSection?: "signals" | "message";
+  /** steerable regenerate for the queued draft — the control is hidden until a caller supplies it */
+  onRegenerate?: RegenerateDraft;
 }) {
   const insights = lead.ai_insights;
   const proj = projectedRevenue(avgDealValueCents, goalCents, lead.ai_score);
+  // Footer "Not a fit" → remount the Fit section focused with the reason input open.
+  const [fitAsk, setFitAsk] = useState(0);
 
-  // A slide-over is a dialog: Escape must close it (keyboard parity with the overlay click).
+  // A slide-over is a dialog: Escape must close it (keyboard parity with the overlay click);
+  // ↑/↓ step through the list when the caller provides navigation.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
+      else if (nav && !isEditable(e.target)) {
+        if (e.key === "ArrowUp" && nav.index > 0) {
+          e.preventDefault();
+          nav.onPrev();
+        } else if (e.key === "ArrowDown" && nav.index < nav.total - 1) {
+          e.preventDefault();
+          nav.onNext();
+        }
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, [onClose, nav]);
+
+  const signals = lead.lead_signals ?? [];
+  const posts = lead.intent_posts ?? [];
+  const postTitle = lead.why_now?.href
+    ? (posts.find((p) => p.post_ref === lead.why_now?.href)?.headline ?? null)
+    : null;
 
   return (
     <>
@@ -173,7 +224,11 @@ export function LeadProfileSheet({
             <p className="text-sm text-muted-foreground">
               {[lead.title, lead.company_name].filter(Boolean).join(" · ")}
             </p>
-            <WhyNowLine lead={lead} />
+            {lead.why_now !== undefined ? (
+              <WhyNowCellView cell={lead.why_now} postTitle={postTitle} className="mt-1" />
+            ) : (
+              <WhyNowLine lead={lead} />
+            )}
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <Badge>{STATUS_LABELS[lead.status] ?? lead.status}</Badge>
               {(() => {
@@ -194,95 +249,169 @@ export function LeadProfileSheet({
               })()}
             </div>
           </div>
-          <Button variant="ghost" size="sm" onClick={onClose} aria-label="Close">
-            <X className="size-4" />
-          </Button>
+          <div className="flex shrink-0 items-center gap-1">
+            {nav && nav.index >= 0 && (
+              <>
+                <span className="mr-1 font-mono text-[11px] tabular-nums text-muted-foreground">
+                  {nav.index + 1} of {nav.total}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={nav.onPrev}
+                  disabled={nav.index <= 0}
+                  aria-label="Previous prospect"
+                >
+                  <ChevronUp className="size-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={nav.onNext}
+                  disabled={nav.index >= nav.total - 1}
+                  aria-label="Next prospect"
+                >
+                  <ChevronDown className="size-4" />
+                </Button>
+              </>
+            )}
+            <Button variant="ghost" size="sm" onClick={onClose} aria-label="Close">
+              <X className="size-4" />
+            </Button>
+          </div>
         </div>
 
-        <div className="mt-6 space-y-6">
-          <section>
-            <div className="flex items-baseline justify-between">
-              <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Fit score</p>
-              <p className="font-mono text-3xl font-semibold tabular-nums">{lead.ai_score ?? "—"}</p>
-            </div>
+        {/* Keyed by lead so prev/next resets every section's local state (draft edits, fit step). */}
+        <div key={lead.id ?? leadName(lead)} className="mt-6 space-y-4">
+          <Section id="signals" title="Signals" focus={initialSection === "signals"}>
+            <SignalsTimeline signals={signals} posts={posts} />
+          </Section>
+
+          <Section
+            id="rank"
+            title="Why this rank"
+            aside={<span className="font-mono text-2xl font-semibold tabular-nums">{lead.ai_score ?? "—"}</span>}
+          >
             {/* Value framing — same worth-toward-goal line as the table and Hot strip. */}
             {proj && (
-              <p className="mt-1 text-right text-xs text-muted-foreground">
+              <p className="text-xs text-muted-foreground">
                 Worth <span className="font-data font-semibold text-foreground">{usd.format(proj.valueCents / 100)}</span>
                 {proj.dealsToGoal != null && <> · 1 of ~{proj.dealsToGoal} to your goal</>}
               </p>
             )}
-            {lead.ai_rationale && (
-              <p className="mt-2 text-sm text-muted-foreground">{lead.ai_rationale}</p>
-            )}
+            {lead.ai_rationale && <p className="mt-2 text-sm text-muted-foreground">{lead.ai_rationale}</p>}
             {lead.learned_reasons && lead.learned_reasons.length > 0 && (
               <LearnedReasons reasons={lead.learned_reasons} />
             )}
-          </section>
+            {!proj && !lead.ai_rationale && !(lead.learned_reasons && lead.learned_reasons.length > 0) && (
+              <p className="text-sm text-muted-foreground">Not scored yet.</p>
+            )}
+          </Section>
 
           {insights && (
-            <section className="space-y-3 rounded-xl border bg-muted/30 p-4">
-              <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Why this prospect</p>
-              {insights.summary && <p className="text-sm">{insights.summary}</p>}
-              <InsightList label="Pain points" items={insights.pain_points} />
-              <InsightList label="Buying triggers" items={insights.triggers} />
-              <InsightList label="Motivations" items={insights.motivations} />
-              {insights.value_angle && <Field label="Value angle">{insights.value_angle}</Field>}
-              {insights.aha_moment && <Field label="Aha moment">{insights.aha_moment}</Field>}
-            </section>
-          )}
-
-          <section className="grid grid-cols-2 gap-4">
-            <Field label="Company">{lead.company_name ?? "—"}</Field>
-            <Field label="Headcount">{lead.company_size ?? "—"}</Field>
-            <Field label="Industry">{lead.industry ?? "—"}</Field>
-            <Field label="Location">{lead.location ?? "—"}</Field>
-          </section>
-
-          {lead.tech_stack && lead.tech_stack.length > 0 && (
-            <section>
-              <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Tech stack</p>
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {lead.tech_stack.map((t) => (
-                  <Badge key={t} variant="secondary">
-                    {t}
-                  </Badge>
-                ))}
+            <Section id="prospect" title="Why this prospect">
+              <div className="space-y-3">
+                {insights.summary && <p className="text-sm">{insights.summary}</p>}
+                <InsightList label="Pain points" items={insights.pain_points} />
+                <InsightList label="Buying triggers" items={insights.triggers} />
+                <InsightList label="Motivations" items={insights.motivations} />
+                {insights.value_angle && <Field label="Value angle">{insights.value_angle}</Field>}
+                {insights.aha_moment && <Field label="Aha moment">{insights.aha_moment}</Field>}
               </div>
-            </section>
+            </Section>
           )}
 
-          {/* LinkedIn-only platform: the prospect's profile link is the contact surface —
-              email/phone stay internal (CRM-push dedupe data), never product UI. */}
-          {lead.linkedin_url && (
-            <section>
-              <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">LinkedIn</p>
+          <Section id="company" title="Company">
+            <div className="grid grid-cols-2 gap-4">
+              <Field label="Company">{lead.company_name ?? "—"}</Field>
+              <Field label="Headcount">{lead.company_size ?? "—"}</Field>
+              <Field label="Industry">{lead.industry ?? "—"}</Field>
+              <Field label="Location">{lead.location ?? "—"}</Field>
+            </div>
+            {lead.tech_stack && lead.tech_stack.length > 0 && (
+              <div className="mt-4">
+                <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Tech stack</p>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {lead.tech_stack.map((t) => (
+                    <Badge key={t} variant="secondary">
+                      {t}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+            {/* LinkedIn-only platform: the prospect's profile link is the contact surface —
+                email/phone stay internal (CRM-push dedupe data), never product UI. */}
+            {lead.linkedin_url && (
               <a
                 href={lead.linkedin_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mt-2 flex items-center gap-1 text-sm underline underline-offset-2"
+                className="mt-4 flex items-center gap-1 text-sm underline underline-offset-2"
               >
                 LinkedIn profile <ExternalLink className="size-3" />
               </a>
-            </section>
+            )}
+          </Section>
+
+          {lead.queued_draft && (
+            <Section id="message" title="Message" focus={initialSection === "message"}>
+              <MessageSection draft={lead.queued_draft} onRegenerate={onRegenerate} />
+            </Section>
           )}
 
-          {lead.id && <LeadFitControls key={lead.id} leadId={lead.id} verdict={lead.fit_verdict ?? null} />}
+          {lead.id && (
+            <Section key={`fit-${fitAsk}`} id="fit" title="Fit" focus={fitAsk > 0}>
+              <LeadFitControls
+                key={lead.id}
+                leadId={lead.id}
+                verdict={lead.fit_verdict ?? null}
+                reason={lead.fit_reason ?? null}
+                askReason={fitAsk > 0}
+              />
+            </Section>
+          )}
 
-          {lead.id && <LeadCrmControls leadId={lead.id} status={lead.status} />}
+          {lead.id && (
+            <Section id="crm" title="CRM">
+              <LeadCrmControls leadId={lead.id} status={lead.status} />
+            </Section>
+          )}
+
+          {/* Notes need server data the row doesn't carry — the peek stays fetch-free and links through. */}
+          {lead.id && fullProfileHref && (
+            <Section id="notes" title="Notes" defaultOpen={false}>
+              <Link
+                href={`${fullProfileHref}#notes`}
+                className="inline-flex items-center gap-1 text-sm underline underline-offset-2"
+              >
+                Read and add notes in the full brief <ArrowRight className="size-3.5" aria-hidden />
+              </Link>
+            </Section>
+          )}
         </div>
       </div>
 
       {/* Pinned footer — the peek is for working the lead in place; the full brief is one click. */}
-      {fullProfileHref && (
-        <div className="shrink-0 border-t border-[var(--hairline)] bg-background p-4">
-          <Link
-            href={fullProfileHref}
-            className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-[var(--hairline)] bg-white px-4 py-2 text-sm font-medium transition-colors hover:border-[var(--cyan-line)] hover:bg-[var(--cyan-tint)]"
-          >
-            Open full profile <ArrowRight className="size-4" aria-hidden />
-          </Link>
+      {(fullProfileHref || (lead.id && !lead.fit_verdict)) && (
+        <div className="flex shrink-0 gap-2 border-t border-[var(--hairline)] bg-background p-4">
+          {lead.id && !lead.fit_verdict && (
+            <button
+              type="button"
+              onClick={() => setFitAsk((n) => n + 1)}
+              className="inline-flex shrink-0 items-center justify-center rounded-lg border border-[var(--hairline)] bg-white px-4 py-2 text-sm font-medium transition-colors hover:bg-[var(--surface-2)]"
+            >
+              Not a fit
+            </button>
+          )}
+          {fullProfileHref && (
+            <Link
+              href={fullProfileHref}
+              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-[var(--hairline)] bg-white px-4 py-2 text-sm font-medium transition-colors hover:border-[var(--cyan-line)] hover:bg-[var(--cyan-tint)]"
+            >
+              Open full brief <ArrowRight className="size-4" aria-hidden />
+            </Link>
+          )}
         </div>
       )}
       </motion.aside>

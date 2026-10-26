@@ -56,8 +56,8 @@ function sanitizeSearch(raw: string | undefined): string {
 }
 
 // R4: page size is a URL param (10/25/50). 25 default — the old fixed 10 meant 50+ pages
-// at prod's real volume. Module scope for the date filter (react purity lint bars Date.now
-// in render).
+// at prod's real volume. sourcedSinceIso reads the clock when the (server) page calls it per
+// request — a helper rather than an inline Date.now so the react purity lint stays quiet.
 const PER_OPTIONS = [10, 25, 50] as const;
 const SCORE_FLOORS = [50, 70, 85] as const;
 const DAY_WINDOWS = [7, 30, 90] as const;
@@ -330,6 +330,7 @@ export default async function LeadsPage({
                 className={segmentClass(isActive)}
               >
                 {t.label}
+                <span className="ml-1 font-mono text-xs tabular-nums opacity-60">· {tabCounts[t.key]}</span>
               </Link>
             );
           })}

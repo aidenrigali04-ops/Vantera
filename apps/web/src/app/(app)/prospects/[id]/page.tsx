@@ -536,7 +536,7 @@ export default async function LeadProfilePage({ params }: { params: Promise<{ id
           </div>
         </section>
 
-        <section className={cn(PANEL_SURFACE, "shrink-0 p-5 lg:max-h-72 lg:overflow-y-auto")}>
+        <section id="notes" className={cn(PANEL_SURFACE, "shrink-0 scroll-mt-4 p-5 lg:max-h-72 lg:overflow-y-auto")}>
           <Eyebrow>Notes</Eyebrow>
           <div className="mt-3">
             <LeadNotes leadId={lead.id} currentUserId={user?.id ?? ""} notes={noteRows ?? []} />

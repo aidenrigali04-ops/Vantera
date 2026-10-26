@@ -2,9 +2,11 @@
 
 import { Radar } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { WhyNowCell as WhyNowCellModel } from "@/lib/prospects/why-now-cell";
 import {
   leadSignalLine,
   scoreVerdict,
+  tierGlyph,
   topLeadSignal,
   type LeadSignalView,
   type ScoreTier,
@@ -68,11 +70,51 @@ const SCORE_BADGE_CLASS: Record<ScoreTier, string> = {
   unscored: "text-muted-foreground/60",
 };
 
-/** The fit chip. `withVerdict` spells the tier out ("Hot prospect · 91") so the number needs no decoding. */
-export function ScoreBadge({ score, withVerdict = false }: { score: number | null; withVerdict?: boolean }) {
-  if (score == null) return <span className="font-mono text-muted-foreground/50">—</span>;
-  const { tier, label } = scoreVerdict(score);
+/** Three rising bars, lit by tier (hot 3 · strong 2 · look 1 · unscored 0) — the tier reads at a glance. */
+export function TierGlyph({ score }: { score: number | null }) {
+  const lit = tierGlyph(score);
+  const { label } = scoreVerdict(score);
   return (
+    <span className="inline-flex items-end gap-0.5" role="img" aria-label={label}>
+      {[0, 1, 2].map((i) => (
+        <span
+          key={i}
+          data-bar={i}
+          data-lit={i < lit ? "true" : "false"}
+          className={cn(
+            "w-1 rounded-sm",
+            i === 0 ? "h-1.5" : i === 1 ? "h-2.5" : "h-3.5",
+            i < lit ? "bg-[var(--acc)]" : "bg-[var(--line)]"
+          )}
+        />
+      ))}
+    </span>
+  );
+}
+
+/** The fit chip. `withVerdict` spells the tier out ("Hot prospect · 91") so the number needs no decoding;
+ *  `glyph` prefixes the three-bar tier glyph (Prospects table) — off by default so other surfaces are unchanged. */
+export function ScoreBadge({
+  score,
+  withVerdict = false,
+  glyph = false,
+}: {
+  score: number | null;
+  withVerdict?: boolean;
+  glyph?: boolean;
+}) {
+  if (score == null) {
+    const dash = <span className="font-mono text-muted-foreground/50">—</span>;
+    if (!glyph) return dash;
+    return (
+      <span className="inline-flex items-center gap-1.5">
+        <TierGlyph score={null} />
+        {dash}
+      </span>
+    );
+  }
+  const { tier, label } = scoreVerdict(score);
+  const chip = (
     <span
       className={cn(
         "inline-flex items-center rounded-full px-2.5 py-0.5 font-mono text-xs font-semibold tabular-nums",
@@ -81,5 +123,70 @@ export function ScoreBadge({ score, withVerdict = false }: { score: number | nul
     >
       {withVerdict ? `${label} · ${score}` : score}
     </span>
+  );
+  if (!glyph) return chip;
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <TierGlyph score={score} />
+      {chip}
+    </span>
+  );
+}
+
+/** The Prospects "why now" cell: `label · when`, the source post title linked when it has a real URL, and a
+ *  `+N` chip for the rest of the signals (opens the peek on Signals). `when` is precomputed server-side. */
+export function WhyNowCellView({
+  cell,
+  postTitle,
+  onMore,
+  className,
+}: {
+  cell: WhyNowCellModel;
+  /** headline of the linked post (the row's intent_posts entry whose post_ref is `cell.href`) */
+  postTitle?: string | null;
+  onMore?: () => void;
+  className?: string;
+}) {
+  if (!cell) return null;
+  const isIntent = cell.kind === "intent";
+  return (
+    <div className={cn("flex min-w-0 items-center gap-1.5 text-xs", className)}>
+      {isIntent ? (
+        <Radar className="size-3 shrink-0 text-[var(--positive)]" aria-hidden />
+      ) : (
+        <span className="size-1.5 shrink-0 rounded-full bg-[var(--acc)]" aria-hidden />
+      )}
+      <span className={cn("min-w-0 truncate", isIntent ? "text-[var(--positive)]" : "text-[var(--ink-2)]")}>
+        {cell.label}
+        {cell.when && <span className="text-muted-foreground"> · {cell.when}</span>}
+        {cell.href && (
+          <>
+            <span className="text-muted-foreground"> · </span>
+            <a
+              href={cell.href}
+              target="_blank"
+              rel="noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="text-[var(--ink-mid)] underline decoration-[var(--line)] underline-offset-2 hover:decoration-current"
+            >
+              {postTitle?.trim() || "View post"}
+            </a>
+          </>
+        )}
+      </span>
+      {cell.more > 0 && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onMore?.();
+          }}
+          aria-label={`${cell.more} more signal${cell.more === 1 ? "" : "s"}`}
+          className="shrink-0 rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 font-mono text-[11px] font-medium tabular-nums text-[var(--ink-mid)] transition-colors hover:bg-[var(--acc-tint)] hover:text-[var(--acc-ink)]"
+        >
+          +{cell.more}
+        </button>
+      )}
+    </div>
   );
 }
