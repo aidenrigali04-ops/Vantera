@@ -13,7 +13,13 @@ import { createClient } from "@/lib/supabase/server";
 import { normalizeSuppressionValue } from "@/lib/suppression";
 import { parseDraftEdit } from "./validation";
 
-export type ReviewActionState = { error?: string; notice?: string };
+export type ReviewActionState = {
+  error?: string;
+  notice?: string;
+  /** saveDraftEdit: what was actually written, so the caller shows the saved text + re-linted flags */
+  body?: string;
+  styleFlags?: string | null;
+};
 
 async function session() {
   const supabase = await createClient();
@@ -88,14 +94,18 @@ export async function saveDraftEdit(
   const violations = validateHumanity([subject, body].filter(Boolean).join("\n"));
   const styleFlags = violations.length > 0 ? describeViolations(violations) : null;
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("scheduled_sends")
     .update({ subject, body, style_flags: styleFlags })
     .eq("id", sendId)
-    .eq("status", "pending_review");
+    .eq("status", "pending_review")
+    .select("id");
   if (error) return { error: "Could not save the edit. Only workspace admins can review." };
+  // 0 rows = no longer pending (sent/approved/canceled) or RLS hid it — never report a save that didn't land.
+  if (!data || data.length === 0) return { error: "That draft was already handled." };
   revalidatePath("/approvals");
-  return {};
+  revalidatePath("/prospects");
+  return { body, styleFlags };
 }
 
 /**

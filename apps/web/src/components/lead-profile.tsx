@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowRight, ChevronDown, ChevronUp, Clock, ExternalLink, X } from "lucide-react";
+import { ArrowRight, ChevronLeft, ChevronRight, Clock, ExternalLink, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { LeadCrmControls } from "@/components/lead-crm-controls";
@@ -75,7 +75,7 @@ export interface LeadProfile {
 
 export type PeekNavProps = { index: number; total: number; onPrev: () => void; onNext: () => void };
 
-/** Arrow keys walk the list — but never while typing in a field. */
+/** ←/→ walk the list (↑/↓ keep scrolling the peek) — but never while typing in a field. */
 function isEditable(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
   return target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName);
@@ -178,23 +178,29 @@ export function LeadProfileSheet({
   const [fitAsk, setFitAsk] = useState(0);
 
   // A slide-over is a dialog: Escape must close it (keyboard parity with the overlay click);
-  // ↑/↓ step through the list when the caller provides navigation.
+  // ←/→ step through the list when the caller provides navigation. Callers pass fresh closures
+  // each render, so the latest ones ride a ref and the window listener binds once.
+  const keys = useRef({ onClose, nav });
+  useEffect(() => {
+    keys.current = { onClose, nav };
+  });
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-      else if (nav && !isEditable(e.target)) {
-        if (e.key === "ArrowUp" && nav.index > 0) {
+      const { onClose: close, nav: n } = keys.current;
+      if (e.key === "Escape") close();
+      else if (n && !isEditable(e.target)) {
+        if (e.key === "ArrowLeft" && n.index > 0) {
           e.preventDefault();
-          nav.onPrev();
-        } else if (e.key === "ArrowDown" && nav.index < nav.total - 1) {
+          n.onPrev();
+        } else if (e.key === "ArrowRight" && n.index < n.total - 1) {
           e.preventDefault();
-          nav.onNext();
+          n.onNext();
         }
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose, nav]);
+  }, []);
 
   const signals = lead.lead_signals ?? [];
   const posts = lead.intent_posts ?? [];
@@ -261,8 +267,9 @@ export function LeadProfileSheet({
                   onClick={nav.onPrev}
                   disabled={nav.index <= 0}
                   aria-label="Previous prospect"
+                  aria-keyshortcuts="ArrowLeft"
                 >
-                  <ChevronUp className="size-4" />
+                  <ChevronLeft className="size-4" />
                 </Button>
                 <Button
                   variant="ghost"
@@ -270,8 +277,9 @@ export function LeadProfileSheet({
                   onClick={nav.onNext}
                   disabled={nav.index >= nav.total - 1}
                   aria-label="Next prospect"
+                  aria-keyshortcuts="ArrowRight"
                 >
-                  <ChevronDown className="size-4" />
+                  <ChevronRight className="size-4" />
                 </Button>
               </>
             )}

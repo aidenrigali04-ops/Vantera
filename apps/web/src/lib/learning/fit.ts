@@ -16,6 +16,23 @@ export function parseFitReason(raw: FormDataEntryValue | null): { ok: true; reas
   return { ok: true, reason: text };
 }
 
+/** The Fit control's lifecycle after a save: the shown reason and a closed input follow only a
+ *  confirmed save; a failed one keeps the old reason and leaves the input (and its text) open. */
+export function fitAfterSave(
+  prevReason: string | null,
+  verdict: FormDataEntryValue | null,
+  reasonRaw: FormDataEntryValue | null,
+  ok: boolean
+): { reason: string | null; closeInput: boolean } {
+  if (!ok) return { reason: prevReason, closeInput: false };
+  if (verdict === "not_fit") {
+    const parsed = parseFitReason(reasonRaw);
+    return { reason: parsed.ok ? parsed.reason : null, closeInput: true };
+  }
+  if (verdict === "clear") return { reason: null, closeInput: true };
+  return { reason: prevReason, closeInput: true };
+}
+
 /** lead_feedback rows → lead id → verdict (unknown values dropped; a failed read is just empty). */
 export function fitVerdictFromRows(rows: { lead_id: string; verdict: string }[] | null): Map<string, FitVerdict> {
   const m = new Map<string, FitVerdict>();

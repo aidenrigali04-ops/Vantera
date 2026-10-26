@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useRouter } from "next/navigation";
 import { ChevronDown, ExternalLink, Radar } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { saveDraftEdit, type ReviewActionState } from "@/app/(app)/approvals/actions";
@@ -14,8 +15,10 @@ import { saveDraftEdit, type ReviewActionState } from "@/app/(app)/approvals/act
 // ── Persisted open/closed state ──────────────────────────────────────────────
 // Same pattern as the Prospects density toggle: localStorage read through useSyncExternalStore.
 // The snapshot is the raw string (stable by value), parsed in render; the server snapshot is ""
-// so SSR/hydration always render the defaults.
+// so SSR/hydration always render the defaults. When storage is unavailable (private mode, blocked
+// site data) the toggles live in `memorySections` for the session so sections still open/close.
 const SECTIONS_KEY = "vantera:peek:sections";
+let memorySections: string | null = null;
 let sectionListeners: Array<() => void> = [];
 function subscribeSections(cb: () => void): () => void {
   sectionListeners.push(cb);
@@ -26,6 +29,7 @@ function subscribeSections(cb: () => void): () => void {
   };
 }
 function readSectionsRaw(): string {
+  if (memorySections !== null) return memorySections;
   try {
     return window.localStorage.getItem(SECTIONS_KEY) ?? "";
   } catch {
@@ -41,14 +45,18 @@ function parseSections(raw: string): Record<string, boolean> {
     return {};
   }
 }
-function writeSection(id: string, open: boolean) {
+export function writeSection(id: string, open: boolean) {
+  const next = JSON.stringify({ ...parseSections(readSectionsRaw()), [id]: open });
   try {
-    const next = { ...parseSections(readSectionsRaw()), [id]: open };
-    window.localStorage.setItem(SECTIONS_KEY, JSON.stringify(next));
+    window.localStorage.setItem(SECTIONS_KEY, next);
   } catch {
-    // storage blocked — the toggle still works for this render via the listeners below
+    memorySections = next; // storage blocked — keep toggling in memory
   }
   for (const l of sectionListeners) l();
+}
+/** Test seam: the current persisted map (storage, or the in-memory fallback). */
+export function readSections(): Record<string, boolean> {
+  return parseSections(readSectionsRaw());
 }
 
 export type PeekSectionId =
@@ -245,23 +253,39 @@ function flagsText(flags: unknown): string | null {
 
 /** The prospect's queued draft, editable while it waits in review. Regenerate shows only when the
  *  caller supplies `onRegenerate` (the steerable regenerate action ships separately). */
-export function MessageSection({ draft, onRegenerate }: { draft: QueuedDraft; onRegenerate?: RegenerateDraft }) {
+export function MessageSection({
+  draft,
+  onRegenerate,
+  initialEditing = false,
+  initialError,
+}: {
+  draft: QueuedDraft;
+  onRegenerate?: RegenerateDraft;
+  /** test/preview seams: start in the editor, optionally with a save error showing */
+  initialEditing?: boolean;
+  initialError?: string;
+}) {
   const [body, setBody] = useState(draft.body);
   const [flags, setFlags] = useState<string | null>(flagsText(draft.style_flags));
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState(initialEditing);
   const [steer, setSteer] = useState("");
   const [regenError, setRegenError] = useState<string | null>(null);
   const [regenerating, setRegenerating] = useState(false);
   const editable = draft.status === "pending_review";
 
+  const router = useRouter();
+  // Only what the server confirms it wrote reaches the screen: the returned body + re-linted flags.
+  // An error (draft no longer pending, or not allowed) keeps the editor open with the message.
   const [state, action, pending] = useActionState<ReviewActionState, FormData>(async (prev, fd) => {
     const res = await saveDraftEdit(prev, fd);
     if (!res.error) {
-      setBody(String(fd.get("body") ?? "").trim());
+      setBody(res.body ?? String(fd.get("body") ?? "").trim());
+      setFlags(res.styleFlags ?? null);
       setEditing(false);
+      router.refresh(); // the table row and any remount read the saved draft
     }
     return res;
-  }, {});
+  }, initialError ? { error: initialError } : {});
 
   const regenerate = async () => {
     if (!onRegenerate) return;
@@ -314,7 +338,11 @@ export function MessageSection({ draft, onRegenerate }: { draft: QueuedDraft; on
               Cancel
             </button>
           </div>
-          {state.error && <p className="text-xs text-destructive">{state.error}</p>}
+          {state.error && (
+            <p role="alert" className="text-xs text-destructive">
+              {state.error}
+            </p>
+          )}
         </form>
       ) : (
         <p className="whitespace-pre-wrap rounded-lg bg-[var(--surface-2)] p-3 text-sm text-[var(--ink)]">{body}</p>

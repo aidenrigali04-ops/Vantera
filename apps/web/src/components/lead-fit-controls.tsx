@@ -3,7 +3,7 @@
 import { useActionState, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { setLeadFit, type FitState } from "@/app/(app)/prospects/fit-actions";
-import { FIT_REASON_MAX, type FitVerdict } from "@/lib/learning/fit";
+import { FIT_REASON_MAX, fitAfterSave, type FitVerdict } from "@/lib/learning/fit";
 
 /** ML-4: "Good fit" / "Not a fit" on any prospect — teaches the agent who you want to talk to.
  *  "Not a fit" asks for an optional one-line reason first (`askReason` opens that step directly —
@@ -20,24 +20,29 @@ export function LeadFitControls({
   reason?: string | null;
   askReason?: boolean;
 }) {
-  const [state, action, pending] = useActionState<FitState, FormData>(setLeadFit, { verdict });
   const [asking, setAsking] = useState(askReason);
   const [savedReason, setSavedReason] = useState(reason);
+  // Controlled so the typed reason survives a failed save (React resets uncontrolled fields
+  // after a form action). The saved reason and the closed input only follow a confirmed save.
+  const [reasonText, setReasonText] = useState("");
+  const [state, action, pending] = useActionState<FitState, FormData>(async (prev, fd) => {
+    const res = await setLeadFit(prev, fd);
+    const ok = !res.error;
+    const next = fitAfterSave(savedReason, fd.get("verdict"), fd.get("reason"), ok);
+    setSavedReason(next.reason);
+    if (next.closeInput) {
+      setReasonText("");
+      setAsking(false);
+    }
+    // a failed save keeps the verdict on screen (never flips back to the stale prop)
+    return ok ? res : { verdict: prev.verdict, error: res.error };
+  }, { verdict });
   const current = state.verdict === undefined ? verdict : state.verdict;
 
   return (
     <section className="space-y-2">
       <p className="text-xs font-medium text-muted-foreground">Is this who you want?</p>
-      <form
-        action={(fd) => {
-          const v = fd.get("verdict");
-          if (v === "not_fit") setSavedReason(String(fd.get("reason") ?? "").trim() || null);
-          if (v === "clear") setSavedReason(null);
-          setAsking(false);
-          return action(fd);
-        }}
-        className="flex flex-wrap items-center gap-2"
-      >
+      <form action={action} className="flex flex-wrap items-center gap-2">
         <input type="hidden" name="leadId" value={leadId} />
         {current ? (
           <>
@@ -58,6 +63,8 @@ export function LeadFitControls({
             <input
               type="text"
               name="reason"
+              value={reasonText}
+              onChange={(e) => setReasonText(e.target.value)}
               maxLength={FIT_REASON_MAX}
               autoFocus
               placeholder="Why not? (optional) — e.g. too small a team"
