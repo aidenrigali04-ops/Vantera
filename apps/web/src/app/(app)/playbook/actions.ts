@@ -509,6 +509,7 @@ export async function updateSendMode(
     .eq("id", campaignId);
   if (error) return { error: "Could not update send mode. Only workspace admins can do this." };
   revalidatePath("/playbook");
+  revalidatePath("/approvals");
   return {};
 }
 

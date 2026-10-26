@@ -9,6 +9,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ScoreBadge, SourceBadge, WhyNowCellView, WhyNowLine } from "@/components/lead-why-now";
 import { LeadProfileSheet } from "@/components/lead-profile";
 import { peekNav } from "@/components/lead-profile/use-peek-nav";
+import { regenerateDraft } from "../approvals/actions";
 import { bulkArchiveLeads, bulkSuppressLeads, type BulkResult } from "./bulk-actions";
 import { cn } from "@/lib/utils";
 import { Avatar } from "@/components/today/work-card/chips";
@@ -800,6 +801,11 @@ export function LeadsTable({
           goalCents={goalCents}
           fullProfileHref={`/prospects/${peek.lead.id}`}
           initialSection={peek.section}
+          onRegenerate={
+            peek.lead.queued_draft?.origin === "sequence" && peek.lead.queued_draft.status === "pending_review"
+              ? (id, steer) => regenerateDraft(id, steer)
+              : undefined
+          }
           nav={
             nav && nav.index >= 0
               ? {
