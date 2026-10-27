@@ -116,7 +116,7 @@ describe("suppression list (rule 11 — the master gate)", () => {
 });
 
 describe("retention windows (rule 11)", () => {
-  it.each(["leads", "enrichment_results", "scheduled_sends", "replies", "inbound_leads", "lead_signals", "intent_observations", "reveal_runs", "strategies", "lead_strategy_stamp", "lead_feedback", "meeting_connections", "meeting_events", "lead_embeddings"])(
+  it.each(["leads", "enrichment_results", "scheduled_sends", "replies", "inbound_leads", "lead_signals", "intent_observations", "reveal_runs", "lab_decisions", "strategies", "lead_strategy_stamp", "lead_feedback", "meeting_connections", "meeting_events", "lead_embeddings"])(
     "%s states its retention window",
     (table) => {
       expect(allMigrations).toContain(`retention(${table})`);
@@ -125,13 +125,25 @@ describe("retention windows (rule 11)", () => {
 });
 
 describe("service-role-only write surfaces (rules 09/11)", () => {
-  it.each(["outreach_sends", "copilot_actions", "enrichment_results", "replies", "unsubscribe_tokens", "conversion_tokens", "copilot_conversations", "copilot_messages", "calls", "security_events", "inbound_leads", "lead_signals", "intent_observations", "reveal_runs", "strategies", "lead_strategy_stamp", "meeting_connections", "meeting_events"])(
+  it.each(["outreach_sends", "copilot_actions", "enrichment_results", "replies", "unsubscribe_tokens", "conversion_tokens", "copilot_conversations", "copilot_messages", "calls", "security_events", "inbound_leads", "lead_signals", "intent_observations", "reveal_runs", "strategies", "lead_strategy_stamp", "meeting_connections", "meeting_events", "lab_decisions"])(
     "%s has no client write policies",
     (table) => {
     const policyRe = new RegExp(`create policy \\w+ on public\\.${table}\\s+for (insert|update|delete|all)`);
     expect(allMigrations).not.toMatch(policyRe);
     // still readable by account members
     expect(allMigrations).toMatch(new RegExp(`create policy \\w+ on public\\.${table}\\s+for select`));
+  });
+});
+
+describe("simulation schema (0071)", () => {
+  const sql = readFileSync(join(migrationsDir, "0071_sim_schema.sql"), "utf8");
+
+  it("keeps simulation data out of the public schema and away from app sessions", () => {
+    expect(sql).toMatch(/create schema if not exists sim/);
+    expect(sql).toMatch(/revoke all on schema sim from public/);
+    expect(sql).toMatch(/revoke all on schema sim from anon/);
+    expect(sql).toMatch(/revoke all on schema sim from authenticated/);
+    expect(sql).not.toMatch(/create table/i);
   });
 });
 

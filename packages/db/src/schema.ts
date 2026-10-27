@@ -2,6 +2,7 @@ import {
   bigint,
   boolean,
   customType,
+  foreignKey,
   index,
   integer,
   jsonb,
@@ -12,6 +13,7 @@ import {
   text,
   time,
   timestamp,
+  unique,
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
@@ -590,6 +592,44 @@ export const scheduledSends = pgTable(
     index("scheduled_sends_account_status_idx").on(t.accountId, t.status),
     index("scheduled_sends_campaign_idx").on(t.campaignId),
     index("scheduled_sends_lead_idx").on(t.leadId),
+    // 0070: lets lab_decisions reference (id, account_id) so a decision cannot point at another account's send
+    unique("scheduled_sends_id_account_unique").on(t.id, t.accountId),
+  ]
+);
+
+// 0070: one append-only row per scheduled send. Members read; the service role writes.
+// Updates are rejected in SQL. Account deletion cascades the log with the send.
+export const labDecisions = pgTable(
+  "lab_decisions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    scheduledSendId: uuid("scheduled_send_id").notNull(),
+    leadId: uuid("lead_id").notNull(),
+    decidedAt: timestamp("decided_at", { withTimezone: true }).notNull(),
+    propensity: numeric("propensity", { precision: 8, scale: 6 }).notNull(),
+    seed: text("seed").notNull(),
+    action: text("action").notNull(),
+    context: jsonb("context").notNull(),
+    features: jsonb("features"),
+    featureTrust: text("feature_trust", { enum: ["point_in_time", "action_only"] }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    unique("lab_decisions_send_unique").on(t.scheduledSendId),
+    foreignKey({
+      columns: [t.scheduledSendId, t.accountId],
+      foreignColumns: [scheduledSends.id, scheduledSends.accountId],
+      name: "lab_decisions_send_fk",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [t.leadId, t.accountId],
+      foreignColumns: [leads.id, leads.accountId],
+      name: "lab_decisions_lead_fk",
+    }).onDelete("cascade"),
+    index("lab_decisions_account_decided_idx").on(t.accountId, t.decidedAt),
   ]
 );
 
