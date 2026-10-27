@@ -22,7 +22,9 @@ To remove a connected account entirely, use **Remove** next to it: outreach from
 
 Your agents draft outreach as soon as qualified prospects arrive, but nothing actually sends until a LinkedIn account is connected and active. Connecting is the one step between a drafted queue and live outreach — so do it early. Drafting still works in the meantime, and everything waits safely in Approvals.
 
-To protect your account, Vantera paces sending with human-like timing and a weekly invite ceiling, and ramps a newly connected account up gradually. These limits aren't configurable below their safety thresholds — they keep your own LinkedIn account healthy.
+To protect your account, Vantera paces sending with human-like timing and a weekly invite ceiling, and ramps a newly connected account up gradually. Sends stay within LinkedIn-safe limits: 20 invites a day once ramped (5 → 10 → 15 over the first four weeks), 25 messages a day, about 100 invites a week. These limits aren't configurable below their safety thresholds — they keep your own LinkedIn account healthy.
+
+Under each connected account, the Senders page shows how much of those limits it has used: invites this week out of 100, invites today, and messages today out of 25. It also shows the ramp for new accounts: 5 → 10 → 15 → 20/day over the first four weeks. These are the same numbers the system enforces, not a separate setting.
 
 Proactive outreach (first touches and follow-ups) only goes out Monday–Friday, roughly 8am–5pm in each prospect's local time — that's why sending can look quiet overnight and on weekends. Replies in a live conversation are exempt and send any time, because answering promptly is the human thing to do.
 

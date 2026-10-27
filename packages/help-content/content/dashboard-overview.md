@@ -6,7 +6,7 @@ routes: /dashboard
 
 # Understanding your Results dashboard
 
-**Results** is the deeper view behind Today — open it from search (⌘K) when you want the full picture of what's working. It has three tabs along the top: **Overview** (revenue, goal pace, live agents, top prospects, recent replies), **Analytics** (the conversion funnel and return on spend), and **Pipeline** (the live, stage-by-stage view of every prospect your agents are working).
+**Results** is the deeper view behind Today — open it from search (⌘K) when you want the full picture of what's working. It has three tabs along the top: **Overview** (revenue, goal pace, live agents, top prospects, recent replies), **Analytics** (counts first: the eight-stage funnel from Found to Closed and where your prospects come from, then return on spend once you've set a deal size and have a plan), and **Pipeline** (the live, stage-by-stage view of every prospect your agents are working).
 
 On the **Overview** tab:
 

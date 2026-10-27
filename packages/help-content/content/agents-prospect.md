@@ -51,6 +51,10 @@ Your agent gets sharper the more you use it:
 
 Every scheduled run leaves a record. The agent's card shows what the **last run** did ("25 sourced → 20 passed gate → 5 qualified"), and the agent's page keeps the **recent runs** list — so a quiet week is never a mystery. If a live agent hits something that needs you — a search that came back empty, an ICP it couldn't turn into a search, scoring that failed before anyone was qualified, a LinkedIn connection that's dropped — its status turns amber (**Needs attention**) with the reason and the fix, instead of showing a green "Live" that hides the problem.
 
+The card also carries a small funnel for this agent alone: **Found → Contacted → Replied**, counting only the prospects it found, with each step as a share of the one before. Before it has found anyone, the funnel reads "No prospects found yet". The numbers are the same ones the Agents rows show on Results, so the two always agree.
+
+The agent's page ends with an **Activity** list: what has happened in your workspace, newest first. It shows setup moments ("Site read", "Buyer profile drafted", "Prospect agent live") alongside each recorded run of your Prospect and Intent agents, so you can see what was done and when.
+
 **Run now** starts a run immediately instead of waiting for the next scheduled one — handy right after you change your targeting, so you can verify the change worked. It's the exact same run the schedule fires.
 
 ## Pausing and resuming

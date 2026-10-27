@@ -45,6 +45,10 @@ When you deploy, you choose how outreach and replies leave the agent:
 
 Either way, anyone on your suppression list is never drafted to at all — unsubscribes and opt-outs are honored before a single word is written.
 
+## Seeing what it produced
+
+The Outreach Agent's card on Playbook shows a small funnel: **Contacted → Accepted → Replied → Interested**, with each step as a share of the one before. It counts everyone the agent has reached, and it matches the Outreach row on Results. Until anything has gone out, it reads "Nothing sent yet". The agent's page also ends with an **Activity** list, newest first, showing your setup moments (for example "Outreach agent live") and your agents' recorded runs.
+
 ## Who goes first when the day's limit is tight
 
 LinkedIn allows only so many messages and invitations a day, and those limits are never raised. When they're nearly used up, the warmest people go first: a reply to someone who just wrote back, then a message you typed yourself, then ongoing conversations, then the first message to someone who just accepted your request (most recent first), then other follow-ups, and finally new invitations. Nothing skips the limits — this only decides the order.

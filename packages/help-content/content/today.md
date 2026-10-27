@@ -30,6 +30,10 @@ Up to four items, in priority order, each one click from done:
 
 When nothing needs you, the row says so in one line and the dark button disappears. That is the intended end state, not an empty page.
 
+### Set your average deal size
+
+Once at least one person has replied and you haven't set a deal size, **Needs you** asks: **Set your average deal size**. Type a whole-dollar amount straight into the tile and press **Save**. No page change needed. Saving turns on the dollar figures on Results: pipeline value right away, plus return on spend and cost per meeting and per close once you're on a plan. The confirmation offers **Open Results**. Only a workspace admin can set it. If you're not ready, dismiss it and it stays hidden for the rest of the day. You can also set it any time in Settings.
+
 ## Get started
 
 New accounts see a **Get started** checklist on Today. Four steps count toward your progress, in this order:

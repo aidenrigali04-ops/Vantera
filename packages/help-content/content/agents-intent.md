@@ -44,7 +44,11 @@ Only people who clear both become prospects, each tagged with the "why now" sign
 
 ## Changing what it watches
 
-Open the agent on the Playbook page and choose **Edit config**. You can rename it, add or remove keywords, competitors, hashtags, and creators, switch signal types on or off, and change the run time or cadence. **Save changes** keeps the agent live (or paused, if you paused it) — the new watchlist is read on its next run, within about 15 minutes, and then it follows the new schedule. Only workspace admins can change an agent.
+Open the agent on the Playbook page and choose **Edit config**. You can rename it, add or remove keywords, competitors, hashtags, and creators, switch signal types on or off, and change the run time or cadence. **Save changes** keeps the agent live, and it starts a fresh run with the new watchlist within about 15 minutes, then follows the new schedule. If you paused the agent, saving keeps it paused: "Runs resume when you unpause the agent." Only workspace admins can change an agent. Anyone else sees "Only an admin can change this agent."
+
+## Seeing what it found
+
+The Intent Agent's card on Playbook shows a small funnel from its last completed run: **Observed → Intent → Qualified**. That's the people it saw react to what you watch, the ones whose activity showed buying intent, and the ones who also fit your ICP. Before its first run finishes it reads "No run yet". If the last run found no one, it reads "Last run found nothing". The agent's page ends with an **Activity** list, newest first, showing your setup moments (for example "Intent agent live") and each recorded run.
 
 ## Company events, too (Growth and Scale)
 
